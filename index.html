@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hawkeye Sterling — Entity Risk Assessment</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f1;--surface:#fff;--surface2:#f0efeb;--surface3:#e8e7e2;
+  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.15);
+  --text:#1c1c1a;--text2:#5a5a55;--text3:#9a9a94;
+  --low-bg:#e8f5ec;--low-text:#1a6132;--low-bd:rgba(26,97,50,0.22);
+  --med-bg:#fef5e0;--med-text:#7a5000;--med-bd:rgba(122,80,0,0.22);
+  --high-bg:#fce9e7;--high-text:#a82215;--high-bd:rgba(168,34,21,0.22);
+  --none-bg:#ebebeb;--none-text:#666;--none-bd:rgba(0,0,0,0.12);
+  --accent:#1a6132;
+  --r:10px;--r-sm:6px;--r-xs:4px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#111110;--surface:#1c1c1a;--surface2:#242422;--surface3:#2c2c29;
+    --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+    --text:#f0ede8;--text2:#a0a09a;--text3:#606060;
+    --low-bg:#0a2515;--low-text:#4ec46a;--low-bd:rgba(78,196,106,0.18);
+    --med-bg:#221500;--med-text:#d4a030;--med-bd:rgba(212,160,48,0.18);
+    --high-bg:#250908;--high-text:#e06050;--high-bd:rgba(224,96,80,0.18);
+    --none-bg:#2c2c29;--none-text:#888;--none-bd:rgba(255,255,255,0.08);
+    --accent:#4ec46a;
+  }
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
+.app{max-width:820px;margin:0 auto;padding:28px 18px 60px}
+
+/* ── TOP HEADER ── */
+.top-bar{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:6px}
+.brand-over{font-size:10px;letter-spacing:2.5px;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:2px}
+.logo-area h1{font-size:19px;font-weight:600;letter-spacing:-0.2px;color:var(--text)}
+.logo-area p{font-size:12px;color:var(--text3);margin-top:2px}
+.ver-chip{font-size:10px;font-weight:600;background:var(--surface3);color:var(--text2);padding:2px 8px;border-radius:99px;vertical-align:3px;margin-left:7px;letter-spacing:0.3px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{background:var(--surface);border:0.5px solid var(--border2);color:var(--text2);border-radius:var(--r-sm);padding:7px 14px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:500;transition:background .15s,color .15s}
+.btn:hover{background:var(--surface2)}
+.btn-primary{background:var(--accent);border-color:transparent;color:#fff}
+.btn-primary:hover{background:var(--accent);opacity:.88}
+.meta-row{text-align:right;font-size:11px;color:var(--text3);margin-bottom:16px;min-height:17px}
+
+/* ── CARDS & FIELDS ── */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.card-title{font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text3);font-weight:600;margin-bottom:14px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.field-row:last-child{margin-bottom:0}
+.field-row.single{grid-template-columns:1fr}
+.field-group{display:flex;flex-direction:column;gap:5px}
+.field-group label{font-size:12px;color:var(--text2);font-weight:500}
+.field-group input,.field-group select,.field-group textarea{background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;width:100%;transition:border-color .15s}
+.field-group input:focus,.field-group select:focus,.field-group textarea:focus{border-color:var(--accent)}
+.field-group select{cursor:pointer}
+textarea{min-height:96px;resize:vertical;line-height:1.5}
+.score-tag{display:inline-flex;align-items:center;gap:5px;margin-top:3px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px}
+.st-0{background:var(--none-bg);color:var(--none-text)}
+.st-1{background:var(--low-bg);color:var(--low-text)}
+.st-2{background:var(--med-bg);color:var(--med-text)}
+.st-3{background:var(--high-bg);color:var(--high-text)}
+.review-hint{font-size:11px;color:var(--text3);margin-top:3px}
+.review-hint a{color:var(--accent);cursor:pointer;text-decoration:underline}
+
+/* ── SECTION DIVIDER ── */
+.sec-divider{font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text3);font-weight:600;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.sec-divider::after{content:'';flex:1;height:0.5px;background:var(--border2)}
+
+/* ── QUESTION ROWS ── */
+.q-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:0.5px solid var(--border)}
+.q-row:last-child{border-bottom:none}
+.q-text{font-size:13px;color:var(--text);flex:1;line-height:1.45}
+.crit-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;background:var(--high-bg);color:var(--high-text);border:0.5px solid var(--high-bd);border-radius:99px;padding:1px 7px;margin-left:7px;white-space:nowrap;vertical-align:1px;cursor:help}
+.q-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.toggle-group{display:flex;border:0.5px solid var(--border2);border-radius:var(--r-sm);overflow:hidden}
+.toggle-btn{background:var(--surface2);border:none;color:var(--text2);padding:6px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .12s,color .12s;white-space:nowrap}
+.toggle-btn:first-child{border-right:0.5px solid var(--border2)}
+.toggle-btn.active-yes{background:var(--high-bg);color:var(--high-text)}
+.toggle-btn.active-no{background:var(--low-bg);color:var(--low-text)}
+.toggle-btn.active-yes-inv{background:var(--low-bg);color:var(--low-text)}
+.toggle-btn.active-no-inv{background:var(--high-bg);color:var(--high-text)}
+.q-score-pill{min-width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+
+/* ── SUPPLIER ROWS ── */
+.supplier-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0}
+.supplier-item{display:flex;flex-direction:column;gap:4px}
+.supplier-item label{font-size:11px;color:var(--text3);font-weight:500}
+.supplier-item select{background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:7px 9px;font-size:12px;font-family:inherit;outline:none;width:100%}
+.supplier-item select:focus{border-color:var(--accent)}
+.sup-score{font-size:10px;font-weight:600;margin-top:1px}
+
+/* ── SCOREBOARD ── */
+.scoreboard{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:20px;margin-top:20px;position:sticky;bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
+.sb-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.sb-score-big{display:flex;align-items:baseline;gap:6px}
+.sb-score-big .num{font-size:42px;font-weight:700;line-height:1;color:var(--text)}
+.sb-score-big .denom{font-size:16px;color:var(--text3)}
+.sb-verdict{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.verdict-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:99px;font-size:13px;font-weight:700;border:1px solid}
+.vp-cdd{background:var(--low-bg);color:var(--low-text);border-color:var(--low-bd)}
+.vp-sdd{background:var(--med-bg);color:var(--med-text);border-color:var(--med-bd)}
+.vp-edd{background:var(--high-bg);color:var(--high-text);border-color:var(--high-bd)}
+.sb-thresholds{display:flex;gap:10px;flex-wrap:wrap}
+.thresh-chip{font-size:11px;padding:4px 10px;border-radius:99px;font-weight:600;border:0.5px solid}
+.tc-low{background:var(--low-bg);color:var(--low-text);border-color:var(--low-bd)}
+.tc-med{background:var(--med-bg);color:var(--med-text);border-color:var(--med-bd)}
+.tc-high{background:var(--high-bg);color:var(--high-text);border-color:var(--high-bd)}
+.tc-active{border-width:1.5px;font-size:12px}
+.sb-bar-wrap{width:100%;margin-top:12px}
+.sb-bar-track{display:flex;height:10px;border-radius:99px;overflow:hidden;border:0.5px solid var(--border)}
+.sb-seg-low{background:var(--low-bg);flex:0 0 63.3%}
+.sb-seg-med{background:var(--med-bg);flex:0 0 10%}
+.sb-seg-high{background:var(--high-bg);flex:1}
+.sb-bar-pointer-wrap{position:relative;height:16px;margin-top:2px}
+.sb-bar-pointer{position:absolute;display:flex;flex-direction:column;align-items:center;transform:translateX(-50%);transition:left 0.3s ease}
+.sb-bar-pointer span{font-size:10px;font-weight:700;color:var(--text);white-space:nowrap}
+.sb-bar-pointer::before{content:'▲';font-size:8px;color:var(--text2)}
+.sb-axis{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:2px;padding:0 1px}
+.crit-banner{display:none;margin-top:12px;background:var(--high-bg);color:var(--high-text);border:1px solid var(--high-bd);border-radius:var(--r-sm);padding:9px 12px;font-size:12px;font-weight:600;line-height:1.5}
+.boundary-warn{font-size:11px;color:var(--med-text);background:var(--med-bg);border:0.5px solid var(--med-bd);border-radius:var(--r-sm);padding:5px 10px;margin-top:8px;display:none}
+.completeness{font-size:11px;color:var(--text3);margin-top:10px}
+.completeness.ok{color:var(--low-text)}
+
+/* ── BREAKDOWN ── */
+.breakdown-toggle{background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;font-family:inherit;padding:8px 0;display:flex;align-items:center;gap:5px;margin-top:4px}
+.breakdown-toggle:hover{color:var(--text2)}
+.breakdown-panel{display:none;margin-top:8px}
+.breakdown-panel.open{display:block}
+.bd-table{width:100%;border-collapse:collapse;font-size:12px}
+.bd-table tr{border-bottom:0.5px solid var(--border)}
+.bd-table tr:last-child{border-bottom:none}
+.bd-table td{padding:5px 4px;color:var(--text2);vertical-align:middle}
+.bd-table td:last-child{text-align:right}
+
+/* ── UTILS ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
+.b0{background:var(--none-bg);color:var(--none-text)}
+.b1{background:var(--low-bg);color:var(--low-text)}
+.b2{background:var(--med-bg);color:var(--med-text)}
+.b3{background:var(--high-bg);color:var(--high-text)}
+.risk-label-0{color:var(--none-text)}
+.risk-label-1{color:var(--low-text)}
+.risk-label-2{color:var(--med-text)}
+.risk-label-3{color:var(--high-text)}
+.app-footer{margin-top:28px;font-size:11px;color:var(--text3);line-height:1.7;text-align:center}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(8px);background:var(--text);color:var(--bg);font-size:12px;font-weight:600;padding:8px 18px;border-radius:99px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── PRINT REPORT ── */
+#printReport{display:none}
+#printReport h3{font-size:12px;text-transform:uppercase;letter-spacing:0.8px;margin:15px 0 6px;border-bottom:1px solid #bbb;padding-bottom:3px;color:#111}
+.pr-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px}
+.pr-brand{font-size:11px;font-weight:800;letter-spacing:2.5px;color:#111}
+.pr-title{font-size:19px;font-weight:700;margin-top:2px;color:#111}
+.pr-sub{font-size:10px;color:#555;margin-top:2px}
+.pr-refbox{text-align:right;font-size:10px;color:#444}
+.pr-refbox b{font-size:13px;color:#111}
+.pr-kv{width:100%;border-collapse:collapse;font-size:11px}
+.pr-kv td{padding:3px 8px 3px 0;vertical-align:top;color:#111}
+.pr-kv td.k{color:#666;width:180px;white-space:nowrap}
+.pr-verdict{border:1.5px solid #111;border-radius:6px;padding:10px 12px;font-size:12px;margin-top:4px;color:#111;line-height:1.7}
+.pr-crit{border:1.5px solid #a82215;color:#a82215;border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700;margin-top:8px;line-height:1.6}
+.pr-table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:4px}
+.pr-table th{text-align:left;border-bottom:1.5px solid #111;padding:4px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#111}
+.pr-table td{border-bottom:0.5px solid #ccc;padding:3.5px 6px;color:#222}
+.pr-c{text-align:center}
+.pr-total td{font-weight:800;border-top:1.5px solid #111;border-bottom:none;color:#111}
+.pr-notes{font-size:11px;color:#222;min-height:42px;border:0.5px solid #ccc;border-radius:6px;padding:8px 10px;line-height:1.6}
+.pr-sig{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:6px}
+.pr-sig td{width:25%;padding:6px 12px 4px 0;vertical-align:top;color:#444}
+.pr-sig b{color:#111}
+.pr-sigline{border-bottom:1px solid #555;height:30px;margin:8px 0 3px}
+.pr-sig span{font-size:9px;color:#888}
+.pr-foot{margin-top:18px;border-top:0.5px solid #999;padding-top:8px;font-size:9px;color:#666;line-height:1.6}
+@media print{
+  @page{size:A4;margin:16mm 14mm}
+  body{background:#fff}
+  .app,.toast{display:none!important}
+  #printReport{display:block!important;color:#111;font-size:11px;line-height:1.5}
+}
+
+@media(max-width:560px){
+  .field-row{grid-template-columns:1fr}
+  .supplier-grid{grid-template-columns:1fr}
+  .sb-row{flex-direction:column;align-items:flex-start}
+  .q-text{font-size:12px}
+  .q-controls{flex-shrink:0}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div class="logo-area">
+      <div class="brand-over">Hawkeye Sterling</div>
+      <h1>Entity Risk Assessment <span class="ver-chip" id="verChip"></span></h1>
+      <p>AML/CFT Customer Risk Assessment — DPMS Template</p>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="newAssessment()">＋ New</button>
+      <button class="btn" onclick="importJSON()">Import</button>
+      <button class="btn" onclick="exportJSON()">Export JSON</button>
+      <button class="btn btn-primary" onclick="printReport()">Print report</button>
+    </div>
+  </div>
+  <div class="meta-row"><span id="saveStamp"></span></div>
+
+  <!-- Assessment details -->
+  <div class="card">
+    <div class="card-title">Assessment details</div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Reference</label>
+        <input type="text" id="refInput" oninput="onField('meta','ref',this.value)">
+      </div>
+      <div class="field-group">
+        <label>Assessment date</label>
+        <input type="date" id="assessDate" oninput="onField('meta','date',this.value)">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Assessor name</label>
+        <input type="text" id="assessorName" placeholder="Full name" oninput="onField('meta','assessor',this.value)">
+      </div>
+      <div class="field-group">
+        <label>Assessor role / title</label>
+        <input type="text" id="assessorRole" placeholder="e.g. Compliance Analyst" oninput="onField('meta','role',this.value)">
+      </div>
+    </div>
+  </div>
+
+  <!-- Identity -->
+  <div class="card">
+    <div class="card-title">Entity identification</div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Legal entity name</label>
+        <input type="text" id="entityName" placeholder="e.g. Fine Gold LLC" oninput="onField('entity','name',this.value)">
+      </div>
+      <div class="field-group">
+        <label>Trading name (if different)</label>
+        <input type="text" id="entityTrading" placeholder="Optional" oninput="onField('entity','trading',this.value)">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Registration / licence no.</label>
+        <input type="text" id="entityRegno" placeholder="Company or trade licence number" oninput="onField('entity','regno',this.value)">
+      </div>
+      <div class="field-group">
+        <label>Jurisdiction of incorporation &amp; operation <span id="jurisdictionScore" class="score-tag st-1"></span></label>
+        <select id="jurisdictionSelect" onchange="onJurisdiction()"></select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Registered address</label>
+        <input type="text" id="entityAddress" placeholder="Street, city, country" oninput="onField('entity','address',this.value)">
+      </div>
+      <div class="field-group">
+        <label>Website / email</label>
+        <input type="text" id="entityContact" placeholder="Optional" oninput="onField('entity','contact',this.value)">
+      </div>
+    </div>
+  </div>
+
+  <!-- Business activities -->
+  <div class="card">
+    <div class="card-title">Business profile</div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Nature &amp; complexity of business activities <span id="activityScore" class="score-tag st-3"></span></label>
+        <select id="activitySelect" onchange="onActivity()"></select>
+      </div>
+      <div class="field-group">
+        <label>Onboarding channel</label>
+        <div class="toggle-group" style="width:fit-content">
+          <button class="toggle-btn" id="btn_onboard_no" onclick="setToggle('onboard','No')">In-person</button>
+          <button class="toggle-btn" id="btn_onboard_yes" onclick="setToggle('onboard','Yes')">Remote / Non-F2F</button>
+        </div>
+        <span id="onboard_score_tag" class="score-tag st-1" style="margin-top:4px"></span>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Operational history — entity <span id="entityYearsScore" class="score-tag st-1"></span></label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" id="entityYearsInput" min="0" max="99" oninput="onYears('entity')" style="width:80px">
+          <span style="font-size:12px;color:var(--text3)">years</span>
+        </div>
+      </div>
+      <div class="field-group">
+        <label>Relationship duration with reporting entity <span id="relYearsScore" class="score-tag st-1"></span></label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" id="relYearsInput" min="0" max="99" oninput="onYears('rel')" style="width:80px">
+          <span style="font-size:12px;color:var(--text3)">years</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ownership & control questions -->
+  <div class="card">
+    <div class="card-title">Ownership, control &amp; compliance</div>
+    <div id="questions-oc"></div>
+  </div>
+
+  <!-- Supply chain -->
+  <div class="card">
+    <div class="card-title">Supply chain — material sources</div>
+    <div class="sec-divider">Recycled material sources</div>
+    <div class="supplier-grid" id="recycled-grid"></div>
+    <div class="sec-divider">Mined material sources</div>
+    <div class="supplier-grid" id="mined-grid"></div>
+  </div>
+
+  <!-- Analyst notes -->
+  <div class="card">
+    <div class="card-title">Analyst notes &amp; rationale</div>
+    <div class="field-row single">
+      <div class="field-group">
+        <textarea id="notesInput" placeholder="Document the rationale for the risk rating, mitigating factors, outstanding follow-up actions, and references to supporting evidence…" oninput="onNotes(this.value)"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sign-off & review -->
+  <div class="card">
+    <div class="card-title">Sign-off &amp; review</div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Completed by</label>
+        <input type="text" id="completedBy" placeholder="Full name" oninput="onSign('completedBy',this.value)">
+      </div>
+      <div class="field-group">
+        <label>Date completed</label>
+        <input type="date" id="completedDate" oninput="onSign('completedDate',this.value)">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Approved by (MLRO / senior management)</label>
+        <input type="text" id="approvedBy" placeholder="Full name" oninput="onSign('approvedBy',this.value)">
+      </div>
+      <div class="field-group">
+        <label>Date approved</label>
+        <input type="date" id="approvedDate" oninput="onSign('approvedDate',this.value)">
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field-group">
+        <label>Next review date</label>
+        <input type="date" id="nextReview" oninput="onSign('nextReview',this.value)">
+        <span class="review-hint" id="reviewHint"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scoreboard -->
+  <div class="scoreboard">
+    <div class="sb-row">
+      <div class="sb-score-big">
+        <span class="num" id="totalScore">0</span>
+        <span class="denom">/ <span id="maxScore"></span> max</span>
+      </div>
+      <div class="sb-verdict">
+        <div class="verdict-pill vp-cdd" id="verdictPill">
+          <span id="verdictIcon">✓</span>
+          <span id="verdictText"></span>
+        </div>
+        <div class="sb-thresholds">
+          <span class="thresh-chip tc-low" id="tc-low">CDD: 0–19</span>
+          <span class="thresh-chip tc-med" id="tc-med">SDD: 20–22</span>
+          <span class="thresh-chip tc-high" id="tc-high">EDD: 23+</span>
+        </div>
+      </div>
+    </div>
+    <div class="sb-bar-wrap">
+      <div class="sb-bar-track">
+        <div class="sb-seg-low"></div>
+        <div class="sb-seg-med"></div>
+        <div class="sb-seg-high"></div>
+      </div>
+      <div class="sb-bar-pointer-wrap">
+        <div class="sb-bar-pointer" id="barPointer" style="left:63.3%">
+          <span id="pointerLabel">0</span>
+        </div>
+      </div>
+      <div class="sb-axis"><span>0</span><span>10</span><span>20</span><span>30+</span></div>
+    </div>
+    <div class="crit-banner" id="critBanner"></div>
+    <div class="boundary-warn" id="boundaryWarn">⚠ Score is at the CDD/SDD boundary. One point higher triggers Simplified Due Diligence review.</div>
+    <div class="completeness" id="completeness"></div>
+    <button class="breakdown-toggle" onclick="toggleBreakdown()">
+      <span id="bdArrow">▶</span> Show score breakdown
+    </button>
+    <div class="breakdown-panel" id="breakdownPanel">
+      <table class="bd-table" id="bdTable"></table>
+    </div>
+  </div>
+
+  <div class="app-footer">
+    Hawkeye Sterling — Entity Risk Assessment <span id="footVer"></span> · For internal compliance use only.<br>
+    Assessments autosave to this browser (localStorage) and never leave your device.
+    This tool supports — it does not replace — professional judgement and applicable AML/CFT obligations.
+  </div>
+
+</div>
+
+<input type="file" id="importFile" accept=".json,application/json" style="display:none">
+<div class="toast" id="toast"></div>
+<div id="printReport"></div>
+
+<script>
+/* ══════════════════════════════════════════
+   DATA (sourced directly from Data sheet)
+══════════════════════════════════════════ */
+const APP_VERSION = '2.0.0';
+
+const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":1},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":1},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":1},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":1},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":1},{"name":"Isle of Man","score":1},{"name":"Belgium","score":1},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":1},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":1},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":1},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":2},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":2},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":1},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":2},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":2},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":2},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":2},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":1},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":2},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3},{"name":"Islamic Republic of Iran","score":3}];
+
+const RECYCLED = [{"name":"N/A","score":0},{"name":"LBMA GD Bullion/DGD Good Delivery","score":1},{"name":"Rudimentary Bars","score":2},{"name":"Gold & Silver Coins","score":1},{"name":"Industrial Waste","score":1},{"name":"Gold Jewellery","score":2},{"name":"Collected waste","score":2},{"name":"Silver/Gold Grains","score":1},{"name":"Broken jewellery","score":2},{"name":"Gold-Processing Chemicals","score":3},{"name":"Others","score":0}];
+const MINED = [{"name":"N/A","score":0},{"name":"LSM — Large Scale Mining","score":2},{"name":"MSM — Medium Scale Mining","score":2},{"name":"ASM — Artisanal Mining","score":3}];
+const ACTIVITIES = [{"name":"Regulated Financial Entities","score":1},{"name":"Non-Manufactured Precious Metal Trading","score":3},{"name":"Mineral Processing Facility","score":3},{"name":"Mining Company","score":3},{"name":"Jewellery Trading","score":3},{"name":"Precious Metal Refinery","score":3},{"name":"Wholesalers/Pawn Shops","score":3}];
+
+/* Scoring rules: Yes/No questions */
+/* vlok  (standard): Yes=3 High, No=1 Low */
+/* vlok2 (inverse):  Yes=1 Low,  No=3 High — AML/CFT control adequacy */
+/* onboard: Yes (remote / non-F2F)=3 High, No (in-person)=1 Low */
+/* Questions flagged `critical:true` force an automatic EDD outcome when answered Yes. */
+
+const QUESTIONS_OC = [
+  {id:'aml',       short:'AML/CFT control environment', text:'Does the legal entity have an adequate and effective AML/CFT control environment (where applicable)?', default:'Yes', type:'vlok2'},
+  {id:'sanctions_person', short:'Sanctions — owners / directors / management', text:'Are any beneficial owners, controllers, directors, or senior management subject to sanctions?', default:'No', type:'vlok', critical:true},
+  {id:'criminal',  short:'Criminal proceedings / investigations', text:'Is the entity subject to any criminal proceedings or ongoing legal investigations?', default:'No', type:'vlok'},
+  {id:'adverse',   short:'Adverse media findings', text:'Are any beneficial owners, controllers, directors, or senior management subject to adverse media or negative reputational findings?', default:'No', type:'vlok'},
+  {id:'sanctions_entity', short:'Sanctions — legal entity', text:'Is the legal entity itself subject to any national or international sanctions?', default:'No', type:'vlok', critical:true},
+  {id:'sof',       short:'Source of funds / wealth concerns', text:'Are there any concerns regarding the source of funds and/or source of wealth of the beneficial owners or the legal entity (where applicable)?', default:'No', type:'vlok'},
+  {id:'high_risk_ind', short:'High-risk industry involvement', text:'Is the entity involved in any high-risk industries (arms, gaming, casinos)?', default:'No', type:'vlok'},
+  {id:'tf',        short:'Terrorist financing connections', text:'Are any beneficial owners, controllers, or managers connected to terrorist financing or designated terrorist organisations?', default:'No', type:'vlok', critical:true},
+  {id:'pf',        short:'Proliferation financing connections', text:'Are any beneficial owners, controllers, or managers connected to proliferation financing or the trade of materials or technology related to weapons of mass destruction?', default:'No', type:'vlok', critical:true},
+  {id:'pep',       short:'PEP exposure', text:'Are any beneficial owners, controllers, or senior management Politically Exposed Persons (PEPs)?', default:'No', type:'vlok'},
+  {id:'gov',       short:'Government / state ownership', text:'Is the legal entity owned or controlled by a government, state authority, or public sector body?', default:'No', type:'vlok'},
+];
+
+const BAND_FULL = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence', EDD:'Enhanced Due Diligence'};
+const BAND_ICON = {CDD:'✓', SDD:'!', EDD:'⚠'};
+const REVIEW_MONTHS = {CDD:36, SDD:24, EDD:12};
+const MAX_SCORE = 3 + 3 + QUESTIONS_OC.length*3 + 3 + 3 + 3 + 3*3 + 3*3; /* jurisdiction + activity + questions + onboard + 2×years + 6 suppliers */
+const STORAGE_KEY = 'hsra.draft.v2';
+const SEQ_KEY = 'hsra.seq';
+
+/* ══════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════ */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function scoreFromYesNo(val, type) {
+  if(type==='vlok')  return val==='Yes' ? 3 : 1;
+  if(type==='vlok2') return val==='Yes' ? 1 : 3;
+  if(type==='onboard') return val==='Yes' ? 3 : 1;
+  return 1;
+}
+function ratingLabel(s){ return ['No Risk','Low','Medium','High'][s] || '—'; }
+function ratingClass(s){ return ['b0','b1','b2','b3'][s] || 'b0'; }
+function scoreTagClass(s){ return ['st-0','st-1','st-2','st-3'][s] || 'st-0'; }
+function yearsToScore(y){ return y<=0 ? 3 : y===1 ? 2 : 1; }
+function toISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function todayISO(){ return toISO(new Date()); }
+function addMonths(iso, m){
+  const p = (iso || todayISO()).split('-').map(Number);
+  const d = new Date(p[0], (p[1]||1)-1, p[2]||1);
+  d.setMonth(d.getMonth()+m);
+  return toISO(d);
+}
+function newRef(){
+  const d = new Date();
+  const ymd = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  let seq = 1;
+  try{ seq = (parseInt(localStorage.getItem(SEQ_KEY))||0) + 1; localStorage.setItem(SEQ_KEY, seq); }catch(e){}
+  return 'RA-' + ymd + '-' + String(seq).padStart(3,'0');
+}
+
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+function defaultState(){
+  const questions = {};
+  QUESTIONS_OC.forEach(q => questions[q.id] = q.default);
+  return {
+    meta:    {ref:'', date:'', assessor:'', role:''},
+    entity:  {name:'', trading:'', regno:'', address:'', contact:'', jurisdiction:'United Kingdom'},
+    profile: {activity:'Non-Manufactured Precious Metal Trading', onboard:'No', entityYears:2, relYears:2},
+    questions,
+    suppliers:{recycled:['LBMA GD Bullion/DGD Good Delivery','N/A','N/A'], mined:['N/A','N/A','N/A']},
+    notes:   '',
+    signoff: {completedBy:'', completedDate:'', approvedBy:'', approvedDate:'', nextReview:'', reviewManual:false}
+  };
+}
+function freshState(){
+  const s = defaultState();
+  s.meta.ref = newRef();
+  s.meta.date = todayISO();
+  return s;
+}
+function mergeState(src){
+  const out = defaultState();
+  if(!src || typeof src!=='object') return out;
+  ['meta','entity','profile','signoff'].forEach(k => {
+    if(src[k] && typeof src[k]==='object') Object.assign(out[k], src[k]);
+  });
+  if(src.questions && typeof src.questions==='object'){
+    QUESTIONS_OC.forEach(q => {
+      const v = src.questions[q.id];
+      if(v==='Yes' || v==='No') out.questions[q.id] = v;
+    });
+  }
+  if(src.suppliers && typeof src.suppliers==='object'){
+    [['recycled',RECYCLED],['mined',MINED]].forEach(([k,list]) => {
+      if(Array.isArray(src.suppliers[k])){
+        src.suppliers[k].slice(0,3).forEach((v,i) => {
+          out.suppliers[k][i] = list.some(o=>o.name===v) ? v : 'N/A';
+        });
+      }
+    });
+  }
+  if(typeof src.notes==='string') out.notes = src.notes;
+  if(!COUNTRIES.some(c=>c.name===out.entity.jurisdiction)) out.entity.jurisdiction = 'United Kingdom';
+  if(!ACTIVITIES.some(a=>a.name===out.profile.activity)) out.profile.activity = ACTIVITIES[0].name;
+  out.profile.onboard = out.profile.onboard==='Yes' ? 'Yes' : 'No';
+  out.profile.entityYears = Math.max(0, parseInt(out.profile.entityYears)||0);
+  out.profile.relYears = Math.max(0, parseInt(out.profile.relYears)||0);
+  out.signoff.reviewManual = !!out.signoff.reviewManual;
+  return out;
+}
+
+let state = defaultState();
+
+/* ══════════════════════════════════════════
+   BUILD UI
+══════════════════════════════════════════ */
+function buildCountrySelect() {
+  const sel = $('jurisdictionSelect');
+  const sorted = [...COUNTRIES].sort((a,b)=>a.name.localeCompare(b.name));
+  sorted.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.name;
+    opt.textContent = c.name + ' — ' + ['','Low ✓','Medium','High ⚠'][c.score];
+    sel.appendChild(opt);
+  });
+}
+
+function buildActivitySelect() {
+  const sel = $('activitySelect');
+  ACTIVITIES.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.name;
+    opt.textContent = a.name + ' — ' + ratingLabel(a.score);
+    sel.appendChild(opt);
+  });
+}
+
+function buildQuestions() {
+  const container = $('questions-oc');
+  QUESTIONS_OC.forEach(q => {
+    const div = document.createElement('div');
+    div.className = 'q-row';
+    const crit = q.critical ? '<span class="crit-tag" title="If Yes, the assessment is automatically escalated to Enhanced Due Diligence regardless of the numeric score.">Critical</span>' : '';
+    div.innerHTML = `
+      <span class="q-text">${q.text}${crit}</span>
+      <div class="q-controls">
+        <div class="toggle-group">
+          <button class="toggle-btn" id="btn_${q.id}_yes" onclick="setToggle('${q.id}','Yes')">Yes</button>
+          <button class="toggle-btn" id="btn_${q.id}_no" onclick="setToggle('${q.id}','No')">No</button>
+        </div>
+        <span class="q-score-pill" id="pill_${q.id}"></span>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function buildSuppliers() {
+  buildSupplierGroup('recycled-grid', RECYCLED, 'recycled');
+  buildSupplierGroup('mined-grid', MINED, 'mined');
+}
+
+function buildSupplierGroup(containerId, options, prefix) {
+  const container = $(containerId);
+  for(let i=0;i<3;i++){
+    const item = document.createElement('div');
+    item.className = 'supplier-item';
+    const opts = options.map(o=>`<option value="${esc(o.name)}">${esc(o.name)}</option>`).join('');
+    item.innerHTML = `
+      <label>Supplier ${i+1}</label>
+      <select id="sel_${prefix}_${i}" onchange="onSupplier('${prefix}',${i})">${opts}</select>
+      <span id="sup_score_${prefix}_${i}" class="sup-score"></span>`;
+    container.appendChild(item);
+  }
+}
+
+/* ══════════════════════════════════════════
+   PAINT (state → UI)
+══════════════════════════════════════════ */
+function paintToggle(id, val, type) {
+  const inv = type==='vlok2';
+  const score = scoreFromYesNo(val, type);
+  const y = $('btn_'+id+'_yes'), n = $('btn_'+id+'_no');
+  y.className = 'toggle-btn' + (val==='Yes' ? (inv?' active-yes-inv':' active-yes') : '');
+  n.className = 'toggle-btn' + (val==='No'  ? (inv?' active-no-inv':' active-no')   : '');
+  const pill = $('pill_'+id);
+  if(pill){ pill.className = 'q-score-pill '+ratingClass(score); pill.textContent = score; }
+  const tag = $(id+'_score_tag');
+  if(tag){ tag.className = 'score-tag '+scoreTagClass(score); tag.textContent = 'Score: '+score+' · '+ratingLabel(score); }
+}
+function paintJurisdiction() {
+  const c = COUNTRIES.find(c=>c.name===state.entity.jurisdiction);
+  const score = c ? c.score : 1;
+  const tag = $('jurisdictionScore');
+  tag.className = 'score-tag '+scoreTagClass(score);
+  tag.textContent = 'Score: '+score+' · '+ratingLabel(score);
+}
+function paintActivity() {
+  const a = ACTIVITIES.find(a=>a.name===state.profile.activity);
+  const score = a ? a.score : 1;
+  const tag = $('activityScore');
+  tag.className = 'score-tag '+scoreTagClass(score);
+  tag.textContent = 'Score: '+score+' · '+ratingLabel(score);
+}
+function paintYears(which) {
+  const y = which==='entity' ? state.profile.entityYears : state.profile.relYears;
+  const score = yearsToScore(y);
+  const tag = $(which==='entity'?'entityYearsScore':'relYearsScore');
+  tag.className = 'score-tag '+scoreTagClass(score);
+  tag.textContent = 'Score: '+score+' · '+ratingLabel(score);
+}
+function paintSupplier(prefix, i) {
+  const list = prefix==='recycled' ? RECYCLED : MINED;
+  const item = list.find(o=>o.name===state.suppliers[prefix][i]);
+  const score = item ? item.score : 0;
+  const el = $('sup_score_'+prefix+'_'+i);
+  el.className = 'sup-score '+ratingClass(score);
+  el.textContent = ratingLabel(score)+' ('+score+')';
+}
+
+function syncUI() {
+  const s = state;
+  $('refInput').value = s.meta.ref;
+  $('assessDate').value = s.meta.date;
+  $('assessorName').value = s.meta.assessor;
+  $('assessorRole').value = s.meta.role;
+  $('entityName').value = s.entity.name;
+  $('entityTrading').value = s.entity.trading;
+  $('entityRegno').value = s.entity.regno;
+  $('entityAddress').value = s.entity.address;
+  $('entityContact').value = s.entity.contact;
+  $('jurisdictionSelect').value = s.entity.jurisdiction; paintJurisdiction();
+  $('activitySelect').value = s.profile.activity; paintActivity();
+  paintToggle('onboard', s.profile.onboard, 'onboard');
+  $('entityYearsInput').value = s.profile.entityYears; paintYears('entity');
+  $('relYearsInput').value = s.profile.relYears; paintYears('rel');
+  QUESTIONS_OC.forEach(q => paintToggle(q.id, s.questions[q.id], q.type));
+  ['recycled','mined'].forEach(p => s.suppliers[p].forEach((v,i) => {
+    $('sel_'+p+'_'+i).value = v; paintSupplier(p,i);
+  }));
+  $('notesInput').value = s.notes;
+  $('completedBy').value = s.signoff.completedBy;
+  $('completedDate').value = s.signoff.completedDate;
+  $('approvedBy').value = s.signoff.approvedBy;
+  $('approvedDate').value = s.signoff.approvedDate;
+  $('nextReview').value = s.signoff.nextReview;
+  recalc();
+}
+
+/* ══════════════════════════════════════════
+   EVENT HANDLERS (UI → state)
+══════════════════════════════════════════ */
+function qType(id){
+  if(id==='onboard') return 'onboard';
+  const q = QUESTIONS_OC.find(q=>q.id===id);
+  return q ? q.type : 'vlok';
+}
+function onField(section, key, val) {
+  state[section][key] = val;
+  if(section==='meta' && key==='date'){ recalc(); return; }
+  updateCompleteness();
+  scheduleSave();
+}
+function onNotes(val){ state.notes = val; scheduleSave(); }
+function onSign(key, val) {
+  state.signoff[key] = val;
+  if(key==='nextReview'){ state.signoff.reviewManual = true; recalc(); return; }
+  updateCompleteness();
+  scheduleSave();
+}
+function useSuggestedReview(){ state.signoff.reviewManual = false; recalc(); }
+function onJurisdiction() {
+  state.entity.jurisdiction = $('jurisdictionSelect').value;
+  paintJurisdiction();
+  recalc();
+}
+function onActivity() {
+  state.profile.activity = $('activitySelect').value;
+  paintActivity();
+  recalc();
+}
+function setToggle(id, val) {
+  if(id==='onboard') state.profile.onboard = val;
+  else state.questions[id] = val;
+  paintToggle(id, val, qType(id));
+  recalc();
+}
+function onYears(which) {
+  const inp = $(which==='entity'?'entityYearsInput':'relYearsInput');
+  let y = parseInt(inp.value);
+  if(isNaN(y) || y<0) y = 0;
+  if(which==='entity') state.profile.entityYears = y; else state.profile.relYears = y;
+  paintYears(which);
+  recalc();
+}
+function onSupplier(prefix, i) {
+  state.suppliers[prefix][i] = $('sel_'+prefix+'_'+i).value;
+  paintSupplier(prefix, i);
+  recalc();
+}
+
+/* ══════════════════════════════════════════
+   ASSESSMENT ENGINE
+══════════════════════════════════════════ */
+function computeAssessment() {
+  const s = state, parts = [];
+
+  const jC = COUNTRIES.find(c=>c.name===s.entity.jurisdiction);
+  parts.push({label:'Jurisdiction of incorporation & operation', value:s.entity.jurisdiction, score:jC?jC.score:1});
+
+  const aAct = ACTIVITIES.find(a=>a.name===s.profile.activity);
+  parts.push({label:'Nature & complexity of business activities', value:s.profile.activity, score:aAct?aAct.score:1});
+
+  QUESTIONS_OC.forEach(q => {
+    const val = s.questions[q.id];
+    parts.push({label:q.short, value:val, score:scoreFromYesNo(val, q.type)});
+  });
+
+  parts.push({label:'Onboarding channel', value:s.profile.onboard==='Yes'?'Remote / non-face-to-face':'In-person', score:scoreFromYesNo(s.profile.onboard,'onboard')});
+  parts.push({label:'Operational history — entity', value:s.profile.entityYears+' years', score:yearsToScore(s.profile.entityYears)});
+  parts.push({label:'Relationship duration', value:s.profile.relYears+' years', score:yearsToScore(s.profile.relYears)});
+
+  s.suppliers.recycled.forEach((v,i) => {
+    const item = RECYCLED.find(o=>o.name===v);
+    parts.push({label:'Recycled source — Supplier '+(i+1), value:v, score:item?item.score:0});
+  });
+  s.suppliers.mined.forEach((v,i) => {
+    const item = MINED.find(o=>o.name===v);
+    parts.push({label:'Mined source — Supplier '+(i+1), value:v, score:item?item.score:0});
+  });
+
+  const total = parts.reduce((sum,p)=>sum+p.score, 0);
+  const critical = QUESTIONS_OC.filter(q=>q.critical && s.questions[q.id]==='Yes').map(q=>q.short);
+  const numericBand = total<=19 ? 'CDD' : total<=22 ? 'SDD' : 'EDD';
+  const band = critical.length ? 'EDD' : numericBand;
+  return {parts, total, critical, numericBand, band, forced:critical.length>0 && numericBand!=='EDD'};
+}
+
+function recalc() {
+  const a = computeAssessment();
+  const s = state;
+
+  $('totalScore').textContent = a.total;
+
+  /* Verdict pill + threshold chips */
+  const vpEl = $('verdictPill');
+  vpEl.className = 'verdict-pill ' + {CDD:'vp-cdd', SDD:'vp-sdd', EDD:'vp-edd'}[a.band];
+  $('verdictText').textContent = a.band + ' — ' + BAND_FULL[a.band];
+  $('verdictIcon').textContent = BAND_ICON[a.band];
+  const chips = {CDD:$('tc-low'), SDD:$('tc-med'), EDD:$('tc-high')};
+  Object.values(chips).forEach(el=>el.classList.remove('tc-active'));
+  chips[a.band].classList.add('tc-active');
+
+  /* Critical-factor escalation banner */
+  const banner = $('critBanner');
+  if(a.critical.length){
+    banner.style.display = 'block';
+    banner.textContent = '⚠ Critical risk factor(s) present — Enhanced Due Diligence is mandatory'
+      + (a.forced ? ' (escalated from '+a.numericBand+')' : '') + ': ' + a.critical.join('; ') + '.';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  /* Boundary warning */
+  $('boundaryWarn').style.display = (!a.critical.length && a.total===19) ? 'block' : 'none';
+
+  /* Bar pointer: display scale 0–30 */
+  $('barPointer').style.left = Math.min(a.total/30*100, 100) + '%';
+  $('pointerLabel').textContent = a.total;
+
+  /* Next review date suggestion */
+  const months = REVIEW_MONTHS[a.band];
+  const suggested = addMonths(s.meta.date, months);
+  if(!s.signoff.reviewManual){
+    s.signoff.nextReview = suggested;
+    $('nextReview').value = suggested;
+  }
+  $('reviewHint').innerHTML = 'Suggested: ' + suggested + ' (' + months + ' months — ' + a.band + ')'
+    + (s.signoff.reviewManual ? ' · <a onclick="useSuggestedReview()">use suggested</a>' : '');
+
+  /* Breakdown table */
+  $('bdTable').innerHTML = a.parts.map(p=>`
+    <tr>
+      <td style="color:var(--text2);font-size:11px;max-width:380px;word-wrap:break-word">${esc(p.label)}</td>
+      <td style="color:var(--text3);font-size:11px;padding-left:8px">${esc(p.value)}</td>
+      <td><span class="badge ${ratingClass(p.score)}">${p.score} · ${ratingLabel(p.score)}</span></td>
+    </tr>`).join('') +
+    `<tr style="border-top:1px solid var(--border2)">
+      <td colspan="2" style="font-weight:600;font-size:12px;padding-top:6px">TOTAL</td>
+      <td style="padding-top:6px"><span class="badge ${a.band==='CDD'?'b1':a.band==='SDD'?'b2':'b3'}" style="font-size:12px">${a.total} · ${a.band}</span></td>
+    </tr>`;
+
+  updateCompleteness();
+  scheduleSave();
+}
+
+function updateCompleteness() {
+  const s = state;
+  const req = [
+    ['legal entity name', s.entity.name],
+    ['registration / licence no.', s.entity.regno],
+    ['assessor name', s.meta.assessor],
+    ['completed by', s.signoff.completedBy],
+  ];
+  const missing = req.filter(r=>!String(r[1]||'').trim()).map(r=>r[0]);
+  const el = $('completeness');
+  el.className = 'completeness' + (missing.length ? '' : ' ok');
+  el.textContent = missing.length
+    ? 'Record completeness: '+(req.length-missing.length)+'/'+req.length+' required fields — missing: '+missing.join(', ')
+    : 'Record completeness: all '+req.length+' required fields completed ✓';
+}
+
+function toggleBreakdown(){
+  const p = $('breakdownPanel');
+  p.classList.toggle('open');
+  $('bdArrow').textContent = p.classList.contains('open') ? '▼' : '▶';
+}
+
+/* ══════════════════════════════════════════
+   PERSISTENCE — autosave / export / import
+══════════════════════════════════════════ */
+let saveTimer = null, toastTimer = null;
+
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveDraft, 400);
+}
+function saveDraft(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({version:APP_VERSION, savedAt:new Date().toISOString(), state}));
+    $('saveStamp').textContent = 'Autosaved '+new Date().toLocaleTimeString();
+  }catch(e){ /* storage unavailable (private mode etc.) — app still works, just no draft */ }
+}
+function loadDraft(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    if(!data || !data.state) return null;
+    return {state:mergeState(data.state), savedAt:data.savedAt};
+  }catch(e){ return null; }
+}
+
+function newAssessment(){
+  if(!confirm('Start a new assessment? The current draft in this browser will be replaced.')) return;
+  state = freshState();
+  syncUI();
+  toast('New assessment started — '+state.meta.ref);
+}
+
+function exportJSON(){
+  const a = computeAssessment();
+  const out = {
+    app: 'Hawkeye Sterling — Entity Risk Assessment',
+    version: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    state,
+    result: {totalScore:a.total, maxScore:MAX_SCORE, riskBand:a.band, numericBand:a.numericBand, criticalFactors:a.critical}
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = (state.meta.ref || 'risk-assessment') + '.json';
+  link.click();
+  setTimeout(()=>URL.revokeObjectURL(link.href), 1000);
+  toast('Assessment exported');
+}
+
+function importJSON(){ $('importFile').click(); }
+$('importFile').addEventListener('change', function(e){
+  const f = e.target.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = function(){
+    try{
+      const data = JSON.parse(r.result);
+      const src = data && data.state ? data.state : data;
+      if(!src || typeof src!=='object' || !src.questions) throw new Error('invalid');
+      state = mergeState(src);
+      syncUI();
+      toast('Assessment imported'+(state.meta.ref?' — '+state.meta.ref:''));
+    }catch(err){
+      alert('Invalid assessment file. Expected a JSON export from this application.');
+    }
+    e.target.value = '';
+  };
+  r.readAsText(f);
+});
+
+/* ══════════════════════════════════════════
+   PRINT REPORT
+══════════════════════════════════════════ */
+function buildPrintReport(){
+  const a = computeAssessment();
+  const s = state;
+  const dash = v => (v && String(v).trim()) ? esc(v) : '—';
+  const rows = a.parts.map(p=>`<tr><td>${esc(p.label)}</td><td>${esc(p.value)}</td><td class="pr-c">${p.score}</td><td class="pr-c">${ratingLabel(p.score)}</td></tr>`).join('');
+  const crit = a.critical.length
+    ? `<div class="pr-crit">Critical risk factor(s) — Enhanced Due Diligence mandatory${a.forced?' (escalated from '+a.numericBand+')':''}: ${esc(a.critical.join('; '))}</div>`
+    : '';
+  $('printReport').innerHTML = `
+    <div class="pr-head">
+      <div>
+        <div class="pr-brand">HAWKEYE STERLING</div>
+        <div class="pr-title">Entity Risk Assessment Report</div>
+        <div class="pr-sub">AML/CFT Customer Risk Assessment — DPMS Template</div>
+      </div>
+      <div class="pr-refbox">Reference<br><b>${dash(s.meta.ref)}</b></div>
+    </div>
+    <table class="pr-kv">
+      <tr><td class="k">Assessment date</td><td>${dash(s.meta.date)}</td></tr>
+      <tr><td class="k">Assessor</td><td>${dash(s.meta.assessor)}${s.meta.role?' — '+esc(s.meta.role):''}</td></tr>
+    </table>
+    <h3>Entity</h3>
+    <table class="pr-kv">
+      <tr><td class="k">Legal entity name</td><td>${dash(s.entity.name)}</td></tr>
+      <tr><td class="k">Trading name</td><td>${dash(s.entity.trading)}</td></tr>
+      <tr><td class="k">Registration / licence no.</td><td>${dash(s.entity.regno)}</td></tr>
+      <tr><td class="k">Jurisdiction</td><td>${dash(s.entity.jurisdiction)}</td></tr>
+      <tr><td class="k">Registered address</td><td>${dash(s.entity.address)}</td></tr>
+      <tr><td class="k">Website / email</td><td>${dash(s.entity.contact)}</td></tr>
+    </table>
+    <h3>Result</h3>
+    <div class="pr-verdict">
+      Total risk score: <b>${a.total}</b> / ${MAX_SCORE}
+      &nbsp;·&nbsp; Risk band: <b>${a.band} — ${BAND_FULL[a.band]}</b>${a.forced?' (escalated from '+a.numericBand+' due to critical risk factors)':''}<br>
+      Next review date: <b>${dash(s.signoff.nextReview)}</b>
+    </div>
+    ${crit}
+    <h3>Risk factor breakdown</h3>
+    <table class="pr-table">
+      <thead><tr><th>Factor</th><th>Value</th><th>Score</th><th>Rating</th></tr></thead>
+      <tbody>
+        ${rows}
+        <tr class="pr-total"><td colspan="2">TOTAL</td><td class="pr-c">${a.total}</td><td class="pr-c">${a.band}</td></tr>
+      </tbody>
+    </table>
+    <h3>Analyst notes &amp; rationale</h3>
+    <div class="pr-notes">${s.notes.trim() ? esc(s.notes).replace(/\n/g,'<br>') : '—'}</div>
+    <h3>Sign-off</h3>
+    <table class="pr-sig"><tr>
+      <td>Completed by<br><b>${dash(s.signoff.completedBy)}</b><div class="pr-sigline"></div><span>Signature</span></td>
+      <td>Date completed<br><b>${dash(s.signoff.completedDate)}</b></td>
+      <td>Approved by (MLRO)<br><b>${dash(s.signoff.approvedBy)}</b><div class="pr-sigline"></div><span>Signature</span></td>
+      <td>Date approved<br><b>${dash(s.signoff.approvedDate)}</b></td>
+    </tr></table>
+    <div class="pr-foot">Generated by Hawkeye Sterling — Entity Risk Assessment v${APP_VERSION} on ${esc(new Date().toLocaleString())}. For internal compliance use only. This assessment supports, and does not replace, professional judgement and applicable AML/CFT regulatory obligations.</div>`;
+}
+function printReport(){
+  buildPrintReport();
+  window.print();
+}
+window.addEventListener('beforeprint', buildPrintReport);
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+$('verChip').textContent = 'v'+APP_VERSION;
+$('footVer').textContent = 'v'+APP_VERSION;
+$('maxScore').textContent = MAX_SCORE;
+
+buildCountrySelect();
+buildActivitySelect();
+buildQuestions();
+buildSuppliers();
+
+const draft = loadDraft();
+if(draft){
+  state = draft.state;
+  syncUI();
+  toast('Draft restored'+(draft.savedAt?' — last saved '+new Date(draft.savedAt).toLocaleString():''));
+} else {
+  state = freshState();
+  syncUI();
+}
+</script>
+</body>
+</html>
