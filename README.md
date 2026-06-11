@@ -13,6 +13,7 @@ The entire application lives in [`index.html`](index.html) — no build step, no
 - **Structured risk scoring** across jurisdiction, business activity, onboarding channel, operational history, relationship duration, ownership/control/compliance questions, and supply-chain material sources (recycled and mined).
 - **Live verdict** — total score, numeric band (CDD / SDD / EDD), score bar, and a full per-factor breakdown table.
 - **Hard outcomes** — designated-party exposure (sanctions on the entity or its principals, terrorist financing, proliferation financing) produces a **PROHIBITED — Do Not Onboard** verdict with freeze-and-report instructions; PEP exposure, FATF call-for-action jurisdictions, and the ASM/high-risk-country red flag force **mandatory EDD** regardless of the numeric score. Every escalation is shown with its reason and carried into the export and printed report.
+- **Live screening** — one click screens the legal entity and its principals against the Hawkeye Sterling screening service (UN / OFAC / EU / UK OFSI and other sanctions lists, PEP, adverse media). Strong matches auto-set the related questions to Yes — driving the PROHIBITED/EDD machinery — while weaker matches are flagged *review required*. Full evidence (matches, lists checked, timestamps, data-source health) is stored with the assessment, exported, and printed.
 - **Assessment metadata** — auto-generated reference (`RA-YYYYMMDD-NNN`), assessment date, assessor name and role.
 - **Expanded entity identification** — legal and trading names, registration/licence number, jurisdiction, registered address, website/email.
 - **Analyst notes & rationale** — free-text section included in the printed report.
@@ -63,6 +64,16 @@ The numeric score is always displayed unchanged; the operative outcome is layere
 | Any mined source = ASM **and** jurisdiction risk score 3 | OECD Due Diligence Guidance, Annex II red flag |
 
 **3 ·** Otherwise the numeric band applies.
+
+## Live screening
+
+The **⚡ Screen entity & principals** button (Entity identification card) posts each subject to the Hawkeye Sterling screening endpoint (`/api/screening`). On the deployed site the call is proxied **same-origin** to the platform via `netlify.toml`, so no CORS configuration is needed; when the app is opened from disk or another host it falls back to `https://hawkeye-sterling.netlify.app` directly (subject to that platform's CORS policy).
+
+- **Strong matches** (engine recommendation `confirm`/`escalate`, tier `confirmed`, or score ≥ 92%) auto-set the mapped question to **Yes** — sanctions hits map to the entity/principal sanctions questions, PEP hits to PEP, adverse-media hits to adverse media, terror/proliferation categories to TF/PF.
+- **Weaker matches** never change answers; they appear as *review required* evidence for the analyst to disposition.
+- Screening evidence (per-subject matches, lists checked, engine version, timestamps, and any data-source degradation warnings) is saved in the assessment, included in the JSON export, and printed in the report. Unscreened assessments are explicitly stamped "Not screened — answers are manual attestation only."
+- Screening output is AI-assisted: **MLRO review is required before any compliance action** (noted on the evidence and the report).
+- Ops overrides (browser console, no UI): `localStorage['hsra.screeningEndpoint']` to point at a different endpoint, `localStorage['hsra.screeningToken']` to send a bearer token.
 
 ## Data management & privacy
 

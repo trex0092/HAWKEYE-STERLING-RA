@@ -50,7 +50,9 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   get state(){ return state; }, set state(v){ state = v; },
   computeAssessment, setToggle, onYears, onJurisdiction, onActivity, onSupplier,
   onSign, onField, useSuggestedReview, recalc, syncUI, freshState, mergeState,
-  saveDraft, loadDraft, exportJSON, buildPrintReport, newAssessment, MAX_SCORE
+  saveDraft, loadDraft, exportJSON, buildPrintReport, newAssessment, MAX_SCORE,
+  screeningSubjects, summariseScreenResponse, isStrongHit, questionForHit,
+  applyScreening, runScreening, renderScreening
 };`);
 const A = globalThis.__app;
 const txt = el => String(el.textContent);
@@ -214,5 +216,79 @@ A.newAssessment();
 check('new ref differs and matches format', A.state.meta.ref !== prevRef && /^RA-\d{8}-\d{3}$/.test(A.state.meta.ref));
 check('new assessment resets to 19/CDD', A.computeAssessment().total === 19 && A.computeAssessment().outcome === 'CDD');
 
-console.log('\n' + passed + ' passed, ' + failed + ' failed');
-process.exit(failed ? 1 : 0);
+/* ── 14. Live screening (async, fake fetch) ── */
+const hit = (over={}) => Object.assign({
+  candidateName:'Match Name', sourceLabel:'OFAC SDN', riskCategory:'sanctions',
+  score:0.97, confidenceTier:'confirmed', recommendation:'escalate', listRef:'SDN-1'
+}, over);
+const screenResp = (hits) => ({ ok:true, hits, topScore:hits.length?Math.round(hits[0].score*100):0,
+  severity:hits.length?'high':'clear', listsChecked:12, listIds:['ofac_sdn'], clearVerdictReliable:true,
+  engineVersion:'wave-5', commitRef:'test', generatedAt:'2026-06-11T09:00:00.000Z',
+  dataSourceHealth:{healthy:true} });
+
+(async () => {
+  // strong-match classification
+  check('strong: escalate recommendation', A.isStrongHit(hit({score:0.5, confidenceTier:'', recommendation:'escalate'})));
+  check('strong: score >= 92', A.isStrongHit(hit({score:0.92, confidenceTier:'', recommendation:''})));
+  check('not strong: 84% review/probable', !A.isStrongHit(hit({score:0.84, confidenceTier:'probable', recommendation:'review'})));
+  check('category mapping', A.questionForHit({riskCategory:'terrorism'},'principal')==='tf'
+    && A.questionForHit({riskCategory:'proliferation'},'entity')==='pf'
+    && A.questionForHit({riskCategory:'pep'},'principal')==='pep'
+    && A.questionForHit({riskCategory:'adverse-media'},'principal')==='adverse'
+    && A.questionForHit({riskCategory:'sanctions'},'entity')==='sanctions_entity'
+    && A.questionForHit({riskCategory:'sanctions'},'principal')==='sanctions_person');
+
+  // subjects built from entity + principals
+  reset();
+  A.state.entity.name = 'Fine Gold LLC';
+  A.state.entity.principals = 'John Smith, Jane Doe';
+  const subs = A.screeningSubjects();
+  check('subjects: entity + 2 principals', subs.length === 3
+    && subs[0].role === 'entity' && subs[0].entityType === 'organisation'
+    && subs[1].role === 'principal' && subs[1].entityType === 'individual');
+
+  // end-to-end: entity strong sanctions hit, principal weak hit, principal strong PEP hit
+  const responses = [
+    screenResp([hit()]),                                                                    // entity → strong sanctions
+    screenResp([hit({score:0.84, confidenceTier:'probable', recommendation:'review'})]),   // John → weak, review only
+    screenResp([hit({riskCategory:'pep', score:0.95, recommendation:'confirm'})])          // Jane → strong PEP
+  ];
+  let call = 0;
+  global.fetch = async () => ({ ok:true, status:200, json: async () => responses[call++] });
+  await A.runScreening();
+  let a2 = A.computeAssessment();
+  check('strong entity hit auto-sets sanctions_entity', A.state.questions.sanctions_entity === 'Yes');
+  check('weak principal hit does NOT auto-set', A.state.questions.sanctions_person === 'No');
+  check('strong PEP hit auto-sets pep', A.state.questions.pep === 'Yes');
+  check('screening drives PROHIBITED outcome', a2.outcome === 'PROHIBITED');
+  check('evidence recorded for 3 subjects', A.state.screening && A.state.screening.subjects.length === 3);
+  check('autoSet lists the right questions', A.state.screening.autoSet.includes('sanctions_entity')
+    && A.state.screening.autoSet.includes('pep') && !A.state.screening.autoSet.includes('sanctions_person'));
+  check('status line reports strong matches', txt(els.screenStatus).includes('3 subject(s)') && txt(els.screenStatus).includes('strong'));
+  check('panel shows auto-set and review-required', els.screenPanel._inner.includes('auto-set') && els.screenPanel._inner.includes('review required'));
+
+  // print report carries the evidence
+  A.buildPrintReport();
+  const pr2 = els.printReport._inner;
+  check('print has screening evidence table', pr2.includes('Screening evidence') && pr2.includes('OFAC SDN') && pr2.includes('auto-set'));
+
+  // unscreened assessments say so in print
+  reset();
+  A.buildPrintReport();
+  check('print flags unscreened assessments', els.printReport._inner.includes('Not screened — answers are manual attestation only.'));
+
+  // failure path: network error leaves assessment untouched
+  reset();
+  A.state.entity.name = 'Fine Gold LLC';
+  global.fetch = async () => { throw new Error('boom'); };
+  await A.runScreening();
+  check('fetch failure → error status, no changes', txt(els.screenStatus).includes('Screening unavailable')
+    && A.state.screening === null && A.computeAssessment().outcome === 'CDD');
+
+  // screening block survives merge (import/export round-trip)
+  const m = A.mergeState({screening:{at:'2026-06-11', subjects:[], autoSet:[], reviewNote:'x'}});
+  check('mergeState keeps screening evidence', m.screening && Array.isArray(m.screening.subjects));
+
+  console.log('\n' + passed + ' passed, ' + failed + ' failed');
+  process.exit(failed ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });

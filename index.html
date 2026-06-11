@@ -65,6 +65,20 @@ textarea{min-height:96px;resize:vertical;line-height:1.5}
 .review-hint{font-size:11px;color:var(--text3);margin-top:3px}
 .review-hint a{color:var(--accent);cursor:pointer;text-decoration:underline}
 
+/* ── SCREENING ── */
+.screen-row{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.btn-screen{background:var(--accent);border:0.5px solid transparent;color:#fff;font-weight:600}
+.btn-screen:hover{background:var(--accent);opacity:.88}
+.btn-screen:disabled{opacity:.55;cursor:wait}
+.screen-status{font-size:11px;color:var(--text3)}
+.screen-status.err{color:var(--high-text);font-weight:600}
+.scr-panel{display:none;margin-top:12px;border-top:0.5px solid var(--border);padding-top:10px}
+.scr-panel.open{display:block}
+.scr-subj{font-size:12px;font-weight:600;color:var(--text);margin:8px 0 4px}
+.scr-meta{font-size:10.5px;color:var(--text3);margin-top:10px;line-height:1.6}
+.scr-hit{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--text2);padding:4px 0;border-bottom:0.5px dashed var(--border)}
+.scr-note{font-size:10.5px;color:var(--med-text);background:var(--med-bg);border:0.5px solid var(--med-bd);border-radius:var(--r-sm);padding:5px 9px;margin-top:8px}
+
 /* ── SECTION DIVIDER ── */
 .sec-divider{font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text3);font-weight:600;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
 .sec-divider::after{content:'';flex:1;height:0.5px;background:var(--border2)}
@@ -273,6 +287,17 @@ textarea{min-height:96px;resize:vertical;line-height:1.5}
         <input type="text" id="entityContact" placeholder="Optional" oninput="onField('entity','contact',this.value)">
       </div>
     </div>
+    <div class="field-row single">
+      <div class="field-group">
+        <label>Principals — beneficial owners / controllers / directors (comma-separated)</label>
+        <input type="text" id="entityPrincipals" placeholder="e.g. John Smith, Jane Doe" oninput="onField('entity','principals',this.value)">
+      </div>
+    </div>
+    <div class="screen-row">
+      <button class="btn btn-screen" id="screenBtn" onclick="runScreening()">⚡ Screen entity &amp; principals</button>
+      <span class="screen-status" id="screenStatus"></span>
+    </div>
+    <div class="scr-panel" id="screenPanel"></div>
   </div>
 
   <!-- Business activities -->
@@ -426,7 +451,7 @@ textarea{min-height:96px;resize:vertical;line-height:1.5}
 /* ══════════════════════════════════════════
    DATA (sourced directly from Data sheet)
 ══════════════════════════════════════════ */
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 
 const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":1},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":1},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":1},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":1},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":1},{"name":"Isle of Man","score":1},{"name":"Belgium","score":1},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":1},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":1},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":1},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":2},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":2},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":1},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":2},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":2},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":2},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":2},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":1},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":2},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3,"cfa":true},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3,"cfa":true},{"name":"Islamic Republic of Iran","score":3,"cfa":true}];
 
@@ -459,6 +484,17 @@ const BAND_FULL = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence',
 const BAND_ICON = {CDD:'✓', SDD:'!', EDD:'⚠', PROHIBITED:'⛔'};
 const REVIEW_MONTHS = {CDD:36, SDD:24, EDD:12};
 const ASM_SOURCE = 'ASM — Artisanal Mining';
+
+/* Live screening — Hawkeye Sterling screening service.
+   On the deployed site, /api/screening is proxied same-origin to the platform
+   (see netlify.toml); elsewhere the absolute base is used (subject to CORS).
+   Optional localStorage overrides: hsra.screeningEndpoint, hsra.screeningToken. */
+const SCREENING = {
+  path: '/api/screening',
+  absBase: 'https://hawkeye-sterling.netlify.app',
+  strongScore: 92,      /* % — at/above this a hit auto-sets the related answer */
+  timeoutMs: 45000
+};
 const MAX_SCORE = 3 + 3 + QUESTIONS_OC.length*3 + 3 + 3 + 3 + 3*3 + 3*3; /* jurisdiction + activity + questions + onboard + 2×years + 6 suppliers */
 const STORAGE_KEY = 'hsra.draft.v2';
 const SEQ_KEY = 'hsra.seq';
@@ -502,11 +538,12 @@ function defaultState(){
   QUESTIONS_OC.forEach(q => questions[q.id] = q.default);
   return {
     meta:    {ref:'', date:'', assessor:'', role:''},
-    entity:  {name:'', trading:'', regno:'', address:'', contact:'', jurisdiction:'United Kingdom'},
+    entity:  {name:'', trading:'', regno:'', address:'', contact:'', jurisdiction:'United Kingdom', principals:''},
     profile: {activity:'Non-Manufactured Precious Metal Trading', onboard:'No', entityYears:2, relYears:2},
     questions,
     suppliers:{recycled:['LBMA GD Bullion/DGD Good Delivery','N/A','N/A'], mined:['N/A','N/A','N/A']},
     notes:   '',
+    screening: null,
     signoff: {completedBy:'', completedDate:'', approvedBy:'', approvedDate:'', nextReview:'', reviewManual:false}
   };
 }
@@ -538,6 +575,7 @@ function mergeState(src){
     });
   }
   if(typeof src.notes==='string') out.notes = src.notes;
+  if(src.screening && typeof src.screening==='object' && Array.isArray(src.screening.subjects)) out.screening = src.screening;
   if(!COUNTRIES.some(c=>c.name===out.entity.jurisdiction)) out.entity.jurisdiction = 'United Kingdom';
   if(!ACTIVITIES.some(a=>a.name===out.profile.activity)) out.profile.activity = ACTIVITIES[0].name;
   out.profile.onboard = out.profile.onboard==='Yes' ? 'Yes' : 'No';
@@ -670,6 +708,8 @@ function syncUI() {
   $('entityRegno').value = s.entity.regno;
   $('entityAddress').value = s.entity.address;
   $('entityContact').value = s.entity.contact;
+  $('entityPrincipals').value = s.entity.principals;
+  renderScreening();
   $('jurisdictionSelect').value = s.entity.jurisdiction; paintJurisdiction();
   $('activitySelect').value = s.profile.activity; paintActivity();
   paintToggle('onboard', s.profile.onboard, 'onboard');
@@ -954,6 +994,141 @@ $('importFile').addEventListener('change', function(e){
 });
 
 /* ══════════════════════════════════════════
+   LIVE SCREENING — sanctions / PEP / adverse media
+══════════════════════════════════════════ */
+function screeningEndpoints(){
+  try{
+    const o = localStorage.getItem('hsra.screeningEndpoint');
+    if(o) return [o];
+  }catch(e){}
+  const eps = [];
+  if(typeof location!=='undefined' && /^https?:$/.test(location.protocol)) eps.push(SCREENING.path);
+  eps.push(SCREENING.absBase + SCREENING.path);
+  return eps;
+}
+function screeningSubjects(){
+  const subs = [];
+  const name = String(state.entity.name||'').trim();
+  if(name) subs.push({name, entityType:'organisation', jurisdiction:state.entity.jurisdiction, role:'entity'});
+  String(state.entity.principals||'').split(',').map(p=>p.trim()).filter(Boolean)
+    .forEach(p=>subs.push({name:p, entityType:'individual', role:'principal'}));
+  return subs;
+}
+async function fetchScreen(subject){
+  let lastErr = null;
+  for(const ep of screeningEndpoints()){
+    try{
+      const ctl = new AbortController();
+      const timer = setTimeout(()=>ctl.abort(), SCREENING.timeoutMs);
+      let token = null;
+      try{ token = localStorage.getItem('hsra.screeningToken'); }catch(e){}
+      const headers = {'Content-Type':'application/json'};
+      if(token) headers['Authorization'] = 'Bearer '+token;
+      const res = await fetch(ep, {
+        method:'POST', headers,
+        body: JSON.stringify({subjects:[{name:subject.name, entityType:subject.entityType, jurisdiction:subject.jurisdiction}]}),
+        signal: ctl.signal
+      });
+      clearTimeout(timer);
+      if(res.status===404){ lastErr = new Error('endpoint not found'); continue; }
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return await res.json();
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('screening unreachable');
+}
+function isStrongHit(h){
+  return h.recommendation==='confirm' || h.recommendation==='escalate'
+    || h.confidenceTier==='confirmed'
+    || Math.round((h.score||0)*100) >= SCREENING.strongScore;
+}
+function questionForHit(hit, role){
+  const cat = String(hit.riskCategory||'').toLowerCase();
+  if(cat.includes('terror')) return 'tf';
+  if(cat.includes('prolif')) return 'pf';
+  if(cat.includes('pep')) return 'pep';
+  if(cat.includes('adverse') || cat.includes('media')) return 'adverse';
+  return role==='entity' ? 'sanctions_entity' : 'sanctions_person';
+}
+function summariseScreenResponse(subject, r){
+  const hits = (r.hits||[]).map(h=>({
+    candidateName: h.candidateName||'', sourceLabel: h.sourceLabel||h.sourceList||h.listId||'',
+    riskCategory: h.riskCategory||'sanctions', scorePct: Math.round((h.score||0)*100),
+    confidenceTier: h.confidenceTier||'', recommendation: h.recommendation||'',
+    listRef: h.listRef||'', strong: isStrongHit(h),
+    question: questionForHit(h, subject.role)
+  }));
+  return {
+    name: subject.name, role: subject.role, hits,
+    topScore: r.topScore||0, severity: r.severity||'clear',
+    listsChecked: r.listsChecked||0, listIds: r.listIds||[],
+    clearReliable: r.clearVerdictReliable!==false,
+    degradationNote: (r.dataSourceHealth && !r.dataSourceHealth.healthy && r.dataSourceHealth.degradationNote) || '',
+    engine: String(r.engineVersion||'')+(r.commitRef ? ' '+r.commitRef : ''),
+    generatedAt: r.generatedAt || new Date().toISOString()
+  };
+}
+function applyScreening(evidences){
+  const autoSet = [];
+  evidences.forEach(ev => ev.hits.forEach(h => {
+    if(h.strong && state.questions[h.question] !== 'Yes'){
+      setToggle(h.question, 'Yes');
+      autoSet.push(h.question);
+    }
+  }));
+  state.screening = {
+    at: new Date().toISOString(),
+    subjects: evidences,
+    autoSet: [...new Set(autoSet)],
+    reviewNote: 'AI-assisted screening — MLRO review required before any compliance action.'
+  };
+  renderScreening();
+  recalc();
+}
+async function runScreening(){
+  const subs = screeningSubjects();
+  const st = $('screenStatus'), btn = $('screenBtn');
+  if(!subs.length){ st.className='screen-status err'; st.textContent='Enter the legal entity name first.'; return; }
+  btn.disabled = true;
+  st.className = 'screen-status';
+  try{
+    const evidences = [];
+    for(let i=0;i<subs.length;i++){
+      st.textContent = 'Screening '+(i+1)+'/'+subs.length+' — '+subs[i].name+'…';
+      const r = await fetchScreen(subs[i]);
+      evidences.push(summariseScreenResponse(subs[i], r));
+    }
+    applyScreening(evidences);
+    const totalHits = evidences.reduce((n,e)=>n+e.hits.length, 0);
+    const strong = evidences.reduce((n,e)=>n+e.hits.filter(h=>h.strong).length, 0);
+    st.textContent = 'Screened '+subs.length+' subject(s) — '+totalHits+' potential match(es)'
+      + (strong ? ', '+strong+' strong (answers auto-set)' : '') + '.';
+    toast('Screening complete');
+  }catch(e){
+    st.className = 'screen-status err';
+    st.textContent = 'Screening unavailable ('+(e && e.name==='AbortError' ? 'timeout' : (e && e.message) || 'network/CORS')+') — answer the questions manually.';
+  }
+  btn.disabled = false;
+}
+function renderScreening(){
+  const p = $('screenPanel');
+  const sc = state.screening;
+  if(!sc){ p.className='scr-panel'; p.innerHTML=''; return; }
+  p.className = 'scr-panel open';
+  p.innerHTML = sc.subjects.map(ev=>`
+    <div class="scr-subj">${esc(ev.name)} <span style="color:var(--text3);font-weight:400">(${esc(ev.role)})</span> —
+      ${ev.hits.length ? esc(String(ev.hits.length))+' potential match(es), top score '+esc(String(ev.topScore))+'%' : 'no matches'}
+      · ${esc(String(ev.listsChecked))} lists checked</div>
+    ${ev.hits.map(h=>`<div class="scr-hit">
+      <span>${esc(h.candidateName)} · ${esc(h.sourceLabel)} · ${esc(h.riskCategory)}${h.listRef ? ' · '+esc(h.listRef) : ''}</span>
+      <span class="badge ${h.strong?'b3':'b2'}">${esc(String(h.scorePct))}% — ${h.strong?'auto-set':'review required'}</span>
+    </div>`).join('')}
+    ${ev.degradationNote ? `<div class="scr-note">⚠ ${esc(ev.degradationNote)}</div>` : ''}
+  `).join('')
+  + `<div class="scr-meta">Screened ${esc(new Date(sc.at).toLocaleString())}${sc.autoSet.length ? ' · auto-set to Yes: '+esc(sc.autoSet.join(', ')) : ''}<br>${esc(sc.reviewNote)}</div>`;
+}
+
+/* ══════════════════════════════════════════
    PRINT REPORT
 ══════════════════════════════════════════ */
 function buildPrintReport(){
@@ -1005,6 +1180,23 @@ function buildPrintReport(){
         <tr class="pr-total"><td colspan="2">TOTAL</td><td class="pr-c">${a.total}</td><td class="pr-c">${a.outcome}</td></tr>
       </tbody>
     </table>
+    <h3>Screening evidence</h3>
+    ${s.screening ? `
+    <table class="pr-table">
+      <thead><tr><th>Subject</th><th>Potential matches</th><th>Lists</th></tr></thead>
+      <tbody>${s.screening.subjects.map(ev=>`
+        <tr>
+          <td>${esc(ev.name)} (${esc(ev.role)})</td>
+          <td>${ev.hits.length ? ev.hits.map(h=>esc(h.candidateName+' — '+h.sourceLabel+' ('+h.riskCategory+', '+h.scorePct+'%, '+(h.strong?'strong — auto-set':'review required')+')')).join('<br>') : 'No matches'}</td>
+          <td class="pr-c">${esc(String(ev.listsChecked))}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="font-size:9.5px;color:#555;margin-top:5px;line-height:1.6">
+      Screened ${esc(new Date(s.screening.at).toLocaleString())}${s.screening.autoSet.length ? ' · answers auto-set to Yes: '+esc(s.screening.autoSet.join(', ')) : ''} · ${esc(s.screening.reviewNote)}
+      ${s.screening.subjects.some(ev=>ev.degradationNote) ? '<br>⚠ '+esc(s.screening.subjects.map(ev=>ev.degradationNote).filter(Boolean)[0]) : ''}
+    </div>` : `
+    <div class="pr-notes">Not screened — answers are manual attestation only.</div>`}
     <h3>Analyst notes &amp; rationale</h3>
     <div class="pr-notes">${s.notes.trim() ? esc(s.notes).replace(/\n/g,'<br>') : '—'}</div>
     <h3>Sign-off</h3>
