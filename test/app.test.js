@@ -50,7 +50,8 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   get state(){ return state; }, set state(v){ state = v; },
   computeAssessment, setToggle, onYears, onJurisdiction, onActivity, onSupplier,
   onSign, onField, useSuggestedReview, recalc, syncUI, freshState, mergeState,
-  saveDraft, loadDraft, exportJSON, buildPrintReport, newAssessment, MAX_SCORE
+  saveDraft, loadDraft, exportJSON, buildPrintReport, newAssessment, MAX_SCORE,
+  addMonths, exportFileName
 };`);
 const A = globalThis.__app;
 const txt = el => String(el.textContent);
@@ -222,6 +223,40 @@ check('print includes principals', els.printReport._inner.includes('John Smith, 
 check('mergeState keeps principals', A.mergeState({entity:{principals:'A, B'}}).entity.principals === 'A, B');
 check('old exports with screening data import cleanly',
   A.mergeState({screening:{at:'x', subjects:[]}, entity:{name:'Y'}}).screening === undefined);
+
+/* ── 15. Deep-review regressions ── */
+// addMonths clamps day overflow instead of rolling into the next month
+check('addMonths: 29 Feb + 12mo clamps to 28 Feb', A.addMonths('2028-02-29',12) === '2029-02-28');
+check('addMonths: 31 Jan + 1mo clamps to 28 Feb', A.addMonths('2026-01-31',1) === '2026-02-28');
+check('addMonths: plain dates unaffected', A.addMonths('2026-06-11',36) === '2029-06-11');
+reset();
+A.state.meta.date = '2028-02-29'; A.recalc();
+check('leap-day assessment → review 2031-02-28 (CDD +36mo)', A.state.signoff.nextReview === '2031-02-28');
+
+// boundary warning covers both band edges with the right text
+reset();                                                       // 19 — CDD/SDD edge
+check('boundary at 19 names CDD/SDD', els.boundaryWarn.style.display === 'block'
+  && txt(els.boundaryWarn).includes('CDD/SDD'));
+els.sel_mined_0.value = 'ASM — Artisanal Mining'; A.onSupplier('mined',0);  // 22 SDD, no escalation
+check('boundary at 22 names SDD/EDD', els.boundaryWarn.style.display === 'block'
+  && txt(els.boundaryWarn).includes('SDD/EDD') && txt(els.boundaryWarn).includes('Enhanced Due Diligence'));
+reset();
+A.setToggle('criminal','Yes');                                 // 21 — mid-band
+check('boundary hidden mid-band', els.boundaryWarn.style.display === 'none');
+
+// mergeState rejects objects, coerces scalars, drops unknown keys
+const hard = A.mergeState({meta:{ref:{a:1}}, entity:{name:123, evil:'x'}, signoff:{reviewManual:'true'}});
+check('import: object value rejected (no "[object Object]")', hard.meta.ref === '');
+check('import: scalar coerced to string', hard.entity.name === '123');
+check('import: unknown keys dropped', !('evil' in hard.entity));
+check('import: reviewManual normalised to boolean', hard.signoff.reviewManual === true);
+
+// export filename is sanitised
+reset();
+A.state.meta.ref = 'RA/2026:te*st?"x"<y>|z';
+check('export filename sanitised', A.exportFileName() === 'RA-2026-te-st--x--y--z.json');
+A.state.meta.ref = '  ';
+check('blank ref falls back to default filename', A.exportFileName() === 'risk-assessment.json');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
