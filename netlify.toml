@@ -1,0 +1,9 @@
+# Static single-file app — publish the repo root, no build step.
+[build]
+  publish = "."
+
+# Same-origin proxy to the Hawkeye Sterling screening service (avoids CORS).
+[[redirects]]
+  from = "/api/screening"
+  to = "https://hawkeye-sterling.netlify.app/api/screening"
+  status = 200
