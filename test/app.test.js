@@ -54,7 +54,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   addMonths, exportFileName, toggleComplete,
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
-  setAnalystOverride,
+  setAnalystOverride, reassess, priorChanges,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -373,6 +373,39 @@ a = A.computeAssessment();
 check('override never applies when prohibited', a.outcome === 'PROHIBITED' && a.analystOv === null);
 check('mergeState whitelists override band', A.mergeState({override:{band:'CDD', reason:'x'}}).override.band === ''
   && A.mergeState({override:{band:'EDD', reason:'why', at:'2026-06-12'}}).override.reason === 'why');
+
+/* ── 20. Periodic re-assessment flow ── */
+reset();
+A.state.entity.name = 'Fine Gold LLC';
+A.state.notes = 'old rationale';
+A.state.signoff.completedBy = 'J. Smith';
+A.state.complete = true;
+const oldRef = A.state.meta.ref;
+A.reassess();
+check('re-assess issues a new ref and keeps the facts', A.state.meta.ref !== oldRef
+  && A.state.entity.name === 'Fine Gold LLC' && A.state.prior && A.state.prior.ref === oldRef);
+check('re-assess clears rationale, sign-off, status', A.state.notes === ''
+  && A.state.signoff.completedBy === '' && A.state.complete === false);
+check('prior snapshot records result + factors', A.state.prior.total === 19
+  && A.state.prior.outcome === 'CDD' && A.state.prior.parts.length === 22);
+check('no changes right after cloning', (A.priorChanges(A.computeAssessment()) || []).length === 0
+  && txt(els.priorChangesLbl).includes('No changes'));
+els.jurisdictionSelect.value = 'Nigeria'; A.onJurisdiction();
+let ch = A.priorChanges(A.computeAssessment());
+check('factor change is diffed against prior', ch.length === 2
+  && ch[0].includes('United Kingdom (1) → Nigeria (3)') && ch[1].includes('Result: 19 · CDD → 21 · SDD'));
+check('prior block painted', els.priorBlock.style.display === 'block'
+  && txt(els.priorInfo).includes(oldRef) && txt(els.priorChangesLbl).includes('2 changes'));
+A.buildPrintReport();
+pr = els.printReport._inner;
+check('report shows re-assessment box with changes', pr.includes('Periodic re-assessment')
+  && pr.includes(oldRef) && pr.includes('United Kingdom (1) → Nigeria (3)'));
+check('mergeState round-trips the prior snapshot',
+  JSON.stringify(A.mergeState(JSON.parse(JSON.stringify(A.state))).prior) === JSON.stringify(A.state.prior));
+check('mergeState rejects malformed priors', A.mergeState({prior:{total:'NaNish', outcome:'CDD'}}).prior === null
+  && A.mergeState({prior:{total:19, outcome:'BOGUS'}}).prior === null);
+A.newAssessment();
+check('new assessment clears the prior', A.state.prior === null && els.priorBlock.style.display === 'none');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

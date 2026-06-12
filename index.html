@@ -208,6 +208,8 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sb-bar-pointer::before{content:'\25B2';font-size:6px;color:var(--text2)}
 .sb-axis{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
 .boundary-warn{font-size:10px;color:var(--yneon);background:rgba(247,229,90,0.08);border:1px solid rgba(247,229,90,0.50);border-radius:var(--r-sm);padding:7px 10px;margin-top:10px;display:none;line-height:1.4;box-shadow:0 0 12px rgba(247,229,90,0.25),inset 0 0 8px rgba(247,229,90,0.05)}
+.prior-info{font-size:10px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.5;letter-spacing:0.3px}
+.prior-list{font-size:10px;color:var(--text2);line-height:1.7}
 .breakdown-toggle{background:none;border:none;font-size:9px;color:var(--text2);cursor:pointer;font-family:var(--sans);padding:0;display:flex;align-items:center;gap:5px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600}
 .breakdown-toggle:hover{color:var(--text)}
 .breakdown-panel{display:none;margin-top:10px}
@@ -318,6 +320,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 .foot{margin-top:18px;border-top:0.75px solid #F06AA8;padding-top:5px;font-size:7.5pt;color:#7A8090;text-align:center;letter-spacing:0.06em}
 .rd-stamp{font-size:7.5pt;color:#7A8090;letter-spacing:0.05em;margin:-10px 0 12px}
 .pr-rd{border:0.75px solid #D9CCD3;border-left:3px solid #A4690B;border-radius:8px;padding:7px 10px;font-size:8.5pt;color:#4A5160;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
+.pr-prior{border:0.75px solid #D9CCD3;border-left:3px solid #2C5F8A;border-radius:8px;padding:7px 10px;font-size:8.5pt;color:#4A5160;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
 .rd-mark{color:#A4690B;font-size:8pt;margin-left:3px}
 
 @media print{
@@ -595,6 +598,13 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <div class="boundary-warn" id="boundaryWarn"></div>
       </div>
 
+      <div class="sp-block" id="priorBlock" style="display:none">
+        <div class="sp-label">Prior Review</div>
+        <div class="prior-info" id="priorInfo"></div>
+        <button class="breakdown-toggle" onclick="togglePrior()"><span id="priorArrow">▶</span>&nbsp;<span id="priorChangesLbl">Changes</span></button>
+        <div class="breakdown-panel" id="priorPanel"><div class="prior-list" id="priorList"></div></div>
+      </div>
+
       <div class="sp-block">
         <button class="breakdown-toggle" onclick="toggleBreakdown()"><span id="bdArrow">▶</span>&nbsp;Score Breakdown</button>
         <div class="breakdown-panel" id="breakdownPanel"><table class="bd-table" id="bdTable"></table></div>
@@ -605,7 +615,10 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       <div class="sp-actions no-print">
         <button class="btn btn-primary btn-full" onclick="printReport()">⎙ Print / Export PDF</button>
         <button class="btn btn-secondary btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
-        <button class="btn btn-ghost btn-full" onclick="newAssessment()">↺ Reset</button>
+        <div class="action-row">
+          <button class="btn btn-ghost btn-half" onclick="newAssessment()">↺ Reset</button>
+          <button class="btn btn-blue btn-half" onclick="reassess()">⟳ Re-assess</button>
+        </div>
         <div class="action-row">
           <button class="btn btn-ghost btn-half" onclick="importJSON()">⇪ Import</button>
           <button class="btn btn-ghost btn-half" onclick="exportJSON()">⇩ Export JSON</button>
@@ -746,7 +759,8 @@ function defaultState(){
     notes:   '',
     override:{band:'', reason:'', at:''},
     signoff: {completedBy:'', completedTitle:'', completedDate:'', approvedBy:'', approvedTitle:'', approvedDate:'', nextReview:'', reviewManual:false},
-    complete: false
+    complete: false,
+    prior: null
   };
 }
 function freshState(){
@@ -810,6 +824,24 @@ function mergeState(src){
     if(/^\d{4}-\d{2}-\d{2}$/.test(String(src.override.at||''))) out.override.at = String(src.override.at);
   }
   out.complete = (src.complete===true || src.complete==='true');
+  if(src.prior && typeof src.prior==='object' && !Array.isArray(src.prior)){
+    /* prior-review snapshot kept by the re-assessment flow */
+    const p = src.prior, total = parseInt(p.total);
+    if(!isNaN(total) && ['CDD','SDD','EDD','PROHIBITED'].indexOf(String(p.outcome))!==-1){
+      const prior = {ref:'', date:'', total, outcome:String(p.outcome), parts:[]};
+      ['ref','date'].forEach(f => {
+        const v = p[f];
+        if(v!=null && typeof v!=='object' && typeof v!=='function') prior[f] = String(v);
+      });
+      if(Array.isArray(p.parts)) p.parts.slice(0,40).forEach(row => {
+        if(!row || typeof row!=='object') return;
+        const sc = parseInt(row.score);
+        if(row.label==null || typeof row.label==='object' || isNaN(sc)) return;
+        prior.parts.push({label:String(row.label), value:(row.value!=null && typeof row.value!=='object') ? String(row.value) : '', score:Math.max(0, Math.min(3, sc))});
+      });
+      out.prior = prior;
+    }
+  }
   if(!COUNTRIES.some(c=>c.name===out.entity.jurisdiction)) out.entity.jurisdiction = 'United Kingdom';
   if(!ACTIVITIES.some(a=>a.name===out.profile.activity)) out.profile.activity = ACTIVITIES[0].name;
   out.profile.onboard = out.profile.onboard==='Yes' ? 'Yes' : 'No';
@@ -1446,6 +1478,20 @@ function recalc() {
   $('barPointer').style.left = Math.min(a.total/30*100, 100) + '%';
   $('pointerLabel').textContent = a.total;
 
+  /* Prior review block (re-assessments only) */
+  const pb = $('priorBlock');
+  if(pb){
+    if(s.prior){
+      pb.style.display = 'block';
+      const ch = priorChanges(a) || [];
+      $('priorInfo').textContent = s.prior.ref + ' · ' + (fmtDate(s.prior.date) || s.prior.date || '—') + ' · ' + s.prior.total + ' · ' + s.prior.outcome;
+      $('priorChangesLbl').textContent = ch.length ? ch.length + ' change' + (ch.length===1?'':'s') + ' since prior' : 'No changes since prior';
+      $('priorList').innerHTML = ch.length ? ch.map(c => '<div>'+esc(c)+'</div>').join('') : '<div>No factor changes.</div>';
+    } else {
+      pb.style.display = 'none';
+    }
+  }
+
   /* Next review date suggestion — none for prohibited relationships */
   const suggested = a.prohibited ? '' : addMonths(s.meta.date, REVIEW_MONTHS[a.outcome]);
   if(!s.signoff.reviewManual){
@@ -1532,6 +1578,49 @@ function newAssessment(){
   state = freshState();
   syncUI();
   toast('New assessment started — '+state.meta.ref);
+}
+
+/* Periodic re-assessment: clone the current record under a new reference,
+   keeping the outgoing assessment as the prior for comparison. Facts carry
+   over; rationale, sign-off, status, and analyst override start fresh. */
+function reassess(){
+  const a = computeAssessment();
+  if(!confirm('Start a periodic re-assessment? A new reference will be issued and the current assessment is kept as the prior for comparison.')) return;
+  const prior = {
+    ref: state.meta.ref, date: state.meta.date, total: a.total, outcome: a.outcome,
+    parts: a.parts.map(p => ({label:p.label, value:String(p.value), score:p.score}))
+  };
+  const next = mergeState(JSON.parse(JSON.stringify(state)));
+  next.meta.ref = newRef();
+  next.meta.date = todayISO();
+  next.notes = '';
+  next.signoff = defaultState().signoff;
+  next.override = defaultState().override;
+  next.complete = false;
+  next.prior = prior;
+  state = next;
+  syncUI();
+  toast('Re-assessment started — ' + state.meta.ref + ' (prior ' + prior.ref + ')');
+}
+function priorChanges(a){
+  const p = state.prior;
+  if(!p) return null;
+  const prev = {};
+  (p.parts || []).forEach(r => prev[r.label] = r);
+  const changes = [];
+  a.parts.forEach(cur => {
+    const old = prev[cur.label];
+    if(old && (String(old.value)!==String(cur.value) || old.score!==cur.score)){
+      changes.push(cur.label + ': ' + old.value + ' (' + old.score + ') → ' + cur.value + ' (' + cur.score + ')');
+    }
+  });
+  if(p.total!==a.total || p.outcome!==a.outcome) changes.push('Result: ' + p.total + ' · ' + p.outcome + ' → ' + a.total + ' · ' + a.outcome);
+  return changes;
+}
+function togglePrior(){
+  const p = $('priorPanel');
+  p.classList.toggle('open');
+  $('priorArrow').textContent = p.classList.contains('open') ? '▼' : '▶';
 }
 
 function exportFileName(){
@@ -1629,6 +1718,10 @@ function buildPrintReport(){
   });
   if(!supRows) supRows = '<tr><td class="k">Material sources</td><td class="v">None declared</td><td class="s"></td></tr>';
   const ovBox = ovNotes.length ? '<div class="pr-rd"><b>✱ Risk data overrides applied:</b> ' + esc(ovNotes.join('; ')) + '.</div>' : '';
+  const pCh = s.prior ? (priorChanges(a) || []) : [];
+  const priorBox = s.prior
+    ? `<div class="pr-prior"><b>Periodic re-assessment</b> of ${dash(s.prior.ref)} (${fmtDate(s.prior.date) ? esc(fmtDate(s.prior.date)) : dash(s.prior.date)} — ${s.prior.total} · ${esc(s.prior.outcome)}). ${pCh.length ? 'Changes since prior: ' + esc(pCh.join('; ')) + '.' : 'No factor changes since the prior review.'}</div>`
+    : '';
   const ovCount = rdCount();
   const rdStamp = 'Risk data: baseline ' + RISK_DATA_VERSION
     + (ovCount ? ' · ' + ovCount + ' local override' + (ovCount===1?'':'s') + ' in effect'
@@ -1678,7 +1771,7 @@ function buildPrintReport(){
         </div>
       </div>
     </div>
-    ${escBoxes}${ovBox}
+    ${escBoxes}${ovBox}${priorBox}
     <h2 class="sec"><span class="n">01</span>Assessment Administration</h2>
     <table class="kv"><tbody>
       <tr><td class="k">Assessed by</td><td class="v">${dash(s.meta.assessor)}</td><td class="s"></td></tr>
