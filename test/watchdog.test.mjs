@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, splitFatfPage, diffLists, buildAlert, normalize, sliceCurrentSection } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, sliceCurrentSection } from '../scripts/fatf-watchdog.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -20,14 +20,15 @@ const fixture = `
 <h2>Jurisdictions under Increased Monitoring</h2>
 <ul><li>Algeria</li><li>Angola</li><li>Bulgaria</li><li>Monaco</li><li>Nigeria</li><li>South Africa</li><li>Côte d'Ivoire</li></ul>`;
 
-const seg = splitFatfPage(fixture);
-const black = extractCountries(seg.black, baseline);
-const grey = extractCountries(seg.grey, baseline);
-check('black list extracted via aliases', black.join('|') === 'Islamic Republic of Iran|Myanmar|North Korea');
-check('grey list extracted incl. accented alias', grey.includes("Cote D'Ivoire") && grey.includes('Nigeria') && grey.length === 7);
-check('heading order tolerated', (() => {
-  const flipped = splitFatfPage(fixture.split('\n').reverse().join('\n'));
-  return typeof flipped.black === 'string' && typeof flipped.grey === 'string';
+const noisy = '<nav>  black and grey lists   call for action  ·  increased monitoring </nav>\n' + fixture.replace('<p>Iran</p>', '<p>     Iran   </p>');
+const lists = classifyCountries(noisy, baseline);
+check('black list classified via aliases despite nav noise and whitespace',
+  lists.black.join('|') === 'Islamic Republic of Iran|Myanmar|North Korea');
+check('grey list classified incl. accented alias, Niger not false-matched',
+  lists.grey.includes("Cote D'Ivoire") && lists.grey.includes('Nigeria')
+  && !lists.grey.includes('Niger') && lists.grey.length === 7);
+check('classification requires both headings', (() => {
+  try { classifyCountries('<p>Iran</p>', baseline); return false; } catch (e) { return true; }
 })());
 
 const diff = diffLists({ black: ['Islamic Republic of Iran', 'Myanmar', 'North Korea'], grey: ['Algeria', 'Monaco'] },

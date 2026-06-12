@@ -63,14 +63,46 @@ export function extractCountries(segment, baseline) {
   return [...found].sort();
 }
 
-export function splitFatfPage(html) {
-  const lower = normalize(html);
-  const blackAt = lower.indexOf('call for action');
-  const greyAt = lower.indexOf('increased monitoring');
-  if (blackAt === -1 || greyAt === -1) throw new Error('FATF page structure changed: section headings not found');
-  const first = Math.min(blackAt, greyAt), second = Math.max(blackAt, greyAt);
-  const seg1 = html.slice(first, second), seg2 = html.slice(second);
-  return blackAt < greyAt ? { black: seg1, grey: seg2 } : { black: seg2, grey: seg1 };
+/* Position-based classification: no slicing (offset bugs are impossible).
+   Every country occurrence is classified by whichever section heading most
+   recently precedes it in the page; the first classified occurrence of a
+   name decides its list. Occurrences before any heading (nav links) are
+   ignored. Works on a lowercased copy, which preserves string positions. */
+export function classifyCountries(html, baseline) {
+  /* lowercase + accent fold; headings and matches use the SAME folded
+     string, so positions stay mutually consistent */
+  const lower = String(html || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  const positions = (needle) => {
+    const out = []; let i = 0;
+    while ((i = lower.indexOf(needle, i)) !== -1) { out.push(i); i += needle.length; }
+    return out;
+  };
+  const blackPos = positions('call for action');
+  const greyPos = positions('increased monitoring');
+  if (!blackPos.length || !greyPos.length) throw new Error('FATF page structure changed: section headings not found');
+  const dict = [
+    ...baseline.map(c => ({ key: normalize(c.name), canonical: c.name })),
+    ...Object.entries(ALIASES).map(([a, c]) => ({ key: normalize(a), canonical: c }))
+  ].sort((a, b) => b.key.length - a.key.length);
+  let masked = lower;
+  const black = new Set(), grey = new Set(), decided = new Set();
+  for (const { key, canonical } of dict) {
+    const rx = new RegExp('(^|[^a-z])(' + escapeRx(key) + ')(?=[^a-z]|$)', 'g');
+    let m;
+    while ((m = rx.exec(masked)) !== null) {
+      if (decided.has(canonical)) break;
+      const idx = m.index + m[1].length;
+      const lastBlack = [...blackPos].filter(p => p < idx).pop();
+      const lastGrey = [...greyPos].filter(p => p < idx).pop();
+      if (lastBlack === undefined && lastGrey === undefined) continue;
+      const isBlack = lastGrey === undefined || (lastBlack !== undefined && lastBlack > lastGrey);
+      (isBlack ? black : grey).add(canonical);
+      decided.add(canonical);
+    }
+    /* mask with same-length filler so shorter names cannot rematch inside */
+    masked = masked.replace(rx, (all, p1, p2) => p1 + '#'.repeat(p2.length));
+  }
+  return { black: [...black].sort(), grey: [...grey].sort() };
 }
 
 export function diffLists(prev, curr) {
@@ -127,8 +159,7 @@ async function fetchFatfSegments() {
     const r = await fetch(FATF_URL, { headers, redirect: 'follow' });
     console.log('fatf-gafi.org direct: ' + r.status);
     if (r.ok) {
-      const seg = splitFatfPage(await r.text());
-      return { blackSeg: seg.black, greySeg: seg.grey, source: 'fatf-gafi.org (live)' };
+      return { html: await r.text(), source: 'fatf-gafi.org (live)' };
     }
   } catch (e) { console.log('fatf direct error: ' + e.message); }
   /* 2. Wayback snapshot via the availability API */
@@ -142,8 +173,7 @@ async function fetchFatfSegments() {
         const s = await fetch(closest.url.replace(/^http:/, 'https:'), { headers, redirect: 'follow' });
         console.log('wayback snapshot ' + (closest.timestamp || '') + ': ' + s.status);
         if (s.ok) {
-          const seg = splitFatfPage(await s.text());
-          return { blackSeg: seg.black, greySeg: seg.grey, source: 'web.archive.org snapshot ' + (closest.timestamp || '') };
+          return { html: await s.text(), source: 'web.archive.org snapshot ' + (closest.timestamp || '') };
         }
       }
     }
@@ -207,12 +237,12 @@ export async function main(mode) {
   }
 
   const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
-  const { blackSeg, greySeg, source } = await fetchFatfSegments();
-  console.log('list source: ' + source);
-  const current = {
-    black: extractCountries(blackSeg, baseline),
-    grey: extractCountries(greySeg, baseline)
-  };
+  const fetched = await fetchFatfSegments();
+  console.log('list source: ' + fetched.source);
+  const source = fetched.source;
+  const current = fetched.html
+    ? classifyCountries(fetched.html, baseline)
+    : { black: extractCountries(fetched.blackSeg, baseline), grey: extractCountries(fetched.greySeg, baseline) };
   /* Safety: a sudden empty/tiny list means the page changed shape, not mass delisting. */
   if (current.black.length < 1 || current.grey.length < 5) {
     throw new Error('FATF parse safety stop: black=' + current.black.length + ' grey=' + current.grey.length + ' — page structure likely changed');
