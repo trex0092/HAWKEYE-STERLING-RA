@@ -15,9 +15,12 @@ exports.handler = async (event) => {
 
   const name = String(payload.name || '').trim().slice(0, 250);
   const notes = String(payload.notes || '').slice(0, 60000);
+  const dueOn = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.due_on || '')) ? payload.due_on : null;
   if (!name) return resp(400, { ok: false, error: 'name required' });
 
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
+  const data = { name, notes, projects: [project] };
+  if (dueOn) data.due_on = dueOn;
   try {
     const r = await fetch('https://app.asana.com/api/1.0/tasks', {
       method: 'POST',
@@ -26,7 +29,7 @@ exports.handler = async (event) => {
         'Content-Type': 'application/json',
         Accept: 'application/json'
       },
-      body: JSON.stringify({ data: { name, notes, projects: [project] } })
+      body: JSON.stringify({ data })
     });
     const d = await r.json();
     if (!r.ok) {

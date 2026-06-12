@@ -490,6 +490,13 @@ ap = A.asanaPayload();
 check('asana delivers manually-entered assessor and MLRO',
   ap.notes.includes('Assessed by: J. Smith (Senior Compliance Analyst), 12/06/2026')
   && ap.notes.includes('Approved by (MLRO): A. Jones (MLRO), 13/06/2026'));
+check('asana due date mirrors the next-review date (risk level)', ap.due_on === A.state.signoff.nextReview
+  && /^\d{4}-\d{2}-\d{2}$/.test(ap.due_on));
+A.onSign('nextReview','2026-08-01');                      // manual entry (e.g. change in law)
+check('manual review date drives the asana due date', A.asanaPayload().due_on === '2026-08-01');
+A.setToggle('sanctions_entity','Yes');                    // prohibited → no review date
+check('prohibited assessments carry no due date', A.asanaPayload().due_on === '');
+A.setToggle('sanctions_entity','No');
 check('toggleComplete is safe without fetch (sandbox/test)', (A.toggleComplete(), A.state.complete === true));
 A.toggleComplete();
 
@@ -498,12 +505,15 @@ A.toggleComplete();
   let sent = null;
   global.fetch = async (url, opts) => { sent = {url, opts}; return {ok:true, status:200, json:async()=>({data:{gid:'42', permalink_url:'https://app.asana.com/x/42'}})}; };
   process.env.ASANA_ACCESS_TOKEN = 'test-token';
-  let r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA X · Y · CDD 19', notes:'n'})});
+  let r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA X · Y · CDD 19', notes:'n', due_on:'2027-06-12'})});
   const body = JSON.parse(r.body), sentBody = JSON.parse(sent.opts.body);
   check('fn creates the asana task in RISK ASSESSMENTS', r.statusCode === 200 && body.ok === true
     && sent.url === 'https://app.asana.com/api/1.0/tasks'
     && sent.opts.headers.Authorization === 'Bearer test-token'
     && sentBody.data.projects[0] === '1215653768729951' && sentBody.data.name === 'RA X · Y · CDD 19');
+  check('fn passes the due date through to asana', sentBody.data.due_on === '2027-06-12');
+  await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x', due_on:'junk'})});
+  check('fn drops malformed due dates', !('due_on' in JSON.parse(sent.opts.body).data));
   r = await fn.handler({httpMethod:'GET'});
   check('fn rejects non-POST', r.statusCode === 405);
   r = await fn.handler({httpMethod:'POST', body:'{}'});

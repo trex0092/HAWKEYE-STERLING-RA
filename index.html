@@ -1342,6 +1342,10 @@ function asanaPayload(){
   const name = String(s.entity.name||'').trim() || '[Unnamed entity]';
   return {
     name: 'RA ' + (String(s.meta.ref||'').trim() || '(no ref)') + ' · ' + name + ' · ' + a.outcome + ' ' + a.total,
+    /* Task due date mirrors the Next Review Date field: suggested by risk
+       level (12/6/3 months), auto-updated when risk data changes the band,
+       and always overridable by manual entry (e.g. on a change in law). */
+    due_on: /^\d{4}-\d{2}-\d{2}$/.test(String(s.signoff.nextReview||'')) ? s.signoff.nextReview : '',
     notes: (String(s.notes||'').trim() || buildNarrative())
       + '\n\nRef: ' + (s.meta.ref || '-')
       + '\nAssessment date: ' + (fmtDate(s.meta.date) || '-')
