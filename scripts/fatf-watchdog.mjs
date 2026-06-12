@@ -100,6 +100,30 @@ export function buildAlert(diff, baseline, affected, today) {
   return notes;
 }
 
+/* fatf-gafi.org sits behind bot protection that 403s datacenter IPs, so we
+   try the live page first and fall back to the Internet Archive's latest
+   snapshot of the same page. For a monthly cadence the snapshot lag is
+   negligible, and the alert only prompts a human to check the official
+   source anyway. */
+async function fetchFatfHtml() {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en'
+  };
+  try {
+    const r = await fetch(FATF_URL, { headers, redirect: 'follow' });
+    if (r.ok) { console.log('source: fatf-gafi.org (live)'); return await r.text(); }
+    console.log('direct fetch returned ' + r.status + ' — falling back to the Web Archive');
+  } catch (e) {
+    console.log('direct fetch failed (' + e.message + ') — falling back to the Web Archive');
+  }
+  const wb = await fetch('https://web.archive.org/web/' + FATF_URL, { headers, redirect: 'follow' });
+  if (!wb.ok) throw new Error('FATF page unavailable both directly and via the Web Archive (' + wb.status + ')');
+  console.log('source: web.archive.org (latest snapshot of the FATF page)');
+  return await wb.text();
+}
+
 async function asana(path, opts = {}) {
   const r = await fetch('https://app.asana.com/api/1.0' + path, {
     ...opts,
@@ -146,9 +170,7 @@ export async function main(mode) {
   }
 
   const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
-  const res = await fetch(FATF_URL, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; fatf-watchdog)' } });
-  if (!res.ok) throw new Error('FATF page fetch failed: ' + res.status);
-  const html = await res.text();
+  const html = await fetchFatfHtml();
   const segments = splitFatfPage(html);
   const current = {
     black: extractCountries(segments.black, baseline),
