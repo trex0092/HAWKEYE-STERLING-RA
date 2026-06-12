@@ -16,9 +16,11 @@ jobs:
         run: node test/app.test.js
       - name: Browser smoke test (headless Chrome)
         run: |
-          # Chrome occasionally exits non-zero after a successful --dump-dom on
-          # runners (shutdown race); the greps below are the real assertions.
-          google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=5000 \
+          # Reduced motion skips the gauge draw-in animation, whose mid-flight
+          # rewind raced the DOM dump under virtual time (flaky runs 38/39).
+          # Chrome's own exit code is tolerated; the greps are the assertions.
+          google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
+            --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/index.html" > /tmp/dom.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom.html
           for s in 'HAWKEYE STERLING — ENTITY RISK ASSESSMENT' 'CDD — Customer Due Diligence' 'stroke-dasharray: 214.7, 452'; do
