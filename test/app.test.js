@@ -224,8 +224,11 @@ A.state.entity.principals = 'John Smith, Jane Doe';
 A.buildPrintReport();
 check('print includes principals', els.printReport._inner.includes('John Smith, Jane Doe'));
 check('mergeState keeps principals', A.mergeState({entity:{principals:'A, B'}}).entity.principals === 'A, B');
-check('old exports with screening data import cleanly',
-  A.mergeState({screening:{at:'x', subjects:[]}, entity:{name:'Y'}}).screening === undefined);
+// `screening` is now the evidence-fields record; legacy live-screening exports
+// ({at, subjects}) must still import cleanly with their junk keys dropped.
+const oldScr = A.mergeState({screening:{at:'x', subjects:[]}, entity:{name:'Y'}});
+check('legacy screening import sanitised to evidence fields',
+  oldScr.screening.sanctions.system === '' && !('at' in oldScr.screening) && !('subjects' in oldScr.screening));
 
 /* ── 15. Deep-review regressions ── */
 // addMonths clamps day overflow instead of rolling into the next month
@@ -322,6 +325,19 @@ check('export sheet did not throw', (A.rdExportSheet(), true));
 check('panel render did not throw', (A.rdRender(), true));
 A.rdResetAll();
 check('reset restores baseline scoring', A.rdCount() === 0 && A.computeAssessment().total === 19);
+
+/* ── 18. Screening evidence fields ── */
+reset();
+A.state.screening.sanctions = {system:'OpenSanctions', date:'2026-06-12', ref:'SCR-001'};
+A.buildPrintReport();
+pr = els.printReport._inner;
+check('report shows screening evidence', pr.includes('Sanctions screening')
+  && pr.includes('OpenSanctions · 12 Jun 2026 · Ref SCR-001'));
+check('report dashes unscreened checks', pr.includes('PEP screening') && pr.includes('Adverse media screening'));
+const scrMerged = A.mergeState({screening:{sanctions:{system:'DJ', date:'2026-01-01', ref:'R1', evil:'x'}, pep:'bogus'}});
+check('mergeState sanitises screening fields', scrMerged.screening.sanctions.system === 'DJ'
+  && !('evil' in scrMerged.screening.sanctions) && scrMerged.screening.pep.system === '');
+check('screening survives draft round-trip', (A.saveDraft(), A.loadDraft().state.screening.sanctions.ref === 'SCR-001'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

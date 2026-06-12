@@ -459,6 +459,22 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       <div class="card">
         <div class="section-hd"><span class="sn">04</span><span class="st">Ownership, Control &amp; Compliance</span></div>
         <div id="questions-oc"></div>
+        <div class="sec-divider">Screening Evidence</div>
+        <div class="field-row three">
+          <div class="fg"><label>Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" oninput="onScreening('sanctions','system',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="date" id="scr_sanctions_date" oninput="onScreening('sanctions','date',this.value)"></div>
+          <div class="fg"><label>Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" oninput="onScreening('sanctions','ref',this.value)"></div>
+        </div>
+        <div class="field-row three">
+          <div class="fg"><label>PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" oninput="onScreening('pep','system',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="date" id="scr_pep_date" oninput="onScreening('pep','date',this.value)"></div>
+          <div class="fg"><label>Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" oninput="onScreening('pep','ref',this.value)"></div>
+        </div>
+        <div class="field-row three">
+          <div class="fg"><label>Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" oninput="onScreening('adverse','system',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="date" id="scr_adverse_date" oninput="onScreening('adverse','date',this.value)"></div>
+          <div class="fg"><label>Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" oninput="onScreening('adverse','ref',this.value)"></div>
+        </div>
       </div>
 
       <!-- 05 · Supply Chain -->
@@ -648,6 +664,7 @@ const BAND_FULL = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence',
 const BAND_ICON = {CDD:'✓', SDD:'!', EDD:'⚠', PROHIBITED:'⛔'};
 const REVIEW_MONTHS = {CDD:36, SDD:24, EDD:12};
 const ASM_SOURCE = 'ASM — Artisanal Mining';
+const SCREENING_GROUPS = [['sanctions','Sanctions screening'],['pep','PEP screening'],['adverse','Adverse media screening']];
 
 const MAX_SCORE = 3 + 3 + QUESTIONS_OC.length*3 + 3 + 3 + 3 + 3*3 + 3*3; /* jurisdiction + activity + questions + onboard + 2×years + 6 suppliers */
 const STORAGE_KEY = 'hsra.draft.v2';
@@ -702,6 +719,7 @@ function defaultState(){
     profile: {activity:'Non-Manufactured Precious Metal Trading', onboard:'No', entityYears:2, relYears:2},
     questions,
     suppliers:{recycled:['LBMA GD Bullion/DGD Good Delivery','N/A','N/A'], mined:['N/A','N/A','N/A']},
+    screening:{sanctions:{system:'',date:'',ref:''}, pep:{system:'',date:'',ref:''}, adverse:{system:'',date:'',ref:''}},
     notes:   '',
     signoff: {completedBy:'', completedTitle:'', completedDate:'', approvedBy:'', approvedTitle:'', approvedDate:'', nextReview:'', reviewManual:false},
     complete: false
@@ -746,6 +764,18 @@ function mergeState(src){
           out.suppliers[k][i] = list.some(o=>o.name===v) ? v : 'N/A';
         });
       }
+    });
+  }
+  if(src.screening && typeof src.screening==='object'){
+    /* evidence-of-screening record: system / date / reference per check */
+    Object.keys(out.screening).forEach(g => {
+      const m = src.screening[g];
+      if(!m || typeof m!=='object') return;
+      ['system','date','ref'].forEach(f => {
+        const v = m[f];
+        if(v==null || typeof v==='object' || typeof v==='function') return;
+        out.screening[g][f] = String(v);
+      });
     });
   }
   if(typeof src.notes==='string') out.notes = src.notes;
@@ -1163,6 +1193,9 @@ function syncUI() {
     $('sel_'+p+'_'+i).value = v; paintSupplier(p,i);
   }));
   $('notesInput').value = s.notes;
+  SCREENING_GROUPS.forEach(([g]) => ['system','date','ref'].forEach(f => {
+    $('scr_'+g+'_'+f).value = s.screening[g][f];
+  }));
   $('completedBy').value = s.signoff.completedBy;
   $('completedTitle').value = s.signoff.completedTitle;
   $('completedDate').value = s.signoff.completedDate;
@@ -1190,6 +1223,7 @@ function onField(section, key, val) {
   scheduleSave();
 }
 function onNotes(val){ state.notes = val; scheduleSave(); }
+function onScreening(group, key, val){ state.screening[group][key] = val; scheduleSave(); }
 function onSign(key, val) {
   state.signoff[key] = val;
   if(key==='nextReview'){ state.signoff.reviewManual = true; recalc(); return; }
@@ -1495,6 +1529,15 @@ function buildPrintReport(){
   const qRows = QUESTIONS_OC.map((q,i) =>
     `<tr><td class="k">${String(i+1).padStart(2,'0')}</td><td class="q">${esc(q.text)}</td><td class="a">${esc(s.questions[q.id])}</td><td class="s">${chip(scoreFromYesNo(s.questions[q.id], q.type))}</td></tr>`).join('');
 
+  const scrRows = SCREENING_GROUPS.map(([g,label]) => {
+    const v = s.screening[g];
+    const has = (v.system || v.date || v.ref);
+    const txt = has
+      ? [(v.system || '—'), (v.date ? (fmtDate(v.date)||v.date) : '—'), (v.ref ? 'Ref ' + v.ref : '—')].join(' · ')
+      : '—';
+    return `<tr><td class="k">${esc(label)}</td><td class="v">${esc(txt)}</td><td class="s"></td></tr>`;
+  }).join('');
+
   let supRows = '';
   [['recycled','Recycled'],['mined','Mined']].forEach(([key,label]) => {
     s.suppliers[key].forEach((v,i) => {
@@ -1579,6 +1622,7 @@ function buildPrintReport(){
     </tbody></table>
     <h2 class="sec"><span class="n">04</span>Ownership, Control &amp; Compliance</h2>
     <table class="kv qs"><tbody>${qRows}</tbody></table>
+    <table class="kv"><tbody>${scrRows}</tbody></table>
     <h2 class="sec"><span class="n">05</span>Supply Chain — Material Sources</h2>
     <table class="kv"><tbody>${supRows}</tbody></table>
     <h2 class="sec"><span class="n">06</span>Assessment Notes &amp; Risk Rationale</h2>
