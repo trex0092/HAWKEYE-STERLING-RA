@@ -1043,7 +1043,7 @@ function refreshSelectLabels(){
   if(jSel && jSel.options){
     for(const opt of jSel.options){
       const e = effCountry(opt.value);
-      if(e) opt.textContent = opt.value + ' — ' + ['','Low ✓','Medium','High ⚠'][e.score] + (e.overridden ? ' ✱' : '');
+      if(e) opt.textContent = opt.value + ' — ' + ratingLabel(e.score) + (e.overridden ? ' ✱' : '');
     }
   }
   const aSel = $('activitySelect');
@@ -1102,7 +1102,7 @@ function buildCountrySelect() {
   sorted.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.name;
-    opt.textContent = c.name + ' — ' + ['','Low ✓','Medium','High ⚠'][c.score];
+    opt.textContent = c.name + ' — ' + ratingLabel(c.score);
     sel.appendChild(opt);
   });
 }
@@ -1320,7 +1320,7 @@ function asanaPayload(){
   const s = state;
   const name = String(s.entity.name||'').trim() || '[Unnamed entity]';
   return {
-    name: 'RA ' + (String(s.meta.ref||'').trim() || '(no ref)') + ' · ' + name + ' · ' + a.outcome + ' ' + a.total,
+    name: (String(s.meta.ref||'').trim() || '(no ref)') + ' · ' + name + ' · ' + a.outcome + ' ' + a.total,
     /* Task due date mirrors the Next Review Date field: suggested by risk
        level (12/6/3 months), auto-updated when risk data changes the band,
        and always overridable by manual entry (e.g. on a change in law).
