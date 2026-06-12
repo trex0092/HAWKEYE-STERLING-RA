@@ -236,6 +236,20 @@ export async function main(mode) {
     return;
   }
 
+  if (mode === 'setup-sections') {
+    /* One-time helper: ensure the four risk-band sections exist so completed
+       assessments file into them (see netlify/functions/asana-task.js). */
+    const names = ['LOW RISK (CDD)', 'MEDIUM RISK (SDD)', 'HIGH RISK (EDD)', 'PROHIBITED (DO NOT ONBOARD)'];
+    const existing = ((await asana('/projects/' + PROJECT_GID + '/sections?limit=100')).data || [])
+      .map(s => String(s.name || '').trim().toUpperCase());
+    for (const n of names) {
+      if (existing.includes(n.toUpperCase())) { console.log('section exists: ' + n); continue; }
+      await asana('/projects/' + PROJECT_GID + '/sections', { method: 'POST', body: JSON.stringify({ data: { name: n } }) });
+      console.log('section created: ' + n);
+    }
+    return;
+  }
+
   const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
   const fetched = await fetchFatfSegments();
   console.log('list source: ' + fetched.source);

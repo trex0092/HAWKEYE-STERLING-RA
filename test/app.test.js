@@ -493,10 +493,12 @@ check('asana delivers manually-entered assessor and MLRO',
   && ap.notes.includes('Approved by (MLRO): A. Jones (MLRO), 13/06/2026'));
 check('asana due date mirrors the next-review date (risk level)', ap.due_on === A.state.signoff.nextReview
   && /^\d{4}-\d{2}-\d{2}$/.test(ap.due_on));
+check('asana payload carries the risk band for sectioning', ap.band === 'CDD');
 A.onSign('nextReview','2026-08-01');                      // manual entry (e.g. change in law)
 check('manual review date drives the asana due date', A.asanaPayload().due_on === '2026-08-01');
 A.setToggle('sanctions_entity','Yes');                    // prohibited → no review date
 check('prohibited assessments carry no due date', A.asanaPayload().due_on === '');
+check('prohibited payload band = PROHIBITED', A.asanaPayload().band === 'PROHIBITED');
 A.setToggle('sanctions_entity','No');
 check('toggleComplete is safe without fetch (sandbox/test)', (A.toggleComplete(), A.state.complete === true));
 A.toggleComplete();
@@ -564,8 +566,16 @@ check('register panel closes', !els.regOverlay.classList.contains('open'));
 
 (async () => {
   const fn = require('../netlify/functions/asana-task.js');
-  let sent = null;
-  global.fetch = async (url, opts) => { sent = {url, opts}; return {ok:true, status:200, json:async()=>({data:{gid:'42', permalink_url:'https://app.asana.com/x/42'}})}; };
+  let sent = null, calls = [];
+  let sectionsOnServer = [{ gid: 's-low', name: 'LOW RISK (CDD)' }];
+  global.fetch = async (url, opts) => {
+    calls.push({ url, opts });
+    if (url.includes('/sections?')) return { ok: true, status: 200, json: async () => ({ data: sectionsOnServer }) };
+    if (/\/projects\/[^/]+\/sections$/.test(url)) return { ok: true, status: 200, json: async () => ({ data: { gid: 's-new' } }) };
+    if (url.includes('/addTask')) return { ok: true, status: 200, json: async () => ({ data: {} }) };
+    sent = { url, opts };
+    return { ok: true, status: 200, json: async () => ({ data: { gid: '42', permalink_url: 'https://app.asana.com/x/42' } }) };
+  };
   process.env.ASANA_ACCESS_TOKEN = 'test-token';
   let r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA X · Y · CDD 19', notes:'n', due_on:'2027-06-12'})});
   const body = JSON.parse(r.body), sentBody = JSON.parse(sent.opts.body);
@@ -576,6 +586,24 @@ check('register panel closes', !els.regOverlay.classList.contains('open'));
   check('fn passes the due date through to asana', sentBody.data.due_on === '2027-06-12');
   await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x', due_on:'junk'})});
   check('fn drops malformed due dates', !('due_on' in JSON.parse(sent.opts.body).data));
+  check('fn assigns the task so Asana sends due-date reminders', JSON.parse(sent.opts.body).data.assignee === 'me');
+  calls = [];
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA Z · Low Co · CDD 19', band:'CDD'})});
+  check('fn files CDD tasks into the LOW RISK section', r.statusCode === 200
+    && JSON.parse(r.body).section === 'LOW RISK (CDD)'
+    && calls.some(c => c.url.includes('/sections?limit=100'))
+    && calls.some(c => c.url.endsWith('/sections/s-low/addTask')));
+  calls = [];
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA W · High Co · EDD 24', band:'EDD'})});
+  const mkSection = calls.find(c => /\/projects\/[^/]+\/sections$/.test(c.url));
+  check('fn creates a missing band section on demand', mkSection
+    && JSON.parse(mkSection.opts.body).data.name === 'HIGH RISK (EDD)'
+    && calls.some(c => c.url.endsWith('/sections/s-new/addTask'))
+    && JSON.parse(r.body).section === 'HIGH RISK (EDD)');
+  calls = [];
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA V · Junk Band Co', band:'NOT-A-BAND'})});
+  check('fn ignores unknown bands (task still created, no section calls)', r.statusCode === 200
+    && JSON.parse(r.body).section === null && !calls.some(c => c.url.includes('section')));
   r = await fn.handler({httpMethod:'GET'});
   check('fn rejects non-POST', r.statusCode === 405);
   r = await fn.handler({httpMethod:'POST', body:'{}'});
