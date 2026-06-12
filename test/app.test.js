@@ -432,9 +432,11 @@ check('next-review input shows dd/mm/yyyy', /^\d{2}\/\d{2}\/\d{4}$/.test(els.nex
 /* ── 23. Narrative template (formal, plain, human voice, audit-ready) ── */
 reset();
 let nar = A.buildNarrative();
-check('low narrative is plain and cites the manual', nar.includes('low risk band')
-  && nar.includes('FG/RAS') && nar.includes('Standard due diligence')
-  && nar.includes('every twelve months') && nar.includes('FG/RDF'));
+check('low narrative cites policies by full name', nar.includes('low risk band')
+  && nar.includes("Company's Risk Assessment methodology") && nar.includes('Standard due diligence')
+  && nar.includes('every twelve months') && nar.includes('Targeted Financial Sanctions')
+  && nar.includes('Know Your Customer procedure'));
+check('narrative contains no manual codes', nar.indexOf('FG/') === -1);
 check('narrative uses placeholder when entity unnamed', nar.includes('[Entity Legal Name]'));
 check('narrative contains no em-dash', nar.indexOf('—') === -1);
 A.state.entity.name = 'Fine Gold LLC';
@@ -464,7 +466,7 @@ check('insertNarrative fills the notes box', A.state.notes.includes('low risk ba
   && els.notesInput.value === A.state.notes);
 A.buildPrintReport();
 check('narrative prints in the report notes', els.printReport._inner.includes('low risk band')
-  && els.printReport._inner.includes('FG/RAS'));
+  && els.printReport._inner.includes('Risk Assessment methodology'));
 
 /* ── 24. Asana delivery payload + Netlify function ── */
 reset();
