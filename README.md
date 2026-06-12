@@ -23,7 +23,8 @@ The entire application lives in [`index.html`](index.html) — no build step, no
 - **Screening evidence** — record the system/provider, date, and reference ID for sanctions, PEP, and adverse-media checks; printed in the report as audit evidence.
 - **Assessment metadata** — auto-generated reference (`RA-YYYYMMDD-NNN`), assessment date, assessor name and role.
 - **Expanded entity identification** — legal and trading names, registration/licence number, jurisdiction, registered address, website/email, principals (beneficial owners / controllers / directors).
-- **Analyst notes & rationale** — free-text section included in the printed report, with a one-click **Narrative Template** that generates a band-matching risk rationale (low / medium / high / prohibited) grounded in the firm's compliance manual (FG/RAS, FG/KYC, FG/RAP, FG/RDF) and auto-filled from the live assessment.
+- **Analyst notes & rationale** — free-text section included in the printed report, with a one-click **Narrative Template** that writes a formal, plain-language risk rationale for the matching band (low / medium / high / prohibited), citing the firm's compliance manual (FG/RAS, FG/KYC, FG/RAP, FG/RDF) and filling in the entity, date, and score automatically.
+- **Asana delivery** — marking an assessment *Complete* on the deployed site creates a task in the firm's **RISK ASSESSMENTS** Asana project (task named after the reference, entity, and band; the narrative and result summary in the description) via a Netlify function, so the Asana token never reaches the browser.
 - **Sign-off & attestation** — first-line (assessed by) and second-line (reviewed & approved, MLRO) blocks with name, title, date, and signature lines under a formal attestation statement, plus an auto-suggested next review date based on the risk band (editable). A *Complete Assessment* toggle tracks draft/complete status.
 - **Print-ready report** — a formal black/pink A4 letterhead report (exact-color printing) with the result box, hard-outcome notices, per-factor score chips across every section, notes, attestation, and signature blocks. Use *Print / Export PDF* → save as PDF.
 - **Persistence** — drafts autosave to the browser (`localStorage`) and are restored on reload. All dates are entered and displayed as DD/MM/YYYY.
@@ -125,6 +126,7 @@ CI runs the suite plus a headless-Chrome smoke test (renders `index.html`, asser
 ├── test/app.test.js            # Functional test suite (no dependencies)
 ├── .github/workflows/ci.yml    # CI — tests + headless-Chrome smoke test on every push / PR
 ├── netlify.toml                # Static publish config (repo root, no build)
+├── netlify/functions/          # Serverless: Asana task delivery on completion
 ├── docs/                       # README screenshots
 ├── design/                     # Original design handoff (reference only, not served logic)
 └── README.md

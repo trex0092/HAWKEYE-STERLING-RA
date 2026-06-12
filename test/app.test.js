@@ -57,7 +57,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
   setAnalystOverride, reassess, priorChanges, fmtDate, dmyToISO, dateFieldChanged,
-  buildNarrative, insertNarrative,
+  buildNarrative, insertNarrative, asanaPayload, sendToAsana,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -429,40 +429,79 @@ A.dateFieldChanged(dEl, v => A.onField('meta','date', v));
 check('date field stores ISO and normalises display', A.state.meta.date === '2026-06-01' && dEl.value === '01/06/2026');
 check('next-review input shows dd/mm/yyyy', /^\d{2}\/\d{2}\/\d{4}$/.test(els.nextReview.value));
 
-/* ── 23. Narrative template (manual-grounded, band-matching) ── */
+/* ── 23. Narrative template (formal, plain, human voice, audit-ready) ── */
 reset();
 let nar = A.buildNarrative();
-check('low-risk narrative cites the manual and CDD measures', nar.includes('LOW RISK')
-  && nar.includes('FG/RAS') && nar.includes('Standard Customer Due Diligence')
-  && nar.includes('every 12 months (FG/KYC)') && nar.includes('biannual/yearly, FG/RDF'));
+check('low narrative is plain and cites the manual', nar.includes('low risk band')
+  && nar.includes('FG/RAS') && nar.includes('Standard due diligence')
+  && nar.includes('every twelve months') && nar.includes('FG/RDF'));
 check('narrative uses placeholder when entity unnamed', nar.includes('[Entity Legal Name]'));
-A.state.entity.name = 'Fine Gold LLC'; A.state.screening.sanctions = {system:'OpenSanctions', date:'2026-06-12', ref:'SCR-1'};
+check('narrative contains no em-dash', nar.indexOf('—') === -1);
+A.state.entity.name = 'Fine Gold LLC';
 nar = A.buildNarrative();
-check('narrative auto-fills entity and screening evidence', nar.includes('Fine Gold LLC')
-  && nar.includes('OpenSanctions, 12/06/2026, ref SCR-1'));
+check('narrative auto-fills entity, date, and score', nar.includes('We assessed Fine Gold LLC on ')
+  && nar.includes('19 / 30+'));
 A.setToggle('criminal','Yes');                                  // 21 → SDD
 nar = A.buildNarrative();
-check('medium narrative names drivers and SDD cadence', nar.includes('MEDIUM RISK')
-  && nar.includes('Criminal proceedings / investigations — Yes (3)')
-  && nar.includes('every 6 months (FG/KYC)') && nar.includes('monthly/quarterly, FG/RDF'));
+check('medium narrative reads human with six-month cycle', nar.includes('medium risk band')
+  && nar.includes('Simplified due diligence') && nar.includes('every six months')
+  && nar.indexOf('—') === -1);
 reset();
 A.setToggle('pep','Yes');                                       // EDD floor
 nar = A.buildNarrative();
-check('high narrative includes EDD measures and 3-month cycle', nar.includes('HIGH RISK')
-  && nar.includes('Enhanced Due Diligence') && nar.includes('every 3 months (FG/KYC)')
-  && nar.includes('PEP measures applied (FG/PEP)') && nar.includes('daily/weekly, FG/RDF'));
+check('high narrative covers EDD measures and three-month cycle', nar.includes('high risk band')
+  && nar.includes('Enhanced due diligence') && nar.includes('every three months')
+  && nar.includes('senior management approval') && nar.indexOf('—') === -1);
 reset();
 A.setToggle('sanctions_entity','Yes');
 nar = A.buildNarrative();
-check('prohibited narrative cites Article 11 and freeze', nar.includes('PROHIBITED — DO NOT ONBOARD')
-  && nar.includes('Article 11 of Federal Decree-Law No. (10) of 2025') && nar.includes('funds are frozen'));
+check('prohibited narrative cites Article 11, freeze, no em-dash', nar.includes('The relationship is prohibited')
+  && nar.includes('Article 11 of Federal Decree-Law No. (10) of 2025') && nar.includes('Funds are frozen')
+  && nar.indexOf('—') === -1);
 reset();
 A.insertNarrative();
-check('insertNarrative fills the notes box', A.state.notes.includes('LOW RISK')
+check('insertNarrative fills the notes box', A.state.notes.includes('low risk band')
   && els.notesInput.value === A.state.notes);
 A.buildPrintReport();
-check('narrative prints in the report notes', els.printReport._inner.includes('LOW RISK')
+check('narrative prints in the report notes', els.printReport._inner.includes('low risk band')
   && els.printReport._inner.includes('FG/RAS'));
 
-console.log('\n' + passed + ' passed, ' + failed + ' failed');
-process.exit(failed ? 1 : 0);
+/* ── 24. Asana delivery payload + Netlify function ── */
+reset();
+A.state.entity.name = 'Fine Gold LLC';
+A.recalc();
+let ap = A.asanaPayload();
+check('asana task name carries ref, entity, band, score',
+  /^RA RA-\d{8}-\d{3} · Fine Gold LLC · CDD 19$/.test(ap.name));
+check('asana notes fall back to the generated narrative', ap.notes.includes('low risk band')
+  && ap.notes.includes('Ref: ' + A.state.meta.ref) && ap.notes.includes('Result: 19 / 30+ (CDD)'));
+A.state.notes = 'Officer-written rationale.';
+ap = A.asanaPayload();
+check('asana notes prefer the officer narrative', ap.notes.startsWith('Officer-written rationale.')
+  && ap.notes.includes('Next review:'));
+check('toggleComplete is safe without fetch (sandbox/test)', (A.toggleComplete(), A.state.complete === true));
+A.toggleComplete();
+
+(async () => {
+  const fn = require('../netlify/functions/asana-task.js');
+  let sent = null;
+  global.fetch = async (url, opts) => { sent = {url, opts}; return {ok:true, status:200, json:async()=>({data:{gid:'42', permalink_url:'https://app.asana.com/x/42'}})}; };
+  process.env.ASANA_ACCESS_TOKEN = 'test-token';
+  let r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA X · Y · CDD 19', notes:'n'})});
+  const body = JSON.parse(r.body), sentBody = JSON.parse(sent.opts.body);
+  check('fn creates the asana task in RISK ASSESSMENTS', r.statusCode === 200 && body.ok === true
+    && sent.url === 'https://app.asana.com/api/1.0/tasks'
+    && sent.opts.headers.Authorization === 'Bearer test-token'
+    && sentBody.data.projects[0] === '1215653768729951' && sentBody.data.name === 'RA X · Y · CDD 19');
+  r = await fn.handler({httpMethod:'GET'});
+  check('fn rejects non-POST', r.statusCode === 405);
+  r = await fn.handler({httpMethod:'POST', body:'{}'});
+  check('fn requires a task name', r.statusCode === 400);
+  delete process.env.ASANA_ACCESS_TOKEN;
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x'})});
+  check('fn fails clearly without token', r.statusCode === 500 && JSON.parse(r.body).error.includes('ASANA_ACCESS_TOKEN'));
+  delete global.fetch;
+
+  console.log('\n' + passed + ' passed, ' + failed + ' failed');
+  process.exit(failed ? 1 : 0);
+})();

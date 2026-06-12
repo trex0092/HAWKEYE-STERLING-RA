@@ -1289,69 +1289,40 @@ function onField(section, key, val) {
 function onNotes(val){ state.notes = val; scheduleSave(); }
 function onScreening(group, key, val){ state.screening[group][key] = val; scheduleSave(); }
 
-/* ── Narrative template: band-matching risk rationale grounded in the
-   compliance manual (FG/RAS, FG/KYC, FG/RAP, FG/RDF, FG/RSP, FG/SWF).
-   Auto-fills from the live assessment; [bracketed] fields need review. ── */
+/* ── Narrative template: general, band-matching risk rationale grounded in
+   the compliance manual (FG/RAS, FG/KYC, FG/RAP, FG/RDF, FG/RSP, FG/SWF).
+   Kept general so one text serves every assessed entity; the few live facts
+   (entity, date, score, jurisdiction band) are filled automatically and
+   [bracketed] fields need officer review. Plain hyphens only (no em-dash). ── */
 function buildNarrative(){
   const a = computeAssessment();
   const s = state;
   const name = String(s.entity.name||'').trim() || '[Entity Legal Name]';
   const when = fmtDate(s.meta.date) || '[DD/MM/YYYY]';
-  const jur = s.entity.jurisdiction;
-  const jC = effCountry(jur);
+  const jC = effCountry(s.entity.jurisdiction);
   const jScore = jC ? jC.score : 1;
-  const jurWord = jScore===1
-    ? 'rated low risk under the Know Your Country methodology (strong AML/CFT framework, low corruption, limited financial-crime exposure — FG/RAS)'
-    : jScore===2
-      ? 'rated medium risk under the Know Your Country methodology (moderate risk indicators, partially mitigated weaknesses — FG/RAS)'
-      : 'rated high risk under the Know Your Country methodology (significant AML/CFT deficiencies, elevated corruption, or FATF listing — FG/RAS)';
-  const scrLine = SCREENING_GROUPS.map(([g,label]) => {
-    const v = s.screening[g];
-    return label.replace(' screening','') + ': ' + ((v.system||v.date||v.ref)
-      ? [(v.system||'[system]'), (v.date?(fmtDate(v.date)||v.date):'[date]'), (v.ref?('ref '+v.ref):'[ref]')].join(', ')
-      : '[system / date / ref]');
-  }).join('; ');
-  const sup = [];
-  [['recycled','recycled'],['mined','mined']].forEach(([k,label]) => {
-    s.suppliers[k].forEach(v => {
-      if(v && v!=='N/A'){
-        const item = effOf(k, v);
-        const cat = item ? (['','A (low)','B (medium)','C (high)'][item.score] || '') : '';
-        sup.push(label+' — '+v+(cat?' (FG/RSP category '+cat+')':''));
-      }
-    });
-  });
-  const supLine = sup.length ? sup.join('; ') : 'none declared';
-  const drivers = a.parts.filter(p => p.score>=2).map(p => p.label+' — '+p.value+' ('+p.score+')');
-  const onboardLine = s.profile.onboard==='Yes' ? 'remote / non-face-to-face (delivery-channel risk, FG/RAS)' : 'face-to-face';
-  const hist = s.profile.entityYears+' year(s) of operating history and a '+s.profile.relYears+'-year relationship';
-  const ovLine = a.analystOv ? ' The operative outcome was raised from '+a.analystOv.from+' to '+a.analystOv.band+' by analyst override — '+a.analystOv.reason+'.' : '';
-  const escLine = a.escalations.length ? ' Escalations recorded: '+a.escalations.map(e=>e.reason).join('; ')+'.' : '';
-
+  const jurWord = ['', 'a low risk jurisdiction under the Know Your Country methodology (FG/RAS)',
+    'a medium risk jurisdiction under the Know Your Country methodology (FG/RAS)',
+    'a high risk jurisdiction under the Know Your Country methodology (FG/RAS)'][jScore];
+  const score = a.total + ' / 30+';
+  let t;
   if(a.prohibited){
-    return 'PROHIBITED — DO NOT ONBOARD. '+name+' was assessed under FG/RAS on '+when+' (total score '+a.total+' / 30+). Designated-party exposure was identified: '
+    t = 'We assessed ' + name + ' on ' + when + ' using the firm\'s risk assessment methodology (FG/RAS). The total score is ' + score + '. Designated party exposure was identified: '
       + a.escalations.filter(e=>e.level==='prohibit').map(e=>e.reason).join('; ')
-      + '. In line with the Risk Appetite Statement (FG/RAP) and Targeted Financial Sanctions procedures (FG/TFS), the relationship must not be established or continued; funds are frozen where held, and the Compliance Officer will determine whether an SAR/STR is required under Article 11 of Federal Decree-Law No. (10) of 2025. Screening evidence — '+scrLine+'. No review date is scheduled; the relationship is declined. Rationale recorded per FG/KYC.';
+      + '. The relationship is prohibited. We will not onboard or continue with this customer. Funds are frozen where held, and the Compliance Officer will decide whether a report must be filed under Article 11 of Federal Decree-Law No. (10) of 2025 (FG/TFS, FG/RAP). No review date is set because the relationship is declined. This note is kept as the record of our decision (FG/KYC).';
+  } else if(a.outcome==='CDD'){
+    t = 'We assessed ' + name + ' on ' + when + ' using the firm\'s risk assessment methodology (FG/RAS). The total score is ' + score + ', which places the customer in the low risk band. The customer operates from ' + jurWord + ' and its licensed activity is within our accepted client sectors (FG/RAP). Screening for sanctions, PEP and adverse media was completed and cleared before onboarding (FG/TFS). We found no concerns over the source of funds or wealth (FG/SWF), and the declared material sources fall within our responsible sourcing rules (FG/RSP). Standard due diligence applies. We will review the file at least every twelve months, re-screen the customer annually, and bring the review forward if anything changes (FG/KYC). Transaction monitoring follows the low risk cycle (FG/RDF). The relationship is within our risk appetite and is approved. This note is kept as the record of our decision (FG/KYC).';
+  } else if(a.outcome==='SDD'){
+    t = 'We assessed ' + name + ' on ' + when + ' using the firm\'s risk assessment methodology (FG/RAS). The total score is ' + score + ', which places the customer in the medium risk band. Some factors raise the profile, such as the jurisdiction, the business activity, the material sources or the length of trading history. Screening was completed and cleared (FG/TFS), the source of funds is verifiable (FG/SWF), and the activity remains within our accepted client sectors (FG/RAP).'
+      + (a.total===22 ? ' The score is one point below the high risk threshold, so a change in a single factor will raise the required diligence.' : '')
+      + ' Simplified due diligence applies, with closer monitoring where needed (FG/RAS). We will review the file every six months, or sooner if a trigger event occurs (FG/KYC). Transaction monitoring follows the medium risk cycle (FG/RDF). We continue the relationship on a conditional basis under the Risk Control Plan (FG/RCP). This note is kept as the record of our decision (FG/KYC).';
+  } else {
+    t = 'We assessed ' + name + ' on ' + when + ' using the firm\'s risk assessment methodology (FG/RAS). The total score is ' + score + ', which places the customer in the high risk band.'
+      + (a.escalations.length ? ' This includes a mandatory escalation: ' + a.escalations.map(e=>e.reason).join('; ') + '.' : '')
+      + (a.analystOv ? ' The outcome was raised from ' + a.analystOv.from + ' by an analyst override: ' + a.analystOv.reason + '.' : '')
+      + ' The main concerns come from factors such as the jurisdiction, the material sources, the delivery channel or the ownership structure. The customer is not based in a FATF blacklisted country, screening returned no matches on the UN, EU, OFAC or UAE lists (FG/TFS), and the source of funds can be verified, so we may continue under enhanced controls (FG/RAP). Enhanced due diligence applies and senior management approval is recorded. We verify the owners and controllers (FG/UBO), obtain documents that support the source of funds and wealth (FG/SWF), and carry out enhanced checks on the supply chain (FG/RSP). We will review the file at least every three months, or immediately if a trigger event occurs (FG/KYC). Transaction monitoring follows the high risk cycle (FG/RDF). Approved by [MLRO name] on [DD/MM/YYYY]. This note is kept as the record of our decision (FG/KYC).';
   }
-  if(a.outcome==='CDD'){
-    return 'RISK CLASSIFICATION & RATIONALE. '+name+' was assessed under the firm\'s structured entity risk assessment (FG/RAS) on '+when+' and is classified LOW RISK with a total score of '+a.total+' / 30+ (CDD band). The entity is incorporated and operates in '+jur+', '+jurWord+'. Its activity, '+s.profile.activity+', falls within the firm\'s targeted client sectors under the Risk Appetite Statement (FG/RAP). All ownership, control and compliance indicators returned the favourable response, and the entity maintains an adequate AML/CFT control environment. Sanctions, PEP and adverse-media screening was completed and cleared by the Compliance Officer (FG/TFS) — '+scrLine+'. Source of funds and wealth raise no concerns (FG/SWF). Material sourcing: '+supLine+'. '+hist+' and '+onboardLine+' onboarding support profile stability.'+escLine+ovLine
-      + ' DUE DILIGENCE & FORWARD PLAN. Per FG/RAS (categorisation 1 — Low), Standard Customer Due Diligence applies. KYC and CDD will be reviewed at least every 12 months (FG/KYC), with annual re-screening, event-driven review on any trigger, and transaction monitoring at the low-risk cadence (biannual/yearly, FG/RDF). The relationship is within risk appetite and approved; rationale recorded per FG/KYC.';
-  }
-  if(a.outcome==='SDD'){
-    return 'RISK CLASSIFICATION & RATIONALE. '+name+' was assessed under FG/RAS on '+when+' and is classified MEDIUM RISK with a total score of '+a.total+' / 30+ (SDD band). Elevated factors: '
-      + (drivers.length ? drivers.join('; ') : '[name the scored drivers]')
-      + '. Mitigating factors: screening completed and cleared (FG/TFS) — '+scrLine+'; the activity ('+s.profile.activity+') is licensed and within targeted sectors (FG/RAP); source of funds is verifiable (FG/SWF); onboarding was '+onboardLine+'; '+hist+'. Material sourcing: '+supLine+'.'
-      + (a.total===22 ? ' The profile sits one point below the EDD threshold; any deterioration in a single factor escalates the required diligence.' : '')
-      + escLine+ovLine
-      + ' DUE DILIGENCE & FORWARD PLAN. Per FG/RAS (categorisation 2 — Medium), Simplified Due Diligence measures apply with enhanced monitoring where appropriate. KYC and CDD are reviewed every 6 months (FG/KYC), with transaction monitoring at the medium cadence (monthly/quarterly, FG/RDF) and earlier review on any trigger event. The relationship continues on an acceptable/conditional basis under the Risk Control Plan (FG/RCP); rationale recorded per FG/KYC.';
-  }
-  return 'RISK CLASSIFICATION & RATIONALE. '+name+' was assessed under FG/RAS on '+when+' and is classified HIGH RISK with a total score of '+a.total+' / 30+ (EDD band).'+escLine+ovLine+' Principal drivers: '
-    + (drivers.length ? drivers.join('; ') : '[name the scored drivers]')
-    + '. Jurisdiction: '+jur+', '+jurWord+'. Material sourcing: '+supLine+'. Onboarding: '+onboardLine+'. Appetite check (FG/RAP): the jurisdiction is not FATF-blacklisted, screening produced no UN/EU/OFAC/UAE designations (FG/TFS — '+scrLine+'), and source of funds is verifiable — the relationship remains permissible subject to enhanced controls.'
-    + ' DUE DILIGENCE & FORWARD PLAN. Per FG/RAS (categorisation 3 — High), Enhanced Due Diligence is executed with senior management approval recorded: certified identification and UBO verification (FG/UBO); documentary corroboration of source of funds and wealth (FG/SWF); supply-chain enhanced due diligence including licences and traceability records (FG/RSP)'
-    + (s.profile.onboard==='Yes' ? '; certified documents, banking verification and live verification for non-face-to-face onboarding (FG/KYC)' : '')
-    + (s.questions.pep==='Yes' ? '; PEP measures applied (FG/PEP)' : '')
-    + '. KYC and CDD are re-performed at least every 3 months (FG/KYC) with transaction monitoring at the high-risk cadence (daily/weekly, FG/RDF) and immediate review on any trigger. Approved by [MLRO name] on [DD/MM/YYYY]; rationale recorded per FG/KYC.';
+  return t.replace(/—/g, '-'); /* narrative stays em-dash free per client style */
 }
 function insertNarrative(){
   const t = buildNarrative();
@@ -1359,7 +1330,38 @@ function insertNarrative(){
   state.notes = t;
   $('notesInput').value = t;
   scheduleSave();
-  toast('Narrative inserted — review the [bracketed] fields');
+  toast('Narrative inserted');
+}
+
+/* ── Asana delivery: marking an assessment Complete creates a task in the
+   RISK ASSESSMENTS project via a Netlify function (token stays server side). ── */
+function asanaPayload(){
+  const a = computeAssessment();
+  const s = state;
+  const name = String(s.entity.name||'').trim() || '[Unnamed entity]';
+  return {
+    name: 'RA ' + (String(s.meta.ref||'').trim() || '(no ref)') + ' · ' + name + ' · ' + a.outcome + ' ' + a.total,
+    notes: (String(s.notes||'').trim() || buildNarrative())
+      + '\n\nRef: ' + (s.meta.ref || '-')
+      + '\nAssessment date: ' + (fmtDate(s.meta.date) || '-')
+      + '\nEntity: ' + name
+      + '\nJurisdiction: ' + s.entity.jurisdiction
+      + '\nActivity: ' + s.profile.activity
+      + '\nResult: ' + a.total + ' / 30+ (' + a.outcome + ')'
+      + '\nNext review: ' + (fmtDate(s.signoff.nextReview) || '-')
+  };
+}
+function sendToAsana(){
+  /* Only meaningful on the deployed site; silently unavailable on file:// and in tests. */
+  if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) return;
+  const p = asanaPayload();
+  fetch('/.netlify/functions/asana-task', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(p)
+  }).then(r => r.json()).then(d => {
+    toast(d && d.ok ? 'Delivered to Asana: ' + p.name : 'Asana delivery failed' + (d && d.error ? ' (' + d.error + ')' : ''));
+  }).catch(() => toast('Asana delivery unavailable'));
 }
 function onSign(key, val) {
   state.signoff[key] = val;
@@ -1401,6 +1403,7 @@ function toggleComplete() {
   state.complete = !state.complete;
   paintStatus();
   scheduleSave();
+  if(state.complete) sendToAsana();
   toast(state.complete ? 'Assessment marked complete' : 'Assessment back to draft');
 }
 
