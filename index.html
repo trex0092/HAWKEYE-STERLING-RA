@@ -161,6 +161,8 @@ input[type="number"]{-moz-appearance:textfield}
 .btn-blue:hover{background:rgba(126,200,255,0.18);color:#B5E0FF;box-shadow:0 0 20px rgba(126,200,255,0.42)}
 .btn-lilac{background:rgba(201,162,255,0.10);color:#CBA8FF;border-color:rgba(201,162,255,0.45);box-shadow:0 0 12px rgba(201,162,255,0.22),inset 0 0 10px rgba(201,162,255,0.05)}
 .btn-lilac:hover{background:rgba(201,162,255,0.18);color:#DEC4FF;box-shadow:0 0 20px rgba(201,162,255,0.42)}
+.btn-red{background:rgba(255,87,87,0.10);color:#FF7D7D;border-color:rgba(255,87,87,0.50);box-shadow:0 0 12px rgba(255,87,87,0.25),inset 0 0 10px rgba(255,87,87,0.06)}
+.btn-red:hover{background:rgba(255,87,87,0.18);color:#FF9B9B;border-color:rgba(255,87,87,0.7);box-shadow:0 0 20px rgba(255,87,87,0.45)}
 button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
 /* ── Side panel ───────────────────────── */
@@ -174,7 +176,8 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sp-indicator{height:2px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2))!important;width:50%;margin:0 auto 4px;box-shadow:0 0 10px rgba(255,92,168,0.5),0 0 18px rgba(180,92,255,0.3)}
 .sp-score-label{text-align:center;font-size:8px;color:#D6DBE6;letter-spacing:1.2px;text-transform:uppercase;font-family:var(--mono)}
 .sp-spacer{flex:1;min-height:10px}
-.sp-actions{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--border2)}
+.sp-actions{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--border2)}
+.sp-actions .btn{padding:6px 12px;font-size:9.5px}
 .save-stamp{text-align:center;font-size:8.5px;color:var(--text3);font-family:var(--mono);letter-spacing:0.5px;min-height:12px;margin-top:2px}
 .verdict-pill{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:600;border:1px solid;margin-bottom:10px;white-space:nowrap;width:fit-content;font-family:var(--sans)}
 .vp-cdd{background:var(--cdd-bg);color:var(--cdd-text);border-color:var(--cdd-bd)}
@@ -607,6 +610,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       <div class="sp-actions no-print">
         <button class="btn btn-primary btn-full" onclick="printReport()" title="Safari: choose A4 paper size and enable “Print backgrounds” in the print dialog">⎙ Print / Export PDF</button>
         <button class="btn btn-secondary btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
+        <button class="btn btn-red btn-full" onclick="newAssessment()">↺ Reset</button>
         <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
       </div>
