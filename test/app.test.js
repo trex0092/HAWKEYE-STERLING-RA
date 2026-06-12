@@ -17,6 +17,8 @@ function makeEl() {
       contains(c){ return this._s.has(c); }
     },
     appendChild(){}, addEventListener(){}, click(){},
+    setAttribute(k,v){ this['_a_'+k] = String(v); },
+    getAttribute(k){ const v = this['_a_'+k]; return v==null ? null : v; },
   };
   Object.defineProperty(el, 'innerHTML', {
     get(){ return this._inner; },
@@ -406,6 +408,14 @@ check('mergeState rejects malformed priors', A.mergeState({prior:{total:'NaNish'
   && A.mergeState({prior:{total:19, outcome:'BOGUS'}}).prior === null);
 A.newAssessment();
 check('new assessment clears the prior', A.state.prior === null && els.priorBlock.style.display === 'none');
+
+/* ── 21. Accessibility: toggle buttons expose pressed state ── */
+reset();
+check('aria-pressed reflects the AML answer (Yes default)',
+  els.btn_aml_yes.getAttribute('aria-pressed') === 'true' && els.btn_aml_no.getAttribute('aria-pressed') === 'false');
+A.setToggle('aml','No');
+check('aria-pressed follows toggling', els.btn_aml_yes.getAttribute('aria-pressed') === 'false'
+  && els.btn_aml_no.getAttribute('aria-pressed') === 'true');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -14,3 +14,11 @@ jobs:
           node-version: 22
       - name: Run scoring-engine tests
         run: node test/app.test.js
+      - name: Browser smoke test (headless Chrome)
+        run: |
+          google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=5000 \
+            --dump-dom "file://$PWD/index.html" > /tmp/dom.html
+          grep -q 'HAWKEYE STERLING — ENTITY RISK ASSESSMENT' /tmp/dom.html
+          grep -q 'CDD — Customer Due Diligence' /tmp/dom.html
+          grep -q 'stroke-dasharray: 214.7, 452' /tmp/dom.html
+          echo "smoke ok — app renders, engine computes 19/CDD, gauge wired"

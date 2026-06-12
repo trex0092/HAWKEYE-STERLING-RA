@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entity Risk Assessment — Hawkeye Sterling LLC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/fg-dark.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="doc-header" data-screen-label="Header">
+    <div class="brand-area">
+      <div class="brand-mark">HS</div>
+      <div class="brand-name">HAWKEYE STERLING — ENTITY RISK ASSESSMENT</div>
+    </div>
+    <div class="hdr-right">
+      <span class="doc-ref" id="docRef">Ref: —</span>
+      <span class="hdr-sep">·</span>
+      <span class="doc-date" id="docDate">—</span>
+      <span class="status-badge s-draft" id="statusBadge">DRAFT</span>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <div class="form-panel">
+
+      <div class="card" data-screen-label="01 Assessment Administration">
+        <div class="section-hd"><span class="sn">01</span><span class="st">Assessment Administration</span></div>
+        <div class="field-row three">
+          <div class="fg"><label>Reference Number</label><input type="text" id="refNumber" placeholder="HS-2024-0001" oninput="onRefChange()"></div>
+          <div class="fg"><label>Assessment Date</label><input type="text" id="assessmentDate" placeholder="DD/MM/YYYY" maxlength="10" onchange="onDateChange()"></div>
+          <div class="fg"><label>Next Review Date</label><input type="text" id="nextReviewDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
+        </div>
+        <div class="field-row">
+          <div class="fg"><label>Assessed By</label><input type="text" id="assessorName" placeholder="Full name" oninput="saveLS()"></div>
+          <div class="fg"><label>Role / Department</label><input type="text" id="assessorRole" placeholder="e.g. Compliance Officer" oninput="saveLS()"></div>
+        </div>
+      </div>
+
+      <div class="card" data-screen-label="02 Entity Identification">
+        <div class="section-hd"><span class="sn">02</span><span class="st">Entity Identification</span></div>
+        <div class="field-row">
+          <div class="fg"><label>Legal Entity Name</label><input type="text" id="entityName" placeholder="e.g. Hawkeye Sterling LLC" value="XXXX"></div>
+          <div class="fg"><label>Jurisdiction &amp; Incorporation <span id="jurisdictionScore" class="score-tag st-1">1 · Low</span></label><select id="jurisdictionSelect" onchange="onJurisdiction()"></select></div>
+        </div>
+      </div>
+
+      <div class="card" data-screen-label="03 Business Profile">
+        <div class="section-hd"><span class="sn">03</span><span class="st">Business Profile</span></div>
+        <div class="field-row">
+          <div class="fg"><label>Business Activity <span id="activityScore" class="score-tag st-3">3 · High</span></label><select id="activitySelect" onchange="onActivity()"></select></div>
+          <div class="fg">
+            <label>Onboarding Channel <span id="onboard_score_tag" class="score-tag st-1">1 · Low</span></label>
+            <div class="toggle-group">
+              <button class="toggle-btn active-no" id="btn_onboard_no" onclick="setToggle('onboard','No','onboard')">In-Person</button>
+              <button class="toggle-btn" id="btn_onboard_yes" onclick="setToggle('onboard','Yes','onboard')">Remote / Non-F2F</button>
+            </div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="fg">
+            <label>Operational History — Entity <span id="entityYearsScore" class="score-tag st-1">1 · Low</span></label>
+            <div style="display:flex;align-items:center;gap:8px"><input type="number" id="entityYearsInput" min="0" max="99" value="2" oninput="onYears('entity')" style="width:72px"><span style="font-size:12px;color:var(--text3)">years in operation</span></div>
+          </div>
+          <div class="fg">
+            <label>Relationship Duration <span id="relYearsScore" class="score-tag st-1">1 · Low</span></label>
+            <div style="display:flex;align-items:center;gap:8px"><input type="number" id="relYearsInput" min="0" max="99" value="2" oninput="onYears('rel')" style="width:72px"><span style="font-size:12px;color:var(--text3)">years with entity</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-screen-label="04 Ownership Control Compliance">
+        <div class="section-hd"><span class="sn">04</span><span class="st">Ownership, Control &amp; Compliance</span></div>
+        <div id="questions-oc"></div>
+      </div>
+
+      <div class="card" data-screen-label="05 Supply Chain">
+        <div class="section-hd"><span class="sn">05</span><span class="st">Supply Chain — Material Sources</span></div>
+        <div class="sec-divider">Recycled Material Sources</div>
+        <div class="supplier-grid" id="recycled-grid"></div>
+        <div class="sec-divider">Mined Material Sources</div>
+        <div class="supplier-grid" id="mined-grid"></div>
+      </div>
+
+      <div class="card" data-screen-label="06 Sign-Off">
+        <div class="section-hd"><span class="sn">06</span><span class="st">Sign-Off &amp; Attestation</span></div>
+        <div class="attest-statement">I confirm that this risk assessment has been completed in accordance with Hawkeye Sterling LLC&rsquo;s AML/CFT Risk Assessment Policy, the applicable DPMS regulatory guidelines, and all relevant national and international sanctions obligations. The information provided is accurate to the best of my knowledge.</div>
+        <div class="attest-grid">
+          <div class="attest-block">
+            <div class="attest-role">First-Line — Assessed By</div>
+            <div class="fg"><label>Full Name</label><input type="text" id="s_assessorName" placeholder="Full name" oninput="saveLS()"></div>
+            <div class="fg" style="margin-top:10px"><label>Title / Role</label><input type="text" id="s_assessorTitle" placeholder="e.g. Compliance Analyst" oninput="saveLS()"></div>
+            <div class="fg" style="margin-top:10px"><label>Date</label><input type="text" id="s_assessorDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
+            <div class="sig-line"></div><div class="sig-caption">Signature</div>
+          </div>
+          <div class="attest-block">
+            <div class="attest-role">Second-Line — Reviewed &amp; Approved By</div>
+            <div class="fg"><label>Full Name</label><input type="text" id="s_reviewerName" placeholder="Full name" oninput="saveLS()"></div>
+            <div class="fg" style="margin-top:10px"><label>Title / Role</label><input type="text" id="s_reviewerTitle" placeholder="e.g. MLRO / Head of Compliance" oninput="saveLS()"></div>
+            <div class="fg" style="margin-top:10px"><label>Date</label><input type="text" id="s_reviewerDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
+            <div class="sig-line"></div><div class="sig-caption">Signature</div>
+          </div>
+        </div>
+        <div class="fg">
+          <label class="neon-title">Assessment Notes &amp; Risk Rationale</label>
+          <textarea id="assessmentNotes" placeholder="Document any overrides, mitigating factors, escalation rationale, or additional risk considerations..." oninput="saveLS()"></textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <aside class="side-panel" data-screen-label="Risk Summary Panel">
+      <div class="sp-block">
+        <div class="gauge-wrap">
+          <svg viewBox="0 0 220 185" width="220" height="185">
+            <defs>
+              <linearGradient id="trackZone" x1="30" y1="110" x2="190" y2="110" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="rgba(44,95,138,0.14)"></stop>
+                <stop offset="63%" stop-color="rgba(44,95,138,0.14)"></stop>
+                <stop offset="73%" stop-color="rgba(255,148,52,0.14)"></stop>
+                <stop offset="100%" stop-color="rgba(255,87,87,0.14)"></stop>
+              </linearGradient>
+              <linearGradient id="gaugeGrad" x1="20" y1="110" x2="200" y2="110" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#5B9BD8"></stop>
+                <stop offset="58%" stop-color="#5B9BD8"></stop>
+                <stop offset="72%" stop-color="#FF9434"></stop>
+                <stop offset="88%" stop-color="#FF5757"></stop>
+                <stop offset="100%" stop-color="#FF5757"></stop>
+              </linearGradient>
+            </defs>
+            <circle cx="110" cy="106" r="74" fill="none" stroke="url(#trackZone)" stroke-width="12" stroke-dasharray="339 113" stroke-linecap="butt" transform="rotate(135,110,106)"></circle>
+            <circle cx="110" cy="106" r="74" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10" stroke-dasharray="339 113" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
+            <circle id="gaugeArc" cx="110" cy="106" r="74" fill="none" stroke="url(#gaugeGrad)" stroke-width="10" stroke-dasharray="0 452" stroke-linecap="round" transform="rotate(135,110,106)" style="transition:stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1)"></circle>
+            <circle cx="110" cy="106" r="86" fill="none" stroke="rgba(255,148,52,0.55)" stroke-width="2" stroke-dasharray="2 450" stroke-dashoffset="-212" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
+            <circle cx="110" cy="106" r="86" fill="none" stroke="rgba(255,87,87,0.55)" stroke-width="2" stroke-dasharray="2 450" stroke-dashoffset="-248" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
+            <text id="totalScore" x="110" y="98" text-anchor="middle" font-family="Arial Narrow,Arial,sans-serif" font-size="46" font-weight="600" fill="#F0EDE4" letter-spacing="-1">0</text>
+            <text x="110" y="118" text-anchor="middle" font-family="Arial Narrow,Arial,sans-serif" font-size="8" fill="#D6DBE6" letter-spacing="1.5">RISK SCORE</text>
+          </svg>
+        </div>
+        <div class="sp-indicator" id="scoreIndicator"></div>
+        <div class="sp-score-label">Out of 30+</div>
+      </div>
+
+      <div class="sp-block">
+        <div class="sp-label">Required Diligence</div>
+        <div class="verdict-pill vp-cdd" id="verdictPill"><span id="verdictIcon">✓</span><span id="verdictText">CDD — Customer Due Diligence</span></div>
+        <div class="sb-thresholds">
+          <span class="thresh-chip tc-low tc-active" id="tc-low">CDD: 0–19</span>
+          <span class="thresh-chip tc-med" id="tc-med">SDD: 20–22</span>
+          <span class="thresh-chip tc-high" id="tc-high">EDD: 23+</span>
+        </div>
+      </div>
+
+      <div class="sp-block">
+        <div class="sp-label">Risk Position</div>
+        <div class="sb-bar-track"><div class="sb-seg-low"></div><div class="sb-seg-med"></div><div class="sb-seg-high"></div></div>
+        <div class="sb-bar-pointer-wrap"><div class="sb-bar-pointer" id="barPointer" style="left:0%"><span id="pointerLabel">0</span></div></div>
+        <div class="sb-axis"><span>0</span><span>10</span><span>20</span><span>30</span></div>
+        <div class="boundary-warn" id="boundaryWarn">⚠ At CDD/SDD boundary — one point triggers SDD.</div>
+      </div>
+
+      <div class="sp-block">
+        <button class="breakdown-toggle" onclick="toggleBreakdown()"><span id="bdArrow">▶</span>&nbsp;Score Breakdown</button>
+        <div class="breakdown-panel" id="breakdownPanel"><table class="bd-table" id="bdTable"><tbody></tbody></table></div>
+      </div>
+
+      <div class="sp-spacer"></div>
+
+      <div class="sp-actions no-print">
+        <button class="btn btn-primary btn-full" onclick="printReport()">⎙ Print / Export PDF</button>
+        <button class="btn btn-secondary btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
+        <button class="btn btn-ghost btn-full" onclick="resetForm()">↺ Reset</button>
+      </div>
+    </aside>
+  </div>
+  <div class="print-footer" id="printFooter">CONFIDENTIAL — Hawkeye Sterling LLC — AML/CFT Entity Risk Assessment — DPMS Template</div>
+</div>
+
+<div id="tweaks-root" class="no-print"></div>
+
+<script src="assets/fg-app.js"></script>
+<script src="assets/fg-anim.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="assets/tweaks-panel.jsx"></script>
+<script type="text/babel" src="assets/fg-tweaks-dark.jsx"></script>
+
+</body>
+</html>
