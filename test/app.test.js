@@ -51,7 +51,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   computeAssessment, setToggle, onYears, onJurisdiction, onActivity, onSupplier,
   onSign, onField, useSuggestedReview, recalc, syncUI, freshState, mergeState,
   saveDraft, loadDraft, exportJSON, buildPrintReport, newAssessment, MAX_SCORE,
-  addMonths, exportFileName
+  addMonths, exportFileName, toggleComplete
 };`);
 const A = globalThis.__app;
 const txt = el => String(el.textContent);
@@ -201,7 +201,7 @@ check('print prohibition box cites factor + instruction', pr.includes('Prolifera
   && pr.includes('Freeze funds where held'));
 check('print escapes HTML in name', pr.includes('&lt;img src=x onerror=alert(1)&gt; &amp; Co') && !pr.includes('<img src=x'));
 check('print escapes notes + newlines', pr.includes('line1<br>line2 &lt;script&gt;'));
-check('print includes max score', pr.includes('/ 66'));
+check('print shows score caption (0–30 display scale)', pr.includes('Risk score / 30+'));
 reset();
 A.setToggle('pep','Yes');
 A.buildPrintReport();
@@ -257,6 +257,24 @@ A.state.meta.ref = 'RA/2026:te*st?"x"<y>|z';
 check('export filename sanitised', A.exportFileName() === 'RA-2026-te-st--x--y--z.json');
 A.state.meta.ref = '  ';
 check('blank ref falls back to default filename', A.exportFileName() === 'risk-assessment.json');
+
+/* ── 16. Dark-redesign additions: gauge, complete toggle, signatory titles ── */
+reset();
+check('gauge arc tracks score (19/30 of the 339-unit sweep)', els.gaugeArc.style.strokeDasharray === '214.7 452');
+A.setToggle('criminal','Yes');                                 // 21
+check('gauge arc updates on change', els.gaugeArc.style.strokeDasharray === '237.3 452');
+reset();
+A.toggleComplete();
+check('complete toggle sets state + badge + button', A.state.complete === true
+  && els.statusBadge.className === 'status-badge s-complete'
+  && txt(els.btnComplete) === '✓ Mark as Draft');
+A.toggleComplete();
+check('complete toggle back to draft', A.state.complete === false
+  && els.statusBadge.className === 'status-badge s-draft');
+check('mergeState keeps signatory titles', A.mergeState({signoff:{completedTitle:'Analyst', approvedTitle:'MLRO'}}).signoff.completedTitle === 'Analyst'
+  && A.mergeState({signoff:{approvedTitle:'MLRO'}}).signoff.approvedTitle === 'MLRO');
+check('mergeState normalises complete flag', A.mergeState({complete:'true'}).complete === true
+  && A.mergeState({complete:{}}).complete === false && A.mergeState({}).complete === false);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

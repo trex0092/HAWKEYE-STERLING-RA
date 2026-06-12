@@ -11,15 +11,16 @@ The entire application lives in [`index.html`](index.html) — no build step, no
 ## Features
 
 - **Structured risk scoring** across jurisdiction, business activity, onboarding channel, operational history, relationship duration, ownership/control/compliance questions, and supply-chain material sources (recycled and mined).
-- **Live verdict** — total score, numeric band (CDD / SDD / EDD), score bar, and a full per-factor breakdown table.
+- **Dark neon interface** — six numbered form sections beside a sticky risk-summary sidebar: an animated 270° SVG risk gauge, the required-diligence verdict with threshold chips, a 0–30 risk-position bar, and a collapsible per-factor score breakdown. Entrance and gauge animations respect `prefers-reduced-motion`.
+- **Live verdict** — total score, numeric band (CDD / SDD / EDD), and boundary warnings one point below each band edge, recomputed on every change.
 - **Hard outcomes** — designated-party exposure (sanctions on the entity or its principals, terrorist financing, proliferation financing) produces a **PROHIBITED — Do Not Onboard** verdict with freeze-and-report instructions; PEP exposure, FATF call-for-action jurisdictions, and the ASM/high-risk-country red flag force **mandatory EDD** regardless of the numeric score. Every escalation is shown with its reason and carried into the export and printed report.
 - **Assessment metadata** — auto-generated reference (`RA-YYYYMMDD-NNN`), assessment date, assessor name and role.
 - **Expanded entity identification** — legal and trading names, registration/licence number, jurisdiction, registered address, website/email, principals (beneficial owners / controllers / directors).
 - **Analyst notes & rationale** — free-text section included in the printed report.
-- **Sign-off & review** — completed-by / approved-by (MLRO) fields with dates, plus an auto-suggested next review date based on the risk band (editable).
-- **Print-ready report** — a dedicated print layout (A4) with entity details, full factor breakdown, verdict, notes, signature lines, and disclaimer. Use *Print report* → save as PDF.
+- **Sign-off & attestation** — first-line (assessed by) and second-line (reviewed & approved, MLRO) blocks with name, title, date, and signature lines under a formal attestation statement, plus an auto-suggested next review date based on the risk band (editable). A *Complete Assessment* toggle tracks draft/complete status.
+- **Print-ready report** — a formal black/pink A4 letterhead report (exact-color printing) with the result box, hard-outcome notices, per-factor score chips across every section, notes, attestation, and signature blocks. Use *Print / Export PDF* → save as PDF.
 - **Persistence** — drafts autosave to the browser (`localStorage`) and are restored on reload; assessments can be exported/imported as JSON for record-keeping.
-- **Record completeness indicator** and automatic dark-mode support.
+- **Record completeness indicator** in the risk-summary sidebar.
 
 ## Risk methodology
 
@@ -88,7 +89,7 @@ python3 -m http.server 8000
 The scoring engine, hard-outcome escalations, persistence, and report rendering are covered by a dependency-free test suite that executes the app's full inline script against a DOM stub:
 
 ```bash
-node test/app.test.js   # 55 checks
+node test/app.test.js   # 77 checks
 ```
 
 CI runs the suite on every push and pull request (`.github/workflows/ci.yml`).
