@@ -41,7 +41,13 @@ const ALIASES = {
 };
 
 export function normalize(s) {
-  return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  /* hyphens fold to spaces so "Guinea-Bissau" can never half-match as "Guinea" */
+  return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[‐‑‒–—-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/* Multi-word names must match across any whitespace run (newlines in HTML). */
+function keyToRx(key) {
+  return key.split(' ').map(escapeRx).join('\\s+');
 }
 
 export function loadBaseline(indexHtml) {
@@ -63,7 +69,7 @@ export function extractCountries(segment, baseline) {
   ].sort((a, b) => b.key.length - a.key.length);
   const found = new Set();
   for (const { key, canonical } of dict) {
-    const rx = new RegExp('(^|[^a-z])(' + escapeRx(key) + ')(?=[^a-z]|$)', 'g');
+    const rx = new RegExp('(^|[^a-z])(' + keyToRx(key) + ')(?=[^a-z]|$)', 'g');
     if (rx.test(text)) {
       found.add(canonical);
       text = text.replace(rx, '$1§');
@@ -78,9 +84,11 @@ export function extractCountries(segment, baseline) {
    name decides its list. Occurrences before any heading (nav links) are
    ignored. Works on a lowercased copy, which preserves string positions. */
 export function classifyCountries(html, baseline) {
-  /* lowercase + accent fold; headings and matches use the SAME folded
-     string, so positions stay mutually consistent */
-  const lower = String(html || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  /* lowercase + accent fold + 1:1 hyphen/whitespace fold; headings and
+     matches use the SAME folded string, and every fold maps one character
+     to one character, so positions stay mutually consistent */
+  const lower = String(html || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2010\u2011\u2012\u2013\u2014-]/g, ' ').replace(/\s/g, ' ');
   const positions = (needle) => {
     const out = []; let i = 0;
     while ((i = lower.indexOf(needle, i)) !== -1) { out.push(i); i += needle.length; }
@@ -88,14 +96,18 @@ export function classifyCountries(html, baseline) {
   };
   const blackPosAll = positions('call for action');
   const greyPosAll = positions('increased monitoring');
-  /* "Jurisdictions no longer subject to ..." headings open the DELISTED
-     tables; names under them are former members, not current ones. Those
-     headings embed the same needles ("...no longer subject to increased
-     monitoring"), so drop needle hits that sit inside such a heading. */
-  const endPos = positions('no longer subject to');
+  /* Terminators close a list region: the "no longer subject to ..."
+     delisted headings, and the boilerplate that follows the lists on the
+     FATF page ("Find out more ..."). Names governed by a terminator (or
+     sitting unreasonably far below their heading - footer/nav links) are
+     not current members. The delisted headings embed the same needles
+     ("...no longer subject to increased monitoring"), so needle hits
+     inside them are dropped. */
+  const endPos = [...positions('no longer subject to'), ...positions('find out more'), ...positions('related publication'), ...positions('related material')].sort((a, b) => a - b);
   const insideEndHeading = p => endPos.some(e => p >= e && p - e <= 60);
   const blackPos = blackPosAll.filter(p => !insideEndHeading(p));
   const greyPos = greyPosAll.filter(p => !insideEndHeading(p));
+  const MAX_REGION = 20000; /* a 22-row list table is a few KB of HTML; footers sit far beyond */
   if (!blackPos.length || !greyPos.length) throw new Error('FATF page structure changed: section headings not found');
   const dict = [
     ...baseline.map(c => ({ key: normalize(c.name), canonical: c.name })),
@@ -104,7 +116,7 @@ export function classifyCountries(html, baseline) {
   let masked = lower;
   const black = new Set(), grey = new Set(), decided = new Set();
   for (const { key, canonical } of dict) {
-    const rx = new RegExp('(^|[^a-z])(' + escapeRx(key) + ')(?=[^a-z]|$)', 'g');
+    const rx = new RegExp('(^|[^a-z])(' + keyToRx(key) + ')(?=[^a-z]|$)', 'g');
     let m;
     while ((m = rx.exec(masked)) !== null) {
       if (decided.has(canonical)) break;
@@ -114,7 +126,8 @@ export function classifyCountries(html, baseline) {
       const lastEnd = [...endPos].filter(p => p < idx).pop();
       if (lastBlack === undefined && lastGrey === undefined) continue;
       const nearest = Math.max(lastBlack ?? -1, lastGrey ?? -1, lastEnd ?? -1);
-      if (lastEnd !== undefined && nearest === lastEnd) continue; /* delisted table — skip this occurrence */
+      if (lastEnd !== undefined && nearest === lastEnd) continue; /* delisted table / post-list content */
+      if (idx - nearest > MAX_REGION) continue; /* far below the heading — footer or nav, not the list */
       const isBlack = (lastBlack ?? -1) > (lastGrey ?? -1);
       (isBlack ? black : grey).add(canonical);
       decided.add(canonical);
@@ -325,9 +338,14 @@ export async function main(mode) {
     console.log('grey (' + current.grey.length + '): ' + current.grey.join(', '));
     const flat = (fetched.html || (String(fetched.blackSeg) + ' ||GREY|| ' + String(fetched.greySeg)))
       .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
-    for (const probe of ['virgin islands', 'congo', 'guinea', 'sudan', 'no longer subject']) {
-      const i = flat.toLowerCase().indexOf(probe);
-      console.log('probe "' + probe + '": ' + (i === -1 ? 'absent' : '…' + flat.slice(Math.max(0, i - 70), i + 90) + '…'));
+    for (const probe of ['virgin islands', 'congo', 'guinea', 'sudan', 'no longer subject', 'find out more']) {
+      const fl = flat.toLowerCase();
+      let i = -1, n = 0;
+      while ((i = fl.indexOf(probe, i + 1)) !== -1 && n < 6) {
+        n++;
+        console.log('probe "' + probe + '" #' + n + ': …' + flat.slice(Math.max(0, i - 70), i + 90) + '…');
+      }
+      if (!n) console.log('probe "' + probe + '": absent');
     }
     return;
   }
