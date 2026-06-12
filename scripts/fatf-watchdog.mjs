@@ -118,9 +118,30 @@ async function fetchFatfHtml() {
   } catch (e) {
     console.log('direct fetch failed (' + e.message + ') — falling back to the Web Archive');
   }
-  const wb = await fetch('https://web.archive.org/web/' + FATF_URL, { headers, redirect: 'follow' });
-  if (!wb.ok) throw new Error('FATF page unavailable both directly and via the Web Archive (' + wb.status + ')');
-  console.log('source: web.archive.org (latest snapshot of the FATF page)');
+  /* Attempt 2: Wayback availability API gives the closest snapshot URL. */
+  try {
+    const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(FATF_URL), { headers });
+    console.log('wayback availability API: ' + av.status);
+    if (av.ok) {
+      const j = await av.json();
+      const closest = j && j.archived_snapshots && j.archived_snapshots.closest;
+      if (closest && closest.url) {
+        const snapUrl = closest.url.replace(/^http:/, 'https:');
+        const s = await fetch(snapUrl, { headers, redirect: 'follow' });
+        console.log('snapshot ' + (closest.timestamp || '') + ' fetch: ' + s.status);
+        if (s.ok) { console.log('source: web.archive.org snapshot ' + (closest.timestamp || '')); return await s.text(); }
+      } else {
+        console.log('availability API returned no snapshot');
+      }
+    }
+  } catch (e) {
+    console.log('wayback availability attempt failed (' + e.message + ')');
+  }
+  /* Attempt 3: the /web/<year>/ redirect form. */
+  const wb = await fetch('https://web.archive.org/web/2026/' + FATF_URL, { headers, redirect: 'follow' });
+  console.log('wayback /web/2026/ form: ' + wb.status);
+  if (!wb.ok) throw new Error('FATF page unavailable directly and via the Web Archive (' + wb.status + ')');
+  console.log('source: web.archive.org (year-redirect snapshot)');
   return await wb.text();
 }
 
