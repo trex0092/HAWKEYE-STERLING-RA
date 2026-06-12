@@ -18,7 +18,9 @@ const fixture = `
 <h2>High-Risk Jurisdictions subject to a Call for Action</h2>
 <p>Democratic People's Republic of Korea (DPRK)</p><p>Iran</p><p>Myanmar</p>
 <h2>Jurisdictions under Increased Monitoring</h2>
-<ul><li>Algeria</li><li>Angola</li><li>Bulgaria</li><li>Monaco</li><li>Nigeria</li><li>South Africa</li><li>Côte d'Ivoire</li></ul>`;
+<ul><li>Algeria</li><li>Angola</li><li>Bulgaria</li><li>Monaco</li><li>Nigeria</li><li>South Africa</li><li>Côte d'Ivoire</li><li>Democratic Republic of Congo</li><li>Virgin Islands (UK)</li></ul>
+<h3>Jurisdictions No Longer Subject to Increased Monitoring</h3>
+<p>Guinea</p><p>Sudan</p>`;
 
 const noisy = '<nav>  black and grey lists   call for action  ·  increased monitoring </nav>\n' + fixture.replace('<p>Iran</p>', '<p>     Iran   </p>');
 const lists = classifyCountries(noisy, baseline);
@@ -26,7 +28,12 @@ check('black list classified via aliases despite nav noise and whitespace',
   lists.black.join('|') === 'Islamic Republic of Iran|Myanmar|North Korea');
 check('grey list classified incl. accented alias, Niger not false-matched',
   lists.grey.includes("Cote D'Ivoire") && lists.grey.includes('Nigeria')
-  && !lists.grey.includes('Niger') && lists.grey.length === 7);
+  && !lists.grey.includes('Niger') && lists.grey.length === 9);
+check('FATF spelling variants map to baseline names (DRC, Virgin Islands (UK))',
+  lists.grey.includes('The Democratic Republic Of Congo') && lists.grey.includes('British Virgin Islands'));
+check('delisted table is not classified as current (Guinea, Sudan excluded)',
+  !lists.grey.includes('Guinea') && !lists.grey.includes('Sudan')
+  && !lists.black.includes('Guinea') && !lists.black.includes('Sudan'));
 check('classification requires both headings', (() => {
   try { classifyCountries('<p>Iran</p>', baseline); return false; } catch (e) { return true; }
 })());

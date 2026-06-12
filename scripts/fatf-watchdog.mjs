@@ -7,7 +7,8 @@
    Modes: check (default) · seed (record current lists, no alert) · test-alert
    · setup-sections (create the risk-band sections) · digest (monthly
    "Reviews due" task listing clients whose next review falls due)
-   · backup-risk-data (commit the Asana risk-data mirror to the repo).
+   · backup-risk-data (commit the Asana risk-data mirror to the repo)
+   · probe (diagnostic: print source, classified lists, name contexts).
 */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
@@ -26,6 +27,11 @@ const ALIASES = {
   "cote d'ivoire": "Cote D'Ivoire",
   "côte d'ivoire": "Cote D'Ivoire",
   'democratic republic of the congo': 'The Democratic Republic Of Congo',
+  'democratic republic of congo': 'The Democratic Republic Of Congo',
+  'dr congo': 'The Democratic Republic Of Congo',
+  'virgin islands (uk)': 'British Virgin Islands',
+  'virgin islands (united kingdom)': 'British Virgin Islands',
+  'british virgin islands (uk)': 'British Virgin Islands',
   'lao pdr': "Lao People's Democratic Republic",
   "lao people's democratic republic": "Lao People's Democratic Republic",
   'türkiye': 'Turkey',
@@ -80,8 +86,16 @@ export function classifyCountries(html, baseline) {
     while ((i = lower.indexOf(needle, i)) !== -1) { out.push(i); i += needle.length; }
     return out;
   };
-  const blackPos = positions('call for action');
-  const greyPos = positions('increased monitoring');
+  const blackPosAll = positions('call for action');
+  const greyPosAll = positions('increased monitoring');
+  /* "Jurisdictions no longer subject to ..." headings open the DELISTED
+     tables; names under them are former members, not current ones. Those
+     headings embed the same needles ("...no longer subject to increased
+     monitoring"), so drop needle hits that sit inside such a heading. */
+  const endPos = positions('no longer subject to');
+  const insideEndHeading = p => endPos.some(e => p >= e && p - e <= 60);
+  const blackPos = blackPosAll.filter(p => !insideEndHeading(p));
+  const greyPos = greyPosAll.filter(p => !insideEndHeading(p));
   if (!blackPos.length || !greyPos.length) throw new Error('FATF page structure changed: section headings not found');
   const dict = [
     ...baseline.map(c => ({ key: normalize(c.name), canonical: c.name })),
@@ -97,8 +111,11 @@ export function classifyCountries(html, baseline) {
       const idx = m.index + m[1].length;
       const lastBlack = [...blackPos].filter(p => p < idx).pop();
       const lastGrey = [...greyPos].filter(p => p < idx).pop();
+      const lastEnd = [...endPos].filter(p => p < idx).pop();
       if (lastBlack === undefined && lastGrey === undefined) continue;
-      const isBlack = lastGrey === undefined || (lastBlack !== undefined && lastBlack > lastGrey);
+      const nearest = Math.max(lastBlack ?? -1, lastGrey ?? -1, lastEnd ?? -1);
+      if (lastEnd !== undefined && nearest === lastEnd) continue; /* delisted table — skip this occurrence */
+      const isBlack = (lastBlack ?? -1) > (lastGrey ?? -1);
       (isBlack ? black : grey).add(canonical);
       decided.add(canonical);
     }
@@ -292,6 +309,26 @@ export async function main(mode) {
       + '\nApp: https://hawkeye-sterling-ra.netlify.app';
     const url = await createTask(title, notes, monthEnd);
     console.log('digest task created (' + lines.length + ' client' + (lines.length === 1 ? '' : 's') + '): ' + url);
+    return;
+  }
+
+  if (mode === 'probe') {
+    /* Diagnostic: print what the source chain returns and how it classifies,
+       so list discrepancies can be traced to source content vs parsing. */
+    const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
+    const fetched = await fetchFatfSegments();
+    console.log('source: ' + fetched.source);
+    const current = fetched.html
+      ? classifyCountries(fetched.html, baseline)
+      : { black: extractCountries(fetched.blackSeg, baseline), grey: extractCountries(fetched.greySeg, baseline) };
+    console.log('black: ' + current.black.join(', '));
+    console.log('grey (' + current.grey.length + '): ' + current.grey.join(', '));
+    const flat = (fetched.html || (String(fetched.blackSeg) + ' ||GREY|| ' + String(fetched.greySeg)))
+      .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    for (const probe of ['virgin islands', 'congo', 'guinea', 'sudan', 'no longer subject']) {
+      const i = flat.toLowerCase().indexOf(probe);
+      console.log('probe "' + probe + '": ' + (i === -1 ? 'absent' : '…' + flat.slice(Math.max(0, i - 70), i + 90) + '…'));
+    }
     return;
   }
 

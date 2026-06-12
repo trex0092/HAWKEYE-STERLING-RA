@@ -117,7 +117,7 @@ The scoring engine, hard-outcome escalations, persistence, and report rendering 
 
 ```bash
 node test/app.test.js        # 187 checks — engine, register, report, Asana delivery & backup
-node test/watchdog.test.mjs  # 16 checks — FATF list parsing, alerts, digest, backup extraction
+node test/watchdog.test.mjs  # 18 checks — FATF list parsing, alerts, digest, backup extraction
 ```
 
 CI runs both suites plus a headless-Chrome smoke test (renders `index.html`, asserts the computed verdict and gauge) on every push and pull request (`.github/workflows/ci.yml`).

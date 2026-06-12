@@ -459,8 +459,10 @@ check('high narrative covers EDD measures and three-month cycle', nar.includes('
 reset();
 A.setToggle('sanctions_entity','Yes');
 nar = A.buildNarrative();
-check('prohibited narrative cites Article 11, freeze, no em-dash', nar.includes('The relationship is prohibited')
-  && nar.includes('Article 11 of Federal Decree-Law No. (10) of 2025') && nar.includes('Funds are frozen')
+check('prohibited narrative cites the law + FIU (no article number), freeze, no em-dash',
+  nar.includes('The relationship is prohibited')
+  && nar.includes('Federal Decree-Law No. (10) of 2025') && nar.includes('Financial Intelligence Unit')
+  && nar.indexOf('Article 11') === -1 && nar.includes('Funds are frozen')
   && nar.indexOf('—') === -1);
 reset();
 A.insertNarrative();
