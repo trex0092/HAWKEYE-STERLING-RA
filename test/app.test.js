@@ -51,7 +51,10 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   computeAssessment, setToggle, onYears, onJurisdiction, onActivity, onSupplier,
   onSign, onField, useSuggestedReview, recalc, syncUI, freshState, mergeState,
   saveDraft, loadDraft, exportJSON, buildPrintReport, newAssessment, MAX_SCORE,
-  addMonths, exportFileName, toggleComplete
+  addMonths, exportFileName, toggleComplete,
+  rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
+  saveRiskData, loadRiskData, rdExportSheet, rdRender,
+  get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
 const txt = el => String(el.textContent);
@@ -275,6 +278,50 @@ check('mergeState keeps signatory titles', A.mergeState({signoff:{completedTitle
   && A.mergeState({signoff:{approvedTitle:'MLRO'}}).signoff.approvedTitle === 'MLRO');
 check('mergeState normalises complete flag', A.mergeState({complete:'true'}).complete === true
   && A.mergeState({complete:{}}).complete === false && A.mergeState({}).complete === false);
+
+/* ── 17. Risk Data overrides: mandatory reason, scoring, flags, persistence ── */
+reset();
+check('risk data starts at baseline', A.rdCount() === 0 && A.computeAssessment().total === 19);
+check('override rejects empty reason', A.rdSetOverride('countries','United Kingdom',{score:3, reason:'  '}) === false && A.rdCount() === 0);
+check('override rejects N/A and out-of-range scores',
+  A.rdSetOverride('mined','N/A',{score:2, reason:'x'}) === false
+  && A.rdSetOverride('countries','United Kingdom',{score:9, reason:'x'}) === false
+  && A.rdSetOverride('countries','United Kingdom',{score:0, reason:'x'}) === false);
+check('override applies: UK 1→3 lifts total to 21 SDD',
+  A.rdSetOverride('countries','United Kingdom',{score:3, reason:'Test escalation'}) === true
+  && A.computeAssessment().total === 21 && A.computeAssessment().outcome === 'SDD');
+a = A.computeAssessment();
+check('breakdown part carries override audit', !!a.parts[0].ov
+  && a.parts[0].ov.baseScore === 1 && a.parts[0].ov.reason === 'Test escalation');
+check('jurisdiction tag marks override', txt(els.jurisdictionScore).includes('✱'));
+A.buildPrintReport();
+pr = els.printReport._inner;
+check('report flags the override with audit detail', pr.includes('United Kingdom: 1 → 3') && pr.includes('Test escalation'));
+check('report carries risk-data version stamp', pr.includes('Risk data: baseline') && pr.includes('1 local override'));
+check('cfa-only override is a stored delta', A.rdSetOverride('countries','United Kingdom',{score:1, cfa:true, reason:'CFA test'}) === true && A.rdCount() === 1);
+a = A.computeAssessment();
+check('CFA override triggers the EDD floor', a.outcome === 'EDD'
+  && a.escalations.some(e=>e.reason.includes('call-for-action')));
+check('setting baseline values clears the override',
+  A.rdSetOverride('countries','United Kingdom',{score:1, cfa:false, reason:'back'}) === true && A.rdCount() === 0);
+const rdHard = A.mergeRiskData({overrides:{
+  countries:{ Narnia:{score:3, reason:'x'}, Hungary:{score:9, reason:'x'}, France:{score:3} },
+  bogus:{ France:{score:3, reason:'x'} }
+}});
+check('mergeRiskData drops unknown names/kinds and bad scores',
+  !rdHard.overrides.countries.Narnia && !rdHard.overrides.countries.Hungary && !rdHard.overrides.bogus);
+check('mergeRiskData coerces missing reason', rdHard.overrides.countries.France
+  && rdHard.overrides.countries.France.reason === '(no reason recorded)');
+check('mergeRiskData drops non-delta entries',
+  !A.mergeRiskData({overrides:{countries:{France:{score:1, reason:'same as baseline'}}}}).overrides.countries.France);
+A.rdSetOverride('activities','Jewellery Trading',{score:2, reason:'Mitigated channel'});
+const rdLoaded = A.loadRiskData();
+check('risk data persists via localStorage', rdLoaded.overrides.activities['Jewellery Trading'].score === 2
+  && rdLoaded.overrides.activities['Jewellery Trading'].reason === 'Mitigated channel');
+check('export sheet did not throw', (A.rdExportSheet(), true));
+check('panel render did not throw', (A.rdRender(), true));
+A.rdResetAll();
+check('reset restores baseline scoring', A.rdCount() === 0 && A.computeAssessment().total === 19);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
