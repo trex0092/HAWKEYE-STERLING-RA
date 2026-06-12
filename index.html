@@ -155,6 +155,13 @@ input[type="date"]{color-scheme:dark}
 .btn-full{width:100%;justify-content:center}
 .action-row{display:flex;gap:8px}
 .btn-half{flex:1;justify-content:center}
+.btn-gold{background:rgba(210,166,72,0.10);color:#E5C16C;border-color:rgba(210,166,72,0.45);box-shadow:0 0 10px rgba(210,166,72,0.20)}
+.btn-gold:hover{background:rgba(210,166,72,0.18);color:#F0D08A;box-shadow:0 0 18px rgba(210,166,72,0.38)}
+.btn-blue{background:rgba(126,200,255,0.10);color:#8FD0FF;border-color:rgba(126,200,255,0.45);box-shadow:0 0 12px rgba(126,200,255,0.22),inset 0 0 10px rgba(126,200,255,0.05)}
+.btn-blue:hover{background:rgba(126,200,255,0.18);color:#B5E0FF;box-shadow:0 0 20px rgba(126,200,255,0.42)}
+.btn-lilac{background:rgba(201,162,255,0.10);color:#CBA8FF;border-color:rgba(201,162,255,0.45);box-shadow:0 0 12px rgba(201,162,255,0.22),inset 0 0 10px rgba(201,162,255,0.05)}
+.btn-lilac:hover{background:rgba(201,162,255,0.18);color:#DEC4FF;box-shadow:0 0 20px rgba(201,162,255,0.42)}
+button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
 /* ── Side panel ───────────────────────── */
 .sp-block{padding:14px 0;border-bottom:1px solid;border-image:linear-gradient(90deg,rgba(180,92,255,0.45),rgba(255,92,168,0.35) 60%,transparent) 1}
@@ -206,6 +213,45 @@ input[type="date"]{color-scheme:dark}
 .b1{background:var(--low-bg);color:var(--low-text)}
 .b2{background:var(--med-bg);color:var(--med-text)}
 .b3{background:var(--high-bg);color:var(--high-text)}
+
+/* ── Risk Data panel ──────────────────── */
+.rd-overlay{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(5,8,14,0.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.rd-overlay.open{display:flex}
+.rd-panel{width:min(940px,94vw);height:min(86vh,840px);display:flex;flex-direction:column;background:var(--card-bg);border:1px solid var(--border2);border-radius:var(--r);box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);position:relative;overflow:hidden}
+.rd-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent);pointer-events:none}
+.rd-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border2)}
+.rd-meta{font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.4px}
+.rd-spacer{flex:1}
+.rd-close{background:none;border:1px solid var(--border2);color:var(--text2);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1;transition:all .18s;flex-shrink:0}
+.rd-close:hover{color:var(--text);border-color:rgba(255,255,255,0.25)}
+.rd-toolbar{display:flex;gap:6px;padding:10px 18px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap}
+.rd-tab{font-size:9px;padding:3px 10px;border-radius:99px;font-weight:600;border:1px solid var(--border2);color:var(--text3);background:rgba(255,255,255,0.03);cursor:pointer;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.6px;transition:all .2s}
+.rd-tab:hover{color:var(--text2)}
+.rd-tab.active{background:var(--gold-dim);color:var(--gold);border-color:rgba(210,166,72,0.45)}
+.rd-search{flex:1;min-width:130px;background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:4px 10px;font-size:11.5px;font-family:var(--sans);outline:none;transition:border-color .18s,box-shadow .18s}
+.rd-search:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.rd-search::placeholder{color:#4A5468}
+.rd-rows{flex:1;overflow-y:auto;padding:4px 18px 10px}
+.rd-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.rd-row:last-child{border-bottom:none}
+.rd-name{flex:1;font-size:12.5px;color:var(--text);min-width:160px}
+.rd-row.rd-ov .rd-name{color:#F0D08A}
+.rd-base{font-size:9px;font-family:var(--mono);color:var(--text3);white-space:nowrap}
+.rd-score{background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:3px 6px;font-size:11.5px;font-family:var(--mono);outline:none;cursor:pointer}
+.rd-score option{background:#121826;color:var(--text)}
+.rd-cfa{font-size:9px;color:var(--text2);display:inline-flex;gap:5px;align-items:center;font-family:var(--mono);cursor:pointer;letter-spacing:0.5px}
+.rd-cfa input{accent-color:var(--high-text);cursor:pointer}
+.rd-reason{width:230px;background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:3px 9px;font-size:11px;font-family:var(--sans);outline:none;transition:border-color .18s,box-shadow .18s}
+.rd-reason:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.rd-reason::placeholder{color:#4A5468}
+.rd-row.rd-pending .rd-reason{border-color:var(--med-text);box-shadow:0 0 0 3px rgba(224,163,60,0.20)}
+.rd-at{font-size:8.5px;color:var(--text3);font-family:var(--mono);width:72px;text-align:right}
+.rd-clear{background:var(--high-bg);border:1px solid var(--high-bd);color:var(--high-text);border-radius:5px;width:20px;height:20px;cursor:pointer;font-size:10px;line-height:1;flex-shrink:0}
+.rd-empty{font-size:11px;color:var(--text3);padding:18px 0;text-align:center;font-family:var(--mono)}
+.rd-foot{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border2);align-items:center;flex-wrap:wrap}
+.rd-count{font-size:9px;font-family:var(--mono);color:var(--gold);letter-spacing:0.6px;text-transform:uppercase}
+.ov-mark{color:var(--gold);cursor:help}
+@media(max-width:520px){.rd-reason{width:100%}.rd-at{display:none}}
 
 /* ── Footer & toast ───────────────────── */
 .app-footer{margin-top:18px;font-size:10px;color:var(--text3);line-height:1.7;text-align:center;font-family:var(--mono)}
@@ -260,6 +306,9 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 .sign-line{border-bottom:1px solid #1A1F2B;height:38px}
 .sign-cap{font-size:8pt;color:#7A8090;text-align:center;margin-top:3px;letter-spacing:0.08em;text-transform:uppercase}
 .foot{margin-top:18px;border-top:0.75px solid #F06AA8;padding-top:5px;font-size:7.5pt;color:#7A8090;text-align:center;letter-spacing:0.06em}
+.rd-stamp{font-size:7.5pt;color:#7A8090;letter-spacing:0.05em;margin:-10px 0 12px}
+.pr-rd{border:0.75px solid #D9CCD3;border-left:3px solid #A4690B;border-radius:8px;padding:7px 10px;font-size:8.5pt;color:#4A5160;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
+.rd-mark{color:#A4690B;font-size:8pt;margin-left:3px}
 
 @media print{
   body{background:#FFFFFF}
@@ -522,13 +571,43 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
           <button class="btn btn-ghost btn-half" onclick="importJSON()">⇪ Import</button>
           <button class="btn btn-ghost btn-half" onclick="exportJSON()">⇩ Export JSON</button>
         </div>
+        <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
       </div>
     </aside>
   </div>
+
+  <!-- Risk Data panel (reference scores: baseline + compliance overrides) -->
+  <div class="rd-overlay" id="rdOverlay">
+    <div class="rd-panel">
+      <div class="rd-head">
+        <span class="st">Risk Data — Reference Scores</span>
+        <span class="rd-meta" id="rdMeta"></span>
+        <span class="rd-spacer"></span>
+        <button class="rd-close" onclick="closeRiskData()" title="Close">✕</button>
+      </div>
+      <div class="rd-toolbar">
+        <button class="rd-tab active" id="rdTab_countries" onclick="rdSetTab('countries')">Countries</button>
+        <button class="rd-tab" id="rdTab_activities" onclick="rdSetTab('activities')">Activities</button>
+        <button class="rd-tab" id="rdTab_recycled" onclick="rdSetTab('recycled')">Recycled</button>
+        <button class="rd-tab" id="rdTab_mined" onclick="rdSetTab('mined')">Mined</button>
+        <input class="rd-search" id="rdSearch" placeholder="Filter by name…" oninput="rdRender()">
+        <button class="rd-tab" id="rdOvOnly" onclick="rdToggleOvOnly()">✱ Overridden only</button>
+      </div>
+      <div class="rd-rows" id="rdRows"></div>
+      <div class="rd-foot">
+        <span class="rd-count" id="rdCountLbl"></span>
+        <span class="rd-spacer"></span>
+        <button class="btn btn-blue" onclick="rdExportSheet()">⇩ Export Sheet</button>
+        <button class="btn btn-lilac" onclick="rdImportSheet()">⇪ Import Sheet</button>
+        <button class="btn btn-ghost" onclick="rdResetConfirm()">↺ Reset</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+<input type="file" id="rdImportFile" accept=".json,application/json" style="display:none">
 <div class="toast" id="toast"></div>
 <div id="printReport"></div>
 
@@ -536,7 +615,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 /* ══════════════════════════════════════════
    DATA (sourced directly from Data sheet)
 ══════════════════════════════════════════ */
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.1.0';
 
 const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":1},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":1},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":1},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":1},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":1},{"name":"Isle of Man","score":1},{"name":"Belgium","score":1},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":1},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":1},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":1},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":2},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":2},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":1},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":2},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":2},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":2},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":2},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":1},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":2},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3,"cfa":true},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3,"cfa":true},{"name":"Islamic Republic of Iran","score":3,"cfa":true}];
 
@@ -682,6 +761,258 @@ function mergeState(src){
 let state = defaultState();
 
 /* ══════════════════════════════════════════
+   RISK DATA — baseline arrays + compliance overrides
+   The arrays above are the firm-approved baseline (changes to them go
+   through a PR). The compliance officer can layer per-item overrides on
+   top — each with a mandatory reason — kept in localStorage and shareable
+   as an exported "risk data sheet" file.
+══════════════════════════════════════════ */
+const RISK_DATA_VERSION = '2026-06'; /* bump when the baseline arrays change */
+const RD_STORAGE_KEY = 'hsra.riskdata.v1';
+const RD_KINDS = {
+  countries: {list:COUNTRIES,  label:'Countries',  min:1},
+  activities:{list:ACTIVITIES, label:'Activities', min:1},
+  recycled:  {list:RECYCLED,   label:'Recycled',   min:0},
+  mined:     {list:MINED,      label:'Mined',      min:0}
+};
+
+function freshRiskData(){ return {overrides:{countries:{}, activities:{}, recycled:{}, mined:{}}, updatedAt:''}; }
+let riskData = freshRiskData();
+
+function rdBase(kind, name){ return RD_KINDS[kind] ? (RD_KINDS[kind].list.find(o=>o.name===name) || null) : null; }
+function rdOv(kind, name){ return (riskData.overrides[kind] && riskData.overrides[kind][name]) || null; }
+function rdCount(){ return Object.values(riskData.overrides).reduce((n,m)=>n+Object.keys(m).length, 0); }
+/* Effective item: baseline merged with any override, plus audit fields when overridden */
+function effOf(kind, name){
+  const b = rdBase(kind, name);
+  if(!b) return null;
+  const o = rdOv(kind, name);
+  if(!o) return b;
+  const e = {name:b.name, score:o.score, overridden:true, baseScore:b.score, reason:o.reason, at:o.at};
+  if(kind==='countries'){ e.cfa = !!o.cfa; e.baseCfa = !!b.cfa; }
+  return e;
+}
+function effCountry(name){ return effOf('countries', name); }
+
+function mergeRiskData(src){
+  /* Same philosophy as mergeState: only known items, sane values, deltas only. */
+  const out = freshRiskData();
+  if(!src || typeof src!=='object') return out;
+  const map = (src.overrides && typeof src.overrides==='object') ? src.overrides : src;
+  Object.keys(RD_KINDS).forEach(kind => {
+    const m = map[kind];
+    if(!m || typeof m!=='object') return;
+    Object.keys(m).forEach(name => {
+      const b = rdBase(kind, name), v = m[name];
+      if(!b || b.name==='N/A' || !v || typeof v!=='object') return;
+      const score = parseInt(v.score);
+      if(isNaN(score) || score < RD_KINDS[kind].min || score > 3) return;
+      const cfa = kind==='countries' ? (v.cfa===true || v.cfa==='true') : undefined;
+      if(score===b.score && (kind!=='countries' || cfa===!!b.cfa)) return; /* not a delta */
+      const entry = {
+        score,
+        reason: (typeof v.reason==='string' && v.reason.trim()) ? v.reason.trim() : '(no reason recorded)',
+        at: /^\d{4}-\d{2}-\d{2}$/.test(String(v.at||'')) ? String(v.at) : todayISO()
+      };
+      if(kind==='countries') entry.cfa = cfa;
+      out.overrides[kind][name] = entry;
+    });
+  });
+  if(typeof src.updatedAt==='string') out.updatedAt = src.updatedAt;
+  return out;
+}
+function loadRiskData(){
+  try{
+    const raw = localStorage.getItem(RD_STORAGE_KEY);
+    return raw ? mergeRiskData(JSON.parse(raw)) : freshRiskData();
+  }catch(e){ return freshRiskData(); }
+}
+function saveRiskData(){
+  riskData.updatedAt = todayISO();
+  try{ localStorage.setItem(RD_STORAGE_KEY, JSON.stringify(riskData)); }catch(e){}
+}
+function rdAfterChange(){
+  saveRiskData();
+  refreshSelectLabels();
+  paintJurisdiction();
+  paintActivity();
+  ['recycled','mined'].forEach(p => state.suppliers[p].forEach((v,i) => paintSupplier(p,i)));
+  recalc();
+  rdRender();
+}
+/* Set one override. A reason is mandatory for any deviation from baseline;
+   setting values equal to baseline clears the override instead. */
+function rdSetOverride(kind, name, vals){
+  const b = rdBase(kind, name);
+  if(!b || b.name==='N/A' || !vals) return false;
+  const score = parseInt(vals.score);
+  if(isNaN(score) || score < RD_KINDS[kind].min || score > 3) return false;
+  const cfa = kind==='countries' ? !!vals.cfa : undefined;
+  if(score===b.score && (kind!=='countries' || cfa===!!b.cfa)){
+    if(rdOv(kind, name)) rdClearOverride(kind, name);
+    return true;
+  }
+  const reason = String(vals.reason==null ? '' : vals.reason).trim();
+  if(!reason) return false;
+  const entry = {score, reason, at:todayISO()};
+  if(kind==='countries') entry.cfa = cfa;
+  riskData.overrides[kind][name] = entry;
+  rdAfterChange();
+  return true;
+}
+function rdClearOverride(kind, name){
+  if(rdOv(kind, name)){
+    delete riskData.overrides[kind][name];
+    rdAfterChange();
+  }
+}
+function rdResetAll(){
+  riskData = freshRiskData();
+  rdAfterChange();
+}
+function rdResetConfirm(){
+  if(!confirm('Remove all risk-data overrides and restore the baseline scores?')) return;
+  rdResetAll();
+  toast('Risk data reset to baseline');
+}
+function rdExportSheet(){
+  const out = {
+    app: 'Hawkeye Sterling — Risk Data Sheet',
+    version: APP_VERSION,
+    baseline: RISK_DATA_VERSION,
+    exportedAt: new Date().toISOString(),
+    updatedAt: riskData.updatedAt,
+    overrides: riskData.overrides
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'hs-risk-data-sheet-' + todayISO().replace(/-/g,'') + '.json';
+  link.click();
+  setTimeout(()=>URL.revokeObjectURL(link.href), 1000);
+  toast('Risk data sheet exported');
+}
+function rdImportSheet(){ $('rdImportFile').click(); }
+$('rdImportFile').addEventListener('change', function(e){
+  const f = e.target.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = function(){
+    try{
+      const data = JSON.parse(r.result);
+      const looks = data && typeof data==='object'
+        && (data.overrides || Object.keys(RD_KINDS).some(k => data[k]));
+      if(!looks) throw new Error('invalid');
+      riskData = mergeRiskData(data);
+      rdAfterChange();
+      toast('Risk data sheet imported — ' + rdCount() + ' override' + (rdCount()===1?'':'s'));
+    }catch(err){
+      alert('Invalid risk data sheet. Expected a sheet exported from this application.');
+    }
+    e.target.value = '';
+  };
+  r.readAsText(f);
+});
+
+/* ── Risk Data panel UI ── */
+let rdTab = 'countries', rdShowOvOnly = false;
+function openRiskData(){ const o = $('rdOverlay'); if(o) o.classList.add('open'); rdRender(); }
+function closeRiskData(){ const o = $('rdOverlay'); if(o) o.classList.remove('open'); }
+function rdSetTab(kind){ rdTab = kind; rdRender(); }
+function rdToggleOvOnly(){ rdShowOvOnly = !rdShowOvOnly; rdRender(); }
+function rdRender(){
+  const rows = $('rdRows');
+  if(!rows) return;
+  Object.keys(RD_KINDS).forEach(k => {
+    const t = $('rdTab_'+k);
+    if(t) t.className = 'rd-tab' + (k===rdTab ? ' active' : '');
+  });
+  const oo = $('rdOvOnly');
+  if(oo) oo.className = 'rd-tab' + (rdShowOvOnly ? ' active' : '');
+  const q = (($('rdSearch') && $('rdSearch').value) || '').toLowerCase();
+  const def = RD_KINDS[rdTab];
+  let list = def.list.filter(o => o.name!=='N/A');
+  if(rdTab==='countries') list = [...list].sort((a,b)=>a.name.localeCompare(b.name));
+  const html = list.map(b => {
+    const o = rdOv(rdTab, b.name);
+    if(rdShowOvOnly && !o) return '';
+    if(q && b.name.toLowerCase().indexOf(q)===-1) return '';
+    const eff = o ? o.score : b.score;
+    const effCfa = o ? !!o.cfa : !!b.cfa;
+    const opts = [];
+    for(let sc=def.min; sc<=3; sc++) opts.push('<option value="'+sc+'"'+(sc===eff?' selected':'')+'>'+sc+'</option>');
+    return '<div class="rd-row'+(o?' rd-ov':'')+'" data-kind="'+rdTab+'" data-name="'+esc(b.name)+'">'
+      + '<span class="rd-name">'+(o?'<span class="ov-mark">✱</span> ':'')+esc(b.name)+'</span>'
+      + '<span class="rd-base" title="Baseline">base '+b.score+(rdTab==='countries'&&b.cfa?' · CFA':'')+'</span>'
+      + '<select class="rd-score">'+opts.join('')+'</select>'
+      + (rdTab==='countries' ? '<label class="rd-cfa"><input type="checkbox" class="rd-cfa-box"'+(effCfa?' checked':'')+'>CFA</label>' : '')
+      + '<input class="rd-reason" placeholder="Reason (required)" value="'+esc(o?o.reason:'')+'">'
+      + '<span class="rd-at">'+(o?esc(o.at):'')+'</span>'
+      + '<button class="rd-clear" title="Clear override — restore baseline"'+(o?'':' style="visibility:hidden"')+'>✕</button>'
+      + '</div>';
+  }).join('');
+  rows.innerHTML = html || '<div class="rd-empty">No matches'+(rdShowOvOnly?' — no overrides on this tab':'')+'.</div>';
+  const c = $('rdCountLbl');
+  if(c) c.textContent = rdCount() + ' override' + (rdCount()===1?'':'s');
+  const m = $('rdMeta');
+  if(m) m.textContent = 'Baseline ' + RISK_DATA_VERSION + (riskData.updatedAt ? ' · sheet updated ' + riskData.updatedAt : '');
+}
+function refreshSelectLabels(){
+  const jSel = $('jurisdictionSelect');
+  if(jSel && jSel.options){
+    for(const opt of jSel.options){
+      const e = effCountry(opt.value);
+      if(e) opt.textContent = opt.value + ' — ' + ['','Low ✓','Medium','High ⚠'][e.score] + (e.overridden ? ' ✱' : '');
+    }
+  }
+  const aSel = $('activitySelect');
+  if(aSel && aSel.options){
+    for(const opt of aSel.options){
+      const e = effOf('activities', opt.value);
+      if(e) opt.textContent = opt.value + ' — ' + ratingLabel(e.score) + (e.overridden ? ' ✱' : '');
+    }
+  }
+}
+function initRiskDataPanel(){
+  const rows = $('rdRows');
+  if(!rows) return;
+  const apply = function(target){
+    const row = target && target.closest ? target.closest('.rd-row') : null;
+    if(!row) return;
+    const kind = row.getAttribute('data-kind'), name = row.getAttribute('data-name');
+    const b = rdBase(kind, name);
+    if(!b) return;
+    const score = parseInt(row.querySelector('.rd-score').value);
+    const cfaBox = row.querySelector('.rd-cfa-box');
+    const cfa = cfaBox ? cfaBox.checked : undefined;
+    const reason = row.querySelector('.rd-reason').value.trim();
+    const isBaseline = score===b.score && (kind!=='countries' || cfa===!!b.cfa);
+    if(isBaseline){
+      if(rdOv(kind, name)) rdClearOverride(kind, name); else rdRender();
+      return;
+    }
+    if(!reason){
+      row.classList.add('rd-pending');
+      row.querySelector('.rd-reason').focus();
+      return;
+    }
+    row.classList.remove('rd-pending');
+    rdSetOverride(kind, name, {score, cfa, reason});
+  };
+  rows.addEventListener('change', function(e){ apply(e.target); });
+  rows.addEventListener('click', function(e){
+    const t = e.target;
+    if(t && t.className==='rd-clear'){
+      const row = t.closest ? t.closest('.rd-row') : null;
+      if(row) rdClearOverride(row.getAttribute('data-kind'), row.getAttribute('data-name'));
+    }
+  });
+  const ov = $('rdOverlay');
+  if(ov) ov.addEventListener('click', function(e){ if(e.target===ov) closeRiskData(); });
+  if(document.addEventListener) document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeRiskData(); });
+}
+
+/* ══════════════════════════════════════════
    BUILD UI
 ══════════════════════════════════════════ */
 function buildCountrySelect() {
@@ -762,19 +1093,22 @@ function paintToggle(id, val, type) {
   const tag = $(id+'_score_tag');
   if(tag){ tag.className = 'score-tag '+scoreTagClass(score); tag.textContent = 'Score: '+score+' · '+ratingLabel(score); }
 }
+function ovTitle(e){ return e && e.overridden ? 'Overridden from '+e.baseScore+' on '+e.at+' — '+e.reason : ''; }
 function paintJurisdiction() {
-  const c = COUNTRIES.find(c=>c.name===state.entity.jurisdiction);
+  const c = effCountry(state.entity.jurisdiction);
   const score = c ? c.score : 1;
   const tag = $('jurisdictionScore');
   tag.className = 'score-tag '+scoreTagClass(score);
-  tag.textContent = 'Score: '+score+' · '+ratingLabel(score);
+  tag.textContent = 'Score: '+score+' · '+ratingLabel(score)+(c && c.overridden ? ' ✱' : '');
+  tag.title = ovTitle(c);
 }
 function paintActivity() {
-  const a = ACTIVITIES.find(a=>a.name===state.profile.activity);
+  const a = effOf('activities', state.profile.activity);
   const score = a ? a.score : 1;
   const tag = $('activityScore');
   tag.className = 'score-tag '+scoreTagClass(score);
-  tag.textContent = 'Score: '+score+' · '+ratingLabel(score);
+  tag.textContent = 'Score: '+score+' · '+ratingLabel(score)+(a && a.overridden ? ' ✱' : '');
+  tag.title = ovTitle(a);
 }
 function paintYears(which) {
   const y = which==='entity' ? state.profile.entityYears : state.profile.relYears;
@@ -784,12 +1118,12 @@ function paintYears(which) {
   tag.textContent = 'Score: '+score+' · '+ratingLabel(score);
 }
 function paintSupplier(prefix, i) {
-  const list = prefix==='recycled' ? RECYCLED : MINED;
-  const item = list.find(o=>o.name===state.suppliers[prefix][i]);
+  const item = effOf(prefix, state.suppliers[prefix][i]);
   const score = item ? item.score : 0;
   const el = $('sup_score_'+prefix+'_'+i);
   el.className = 'sup-score '+ratingClass(score);
-  el.textContent = ratingLabel(score)+' ('+score+')';
+  el.textContent = ratingLabel(score)+' ('+score+')'+(item && item.overridden ? ' ✱' : '');
+  el.title = ovTitle(item);
 }
 function paintStatus() {
   const badge = $('statusBadge');
@@ -905,11 +1239,11 @@ function toggleComplete() {
 function computeAssessment() {
   const s = state, parts = [];
 
-  const jC = COUNTRIES.find(c=>c.name===s.entity.jurisdiction);
-  parts.push({label:'Jurisdiction of incorporation & operation', value:s.entity.jurisdiction, score:jC?jC.score:1});
+  const jC = effCountry(s.entity.jurisdiction);
+  parts.push({label:'Jurisdiction of incorporation & operation', value:s.entity.jurisdiction, score:jC?jC.score:1, ov:(jC && jC.overridden)?jC:null});
 
-  const aAct = ACTIVITIES.find(a=>a.name===s.profile.activity);
-  parts.push({label:'Nature & complexity of business activities', value:s.profile.activity, score:aAct?aAct.score:1});
+  const aAct = effOf('activities', s.profile.activity);
+  parts.push({label:'Nature & complexity of business activities', value:s.profile.activity, score:aAct?aAct.score:1, ov:(aAct && aAct.overridden)?aAct:null});
 
   QUESTIONS_OC.forEach(q => {
     const val = s.questions[q.id];
@@ -921,12 +1255,12 @@ function computeAssessment() {
   parts.push({label:'Relationship duration', value:s.profile.relYears+' years', score:yearsToScore(s.profile.relYears)});
 
   s.suppliers.recycled.forEach((v,i) => {
-    const item = RECYCLED.find(o=>o.name===v);
-    parts.push({label:'Recycled source — Supplier '+(i+1), value:v, score:item?item.score:0});
+    const item = effOf('recycled', v);
+    parts.push({label:'Recycled source — Supplier '+(i+1), value:v, score:item?item.score:0, ov:(item && item.overridden)?item:null});
   });
   s.suppliers.mined.forEach((v,i) => {
-    const item = MINED.find(o=>o.name===v);
-    parts.push({label:'Mined source — Supplier '+(i+1), value:v, score:item?item.score:0});
+    const item = effOf('mined', v);
+    parts.push({label:'Mined source — Supplier '+(i+1), value:v, score:item?item.score:0, ov:(item && item.overridden)?item:null});
   });
 
   const total = parts.reduce((sum,p)=>sum+p.score, 0);
@@ -1013,7 +1347,7 @@ function recalc() {
   /* Breakdown table */
   $('bdTable').innerHTML = a.parts.map(p=>`
     <tr>
-      <td style="color:var(--text2);font-size:10px;max-width:160px;word-wrap:break-word">${esc(p.label)}</td>
+      <td style="color:var(--text2);font-size:10px;max-width:160px;word-wrap:break-word">${esc(p.label)}${p.ov ? ' <span class="ov-mark" title="Overridden from '+p.ov.baseScore+' on '+esc(p.ov.at)+' — '+esc(p.ov.reason)+'">✱</span>' : ''}</td>
       <td style="color:var(--text3);font-size:10px;padding-left:6px">${esc(p.value)}</td>
       <td><span class="badge ${ratingClass(p.score)}">${p.score}</span></td>
     </tr>`).join('') +
@@ -1098,7 +1432,8 @@ function exportJSON(){
     version: APP_VERSION,
     exportedAt: new Date().toISOString(),
     state,
-    result: {totalScore:a.total, maxScore:MAX_SCORE, numericBand:a.numericBand, outcome:a.outcome, escalations:a.escalations}
+    result: {totalScore:a.total, maxScore:MAX_SCORE, numericBand:a.numericBand, outcome:a.outcome, escalations:a.escalations},
+    riskData: {baseline:RISK_DATA_VERSION, overrides:rdCount(), updatedAt:riskData.updatedAt}
   };
   const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
   const link = document.createElement('a');
@@ -1140,26 +1475,42 @@ function buildPrintReport(){
   const dDate = iso => { const f = fmtDate(iso); return f ? esc(f) : '—'; };
   const chip = sc => `<span class="chip c${sc}">${sc} · ${ratingLabel(sc)}</span>`;
 
-  const jC = COUNTRIES.find(c=>c.name===s.entity.jurisdiction);
+  const jC = effCountry(s.entity.jurisdiction);
   const jScore = jC ? jC.score : 1;
-  const act = ACTIVITIES.find(x=>x.name===s.profile.activity);
+  const act = effOf('activities', s.profile.activity);
   const aScore = act ? act.score : 1;
   const obScore = scoreFromYesNo(s.profile.onboard,'onboard');
   const eyScore = yearsToScore(s.profile.entityYears), ryScore = yearsToScore(s.profile.relYears);
+
+  /* Risk-data overrides applied to factors used by THIS assessment */
+  const ovNotes = [], ovMark = '<span class="rd-mark">✱</span>';
+  const ovWhen = e => fmtDate(e.at) || e.at || '—';
+  if(jC && jC.overridden){
+    let chg = jC.baseScore + ' → ' + jC.score;
+    if(!!jC.cfa !== !!jC.baseCfa) chg += jC.cfa ? ' (CFA flag added)' : ' (CFA flag removed)';
+    ovNotes.push('Jurisdiction — ' + s.entity.jurisdiction + ': ' + chg + ', overridden ' + ovWhen(jC) + ' — ' + jC.reason);
+  }
+  if(act && act.overridden) ovNotes.push('Business activity — ' + s.profile.activity + ': ' + act.baseScore + ' → ' + act.score + ', overridden ' + ovWhen(act) + ' — ' + act.reason);
 
   const qRows = QUESTIONS_OC.map((q,i) =>
     `<tr><td class="k">${String(i+1).padStart(2,'0')}</td><td class="q">${esc(q.text)}</td><td class="a">${esc(s.questions[q.id])}</td><td class="s">${chip(scoreFromYesNo(s.questions[q.id], q.type))}</td></tr>`).join('');
 
   let supRows = '';
-  [['recycled',RECYCLED,'Recycled'],['mined',MINED,'Mined']].forEach(([key,list,label]) => {
+  [['recycled','Recycled'],['mined','Mined']].forEach(([key,label]) => {
     s.suppliers[key].forEach((v,i) => {
       if(v && v!=='N/A'){
-        const item = list.find(o=>o.name===v);
-        supRows += `<tr><td class="k">${label} — Supplier ${i+1}</td><td class="v">${esc(v)}</td><td class="s">${chip(item?item.score:0)}</td></tr>`;
+        const item = effOf(key, v);
+        if(item && item.overridden) ovNotes.push(label + ' material — ' + v + ': ' + item.baseScore + ' → ' + item.score + ', overridden ' + ovWhen(item) + ' — ' + item.reason);
+        supRows += `<tr><td class="k">${label} — Supplier ${i+1}</td><td class="v">${esc(v)}</td><td class="s">${chip(item?item.score:0)}${item && item.overridden ? ovMark : ''}</td></tr>`;
       }
     });
   });
   if(!supRows) supRows = '<tr><td class="k">Material sources</td><td class="v">None declared</td><td class="s"></td></tr>';
+  const ovBox = ovNotes.length ? '<div class="pr-rd"><b>✱ Risk data overrides applied:</b> ' + esc(ovNotes.join('; ')) + '.</div>' : '';
+  const ovCount = rdCount();
+  const rdStamp = 'Risk data: baseline ' + RISK_DATA_VERSION
+    + (ovCount ? ' · ' + ovCount + ' local override' + (ovCount===1?'':'s') + ' in effect'
+       + (riskData.updatedAt ? ' (sheet updated ' + (fmtDate(riskData.updatedAt) || riskData.updatedAt) + ')' : '') : '');
 
   const prohibitReasons = a.escalations.filter(e=>e.level==='prohibit').map(e=>e.reason);
   const eddReasons = a.escalations.filter(e=>e.level==='edd').map(e=>e.reason);
@@ -1189,6 +1540,7 @@ function buildPrintReport(){
       <span>Next review: <b>${esc(nextReview)}</b></span>
       <span>Status: <b class="conf">CONFIDENTIAL</b></span>
     </div>
+    <div class="rd-stamp">${esc(rdStamp)}</div>
     <div class="result-box">
       <div class="rb-score">
         <div class="rb-num">${a.total}</div>
@@ -1202,7 +1554,7 @@ function buildPrintReport(){
         </div>
       </div>
     </div>
-    ${escBoxes}
+    ${escBoxes}${ovBox}
     <h2 class="sec"><span class="n">01</span>Assessment Administration</h2>
     <table class="kv"><tbody>
       <tr><td class="k">Assessed by</td><td class="v">${dash(s.meta.assessor)}</td><td class="s"></td></tr>
@@ -1213,14 +1565,14 @@ function buildPrintReport(){
       <tr><td class="k">Legal entity name</td><td class="v">${dash(s.entity.name)}</td><td class="s"></td></tr>
       <tr><td class="k">Trading name</td><td class="v">${dash(s.entity.trading)}</td><td class="s"></td></tr>
       <tr><td class="k">Registration / licence no.</td><td class="v">${dash(s.entity.regno)}</td><td class="s"></td></tr>
-      <tr><td class="k">Jurisdiction &amp; incorporation</td><td class="v">${dash(s.entity.jurisdiction)}</td><td class="s">${chip(jScore)}</td></tr>
+      <tr><td class="k">Jurisdiction &amp; incorporation</td><td class="v">${dash(s.entity.jurisdiction)}</td><td class="s">${chip(jScore)}${jC && jC.overridden ? ovMark : ''}</td></tr>
       <tr><td class="k">Registered address</td><td class="v">${dash(s.entity.address)}</td><td class="s"></td></tr>
       <tr><td class="k">Website / email</td><td class="v">${dash(s.entity.contact)}</td><td class="s"></td></tr>
       <tr><td class="k">Principals</td><td class="v">${dash(s.entity.principals)}</td><td class="s"></td></tr>
     </tbody></table>
     <h2 class="sec"><span class="n">03</span>Business Profile</h2>
     <table class="kv"><tbody>
-      <tr><td class="k">Business activity</td><td class="v">${dash(s.profile.activity)}</td><td class="s">${chip(aScore)}</td></tr>
+      <tr><td class="k">Business activity</td><td class="v">${dash(s.profile.activity)}</td><td class="s">${chip(aScore)}${act && act.overridden ? ovMark : ''}</td></tr>
       <tr><td class="k">Onboarding channel</td><td class="v">${s.profile.onboard==='Yes'?'Remote / Non-F2F':'In-Person'}</td><td class="s">${chip(obScore)}</td></tr>
       <tr><td class="k">Operational history</td><td class="v">${esc(String(s.profile.entityYears))} years in operation</td><td class="s">${chip(eyScore)}</td></tr>
       <tr><td class="k">Relationship duration</td><td class="v">${esc(String(s.profile.relYears))} years with entity</td><td class="s">${chip(ryScore)}</td></tr>
@@ -1317,10 +1669,13 @@ function initAnimations(){
 ══════════════════════════════════════════ */
 $('footVer').textContent = 'v'+APP_VERSION;
 
+riskData = loadRiskData();
 buildCountrySelect();
 buildActivitySelect();
 buildQuestions();
 buildSuppliers();
+refreshSelectLabels();
+initRiskDataPanel();
 
 const draft = loadDraft();
 if(draft){
