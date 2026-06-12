@@ -6,7 +6,8 @@
    Runs in GitHub Actions (.github/workflows/fatf-watchdog.yml).
    Modes: check (default) · seed (record current lists, no alert) · test-alert
    · setup-sections (create the risk-band sections) · digest (monthly
-   "Reviews due" task listing clients whose next review falls due).
+   "Reviews due" task listing clients whose next review falls due)
+   · backup-risk-data (commit the Asana risk-data mirror to the repo).
 */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
@@ -251,6 +252,17 @@ export function collectReviewsDue(tasks, today, monthEnd) {
     .map(t => '- ' + t.name + ': review due ' + dmy(t.due_on) + (t.due_on < today ? ' (OVERDUE)' : ''));
 }
 
+/* Pulls the JSON sheet out of the auto-backup task's notes (written by
+   netlify/functions/risk-backup.js between the marker lines). */
+export function extractSheet(notes) {
+  const m = /===RISK DATA SHEET===\n([\s\S]*?)\n===END===/.exec(String(notes || ''));
+  if (!m) return null;
+  try {
+    const s = JSON.parse(m[1]);
+    return (s && typeof s === 'object' && s.overrides && typeof s.overrides === 'object') ? s : null;
+  } catch (e) { return null; }
+}
+
 export async function main(mode) {
   if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN secret is not configured in GitHub Actions');
 
@@ -280,6 +292,21 @@ export async function main(mode) {
       + '\nApp: https://hawkeye-sterling-ra.netlify.app';
     const url = await createTask(title, notes, monthEnd);
     console.log('digest task created (' + lines.length + ' client' + (lines.length === 1 ? '' : 's') + '): ' + url);
+    return;
+  }
+
+  if (mode === 'backup-risk-data') {
+    /* Commit the officer's override sheet (mirrored into Asana by the app on
+       every change) to the repository, so the browser-held risk data has an
+       off-device backup with a git audit trail. */
+    const tasks = await listProjectTasks('name,notes');
+    const mirror = tasks.find(t => String(t.name || '') === 'RISK DATA SHEET (auto-backup)');
+    if (!mirror) { console.log('no risk-data mirror task yet - nothing to back up'); return; }
+    const sheet = extractSheet(mirror.notes);
+    if (!sheet) throw new Error('risk-data mirror task exists but its sheet could not be parsed - check the task notes');
+    mkdirSync('data', { recursive: true });
+    writeFileSync('data/risk-overrides-backup.json', JSON.stringify(sheet, null, 2) + '\n');
+    console.log('risk-data sheet backed up to data/risk-overrides-backup.json (sheet updated ' + (sheet.updatedAt || 'unknown') + ')');
     return;
   }
 

@@ -1,0 +1,38 @@
+name: Site Health
+
+# Weekly check that the LIVE site is up and actually working: renders the
+# deployed app in headless Chrome and asserts the brand, the computed
+# verdict, and the gauge. On failure it opens an assigned alert task in the
+# RISK ASSESSMENTS Asana project (plus GitHub's own failure email).
+on:
+  schedule:
+    - cron: '0 5 * * 1' # 05:00 UTC every Monday (09:00 UAE)
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Render the live site (headless Chrome)
+        run: |
+          google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
+            --virtual-time-budget=8000 \
+            --dump-dom "https://hawkeye-sterling-ra.netlify.app" > /tmp/dom.html || echo "chrome exit tolerated; asserting content"
+          test -s /tmp/dom.html
+          for s in 'HAWKEYE STERLING — ENTITY RISK ASSESSMENT' 'CDD — Customer Due Diligence' 'stroke-dasharray: 214.7, 452'; do
+            grep -q "$s" /tmp/dom.html || { echo "MISSING: $s"; exit 1; }
+          done
+          echo "live site healthy — renders and computes"
+      - name: Alert in Asana
+        if: failure()
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "SITE DOWN: hawkeye-sterling-ra.netlify.app failed its health check" \
+            "The weekly health check could not load or verify the live assessment app. Check the Netlify deploys (https://app.netlify.com/projects/hawkeye-sterling-ra) and the run log: $RUN_URL"
