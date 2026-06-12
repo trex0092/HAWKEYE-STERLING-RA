@@ -26,6 +26,7 @@ exports.handler = async (event) => {
   const notes = String(payload.notes || '').slice(0, 60000);
   const dueOn = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.due_on || '')) ? payload.due_on : null;
   const sectionName = SECTIONS[String(payload.band || '')] || null;
+  const gid = /^\d{1,30}$/.test(String(payload.gid || '')) ? String(payload.gid) : null;
   if (!name) return resp(400, { ok: false, error: 'name required' });
 
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
@@ -35,6 +36,21 @@ exports.handler = async (event) => {
     let section = null;
     if (sectionName) {
       try { section = await ensureSection(token, project, sectionName); } catch (e) { section = null; }
+    }
+
+    if (gid) {
+      /* Re-completion of an already-delivered reference: update the existing
+         task (one task per reference). due_on null clears a stale date, e.g.
+         when an assessment turned prohibited. */
+      const upd = await api(token, 'PUT', '/tasks/' + gid, { data: { name, notes, due_on: dueOn } });
+      if (upd.ok) {
+        if (section) {
+          try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: gid } }); }
+          catch (e) { section = null; }
+        }
+        return resp(200, { ok: true, gid, url: upd.body.data.permalink_url, section: section ? sectionName : null, updated: true });
+      }
+      /* The remembered task was deleted in Asana or is inaccessible — create a fresh one. */
     }
 
     const data = { name, notes, projects: [project], assignee: process.env.ASANA_ASSIGNEE || 'me' };
