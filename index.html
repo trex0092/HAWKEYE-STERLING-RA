@@ -62,13 +62,6 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 .brand-area{display:flex;align-items:center;gap:12px}
 .brand-mark{width:38px;height:38px;border:1.5px solid var(--yneon);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:15px;font-weight:700;color:var(--yneon);flex-shrink:0;background:rgba(247,229,90,0.08);box-shadow:0 0 14px rgba(247,229,90,0.35),inset 0 0 8px rgba(247,229,90,0.08)}
 .brand-name{font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:0.13em;color:var(--yneon);line-height:1.2;white-space:nowrap;text-shadow:0 0 12px rgba(247,229,90,0.45),0 0 28px rgba(247,229,90,0.20)}
-.hdr-right{display:flex;align-items:center;gap:8px;position:absolute;right:36px}
-.doc-ref{font-size:10.5px;color:var(--gold);font-weight:600;font-family:var(--mono)}
-.doc-date{font-size:10.5px;color:var(--text2);font-family:var(--mono)}
-.hdr-sep{color:var(--text3)}
-.status-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:3px;font-size:8.5px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;border:1px solid;font-family:var(--mono)}
-.s-draft{background:var(--none-bg);color:var(--none-text);border-color:var(--none-bd)}
-.s-complete{background:var(--low-bg);color:var(--low-text);border-color:var(--low-bd)}
 
 /* ── Layout ───────────────────────────── */
 .main-layout{display:grid;grid-template-columns:1fr 320px;flex:1;align-items:start}
@@ -332,7 +325,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 @media(max-width:800px){
   .main-layout{grid-template-columns:1fr}.side-panel{position:static;height:auto;border-left:none;border-top:1px solid var(--border2)}
   .form-panel{padding:20px 20px 40px}.supplier-grid{grid-template-columns:1fr 1fr}
-  .doc-header{padding:0 18px}.hdr-right{display:none}
+  .doc-header{padding:0 18px}
 }
 @media(max-width:520px){
   .field-row,.field-row.three{grid-template-columns:1fr}.supplier-grid{grid-template-columns:1fr}
@@ -348,12 +341,6 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
     <div class="brand-area">
       <div class="brand-mark">HS</div>
       <div class="brand-name">HAWKEYE STERLING — ENTITY RISK ASSESSMENT</div>
-    </div>
-    <div class="hdr-right">
-      <span class="doc-ref" id="docRef">Ref: —</span>
-      <span class="hdr-sep">·</span>
-      <span class="doc-date" id="docDate">—</span>
-      <span class="status-badge s-draft" id="statusBadge">DRAFT</span>
     </div>
   </header>
 
@@ -609,7 +596,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 
       <div class="sp-actions no-print">
         <button class="btn btn-primary btn-full" onclick="printReport()" title="Safari: choose A4 paper size and enable “Print backgrounds” in the print dialog">⎙ Print / Export PDF</button>
-        <button class="btn btn-secondary btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
+        <button class="btn btn-ghost btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
         <button class="btn btn-red btn-full" onclick="newAssessment()">↺ Reset</button>
         <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
@@ -1222,19 +1209,8 @@ function paintSupplier(prefix, i) {
   el.title = ovTitle(item);
 }
 function paintStatus() {
-  const badge = $('statusBadge');
-  if(badge){
-    badge.className = 'status-badge ' + (state.complete ? 's-complete' : 's-draft');
-    badge.textContent = state.complete ? 'COMPLETE' : 'DRAFT';
-  }
   const btn = $('btnComplete');
   if(btn) btn.textContent = state.complete ? '✓ Mark as Draft' : '✓ Complete Assessment';
-}
-function paintHeaderMeta() {
-  const r = $('docRef');
-  if(r) r.textContent = 'Ref: ' + (String(state.meta.ref||'').trim() || '—');
-  const d = $('docDate');
-  if(d) d.textContent = fmtDate(state.meta.date) || '—';
 }
 
 function syncUI() {
@@ -1286,7 +1262,6 @@ function qType(id){
 function onField(section, key, val) {
   state[section][key] = val;
   if(section==='meta' && key==='date'){ recalc(); return; }
-  if(section==='meta' && key==='ref') paintHeaderMeta();
   updateCompleteness();
   scheduleSave();
 }
@@ -1509,7 +1484,6 @@ function recalc() {
   const arc = $('gaugeArc');
   if(arc) arc.style.strokeDasharray = (Math.min(a.total/30, 1)*339).toFixed(1) + ' 452';
 
-  paintHeaderMeta();
 
   /* Verdict pill (operative outcome) + threshold chips (numeric band) */
   const vpEl = $('verdictPill');

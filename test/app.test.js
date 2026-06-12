@@ -275,12 +275,11 @@ A.setToggle('criminal','Yes');                                 // 21
 check('gauge arc updates on change', els.gaugeArc.style.strokeDasharray === '237.3 452');
 reset();
 A.toggleComplete();
-check('complete toggle sets state + badge + button', A.state.complete === true
-  && els.statusBadge.className === 'status-badge s-complete'
+check('complete toggle sets state + button', A.state.complete === true
   && txt(els.btnComplete) === '✓ Mark as Draft');
 A.toggleComplete();
 check('complete toggle back to draft', A.state.complete === false
-  && els.statusBadge.className === 'status-badge s-draft');
+  && txt(els.btnComplete) === '✓ Complete Assessment');
 check('mergeState keeps signatory titles', A.mergeState({signoff:{completedTitle:'Analyst', approvedTitle:'MLRO'}}).signoff.completedTitle === 'Analyst'
   && A.mergeState({signoff:{approvedTitle:'MLRO'}}).signoff.approvedTitle === 'MLRO');
 check('mergeState normalises complete flag', A.mergeState({complete:'true'}).complete === true
