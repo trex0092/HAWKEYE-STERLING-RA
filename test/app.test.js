@@ -57,6 +57,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
   setAnalystOverride, reassess, priorChanges, fmtDate, dmyToISO, dateFieldChanged,
+  buildNarrative, insertNarrative,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -120,7 +121,7 @@ check('PEP Yes → outcome EDD over numeric SDD', a.outcome === 'EDD' && a.numer
 check('PEP escalation reason cites FATF R.12', a.escalations.some(e=>e.level==='edd' && e.reason.includes('PEP') && e.reason.includes('FATF R.12')));
 check('banner says EDD mandatory', txt(els.critBanner).includes('Enhanced Due Diligence mandatory'));
 A.state.meta.date = '2026-06-11'; A.recalc();
-check('PEP review +12mo (EDD cadence)', A.state.signoff.nextReview === '2027-06-11');
+check('PEP review +3mo (EDD cadence, FG/KYC)', A.state.signoff.nextReview === '2026-09-11');
 
 // 6. FATF call-for-action jurisdictions = mandatory EDD floor
 for(const c of ['Islamic Republic of Iran','North Korea','Myanmar']){
@@ -170,12 +171,12 @@ check('2 years → back to 19', A.computeAssessment().total === 19);
 // 10. Review suggestion follows outcome; manual override respected
 reset();
 A.state.meta.date = '2026-06-11'; A.recalc();
-check('CDD review +36mo', A.state.signoff.nextReview === '2029-06-11');
+check('CDD review +12mo (FG/KYC)', A.state.signoff.nextReview === '2027-06-11');
 A.onSign('nextReview','2026-12-31');
 check('manual review kept', A.state.signoff.nextReview === '2026-12-31' && A.state.signoff.reviewManual === true);
 check('hint offers "use suggested"', els.reviewHint._inner.includes('use suggested'));
 A.useSuggestedReview();
-check('back to suggested', A.state.signoff.nextReview === '2029-06-11' && A.state.signoff.reviewManual === false);
+check('back to suggested', A.state.signoff.nextReview === '2027-06-11' && A.state.signoff.reviewManual === false);
 
 // 11. Persistence round-trip
 reset();
@@ -240,7 +241,7 @@ check('addMonths: 31 Jan + 1mo clamps to 28 Feb', A.addMonths('2026-01-31',1) ==
 check('addMonths: plain dates unaffected', A.addMonths('2026-06-11',36) === '2029-06-11');
 reset();
 A.state.meta.date = '2028-02-29'; A.recalc();
-check('leap-day assessment → review 2031-02-28 (CDD +36mo)', A.state.signoff.nextReview === '2031-02-28');
+check('leap-day assessment → review 2029-02-28 (CDD +12mo)', A.state.signoff.nextReview === '2029-02-28');
 
 // boundary warning covers both band edges with the right text
 reset();                                                       // 19 — CDD/SDD edge
@@ -358,7 +359,7 @@ check('verdict pill reflects override with marker', els.verdictPill.className ==
 check('override banner shown with from→to', els.ovBanner.style.display === 'block'
   && txt(els.ovBanner).includes('CDD → EDD'));
 A.state.meta.date = '2026-06-11'; A.recalc();
-check('review cadence follows the overridden band (+12mo)', A.state.signoff.nextReview === '2027-06-11');
+check('review cadence follows the overridden band (+3mo, EDD)', A.state.signoff.nextReview === '2026-09-11');
 A.buildPrintReport();
 pr = els.printReport._inner;
 check('report shows analyst override box + computed outcome', pr.includes('Analyst override')
@@ -427,6 +428,41 @@ const dEl = {value:'1/6/2026'};
 A.dateFieldChanged(dEl, v => A.onField('meta','date', v));
 check('date field stores ISO and normalises display', A.state.meta.date === '2026-06-01' && dEl.value === '01/06/2026');
 check('next-review input shows dd/mm/yyyy', /^\d{2}\/\d{2}\/\d{4}$/.test(els.nextReview.value));
+
+/* ── 23. Narrative template (manual-grounded, band-matching) ── */
+reset();
+let nar = A.buildNarrative();
+check('low-risk narrative cites the manual and CDD measures', nar.includes('LOW RISK')
+  && nar.includes('FG/RAS') && nar.includes('Standard Customer Due Diligence')
+  && nar.includes('every 12 months (FG/KYC)') && nar.includes('biannual/yearly, FG/RDF'));
+check('narrative uses placeholder when entity unnamed', nar.includes('[Entity Legal Name]'));
+A.state.entity.name = 'Fine Gold LLC'; A.state.screening.sanctions = {system:'OpenSanctions', date:'2026-06-12', ref:'SCR-1'};
+nar = A.buildNarrative();
+check('narrative auto-fills entity and screening evidence', nar.includes('Fine Gold LLC')
+  && nar.includes('OpenSanctions, 12/06/2026, ref SCR-1'));
+A.setToggle('criminal','Yes');                                  // 21 → SDD
+nar = A.buildNarrative();
+check('medium narrative names drivers and SDD cadence', nar.includes('MEDIUM RISK')
+  && nar.includes('Criminal proceedings / investigations — Yes (3)')
+  && nar.includes('every 6 months (FG/KYC)') && nar.includes('monthly/quarterly, FG/RDF'));
+reset();
+A.setToggle('pep','Yes');                                       // EDD floor
+nar = A.buildNarrative();
+check('high narrative includes EDD measures and 3-month cycle', nar.includes('HIGH RISK')
+  && nar.includes('Enhanced Due Diligence') && nar.includes('every 3 months (FG/KYC)')
+  && nar.includes('PEP measures applied (FG/PEP)') && nar.includes('daily/weekly, FG/RDF'));
+reset();
+A.setToggle('sanctions_entity','Yes');
+nar = A.buildNarrative();
+check('prohibited narrative cites Article 11 and freeze', nar.includes('PROHIBITED — DO NOT ONBOARD')
+  && nar.includes('Article 11 of Federal Decree-Law No. (10) of 2025') && nar.includes('funds are frozen'));
+reset();
+A.insertNarrative();
+check('insertNarrative fills the notes box', A.state.notes.includes('LOW RISK')
+  && els.notesInput.value === A.state.notes);
+A.buildPrintReport();
+check('narrative prints in the report notes', els.printReport._inner.includes('LOW RISK')
+  && els.printReport._inner.includes('FG/RAS'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
