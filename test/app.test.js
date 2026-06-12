@@ -56,7 +56,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   addMonths, exportFileName, toggleComplete,
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
-  setAnalystOverride, reassess, priorChanges,
+  setAnalystOverride, reassess, priorChanges, fmtDate, dmyToISO, dateFieldChanged,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -335,7 +335,7 @@ A.state.screening.sanctions = {system:'OpenSanctions', date:'2026-06-12', ref:'S
 A.buildPrintReport();
 pr = els.printReport._inner;
 check('report shows screening evidence', pr.includes('Sanctions screening')
-  && pr.includes('OpenSanctions · 12 Jun 2026 · Ref SCR-001'));
+  && pr.includes('OpenSanctions · 12/06/2026 · Ref SCR-001'));
 check('report dashes unscreened checks', pr.includes('PEP screening') && pr.includes('Adverse media screening'));
 const scrMerged = A.mergeState({screening:{sanctions:{system:'DJ', date:'2026-01-01', ref:'R1', evil:'x'}, pep:'bogus'}});
 check('mergeState sanitises screening fields', scrMerged.screening.sanctions.system === 'DJ'
@@ -416,6 +416,17 @@ check('aria-pressed reflects the AML answer (Yes default)',
 A.setToggle('aml','No');
 check('aria-pressed follows toggling', els.btn_aml_yes.getAttribute('aria-pressed') === 'false'
   && els.btn_aml_no.getAttribute('aria-pressed') === 'true');
+
+/* ── 22. DD/MM/YYYY display with ISO state ── */
+check('fmtDate renders dd/mm/yyyy', A.fmtDate('2026-06-12') === '12/06/2026' && A.fmtDate('') === '' && A.fmtDate('junk') === '');
+check('dmyToISO parses and pads', A.dmyToISO('1/6/2026') === '2026-06-01' && A.dmyToISO('31/12/2026') === '2026-12-31');
+check('dmyToISO rejects impossible dates', A.dmyToISO('31/02/2026') === '' && A.dmyToISO('12/13/2026') === ''
+  && A.dmyToISO('2026-06-12') === '');
+reset();
+const dEl = {value:'1/6/2026'};
+A.dateFieldChanged(dEl, v => A.onField('meta','date', v));
+check('date field stores ISO and normalises display', A.state.meta.date === '2026-06-01' && dEl.value === '01/06/2026');
+check('next-review input shows dd/mm/yyyy', /^\d{2}\/\d{2}\/\d{4}$/.test(els.nextReview.value));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

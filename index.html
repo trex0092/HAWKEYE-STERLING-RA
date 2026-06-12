@@ -101,7 +101,6 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 .fg textarea{resize:vertical;min-height:64px;line-height:1.55}
 input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 input[type="number"]{-moz-appearance:textfield}
-input[type="date"]{color-scheme:dark}
 .score-tag{display:inline-flex;align-items:center;font-size:9px;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap;font-family:var(--mono);transition:background .3s,color .3s}
 .st-0{background:var(--none-bg);color:var(--none-text)}
 .st-1{background:var(--low-bg);color:var(--low-text)}
@@ -153,8 +152,6 @@ input[type="date"]{color-scheme:dark}
 .btn-ghost{background:rgba(59,196,143,0.08);color:#3BC48F;border-color:rgba(59,196,143,0.40);box-shadow:0 0 10px rgba(59,196,143,0.18)}
 .btn-ghost:hover{background:rgba(59,196,143,0.16);color:#5FDCAB;box-shadow:0 0 18px rgba(59,196,143,0.38)}
 .btn-full{width:100%;justify-content:center}
-.action-row{display:flex;gap:8px}
-.btn-half{flex:1;justify-content:center}
 .btn-gold{background:rgba(210,166,72,0.10);color:#E5C16C;border-color:rgba(210,166,72,0.45);box-shadow:0 0 10px rgba(210,166,72,0.20)}
 .btn-gold:hover{background:rgba(210,166,72,0.18);color:#F0D08A;box-shadow:0 0 18px rgba(210,166,72,0.38)}
 .btn-blue{background:rgba(126,200,255,0.10);color:#8FD0FF;border-color:rgba(126,200,255,0.45);box-shadow:0 0 12px rgba(126,200,255,0.22),inset 0 0 10px rgba(126,200,255,0.05)}
@@ -214,12 +211,6 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .breakdown-toggle:hover{color:var(--text)}
 .breakdown-panel{display:none;margin-top:10px}
 .breakdown-panel.open{display:block;animation:fgWarnIn .35s ease-out}
-.bd-table{width:100%;border-collapse:collapse;font-size:10px}
-.bd-table tr{border-bottom:1px solid var(--border)}
-.bd-table tr:last-child{border-bottom:none}
-.bd-table td{padding:4px 3px;color:var(--text);vertical-align:middle}
-.bd-table td:last-child{text-align:right}
-.badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:600;font-family:var(--mono)}
 .b0{background:var(--none-bg);color:var(--none-text)}
 .b1{background:var(--low-bg);color:var(--low-text)}
 .b2{background:var(--med-bg);color:var(--med-text)}
@@ -373,11 +364,11 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
           </div>
           <div class="fg">
             <label>Assessment Date</label>
-            <input type="date" id="assessDate" oninput="onField('meta','date',this.value)">
+            <input type="text" id="assessDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onField('meta','date', v))">
           </div>
           <div class="fg">
             <label>Next Review Date</label>
-            <input type="date" id="nextReview" oninput="onSign('nextReview',this.value)">
+            <input type="text" id="nextReview" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('nextReview', v))">
             <span class="review-hint" id="reviewHint"></span>
           </div>
         </div>
@@ -475,17 +466,17 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <div class="sec-divider">Screening Evidence</div>
         <div class="field-row three">
           <div class="fg"><label>Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" oninput="onScreening('sanctions','system',this.value)"></div>
-          <div class="fg"><label>Screened On</label><input type="date" id="scr_sanctions_date" oninput="onScreening('sanctions','date',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="text" id="scr_sanctions_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('sanctions','date', v))"></div>
           <div class="fg"><label>Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" oninput="onScreening('sanctions','ref',this.value)"></div>
         </div>
         <div class="field-row three">
           <div class="fg"><label>PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" oninput="onScreening('pep','system',this.value)"></div>
-          <div class="fg"><label>Screened On</label><input type="date" id="scr_pep_date" oninput="onScreening('pep','date',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="text" id="scr_pep_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('pep','date', v))"></div>
           <div class="fg"><label>Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" oninput="onScreening('pep','ref',this.value)"></div>
         </div>
         <div class="field-row three">
           <div class="fg"><label>Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" oninput="onScreening('adverse','system',this.value)"></div>
-          <div class="fg"><label>Screened On</label><input type="date" id="scr_adverse_date" oninput="onScreening('adverse','date',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="text" id="scr_adverse_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('adverse','date', v))"></div>
           <div class="fg"><label>Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" oninput="onScreening('adverse','ref',this.value)"></div>
         </div>
       </div>
@@ -508,14 +499,14 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
             <div class="attest-role">First-Line — Assessed By</div>
             <div class="fg"><label>Full Name</label><input type="text" id="completedBy" placeholder="Full name" oninput="onSign('completedBy',this.value)"></div>
             <div class="fg" style="margin-top:10px"><label>Title / Role</label><input type="text" id="completedTitle" placeholder="e.g. Compliance Analyst" oninput="onSign('completedTitle',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label>Date</label><input type="date" id="completedDate" oninput="onSign('completedDate',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label>Date</label><input type="text" id="completedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('completedDate', v))"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
           <div class="attest-block">
             <div class="attest-role">Second-Line — Reviewed &amp; Approved By</div>
             <div class="fg"><label>Full Name</label><input type="text" id="approvedBy" placeholder="Full name" oninput="onSign('approvedBy',this.value)"></div>
             <div class="fg" style="margin-top:10px"><label>Title / Role</label><input type="text" id="approvedTitle" placeholder="e.g. MLRO / Head of Compliance" oninput="onSign('approvedTitle',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label>Date</label><input type="date" id="approvedDate" oninput="onSign('approvedDate',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label>Date</label><input type="text" id="approvedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('approvedDate', v))"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
         </div>
@@ -605,24 +596,11 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <div class="breakdown-panel" id="priorPanel"><div class="prior-list" id="priorList"></div></div>
       </div>
 
-      <div class="sp-block">
-        <button class="breakdown-toggle" onclick="toggleBreakdown()"><span id="bdArrow">▶</span>&nbsp;Score Breakdown</button>
-        <div class="breakdown-panel" id="breakdownPanel"><table class="bd-table" id="bdTable"></table></div>
-      </div>
-
       <div class="sp-spacer"></div>
 
       <div class="sp-actions no-print">
         <button class="btn btn-primary btn-full" onclick="printReport()" title="Safari: choose A4 paper size and enable “Print backgrounds” in the print dialog">⎙ Print / Export PDF</button>
         <button class="btn btn-secondary btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
-        <div class="action-row">
-          <button class="btn btn-ghost btn-half" onclick="newAssessment()">↺ Reset</button>
-          <button class="btn btn-blue btn-half" onclick="reassess()">⟳ Re-assess</button>
-        </div>
-        <div class="action-row">
-          <button class="btn btn-ghost btn-half" onclick="importJSON()">⇪ Import</button>
-          <button class="btn btn-ghost btn-half" onclick="exportJSON()">⇩ Export JSON</button>
-        </div>
         <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
       </div>
@@ -723,11 +701,22 @@ function scoreTagClass(s){ return ['st-0','st-1','st-2','st-3'][s] || 'st-0'; }
 function yearsToScore(y){ return y<=0 ? 3 : y===1 ? 2 : 1; }
 function toISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function todayISO(){ return toISO(new Date()); }
+/* All dates display as DD/MM/YYYY; state and storage stay ISO (yyyy-mm-dd). */
 function fmtDate(iso){
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso||''));
+  return m ? m[3]+'/'+m[2]+'/'+m[1] : '';
+}
+function dmyToISO(s){
+  const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/.exec(String(s||''));
   if(!m) return '';
-  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return m[3]+' '+(MON[parseInt(m[2],10)-1]||'')+' '+m[1];
+  const d = parseInt(m[1],10), mo = parseInt(m[2],10), y = parseInt(m[3],10);
+  if(mo<1 || mo>12 || d<1 || d>new Date(y, mo, 0).getDate()) return '';
+  return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+function dateFieldChanged(el, apply){
+  const iso = dmyToISO(el.value);
+  if(iso) el.value = fmtDate(iso); /* normalise e.g. 1/6/2026 → 01/06/2026 */
+  apply(iso);
 }
 function addMonths(iso, m){
   const p = (iso || todayISO()).split('-').map(Number);
@@ -1017,7 +1006,10 @@ function rdRender(){
   if(!rows) return;
   Object.keys(RD_KINDS).forEach(k => {
     const t = $('rdTab_'+k);
-    if(t) t.className = 'rd-tab' + (k===rdTab ? ' active' : '');
+    if(t){
+      t.className = 'rd-tab' + (k===rdTab ? ' active' : '');
+      t.textContent = RD_KINDS[k].label + ' · ' + RD_KINDS[k].list.filter(o => o.name!=='N/A').length;
+    }
   });
   const oo = $('rdOvOnly');
   if(oo) oo.className = 'rd-tab' + (rdShowOvOnly ? ' active' : '');
@@ -1039,7 +1031,7 @@ function rdRender(){
       + '<select class="rd-score">'+opts.join('')+'</select>'
       + (rdTab==='countries' ? '<label class="rd-cfa"><input type="checkbox" class="rd-cfa-box"'+(effCfa?' checked':'')+'>CFA</label>' : '')
       + '<input class="rd-reason" placeholder="Reason (required)" value="'+esc(o?o.reason:'')+'">'
-      + '<span class="rd-at">'+(o?esc(o.at):'')+'</span>'
+      + '<span class="rd-at">'+(o?esc(fmtDate(o.at)||o.at):'')+'</span>'
       + '<button class="rd-clear" title="Clear override — restore baseline" aria-label="Clear override for '+esc(b.name)+'"'+(o?'':' style="visibility:hidden"')+'>✕</button>'
       + '</div>';
   }).join('');
@@ -1047,7 +1039,7 @@ function rdRender(){
   const c = $('rdCountLbl');
   if(c) c.textContent = rdCount() + ' override' + (rdCount()===1?'':'s');
   const m = $('rdMeta');
-  if(m) m.textContent = 'Baseline ' + RISK_DATA_VERSION + (riskData.updatedAt ? ' · sheet updated ' + riskData.updatedAt : '');
+  if(m) m.textContent = riskData.updatedAt ? 'Sheet updated ' + (fmtDate(riskData.updatedAt) || riskData.updatedAt) : '';
 }
 function refreshSelectLabels(){
   const jSel = $('jurisdictionSelect');
@@ -1187,7 +1179,7 @@ function paintToggle(id, val, type) {
   const tag = $(id+'_score_tag');
   if(tag){ tag.className = 'score-tag '+scoreTagClass(score); tag.textContent = 'Score: '+score+' · '+ratingLabel(score); }
 }
-function ovTitle(e){ return e && e.overridden ? 'Overridden from '+e.baseScore+' on '+e.at+' — '+e.reason : ''; }
+function ovTitle(e){ return e && e.overridden ? 'Overridden from '+e.baseScore+' on '+(fmtDate(e.at)||e.at)+' — '+e.reason : ''; }
 function paintJurisdiction() {
   const c = effCountry(state.entity.jurisdiction);
   const score = c ? c.score : 1;
@@ -1238,7 +1230,7 @@ function paintHeaderMeta() {
 function syncUI() {
   const s = state;
   $('refInput').value = s.meta.ref;
-  $('assessDate').value = s.meta.date;
+  $('assessDate').value = fmtDate(s.meta.date);
   $('assessorName').value = s.meta.assessor;
   $('assessorRole').value = s.meta.role;
   $('entityName').value = s.entity.name;
@@ -1258,15 +1250,15 @@ function syncUI() {
   }));
   $('notesInput').value = s.notes;
   SCREENING_GROUPS.forEach(([g]) => ['system','date','ref'].forEach(f => {
-    $('scr_'+g+'_'+f).value = s.screening[g][f];
+    $('scr_'+g+'_'+f).value = f==='date' ? fmtDate(s.screening[g][f]) : s.screening[g][f];
   }));
   $('completedBy').value = s.signoff.completedBy;
   $('completedTitle').value = s.signoff.completedTitle;
-  $('completedDate').value = s.signoff.completedDate;
+  $('completedDate').value = fmtDate(s.signoff.completedDate);
   $('approvedBy').value = s.signoff.approvedBy;
   $('approvedTitle').value = s.signoff.approvedTitle;
-  $('approvedDate').value = s.signoff.approvedDate;
-  $('nextReview').value = s.signoff.nextReview;
+  $('approvedDate').value = fmtDate(s.signoff.approvedDate);
+  $('nextReview').value = fmtDate(s.signoff.nextReview);
   $('ovBand').value = s.override.band;
   $('ovReason').value = s.override.reason;
   paintStatus();
@@ -1432,7 +1424,7 @@ function recalc() {
   if(a.analystOv){
     ovB.style.display = 'block';
     ovB.textContent = '⚑ Analyst override: ' + a.analystOv.from + ' → ' + a.analystOv.band + ' — ' + a.analystOv.reason
-      + (a.analystOv.at ? ' (' + a.analystOv.at + ')' : '');
+      + (a.analystOv.at ? ' (' + (fmtDate(a.analystOv.at) || a.analystOv.at) + ')' : '');
   } else {
     ovB.style.display = 'none';
   }
@@ -1498,24 +1490,12 @@ function recalc() {
   const suggested = a.prohibited ? '' : addMonths(s.meta.date, REVIEW_MONTHS[a.outcome]);
   if(!s.signoff.reviewManual){
     s.signoff.nextReview = suggested;
-    $('nextReview').value = suggested;
+    $('nextReview').value = fmtDate(suggested);
   }
   $('reviewHint').innerHTML = (a.prohibited
       ? 'No review — relationship prohibited'
-      : 'Suggested: ' + suggested + ' (' + REVIEW_MONTHS[a.outcome] + ' months — ' + a.outcome + ')')
+      : 'Suggested: ' + fmtDate(suggested) + ' (' + REVIEW_MONTHS[a.outcome] + ' months — ' + a.outcome + ')')
     + (s.signoff.reviewManual ? ' · <a onclick="useSuggestedReview()">use suggested</a>' : '');
-
-  /* Breakdown table */
-  $('bdTable').innerHTML = a.parts.map(p=>`
-    <tr>
-      <td style="color:var(--text2);font-size:10px;max-width:160px;word-wrap:break-word">${esc(p.label)}${p.ov ? ' <span class="ov-mark" title="Overridden from '+p.ov.baseScore+' on '+esc(p.ov.at)+' — '+esc(p.ov.reason)+'">✱</span>' : ''}</td>
-      <td style="color:var(--text3);font-size:10px;padding-left:6px">${esc(p.value)}</td>
-      <td><span class="badge ${ratingClass(p.score)}">${p.score}</span></td>
-    </tr>`).join('') +
-    `<tr style="border-top:1px solid var(--border2)">
-      <td colspan="2" style="font-weight:600;font-size:11px;padding-top:6px">TOTAL</td>
-      <td style="padding-top:6px"><span class="badge ${a.outcome==='CDD'?'b1':a.outcome==='SDD'?'b2':'b3'}" style="font-size:11px">${a.total} · ${a.outcome}</span></td>
-    </tr>`;
 
   updateCompleteness();
   scheduleSave();
@@ -1535,12 +1515,6 @@ function updateCompleteness() {
   el.textContent = missing.length
     ? 'Record completeness: '+(req.length-missing.length)+'/'+req.length+' required fields — missing: '+missing.join(', ')
     : 'Record completeness: all '+req.length+' required fields completed ✓';
-}
-
-function toggleBreakdown(){
-  const p = $('breakdownPanel');
-  p.classList.toggle('open');
-  $('bdArrow').textContent = p.classList.contains('open') ? '▼' : '▶';
 }
 
 /* ══════════════════════════════════════════
