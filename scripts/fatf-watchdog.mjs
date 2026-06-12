@@ -100,25 +100,38 @@ export function buildAlert(diff, baseline, affected, today) {
   return notes;
 }
 
-/* fatf-gafi.org sits behind bot protection that 403s datacenter IPs, so we
-   try the live page first and fall back to the Internet Archive's latest
-   snapshot of the same page. For a monthly cadence the snapshot lag is
-   negligible, and the alert only prompts a human to check the official
-   source anyway. */
-async function fetchFatfHtml() {
+/* fatf-gafi.org 403s datacenter IPs, and archive.org now 403s runner IPs for
+   page content (its JSON API still answers). Sources, in order of preference:
+   1. fatf-gafi.org live page;
+   2. the Wayback snapshot named by the availability API;
+   3. Wikipedia's FATF blacklist/greylist articles via the Wikimedia REST API
+      (explicitly automation-friendly), reading only the "Current" sections.
+   Alerts always tell the officer to verify on the official FATF site. */
+export function sliceCurrentSection(html, marker) {
+  const lower = html.toLowerCase();
+  let i = lower.indexOf('id="current');
+  if (i === -1) i = lower.indexOf(marker);
+  if (i === -1) throw new Error('wikipedia structure changed: current-list section not found');
+  const j = lower.indexOf('<h2', i + 10);
+  return html.slice(i, j === -1 ? undefined : j);
+}
+
+async function fetchFatfSegments() {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en'
   };
+  /* 1. Official page */
   try {
     const r = await fetch(FATF_URL, { headers, redirect: 'follow' });
-    if (r.ok) { console.log('source: fatf-gafi.org (live)'); return await r.text(); }
-    console.log('direct fetch returned ' + r.status + ' — falling back to the Web Archive');
-  } catch (e) {
-    console.log('direct fetch failed (' + e.message + ') — falling back to the Web Archive');
-  }
-  /* Attempt 2: Wayback availability API gives the closest snapshot URL. */
+    console.log('fatf-gafi.org direct: ' + r.status);
+    if (r.ok) {
+      const seg = splitFatfPage(await r.text());
+      return { blackSeg: seg.black, greySeg: seg.grey, source: 'fatf-gafi.org (live)' };
+    }
+  } catch (e) { console.log('fatf direct error: ' + e.message); }
+  /* 2. Wayback snapshot via the availability API */
   try {
     const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(FATF_URL), { headers });
     console.log('wayback availability API: ' + av.status);
@@ -126,23 +139,26 @@ async function fetchFatfHtml() {
       const j = await av.json();
       const closest = j && j.archived_snapshots && j.archived_snapshots.closest;
       if (closest && closest.url) {
-        const snapUrl = closest.url.replace(/^http:/, 'https:');
-        const s = await fetch(snapUrl, { headers, redirect: 'follow' });
-        console.log('snapshot ' + (closest.timestamp || '') + ' fetch: ' + s.status);
-        if (s.ok) { console.log('source: web.archive.org snapshot ' + (closest.timestamp || '')); return await s.text(); }
-      } else {
-        console.log('availability API returned no snapshot');
+        const s = await fetch(closest.url.replace(/^http:/, 'https:'), { headers, redirect: 'follow' });
+        console.log('wayback snapshot ' + (closest.timestamp || '') + ': ' + s.status);
+        if (s.ok) {
+          const seg = splitFatfPage(await s.text());
+          return { blackSeg: seg.black, greySeg: seg.grey, source: 'web.archive.org snapshot ' + (closest.timestamp || '') };
+        }
       }
     }
-  } catch (e) {
-    console.log('wayback availability attempt failed (' + e.message + ')');
-  }
-  /* Attempt 3: the /web/<year>/ redirect form. */
-  const wb = await fetch('https://web.archive.org/web/2026/' + FATF_URL, { headers, redirect: 'follow' });
-  console.log('wayback /web/2026/ form: ' + wb.status);
-  if (!wb.ok) throw new Error('FATF page unavailable directly and via the Web Archive (' + wb.status + ')');
-  console.log('source: web.archive.org (year-redirect snapshot)');
-  return await wb.text();
+  } catch (e) { console.log('wayback attempt error: ' + e.message); }
+  /* 3. Wikipedia mirror via the Wikimedia REST API */
+  const wikiHeaders = { ...headers, 'Api-User-Agent': 'hawkeye-sterling-ra-fatf-watchdog/1.0 (compliance list monitoring)' };
+  const get = async (title) => {
+    const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/html/' + title, { headers: wikiHeaders, redirect: 'follow' });
+    console.log('wikipedia ' + title + ': ' + r.status);
+    if (!r.ok) throw new Error('wikipedia ' + title + ' returned ' + r.status);
+    return await r.text();
+  };
+  const blackSeg = sliceCurrentSection(await get('FATF_blacklist'), 'call for action');
+  const greySeg = sliceCurrentSection(await get('FATF_greylist'), 'increased monitoring');
+  return { blackSeg, greySeg, source: 'en.wikipedia.org mirror (verify on fatf-gafi.org)' };
 }
 
 async function asana(path, opts = {}) {
@@ -191,11 +207,11 @@ export async function main(mode) {
   }
 
   const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
-  const html = await fetchFatfHtml();
-  const segments = splitFatfPage(html);
+  const { blackSeg, greySeg, source } = await fetchFatfSegments();
+  console.log('list source: ' + source);
   const current = {
-    black: extractCountries(segments.black, baseline),
-    grey: extractCountries(segments.grey, baseline)
+    black: extractCountries(blackSeg, baseline),
+    grey: extractCountries(greySeg, baseline)
   };
   /* Safety: a sudden empty/tiny list means the page changed shape, not mass delisting. */
   if (current.black.length < 1 || current.grey.length < 5) {
@@ -216,7 +232,7 @@ export async function main(mode) {
 
   const today = new Date().toISOString().slice(0, 10).split('-').reverse().join('/');
   const affected = await findAffected(changed);
-  const notes = buildAlert(diff, baseline, affected, today);
+  const notes = buildAlert(diff, baseline, affected, today) + '\n\nDetected via: ' + source + '. Verify on the official FATF site before acting.';
   const url = await createTask('FATF list change: ' + changed.join(', '), notes);
   console.log('alert task created: ' + url);
   writeFileSync(STATE_FILE, JSON.stringify({ ...current, updated: new Date().toISOString().slice(0, 10) }, null, 2) + '\n');

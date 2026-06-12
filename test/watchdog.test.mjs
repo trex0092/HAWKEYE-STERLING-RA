@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, splitFatfPage, diffLists, buildAlert, normalize } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, splitFatfPage, diffLists, buildAlert, normalize, sliceCurrentSection } from '../scripts/fatf-watchdog.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -45,6 +45,12 @@ check('alert lists affected assessments and re-assess instruction',
   notes.includes('FINE GOLD LLC') && notes.includes('Re-assess these entities'));
 check('alert with no affected says none', buildAlert(diff, baseline, [], '24/10/2026').includes('none found'));
 check('normalize strips accents and case', normalize('CÔTE  d’IvoirE'.replace('’', "'")) === "cote d'ivoire");
+
+const wiki = '<h2 id="Current_FATF_blacklist">Current</h2><ul><li>Iran</li><li>North Korea</li><li>Myanmar</li></ul><h2 id="Former">Former</h2><ul><li>Panama</li><li>Nigeria</li></ul>';
+const wikiSlice = sliceCurrentSection(wiki, 'call for action');
+const wikiBlack = extractCountries(wikiSlice, baseline);
+check('wikipedia slice keeps only the current section',
+  wikiBlack.join('|') === 'Islamic Republic of Iran|Myanmar|North Korea' && !wikiSlice.includes('Panama'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
