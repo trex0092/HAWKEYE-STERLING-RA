@@ -6,7 +6,7 @@
    Runs in GitHub Actions (.github/workflows/fatf-watchdog.yml).
    Modes: check (default) · seed (record current lists, no alert) · test-alert.
 */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
 export const STATE_FILE = 'data/fatf-state.json';
 const FATF_URL = 'https://www.fatf-gafi.org/en/countries/black-and-grey-lists.html';
@@ -250,6 +250,7 @@ export async function main(mode) {
   console.log('FATF now — black:', current.black.join(', '), '| grey:', current.grey.length, 'countries');
 
   if (mode === 'seed' || !existsSync(STATE_FILE)) {
+    mkdirSync('data', { recursive: true }); /* git does not keep empty dirs */
     writeFileSync(STATE_FILE, JSON.stringify({ ...current, updated: new Date().toISOString().slice(0, 10) }, null, 2) + '\n');
     console.log('state seeded — no alert on the first run');
     return;
