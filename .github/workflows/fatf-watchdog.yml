@@ -1,0 +1,41 @@
+name: FATF Watchdog
+
+# Monthly check of FATF's black (call-for-action) and grey (increased
+# monitoring) lists against the app's country data. On any change it creates
+# a review task in the RISK ASSESSMENTS Asana project naming the affected
+# assessments. Needs the ASANA_ACCESS_TOKEN repository secret.
+on:
+  schedule:
+    - cron: '0 6 1 * *' # 06:00 UTC on the 1st of every month
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check (compare + alert) | seed (record current lists, no alert) | test-alert (create a [TEST] Asana task)'
+        default: 'check'
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run watchdog
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+        run: node scripts/fatf-watchdog.mjs "${{ inputs.mode || 'check' }}"
+      - name: Persist list state
+        run: |
+          if ! git diff --quiet -- data/fatf-state.json 2>/dev/null || [ -n "$(git status --porcelain data/fatf-state.json)" ]; then
+            git config user.name "fatf-watchdog"
+            git config user.email "actions@github.com"
+            git add data/fatf-state.json
+            git commit -m "FATF watchdog: record current list state [skip ci]"
+            git push
+          else
+            echo "state unchanged"
+          fi
