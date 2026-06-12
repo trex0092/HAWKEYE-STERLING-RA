@@ -481,6 +481,15 @@ A.state.notes = 'Officer-written rationale.';
 ap = A.asanaPayload();
 check('asana notes prefer the officer narrative', ap.notes.startsWith('Officer-written rationale.')
   && ap.notes.includes('Next review:'));
+check('asana shows unsigned sign-off as dashes', ap.notes.includes('Assessed by: -')
+  && ap.notes.includes('Approved by (MLRO): -'));
+A.state.signoff.completedBy = 'J. Smith'; A.state.signoff.completedTitle = 'Senior Compliance Analyst';
+A.state.signoff.completedDate = '2026-06-12';
+A.state.signoff.approvedBy = 'A. Jones'; A.state.signoff.approvedTitle = 'MLRO'; A.state.signoff.approvedDate = '2026-06-13';
+ap = A.asanaPayload();
+check('asana delivers manually-entered assessor and MLRO',
+  ap.notes.includes('Assessed by: J. Smith (Senior Compliance Analyst), 12/06/2026')
+  && ap.notes.includes('Approved by (MLRO): A. Jones (MLRO), 13/06/2026'));
 check('toggleComplete is safe without fetch (sandbox/test)', (A.toggleComplete(), A.state.complete === true));
 A.toggleComplete();
 

@@ -1350,6 +1350,12 @@ function asanaPayload(){
       + '\nActivity: ' + s.profile.activity
       + '\nResult: ' + a.total + ' / 30+ (' + a.outcome + ')'
       + '\nNext review: ' + (fmtDate(s.signoff.nextReview) || '-')
+      + '\nAssessed by: ' + (String(s.signoff.completedBy||'').trim() || '-')
+      + (String(s.signoff.completedTitle||'').trim() ? ' (' + s.signoff.completedTitle.trim() + ')' : '')
+      + (s.signoff.completedDate ? ', ' + (fmtDate(s.signoff.completedDate) || s.signoff.completedDate) : '')
+      + '\nApproved by (MLRO): ' + (String(s.signoff.approvedBy||'').trim() || '-')
+      + (String(s.signoff.approvedTitle||'').trim() ? ' (' + s.signoff.approvedTitle.trim() + ')' : '')
+      + (s.signoff.approvedDate ? ', ' + (fmtDate(s.signoff.approvedDate) || s.signoff.approvedDate) : '')
   };
 }
 function sendToAsana(){
