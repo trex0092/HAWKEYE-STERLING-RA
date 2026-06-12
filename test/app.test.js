@@ -57,7 +57,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
   setAnalystOverride, reassess, priorChanges, fmtDate, dmyToISO, dateFieldChanged,
-  buildNarrative, insertNarrative, asanaPayload, sendToAsana,
+  buildNarrative, insertNarrative, asanaPayload, sendToAsana, deliveredGid, rememberDelivered,
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
   openRegister, closeRegister,
   get riskData(){ return riskData; }
@@ -500,6 +500,11 @@ A.setToggle('sanctions_entity','Yes');                    // prohibited → no r
 check('prohibited assessments carry no due date', A.asanaPayload().due_on === '');
 check('prohibited payload band = PROHIBITED', A.asanaPayload().band === 'PROHIBITED');
 A.setToggle('sanctions_entity','No');
+check('payload carries no task gid before first delivery', A.asanaPayload().gid === '');
+A.rememberDelivered(A.state.meta.ref, '4242');
+check('delivered gid remembered per reference for update-not-duplicate',
+  A.deliveredGid(A.state.meta.ref) === '4242' && A.deliveredGid('RA-OTHER') === ''
+  && A.asanaPayload().gid === '4242');
 check('toggleComplete is safe without fetch (sandbox/test)', (A.toggleComplete(), A.state.complete === true));
 A.toggleComplete();
 
@@ -564,6 +569,25 @@ check('deleting a missing ref is a clean no-op', A.regDelete('RA-NOPE') === fals
 A.closeRegister();
 check('register panel closes', !els.regOverlay.classList.contains('open'));
 
+/* ── 26. Review fixes: ref rename, invalid date display ── */
+localStorage.removeItem('hsra.register.v1');
+reset();
+A.state.entity.name = 'Rename Co';
+A.saveDraft();
+const renameFrom = A.state.meta.ref;
+A.onField('meta','ref', renameFrom + 'B');                 // typing in the reference field
+A.saveDraft();
+check('renaming the reference moves its register entry (no duplicate)',
+  A.regAll()[renameFrom] == null && A.regAll()[renameFrom + 'B'] != null
+  && A.regAll()[renameFrom + 'B'].summary.entity === 'Rename Co');
+const badDate = { value: '31/02/2026' };
+let badGot = 'x';
+A.dateFieldChanged(badDate, v => badGot = v);
+check('invalid date clears both the field and the state', badDate.value === '' && badGot === '');
+const goodDate = { value: '1/6/2026' };
+A.dateFieldChanged(goodDate, v => {});
+check('valid date still normalises in place', goodDate.value === '01/06/2026');
+
 (async () => {
   const fn = require('../netlify/functions/asana-task.js');
   let sent = null, calls = [];
@@ -573,6 +597,9 @@ check('register panel closes', !els.regOverlay.classList.contains('open'));
     if (url.includes('/sections?')) return { ok: true, status: 200, json: async () => ({ data: sectionsOnServer }) };
     if (/\/projects\/[^/]+\/sections$/.test(url)) return { ok: true, status: 200, json: async () => ({ data: { gid: 's-new' } }) };
     if (url.includes('/addTask')) return { ok: true, status: 200, json: async () => ({ data: {} }) };
+    if (opts && opts.method === 'PUT') return url.endsWith('/tasks/410')
+      ? { ok: false, status: 404, json: async () => ({ errors: [{ message: 'Not Found' }] }) }
+      : { ok: true, status: 200, json: async () => ({ data: { gid: url.split('/').pop(), permalink_url: 'https://app.asana.com/x/upd' } }) };
     sent = { url, opts };
     return { ok: true, status: 200, json: async () => ({ data: { gid: '42', permalink_url: 'https://app.asana.com/x/42' } }) };
   };
@@ -604,6 +631,20 @@ check('register panel closes', !els.regOverlay.classList.contains('open'));
   r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA V · Junk Band Co', band:'NOT-A-BAND'})});
   check('fn ignores unknown bands (task still created, no section calls)', r.statusCode === 200
     && JSON.parse(r.body).section === null && !calls.some(c => c.url.includes('section')));
+  calls = [];
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA U2 · Co · SDD 21', band:'SDD', gid:'42'})});
+  const put = calls.find(c => c.opts && c.opts.method === 'PUT');
+  check('fn updates the existing task instead of duplicating', r.statusCode === 200
+    && JSON.parse(r.body).updated === true && put && put.url.endsWith('/tasks/42')
+    && !calls.some(c => c.opts.method === 'POST' && c.url.endsWith('/tasks')));
+  check('fn re-files the updated task into its (new) band section',
+    calls.some(c => /\/projects\/[^/]+\/sections$/.test(c.url))
+    && calls.some(c => c.url.endsWith('/sections/s-new/addTask')));
+  calls = [];
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA U3 · Co · CDD 19', band:'CDD', gid:'410'})});
+  check('fn falls back to create when the remembered task is gone', r.statusCode === 200
+    && JSON.parse(r.body).updated !== true && JSON.parse(r.body).gid === '42'
+    && calls.some(c => c.opts.method === 'POST' && c.url.endsWith('/tasks')));
   r = await fn.handler({httpMethod:'GET'});
   check('fn rejects non-POST', r.statusCode === 405);
   r = await fn.handler({httpMethod:'POST', body:'{}'});

@@ -115,7 +115,7 @@ python3 -m http.server 8000
 The scoring engine, hard-outcome escalations, persistence, and report rendering are covered by a dependency-free test suite that executes the app's full inline script against a DOM stub:
 
 ```bash
-node test/app.test.js        # 168 checks — engine, register, report, Asana payload
+node test/app.test.js        # 182 checks — engine, register, report, Asana delivery
 node test/watchdog.test.mjs  # 12 checks — FATF list parsing & alert building
 ```
 
