@@ -26,9 +26,10 @@ The entire application lives in [`index.html`](index.html) — no build step, no
 - **Analyst notes & rationale** — free-text section included in the printed report, with a one-click **Narrative Template** that writes a formal, plain-language risk rationale for the matching band (low / medium / high / prohibited), citing the Company's policies by full name (Risk Assessment methodology, Know Your Customer, Risk Appetite Statement, Targeted Financial Sanctions) and filling in the entity, date, and score automatically.
 - **FATF Watchdog** — a monthly GitHub Action (`.github/workflows/fatf-watchdog.yml`) reads FATF's published black/grey lists, compares them with the app's country data, and on any change (listed *or* delisted) creates a review task in the RISK ASSESSMENTS Asana project naming the affected assessments. Detection is automatic; score changes remain a human decision via the Risk Data panel. Requires the `ASANA_ACCESS_TOKEN` repository secret.
 - **Asana delivery** — marking an assessment *Complete* on the deployed site creates a task in the firm's **RISK ASSESSMENTS** Asana project (task named after the reference, entity, and band; the narrative and result summary in the description) via a Netlify function, so the Asana token never reaches the browser.
+- **Assessment register** — every assessment with an entity name files itself into a built-in register (sidebar → *☰ Register*), keyed by its reference: each customer's band, draft/complete status, and next review date at a glance (overdue reviews flagged in red, reviews due within a month in amber), with one-click *Open* to resume any of them and *Delete* to remove a filed copy. Switching never loses work — the current assessment is filed before another is opened — so one browser serves a whole portfolio of entities.
 - **Sign-off & attestation** — first-line (assessed by) and second-line (reviewed & approved, MLRO) blocks with name, title, date, and signature lines under a formal attestation statement, plus an auto-suggested next review date based on the risk band (editable). A *Complete Assessment* toggle tracks draft/complete status.
 - **Print-ready report** — a formal black/pink A4 letterhead report (exact-color printing) with the result box, hard-outcome notices, per-factor score chips across every section, notes, attestation, and signature blocks. Use *Print / Export PDF* → save as PDF.
-- **Persistence** — drafts autosave to the browser (`localStorage`) and are restored on reload. All dates are entered and displayed as DD/MM/YYYY.
+- **Persistence** — drafts autosave to the browser (`localStorage`) and are restored on reload; named assessments are also filed in the on-device register. All dates are entered and displayed as DD/MM/YYYY.
 - **Record completeness indicator** in the risk-summary sidebar.
 
 ## Risk methodology
@@ -114,10 +115,11 @@ python3 -m http.server 8000
 The scoring engine, hard-outcome escalations, persistence, and report rendering are covered by a dependency-free test suite that executes the app's full inline script against a DOM stub:
 
 ```bash
-node test/app.test.js   # 121 checks
+node test/app.test.js        # 168 checks — engine, register, report, Asana payload
+node test/watchdog.test.mjs  # 12 checks — FATF list parsing & alert building
 ```
 
-CI runs the suite plus a headless-Chrome smoke test (renders `index.html`, asserts the computed verdict and gauge) on every push and pull request (`.github/workflows/ci.yml`).
+CI runs both suites plus a headless-Chrome smoke test (renders `index.html`, asserts the computed verdict and gauge) on every push and pull request (`.github/workflows/ci.yml`).
 
 ## Project structure
 
@@ -125,7 +127,10 @@ CI runs the suite plus a headless-Chrome smoke test (renders `index.html`, asser
 .
 ├── index.html                  # The complete application (markup, styles, data, logic)
 ├── test/app.test.js            # Functional test suite (no dependencies)
-├── .github/workflows/ci.yml    # CI — tests + headless-Chrome smoke test on every push / PR
+├── test/watchdog.test.mjs      # FATF watchdog unit tests
+├── scripts/fatf-watchdog.mjs   # Monthly FATF black/grey list watchdog (Asana alerts)
+├── data/fatf-state.json        # Watchdog's last-seen FATF lists (committed by the action)
+├── .github/workflows/          # CI (tests + smoke test), FATF watchdog, release
 ├── netlify.toml                # Static publish config (repo root, no build)
 ├── netlify/functions/          # Serverless: Asana task delivery on completion
 ├── docs/                       # README screenshots

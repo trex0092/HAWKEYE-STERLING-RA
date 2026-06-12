@@ -58,6 +58,8 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
   setAnalystOverride, reassess, priorChanges, fmtDate, dmyToISO, dateFieldChanged,
   buildNarrative, insertNarrative, asanaPayload, sendToAsana,
+  regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
+  openRegister, closeRegister,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -498,6 +500,67 @@ check('prohibited assessments carry no due date', A.asanaPayload().due_on === ''
 A.setToggle('sanctions_entity','No');
 check('toggleComplete is safe without fetch (sandbox/test)', (A.toggleComplete(), A.state.complete === true));
 A.toggleComplete();
+
+/* ── 25. Assessment register (the filing cabinet) ── */
+localStorage.removeItem('hsra.register.v1');               // earlier sections filed entries; start clean
+reset();
+A.saveDraft();
+check('register ignores unnamed assessments', Object.keys(A.regAll()).length === 0);
+A.state.entity.name = 'Alpha Gold DMCC';
+A.saveDraft();
+const regRef1 = A.state.meta.ref;
+let regItems = A.regAll();
+check('named assessment files itself on save', Object.keys(regItems).length === 1
+  && regItems[regRef1].summary.entity === 'Alpha Gold DMCC'
+  && regItems[regRef1].summary.total === 19 && regItems[regRef1].summary.outcome === 'CDD'
+  && regItems[regRef1].summary.complete === false
+  && regItems[regRef1].state.entity.name === 'Alpha Gold DMCC');
+A.state.complete = true;
+A.saveDraft();
+check('completion status reaches the register', A.regAll()[regRef1].summary.complete === true);
+A.newAssessment();                                          // files Alpha, opens a fresh ref
+check('reset keeps the filed assessment and issues a new ref',
+  A.state.meta.ref !== regRef1 && A.regAll()[regRef1] != null && A.state.entity.name === '');
+A.state.entity.name = 'Beta Jewellery LLC';
+A.setToggle('pep','Yes');                                   // EDD floor for a distinct summary
+A.saveDraft();
+const regRef2 = A.state.meta.ref;
+check('second entity files alongside the first', Object.keys(A.regAll()).length === 2
+  && A.regAll()[regRef2].summary.outcome === 'EDD');
+check('regOpenEntry restores a filed assessment', A.regOpenEntry(regRef1)
+  && A.state.meta.ref === regRef1 && A.state.entity.name === 'Alpha Gold DMCC'
+  && A.state.complete === true && A.computeAssessment().total === 19);
+check('opening filed Beta first (auto-file on switch)', A.regAll()[regRef2].state.questions.pep === 'Yes');
+A.regAll()[regRef1].state.entity.jurisdiction = 'Narnia';   // returned copy only — store is untouched
+check('regAll returns copies, store stays clean', A.regAll()[regRef1].state.entity.jurisdiction === 'United Kingdom');
+localStorage.setItem('hsra.register.v1',
+  JSON.stringify({version:1, items:{'RA-X':{savedAt:'2026-01-01', summary:{entity:'Tampered'}, state:{questions:{}, entity:{jurisdiction:'Narnia', name:'Tampered'}}}}}));
+check('tampered snapshot is sanitised through mergeState', A.regOpenEntry('RA-X')
+  && A.state.entity.jurisdiction === 'United Kingdom' && A.state.entity.name === 'Tampered');
+localStorage.setItem('hsra.register.v1', '{corrupt');
+check('corrupt register degrades to empty, app survives', Object.keys(A.regAll()).length === 0);
+localStorage.removeItem('hsra.register.v1');
+reset();
+A.state.entity.name = 'Gamma Metals FZE';
+A.state.signoff.nextReview = '2020-01-01'; A.state.signoff.reviewManual = true;
+A.saveDraft();
+A.openRegister();
+check('register panel opens and renders rows', els.regOverlay.classList.contains('open')
+  && els.regRows._inner.includes('Gamma Metals FZE') && els.regRows._inner.includes('Open')
+  && txt(els.regCountLbl) === '1 assessment filed');
+check('overdue reviews are flagged', els.regRows._inner.includes('REVIEW OVERDUE — 01/01/2020'));
+check('the open assessment is marked current', els.regRows._inner.includes('reg-cur'));
+els.regSearch.value = 'zzz-no-match';
+A.regRender();
+check('filter hides non-matching rows', els.regRows._inner.includes('No matches'));
+els.regSearch.value = '';
+A.regRender();
+A.regDeleteIdx(0);                                          // confirm is stubbed true
+check('delete removes the filed copy', Object.keys(A.regAll()).length === 0
+  && els.regRows._inner.includes('Nothing filed yet'));
+check('deleting a missing ref is a clean no-op', A.regDelete('RA-NOPE') === false);
+A.closeRegister();
+check('register panel closes', !els.regOverlay.classList.contains('open'));
 
 (async () => {
   const fn = require('../netlify/functions/asana-task.js');
