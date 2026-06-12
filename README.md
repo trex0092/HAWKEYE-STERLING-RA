@@ -92,7 +92,7 @@ Separately from the risk data (which is firm-wide), the analyst may raise the op
 
 - **Autosave** — the working draft is saved to `localStorage` in the user's browser only; nothing is transmitted anywhere.
 - **Export / Import** — the full assessment (inputs + computed result) round-trips as a JSON file named after the reference (e.g. `RA-20260611-001.json`).
-- **Print report** — produces an audit-ready PDF via the browser's print dialog.
+- **Print report** — produces an audit-ready PDF via the browser's print dialog. Chrome/Edge/Firefox apply A4 and exact colours automatically; in **Safari**, choose A4 paper size and enable *Print backgrounds* in the print dialog.
 
 ## Getting started
 
