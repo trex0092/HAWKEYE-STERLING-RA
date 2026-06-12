@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check (compare + alert) | seed (record current lists, no alert) | test-alert (create a [TEST] Asana task)'
+        description: 'check (compare + alert) | seed (record current lists, no alert) | test-alert (create a [TEST] Asana task) | setup-sections (create the LOW/MEDIUM/HIGH/PROHIBITED sections)'
         default: 'check'
 
 permissions:
