@@ -21,13 +21,12 @@ The entire application lives in [`index.html`](index.html) — no build step, no
 - **Hard outcomes** — designated-party exposure (sanctions on the entity or its principals, terrorist financing, proliferation financing) produces a **PROHIBITED — Do Not Onboard** verdict with freeze-and-report instructions; PEP exposure, FATF call-for-action jurisdictions, and the ASM/high-risk-country red flag force **mandatory EDD** regardless of the numeric score. Every escalation is shown with its reason and carried into the export and printed report.
 - **Analyst override** — the operative outcome can be raised above the computed one (one-way ratchet: CDD → SDD/EDD, SDD → EDD) with a mandatory justification that prints on the report; it never weakens the computed outcome and never applies to prohibited relationships.
 - **Screening evidence** — record the system/provider, date, and reference ID for sanctions, PEP, and adverse-media checks; printed in the report as audit evidence.
-- **Periodic re-assessment** — clone a completed assessment under a new reference for its scheduled review; the prior result is kept and every changed factor is diffed live and on the report.
 - **Assessment metadata** — auto-generated reference (`RA-YYYYMMDD-NNN`), assessment date, assessor name and role.
 - **Expanded entity identification** — legal and trading names, registration/licence number, jurisdiction, registered address, website/email, principals (beneficial owners / controllers / directors).
 - **Analyst notes & rationale** — free-text section included in the printed report.
 - **Sign-off & attestation** — first-line (assessed by) and second-line (reviewed & approved, MLRO) blocks with name, title, date, and signature lines under a formal attestation statement, plus an auto-suggested next review date based on the risk band (editable). A *Complete Assessment* toggle tracks draft/complete status.
 - **Print-ready report** — a formal black/pink A4 letterhead report (exact-color printing) with the result box, hard-outcome notices, per-factor score chips across every section, notes, attestation, and signature blocks. Use *Print / Export PDF* → save as PDF.
-- **Persistence** — drafts autosave to the browser (`localStorage`) and are restored on reload; assessments can be exported/imported as JSON for record-keeping.
+- **Persistence** — drafts autosave to the browser (`localStorage`) and are restored on reload. All dates are entered and displayed as DD/MM/YYYY.
 - **Record completeness indicator** in the risk-summary sidebar.
 
 ## Risk methodology
@@ -91,7 +90,6 @@ Separately from the risk data (which is firm-wide), the analyst may raise the op
 ## Data management & privacy
 
 - **Autosave** — the working draft is saved to `localStorage` in the user's browser only; nothing is transmitted anywhere.
-- **Export / Import** — the full assessment (inputs + computed result) round-trips as a JSON file named after the reference (e.g. `RA-20260611-001.json`).
 - **Print report** — produces an audit-ready PDF via the browser's print dialog. Chrome/Edge/Firefox apply A4 and exact colours automatically; in **Safari**, choose A4 paper size and enable *Print backgrounds* in the print dialog.
 
 ## Getting started
