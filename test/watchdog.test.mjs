@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, sliceCurrentSection, collectReviewsDue } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, sliceCurrentSection, collectReviewsDue, extractSheet } from '../scripts/fatf-watchdog.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -68,6 +68,15 @@ check('digest picks due + overdue clients only, oldest first', digest.length ===
   && digest[1].includes('Beta Jewellery LLC') && digest[1].includes('(OVERDUE)')
   && digest[2].includes('Alpha Gold DMCC') && digest[2].includes('review due 15/06/2026') && !digest[2].includes('OVERDUE'));
 check('digest is silent when nothing is due', collectReviewsDue(digestTasks, '2026-01-01', '2026-01-31').length === 0);
+
+const goodNotes = 'header text\n===RISK DATA SHEET===\n{"updatedAt":"2026-06-12","overrides":{"countries":{"Hungary":{"score":3}}}}\n===END===';
+const sheetParsed = extractSheet(goodNotes);
+check('backup sheet extracted from mirror-task notes', !!sheetParsed
+  && sheetParsed.updatedAt === '2026-06-12' && sheetParsed.overrides.countries.Hungary.score === 3);
+check('backup extraction rejects garbage and missing markers',
+  extractSheet('no markers {"overrides":{}}') === null
+  && extractSheet('===RISK DATA SHEET===\n{broken\n===END===') === null
+  && extractSheet('===RISK DATA SHEET===\n{"noOverrides":1}\n===END===') === null);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

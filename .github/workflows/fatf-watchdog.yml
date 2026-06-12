@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check (compare + alert) | seed (record lists, no alert) | test-alert ([TEST] Asana task) | setup-sections (risk-band sections) | digest (monthly "Reviews due" task)'
+        description: 'check (compare + alert) | seed (record lists, no alert) | test-alert ([TEST] Asana task) | setup-sections (risk-band sections) | digest (monthly "Reviews due" task) | backup-risk-data (commit override sheet)'
         default: 'check'
 
 permissions:
@@ -34,13 +34,19 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
         run: node scripts/fatf-watchdog.mjs digest
-      - name: Persist list state
+      - name: Monthly risk-data backup
+        if: always() && github.event_name == 'schedule'
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+        run: node scripts/fatf-watchdog.mjs backup-risk-data
+      - name: Persist list state and backups
+        if: always()
         run: |
-          if ! git diff --quiet -- data/fatf-state.json 2>/dev/null || [ -n "$(git status --porcelain data/fatf-state.json)" ]; then
+          if [ -n "$(git status --porcelain data/)" ]; then
             git config user.name "fatf-watchdog"
             git config user.email "actions@github.com"
-            git add data/fatf-state.json
-            git commit -m "FATF watchdog: record current list state [skip ci]"
+            git add data/
+            git commit -m "Watchdog: record list state / risk-data backup [skip ci]"
             git push
           else
             echo "state unchanged"

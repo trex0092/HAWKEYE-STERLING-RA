@@ -58,6 +58,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
   setAnalystOverride, reassess, priorChanges, fmtDate, dmyToISO, dateFieldChanged,
   buildNarrative, insertNarrative, asanaPayload, sendToAsana, deliveredGid, rememberDelivered,
+  scheduleRiskBackup,
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
   openRegister, closeRegister,
   get riskData(){ return riskData; }
@@ -587,14 +588,17 @@ check('invalid date clears both the field and the state', badDate.value === '' &
 const goodDate = { value: '1/6/2026' };
 A.dateFieldChanged(goodDate, v => {});
 check('valid date still normalises in place', goodDate.value === '01/06/2026');
+check('risk-backup scheduler is inert without fetch (test/file://)', (A.scheduleRiskBackup(), true));
 
 (async () => {
   const fn = require('../netlify/functions/asana-task.js');
   let sent = null, calls = [];
   let sectionsOnServer = [{ gid: 's-low', name: 'LOW RISK (CDD)' }];
+  let projectTasksOnServer = [];
   global.fetch = async (url, opts) => {
     calls.push({ url, opts });
     if (url.includes('/sections?')) return { ok: true, status: 200, json: async () => ({ data: sectionsOnServer }) };
+    if (url.includes('/tasks?')) return { ok: true, status: 200, json: async () => ({ data: projectTasksOnServer }) };
     if (/\/projects\/[^/]+\/sections$/.test(url)) return { ok: true, status: 200, json: async () => ({ data: { gid: 's-new' } }) };
     if (url.includes('/addTask')) return { ok: true, status: 200, json: async () => ({ data: {} }) };
     if (opts && opts.method === 'PUT') return url.endsWith('/tasks/410')
@@ -652,6 +656,30 @@ check('valid date still normalises in place', goodDate.value === '01/06/2026');
   delete process.env.ASANA_ACCESS_TOKEN;
   r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x'})});
   check('fn fails clearly without token', r.statusCode === 500 && JSON.parse(r.body).error.includes('ASANA_ACCESS_TOKEN'));
+
+  /* risk-backup function: browser overrides → Asana mirror task */
+  const rb = require('../netlify/functions/risk-backup.js');
+  const sheet = {app:'x', version:'3.6.0', riskDataVersion:'2026-06', updatedAt:'2026-06-12',
+    overrides:{countries:{Hungary:{score:3, reason:'FATF grey-listing', at:'2026-06-12'}}, activities:{}, recycled:{}, mined:{}}};
+  process.env.ASANA_ACCESS_TOKEN = 'test-token';
+  calls = []; projectTasksOnServer = [];
+  r = await rb.handler({httpMethod:'POST', body:JSON.stringify({sheet})});
+  const rbMade = calls.find(c => c.opts.method === 'POST' && c.url.endsWith('/tasks'));
+  check('risk-backup creates the mirror task with the sheet between markers', r.statusCode === 200
+    && JSON.parse(r.body).updated === false && rbMade
+    && JSON.parse(rbMade.opts.body).data.name === 'RISK DATA SHEET (auto-backup)'
+    && JSON.parse(rbMade.opts.body).data.notes.includes('===RISK DATA SHEET===')
+    && JSON.parse(rbMade.opts.body).data.notes.includes('FATF grey-listing'));
+  calls = []; projectTasksOnServer = [{gid:'rb1', name:'RISK DATA SHEET (auto-backup)'}];
+  r = await rb.handler({httpMethod:'POST', body:JSON.stringify({sheet})});
+  check('risk-backup updates the existing mirror task in place', r.statusCode === 200
+    && JSON.parse(r.body).updated === true
+    && calls.some(c => c.opts.method === 'PUT' && c.url.endsWith('/tasks/rb1')));
+  r = await rb.handler({httpMethod:'POST', body:JSON.stringify({sheet:{nope:1}})});
+  check('risk-backup rejects payloads without overrides', r.statusCode === 400);
+  r = await rb.handler({httpMethod:'GET'});
+  check('risk-backup rejects non-POST', r.statusCode === 405);
+  delete process.env.ASANA_ACCESS_TOKEN;
   delete global.fetch;
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
