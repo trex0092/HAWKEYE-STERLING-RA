@@ -7,7 +7,8 @@
    Modes: check (default) · seed (record current lists, no alert) · test-alert
    · setup-sections (create the risk-band sections) · digest (monthly
    "Reviews due" task listing clients whose next review falls due)
-   · backup-risk-data (commit the Asana risk-data mirror to the repo).
+   · backup-risk-data (commit the Asana risk-data mirror to the repo)
+   · probe (diagnostic: print source, classified lists, name contexts).
 */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
@@ -26,6 +27,11 @@ const ALIASES = {
   "cote d'ivoire": "Cote D'Ivoire",
   "côte d'ivoire": "Cote D'Ivoire",
   'democratic republic of the congo': 'The Democratic Republic Of Congo',
+  'democratic republic of congo': 'The Democratic Republic Of Congo',
+  'dr congo': 'The Democratic Republic Of Congo',
+  'virgin islands (uk)': 'British Virgin Islands',
+  'virgin islands (united kingdom)': 'British Virgin Islands',
+  'british virgin islands (uk)': 'British Virgin Islands',
   'lao pdr': "Lao People's Democratic Republic",
   "lao people's democratic republic": "Lao People's Democratic Republic",
   'türkiye': 'Turkey',
@@ -35,7 +41,13 @@ const ALIASES = {
 };
 
 export function normalize(s) {
-  return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  /* hyphens fold to spaces so "Guinea-Bissau" can never half-match as "Guinea" */
+  return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[‐‑‒–—-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/* Multi-word names must match across any whitespace run (newlines in HTML). */
+function keyToRx(key) {
+  return key.split(' ').map(escapeRx).join('\\s+');
 }
 
 export function loadBaseline(indexHtml) {
@@ -57,7 +69,7 @@ export function extractCountries(segment, baseline) {
   ].sort((a, b) => b.key.length - a.key.length);
   const found = new Set();
   for (const { key, canonical } of dict) {
-    const rx = new RegExp('(^|[^a-z])(' + escapeRx(key) + ')(?=[^a-z]|$)', 'g');
+    const rx = new RegExp('(^|[^a-z])(' + keyToRx(key) + ')(?=[^a-z]|$)', 'g');
     if (rx.test(text)) {
       found.add(canonical);
       text = text.replace(rx, '$1§');
@@ -72,16 +84,30 @@ export function extractCountries(segment, baseline) {
    name decides its list. Occurrences before any heading (nav links) are
    ignored. Works on a lowercased copy, which preserves string positions. */
 export function classifyCountries(html, baseline) {
-  /* lowercase + accent fold; headings and matches use the SAME folded
-     string, so positions stay mutually consistent */
-  const lower = String(html || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  /* lowercase + accent fold + 1:1 hyphen/whitespace fold; headings and
+     matches use the SAME folded string, and every fold maps one character
+     to one character, so positions stay mutually consistent */
+  const lower = String(html || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2010\u2011\u2012\u2013\u2014-]/g, ' ').replace(/\s/g, ' ');
   const positions = (needle) => {
     const out = []; let i = 0;
     while ((i = lower.indexOf(needle, i)) !== -1) { out.push(i); i += needle.length; }
     return out;
   };
-  const blackPos = positions('call for action');
-  const greyPos = positions('increased monitoring');
+  const blackPosAll = positions('call for action');
+  const greyPosAll = positions('increased monitoring');
+  /* Terminators close a list region: the "no longer subject to ..."
+     delisted headings, and the boilerplate that follows the lists on the
+     FATF page ("Find out more ..."). Names governed by a terminator (or
+     sitting unreasonably far below their heading - footer/nav links) are
+     not current members. The delisted headings embed the same needles
+     ("...no longer subject to increased monitoring"), so needle hits
+     inside them are dropped. */
+  const endPos = [...positions('no longer subject to'), ...positions('find out more'), ...positions('related publication'), ...positions('related material')].sort((a, b) => a - b);
+  const insideEndHeading = p => endPos.some(e => p >= e && p - e <= 60);
+  const blackPos = blackPosAll.filter(p => !insideEndHeading(p));
+  const greyPos = greyPosAll.filter(p => !insideEndHeading(p));
+  const MAX_REGION = 20000; /* a 22-row list table is a few KB of HTML; footers sit far beyond */
   if (!blackPos.length || !greyPos.length) throw new Error('FATF page structure changed: section headings not found');
   const dict = [
     ...baseline.map(c => ({ key: normalize(c.name), canonical: c.name })),
@@ -90,15 +116,19 @@ export function classifyCountries(html, baseline) {
   let masked = lower;
   const black = new Set(), grey = new Set(), decided = new Set();
   for (const { key, canonical } of dict) {
-    const rx = new RegExp('(^|[^a-z])(' + escapeRx(key) + ')(?=[^a-z]|$)', 'g');
+    const rx = new RegExp('(^|[^a-z])(' + keyToRx(key) + ')(?=[^a-z]|$)', 'g');
     let m;
     while ((m = rx.exec(masked)) !== null) {
       if (decided.has(canonical)) break;
       const idx = m.index + m[1].length;
       const lastBlack = [...blackPos].filter(p => p < idx).pop();
       const lastGrey = [...greyPos].filter(p => p < idx).pop();
+      const lastEnd = [...endPos].filter(p => p < idx).pop();
       if (lastBlack === undefined && lastGrey === undefined) continue;
-      const isBlack = lastGrey === undefined || (lastBlack !== undefined && lastBlack > lastGrey);
+      const nearest = Math.max(lastBlack ?? -1, lastGrey ?? -1, lastEnd ?? -1);
+      if (lastEnd !== undefined && nearest === lastEnd) continue; /* delisted table / post-list content */
+      if (idx - nearest > MAX_REGION) continue; /* far below the heading — footer or nav, not the list */
+      const isBlack = (lastBlack ?? -1) > (lastGrey ?? -1);
       (isBlack ? black : grey).add(canonical);
       decided.add(canonical);
     }
@@ -292,6 +322,31 @@ export async function main(mode) {
       + '\nApp: https://hawkeye-sterling-ra.netlify.app';
     const url = await createTask(title, notes, monthEnd);
     console.log('digest task created (' + lines.length + ' client' + (lines.length === 1 ? '' : 's') + '): ' + url);
+    return;
+  }
+
+  if (mode === 'probe') {
+    /* Diagnostic: print what the source chain returns and how it classifies,
+       so list discrepancies can be traced to source content vs parsing. */
+    const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
+    const fetched = await fetchFatfSegments();
+    console.log('source: ' + fetched.source);
+    const current = fetched.html
+      ? classifyCountries(fetched.html, baseline)
+      : { black: extractCountries(fetched.blackSeg, baseline), grey: extractCountries(fetched.greySeg, baseline) };
+    console.log('black: ' + current.black.join(', '));
+    console.log('grey (' + current.grey.length + '): ' + current.grey.join(', '));
+    const flat = (fetched.html || (String(fetched.blackSeg) + ' ||GREY|| ' + String(fetched.greySeg)))
+      .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    for (const probe of ['virgin islands', 'congo', 'guinea', 'sudan', 'no longer subject', 'find out more']) {
+      const fl = flat.toLowerCase();
+      let i = -1, n = 0;
+      while ((i = fl.indexOf(probe, i + 1)) !== -1 && n < 6) {
+        n++;
+        console.log('probe "' + probe + '" #' + n + ': …' + flat.slice(Math.max(0, i - 70), i + 90) + '…');
+      }
+      if (!n) console.log('probe "' + probe + '": absent');
+    }
     return;
   }
 
