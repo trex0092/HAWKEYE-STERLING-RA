@@ -1,3 +1,7 @@
 # Static single-file app — publish the repo root, no build step.
 [build]
   publish = "."
+
+# Serverless: Asana task delivery on assessment completion.
+[functions]
+  directory = "netlify/functions"

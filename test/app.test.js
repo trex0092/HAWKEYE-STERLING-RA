@@ -57,6 +57,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
   setAnalystOverride, reassess, priorChanges, fmtDate, dmyToISO, dateFieldChanged,
+  buildNarrative, insertNarrative, asanaPayload, sendToAsana,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -120,7 +121,7 @@ check('PEP Yes → outcome EDD over numeric SDD', a.outcome === 'EDD' && a.numer
 check('PEP escalation reason cites FATF R.12', a.escalations.some(e=>e.level==='edd' && e.reason.includes('PEP') && e.reason.includes('FATF R.12')));
 check('banner says EDD mandatory', txt(els.critBanner).includes('Enhanced Due Diligence mandatory'));
 A.state.meta.date = '2026-06-11'; A.recalc();
-check('PEP review +12mo (EDD cadence)', A.state.signoff.nextReview === '2027-06-11');
+check('PEP review +3mo (EDD cadence, FG/KYC)', A.state.signoff.nextReview === '2026-09-11');
 
 // 6. FATF call-for-action jurisdictions = mandatory EDD floor
 for(const c of ['Islamic Republic of Iran','North Korea','Myanmar']){
@@ -170,12 +171,12 @@ check('2 years → back to 19', A.computeAssessment().total === 19);
 // 10. Review suggestion follows outcome; manual override respected
 reset();
 A.state.meta.date = '2026-06-11'; A.recalc();
-check('CDD review +36mo', A.state.signoff.nextReview === '2029-06-11');
+check('CDD review +12mo (FG/KYC)', A.state.signoff.nextReview === '2027-06-11');
 A.onSign('nextReview','2026-12-31');
 check('manual review kept', A.state.signoff.nextReview === '2026-12-31' && A.state.signoff.reviewManual === true);
 check('hint offers "use suggested"', els.reviewHint._inner.includes('use suggested'));
 A.useSuggestedReview();
-check('back to suggested', A.state.signoff.nextReview === '2029-06-11' && A.state.signoff.reviewManual === false);
+check('back to suggested', A.state.signoff.nextReview === '2027-06-11' && A.state.signoff.reviewManual === false);
 
 // 11. Persistence round-trip
 reset();
@@ -240,7 +241,7 @@ check('addMonths: 31 Jan + 1mo clamps to 28 Feb', A.addMonths('2026-01-31',1) ==
 check('addMonths: plain dates unaffected', A.addMonths('2026-06-11',36) === '2029-06-11');
 reset();
 A.state.meta.date = '2028-02-29'; A.recalc();
-check('leap-day assessment → review 2031-02-28 (CDD +36mo)', A.state.signoff.nextReview === '2031-02-28');
+check('leap-day assessment → review 2029-02-28 (CDD +12mo)', A.state.signoff.nextReview === '2029-02-28');
 
 // boundary warning covers both band edges with the right text
 reset();                                                       // 19 — CDD/SDD edge
@@ -274,12 +275,11 @@ A.setToggle('criminal','Yes');                                 // 21
 check('gauge arc updates on change', els.gaugeArc.style.strokeDasharray === '237.3 452');
 reset();
 A.toggleComplete();
-check('complete toggle sets state + badge + button', A.state.complete === true
-  && els.statusBadge.className === 'status-badge s-complete'
+check('complete toggle sets state + button', A.state.complete === true
   && txt(els.btnComplete) === '✓ Mark as Draft');
 A.toggleComplete();
 check('complete toggle back to draft', A.state.complete === false
-  && els.statusBadge.className === 'status-badge s-draft');
+  && txt(els.btnComplete) === '✓ Complete Assessment');
 check('mergeState keeps signatory titles', A.mergeState({signoff:{completedTitle:'Analyst', approvedTitle:'MLRO'}}).signoff.completedTitle === 'Analyst'
   && A.mergeState({signoff:{approvedTitle:'MLRO'}}).signoff.approvedTitle === 'MLRO');
 check('mergeState normalises complete flag', A.mergeState({complete:'true'}).complete === true
@@ -358,7 +358,7 @@ check('verdict pill reflects override with marker', els.verdictPill.className ==
 check('override banner shown with from→to', els.ovBanner.style.display === 'block'
   && txt(els.ovBanner).includes('CDD → EDD'));
 A.state.meta.date = '2026-06-11'; A.recalc();
-check('review cadence follows the overridden band (+12mo)', A.state.signoff.nextReview === '2027-06-11');
+check('review cadence follows the overridden band (+3mo, EDD)', A.state.signoff.nextReview === '2026-09-11');
 A.buildPrintReport();
 pr = els.printReport._inner;
 check('report shows analyst override box + computed outcome', pr.includes('Analyst override')
@@ -428,5 +428,100 @@ A.dateFieldChanged(dEl, v => A.onField('meta','date', v));
 check('date field stores ISO and normalises display', A.state.meta.date === '2026-06-01' && dEl.value === '01/06/2026');
 check('next-review input shows dd/mm/yyyy', /^\d{2}\/\d{2}\/\d{4}$/.test(els.nextReview.value));
 
-console.log('\n' + passed + ' passed, ' + failed + ' failed');
-process.exit(failed ? 1 : 0);
+/* ── 23. Narrative template (formal, plain, human voice, audit-ready) ── */
+reset();
+let nar = A.buildNarrative();
+check('low narrative cites policies by full name', nar.includes('low risk band')
+  && nar.includes("Company's Risk Assessment methodology") && nar.includes('Standard due diligence')
+  && nar.includes('every twelve months') && nar.includes('Targeted Financial Sanctions')
+  && nar.includes('Know Your Customer procedure'));
+check('narrative contains no manual codes', nar.indexOf('FG/') === -1);
+check('narrative uses placeholder when entity unnamed', nar.includes('[Entity Legal Name]'));
+check('narrative contains no em-dash', nar.indexOf('—') === -1);
+A.state.entity.name = 'Fine Gold LLC';
+nar = A.buildNarrative();
+check('narrative auto-fills entity, date, and score', nar.includes('We assessed Fine Gold LLC on ')
+  && nar.includes('19 / 30+'));
+A.setToggle('criminal','Yes');                                  // 21 → SDD
+nar = A.buildNarrative();
+check('medium narrative reads human with six-month cycle', nar.includes('medium risk band')
+  && nar.includes('Simplified due diligence') && nar.includes('every six months')
+  && nar.indexOf('—') === -1);
+reset();
+A.setToggle('pep','Yes');                                       // EDD floor
+nar = A.buildNarrative();
+check('high narrative covers EDD measures and three-month cycle', nar.includes('high risk band')
+  && nar.includes('Enhanced due diligence') && nar.includes('every three months')
+  && nar.includes('senior management approval') && nar.indexOf('—') === -1);
+reset();
+A.setToggle('sanctions_entity','Yes');
+nar = A.buildNarrative();
+check('prohibited narrative cites Article 11, freeze, no em-dash', nar.includes('The relationship is prohibited')
+  && nar.includes('Article 11 of Federal Decree-Law No. (10) of 2025') && nar.includes('Funds are frozen')
+  && nar.indexOf('—') === -1);
+reset();
+A.insertNarrative();
+check('insertNarrative fills the notes box', A.state.notes.includes('low risk band')
+  && els.notesInput.value === A.state.notes);
+A.buildPrintReport();
+check('narrative prints in the report notes', els.printReport._inner.includes('low risk band')
+  && els.printReport._inner.includes('Risk Assessment methodology'));
+
+/* ── 24. Asana delivery payload + Netlify function ── */
+reset();
+A.state.entity.name = 'Fine Gold LLC';
+A.recalc();
+let ap = A.asanaPayload();
+check('asana task name carries ref, entity, band, score',
+  /^RA RA-\d{8}-\d{3} · Fine Gold LLC · CDD 19$/.test(ap.name));
+check('asana notes fall back to the generated narrative', ap.notes.includes('low risk band')
+  && ap.notes.includes('Ref: ' + A.state.meta.ref) && ap.notes.includes('Result: 19 / 30+ (CDD)'));
+A.state.notes = 'Officer-written rationale.';
+ap = A.asanaPayload();
+check('asana notes prefer the officer narrative', ap.notes.startsWith('Officer-written rationale.')
+  && ap.notes.includes('Next review:'));
+check('asana shows unsigned sign-off as dashes', ap.notes.includes('Assessed by: -')
+  && ap.notes.includes('Approved by (MLRO): -'));
+A.state.signoff.completedBy = 'J. Smith'; A.state.signoff.completedTitle = 'Senior Compliance Analyst';
+A.state.signoff.completedDate = '2026-06-12';
+A.state.signoff.approvedBy = 'A. Jones'; A.state.signoff.approvedTitle = 'MLRO'; A.state.signoff.approvedDate = '2026-06-13';
+ap = A.asanaPayload();
+check('asana delivers manually-entered assessor and MLRO',
+  ap.notes.includes('Assessed by: J. Smith (Senior Compliance Analyst), 12/06/2026')
+  && ap.notes.includes('Approved by (MLRO): A. Jones (MLRO), 13/06/2026'));
+check('asana due date mirrors the next-review date (risk level)', ap.due_on === A.state.signoff.nextReview
+  && /^\d{4}-\d{2}-\d{2}$/.test(ap.due_on));
+A.onSign('nextReview','2026-08-01');                      // manual entry (e.g. change in law)
+check('manual review date drives the asana due date', A.asanaPayload().due_on === '2026-08-01');
+A.setToggle('sanctions_entity','Yes');                    // prohibited → no review date
+check('prohibited assessments carry no due date', A.asanaPayload().due_on === '');
+A.setToggle('sanctions_entity','No');
+check('toggleComplete is safe without fetch (sandbox/test)', (A.toggleComplete(), A.state.complete === true));
+A.toggleComplete();
+
+(async () => {
+  const fn = require('../netlify/functions/asana-task.js');
+  let sent = null;
+  global.fetch = async (url, opts) => { sent = {url, opts}; return {ok:true, status:200, json:async()=>({data:{gid:'42', permalink_url:'https://app.asana.com/x/42'}})}; };
+  process.env.ASANA_ACCESS_TOKEN = 'test-token';
+  let r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'RA X · Y · CDD 19', notes:'n', due_on:'2027-06-12'})});
+  const body = JSON.parse(r.body), sentBody = JSON.parse(sent.opts.body);
+  check('fn creates the asana task in RISK ASSESSMENTS', r.statusCode === 200 && body.ok === true
+    && sent.url === 'https://app.asana.com/api/1.0/tasks'
+    && sent.opts.headers.Authorization === 'Bearer test-token'
+    && sentBody.data.projects[0] === '1215653768729951' && sentBody.data.name === 'RA X · Y · CDD 19');
+  check('fn passes the due date through to asana', sentBody.data.due_on === '2027-06-12');
+  await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x', due_on:'junk'})});
+  check('fn drops malformed due dates', !('due_on' in JSON.parse(sent.opts.body).data));
+  r = await fn.handler({httpMethod:'GET'});
+  check('fn rejects non-POST', r.statusCode === 405);
+  r = await fn.handler({httpMethod:'POST', body:'{}'});
+  check('fn requires a task name', r.statusCode === 400);
+  delete process.env.ASANA_ACCESS_TOKEN;
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x'})});
+  check('fn fails clearly without token', r.statusCode === 500 && JSON.parse(r.body).error.includes('ASANA_ACCESS_TOKEN'));
+  delete global.fetch;
+
+  console.log('\n' + passed + ' passed, ' + failed + ' failed');
+  process.exit(failed ? 1 : 0);
+})();
