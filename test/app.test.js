@@ -473,7 +473,7 @@ A.state.entity.name = 'Fine Gold LLC';
 A.recalc();
 let ap = A.asanaPayload();
 check('asana task name carries ref, entity, band, score',
-  /^RA RA-\d{8}-\d{3} · Fine Gold LLC · CDD 19$/.test(ap.name));
+  /^RA-\d{8}-\d{3} · Fine Gold LLC · CDD 19$/.test(ap.name));
 check('asana notes fall back to the generated narrative', ap.notes.includes('low risk band')
   && ap.notes.includes('Ref: ' + A.state.meta.ref) && ap.notes.includes('Result: 19 / 30+ (CDD)'));
 A.state.notes = 'Officer-written rationale.';
