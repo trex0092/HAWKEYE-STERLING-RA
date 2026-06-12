@@ -6,6 +6,10 @@ A single-file web application for **AML/CFT customer (entity) risk assessment**,
 
 **Live:** https://hawkeye-sterling-ra.netlify.app
 
+| Assessment form (dark neon UI) | Print report (A4) |
+|---|---|
+| ![Assessment form](docs/form.png) | ![Print report](docs/report.png) |
+
 The entire application lives in [`index.html`](index.html) — no build step, no dependencies, no backend. It runs offline, deploys to any static host, and keeps all data on the user's device.
 
 ## Features
@@ -15,6 +19,9 @@ The entire application lives in [`index.html`](index.html) — no build step, no
 - **Dark neon interface** — six numbered form sections beside a sticky risk-summary sidebar: an animated 270° SVG risk gauge, the required-diligence verdict with threshold chips, a 0–30 risk-position bar, and a collapsible per-factor score breakdown. Entrance and gauge animations respect `prefers-reduced-motion`.
 - **Live verdict** — total score, numeric band (CDD / SDD / EDD), and boundary warnings one point below each band edge, recomputed on every change.
 - **Hard outcomes** — designated-party exposure (sanctions on the entity or its principals, terrorist financing, proliferation financing) produces a **PROHIBITED — Do Not Onboard** verdict with freeze-and-report instructions; PEP exposure, FATF call-for-action jurisdictions, and the ASM/high-risk-country red flag force **mandatory EDD** regardless of the numeric score. Every escalation is shown with its reason and carried into the export and printed report.
+- **Analyst override** — the operative outcome can be raised above the computed one (one-way ratchet: CDD → SDD/EDD, SDD → EDD) with a mandatory justification that prints on the report; it never weakens the computed outcome and never applies to prohibited relationships.
+- **Screening evidence** — record the system/provider, date, and reference ID for sanctions, PEP, and adverse-media checks; printed in the report as audit evidence.
+- **Periodic re-assessment** — clone a completed assessment under a new reference for its scheduled review; the prior result is kept and every changed factor is diffed live and on the report.
 - **Assessment metadata** — auto-generated reference (`RA-YYYYMMDD-NNN`), assessment date, assessor name and role.
 - **Expanded entity identification** — legal and trading names, registration/licence number, jurisdiction, registered address, website/email, principals (beneficial owners / controllers / directors).
 - **Analyst notes & rationale** — free-text section included in the printed report.
@@ -75,7 +82,11 @@ On top of the baseline, the **Risk Data** panel (sidebar → *⚙ Risk Data*) le
 - Change any score (1–3 for countries/activities, 0–3 for materials) or a country's **CFA** (FATF call-for-action) flag — a **reason is mandatory** and the change is date-stamped.
 - Overrides are stored as deltas in the browser (`localStorage`) and as a portable **risk data sheet** (JSON export/import), so one approved sheet can be distributed to the whole team.
 - Factors affected by an override are marked **✱** in the form, the score breakdown, and the printed report, which also lists each applied override ("Jurisdiction — Hungary: 2 → 3, overridden 12 Jun 2026 — FATF grey-listing") and carries a risk-data version stamp.
-- *Reset to Baseline* removes all overrides. When the firm formally adopts a change, it graduates into the baseline arrays via a PR and the override is retired.
+- *Reset* removes all overrides. When the firm formally adopts a change, it graduates into the baseline arrays via a PR and the override is retired.
+
+### Analyst override
+
+Separately from the risk data (which is firm-wide), the analyst may raise the operative outcome of a single assessment above the computed one — CDD → SDD/EDD or SDD → EDD — with a mandatory justification. It is a **one-way ratchet**: it can never weaken the computed outcome, is inert without a justification, and never applies to PROHIBITED relationships. The suggested review cadence follows the overridden band, and the report records both the computed and the overridden outcome.
 
 ## Data management & privacy
 
@@ -101,10 +112,10 @@ python3 -m http.server 8000
 The scoring engine, hard-outcome escalations, persistence, and report rendering are covered by a dependency-free test suite that executes the app's full inline script against a DOM stub:
 
 ```bash
-node test/app.test.js   # 95 checks
+node test/app.test.js   # 121 checks
 ```
 
-CI runs the suite on every push and pull request (`.github/workflows/ci.yml`).
+CI runs the suite plus a headless-Chrome smoke test (renders `index.html`, asserts the computed verdict and gauge) on every push and pull request (`.github/workflows/ci.yml`).
 
 ## Project structure
 
@@ -112,8 +123,10 @@ CI runs the suite on every push and pull request (`.github/workflows/ci.yml`).
 .
 ├── index.html                  # The complete application (markup, styles, data, logic)
 ├── test/app.test.js            # Functional test suite (no dependencies)
-├── .github/workflows/ci.yml    # CI — runs the tests on every push / PR
+├── .github/workflows/ci.yml    # CI — tests + headless-Chrome smoke test on every push / PR
 ├── netlify.toml                # Static publish config (repo root, no build)
+├── docs/                       # README screenshots
+├── design/                     # Original design handoff (reference only, not served logic)
 └── README.md
 ```
 

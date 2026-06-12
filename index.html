@@ -62,7 +62,7 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 .brand-area{display:flex;align-items:center;gap:12px}
 .brand-mark{width:38px;height:38px;border:1.5px solid var(--yneon);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:15px;font-weight:700;color:var(--yneon);flex-shrink:0;background:rgba(247,229,90,0.08);box-shadow:0 0 14px rgba(247,229,90,0.35),inset 0 0 8px rgba(247,229,90,0.08)}
 .brand-name{font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:0.13em;color:var(--yneon);line-height:1.2;white-space:nowrap;text-shadow:0 0 12px rgba(247,229,90,0.45),0 0 28px rgba(247,229,90,0.20)}
-.hdr-right{display:none}
+.hdr-right{display:flex;align-items:center;gap:8px;position:absolute;right:36px}
 .doc-ref{font-size:10.5px;color:var(--gold);font-weight:600;font-family:var(--mono)}
 .doc-date{font-size:10.5px;color:var(--text2);font-family:var(--mono)}
 .hdr-sep{color:var(--text3)}
@@ -187,6 +187,15 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .thresh-chip.tc-med.tc-active{background:var(--sdd-bg);color:var(--sdd-text);border-color:var(--sdd-bd);font-weight:600}
 .thresh-chip.tc-high.tc-active{background:var(--high-bg);color:var(--high-text);border-color:var(--high-bd);font-weight:600}
 .crit-banner{font-size:10px;color:var(--high-text);background:var(--high-bg);border:1px solid var(--high-bd);border-radius:var(--r-sm);padding:7px 10px;margin-top:10px;display:none;line-height:1.5;font-weight:600;box-shadow:0 0 12px rgba(255,87,87,0.25),inset 0 0 8px rgba(255,87,87,0.05)}
+.ov-banner{font-size:10px;color:#E5C16C;background:rgba(210,166,72,0.08);border:1px solid rgba(210,166,72,0.45);border-radius:var(--r-sm);padding:7px 10px;margin-top:10px;display:none;line-height:1.5;font-weight:600;box-shadow:0 0 12px rgba(210,166,72,0.18)}
+.ov-ctl{margin-top:10px}
+.ov-form{display:none;margin-top:8px;flex-direction:column;gap:6px}
+.ov-form.open{display:flex}
+.ov-form select,.ov-form input{background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:4px 9px;font-size:11px;font-family:var(--sans);outline:none;width:100%;transition:border-color .18s,box-shadow .18s}
+.ov-form select:focus,.ov-form input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.ov-form select option{background:#121826;color:var(--text)}
+.ov-form input::placeholder{color:#4A5468}
+.ov-hint{font-size:9px;color:var(--text3);font-family:var(--mono);line-height:1.4}
 .completeness{font-size:9px;color:var(--text3);margin-top:10px;font-family:var(--mono);letter-spacing:0.3px;line-height:1.5}
 .completeness.ok{color:var(--low-text)}
 .sb-bar-track{display:flex;height:4px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,0.06)}
@@ -199,6 +208,8 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sb-bar-pointer::before{content:'\25B2';font-size:6px;color:var(--text2)}
 .sb-axis{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
 .boundary-warn{font-size:10px;color:var(--yneon);background:rgba(247,229,90,0.08);border:1px solid rgba(247,229,90,0.50);border-radius:var(--r-sm);padding:7px 10px;margin-top:10px;display:none;line-height:1.4;box-shadow:0 0 12px rgba(247,229,90,0.25),inset 0 0 8px rgba(247,229,90,0.05)}
+.prior-info{font-size:10px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.5;letter-spacing:0.3px}
+.prior-list{font-size:10px;color:var(--text2);line-height:1.7}
 .breakdown-toggle{background:none;border:none;font-size:9px;color:var(--text2);cursor:pointer;font-family:var(--sans);padding:0;display:flex;align-items:center;gap:5px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600}
 .breakdown-toggle:hover{color:var(--text)}
 .breakdown-panel{display:none;margin-top:10px}
@@ -276,6 +287,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .rb-cap{font-size:8pt;letter-spacing:0.12em;text-transform:uppercase;color:#9aa0ae;margin-top:2px}
 .rb-proh{color:#FF7B7B;font-size:12pt;font-weight:800;margin-bottom:3px;letter-spacing:0.02em}
 .rb-verdict{font-size:14pt;font-weight:700;margin-bottom:4px}
+.rb-sub{font-size:8pt;color:#9aa0ae;margin:-2px 0 4px;letter-spacing:0.03em}
 .rb-verdict.v-cdd{color:#7FB3E8}.rb-verdict.v-sdd{color:#FFAA5C}.rb-verdict.v-edd{color:#FF7B7B}
 .rb-thresh{font-size:9pt;color:#B6BCC8}
 .rb-thresh b{padding:1px 7px;border:1px solid #3A3F4D;border-radius:99px;margin-right:6px;font-weight:700}
@@ -308,6 +320,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 .foot{margin-top:18px;border-top:0.75px solid #F06AA8;padding-top:5px;font-size:7.5pt;color:#7A8090;text-align:center;letter-spacing:0.06em}
 .rd-stamp{font-size:7.5pt;color:#7A8090;letter-spacing:0.05em;margin:-10px 0 12px}
 .pr-rd{border:0.75px solid #D9CCD3;border-left:3px solid #A4690B;border-radius:8px;padding:7px 10px;font-size:8.5pt;color:#4A5160;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
+.pr-prior{border:0.75px solid #D9CCD3;border-left:3px solid #2C5F8A;border-radius:8px;padding:7px 10px;font-size:8.5pt;color:#4A5160;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
 .rd-mark{color:#A4690B;font-size:8pt;margin-left:3px}
 
 @media print{
@@ -322,7 +335,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 @media(max-width:800px){
   .main-layout{grid-template-columns:1fr}.side-panel{position:static;height:auto;border-left:none;border-top:1px solid var(--border2)}
   .form-panel{padding:20px 20px 40px}.supplier-grid{grid-template-columns:1fr 1fr}
-  .doc-header{padding:0 18px}
+  .doc-header{padding:0 18px}.hdr-right{display:none}
 }
 @media(max-width:520px){
   .field-row,.field-row.three{grid-template-columns:1fr}.supplier-grid{grid-template-columns:1fr}
@@ -459,6 +472,22 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       <div class="card">
         <div class="section-hd"><span class="sn">04</span><span class="st">Ownership, Control &amp; Compliance</span></div>
         <div id="questions-oc"></div>
+        <div class="sec-divider">Screening Evidence</div>
+        <div class="field-row three">
+          <div class="fg"><label>Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" oninput="onScreening('sanctions','system',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="date" id="scr_sanctions_date" oninput="onScreening('sanctions','date',this.value)"></div>
+          <div class="fg"><label>Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" oninput="onScreening('sanctions','ref',this.value)"></div>
+        </div>
+        <div class="field-row three">
+          <div class="fg"><label>PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" oninput="onScreening('pep','system',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="date" id="scr_pep_date" oninput="onScreening('pep','date',this.value)"></div>
+          <div class="fg"><label>Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" oninput="onScreening('pep','ref',this.value)"></div>
+        </div>
+        <div class="field-row three">
+          <div class="fg"><label>Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" oninput="onScreening('adverse','system',this.value)"></div>
+          <div class="fg"><label>Screened On</label><input type="date" id="scr_adverse_date" oninput="onScreening('adverse','date',this.value)"></div>
+          <div class="fg"><label>Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" oninput="onScreening('adverse','ref',this.value)"></div>
+        </div>
       </div>
 
       <!-- 05 · Supply Chain -->
@@ -507,7 +536,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
     <aside class="side-panel">
       <div class="sp-block">
         <div class="gauge-wrap" id="gaugeWrap">
-          <svg viewBox="0 0 220 185" width="220" height="185">
+          <svg viewBox="0 0 220 185" width="220" height="185" role="img" aria-label="Risk score gauge">
             <defs>
               <linearGradient id="trackZone" x1="30" y1="110" x2="190" y2="110" gradientUnits="userSpaceOnUse">
                 <stop offset="0%" stop-color="rgba(44,95,138,0.14)"></stop>
@@ -545,6 +574,19 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
           <span class="thresh-chip tc-high" id="tc-high">EDD: 23+</span>
         </div>
         <div class="crit-banner" id="critBanner"></div>
+        <div class="ov-banner" id="ovBanner"></div>
+        <div class="ov-ctl no-print">
+          <button class="breakdown-toggle" onclick="toggleOvForm()"><span id="ovArrow">▶</span>&nbsp;Analyst Override</button>
+          <div class="ov-form" id="ovForm">
+            <select id="ovBand" onchange="onOvField()" aria-label="Override band">
+              <option value="">— No override —</option>
+              <option value="SDD">Raise to SDD</option>
+              <option value="EDD">Raise to EDD</option>
+            </select>
+            <input type="text" id="ovReason" placeholder="Justification (required)" oninput="onOvField()">
+            <div class="ov-hint" id="ovHint"></div>
+          </div>
+        </div>
         <div class="completeness" id="completeness"></div>
       </div>
 
@@ -554,6 +596,13 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <div class="sb-bar-pointer-wrap"><div class="sb-bar-pointer" id="barPointer" style="left:0%"><span id="pointerLabel">0</span></div></div>
         <div class="sb-axis"><span>0</span><span>10</span><span>20</span><span>30</span></div>
         <div class="boundary-warn" id="boundaryWarn"></div>
+      </div>
+
+      <div class="sp-block" id="priorBlock" style="display:none">
+        <div class="sp-label">Prior Review</div>
+        <div class="prior-info" id="priorInfo"></div>
+        <button class="breakdown-toggle" onclick="togglePrior()"><span id="priorArrow">▶</span>&nbsp;<span id="priorChangesLbl">Changes</span></button>
+        <div class="breakdown-panel" id="priorPanel"><div class="prior-list" id="priorList"></div></div>
       </div>
 
       <div class="sp-block">
@@ -566,7 +615,10 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       <div class="sp-actions no-print">
         <button class="btn btn-primary btn-full" onclick="printReport()">⎙ Print / Export PDF</button>
         <button class="btn btn-secondary btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
-        <button class="btn btn-ghost btn-full" onclick="newAssessment()">↺ Reset</button>
+        <div class="action-row">
+          <button class="btn btn-ghost btn-half" onclick="newAssessment()">↺ Reset</button>
+          <button class="btn btn-blue btn-half" onclick="reassess()">⟳ Re-assess</button>
+        </div>
         <div class="action-row">
           <button class="btn btn-ghost btn-half" onclick="importJSON()">⇪ Import</button>
           <button class="btn btn-ghost btn-half" onclick="exportJSON()">⇩ Export JSON</button>
@@ -584,7 +636,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <span class="st">Risk Data — Reference Scores</span>
         <span class="rd-meta" id="rdMeta"></span>
         <span class="rd-spacer"></span>
-        <button class="rd-close" onclick="closeRiskData()" title="Close">✕</button>
+        <button class="rd-close" onclick="closeRiskData()" title="Close" aria-label="Close risk data panel">✕</button>
       </div>
       <div class="rd-toolbar">
         <button class="rd-tab active" id="rdTab_countries" onclick="rdSetTab('countries')">Countries</button>
@@ -615,7 +667,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 /* ══════════════════════════════════════════
    DATA (sourced directly from Data sheet)
 ══════════════════════════════════════════ */
-const APP_VERSION = '3.1.0';
+const APP_VERSION = '3.2.0';
 
 const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":1},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":1},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":1},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":1},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":1},{"name":"Isle of Man","score":1},{"name":"Belgium","score":1},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":1},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":1},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":1},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":2},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":2},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":1},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":2},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":2},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":2},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":2},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":1},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":2},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3,"cfa":true},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3,"cfa":true},{"name":"Islamic Republic of Iran","score":3,"cfa":true}];
 
@@ -648,6 +700,7 @@ const BAND_FULL = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence',
 const BAND_ICON = {CDD:'✓', SDD:'!', EDD:'⚠', PROHIBITED:'⛔'};
 const REVIEW_MONTHS = {CDD:36, SDD:24, EDD:12};
 const ASM_SOURCE = 'ASM — Artisanal Mining';
+const SCREENING_GROUPS = [['sanctions','Sanctions screening'],['pep','PEP screening'],['adverse','Adverse media screening']];
 
 const MAX_SCORE = 3 + 3 + QUESTIONS_OC.length*3 + 3 + 3 + 3 + 3*3 + 3*3; /* jurisdiction + activity + questions + onboard + 2×years + 6 suppliers */
 const STORAGE_KEY = 'hsra.draft.v2';
@@ -702,9 +755,12 @@ function defaultState(){
     profile: {activity:'Non-Manufactured Precious Metal Trading', onboard:'No', entityYears:2, relYears:2},
     questions,
     suppliers:{recycled:['LBMA GD Bullion/DGD Good Delivery','N/A','N/A'], mined:['N/A','N/A','N/A']},
+    screening:{sanctions:{system:'',date:'',ref:''}, pep:{system:'',date:'',ref:''}, adverse:{system:'',date:'',ref:''}},
     notes:   '',
+    override:{band:'', reason:'', at:''},
     signoff: {completedBy:'', completedTitle:'', completedDate:'', approvedBy:'', approvedTitle:'', approvedDate:'', nextReview:'', reviewManual:false},
-    complete: false
+    complete: false,
+    prior: null
   };
 }
 function freshState(){
@@ -748,8 +804,44 @@ function mergeState(src){
       }
     });
   }
+  if(src.screening && typeof src.screening==='object'){
+    /* evidence-of-screening record: system / date / reference per check */
+    Object.keys(out.screening).forEach(g => {
+      const m = src.screening[g];
+      if(!m || typeof m!=='object') return;
+      ['system','date','ref'].forEach(f => {
+        const v = m[f];
+        if(v==null || typeof v==='object' || typeof v==='function') return;
+        out.screening[g][f] = String(v);
+      });
+    });
+  }
   if(typeof src.notes==='string') out.notes = src.notes;
+  if(src.override && typeof src.override==='object' && (src.override.band==='SDD' || src.override.band==='EDD')){
+    out.override.band = src.override.band;
+    const r = src.override.reason;
+    if(r!=null && typeof r!=='object' && typeof r!=='function') out.override.reason = String(r);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(String(src.override.at||''))) out.override.at = String(src.override.at);
+  }
   out.complete = (src.complete===true || src.complete==='true');
+  if(src.prior && typeof src.prior==='object' && !Array.isArray(src.prior)){
+    /* prior-review snapshot kept by the re-assessment flow */
+    const p = src.prior, total = parseInt(p.total);
+    if(!isNaN(total) && ['CDD','SDD','EDD','PROHIBITED'].indexOf(String(p.outcome))!==-1){
+      const prior = {ref:'', date:'', total, outcome:String(p.outcome), parts:[]};
+      ['ref','date'].forEach(f => {
+        const v = p[f];
+        if(v!=null && typeof v!=='object' && typeof v!=='function') prior[f] = String(v);
+      });
+      if(Array.isArray(p.parts)) p.parts.slice(0,40).forEach(row => {
+        if(!row || typeof row!=='object') return;
+        const sc = parseInt(row.score);
+        if(row.label==null || typeof row.label==='object' || isNaN(sc)) return;
+        prior.parts.push({label:String(row.label), value:(row.value!=null && typeof row.value!=='object') ? String(row.value) : '', score:Math.max(0, Math.min(3, sc))});
+      });
+      out.prior = prior;
+    }
+  }
   if(!COUNTRIES.some(c=>c.name===out.entity.jurisdiction)) out.entity.jurisdiction = 'United Kingdom';
   if(!ACTIVITIES.some(a=>a.name===out.profile.activity)) out.profile.activity = ACTIVITIES[0].name;
   out.profile.onboard = out.profile.onboard==='Yes' ? 'Yes' : 'No';
@@ -948,7 +1040,7 @@ function rdRender(){
       + (rdTab==='countries' ? '<label class="rd-cfa"><input type="checkbox" class="rd-cfa-box"'+(effCfa?' checked':'')+'>CFA</label>' : '')
       + '<input class="rd-reason" placeholder="Reason (required)" value="'+esc(o?o.reason:'')+'">'
       + '<span class="rd-at">'+(o?esc(o.at):'')+'</span>'
-      + '<button class="rd-clear" title="Clear override — restore baseline"'+(o?'':' style="visibility:hidden"')+'>✕</button>'
+      + '<button class="rd-clear" title="Clear override — restore baseline" aria-label="Clear override for '+esc(b.name)+'"'+(o?'':' style="visibility:hidden"')+'>✕</button>'
       + '</div>';
   }).join('');
   rows.innerHTML = html || '<div class="rd-empty">No matches'+(rdShowOvOnly?' — no overrides on this tab':'')+'.</div>';
@@ -1088,6 +1180,8 @@ function paintToggle(id, val, type) {
   const y = $('btn_'+id+'_yes'), n = $('btn_'+id+'_no');
   y.className = 'toggle-btn' + (val==='Yes' ? (inv?' active-yes-inv':' active-yes') : '');
   n.className = 'toggle-btn' + (val==='No'  ? (inv?' active-no-inv':' active-no')   : '');
+  y.setAttribute('aria-pressed', val==='Yes' ? 'true' : 'false');
+  n.setAttribute('aria-pressed', val==='No' ? 'true' : 'false');
   const pill = $('pill_'+id);
   if(pill){ pill.className = 'q-score-pill '+ratingClass(score); pill.textContent = score; }
   const tag = $(id+'_score_tag');
@@ -1163,6 +1257,9 @@ function syncUI() {
     $('sel_'+p+'_'+i).value = v; paintSupplier(p,i);
   }));
   $('notesInput').value = s.notes;
+  SCREENING_GROUPS.forEach(([g]) => ['system','date','ref'].forEach(f => {
+    $('scr_'+g+'_'+f).value = s.screening[g][f];
+  }));
   $('completedBy').value = s.signoff.completedBy;
   $('completedTitle').value = s.signoff.completedTitle;
   $('completedDate').value = s.signoff.completedDate;
@@ -1170,6 +1267,8 @@ function syncUI() {
   $('approvedTitle').value = s.signoff.approvedTitle;
   $('approvedDate').value = s.signoff.approvedDate;
   $('nextReview').value = s.signoff.nextReview;
+  $('ovBand').value = s.override.band;
+  $('ovReason').value = s.override.reason;
   paintStatus();
   recalc();
 }
@@ -1190,6 +1289,7 @@ function onField(section, key, val) {
   scheduleSave();
 }
 function onNotes(val){ state.notes = val; scheduleSave(); }
+function onScreening(group, key, val){ state.screening[group][key] = val; scheduleSave(); }
 function onSign(key, val) {
   state.signoff[key] = val;
   if(key==='nextReview'){ state.signoff.reviewManual = true; recalc(); return; }
@@ -1278,8 +1378,35 @@ function computeAssessment() {
   if((jC?jC.score:1)===3 && s.suppliers.mined.includes(ASM_SOURCE)) escalations.push({level:'edd', reason:'OECD Annex II red flag — artisanal (ASM) gold from a high-risk jurisdiction'});
 
   const prohibited = escalations.some(e=>e.level==='prohibit');
-  const outcome = prohibited ? 'PROHIBITED' : (escalations.length ? 'EDD' : numericBand);
-  return {parts, total, numericBand, outcome, escalations, prohibited, forced:outcome!==numericBand};
+  const engineOutcome = prohibited ? 'PROHIBITED' : (escalations.length ? 'EDD' : numericBand);
+
+  /* Analyst override — one-way ratchet: may only RAISE the required diligence
+     above the computed outcome, never weaken it, and never applies to
+     prohibited relationships. Requires a justification to take effect. */
+  const RANK = {CDD:0, SDD:1, EDD:2};
+  let outcome = engineOutcome, analystOv = null;
+  const ao = s.override;
+  if(!prohibited && ao && (ao.band==='SDD' || ao.band==='EDD')
+     && String(ao.reason||'').trim() && RANK[ao.band] > RANK[engineOutcome]){
+    outcome = ao.band;
+    analystOv = {from:engineOutcome, band:ao.band, reason:ao.reason, at:ao.at};
+  }
+  return {parts, total, numericBand, engineOutcome, outcome, escalations, prohibited, analystOv, forced:outcome!==numericBand};
+}
+
+function setAnalystOverride(band, reason){
+  if(band==='SDD' || band==='EDD'){
+    state.override = {band, reason:String(reason==null?'':reason), at:todayISO()};
+  } else {
+    state.override = {band:'', reason:'', at:''};
+  }
+  recalc();
+}
+function onOvField(){ setAnalystOverride($('ovBand').value, $('ovReason').value); }
+function toggleOvForm(){
+  const f = $('ovForm');
+  f.classList.toggle('open');
+  $('ovArrow').textContent = f.classList.contains('open') ? '▼' : '▶';
 }
 
 function recalc() {
@@ -1297,8 +1424,28 @@ function recalc() {
   /* Verdict pill (operative outcome) + threshold chips (numeric band) */
   const vpEl = $('verdictPill');
   vpEl.className = 'verdict-pill ' + {CDD:'vp-cdd', SDD:'vp-sdd', EDD:'vp-edd', PROHIBITED:'vp-proh'}[a.outcome];
-  $('verdictText').textContent = a.outcome + ' — ' + BAND_FULL[a.outcome];
+  $('verdictText').textContent = a.outcome + ' — ' + BAND_FULL[a.outcome] + (a.analystOv ? ' ✱' : '');
   $('verdictIcon').textContent = BAND_ICON[a.outcome];
+
+  /* Analyst override banner + form hint */
+  const ovB = $('ovBanner');
+  if(a.analystOv){
+    ovB.style.display = 'block';
+    ovB.textContent = '⚑ Analyst override: ' + a.analystOv.from + ' → ' + a.analystOv.band + ' — ' + a.analystOv.reason
+      + (a.analystOv.at ? ' (' + a.analystOv.at + ')' : '');
+  } else {
+    ovB.style.display = 'none';
+  }
+  const ovH = $('ovHint');
+  if(ovH){
+    const sel = s.override && s.override.band;
+    ovH.textContent = a.prohibited
+      ? 'Not applicable to prohibited relationships.'
+      : (sel && !String(s.override.reason||'').trim()) ? 'Justification required to apply the override.'
+      : (sel && !a.analystOv) ? 'Inactive — computed outcome is already ' + a.engineOutcome + ' or higher.'
+      : a.analystOv ? 'Applied — review cadence follows ' + a.analystOv.band + '.'
+      : 'May only raise the required diligence level.';
+  }
   const chips = {CDD:$('tc-low'), SDD:$('tc-med'), EDD:$('tc-high')};
   Object.values(chips).forEach(el=>el.classList.remove('tc-active'));
   chips[a.numericBand].classList.add('tc-active');
@@ -1332,6 +1479,20 @@ function recalc() {
   /* Bar pointer: display scale 0–30 */
   $('barPointer').style.left = Math.min(a.total/30*100, 100) + '%';
   $('pointerLabel').textContent = a.total;
+
+  /* Prior review block (re-assessments only) */
+  const pb = $('priorBlock');
+  if(pb){
+    if(s.prior){
+      pb.style.display = 'block';
+      const ch = priorChanges(a) || [];
+      $('priorInfo').textContent = s.prior.ref + ' · ' + (fmtDate(s.prior.date) || s.prior.date || '—') + ' · ' + s.prior.total + ' · ' + s.prior.outcome;
+      $('priorChangesLbl').textContent = ch.length ? ch.length + ' change' + (ch.length===1?'':'s') + ' since prior' : 'No changes since prior';
+      $('priorList').innerHTML = ch.length ? ch.map(c => '<div>'+esc(c)+'</div>').join('') : '<div>No factor changes.</div>';
+    } else {
+      pb.style.display = 'none';
+    }
+  }
 
   /* Next review date suggestion — none for prohibited relationships */
   const suggested = a.prohibited ? '' : addMonths(s.meta.date, REVIEW_MONTHS[a.outcome]);
@@ -1421,6 +1582,49 @@ function newAssessment(){
   toast('New assessment started — '+state.meta.ref);
 }
 
+/* Periodic re-assessment: clone the current record under a new reference,
+   keeping the outgoing assessment as the prior for comparison. Facts carry
+   over; rationale, sign-off, status, and analyst override start fresh. */
+function reassess(){
+  const a = computeAssessment();
+  if(!confirm('Start a periodic re-assessment? A new reference will be issued and the current assessment is kept as the prior for comparison.')) return;
+  const prior = {
+    ref: state.meta.ref, date: state.meta.date, total: a.total, outcome: a.outcome,
+    parts: a.parts.map(p => ({label:p.label, value:String(p.value), score:p.score}))
+  };
+  const next = mergeState(JSON.parse(JSON.stringify(state)));
+  next.meta.ref = newRef();
+  next.meta.date = todayISO();
+  next.notes = '';
+  next.signoff = defaultState().signoff;
+  next.override = defaultState().override;
+  next.complete = false;
+  next.prior = prior;
+  state = next;
+  syncUI();
+  toast('Re-assessment started — ' + state.meta.ref + ' (prior ' + prior.ref + ')');
+}
+function priorChanges(a){
+  const p = state.prior;
+  if(!p) return null;
+  const prev = {};
+  (p.parts || []).forEach(r => prev[r.label] = r);
+  const changes = [];
+  a.parts.forEach(cur => {
+    const old = prev[cur.label];
+    if(old && (String(old.value)!==String(cur.value) || old.score!==cur.score)){
+      changes.push(cur.label + ': ' + old.value + ' (' + old.score + ') → ' + cur.value + ' (' + cur.score + ')');
+    }
+  });
+  if(p.total!==a.total || p.outcome!==a.outcome) changes.push('Result: ' + p.total + ' · ' + p.outcome + ' → ' + a.total + ' · ' + a.outcome);
+  return changes;
+}
+function togglePrior(){
+  const p = $('priorPanel');
+  p.classList.toggle('open');
+  $('priorArrow').textContent = p.classList.contains('open') ? '▼' : '▶';
+}
+
 function exportFileName(){
   /* keep the download name safe across platforms */
   return (String(state.meta.ref||'').trim() || 'risk-assessment').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'-') + '.json';
@@ -1432,7 +1636,7 @@ function exportJSON(){
     version: APP_VERSION,
     exportedAt: new Date().toISOString(),
     state,
-    result: {totalScore:a.total, maxScore:MAX_SCORE, numericBand:a.numericBand, outcome:a.outcome, escalations:a.escalations},
+    result: {totalScore:a.total, maxScore:MAX_SCORE, numericBand:a.numericBand, engineOutcome:a.engineOutcome, outcome:a.outcome, escalations:a.escalations, analystOverride:a.analystOv},
     riskData: {baseline:RISK_DATA_VERSION, overrides:rdCount(), updatedAt:riskData.updatedAt}
   };
   const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
@@ -1495,6 +1699,15 @@ function buildPrintReport(){
   const qRows = QUESTIONS_OC.map((q,i) =>
     `<tr><td class="k">${String(i+1).padStart(2,'0')}</td><td class="q">${esc(q.text)}</td><td class="a">${esc(s.questions[q.id])}</td><td class="s">${chip(scoreFromYesNo(s.questions[q.id], q.type))}</td></tr>`).join('');
 
+  const scrRows = SCREENING_GROUPS.map(([g,label]) => {
+    const v = s.screening[g];
+    const has = (v.system || v.date || v.ref);
+    const txt = has
+      ? [(v.system || '—'), (v.date ? (fmtDate(v.date)||v.date) : '—'), (v.ref ? 'Ref ' + v.ref : '—')].join(' · ')
+      : '—';
+    return `<tr><td class="k">${esc(label)}</td><td class="v">${esc(txt)}</td><td class="s"></td></tr>`;
+  }).join('');
+
   let supRows = '';
   [['recycled','Recycled'],['mined','Mined']].forEach(([key,label]) => {
     s.suppliers[key].forEach((v,i) => {
@@ -1507,6 +1720,10 @@ function buildPrintReport(){
   });
   if(!supRows) supRows = '<tr><td class="k">Material sources</td><td class="v">None declared</td><td class="s"></td></tr>';
   const ovBox = ovNotes.length ? '<div class="pr-rd"><b>✱ Risk data overrides applied:</b> ' + esc(ovNotes.join('; ')) + '.</div>' : '';
+  const pCh = s.prior ? (priorChanges(a) || []) : [];
+  const priorBox = s.prior
+    ? `<div class="pr-prior"><b>Periodic re-assessment</b> of ${dash(s.prior.ref)} (${fmtDate(s.prior.date) ? esc(fmtDate(s.prior.date)) : dash(s.prior.date)} — ${s.prior.total} · ${esc(s.prior.outcome)}). ${pCh.length ? 'Changes since prior: ' + esc(pCh.join('; ')) + '.' : 'No factor changes since the prior review.'}</div>`
+    : '';
   const ovCount = rdCount();
   const rdStamp = 'Risk data: baseline ' + RISK_DATA_VERSION
     + (ovCount ? ' · ' + ovCount + ' local override' + (ovCount===1?'':'s') + ' in effect'
@@ -1516,7 +1733,8 @@ function buildPrintReport(){
   const eddReasons = a.escalations.filter(e=>e.level==='edd').map(e=>e.reason);
   const escBoxes =
     (prohibitReasons.length ? `<div class="pr-crit">⛔ PROHIBITED — designated-party exposure: ${esc(prohibitReasons.join('; '))}. Do not onboard. Freeze funds where held and file a report with the FIU / relevant authority.</div>` : '')
-    + (eddReasons.length ? `<div class="pr-floor">⚠ Enhanced Due Diligence mandatory — ${esc(eddReasons.join('; '))}.</div>` : '');
+    + (eddReasons.length ? `<div class="pr-floor">⚠ Enhanced Due Diligence mandatory — ${esc(eddReasons.join('; '))}.</div>` : '')
+    + (a.analystOv ? `<div class="pr-floor">⚑ Analyst override — required diligence raised to ${a.analystOv.band} (computed ${a.analystOv.from}): ${esc(a.analystOv.reason)}${a.analystOv.at ? ' (' + (fmtDate(a.analystOv.at) || esc(a.analystOv.at)) + ')' : ''}.</div>` : '');
 
   /* When prohibited, the red DO-NOT-ONBOARD line carries the outcome; the verdict
      line then shows the numeric band the chips track instead of repeating it. */
@@ -1549,12 +1767,13 @@ function buildPrintReport(){
       <div>
         ${a.prohibited ? '<div class="rb-proh">⛔ PROHIBITED — DO NOT ONBOARD</div>' : ''}
         <div class="rb-verdict ${verdictCls}">${verdictLine}</div>
+        ${a.analystOv ? '<div class="rb-sub">Computed outcome: ' + a.analystOv.from + ' — raised by analyst override ✱</div>' : ''}
         <div class="rb-thresh">
           <b${thOn==='L'?' class="on"':''}>CDD: 0–19</b><b${thOn==='M'?' class="on"':''}>SDD: 20–22</b><b${thOn==='H'?' class="on"':''}>EDD: 23+</b>
         </div>
       </div>
     </div>
-    ${escBoxes}${ovBox}
+    ${escBoxes}${ovBox}${priorBox}
     <h2 class="sec"><span class="n">01</span>Assessment Administration</h2>
     <table class="kv"><tbody>
       <tr><td class="k">Assessed by</td><td class="v">${dash(s.meta.assessor)}</td><td class="s"></td></tr>
@@ -1579,6 +1798,7 @@ function buildPrintReport(){
     </tbody></table>
     <h2 class="sec"><span class="n">04</span>Ownership, Control &amp; Compliance</h2>
     <table class="kv qs"><tbody>${qRows}</tbody></table>
+    <table class="kv"><tbody>${scrRows}</tbody></table>
     <h2 class="sec"><span class="n">05</span>Supply Chain — Material Sources</h2>
     <table class="kv"><tbody>${supRows}</tbody></table>
     <h2 class="sec"><span class="n">06</span>Assessment Notes &amp; Risk Rationale</h2>

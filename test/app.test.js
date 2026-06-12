@@ -17,6 +17,8 @@ function makeEl() {
       contains(c){ return this._s.has(c); }
     },
     appendChild(){}, addEventListener(){}, click(){},
+    setAttribute(k,v){ this['_a_'+k] = String(v); },
+    getAttribute(k){ const v = this['_a_'+k]; return v==null ? null : v; },
   };
   Object.defineProperty(el, 'innerHTML', {
     get(){ return this._inner; },
@@ -54,6 +56,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   addMonths, exportFileName, toggleComplete,
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
+  setAnalystOverride, reassess, priorChanges,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -224,8 +227,11 @@ A.state.entity.principals = 'John Smith, Jane Doe';
 A.buildPrintReport();
 check('print includes principals', els.printReport._inner.includes('John Smith, Jane Doe'));
 check('mergeState keeps principals', A.mergeState({entity:{principals:'A, B'}}).entity.principals === 'A, B');
-check('old exports with screening data import cleanly',
-  A.mergeState({screening:{at:'x', subjects:[]}, entity:{name:'Y'}}).screening === undefined);
+// `screening` is now the evidence-fields record; legacy live-screening exports
+// ({at, subjects}) must still import cleanly with their junk keys dropped.
+const oldScr = A.mergeState({screening:{at:'x', subjects:[]}, entity:{name:'Y'}});
+check('legacy screening import sanitised to evidence fields',
+  oldScr.screening.sanctions.system === '' && !('at' in oldScr.screening) && !('subjects' in oldScr.screening));
 
 /* ── 15. Deep-review regressions ── */
 // addMonths clamps day overflow instead of rolling into the next month
@@ -322,6 +328,94 @@ check('export sheet did not throw', (A.rdExportSheet(), true));
 check('panel render did not throw', (A.rdRender(), true));
 A.rdResetAll();
 check('reset restores baseline scoring', A.rdCount() === 0 && A.computeAssessment().total === 19);
+
+/* ── 18. Screening evidence fields ── */
+reset();
+A.state.screening.sanctions = {system:'OpenSanctions', date:'2026-06-12', ref:'SCR-001'};
+A.buildPrintReport();
+pr = els.printReport._inner;
+check('report shows screening evidence', pr.includes('Sanctions screening')
+  && pr.includes('OpenSanctions · 12 Jun 2026 · Ref SCR-001'));
+check('report dashes unscreened checks', pr.includes('PEP screening') && pr.includes('Adverse media screening'));
+const scrMerged = A.mergeState({screening:{sanctions:{system:'DJ', date:'2026-01-01', ref:'R1', evil:'x'}, pep:'bogus'}});
+check('mergeState sanitises screening fields', scrMerged.screening.sanctions.system === 'DJ'
+  && !('evil' in scrMerged.screening.sanctions) && scrMerged.screening.pep.system === '');
+check('screening survives draft round-trip', (A.saveDraft(), A.loadDraft().state.screening.sanctions.ref === 'SCR-001'));
+
+/* ── 19. Analyst override (one-way ratchet) ── */
+reset();
+a = A.computeAssessment();
+check('no override by default', a.analystOv === null && a.outcome === a.engineOutcome);
+A.setAnalystOverride('EDD', '');
+check('override without justification is inactive', A.computeAssessment().analystOv === null
+  && A.computeAssessment().outcome === 'CDD');
+A.setAnalystOverride('EDD', 'Complex layered ownership');
+a = A.computeAssessment();
+check('override raises CDD → EDD', a.outcome === 'EDD' && a.engineOutcome === 'CDD'
+  && a.analystOv.reason === 'Complex layered ownership');
+check('verdict pill reflects override with marker', els.verdictPill.className === 'verdict-pill vp-edd'
+  && txt(els.verdictText).includes('✱'));
+check('override banner shown with from→to', els.ovBanner.style.display === 'block'
+  && txt(els.ovBanner).includes('CDD → EDD'));
+A.state.meta.date = '2026-06-11'; A.recalc();
+check('review cadence follows the overridden band (+12mo)', A.state.signoff.nextReview === '2027-06-11');
+A.buildPrintReport();
+pr = els.printReport._inner;
+check('report shows analyst override box + computed outcome', pr.includes('Analyst override')
+  && pr.includes('Complex layered ownership') && pr.includes('Computed outcome: CDD'));
+reset();
+A.setToggle('pep','Yes');                            // mandatory-EDD floor
+A.setAnalystOverride('SDD', 'attempt to lower');
+a = A.computeAssessment();
+check('override cannot weaken the outcome', a.outcome === 'EDD' && a.analystOv === null);
+reset();
+A.setToggle('sanctions_entity','Yes');
+A.setAnalystOverride('EDD', 'irrelevant');
+a = A.computeAssessment();
+check('override never applies when prohibited', a.outcome === 'PROHIBITED' && a.analystOv === null);
+check('mergeState whitelists override band', A.mergeState({override:{band:'CDD', reason:'x'}}).override.band === ''
+  && A.mergeState({override:{band:'EDD', reason:'why', at:'2026-06-12'}}).override.reason === 'why');
+
+/* ── 20. Periodic re-assessment flow ── */
+reset();
+A.state.entity.name = 'Fine Gold LLC';
+A.state.notes = 'old rationale';
+A.state.signoff.completedBy = 'J. Smith';
+A.state.complete = true;
+const oldRef = A.state.meta.ref;
+A.reassess();
+check('re-assess issues a new ref and keeps the facts', A.state.meta.ref !== oldRef
+  && A.state.entity.name === 'Fine Gold LLC' && A.state.prior && A.state.prior.ref === oldRef);
+check('re-assess clears rationale, sign-off, status', A.state.notes === ''
+  && A.state.signoff.completedBy === '' && A.state.complete === false);
+check('prior snapshot records result + factors', A.state.prior.total === 19
+  && A.state.prior.outcome === 'CDD' && A.state.prior.parts.length === 22);
+check('no changes right after cloning', (A.priorChanges(A.computeAssessment()) || []).length === 0
+  && txt(els.priorChangesLbl).includes('No changes'));
+els.jurisdictionSelect.value = 'Nigeria'; A.onJurisdiction();
+let ch = A.priorChanges(A.computeAssessment());
+check('factor change is diffed against prior', ch.length === 2
+  && ch[0].includes('United Kingdom (1) → Nigeria (3)') && ch[1].includes('Result: 19 · CDD → 21 · SDD'));
+check('prior block painted', els.priorBlock.style.display === 'block'
+  && txt(els.priorInfo).includes(oldRef) && txt(els.priorChangesLbl).includes('2 changes'));
+A.buildPrintReport();
+pr = els.printReport._inner;
+check('report shows re-assessment box with changes', pr.includes('Periodic re-assessment')
+  && pr.includes(oldRef) && pr.includes('United Kingdom (1) → Nigeria (3)'));
+check('mergeState round-trips the prior snapshot',
+  JSON.stringify(A.mergeState(JSON.parse(JSON.stringify(A.state))).prior) === JSON.stringify(A.state.prior));
+check('mergeState rejects malformed priors', A.mergeState({prior:{total:'NaNish', outcome:'CDD'}}).prior === null
+  && A.mergeState({prior:{total:19, outcome:'BOGUS'}}).prior === null);
+A.newAssessment();
+check('new assessment clears the prior', A.state.prior === null && els.priorBlock.style.display === 'none');
+
+/* ── 21. Accessibility: toggle buttons expose pressed state ── */
+reset();
+check('aria-pressed reflects the AML answer (Yes default)',
+  els.btn_aml_yes.getAttribute('aria-pressed') === 'true' && els.btn_aml_no.getAttribute('aria-pressed') === 'false');
+A.setToggle('aml','No');
+check('aria-pressed follows toggling', els.btn_aml_yes.getAttribute('aria-pressed') === 'false'
+  && els.btn_aml_no.getAttribute('aria-pressed') === 'true');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

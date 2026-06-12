@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk Assessment Report — Hawkeye Sterling LLC</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1A1F2B;--ink2:#4A5160;--ink3:#7A8090;
+  --pink:#D6336C;--pink2:#F06AA8;--black:#15171E;
+  --gold:#D6336C;--line:#D9CCD3;--line-soft:#EBE2E7;
+  --low:#1F7A53;--med:#A4690B;--high:#B23A2E;--none:#7A8090;
+  --cdd:#2C5F8A;--sdd:#B06A14;--edd:#B23A2E;
+  --nf:'Arial Narrow','Helvetica Neue',Arial,sans-serif;
+}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:var(--nf);color:var(--ink);background:#EFE7EB;font-size:11.5pt;line-height:1.5}
+.toolbar{position:sticky;top:0;z-index:50;display:flex;justify-content:center;gap:10px;padding:10px;background:#1A1F2B}
+.toolbar a,.toolbar button{font-family:var(--nf);font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:8px 18px;border-radius:5px;cursor:pointer;text-decoration:none;border:1px solid}
+.toolbar button{background:var(--pink);color:#fff;border-color:var(--pink)}
+.toolbar a{background:transparent;color:#cfd4de;border-color:#4A5160}
+.page{width:210mm;min-height:297mm;margin:18px auto;background:#FFFFFF;padding:6mm 6mm 8mm;box-shadow:0 4px 24px rgba(0,0,0,0.18);border-radius:12px}
+
+.letterhead{display:flex;align-items:center;justify-content:space-between;background:var(--black);color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:6px}
+.lh-brand{display:flex;align-items:center;gap:10px}
+.lh-mark{width:34px;height:34px;border:1.5px solid var(--pink2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--pink2);background:rgba(240,106,168,0.10)}
+.lh-name{font-size:16pt;font-weight:700;letter-spacing:0.10em;color:#fff}
+.lh-doc{text-align:right}
+.lh-doc .t{font-size:11pt;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--pink2)}
+.lh-doc .s{font-size:8.5pt;color:#9aa0ae;letter-spacing:0.08em;text-transform:uppercase}
+.meta-line{display:flex;justify-content:space-between;font-size:9pt;color:var(--ink2);border-bottom:1px solid var(--pink2);padding:5px 2px;margin-bottom:14px}
+.meta-line b{color:var(--ink)}
+
+.result-box{display:grid;grid-template-columns:auto 1fr;gap:0 22px;background:var(--black);color:#fff;border:none;border-radius:12px;padding:14px 18px;margin-bottom:16px;align-items:center}
+.rb-score{text-align:center;padding-right:22px;border-right:1px solid rgba(240,106,168,0.4)}
+.rb-num{font-size:34pt;font-weight:700;line-height:1;color:var(--pink2)}
+.rb-cap{font-size:8pt;letter-spacing:0.12em;text-transform:uppercase;color:#9aa0ae;margin-top:2px}
+.rb-verdict{font-size:14pt;font-weight:700;margin-bottom:4px}
+.rb-verdict.v-cdd{color:#7FB3E8}.rb-verdict.v-sdd{color:#FFAA5C}.rb-verdict.v-edd{color:#FF7B7B}
+.rb-thresh{font-size:9pt;color:#B6BCC8}
+.rb-thresh b{padding:1px 7px;border:1px solid #3A3F4D;border-radius:99px;margin-right:6px;font-weight:700}
+.rb-thresh b.on{border-color:var(--pink2);color:var(--pink2)}
+
+h2.sec{font-size:10.5pt;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:var(--pink);border-bottom:1.5px solid;border-image:linear-gradient(90deg,var(--pink),var(--pink2) 50%,transparent) 1;padding-bottom:3px;margin:16px 0 8px;display:flex;gap:8px;align-items:baseline}
+h2.sec .n{color:var(--pink2);background:var(--black);font-size:8.5pt;padding:1px 7px;border-radius:5px}
+table.kv{width:100%;border-collapse:collapse}
+table.kv td{padding:4px 6px;border-bottom:0.75px solid var(--line-soft);font-size:10pt;vertical-align:top}
+table.kv td.k{width:34%;color:var(--ink2);text-transform:uppercase;font-size:8.5pt;letter-spacing:0.05em;padding-top:6px}
+table.kv td.v{font-weight:600}
+table.kv td.s{width:14%;text-align:right;white-space:nowrap}
+.chip{display:inline-block;padding:1px 9px;border-radius:99px;border:none;font-size:8.5pt;font-weight:700;white-space:nowrap;color:#fff}
+.c0{background:var(--none)}
+.c1{background:var(--low)}
+.c2{background:var(--med)}
+.c3{background:var(--high)}
+table.kv td.q{font-size:9.5pt;line-height:1.35;color:var(--ink2);text-transform:uppercase;font-size:8.5pt;letter-spacing:0.05em}
+#rQuestions td.k{width:24px;white-space:nowrap}
+table.kv td.a{width:10%;font-weight:700;text-align:center}
+
+.notes-box{border:0.75px solid var(--line);border-left:3px solid var(--pink);border-radius:8px;padding:10px 12px;font-size:10pt;min-height:54px;white-space:pre-wrap}
+.notes-empty{color:var(--ink3);font-style:italic}
+
+.attest{font-size:9.5pt;font-style:italic;color:var(--ink2);border:0.75px solid var(--line);border-left:3px solid var(--pink);background:#FAF2F6;border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.55}
+.sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;page-break-inside:avoid}
+.sign-block .role{font-size:8.5pt;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:var(--pink);margin-bottom:8px}
+.sign-block table.kv td{border-bottom:none;padding:2px 0}
+.sign-line{border-bottom:1px solid var(--ink);height:38px}
+.sign-cap{font-size:8pt;color:var(--ink3);text-align:center;margin-top:3px;letter-spacing:0.08em;text-transform:uppercase}
+
+.foot{margin-top:18px;border-top:0.75px solid var(--pink2);padding-top:5px;font-size:7.5pt;color:var(--ink3);text-align:center;letter-spacing:0.06em}
+
+@media print{
+  body{background:#FFFFFF}
+  .toolbar{display:none}
+  .page{width:auto;min-height:0;margin:0;padding:0 6mm;box-shadow:none;border-radius:0;background:#FFFFFF}
+  .result-box,.sign-grid,.notes-box{page-break-inside:avoid}
+  h2.sec{page-break-after:avoid}
+  @page{size:A4;margin:9mm 0}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button onclick="window.print()">⎙ Print / Save as PDF</button>
+  <a href="Entity Risk Assessment - Hawkeye Sterling (dark).html">← Back to form</a>
+</div>
+
+<div class="page">
+  <div class="letterhead">
+    <div class="lh-brand">
+      <div class="lh-mark">HS</div>
+      <div class="lh-name">HAWKEYE STERLING</div>
+    </div>
+    <div class="lh-doc">
+      <div class="t">Entity Risk Assessment</div>
+      <div class="s">AML / CFT — DPMS Template</div>
+    </div>
+  </div>
+  <div class="meta-line">
+    <span>Ref: <b id="rRef">—</b></span>
+    <span>Assessment date: <b id="rDate">—</b></span>
+    <span>Next review: <b id="rNext">—</b></span>
+    <span>Status: <b style="color:#C9252D">CONFIDENTIAL</b></span>
+  </div>
+
+  <div class="result-box">
+    <div class="rb-score">
+      <div class="rb-num" id="rScore">—</div>
+      <div class="rb-cap">Risk score / 30+</div>
+    </div>
+    <div>
+      <div class="rb-verdict" id="rVerdict">—</div>
+      <div class="rb-thresh">
+        <b id="thL">CDD: 0–19</b><b id="thM">SDD: 20–22</b><b id="thH">EDD: 23+</b>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec"><span class="n">01</span>Assessment Administration</h2>
+  <table class="kv">
+    <tbody>
+      <tr><td class="k">Assessed by</td><td class="v" id="rAssessor">—</td><td class="s"></td></tr>
+      <tr><td class="k">Role / Department</td><td class="v" id="rRole">—</td><td class="s"></td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec"><span class="n">02</span>Entity Identification</h2>
+  <table class="kv">
+    <tbody>
+      <tr><td class="k">Legal entity name</td><td class="v" id="rEntity">—</td><td class="s"></td></tr>
+      <tr><td class="k">Jurisdiction &amp; incorporation</td><td class="v" id="rJur">—</td><td class="s" id="rJurS"></td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec"><span class="n">03</span>Business Profile</h2>
+  <table class="kv">
+    <tbody>
+      <tr><td class="k">Business activity</td><td class="v" id="rAct">—</td><td class="s" id="rActS"></td></tr>
+      <tr><td class="k">Onboarding channel</td><td class="v" id="rOnb">—</td><td class="s" id="rOnbS"></td></tr>
+      <tr><td class="k">Operational history</td><td class="v" id="rEY">—</td><td class="s" id="rEYS"></td></tr>
+      <tr><td class="k">Relationship duration</td><td class="v" id="rRY">—</td><td class="s" id="rRYS"></td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec"><span class="n">04</span>Ownership, Control &amp; Compliance</h2>
+  <table class="kv"><tbody id="rQuestions"></tbody></table>
+
+  <h2 class="sec"><span class="n">05</span>Supply Chain — Material Sources</h2>
+  <table class="kv"><tbody id="rSuppliers"></tbody></table>
+
+  <h2 class="sec"><span class="n">06</span>Assessment Notes &amp; Risk Rationale</h2>
+  <div class="notes-box" id="rNotes"></div>
+
+  <h2 class="sec"><span class="n">07</span>Sign-Off &amp; Attestation</h2>
+  <div class="attest">I confirm that this risk assessment has been completed in accordance with Hawkeye Sterling LLC&rsquo;s AML/CFT Risk Assessment Policy, the applicable DPMS regulatory guidelines, and all relevant national and international sanctions obligations. The information provided is accurate to the best of my knowledge.</div>
+  <div class="sign-grid">
+    <div class="sign-block">
+      <div class="role">First-Line — Assessed By</div>
+      <table class="kv"><tbody>
+        <tr><td class="k">Name</td><td class="v" id="sName1">—</td></tr>
+        <tr><td class="k">Title</td><td class="v" id="sTitle1">—</td></tr>
+        <tr><td class="k">Date</td><td class="v" id="sDate1">—</td></tr>
+      </tbody></table>
+      <div class="sign-line"></div><div class="sign-cap">Signature</div>
+    </div>
+    <div class="sign-block">
+      <div class="role">Second-Line — Reviewed &amp; Approved By</div>
+      <table class="kv"><tbody>
+        <tr><td class="k">Name</td><td class="v" id="sName2">—</td></tr>
+        <tr><td class="k">Title</td><td class="v" id="sTitle2">—</td></tr>
+        <tr><td class="k">Date</td><td class="v" id="sDate2">—</td></tr>
+      </tbody></table>
+      <div class="sign-line"></div><div class="sign-cap">Signature</div>
+    </div>
+  </div>
+
+  <div class="foot" id="rFoot">CONFIDENTIAL — Hawkeye Sterling LLC — AML/CFT Entity Risk Assessment — DPMS Template</div>
+</div>
+
+<script src="assets/hs-report.js"></script>
+</body>
+</html>
