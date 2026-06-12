@@ -54,6 +54,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   addMonths, exportFileName, toggleComplete,
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
+  setAnalystOverride,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -338,6 +339,40 @@ const scrMerged = A.mergeState({screening:{sanctions:{system:'DJ', date:'2026-01
 check('mergeState sanitises screening fields', scrMerged.screening.sanctions.system === 'DJ'
   && !('evil' in scrMerged.screening.sanctions) && scrMerged.screening.pep.system === '');
 check('screening survives draft round-trip', (A.saveDraft(), A.loadDraft().state.screening.sanctions.ref === 'SCR-001'));
+
+/* ── 19. Analyst override (one-way ratchet) ── */
+reset();
+a = A.computeAssessment();
+check('no override by default', a.analystOv === null && a.outcome === a.engineOutcome);
+A.setAnalystOverride('EDD', '');
+check('override without justification is inactive', A.computeAssessment().analystOv === null
+  && A.computeAssessment().outcome === 'CDD');
+A.setAnalystOverride('EDD', 'Complex layered ownership');
+a = A.computeAssessment();
+check('override raises CDD → EDD', a.outcome === 'EDD' && a.engineOutcome === 'CDD'
+  && a.analystOv.reason === 'Complex layered ownership');
+check('verdict pill reflects override with marker', els.verdictPill.className === 'verdict-pill vp-edd'
+  && txt(els.verdictText).includes('✱'));
+check('override banner shown with from→to', els.ovBanner.style.display === 'block'
+  && txt(els.ovBanner).includes('CDD → EDD'));
+A.state.meta.date = '2026-06-11'; A.recalc();
+check('review cadence follows the overridden band (+12mo)', A.state.signoff.nextReview === '2027-06-11');
+A.buildPrintReport();
+pr = els.printReport._inner;
+check('report shows analyst override box + computed outcome', pr.includes('Analyst override')
+  && pr.includes('Complex layered ownership') && pr.includes('Computed outcome: CDD'));
+reset();
+A.setToggle('pep','Yes');                            // mandatory-EDD floor
+A.setAnalystOverride('SDD', 'attempt to lower');
+a = A.computeAssessment();
+check('override cannot weaken the outcome', a.outcome === 'EDD' && a.analystOv === null);
+reset();
+A.setToggle('sanctions_entity','Yes');
+A.setAnalystOverride('EDD', 'irrelevant');
+a = A.computeAssessment();
+check('override never applies when prohibited', a.outcome === 'PROHIBITED' && a.analystOv === null);
+check('mergeState whitelists override band', A.mergeState({override:{band:'CDD', reason:'x'}}).override.band === ''
+  && A.mergeState({override:{band:'EDD', reason:'why', at:'2026-06-12'}}).override.reason === 'why');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
