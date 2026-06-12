@@ -4,7 +4,9 @@
    human decision (senior-management approval per the compliance manual).
 
    Runs in GitHub Actions (.github/workflows/fatf-watchdog.yml).
-   Modes: check (default) · seed (record current lists, no alert) · test-alert.
+   Modes: check (default) · seed (record current lists, no alert) · test-alert
+   · setup-sections (create the risk-band sections) · digest (monthly
+   "Reviews due" task listing clients whose next review falls due).
 */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
@@ -206,25 +208,47 @@ async function asana(path, opts = {}) {
   return d;
 }
 
-async function findAffected(changedCountries) {
-  const affected = [];
-  let path = '/projects/' + PROJECT_GID + '/tasks?limit=100&opt_fields=name,notes';
+async function listProjectTasks(fields) {
+  const out = [];
+  const base = '/projects/' + PROJECT_GID + '/tasks?limit=100&opt_fields=' + (fields || 'name,notes');
+  let path = base;
   while (path) {
     const d = await asana(path);
-    for (const t of d.data || []) {
-      for (const c of changedCountries) {
-        if ((t.notes || '').includes('Jurisdiction: ' + c)) { affected.push(t.name + ' (' + c + ')'); break; }
-      }
+    out.push(...(d.data || []));
+    path = d.next_page ? base + '&offset=' + d.next_page.offset : null;
+  }
+  return out;
+}
+
+async function findAffected(changedCountries) {
+  const affected = [];
+  for (const t of await listProjectTasks('name,notes')) {
+    for (const c of changedCountries) {
+      if ((t.notes || '').includes('Jurisdiction: ' + c)) { affected.push(t.name + ' (' + c + ')'); break; }
     }
-    path = d.next_page ? '/projects/' + PROJECT_GID + '/tasks?limit=100&opt_fields=name,notes&offset=' + d.next_page.offset : null;
   }
   return affected;
 }
 
-async function createTask(name, notes) {
-  const due = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-  const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name, notes, projects: [PROJECT_GID], due_on: due } }) });
+async function createTask(name, notes, due) {
+  due = due || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  /* Assigned so the alert reaches the compliance officer's Asana inbox. */
+  const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name, notes, projects: [PROJECT_GID], due_on: due, assignee: 'me' } }) });
   return d.data.permalink_url;
+}
+
+/* Client tasks are named "<ref> · <entity> · <band> <score>"; everything else
+   in the project (backlog, QA, FATF alerts, digests) is ignored. Returns one
+   line per client whose next review falls on or before monthEnd, oldest first. */
+export function collectReviewsDue(tasks, today, monthEnd) {
+  const dmy = iso => iso.split('-').reverse().join('/');
+  return (tasks || [])
+    .filter(t => !t.completed
+      && /^\d{4}-\d{2}-\d{2}$/.test(String(t.due_on || ''))
+      && / · (CDD|SDD|EDD) \d+$/.test(String(t.name || ''))
+      && t.due_on <= monthEnd)
+    .sort((a, b) => a.due_on.localeCompare(b.due_on))
+    .map(t => '- ' + t.name + ': review due ' + dmy(t.due_on) + (t.due_on < today ? ' (OVERDUE)' : ''));
 }
 
 export async function main(mode) {
@@ -233,6 +257,29 @@ export async function main(mode) {
   if (mode === 'test-alert') {
     const url = await createTask('[TEST] FATF Watchdog connectivity check', 'The watchdog can reach Asana and create tasks. Close this task. Created ' + new Date().toISOString().slice(0, 10) + '.');
     console.log('test task created: ' + url);
+    return;
+  }
+
+  if (mode === 'digest') {
+    /* Monthly "Reviews due" digest: one task naming every client whose next
+       review falls due this month (or is still open from before). Idempotent:
+       skipped if this month's digest already exists, silent when nothing is due. */
+    const now = new Date();
+    const label = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][now.getMonth()] + ' ' + now.getFullYear();
+    const title = 'Reviews due: ' + label;
+    const today = now.toISOString().slice(0, 10);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const monthEnd = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
+    const tasks = await listProjectTasks('name,due_on,completed');
+    if (tasks.some(t => String(t.name || '') === title)) { console.log('digest already exists: ' + title); return; }
+    const lines = collectReviewsDue(tasks, today, monthEnd);
+    if (!lines.length) { console.log('no client reviews due in ' + label + ' - staying silent'); return; }
+    const notes = 'Customer risk reviews falling due in ' + label + ', including any still open from earlier months:\n\n'
+      + lines.join('\n')
+      + '\n\nFor each client: open the app, open the client from the Register, run Re-assess, complete the assessment, and close its Asana task. The dates above mirror each assessment\'s Next Review Date.'
+      + '\nApp: https://hawkeye-sterling-ra.netlify.app';
+    const url = await createTask(title, notes, monthEnd);
+    console.log('digest task created (' + lines.length + ' client' + (lines.length === 1 ? '' : 's') + '): ' + url);
     return;
   }
 

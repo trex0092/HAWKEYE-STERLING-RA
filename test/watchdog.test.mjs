@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, sliceCurrentSection } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, sliceCurrentSection, collectReviewsDue } from '../scripts/fatf-watchdog.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -52,6 +52,22 @@ const wikiSlice = sliceCurrentSection(wiki, 'call for action');
 const wikiBlack = extractCountries(wikiSlice, baseline);
 check('wikipedia slice keeps only the current section',
   wikiBlack.join('|') === 'Islamic Republic of Iran|Myanmar|North Korea' && !wikiSlice.includes('Panama'));
+
+const digestTasks = [
+  { name: 'RA-1 · Alpha Gold DMCC · CDD 19', due_on: '2026-06-15', completed: false },
+  { name: 'RA-2 · Beta Jewellery LLC · EDD 24', due_on: '2026-06-01', completed: false },
+  { name: 'RA-3 · Gamma Metals FZE · SDD 21', due_on: '2026-07-02', completed: false },   // next month
+  { name: 'RA-4 · Done Co · CDD 19', due_on: '2026-06-20', completed: true },              // completed
+  { name: 'Print check — iPhone Safari only (Edge already verified)', due_on: '2026-06-19', completed: false }, // not a client
+  { name: 'RA-6 · Prohibited Co · PROHIBITED 21', due_on: '2026-06-18', completed: false }, // prohibited: no reviews
+  { name: 'RA-5 · Old Overdue LLC · CDD 19', due_on: '2026-05-30', completed: false },     // overdue from May
+];
+const digest = collectReviewsDue(digestTasks, '2026-06-10', '2026-06-30');
+check('digest picks due + overdue clients only, oldest first', digest.length === 3
+  && digest[0].includes('Old Overdue LLC') && digest[0].includes('30/05/2026') && digest[0].includes('(OVERDUE)')
+  && digest[1].includes('Beta Jewellery LLC') && digest[1].includes('(OVERDUE)')
+  && digest[2].includes('Alpha Gold DMCC') && digest[2].includes('review due 15/06/2026') && !digest[2].includes('OVERDUE'));
+check('digest is silent when nothing is due', collectReviewsDue(digestTasks, '2026-01-01', '2026-01-31').length === 0);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check (compare + alert) | seed (record current lists, no alert) | test-alert (create a [TEST] Asana task) | setup-sections (create the LOW/MEDIUM/HIGH/PROHIBITED sections)'
+        description: 'check (compare + alert) | seed (record lists, no alert) | test-alert ([TEST] Asana task) | setup-sections (risk-band sections) | digest (monthly "Reviews due" task)'
         default: 'check'
 
 permissions:
@@ -28,6 +28,12 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
         run: node scripts/fatf-watchdog.mjs "${{ inputs.mode || 'check' }}"
+      - name: Monthly review digest
+        # Runs with the monthly schedule even if the FATF source check failed.
+        if: always() && github.event_name == 'schedule'
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+        run: node scripts/fatf-watchdog.mjs digest
       - name: Persist list state
         run: |
           if ! git diff --quiet -- data/fatf-state.json 2>/dev/null || [ -n "$(git status --porcelain data/fatf-state.json)" ]; then
