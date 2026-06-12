@@ -157,6 +157,11 @@ input[type="date"]{color-scheme:dark}
 .btn-half{flex:1;justify-content:center}
 .btn-gold{background:rgba(210,166,72,0.10);color:#E5C16C;border-color:rgba(210,166,72,0.45);box-shadow:0 0 10px rgba(210,166,72,0.20)}
 .btn-gold:hover{background:rgba(210,166,72,0.18);color:#F0D08A;box-shadow:0 0 18px rgba(210,166,72,0.38)}
+.btn-blue{background:rgba(126,200,255,0.10);color:#8FD0FF;border-color:rgba(126,200,255,0.45);box-shadow:0 0 12px rgba(126,200,255,0.22),inset 0 0 10px rgba(126,200,255,0.05)}
+.btn-blue:hover{background:rgba(126,200,255,0.18);color:#B5E0FF;box-shadow:0 0 20px rgba(126,200,255,0.42)}
+.btn-lilac{background:rgba(201,162,255,0.10);color:#CBA8FF;border-color:rgba(201,162,255,0.45);box-shadow:0 0 12px rgba(201,162,255,0.22),inset 0 0 10px rgba(201,162,255,0.05)}
+.btn-lilac:hover{background:rgba(201,162,255,0.18);color:#DEC4FF;box-shadow:0 0 20px rgba(201,162,255,0.42)}
+button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
 /* ── Side panel ───────────────────────── */
 .sp-block{padding:14px 0;border-bottom:1px solid;border-image:linear-gradient(90deg,rgba(180,92,255,0.45),rgba(255,92,168,0.35) 60%,transparent) 1}
@@ -593,9 +598,9 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       <div class="rd-foot">
         <span class="rd-count" id="rdCountLbl"></span>
         <span class="rd-spacer"></span>
-        <button class="btn btn-gold" onclick="rdExportSheet()">⇩ Export Sheet</button>
-        <button class="btn btn-gold" onclick="rdImportSheet()">⇪ Import Sheet</button>
-        <button class="btn btn-ghost" onclick="rdResetConfirm()">↺ Reset to Baseline</button>
+        <button class="btn btn-blue" onclick="rdExportSheet()">⇩ Export Sheet</button>
+        <button class="btn btn-lilac" onclick="rdImportSheet()">⇪ Import Sheet</button>
+        <button class="btn btn-ghost" onclick="rdResetConfirm()">↺ Reset</button>
       </div>
     </div>
   </div>
