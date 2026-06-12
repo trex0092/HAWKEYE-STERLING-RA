@@ -16,9 +16,12 @@ jobs:
         run: node test/app.test.js
       - name: Browser smoke test (headless Chrome)
         run: |
+          # Chrome occasionally exits non-zero after a successful --dump-dom on
+          # runners (shutdown race); the greps below are the real assertions.
           google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=5000 \
-            --dump-dom "file://$PWD/index.html" > /tmp/dom.html
-          grep -q 'HAWKEYE STERLING — ENTITY RISK ASSESSMENT' /tmp/dom.html
-          grep -q 'CDD — Customer Due Diligence' /tmp/dom.html
-          grep -q 'stroke-dasharray: 214.7, 452' /tmp/dom.html
+            --dump-dom "file://$PWD/index.html" > /tmp/dom.html || echo "chrome exit tolerated; asserting content"
+          test -s /tmp/dom.html
+          for s in 'HAWKEYE STERLING — ENTITY RISK ASSESSMENT' 'CDD — Customer Due Diligence' 'stroke-dasharray: 214.7, 452'; do
+            grep -q "$s" /tmp/dom.html || { echo "MISSING: $s"; exit 1; }
+          done
           echo "smoke ok — app renders, engine computes 19/CDD, gauge wired"
