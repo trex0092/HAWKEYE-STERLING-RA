@@ -5,6 +5,12 @@
    The Asana token lives in the Netlify environment (ASANA_ACCESS_TOKEN)
    and never reaches the browser. */
 const DEFAULT_PROJECT_GID = '1215653768729951'; /* RISK ASSESSMENTS */
+
+/* Module-level dedup cache: if the same assessment ref is submitted again within
+   60 s (e.g. double-click or UI bug) return the cached result instead of creating
+   a second task. The cache is ephemeral and resets on each cold-start. */
+const _recentCache = new Map(); /* key: ref string → {gid, url, section, ts} */
+const DEDUP_WINDOW_MS = 60 * 1000;
 const SECTIONS = {
   CDD: 'LOW RISK (CDD)',
   SDD: 'MEDIUM RISK (SDD)',
@@ -30,6 +36,14 @@ exports.handler = async (event) => {
   if (!name) return resp(400, { ok: false, error: 'name required' });
 
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
+  if (!process.env.ASANA_PROJECT_GID) console.warn('ASANA_PROJECT_GID not set — using hardcoded default project GID');
+
+  /* Dedup: a re-submission of the same name within DEDUP_WINDOW_MS returns the cached result. */
+  const cacheKey = name;
+  const cached = _recentCache.get(cacheKey);
+  if (cached && !gid && (Date.now() - cached.ts) < DEDUP_WINDOW_MS) {
+    return resp(200, { ok: true, gid: cached.gid, url: cached.url, section: cached.section, deduplicated: true });
+  }
 
   try {
     /* Resolve the risk-band section first; a section problem must never lose the task. */
@@ -64,7 +78,9 @@ exports.handler = async (event) => {
       try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: made.body.data.gid } }); }
       catch (e) { section = null; /* task stays in the default section */ }
     }
-    return resp(200, { ok: true, gid: made.body.data.gid, url: made.body.data.permalink_url, section: section ? sectionName : null });
+    const result = { ok: true, gid: made.body.data.gid, url: made.body.data.permalink_url, section: section ? sectionName : null };
+    _recentCache.set(cacheKey, { ...result, ts: Date.now() });
+    return resp(200, result);
   } catch (e) {
     return resp(502, { ok: false, error: 'asana unreachable' });
   }

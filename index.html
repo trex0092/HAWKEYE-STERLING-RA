@@ -150,6 +150,8 @@ input[type="number"]{-moz-appearance:textfield}
 .btn-full{width:100%;justify-content:center}
 .btn-gold{background:rgba(210,166,72,0.10);color:#E5C16C;border-color:rgba(210,166,72,0.45);box-shadow:0 0 10px rgba(210,166,72,0.20)}
 .btn-gold:hover{background:rgba(210,166,72,0.18);color:#F0D08A;box-shadow:0 0 18px rgba(210,166,72,0.38)}
+.btn-orange{background:rgba(255,140,66,0.10);color:#ff8c42;border-color:rgba(255,140,66,0.45);box-shadow:0 0 10px rgba(255,140,66,0.20)}
+.btn-orange:hover{background:rgba(255,140,66,0.18);color:#ffaa70;box-shadow:0 0 18px rgba(255,140,66,0.38)}
 .btn-blue{background:rgba(126,200,255,0.10);color:#8FD0FF;border-color:rgba(126,200,255,0.45);box-shadow:0 0 12px rgba(126,200,255,0.22),inset 0 0 10px rgba(126,200,255,0.05)}
 .btn-blue:hover{background:rgba(126,200,255,0.18);color:#B5E0FF;box-shadow:0 0 20px rgba(126,200,255,0.42)}
 .btn-lilac{background:rgba(201,162,255,0.10);color:#CBA8FF;border-color:rgba(201,162,255,0.45);box-shadow:0 0 12px rgba(201,162,255,0.22),inset 0 0 10px rgba(201,162,255,0.05)}
@@ -277,6 +279,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .app-footer{margin-top:18px;font-size:10px;color:var(--text3);line-height:1.7;text-align:center;font-family:var(--mono)}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(8px);background:#10161F;color:var(--text);font-size:11px;font-weight:600;letter-spacing:0.05em;padding:9px 18px;border-radius:99px;border:1px solid rgba(255,92,168,0.50);box-shadow:0 0 14px rgba(255,92,168,0.30);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:300;font-family:var(--mono)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.storage-warn{position:fixed;top:0;left:0;right:0;background:#3d1200;color:#ffb347;font-size:11px;font-weight:600;text-align:center;padding:7px 16px;z-index:400;border-bottom:1px solid #ff8c00;font-family:var(--mono)}
 
 /* ── PRINT REPORT (black/pink A4 — hidden on screen) ── */
 #printReport{display:none;font-family:'Arial Narrow','Helvetica Neue',Arial,sans-serif;color:#1A1F2B;font-size:11.5pt;line-height:1.5;padding:0 6mm;background:#FFFFFF}
@@ -614,8 +617,9 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       <div class="sp-spacer"></div>
 
       <div class="sp-actions no-print">
-        <button class="btn btn-primary btn-full" onclick="printReport()" title="Safari: choose A4 paper size and enable “Print backgrounds” in the print dialog">⎙ Print / Export PDF</button>
+        <button class="btn btn-primary btn-full" onclick="printPreflight()">⎙ Print / Export PDF</button>
         <button class="btn btn-ghost btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
+        <button class="btn btn-orange btn-full" id="btnRetryAsana" onclick="retryAsanaDelivery()" style="display:none">↻ Retry Asana Delivery</button>
         <button class="btn btn-blue btn-full" onclick="openRegister()">☰ Register</button>
         <button class="btn btn-red btn-full" onclick="newAssessment()">↺ Reset</button>
         <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
@@ -641,7 +645,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <button class="rd-tab" id="rdTab_activities" onclick="rdSetTab('activities')">Activities</button>
         <button class="rd-tab" id="rdTab_recycled" onclick="rdSetTab('recycled')">Recycled</button>
         <button class="rd-tab" id="rdTab_mined" onclick="rdSetTab('mined')">Mined</button>
-        <input class="rd-search" id="rdSearch" placeholder="Filter by name…" oninput="rdRender()">
+        <input class="rd-search" id="rdSearch" placeholder="Filter by name…" oninput="rdSearchInput()">
         <button class="rd-tab" id="rdOvOnly" onclick="rdToggleOvOnly()">✱ Overridden only</button>
       </div>
       <div class="rd-rows" id="rdRows"></div>
@@ -680,6 +684,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 <input type="file" id="importFile" accept=".json,application/json" style="display:none">
 <input type="file" id="rdImportFile" accept=".json,application/json" style="display:none">
 <div class="toast" id="toast"></div>
+<div class="storage-warn" id="storageWarn" role="alert" aria-live="assertive" style="display:none">⚠ Autosave unavailable — your browser's local storage is blocked or full. Export your assessment to avoid losing work.</div>
 <div id="printReport"></div>
 
 <script>
@@ -687,6 +692,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
    DATA (sourced directly from Data sheet)
 ══════════════════════════════════════════ */
 const APP_VERSION = '3.6.1';
+const TOAST_DURATION_MS = 2600; /* keeps toasts readable per accessibility guidelines */
 
 const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":1},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":1},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":1},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":1},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":1},{"name":"Isle of Man","score":1},{"name":"Belgium","score":1},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":1},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":1},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":1},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":2},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":2},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":1},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":2},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":2},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":2},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":2},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":1},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":2},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3,"cfa":true},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3,"cfa":true},{"name":"Islamic Republic of Iran","score":3,"cfa":true}];
 
@@ -717,7 +723,18 @@ const QUESTIONS_OC = [
 
 const BAND_FULL = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence', EDD:'Enhanced Due Diligence', PROHIBITED:'Do Not Onboard'};
 const BAND_ICON = {CDD:'✓', SDD:'!', EDD:'⚠', PROHIBITED:'⛔'};
-const REVIEW_MONTHS = {CDD:12, SDD:6, EDD:3}; /* manual's KYC review cycles: low 12m, medium 6m, high 3m */
+const REVIEW_MONTHS = {CDD:12, SDD:6, EDD:3}; /* KYC review cycles per compliance manual: low 12m, medium 6m, high 3m */
+
+/* Policy names referenced in the narrative template — update here if policies are renamed. */
+const POLICIES = {
+  TFS:  'Targeted Financial Sanctions procedure',
+  RAS:  'Risk Appetite Statement',
+  SOFW: 'Source of Funds and Source of Wealth policy',
+  RS:   'Responsible Sourcing and Supply Chain policy',
+  KYC:  'Know Your Customer procedure',
+  UBO:  'Ultimate Beneficial Owner procedure',
+  RCP:  'Risk Control Plan'
+};
 const ASM_SOURCE = 'ASM — Artisanal Mining';
 const SCREENING_GROUPS = [['sanctions','Sanctions screening'],['pep','PEP screening'],['adverse','Adverse media screening']];
 
@@ -800,6 +817,8 @@ function freshState(){
   s.meta.date = todayISO();
   return s;
 }
+/** Merge an untrusted source object into a clean default state. Only whitelisted scalar fields
+ *  cross the boundary; unknown keys and non-scalar values are silently dropped. */
 function mergeState(src){
   const out = defaultState();
   if(!src || typeof src!=='object') return out;
@@ -876,8 +895,8 @@ function mergeState(src){
   if(!COUNTRIES.some(c=>c.name===out.entity.jurisdiction)) out.entity.jurisdiction = 'United Kingdom';
   if(!ACTIVITIES.some(a=>a.name===out.profile.activity)) out.profile.activity = ACTIVITIES[0].name;
   out.profile.onboard = out.profile.onboard==='Yes' ? 'Yes' : 'No';
-  out.profile.entityYears = Math.max(0, parseInt(out.profile.entityYears)||0);
-  out.profile.relYears = Math.max(0, parseInt(out.profile.relYears)||0);
+  out.profile.entityYears = Math.max(0, Math.min(99, parseInt(out.profile.entityYears)||0));
+  out.profile.relYears = Math.max(0, Math.min(99, parseInt(out.profile.relYears)||0));
   return out;
 }
 
@@ -982,6 +1001,8 @@ function scheduleRiskBackup(){
 }
 /* Set one override. A reason is mandatory for any deviation from baseline;
    setting values equal to baseline clears the override instead. */
+/** Apply one risk-data override. Reason is mandatory for any deviation from baseline;
+ *  setting values equal to baseline clears the override. Returns false if validation fails. */
 function rdSetOverride(kind, name, vals){
   const b = rdBase(kind, name);
   if(!b || b.name==='N/A' || !vals) return false;
@@ -992,7 +1013,7 @@ function rdSetOverride(kind, name, vals){
     if(rdOv(kind, name)) rdClearOverride(kind, name);
     return true;
   }
-  const reason = String(vals.reason==null ? '' : vals.reason).trim();
+  const reason = String(vals.reason==null ? '' : vals.reason).trim().slice(0, 500);
   if(!reason) return false;
   const entry = {score, reason, at:todayISO()};
   if(kind==='countries') entry.cfa = cfa;
@@ -1038,28 +1059,31 @@ $('rdImportFile').addEventListener('change', function(e){
   if(!f) return;
   const r = new FileReader();
   r.onload = function(){
-    try{
-      const data = JSON.parse(r.result);
-      const looks = data && typeof data==='object'
-        && (data.overrides || Object.keys(RD_KINDS).some(k => data[k]));
-      if(!looks) throw new Error('invalid');
-      riskData = mergeRiskData(data);
-      rdAfterChange();
-      toast('Risk data sheet imported — ' + rdCount() + ' override' + (rdCount()===1?'':'s'));
-    }catch(err){
-      alert('Invalid risk data sheet. Expected a sheet exported from this application.');
+    if(r.result && r.result.length > 10 * 1024 * 1024){ alert('File too large. Maximum allowed size is 10 MB.'); e.target.value = ''; return; }
+    let data;
+    try{ data = JSON.parse(r.result); }
+    catch(err){ alert('The file contains invalid JSON. Expected a risk data sheet exported from this application.'); e.target.value = ''; return; }
+    const looks = data && typeof data==='object' && (data.overrides || Object.keys(RD_KINDS).some(k => data[k]));
+    if(!looks){ alert('Invalid risk data sheet. Expected a sheet exported from this application.'); e.target.value = ''; return; }
+    if(typeof data.updatedAt !== 'undefined' && !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(String(data.updatedAt))){
+      alert('The file has an invalid date format. Expected a sheet exported from this application.'); e.target.value = ''; return;
     }
+    riskData = mergeRiskData(data);
+    rdAfterChange();
+    toast('Risk data sheet imported — ' + rdCount() + ' override' + (rdCount()===1?'':'s'));
     e.target.value = '';
   };
   r.readAsText(f);
 });
 
 /* ── Risk Data panel UI ── */
-let rdTab = 'countries', rdShowOvOnly = false;
+let rdTab = 'countries', rdShowOvOnly = false, rdSearchTimer = null;
 function openRiskData(){ const o = $('rdOverlay'); if(o) o.classList.add('open'); rdRender(); }
 function closeRiskData(){ const o = $('rdOverlay'); if(o) o.classList.remove('open'); }
 function rdSetTab(kind){ rdTab = kind; rdRender(); }
 function rdToggleOvOnly(){ rdShowOvOnly = !rdShowOvOnly; rdRender(); }
+/** Debounce keystrokes so the 380-row DOM rebuild doesn't fire on every character. */
+function rdSearchInput(){ clearTimeout(rdSearchTimer); rdSearchTimer = setTimeout(rdRender, 200); }
 function rdRender(){
   const rows = $('rdRows');
   if(!rows) return;
@@ -1273,6 +1297,7 @@ function paintSupplier(prefix, i) {
 function paintStatus() {
   const btn = $('btnComplete');
   if(btn) btn.textContent = state.complete ? '✓ Mark as Draft' : '✓ Complete Assessment';
+  paintRetryButton();
 }
 
 function syncUI() {
@@ -1341,6 +1366,8 @@ function onScreening(group, key, val){ state.screening[group][key] = val; schedu
    and Wealth, Responsible Sourcing). One text serves every assessed
    entity; entity, date, score and jurisdiction band fill automatically,
    [bracketed] fields need officer review. No em-dashes. ── */
+/** Generate a band-appropriate narrative template for the notes field. Policy names come
+ *  from the POLICIES constant so they stay consistent if policies are renamed. */
 function buildNarrative(){
   const a = computeAssessment();
   const s = state;
@@ -1356,18 +1383,18 @@ function buildNarrative(){
   if(a.prohibited){
     t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + '. Designated party exposure was identified: '
       + a.escalations.filter(e=>e.level==='prohibit').map(e=>e.reason).join('; ')
-      + '. The relationship is prohibited under our Targeted Financial Sanctions procedure and our Risk Appetite Statement. We will not onboard or continue with this customer. Funds are frozen where held, and the Compliance Officer will decide whether a report must be filed with the Financial Intelligence Unit under Federal Decree-Law No. (10) of 2025 and the Cabinet Decision on Targeted Financial Sanctions. No review date is set because the relationship is declined. This note is kept as the record of our decision.';
+      + '. The relationship is prohibited under our ' + POLICIES.TFS + ' and our ' + POLICIES.RAS + '. We will not onboard or continue with this customer. Funds are frozen where held, and the Compliance Officer will decide whether a report must be filed with the Financial Intelligence Unit under Federal Decree-Law No. (10) of 2025 and the Cabinet Decision on Targeted Financial Sanctions. No review date is set because the relationship is declined. This note is kept as the record of our decision.';
   } else if(a.outcome==='CDD'){
-    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the low risk band. The customer operates from ' + jurWord + ', and its licensed activity is within the sectors accepted by our Risk Appetite Statement. Screening for sanctions, PEP and adverse media was completed and cleared before onboarding under our Targeted Financial Sanctions procedure. We found no concerns under our Source of Funds and Source of Wealth policy, and the declared material sources fall within our Responsible Sourcing and Supply Chain policy. Standard due diligence applies. We will review the file at least every twelve months, re-screen the customer annually, and bring the review forward if anything changes, in line with our Know Your Customer procedure. Transaction monitoring follows the low risk cycle. The relationship is within our risk appetite and is approved. This note is kept as the record of our decision.';
+    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the low risk band. The customer operates from ' + jurWord + ', and its licensed activity is within the sectors accepted by our ' + POLICIES.RAS + '. Screening for sanctions, PEP and adverse media was completed and cleared before onboarding under our ' + POLICIES.TFS + '. We found no concerns under our ' + POLICIES.SOFW + ', and the declared material sources fall within our ' + POLICIES.RS + '. Standard due diligence applies. We will review the file at least every twelve months, re-screen the customer annually, and bring the review forward if anything changes, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the low risk cycle. The relationship is within our risk appetite and is approved. This note is kept as the record of our decision.';
   } else if(a.outcome==='SDD'){
-    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the medium risk band. Some factors raise the profile, such as the jurisdiction, the business activity, the material sources or the length of trading history. Screening was completed and cleared under our Targeted Financial Sanctions procedure, the source of funds is verifiable under our Source of Funds and Source of Wealth policy, and the activity remains within the sectors accepted by our Risk Appetite Statement.'
+    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the medium risk band. Some factors raise the profile, such as the jurisdiction, the business activity, the material sources or the length of trading history. Screening was completed and cleared under our ' + POLICIES.TFS + ', the source of funds is verifiable under our ' + POLICIES.SOFW + ', and the activity remains within the sectors accepted by our ' + POLICIES.RAS + '.'
       + (a.total===22 ? ' The score is one point below the high risk threshold, so a change in a single factor will raise the required diligence.' : '')
-      + ' Simplified due diligence applies, with closer monitoring where needed. We will review the file every six months, or sooner if a trigger event occurs, in line with our Know Your Customer procedure. Transaction monitoring follows the medium risk cycle. We continue the relationship on a conditional basis under our Risk Control Plan. This note is kept as the record of our decision.';
+      + ' Simplified due diligence applies, with closer monitoring where needed. We will review the file every six months, or sooner if a trigger event occurs, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the medium risk cycle. We continue the relationship on a conditional basis under our ' + POLICIES.RCP + '. This note is kept as the record of our decision.';
   } else {
     t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the high risk band.'
       + (a.escalations.length ? ' This includes a mandatory escalation: ' + a.escalations.map(e=>e.reason).join('; ') + '.' : '')
       + (a.analystOv ? ' The outcome was raised from ' + a.analystOv.from + ' by an analyst override: ' + a.analystOv.reason + '.' : '')
-      + ' The main concerns come from factors such as the jurisdiction, the material sources, the delivery channel or the ownership structure. The customer is not based in a FATF blacklisted country, screening returned no matches on the UN, EU, OFAC or UAE lists under our Targeted Financial Sanctions procedure, and the source of funds can be verified, so we may continue under enhanced controls within our Risk Appetite Statement. Enhanced due diligence applies and senior management approval is recorded. We verify the owners and controllers under our Ultimate Beneficial Owner procedure, obtain documents that support the source of funds and wealth, and carry out enhanced checks under our Responsible Sourcing and Supply Chain policy. We will review the file at least every three months, or immediately if a trigger event occurs, in line with our Know Your Customer procedure. Transaction monitoring follows the high risk cycle. Approved by [MLRO name] on [DD/MM/YYYY]. This note is kept as the record of our decision.';
+      + ' The main concerns come from factors such as the jurisdiction, the material sources, the delivery channel or the ownership structure. The customer is not based in a FATF blacklisted country, screening returned no matches on the UN, EU, OFAC or UAE lists under our ' + POLICIES.TFS + ', and the source of funds can be verified, so we may continue under enhanced controls within our ' + POLICIES.RAS + '. Enhanced due diligence applies and senior management approval is recorded. We verify the owners and controllers under our ' + POLICIES.UBO + ', obtain documents that support the source of funds and wealth, and carry out enhanced checks under our ' + POLICIES.RS + '. We will review the file at least every three months, or immediately if a trigger event occurs, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the high risk cycle. Approved by [MLRO name] on [DD/MM/YYYY]. This note is kept as the record of our decision.';
   }
   return t.replace(/—/g, '-'); /* narrative stays em-dash free per client style */
 }
@@ -1431,20 +1458,57 @@ function asanaPayload(){
       + (s.signoff.approvedDate ? ', ' + (fmtDate(s.signoff.approvedDate) || s.signoff.approvedDate) : '')
   };
 }
+const ASANA_FAILED_KEY = 'hsra.asana.failed.v1';
+/** Store a failed delivery payload for manual retry; shows the retry button. */
+function storeFailedDelivery(ref, payload){
+  if(!ref) return;
+  try{ const m = JSON.parse(localStorage.getItem(ASANA_FAILED_KEY)) || {}; m[ref] = payload; localStorage.setItem(ASANA_FAILED_KEY, JSON.stringify(m)); }catch(e){}
+  paintRetryButton();
+}
+function clearFailedDelivery(ref){
+  if(!ref) return;
+  try{ const m = JSON.parse(localStorage.getItem(ASANA_FAILED_KEY)) || {}; delete m[ref]; localStorage.setItem(ASANA_FAILED_KEY, JSON.stringify(m)); }catch(e){}
+  paintRetryButton();
+}
+function getFailedPayload(ref){
+  if(!ref) return null;
+  try{ const m = JSON.parse(localStorage.getItem(ASANA_FAILED_KEY)) || {}; return m[ref] || null; }catch(e){ return null; }
+}
+/** Show the retry button only when there is a pending failed delivery for the current ref. */
+function paintRetryButton(){
+  const btn = $('btnRetryAsana');
+  if(!btn) return;
+  const ref = String(state.meta.ref||'').trim();
+  btn.style.display = (ref && getFailedPayload(ref)) ? '' : 'none';
+}
 function sendToAsana(){
   /* Only meaningful on the deployed site; silently unavailable on file:// and in tests. */
   if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) return;
   const p = asanaPayload();
   const ref = String(state.meta.ref||'').trim();
+  doSendToAsana(p, ref, false);
+}
+function retryAsanaDelivery(){
+  const ref = String(state.meta.ref||'').trim();
+  const p = getFailedPayload(ref);
+  if(!p) return;
+  doSendToAsana(p, ref, true);
+}
+function doSendToAsana(p, ref, isRetry){
+  if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) return;
   fetch('/.netlify/functions/asana-task', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(p)
   }).then(r => r.json()).then(d => {
-    if(d && d.ok && d.gid) rememberDelivered(ref, d.gid);
+    if(d && d.ok && d.gid){ rememberDelivered(ref, d.gid); clearFailedDelivery(ref); }
+    else storeFailedDelivery(ref, p);
     toast(d && d.ok ? (d.updated ? 'Updated in Asana: ' : 'Delivered to Asana: ') + p.name
                     : 'Asana delivery failed' + (d && d.error ? ' (' + d.error + ')' : ''));
-  }).catch(() => toast('Asana delivery unavailable'));
+  }).catch(() => {
+    storeFailedDelivery(ref, p);
+    toast(isRetry ? 'Retry failed — Asana still unavailable' : 'Asana delivery unavailable');
+  });
 }
 function onSign(key, val) {
   state.signoff[key] = val;
@@ -1473,6 +1537,7 @@ function onYears(which) {
   const inp = $(which==='entity'?'entityYearsInput':'relYearsInput');
   let y = parseInt(inp.value);
   if(isNaN(y) || y<0) y = 0;
+  if(y>99) y = 99;
   if(which==='entity') state.profile.entityYears = y; else state.profile.relYears = y;
   paintYears(which);
   recalc();
@@ -1493,6 +1558,8 @@ function toggleComplete() {
 /* ══════════════════════════════════════════
    ASSESSMENT ENGINE
 ══════════════════════════════════════════ */
+/** Compute the full assessment result from current state. Returns {parts, total, numericBand,
+ *  engineOutcome, outcome, escalations, prohibited, analystOv, forced}. Pure — does not mutate state. */
 function computeAssessment() {
   const s = state, parts = [];
 
@@ -1572,7 +1639,8 @@ function recalc() {
 
   $('totalScore').textContent = a.total;
 
-  /* Gauge arc: 270° sweep = 339 dash units on the r=74 circle, display scale 0–30 */
+  /* Gauge arc: 270° sweep on r=74 circle. 339 ≈ 2π×72×0.75 (fitted to the visual sweep including round linecap).
+     452 = circumference buffer; must be > 339 so the gap stays hidden. Display scale: 0–30. */
   const arc = $('gaugeArc');
   if(arc) arc.style.strokeDasharray = (Math.min(a.total/30, 1)*339).toFixed(1) + ' 452';
 
@@ -1656,10 +1724,12 @@ function recalc() {
     s.signoff.nextReview = suggested;
     $('nextReview').value = fmtDate(suggested);
   }
+  const manualLate = s.signoff.reviewManual && suggested && s.signoff.nextReview && s.signoff.nextReview > suggested;
   $('reviewHint').innerHTML = (a.prohibited
       ? 'No review — relationship prohibited'
       : 'Suggested: ' + fmtDate(suggested) + ' (' + REVIEW_MONTHS[a.outcome] + ' months — ' + a.outcome + ')')
-    + (s.signoff.reviewManual ? ' · <a onclick="useSuggestedReview()">use suggested</a>' : '');
+    + (s.signoff.reviewManual ? ' · <a onclick="useSuggestedReview()">use suggested</a>' : '')
+    + (manualLate ? ' <b style="color:#ff8c42">⚠ manual date is later than the ' + a.outcome + ' schedule</b>' : '');
 
   updateCompleteness();
   scheduleSave();
@@ -1691,7 +1761,7 @@ function toast(msg){
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), TOAST_DURATION_MS);
 }
 function scheduleSave(){
   clearTimeout(saveTimer);
@@ -1701,7 +1771,12 @@ function saveDraft(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify({version:APP_VERSION, savedAt:new Date().toISOString(), state}));
     $('saveStamp').textContent = 'Autosaved '+new Date().toLocaleTimeString();
-  }catch(e){ /* storage unavailable (private mode etc.) — app still works, just no draft */ }
+    const warn = $('storageWarn'); if(warn) warn.style.display = 'none';
+  }catch(e){
+    /* Storage blocked (private mode, quota exceeded, or security policy). Show a persistent banner
+       so the user knows to export manually before closing the tab. */
+    const warn = $('storageWarn'); if(warn) warn.style.display = '';
+  }
   regUpsert(); /* the register mirrors every named save */
 }
 function loadDraft(){
@@ -1752,6 +1827,8 @@ function regDelete(ref){
   regWrite(items);
   return true;
 }
+/** Load an assessment from the register by reference. Saves the current assessment first
+ *  so no work is lost. Returns false if the ref is not found. */
 function regOpenEntry(ref){
   const e = regAll()[ref];
   if(!e || !e.state || typeof e.state!=='object') return false;
@@ -1914,16 +1991,15 @@ $('importFile').addEventListener('change', function(e){
   if(!f) return;
   const r = new FileReader();
   r.onload = function(){
-    try{
-      const data = JSON.parse(r.result);
-      const src = data && data.state ? data.state : data;
-      if(!src || typeof src!=='object' || !src.questions) throw new Error('invalid');
-      state = mergeState(src);
-      syncUI();
-      toast('Assessment imported'+(state.meta.ref?' — '+state.meta.ref:''));
-    }catch(err){
-      alert('Invalid assessment file. Expected a JSON export from this application.');
-    }
+    if(r.result && r.result.length > 10 * 1024 * 1024){ alert('File too large. Maximum allowed size is 10 MB.'); e.target.value = ''; return; }
+    let data;
+    try{ data = JSON.parse(r.result); }
+    catch(err){ alert('The file contains invalid JSON. Expected an assessment exported from this application.'); e.target.value = ''; return; }
+    const src = data && data.state ? data.state : data;
+    if(!src || typeof src!=='object' || !src.questions){ alert('Invalid assessment file. Expected a JSON export from this application.'); e.target.value = ''; return; }
+    state = mergeState(src);
+    syncUI();
+    toast('Assessment imported'+(state.meta.ref?' — '+state.meta.ref:''));
     e.target.value = '';
   };
   r.readAsText(f);
@@ -2091,6 +2167,17 @@ function printReport(){
   buildPrintReport();
   window.print();
 }
+/** Pre-flight checklist for PDF export — warns about Safari's "Print backgrounds" requirement. */
+function printPreflight(){
+  const ok = confirm(
+    'Before printing / exporting PDF:\n\n'
+    + '• Set paper size to A4 (portrait recommended)\n'
+    + '• Safari: enable "Print backgrounds" in the print dialog\n'
+    + '• Firefox: check "Print backgrounds" in "More settings"\n\n'
+    + 'Proceed?'
+  );
+  if(ok) printReport();
+}
 window.addEventListener('beforeprint', buildPrintReport);
 /* Flush the debounced autosave so closing the tab right after typing loses nothing */
 window.addEventListener('beforeunload', saveDraft);
@@ -2149,12 +2236,15 @@ function initAnimations(){
 ══════════════════════════════════════════ */
 $('footVer').textContent = 'v'+APP_VERSION;
 
+/* Init order: risk data loads first so effCountry/effOf have overrides ready;
+   country and activity selects must be built before initRiskDataPanel() and
+   refreshSelectLabels() can enrich their <option> elements with override marks. */
 riskData = loadRiskData();
 buildCountrySelect();
 buildActivitySelect();
 buildQuestions();
 buildSuppliers();
-refreshSelectLabels();
+refreshSelectLabels(); /* add override marks (✱) to the now-built selects */
 initRiskDataPanel();
 initRegisterPanel();
 

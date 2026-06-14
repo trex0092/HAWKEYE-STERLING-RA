@@ -22,10 +22,13 @@ exports.handler = async (event) => {
   if (!sheet || typeof sheet !== 'object' || !sheet.overrides || typeof sheet.overrides !== 'object') {
     return resp(400, { ok: false, error: 'sheet with overrides required' });
   }
+  /* Validate size before stringifying to avoid unnecessary memory allocation. */
+  const estimatedSize = JSON.stringify(sheet).length;
+  if (estimatedSize > 50000) return resp(413, { ok: false, error: 'sheet too large' });
   const json = JSON.stringify(sheet, null, 2);
-  if (json.length > 50000) return resp(413, { ok: false, error: 'sheet too large' });
 
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
+  if (!process.env.ASANA_PROJECT_GID) console.warn('ASANA_PROJECT_GID not set — using hardcoded default project GID');
   const notes = 'Automatic mirror of the in-app risk-data overrides. Do not edit by hand; '
     + 'the monthly watchdog commits this sheet to the repository as data/risk-overrides-backup.json.\n'
     + 'Updated: ' + new Date().toISOString() + '\n\n'
@@ -34,12 +37,15 @@ exports.handler = async (event) => {
   try {
     let gid = null;
     let path = '/projects/' + project + '/tasks?limit=100&opt_fields=name';
-    while (path && !gid) {
+    let iterations = 0;
+    while (path && !gid && iterations < 50) { /* guard against malformed pagination loops */
+      iterations++;
       const page = await api(token, 'GET', path);
       if (!page.ok) break;
       const hit = (page.body.data || []).find(t => String(t.name || '') === TASK_NAME);
       if (hit) gid = hit.gid;
-      path = page.body.next_page ? '/projects/' + project + '/tasks?limit=100&opt_fields=name&offset=' + page.body.next_page.offset : null;
+      path = (page.body.next_page && page.body.next_page.offset)
+        ? '/projects/' + project + '/tasks?limit=100&opt_fields=name&offset=' + page.body.next_page.offset : null;
     }
 
     if (gid) {

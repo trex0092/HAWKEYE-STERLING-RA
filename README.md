@@ -98,7 +98,19 @@ Separately from the risk data (which is firm-wide), the analyst may raise the op
 - **Autosave** — the working draft is saved to `localStorage` in the user's browser only; nothing is transmitted anywhere.
 - **Print report** — produces an audit-ready PDF via the browser's print dialog. Chrome/Edge/Firefox apply A4 and exact colours automatically; in **Safari**, choose A4 paper size and enable *Print backgrounds* in the print dialog.
 
-## Getting started
+## Setup
+
+### Asana integration
+
+Copy `.env.example` to `.env` (never commit it) and fill in the values, then add them to your hosting environment:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `ASANA_ACCESS_TOKEN` | Yes | Personal access token from [Asana Developer Console](https://app.asana.com/0/developer-console). Used by Netlify functions and the GitHub Actions watchdog. Add to GitHub Secrets **and** Netlify environment variables. |
+| `ASANA_PROJECT_GID` | Recommended | GID of the RISK ASSESSMENTS Asana project (from the project URL). Defaults to the built-in value — set explicitly to avoid targeting the wrong project after a project rename or workspace change. |
+| `ASANA_ASSIGNEE` | No | Asana user to assign tasks to. Defaults to `me` (the token bearer). |
+
+### Getting started
 
 **Open directly** — download `index.html` and open it in any modern browser.
 
@@ -116,11 +128,22 @@ python3 -m http.server 8000
 The scoring engine, hard-outcome escalations, persistence, and report rendering are covered by a dependency-free test suite that executes the app's full inline script against a DOM stub:
 
 ```bash
-node test/app.test.js        # 187 checks — engine, register, report, Asana delivery & backup
+node test/app.test.js        # checks — engine, register, report, Asana delivery & backup, edge cases
 node test/watchdog.test.mjs  # 20 checks — FATF list parsing, alerts, digest, backup extraction
 ```
 
-CI runs both suites plus a headless-Chrome smoke test (renders `index.html`, asserts the computed verdict and gauge) on every push and pull request (`.github/workflows/ci.yml`).
+CI runs both suites plus two headless-Chrome smoke tests (one with `prefers-reduced-motion` for stability, one with motion enabled to exercise animation code paths) on every push and pull request (`.github/workflows/ci.yml`).
+
+## Accessibility
+
+The application targets WCAG 2.1 Level AA for its core assessment workflow:
+
+- All interactive controls have visible labels and `aria-pressed` state on Yes/No toggles.
+- A persistent warning banner is shown if the browser's localStorage is blocked or full, directing the user to export their work.
+- The gauge and risk-position bar are decorative; the score and verdict are also rendered as text.
+- Animations respect the `prefers-reduced-motion` media query — the gauge draw-in and count-up are skipped when motion is reduced.
+
+**Known limitations:** colour-contrast of some badge colours has not been independently audited. The print report requires the user to enable "Print backgrounds" in Safari and Firefox print dialogs.
 
 ## Project structure
 

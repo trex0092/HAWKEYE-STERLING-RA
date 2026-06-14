@@ -61,6 +61,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   scheduleRiskBackup,
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
   openRegister, closeRegister,
+  storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -684,11 +685,58 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
   delete process.env.ASANA_ACCESS_TOKEN;
   delete global.fetch;
 
+  // ── Edge-case resilience tests ──
+
+  // Corrupted localStorage recovery: loadRiskData must return a fresh empty sheet,
+  // never throw, even when the stored value is not valid JSON.
+  (function(){
+    const savedM = Object.assign({}, global.localStorage._m);
+    global.localStorage._m['hsra.riskdata.v1'] = '{corrupted:{{{not json';
+    const rd = A.loadRiskData();
+    check('loadRiskData recovers from corrupted localStorage', rd && typeof rd.overrides === 'object' && Object.keys(rd.overrides.countries).length === 0);
+    global.localStorage._m = savedM;
+  })();
+
+  // Year field clamping: mergeState must clamp entityYears and relYears to 0–99.
+  (function(){
+    const s = A.mergeState({profile:{activity:'Non-Manufactured Precious Metal Trading', onboard:'No', entityYears:9999, relYears:-5}});
+    check('mergeState clamps entityYears to 99', s.profile.entityYears === 99);
+    check('mergeState clamps relYears to 0',     s.profile.relYears   === 0);
+  })();
+
+  // Very long string handling: mergeState must not crash and must preserve long strings as-is.
+  (function(){
+    const longName = 'A'.repeat(12000);
+    const s = A.mergeState({entity:{name: longName, jurisdiction:'United Kingdom'}, profile:{}, questions:{}, signoff:{}});
+    check('mergeState handles 12k-char entity name without throwing', typeof s.entity.name === 'string' && s.entity.name.length === 12000);
+  })();
+
+  // Asana retry: storeFailedDelivery / clearFailedDelivery round-trip.
+  (function(){
+    const ref = 'RA-TEST-999';
+    const payload = {name: ref + ' · Test · CDD 19', band: 'CDD'};
+    A.storeFailedDelivery(ref, payload);
+    check('storeFailedDelivery persists payload',   JSON.stringify(A.getFailedPayload(ref)) === JSON.stringify(payload));
+    A.clearFailedDelivery(ref);
+    check('clearFailedDelivery removes payload',    A.getFailedPayload(ref) === null);
+  })();
+
+  // NARRATIVE_POLICIES: buildNarrative must still reference all policy long-form names.
+  (function(){
+    reset(); A.state.entity.name = 'Test Co'; A.state.entity.jurisdiction = 'United Kingdom'; A.recalc();
+    const n = A.buildNarrative();
+    check('narrative cites TFS policy by full name',  n.includes('Targeted Financial Sanctions procedure'));
+    check('narrative cites KYC policy by full name',  n.includes('Know Your Customer procedure'));
+    check('narrative cites RAS by full name',         n.includes('Risk Appetite Statement'));
+  })();
+
   // UI entry-point regression: these functions are tested above; the buttons
   // ensure users can actually reach them without the browser console.
   check('exportJSON button wired in HTML', html.includes('onclick="exportJSON()"'));
   check('importJSON button wired in HTML', html.includes('onclick="importJSON()"'));
   check('reassess button wired in HTML', html.includes('onclick="reassess()"'));
+  check('retry Asana button wired in HTML', html.includes('onclick="retryAsanaDelivery()"'));
+  check('print preflight wired in HTML', html.includes('onclick="printPreflight()"'));
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);
