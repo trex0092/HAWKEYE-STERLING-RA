@@ -62,6 +62,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
   openRegister, closeRegister,
   storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
+  _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -660,6 +661,14 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
   r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x'})});
   check('fn fails clearly without token', r.statusCode === 500 && JSON.parse(r.body).error.includes('ASANA_ACCESS_TOKEN'));
 
+  /* origin guard: cross-site browser origin is rejected; same-origin / header-less pass */
+  r = await fn.handler({httpMethod:'POST', headers:{origin:'https://evil.example', host:'hawkeye-sterling-ra.netlify.app'}, body:JSON.stringify({name:'x'})});
+  check('fn rejects a foreign browser origin (403)', r.statusCode === 403);
+  r = await fn.handler({httpMethod:'POST', headers:{origin:'https://hawkeye-sterling-ra.netlify.app', host:'hawkeye-sterling-ra.netlify.app'}, body:JSON.stringify({name:'x'})});
+  check('fn allows the same-origin request past the guard', r.statusCode !== 403);
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x'})});
+  check('fn allows header-less (server-to-server) requests past the guard', r.statusCode !== 403);
+
   /* risk-backup function: browser overrides → Asana mirror task */
   const rb = require('../netlify/functions/risk-backup.js');
   const sheet = {app:'x', version:'3.6.0', riskDataVersion:'2026-06', updatedAt:'2026-06-12',
@@ -737,6 +746,38 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
   check('reassess button wired in HTML', html.includes('onclick="reassess()"'));
   check('retry Asana button wired in HTML', html.includes('onclick="retryAsanaDelivery()"'));
   check('print preflight wired in HTML', html.includes('onclick="printPreflight()"'));
+
+  /* ── 27. Encryption-at-rest primitives (WebCrypto) ── */
+  await (async function(){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await A._deriveKey('correct horse battery staple', salt, 1000);
+    const plain = 'sensitive client data — Fine Gold LLC, REG-123';
+    const blob = await A.encryptStr(key, plain);
+    check('encryptStr produces tagged ciphertext, not plaintext',
+      blob.startsWith('hsx1:') && !blob.includes('Fine Gold') && !blob.includes('REG-123'));
+    check('decryptStr round-trips to the original plaintext', (await A.decryptStr(key, blob)) === plain);
+    const wrong = await A._deriveKey('wrong passphrase', salt, 1000);
+    let rejected = false; try{ await A.decryptStr(wrong, blob); }catch(e){ rejected = true; }
+    check('wrong passphrase cannot decrypt (AES-GCM auth fails)', rejected);
+    let plainRejected = false; try{ await A.decryptStr(key, 'just-some-plaintext'); }catch(e){ plainRejected = true; }
+    check('decryptStr rejects non-encrypted input', plainRejected);
+  })();
+
+  /* ── 28. Tamper-evident activity log (hash chain) ── */
+  await (async function(){
+    global.localStorage.removeItem('hsra.audit.v1');
+    await A.auditAppend('test.one', 'first');
+    await A.auditAppend('test.two', 'second');
+    const log = A.auditAll();
+    check('audit log appends hash-chained entries',
+      log.length === 2 && !!log[0].hash && !!log[1].hash && log[0].hash !== log[1].hash);
+    check('audit chain verifies as intact', (await A.auditVerify()) === true);
+    const sameHash = await A.sha256Hex('x'); const sameHash2 = await A.sha256Hex('x');
+    check('sha256Hex is deterministic 64-hex', sameHash === sameHash2 && /^[0-9a-f]{64}$/.test(sameHash));
+    log[0].detail = 'tampered'; global.localStorage.setItem('hsra.audit.v1', JSON.stringify(log));
+    check('audit chain detects a tampered earlier entry', (await A.auditVerify()) === false);
+    global.localStorage.removeItem('hsra.audit.v1');
+  })();
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);

@@ -10,6 +10,7 @@ const SHEET_CLOSE = '===END===';
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
+  if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
 
   const token = process.env.ASANA_ACCESS_TOKEN;
   if (!token) return resp(500, { ok: false, error: 'ASANA_ACCESS_TOKEN not configured' });
@@ -76,6 +77,20 @@ async function api(token, method, path, body) {
   });
   const d = await r.json();
   return { ok: r.ok, status: r.status, body: d };
+}
+
+/* Cross-origin guard: see asana-task.js. Missing Origin (server-to-server, curl,
+   same-origin posts) is allowed; a present Origin must be same-origin as the host
+   or listed in ALLOWED_ORIGINS, else 403. */
+function originAllowed(event) {
+  const h = (event && event.headers) || {};
+  const origin = h.origin || h.Origin;
+  if (!origin) return true;
+  const host = h.host || h.Host || '';
+  const originHost = String(origin).replace(/^[a-z]+:\/\//i, '').split('/')[0];
+  if (host && originHost === host) return true;
+  const allow = String(process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  return allow.includes(origin);
 }
 
 function resp(statusCode, obj) {

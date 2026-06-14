@@ -98,6 +98,17 @@ Separately from the risk data (which is firm-wide), the analyst may raise the op
 - **Autosave** — the working draft is saved to `localStorage` in the user's browser only; nothing is transmitted anywhere.
 - **Print report** — produces an audit-ready PDF via the browser's print dialog. Chrome/Edge/Firefox apply A4 and exact colours automatically; in **Safari**, choose A4 paper size and enable *Print backgrounds* in the print dialog.
 
+## Device security
+
+For an offline, zero-backend tool, sensitive data is protected **on the device** rather than behind a server:
+
+- **Encryption at rest** — assessments, the register, risk-data overrides, Asana payloads and the activity log are encrypted in `localStorage` with **AES-256-GCM** (WebCrypto). The key is derived from the officer's passphrase via **PBKDF2** (250k iterations, random salt); each write uses a fresh IV. On first run you can set a passphrase or continue unencrypted; the choice is remembered. **There is no recovery — keep a copy via *Export JSON*.**
+- **Passphrase gate & idle auto-lock** — the app prompts to unlock on each visit and re-locks after 15 minutes of inactivity (or via the *Lock device* button). The scoring engine still renders underneath the gate, so the page always computes.
+- **Tamper-evident activity log** — a SHA-256 **hash-chained** record of completions, overrides, exports, deletions and unlocks. View it via *▤ Activity Log* (with a chain-integrity check), export it, or read the last entries as an appendix in the printed report.
+- **Edge & function hardening** — a strict **Content-Security-Policy**, HSTS and anti-clickjacking headers are applied to every response (`netlify.toml`); the Asana relay functions enforce a same-origin / `ALLOWED_ORIGINS` allow-list.
+
+A full mapping of this app against the *AI Governance & Security Periodic Table (2026)* — what applies, what is implemented, and what is out of scope for a non-AI, on-device tool — is in [`docs/governance/ai-governance-gap-analysis-2026.md`](docs/governance/ai-governance-gap-analysis-2026.md).
+
 ## Setup
 
 ### Asana integration
@@ -109,6 +120,7 @@ Copy `.env.example` to `.env` (never commit it) and fill in the values, then add
 | `ASANA_ACCESS_TOKEN` | Yes | Personal access token from [Asana Developer Console](https://app.asana.com/0/developer-console). Used by Netlify functions and the GitHub Actions watchdog. Add to GitHub Secrets **and** Netlify environment variables. |
 | `ASANA_PROJECT_GID` | Recommended | GID of the RISK ASSESSMENTS Asana project (from the project URL). Defaults to the built-in value — set explicitly to avoid targeting the wrong project after a project rename or workspace change. |
 | `ASANA_ASSIGNEE` | No | Asana user to assign tasks to. Defaults to `me` (the token bearer). |
+| `ALLOWED_ORIGINS` | No | Comma-separated extra browser origins permitted to call the Netlify functions. Same-origin requests and header-less (server-to-server) calls are always allowed; cross-site browser origins are rejected with `403`. |
 
 ### Getting started
 
@@ -158,7 +170,8 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 ├── scripts/asana-alert.mjs     # Asana alert task helper (used by site health)
 ├── netlify.toml                # Static publish config (repo root, no build)
 ├── netlify/functions/          # Serverless: Asana task delivery + risk-data mirror
-├── docs/                       # README screenshots
+├── docs/                       # README screenshots + governance/research notes
+│   └── governance/             # AI governance & security gap analysis
 ├── design/                     # Original design handoff (reference only, not served logic)
 └── README.md
 ```

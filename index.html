@@ -256,6 +256,19 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .ov-mark{color:var(--gold);cursor:help}
 @media(max-width:520px){.rd-reason{width:100%}.rd-at{display:none}}
 
+/* ── Device security gate (passphrase + encryption-at-rest) ─ */
+.sec-overlay{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:#05080E;background:radial-gradient(120% 120% at 50% 0%,#0A1020 0%,#05080E 70%)}
+.sec-overlay.open{display:flex}
+.sec-box{width:min(420px,92vw);background:var(--card-bg);border:1px solid var(--border2);border-radius:var(--r);box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);padding:26px 24px 22px;position:relative;overflow:hidden}
+.sec-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent)}
+.sec-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;letter-spacing:0.3px}
+.sec-msg{font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:14px}
+.sec-input{width:100%;background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:9px 11px;font-size:13px;font-family:var(--sans);outline:none;margin-bottom:9px;transition:border-color .18s,box-shadow .18s}
+.sec-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.sec-err{font-size:11.5px;color:var(--high-text);margin:2px 0 10px}
+.sec-actions{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.sec-note{font-size:10.5px;color:var(--text3);line-height:1.5;margin-top:13px;font-family:var(--mono)}
+
 /* ── Assessment Register (filing cabinet) ─ */
 .reg-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .reg-row:last-child{border-bottom:none}
@@ -621,6 +634,8 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <button class="btn btn-ghost btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
         <button class="btn btn-orange btn-full" id="btnRetryAsana" onclick="retryAsanaDelivery()" style="display:none">↻ Retry Asana Delivery</button>
         <button class="btn btn-blue btn-full" onclick="openRegister()">☰ Register</button>
+        <button class="btn btn-blue btn-full" onclick="openAudit()">▤ Activity Log</button>
+        <button class="btn btn-ghost btn-full" id="btnLock" onclick="secLock()" style="display:none">🔒 Lock device</button>
         <button class="btn btn-red btn-full" onclick="newAssessment()">↺ Reset</button>
         <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
         <button class="btn btn-gold btn-full" onclick="exportJSON()">⇩ Export JSON</button>
@@ -679,6 +694,41 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       </div>
     </div>
   </div>
+
+  <!-- Activity Log — tamper-evident, hash-chained record of key actions on this device -->
+  <div class="rd-overlay" id="auditOverlay">
+    <div class="rd-panel">
+      <div class="rd-head">
+        <span class="st">Activity Log</span>
+        <span class="rd-meta" id="auditMeta"></span>
+        <span class="rd-spacer"></span>
+        <button class="rd-close" onclick="closeAudit()" title="Close" aria-label="Close activity log">✕</button>
+      </div>
+      <div class="rd-rows" id="auditRows"></div>
+      <div class="rd-foot">
+        <span class="rd-count" id="auditCountLbl"></span>
+        <span class="rd-spacer"></span>
+        <button class="btn btn-blue" onclick="exportAudit()">⇩ Export Log</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Device security gate: passphrase unlock + encryption-at-rest. Renders over the
+     app; the engine still boots underneath so the page always computes. -->
+<div class="sec-overlay" id="secOverlay" role="dialog" aria-modal="true" aria-label="Device security">
+  <div class="sec-box">
+    <div class="sec-title" id="secTitle">Unlock</div>
+    <div class="sec-msg" id="secMsg"></div>
+    <input type="password" id="secPass" class="sec-input" placeholder="Passphrase" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <input type="password" id="secPass2" class="sec-input" placeholder="Confirm passphrase" autocomplete="off" autocapitalize="off" spellcheck="false" style="display:none">
+    <div class="sec-err" id="secErr" style="display:none"></div>
+    <div class="sec-actions">
+      <button class="btn btn-primary btn-full" id="secPrimary" onclick="secSubmit()">Unlock</button>
+      <button class="btn btn-ghost btn-full" id="secSkip" onclick="secSkip()" style="display:none">Continue without encryption</button>
+    </div>
+    <div class="sec-note" id="secNote"></div>
+  </div>
 </div>
 
 <input type="file" id="importFile" accept=".json,application/json" style="display:none">
@@ -691,7 +741,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 /* ══════════════════════════════════════════
    DATA (sourced directly from Data sheet)
 ══════════════════════════════════════════ */
-const APP_VERSION = '3.6.1';
+const APP_VERSION = '3.7.0';
 const TOAST_DURATION_MS = 2600; /* keeps toasts readable per accessibility guidelines */
 
 const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":1},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":1},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":1},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":1},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":1},{"name":"Isle of Man","score":1},{"name":"Belgium","score":1},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":1},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":1},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":1},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":2},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":2},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":1},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":2},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":2},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":2},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":2},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":1},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":2},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3,"cfa":true},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3,"cfa":true},{"name":"Islamic Republic of Iran","score":3,"cfa":true}];
@@ -747,6 +797,247 @@ const SEQ_KEY = 'hsra.seq';
 ══════════════════════════════════════════ */
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ══════════════════════════════════════════
+   DEVICE SECURITY — passphrase gate + encryption-at-rest (WebCrypto, no deps)
+   Sensitive data (drafts, register, risk-data overrides, Asana payloads, the
+   activity log) is encrypted at rest with AES-GCM under a key derived from the
+   officer's passphrase via PBKDF2. While locked or never configured, the store
+   is a transparent passthrough to localStorage — no behaviour change — so the
+   scoring engine and its full test suite are unaffected. Closes the Identity &
+   Access / Data Protection gaps for an on-device app (no backend to host them).
+══════════════════════════════════════════ */
+const SECURE_KEYS = ['hsra.draft.v2','hsra.riskdata.v1','hsra.register.v1','hsra.asana.delivered.v1','hsra.asana.failed.v1','hsra.audit.v1'];
+const SEC_META_KEY = 'hsra.sec.v1';        /* {v,salt,iter,iv,ct} passphrase verifier — never encrypted */
+const SEC_OPTOUT_KEY = 'hsra.sec.optout';  /* '1' when the officer chose to store unencrypted */
+const PBKDF2_ITER = 250000;
+const IDLE_LOCK_MS = 15 * 60 * 1000;       /* auto-lock after inactivity (zero-trust session) */
+let _secKey = null;        /* CryptoKey, in memory only while unlocked */
+let _secActive = false;    /* true once unlocked: reads/writes use the decrypted in-memory mirror */
+let _secMode = 'unlock';
+let _idleTimer = null;
+const _secMem = {};        /* decrypted plaintext mirror, keyed by storage key */
+
+function _hasCrypto(){ try{ return !!(crypto && crypto.subtle && crypto.getRandomValues); }catch(e){ return false; } }
+const _u8 = s => new TextEncoder().encode(s);
+const _b64 = u => btoa(String.fromCharCode.apply(null, new Uint8Array(u)));
+const _ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function _deriveKey(pass, salt, iter){
+  const base = await crypto.subtle.importKey('raw', _u8(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'},
+    base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+async function encryptStr(key, str){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, _u8(str));
+  return 'hsx1:' + _b64(iv) + ':' + _b64(ct);
+}
+async function decryptStr(key, blob){
+  const p = String(blob).split(':');
+  if(p[0] !== 'hsx1' || p.length !== 3) throw new Error('not-encrypted');
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:_ub64(p[1])}, key, _ub64(p[2]));
+  return new TextDecoder().decode(pt);
+}
+async function sha256Hex(str){
+  const d = await crypto.subtle.digest('SHA-256', _u8(str));
+  return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+/* Secure-store facade: every sensitive key routes through this instead of
+   localStorage directly. Synchronous reads after unlock come from the mirror;
+   persistence is async-encrypted. */
+const SS = {
+  getItem(k){
+    if(_secActive) return Object.prototype.hasOwnProperty.call(_secMem,k) ? _secMem[k] : null;
+    try{ return localStorage.getItem(k); }catch(e){ return null; }
+  },
+  setItem(k,v){
+    v = String(v);
+    if(_secActive){ _secMem[k] = v; _secPersist(k, v); }
+    else localStorage.setItem(k, v);   /* may throw on quota — callers handle storageWarn */
+  },
+  removeItem(k){
+    if(_secActive) delete _secMem[k];
+    try{ localStorage.removeItem(k); }catch(e){}
+  }
+};
+function _secWarn(show){ const w = $('storageWarn'); if(w) w.style.display = show ? '' : 'none'; }
+function _secPersist(k, v){
+  encryptStr(_secKey, v)
+    .then(blob => { try{ localStorage.setItem(k, blob); _secWarn(false); }catch(e){ _secWarn(true); } })
+    .catch(() => _secWarn(true));
+}
+
+function _secError(msg){ const e = $('secErr'); if(e){ e.textContent = msg; e.style.display = ''; } }
+function _secShow(mode){
+  _secMode = mode;
+  const setup = mode === 'setup';
+  if($('secTitle')) $('secTitle').textContent = setup ? 'Protect this device' : 'Unlock';
+  if($('secMsg')) $('secMsg').textContent = setup
+    ? 'Encrypt every assessment, register entry and risk-data override stored in this browser with a passphrase (AES-256-GCM). You will enter it each time you open the tool on this device.'
+    : 'Enter your passphrase to decrypt this device’s assessments.';
+  if($('secPass')) $('secPass').value = '';
+  if($('secPass2')){ $('secPass2').value = ''; $('secPass2').style.display = setup ? '' : 'none'; }
+  if($('secPrimary')) $('secPrimary').textContent = setup ? 'Set passphrase & encrypt' : 'Unlock';
+  if($('secSkip')) $('secSkip').style.display = setup ? '' : 'none';
+  if($('secNote')) $('secNote').textContent = setup
+    ? '⚠ There is no recovery. If the passphrase is forgotten the stored data cannot be read — keep a copy via Export JSON.'
+    : '';
+  if($('secErr')) $('secErr').style.display = 'none';
+  if($('secOverlay')) $('secOverlay').classList.add('open');
+  const p = $('secPass'); if(p && p.focus) try{ p.focus(); }catch(e){}
+}
+function _secHide(){ if($('secOverlay')) $('secOverlay').classList.remove('open'); if($('secPass')) $('secPass').value=''; if($('secPass2')) $('secPass2').value=''; }
+
+async function secSubmit(){
+  if(!_hasCrypto()) return;
+  const pass = ($('secPass') && $('secPass').value) || '';
+  if(_secMode === 'setup'){
+    if(pass.length < 8) return _secError('Use at least 8 characters.');
+    if(pass !== (($('secPass2') && $('secPass2').value) || '')) return _secError('Passphrases do not match.');
+    try{
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      _secKey = await _deriveKey(pass, salt, PBKDF2_ITER);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, _secKey, _u8('hsra-verify'));
+      localStorage.setItem(SEC_META_KEY, JSON.stringify({v:1, salt:_b64(salt), iter:PBKDF2_ITER, iv:_b64(iv), ct:_b64(ct)}));
+      localStorage.removeItem(SEC_OPTOUT_KEY);
+      await _secActivate();          /* migrates existing plaintext → encrypted */
+      await auditAppend('security.enabled', 'Encryption-at-rest enabled');
+      _secFinish('Device encrypted — assessments are now protected.');
+    }catch(e){ _secError('Could not enable encryption: ' + ((e && e.message) || e)); }
+  } else {
+    try{
+      const meta = JSON.parse(localStorage.getItem(SEC_META_KEY));
+      _secKey = await _deriveKey(pass, _ub64(meta.salt), meta.iter || PBKDF2_ITER);
+      const check = await crypto.subtle.decrypt({name:'AES-GCM', iv:_ub64(meta.iv)}, _secKey, _ub64(meta.ct));
+      if(new TextDecoder().decode(check) !== 'hsra-verify') throw new Error('bad');
+      await _secActivate();
+      await auditAppend('security.unlock', 'Device unlocked');
+      _secFinish('Unlocked.');
+    }catch(e){ _secKey = null; _secError('Incorrect passphrase.'); }
+  }
+}
+/* First-run only: officer declines encryption — remember the choice, stay plaintext. */
+function secSkip(){ try{ localStorage.setItem(SEC_OPTOUT_KEY, '1'); }catch(e){} _secHide(); }
+
+async function _secActivate(){
+  _secActive = true;
+  for(const k of SECURE_KEYS){
+    let raw = null; try{ raw = localStorage.getItem(k); }catch(e){}
+    if(raw == null) continue;
+    try{ _secMem[k] = await decryptStr(_secKey, raw); }
+    catch(e){ _secMem[k] = raw; _secPersist(k, raw); }   /* legacy plaintext → upgrade in place */
+  }
+  _secArmIdle();
+}
+function _secFinish(msg){
+  _secHide();
+  if($('btnLock')) $('btnLock').style.display = '';
+  hydrateApp();
+  toast(msg);
+}
+function _secArmIdle(){
+  if(!_secActive || typeof window === 'undefined' || !window.addEventListener) return;
+  ['click','keydown','mousemove','touchstart'].forEach(ev => window.addEventListener(ev, _secBumpIdle, {passive:true}));
+  _secBumpIdle();
+}
+function _secBumpIdle(){ if(_idleTimer) clearTimeout(_idleTimer); _idleTimer = setTimeout(secLock, IDLE_LOCK_MS); }
+function secLock(){
+  if(!_secActive) return;
+  _secKey = null; _secActive = false;
+  for(const k in _secMem) delete _secMem[k];
+  if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer = null; }
+  if($('btnLock')) $('btnLock').style.display = 'none';
+  _secShow('unlock');   /* opaque overlay hides the on-screen data until re-unlocked */
+}
+/* Boot entry point: decide whether to gate. Runs after the app has rendered, so
+   a thrown error here can never blank the page (and the engine/CI smoke test
+   always sees a computed verdict underneath the overlay). */
+function initSecurity(){
+  try{
+    if(!_hasCrypto() || !$('secOverlay')) return;          /* no WebCrypto (or test stub) → unchanged */
+    let meta = null; try{ meta = JSON.parse(localStorage.getItem(SEC_META_KEY) || 'null'); }catch(e){}
+    const p = $('secPass');
+    if(p && p.addEventListener) p.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
+    const p2 = $('secPass2');
+    if(p2 && p2.addEventListener) p2.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
+    if(meta && meta.salt) _secShow('unlock');               /* returning, encrypted device */
+    else if(localStorage.getItem(SEC_OPTOUT_KEY) === '1') return;  /* opted out previously */
+    else _secShow('setup');                                 /* first run → offer protection */
+  }catch(e){}
+}
+
+/* ── Tamper-evident activity log (AUDIT / LOG / TRACE) ──
+   Append-only, SHA-256 hash-chained: each entry binds the previous hash so any
+   edit or deletion to earlier rows is detectable. Stored via the encrypted layer. */
+const AUDIT_KEY = 'hsra.audit.v1';
+function auditAll(){ try{ const r = SS.getItem(AUDIT_KEY); return r ? JSON.parse(r) : []; }catch(e){ return []; } }
+async function auditAppend(event, detail){
+  if(!_hasCrypto()) return;
+  try{
+    const log = auditAll();
+    const prev = log.length ? log[log.length-1].hash : 'GENESIS';
+    const e = {
+      ts: new Date().toISOString(),
+      who: (typeof state !== 'undefined' && state.meta && state.meta.assessor) || '',
+      ref: (typeof state !== 'undefined' && state.meta && state.meta.ref) || '',
+      event: String(event), detail: String(detail == null ? '' : detail)
+    };
+    e.hash = await sha256Hex(prev + '|' + e.ts + '|' + e.who + '|' + e.ref + '|' + e.event + '|' + e.detail);
+    log.push(e);
+    SS.setItem(AUDIT_KEY, JSON.stringify(log));
+  }catch(err){}
+}
+async function auditVerify(){
+  const log = auditAll();
+  let prev = 'GENESIS';
+  for(const e of log){
+    const h = await sha256Hex(prev + '|' + e.ts + '|' + e.who + '|' + e.ref + '|' + e.event + '|' + e.detail);
+    if(h !== e.hash) return false;
+    prev = e.hash;
+  }
+  return true;
+}
+function _auditRow(e){
+  return '<div class="rd-row"><span class="rd-at" style="width:auto">'+esc(fmtDateTime(e.ts))+'</span>'
+    + '<span class="rd-name">'+esc(e.event)+(e.detail?' — '+esc(e.detail):'')+'</span>'
+    + '<span class="rd-base">'+esc(e.who||'—')+(e.ref?' · '+esc(e.ref):'')+'</span></div>';
+}
+function fmtDateTime(iso){ try{ const d = new Date(iso); return fmtDate(d.toISOString().slice(0,10)) + ' ' + d.toTimeString().slice(0,5); }catch(e){ return esc(iso); } }
+async function openAudit(){
+  const log = auditAll();
+  if($('auditRows')) $('auditRows').innerHTML = log.length
+    ? log.slice().reverse().map(_auditRow).join('')
+    : '<div class="rd-empty">No activity recorded yet.</div>';
+  if($('auditCountLbl')) $('auditCountLbl').textContent = log.length + (log.length===1?' entry':' entries');
+  if($('auditMeta')) $('auditMeta').textContent = '';
+  if($('auditOverlay')) $('auditOverlay').classList.add('open');
+  const ok = await auditVerify();
+  if($('auditMeta')) $('auditMeta').textContent = log.length ? (ok ? '✓ chain intact' : '⚠ integrity check failed') : '';
+}
+function closeAudit(){ if($('auditOverlay')) $('auditOverlay').classList.remove('open'); }
+function exportAudit(){
+  const out = {app:'Hawkeye Sterling — Activity Log', exportedAt:new Date().toISOString(), entries:auditAll()};
+  const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'activity-log.json';
+  link.click();
+  setTimeout(()=>URL.revokeObjectURL(link.href), 1000);
+  toast('Activity log exported');
+}
+function _auditReportBlock(){
+  const log = auditAll();
+  if(!log.length) return '';
+  const rows = log.slice(-15).map(e =>
+    '<tr><td class="k" style="white-space:nowrap">'+esc(fmtDateTime(e.ts))+'</td>'
+    + '<td class="v">'+esc(e.event)+(e.detail?' — '+esc(e.detail):'')+'</td>'
+    + '<td class="s">'+esc(e.who||'—')+'</td></tr>').join('');
+  return '<h2 class="sec"><span class="n">08</span>Activity Log <span style="font-weight:400;font-size:9pt">(tamper-evident, hash-chained — last '+Math.min(15,log.length)+' of '+log.length+')</span></h2>'
+    + '<table class="kv"><tbody>'+rows+'</tbody></table>';
+}
 function scoreFromYesNo(val, type) {
   if(type==='vlok')  return val==='Yes' ? 3 : 1;
   if(type==='vlok2') return val==='Yes' ? 1 : 3;
@@ -965,13 +1256,13 @@ function mergeRiskData(src){
 }
 function loadRiskData(){
   try{
-    const raw = localStorage.getItem(RD_STORAGE_KEY);
+    const raw = SS.getItem(RD_STORAGE_KEY);
     return raw ? mergeRiskData(JSON.parse(raw)) : freshRiskData();
   }catch(e){ return freshRiskData(); }
 }
 function saveRiskData(){
   riskData.updatedAt = todayISO();
-  try{ localStorage.setItem(RD_STORAGE_KEY, JSON.stringify(riskData)); }catch(e){}
+  try{ SS.setItem(RD_STORAGE_KEY, JSON.stringify(riskData)); }catch(e){}
 }
 function rdAfterChange(){
   saveRiskData();
@@ -1019,6 +1310,7 @@ function rdSetOverride(kind, name, vals){
   if(kind==='countries') entry.cfa = cfa;
   riskData.overrides[kind][name] = entry;
   rdAfterChange();
+  auditAppend('riskdata.override', kind+'/'+name+' → '+score+(cfa?' (CFA)':''));
   return true;
 }
 function rdClearOverride(kind, name){
@@ -1176,7 +1468,7 @@ function initRiskDataPanel(){
   });
   const ov = $('rdOverlay');
   if(ov) ov.addEventListener('click', function(e){ if(e.target===ov) closeRiskData(); });
-  if(document.addEventListener) document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeRiskData(); closeRegister(); } });
+  if(document.addEventListener) document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeRiskData(); closeRegister(); closeAudit(); } });
 }
 
 /* ══════════════════════════════════════════
@@ -1415,16 +1707,16 @@ const ASANA_DELIVERED_KEY = 'hsra.asana.delivered.v1';
 function deliveredGid(ref){
   if(!ref) return '';
   try{
-    const m = JSON.parse(localStorage.getItem(ASANA_DELIVERED_KEY)) || {};
+    const m = JSON.parse(SS.getItem(ASANA_DELIVERED_KEY)) || {};
     return typeof m[ref]==='string' ? m[ref] : '';
   }catch(e){ return ''; }
 }
 function rememberDelivered(ref, gid){
   if(!ref || !gid) return;
   try{
-    const m = JSON.parse(localStorage.getItem(ASANA_DELIVERED_KEY)) || {};
+    const m = JSON.parse(SS.getItem(ASANA_DELIVERED_KEY)) || {};
     m[ref] = String(gid);
-    localStorage.setItem(ASANA_DELIVERED_KEY, JSON.stringify(m));
+    SS.setItem(ASANA_DELIVERED_KEY, JSON.stringify(m));
   }catch(e){}
 }
 function asanaPayload(){
@@ -1462,17 +1754,17 @@ const ASANA_FAILED_KEY = 'hsra.asana.failed.v1';
 /** Store a failed delivery payload for manual retry; shows the retry button. */
 function storeFailedDelivery(ref, payload){
   if(!ref) return;
-  try{ const m = JSON.parse(localStorage.getItem(ASANA_FAILED_KEY)) || {}; m[ref] = payload; localStorage.setItem(ASANA_FAILED_KEY, JSON.stringify(m)); }catch(e){}
+  try{ const m = JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}; m[ref] = payload; SS.setItem(ASANA_FAILED_KEY, JSON.stringify(m)); }catch(e){}
   paintRetryButton();
 }
 function clearFailedDelivery(ref){
   if(!ref) return;
-  try{ const m = JSON.parse(localStorage.getItem(ASANA_FAILED_KEY)) || {}; delete m[ref]; localStorage.setItem(ASANA_FAILED_KEY, JSON.stringify(m)); }catch(e){}
+  try{ const m = JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}; delete m[ref]; SS.setItem(ASANA_FAILED_KEY, JSON.stringify(m)); }catch(e){}
   paintRetryButton();
 }
 function getFailedPayload(ref){
   if(!ref) return null;
-  try{ const m = JSON.parse(localStorage.getItem(ASANA_FAILED_KEY)) || {}; return m[ref] || null; }catch(e){ return null; }
+  try{ const m = JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}; return m[ref] || null; }catch(e){ return null; }
 }
 /** Show the retry button only when there is a pending failed delivery for the current ref. */
 function paintRetryButton(){
@@ -1552,6 +1844,7 @@ function toggleComplete() {
   paintStatus();
   scheduleSave();
   if(state.complete) sendToAsana();
+  auditAppend('assessment.complete', state.complete ? 'Marked complete' : 'Reverted to draft');
   toast(state.complete ? 'Assessment marked complete' : 'Assessment back to draft');
 }
 
@@ -1769,7 +2062,7 @@ function scheduleSave(){
 }
 function saveDraft(){
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({version:APP_VERSION, savedAt:new Date().toISOString(), state}));
+    SS.setItem(STORAGE_KEY, JSON.stringify({version:APP_VERSION, savedAt:new Date().toISOString(), state}));
     $('saveStamp').textContent = 'Autosaved '+new Date().toLocaleTimeString();
     const warn = $('storageWarn'); if(warn) warn.style.display = 'none';
   }catch(e){
@@ -1781,7 +2074,7 @@ function saveDraft(){
 }
 function loadDraft(){
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = SS.getItem(STORAGE_KEY);
     if(!raw) return null;
     const data = JSON.parse(raw);
     if(!data || !data.state) return null;
@@ -1799,12 +2092,12 @@ const REG_KEY = 'hsra.register.v1';
 
 function regAll(){
   try{
-    const data = JSON.parse(localStorage.getItem(REG_KEY));
+    const data = JSON.parse(SS.getItem(REG_KEY));
     return (data && data.items && typeof data.items==='object' && !Array.isArray(data.items)) ? data.items : {};
   }catch(e){ return {}; }
 }
 function regWrite(items){
-  try{ localStorage.setItem(REG_KEY, JSON.stringify({version:1, items})); }catch(e){}
+  try{ SS.setItem(REG_KEY, JSON.stringify({version:1, items})); }catch(e){}
 }
 function regUpsert(){
   const ref = String(state.meta.ref||'').trim();
@@ -1825,6 +2118,7 @@ function regDelete(ref){
   if(!items[ref]) return false;
   delete items[ref];
   regWrite(items);
+  auditAppend('register.delete', ref);
   return true;
 }
 /** Load an assessment from the register by reference. Saves the current assessment first
@@ -1982,6 +2276,7 @@ function exportJSON(){
   link.download = exportFileName();
   link.click();
   setTimeout(()=>URL.revokeObjectURL(link.href), 1000);
+  auditAppend('export.json', state.meta.ref || '(unsaved)');
   toast('Assessment exported');
 }
 
@@ -2161,6 +2456,7 @@ function buildPrintReport(){
         <div class="sign-line"></div><div class="sign-cap">Signature</div>
       </div>
     </div>
+    ${_auditReportBlock()}
     <div class="foot">CONFIDENTIAL — Hawkeye Sterling LLC — AML/CFT Entity Risk Assessment — Ref: ${dash(s.meta.ref)} — DPMS Template</div>`;
 }
 function printReport(){
@@ -2248,16 +2544,23 @@ refreshSelectLabels(); /* add override marks (✱) to the now-built selects */
 initRiskDataPanel();
 initRegisterPanel();
 
-const draft = loadDraft();
-if(draft){
-  state = draft.state;
+/* (Re)load persisted risk data + draft into the UI. Safe to re-run after the
+   device is unlocked, when the encrypted store first becomes readable. */
+function hydrateApp(){
+  riskData = loadRiskData();
+  refreshSelectLabels();
+  paintJurisdiction();
+  paintActivity();
+  const draft = loadDraft();
+  state = draft ? draft.state : freshState();
   syncUI();
-  toast('Draft restored'+(draft.savedAt?' — last saved '+new Date(draft.savedAt).toLocaleString():''));
-} else {
-  state = freshState();
-  syncUI();
+  return draft;
 }
+
+const draft = hydrateApp();
+if(draft) toast('Draft restored'+(draft.savedAt?' — last saved '+new Date(draft.savedAt).toLocaleString():''));
 initAnimations();
+initSecurity();   /* gate the app behind the passphrase, if configured/offered */
 </script>
 </body>
 </html>
