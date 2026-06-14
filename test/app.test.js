@@ -684,6 +684,12 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
   delete process.env.ASANA_ACCESS_TOKEN;
   delete global.fetch;
 
+  // UI entry-point regression: these functions are tested above; the buttons
+  // ensure users can actually reach them without the browser console.
+  check('exportJSON button wired in HTML', html.includes('onclick="exportJSON()"'));
+  check('importJSON button wired in HTML', html.includes('onclick="importJSON()"'));
+  check('reassess button wired in HTML', html.includes('onclick="reassess()"'));
+
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);
 })();
