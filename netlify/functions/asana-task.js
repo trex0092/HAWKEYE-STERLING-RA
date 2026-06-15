@@ -18,7 +18,22 @@ const SECTIONS = {
   PROHIBITED: 'PROHIBITED (DO NOT ONBOARD)'
 };
 
+/* CORS is applied here, at the function boundary. The wrapper answers the
+   browser's preflight (OPTIONS) and stamps the CORS headers onto every response
+   the inner handler returns, so the allow-list lives in exactly one place. */
 exports.handler = async (event) => {
+  const cors = corsHeaders(event);
+  if ((event.httpMethod || '').toUpperCase() === 'OPTIONS') {
+    return originAllowed(event)
+      ? { statusCode: 204, headers: cors, body: '' }
+      : resp(403, { ok: false, error: 'origin not allowed' }, cors);
+  }
+  const res = await handle(event);
+  res.headers = { ...(res.headers || {}), ...cors };
+  return res;
+};
+
+const handle = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
   if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
 
@@ -112,10 +127,22 @@ async function ensureSection(token, project, name) {
   return made.ok ? made.body.data.gid : null;
 }
 
+/* The site's own production origin. Same-origin requests (prod + Netlify deploy
+   previews) are matched against the request host below, so this is the canonical
+   public domain used when no host is available. Override the whole allow-list
+   with the ALLOWED_ORIGINS env var (e.g. a custom domain). */
+const PRIMARY_ORIGIN = process.env.PRIMARY_ORIGIN || 'https://hawkeye-sterling-ra.netlify.app';
+
+/* The full set of browser origins permitted to call this function. */
+function allowedOrigins() {
+  const extra = String(process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  return [PRIMARY_ORIGIN, ...extra];
+}
+
 /* Cross-origin guard: a browser only sends Origin on cross-site requests, so a
-   missing Origin (server-to-server, curl, same-origin form posts) is allowed.
-   When present, the request must be same-origin as the function host or appear
-   in the ALLOWED_ORIGINS env allow-list — otherwise it is rejected (403). */
+   missing Origin (server-to-server, curl, the GitHub Action, same-origin form
+   posts) is allowed. When present, the request must be same-origin as the
+   function host or appear in the allow-list — otherwise it is rejected (403). */
 function originAllowed(event) {
   const h = (event && event.headers) || {};
   const origin = h.origin || h.Origin;
@@ -123,10 +150,25 @@ function originAllowed(event) {
   const host = h.host || h.Host || '';
   const originHost = String(origin).replace(/^[a-z]+:\/\//i, '').split('/')[0];
   if (host && originHost === host) return true;
-  const allow = String(process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
-  return allow.includes(origin);
+  return allowedOrigins().includes(origin);
 }
 
-function resp(statusCode, obj) {
-  return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) };
+/* CORS response headers. The request's Origin is reflected back ONLY when it
+   passes the guard, so a disallowed origin receives no Access-Control-Allow-Origin
+   and the browser blocks the response. `Vary: Origin` keeps caches honest. */
+function corsHeaders(event) {
+  const h = (event && event.headers) || {};
+  const origin = h.origin || h.Origin;
+  const headers = { 'Vary': 'Origin' };
+  if (origin && originAllowed(event)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+    headers['Access-Control-Max-Age'] = '86400';
+  }
+  return headers;
+}
+
+function resp(statusCode, obj, extra) {
+  return { statusCode, headers: { 'Content-Type': 'application/json', ...(extra || {}) }, body: JSON.stringify(obj) };
 }
