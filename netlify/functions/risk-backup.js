@@ -8,7 +8,22 @@ const TASK_NAME = 'RISK DATA SHEET (auto-backup)';
 const SHEET_OPEN = '===RISK DATA SHEET===';
 const SHEET_CLOSE = '===END===';
 
+/* CORS is applied here, at the function boundary — see asana-task.js. The
+   wrapper answers preflight (OPTIONS) and stamps CORS headers onto every
+   response the inner handler returns. */
 exports.handler = async (event) => {
+  const cors = corsHeaders(event);
+  if ((event.httpMethod || '').toUpperCase() === 'OPTIONS') {
+    return originAllowed(event)
+      ? { statusCode: 204, headers: cors, body: '' }
+      : resp(403, { ok: false, error: 'origin not allowed' }, cors);
+  }
+  const res = await handle(event);
+  res.headers = { ...(res.headers || {}), ...cors };
+  return res;
+};
+
+const handle = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
   if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
 
@@ -79,9 +94,18 @@ async function api(token, method, path, body) {
   return { ok: r.ok, status: r.status, body: d };
 }
 
+/* The site's own production origin — see asana-task.js. Override the whole
+   allow-list with the ALLOWED_ORIGINS env var (e.g. a custom domain). */
+const PRIMARY_ORIGIN = process.env.PRIMARY_ORIGIN || 'https://hawkeye-sterling-ra.netlify.app';
+
+function allowedOrigins() {
+  const extra = String(process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  return [PRIMARY_ORIGIN, ...extra];
+}
+
 /* Cross-origin guard: see asana-task.js. Missing Origin (server-to-server, curl,
    same-origin posts) is allowed; a present Origin must be same-origin as the host
-   or listed in ALLOWED_ORIGINS, else 403. */
+   or in the allow-list, else 403. */
 function originAllowed(event) {
   const h = (event && event.headers) || {};
   const origin = h.origin || h.Origin;
@@ -89,10 +113,24 @@ function originAllowed(event) {
   const host = h.host || h.Host || '';
   const originHost = String(origin).replace(/^[a-z]+:\/\//i, '').split('/')[0];
   if (host && originHost === host) return true;
-  const allow = String(process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
-  return allow.includes(origin);
+  return allowedOrigins().includes(origin);
 }
 
-function resp(statusCode, obj) {
-  return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) };
+/* CORS response headers: reflect the Origin only when it passes the guard, so a
+   disallowed origin gets no Access-Control-Allow-Origin and the browser blocks it. */
+function corsHeaders(event) {
+  const h = (event && event.headers) || {};
+  const origin = h.origin || h.Origin;
+  const headers = { 'Vary': 'Origin' };
+  if (origin && originAllowed(event)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+    headers['Access-Control-Max-Age'] = '86400';
+  }
+  return headers;
+}
+
+function resp(statusCode, obj, extra) {
+  return { statusCode, headers: { 'Content-Type': 'application/json', ...(extra || {}) }, body: JSON.stringify(obj) };
 }
