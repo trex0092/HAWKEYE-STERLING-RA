@@ -7,8 +7,8 @@ import { resolve } from 'node:path';
 for (const file of ['index.html', 'console.html', 'advisor.html']) {
   test(`visual: ${file}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1500);
+    await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load' });
+    await page.waitForTimeout(2000);   // let fonts/gauge settle (no networkidle: the Google-Fonts link can hang)
     await expect(page).toHaveScreenshot(`${file}.png`, {
       fullPage: true,
       animations: 'disabled',
