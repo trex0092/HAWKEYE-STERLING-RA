@@ -1,4 +1,139 @@
 {
-  "updated": null,
-  "sources": {}
+  "updated": "2026-06-16",
+  "sources": {
+    "uae-moe": {
+      "hash": "63f55b44ebc38eb41d9f2d68be3c016724af20ef4f6539a39499d487f02a23b3",
+      "bytes": 11245,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "uae-fiu": {
+      "hash": "a7842f643c8783ab0a87f320b899e7d5526fb7661396b17bbc2138fb9ce9b446",
+      "bytes": 4427,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "uae-namlcftc": {
+      "hash": null,
+      "bytes": 0,
+      "checkedAt": "2026-06-16",
+      "changedAt": null,
+      "status": 418,
+      "error": "HTTP 418"
+    },
+    "uae-eocn": {
+      "hash": "2b52abc1fe81f88bc71ad3eb8c0b45c4d705ae48e946dbf9b9d656e18809428d",
+      "bytes": 122,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "uae-cbuae": {
+      "hash": null,
+      "bytes": 0,
+      "checkedAt": "2026-06-16",
+      "changedAt": null,
+      "status": 403,
+      "error": "HTTP 403"
+    },
+    "uae-vara": {
+      "hash": "db43741ad03345f00bd7eadd3e4bca7c1072d81bf74f01b3ae9f96bf2cb18447",
+      "bytes": 4048,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "uae-jewellery": {
+      "hash": null,
+      "bytes": 0,
+      "checkedAt": "2026-06-16",
+      "changedAt": null,
+      "status": 404,
+      "error": "HTTP 404"
+    },
+    "fatf-guidance": {
+      "hash": null,
+      "bytes": 0,
+      "checkedAt": "2026-06-16",
+      "changedAt": null,
+      "status": 403,
+      "error": "HTTP 403"
+    },
+    "wolfsberg": {
+      "hash": "670bd2eccc7c4decab6f03e68a924a4c4b60315ca527966b89dd5bbf30900795",
+      "bytes": 5932,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "rmi": {
+      "hash": null,
+      "bytes": 0,
+      "checkedAt": "2026-06-16",
+      "changedAt": null,
+      "status": "error",
+      "error": "fetch failed"
+    },
+    "lbma": {
+      "hash": "079c45bb570198e2de57cd1b63c7d4e98f3a751a6a90fb0df585a04a02955ee0",
+      "bytes": 106,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "oecd": {
+      "hash": null,
+      "bytes": 0,
+      "checkedAt": "2026-06-16",
+      "changedAt": null,
+      "status": 403,
+      "error": "HTTP 403"
+    },
+    "ofac": {
+      "hash": "be2bb57c52a3c3c1f9bd57c1fbfb5103a90272f21668ee898e45f85fcb0bc6d6",
+      "bytes": 3970,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "unsc": {
+      "hash": null,
+      "bytes": 0,
+      "checkedAt": "2026-06-16",
+      "changedAt": null,
+      "status": 403,
+      "error": "HTTP 403"
+    },
+    "eu-sanctions": {
+      "hash": "ce0da51685c835acd8b7a93f97dd758581a4f0357d599f9dc9d9973a7e30b3fe",
+      "bytes": 3803,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "uk-ofsi": {
+      "hash": "7deff10bce66284bdfbc86bb386ec27535efa876c01f67ce1e67de3c45f9fd8c",
+      "bytes": 102638,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    },
+    "egmont": {
+      "hash": null,
+      "bytes": 0,
+      "checkedAt": "2026-06-16",
+      "changedAt": null,
+      "status": 403,
+      "error": "HTTP 403"
+    },
+    "basel-index": {
+      "hash": "167979bf07823f1a2f888c3d7940c5a423ba9cc02e4d90992ea74dbb4f3b9c2b",
+      "bytes": 3348,
+      "checkedAt": "2026-06-16",
+      "changedAt": "2026-06-16",
+      "status": 200
+    }
+  }
 }
