@@ -38,7 +38,7 @@ jobs:
 
       - name: Open/refresh tracking issue (scheduled runs only)
         if: github.event_name == 'schedule' && steps.lc.outputs.has_dead == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
