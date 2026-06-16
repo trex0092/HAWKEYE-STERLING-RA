@@ -178,7 +178,7 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-const COUNTS = {Quick:24, Speed:48, Balanced:96, Deep:152};
+const MODES = ['Quick','Speed','Balanced','Deep'];
 
 const ANSWER = {
   verdict:'Enhanced Due Diligence', tone:'high', confidence:'High confidence',
@@ -239,7 +239,6 @@ function tone(t){
   return            {c:'#4FD6A0', bg:'rgba(59,196,143,0.10)', bd:'rgba(59,196,143,0.36)'};
 }
 function pillStyle(t){ const x=tone(t); return 'color:'+x.c+';background:'+x.bg+';border-color:'+x.bd+';box-shadow:0 0 14px '+x.bg; }
-function modeHint(){ return 'Reasoning over '+COUNTS[state.mode]+' directives'; }
 
 /* ── Renderers ── */
 function renderAvatar(){
@@ -285,7 +284,7 @@ function heroReasoningHtml(){
   return '<div class="hero-reason">'
     + '<div class="scan"></div>'
     + '<div class="reason-av"><div style="background-image:url(\''+p.img+'\');background-position:'+p.pos+'"></div></div>'
-    + '<div class="reason-txt">'+esc(modeHint())+'</div>'
+    + '<div class="reason-txt">Reviewing the cited legal sources…</div>'
     + '<div class="dots">'
     +   '<span style="background:var(--ac1);box-shadow:0 0 8px var(--ac1)"></span>'
     +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
@@ -322,7 +321,7 @@ function heroHtml(){
 }
 
 function renderAsk(){
-  const modes = Object.keys(COUNTS).map(m=>
+  const modes = MODES.map(m=>
     '<button class="mode-btn'+(state.mode===m?' active':'')+'" data-mode="'+m+'">'+m+'</button>').join('');
   $('main').innerHTML =
     '<div class="ask-grid">'
@@ -333,7 +332,6 @@ function renderAsk(){
     +     '<button class="ask-btn" id="askBtn">Ask the advisor <span style="font-size:11px">&#9658;</span></button>'
     +   '</div>'
     +   '<div class="mode-strip"><span class="ml">Mode</span><div class="mode-group">'+modes+'</div></div>'
-    +   '<div class="mode-hint"><b>&#9671;</b>'+esc(modeHint())+' · grounded in cited legal sources</div>'
     + '</div></div>'
     + '<div>'
     +   '<div style="margin-bottom:16px"><div class="sec-lbl" style="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'

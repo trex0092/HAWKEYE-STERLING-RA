@@ -39,7 +39,7 @@ function makeEl(){
 
 /* Run a screen's inline <script> under the stub, with an appended bridge that
    exposes its internals (same technique app.test.js uses for index.html). */
-function runScreen(file, bridge){
+function runScreen(file, bridge, seed){
   const html = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
   /* Extract the single inline boot <script> by plain string search rather than a
      tag-matching regex. These are our own controlled fixtures (one lowercase
@@ -61,6 +61,11 @@ function runScreen(file, bridge){
     documentElement: { style: { _p:{}, setProperty(k,v){ this._p[k] = v; }, getPropertyValue(k){ return this._p[k] || ''; } } }
   };
   global.window = { matchMedia(){ return { matches:true }; }, addEventListener(){} };  /* reduced motion → deterministic */
+  const _store = Object.assign({}, seed || {});                                        /* seedable localStorage */
+  global.localStorage = {
+    getItem(k){ return Object.prototype.hasOwnProperty.call(_store,k) ? _store[k] : null; },
+    setItem(k,v){ _store[k]=String(v); }, removeItem(k){ delete _store[k]; }
+  };
   global.requestAnimationFrame = () => 0;
   global.cancelAnimationFrame = () => {};
   global.performance = { now: () => Date.now() };
@@ -73,29 +78,53 @@ function runScreen(file, bridge){
   return { els, timers, api, docStyle: global.document.documentElement.style };
 }
 
-/* ── 1. AI Operations Console ── */
+/* ── 1a. AI Operations Console — NEW APP (empty register → zeros, no mock data) ── */
 (function(){
   const { els, api, docStyle } = runScreen('console.html',
-    '{ get state(){return state;}, op, renderOperator, OPERATORS }');
+    '{ get state(){return state;}, op, renderOperator, OPERATORS }');   /* no seed → empty register */
 
-  check('console: boots with Cypher on duty', els.operatorName.textContent === 'Cypher'
+  check('console(new): boots with Cypher on duty', els.operatorName.textContent === 'Cypher'
     && /Transaction Monitoring/.test(els.operatorRole.textContent));
-  check('console: default accent is Cypher pink', docStyle.getPropertyValue('--ac') === '255,92,168');
-  check('console: stat tiles count up to full targets', countOcc(els.statTiles.innerHTML, 'class="tile"') === 4
-    && els.statTiles.innerHTML.includes('9,471') && els.statTiles.innerHTML.includes('1,284'));
-  check('console: six live alerts render with entities', countOcc(els.alertStream.innerHTML, 'class="alert-row"') === 6
-    && els.alertStream.innerHTML.includes('Meridian Bullion DMCC') && els.alertStream.innerHTML.includes('Aurum Refining Ltd'));
-  check('console: diligence mix shows three bands at 68/22/10', countOcc(els.riskBars.innerHTML, 'class="bar-row"') === 3
-    && els.riskBars.innerHTML.includes('68%') && els.riskBars.innerHTML.includes('10%'));
-  check('console: jurisdiction watch lists five jurisdictions', countOcc(els.jurWatch.innerHTML, 'class="jur-row"') === 5
-    && els.jurWatch.innerHTML.includes('Iran') && els.jurWatch.innerHTML.includes('United Arab Emirates'));
-  check('console: operator strip offers all six robots', countOcc(els.operatorStrip.innerHTML, 'class="op-btn"') === 6);
-  check('console: uptime renders as HH:MM:SS', /\d{2}:\d{2}:\d{2}/.test(els.uptime.textContent));
+  check('console(new): four stat tiles all read zero', countOcc(els.statTiles.innerHTML, 'class="tile"') === 4
+    && countOcc(els.statTiles.innerHTML, '>0<') === 4);
+  check('console(new): NO fabricated demo numbers (9,471 / 1,284 / 37)', !els.statTiles.innerHTML.includes('9,471')
+    && !els.statTiles.innerHTML.includes('1,284') && !els.statTiles.innerHTML.includes('>37<'));
+  check('console(new): tile titles coloured green / amber / red / blue',
+    els.statTiles.innerHTML.includes('color:#4FD6A0">Entities Monitored')
+    && els.statTiles.innerHTML.includes('color:#FFAE57">Open Alerts')
+    && els.statTiles.innerHTML.includes('color:#FF6B6B">Sanctions Hits')
+    && els.statTiles.innerHTML.includes('color:#7FB3E8">Cases Cleared'));
+  check('console(new): alert stream shows guidance, no fake entities', els.alertStream.innerHTML.includes('No assessments filed yet')
+    && !els.alertStream.innerHTML.includes('Meridian'));
+  check('console(new): diligence mix + jurisdictions show empty states',
+    els.riskBars.innerHTML.includes('No assessments yet') && els.jurWatch.innerHTML.includes('No jurisdictions yet'));
+  check('console(new): threat level NOMINAL when nothing is filed', els.threatLevel.textContent === 'NOMINAL');
+  check('console(new): operator strip offers all six robots', countOcc(els.operatorStrip.innerHTML, 'class="op-btn"') === 6);
+  check('console(new): default accent is Cypher pink', docStyle.getPropertyValue('--ac') === '255,92,168');
 
-  /* Reassign operator → HUD + accent recolour */
   api.state.operatorId = 'ember'; api.renderOperator();
-  check('console: reassigning to Ember swaps the robot image', els.operatorName.textContent === 'Ember'
+  check('console(new): reassigning to Ember swaps the robot image', els.operatorName.textContent === 'Ember'
     && els.robotImg.style.backgroundImage.includes('persona-ember'));
+})();
+
+/* ── 1b. AI Operations Console — WITH DATA (derived from the register) ── */
+(function(){
+  const reg = JSON.stringify({version:1, items:{
+    'RA-1':{savedAt:'2026-06-15T10:00:00Z', summary:{entity:'Alpha Gold DMCC', total:19, outcome:'CDD', prohibited:false, complete:true,  date:'2026-06-15', nextReview:'2027-06-15'}, state:{entity:{name:'Alpha Gold DMCC', jurisdiction:'United Arab Emirates'}, signoff:{}}},
+    'RA-2':{savedAt:'2026-06-16T11:00:00Z', summary:{entity:'Beta Refining',   total:24, outcome:'EDD', prohibited:false, complete:false, date:'2026-06-16', nextReview:'2020-01-01'}, state:{entity:{name:'Beta Refining', jurisdiction:'Russian Federation'}, signoff:{}}},
+    'RA-3':{savedAt:'2026-06-14T09:00:00Z', summary:{entity:'Gamma Metals',    total:21, outcome:'PROHIBITED', prohibited:true, complete:true, date:'2026-06-14', nextReview:''}, state:{entity:{name:'Gamma Metals', jurisdiction:'Islamic Republic of Iran'}, signoff:{}}}
+  }});
+  const { els } = runScreen('console.html', '{}', {'hsra.register.v1': reg});
+
+  check('console(data): entities monitored = 3 from the register', els.statTiles.innerHTML.includes('>3<'));
+  check('console(data): a prohibited entity surfaces as a sanctions hit', els.statTiles.innerHTML.includes('do not onboard'));
+  check('console(data): completed assessments counted as cases cleared', els.statTiles.innerHTML.includes('marked complete'));
+  check('console(data): real entities populate the alert stream', els.alertStream.innerHTML.includes('Alpha Gold DMCC')
+    && els.alertStream.innerHTML.includes('Beta Refining') && !els.alertStream.innerHTML.includes('Meridian'));
+  check('console(data): jurisdiction watch reflects the register', els.jurWatch.innerHTML.includes('Islamic Republic of Iran')
+    && els.jurWatch.innerHTML.includes('United Arab Emirates'));
+  check('console(data): threat CRITICAL when a prohibited entity exists', els.threatLevel.textContent === 'CRITICAL');
+  check('console(data): diligence mix renders percentages', /\d+%/.test(els.riskBars.innerHTML));
 })();
 
 /* ── 2. Hawkeye Sterling Advisor ── */
@@ -109,7 +138,9 @@ function runScreen(file, bridge){
     && els.main.innerHTML.includes('Ask me anything about AML compliance.'));
   check('advisor: persona picker offers five advisors, Sterling default', countOcc(els.main.innerHTML, 'class="p-btn"') === 5
     && els.main.innerHTML.includes('<b>Sterling</b>'));
-  check('advisor: Quick mode hint reasons over 24 directives', els.main.innerHTML.includes('Reasoning over 24 directives'));
+  check('advisor: mode toggle offers four depths, no fake "directives" claim',
+    els.main.innerHTML.includes('data-mode="Quick"') && els.main.innerHTML.includes('data-mode="Deep"')
+    && !els.main.innerHTML.includes('directives'));
 
   /* Switch persona → header avatar + picker update */
   api.state.personaId = 'ember'; api.renderAsk();
@@ -120,7 +151,7 @@ function runScreen(file, bridge){
   api.state.question = 'What CDD is required for a UAE gold trader?';
   api.ask();
   check('advisor: Ask enters the reasoning phase', api.state.phase === 'reasoning'
-    && els.hero.innerHTML.includes('Reasoning over 24 directives'));
+    && els.hero.innerHTML.includes('Reviewing the cited legal sources'));
   check('advisor: reasoning timer was scheduled', timers.length >= 1);
   timers[timers.length - 1]();   /* flush the 1.5s reasoning timer */
   check('advisor: answer renders verdict, citation and steps', api.state.phase === 'answer'
