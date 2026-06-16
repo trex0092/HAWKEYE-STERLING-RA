@@ -237,7 +237,7 @@ function runScreen(file, bridge, seed){
   api.state.tab = 'qa'; api.render();
   api.state.regOpen = 0;
   const firstQ = groups[0].questions[0];
-  api.state.qOpen = firstQ.q; api.renderRegGroups();
+  api.state.qOpen = '0␟' + firstQ.q; api.renderRegGroups();   // qOpen is keyed by groupIndex␟question
   check('qa: opening a question shows its own answer inline',
     els.regGroups.innerHTML.includes('class="qa-summary"')
     && els.regGroups.innerHTML.includes(esc_(firstQ.a).slice(0, 24))
@@ -245,7 +245,7 @@ function runScreen(file, bridge, seed){
 
   /* Different questions yield different answers (no single canned reply) */
   const q2 = groups[1].questions[0];
-  api.state.regOpen = 1; api.state.qOpen = q2.q; api.renderRegGroups();
+  api.state.regOpen = 1; api.state.qOpen = '1␟' + q2.q; api.renderRegGroups();
   check('qa: a second question yields a different cited answer',
     els.regGroups.innerHTML.includes(esc_(q2.a).slice(0, 24)) && q2.a !== firstQ.a);
 

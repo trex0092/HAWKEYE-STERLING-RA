@@ -58,11 +58,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: regulatory-watch/update
           base: main
-          add-paths: |
-            data/reg-watch-state.json
-            docs/research/auto/**
-          commit-message: "Regulatory Watch: ${{ steps.watch.outputs.changed_count || '0' }} source change(s) detected"
-          title: "Regulatory Watch — ${{ steps.watch.outputs.changed_count || '0' }} source change(s)"
+          # No add-paths: commit every non-ignored change (the fingerprint state
+          # and any AI draft under docs/research/auto). The per-run artifacts
+          # reg-watch-report.md and reg-watch-changes.json are gitignored, so
+          # they are never committed; the report is used only as the PR body.
+          commit-message: ${{ steps.watch.outputs.pr_title }}
+          title: ${{ steps.watch.outputs.pr_title }}
           body-path: reg-watch-report.md
           labels: regulatory-watch
           delete-branch: true

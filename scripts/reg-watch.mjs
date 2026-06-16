@@ -19,6 +19,7 @@
 */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 
 export const SOURCES_FILE = 'data/reg-sources.json';
 export const STATE_FILE   = 'data/reg-watch-state.json';
@@ -61,35 +62,51 @@ export function fingerprint(raw) {
 }
 
 /* ── Diff fetched content against stored state ──
-   fetched: Map/object id -> { ok, status, body, error }
-   Returns { changes:[...], state } where each change has a status:
-   new | changed | unchanged | error. Errors never count as content changes
-   (a 404 or a flaky network must not raise a false PR). */
+   fetched: object (or Map) id -> { ok, status, body, error }
+   Returns { changes:[...], state }. Each change has a status:
+     new        — first time we see a brand-new source (counts as a change)
+     changed    — text moved versus the last good snapshot (counts)
+     recovered  — first good snapshot after a prior fetch error (does NOT count)
+     unchanged  — text identical to last snapshot
+     error      — fetch failed OR an "ok" response had empty content
+   Errors and empty 200s never count as content changes and never overwrite a
+   known-good hash, so a 404, a flaky network, or an empty gateway page cannot
+   raise a false PR. */
 export function computeChanges(sources, prevState, fetched, today) {
   const prev = (prevState && prevState.sources) || {};
   const stateSources = {};
   const changes = [];
+  const base = s => ({ id: s.id, name: s.name, jurisdiction: s.jurisdiction, url: s.url });
   for (const s of sources) {
     const f = fetched[s.id] || fetched.get?.(s.id);
     const old = prev[s.id];
-    if (!f || f.ok === false || f.error || typeof f.body !== 'string') {
+    const okResponse = f && f.ok !== false && !f.error && typeof f.body === 'string';
+    const text = okResponse ? extractText(f.body) : '';
+    if (!okResponse || text.length === 0) {
+      const detail = okResponse ? 'empty response (no text content)'
+        : (f && (f.error || ('HTTP ' + (f && f.status)))) || 'fetch failed';
+      const status = (f && f.status) || 'error';
       stateSources[s.id] = old
-        ? { ...old, checkedAt: today, status: (f && f.status) || 'error', error: (f && (f.error || ('HTTP ' + f.status))) || 'fetch failed' }
-        : { hash: null, bytes: 0, checkedAt: today, changedAt: null, status: (f && f.status) || 'error', error: (f && (f.error || ('HTTP ' + f.status))) || 'fetch failed' };
-      changes.push({ id: s.id, name: s.name, jurisdiction: s.jurisdiction, url: s.url, status: 'error', detail: stateSources[s.id].error });
+        ? { ...old, checkedAt: today, status, error: detail }
+        : { hash: null, bytes: 0, checkedAt: today, changedAt: null, status, error: detail };
+      changes.push({ ...base(s), status: 'error', detail });
       continue;
     }
     const hash = fingerprint(f.body);
-    const bytes = extractText(f.body).length;
-    if (!old || old.hash == null) {
+    const bytes = text.length;
+    if (!old) {
       stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200 };
-      changes.push({ id: s.id, name: s.name, jurisdiction: s.jurisdiction, url: s.url, status: old ? 'changed' : 'new', prevHash: old ? old.hash : null, newHash: hash });
+      changes.push({ ...base(s), status: 'new', newHash: hash });
+    } else if (old.hash == null) {
+      /* first good snapshot after a prior error — record silently, no PR */
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200 };
+      changes.push({ ...base(s), status: 'recovered', newHash: hash });
     } else if (old.hash !== hash) {
       stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, prevHash: old.hash };
-      changes.push({ id: s.id, name: s.name, jurisdiction: s.jurisdiction, url: s.url, status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes });
+      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes });
     } else {
       stateSources[s.id] = { ...old, checkedAt: today, status: f.status || 200 };
-      changes.push({ id: s.id, name: s.name, jurisdiction: s.jurisdiction, url: s.url, status: 'unchanged' });
+      changes.push({ ...base(s), status: 'unchanged' });
     }
   }
   return { changes, state: { updated: today, sources: stateSources } };
@@ -100,10 +117,20 @@ export function contentChanges(changes) {
 }
 
 /* ── Human-readable report (PR body + committed artifact) ── */
-export function buildReport(changes, today) {
+export function buildReport(changes, today, mode) {
   const moved = contentChanges(changes);
   const errors = changes.filter(c => c.status === 'error');
+  const seeded = changes.filter(c => c.status !== 'error').length;
   const lines = [];
+  if (mode === 'seed') {
+    lines.push('# Regulatory Watch — baseline — ' + today);
+    lines.push('');
+    lines.push('Recorded baseline fingerprints for **' + seeded + '** of ' + changes.length + ' monitored source(s). A seed run flags no changes; future weekly runs compare against this baseline.');
+    if (errors.length) appendErrors(lines, errors);
+    lines.push('');
+    lines.push('_Detection is automatic; wording changes are a reviewed decision. Country black/grey list moves are handled by the FATF Watchdog._');
+    return lines.join('\n');
+  }
   lines.push('# Regulatory Watch — ' + today);
   lines.push('');
   if (!moved.length) {
@@ -117,17 +144,19 @@ export function buildReport(changes, today) {
       lines.push('| ' + c.name + ' | ' + (c.jurisdiction || '') + ' | ' + (c.status === 'new' ? 'first snapshot' : 'content changed') + ' | ' + c.url + ' |');
     }
   }
-  if (errors.length) {
-    lines.push('');
-    lines.push('<details><summary>' + errors.length + ' source(s) could not be fetched (no action — re-checked next run)</summary>');
-    lines.push('');
-    for (const e of errors) lines.push('- ' + e.name + ' — ' + e.detail + ' (' + e.url + ')');
-    lines.push('');
-    lines.push('</details>');
-  }
+  if (errors.length) appendErrors(lines, errors);
   lines.push('');
   lines.push('_Detection is automatic; wording changes are a reviewed decision. Country black/grey list moves are handled by the FATF Watchdog._');
   return lines.join('\n');
+}
+
+function appendErrors(lines, errors) {
+  lines.push('');
+  lines.push('<details><summary>' + errors.length + ' source(s) could not be fetched (no action — re-checked next run)</summary>');
+  lines.push('');
+  for (const e of errors) lines.push('- ' + e.name + ' — ' + e.detail + ' (' + e.url + ')');
+  lines.push('');
+  lines.push('</details>');
 }
 
 /* ── Network (only used by the runner, not by tests) ── */
@@ -172,7 +201,9 @@ async function main() {
 
   const { changes, state } = computeChanges(sources, prevState, fetched, today);
   const moved = contentChanges(changes);
-  const report = buildReport(changes, today);
+  const errors = changes.filter(c => c.status === 'error');
+  const seeded = changes.filter(c => c.status !== 'error').length;
+  const report = buildReport(changes, today, mode);
 
   mkdirSync('data', { recursive: true });
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
@@ -180,14 +211,23 @@ async function main() {
 
   const flagged = mode === 'seed' ? [] : moved;
   writeFileSync(CHANGES_FILE, JSON.stringify({ date: today, mode, changes: flagged }, null, 2) + '\n');
+
+  const count = mode === 'seed' ? seeded : moved.length;
+  const prTitle = mode === 'seed'
+    ? 'Regulatory Watch — baseline (' + seeded + ' source' + (seeded === 1 ? '' : 's') + ')'
+    : 'Regulatory Watch — ' + count + ' source change' + (count === 1 ? '' : 's');
+
   console.log(report);
-  console.log('\nmode=' + mode + '  content-changes=' + moved.length + '  errors=' + changes.filter(c => c.status === 'error').length);
+  console.log('\nmode=' + mode + '  content-changes=' + moved.length + '  errors=' + errors.length + '  seeded=' + seeded);
   setOutput('has_changes', flagged.length ? 'true' : 'false');
-  setOutput('changed_count', String(flagged.length));
+  setOutput('changed_count', String(count));
+  setOutput('pr_title', prTitle);
   setOutput('report_file', REPORT_FILE);
 }
 
-/* Run only when invoked directly (not when imported by tests). */
-if (import.meta.url === ('file://' + process.argv[1]) || process.argv[1]?.endsWith('reg-watch.mjs')) {
+/* Run only when invoked directly (node scripts/reg-watch.mjs), never when
+   imported by a test or by reg-draft.mjs. pathToFileURL handles path encoding
+   and avoids the substring false-match that endsWith() would allow. */
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(e => { console.error(e); process.exit(1); });
 }

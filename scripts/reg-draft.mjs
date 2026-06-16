@@ -22,7 +22,12 @@ function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection
 if (!KEY) skip('no ANTHROPIC_API_KEY');
 if (!existsSync(CHANGES_FILE)) skip('no changes file');
 
-const { date, changes } = JSON.parse(readFileSync(CHANGES_FILE, 'utf8'));
+let date, changes;
+try {
+  ({ date, changes } = JSON.parse(readFileSync(CHANGES_FILE, 'utf8')));
+} catch (e) {
+  skip('changes file unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
+}
 if (!Array.isArray(changes) || !changes.length) skip('no content changes');
 
 async function fetchText(url) {

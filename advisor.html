@@ -417,15 +417,15 @@ function renderRegGroups(){
       + '<button class="reg-cat-head" data-gi="'+gi+'"><span class="reg-cat-name">'+esc(g.label)+'</span>'
       +   '<span class="reg-cat-meta"><span class="reg-cat-count">'+matches.length+'</span><span class="reg-cat-sign">'+(open?'−':'+')+'</span></span></button>';
     if(open) html += '<div class="reg-qs">'+matches.map(q=>{
-      const t = qText(q), ans = qAnswer(q), isOpen = state.qOpen===t;
-      return '<button class="reg-q" data-q="'+esc(t)+'" aria-expanded="'+(isOpen?'true':'false')+'"><span class="reg-q-arrow">'+(isOpen?'⌄':'›')+'</span>'+esc(t)+'</button>'
+      const t = qText(q), ans = qAnswer(q), key = gi+'␟'+t, isOpen = state.qOpen===key;
+      return '<button class="reg-q" data-gi="'+gi+'" data-q="'+esc(t)+'" aria-expanded="'+(isOpen?'true':'false')+'"><span class="reg-q-arrow">'+(isOpen?'⌄':'›')+'</span>'+esc(t)+'</button>'
         + (isOpen && ans ? regAnswerHtml(ans) : '');
     }).join('')+'</div>';
     html += '</div>';
   });
   $('regGroups').innerHTML = html || '<p class="empty">No questions match “'+esc(fil)+'”.</p>';
   Array.from(document.querySelectorAll('.reg-cat-head')).forEach(b=>b.addEventListener('click',()=>{ const gi=+b.getAttribute('data-gi'); state.regOpen = state.regOpen===gi?null:gi; state.qOpen=null; renderRegGroups(); }));
-  Array.from(document.querySelectorAll('.reg-q')).forEach(b=>b.addEventListener('click',()=>{ const t=b.getAttribute('data-q'); state.qOpen = state.qOpen===t?null:t; renderRegGroups(); }));
+  Array.from(document.querySelectorAll('.reg-q')).forEach(b=>b.addEventListener('click',()=>{ const key=b.getAttribute('data-gi')+'␟'+b.getAttribute('data-q'); state.qOpen = state.qOpen===key?null:key; renderRegGroups(); }));
   Array.from(document.querySelectorAll('[data-ask]')).forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); askQuestion(b.getAttribute('data-ask')); }));
 }
 

@@ -68,6 +68,27 @@ const e2 = computeChanges([{ id: 'z', name: 'Z', url: 'https://z' }], { sources:
   { z: { ok: false, status: 'error', error: 'timeout' } }, '2026-06-16');
 check('unknown source error handled cleanly', e2.changes[0].status === 'error' && e2.state.sources.z.hash === null);
 
+/* recovered: first good snapshot after a prior error records silently, no PR */
+const rec = computeChanges([{ id: 'z', name: 'Z', url: 'https://z' }],
+  { sources: { z: { hash: null, bytes: 0, changedAt: null, status: 404, error: 'HTTP 404' } } },
+  { z: { ok: true, status: 200, body: 'now reachable content' } }, '2026-06-16');
+check('recovery after error is "recovered", not a content change',
+  rec.changes[0].status === 'recovered' && rec.state.sources.z.hash && contentChanges(rec.changes).length === 0);
+
+/* an "ok" 200 with empty/markup-only body is NOT a content change and never overwrites a good hash */
+const goodHash = fingerprint('the real circular text');
+const empty = computeChanges([{ id: 'p', name: 'P', url: 'https://p' }],
+  { sources: { p: { hash: goodHash, bytes: 20, changedAt: '2026-06-01', status: 200 } } },
+  { p: { ok: true, status: 200, body: '<html><head><style>x{}</style></head><body></body></html>' } }, '2026-06-16');
+check('empty 200 is treated as error and keeps the last good hash',
+  empty.changes[0].status === 'error' && empty.changes[0].detail.includes('empty')
+  && empty.state.sources.p.hash === goodHash && contentChanges(empty.changes).length === 0);
+
+/* seed-mode report reads as a baseline, not "no changes" */
+const seedRep = buildReport([{ id: 'a', name: 'A', status: 'new', newHash: 'h' }, { id: 'b', name: 'B', status: 'error', detail: 'HTTP 403' }], '2026-06-16', 'seed');
+check('seed report reads as a baseline with the seeded count', seedRep.includes('baseline')
+  && seedRep.includes('Recorded baseline fingerprints for **1**'));
+
 /* ── Report ── */
 const rep = buildReport(changes, '2026-06-16');
 check('report names changed sources and the data files to edit',
