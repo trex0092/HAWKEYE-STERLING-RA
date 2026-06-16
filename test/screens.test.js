@@ -41,13 +41,20 @@ function makeEl(){
    exposes its internals (same technique app.test.js uses for index.html). */
 function runScreen(file, bridge, seed){
   const html = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-  /* Extract the single inline boot <script> by plain string search rather than a
-     tag-matching regex. These are our own controlled fixtures (one lowercase
-     <script> block each); a regex HTML-tag matcher buys nothing here and trips
-     CodeQL's js/bad-tag-filter. indexOf is case-folded and attribute-tolerant. */
+  /* Extract the inline boot <script> (no attributes) by plain string search — our
+     fixtures have a single lowercase <script> block. Same-origin data scripts
+     (<script src="…js">) are collected here and eval'd below so their globals
+     (window.SUPER_TOOLS / REG_GROUPS) exist before the boot runs. Tag scanning is
+     done with indexOf, not a tag-matching regex (avoids CodeQL js/bad-tag-filter). */
   const lower = html.toLowerCase();
-  const open = lower.indexOf('<script');
-  const start = open === -1 ? -1 : html.indexOf('>', open) + 1;
+  const dataSrcs = [];
+  for(let si = lower.indexOf('<script'); si !== -1; si = lower.indexOf('<script', si + 7)){
+    const tagEnd = html.indexOf('>', si); if(tagEnd === -1) break;
+    const seg = html.slice(si, tagEnd), k = seg.indexOf('src="');
+    if(k !== -1){ const v = seg.slice(k + 5, seg.indexOf('"', k + 5)); if(/\.js$/i.test(v)) dataSrcs.push(v.replace(/^\//, '')); }
+  }
+  const open = lower.indexOf('<script>');
+  const start = open === -1 ? -1 : open + '<script>'.length;
   const end = start > 0 ? lower.indexOf('</script', start) : -1;
   if(open === -1 || start <= 0 || end === -1) throw new Error('no inline script in ' + file);
   const script = html.slice(start, end);
@@ -73,6 +80,7 @@ function runScreen(file, bridge, seed){
   global.setTimeout = (cb) => { timers.push(cb); return timers.length; };  global.clearTimeout = () => {};
 
   let api = {};
+  for(const p of dataSrcs){ try{ (0, eval)(fs.readFileSync(path.join(__dirname, '..', p), 'utf8')); }catch(e){} }
   (0, eval)(script + '\n;globalThis.__screenAPI = (' + bridge + ');');
   api = globalThis.__screenAPI;
   return { els, timers, api, docStyle: global.document.documentElement.style };
@@ -130,10 +138,10 @@ function runScreen(file, bridge, seed){
 /* ── 2. Hawkeye Sterling Advisor ── */
 (function(){
   const { els, timers, api } = runScreen('advisor.html',
-    '{ get state(){return state;}, render, renderAsk, renderQa, renderQaList, ask, reset, persona, PERSONAS, QA_DATA }');
+    '{ get state(){return state;}, render, renderAsk, renderQa, renderQaList, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, PERSONAS, QA_DATA }');
 
-  check('advisor: boots on the Ask tab', els.tabs.innerHTML.includes('Ask the advisor')
-    && els.tabs.innerHTML.includes('Regulatory Q&amp;A'));
+  check('advisor: boots on the Ask tab with all three tabs', els.tabs.innerHTML.includes('Ask the advisor')
+    && els.tabs.innerHTML.includes('Regulatory Q&amp;A') && els.tabs.innerHTML.includes('Super Tools'));
   check('advisor: composer + idle hero render', els.main.innerHTML.includes('Your question')
     && els.main.innerHTML.includes('Ask me anything about AML compliance.'));
   check('advisor: persona picker offers five advisors, Sterling default', countOcc(els.main.innerHTML, 'class="p-btn"') === 5
@@ -175,6 +183,37 @@ function runScreen(file, bridge, seed){
   api.state.qaQuery = 'suspicious'; api.renderQaList();
   check('advisor: filter narrows the Q&A list', countOcc(els.qaList.innerHTML, 'class="qa-item"') === 1
     && els.qaList.innerHTML.includes('Suspicious Activity Report'));
+
+  /* Super Tools tab — full 186-tool grouped picker + deterministic engines */
+  api.state.tab = 'tools'; api.render();
+  check('advisor: Super Tools renders the grouped picker + Escalation form',
+    els.main.innerHTML.includes('Super Tools') && els.main.innerHTML.includes('Escalation Decision Engine')
+    && els.main.innerHTML.includes('id="tf_subject"') && els.main.innerHTML.includes('Get Escalation Decision')
+    && els.main.innerHTML.includes('<optgroup'));
+  check('advisor: the picker carries the full 186-tool catalogue across 7 groups',
+    api.toolsList().length === 186 && countOcc(els.main.innerHTML, '<optgroup') === 7
+    && els.main.innerHTML.includes('Sanctions Nexus') && els.main.innerHTML.includes('STR Drafter'));
+  /* sanctions hit → PROHIBITED escalation */
+  api.state.toolInputs = {subject:'Aurum Refining Ltd', sanctions:'OFAC, EU'};
+  api.state.toolResult = api.escalationRun(api.state.toolInputs); api.renderResultOnly();
+  check('advisor: a sanctions hit drives a PROHIBITED escalation decision',
+    api.state.toolResult.verdict.indexOf('PROHIBITED') === 0 && els.toolResult.innerHTML.includes('FATF Rec. 6'));
+  /* PEP forces the EDD floor even over a low risk score */
+  api.state.toolInputs = {subject:'Northwind Jewellers', pep:'national', risk:'30'};
+  api.state.toolResult = api.escalationRun(api.state.toolInputs); api.renderResultOnly();
+  check('advisor: a PEP forces a mandatory EDD escalation over a low score',
+    api.state.toolResult.verdict.indexOf('EDD') === 0 && els.toolResult.innerHTML.includes('FATF Rec. 12'));
+  /* clean signals → CDD */
+  api.state.toolInputs = {subject:'Crown Coin Exchange', risk:'20'};
+  api.state.toolResult = api.escalationRun(api.state.toolInputs); api.renderResultOnly();
+  check('advisor: clean low-risk signals resolve to CDD', api.state.toolResult.verdict.indexOf('CDD') === 0);
+  /* a non-escalation tool returns deterministic, cited guidance (no faked AI) */
+  const genTool = api.toolsList().find(t => t.id !== 'escalation');
+  api.state.toolResult = api.genericRun(genTool, 'a DPMS dealer taking structured cash deposits');
+  api.renderResultOnly();
+  check('advisor: a generic tool returns deterministic, cited guidance',
+    api.state.toolResult.kind === 'generic' && els.toolResult.innerHTML.includes('Deterministic guidance')
+    && els.toolResult.innerHTML.includes('Federal Decree-Law No. 10 of 2025'));
 })();
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
