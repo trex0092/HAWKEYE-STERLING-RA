@@ -41,8 +41,16 @@ function makeEl(){
    exposes its internals (same technique app.test.js uses for index.html). */
 function runScreen(file, bridge){
   const html = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-  const m = html.match(/<script>([\s\S]*?)<\/script>/);
-  if(!m) throw new Error('no inline script in ' + file);
+  /* Extract the single inline boot <script> by plain string search rather than a
+     tag-matching regex. These are our own controlled fixtures (one lowercase
+     <script> block each); a regex HTML-tag matcher buys nothing here and trips
+     CodeQL's js/bad-tag-filter. indexOf is case-folded and attribute-tolerant. */
+  const lower = html.toLowerCase();
+  const open = lower.indexOf('<script');
+  const start = open === -1 ? -1 : html.indexOf('>', open) + 1;
+  const end = start > 0 ? lower.indexOf('</script', start) : -1;
+  if(open === -1 || start <= 0 || end === -1) throw new Error('no inline script in ' + file);
+  const script = html.slice(start, end);
 
   const els = {};
   const timers = [];
@@ -60,7 +68,7 @@ function runScreen(file, bridge){
   global.setTimeout = (cb) => { timers.push(cb); return timers.length; };  global.clearTimeout = () => {};
 
   let api = {};
-  (0, eval)(m[1] + '\n;globalThis.__screenAPI = (' + bridge + ');');
+  (0, eval)(script + '\n;globalThis.__screenAPI = (' + bridge + ');');
   api = globalThis.__screenAPI;
   return { els, timers, api, docStyle: global.document.documentElement.style };
 }
