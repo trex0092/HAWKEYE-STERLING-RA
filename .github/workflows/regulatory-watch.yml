@@ -59,7 +59,7 @@ jobs:
         # still pushed; the fallback step below opens an issue with the link.
         continue-on-error: true
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: regulatory-watch/update

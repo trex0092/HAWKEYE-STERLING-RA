@@ -44,7 +44,7 @@ jobs:
         id: pr
         continue-on-error: true
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: sanctions-watch/update
