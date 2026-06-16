@@ -36,34 +36,38 @@ every source carries a narrative.
 
 ## The sources and their narrative
 
-Worldwide, UAE-weighted. "Feeds" = what each source keeps current in the app.
+<!-- BEGIN:reg-sources -->
+<!-- Auto-generated from data/reg-sources.json by scripts/reg-sources-doc.mjs. Do not edit by hand; run `node scripts/reg-sources-doc.mjs`. -->
+
+Worldwide, UAE-weighted. The narrative is what each source is, why it is watched, and what it feeds in the app. _Edit the set in `data/reg-sources.json`; this table regenerates from it._
 
 ### UAE (primary focus)
 
-| Source | What it is | Why watched / app impact |
-| --- | --- | --- |
-| **UAE Ministry of Economy (MoE)** | Federal supervisor for DNFBPs — dealers in precious metals & stones (DPMS) and real estate | DPMS guidance, goAML registration, the AED 55,000 cash-reporting threshold → DPMS/real-estate Q&A and sector tools |
-| **UAE FIU (goAML)** | Receives STRs/SARs and issues filing guidance & feedback | STR/AIF deadlines, formats, narrative requirements → goAML/FIU answers and the STR Drafter tool |
-| **UAE NAMLCFTC** | National AML/CFT committee; owns the National Risk Assessment | NRA outputs, national typologies, policy → EWRA, governance, typology answers/tools |
-| **UAE EOCN** | Executive Office for Control & Non-Proliferation; UAE targeted financial sanctions | Consolidated-list updates, freeze-timeline guidance → sanctions answers, escalation/CFA logic, risk data |
-| **UAE Central Bank (CBUAE)** | Supervises financial institutions & exchange houses | AML circulars, Standards/Guidance, exam expectations → FI answers, exam-readiness & transaction-monitoring tools |
-| **Dubai VARA** | Dubai virtual-assets regulator | VASP AML/CFT, travel-rule, licensing rulebooks → virtual-asset answers and the VARA tool |
-| **Dubai Gold & Jewellery Group / DMCC** | UAE gold/jewellery sector bodies | Codes of practice, DMCC responsible-sourcing rules → sector-specific gold/jewellery answers and tools |
+| Source | Narrative |
+| --- | --- |
+| **UAE Ministry of Economy (MoE) — DNFBP / DPMS supervisor** | Federal supervisor for Designated Non-Financial Businesses and Professions, including Dealers in Precious Metals and Stones (DPMS) and real estate. Issues DPMS guidance, goAML registration rules and the cash-transaction reporting threshold (AED 55,000). Watched so DPMS/real-estate Q&A answers and sector tools stay current. |
+| **UAE Financial Intelligence Unit (FIU) — goAML** | Receives Suspicious Transaction/Activity Reports via the goAML platform and issues filing guidance, formats and feedback. Watched so STR/AIF deadlines, narrative requirements and the goAML / FIU-reporting answers and the STR Drafter tool stay current. |
+| **UAE National Committee for AML/CFT (NAMLCFTC)** | National coordination body owning the National Risk Assessment and AML/CFT strategy. Watched for new NRA outputs, national typologies and policy shifts that feed the EWRA, governance and typology answers/tools. |
+| **UAE Executive Office for Control & Non-Proliferation (EOCN)** | Administers UAE targeted financial sanctions, the local consolidated list and freezing obligations. Watched for list updates and freeze-timeline guidance feeding the sanctions answers, the escalation/CFA logic and the risk data. |
+| **UAE Central Bank (CBUAE) — AML/CFT** | Supervises licensed financial institutions and exchange houses for AML/CFT and issues circulars, the AML Standards/Guidance and examination expectations. Watched so FI-facing answers, examination-readiness and transaction-monitoring tools stay current. |
+| **Dubai Virtual Assets Regulatory Authority (VARA)** | Regulates virtual-asset activity in Dubai (ex-DIFC), including AML/CFT, travel-rule and licensing rulebooks. Watched so VASP / virtual-asset answers and the VARA compliance tool stay current. |
+| **Dubai Gold & Jewellery Group / DMCC (sector)** | UAE gold and jewellery sector bodies issuing codes of practice and responsible-sourcing expectations (DMCC Rules for Risk-Based Due Diligence). Watched so sector-specific gold/jewellery answers and tools reflect current sector guidance. |
 
 ### Global
 
-| Source | What it is | Why watched / app impact |
-| --- | --- | --- |
-| **FATF (guidance & news)** | The global AML/CFT standard-setter | Guidance and Recommendation revisions → most Q&A citations and tool references. *(Black/grey lists → FATF Watchdog.)* |
-| **Wolfsberg Group** | Bank-industry standards body | Principles & questionnaires (correspondent banking, CDD, CBDDQ) → those answers/tools |
-| **RMI** | Responsible Minerals Initiative | RMAP smelter audits, CMRT template → RMI/minerals answers |
-| **LBMA** | London Bullion Market Association | Responsible Gold Guidance, Good Delivery refiner rules → LBMA answers and gold-sourcing logic |
-| **OECD** | Due Diligence Guidance for minerals from CAHRA (5-step); MNE Guidelines | Guidance revisions, Annex II shifts → OECD answers and the high-risk-country / ASM risk floor |
-| **US OFAC** | US Treasury sanctions authority | Designations/de-listings, 50%-rule guidance → sanctions answers and escalation/CFA logic |
-| **UN Security Council** | UNSC consolidated sanctions list | Designations under 1267/1988/1718 etc. → sanctions/TF/PF answers and freeze logic |
-| **EU** | EU financial-sanctions list & guidance | Ownership-and-control test, blocking statute (Reg 2271/96) → EU sanctions answers |
-| **UK OFSI** | UK financial-sanctions implementation | UK consolidated list & guidance → correspondent/trade-finance exposure answers |
-| **Egmont Group** | Global network of FIUs | FIU-to-FIU information-exchange rules → Egmont request/cooperation answers and tools |
-| **Basel AML Index** | Basel Institute country ML/TF risk scoring | Republished scores → recalibrate country-risk weighting in the EWRA and customer risk ratings |
+| Source | Narrative |
+| --- | --- |
+| **FATF — guidance, recommendations & news** | The global AML/CFT standard-setter. This entry watches FATF publications, guidance and Recommendation revisions (NOT the black/grey lists, which the FATF Watchdog handles). Feeds most Q&A citations and tool reference lists. |
+| **Wolfsberg Group** | Bank-industry body issuing principles and questionnaires (correspondent banking, CDD, CBDDQ). Watched so correspondent-banking and CDD answers/tools reflect the latest Wolfsberg standards. |
+| **Responsible Minerals Initiative (RMI)** | Runs the Responsible Minerals Assurance Process (RMAP) smelter audits and the Conflict Minerals Reporting Template (CMRT). Watched so the RMI / minerals answers reflect current audit protocols and templates. |
+| **LBMA — Responsible Sourcing** | Sets the Responsible Gold Guidance (RGG) and Good Delivery refiner standards. Watched so LBMA answers and gold-sourcing logic reflect current RGG steps and refiner rules. |
+| **OECD — Responsible Mineral Supply Chains (CAHRA)** | Owns the Due Diligence Guidance for Responsible Supply Chains of Minerals from Conflict-Affected and High-Risk Areas (the 5-step framework) and MNE Guidelines. Watched so OECD answers and the high-risk-country / ASM risk floor reflect current guidance and Annex II shifts. |
+| **US OFAC — Recent Actions** | US Treasury sanctions authority. Watched for designations/de-listings and 50%-rule guidance feeding the sanctions answers and the escalation/CFA logic (secondary-sanctions exposure for UAE gold trade). |
+| **UN Security Council — Consolidated List** | The UN Security Council consolidated sanctions list, implemented in the UAE without delay. Watched for designations under 1267/1988/1718 etc. feeding the sanctions/TF/PF answers and freeze logic. |
+| **EU — Financial Sanctions** | EU consolidated financial-sanctions list and ownership-and-control guidance. Watched so the EU 'ownership and control' answers and blocking-statute (Reg 2271/96) content stay current. |
+| **UK OFSI — Consolidated List of Targets** | UK Office of Financial Sanctions Implementation consolidated list and guidance. Watched for UK designations relevant to correspondent and trade-finance exposure. |
+| **Egmont Group of FIUs** | Global network of Financial Intelligence Units governing FIU-to-FIU information exchange. Watched so the Egmont information-request and cross-border cooperation answers/tools stay current. |
+| **Basel AML Index** | Basel Institute composite country ML/TF risk scoring. Watched so the country-risk weighting in the EWRA and customer risk-rating logic can be recalibrated when scores are republished. |
 
-_Adjust the set any time in `data/reg-sources.json`._
+<!-- END:reg-sources -->
+
