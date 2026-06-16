@@ -1,0 +1,167 @@
+{
+  "_README": "Registry of regulatory sources watched by scripts/reg-watch.mjs. Worldwide coverage, UAE-weighted (UAE sources first). Each source: id (stable key), name, jurisdiction, category, narrative (what it is + why watched + what it feeds in the app), url, type (html|rss|json). Edit this file to add/remove sources; the weekly Regulatory Watch workflow fingerprints each url and opens a PR when content changes. Country black/grey LIST changes are handled separately by the FATF Watchdog (scripts/fatf-watchdog.mjs); the FATF entry here watches guidance/news, not the lists.",
+  "sources": [
+    {
+      "id": "uae-moe",
+      "name": "UAE Ministry of Economy (MoE) — DNFBP / DPMS supervisor",
+      "jurisdiction": "UAE",
+      "category": "Supervisor",
+      "narrative": "Federal supervisor for Designated Non-Financial Businesses and Professions, including Dealers in Precious Metals and Stones (DPMS) and real estate. Issues DPMS guidance, goAML registration rules and the cash-transaction reporting threshold (AED 55,000). Watched so DPMS/real-estate Q&A answers and sector tools stay current.",
+      "url": "https://www.moec.gov.ae/en/anti-money-laundering",
+      "type": "html"
+    },
+    {
+      "id": "uae-fiu",
+      "name": "UAE Financial Intelligence Unit (FIU) — goAML",
+      "jurisdiction": "UAE",
+      "category": "FIU",
+      "narrative": "Receives Suspicious Transaction/Activity Reports via the goAML platform and issues filing guidance, formats and feedback. Watched so STR/AIF deadlines, narrative requirements and the goAML / FIU-reporting answers and the STR Drafter tool stay current.",
+      "url": "https://www.uaefiu.gov.ae/en/",
+      "type": "html"
+    },
+    {
+      "id": "uae-namlcftc",
+      "name": "UAE National Committee for AML/CFT (NAMLCFTC)",
+      "jurisdiction": "UAE",
+      "category": "Policy",
+      "narrative": "National coordination body owning the National Risk Assessment and AML/CFT strategy. Watched for new NRA outputs, national typologies and policy shifts that feed the EWRA, governance and typology answers/tools.",
+      "url": "https://www.namlcftc.gov.ae/en",
+      "type": "html"
+    },
+    {
+      "id": "uae-eocn",
+      "name": "UAE Executive Office for Control & Non-Proliferation (EOCN)",
+      "jurisdiction": "UAE",
+      "category": "Sanctions",
+      "narrative": "Administers UAE targeted financial sanctions, the local consolidated list and freezing obligations. Watched for list updates and freeze-timeline guidance feeding the sanctions answers, the escalation/CFA logic and the risk data.",
+      "url": "https://www.uaeiec.gov.ae/en/",
+      "type": "html"
+    },
+    {
+      "id": "uae-cbuae",
+      "name": "UAE Central Bank (CBUAE) — AML/CFT",
+      "jurisdiction": "UAE",
+      "category": "Supervisor",
+      "narrative": "Supervises licensed financial institutions and exchange houses for AML/CFT and issues circulars, the AML Standards/Guidance and examination expectations. Watched so FI-facing answers, examination-readiness and transaction-monitoring tools stay current.",
+      "url": "https://www.centralbank.ae/en/cbuae-amlcft/",
+      "type": "html"
+    },
+    {
+      "id": "uae-vara",
+      "name": "Dubai Virtual Assets Regulatory Authority (VARA)",
+      "jurisdiction": "UAE",
+      "category": "Supervisor",
+      "narrative": "Regulates virtual-asset activity in Dubai (ex-DIFC), including AML/CFT, travel-rule and licensing rulebooks. Watched so VASP / virtual-asset answers and the VARA compliance tool stay current.",
+      "url": "https://www.vara.ae/en/",
+      "type": "html"
+    },
+    {
+      "id": "uae-jewellery",
+      "name": "Dubai Gold & Jewellery Group / DMCC (sector)",
+      "jurisdiction": "UAE",
+      "category": "Sector body",
+      "narrative": "UAE gold and jewellery sector bodies issuing codes of practice and responsible-sourcing expectations (DMCC Rules for Risk-Based Due Diligence). Watched so sector-specific gold/jewellery answers and tools reflect current sector guidance.",
+      "url": "https://www.dmcc.ae/services/responsible-sourcing",
+      "type": "html"
+    },
+    {
+      "id": "fatf-guidance",
+      "name": "FATF — guidance, recommendations & news",
+      "jurisdiction": "Global",
+      "category": "Standard-setter",
+      "narrative": "The global AML/CFT standard-setter. This entry watches FATF publications, guidance and Recommendation revisions (NOT the black/grey lists, which the FATF Watchdog handles). Feeds most Q&A citations and tool reference lists.",
+      "url": "https://www.fatf-gafi.org/en/publications.html",
+      "type": "html"
+    },
+    {
+      "id": "wolfsberg",
+      "name": "Wolfsberg Group",
+      "jurisdiction": "Global",
+      "category": "Industry standard",
+      "narrative": "Bank-industry body issuing principles and questionnaires (correspondent banking, CDD, CBDDQ). Watched so correspondent-banking and CDD answers/tools reflect the latest Wolfsberg standards.",
+      "url": "https://www.wolfsberg-principles.com/",
+      "type": "html"
+    },
+    {
+      "id": "rmi",
+      "name": "Responsible Minerals Initiative (RMI)",
+      "jurisdiction": "Global",
+      "category": "Supply chain",
+      "narrative": "Runs the Responsible Minerals Assurance Process (RMAP) smelter audits and the Conflict Minerals Reporting Template (CMRT). Watched so the RMI / minerals answers reflect current audit protocols and templates.",
+      "url": "https://www.responsiblemineralsinitiative.org/news/",
+      "type": "html"
+    },
+    {
+      "id": "lbma",
+      "name": "LBMA — Responsible Sourcing",
+      "jurisdiction": "Global",
+      "category": "Supply chain",
+      "narrative": "Sets the Responsible Gold Guidance (RGG) and Good Delivery refiner standards. Watched so LBMA answers and gold-sourcing logic reflect current RGG steps and refiner rules.",
+      "url": "https://www.lbma.org.uk/responsible-sourcing",
+      "type": "html"
+    },
+    {
+      "id": "oecd",
+      "name": "OECD — Responsible Mineral Supply Chains (CAHRA)",
+      "jurisdiction": "Global",
+      "category": "Supply chain",
+      "narrative": "Owns the Due Diligence Guidance for Responsible Supply Chains of Minerals from Conflict-Affected and High-Risk Areas (the 5-step framework) and MNE Guidelines. Watched so OECD answers and the high-risk-country / ASM risk floor reflect current guidance and Annex II shifts.",
+      "url": "https://mneguidelines.oecd.org/mining.htm",
+      "type": "html"
+    },
+    {
+      "id": "ofac",
+      "name": "US OFAC — Recent Actions",
+      "jurisdiction": "Global",
+      "category": "Sanctions",
+      "narrative": "US Treasury sanctions authority. Watched for designations/de-listings and 50%-rule guidance feeding the sanctions answers and the escalation/CFA logic (secondary-sanctions exposure for UAE gold trade).",
+      "url": "https://ofac.treasury.gov/recent-actions",
+      "type": "html"
+    },
+    {
+      "id": "unsc",
+      "name": "UN Security Council — Consolidated List",
+      "jurisdiction": "Global",
+      "category": "Sanctions",
+      "narrative": "The UN Security Council consolidated sanctions list, implemented in the UAE without delay. Watched for designations under 1267/1988/1718 etc. feeding the sanctions/TF/PF answers and freeze logic.",
+      "url": "https://www.un.org/securitycouncil/content/un-sc-consolidated-list",
+      "type": "html"
+    },
+    {
+      "id": "eu-sanctions",
+      "name": "EU — Financial Sanctions",
+      "jurisdiction": "Global",
+      "category": "Sanctions",
+      "narrative": "EU consolidated financial-sanctions list and ownership-and-control guidance. Watched so the EU 'ownership and control' answers and blocking-statute (Reg 2271/96) content stay current.",
+      "url": "https://finance.ec.europa.eu/eu-and-world/sanctions-restrictive-measures_en",
+      "type": "html"
+    },
+    {
+      "id": "uk-ofsi",
+      "name": "UK OFSI — Consolidated List of Targets",
+      "jurisdiction": "Global",
+      "category": "Sanctions",
+      "narrative": "UK Office of Financial Sanctions Implementation consolidated list and guidance. Watched for UK designations relevant to correspondent and trade-finance exposure.",
+      "url": "https://www.gov.uk/government/publications/financial-sanctions-consolidated-list-of-targets",
+      "type": "html"
+    },
+    {
+      "id": "egmont",
+      "name": "Egmont Group of FIUs",
+      "jurisdiction": "Global",
+      "category": "FIU network",
+      "narrative": "Global network of Financial Intelligence Units governing FIU-to-FIU information exchange. Watched so the Egmont information-request and cross-border cooperation answers/tools stay current.",
+      "url": "https://egmontgroup.org/news/",
+      "type": "html"
+    },
+    {
+      "id": "basel-index",
+      "name": "Basel AML Index",
+      "jurisdiction": "Global",
+      "category": "Risk data",
+      "narrative": "Basel Institute composite country ML/TF risk scoring. Watched so the country-risk weighting in the EWRA and customer risk-rating logic can be recalibrated when scores are republished.",
+      "url": "https://index.baselgovernance.org/",
+      "type": "html"
+    }
+  ]
+}

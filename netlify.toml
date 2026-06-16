@@ -5,3 +5,23 @@
 # Serverless: Asana task delivery on assessment completion.
 [functions]
   directory = "netlify/functions"
+
+# Security headers applied to every response (edge hardening).
+# CSP is scoped to 'self'; 'unsafe-inline' is required because the entire app
+# (script + styles) is inlined in index.html with no build step. connect-src
+# permits the same-origin Netlify functions only; data: covers the inline SVG.
+# The Google Fonts origins (fonts.googleapis.com for the stylesheet,
+# fonts.gstatic.com for the font files) carry the Space Grotesk / JetBrains
+# Mono / Manrope display faces; the app degrades gracefully to the system
+# stack if they are blocked or the device is offline.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Resource-Policy = "same-origin"

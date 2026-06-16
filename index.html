@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawkeye Sterling — Entity Risk Assessment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 :root{
@@ -18,8 +21,12 @@
   --none-bg:rgba(130,140,165,0.10);--none-text:#828CA5;--none-bd:rgba(130,140,165,0.26);
   --cdd-bg:rgba(91,155,216,0.10);--cdd-text:#5B9BD8;--cdd-bd:rgba(91,155,216,0.30);
   --sdd-bg:rgba(255,148,52,0.10);--sdd-text:#FF9434;--sdd-bd:rgba(255,148,52,0.42);
-  --serif:'Arial Narrow','Helvetica Neue',Arial,sans-serif;--sans:'Arial Narrow','Helvetica Neue',Arial,sans-serif;--mono:'Arial Narrow','Helvetica Neue',Arial,sans-serif;
-  --r:9px;--r-sm:6px;
+  --sans:'Manrope','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  --display:'Space Grotesk','Helvetica Neue',Arial,sans-serif;
+  --serif:'Space Grotesk','Helvetica Neue',Arial,sans-serif;
+  --ac1:#B45CFF;--ac2:#FF5CA8;--glow:255,92,168;
+  --r:13px;--r-sm:7px;
   --shadow:0 1px 0 rgba(255,255,255,0.03) inset,0 12px 32px rgba(0,0,0,0.35);
   --hdr-h:64px;
 }
@@ -56,25 +63,64 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 @keyframes fgDrift{to{transform:translate(3.5%,-2.5%) scale(1.07)}}
 @keyframes fgWarnIn{from{opacity:0;transform:translateY(-4px)}}
 @keyframes fgPop{45%{transform:scale(1.18)}}
+@keyframes ping{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.72)}}
+@keyframes advPulse{0%,100%{opacity:.4;transform:scale(.9)}50%{opacity:.85;transform:scale(1.1)}}
+@keyframes advSpin{to{transform:rotate(360deg)}}
+@keyframes advSpinRev{to{transform:rotate(-360deg)}}
+/* Continuous HUD/live motion runs only when motion is welcome. */
+@media (prefers-reduced-motion: no-preference){
+  .live-dot{animation:ping 2.2s ease-in-out infinite}
+  .adv-glow{animation:advPulse 2.6s ease-in-out infinite}
+  .adv-sweep{animation:advSpin 3.6s linear infinite}
+  .adv-ring-svg.s1{animation:advSpin 22s linear infinite}
+  .adv-ring-svg.s2{animation:advSpinRev 15s linear infinite}
+  .adv-orbit{animation:advSpin 2.8s linear infinite}
+}
 
-/* ── Header ───────────────────────────── */
-.doc-header{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 36px;height:var(--hdr-h);position:sticky;top:0;z-index:200;background:rgba(8,11,18,0.88);border-bottom:1px solid var(--border2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-.brand-area{display:flex;align-items:center;gap:12px}
-.brand-mark{width:38px;height:38px;border:1.5px solid var(--yneon);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:15px;font-weight:700;color:var(--yneon);flex-shrink:0;background:rgba(247,229,90,0.08);box-shadow:0 0 14px rgba(247,229,90,0.35),inset 0 0 8px rgba(247,229,90,0.08)}
-.brand-name{font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:0.13em;color:var(--yneon);line-height:1.2;white-space:nowrap;text-shadow:0 0 12px rgba(247,229,90,0.45),0 0 28px rgba(247,229,90,0.20)}
+/* ── Header (persona command-center) ──── */
+.doc-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 30px;height:var(--hdr-h);position:sticky;top:0;z-index:200;background:rgba(8,11,18,0.88);border-bottom:1px solid var(--border2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.brand-area{display:flex;align-items:center;gap:13px;min-width:0}
+.brand-avatar{width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#0B101A;border:1.5px solid rgba(var(--glow),0.55);box-shadow:0 0 16px rgba(var(--glow),0.30)}
+.brand-avatar>span{display:block;width:100%;height:100%;background-image:url('assets/persona-sterling.png');background-size:cover;background-position:36% 24%}
+.brand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.brand-name{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:0.06em;line-height:1;white-space:nowrap;background:linear-gradient(90deg,var(--ac1),var(--ac2) 82%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 10px rgba(var(--glow),0.30))}
+.brand-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-right{display:flex;align-items:center;gap:16px}
+.hdr-nav{display:flex;align-items:center;gap:4px}
+.hdr-nav a{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text2);text-decoration:none;padding:6px 11px;border-radius:7px;border:1px solid transparent;transition:all .16s;white-space:nowrap}
+.hdr-nav a:hover{color:var(--text);background:rgba(255,255,255,0.04);border-color:var(--border2)}
+.hdr-nav a.active{color:#FCE3EF;background:rgba(var(--glow),0.14);border-color:rgba(var(--glow),0.5);box-shadow:0 0 14px rgba(var(--glow),0.22)}
+.live-status{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#4FD6A0;white-space:nowrap}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#3BC48F;box-shadow:0 0 8px #3BC48F;flex-shrink:0}
+.live-clock{font-family:var(--mono);font-size:11px;color:var(--text2);white-space:nowrap}
+.live-clock b{color:var(--text3);font-weight:400}
+.lock-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;font-family:var(--mono);font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;transition:all .16s;border:1px solid var(--border2);color:var(--text2);background:rgba(255,255,255,0.04)}
+.lock-btn:hover{color:var(--text);border-color:rgba(255,255,255,0.25)}
+.lock-btn.locked{color:#5FDCAB;background:rgba(59,196,143,0.12);border-color:rgba(59,196,143,0.45)}
+/* Mobile header: keep the section nav reachable — drop the clock/lock/status to
+   make room, and on phones wrap the nav onto its own full-width tappable row. */
+@media(max-width:1040px){.live-clock,.lock-btn{display:none}}
+@media(max-width:800px){
+  .doc-header{flex-wrap:wrap;height:auto;padding:9px 16px;row-gap:9px}
+  .live-status{display:none}
+  .hdr-right{flex:1 1 100%}
+  .hdr-nav{display:flex;width:100%}
+  .hdr-nav a{flex:1;text-align:center;padding:8px 6px}
+}
+@media(max-width:760px){.brand-sub{display:none}}
 
 /* ── Layout ───────────────────────────── */
-.main-layout{display:grid;grid-template-columns:1fr 320px;flex:1;align-items:start}
-.form-panel{padding:24px 32px 64px;min-width:0}
+.main-layout{display:grid;grid-template-columns:minmax(0,1fr) 344px;flex:1;align-items:start}
+.form-panel{padding:24px 30px 72px;min-width:0}
 .side-panel{padding:22px 22px 28px;position:sticky;top:var(--hdr-h);height:calc(100vh - var(--hdr-h));overflow-y:auto;background:rgba(7,10,16,0.65);border-left:1px solid var(--border2);display:flex;flex-direction:column;backdrop-filter:blur(8px)}
 
 /* ── Sections & cards ─────────────────── */
 .section-hd{display:flex;align-items:center;gap:10px;margin-bottom:12px;white-space:nowrap}
 .sn{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--gold);flex-shrink:0}
-.st{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;font-weight:600;flex-shrink:0;font-family:var(--sans)}
+.st{font-size:12px;text-transform:uppercase;letter-spacing:0.13em;font-weight:600;flex-shrink:0;font-family:var(--display)}
 .st,.neon-title,.attest-role{background:linear-gradient(90deg,var(--neon1),var(--neon2) 80%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 7px rgba(255,92,168,0.35))}
 .section-hd::after{content:'';flex:1;height:1.5px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2) 55%,transparent);min-width:20px;box-shadow:0 0 8px rgba(255,92,168,0.45),0 0 16px rgba(180,92,255,0.25)}
-.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--r);padding:14px 18px;margin-bottom:10px;box-shadow:var(--shadow);position:relative;transition:border-color .25s}
+.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--r);padding:18px 20px;margin-bottom:10px;box-shadow:var(--shadow);position:relative;transition:border-color .25s}
 .card:hover{border-color:rgba(255,255,255,0.12)}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;border-radius:var(--r) var(--r) 0 0;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent);pointer-events:none}
 .card:last-of-type{margin-bottom:0}
@@ -150,6 +196,8 @@ input[type="number"]{-moz-appearance:textfield}
 .btn-full{width:100%;justify-content:center}
 .btn-gold{background:rgba(210,166,72,0.10);color:#E5C16C;border-color:rgba(210,166,72,0.45);box-shadow:0 0 10px rgba(210,166,72,0.20)}
 .btn-gold:hover{background:rgba(210,166,72,0.18);color:#F0D08A;box-shadow:0 0 18px rgba(210,166,72,0.38)}
+.btn-orange{background:rgba(255,140,66,0.10);color:#ff8c42;border-color:rgba(255,140,66,0.45);box-shadow:0 0 10px rgba(255,140,66,0.20)}
+.btn-orange:hover{background:rgba(255,140,66,0.18);color:#ffaa70;box-shadow:0 0 18px rgba(255,140,66,0.38)}
 .btn-blue{background:rgba(126,200,255,0.10);color:#8FD0FF;border-color:rgba(126,200,255,0.45);box-shadow:0 0 12px rgba(126,200,255,0.22),inset 0 0 10px rgba(126,200,255,0.05)}
 .btn-blue:hover{background:rgba(126,200,255,0.18);color:#B5E0FF;box-shadow:0 0 20px rgba(126,200,255,0.42)}
 .btn-lilac{background:rgba(201,162,255,0.10);color:#CBA8FF;border-color:rgba(201,162,255,0.45);box-shadow:0 0 12px rgba(201,162,255,0.22),inset 0 0 10px rgba(201,162,255,0.05)}
@@ -166,13 +214,40 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sp-label::after{content:'';flex:1;height:1px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2) 55%,transparent);box-shadow:0 0 6px rgba(255,92,168,0.4)}
 .gauge-wrap{display:flex;justify-content:center;margin-bottom:4px}
 .gauge-wrap svg{overflow:visible}
+/* Gauge HUD — breathing halo + counter-rotating dashed rings, recoloured to the
+   verdict (the same live treatment as the AI Risk Advisor robot below it). */
+.gh-halo{fill:rgba(var(--gauge-rgb,91,155,216),0.16);filter:blur(5px)}
+.gh-ring{fill:none}
+.gh-ring-a{stroke:rgba(var(--gauge-rgb,91,155,216),0.40)}
+.gh-ring-b{stroke:rgba(var(--gauge-rgb,91,155,216),0.55)}
+@keyframes ghSpin{to{transform:rotate(360deg)}}
+@keyframes ghPulse{0%,100%{opacity:.4;transform:scale(.95)}50%{opacity:.85;transform:scale(1.04)}}
+@media (prefers-reduced-motion: no-preference){
+  .gh-halo{transform-box:fill-box;transform-origin:center;animation:ghPulse 2.8s ease-in-out infinite}
+  .gh-ring-a{transform-box:fill-box;transform-origin:center;animation:ghSpin 24s linear infinite}
+  .gh-ring-b{transform-box:fill-box;transform-origin:center;animation:ghSpin 17s linear infinite reverse}
+}
 .sp-indicator{height:2px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2))!important;width:50%;margin:0 auto 4px;box-shadow:0 0 10px rgba(255,92,168,0.5),0 0 18px rgba(180,92,255,0.3)}
 .sp-score-label{text-align:center;font-size:8px;color:#D6DBE6;letter-spacing:1.2px;text-transform:uppercase;font-family:var(--mono)}
 .sp-spacer{flex:1;min-height:10px}
+
+/* ── AI Risk Advisor (HUD robot, recolors to risk) ── */
+.adv-block{display:flex;align-items:center;gap:13px}
+.adv-hud{position:relative;width:100px;height:100px;flex-shrink:0}
+.adv-glow{position:absolute;inset:-4px;border-radius:50%;pointer-events:none}
+.adv-sweep{position:absolute;inset:0;border-radius:50%}
+.adv-ring-svg{position:absolute;inset:0;overflow:visible}
+.adv-img-ring{position:absolute;top:14px;left:14px;width:72px;height:72px;border-radius:50%;overflow:hidden}
+.adv-img{width:100%;height:100%;background-size:cover}
+.adv-orbit{position:absolute;inset:0}
+.adv-dot{position:absolute;top:-1px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%}
+.adv-name{font-family:var(--display);font-weight:600;font-size:15px;color:var(--text)}
+.adv-role{font-family:var(--mono);font-size:9.5px;letter-spacing:0.05em}
+.adv-note{margin-top:11px;font-size:12.5px;line-height:1.55;color:var(--text2);text-wrap:pretty}
 .sp-actions{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--border2)}
 .sp-actions .btn{padding:6px 12px;font-size:9.5px}
 .save-stamp{text-align:center;font-size:8.5px;color:var(--text3);font-family:var(--mono);letter-spacing:0.5px;min-height:12px;margin-top:2px}
-.verdict-pill{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:600;border:1px solid;margin-bottom:10px;white-space:nowrap;width:fit-content;font-family:var(--sans)}
+.verdict-pill{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;border:1px solid;margin-bottom:10px;white-space:nowrap;width:fit-content;font-family:var(--display)}
 .vp-cdd{background:var(--cdd-bg);color:var(--cdd-text);border-color:var(--cdd-bd)}
 .vp-sdd{background:var(--sdd-bg);color:var(--sdd-text);border-color:var(--sdd-bd);box-shadow:0 0 12px rgba(255,148,52,0.30),inset 0 0 8px rgba(255,148,52,0.06)}
 .vp-edd{background:var(--high-bg);color:var(--high-text);border-color:var(--high-bd);box-shadow:0 0 12px rgba(255,87,87,0.35),inset 0 0 8px rgba(255,87,87,0.07)}
@@ -218,7 +293,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 /* ── Risk Data panel ──────────────────── */
 .rd-overlay{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(5,8,14,0.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .rd-overlay.open{display:flex}
-.rd-panel{width:min(940px,94vw);height:min(86vh,840px);display:flex;flex-direction:column;background:var(--card-bg);border:1px solid var(--border2);border-radius:var(--r);box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);position:relative;overflow:hidden}
+.rd-panel{width:min(940px,94vw);height:min(86vh,840px);display:flex;flex-direction:column;background:var(--card-bg);border:1px solid var(--border2);border-radius:16px;box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);position:relative;overflow:hidden}
 .rd-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent);pointer-events:none}
 .rd-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border2)}
 .rd-meta{font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.4px}
@@ -254,6 +329,19 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .ov-mark{color:var(--gold);cursor:help}
 @media(max-width:520px){.rd-reason{width:100%}.rd-at{display:none}}
 
+/* ── Device security gate (passphrase + encryption-at-rest) ─ */
+.sec-overlay{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:#05080E;background:radial-gradient(120% 120% at 50% 0%,#0A1020 0%,#05080E 70%)}
+.sec-overlay.open{display:flex}
+.sec-box{width:min(420px,92vw);background:var(--card-bg);border:1px solid var(--border2);border-radius:16px;box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);padding:26px 24px 22px;position:relative;overflow:hidden}
+.sec-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent)}
+.sec-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;letter-spacing:0.3px}
+.sec-msg{font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:14px}
+.sec-input{width:100%;background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:9px 11px;font-size:13px;font-family:var(--sans);outline:none;margin-bottom:9px;transition:border-color .18s,box-shadow .18s}
+.sec-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.sec-err{font-size:11.5px;color:var(--high-text);margin:2px 0 10px}
+.sec-actions{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.sec-note{font-size:10.5px;color:var(--text3);line-height:1.5;margin-top:13px;font-family:var(--mono)}
+
 /* ── Assessment Register (filing cabinet) ─ */
 .reg-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .reg-row:last-child{border-bottom:none}
@@ -277,6 +365,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .app-footer{margin-top:18px;font-size:10px;color:var(--text3);line-height:1.7;text-align:center;font-family:var(--mono)}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(8px);background:#10161F;color:var(--text);font-size:11px;font-weight:600;letter-spacing:0.05em;padding:9px 18px;border-radius:99px;border:1px solid rgba(255,92,168,0.50);box-shadow:0 0 14px rgba(255,92,168,0.30);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:300;font-family:var(--mono)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.storage-warn{position:fixed;top:0;left:0;right:0;background:#3d1200;color:#ffb347;font-size:11px;font-weight:600;text-align:center;padding:7px 16px;z-index:400;border-bottom:1px solid #ff8c00;font-family:var(--mono)}
 
 /* ── PRINT REPORT (black/pink A4 — hidden on screen) ── */
 #printReport{display:none;font-family:'Arial Narrow','Helvetica Neue',Arial,sans-serif;color:#1A1F2B;font-size:11.5pt;line-height:1.5;padding:0 6mm;background:#FFFFFF}
@@ -358,8 +447,21 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 <div class="app">
   <header class="doc-header">
     <div class="brand-area">
-      <div class="brand-mark">HS</div>
-      <div class="brand-name">HAWKEYE STERLING — ENTITY RISK ASSESSMENT</div>
+      <div class="brand-avatar"><span></span></div>
+      <div class="brand-text">
+        <div class="brand-name">HAWKEYE STERLING</div>
+        <div class="brand-sub">Entity Risk Assessment · AML / CFT — DPMS</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <nav class="hdr-nav" aria-label="Suite navigation">
+        <a href="index.html" class="active" aria-current="page">Assessment</a>
+        <a href="console.html">Console</a>
+        <a href="advisor.html">Advisor</a>
+      </nav>
+      <div class="live-status" title="Live engine status"><span class="live-dot"></span><span class="lbl">ALL SYSTEMS LIVE</span></div>
+      <span class="live-clock" id="utcClock">--:--:--&nbsp;<b>UTC</b></span>
+      <button class="lock-btn" id="hdrLock" onclick="headerLock()" title="Lock this device">⚿ Lock</button>
     </div>
   </header>
 
@@ -558,13 +660,16 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
                 <stop offset="100%" stop-color="#FF5757"></stop>
               </linearGradient>
             </defs>
+            <circle class="gh-halo" cx="110" cy="106" r="64"></circle>
+            <circle class="gh-ring gh-ring-a" cx="110" cy="106" r="88" fill="none" stroke-width="1" stroke-dasharray="2 7"></circle>
+            <circle class="gh-ring gh-ring-b" cx="110" cy="106" r="81" fill="none" stroke-width="1.5" stroke-dasharray="20 9 3 9"></circle>
             <circle cx="110" cy="106" r="74" fill="none" stroke="url(#trackZone)" stroke-width="12" stroke-dasharray="339 113" stroke-linecap="butt" transform="rotate(135,110,106)"></circle>
             <circle cx="110" cy="106" r="74" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10" stroke-dasharray="339 113" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
             <circle id="gaugeArc" cx="110" cy="106" r="74" fill="none" stroke="url(#gaugeGrad)" stroke-width="10" stroke-dasharray="0 452" stroke-linecap="round" transform="rotate(135,110,106)" style="transition:stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1)"></circle>
             <circle cx="110" cy="106" r="86" fill="none" stroke="rgba(255,148,52,0.55)" stroke-width="2" stroke-dasharray="2 450" stroke-dashoffset="-212" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
             <circle cx="110" cy="106" r="86" fill="none" stroke="rgba(255,87,87,0.55)" stroke-width="2" stroke-dasharray="2 450" stroke-dashoffset="-248" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
-            <text id="totalScore" x="110" y="98" text-anchor="middle" font-family="Arial Narrow,Arial,sans-serif" font-size="46" font-weight="600" fill="#F0EDE4" letter-spacing="-1">0</text>
-            <text x="110" y="118" text-anchor="middle" font-family="Arial Narrow,Arial,sans-serif" font-size="8" fill="#D6DBE6" letter-spacing="1.5">RISK SCORE</text>
+            <text id="totalScore" x="110" y="99" text-anchor="middle" font-family="'Space Grotesk',Arial,sans-serif" font-size="46" font-weight="700" fill="#F0EDE4" letter-spacing="-1">0</text>
+            <text x="110" y="118" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="8" fill="#D6DBE6" letter-spacing="1.5">RISK SCORE</text>
           </svg>
         </div>
         <div class="sp-indicator" id="scoreIndicator"></div>
@@ -597,6 +702,25 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       </div>
 
       <div class="sp-block">
+        <div class="sp-label">AI Risk Advisor</div>
+        <div class="adv-block">
+          <div class="adv-hud">
+            <div class="adv-glow" id="advGlow"></div>
+            <div class="adv-sweep" id="advSweep"></div>
+            <svg class="adv-ring-svg s1" width="100" height="100" viewBox="0 0 100 100" aria-hidden="true"><circle id="advCircle1" cx="50" cy="50" r="47" fill="none" stroke="rgba(59,229,208,0.45)" stroke-width="1" stroke-dasharray="2 7"></circle></svg>
+            <svg class="adv-ring-svg s2" width="100" height="100" viewBox="0 0 100 100" aria-hidden="true"><circle id="advCircle2" cx="50" cy="50" r="40" fill="none" stroke="rgba(59,229,208,0.65)" stroke-width="1.5" stroke-dasharray="18 8 3 8"></circle></svg>
+            <div class="adv-img-ring" id="advImgRing"><div class="adv-img" id="advImg"></div></div>
+            <div class="adv-orbit"><div class="adv-dot" id="advDot"></div></div>
+          </div>
+          <div>
+            <div class="adv-name" id="advName">Vale</div>
+            <div class="adv-role" id="advRole">KYC &amp; onboarding</div>
+          </div>
+        </div>
+        <div class="adv-note" id="advNote"></div>
+      </div>
+
+      <div class="sp-block">
         <div class="sp-label">Risk Position</div>
         <div class="sb-bar-track"><div class="sb-seg-low"></div><div class="sb-seg-med"></div><div class="sb-seg-high"></div></div>
         <div class="sb-bar-pointer-wrap"><div class="sb-bar-pointer" id="barPointer" style="left:0%"><span id="pointerLabel">0</span></div></div>
@@ -614,10 +738,14 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       <div class="sp-spacer"></div>
 
       <div class="sp-actions no-print">
-        <button class="btn btn-primary btn-full" onclick="printReport()" title="Safari: choose A4 paper size and enable “Print backgrounds” in the print dialog">⎙ Print / Export PDF</button>
+        <button class="btn btn-primary btn-full" onclick="printPreflight()">⎙ Print / Export PDF</button>
         <button class="btn btn-ghost btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
-        <button class="btn btn-blue btn-full" onclick="openRegister()">☰ Register</button>
+        <button class="btn btn-orange btn-full" id="btnRetryAsana" onclick="retryAsanaDelivery()" style="display:none">↻ Retry Asana Delivery</button>
+        <button class="btn btn-secondary btn-full" onclick="openRegister()">≡ Register</button>
+        <button class="btn btn-orange btn-full" onclick="openAudit()">▤ Activity Log</button>
+        <button class="btn btn-lilac btn-full" onclick="sendToAsana()">↗ Send to Asana</button>
         <button class="btn btn-red btn-full" onclick="newAssessment()">↺ Reset</button>
+        <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
         <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
       </div>
@@ -638,7 +766,7 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <button class="rd-tab" id="rdTab_activities" onclick="rdSetTab('activities')">Activities</button>
         <button class="rd-tab" id="rdTab_recycled" onclick="rdSetTab('recycled')">Recycled</button>
         <button class="rd-tab" id="rdTab_mined" onclick="rdSetTab('mined')">Mined</button>
-        <input class="rd-search" id="rdSearch" placeholder="Filter by name…" oninput="rdRender()">
+        <input class="rd-search" id="rdSearch" placeholder="Filter by name…" oninput="rdSearchInput()">
         <button class="rd-tab" id="rdOvOnly" onclick="rdToggleOvOnly()">✱ Overridden only</button>
       </div>
       <div class="rd-rows" id="rdRows"></div>
@@ -672,18 +800,55 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       </div>
     </div>
   </div>
+
+  <!-- Activity Log — tamper-evident, hash-chained record of key actions on this device -->
+  <div class="rd-overlay" id="auditOverlay">
+    <div class="rd-panel">
+      <div class="rd-head">
+        <span class="st">Activity Log</span>
+        <span class="rd-meta" id="auditMeta"></span>
+        <span class="rd-spacer"></span>
+        <button class="rd-close" onclick="closeAudit()" title="Close" aria-label="Close activity log">✕</button>
+      </div>
+      <div class="rd-rows" id="auditRows"></div>
+      <div class="rd-foot">
+        <span class="rd-count" id="auditCountLbl"></span>
+        <span class="rd-spacer"></span>
+        <button class="btn btn-blue" onclick="exportAudit()">⇩ Export Log</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Device security gate: passphrase unlock + encryption-at-rest. Renders over the
+     app; the engine still boots underneath so the page always computes. -->
+<div class="sec-overlay" id="secOverlay" role="dialog" aria-modal="true" aria-label="Device security">
+  <div class="sec-box">
+    <div class="sec-title" id="secTitle">Unlock</div>
+    <div class="sec-msg" id="secMsg"></div>
+    <input type="password" id="secPass" class="sec-input" placeholder="Passphrase" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <input type="password" id="secPass2" class="sec-input" placeholder="Confirm passphrase" autocomplete="off" autocapitalize="off" spellcheck="false" style="display:none">
+    <div class="sec-err" id="secErr" style="display:none"></div>
+    <div class="sec-actions">
+      <button class="btn btn-primary btn-full" id="secPrimary" onclick="secSubmit()">Unlock</button>
+      <button class="btn btn-ghost btn-full" id="secSkip" onclick="secSkip()" style="display:none">Continue without encryption</button>
+    </div>
+    <div class="sec-note" id="secNote"></div>
+  </div>
 </div>
 
 <input type="file" id="importFile" accept=".json,application/json" style="display:none">
 <input type="file" id="rdImportFile" accept=".json,application/json" style="display:none">
 <div class="toast" id="toast"></div>
+<div class="storage-warn" id="storageWarn" role="alert" aria-live="assertive" style="display:none">⚠ Autosave unavailable — your browser's local storage is blocked or full. Export your assessment to avoid losing work.</div>
 <div id="printReport"></div>
 
 <script>
 /* ══════════════════════════════════════════
    DATA (sourced directly from Data sheet)
 ══════════════════════════════════════════ */
-const APP_VERSION = '3.6.1';
+const APP_VERSION = '3.7.0';
+const TOAST_DURATION_MS = 2600; /* keeps toasts readable per accessibility guidelines */
 
 const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":1},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":1},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":1},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":1},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":1},{"name":"Isle of Man","score":1},{"name":"Belgium","score":1},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":1},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":1},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":1},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":2},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":2},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":1},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":2},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":2},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":2},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":2},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":1},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":2},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3,"cfa":true},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3,"cfa":true},{"name":"Islamic Republic of Iran","score":3,"cfa":true}];
 
@@ -714,7 +879,18 @@ const QUESTIONS_OC = [
 
 const BAND_FULL = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence', EDD:'Enhanced Due Diligence', PROHIBITED:'Do Not Onboard'};
 const BAND_ICON = {CDD:'✓', SDD:'!', EDD:'⚠', PROHIBITED:'⛔'};
-const REVIEW_MONTHS = {CDD:12, SDD:6, EDD:3}; /* manual's KYC review cycles: low 12m, medium 6m, high 3m */
+const REVIEW_MONTHS = {CDD:12, SDD:6, EDD:3}; /* KYC review cycles per compliance manual: low 12m, medium 6m, high 3m */
+
+/* Policy names referenced in the narrative template — update here if policies are renamed. */
+const POLICIES = {
+  TFS:  'Targeted Financial Sanctions procedure',
+  RAS:  'Risk Appetite Statement',
+  SOFW: 'Source of Funds and Source of Wealth policy',
+  RS:   'Responsible Sourcing and Supply Chain policy',
+  KYC:  'Know Your Customer procedure',
+  UBO:  'Ultimate Beneficial Owner procedure',
+  RCP:  'Risk Control Plan'
+};
 const ASM_SOURCE = 'ASM — Artisanal Mining';
 const SCREENING_GROUPS = [['sanctions','Sanctions screening'],['pep','PEP screening'],['adverse','Adverse media screening']];
 
@@ -727,6 +903,249 @@ const SEQ_KEY = 'hsra.seq';
 ══════════════════════════════════════════ */
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ══════════════════════════════════════════
+   DEVICE SECURITY — passphrase gate + encryption-at-rest (WebCrypto, no deps)
+   Sensitive data (drafts, register, risk-data overrides, Asana payloads, the
+   activity log) is encrypted at rest with AES-GCM under a key derived from the
+   officer's passphrase via PBKDF2. While locked or never configured, the store
+   is a transparent passthrough to localStorage — no behaviour change — so the
+   scoring engine and its full test suite are unaffected. Closes the Identity &
+   Access / Data Protection gaps for an on-device app (no backend to host them).
+══════════════════════════════════════════ */
+const SECURE_KEYS = ['hsra.draft.v2','hsra.riskdata.v1','hsra.register.v1','hsra.asana.delivered.v1','hsra.asana.failed.v1','hsra.audit.v1'];
+const SEC_META_KEY = 'hsra.sec.v1';        /* {v,salt,iter,iv,ct} passphrase verifier — never encrypted */
+const SEC_OPTOUT_KEY = 'hsra.sec.optout';  /* '1' when the officer chose to store unencrypted */
+const PBKDF2_ITER = 250000;
+const IDLE_LOCK_MS = 15 * 60 * 1000;       /* auto-lock after inactivity (zero-trust session) */
+let _secKey = null;        /* CryptoKey, in memory only while unlocked */
+let _secActive = false;    /* true once unlocked: reads/writes use the decrypted in-memory mirror */
+let _secMode = 'unlock';
+let _idleTimer = null;
+const _secMem = {};        /* decrypted plaintext mirror, keyed by storage key */
+
+function _hasCrypto(){ try{ return !!(crypto && crypto.subtle && crypto.getRandomValues); }catch(e){ return false; } }
+const _u8 = s => new TextEncoder().encode(s);
+const _b64 = u => btoa(String.fromCharCode.apply(null, new Uint8Array(u)));
+const _ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function _deriveKey(pass, salt, iter){
+  const base = await crypto.subtle.importKey('raw', _u8(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'},
+    base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+async function encryptStr(key, str){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, _u8(str));
+  return 'hsx1:' + _b64(iv) + ':' + _b64(ct);
+}
+async function decryptStr(key, blob){
+  const p = String(blob).split(':');
+  if(p[0] !== 'hsx1' || p.length !== 3) throw new Error('not-encrypted');
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:_ub64(p[1])}, key, _ub64(p[2]));
+  return new TextDecoder().decode(pt);
+}
+async function sha256Hex(str){
+  const d = await crypto.subtle.digest('SHA-256', _u8(str));
+  return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+/* Secure-store facade: every sensitive key routes through this instead of
+   localStorage directly. Synchronous reads after unlock come from the mirror;
+   persistence is async-encrypted. */
+const SS = {
+  getItem(k){
+    if(_secActive) return Object.prototype.hasOwnProperty.call(_secMem,k) ? _secMem[k] : null;
+    try{ return localStorage.getItem(k); }catch(e){ return null; }
+  },
+  setItem(k,v){
+    v = String(v);
+    if(_secActive){ _secMem[k] = v; _secPersist(k, v); }
+    else localStorage.setItem(k, v);   /* may throw on quota — callers handle storageWarn */
+  },
+  removeItem(k){
+    if(_secActive) delete _secMem[k];
+    try{ localStorage.removeItem(k); }catch(e){}
+  }
+};
+function _secWarn(show){ const w = $('storageWarn'); if(w) w.style.display = show ? '' : 'none'; }
+function _secPersist(k, v){
+  encryptStr(_secKey, v)
+    .then(blob => { try{ localStorage.setItem(k, blob); _secWarn(false); }catch(e){ _secWarn(true); } })
+    .catch(() => _secWarn(true));
+}
+
+function _secError(msg){ const e = $('secErr'); if(e){ e.textContent = msg; e.style.display = ''; } }
+function _secShow(mode){
+  _secMode = mode;
+  const setup = mode === 'setup';
+  if($('secTitle')) $('secTitle').textContent = setup ? 'Protect this device' : 'Unlock';
+  if($('secMsg')) $('secMsg').textContent = setup
+    ? 'Encrypt every assessment, register entry and risk-data override stored in this browser with a passphrase (AES-256-GCM). You will enter it each time you open the tool on this device.'
+    : 'Enter your passphrase to decrypt this device’s assessments.';
+  if($('secPass')) $('secPass').value = '';
+  if($('secPass2')){ $('secPass2').value = ''; $('secPass2').style.display = setup ? '' : 'none'; }
+  if($('secPrimary')) $('secPrimary').textContent = setup ? 'Set passphrase & encrypt' : 'Unlock';
+  if($('secSkip')) $('secSkip').style.display = setup ? '' : 'none';
+  if($('secNote')) $('secNote').textContent = setup
+    ? '⚠ There is no recovery. If the passphrase is forgotten the stored data cannot be read — store the passphrase securely.'
+    : '';
+  if($('secErr')) $('secErr').style.display = 'none';
+  if($('secOverlay')) $('secOverlay').classList.add('open');
+  const p = $('secPass'); if(p && p.focus) try{ p.focus(); }catch(e){}
+}
+function _secHide(){ if($('secOverlay')) $('secOverlay').classList.remove('open'); if($('secPass')) $('secPass').value=''; if($('secPass2')) $('secPass2').value=''; }
+
+async function secSubmit(){
+  if(!_hasCrypto()) return;
+  const pass = ($('secPass') && $('secPass').value) || '';
+  if(_secMode === 'setup'){
+    if(pass.length < 8) return _secError('Use at least 8 characters.');
+    if(pass !== (($('secPass2') && $('secPass2').value) || '')) return _secError('Passphrases do not match.');
+    try{
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      _secKey = await _deriveKey(pass, salt, PBKDF2_ITER);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, _secKey, _u8('hsra-verify'));
+      localStorage.setItem(SEC_META_KEY, JSON.stringify({v:1, salt:_b64(salt), iter:PBKDF2_ITER, iv:_b64(iv), ct:_b64(ct)}));
+      localStorage.removeItem(SEC_OPTOUT_KEY);
+      await _secActivate();          /* migrates existing plaintext → encrypted */
+      await auditAppend('security.enabled', 'Encryption-at-rest enabled');
+      _secFinish('Device encrypted — assessments are now protected.');
+    }catch(e){ _secError('Could not enable encryption: ' + ((e && e.message) || e)); }
+  } else {
+    try{
+      const meta = JSON.parse(localStorage.getItem(SEC_META_KEY));
+      _secKey = await _deriveKey(pass, _ub64(meta.salt), meta.iter || PBKDF2_ITER);
+      const check = await crypto.subtle.decrypt({name:'AES-GCM', iv:_ub64(meta.iv)}, _secKey, _ub64(meta.ct));
+      if(new TextDecoder().decode(check) !== 'hsra-verify') throw new Error('bad');
+      await _secActivate();
+      await auditAppend('security.unlock', 'Device unlocked');
+      _secFinish('Unlocked.');
+    }catch(e){ _secKey = null; _secError('Incorrect passphrase.'); }
+  }
+}
+/* First-run only: officer declines encryption — remember the choice, stay plaintext. */
+function secSkip(){ try{ localStorage.setItem(SEC_OPTOUT_KEY, '1'); }catch(e){} _secHide(); }
+
+async function _secActivate(){
+  _secActive = true;
+  for(const k of SECURE_KEYS){
+    let raw = null; try{ raw = localStorage.getItem(k); }catch(e){}
+    if(raw == null) continue;
+    try{ _secMem[k] = await decryptStr(_secKey, raw); }
+    catch(e){ _secMem[k] = raw; _secPersist(k, raw); }   /* legacy plaintext → upgrade in place */
+  }
+  _secArmIdle();
+}
+function _secFinish(msg){
+  _secHide();
+  if($('btnLock')) $('btnLock').style.display = '';
+  _syncHeaderLock(false);
+  hydrateApp();
+  toast(msg);
+}
+function _secArmIdle(){
+  if(!_secActive || typeof window === 'undefined' || !window.addEventListener) return;
+  ['click','keydown','mousemove','touchstart'].forEach(ev => window.addEventListener(ev, _secBumpIdle, {passive:true}));
+  _secBumpIdle();
+}
+function _secBumpIdle(){ if(_idleTimer) clearTimeout(_idleTimer); _idleTimer = setTimeout(secLock, IDLE_LOCK_MS); }
+function secLock(){
+  if(!_secActive) return;
+  _secKey = null; _secActive = false;
+  for(const k in _secMem) delete _secMem[k];
+  if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer = null; }
+  if($('btnLock')) $('btnLock').style.display = 'none';
+  _syncHeaderLock(true);
+  _secShow('unlock');   /* opaque overlay hides the on-screen data until re-unlocked */
+}
+/* Boot entry point: decide whether to gate. Runs after the app has rendered, so
+   a thrown error here can never blank the page (and the engine/CI smoke test
+   always sees a computed verdict underneath the overlay). */
+function initSecurity(){
+  try{
+    if(!_hasCrypto() || !$('secOverlay')) return;          /* no WebCrypto (or test stub) → unchanged */
+    let meta = null; try{ meta = JSON.parse(localStorage.getItem(SEC_META_KEY) || 'null'); }catch(e){}
+    const p = $('secPass');
+    if(p && p.addEventListener) p.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
+    const p2 = $('secPass2');
+    if(p2 && p2.addEventListener) p2.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
+    if(meta && meta.salt) _secShow('unlock');               /* returning, encrypted device */
+    else if(localStorage.getItem(SEC_OPTOUT_KEY) === '1') return;  /* opted out previously */
+    else _secShow('setup');                                 /* first run → offer protection */
+  }catch(e){}
+}
+
+/* ── Tamper-evident activity log (AUDIT / LOG / TRACE) ──
+   Append-only, SHA-256 hash-chained: each entry binds the previous hash so any
+   edit or deletion to earlier rows is detectable. Stored via the encrypted layer. */
+const AUDIT_KEY = 'hsra.audit.v1';
+function auditAll(){ try{ const r = SS.getItem(AUDIT_KEY); return r ? JSON.parse(r) : []; }catch(e){ return []; } }
+async function auditAppend(event, detail){
+  if(!_hasCrypto()) return;
+  try{
+    const log = auditAll();
+    const prev = log.length ? log[log.length-1].hash : 'GENESIS';
+    const e = {
+      ts: new Date().toISOString(),
+      who: (typeof state !== 'undefined' && state.meta && state.meta.assessor) || '',
+      ref: (typeof state !== 'undefined' && state.meta && state.meta.ref) || '',
+      event: String(event), detail: String(detail == null ? '' : detail)
+    };
+    e.hash = await sha256Hex(prev + '|' + e.ts + '|' + e.who + '|' + e.ref + '|' + e.event + '|' + e.detail);
+    log.push(e);
+    SS.setItem(AUDIT_KEY, JSON.stringify(log));
+  }catch(err){}
+}
+async function auditVerify(){
+  const log = auditAll();
+  let prev = 'GENESIS';
+  for(const e of log){
+    const h = await sha256Hex(prev + '|' + e.ts + '|' + e.who + '|' + e.ref + '|' + e.event + '|' + e.detail);
+    if(h !== e.hash) return false;
+    prev = e.hash;
+  }
+  return true;
+}
+function _auditRow(e){
+  return '<div class="rd-row"><span class="rd-at" style="width:auto">'+esc(fmtDateTime(e.ts))+'</span>'
+    + '<span class="rd-name">'+esc(e.event)+(e.detail?' — '+esc(e.detail):'')+'</span>'
+    + '<span class="rd-base">'+esc(e.who||'—')+(e.ref?' · '+esc(e.ref):'')+'</span></div>';
+}
+function fmtDateTime(iso){ try{ const d = new Date(iso); return fmtDate(d.toISOString().slice(0,10)) + ' ' + d.toTimeString().slice(0,5); }catch(e){ return esc(iso); } }
+async function openAudit(){
+  const log = auditAll();
+  if($('auditRows')) $('auditRows').innerHTML = log.length
+    ? log.slice().reverse().map(_auditRow).join('')
+    : '<div class="rd-empty">No activity recorded yet.</div>';
+  if($('auditCountLbl')) $('auditCountLbl').textContent = log.length + (log.length===1?' entry':' entries');
+  if($('auditMeta')) $('auditMeta').textContent = '';
+  if($('auditOverlay')) $('auditOverlay').classList.add('open');
+  const ok = await auditVerify();
+  if($('auditMeta')) $('auditMeta').textContent = log.length ? (ok ? '✓ chain intact' : '⚠ integrity check failed') : '';
+}
+function closeAudit(){ if($('auditOverlay')) $('auditOverlay').classList.remove('open'); }
+function exportAudit(){
+  const out = {app:'Hawkeye Sterling — Activity Log', exportedAt:new Date().toISOString(), entries:auditAll()};
+  const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'activity-log.json';
+  link.click();
+  setTimeout(()=>URL.revokeObjectURL(link.href), 1000);
+  toast('Activity log exported');
+}
+function _auditReportBlock(){
+  const log = auditAll();
+  if(!log.length) return '';
+  const rows = log.slice(-15).map(e =>
+    '<tr><td class="k" style="white-space:nowrap">'+esc(fmtDateTime(e.ts))+'</td>'
+    + '<td class="v">'+esc(e.event)+(e.detail?' — '+esc(e.detail):'')+'</td>'
+    + '<td class="s">'+esc(e.who||'—')+'</td></tr>').join('');
+  return '<h2 class="sec"><span class="n">08</span>Activity Log <span style="font-weight:400;font-size:9pt">(tamper-evident, hash-chained — last '+Math.min(15,log.length)+' of '+log.length+')</span></h2>'
+    + '<table class="kv"><tbody>'+rows+'</tbody></table>';
+}
 function scoreFromYesNo(val, type) {
   if(type==='vlok')  return val==='Yes' ? 3 : 1;
   if(type==='vlok2') return val==='Yes' ? 1 : 3;
@@ -797,6 +1216,8 @@ function freshState(){
   s.meta.date = todayISO();
   return s;
 }
+/** Merge an untrusted source object into a clean default state. Only whitelisted scalar fields
+ *  cross the boundary; unknown keys and non-scalar values are silently dropped. */
 function mergeState(src){
   const out = defaultState();
   if(!src || typeof src!=='object') return out;
@@ -873,8 +1294,8 @@ function mergeState(src){
   if(!COUNTRIES.some(c=>c.name===out.entity.jurisdiction)) out.entity.jurisdiction = 'United Kingdom';
   if(!ACTIVITIES.some(a=>a.name===out.profile.activity)) out.profile.activity = ACTIVITIES[0].name;
   out.profile.onboard = out.profile.onboard==='Yes' ? 'Yes' : 'No';
-  out.profile.entityYears = Math.max(0, parseInt(out.profile.entityYears)||0);
-  out.profile.relYears = Math.max(0, parseInt(out.profile.relYears)||0);
+  out.profile.entityYears = Math.max(0, Math.min(99, parseInt(out.profile.entityYears)||0));
+  out.profile.relYears = Math.max(0, Math.min(99, parseInt(out.profile.relYears)||0));
   return out;
 }
 
@@ -943,13 +1364,13 @@ function mergeRiskData(src){
 }
 function loadRiskData(){
   try{
-    const raw = localStorage.getItem(RD_STORAGE_KEY);
+    const raw = SS.getItem(RD_STORAGE_KEY);
     return raw ? mergeRiskData(JSON.parse(raw)) : freshRiskData();
   }catch(e){ return freshRiskData(); }
 }
 function saveRiskData(){
   riskData.updatedAt = todayISO();
-  try{ localStorage.setItem(RD_STORAGE_KEY, JSON.stringify(riskData)); }catch(e){}
+  try{ SS.setItem(RD_STORAGE_KEY, JSON.stringify(riskData)); }catch(e){}
 }
 function rdAfterChange(){
   saveRiskData();
@@ -979,6 +1400,8 @@ function scheduleRiskBackup(){
 }
 /* Set one override. A reason is mandatory for any deviation from baseline;
    setting values equal to baseline clears the override instead. */
+/** Apply one risk-data override. Reason is mandatory for any deviation from baseline;
+ *  setting values equal to baseline clears the override. Returns false if validation fails. */
 function rdSetOverride(kind, name, vals){
   const b = rdBase(kind, name);
   if(!b || b.name==='N/A' || !vals) return false;
@@ -989,12 +1412,13 @@ function rdSetOverride(kind, name, vals){
     if(rdOv(kind, name)) rdClearOverride(kind, name);
     return true;
   }
-  const reason = String(vals.reason==null ? '' : vals.reason).trim();
+  const reason = String(vals.reason==null ? '' : vals.reason).trim().slice(0, 500);
   if(!reason) return false;
   const entry = {score, reason, at:todayISO()};
   if(kind==='countries') entry.cfa = cfa;
   riskData.overrides[kind][name] = entry;
   rdAfterChange();
+  auditAppend('riskdata.override', kind+'/'+name+' → '+score+(cfa?' (CFA)':''));
   return true;
 }
 function rdClearOverride(kind, name){
@@ -1035,28 +1459,31 @@ $('rdImportFile').addEventListener('change', function(e){
   if(!f) return;
   const r = new FileReader();
   r.onload = function(){
-    try{
-      const data = JSON.parse(r.result);
-      const looks = data && typeof data==='object'
-        && (data.overrides || Object.keys(RD_KINDS).some(k => data[k]));
-      if(!looks) throw new Error('invalid');
-      riskData = mergeRiskData(data);
-      rdAfterChange();
-      toast('Risk data sheet imported — ' + rdCount() + ' override' + (rdCount()===1?'':'s'));
-    }catch(err){
-      alert('Invalid risk data sheet. Expected a sheet exported from this application.');
+    if(r.result && r.result.length > 10 * 1024 * 1024){ alert('File too large. Maximum allowed size is 10 MB.'); e.target.value = ''; return; }
+    let data;
+    try{ data = JSON.parse(r.result); }
+    catch(err){ alert('The file contains invalid JSON. Expected a risk data sheet exported from this application.'); e.target.value = ''; return; }
+    const looks = data && typeof data==='object' && (data.overrides || Object.keys(RD_KINDS).some(k => data[k]));
+    if(!looks){ alert('Invalid risk data sheet. Expected a sheet exported from this application.'); e.target.value = ''; return; }
+    if(typeof data.updatedAt !== 'undefined' && !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(String(data.updatedAt))){
+      alert('The file has an invalid date format. Expected a sheet exported from this application.'); e.target.value = ''; return;
     }
+    riskData = mergeRiskData(data);
+    rdAfterChange();
+    toast('Risk data sheet imported — ' + rdCount() + ' override' + (rdCount()===1?'':'s'));
     e.target.value = '';
   };
   r.readAsText(f);
 });
 
 /* ── Risk Data panel UI ── */
-let rdTab = 'countries', rdShowOvOnly = false;
+let rdTab = 'countries', rdShowOvOnly = false, rdSearchTimer = null;
 function openRiskData(){ const o = $('rdOverlay'); if(o) o.classList.add('open'); rdRender(); }
 function closeRiskData(){ const o = $('rdOverlay'); if(o) o.classList.remove('open'); }
 function rdSetTab(kind){ rdTab = kind; rdRender(); }
 function rdToggleOvOnly(){ rdShowOvOnly = !rdShowOvOnly; rdRender(); }
+/** Debounce keystrokes so the 380-row DOM rebuild doesn't fire on every character. */
+function rdSearchInput(){ clearTimeout(rdSearchTimer); rdSearchTimer = setTimeout(rdRender, 200); }
 function rdRender(){
   const rows = $('rdRows');
   if(!rows) return;
@@ -1149,7 +1576,7 @@ function initRiskDataPanel(){
   });
   const ov = $('rdOverlay');
   if(ov) ov.addEventListener('click', function(e){ if(e.target===ov) closeRiskData(); });
-  if(document.addEventListener) document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeRiskData(); closeRegister(); } });
+  if(document.addEventListener) document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeRiskData(); closeRegister(); closeAudit(); } });
 }
 
 /* ══════════════════════════════════════════
@@ -1270,6 +1697,7 @@ function paintSupplier(prefix, i) {
 function paintStatus() {
   const btn = $('btnComplete');
   if(btn) btn.textContent = state.complete ? '✓ Mark as Draft' : '✓ Complete Assessment';
+  paintRetryButton();
 }
 
 function syncUI() {
@@ -1338,6 +1766,8 @@ function onScreening(group, key, val){ state.screening[group][key] = val; schedu
    and Wealth, Responsible Sourcing). One text serves every assessed
    entity; entity, date, score and jurisdiction band fill automatically,
    [bracketed] fields need officer review. No em-dashes. ── */
+/** Generate a band-appropriate narrative template for the notes field. Policy names come
+ *  from the POLICIES constant so they stay consistent if policies are renamed. */
 function buildNarrative(){
   const a = computeAssessment();
   const s = state;
@@ -1353,18 +1783,18 @@ function buildNarrative(){
   if(a.prohibited){
     t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + '. Designated party exposure was identified: '
       + a.escalations.filter(e=>e.level==='prohibit').map(e=>e.reason).join('; ')
-      + '. The relationship is prohibited under our Targeted Financial Sanctions procedure and our Risk Appetite Statement. We will not onboard or continue with this customer. Funds are frozen where held, and the Compliance Officer will decide whether a report must be filed with the Financial Intelligence Unit under Federal Decree-Law No. (10) of 2025 and the Cabinet Decision on Targeted Financial Sanctions. No review date is set because the relationship is declined. This note is kept as the record of our decision.';
+      + '. The relationship is prohibited under our ' + POLICIES.TFS + ' and our ' + POLICIES.RAS + '. We will not onboard or continue with this customer. Funds are frozen where held, and the Compliance Officer will decide whether a report must be filed with the Financial Intelligence Unit under Federal Decree-Law No. (10) of 2025 and the Cabinet Decision on Targeted Financial Sanctions. No review date is set because the relationship is declined. This note is kept as the record of our decision.';
   } else if(a.outcome==='CDD'){
-    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the low risk band. The customer operates from ' + jurWord + ', and its licensed activity is within the sectors accepted by our Risk Appetite Statement. Screening for sanctions, PEP and adverse media was completed and cleared before onboarding under our Targeted Financial Sanctions procedure. We found no concerns under our Source of Funds and Source of Wealth policy, and the declared material sources fall within our Responsible Sourcing and Supply Chain policy. Standard due diligence applies. We will review the file at least every twelve months, re-screen the customer annually, and bring the review forward if anything changes, in line with our Know Your Customer procedure. Transaction monitoring follows the low risk cycle. The relationship is within our risk appetite and is approved. This note is kept as the record of our decision.';
+    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the low risk band. The customer operates from ' + jurWord + ', and its licensed activity is within the sectors accepted by our ' + POLICIES.RAS + '. Screening for sanctions, PEP and adverse media was completed and cleared before onboarding under our ' + POLICIES.TFS + '. We found no concerns under our ' + POLICIES.SOFW + ', and the declared material sources fall within our ' + POLICIES.RS + '. Standard due diligence applies. We will review the file at least every twelve months, re-screen the customer annually, and bring the review forward if anything changes, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the low risk cycle. The relationship is within our risk appetite and is approved. This note is kept as the record of our decision.';
   } else if(a.outcome==='SDD'){
-    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the medium risk band. Some factors raise the profile, such as the jurisdiction, the business activity, the material sources or the length of trading history. Screening was completed and cleared under our Targeted Financial Sanctions procedure, the source of funds is verifiable under our Source of Funds and Source of Wealth policy, and the activity remains within the sectors accepted by our Risk Appetite Statement.'
+    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the medium risk band. Some factors raise the profile, such as the jurisdiction, the business activity, the material sources or the length of trading history. Screening was completed and cleared under our ' + POLICIES.TFS + ', the source of funds is verifiable under our ' + POLICIES.SOFW + ', and the activity remains within the sectors accepted by our ' + POLICIES.RAS + '.'
       + (a.total===22 ? ' The score is one point below the high risk threshold, so a change in a single factor will raise the required diligence.' : '')
-      + ' Simplified due diligence applies, with closer monitoring where needed. We will review the file every six months, or sooner if a trigger event occurs, in line with our Know Your Customer procedure. Transaction monitoring follows the medium risk cycle. We continue the relationship on a conditional basis under our Risk Control Plan. This note is kept as the record of our decision.';
+      + ' Simplified due diligence applies, with closer monitoring where needed. We will review the file every six months, or sooner if a trigger event occurs, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the medium risk cycle. We continue the relationship on a conditional basis under our ' + POLICIES.RCP + '. This note is kept as the record of our decision.';
   } else {
     t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the high risk band.'
       + (a.escalations.length ? ' This includes a mandatory escalation: ' + a.escalations.map(e=>e.reason).join('; ') + '.' : '')
       + (a.analystOv ? ' The outcome was raised from ' + a.analystOv.from + ' by an analyst override: ' + a.analystOv.reason + '.' : '')
-      + ' The main concerns come from factors such as the jurisdiction, the material sources, the delivery channel or the ownership structure. The customer is not based in a FATF blacklisted country, screening returned no matches on the UN, EU, OFAC or UAE lists under our Targeted Financial Sanctions procedure, and the source of funds can be verified, so we may continue under enhanced controls within our Risk Appetite Statement. Enhanced due diligence applies and senior management approval is recorded. We verify the owners and controllers under our Ultimate Beneficial Owner procedure, obtain documents that support the source of funds and wealth, and carry out enhanced checks under our Responsible Sourcing and Supply Chain policy. We will review the file at least every three months, or immediately if a trigger event occurs, in line with our Know Your Customer procedure. Transaction monitoring follows the high risk cycle. Approved by [MLRO name] on [DD/MM/YYYY]. This note is kept as the record of our decision.';
+      + ' The main concerns come from factors such as the jurisdiction, the material sources, the delivery channel or the ownership structure. The customer is not based in a FATF blacklisted country, screening returned no matches on the UN, EU, OFAC or UAE lists under our ' + POLICIES.TFS + ', and the source of funds can be verified, so we may continue under enhanced controls within our ' + POLICIES.RAS + '. Enhanced due diligence applies and senior management approval is recorded. We verify the owners and controllers under our ' + POLICIES.UBO + ', obtain documents that support the source of funds and wealth, and carry out enhanced checks under our ' + POLICIES.RS + '. We will review the file at least every three months, or immediately if a trigger event occurs, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the high risk cycle. Approved by [MLRO name] on [DD/MM/YYYY]. This note is kept as the record of our decision.';
   }
   return t.replace(/—/g, '-'); /* narrative stays em-dash free per client style */
 }
@@ -1385,16 +1815,16 @@ const ASANA_DELIVERED_KEY = 'hsra.asana.delivered.v1';
 function deliveredGid(ref){
   if(!ref) return '';
   try{
-    const m = JSON.parse(localStorage.getItem(ASANA_DELIVERED_KEY)) || {};
+    const m = JSON.parse(SS.getItem(ASANA_DELIVERED_KEY)) || {};
     return typeof m[ref]==='string' ? m[ref] : '';
   }catch(e){ return ''; }
 }
 function rememberDelivered(ref, gid){
   if(!ref || !gid) return;
   try{
-    const m = JSON.parse(localStorage.getItem(ASANA_DELIVERED_KEY)) || {};
+    const m = JSON.parse(SS.getItem(ASANA_DELIVERED_KEY)) || {};
     m[ref] = String(gid);
-    localStorage.setItem(ASANA_DELIVERED_KEY, JSON.stringify(m));
+    SS.setItem(ASANA_DELIVERED_KEY, JSON.stringify(m));
   }catch(e){}
 }
 function asanaPayload(){
@@ -1428,20 +1858,61 @@ function asanaPayload(){
       + (s.signoff.approvedDate ? ', ' + (fmtDate(s.signoff.approvedDate) || s.signoff.approvedDate) : '')
   };
 }
+const ASANA_FAILED_KEY = 'hsra.asana.failed.v1';
+/** Store a failed delivery payload for manual retry; shows the retry button. */
+function storeFailedDelivery(ref, payload){
+  if(!ref) return;
+  try{ const m = JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}; m[ref] = payload; SS.setItem(ASANA_FAILED_KEY, JSON.stringify(m)); }catch(e){}
+  paintRetryButton();
+}
+function clearFailedDelivery(ref){
+  if(!ref) return;
+  try{ const m = JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}; delete m[ref]; SS.setItem(ASANA_FAILED_KEY, JSON.stringify(m)); }catch(e){}
+  paintRetryButton();
+}
+function getFailedPayload(ref){
+  if(!ref) return null;
+  try{ const m = JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}; return m[ref] || null; }catch(e){ return null; }
+}
+/** Show the retry button only when there is a pending failed delivery for the current ref. */
+function paintRetryButton(){
+  const btn = $('btnRetryAsana');
+  if(!btn) return;
+  const ref = String(state.meta.ref||'').trim();
+  btn.style.display = (ref && getFailedPayload(ref)) ? '' : 'none';
+}
 function sendToAsana(){
-  /* Only meaningful on the deployed site; silently unavailable on file:// and in tests. */
-  if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) return;
+  /* Only meaningful on the deployed site (needs the Netlify function + token). */
+  if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0){
+    toast('↗ Send to Asana works on the deployed site only.');
+    return;
+  }
+  toast('↗ Sending to Asana…');
   const p = asanaPayload();
   const ref = String(state.meta.ref||'').trim();
+  doSendToAsana(p, ref, false);
+}
+function retryAsanaDelivery(){
+  const ref = String(state.meta.ref||'').trim();
+  const p = getFailedPayload(ref);
+  if(!p) return;
+  doSendToAsana(p, ref, true);
+}
+function doSendToAsana(p, ref, isRetry){
+  if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) return;
   fetch('/.netlify/functions/asana-task', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(p)
   }).then(r => r.json()).then(d => {
-    if(d && d.ok && d.gid) rememberDelivered(ref, d.gid);
+    if(d && d.ok && d.gid){ rememberDelivered(ref, d.gid); clearFailedDelivery(ref); }
+    else storeFailedDelivery(ref, p);
     toast(d && d.ok ? (d.updated ? 'Updated in Asana: ' : 'Delivered to Asana: ') + p.name
                     : 'Asana delivery failed' + (d && d.error ? ' (' + d.error + ')' : ''));
-  }).catch(() => toast('Asana delivery unavailable'));
+  }).catch(() => {
+    storeFailedDelivery(ref, p);
+    toast(isRetry ? 'Retry failed — Asana still unavailable' : 'Asana delivery unavailable');
+  });
 }
 function onSign(key, val) {
   state.signoff[key] = val;
@@ -1470,6 +1941,7 @@ function onYears(which) {
   const inp = $(which==='entity'?'entityYearsInput':'relYearsInput');
   let y = parseInt(inp.value);
   if(isNaN(y) || y<0) y = 0;
+  if(y>99) y = 99;
   if(which==='entity') state.profile.entityYears = y; else state.profile.relYears = y;
   paintYears(which);
   recalc();
@@ -1484,12 +1956,15 @@ function toggleComplete() {
   paintStatus();
   scheduleSave();
   if(state.complete) sendToAsana();
+  auditAppend('assessment.complete', state.complete ? 'Marked complete' : 'Reverted to draft');
   toast(state.complete ? 'Assessment marked complete' : 'Assessment back to draft');
 }
 
 /* ══════════════════════════════════════════
    ASSESSMENT ENGINE
 ══════════════════════════════════════════ */
+/** Compute the full assessment result from current state. Returns {parts, total, numericBand,
+ *  engineOutcome, outcome, escalations, prohibited, analystOv, forced}. Pure — does not mutate state. */
 function computeAssessment() {
   const s = state, parts = [];
 
@@ -1563,13 +2038,43 @@ function toggleOvForm(){
   $('ovArrow').textContent = f.classList.contains('open') ? '▼' : '▶';
 }
 
+/* AI Risk Advisor personas — the sidebar robot whose head, HUD colour, and
+   advisory note follow the operative outcome (CDD → Vale, SDD → Cypher,
+   EDD / PROHIBITED → Ember). Mirrors the design's advisorFor() mapping. */
+const ADVISORS = {
+  high: {img:'assets/persona-ember.png',  pos:'50% 26%', name:'Ember',  role:'Sanctions & high-risk', rgb:'255,87,87',
+         note:'High risk. Escalate for enhanced due diligence, full sanctions screening, and senior-management sign-off.'},
+  med:  {img:'assets/persona-cypher.png', pos:'42% 30%', name:'Cypher', role:'Active monitoring',      rgb:'247,197,60',
+         note:'Elevated risk. Apply enhanced monitoring, refresh KYC records, and document the rationale for the rating.'},
+  low:  {img:'assets/persona-vale.png',   pos:'50% 22%', name:'Vale',   role:'KYC & onboarding',       rgb:'59,229,208',
+         note:'Standard customer due diligence is sufficient. Proceed with routine onboarding and a periodic review cycle.'}
+};
+function advisorKind(outcome){ return (outcome==='EDD'||outcome==='PROHIBITED') ? 'high' : outcome==='SDD' ? 'med' : 'low'; }
+function updateAdvisor(outcome){
+  const a = ADVISORS[advisorKind(outcome)];
+  const set = (id,fn)=>{ const el=$(id); if(el) fn(el); };
+  set('advImg',     el=>{ el.style.backgroundImage="url('"+a.img+"')"; el.style.backgroundPosition=a.pos; });
+  set('advImgRing', el=>{ el.style.border='2px solid rgba('+a.rgb+',0.75)'; el.style.boxShadow='0 0 18px rgba('+a.rgb+',0.4),inset 0 0 16px rgba(0,0,0,0.5)'; });
+  set('advGlow',    el=>{ el.style.background='radial-gradient(circle,rgba('+a.rgb+',0.4),transparent 70%)'; });
+  set('advSweep',   el=>{ el.style.background='conic-gradient(from 0deg,transparent,rgba('+a.rgb+',0.32) 60deg,transparent 130deg)'; });
+  set('advCircle1', el=>el.setAttribute('stroke','rgba('+a.rgb+',0.45)'));
+  set('advCircle2', el=>el.setAttribute('stroke','rgba('+a.rgb+',0.65)'));
+  set('advDot',     el=>{ el.style.background='rgb('+a.rgb+')'; el.style.boxShadow='0 0 9px rgb('+a.rgb+')'; });
+  set('advName',    el=>el.textContent=a.name);
+  set('advRole',    el=>{ el.textContent=a.role; el.style.color='rgb('+a.rgb+')'; });
+  set('advNote',    el=>el.textContent=a.note);
+  /* Gauge HUD recolours to the same verdict accent as the advisor robot. */
+  set('gaugeWrap',  el=>{ if(el.style && el.style.setProperty) el.style.setProperty('--gauge-rgb', a.rgb); });
+}
+
 function recalc() {
   const a = computeAssessment();
   const s = state;
 
   $('totalScore').textContent = a.total;
 
-  /* Gauge arc: 270° sweep = 339 dash units on the r=74 circle, display scale 0–30 */
+  /* Gauge arc: 270° sweep on r=74 circle. 339 ≈ 2π×72×0.75 (fitted to the visual sweep including round linecap).
+     452 = circumference buffer; must be > 339 so the gap stays hidden. Display scale: 0–30. */
   const arc = $('gaugeArc');
   if(arc) arc.style.strokeDasharray = (Math.min(a.total/30, 1)*339).toFixed(1) + ' 452';
 
@@ -1579,6 +2084,9 @@ function recalc() {
   vpEl.className = 'verdict-pill ' + {CDD:'vp-cdd', SDD:'vp-sdd', EDD:'vp-edd', PROHIBITED:'vp-proh'}[a.outcome];
   $('verdictText').textContent = a.outcome + ' — ' + BAND_FULL[a.outcome] + (a.analystOv ? ' ✱' : '');
   $('verdictIcon').textContent = BAND_ICON[a.outcome];
+
+  /* AI Risk Advisor — robot persona recolours to the operative outcome */
+  updateAdvisor(a.outcome);
 
   /* Analyst override banner + form hint */
   const ovB = $('ovBanner');
@@ -1653,10 +2161,12 @@ function recalc() {
     s.signoff.nextReview = suggested;
     $('nextReview').value = fmtDate(suggested);
   }
+  const manualLate = s.signoff.reviewManual && suggested && s.signoff.nextReview && s.signoff.nextReview > suggested;
   $('reviewHint').innerHTML = (a.prohibited
       ? 'No review — relationship prohibited'
       : 'Suggested: ' + fmtDate(suggested) + ' (' + REVIEW_MONTHS[a.outcome] + ' months — ' + a.outcome + ')')
-    + (s.signoff.reviewManual ? ' · <a onclick="useSuggestedReview()">use suggested</a>' : '');
+    + (s.signoff.reviewManual ? ' · <a onclick="useSuggestedReview()">use suggested</a>' : '')
+    + (manualLate ? ' <b style="color:#ff8c42">⚠ manual date is later than the ' + a.outcome + ' schedule</b>' : '');
 
   updateCompleteness();
   scheduleSave();
@@ -1688,7 +2198,7 @@ function toast(msg){
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), TOAST_DURATION_MS);
 }
 function scheduleSave(){
   clearTimeout(saveTimer);
@@ -1696,14 +2206,19 @@ function scheduleSave(){
 }
 function saveDraft(){
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({version:APP_VERSION, savedAt:new Date().toISOString(), state}));
+    SS.setItem(STORAGE_KEY, JSON.stringify({version:APP_VERSION, savedAt:new Date().toISOString(), state}));
     $('saveStamp').textContent = 'Autosaved '+new Date().toLocaleTimeString();
-  }catch(e){ /* storage unavailable (private mode etc.) — app still works, just no draft */ }
+    const warn = $('storageWarn'); if(warn) warn.style.display = 'none';
+  }catch(e){
+    /* Storage blocked (private mode, quota exceeded, or security policy). Show a persistent banner
+       so the user knows to export manually before closing the tab. */
+    const warn = $('storageWarn'); if(warn) warn.style.display = '';
+  }
   regUpsert(); /* the register mirrors every named save */
 }
 function loadDraft(){
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = SS.getItem(STORAGE_KEY);
     if(!raw) return null;
     const data = JSON.parse(raw);
     if(!data || !data.state) return null;
@@ -1721,12 +2236,12 @@ const REG_KEY = 'hsra.register.v1';
 
 function regAll(){
   try{
-    const data = JSON.parse(localStorage.getItem(REG_KEY));
+    const data = JSON.parse(SS.getItem(REG_KEY));
     return (data && data.items && typeof data.items==='object' && !Array.isArray(data.items)) ? data.items : {};
   }catch(e){ return {}; }
 }
 function regWrite(items){
-  try{ localStorage.setItem(REG_KEY, JSON.stringify({version:1, items})); }catch(e){}
+  try{ SS.setItem(REG_KEY, JSON.stringify({version:1, items})); }catch(e){}
 }
 function regUpsert(){
   const ref = String(state.meta.ref||'').trim();
@@ -1747,8 +2262,11 @@ function regDelete(ref){
   if(!items[ref]) return false;
   delete items[ref];
   regWrite(items);
+  auditAppend('register.delete', ref);
   return true;
 }
+/** Load an assessment from the register by reference. Saves the current assessment first
+ *  so no work is lost. Returns false if the ref is not found. */
 function regOpenEntry(ref){
   const e = regAll()[ref];
   if(!e || !e.state || typeof e.state!=='object') return false;
@@ -1902,6 +2420,7 @@ function exportJSON(){
   link.download = exportFileName();
   link.click();
   setTimeout(()=>URL.revokeObjectURL(link.href), 1000);
+  auditAppend('export.json', state.meta.ref || '(unsaved)');
   toast('Assessment exported');
 }
 
@@ -1911,16 +2430,15 @@ $('importFile').addEventListener('change', function(e){
   if(!f) return;
   const r = new FileReader();
   r.onload = function(){
-    try{
-      const data = JSON.parse(r.result);
-      const src = data && data.state ? data.state : data;
-      if(!src || typeof src!=='object' || !src.questions) throw new Error('invalid');
-      state = mergeState(src);
-      syncUI();
-      toast('Assessment imported'+(state.meta.ref?' — '+state.meta.ref:''));
-    }catch(err){
-      alert('Invalid assessment file. Expected a JSON export from this application.');
-    }
+    if(r.result && r.result.length > 10 * 1024 * 1024){ alert('File too large. Maximum allowed size is 10 MB.'); e.target.value = ''; return; }
+    let data;
+    try{ data = JSON.parse(r.result); }
+    catch(err){ alert('The file contains invalid JSON. Expected an assessment exported from this application.'); e.target.value = ''; return; }
+    const src = data && data.state ? data.state : data;
+    if(!src || typeof src!=='object' || !src.questions){ alert('Invalid assessment file. Expected a JSON export from this application.'); e.target.value = ''; return; }
+    state = mergeState(src);
+    syncUI();
+    toast('Assessment imported'+(state.meta.ref?' — '+state.meta.ref:''));
     e.target.value = '';
   };
   r.readAsText(f);
@@ -2082,11 +2600,23 @@ function buildPrintReport(){
         <div class="sign-line"></div><div class="sign-cap">Signature</div>
       </div>
     </div>
+    ${_auditReportBlock()}
     <div class="foot">CONFIDENTIAL — Hawkeye Sterling LLC — AML/CFT Entity Risk Assessment — Ref: ${dash(s.meta.ref)} — DPMS Template</div>`;
 }
 function printReport(){
   buildPrintReport();
   window.print();
+}
+/** Pre-flight checklist for PDF export — warns about Safari's "Print backgrounds" requirement. */
+function printPreflight(){
+  const ok = confirm(
+    'Before printing / exporting PDF:\n\n'
+    + '• Set paper size to A4 (portrait recommended)\n'
+    + '• Safari: enable "Print backgrounds" in the print dialog\n'
+    + '• Firefox: check "Print backgrounds" in "More settings"\n\n'
+    + 'Proceed?'
+  );
+  if(ok) printReport();
 }
 window.addEventListener('beforeprint', buildPrintReport);
 /* Flush the debounced autosave so closing the tab right after typing loses nothing */
@@ -2141,30 +2671,70 @@ function initAnimations(){
   }));
 }
 
+/* Live UTC clock in the header (command-center status strip). */
+function startUtcClock(){
+  const el = $('utcClock');
+  if(!el) return;
+  const tick = () => { try{ el.innerHTML = new Date().toLocaleTimeString('en-GB',{timeZone:'UTC'}) + '&nbsp;<b>UTC</b>'; }catch(e){} };
+  tick();
+  /* Browser-only ticking; the test DOM stub has no matchMedia, so it stays static. */
+  if(typeof window!=='undefined' && typeof window.matchMedia==='function' && typeof setInterval==='function') setInterval(tick, 1000);
+}
+
+/* Header lock toggle. When device encryption is configured it performs the real
+   at-rest lock (secLock); otherwise it is a visual indicator, matching the
+   prototype where "Lock" is cosmetic until encryption is enabled. */
+function headerLock(){
+  if(typeof _secActive !== 'undefined' && _secActive){ secLock(); return; }
+  const btn = $('hdrLock');
+  if(!btn) return;
+  const locked = btn.classList.toggle('locked');
+  btn.textContent = locked ? '⚿ Locked' : '⚿ Lock';
+  toast(locked
+    ? 'Screen locked. Enable device encryption (sidebar) for at-rest protection.'
+    : 'Unlocked.');
+}
+function _syncHeaderLock(locked){
+  const btn = $('hdrLock'); if(!btn) return;
+  btn.classList.toggle('locked', !!locked);
+  btn.textContent = locked ? '⚿ Locked' : '⚿ Lock';
+}
+
 /* ══════════════════════════════════════════
    INIT
 ══════════════════════════════════════════ */
 $('footVer').textContent = 'v'+APP_VERSION;
 
+/* Init order: risk data loads first so effCountry/effOf have overrides ready;
+   country and activity selects must be built before initRiskDataPanel() and
+   refreshSelectLabels() can enrich their <option> elements with override marks. */
 riskData = loadRiskData();
 buildCountrySelect();
 buildActivitySelect();
 buildQuestions();
 buildSuppliers();
-refreshSelectLabels();
+refreshSelectLabels(); /* add override marks (✱) to the now-built selects */
 initRiskDataPanel();
 initRegisterPanel();
 
-const draft = loadDraft();
-if(draft){
-  state = draft.state;
+/* (Re)load persisted risk data + draft into the UI. Safe to re-run after the
+   device is unlocked, when the encrypted store first becomes readable. */
+function hydrateApp(){
+  riskData = loadRiskData();
+  refreshSelectLabels();
+  paintJurisdiction();
+  paintActivity();
+  const draft = loadDraft();
+  state = draft ? draft.state : freshState();
   syncUI();
-  toast('Draft restored'+(draft.savedAt?' — last saved '+new Date(draft.savedAt).toLocaleString():''));
-} else {
-  state = freshState();
-  syncUI();
+  return draft;
 }
+
+const draft = hydrateApp();
+if(draft) toast('Draft restored'+(draft.savedAt?' — last saved '+new Date(draft.savedAt).toLocaleString():''));
 initAnimations();
+startUtcClock();  /* live UTC clock in the header status strip */
+initSecurity();   /* gate the app behind the passphrase, if configured/offered */
 </script>
 </body>
 </html>

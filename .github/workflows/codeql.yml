@@ -1,0 +1,43 @@
+name: CodeQL
+
+# Static security analysis (SAST) of the app's JavaScript. CodeQL's JS extractor
+# scans the inline <script> in index.html plus scripts/*.mjs, netlify/functions/*.js
+# and test/*, surfacing findings in the repo's Security → Code scanning tab. This is
+# the one CI gap not covered by ci.yml (which only runs tests + a render smoke).
+# On a failed *scheduled* run it opens an assigned alert task in the RISK
+# ASSESSMENTS Asana project, mirroring site-health.yml.
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1' # 06:00 UTC every Monday (one hour after site-health)
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - name: Run CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+      - name: Alert in Asana
+        if: failure() && github.event_name == 'schedule'
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "CODE SCAN FAILED: HAWKEYE STERLING CodeQL run could not complete" \
+            "The weekly CodeQL security scan failed before producing results. Review the run log and the Security → Code scanning tab: $RUN_URL"

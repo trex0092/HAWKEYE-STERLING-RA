@@ -235,7 +235,10 @@ async function asana(path, opts = {}) {
     }
   });
   const d = await r.json();
-  if (!r.ok) throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
+  if (!r.ok) {
+    if (r.status === 401) throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked. Rotate it in GitHub Settings → Secrets → ASANA_ACCESS_TOKEN.');
+    throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
+  }
   return d;
 }
 

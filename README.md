@@ -10,7 +10,19 @@ A single-file web application for **AML/CFT customer (entity) risk assessment**,
 |---|---|
 | ![Assessment form](docs/form.png) | ![Print report](docs/report.png) |
 
-The entire application lives in [`index.html`](index.html) — no build step, no dependencies, no backend. It runs offline, deploys to any static host, and keeps all data on the user's device.
+The core application lives in [`index.html`](index.html) — no build step, no backend, no bundler. It deploys to any static host and keeps all data on the user's device. (The dark-neon "command-center" redesign pulls in three Google Fonts — Space Grotesk, JetBrains Mono, Manrope — and falls back to the system stack when offline.)
+
+## The command-center suite
+
+A dark neon, AI-persona "command center" spanning three sibling pages — pure HTML/CSS/JS, no framework, cross-linked from the header nav and sharing the six robot portraits in [`assets/`](assets):
+
+| Page | File | Purpose |
+|---|---|---|
+| **Entity Risk Assessment** | [`index.html`](index.html) | The primary tool — live 0–30 risk scoring, animated gauge, CDD/SDD/EDD verdict, analyst override, Risk-Data editor, register and activity log. |
+| **AI Operations Console** | [`console.html`](console.html) | A live monitoring HUD — a robot "analyst on duty" inside an animated radar, an operator switcher, count-up stat tiles, a live alert stream, the diligence mix and a jurisdiction watch. |
+| **Hawkeye Sterling Advisor** | [`advisor.html`](advisor.html) | A cited-answer AML Q&A — a question composer with a swappable AI persona that returns a verdict, cited legal basis, decision guide and recommended steps, plus a filterable regulatory Q&A. |
+
+The **AI Risk Advisor** in the assessment sidebar is a robot whose head and HUD colour follow the operative outcome — **Vale** (teal) for CDD, **Cypher** (amber) for SDD, **Ember** (red) for EDD / PROHIBITED — each with a one-line advisory note. The header carries a persona avatar, a live UTC clock and a lock toggle. Every animation (gauge draw-in, radar sweep, HUD spin, entrance) respects `prefers-reduced-motion`.
 
 ## Features
 
@@ -25,6 +37,7 @@ The entire application lives in [`index.html`](index.html) — no build step, no
 - **Expanded entity identification** — legal and trading names, registration/licence number, jurisdiction, registered address, website/email, principals (beneficial owners / controllers / directors).
 - **Analyst notes & rationale** — free-text section included in the printed report, with a one-click **Narrative Template** that writes a formal, plain-language risk rationale for the matching band (low / medium / high / prohibited), citing the Company's policies by full name (Risk Assessment methodology, Know Your Customer, Risk Appetite Statement, Targeted Financial Sanctions) and filling in the entity, date, and score automatically.
 - **FATF Watchdog** — a monthly GitHub Action (`.github/workflows/fatf-watchdog.yml`) reads FATF's published black/grey lists, compares them with the app's country data, and on any change (listed *or* delisted) creates a review task in the RISK ASSESSMENTS Asana project naming the affected assessments. Detection is automatic; score changes remain a human decision via the Risk Data panel. The same monthly run also posts a **"Reviews due"** digest task listing every client whose next review falls due that month (overdue ones flagged), assigned and dated for Asana's reminders. Requires the `ASANA_ACCESS_TOKEN` repository secret.
+- **Regulatory Watch** — a weekly GitHub Action (`.github/workflows/regulatory-watch.yml`) that monitors a worldwide, UAE-weighted set of regulatory sources (MoE, FIU, NAMLCFTC, EOCN, CBUAE, VARA and the gold/jewellery sector; plus FATF guidance, Wolfsberg, RMI, LBMA, OECD, OFAC, UN, EU, UK OFSI, Egmont and the Basel AML Index) defined in [`data/reg-sources.json`](data/reg-sources.json). It fingerprints each source's content (`scripts/reg-watch.mjs`) and, on any change, **opens a pull request** carrying the updated fingerprint state and a change report so the Q&A answers (`assets/super-data.js`) and risk data can be reviewed and updated. If an `ANTHROPIC_API_KEY` secret is present it also attaches an **AI-drafted update proposal** (`scripts/reg-draft.mjs`) to the PR. Detection is automatic; the regulator-grade wording change stays a reviewed decision (no auto-publish). Country black/grey list moves are handled by the FATF Watchdog above. See [`docs/regulatory-watch.md`](docs/regulatory-watch.md) for the source narratives and setup. Run once with `mode = seed` to record the baseline.
 - **Asana delivery** — marking an assessment *Complete* on the deployed site creates a task in the firm's **RISK ASSESSMENTS** Asana project (task named after the reference, entity, and band; the narrative and result summary in the description) via a Netlify function, so the Asana token never reaches the browser. The task is **filed into a section by risk band** — *LOW RISK (CDD)*, *MEDIUM RISK (SDD)*, *HIGH RISK (EDD)*, *PROHIBITED (DO NOT ONBOARD)* — created on demand, **assigned** (env `ASANA_ASSIGNEE`, default the token owner) with the **due date set to the next review date**, so Asana itself alerts the compliance officer as each review falls due.
 - **Assessment register** — every assessment with an entity name files itself into a built-in register (sidebar → *☰ Register*), keyed by its reference: each customer's band, draft/complete status, and next review date at a glance (overdue reviews flagged in red, reviews due within a month in amber), with one-click *Open* to resume any of them and *Delete* to remove a filed copy. Switching never loses work — the current assessment is filed before another is opened — so one browser serves a whole portfolio of entities.
 - **Operations robots** — *Site Health* (`.github/workflows/site-health.yml`): every Monday a headless Chrome renders the **live** site and verifies it computes; if it is down or broken, an assigned alert task is opened in Asana. *Auto Release* (`.github/workflows/auto-release.yml`): every merge to `main` that bumps `APP_VERSION` is tagged and released automatically with generated notes. *Risk-data backup*: on every override change the deployed app mirrors the full risk-data sheet to a dedicated Asana task ("RISK DATA SHEET (auto-backup)") via `netlify/functions/risk-backup.js`, and the monthly watchdog commits that mirror to `data/risk-overrides-backup.json` — an off-device backup with a git audit trail.
@@ -98,7 +111,31 @@ Separately from the risk data (which is firm-wide), the analyst may raise the op
 - **Autosave** — the working draft is saved to `localStorage` in the user's browser only; nothing is transmitted anywhere.
 - **Print report** — produces an audit-ready PDF via the browser's print dialog. Chrome/Edge/Firefox apply A4 and exact colours automatically; in **Safari**, choose A4 paper size and enable *Print backgrounds* in the print dialog.
 
-## Getting started
+## Device security
+
+For an offline, zero-backend tool, sensitive data is protected **on the device** rather than behind a server:
+
+- **Encryption at rest** — assessments, the register, risk-data overrides, Asana payloads and the activity log are encrypted in `localStorage` with **AES-256-GCM** (WebCrypto). The key is derived from the officer's passphrase via **PBKDF2** (250k iterations, random salt); each write uses a fresh IV. On first run you can set a passphrase or continue unencrypted; the choice is remembered. **There is no recovery — store the passphrase securely.**
+- **Passphrase gate & idle auto-lock** — the app prompts to unlock on each visit and re-locks after 15 minutes of inactivity (or via the *Lock device* button). The scoring engine still renders underneath the gate, so the page always computes.
+- **Tamper-evident activity log** — a SHA-256 **hash-chained** record of completions, overrides, exports, deletions and unlocks. View it via *▤ Activity Log* (with a chain-integrity check), export it, or read the last entries as an appendix in the printed report.
+- **Edge & function hardening** — a strict **Content-Security-Policy**, HSTS and anti-clickjacking headers are applied to every response (`netlify.toml`); the Asana relay functions enforce a same-origin / `ALLOWED_ORIGINS` allow-list.
+
+A full mapping of this app against the *AI Governance & Security Periodic Table (2026)* — what applies, what is implemented, and what is out of scope for a non-AI, on-device tool — is in [`docs/governance/ai-governance-gap-analysis-2026.md`](docs/governance/ai-governance-gap-analysis-2026.md).
+
+## Setup
+
+### Asana integration
+
+Copy `.env.example` to `.env` (never commit it) and fill in the values, then add them to your hosting environment:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `ASANA_ACCESS_TOKEN` | Yes | Personal access token from [Asana Developer Console](https://app.asana.com/0/developer-console). Used by Netlify functions and the GitHub Actions watchdog. Add to GitHub Secrets **and** Netlify environment variables. |
+| `ASANA_PROJECT_GID` | Recommended | GID of the RISK ASSESSMENTS Asana project (from the project URL). Defaults to the built-in value — set explicitly to avoid targeting the wrong project after a project rename or workspace change. |
+| `ASANA_ASSIGNEE` | No | Asana user to assign tasks to. Defaults to `me` (the token bearer). |
+| `ALLOWED_ORIGINS` | No | Comma-separated extra browser origins permitted to call the Netlify functions. Same-origin requests and header-less (server-to-server) calls are always allowed; cross-site browser origins are rejected with `403`. |
+
+### Getting started
 
 **Open directly** — download `index.html` and open it in any modern browser.
 
@@ -116,11 +153,22 @@ python3 -m http.server 8000
 The scoring engine, hard-outcome escalations, persistence, and report rendering are covered by a dependency-free test suite that executes the app's full inline script against a DOM stub:
 
 ```bash
-node test/app.test.js        # 187 checks — engine, register, report, Asana delivery & backup
+node test/app.test.js        # checks — engine, register, report, Asana delivery & backup, edge cases
 node test/watchdog.test.mjs  # 20 checks — FATF list parsing, alerts, digest, backup extraction
 ```
 
-CI runs both suites plus a headless-Chrome smoke test (renders `index.html`, asserts the computed verdict and gauge) on every push and pull request (`.github/workflows/ci.yml`).
+CI runs both suites plus two headless-Chrome smoke tests (one with `prefers-reduced-motion` for stability, one with motion enabled to exercise animation code paths) on every push and pull request (`.github/workflows/ci.yml`).
+
+## Accessibility
+
+The application targets WCAG 2.1 Level AA for its core assessment workflow:
+
+- All interactive controls have visible labels and `aria-pressed` state on Yes/No toggles.
+- A persistent warning banner is shown if the browser's localStorage is blocked or full, directing the user to export their work.
+- The gauge and risk-position bar are decorative; the score and verdict are also rendered as text.
+- Animations respect the `prefers-reduced-motion` media query — the gauge draw-in and count-up are skipped when motion is reduced.
+
+**Known limitations:** colour-contrast of some badge colours has not been independently audited. The print report requires the user to enable "Print backgrounds" in Safari and Firefox print dialogs.
 
 ## Project structure
 
@@ -129,13 +177,20 @@ CI runs both suites plus a headless-Chrome smoke test (renders `index.html`, ass
 ├── index.html                  # The complete application (markup, styles, data, logic)
 ├── test/app.test.js            # Functional test suite (no dependencies)
 ├── test/watchdog.test.mjs      # FATF watchdog unit tests
+├── test/reg-watch.test.mjs     # Regulatory Watch unit tests
 ├── scripts/fatf-watchdog.mjs   # Monthly FATF black/grey list watchdog (Asana alerts)
+├── scripts/reg-watch.mjs       # Weekly worldwide regulatory-source watcher (opens a PR)
+├── scripts/reg-draft.mjs       # Optional AI update proposal (needs ANTHROPIC_API_KEY)
 ├── data/fatf-state.json        # Watchdog's last-seen FATF lists (committed by the action)
-├── .github/workflows/          # CI, FATF watchdog + digest + backup, site health, releases
+├── data/reg-sources.json       # Regulatory Watch source registry + per-source narratives
+├── data/reg-watch-state.json   # Regulatory Watch content fingerprints (committed by the action)
+├── docs/regulatory-watch.md    # Regulatory Watch: source narratives + how it works
+├── .github/workflows/          # CI, FATF watchdog, Regulatory Watch, site health, releases
 ├── scripts/asana-alert.mjs     # Asana alert task helper (used by site health)
 ├── netlify.toml                # Static publish config (repo root, no build)
 ├── netlify/functions/          # Serverless: Asana task delivery + risk-data mirror
-├── docs/                       # README screenshots
+├── docs/                       # README screenshots + governance/research notes
+│   └── governance/             # AI governance & security gap analysis
 ├── design/                     # Original design handoff (reference only, not served logic)
 └── README.md
 ```

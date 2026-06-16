@@ -61,6 +61,8 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   scheduleRiskBackup,
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
   openRegister, closeRegister,
+  storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
+  _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -659,6 +661,14 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
   r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x'})});
   check('fn fails clearly without token', r.statusCode === 500 && JSON.parse(r.body).error.includes('ASANA_ACCESS_TOKEN'));
 
+  /* origin guard: cross-site browser origin is rejected; same-origin / header-less pass */
+  r = await fn.handler({httpMethod:'POST', headers:{origin:'https://evil.example', host:'hawkeye-sterling-ra.netlify.app'}, body:JSON.stringify({name:'x'})});
+  check('fn rejects a foreign browser origin (403)', r.statusCode === 403);
+  r = await fn.handler({httpMethod:'POST', headers:{origin:'https://hawkeye-sterling-ra.netlify.app', host:'hawkeye-sterling-ra.netlify.app'}, body:JSON.stringify({name:'x'})});
+  check('fn allows the same-origin request past the guard', r.statusCode !== 403);
+  r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x'})});
+  check('fn allows header-less (server-to-server) requests past the guard', r.statusCode !== 403);
+
   /* risk-backup function: browser overrides → Asana mirror task */
   const rb = require('../netlify/functions/risk-backup.js');
   const sheet = {app:'x', version:'3.6.0', riskDataVersion:'2026-06', updatedAt:'2026-06-12',
@@ -683,6 +693,90 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
   check('risk-backup rejects non-POST', r.statusCode === 405);
   delete process.env.ASANA_ACCESS_TOKEN;
   delete global.fetch;
+
+  // ── Edge-case resilience tests ──
+
+  // Corrupted localStorage recovery: loadRiskData must return a fresh empty sheet,
+  // never throw, even when the stored value is not valid JSON.
+  (function(){
+    const savedM = Object.assign({}, global.localStorage._m);
+    global.localStorage._m['hsra.riskdata.v1'] = '{corrupted:{{{not json';
+    const rd = A.loadRiskData();
+    check('loadRiskData recovers from corrupted localStorage', rd && typeof rd.overrides === 'object' && Object.keys(rd.overrides.countries).length === 0);
+    global.localStorage._m = savedM;
+  })();
+
+  // Year field clamping: mergeState must clamp entityYears and relYears to 0–99.
+  (function(){
+    const s = A.mergeState({profile:{activity:'Non-Manufactured Precious Metal Trading', onboard:'No', entityYears:9999, relYears:-5}});
+    check('mergeState clamps entityYears to 99', s.profile.entityYears === 99);
+    check('mergeState clamps relYears to 0',     s.profile.relYears   === 0);
+  })();
+
+  // Very long string handling: mergeState must not crash and must preserve long strings as-is.
+  (function(){
+    const longName = 'A'.repeat(12000);
+    const s = A.mergeState({entity:{name: longName, jurisdiction:'United Kingdom'}, profile:{}, questions:{}, signoff:{}});
+    check('mergeState handles 12k-char entity name without throwing', typeof s.entity.name === 'string' && s.entity.name.length === 12000);
+  })();
+
+  // Asana retry: storeFailedDelivery / clearFailedDelivery round-trip.
+  (function(){
+    const ref = 'RA-TEST-999';
+    const payload = {name: ref + ' · Test · CDD 19', band: 'CDD'};
+    A.storeFailedDelivery(ref, payload);
+    check('storeFailedDelivery persists payload',   JSON.stringify(A.getFailedPayload(ref)) === JSON.stringify(payload));
+    A.clearFailedDelivery(ref);
+    check('clearFailedDelivery removes payload',    A.getFailedPayload(ref) === null);
+  })();
+
+  // NARRATIVE_POLICIES: buildNarrative must still reference all policy long-form names.
+  (function(){
+    reset(); A.state.entity.name = 'Test Co'; A.state.entity.jurisdiction = 'United Kingdom'; A.recalc();
+    const n = A.buildNarrative();
+    check('narrative cites TFS policy by full name',  n.includes('Targeted Financial Sanctions procedure'));
+    check('narrative cites KYC policy by full name',  n.includes('Know Your Customer procedure'));
+    check('narrative cites RAS by full name',         n.includes('Risk Appetite Statement'));
+  })();
+
+  // UI entry-point regression: these functions are tested above; the buttons
+  // ensure users can actually reach them without the browser console.
+  // (Export/Import JSON are intentionally code-only — no UI button.)
+  check('reassess button wired in HTML', html.includes('onclick="reassess()"'));
+  check('retry Asana button wired in HTML', html.includes('onclick="retryAsanaDelivery()"'));
+  check('print preflight wired in HTML', html.includes('onclick="printPreflight()"'));
+
+  /* ── 27. Encryption-at-rest primitives (WebCrypto) ── */
+  await (async function(){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await A._deriveKey('correct horse battery staple', salt, 1000);
+    const plain = 'sensitive client data — Fine Gold LLC, REG-123';
+    const blob = await A.encryptStr(key, plain);
+    check('encryptStr produces tagged ciphertext, not plaintext',
+      blob.startsWith('hsx1:') && !blob.includes('Fine Gold') && !blob.includes('REG-123'));
+    check('decryptStr round-trips to the original plaintext', (await A.decryptStr(key, blob)) === plain);
+    const wrong = await A._deriveKey('wrong passphrase', salt, 1000);
+    let rejected = false; try{ await A.decryptStr(wrong, blob); }catch(e){ rejected = true; }
+    check('wrong passphrase cannot decrypt (AES-GCM auth fails)', rejected);
+    let plainRejected = false; try{ await A.decryptStr(key, 'just-some-plaintext'); }catch(e){ plainRejected = true; }
+    check('decryptStr rejects non-encrypted input', plainRejected);
+  })();
+
+  /* ── 28. Tamper-evident activity log (hash chain) ── */
+  await (async function(){
+    global.localStorage.removeItem('hsra.audit.v1');
+    await A.auditAppend('test.one', 'first');
+    await A.auditAppend('test.two', 'second');
+    const log = A.auditAll();
+    check('audit log appends hash-chained entries',
+      log.length === 2 && !!log[0].hash && !!log[1].hash && log[0].hash !== log[1].hash);
+    check('audit chain verifies as intact', (await A.auditVerify()) === true);
+    const sameHash = await A.sha256Hex('x'); const sameHash2 = await A.sha256Hex('x');
+    check('sha256Hex is deterministic 64-hex', sameHash === sameHash2 && /^[0-9a-f]{64}$/.test(sameHash));
+    log[0].detail = 'tampered'; global.localStorage.setItem('hsra.audit.v1', JSON.stringify(log));
+    check('audit chain detects a tampered earlier entry', (await A.auditVerify()) === false);
+    global.localStorage.removeItem('hsra.audit.v1');
+  })();
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);

@@ -1,0 +1,69 @@
+name: Regulatory Watch
+
+# Weekly worldwide (UAE-weighted) check of the regulatory sources in
+# data/reg-sources.json (MoE, FIU, NAMLCFTC, EOCN, CBUAE, VARA, jewellery
+# sector; FATF guidance, Wolfsberg, RMI, LBMA, OECD, OFAC, UN, EU, UK OFSI,
+# Egmont, Basel). On any content change it opens a PULL REQUEST carrying the
+# updated fingerprint state, a change report, and — if an ANTHROPIC_API_KEY
+# secret is set — an AI-drafted update proposal for MLRO review.
+#
+# Detection is automatic; the regulator-grade wording change stays a reviewed
+# decision (no auto-publish). Country black/grey LIST moves are handled by the
+# separate FATF Watchdog workflow.
+#
+# First-time setup: run once via "Run workflow" with mode = seed to record the
+# current fingerprints without raising a PR. Thereafter the weekly run flags
+# only genuine changes.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # 06:00 UTC every Monday
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check (compare + open PR on change) | seed (record baseline fingerprints, open a baseline PR)'
+        default: 'check'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: regulatory-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run regulatory watch
+        id: watch
+        run: node scripts/reg-watch.mjs "${{ inputs.mode || 'check' }}"
+
+      - name: AI draft (optional — only if ANTHROPIC_API_KEY is set)
+        if: steps.watch.outputs.has_changes == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/reg-draft.mjs
+
+      - name: Open pull request with detected changes
+        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: regulatory-watch/update
+          base: main
+          # No add-paths: commit every non-ignored change (the fingerprint state
+          # and any AI draft under docs/research/auto). The per-run artifacts
+          # reg-watch-report.md and reg-watch-changes.json are gitignored, so
+          # they are never committed; the report is used only as the PR body.
+          commit-message: ${{ steps.watch.outputs.pr_title }}
+          title: ${{ steps.watch.outputs.pr_title }}
+          body-path: reg-watch-report.md
+          labels: regulatory-watch
+          delete-branch: true

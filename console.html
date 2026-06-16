@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hawkeye Sterling — AI Operations Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ac:255,92,168;            /* operator accent (R,G,B) */
+  --display:'Space Grotesk','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+  --sans:'Manrope','Helvetica Neue',Arial,sans-serif;
+}
+html,body{background:#070A11}
+body{font-family:var(--sans);color:#EDEFF4;font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh;position:relative;overflow-x:hidden}
+::selection{background:rgba(255,92,168,0.3)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes spinRev{to{transform:rotate(-360deg)}}
+@keyframes sweep{to{transform:rotate(360deg)}}
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+@keyframes hudGlow{0%,100%{opacity:.5}50%{opacity:.95}}
+@keyframes rowIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes drift{to{transform:translate(2%,-2%) scale(1.06)}}
+
+.bg-glow{position:fixed;inset:-15%;z-index:0;pointer-events:none;background:radial-gradient(ellipse 40% 50% at 22% 18%,rgba(var(--ac),0.08),transparent 60%),radial-gradient(ellipse 50% 55% at 85% 85%,rgba(91,155,216,0.06),transparent 60%)}
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.4;background-image:linear-gradient(rgba(255,255,255,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.022) 1px,transparent 1px);background-size:46px 46px}
+.wrap{position:relative;z-index:1}
+
+/* Header */
+header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 26px;height:58px;border-bottom:1px solid rgba(255,255,255,0.09);background:rgba(8,11,18,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:sticky;top:0;z-index:50}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.hs-mark{width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(var(--ac),0.6);display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:12px;color:#fff;box-shadow:0 0 14px rgba(var(--ac),0.35);flex-shrink:0}
+.wordmark{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:0.04em;color:#EDEFF4;white-space:nowrap}
+.sub{font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:#646F86;text-transform:uppercase;border-left:1px solid rgba(255,255,255,0.12);padding-left:11px;white-space:nowrap}
+.hdr-right{display:flex;align-items:center;gap:18px}
+.nav{display:flex;align-items:center;gap:4px}
+.nav a{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#A3ADC0;text-decoration:none;padding:6px 11px;border-radius:7px;border:1px solid transparent;transition:all .16s;white-space:nowrap}
+.nav a:hover{color:#EDEFF4;background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.11)}
+.nav a.active{color:#FCE3EF;background:rgba(var(--ac),0.14);border-color:rgba(var(--ac),0.5);box-shadow:0 0 14px rgba(var(--ac),0.22)}
+.live{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:#4FD6A0;white-space:nowrap}
+.live i{width:7px;height:7px;border-radius:50%;background:#3BC48F;box-shadow:0 0 8px #3BC48F;animation:pulseDot 2s ease-in-out infinite}
+.clock{font-family:var(--mono);font-size:12px;color:#A3ADC0;letter-spacing:0.06em;white-space:nowrap}
+.clock b{color:#646F86;font-weight:400}
+
+.grid{display:grid;grid-template-columns:430px minmax(0,1fr);gap:18px;padding:20px 26px 30px;align-items:start}
+.col-l{display:flex;flex-direction:column;gap:16px}
+.col-r{display:flex;flex-direction:column;gap:18px;min-width:0}
+
+/* HUD */
+.hud{position:relative;border:1px solid rgba(255,255,255,0.08);border-radius:16px;background:radial-gradient(ellipse at 50% 35%,rgba(var(--ac),0.08),#0B0F18 70%);overflow:hidden;padding:22px 18px 20px;min-height:430px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.corner{position:absolute;width:22px;height:22px}
+.corner.tl{top:12px;left:12px;border-top:2px solid rgba(var(--ac),0.7);border-left:2px solid rgba(var(--ac),0.7)}
+.corner.tr{top:12px;right:12px;border-top:2px solid rgba(var(--ac),0.7);border-right:2px solid rgba(var(--ac),0.7)}
+.corner.bl{bottom:12px;left:12px;border-bottom:2px solid rgba(var(--ac),0.7);border-left:2px solid rgba(var(--ac),0.7)}
+.corner.br{bottom:12px;right:12px;border-bottom:2px solid rgba(var(--ac),0.7);border-right:2px solid rgba(var(--ac),0.7)}
+.tele{position:absolute;font-family:var(--mono);font-size:8.5px;line-height:1.7}
+.tele .k{color:#646F86;letter-spacing:0.12em}
+.tele .v{font-weight:600}
+.tele.t-tl{top:20px;left:20px}.tele.t-tr{top:20px;right:20px;text-align:right}
+.tele.t-bl{bottom:74px;left:20px}.tele.t-br{bottom:74px;right:20px;text-align:right}
+.radar{position:relative;width:262px;height:262px;display:grid;place-items:center}
+.radar .conic{position:absolute;width:262px;height:262px;border-radius:50%;background:conic-gradient(from 0deg,transparent,rgba(var(--ac),0.28) 55deg,transparent 120deg);animation:sweep 3.6s linear infinite}
+.radar .ring1{position:absolute;animation:spin 26s linear infinite}
+.radar .ring2{position:absolute;animation:spinRev 18s linear infinite}
+.radar .face{position:absolute;width:196px;height:196px;border-radius:50%;overflow:hidden;border:2px solid rgba(var(--ac),0.7);box-shadow:0 0 26px rgba(var(--ac),0.4),inset 0 0 30px rgba(0,0,0,0.5)}
+.radar .face>div{width:100%;height:100%;background-size:cover}
+.radar .scanline{position:absolute;left:0;right:0;top:50%;height:1px;background:linear-gradient(90deg,transparent,rgba(var(--ac),0.35),transparent)}
+.duty{margin-top:14px;text-align:center}
+.duty .on{font-family:var(--mono);font-size:9px;letter-spacing:0.28em;color:rgb(var(--ac));animation:hudGlow 2.4s ease-in-out infinite}
+.duty .nm{font-family:var(--display);font-weight:700;font-size:24px;color:#fff;margin-top:5px;letter-spacing:0.01em}
+.duty .rl{font-family:var(--mono);font-size:10.5px;color:#A3ADC0;margin-top:2px;letter-spacing:0.04em}
+
+.panel{border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:#0B0F18;padding:14px 16px}
+.panel-h{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#EDEFF4;font-weight:600}
+.reassign .lbl{font-family:var(--mono);font-size:9px;letter-spacing:0.16em;color:#646F86;text-transform:uppercase;margin-bottom:11px}
+.ops{display:flex;gap:10px;flex-wrap:wrap}
+.op-btn{width:50px;height:50px;border-radius:11px;padding:0;overflow:hidden;cursor:pointer;flex-shrink:0;background:#070A11;transition:all .2s;border:2px solid rgba(255,255,255,0.1)}
+.op-btn>div{width:100%;height:100%;background-size:cover}
+
+/* Stats */
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.tile{position:relative;border:1px solid rgba(255,255,255,0.08);border-radius:13px;background:#0B0F18;padding:15px 16px;overflow:hidden}
+.tile::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(var(--ac),0.6),transparent)}
+.tile .t-l{font-family:var(--mono);font-size:8.5px;letter-spacing:0.12em;text-transform:uppercase;color:#646F86;margin-bottom:8px}
+.tile .t-v{font-family:var(--display);font-weight:700;font-size:27px;color:#fff;line-height:1}
+.tile .t-s{font-family:var(--mono);font-size:9.5px;margin-top:7px}
+
+.lower{display:grid;grid-template-columns:1.35fr 1fr;gap:18px;align-items:start}
+.stream{position:relative;border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:#0B0F18;overflow:hidden}
+.stream-h{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.07)}
+.streaming{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;color:#828CA5}
+.streaming i{width:6px;height:6px;border-radius:50%;background:#646F86;box-shadow:0 0 7px #646F86}
+.alert-row{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid rgba(255,255,255,0.05);animation:rowIn .5s ease-out backwards}
+.alert-row:last-child{border-bottom:none}
+.alert-row .at{font-family:var(--mono);font-size:10px;color:#646F86;flex-shrink:0;white-space:nowrap}
+.alert-row .ae{font-size:13px;color:#EDEFF4;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-row .ay{font-family:var(--mono);font-size:10px;color:#828CA5;margin-top:1px}
+.alert-row .aj{font-family:var(--mono);font-size:9px;color:#A3ADC0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:5px;padding:2px 6px;flex-shrink:0;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alert-row .ab{font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;flex-shrink:0;border:1px solid}
+
+.side-col{display:flex;flex-direction:column;gap:18px}
+.bar-row{margin-bottom:13px}
+.bar-row:last-child{margin-bottom:0}
+.bar-top{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;margin-bottom:5px}
+.bar-top .l{color:#A3ADC0}.bar-top .p{color:#EDEFF4;font-weight:600}
+.bar-track{height:6px;border-radius:99px;background:rgba(255,255,255,0.06);overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;transition:width .2s}
+.jur-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.jur-row:last-child{margin-bottom:0}
+.jur-row .jn{font-size:12.5px;color:#C9D2E2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jur-row .jt{width:84px;height:5px;border-radius:99px;background:rgba(255,255,255,0.06);overflow:hidden;flex-shrink:0}
+.jur-row .jt>div{height:100%;border-radius:99px;transition:width .2s}
+.jur-row .jb{font-family:var(--mono);font-size:8.5px;font-weight:600;width:34px;text-align:right;flex-shrink:0}
+.empty-note{font-family:var(--mono);font-size:11px;color:#646F86;line-height:1.55}
+.stream .empty-note{padding:22px 16px}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+@media(max-width:1080px){.grid{grid-template-columns:1fr}}
+@media(max-width:760px){.tiles{grid-template-columns:1fr 1fr}.lower{grid-template-columns:1fr}.sub,.live,.clock{display:none}
+  header{flex-wrap:wrap;height:auto;padding:9px 16px;row-gap:9px}.hdr-right{flex:1 1 100%}
+  .nav{display:flex;width:100%}.nav a{flex:1;text-align:center;padding:8px 6px}}
+@media(max-width:520px){.tiles{grid-template-columns:1fr 1fr}.clock{display:none}}
+</style>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div class="bg-grid"></div>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="hs-mark">HS</div>
+      <div class="wordmark">HAWKEYE STERLING</div>
+      <span class="sub">Operations Console</span>
+    </div>
+    <div class="hdr-right">
+      <nav class="nav" aria-label="Suite navigation">
+        <a href="index.html">Assessment</a>
+        <a href="console.html" class="active" aria-current="page">Console</a>
+        <a href="advisor.html">Advisor</a>
+      </nav>
+      <div class="live"><i></i>ALL SYSTEMS LIVE</div>
+      <div class="clock" id="clock">--:--:-- <b>UTC</b></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: AI-on-duty HUD -->
+    <div class="col-l">
+      <div class="hud">
+        <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+        <div class="tele t-tl"><div class="k">THREAT LEVEL</div><div class="v" id="threatLevel" style="color:#4FD6A0">NOMINAL</div></div>
+        <div class="tele t-tr"><div class="k">PROCESSOR</div><div class="v" style="color:#A3ADC0">ZX-77 · 16C</div></div>
+        <div class="tele t-bl"><div class="k">UPTIME</div><div class="v" style="color:#A3ADC0" id="uptime">00:00:00</div></div>
+        <div class="tele t-br"><div class="k">NETWORK</div><div class="v" style="color:#4FD6A0">SECURE</div></div>
+
+        <div class="radar">
+          <div class="conic"></div>
+          <svg class="ring1" width="262" height="262" viewBox="0 0 262 262" aria-hidden="true">
+            <circle cx="131" cy="131" r="126" fill="none" stroke="rgba(var(--ac),0.4)" stroke-width="1" stroke-dasharray="2 8"></circle>
+            <circle cx="131" cy="131" r="126" fill="none" stroke="rgba(var(--ac),0.18)" stroke-width="1"></circle>
+          </svg>
+          <svg class="ring2" width="262" height="262" viewBox="0 0 262 262" aria-hidden="true">
+            <circle cx="131" cy="131" r="108" fill="none" stroke="rgba(var(--ac),0.5)" stroke-width="1.5" stroke-dasharray="40 14 4 14"></circle>
+          </svg>
+          <div class="face"><div id="robotImg"></div></div>
+          <div class="scanline"></div>
+        </div>
+
+        <div class="duty">
+          <div class="on">● AI ANALYST ON DUTY</div>
+          <div class="nm" id="operatorName">Cypher</div>
+          <div class="rl" id="operatorRole">Transaction Monitoring Unit</div>
+        </div>
+      </div>
+
+      <div class="panel reassign">
+        <div class="lbl">Reassign Operator</div>
+        <div class="ops" id="operatorStrip"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: portfolio telemetry (derived from the on-device register) -->
+    <div class="col-r">
+      <div class="tiles" id="statTiles"></div>
+
+      <div class="lower">
+        <div class="stream">
+          <div class="stream-h">
+            <div class="panel-h">Live Alert Stream</div>
+            <div class="streaming"><i></i>ON DEVICE</div>
+          </div>
+          <div id="alertStream"></div>
+        </div>
+
+        <div class="side-col">
+          <div class="panel">
+            <div class="panel-h" style="margin-bottom:14px">Diligence Mix</div>
+            <div id="riskBars"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-h" style="margin-bottom:13px">Jurisdiction Watch</div>
+            <div id="jurWatch"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   AI Operations Console — live monitoring HUD.
+   All portfolio telemetry (entities, alerts, mix,
+   jurisdictions, activity) is derived from the
+   on-device assessment register written by the
+   Entity Risk Assessment screen. A new app with no
+   filed assessments shows zeros and empty states —
+   no fabricated numbers.
+══════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const OPERATORS = [
+  {id:'cypher',  img:'assets/persona-cypher.png',  pos:'42% 30%', name:'Cypher',  role:'Transaction Monitoring Unit', ac:'255,92,168'},
+  {id:'sterling',img:'assets/persona-sterling.png',pos:'36% 22%', name:'Sterling',role:'Entity Risk Assessment',     ac:'59,229,208'},
+  {id:'vale',    img:'assets/persona-vale.png',    pos:'50% 22%', name:'Vale',    role:'KYC & Onboarding',           ac:'120,170,255'},
+  {id:'ember',   img:'assets/persona-ember.png',   pos:'50% 26%', name:'Ember',   role:'Sanctions & PEP Screening',  ac:'255,87,87'},
+  {id:'brass',   img:'assets/persona-brass.png',   pos:'46% 26%', name:'Brass',   role:'Records & Audit',            ac:'247,197,60'},
+  {id:'iris',    img:'assets/persona-iris.png',    pos:'42% 26%', name:'Iris',    role:'Typologies & Training',      ac:'180,92,255'}
+];
+
+/* ── Data source: the assessment register (localStorage). Absent (new app) or
+      encrypted-at-rest ("hsx1:" prefix) → treated as empty. ── */
+const REG_KEY = 'hsra.register.v1';
+function readRegister(){
+  let raw=null;
+  try{ raw = localStorage.getItem(REG_KEY); }catch(e){}
+  if(!raw || raw.indexOf('hsx1:')===0) return [];        /* none filed, or locked/encrypted */
+  let data; try{ data = JSON.parse(raw); }catch(e){ return []; }
+  const items = (data && data.items && typeof data.items==='object') ? data.items : {};
+  return Object.keys(items).map(ref=>{
+    const it=items[ref]||{}, s=it.summary||{}, st=it.state||{};
+    return {
+      ref,
+      entity: s.entity || (st.entity&&st.entity.name) || ref,
+      outcome: s.outcome || 'CDD',
+      prohibited: !!s.prohibited,
+      complete: !!s.complete,
+      date: s.date || '',
+      nextReview: s.nextReview || (st.signoff&&st.signoff.nextReview) || '',
+      jurisdiction: (st.entity&&st.entity.jurisdiction) || '—',
+      savedAt: it.savedAt || ''
+    };
+  });
+}
+function aggregate(items){
+  const today=new Date().toISOString().slice(0,10);
+  const fold=o=> o==='PROHIBITED'?'EDD':o;
+  const counts={CDD:0,SDD:0,EDD:0};
+  let prohibited=0, complete=0, overdue=0, drafts=0;
+  items.forEach(it=>{
+    counts[fold(it.outcome)]=(counts[fold(it.outcome)]||0)+1;
+    if(it.prohibited) prohibited++;
+    if(it.complete) complete++; else drafts++;
+    if(it.nextReview && it.nextReview < today) overdue++;
+  });
+  const n=items.length;
+  const mix=['CDD','SDD','EDD'].map(b=>({band:b,count:counts[b],pct:n?Math.round(counts[b]/n*100):0}));
+  const jmap={};
+  items.forEach(it=>{
+    const j=it.jurisdiction||'—';
+    if(!jmap[j]) jmap[j]={name:j,count:0,worst:0};
+    jmap[j].count++;
+    const sev=it.prohibited?4:it.outcome==='EDD'?3:it.outcome==='SDD'?2:1;
+    if(sev>jmap[j].worst) jmap[j].worst=sev;
+  });
+  const jurisdictions=Object.keys(jmap).map(k=>jmap[k]).sort((a,b)=> b.worst-a.worst || b.count-a.count);
+  const recent=items.slice().sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||''))).slice(0,6);
+  const threat = prohibited?{label:'CRITICAL',color:'#FF6B6B'}
+    : counts.EDD?{label:'ELEVATED',color:'#FFAE57'}
+    : n?{label:'GUARDED',color:'#7FB3E8'}
+    : {label:'NOMINAL',color:'#4FD6A0'};
+  return {n,openAlerts:overdue+drafts,drafts,overdue,prohibited,complete,mix,jurisdictions,recent,threat};
+}
+let AGG = aggregate([]);
+
+const BAND_FULL={CDD:'Customer Due Diligence',SDD:'Simplified Due Diligence',EDD:'Enhanced Due Diligence',PROHIBITED:'Prohibited — do not onboard'};
+function bandTone(o){
+  if(o==='PROHIBITED'||o==='EDD') return {c:'#FF6B6B',bg:'rgba(255,87,87,0.14)',bd:'rgba(255,87,87,0.4)',l:o==='PROHIBITED'?'PROH':'EDD'};
+  if(o==='SDD') return {c:'#FFAE57',bg:'rgba(255,148,52,0.14)',bd:'rgba(255,148,52,0.4)',l:'SDD'};
+  return {c:'#7FB3E8',bg:'rgba(91,155,216,0.14)',bd:'rgba(91,155,216,0.4)',l:'CDD'};
+}
+
+let state = {operatorId:'cypher', prog:0, uptime:0};
+
+function op(){ return OPERATORS.find(o=>o.id===state.operatorId) || OPERATORS[0]; }
+function setAccent(){ document.documentElement.style.setProperty('--ac', op().ac); }
+function fmtUptime(s){ const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), x=s%60; return [h,m,x].map(n=>String(n).padStart(2,'0')).join(':'); }
+
+function renderOperator(){
+  const o = op();
+  $('robotImg').style.backgroundImage = "url('"+o.img+"')";
+  $('robotImg').style.backgroundPosition = o.pos;
+  $('operatorName').textContent = o.name;
+  $('operatorRole').textContent = o.role;
+}
+function renderOperatorStrip(){
+  const cur = op();
+  $('operatorStrip').innerHTML = OPERATORS.map(o=>{
+    const on = o.id===cur.id;
+    const style = "border:2px solid rgba("+o.ac+","+(on?'0.95':'0.28')+");"
+      + "box-shadow:"+(on?'0 0 15px rgba('+o.ac+',0.6)':'none')+";"
+      + "opacity:"+(on?'1':'0.55')+";filter:"+(on?'none':'grayscale(0.4)')+";";
+    const img = "background-image:url('"+o.img+"');background-position:"+o.pos+";";
+    return '<button class="op-btn" title="'+esc(o.name)+'" data-id="'+o.id+'" style="'+style+'"><div style="'+img+'"></div></button>';
+  }).join('');
+  Array.from(document.querySelectorAll('.op-btn')).forEach(b=>{
+    b.addEventListener('click', ()=>{ state.operatorId = b.getAttribute('data-id'); setAccent(); renderOperator(); renderOperatorStrip(); });
+  });
+}
+
+function updateThreat(){ const el=$('threatLevel'); if(!el) return; el.textContent=AGG.threat.label; el.style.color=AGG.threat.color; }
+
+function renderStats(){
+  const a=AGG, prog=state.prog;
+  const alertSub = a.overdue&&a.drafts ? a.overdue+' overdue · '+a.drafts+' draft'
+    : a.overdue ? a.overdue+' review overdue'
+    : a.drafts ? a.drafts+' in draft' : 'none open';
+  const tiles=[
+    {label:'Entities Monitored', value:a.n,         color:'#4FD6A0', sub:a.n? a.complete+' complete' : 'no entities yet'},
+    {label:'Open Alerts',        value:a.openAlerts, color:'#FFAE57', sub:alertSub},
+    {label:'Sanctions Hits',     value:a.prohibited, color:'#FF6B6B', sub:a.prohibited? 'do not onboard' : 'none flagged'},
+    {label:'Cases Cleared',      value:a.complete,   color:'#7FB3E8', sub:a.complete? 'marked complete' : 'none yet'}
+  ];
+  $('statTiles').innerHTML = tiles.map(t=>{
+    const v = Math.round(t.value*prog).toLocaleString('en-US');
+    return '<div class="tile"><div class="t-l" style="color:'+t.color+'">'+t.label+'</div>'
+      + '<div class="t-v">'+v+'</div>'
+      + '<div class="t-s" style="color:'+t.color+'">'+esc(t.sub)+'</div></div>';
+  }).join('');
+}
+function renderMix(){
+  const a=AGG, prog=state.prog;
+  if(!a.n){ $('riskBars').innerHTML='<div class="empty-note">No assessments yet — the diligence mix appears as entities are filed.</div>'; return; }
+  const rgb={CDD:'91,155,216',SDD:'255,148,52',EDD:'255,87,87'};
+  const lab={CDD:'CDD · Standard',SDD:'SDD · Enhanced monitoring',EDD:'EDD · Enhanced'};
+  $('riskBars').innerHTML = a.mix.map(m=>{
+    const c=rgb[m.band], w=(m.pct*prog).toFixed(1);
+    const fill="height:100%;border-radius:99px;width:"+w+"%;background:linear-gradient(90deg,rgba("+c+",0.7),rgb("+c+"));box-shadow:0 0 10px rgba("+c+",0.5)";
+    return '<div class="bar-row"><div class="bar-top"><span class="l">'+lab[m.band]+'</span><span class="p">'+m.pct+'%</span></div>'
+      + '<div class="bar-track"><div class="bar-fill" style="'+fill+'"></div></div></div>';
+  }).join('');
+}
+function renderJur(){
+  const a=AGG, prog=state.prog;
+  if(!a.jurisdictions.length){ $('jurWatch').innerHTML='<div class="empty-note">No jurisdictions yet.</div>'; return; }
+  const maxc=Math.max.apply(null, a.jurisdictions.map(j=>j.count)) || 1;
+  const sev={1:{l:'Low',c:'#7FB3E8',rgb:'91,155,216'},2:{l:'Med',c:'#FFAE57',rgb:'255,148,52'},3:{l:'High',c:'#FF6B6B',rgb:'255,87,87'},4:{l:'Proh',c:'#FF6B6B',rgb:'255,87,87'}};
+  $('jurWatch').innerHTML = a.jurisdictions.slice(0,6).map(j=>{
+    const s=sev[j.worst]||sev[1], w=(j.count/maxc*100*prog).toFixed(1);
+    const fill="height:100%;border-radius:99px;width:"+w+"%;background:rgb("+s.rgb+");box-shadow:0 0 8px rgba("+s.rgb+",0.5)";
+    return '<div class="jur-row"><span class="jn">'+esc(j.name)+'</span>'
+      + '<div class="jt"><div style="'+fill+'"></div></div>'
+      + '<span class="jb" style="color:'+s.c+'">'+s.l+'</span></div>';
+  }).join('');
+}
+function renderAlerts(){
+  const a=AGG;
+  if(!a.recent.length){ $('alertStream').innerHTML='<div class="empty-note">No assessments filed yet — file one in the Assessment tab to populate the console.</div>'; return; }
+  $('alertStream').innerHTML = a.recent.map((it,i)=>{
+    const key = it.prohibited?'PROHIBITED':it.outcome;
+    const t=bandTone(key);
+    let when='';
+    if(it.savedAt){ try{ when=new Date(it.savedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ when=it.date||''; } }
+    else when=it.date||'';
+    const row='animation-delay:'+(0.2+i*0.07).toFixed(2)+'s';
+    return '<div class="alert-row" style="'+row+'">'
+      + '<span class="at">'+esc(when)+'</span>'
+      + '<div style="flex:1;min-width:0"><div class="ae">'+esc(it.entity)+'</div><div class="ay">'+esc(BAND_FULL[key]||key)+'</div></div>'
+      + '<span class="aj" title="'+esc(it.jurisdiction)+'">'+esc(it.jurisdiction)+'</span>'
+      + '<span class="ab" style="color:'+t.c+';background:'+t.bg+';border-color:'+t.bd+'">'+t.l+'</span></div>';
+  }).join('');
+}
+function renderAnimated(){ renderStats(); renderMix(); renderJur(); }
+
+/* Count-up tween (rAF, easeOutCubic) — scales values 0 → actual */
+function tween(){
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce){ state.prog = 1; renderAnimated(); return; }
+  const start = performance.now(), dur = 1300, ease = p => 1 - Math.pow(1-p, 3);
+  function loop(now){ const p = Math.min((now-start)/dur, 1); state.prog = ease(p); renderAnimated(); if(p<1) requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+}
+
+function startClock(){
+  const tick = ()=>{
+    try{ $('clock').innerHTML = new Date().toLocaleTimeString('en-GB',{timeZone:'UTC'}) + ' <b>UTC</b>'; }catch(e){}
+    state.uptime++; $('uptime').textContent = fmtUptime(state.uptime);
+  };
+  $('uptime').textContent = fmtUptime(state.uptime);
+  tick();
+  setInterval(tick, 1000);
+}
+
+/* Boot */
+AGG = aggregate(readRegister());
+setAccent();
+renderOperator();
+renderOperatorStrip();
+updateThreat();
+renderAlerts();
+renderAnimated();
+tween();
+startClock();
+</script>
+</body>
+</html>
