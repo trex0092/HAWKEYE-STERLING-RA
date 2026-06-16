@@ -168,7 +168,9 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 .tool-err{margin-top:16px;font-family:var(--mono);font-size:12px;color:#FF6B6B}
 .tool-result{animation:fadeUp .4s cubic-bezier(.22,.7,.25,1)}
 
-@media(max-width:900px){.nav,.sub{display:none}}
+@media(max-width:900px){.sub,.status{display:none}
+  header{flex-wrap:wrap;height:auto;padding:9px 18px;row-gap:9px}.hdr-right{flex:1 1 100%}
+  .nav{display:flex;width:100%}.nav a{flex:1;text-align:center;padding:8px 6px}}
 @media(max-width:560px){.tabs{padding-top:16px}main{padding:18px 18px 48px}.tabs{padding-left:18px;padding-right:18px}}
 </style>
 </head>

@@ -120,7 +120,9 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 @media(max-width:1080px){.grid{grid-template-columns:1fr}}
-@media(max-width:760px){.tiles{grid-template-columns:1fr 1fr}.lower{grid-template-columns:1fr}.nav,.sub{display:none}}
+@media(max-width:760px){.tiles{grid-template-columns:1fr 1fr}.lower{grid-template-columns:1fr}.sub,.live,.clock{display:none}
+  header{flex-wrap:wrap;height:auto;padding:9px 16px;row-gap:9px}.hdr-right{flex:1 1 100%}
+  .nav{display:flex;width:100%}.nav a{flex:1;text-align:center;padding:8px 6px}}
 @media(max-width:520px){.tiles{grid-template-columns:1fr 1fr}.clock{display:none}}
 </style>
 </head>
