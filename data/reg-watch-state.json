@@ -2,18 +2,20 @@
   "updated": "2026-06-16",
   "sources": {
     "uae-moe": {
-      "hash": "63f55b44ebc38eb41d9f2d68be3c016724af20ef4f6539a39499d487f02a23b3",
+      "hash": "47c472dd091d4cd188fca12c0f437130a4477c45ca4fa01d6331e6a55e1beedb",
       "bytes": 11245,
       "checkedAt": "2026-06-16",
       "changedAt": "2026-06-16",
-      "status": 200
+      "status": 200,
+      "prevHash": "63f55b44ebc38eb41d9f2d68be3c016724af20ef4f6539a39499d487f02a23b3"
     },
     "uae-fiu": {
-      "hash": "a7842f643c8783ab0a87f320b899e7d5526fb7661396b17bbc2138fb9ce9b446",
+      "hash": "20fbf1c293d8510ebfce93cf48156898a6916def37570f05c302a14a2f73a378",
       "bytes": 4427,
       "checkedAt": "2026-06-16",
       "changedAt": "2026-06-16",
-      "status": 200
+      "status": 200,
+      "prevHash": "a7842f643c8783ab0a87f320b899e7d5526fb7661396b17bbc2138fb9ce9b446"
     },
     "uae-namlcftc": {
       "hash": null,
@@ -121,12 +123,11 @@
       "status": 200
     },
     "egmont": {
-      "hash": null,
-      "bytes": 0,
+      "hash": "e79bfcef5ad8ddd37046f63df83b1e64bf66640e05fd0221e12538daebb05061",
+      "bytes": 5049,
       "checkedAt": "2026-06-16",
-      "changedAt": null,
-      "status": 403,
-      "error": "HTTP 403"
+      "changedAt": "2026-06-16",
+      "status": 200
     },
     "basel-index": {
       "hash": "167979bf07823f1a2f888c3d7940c5a423ba9cc02e4d90992ea74dbb4f3b9c2b",
