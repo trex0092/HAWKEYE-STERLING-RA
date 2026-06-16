@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hawkeye Sterling — Advisor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ac1:#B45CFF;--ac2:#FF5CA8;--glow:255,92,168;          /* magenta theme */
+  --display:'Space Grotesk','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+  --sans:'Manrope','Helvetica Neue',Arial,sans-serif;
+}
+html,body{background:#0A0E16}
+body{font-family:var(--sans);color:#EDEFF4;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh;position:relative;overflow-x:hidden}
+::selection{background:rgba(255,92,168,0.30)}
+textarea::placeholder,input::placeholder{color:#4A5468}
+button{font-family:inherit}
+@keyframes glowDrift{to{transform:translate(3.5%,-2.5%) scale(1.08)}}
+@keyframes ping{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.72)}}
+@keyframes dotPulse{0%,100%{opacity:.22;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sweep{to{transform:translateX(220px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+
+.bg-glow{position:fixed;inset:-20%;z-index:0;pointer-events:none;background:radial-gradient(ellipse 45% 55% at 18% 22%,rgba(180,92,255,0.11),transparent 60%),radial-gradient(ellipse 55% 60% at 84% 78%,rgba(255,92,168,0.10),transparent 60%),radial-gradient(ellipse 40% 45% at 60% 8%,rgba(91,155,216,0.06),transparent 60%);animation:glowDrift 24s ease-in-out infinite alternate}
+.wrap{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+
+/* Header */
+header{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 30px;height:66px;background:rgba(8,11,18,0.86);border-bottom:1px solid rgba(255,255,255,0.10);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.brand{display:flex;align-items:center;gap:13px;min-width:0}
+.avatar{width:46px;height:46px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#0B101A;border:1.5px solid rgba(var(--glow),0.55);box-shadow:0 0 16px rgba(var(--glow),0.30)}
+.avatar>div{width:100%;height:100%;background-size:cover;background-repeat:no-repeat}
+.brand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wordmark{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-0.01em;line-height:1;background:linear-gradient(90deg,var(--ac1),var(--ac2) 82%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;filter:drop-shadow(0 0 10px rgba(var(--glow),0.35));white-space:nowrap}
+.sub{font-family:var(--mono);font-size:10.5px;letter-spacing:0.04em;color:#646F86;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-right{display:flex;align-items:center;gap:14px}
+.nav{display:flex;align-items:center;gap:4px}
+.nav a{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#A3ADC0;text-decoration:none;padding:6px 11px;border-radius:7px;border:1px solid transparent;transition:all .16s;white-space:nowrap}
+.nav a:hover{color:#EDEFF4;background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.11)}
+.nav a.active{color:#FCE3EF;background:rgba(var(--glow),0.14);border-color:rgba(var(--glow),0.5);box-shadow:0 0 14px rgba(var(--glow),0.22)}
+.status{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;border:1px solid rgba(59,196,143,0.40);background:rgba(59,196,143,0.08);font-family:var(--mono);font-size:11px;color:#4FD6A0;white-space:nowrap;box-shadow:0 0 14px rgba(59,196,143,0.14)}
+.status i{width:8px;height:8px;border-radius:50%;background:#3BC48F;box-shadow:0 0 8px #3BC48F;animation:ping 2.2s ease-in-out infinite}
+
+.tabs{display:flex;gap:12px;padding:22px 30px 0}
+.tab{padding:11px 21px;border-radius:11px;font-family:var(--display);font-weight:600;font-size:13.5px;cursor:pointer;white-space:nowrap;transition:all .18s;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.03);color:#A3ADC0}
+.tab.active{background:rgba(var(--glow),0.15);border-color:rgba(var(--glow),0.55);color:#FCE3EF;box-shadow:0 0 18px rgba(var(--glow),0.32),inset 0 0 12px rgba(var(--glow),0.07)}
+
+main{padding:22px 30px 64px;flex:1}
+
+/* Section label */
+.sec-lbl{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.sec-lbl span{font-family:var(--mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.16em;background:linear-gradient(90deg,var(--ac1),var(--ac2) 80%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;white-space:nowrap}
+.sec-lbl i{flex:1;height:2px;border-radius:99px;background:linear-gradient(90deg,var(--ac1),var(--ac2) 55%,transparent);box-shadow:0 0 8px rgba(var(--glow),0.45)}
+
+.card{position:relative;background:#10161F;border:1px solid rgba(255,255,255,0.07);border-radius:16px;box-shadow:0 1px 0 rgba(255,255,255,0.03) inset,0 16px 38px rgba(0,0,0,0.38);overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent)}
+.card-pad{padding:22px 24px 24px}
+
+.ask-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:22px;align-items:start}
+
+textarea.q{width:100%;min-height:156px;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:11px;padding:14px 16px;color:#EDEFF4;font-family:var(--sans);font-size:15px;line-height:1.6;resize:vertical;outline:none}
+textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0.22)}
+.ask-btn{display:inline-flex;align-items:center;gap:9px;padding:13px 24px;border-radius:11px;background:rgba(var(--glow),0.15);border:1px solid rgba(var(--glow),0.55);color:#FCE3EF;font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:0.01em;cursor:pointer;white-space:nowrap;box-shadow:0 0 18px rgba(var(--glow),0.32),inset 0 0 12px rgba(var(--glow),0.07);transition:transform .18s,box-shadow .18s,background .18s}
+.ask-btn:hover{transform:translateY(-1px);background:rgba(var(--glow),0.24);box-shadow:0 0 26px rgba(var(--glow),0.5)}
+.mode-strip{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-top:22px}
+.mode-strip .ml{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#646F86;text-transform:uppercase}
+.mode-group{display:flex;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:10px;padding:4px;gap:3px}
+.mode-btn{padding:8px 15px;border-radius:7px;font-family:var(--mono);font-size:12px;cursor:pointer;border:none;white-space:nowrap;transition:all .18s;background:transparent;color:#A3ADC0;font-weight:500}
+.mode-btn.active{background:rgba(var(--glow),0.16);color:#FCE3EF;box-shadow:inset 0 0 0 1px rgba(var(--glow),0.5);font-weight:600}
+.mode-hint{margin-top:14px;font-family:var(--mono);font-size:10.5px;color:#646F86;display:flex;align-items:center;gap:8px}
+.mode-hint b{color:var(--ac2);font-weight:400}
+
+.persona-name{font-family:var(--mono);font-size:11px;color:#A3ADC0}
+.persona-name b{color:#EDEFF4;font-weight:600}
+.persona-pick{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:9px}
+.p-btn{width:48px;height:48px;border-radius:50%;padding:0;overflow:hidden;cursor:pointer;flex-shrink:0;background:#0B101A;transition:all .2s;border:2px solid rgba(255,255,255,0.2)}
+.p-btn>div{width:100%;height:100%;background-size:cover;background-position:center 28%;background-repeat:no-repeat}
+
+/* Hero states */
+.hero{position:relative;min-height:430px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);background:#0B0F18}
+.hero-img{position:absolute;inset:0;background-size:cover;background-repeat:no-repeat}
+.hero-shade1{position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,rgba(8,11,18,0.95) 0%,rgba(8,11,18,0.78) 38%,rgba(8,11,18,0.30) 72%,rgba(8,11,18,0.10) 100%)}
+.hero-shade2{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top,rgba(8,11,18,0.75),transparent 45%)}
+.hero-chip{position:absolute;left:24px;top:22px;z-index:2}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;font-family:var(--mono);font-size:11px;color:#EDEFF4;white-space:nowrap}
+.chip i{width:7px;height:7px;border-radius:50%}
+.hero-copy{position:absolute;left:32px;right:32px;bottom:32px;pointer-events:none}
+.hero-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--ac2);margin-bottom:14px;text-shadow:0 0 12px rgba(var(--glow),0.5)}
+.hero-title{font-family:var(--display);font-weight:700;font-size:34px;line-height:1.08;letter-spacing:-0.02em;max-width:420px;background:linear-gradient(90deg,var(--ac1),var(--ac2) 78%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;filter:drop-shadow(0 0 14px rgba(var(--glow),0.32))}
+.hero-lede{margin-top:14px;max-width:400px;font-size:15px;line-height:1.6;color:#A3ADC0}
+
+.hero-reason{position:relative;min-height:430px;border-radius:16px;border:1px solid rgba(255,255,255,0.08);background:#10161F;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;overflow:hidden}
+.hero-reason .scan{position:absolute;top:0;left:-220px;width:220px;height:100%;background:linear-gradient(90deg,transparent,rgba(var(--glow),0.10),transparent);animation:sweep 1.5s linear infinite}
+.reason-av{width:80px;height:80px;border-radius:50%;overflow:hidden;background:#0B101A;border:1.5px solid rgba(var(--glow),0.5);box-shadow:0 0 26px rgba(var(--glow),0.35)}
+.reason-av>div{width:100%;height:100%;background-size:cover;background-repeat:no-repeat}
+.reason-txt{font-family:var(--mono);font-size:13px;color:#A3ADC0;text-align:center;padding:0 24px}
+.dots{display:flex;gap:7px}
+.dots span{width:9px;height:9px;border-radius:50%;animation:dotPulse 1s ease-in-out infinite}
+
+/* Answer */
+.ans{animation:fadeUp .5s cubic-bezier(.22,.7,.25,1)}
+.eyebrow{font-family:var(--mono);font-size:10.5px;color:#646F86;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px}
+.asked{font-size:14px;color:#C9D2E2;line-height:1.5;margin-bottom:18px}
+.pill{display:inline-flex;align-items:center;padding:6px 14px;border-radius:8px;font-family:var(--display);font-weight:600;font-size:13px;border:1px solid}
+.conf{font-family:var(--mono);font-size:11px;color:#4FD6A0;display:inline-flex;align-items:center;gap:6px}
+.conf i{width:7px;height:7px;border-radius:50%;background:#3BC48F;box-shadow:0 0 6px #3BC48F}
+.summary{font-size:15px;line-height:1.7;color:#C9D2E2;margin-bottom:22px;text-wrap:pretty}
+.block-h{font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#A3ADC0;margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.block-h i{flex:1;height:1px;background:linear-gradient(90deg,rgba(180,92,255,0.6),rgba(255,92,168,0.4) 55%,transparent)}
+.basis{background:#0B101A;border:1px solid rgba(255,255,255,0.08);border-left:2px solid var(--ac2);border-radius:8px;padding:10px 13px}
+.basis .ref{font-family:var(--mono);font-size:11.5px;font-weight:600;color:#D7A24E;margin-bottom:3px}
+.basis .note{font-size:13px;color:#A3ADC0;line-height:1.5}
+.guide-row{display:flex;gap:12px;align-items:flex-start}
+.guide-row .n{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ac2);flex-shrink:0;width:22px;padding-top:1px}
+.guide-row .tx{font-size:14px;color:#C9D2E2;line-height:1.55}
+.step-row{display:flex;gap:11px;align-items:flex-start}
+.step-row .ck{color:#3BC48F;flex-shrink:0;font-size:13px;padding-top:1px}
+.step-row .tx{font-size:14px;color:#C9D2E2;line-height:1.55}
+.again{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:10px;background:rgba(59,196,143,0.08);border:1px solid rgba(59,196,143,0.40);color:#5FDCAB;font-family:var(--display);font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;transition:all .18s}
+.again:hover{background:rgba(59,196,143,0.16);box-shadow:0 0 16px rgba(59,196,143,0.3)}
+
+/* Q&A */
+.qa-wrap{max-width:860px;margin:0 auto}
+.qa-desc{font-size:14px;color:#A3ADC0;margin-bottom:18px}
+.qa-filter{width:100%;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:11px;padding:13px 16px;color:#EDEFF4;font-family:var(--sans);font-size:14px;outline:none;margin-bottom:16px}
+.qa-filter:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0.22)}
+.qa-list{display:flex;flex-direction:column;gap:11px}
+.qa-item{position:relative;background:#10161F;border:1px solid rgba(255,255,255,0.07);border-radius:13px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,0.30)}
+.qa-item::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.45),rgba(255,92,168,0.38),transparent)}
+.qa-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px 20px;background:transparent;border:none;cursor:pointer;text-align:left;color:#EDEFF4;font-family:var(--sans);font-size:15.5px;font-weight:600;line-height:1.4}
+.qa-q .chev{color:#A3ADC0;font-size:13px;flex-shrink:0;transition:transform .2s}
+.qa-body{padding:0 20px 20px;animation:fadeUp .35s ease-out}
+.qa-summary{font-size:14.5px;line-height:1.7;color:#C9D2E2;margin:13px 0 16px;text-wrap:pretty}
+.qa-basis{background:#0B101A;border:1px solid rgba(255,255,255,0.08);border-left:2px solid var(--ac2);border-radius:8px;padding:9px 12px}
+.qa-basis .ref{font-family:var(--mono);font-size:11px;font-weight:600;color:#D7A24E;margin-bottom:2px}
+.qa-basis .note{font-size:12.5px;color:#A3ADC0;line-height:1.5}
+.empty{font-size:14px;color:#646F86;text-align:center;padding:30px 0;font-family:var(--mono)}
+
+@media(max-width:900px){.nav,.sub{display:none}}
+@media(max-width:560px){.tabs{padding-top:16px}main{padding:18px 18px 48px}.tabs{padding-left:18px;padding-right:18px}}
+</style>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="avatar" id="advAvatar"><div></div></div>
+      <div class="brand-text">
+        <div class="wordmark">Hawkeye Sterling advisor.</div>
+        <div class="sub">Regulator-grade AML decisioning · every answer cited</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <nav class="nav" aria-label="Suite navigation">
+        <a href="index.html">Assessment</a>
+        <a href="console.html">Console</a>
+        <a href="advisor.html" class="active" aria-current="page">Advisor</a>
+      </nav>
+      <div class="status"><i></i>healthy · LLM live</div>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   Hawkeye Sterling Advisor — cited AML Q&A
+   Vanilla port of the design component.
+══════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const COUNTS = {Quick:24, Speed:48, Balanced:96, Deep:152};
+
+const ANSWER = {
+  verdict:'Enhanced Due Diligence', tone:'high', confidence:'High confidence',
+  summary:'A UAE-licensed dealer in precious metals and stones (DPMS) is a DNFBP under the federal AML framework. Where the trader handles gold at or above the AED 55,000 cash threshold, or shows higher-risk indicators such as cross-border sourcing or PEP involvement, enhanced due diligence is required before the relationship proceeds.',
+  basis:[
+    {ref:'FATF Rec. 22 & 23', note:'Extends CDD, record-keeping and reporting duties to dealers in precious metals and stones.'},
+    {ref:'FATF Rec. 10', note:'Standard customer due diligence and verification of beneficial ownership.'},
+    {ref:'UAE Cabinet Decision No. (10) of 2019', note:'Arts. 4–7 — identification, verification and ongoing monitoring obligations.'},
+    {ref:'MoE DPMS Guidance', note:'Cash-transaction reporting (DPMSR) at or above AED 55,000, single or linked.'}
+  ],
+  guide:[
+    {n:'01', text:'Confirm the entity is a licensed DPMS and identify the trading activity — mined, recycled, or both.'},
+    {n:'02', text:'Screen the customer and all beneficial owners against sanctions, PEP and adverse-media lists.'},
+    {n:'03', text:'Assess geographic exposure: UAE-domestic versus cross-border sourcing from higher-risk jurisdictions.'},
+    {n:'04', text:'Apply the cash test — single or linked transactions at or above AED 55,000 trigger a DPMSR filing.'}
+  ],
+  steps:[
+    'Collect trade licence, beneficial-ownership declaration and source-of-funds evidence.',
+    'Establish the expected transaction profile and set an ongoing-monitoring cadence.',
+    'File a DPMSR for any qualifying cash transaction within the statutory window.',
+    'Record the EDD rationale and obtain senior-management onboarding approval.'
+  ]
+};
+
+const QA_DATA = [
+  {id:'q1', q:'When must a DPMS file a cash transaction report?', tone:'med', verdict:'DPMSR required',
+    summary:'A dealer must file a DPMS cash-transaction report for any single or linked cash transaction at or above AED 55,000, regardless of the customer’s risk rating.',
+    basis:[{ref:'MoE DPMS Guidance', note:'Reporting threshold and linked-transaction aggregation.'},{ref:'Cabinet Decision No. (10) of 2019', note:'Art. 16 — reporting obligations.'}]},
+  {id:'q2', q:'Do I have to identify beneficial owners holding below 25%?', tone:'med', verdict:'Risk-based',
+    summary:'The 25% holding is a starting threshold, not a floor. Where control is exercised by other means — voting rights, agreements, or senior management — those persons must still be identified.',
+    basis:[{ref:'FATF Rec. 10 & 24', note:'Beneficial ownership identified by ownership or control.'},{ref:'Cabinet Decision No. (10) of 2019', note:'Art. 5 — definition of beneficial owner.'}]},
+  {id:'q3', q:'Is a remotely onboarded customer automatically high risk?', tone:'low', verdict:'Not automatic',
+    summary:'Non-face-to-face onboarding is a risk factor, not an automatic high-risk classification. With reliable electronic identity verification and liveness checks it can be managed within standard due diligence.',
+    basis:[{ref:'FATF Rec. 10', note:'Non-face-to-face relationships listed as a risk factor.'},{ref:'FATF Digital ID Guidance', note:'Reliable, independent e-ID may mitigate the risk.'}]},
+  {id:'q4', q:'What records must I keep, and for how long?', tone:'low', verdict:'5 years minimum',
+    summary:'Retain customer identification, due-diligence files and transaction records for at least five years after the relationship ends or the transaction completes, and make them available to the supervisor on request.',
+    basis:[{ref:'FATF Rec. 11', note:'Five-year record-retention requirement.'},{ref:'Cabinet Decision No. (10) of 2019', note:'Art. 24 — record keeping.'}]},
+  {id:'q5', q:'When is a Suspicious Activity Report mandatory?', tone:'high', verdict:'File without delay',
+    summary:'Where there are reasonable grounds to suspect funds are proceeds of crime or linked to financing, a report must be filed with the FIU promptly via the goAML portal — and the customer must not be tipped off.',
+    basis:[{ref:'FATF Rec. 20', note:'Mandatory reporting of suspicious transactions.'},{ref:'Cabinet Decision No. (10) of 2019', note:'Art. 15 & 17 — STR duty and tipping-off prohibition.'}]}
+];
+
+const PERSONAS = [
+  {id:'sterling', name:'Sterling', role:'Lead AML advisor',       img:'assets/persona-sterling.png', accent:'59,229,208',  pos:'36% 24%'},
+  {id:'vale',     name:'Vale',     role:'KYC & onboarding',        img:'assets/persona-vale.png',     accent:'91,155,216',  pos:'50% 22%'},
+  {id:'ember',    name:'Ember',    role:'Sanctions & high-risk',   img:'assets/persona-ember.png',    accent:'255,107,80',  pos:'50% 26%'},
+  {id:'brass',    name:'Brass',    role:'Records & audit',         img:'assets/persona-brass.png',    accent:'210,166,72',  pos:'46% 28%'},
+  {id:'iris',     name:'Iris',     role:'Typologies & training',   img:'assets/persona-iris.png',     accent:'180,92,255',  pos:'40% 24%'}
+];
+
+let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', expandedQa:null, qaQuery:'', personaId:'sterling'};
+let reasoningTimer = null;
+
+function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
+function tone(t){
+  if(t==='high') return {c:'#FF6B6B', bg:'rgba(255,87,87,0.10)',  bd:'rgba(255,87,87,0.45)'};
+  if(t==='med')  return {c:'#FFAE57', bg:'rgba(255,148,52,0.10)', bd:'rgba(255,148,52,0.42)'};
+  return            {c:'#4FD6A0', bg:'rgba(59,196,143,0.10)', bd:'rgba(59,196,143,0.36)'};
+}
+function pillStyle(t){ const x=tone(t); return 'color:'+x.c+';background:'+x.bg+';border-color:'+x.bd+';box-shadow:0 0 14px '+x.bg; }
+function modeHint(){ return 'Reasoning over '+COUNTS[state.mode]+' directives'; }
+
+/* ── Renderers ── */
+function renderAvatar(){
+  const p = persona();
+  $('advAvatar').firstElementChild.style.backgroundImage = "url('"+p.img+"')";
+  $('advAvatar').firstElementChild.style.backgroundPosition = p.pos;
+}
+function renderTabs(){
+  $('tabs').innerHTML =
+    '<button class="tab'+(state.tab==='ask'?' active':'')+'" data-tab="ask">Ask the advisor</button>'+
+    '<button class="tab'+(state.tab==='qa'?' active':'')+'" data-tab="qa">Regulatory Q&amp;A</button>';
+  Array.from(document.querySelectorAll('.tab')).forEach(b=>b.addEventListener('click',()=>{ state.tab=b.getAttribute('data-tab'); render(); }));
+}
+
+function personaPickerHtml(){
+  const cur = persona();
+  const btns = PERSONAS.map(p=>{
+    const on = p.id===cur.id;
+    const ring = 'border:2px solid rgba('+p.accent+','+(on?'0.95':'0.26')+');'
+      + 'box-shadow:'+(on?'0 0 16px rgba('+p.accent+',0.6)':'none')+';'
+      + 'transform:'+(on?'scale(1.08)':'scale(1)')+';opacity:'+(on?'1':'0.5')+';filter:'+(on?'none':'grayscale(0.45)')+';';
+    const img = "background-image:url('"+p.img+"');";
+    return '<button class="p-btn" title="'+esc(p.name)+'" data-pid="'+p.id+'" style="'+ring+'"><div style="'+img+'"></div></button>';
+  }).join('');
+  return '<div class="persona-pick">'+btns+'</div>'
+    + '<div class="persona-name"><b>'+esc(cur.name)+'</b> · '+esc(cur.role)+'</div>';
+}
+
+function heroIdleHtml(){
+  const p = persona();
+  return '<div class="hero">'
+    + '<div class="hero-img" style="background-image:url(\''+p.img+'\');background-position:'+p.pos+'"></div>'
+    + '<div class="hero-shade1"></div><div class="hero-shade2"></div>'
+    + '<div class="hero-chip"><span class="chip" style="background:rgba('+p.accent+',0.16);border:1px solid rgba('+p.accent+',0.55);box-shadow:0 0 14px rgba('+p.accent+',0.3)"><i style="background:rgb('+p.accent+');box-shadow:0 0 8px rgb('+p.accent+')"></i>'+esc(p.name)+'</span></div>'
+    + '<div class="hero-copy">'
+    +   '<div class="hero-eyebrow">Ready when you are</div>'
+    +   '<div class="hero-title">Ask me anything about AML compliance.</div>'
+    +   '<div class="hero-lede">Every answer comes with a cited legal basis, a clear decision guide, and the recommended next steps.</div>'
+    + '</div></div>';
+}
+function heroReasoningHtml(){
+  const p = persona();
+  return '<div class="hero-reason">'
+    + '<div class="scan"></div>'
+    + '<div class="reason-av"><div style="background-image:url(\''+p.img+'\');background-position:'+p.pos+'"></div></div>'
+    + '<div class="reason-txt">'+esc(modeHint())+'</div>'
+    + '<div class="dots">'
+    +   '<span style="background:var(--ac1);box-shadow:0 0 8px var(--ac1)"></span>'
+    +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
+    +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
+    + '</div></div>';
+}
+function heroAnswerHtml(){
+  const a = ANSWER;
+  const basis = a.basis.map(b=>'<div class="basis"><div class="ref">'+esc(b.ref)+'</div><div class="note">'+esc(b.note)+'</div></div>').join('');
+  const guide = a.guide.map(g=>'<div class="guide-row"><span class="n">'+esc(g.n)+'</span><span class="tx">'+esc(g.text)+'</span></div>').join('');
+  const steps = a.steps.map(s=>'<div class="step-row"><span class="ck">&#10003;</span><span class="tx">'+esc(s)+'</span></div>').join('');
+  return '<div class="card ans"><div class="card-pad">'
+    + '<div class="sec-lbl"><span>Advisor response</span><i></i></div>'
+    + '<div class="eyebrow">You asked</div>'
+    + '<div class="asked">'+esc(state.askedQuestion)+'</div>'
+    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
+    +   '<span class="pill" style="'+pillStyle(a.tone)+'">'+esc(a.verdict)+'</span>'
+    +   '<span class="conf"><i></i>'+esc(a.confidence)+'</span>'
+    + '</div>'
+    + '<div class="summary">'+esc(a.summary)+'</div>'
+    + '<div class="block-h">Cited legal basis<i></i></div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">'+basis+'</div>'
+    + '<div class="block-h">Decision guide<i></i></div>'
+    + '<div style="display:flex;flex-direction:column;gap:11px;margin-bottom:22px">'+guide+'</div>'
+    + '<div class="block-h">Recommended steps<i></i></div>'
+    + '<div style="display:flex;flex-direction:column;gap:9px;margin-bottom:24px">'+steps+'</div>'
+    + '<button class="again" id="askAgain"><span>&#8634;</span> Ask another</button>'
+    + '</div></div>';
+}
+function heroHtml(){
+  if(state.phase==='reasoning') return heroReasoningHtml();
+  if(state.phase==='answer') return heroAnswerHtml();
+  return heroIdleHtml();
+}
+
+function renderAsk(){
+  const modes = Object.keys(COUNTS).map(m=>
+    '<button class="mode-btn'+(state.mode===m?' active':'')+'" data-mode="'+m+'">'+m+'</button>').join('');
+  $('main').innerHTML =
+    '<div class="ask-grid">'
+    + '<div class="card"><div class="card-pad">'
+    +   '<div class="sec-lbl"><span>Your question</span><i></i></div>'
+    +   '<textarea class="q" id="qInput" placeholder="Ask a compliance question, e.g. what CDD applies to a cross-border gold shipment?"></textarea>'
+    +   '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px">'
+    +     '<button class="ask-btn" id="askBtn">Ask the advisor <span style="font-size:11px">&#9658;</span></button>'
+    +   '</div>'
+    +   '<div class="mode-strip"><span class="ml">Mode</span><div class="mode-group">'+modes+'</div></div>'
+    +   '<div class="mode-hint"><b>&#9671;</b>'+esc(modeHint())+' · grounded in cited legal sources</div>'
+    + '</div></div>'
+    + '<div>'
+    +   '<div style="margin-bottom:16px"><div class="sec-lbl" style="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'
+    +   '<div id="hero">'+heroHtml()+'</div>'
+    + '</div>'
+    + '</div>';
+
+  const qi = $('qInput'); if(qi){ qi.value = state.question; qi.addEventListener('input', e=>{ state.question = e.target.value; }); }
+  const ab = $('askBtn'); if(ab) ab.addEventListener('click', ask);
+  Array.from(document.querySelectorAll('.mode-btn')).forEach(b=>b.addEventListener('click',()=>{ state.mode=b.getAttribute('data-mode'); renderAsk(); }));
+  bindPersona();
+  bindHero();
+}
+function bindPersona(){
+  Array.from(document.querySelectorAll('.p-btn')).forEach(b=>b.addEventListener('click',()=>{
+    state.personaId = b.getAttribute('data-pid'); renderAvatar(); renderAsk();
+  }));
+}
+function bindHero(){ const aa=$('askAgain'); if(aa) aa.addEventListener('click', reset); }
+
+function ask(){
+  const q = (state.question||'').trim() || 'What CDD is required for a UAE gold trader?';
+  clearTimeout(reasoningTimer);
+  state.askedQuestion = q; state.phase = 'reasoning';
+  $('hero').innerHTML = heroHtml();
+  reasoningTimer = setTimeout(()=>{ state.phase='answer'; $('hero').innerHTML = heroHtml(); bindHero(); }, 1500);
+}
+function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; $('hero').innerHTML = heroHtml(); }
+
+function renderQa(){
+  $('main').innerHTML =
+    '<div class="qa-wrap">'
+    + '<div class="sec-lbl"><span>Regulatory Q&amp;A</span><i></i></div>'
+    + '<div class="qa-desc">Curated answers to the questions DPMS compliance teams ask most — each with its cited basis.</div>'
+    + '<input class="qa-filter" id="qaFilter" placeholder="Filter questions…">'
+    + '<div class="qa-list" id="qaList"></div>'
+    + '</div>';
+  const f = $('qaFilter');
+  f.value = state.qaQuery;
+  f.addEventListener('input', e=>{ state.qaQuery = e.target.value; renderQaList(); });
+  renderQaList();
+}
+function renderQaList(){
+  const q = (state.qaQuery||'').toLowerCase();
+  const items = QA_DATA.filter(x=>x.q.toLowerCase().includes(q));
+  if(!items.length){ $('qaList').innerHTML = '<div class="empty">No matching questions.</div>'; return; }
+  $('qaList').innerHTML = items.map(item=>{
+    const open = state.expandedQa===item.id;
+    const chev = 'transform:rotate('+(open?'180deg':'0deg')+')';
+    let body = '';
+    if(open){
+      const basis = item.basis.map(b=>'<div class="qa-basis"><div class="ref">'+esc(b.ref)+'</div><div class="note">'+esc(b.note)+'</div></div>').join('');
+      body = '<div class="qa-body">'
+        + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:13px"><span class="pill" style="'+pillStyle(item.tone)+'">'+esc(item.verdict)+'</span></div>'
+        + '<div class="qa-summary">'+esc(item.summary)+'</div>'
+        + '<div style="display:flex;flex-direction:column;gap:7px">'+basis+'</div></div>';
+    }
+    return '<div class="qa-item"><button class="qa-q" data-qid="'+item.id+'"><span>'+esc(item.q)+'</span><span class="chev" style="'+chev+'">&#9662;</span></button>'+body+'</div>';
+  }).join('');
+  Array.from(document.querySelectorAll('.qa-q')).forEach(b=>b.addEventListener('click',()=>{
+    const id = b.getAttribute('data-qid');
+    state.expandedQa = state.expandedQa===id ? null : id;
+    renderQaList();
+  }));
+}
+
+function render(){
+  renderTabs();
+  if(state.tab==='ask') renderAsk(); else renderQa();
+}
+
+/* Boot */
+renderAvatar();
+render();
+</script>
+</body>
+</html>

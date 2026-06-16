@@ -10,7 +10,19 @@ A single-file web application for **AML/CFT customer (entity) risk assessment**,
 |---|---|
 | ![Assessment form](docs/form.png) | ![Print report](docs/report.png) |
 
-The entire application lives in [`index.html`](index.html) — no build step, no dependencies, no backend. It runs offline, deploys to any static host, and keeps all data on the user's device.
+The core application lives in [`index.html`](index.html) — no build step, no backend, no bundler. It deploys to any static host and keeps all data on the user's device. (The dark-neon "command-center" redesign pulls in three Google Fonts — Space Grotesk, JetBrains Mono, Manrope — and falls back to the system stack when offline.)
+
+## The command-center suite
+
+A dark neon, AI-persona "command center" spanning three sibling pages — pure HTML/CSS/JS, no framework, cross-linked from the header nav and sharing the six robot portraits in [`assets/`](assets):
+
+| Page | File | Purpose |
+|---|---|---|
+| **Entity Risk Assessment** | [`index.html`](index.html) | The primary tool — live 0–30 risk scoring, animated gauge, CDD/SDD/EDD verdict, analyst override, Risk-Data editor, register and activity log. |
+| **AI Operations Console** | [`console.html`](console.html) | A live monitoring HUD — a robot "analyst on duty" inside an animated radar, an operator switcher, count-up stat tiles, a live alert stream, the diligence mix and a jurisdiction watch. |
+| **Hawkeye Sterling Advisor** | [`advisor.html`](advisor.html) | A cited-answer AML Q&A — a question composer with a swappable AI persona that returns a verdict, cited legal basis, decision guide and recommended steps, plus a filterable regulatory Q&A. |
+
+The **AI Risk Advisor** in the assessment sidebar is a robot whose head and HUD colour follow the operative outcome — **Vale** (teal) for CDD, **Cypher** (amber) for SDD, **Ember** (red) for EDD / PROHIBITED — each with a one-line advisory note. The header carries a persona avatar, a live UTC clock and a lock toggle. Every animation (gauge draw-in, radar sweep, HUD spin, entrance) respects `prefers-reduced-motion`.
 
 ## Features
 
