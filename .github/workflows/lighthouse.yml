@@ -18,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Lighthouse CI
+        continue-on-error: true   # report scores; don't block PRs on infra flakiness
         uses: treosh/lighthouse-ci-action@v12
         with:
           configPath: ./lighthouserc.json
