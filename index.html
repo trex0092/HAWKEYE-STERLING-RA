@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawkeye Sterling — Entity Risk Assessment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 :root{
@@ -60,8 +63,8 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 /* ── Header ───────────────────────────── */
 .doc-header{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 36px;height:var(--hdr-h);position:sticky;top:0;z-index:200;background:rgba(8,11,18,0.88);border-bottom:1px solid var(--border2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .brand-area{display:flex;align-items:center;gap:12px}
-.brand-mark{width:38px;height:38px;border:1.5px solid var(--yneon);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:15px;font-weight:700;color:var(--yneon);flex-shrink:0;background:rgba(247,229,90,0.08);box-shadow:0 0 14px rgba(247,229,90,0.35),inset 0 0 8px rgba(247,229,90,0.08)}
-.brand-name{font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:0.13em;color:var(--yneon);line-height:1.2;white-space:nowrap;text-shadow:0 0 12px rgba(247,229,90,0.45),0 0 28px rgba(247,229,90,0.20)}
+.brand-mark{width:38px;height:38px;border:1.5px solid var(--yneon);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Michroma','Helvetica Neue',Arial,sans-serif;font-size:11px;font-weight:400;color:var(--yneon);flex-shrink:0;background:rgba(247,229,90,0.08);box-shadow:0 0 14px rgba(247,229,90,0.35),inset 0 0 8px rgba(247,229,90,0.08)}
+.brand-name{font-family:'Michroma','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:400;letter-spacing:0.04em;color:var(--yneon);line-height:1.2;white-space:nowrap;text-shadow:0 0 12px rgba(247,229,90,0.45),0 0 28px rgba(247,229,90,0.20)}
 
 /* ── Layout ───────────────────────────── */
 .main-layout{display:grid;grid-template-columns:1fr 320px;flex:1;align-items:start}
@@ -638,8 +641,6 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <button class="btn btn-ghost btn-full" id="btnLock" onclick="secLock()" style="display:none">🔒 Lock device</button>
         <button class="btn btn-red btn-full" onclick="newAssessment()">↺ Reset</button>
         <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
-        <button class="btn btn-gold btn-full" onclick="exportJSON()">⇩ Export JSON</button>
-        <button class="btn btn-lilac btn-full" onclick="importJSON()">⇪ Import JSON</button>
         <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
       </div>
