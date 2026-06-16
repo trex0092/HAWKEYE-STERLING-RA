@@ -234,8 +234,9 @@ const ANSWER = {
   ]
 };
 
-/* Regulatory Q&A now renders window.REG_GROUPS — 56 topic groups / ~300 cited
-   questions ported into assets/super-data.js (see renderRegGroups below). */
+/* Regulatory Q&A renders window.REG_GROUPS — 56 topic groups / 311 cited
+   questions in assets/super-data.js. Each question is {q, a, refs:[{ref,note}]}
+   and expands to its own cited answer inline (see renderRegGroups below). */
 
 const PERSONAS = [
   {id:'sterling', name:'Sterling', role:'Lead AML advisor',       img:'assets/persona-sterling.png', accent:'59,229,208',  pos:'36% 24%'},
@@ -245,7 +246,7 @@ const PERSONAS = [
   {id:'iris',     name:'Iris',     role:'Typologies & training',   img:'assets/persona-iris.png',     accent:'180,92,255',  pos:'40% 24%'}
 ];
 
-let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', regOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null};
+let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null};
 let reasoningTimer = null;
 
 function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
@@ -384,7 +385,7 @@ function renderQa(){
   $('main').innerHTML =
     '<div class="qa-wrap">'
     + '<div class="sec-lbl"><span>Regulatory Q&amp;A</span><i></i></div>'
-    + '<div class="qa-desc">Source-cited regulatory questions, grouped by topic and grounded in UAE Federal Decree-Law No. 10 of 2025, Cabinet Decision 134/2025 and FATF. Pick a question to take it to the advisor.</div>'
+    + '<div class="qa-desc">Source-cited regulatory questions, grouped by topic and grounded in UAE Federal Decree-Law No. 10 of 2025, Cabinet Decision 134/2025 and FATF. Pick a question to read its cited answer.</div>'
     + '<input class="qa-filter" id="qaFilter" placeholder="Filter questions…">'
     + '<div class="reg-groups" id="regGroups"></div>'
     + '</div>';
@@ -393,30 +394,48 @@ function renderQa(){
   f.addEventListener('input', e=>{ state.qaQuery = e.target.value; renderRegGroups(); });
   renderRegGroups();
 }
+/* A question may be a plain string (legacy) or {q, a, refs:[{ref,note}]}. */
+function qText(q){ return typeof q==='string' ? q : (q && q.q) || ''; }
+function qAnswer(q){ return (q && typeof q==='object') ? q : null; }
+function regAnswerHtml(ans){
+  const refs = Array.isArray(ans.refs) ? ans.refs : [];
+  const basis = refs.map(r=>'<div class="qa-basis"><div class="ref">'+esc(r.ref)+'</div><div class="note">'+esc(r.note)+'</div></div>').join('');
+  return '<div class="qa-body">'
+    + (ans.a ? '<div class="qa-summary">'+esc(ans.a)+'</div>' : '')
+    + (basis ? '<div class="block-h">Cited basis<i></i></div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'+basis+'</div>' : '')
+    + '<button class="again" data-ask="'+esc(qText(ans))+'"><span>&#8634;</span> Take to the advisor</button>'
+    + '</div>';
+}
 function renderRegGroups(){
   const groups = regGroups(), fil = (state.qaQuery||'').trim().toLowerCase();
   let html = '';
   groups.forEach((g,gi)=>{
-    const matches = fil ? (g.questions||[]).filter(q=>q.toLowerCase().includes(fil)) : (g.questions||[]);
+    const matches = fil ? (g.questions||[]).filter(q=>qText(q).toLowerCase().includes(fil)) : (g.questions||[]);
     if(fil && !matches.length) return;
     const open = fil ? true : state.regOpen===gi;
     html += '<div class="reg-cat'+(open?' open':'')+'">'
       + '<button class="reg-cat-head" data-gi="'+gi+'"><span class="reg-cat-name">'+esc(g.label)+'</span>'
       +   '<span class="reg-cat-meta"><span class="reg-cat-count">'+matches.length+'</span><span class="reg-cat-sign">'+(open?'−':'+')+'</span></span></button>';
-    if(open) html += '<div class="reg-qs">'+matches.map(q=>'<button class="reg-q" data-q="'+esc(q)+'"><span class="reg-q-arrow">›</span>'+esc(q)+'</button>').join('')+'</div>';
+    if(open) html += '<div class="reg-qs">'+matches.map(q=>{
+      const t = qText(q), ans = qAnswer(q), isOpen = state.qOpen===t;
+      return '<button class="reg-q" data-q="'+esc(t)+'" aria-expanded="'+(isOpen?'true':'false')+'"><span class="reg-q-arrow">'+(isOpen?'⌄':'›')+'</span>'+esc(t)+'</button>'
+        + (isOpen && ans ? regAnswerHtml(ans) : '');
+    }).join('')+'</div>';
     html += '</div>';
   });
   $('regGroups').innerHTML = html || '<p class="empty">No questions match “'+esc(fil)+'”.</p>';
-  Array.from(document.querySelectorAll('.reg-cat-head')).forEach(b=>b.addEventListener('click',()=>{ const gi=+b.getAttribute('data-gi'); state.regOpen = state.regOpen===gi?null:gi; renderRegGroups(); }));
-  Array.from(document.querySelectorAll('.reg-q')).forEach(b=>b.addEventListener('click',()=>{ askQuestion(b.getAttribute('data-q')); }));
+  Array.from(document.querySelectorAll('.reg-cat-head')).forEach(b=>b.addEventListener('click',()=>{ const gi=+b.getAttribute('data-gi'); state.regOpen = state.regOpen===gi?null:gi; state.qOpen=null; renderRegGroups(); }));
+  Array.from(document.querySelectorAll('.reg-q')).forEach(b=>b.addEventListener('click',()=>{ const t=b.getAttribute('data-q'); state.qOpen = state.qOpen===t?null:t; renderRegGroups(); }));
+  Array.from(document.querySelectorAll('[data-ask]')).forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); askQuestion(b.getAttribute('data-ask')); }));
 }
 
 /* ── Super Tools — the advisor's specialist MLRO toolset (window.SUPER_TOOLS:
    186 tools across 7 groups, grouped in the picker). The Escalation Decision
-   Engine runs on a deterministic, citation-backed rule engine; the other tools
-   share a case-context form and return a deterministic, cited playbook. This
-   static build has no LLM backend, so nothing is faked — full case-specific AI
-   analysis runs on the live Hawkeye Sterling engine. */
+   Engine runs on a deterministic, citation-backed rule engine; every other tool
+   carries its own tool-specific playbook (play.intro / play.steps / play.refs in
+   assets/super-data.js) and returns a deterministic, cited result keyed to that
+   tool — not a shared group template. Where a tool has no bespoke playbook the
+   engine falls back to the group-level guidance below. */
 function splitList(s){ return String(s||'').split(',').map(x=>x.trim()).filter(Boolean); }
 function stripEmoji(s){ return String(s||'').replace(/^[^\p{L}\p{N}]+/u,'').trim(); }
 const TOOL_BAND = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence', EDD:'Enhanced Due Diligence', PROHIBITED:'Prohibited — do not onboard'};
@@ -476,11 +495,16 @@ function escalationRun(v){
   return { kind:'escalation', verdict: outcome+' — '+TOOL_BAND[outcome], tone, summary, triggers, actions };
 }
 function genericRun(tool, ctx){
-  const play = GROUP_PLAY[tool.group] || GROUP_PLAY['Core Tools'];
+  const bespoke = tool && tool.play && Array.isArray(tool.play.steps) && tool.play.steps.length ? tool.play : null;
+  const play = bespoke || GROUP_PLAY[tool.group] || GROUP_PLAY['Core Tools'];
+  const refs = (bespoke && Array.isArray(bespoke.refs) && bespoke.refs.length) ? bespoke.refs : CITED_FRAMEWORK;
   const title = stripEmoji(tool.label);
-  return { kind:'generic', title,
-    summary: title + ' — ' + play.intro + ' The deterministic guidance and cited basis below apply to the scenario you described; a full case-specific analysis runs on the live Hawkeye Sterling engine.',
-    triggers: CITED_FRAMEWORK, actions: play.steps };
+  const scenario = String(ctx||'').trim();
+  const tail = scenario
+    ? ' Applied to the scenario you described, the deterministic steps and cited basis below set out what an MLRO should do.'
+    : ' The deterministic steps and cited basis below set out what an MLRO should do.';
+  return { kind:'generic', title, summary: title + ' — ' + play.intro + tail,
+    triggers: refs, actions: play.steps };
 }
 function renderField(f){
   const lab='<label class="tf-label">'+esc(f.label)+(f.req?' <span style="color:var(--ac2)">*</span>':'')+'</label>';

@@ -217,5 +217,52 @@ function runScreen(file, bridge, seed){
     && els.toolResult.innerHTML.includes('Federal Decree-Law No. 10 of 2025'));
 })();
 
+/* ── 3. Regulatory Q&A inline answers + per-tool Super Tools playbooks ── */
+(function(){
+  const { els, api } = runScreen('advisor.html',
+    '{ get state(){return state;}, render, renderRegGroups, regGroups, genericRun, toolsList }');
+
+  /* Every catalogue question now carries its own cited answer */
+  const groups = api.regGroups();
+  let totalQ = 0, withAnswer = 0, withRefs = 0;
+  groups.forEach(g => (g.questions||[]).forEach(q => {
+    totalQ++;
+    if(q && typeof q==='object' && q.a && q.a.length > 20) withAnswer++;
+    if(q && Array.isArray(q.refs) && q.refs.length) withRefs++;
+  }));
+  check('qa-data: 311 questions each carry a substantive cited answer',
+    totalQ === 311 && withAnswer === 311 && withRefs === 311);
+
+  /* Opening a question renders its answer + cited basis inline (not the canned reply) */
+  api.state.tab = 'qa'; api.render();
+  api.state.regOpen = 0;
+  const firstQ = groups[0].questions[0];
+  api.state.qOpen = firstQ.q; api.renderRegGroups();
+  check('qa: opening a question shows its own answer inline',
+    els.regGroups.innerHTML.includes('class="qa-summary"')
+    && els.regGroups.innerHTML.includes(esc_(firstQ.a).slice(0, 24))
+    && els.regGroups.innerHTML.includes('Cited basis'));
+
+  /* Different questions yield different answers (no single canned reply) */
+  const q2 = groups[1].questions[0];
+  api.state.regOpen = 1; api.state.qOpen = q2.q; api.renderRegGroups();
+  check('qa: a second question yields a different cited answer',
+    els.regGroups.innerHTML.includes(esc_(q2.a).slice(0, 24)) && q2.a !== firstQ.a);
+
+  /* Super Tools: each tool carries its own bespoke playbook, not a shared template */
+  const tools = api.toolsList();
+  const withPlay = tools.filter(t => t.play && t.play.intro && Array.isArray(t.play.steps) && t.play.steps.length >= 3
+    && Array.isArray(t.play.refs) && t.play.refs.some(r => r.ref === 'UAE Federal Decree-Law No. 10 of 2025'));
+  check('tools-data: all 186 tools carry a cited deterministic playbook', tools.length === 186 && withPlay.length === 186);
+
+  const a = api.genericRun(tools.find(t=>t.id==='flags'), 'cash-intensive dealer');
+  const b = api.genericRun(tools.find(t=>t.id==='str-drafter') || tools.find(t=>t.id!=='flags'&&t.id!=='escalation'), 'cash-intensive dealer');
+  check('tools: two different tools return distinct, tool-specific guidance',
+    a.summary !== b.summary && JSON.stringify(a.actions) !== JSON.stringify(b.actions)
+    && a.triggers.some(r=>r.ref==='UAE Federal Decree-Law No. 10 of 2025'));
+})();
+
+function esc_(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
