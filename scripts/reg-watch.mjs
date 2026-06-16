@@ -47,15 +47,31 @@ export function loadSources(json) {
    one-off whitespace). Imperfect by design — the PR review gate absorbs the
    occasional false positive; we never auto-publish. */
 export function extractText(raw) {
-  return String(raw || '')
+  return denoise(String(raw || '')
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
+    .toLowerCase())
     .replace(/\s+/g, ' ')
-    .toLowerCase()
     .trim();
+}
+
+/* Strip volatile-but-meaningless tokens so a page's timestamps, session ids,
+   nonces and cache-busters don't shift the fingerprint on every fetch and open
+   a spurious PR. Tuned to leave real regulatory figures intact: only digit runs
+   of 8+ are removed, so thresholds like 55,000 / 60,000 still register. */
+export function denoise(text) {
+  return text
+    .replace(/\d{4}-\d{2}-\d{2}t\d{2}:\d{2}(:\d{2})?(\.\d+)?z?/g, ' ')   // ISO datetimes
+    .replace(/\d{4}-\d{2}-\d{2}/g, ' ')                                   // ISO dates
+    .replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, ' ')                           // d/m/y dates
+    .replace(/\d{1,2}:\d{2}(:\d{2})?\s*(am|pm)?/g, ' ')                   // clock times
+    .replace(/(©|copyright)\s*\d{4}(\s*[-–]\s*\d{4})?/g, ' ')             // copyright years
+    .replace(/\b[0-9a-f]{20,}\b/g, ' ')                                   // long hex / nonces
+    .replace(/(csrf|nonce|token|sessionid|sid|jsessionid|phpsessid|_ga|_gid|utm_[a-z]+|requestid|request-id|cache[-_]?bust|build|ver|v|ts)=[a-z0-9._-]+/g, ' ')
+    .replace(/\d{8,}/g, ' ');                                             // long digit runs (timestamps/ids)
 }
 export function fingerprint(raw) {
   return createHash('sha256').update(extractText(raw), 'utf8').digest('hex');

@@ -1,7 +1,7 @@
 /* Unit tests for the Regulatory Watch pure logic (no network).
    Usage: node test/reg-watch.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadSources, extractText, fingerprint, computeChanges, contentChanges, buildReport } from '../scripts/reg-watch.mjs';
+import { loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -32,6 +32,21 @@ check('fingerprint is stable across markup-only changes',
   fingerprint('<p>Circular 8 of 2021 applies.</p>') === fingerprint('<section>\n  Circular 8 of 2021 applies.\n</section>'));
 check('fingerprint moves when the text changes',
   fingerprint('<p>threshold AED 55,000</p>') !== fingerprint('<p>threshold AED 60,000</p>'));
+
+/* denoise: volatile timestamps/sessions/nonces do not move the fingerprint,
+   but real regulatory figures (5-6 digit thresholds) still do */
+check('denoise: an updated timestamp does not move the fingerprint',
+  fingerprint('<p>Updated 2026-06-16T10:00:00Z. CDD applies.</p>')
+    === fingerprint('<p>Updated 2026-06-16T11:30:05Z. CDD applies.</p>'));
+check('denoise: a rotating session token does not move the fingerprint',
+  fingerprint('<a href="/x?sessionid=abc123def">Guidance</a>')
+    === fingerprint('<a href="/x?sessionid=zzz999qqq">Guidance</a>'));
+check('denoise: a long hex nonce is stripped',
+  fingerprint('rule <span>0123456789abcdef01234567</span> text')
+    === fingerprint('rule <span>ffffffffffffffffffffffff</span> text'));
+check('denoise: real 5-digit thresholds are preserved (not stripped)',
+  denoise('threshold aed 55000').includes('55000')
+    && fingerprint('<p>aed 55000</p>') !== fingerprint('<p>aed 60000</p>'));
 
 /* ── computeChanges: new / changed / unchanged / error ── */
 const src = [
