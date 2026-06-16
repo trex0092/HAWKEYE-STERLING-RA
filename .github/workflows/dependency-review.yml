@@ -1,12 +1,22 @@
 name: Dependency Review
 
-# Flags known-vulnerable dependencies introduced by a pull request. The repo is
-# vanilla (no runtime npm deps), so this mainly guards Netlify-function deps and
-# any future package manifests. Dependabot (.github/dependabot.yml) keeps the
-# GitHub Actions used by these workflows patched and SHA-current.
+# Flags known-vulnerable dependencies introduced by a pull request. This repo is
+# vanilla (no runtime npm deps), so this only runs when an actual dependency
+# manifest changes — which is why it does NOT run on docs/data/workflow PRs.
+# It also requires the repo's Dependency Graph to be enabled
+# (Settings -> Code security and analysis); until then the step is non-blocking,
+# so it can never hard-fail a PR.
 
 on:
   pull_request:
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/yarn.lock'
+      - '**/pnpm-lock.yaml'
+      - '**/requirements.txt'
+      - '**/Gemfile.lock'
+      - '**/composer.lock'
 
 permissions:
   contents: read
@@ -17,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Dependency review
+        continue-on-error: true   # needs Dependency Graph enabled; never block on it
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
