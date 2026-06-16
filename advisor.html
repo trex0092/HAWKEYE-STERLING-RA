@@ -141,6 +141,20 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 .qa-basis .note{font-size:12.5px;color:#A3ADC0;line-height:1.5}
 .empty{font-size:14px;color:#646F86;text-align:center;padding:30px 0;font-family:var(--mono)}
 
+/* Super Tools */
+.tool-select{width:100%;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:11px;padding:13px 16px;color:#EDEFF4;font-family:var(--sans);font-size:14px;outline:none;cursor:pointer}
+.tool-select:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0.22)}
+.tool-select option{background:#10161F;color:#EDEFF4}
+.tool-title{font-family:var(--display);font-weight:700;font-size:19px;color:#EDEFF4;margin-bottom:5px}
+.tool-desc{font-size:13.5px;line-height:1.6;color:#A3ADC0;margin-bottom:18px}
+.tool-form{display:flex;flex-direction:column;gap:13px}
+.tf-row{display:flex;flex-direction:column;gap:6px}
+.tf-label{font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#A3ADC0}
+.tf-input{width:100%;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:9px;padding:10px 13px;color:#EDEFF4;font-family:var(--sans);font-size:14px;line-height:1.5;outline:none;resize:vertical}
+.tf-input:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0.22)}
+.tool-err{margin-top:16px;font-family:var(--mono);font-size:12px;color:#FF6B6B}
+.tool-result{animation:fadeUp .4s cubic-bezier(.22,.7,.25,1)}
+
 @media(max-width:900px){.nav,.sub{display:none}}
 @media(max-width:560px){.tabs{padding-top:16px}main{padding:18px 18px 48px}.tabs{padding-left:18px;padding-right:18px}}
 </style>
@@ -170,6 +184,8 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
   <main id="main"></main>
 </div>
 
+<!-- Super Tools + Regulatory Q&A data (window.SUPER_TOOLS / window.REG_GROUPS) -->
+<script src="assets/super-data.js"></script>
 <script>
 /* ══════════════════════════════════════════
    Hawkeye Sterling Advisor — cited AML Q&A
@@ -229,7 +245,7 @@ const PERSONAS = [
   {id:'iris',     name:'Iris',     role:'Typologies & training',   img:'assets/persona-iris.png',     accent:'180,92,255',  pos:'40% 24%'}
 ];
 
-let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', expandedQa:null, qaQuery:'', personaId:'sterling'};
+let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', expandedQa:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null};
 let reasoningTimer = null;
 
 function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
@@ -249,7 +265,8 @@ function renderAvatar(){
 function renderTabs(){
   $('tabs').innerHTML =
     '<button class="tab'+(state.tab==='ask'?' active':'')+'" data-tab="ask">Ask the advisor</button>'+
-    '<button class="tab'+(state.tab==='qa'?' active':'')+'" data-tab="qa">Regulatory Q&amp;A</button>';
+    '<button class="tab'+(state.tab==='qa'?' active':'')+'" data-tab="qa">Regulatory Q&amp;A</button>'+
+    '<button class="tab'+(state.tab==='tools'?' active':'')+'" data-tab="tools">Super Tools</button>';
   Array.from(document.querySelectorAll('.tab')).forEach(b=>b.addEventListener('click',()=>{ state.tab=b.getAttribute('data-tab'); render(); }));
 }
 
@@ -398,9 +415,148 @@ function renderQaList(){
   }));
 }
 
+/* ── Super Tools — the advisor's specialist MLRO toolset (window.SUPER_TOOLS:
+   186 tools across 7 groups, grouped in the picker). The Escalation Decision
+   Engine runs on a deterministic, citation-backed rule engine; the other tools
+   share a case-context form and return a deterministic, cited playbook. This
+   static build has no LLM backend, so nothing is faked — full case-specific AI
+   analysis runs on the live Hawkeye Sterling engine. */
+function splitList(s){ return String(s||'').split(',').map(x=>x.trim()).filter(Boolean); }
+function stripEmoji(s){ return String(s||'').replace(/^[^\p{L}\p{N}]+/u,'').trim(); }
+const TOOL_BAND = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence', EDD:'Enhanced Due Diligence', PROHIBITED:'Prohibited — do not onboard'};
+const TOOL_CFA = {IR:'Iran', KP:'North Korea', MM:'Myanmar', IRAN:'Iran', 'NORTH KOREA':'North Korea', MYANMAR:'Myanmar'};
+const CITED_FRAMEWORK = [
+  {label:'UAE Federal Decree-Law No. 10 of 2025', ref:'AML/CFT framework — CDD, record-keeping, STR and targeted financial sanctions.'},
+  {label:'Cabinet Decision No. 134 of 2025', ref:'Implementing regulation — risk-based procedures and reporting obligations.'},
+  {label:'FATF Recommendations', ref:'International AML/CFT standards (Recs 1, 6, 10, 12, 19, 20, 22-25).'}
+];
+const GROUP_PLAY = {
+  'Core Tools': {intro:'Apply the firm’s risk-based AML/CFT controls to the scenario.', steps:['Identify and verify the subject and its beneficial owners (KYC/CDD).','Screen against sanctions, PEP and adverse-media lists.','Risk-rate the relationship and set the diligence level (CDD / SDD / EDD).','Document the rationale and set the ongoing-monitoring cadence.']},
+  'Financial Crime Investigation': {intro:'Investigate the suspected predicate offence and its proceeds.', steps:['Establish the predicate offence and the financial footprint.','Trace the flow of funds and identify enablers and networks.','Preserve evidence and maintain the audit trail.','Escalate to the MLRO and file an STR if suspicion is established.']},
+  'Regulatory & Compliance': {intro:'Map the obligation to the applicable regime and close any gaps.', steps:['Identify the controlling regulation and supervisory expectation.','Assess the current programme against the requirement.','Remediate gaps with named owners and deadlines.','Evidence compliance ahead of examination.']},
+  'Advanced KYC/CDD': {intro:'Strengthen identification, verification and ownership transparency.', steps:['Verify identity with reliable, independent sources (including eKYC).','Establish the beneficial-ownership and control structure.','Substantiate source of wealth and source of funds.','Set perpetual-KYC triggers for ongoing review.']},
+  'Transaction Monitoring': {intro:'Detect anomalous activity against the expected customer profile.', steps:['Baseline the expected transaction profile.','Test behaviour against typology and peer-group rules.','Investigate alerts and document each disposition.','Tune thresholds and escalate true positives to the MLRO.']},
+  'Sector-Specific': {intro:'Apply the sector’s red flags and DNFBP obligations.', steps:['Identify the sector-specific ML/TF risks and red flags.','Apply the sector CDD and reporting obligations.','Calibrate monitoring to the sector typologies.','Document the sector risk assessment.']},
+  'Advanced Analytics & Investigation': {intro:'Build the evidential picture and the recovery strategy.', steps:['Map the network and its central nodes.','Follow the money and build the causal chain.','Assess evidence strength and the legal options.','Coordinate with the FIU / law enforcement as appropriate.']}
+};
+function toolsList(){ return (typeof window!=='undefined' && Array.isArray(window.SUPER_TOOLS) && window.SUPER_TOOLS.length) ? window.SUPER_TOOLS : [{id:'escalation', label:'⚡ Escalation Decision Engine', group:'Core Tools'}]; }
+function currentTool(){ const L=toolsList(); return L.find(t=>t.id===state.toolId) || L[0]; }
+const ESC_FIELDS = [
+  {key:'subject', label:'Subject name', req:true, ph:'Full subject name'},
+  {key:'risk', label:'Risk score (0-100)', ph:'e.g. 87', num:true},
+  {key:'sanctions', label:'Sanctions hits (comma-separated)', ph:'OFAC, UN, EU'},
+  {key:'pep', label:'PEP tier', ph:'national, ministerial, local…'},
+  {key:'typologies', label:'Typologies (comma-separated)', ph:'structuring, layering, tbml'},
+  {key:'jurisdictions', label:'Jurisdictions (comma-separated)', ph:'RU, IR, AE'},
+  {key:'notes', label:'Additional notes', ph:'Any additional context…', area:true}
+];
+function escalationRun(v){
+  const subject = (v.subject||'').trim() || 'the subject';
+  const sanctions = splitList(v.sanctions), pep = (v.pep||'').trim(), typ = splitList(v.typologies);
+  const jur = splitList(v.jurisdictions).map(s=>s.toUpperCase());
+  const score = parseInt(v.risk,10), cfa = jur.filter(j=>TOOL_CFA[j]);
+  const triggers = [], rank = {CDD:0, SDD:1, EDD:2};
+  let prohibited = false, floor = 'CDD';
+  if(sanctions.length){ prohibited = true; triggers.push({label:'Designated-party / sanctions exposure: '+sanctions.join(', '), ref:'FATF Rec. 6 · UAE Cabinet Decision 74/2020 (TFS)'}); }
+  if(pep){ floor = 'EDD'; triggers.push({label:'PEP exposure — '+pep, ref:'FATF Rec. 12'}); }
+  if(cfa.length){ floor = 'EDD'; triggers.push({label:'FATF call-for-action jurisdiction: '+cfa.map(c=>TOOL_CFA[c]).join(', '), ref:'FATF Rec. 19'}); }
+  const band = isNaN(score) ? null : score>=70 ? 'EDD' : score>=40 ? 'SDD' : 'CDD';
+  if(band) triggers.push({label:'Risk score '+score+'/100 → '+band+' band', ref:'Firm risk-scoring methodology'});
+  if(typ.length) triggers.push({label:'Typologies present: '+typ.join(', ')+' — assess for suspicion', ref:'FATF typologies · STR consideration (FATF Rec. 20)'});
+  let computed = band || 'CDD';
+  if(rank[floor] > rank[computed]) computed = floor;
+  const outcome = prohibited ? 'PROHIBITED' : computed;
+  const tone = (outcome==='PROHIBITED'||outcome==='EDD') ? 'high' : outcome==='SDD' ? 'med' : 'low';
+  const summary = outcome==='PROHIBITED'
+    ? 'Designated-party exposure makes the relationship prohibited. Do not onboard '+subject+'; freeze any funds held and report to the FIU.'
+    : outcome==='EDD' ? 'Enhanced due diligence is mandatory for '+subject+' before the relationship proceeds, driven by the triggers below.'
+    : outcome==='SDD' ? 'Standard-plus (simplified) due diligence with enhanced monitoring is indicated for '+subject+'.'
+    : 'Standard customer due diligence is sufficient for '+subject+' on the signals provided.';
+  const actions = outcome==='PROHIBITED'
+    ? ['Do not onboard or continue the relationship.','Freeze funds where held; do not tip off.','File a suspicious-transaction report with the UAE FIU via goAML.','Record the prohibition decision and notify the MLRO.']
+    : outcome==='EDD' ? ['Obtain senior-management / MLRO approval before onboarding.','Establish source of wealth and source of funds.','Apply enhanced ongoing monitoring; set a 3-month review.', typ.length?'Assess the flagged typologies and file an STR if suspicion is established.':'Document the EDD rationale on file.']
+    : outcome==='SDD' ? ['Complete standard CDD with enhanced transaction monitoring.','Set a 6-month review cadence.','Re-rate on any material change in the signals.']
+    : ['Complete standard CDD and verify beneficial ownership.','Set a periodic (12-month) review.','Re-assess on any new sanctions, PEP or adverse-media signal.'];
+  return { kind:'escalation', verdict: outcome+' — '+TOOL_BAND[outcome], tone, summary, triggers, actions };
+}
+function genericRun(tool, ctx){
+  const play = GROUP_PLAY[tool.group] || GROUP_PLAY['Core Tools'];
+  const title = stripEmoji(tool.label);
+  return { kind:'generic', title,
+    summary: title + ' — ' + play.intro + ' The deterministic guidance and cited basis below apply to the scenario you described; a full case-specific analysis runs on the live Hawkeye Sterling engine.',
+    triggers: CITED_FRAMEWORK, actions: play.steps };
+}
+function renderField(f){
+  const lab='<label class="tf-label">'+esc(f.label)+(f.req?' <span style="color:var(--ac2)">*</span>':'')+'</label>';
+  const inp = f.area
+    ? '<textarea class="tf-input" id="tf_'+f.key+'" rows="4" placeholder="'+esc(f.ph)+'"></textarea>'
+    : '<input class="tf-input" id="tf_'+f.key+'"'+(f.num?' inputmode="numeric"':'')+' placeholder="'+esc(f.ph)+'">';
+  return '<div class="tf-row">'+lab+inp+'</div>';
+}
+function renderToolResult(){
+  const r = state.toolResult;
+  if(!r) return '';
+  if(r.error) return '<div class="tool-err">⚠ '+esc(r.error)+'</div>';
+  const head = r.kind==='generic'
+    ? '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle('low')+'">Deterministic guidance</span></div>'
+    : '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle(r.tone)+'">'+esc(r.verdict)+'</span></div>';
+  const trig = r.triggers.map(t=>'<div class="qa-basis"><div class="ref">'+esc(t.label)+'</div><div class="note">'+esc(t.ref)+'</div></div>').join('');
+  const acts = r.actions.map(a=>'<div class="step-row"><span class="ck">&#10003;</span><span class="tx">'+esc(a)+'</span></div>').join('');
+  return '<div class="tool-result">'
+    + head
+    + '<div class="summary">'+esc(r.summary)+'</div>'
+    + '<div class="block-h">'+(r.kind==='generic'?'Cited basis':'Triggers &amp; cited basis')+'<i></i></div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">'+trig+'</div>'
+    + '<div class="block-h">'+(r.kind==='generic'?'Recommended steps':'Required actions')+'<i></i></div>'
+    + '<div style="display:flex;flex-direction:column;gap:9px">'+acts+'</div>'
+    + '</div>';
+}
+function renderResultOnly(){ const el=$('toolResult'); if(el) el.innerHTML = renderToolResult(); }
+function renderTools(){
+  const tool = currentTool(), isEsc = tool.id==='escalation';
+  let opts='', curG=null;
+  toolsList().forEach(t=>{
+    if(t.group!==curG){ if(curG!==null) opts+='</optgroup>'; opts+='<optgroup label="'+esc(t.group)+'">'; curG=t.group; }
+    opts+='<option value="'+esc(t.id)+'"'+(t.id===tool.id?' selected':'')+'>'+esc(t.label)+'</option>';
+  });
+  if(curG!==null) opts+='</optgroup>';
+  const title = stripEmoji(tool.label);
+  const form = isEsc ? ESC_FIELDS.map(renderField).join('')
+    : renderField({key:'context', label:'Case context / details', req:true, area:true,
+        ph:'Describe the scenario, transactions or behaviour. Use roles / categories (e.g. “a tier-1 PEP”, “a DPMS dealer”), not named parties.'});
+  const cta = isEsc ? 'Get Escalation Decision' : 'Run '+title;
+  $('main').innerHTML =
+    '<div class="qa-wrap">'
+    + '<div class="sec-lbl"><span>Super Tools</span><i></i></div>'
+    + '<div class="qa-desc">Specialist MLRO tools — each runs on a deterministic, citation-backed engine (rule-based, no free-text inference). Pick a tool, fill the inputs, and run.</div>'
+    + '<select class="tool-select" id="toolSelect" aria-label="Select tool">'+opts+'</select>'
+    + '<div class="card" style="margin-top:14px"><div class="card-pad">'
+    +   '<div class="tool-title">'+esc(tool.label)+'</div>'
+    +   '<div class="tool-form">'+form+'</div>'
+    +   '<button class="ask-btn" id="toolRun" style="margin-top:18px">'+esc(cta)+' <span style="font-size:11px">&#9658;</span></button>'
+    +   '<div id="toolResult">'+ renderToolResult() +'</div>'
+    + '</div></div>'
+    + '</div>';
+  const sel=$('toolSelect'); if(sel) sel.addEventListener('change', e=>{ state.toolId=e.target.value; state.toolInputs={}; state.toolResult=null; renderTools(); });
+  (isEsc ? ESC_FIELDS : [{key:'context'}]).forEach(f=>{ const el=$('tf_'+f.key); if(el){ el.value=state.toolInputs[f.key]||''; el.addEventListener('input', e=>{ state.toolInputs[f.key]=e.target.value; }); } });
+  const run=$('toolRun'); if(run) run.addEventListener('click', ()=>{
+    const t=currentTool();
+    if(t.id==='escalation'){
+      if(!String(state.toolInputs.subject||'').trim()){ state.toolResult={error:'Subject name is required.'}; renderResultOnly(); const el=$('tf_subject'); if(el&&el.focus) el.focus(); return; }
+      state.toolResult = escalationRun(state.toolInputs);
+    } else {
+      if(!String(state.toolInputs.context||'').trim()){ state.toolResult={error:'Please add some case context.'}; renderResultOnly(); const el=$('tf_context'); if(el&&el.focus) el.focus(); return; }
+      state.toolResult = genericRun(t, state.toolInputs.context);
+    }
+    renderResultOnly();
+  });
+}
+
 function render(){
   renderTabs();
-  if(state.tab==='ask') renderAsk(); else renderQa();
+  if(state.tab==='ask') renderAsk();
+  else if(state.tab==='tools') renderTools();
+  else renderQa();
 }
 
 /* Boot */

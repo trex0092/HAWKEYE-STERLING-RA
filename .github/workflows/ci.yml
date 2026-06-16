@@ -63,7 +63,7 @@ jobs:
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/advisor.html" > /tmp/dom-advisor.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-advisor.html
-          for s in 'Hawkeye Sterling advisor.' 'Ask the advisor' 'Regulatory Q&amp;A' 'Ask me anything about AML compliance.' 'Advisor persona'; do
+          for s in 'Hawkeye Sterling advisor.' 'Ask the advisor' 'Regulatory Q&amp;A' 'Super Tools' 'Ask me anything about AML compliance.' 'Advisor persona'; do
             grep -q "$s" /tmp/dom-advisor.html || { echo "MISSING (advisor): $s"; exit 1; }
           done
           echo "advisor smoke ok — composer, persona picker and hero render"
