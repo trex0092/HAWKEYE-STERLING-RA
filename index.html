@@ -883,7 +883,7 @@ function _secShow(mode){
   if($('secPrimary')) $('secPrimary').textContent = setup ? 'Set passphrase & encrypt' : 'Unlock';
   if($('secSkip')) $('secSkip').style.display = setup ? '' : 'none';
   if($('secNote')) $('secNote').textContent = setup
-    ? '⚠ There is no recovery. If the passphrase is forgotten the stored data cannot be read — keep a copy via Export JSON.'
+    ? '⚠ There is no recovery. If the passphrase is forgotten the stored data cannot be read — store the passphrase securely.'
     : '';
   if($('secErr')) $('secErr').style.display = 'none';
   if($('secOverlay')) $('secOverlay').classList.add('open');
