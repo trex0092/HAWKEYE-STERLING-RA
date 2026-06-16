@@ -1,0 +1,23 @@
+app:
+  - changed-files:
+      - any-glob-to-any-file: ['index.html', 'console.html', 'advisor.html', 'assets/**']
+
+data:
+  - changed-files:
+      - any-glob-to-any-file: ['data/**']
+
+automation:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/workflows/**', 'scripts/**']
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: ['test/**']
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md', 'docs/**']
+
+netlify:
+  - changed-files:
+      - any-glob-to-any-file: ['netlify/**', 'netlify.toml']

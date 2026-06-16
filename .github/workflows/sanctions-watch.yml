@@ -1,0 +1,80 @@
+name: Sanctions Watch
+
+# Daily check of the major consolidated designation lists (OFAC SDN + non-SDN,
+# UN Security Council, UK OFSI, EU FSF) defined in data/sanctions-sources.json.
+# On any change it opens a pull request (falling back to a labelled issue if
+# Actions cannot create PRs) with the change report so the sanctions answers,
+# escalation/CFA logic and risk data can be reviewed. Country black/grey list
+# moves are handled by the FATF Watchdog.
+#
+# First run: dispatch with mode = seed to record the baseline quietly.
+
+on:
+  schedule:
+    - cron: '0 5 * * *'   # 05:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check (compare + open PR on change) | seed (record baseline)'
+        default: 'check'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: sanctions-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run sanctions watch
+        id: watch
+        run: node scripts/sanctions-watch.mjs "${{ inputs.mode || 'check' }}"
+
+      - name: Open pull request with detected changes
+        id: pr
+        continue-on-error: true
+        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: sanctions-watch/update
+          base: main
+          commit-message: ${{ steps.watch.outputs.pr_title }}
+          title: ${{ steps.watch.outputs.pr_title }}
+          body-path: sanctions-watch-report.md
+          labels: sanctions-watch
+          delete-branch: true
+
+      - name: Fallback to an issue if PR creation is blocked
+        if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.pr.outcome == 'failure'
+        uses: actions/github-script@v7
+        env:
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('sanctions-watch-report.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const link = `https://github.com/${owner}/${repo}/pull/new/sanctions-watch/update`;
+            const body = report + [
+              '', '---',
+              '> Automated pull-request creation is disabled for this repository, so this issue was opened instead.',
+              '> The change branch `sanctions-watch/update` has already been pushed.',
+              `> **Open the PR:** ${link}`,
+            ].join('\n');
+            await github.rest.issues.create({
+              owner, repo,
+              title: process.env.PR_TITLE || 'Sanctions Watch - changes detected',
+              body,
+              labels: ['sanctions-watch'],
+            });

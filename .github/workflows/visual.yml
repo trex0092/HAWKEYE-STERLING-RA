@@ -1,0 +1,82 @@
+name: Visual Regression
+
+# Playwright screenshot diff of the three screens.
+#   - First time / after intended UI changes: run with mode = baseline to
+#     generate and commit the baseline snapshots (PR, or issue fallback).
+#   - On pull requests: compares against the committed baseline (NON-blocking;
+#     the HTML report is uploaded as an artifact so you can inspect diffs).
+
+on:
+  pull_request:
+    paths: ['index.html', 'console.html', 'advisor.html', 'assets/**', 'test/visual.spec.mjs', 'playwright.config.mjs']
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'compare (default) | baseline (update + commit snapshots)'
+        default: 'compare'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    env:
+      PW: npx --yes --package @playwright/test@1.49.1 playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Chromium
+        run: $PW install --with-deps chromium
+
+      - name: Compare against baseline
+        if: inputs.mode != 'baseline'
+        continue-on-error: true
+        run: $PW test --config=playwright.config.mjs
+
+      - name: Update baseline snapshots
+        if: inputs.mode == 'baseline'
+        run: $PW test --config=playwright.config.mjs --update-snapshots
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Open PR with refreshed baseline
+        id: pr
+        if: inputs.mode == 'baseline'
+        continue-on-error: true
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: visual/baseline
+          base: main
+          add-paths: test/__screenshots__/**
+          commit-message: 'Visual regression: refresh baseline snapshots'
+          title: 'Visual regression: refresh baseline snapshots'
+          body: 'Auto-generated baseline screenshots for index/console/advisor. Review the images, then merge.'
+          labels: visual-regression
+          delete-branch: true
+
+      - name: Fallback note if PR creation is blocked
+        if: inputs.mode == 'baseline' && steps.pr.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.issues.create({
+              owner, repo,
+              title: 'Visual regression: baseline ready to open',
+              body: `Baseline snapshots were pushed to branch \`visual/baseline\`. Open the PR: https://github.com/${owner}/${repo}/pull/new/visual/baseline`,
+              labels: ['visual-regression'],
+            });

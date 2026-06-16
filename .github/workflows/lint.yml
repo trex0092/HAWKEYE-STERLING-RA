@@ -1,0 +1,31 @@
+name: Lint
+
+# ESLint on the Node scripts/tests/functions (real-breakage rules only) and
+# HTMLHint on the three screens. ESLint is enforced; HTMLHint is reported but
+# non-blocking (the hand-written HTML uses patterns HTMLHint is picky about).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: ESLint (scripts, tests, functions)
+        run: npx --yes eslint@9 scripts test netlify
+
+      - name: HTMLHint (screens) — report only
+        continue-on-error: true
+        run: |
+          npx --yes htmlhint@1 index.html console.html advisor.html | tee -a "$GITHUB_STEP_SUMMARY"

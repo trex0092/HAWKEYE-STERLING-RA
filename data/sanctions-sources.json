@@ -1,0 +1,41 @@
+{
+  "_README": "Sanctions consolidated lists watched by scripts/sanctions-watch.mjs. Sibling to the FATF Watchdog (which watches country black/grey lists) and Regulatory Watch (which watches regulations/guidance). This watcher fingerprints the machine-readable designation lists and flags when designations change, feeding the sanctions answers, escalation/CFA logic and risk data. Each source: id, name, jurisdiction, url, type (csv|xml), optional marker (a substring counted once per record to report an approximate entry-count delta).",
+  "sources": [
+    {
+      "id": "ofac-sdn",
+      "name": "US OFAC — SDN list (CSV)",
+      "jurisdiction": "Global",
+      "url": "https://www.treasury.gov/ofac/downloads/sdn.csv",
+      "type": "csv"
+    },
+    {
+      "id": "ofac-consolidated",
+      "name": "US OFAC — Consolidated (non-SDN) list (CSV)",
+      "jurisdiction": "Global",
+      "url": "https://www.treasury.gov/ofac/downloads/consolidated/cons_prim.csv",
+      "type": "csv"
+    },
+    {
+      "id": "un-consolidated",
+      "name": "UN Security Council — Consolidated list (XML)",
+      "jurisdiction": "Global",
+      "url": "https://scsanctions.un.org/resources/xml/en/consolidated.xml",
+      "type": "xml",
+      "marker": "<DATAID>"
+    },
+    {
+      "id": "uk-ofsi",
+      "name": "UK OFSI — Consolidated list of targets (CSV)",
+      "jurisdiction": "Global",
+      "url": "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv",
+      "type": "csv"
+    },
+    {
+      "id": "eu-fsf",
+      "name": "EU — Consolidated financial sanctions list (CSV)",
+      "jurisdiction": "Global",
+      "url": "https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw",
+      "type": "csv"
+    }
+  ]
+}

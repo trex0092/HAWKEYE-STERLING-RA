@@ -1,0 +1,24 @@
+name: Secret Scan (gitleaks)
+
+# Scans pushes and pull requests for committed secrets/keys (Anthropic/Asana
+# tokens, etc.). Fails the run if a secret is detected.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the scan covers the whole tree
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

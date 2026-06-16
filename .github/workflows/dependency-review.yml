@@ -1,0 +1,22 @@
+name: Dependency Review
+
+# Flags known-vulnerable dependencies introduced by a pull request. The repo is
+# vanilla (no runtime npm deps), so this mainly guards Netlify-function deps and
+# any future package manifests. Dependabot (.github/dependabot.yml) keeps the
+# GitHub Actions used by these workflows patched and SHA-current.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
