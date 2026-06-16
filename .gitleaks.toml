@@ -1,0 +1,18 @@
+# gitleaks configuration — extends the default ruleset with an allowlist for
+# known-public, non-secret values so the secret scan doesn't false-positive.
+title = "Hawkeye Sterling gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public, non-secret values: the EU consolidated-list access token (published by the EU), the URL-only data registries, and the env template."
+paths = [
+  '''data/sanctions-sources\.json''',
+  '''data/reg-sources\.json''',
+  '''\.env\.example''',
+]
+regexes = [
+  # EU FSF public access token embedded in the sanctions-list download URL
+  '''token=dG9rZW4tMjAxNw''',
+]
