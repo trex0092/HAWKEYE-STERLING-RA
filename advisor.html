@@ -134,6 +134,19 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 .qa-item::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.45),rgba(255,92,168,0.38),transparent)}
 .qa-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px 20px;background:transparent;border:none;cursor:pointer;text-align:left;color:#EDEFF4;font-family:var(--sans);font-size:15.5px;font-weight:600;line-height:1.4}
 .qa-q .chev{color:#A3ADC0;font-size:13px;flex-shrink:0;transition:transform .2s}
+.reg-groups{display:flex;flex-direction:column;gap:9px}
+.reg-cat{position:relative;background:#10161F;border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,0.26)}
+.reg-cat.open{border-color:rgba(var(--glow),0.32)}
+.reg-cat-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;background:transparent;border:none;cursor:pointer;text-align:left;color:#EDEFF4;font-family:var(--sans);font-size:14.5px;font-weight:600;line-height:1.4;transition:background .15s}
+.reg-cat-head:hover{background:rgba(255,255,255,0.02)}
+.reg-cat-meta{display:flex;align-items:center;gap:11px;flex-shrink:0}
+.reg-cat-count{min-width:22px;height:22px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;border-radius:99px;background:rgba(91,155,216,0.14);border:1px solid rgba(91,155,216,0.4);color:#7FB3E8;font-family:var(--mono);font-size:11px;font-weight:600}
+.reg-cat-sign{color:var(--ac2);font-size:18px;line-height:1;width:14px;text-align:center}
+.reg-qs{display:flex;flex-direction:column;border-top:1px solid rgba(255,255,255,0.06);animation:fadeUp .25s ease-out}
+.reg-q{display:flex;align-items:flex-start;gap:9px;width:100%;padding:12px 18px;background:transparent;border:none;border-top:1px solid rgba(255,255,255,0.04);cursor:pointer;text-align:left;color:#C9D2E2;font-family:var(--sans);font-size:13.5px;line-height:1.5;transition:background .15s,color .15s}
+.reg-q:first-child{border-top:none}
+.reg-q:hover{background:rgba(var(--glow),0.06);color:#EDEFF4}
+.reg-q-arrow{color:var(--ac2);flex-shrink:0;font-weight:700}
 .qa-body{padding:0 20px 20px;animation:fadeUp .35s ease-out}
 .qa-summary{font-size:14.5px;line-height:1.7;color:#C9D2E2;margin:13px 0 16px;text-wrap:pretty}
 .qa-basis{background:#0B101A;border:1px solid rgba(255,255,255,0.08);border-left:2px solid var(--ac2);border-radius:8px;padding:9px 12px}
@@ -219,23 +232,8 @@ const ANSWER = {
   ]
 };
 
-const QA_DATA = [
-  {id:'q1', q:'When must a DPMS file a cash transaction report?', tone:'med', verdict:'DPMSR required',
-    summary:'A dealer must file a DPMS cash-transaction report for any single or linked cash transaction at or above AED 55,000, regardless of the customer’s risk rating.',
-    basis:[{ref:'MoE DPMS Guidance', note:'Reporting threshold and linked-transaction aggregation.'},{ref:'Cabinet Decision No. (10) of 2019', note:'Art. 16 — reporting obligations.'}]},
-  {id:'q2', q:'Do I have to identify beneficial owners holding below 25%?', tone:'med', verdict:'Risk-based',
-    summary:'The 25% holding is a starting threshold, not a floor. Where control is exercised by other means — voting rights, agreements, or senior management — those persons must still be identified.',
-    basis:[{ref:'FATF Rec. 10 & 24', note:'Beneficial ownership identified by ownership or control.'},{ref:'Cabinet Decision No. (10) of 2019', note:'Art. 5 — definition of beneficial owner.'}]},
-  {id:'q3', q:'Is a remotely onboarded customer automatically high risk?', tone:'low', verdict:'Not automatic',
-    summary:'Non-face-to-face onboarding is a risk factor, not an automatic high-risk classification. With reliable electronic identity verification and liveness checks it can be managed within standard due diligence.',
-    basis:[{ref:'FATF Rec. 10', note:'Non-face-to-face relationships listed as a risk factor.'},{ref:'FATF Digital ID Guidance', note:'Reliable, independent e-ID may mitigate the risk.'}]},
-  {id:'q4', q:'What records must I keep, and for how long?', tone:'low', verdict:'5 years minimum',
-    summary:'Retain customer identification, due-diligence files and transaction records for at least five years after the relationship ends or the transaction completes, and make them available to the supervisor on request.',
-    basis:[{ref:'FATF Rec. 11', note:'Five-year record-retention requirement.'},{ref:'Cabinet Decision No. (10) of 2019', note:'Art. 24 — record keeping.'}]},
-  {id:'q5', q:'When is a Suspicious Activity Report mandatory?', tone:'high', verdict:'File without delay',
-    summary:'Where there are reasonable grounds to suspect funds are proceeds of crime or linked to financing, a report must be filed with the FIU promptly via the goAML portal — and the customer must not be tipped off.',
-    basis:[{ref:'FATF Rec. 20', note:'Mandatory reporting of suspicious transactions.'},{ref:'Cabinet Decision No. (10) of 2019', note:'Art. 15 & 17 — STR duty and tipping-off prohibition.'}]}
-];
+/* Regulatory Q&A now renders window.REG_GROUPS — 56 topic groups / ~300 cited
+   questions ported into assets/super-data.js (see renderRegGroups below). */
 
 const PERSONAS = [
   {id:'sterling', name:'Sterling', role:'Lead AML advisor',       img:'assets/persona-sterling.png', accent:'59,229,208',  pos:'36% 24%'},
@@ -245,7 +243,7 @@ const PERSONAS = [
   {id:'iris',     name:'Iris',     role:'Typologies & training',   img:'assets/persona-iris.png',     accent:'180,92,255',  pos:'40% 24%'}
 ];
 
-let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', expandedQa:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null};
+let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', regOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null};
 let reasoningTimer = null;
 
 function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
@@ -378,41 +376,37 @@ function ask(){
 }
 function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; $('hero').innerHTML = heroHtml(); }
 
+function regGroups(){ return (typeof window!=='undefined' && Array.isArray(window.REG_GROUPS)) ? window.REG_GROUPS : []; }
+function askQuestion(q){ state.tab='ask'; state.question=q; render(); }
 function renderQa(){
   $('main').innerHTML =
     '<div class="qa-wrap">'
     + '<div class="sec-lbl"><span>Regulatory Q&amp;A</span><i></i></div>'
-    + '<div class="qa-desc">Curated answers to the questions DPMS compliance teams ask most — each with its cited basis.</div>'
+    + '<div class="qa-desc">Source-cited regulatory questions, grouped by topic and grounded in UAE Federal Decree-Law No. 10 of 2025, Cabinet Decision 134/2025 and FATF. Pick a question to take it to the advisor.</div>'
     + '<input class="qa-filter" id="qaFilter" placeholder="Filter questions…">'
-    + '<div class="qa-list" id="qaList"></div>'
+    + '<div class="reg-groups" id="regGroups"></div>'
     + '</div>';
   const f = $('qaFilter');
   f.value = state.qaQuery;
-  f.addEventListener('input', e=>{ state.qaQuery = e.target.value; renderQaList(); });
-  renderQaList();
+  f.addEventListener('input', e=>{ state.qaQuery = e.target.value; renderRegGroups(); });
+  renderRegGroups();
 }
-function renderQaList(){
-  const q = (state.qaQuery||'').toLowerCase();
-  const items = QA_DATA.filter(x=>x.q.toLowerCase().includes(q));
-  if(!items.length){ $('qaList').innerHTML = '<div class="empty">No matching questions.</div>'; return; }
-  $('qaList').innerHTML = items.map(item=>{
-    const open = state.expandedQa===item.id;
-    const chev = 'transform:rotate('+(open?'180deg':'0deg')+')';
-    let body = '';
-    if(open){
-      const basis = item.basis.map(b=>'<div class="qa-basis"><div class="ref">'+esc(b.ref)+'</div><div class="note">'+esc(b.note)+'</div></div>').join('');
-      body = '<div class="qa-body">'
-        + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:13px"><span class="pill" style="'+pillStyle(item.tone)+'">'+esc(item.verdict)+'</span></div>'
-        + '<div class="qa-summary">'+esc(item.summary)+'</div>'
-        + '<div style="display:flex;flex-direction:column;gap:7px">'+basis+'</div></div>';
-    }
-    return '<div class="qa-item"><button class="qa-q" data-qid="'+item.id+'"><span>'+esc(item.q)+'</span><span class="chev" style="'+chev+'">&#9662;</span></button>'+body+'</div>';
-  }).join('');
-  Array.from(document.querySelectorAll('.qa-q')).forEach(b=>b.addEventListener('click',()=>{
-    const id = b.getAttribute('data-qid');
-    state.expandedQa = state.expandedQa===id ? null : id;
-    renderQaList();
-  }));
+function renderRegGroups(){
+  const groups = regGroups(), fil = (state.qaQuery||'').trim().toLowerCase();
+  let html = '';
+  groups.forEach((g,gi)=>{
+    const matches = fil ? (g.questions||[]).filter(q=>q.toLowerCase().includes(fil)) : (g.questions||[]);
+    if(fil && !matches.length) return;
+    const open = fil ? true : state.regOpen===gi;
+    html += '<div class="reg-cat'+(open?' open':'')+'">'
+      + '<button class="reg-cat-head" data-gi="'+gi+'"><span class="reg-cat-name">'+esc(g.label)+'</span>'
+      +   '<span class="reg-cat-meta"><span class="reg-cat-count">'+matches.length+'</span><span class="reg-cat-sign">'+(open?'−':'+')+'</span></span></button>';
+    if(open) html += '<div class="reg-qs">'+matches.map(q=>'<button class="reg-q" data-q="'+esc(q)+'"><span class="reg-q-arrow">›</span>'+esc(q)+'</button>').join('')+'</div>';
+    html += '</div>';
+  });
+  $('regGroups').innerHTML = html || '<p class="empty">No questions match “'+esc(fil)+'”.</p>';
+  Array.from(document.querySelectorAll('.reg-cat-head')).forEach(b=>b.addEventListener('click',()=>{ const gi=+b.getAttribute('data-gi'); state.regOpen = state.regOpen===gi?null:gi; renderRegGroups(); }));
+  Array.from(document.querySelectorAll('.reg-q')).forEach(b=>b.addEventListener('click',()=>{ askQuestion(b.getAttribute('data-q')); }));
 }
 
 /* ── Super Tools — the advisor's specialist MLRO toolset (window.SUPER_TOOLS:

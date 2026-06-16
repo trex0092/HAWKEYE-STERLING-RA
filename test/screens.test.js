@@ -138,7 +138,7 @@ function runScreen(file, bridge, seed){
 /* ── 2. Hawkeye Sterling Advisor ── */
 (function(){
   const { els, timers, api } = runScreen('advisor.html',
-    '{ get state(){return state;}, render, renderAsk, renderQa, renderQaList, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, PERSONAS, QA_DATA }');
+    '{ get state(){return state;}, render, renderAsk, renderQa, renderRegGroups, regGroups, askQuestion, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, PERSONAS }');
 
   check('advisor: boots on the Ask tab with all three tabs', els.tabs.innerHTML.includes('Ask the advisor')
     && els.tabs.innerHTML.includes('Regulatory Q&amp;A') && els.tabs.innerHTML.includes('Super Tools'));
@@ -170,19 +170,20 @@ function runScreen(file, bridge, seed){
   check('advisor: Ask another returns to the idle hero', api.state.phase === 'idle'
     && els.hero.innerHTML.includes('Ask me anything'));
 
-  /* Regulatory Q&A tab */
+  /* Regulatory Q&A — full 56-group catalogue from window.REG_GROUPS */
   api.state.tab = 'qa'; api.render();
-  check('advisor: Q&A tab lists all five curated questions', els.main.innerHTML.includes('Regulatory Q&amp;A')
-    && countOcc(els.qaList.innerHTML, 'class="qa-item"') === 5
-    && els.qaList.innerHTML.includes('When must a DPMS file a cash transaction report?'));
-  api.state.expandedQa = 'q1'; api.renderQaList();
-  check('advisor: expanding a question reveals its verdict + cited basis',
-    els.qaList.innerHTML.includes('DPMSR required') && els.qaList.innerHTML.includes('Art. 16'));
-
-  /* Filter narrows the list */
-  api.state.qaQuery = 'suspicious'; api.renderQaList();
-  check('advisor: filter narrows the Q&A list', countOcc(els.qaList.innerHTML, 'class="qa-item"') === 1
-    && els.qaList.innerHTML.includes('Suspicious Activity Report'));
+  check('advisor: Q&A renders all 56 regulatory groups', els.main.innerHTML.includes('Regulatory Q&amp;A')
+    && api.regGroups().length === 56 && countOcc(els.regGroups.innerHTML, '<div class="reg-cat') === 56
+    && els.regGroups.innerHTML.includes('UAE FDL &amp; Cabinet Resolution'));
+  api.state.regOpen = 0; api.renderRegGroups();
+  check('advisor: opening a group reveals its cited questions', countOcc(els.regGroups.innerHTML, 'class="reg-q"') >= 1);
+  api.state.qaQuery = 'beneficial owner'; api.renderRegGroups();
+  check('advisor: filtering narrows to matching questions across groups',
+    countOcc(els.regGroups.innerHTML, 'class="reg-q"') >= 1 && /beneficial owner/i.test(els.regGroups.innerHTML));
+  api.state.qaQuery = ''; api.state.regOpen = 0; api.renderRegGroups();
+  api.askQuestion('What records must I keep, and for how long?');
+  check('advisor: picking a question pre-fills the Ask composer', api.state.tab === 'ask'
+    && api.state.question === 'What records must I keep, and for how long?');
 
   /* Super Tools tab — full 186-tool grouped picker + deterministic engines */
   api.state.tab = 'tools'; api.render();
