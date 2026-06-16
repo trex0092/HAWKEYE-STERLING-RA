@@ -49,10 +49,14 @@ jobs:
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/console.html" > /tmp/dom-console.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-console.html
-          for s in 'Operations Console' 'AI ANALYST ON DUTY' 'Live Alert Stream' 'Meridian Bullion DMCC' 'Jurisdiction Watch'; do
+          # New app (no register): the console must show zeros / empty states, not mock data.
+          for s in 'Operations Console' 'AI ANALYST ON DUTY' 'Live Alert Stream' 'Jurisdiction Watch' 'Entities Monitored' 'No assessments filed yet'; do
             grep -q "$s" /tmp/dom-console.html || { echo "MISSING (console): $s"; exit 1; }
           done
-          echo "console smoke ok — HUD, alert stream and panels render"
+          for s in 'Meridian Bullion DMCC' '9,471'; do
+            grep -q "$s" /tmp/dom-console.html && { echo "UNEXPECTED mock data in console: $s"; exit 1; } || true
+          done
+          echo "console smoke ok — HUD + panels render, zero mock data on a fresh app"
       - name: Browser smoke test (Hawkeye Sterling Advisor)
         run: |
           google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
