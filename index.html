@@ -97,9 +97,17 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 .lock-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;font-family:var(--mono);font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;transition:all .16s;border:1px solid var(--border2);color:var(--text2);background:rgba(255,255,255,0.04)}
 .lock-btn:hover{color:var(--text);border-color:rgba(255,255,255,0.25)}
 .lock-btn.locked{color:#5FDCAB;background:rgba(59,196,143,0.12);border-color:rgba(59,196,143,0.45)}
-@media(max-width:1040px){.hdr-nav{display:none}}
-@media(max-width:760px){.brand-sub,.live-status .lbl{display:none}}
-@media(max-width:560px){.live-clock{display:none}}
+/* Mobile header: keep the section nav reachable — drop the clock/lock/status to
+   make room, and on phones wrap the nav onto its own full-width tappable row. */
+@media(max-width:1040px){.live-clock,.lock-btn{display:none}}
+@media(max-width:800px){
+  .doc-header{flex-wrap:wrap;height:auto;padding:9px 16px;row-gap:9px}
+  .live-status{display:none}
+  .hdr-right{flex:1 1 100%}
+  .hdr-nav{display:flex;width:100%}
+  .hdr-nav a{flex:1;text-align:center;padding:8px 6px}
+}
+@media(max-width:760px){.brand-sub{display:none}}
 
 /* ── Layout ───────────────────────────── */
 .main-layout{display:grid;grid-template-columns:minmax(0,1fr) 344px;flex:1;align-items:start}
@@ -1874,8 +1882,12 @@ function paintRetryButton(){
   btn.style.display = (ref && getFailedPayload(ref)) ? '' : 'none';
 }
 function sendToAsana(){
-  /* Only meaningful on the deployed site; silently unavailable on file:// and in tests. */
-  if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) return;
+  /* Only meaningful on the deployed site (needs the Netlify function + token). */
+  if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0){
+    toast('↗ Send to Asana works on the deployed site only.');
+    return;
+  }
+  toast('↗ Sending to Asana…');
   const p = asanaPayload();
   const ref = String(state.meta.ref||'').trim();
   doSendToAsana(p, ref, false);
