@@ -6,7 +6,7 @@
 <title>Hawkeye Sterling — Entity Risk Assessment</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Michroma&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 :root{
@@ -21,8 +21,12 @@
   --none-bg:rgba(130,140,165,0.10);--none-text:#828CA5;--none-bd:rgba(130,140,165,0.26);
   --cdd-bg:rgba(91,155,216,0.10);--cdd-text:#5B9BD8;--cdd-bd:rgba(91,155,216,0.30);
   --sdd-bg:rgba(255,148,52,0.10);--sdd-text:#FF9434;--sdd-bd:rgba(255,148,52,0.42);
-  --serif:'Arial Narrow','Helvetica Neue',Arial,sans-serif;--sans:'Arial Narrow','Helvetica Neue',Arial,sans-serif;--mono:'Arial Narrow','Helvetica Neue',Arial,sans-serif;
-  --r:9px;--r-sm:6px;
+  --sans:'Manrope','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  --display:'Space Grotesk','Helvetica Neue',Arial,sans-serif;
+  --serif:'Space Grotesk','Helvetica Neue',Arial,sans-serif;
+  --ac1:#B45CFF;--ac2:#FF5CA8;--glow:255,92,168;
+  --r:13px;--r-sm:7px;
   --shadow:0 1px 0 rgba(255,255,255,0.03) inset,0 12px 32px rgba(0,0,0,0.35);
   --hdr-h:64px;
 }
@@ -59,25 +63,56 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 @keyframes fgDrift{to{transform:translate(3.5%,-2.5%) scale(1.07)}}
 @keyframes fgWarnIn{from{opacity:0;transform:translateY(-4px)}}
 @keyframes fgPop{45%{transform:scale(1.18)}}
+@keyframes ping{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.72)}}
+@keyframes advPulse{0%,100%{opacity:.4;transform:scale(.9)}50%{opacity:.85;transform:scale(1.1)}}
+@keyframes advSpin{to{transform:rotate(360deg)}}
+@keyframes advSpinRev{to{transform:rotate(-360deg)}}
+/* Continuous HUD/live motion runs only when motion is welcome. */
+@media (prefers-reduced-motion: no-preference){
+  .live-dot{animation:ping 2.2s ease-in-out infinite}
+  .adv-glow{animation:advPulse 2.6s ease-in-out infinite}
+  .adv-sweep{animation:advSpin 3.6s linear infinite}
+  .adv-ring-svg.s1{animation:advSpin 22s linear infinite}
+  .adv-ring-svg.s2{animation:advSpinRev 15s linear infinite}
+  .adv-orbit{animation:advSpin 2.8s linear infinite}
+}
 
-/* ── Header ───────────────────────────── */
-.doc-header{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 36px;height:var(--hdr-h);position:sticky;top:0;z-index:200;background:rgba(8,11,18,0.88);border-bottom:1px solid var(--border2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-.brand-area{display:flex;align-items:center;gap:12px}
-.brand-mark{width:38px;height:38px;border:1.5px solid var(--yneon);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Michroma','Helvetica Neue',Arial,sans-serif;font-size:11px;font-weight:400;color:var(--yneon);flex-shrink:0;background:rgba(247,229,90,0.08);box-shadow:0 0 14px rgba(247,229,90,0.35),inset 0 0 8px rgba(247,229,90,0.08)}
-.brand-name{font-family:'Michroma','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:400;letter-spacing:0.04em;color:var(--yneon);line-height:1.2;white-space:nowrap;text-shadow:0 0 12px rgba(247,229,90,0.45),0 0 28px rgba(247,229,90,0.20)}
+/* ── Header (persona command-center) ──── */
+.doc-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 30px;height:var(--hdr-h);position:sticky;top:0;z-index:200;background:rgba(8,11,18,0.88);border-bottom:1px solid var(--border2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.brand-area{display:flex;align-items:center;gap:13px;min-width:0}
+.brand-avatar{width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#0B101A;border:1.5px solid rgba(var(--glow),0.55);box-shadow:0 0 16px rgba(var(--glow),0.30)}
+.brand-avatar>span{display:block;width:100%;height:100%;background-image:url('assets/persona-sterling.png');background-size:cover;background-position:36% 24%}
+.brand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.brand-name{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:0.06em;line-height:1;white-space:nowrap;background:linear-gradient(90deg,var(--ac1),var(--ac2) 82%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 10px rgba(var(--glow),0.30))}
+.brand-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-right{display:flex;align-items:center;gap:16px}
+.hdr-nav{display:flex;align-items:center;gap:4px}
+.hdr-nav a{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text2);text-decoration:none;padding:6px 11px;border-radius:7px;border:1px solid transparent;transition:all .16s;white-space:nowrap}
+.hdr-nav a:hover{color:var(--text);background:rgba(255,255,255,0.04);border-color:var(--border2)}
+.hdr-nav a.active{color:#FCE3EF;background:rgba(var(--glow),0.14);border-color:rgba(var(--glow),0.5);box-shadow:0 0 14px rgba(var(--glow),0.22)}
+.live-status{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#4FD6A0;white-space:nowrap}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#3BC48F;box-shadow:0 0 8px #3BC48F;flex-shrink:0}
+.live-clock{font-family:var(--mono);font-size:11px;color:var(--text2);white-space:nowrap}
+.live-clock b{color:var(--text3);font-weight:400}
+.lock-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;font-family:var(--mono);font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;transition:all .16s;border:1px solid var(--border2);color:var(--text2);background:rgba(255,255,255,0.04)}
+.lock-btn:hover{color:var(--text);border-color:rgba(255,255,255,0.25)}
+.lock-btn.locked{color:#5FDCAB;background:rgba(59,196,143,0.12);border-color:rgba(59,196,143,0.45)}
+@media(max-width:1040px){.hdr-nav{display:none}}
+@media(max-width:760px){.brand-sub,.live-status .lbl{display:none}}
+@media(max-width:560px){.live-clock{display:none}}
 
 /* ── Layout ───────────────────────────── */
-.main-layout{display:grid;grid-template-columns:1fr 320px;flex:1;align-items:start}
-.form-panel{padding:24px 32px 64px;min-width:0}
+.main-layout{display:grid;grid-template-columns:minmax(0,1fr) 344px;flex:1;align-items:start}
+.form-panel{padding:24px 30px 72px;min-width:0}
 .side-panel{padding:22px 22px 28px;position:sticky;top:var(--hdr-h);height:calc(100vh - var(--hdr-h));overflow-y:auto;background:rgba(7,10,16,0.65);border-left:1px solid var(--border2);display:flex;flex-direction:column;backdrop-filter:blur(8px)}
 
 /* ── Sections & cards ─────────────────── */
 .section-hd{display:flex;align-items:center;gap:10px;margin-bottom:12px;white-space:nowrap}
 .sn{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--gold);flex-shrink:0}
-.st{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;font-weight:600;flex-shrink:0;font-family:var(--sans)}
+.st{font-size:12px;text-transform:uppercase;letter-spacing:0.13em;font-weight:600;flex-shrink:0;font-family:var(--display)}
 .st,.neon-title,.attest-role{background:linear-gradient(90deg,var(--neon1),var(--neon2) 80%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 7px rgba(255,92,168,0.35))}
 .section-hd::after{content:'';flex:1;height:1.5px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2) 55%,transparent);min-width:20px;box-shadow:0 0 8px rgba(255,92,168,0.45),0 0 16px rgba(180,92,255,0.25)}
-.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--r);padding:14px 18px;margin-bottom:10px;box-shadow:var(--shadow);position:relative;transition:border-color .25s}
+.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--r);padding:18px 20px;margin-bottom:10px;box-shadow:var(--shadow);position:relative;transition:border-color .25s}
 .card:hover{border-color:rgba(255,255,255,0.12)}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;border-radius:var(--r) var(--r) 0 0;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent);pointer-events:none}
 .card:last-of-type{margin-bottom:0}
@@ -174,10 +209,24 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sp-indicator{height:2px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2))!important;width:50%;margin:0 auto 4px;box-shadow:0 0 10px rgba(255,92,168,0.5),0 0 18px rgba(180,92,255,0.3)}
 .sp-score-label{text-align:center;font-size:8px;color:#D6DBE6;letter-spacing:1.2px;text-transform:uppercase;font-family:var(--mono)}
 .sp-spacer{flex:1;min-height:10px}
+
+/* ── AI Risk Advisor (HUD robot, recolors to risk) ── */
+.adv-block{display:flex;align-items:center;gap:13px}
+.adv-hud{position:relative;width:100px;height:100px;flex-shrink:0}
+.adv-glow{position:absolute;inset:-4px;border-radius:50%;pointer-events:none}
+.adv-sweep{position:absolute;inset:0;border-radius:50%}
+.adv-ring-svg{position:absolute;inset:0;overflow:visible}
+.adv-img-ring{position:absolute;top:14px;left:14px;width:72px;height:72px;border-radius:50%;overflow:hidden}
+.adv-img{width:100%;height:100%;background-size:cover}
+.adv-orbit{position:absolute;inset:0}
+.adv-dot{position:absolute;top:-1px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%}
+.adv-name{font-family:var(--display);font-weight:600;font-size:15px;color:var(--text)}
+.adv-role{font-family:var(--mono);font-size:9.5px;letter-spacing:0.05em}
+.adv-note{margin-top:11px;font-size:12.5px;line-height:1.55;color:var(--text2);text-wrap:pretty}
 .sp-actions{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--border2)}
 .sp-actions .btn{padding:6px 12px;font-size:9.5px}
 .save-stamp{text-align:center;font-size:8.5px;color:var(--text3);font-family:var(--mono);letter-spacing:0.5px;min-height:12px;margin-top:2px}
-.verdict-pill{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:600;border:1px solid;margin-bottom:10px;white-space:nowrap;width:fit-content;font-family:var(--sans)}
+.verdict-pill{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;border:1px solid;margin-bottom:10px;white-space:nowrap;width:fit-content;font-family:var(--display)}
 .vp-cdd{background:var(--cdd-bg);color:var(--cdd-text);border-color:var(--cdd-bd)}
 .vp-sdd{background:var(--sdd-bg);color:var(--sdd-text);border-color:var(--sdd-bd);box-shadow:0 0 12px rgba(255,148,52,0.30),inset 0 0 8px rgba(255,148,52,0.06)}
 .vp-edd{background:var(--high-bg);color:var(--high-text);border-color:var(--high-bd);box-shadow:0 0 12px rgba(255,87,87,0.35),inset 0 0 8px rgba(255,87,87,0.07)}
@@ -223,7 +272,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 /* ── Risk Data panel ──────────────────── */
 .rd-overlay{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(5,8,14,0.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .rd-overlay.open{display:flex}
-.rd-panel{width:min(940px,94vw);height:min(86vh,840px);display:flex;flex-direction:column;background:var(--card-bg);border:1px solid var(--border2);border-radius:var(--r);box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);position:relative;overflow:hidden}
+.rd-panel{width:min(940px,94vw);height:min(86vh,840px);display:flex;flex-direction:column;background:var(--card-bg);border:1px solid var(--border2);border-radius:16px;box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);position:relative;overflow:hidden}
 .rd-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent);pointer-events:none}
 .rd-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border2)}
 .rd-meta{font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.4px}
@@ -262,7 +311,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 /* ── Device security gate (passphrase + encryption-at-rest) ─ */
 .sec-overlay{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:#05080E;background:radial-gradient(120% 120% at 50% 0%,#0A1020 0%,#05080E 70%)}
 .sec-overlay.open{display:flex}
-.sec-box{width:min(420px,92vw);background:var(--card-bg);border:1px solid var(--border2);border-radius:var(--r);box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);padding:26px 24px 22px;position:relative;overflow:hidden}
+.sec-box{width:min(420px,92vw);background:var(--card-bg);border:1px solid var(--border2);border-radius:16px;box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);padding:26px 24px 22px;position:relative;overflow:hidden}
 .sec-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent)}
 .sec-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;letter-spacing:0.3px}
 .sec-msg{font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:14px}
@@ -377,8 +426,21 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
 <div class="app">
   <header class="doc-header">
     <div class="brand-area">
-      <div class="brand-mark">HS</div>
-      <div class="brand-name">HAWKEYE STERLING — ENTITY RISK ASSESSMENT</div>
+      <div class="brand-avatar"><span></span></div>
+      <div class="brand-text">
+        <div class="brand-name">HAWKEYE STERLING</div>
+        <div class="brand-sub">Entity Risk Assessment · AML / CFT — DPMS</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <nav class="hdr-nav" aria-label="Suite navigation">
+        <a href="index.html" class="active" aria-current="page">Assessment</a>
+        <a href="console.html">Console</a>
+        <a href="advisor.html">Advisor</a>
+      </nav>
+      <div class="live-status" title="Live engine status"><span class="live-dot"></span><span class="lbl">ALL SYSTEMS LIVE</span></div>
+      <span class="live-clock" id="utcClock">--:--:--&nbsp;<b>UTC</b></span>
+      <button class="lock-btn" id="hdrLock" onclick="headerLock()" title="Lock this device">⚿ Lock</button>
     </div>
   </header>
 
@@ -582,8 +644,8 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
             <circle id="gaugeArc" cx="110" cy="106" r="74" fill="none" stroke="url(#gaugeGrad)" stroke-width="10" stroke-dasharray="0 452" stroke-linecap="round" transform="rotate(135,110,106)" style="transition:stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1)"></circle>
             <circle cx="110" cy="106" r="86" fill="none" stroke="rgba(255,148,52,0.55)" stroke-width="2" stroke-dasharray="2 450" stroke-dashoffset="-212" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
             <circle cx="110" cy="106" r="86" fill="none" stroke="rgba(255,87,87,0.55)" stroke-width="2" stroke-dasharray="2 450" stroke-dashoffset="-248" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
-            <text id="totalScore" x="110" y="98" text-anchor="middle" font-family="Arial Narrow,Arial,sans-serif" font-size="46" font-weight="600" fill="#F0EDE4" letter-spacing="-1">0</text>
-            <text x="110" y="118" text-anchor="middle" font-family="Arial Narrow,Arial,sans-serif" font-size="8" fill="#D6DBE6" letter-spacing="1.5">RISK SCORE</text>
+            <text id="totalScore" x="110" y="99" text-anchor="middle" font-family="'Space Grotesk',Arial,sans-serif" font-size="46" font-weight="700" fill="#F0EDE4" letter-spacing="-1">0</text>
+            <text x="110" y="118" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="8" fill="#D6DBE6" letter-spacing="1.5">RISK SCORE</text>
           </svg>
         </div>
         <div class="sp-indicator" id="scoreIndicator"></div>
@@ -616,6 +678,25 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
       </div>
 
       <div class="sp-block">
+        <div class="sp-label">AI Risk Advisor</div>
+        <div class="adv-block">
+          <div class="adv-hud">
+            <div class="adv-glow" id="advGlow"></div>
+            <div class="adv-sweep" id="advSweep"></div>
+            <svg class="adv-ring-svg s1" width="100" height="100" viewBox="0 0 100 100" aria-hidden="true"><circle id="advCircle1" cx="50" cy="50" r="47" fill="none" stroke="rgba(59,229,208,0.45)" stroke-width="1" stroke-dasharray="2 7"></circle></svg>
+            <svg class="adv-ring-svg s2" width="100" height="100" viewBox="0 0 100 100" aria-hidden="true"><circle id="advCircle2" cx="50" cy="50" r="40" fill="none" stroke="rgba(59,229,208,0.65)" stroke-width="1.5" stroke-dasharray="18 8 3 8"></circle></svg>
+            <div class="adv-img-ring" id="advImgRing"><div class="adv-img" id="advImg"></div></div>
+            <div class="adv-orbit"><div class="adv-dot" id="advDot"></div></div>
+          </div>
+          <div>
+            <div class="adv-name" id="advName">Vale</div>
+            <div class="adv-role" id="advRole">KYC &amp; onboarding</div>
+          </div>
+        </div>
+        <div class="adv-note" id="advNote"></div>
+      </div>
+
+      <div class="sp-block">
         <div class="sp-label">Risk Position</div>
         <div class="sb-bar-track"><div class="sb-seg-low"></div><div class="sb-seg-med"></div><div class="sb-seg-high"></div></div>
         <div class="sb-bar-pointer-wrap"><div class="sb-bar-pointer" id="barPointer" style="left:0%"><span id="pointerLabel">0</span></div></div>
@@ -636,8 +717,8 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
         <button class="btn btn-primary btn-full" onclick="printPreflight()">⎙ Print / Export PDF</button>
         <button class="btn btn-ghost btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
         <button class="btn btn-orange btn-full" id="btnRetryAsana" onclick="retryAsanaDelivery()" style="display:none">↻ Retry Asana Delivery</button>
-        <button class="btn btn-blue btn-full" onclick="openRegister()">☰ Register</button>
-        <button class="btn btn-blue btn-full" onclick="openAudit()">▤ Activity Log</button>
+        <button class="btn btn-secondary btn-full" onclick="openRegister()">≡ Register</button>
+        <button class="btn btn-orange btn-full" onclick="openAudit()">▤ Activity Log</button>
         <button class="btn btn-ghost btn-full" id="btnLock" onclick="secLock()" style="display:none">🔒 Lock device</button>
         <button class="btn btn-red btn-full" onclick="newAssessment()">↺ Reset</button>
         <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
@@ -936,6 +1017,7 @@ async function _secActivate(){
 function _secFinish(msg){
   _secHide();
   if($('btnLock')) $('btnLock').style.display = '';
+  _syncHeaderLock(false);
   hydrateApp();
   toast(msg);
 }
@@ -951,6 +1033,7 @@ function secLock(){
   for(const k in _secMem) delete _secMem[k];
   if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer = null; }
   if($('btnLock')) $('btnLock').style.display = 'none';
+  _syncHeaderLock(true);
   _secShow('unlock');   /* opaque overlay hides the on-screen data until re-unlocked */
 }
 /* Boot entry point: decide whether to gate. Runs after the app has rendered, so
@@ -1927,6 +2010,33 @@ function toggleOvForm(){
   $('ovArrow').textContent = f.classList.contains('open') ? '▼' : '▶';
 }
 
+/* AI Risk Advisor personas — the sidebar robot whose head, HUD colour, and
+   advisory note follow the operative outcome (CDD → Vale, SDD → Cypher,
+   EDD / PROHIBITED → Ember). Mirrors the design's advisorFor() mapping. */
+const ADVISORS = {
+  high: {img:'assets/persona-ember.png',  pos:'50% 26%', name:'Ember',  role:'Sanctions & high-risk', rgb:'255,87,87',
+         note:'High risk. Escalate for enhanced due diligence, full sanctions screening, and senior-management sign-off.'},
+  med:  {img:'assets/persona-cypher.png', pos:'42% 30%', name:'Cypher', role:'Active monitoring',      rgb:'247,197,60',
+         note:'Elevated risk. Apply enhanced monitoring, refresh KYC records, and document the rationale for the rating.'},
+  low:  {img:'assets/persona-vale.png',   pos:'50% 22%', name:'Vale',   role:'KYC & onboarding',       rgb:'59,229,208',
+         note:'Standard customer due diligence is sufficient. Proceed with routine onboarding and a periodic review cycle.'}
+};
+function advisorKind(outcome){ return (outcome==='EDD'||outcome==='PROHIBITED') ? 'high' : outcome==='SDD' ? 'med' : 'low'; }
+function updateAdvisor(outcome){
+  const a = ADVISORS[advisorKind(outcome)];
+  const set = (id,fn)=>{ const el=$(id); if(el) fn(el); };
+  set('advImg',     el=>{ el.style.backgroundImage="url('"+a.img+"')"; el.style.backgroundPosition=a.pos; });
+  set('advImgRing', el=>{ el.style.border='2px solid rgba('+a.rgb+',0.75)'; el.style.boxShadow='0 0 18px rgba('+a.rgb+',0.4),inset 0 0 16px rgba(0,0,0,0.5)'; });
+  set('advGlow',    el=>{ el.style.background='radial-gradient(circle,rgba('+a.rgb+',0.4),transparent 70%)'; });
+  set('advSweep',   el=>{ el.style.background='conic-gradient(from 0deg,transparent,rgba('+a.rgb+',0.32) 60deg,transparent 130deg)'; });
+  set('advCircle1', el=>el.setAttribute('stroke','rgba('+a.rgb+',0.45)'));
+  set('advCircle2', el=>el.setAttribute('stroke','rgba('+a.rgb+',0.65)'));
+  set('advDot',     el=>{ el.style.background='rgb('+a.rgb+')'; el.style.boxShadow='0 0 9px rgb('+a.rgb+')'; });
+  set('advName',    el=>el.textContent=a.name);
+  set('advRole',    el=>{ el.textContent=a.role; el.style.color='rgb('+a.rgb+')'; });
+  set('advNote',    el=>el.textContent=a.note);
+}
+
 function recalc() {
   const a = computeAssessment();
   const s = state;
@@ -1944,6 +2054,9 @@ function recalc() {
   vpEl.className = 'verdict-pill ' + {CDD:'vp-cdd', SDD:'vp-sdd', EDD:'vp-edd', PROHIBITED:'vp-proh'}[a.outcome];
   $('verdictText').textContent = a.outcome + ' — ' + BAND_FULL[a.outcome] + (a.analystOv ? ' ✱' : '');
   $('verdictIcon').textContent = BAND_ICON[a.outcome];
+
+  /* AI Risk Advisor — robot persona recolours to the operative outcome */
+  updateAdvisor(a.outcome);
 
   /* Analyst override banner + form hint */
   const ovB = $('ovBanner');
@@ -2528,6 +2641,35 @@ function initAnimations(){
   }));
 }
 
+/* Live UTC clock in the header (command-center status strip). */
+function startUtcClock(){
+  const el = $('utcClock');
+  if(!el) return;
+  const tick = () => { try{ el.innerHTML = new Date().toLocaleTimeString('en-GB',{timeZone:'UTC'}) + '&nbsp;<b>UTC</b>'; }catch(e){} };
+  tick();
+  /* Browser-only ticking; the test DOM stub has no matchMedia, so it stays static. */
+  if(typeof window!=='undefined' && typeof window.matchMedia==='function' && typeof setInterval==='function') setInterval(tick, 1000);
+}
+
+/* Header lock toggle. When device encryption is configured it performs the real
+   at-rest lock (secLock); otherwise it is a visual indicator, matching the
+   prototype where "Lock" is cosmetic until encryption is enabled. */
+function headerLock(){
+  if(typeof _secActive !== 'undefined' && _secActive){ secLock(); return; }
+  const btn = $('hdrLock');
+  if(!btn) return;
+  const locked = btn.classList.toggle('locked');
+  btn.textContent = locked ? '⚿ Locked' : '⚿ Lock';
+  toast(locked
+    ? 'Screen locked. Enable device encryption (sidebar) for at-rest protection.'
+    : 'Unlocked.');
+}
+function _syncHeaderLock(locked){
+  const btn = $('hdrLock'); if(!btn) return;
+  btn.classList.toggle('locked', !!locked);
+  btn.textContent = locked ? '⚿ Locked' : '⚿ Lock';
+}
+
 /* ══════════════════════════════════════════
    INIT
 ══════════════════════════════════════════ */
@@ -2561,6 +2703,7 @@ function hydrateApp(){
 const draft = hydrateApp();
 if(draft) toast('Draft restored'+(draft.savedAt?' — last saved '+new Date(draft.savedAt).toLocaleString():''));
 initAnimations();
+startUtcClock();  /* live UTC clock in the header status strip */
 initSecurity();   /* gate the app behind the passphrase, if configured/offered */
 </script>
 </body>
