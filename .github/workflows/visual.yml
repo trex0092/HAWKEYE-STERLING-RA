@@ -72,7 +72,7 @@ jobs:
 
       - name: Fallback note if PR creation is blocked
         if: inputs.mode == 'baseline' && steps.pr.outcome == 'failure'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { owner, repo } = context.repo;
