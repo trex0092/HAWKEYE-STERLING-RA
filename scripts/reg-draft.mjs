@@ -9,12 +9,13 @@
 
    It NEVER edits super-data.js directly — a human reviews and applies. If the
    key is missing or the API errors, it exits 0 so the (detection-only) PR still
-   opens. Model id per the repo's Claude usage standard: claude-sonnet-4-6. */
+   opens. Model id per the repo's Claude usage standard: claude-opus-4-8
+   (override with ANTHROPIC_MODEL, e.g. claude-sonnet-4-6 to cut cost). */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { extractText, CHANGES_FILE } from './reg-watch.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
 const OUT_DIR = 'docs/research/auto';
 
 function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection-only PR).'); process.exit(0); }
