@@ -27,6 +27,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 concurrency:
   group: regulatory-watch
@@ -52,6 +53,11 @@ jobs:
         run: node scripts/reg-draft.mjs
 
       - name: Open pull request with detected changes
+        id: pr
+        # Don't fail the run if the repo forbids Actions from creating PRs
+        # (Settings -> Actions -> General -> Workflow permissions). The branch is
+        # still pushed; the fallback step below opens an issue with the link.
+        continue-on-error: true
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         uses: peter-evans/create-pull-request@v6
         with:
@@ -67,3 +73,28 @@ jobs:
           body-path: reg-watch-report.md
           labels: regulatory-watch
           delete-branch: true
+
+      - name: Fallback to an issue if PR creation is blocked
+        if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.pr.outcome == 'failure'
+        uses: actions/github-script@v7
+        env:
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('reg-watch-report.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const link = `https://github.com/${owner}/${repo}/pull/new/regulatory-watch/update`;
+            const body = report + [
+              '', '---',
+              '> Automated pull-request creation is disabled for this repository, so this issue was opened instead.',
+              '> The change branch `regulatory-watch/update` has already been pushed.',
+              `> **Open the PR:** ${link}`,
+              '> To get PRs automatically, enable *Settings -> Actions -> General -> Workflow permissions -> "Allow GitHub Actions to create and approve pull requests"*.',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner, repo,
+              title: process.env.PR_TITLE || 'Regulatory Watch - changes detected',
+              body,
+              labels: ['regulatory-watch'],
+            });
