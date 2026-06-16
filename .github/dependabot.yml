@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Keep the GitHub Actions used across the workflows patched (also clears the
+  # "Node 20 actions are deprecated" runner warnings as new majors ship).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]

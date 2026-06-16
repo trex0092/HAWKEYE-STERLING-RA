@@ -1,0 +1,25 @@
+name: Lighthouse
+
+# Runs Lighthouse against the three screens on each PR and uploads the report.
+# Assertions are at "warn" level (non-blocking) so scores are surfaced without
+# gating merges; tighten to "error" in lighthouserc.json to enforce a budget.
+
+on:
+  pull_request:
+    paths: ['index.html', 'console.html', 'advisor.html', 'assets/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true

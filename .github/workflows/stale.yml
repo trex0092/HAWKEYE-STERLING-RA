@@ -1,0 +1,28 @@
+name: Stale
+
+# Marks issues/PRs stale after 60 days of inactivity and closes them 7 days
+# later. Watchdog/automation issues are exempt so monitoring tickets persist.
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 01:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-stale: 60
+          days-before-close: 7
+          stale-issue-label: stale
+          stale-pr-label: stale
+          exempt-issue-labels: 'regulatory-watch,sanctions-watch,link-check,pinned,security'
+          exempt-pr-labels: 'regulatory-watch,sanctions-watch,visual-regression,pinned'
+          stale-issue-message: 'No activity for 60 days — marking stale. It will close in 7 days if nothing changes.'
+          stale-pr-message: 'No activity for 60 days — marking stale. It will close in 7 days if nothing changes.'

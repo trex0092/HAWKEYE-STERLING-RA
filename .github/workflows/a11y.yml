@@ -1,0 +1,37 @@
+name: Accessibility (a11y)
+
+# Audits the three screens against WCAG 2.1 AA with pa11y. Reported to the job
+# summary and NON-blocking by default (so pre-existing issues don't block merges
+# on day one). To enforce, remove `continue-on-error: true` on the audit step.
+
+on:
+  pull_request:
+    paths: ['index.html', 'console.html', 'advisor.html']
+  schedule:
+    - cron: '0 8 * * 1'   # Mondays 08:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pa11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Audit (WCAG 2.1 AA)
+        id: a11y
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          fail=0
+          for f in index.html console.html advisor.html; do
+            echo "## $f" | tee -a "$GITHUB_STEP_SUMMARY"
+            npx --yes pa11y@8 --standard WCAG2AA --reporter cli \
+              --config test/pa11y.config.json "file://$PWD/$f" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || fail=1
+          done
+          exit $fail
