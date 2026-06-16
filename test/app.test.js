@@ -741,8 +741,7 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
 
   // UI entry-point regression: these functions are tested above; the buttons
   // ensure users can actually reach them without the browser console.
-  check('exportJSON button wired in HTML', html.includes('onclick="exportJSON()"'));
-  check('importJSON button wired in HTML', html.includes('onclick="importJSON()"'));
+  // (Export/Import JSON are intentionally code-only — no UI button.)
   check('reassess button wired in HTML', html.includes('onclick="reassess()"'));
   check('retry Asana button wired in HTML', html.includes('onclick="retryAsanaDelivery()"'));
   check('print preflight wired in HTML', html.includes('onclick="printPreflight()"'));
