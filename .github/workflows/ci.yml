@@ -16,6 +16,8 @@ jobs:
         run: node test/app.test.js
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
+      - name: Run regulatory-watch unit tests
+        run: node test/reg-watch.test.mjs
       - name: Run console + advisor screen smoke tests
         run: node test/screens.test.js
       - name: Browser smoke test (reduced motion — stable)

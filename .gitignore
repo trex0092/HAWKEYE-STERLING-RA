@@ -9,3 +9,7 @@ Thumbs.db
 # Misc
 *.log
 node_modules/
+
+# Regulatory Watch runtime artifacts (state is committed; these are per-run)
+reg-watch-report.md
+reg-watch-changes.json
