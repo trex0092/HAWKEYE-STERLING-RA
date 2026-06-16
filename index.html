@@ -206,6 +206,19 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sp-label::after{content:'';flex:1;height:1px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2) 55%,transparent);box-shadow:0 0 6px rgba(255,92,168,0.4)}
 .gauge-wrap{display:flex;justify-content:center;margin-bottom:4px}
 .gauge-wrap svg{overflow:visible}
+/* Gauge HUD — breathing halo + counter-rotating dashed rings, recoloured to the
+   verdict (the same live treatment as the AI Risk Advisor robot below it). */
+.gh-halo{fill:rgba(var(--gauge-rgb,91,155,216),0.16);filter:blur(5px)}
+.gh-ring{fill:none}
+.gh-ring-a{stroke:rgba(var(--gauge-rgb,91,155,216),0.40)}
+.gh-ring-b{stroke:rgba(var(--gauge-rgb,91,155,216),0.55)}
+@keyframes ghSpin{to{transform:rotate(360deg)}}
+@keyframes ghPulse{0%,100%{opacity:.4;transform:scale(.95)}50%{opacity:.85;transform:scale(1.04)}}
+@media (prefers-reduced-motion: no-preference){
+  .gh-halo{transform-box:fill-box;transform-origin:center;animation:ghPulse 2.8s ease-in-out infinite}
+  .gh-ring-a{transform-box:fill-box;transform-origin:center;animation:ghSpin 24s linear infinite}
+  .gh-ring-b{transform-box:fill-box;transform-origin:center;animation:ghSpin 17s linear infinite reverse}
+}
 .sp-indicator{height:2px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2))!important;width:50%;margin:0 auto 4px;box-shadow:0 0 10px rgba(255,92,168,0.5),0 0 18px rgba(180,92,255,0.3)}
 .sp-score-label{text-align:center;font-size:8px;color:#D6DBE6;letter-spacing:1.2px;text-transform:uppercase;font-family:var(--mono)}
 .sp-spacer{flex:1;min-height:10px}
@@ -639,6 +652,9 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
                 <stop offset="100%" stop-color="#FF5757"></stop>
               </linearGradient>
             </defs>
+            <circle class="gh-halo" cx="110" cy="106" r="64"></circle>
+            <circle class="gh-ring gh-ring-a" cx="110" cy="106" r="88" fill="none" stroke-width="1" stroke-dasharray="2 7"></circle>
+            <circle class="gh-ring gh-ring-b" cx="110" cy="106" r="81" fill="none" stroke-width="1.5" stroke-dasharray="20 9 3 9"></circle>
             <circle cx="110" cy="106" r="74" fill="none" stroke="url(#trackZone)" stroke-width="12" stroke-dasharray="339 113" stroke-linecap="butt" transform="rotate(135,110,106)"></circle>
             <circle cx="110" cy="106" r="74" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10" stroke-dasharray="339 113" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
             <circle id="gaugeArc" cx="110" cy="106" r="74" fill="none" stroke="url(#gaugeGrad)" stroke-width="10" stroke-dasharray="0 452" stroke-linecap="round" transform="rotate(135,110,106)" style="transition:stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1)"></circle>
@@ -2035,6 +2051,8 @@ function updateAdvisor(outcome){
   set('advName',    el=>el.textContent=a.name);
   set('advRole',    el=>{ el.textContent=a.role; el.style.color='rgb('+a.rgb+')'; });
   set('advNote',    el=>el.textContent=a.note);
+  /* Gauge HUD recolours to the same verdict accent as the advisor robot. */
+  set('gaugeWrap',  el=>{ if(el.style && el.style.setProperty) el.style.setProperty('--gauge-rgb', a.rgb); });
 }
 
 function recalc() {
