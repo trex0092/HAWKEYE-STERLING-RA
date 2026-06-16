@@ -23,25 +23,27 @@ permissions:
 jobs:
   visual:
     runs-on: ubuntu-latest
-    env:
-      PW: npx --yes --package @playwright/test@1.49.1 playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install Chromium
-        run: $PW install --with-deps chromium
+      - name: Install Playwright + Chromium
+        # Local install so the `import '@playwright/test'` in the config/spec
+        # resolves (the repo has no package.json). node_modules is gitignored.
+        run: |
+          npm install @playwright/test@1.49.1
+          npx playwright install --with-deps chromium
 
       - name: Compare against baseline
         if: inputs.mode != 'baseline'
         continue-on-error: true
-        run: $PW test --config=playwright.config.mjs
+        run: npx playwright test --config=playwright.config.mjs
 
       - name: Update baseline snapshots
         if: inputs.mode == 'baseline'
-        run: $PW test --config=playwright.config.mjs --update-snapshots
+        run: npx playwright test --config=playwright.config.mjs --update-snapshots
 
       - name: Upload report
         if: always()
