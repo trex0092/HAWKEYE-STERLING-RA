@@ -524,7 +524,7 @@ function renderToolResult(){
   const head = r.kind==='generic'
     ? '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle('low')+'">Deterministic guidance</span></div>'
     : '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle(r.tone)+'">'+esc(r.verdict)+'</span></div>';
-  const trig = r.triggers.map(t=>'<div class="qa-basis"><div class="ref">'+esc(t.label)+'</div><div class="note">'+esc(t.ref)+'</div></div>').join('');
+  const trig = r.triggers.map(t=>'<div class="qa-basis"><div class="ref">'+esc(t.ref)+'</div><div class="note">'+esc(t.note)+'</div></div>').join('');
   const acts = r.actions.map(a=>'<div class="step-row"><span class="ck">&#10003;</span><span class="tx">'+esc(a)+'</span></div>').join('');
   return '<div class="tool-result">'
     + head

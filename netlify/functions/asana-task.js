@@ -54,8 +54,9 @@ const handle = async (event) => {
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
   if (!process.env.ASANA_PROJECT_GID) console.warn('ASANA_PROJECT_GID not set — using hardcoded default project GID');
 
-  /* Dedup: a re-submission of the same name within DEDUP_WINDOW_MS returns the cached result. */
-  const cacheKey = name;
+  /* Dedup: a re-submission of the same name+band within DEDUP_WINDOW_MS returns the cached result.
+     The key includes band so two distinct assessments that happen to share a name are never conflated. */
+  const cacheKey = name + '\x00' + String(payload.band || '');
   const cached = _recentCache.get(cacheKey);
   if (cached && !gid && (Date.now() - cached.ts) < DEDUP_WINDOW_MS) {
     return resp(200, { ok: true, gid: cached.gid, url: cached.url, section: cached.section, deduplicated: true });
@@ -78,7 +79,7 @@ const handle = async (event) => {
           try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: gid } }); }
           catch (e) { section = null; }
         }
-        return resp(200, { ok: true, gid, url: upd.body.data.permalink_url, section: section ? sectionName : null, updated: true });
+        return resp(200, { ok: true, gid, url: upd.body?.data?.permalink_url ?? null, section: section ? sectionName : null, updated: true });
       }
       /* The remembered task was deleted in Asana or is inaccessible — create a fresh one. */
     }

@@ -38,10 +38,10 @@ const handle = async (event) => {
   if (!sheet || typeof sheet !== 'object' || !sheet.overrides || typeof sheet.overrides !== 'object') {
     return resp(400, { ok: false, error: 'sheet with overrides required' });
   }
-  /* Validate size before stringifying to avoid unnecessary memory allocation. */
-  const estimatedSize = JSON.stringify(sheet).length;
-  if (estimatedSize > 50000) return resp(413, { ok: false, error: 'sheet too large' });
+  /* Validate size against the actual pretty-printed form that is sent to Asana,
+     which can be ~30 % larger than compact JSON due to indentation. */
   const json = JSON.stringify(sheet, null, 2);
+  if (json.length > 50000) return resp(413, { ok: false, error: 'sheet too large' });
 
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
   if (!process.env.ASANA_PROJECT_GID) console.warn('ASANA_PROJECT_GID not set — using hardcoded default project GID');

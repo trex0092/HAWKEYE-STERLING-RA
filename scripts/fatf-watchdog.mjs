@@ -42,7 +42,7 @@ const ALIASES = {
 
 export function normalize(s) {
   /* hyphens fold to spaces so "Guinea-Bissau" can never half-match as "Guinea" */
-  return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[‐‑‒–—-]/g, ' ').replace(/\s+/g, ' ').trim();
+  return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[‐-—-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /* Multi-word names must match across any whitespace run (newlines in HTML). */
