@@ -35,7 +35,7 @@ jobs:
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/index.html" > /tmp/dom.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom.html
-          for s in 'HAWKEYE STERLING' 'Entity Risk Assessment' 'CDD — Customer Due Diligence' 'stroke-dasharray: 214.7, 452' 'AI Risk Advisor'; do
+          for s in 'HAWKEYE STERLING' 'Entity Risk Assessment' 'CDD — Customer Due Diligence' 'stroke-dasharray: 250.8, 600' 'AI Risk Advisor'; do
             grep -q "$s" /tmp/dom.html || { echo "MISSING: $s"; exit 1; }
           done
           echo "smoke ok — app renders, engine computes 19/CDD, gauge wired, advisor present"

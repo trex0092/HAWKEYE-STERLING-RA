@@ -54,8 +54,8 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
   .side-panel .sp-actions{animation-delay:.5s}
   .doc-header{animation:fgFade .5s ease-out backwards}
   .boundary-warn,.crit-banner{animation:fgWarnIn .45s cubic-bezier(.22,.7,.25,1)}
-  #totalScore{transform-box:fill-box;transform-origin:center}
-  .gauge-wrap.pop #totalScore{animation:fgPop .45s cubic-bezier(.3,1.4,.4,1)}
+  #totalScore{transform-origin:center;display:inline-block}
+  #totalScore.score-pop{animation:fgPop .45s cubic-bezier(.3,1.4,.4,1)}
   .verdict-pill{transition:background .3s,color .3s,border-color .3s}
 }
 @keyframes fgCardIn{from{opacity:0;transform:translateY(16px)}}
@@ -75,6 +75,11 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
   .adv-ring-svg.s1{animation:advSpin 22s linear infinite}
   .adv-ring-svg.s2{animation:advSpinRev 15s linear infinite}
   .adv-orbit{animation:advSpin 2.8s linear infinite}
+  .gr-glow{animation:advPulse 2.6s ease-in-out infinite}
+  .gr-sweep{animation:advSpin 3.6s linear infinite}
+  .gr-ring-svg.s1{animation:advSpin 22s linear infinite}
+  .gr-ring-svg.s2{animation:advSpinRev 15s linear infinite}
+  .gr-orbit{animation:advSpin 3.4s linear infinite}
 }
 
 /* ── Header (persona command-center) ──── */
@@ -212,7 +217,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sp-block:last-of-type{border-bottom:none}
 .sp-label{font-size:9px;text-transform:uppercase;letter-spacing:1.4px;color:var(--text2);font-weight:600;margin-bottom:10px;font-family:var(--mono);display:flex;align-items:center;gap:8px}
 .sp-label::after{content:'';flex:1;height:1px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2) 55%,transparent);box-shadow:0 0 6px rgba(255,92,168,0.4)}
-.gauge-wrap{display:flex;justify-content:center;margin-bottom:4px}
+.gauge-wrap{display:flex;justify-content:center;margin-bottom:4px;position:relative}
 .gauge-wrap svg{overflow:visible}
 /* Gauge HUD — breathing halo + counter-rotating dashed rings, recoloured to the
    verdict (the same live treatment as the AI Risk Advisor robot below it). */
@@ -230,6 +235,22 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sp-indicator{height:2px;border-radius:99px;background:linear-gradient(90deg,var(--neon1),var(--neon2))!important;width:50%;margin:0 auto 4px;box-shadow:0 0 10px rgba(255,92,168,0.5),0 0 18px rgba(180,92,255,0.3)}
 .sp-score-label{text-align:center;font-size:8px;color:#D6DBE6;letter-spacing:1.2px;text-transform:uppercase;font-family:var(--mono)}
 .sp-spacer{flex:1;min-height:10px}
+
+/* Gauge-core robot HUD — robot avatar inside the score ring, recolours/swaps by
+   band; the same live treatment as the AI Risk Advisor robot below it. */
+.gr-hud{position:absolute;top:36px;left:50%;width:168px;height:168px;margin-left:-84px;pointer-events:none;z-index:2}
+.gr-glow{position:absolute;inset:-8px;border-radius:50%}
+.gr-sweep{position:absolute;inset:2px;border-radius:50%}
+.gr-ring-svg{position:absolute;inset:0;overflow:visible}
+.gr-img-ring{position:absolute;top:2px;left:2px;width:164px;height:164px;border-radius:50%;overflow:hidden;background:#0B101A}
+.gr-img{width:100%;height:100%;background-size:cover;transition:opacity .45s ease,background-position .45s ease}
+.gr-orbit{position:absolute;inset:0}
+.gr-dot{position:absolute;top:-1px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%}
+
+/* Score readout — sits below the gauge next to the caption, tinted to the band. */
+.sp-readout{display:flex;align-items:baseline;justify-content:center;gap:10px;margin-top:7px}
+.sp-readout-num{font-family:var(--display);font-size:30px;font-weight:700;color:#F0EDE4;letter-spacing:-1px;line-height:1;display:inline-block;transform-origin:center;transition:color .4s ease}
+.sp-readout-cap{font-family:var(--mono);font-size:8.5px;letter-spacing:1.7px;color:#D6DBE6;text-transform:uppercase}
 
 /* ── AI Risk Advisor (HUD robot, recolors to risk) ── */
 .adv-block{display:flex;align-items:center;gap:13px}
@@ -644,36 +665,35 @@ table.kv td.a{width:10%;font-weight:700;text-align:center}
     <aside class="side-panel">
       <div class="sp-block">
         <div class="gauge-wrap" id="gaugeWrap">
-          <svg viewBox="0 0 220 185" width="220" height="185" role="img" aria-label="Risk score gauge">
+          <svg viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="Risk score gauge">
             <defs>
-              <linearGradient id="trackZone" x1="30" y1="110" x2="190" y2="110" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="rgba(44,95,138,0.14)"></stop>
-                <stop offset="63%" stop-color="rgba(44,95,138,0.14)"></stop>
-                <stop offset="73%" stop-color="rgba(255,148,52,0.14)"></stop>
-                <stop offset="100%" stop-color="rgba(255,87,87,0.14)"></stop>
-              </linearGradient>
-              <linearGradient id="gaugeGrad" x1="20" y1="110" x2="200" y2="110" gradientUnits="userSpaceOnUse">
+              <linearGradient id="gaugeGrad" x1="24" y1="120" x2="216" y2="120" gradientUnits="userSpaceOnUse">
                 <stop offset="0%" stop-color="#5B9BD8"></stop>
-                <stop offset="58%" stop-color="#5B9BD8"></stop>
+                <stop offset="55%" stop-color="#5B9BD8"></stop>
                 <stop offset="72%" stop-color="#FF9434"></stop>
                 <stop offset="88%" stop-color="#FF5757"></stop>
                 <stop offset="100%" stop-color="#FF5757"></stop>
               </linearGradient>
             </defs>
-            <circle class="gh-halo" cx="110" cy="106" r="64"></circle>
-            <circle class="gh-ring gh-ring-a" cx="110" cy="106" r="88" fill="none" stroke-width="1" stroke-dasharray="2 7"></circle>
-            <circle class="gh-ring gh-ring-b" cx="110" cy="106" r="81" fill="none" stroke-width="1.5" stroke-dasharray="20 9 3 9"></circle>
-            <circle cx="110" cy="106" r="74" fill="none" stroke="url(#trackZone)" stroke-width="12" stroke-dasharray="339 113" stroke-linecap="butt" transform="rotate(135,110,106)"></circle>
-            <circle cx="110" cy="106" r="74" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10" stroke-dasharray="339 113" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
-            <circle id="gaugeArc" cx="110" cy="106" r="74" fill="none" stroke="url(#gaugeGrad)" stroke-width="10" stroke-dasharray="0 452" stroke-linecap="round" transform="rotate(135,110,106)" style="transition:stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1)"></circle>
-            <circle cx="110" cy="106" r="86" fill="none" stroke="rgba(255,148,52,0.55)" stroke-width="2" stroke-dasharray="2 450" stroke-dashoffset="-212" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
-            <circle cx="110" cy="106" r="86" fill="none" stroke="rgba(255,87,87,0.55)" stroke-width="2" stroke-dasharray="2 450" stroke-dashoffset="-248" stroke-linecap="round" transform="rotate(135,110,106)"></circle>
-            <text id="totalScore" x="110" y="99" text-anchor="middle" font-family="'Space Grotesk',Arial,sans-serif" font-size="46" font-weight="700" fill="#F0EDE4" letter-spacing="-1">0</text>
-            <text x="110" y="118" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="8" fill="#D6DBE6" letter-spacing="1.5">RISK SCORE</text>
+            <circle class="gh-halo" cx="120" cy="120" r="72"></circle>
+            <circle class="gh-ring gh-ring-a" cx="120" cy="120" r="100" fill="none" stroke-width="1" stroke-dasharray="2 7"></circle>
+            <circle class="gh-ring gh-ring-b" cx="120" cy="120" r="93" fill="none" stroke-width="1.5" stroke-dasharray="20 9 3 9"></circle>
+            <circle cx="120" cy="120" r="84" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="9" stroke-dasharray="396 132" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
+            <circle id="gaugeArc" cx="120" cy="120" r="84" fill="none" stroke="url(#gaugeGrad)" stroke-width="9" stroke-dasharray="0 600" stroke-linecap="round" transform="rotate(135,120,120)" style="transition:stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1)"></circle>
+            <circle cx="120" cy="120" r="93" fill="none" stroke="rgba(255,148,52,0.6)" stroke-width="2" stroke-dasharray="2 600" stroke-dashoffset="-264" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
+            <circle cx="120" cy="120" r="93" fill="none" stroke="rgba(255,87,87,0.6)" stroke-width="2" stroke-dasharray="2 600" stroke-dashoffset="-304" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
           </svg>
+          <div class="gr-hud" id="gaugeRobot" aria-hidden="true">
+            <div class="gr-glow" id="grGlow"></div>
+            <div class="gr-img-ring" id="grImgRing"><div class="gr-img" id="grImg"></div></div>
+            <div class="gr-orbit"><div class="gr-dot" id="grDot"></div></div>
+          </div>
         </div>
         <div class="sp-indicator" id="scoreIndicator"></div>
-        <div class="sp-score-label">Out of 30+</div>
+        <div class="sp-readout">
+          <span class="sp-readout-num" id="totalScore">0</span>
+          <span class="sp-readout-cap">Out of 30+ &middot; Risk Score</span>
+        </div>
       </div>
 
       <div class="sp-block">
@@ -2049,6 +2069,14 @@ const ADVISORS = {
   low:  {img:'assets/persona-vale.png',   pos:'50% 22%', name:'Vale',   role:'KYC & onboarding',       rgb:'59,229,208',
          note:'Standard customer due diligence is sufficient. Proceed with routine onboarding and a periodic review cycle.'}
 };
+
+/* Gauge-core robot — face + accent for the score gauge, swapped by risk band:
+   green robot (low) → gold robot (medium) → red robot (high). */
+const GAUGE_ROBOTS = {
+  high: {img:'assets/robot-high.png', pos:'50% 16%', size:'170%', rgb:'255,87,87'},
+  med:  {img:'assets/robot-med.png',  pos:'50% 20%', size:'176%', rgb:'247,197,60'},
+  low:  {img:'assets/robot-low.png',  pos:'52% 32%', size:'172%', rgb:'52,211,120'}
+};
 function advisorKind(outcome){ return (outcome==='EDD'||outcome==='PROHIBITED') ? 'high' : outcome==='SDD' ? 'med' : 'low'; }
 function updateAdvisor(outcome){
   const a = ADVISORS[advisorKind(outcome)];
@@ -2063,8 +2091,15 @@ function updateAdvisor(outcome){
   set('advName',    el=>el.textContent=a.name);
   set('advRole',    el=>{ el.textContent=a.role; el.style.color='rgb('+a.rgb+')'; });
   set('advNote',    el=>el.textContent=a.note);
-  /* Gauge HUD recolours to the same verdict accent as the advisor robot. */
-  set('gaugeWrap',  el=>{ if(el.style && el.style.setProperty) el.style.setProperty('--gauge-rgb', a.rgb); });
+  /* Gauge-core robot — head image + accent swap to match the band. */
+  const g = GAUGE_ROBOTS[advisorKind(outcome)];
+  set('grImg',     el=>{ el.style.backgroundImage="url('"+g.img+"')"; el.style.backgroundPosition=g.pos; el.style.backgroundSize=g.size||'cover'; });
+  set('grImgRing', el=>{ el.style.border='2px solid rgba('+g.rgb+',0.78)'; el.style.boxShadow='0 0 16px rgba('+g.rgb+',0.45),inset 0 0 14px rgba(0,0,0,0.55)'; });
+  set('grGlow',    el=>{ el.style.background='radial-gradient(circle,rgba('+g.rgb+',0.42),transparent 70%)'; });
+  set('grDot',     el=>{ el.style.background='rgb('+g.rgb+')'; el.style.boxShadow='0 0 9px rgb('+g.rgb+')'; });
+  set('totalScore',el=>{ el.style.color='rgb('+g.rgb+')'; el.style.textShadow='0 0 16px rgba('+g.rgb+',0.5)'; });
+  /* Gauge HUD halo + dashed rings recolour to the band accent. */
+  set('gaugeWrap', el=>{ if(el.style && el.style.setProperty) el.style.setProperty('--gauge-rgb', g.rgb); });
 }
 
 function recalc() {
@@ -2073,10 +2108,10 @@ function recalc() {
 
   $('totalScore').textContent = a.total;
 
-  /* Gauge arc: 270° sweep on r=74 circle. 339 ≈ 2π×72×0.75 (fitted to the visual sweep including round linecap).
-     452 = circumference buffer; must be > 339 so the gap stays hidden. Display scale: 0–30. */
+  /* Gauge arc: 270° sweep on r=84 circle. 396 ≈ 2π×84×0.75 (fitted to the visual sweep including round linecap).
+     600 = circumference buffer; must be > 396 so the gap stays hidden. Display scale: 0–30. */
   const arc = $('gaugeArc');
-  if(arc) arc.style.strokeDasharray = (Math.min(a.total/30, 1)*339).toFixed(1) + ' 452';
+  if(arc) arc.style.strokeDasharray = (Math.min(a.total/30, 1)*396).toFixed(1) + ' 600';
 
 
   /* Verdict pill (operative outcome) + threshold chips (numeric band) */
@@ -2629,17 +2664,17 @@ function initAnimations(){
   /* Browser-only; inert under the test DOM stub (no rAF / matchMedia / MutationObserver there). */
   if(typeof requestAnimationFrame!=='function' || typeof MutationObserver!=='function'
      || typeof performance==='undefined' || typeof window.matchMedia!=='function') return;
-  const scoreEl = $('totalScore'), arc = $('gaugeArc'), wrap = $('gaugeWrap');
+  const scoreEl = $('totalScore'), arc = $('gaugeArc');
   if(!scoreEl || !arc) return;
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function attachPop(){
-    if(reduced || !wrap) return;
+    if(reduced) return;
     const obs = new MutationObserver(() => {
-      wrap.classList.remove('pop');
-      void wrap.offsetWidth; /* restart animation */
-      wrap.classList.add('pop');
-      setTimeout(() => wrap.classList.remove('pop'), 500);
+      scoreEl.classList.remove('score-pop');
+      void scoreEl.offsetWidth;                 // restart animation
+      scoreEl.classList.add('score-pop');
+      setTimeout(() => scoreEl.classList.remove('score-pop'), 500);
     });
     obs.observe(scoreEl, {childList:true, characterData:true, subtree:true});
   }
@@ -2650,7 +2685,7 @@ function initAnimations(){
   const target = arc.style.strokeDasharray || arc.getAttribute('stroke-dasharray');
   const finalScore = parseInt(scoreEl.textContent, 10) || 0;
   arc.style.transition = 'none';
-  arc.style.strokeDasharray = '0 452';
+  arc.style.strokeDasharray = '0 600';
   scoreEl.textContent = '0';
   requestAnimationFrame(() => requestAnimationFrame(() => {
     arc.style.transition = 'stroke-dasharray 1.1s cubic-bezier(0.3,0.7,0.2,1)';

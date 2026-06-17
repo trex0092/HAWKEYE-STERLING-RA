@@ -275,9 +275,9 @@ check('blank ref falls back to default filename', A.exportFileName() === 'risk-a
 
 /* ── 16. Dark-redesign additions: gauge, complete toggle, signatory titles ── */
 reset();
-check('gauge arc tracks score (19/30 of the 339-unit sweep)', els.gaugeArc.style.strokeDasharray === '214.7 452');
+check('gauge arc tracks score (19/30 of the 396-unit sweep)', els.gaugeArc.style.strokeDasharray === '250.8 600');
 A.setToggle('criminal','Yes');                                 // 21
-check('gauge arc updates on change', els.gaugeArc.style.strokeDasharray === '237.3 452');
+check('gauge arc updates on change', els.gaugeArc.style.strokeDasharray === '277.2 600');
 reset();
 A.toggleComplete();
 check('complete toggle sets state + button', A.state.complete === true
