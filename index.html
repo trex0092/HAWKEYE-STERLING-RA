@@ -388,67 +388,95 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .storage-warn{position:fixed;top:0;left:0;right:0;background:#3d1200;color:#ffb347;font-size:11px;font-weight:600;text-align:center;padding:7px 16px;z-index:400;border-bottom:1px solid #ff8c00;font-family:var(--mono)}
 
-/* ── PRINT REPORT (black/pink A4 — hidden on screen) ── */
-#printReport{display:none;font-family:'Arial Narrow','Helvetica Neue',Arial,sans-serif;color:#1A1F2B;font-size:11.5pt;line-height:1.5;padding:0 6mm;background:#FFFFFF}
-.letterhead{display:flex;align-items:center;justify-content:space-between;background:#15171E;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:6px}
-.lh-brand{display:flex;align-items:center;gap:10px}
-.lh-mark{width:34px;height:34px;border:1.5px solid #F06AA8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#F06AA8;background:rgba(240,106,168,0.10)}
-.lh-name{font-size:16pt;font-weight:700;letter-spacing:0.10em;color:#fff}
-.lh-doc{text-align:right}
-.lh-doc .t{font-size:11pt;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#F06AA8}
-.lh-doc .s{font-size:8.5pt;color:#9aa0ae;letter-spacing:0.08em;text-transform:uppercase}
-.meta-line{display:flex;justify-content:space-between;font-size:9pt;color:#4A5160;border-bottom:1px solid #F06AA8;padding:5px 2px;margin-bottom:14px}
-.meta-line b{color:#1A1F2B}
-.meta-line b.conf{color:#C9252D}
-.result-box{display:grid;grid-template-columns:auto 1fr;gap:0 22px;background:#15171E;color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:16px;align-items:center;page-break-inside:avoid}
-.rb-score{text-align:center;padding-right:22px;border-right:1px solid rgba(240,106,168,0.4)}
-.rb-num{font-size:34pt;font-weight:700;line-height:1;color:#F06AA8}
-.rb-cap{font-size:8pt;letter-spacing:0.12em;text-transform:uppercase;color:#9aa0ae;margin-top:2px}
-.rb-proh{color:#FF7B7B;font-size:12pt;font-weight:800;margin-bottom:3px;letter-spacing:0.02em}
-.rb-verdict{font-size:14pt;font-weight:700;margin-bottom:4px}
-.rb-sub{font-size:8pt;color:#9aa0ae;margin:-2px 0 4px;letter-spacing:0.03em}
-.rb-verdict.v-cdd{color:#7FB3E8}.rb-verdict.v-sdd{color:#FFAA5C}.rb-verdict.v-edd{color:#FF7B7B}
-.rb-thresh{font-size:9pt;color:#B6BCC8}
-.rb-thresh b{padding:1px 7px;border:1px solid #3A3F4D;border-radius:99px;margin-right:6px;font-weight:700}
-.rb-thresh b.on{border-color:#F06AA8;color:#F06AA8}
-.pr-crit{border:1.5px solid #B23A2E;color:#B23A2E;border-radius:8px;padding:8px 12px;font-size:9.5pt;font-weight:700;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
-.pr-floor{border:1.5px solid #A4690B;color:#A4690B;border-radius:8px;padding:8px 12px;font-size:9.5pt;font-weight:700;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
-h2.sec{font-size:10.5pt;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:#D6336C;border-bottom:1.5px solid;border-image:linear-gradient(90deg,#D6336C,#F06AA8 50%,transparent) 1;padding-bottom:3px;margin:16px 0 8px;display:flex;gap:8px;align-items:baseline;page-break-after:avoid}
-h2.sec .n{color:#F06AA8;background:#15171E;font-size:8.5pt;padding:1px 7px;border-radius:5px}
-table.kv{width:100%;border-collapse:collapse}
-table.kv td{padding:4px 6px;border-bottom:0.75px solid #EBE2E7;font-size:10pt;vertical-align:top}
-table.kv td.k{width:34%;color:#4A5160;text-transform:uppercase;font-size:8.5pt;letter-spacing:0.05em;padding-top:6px}
-table.kv td.v{font-weight:600}
-table.kv td.s{width:14%;text-align:right;white-space:nowrap}
-table.kv td.q{line-height:1.35;color:#4A5160;text-transform:uppercase;font-size:8.5pt;letter-spacing:0.05em}
-table.kv.qs td.k{width:24px;white-space:nowrap}
-table.kv td.a{width:10%;font-weight:700;text-align:center}
-.chip{display:inline-block;padding:1px 9px;border-radius:99px;border:none;font-size:8.5pt;font-weight:700;white-space:nowrap;color:#fff}
-.c0{background:#7A8090}
-.c1{background:#1F7A53}
-.c2{background:#A4690B}
-.c3{background:#B23A2E}
-.notes-box{border:0.75px solid #D9CCD3;border-left:3px solid #D6336C;border-radius:8px;padding:10px 12px;font-size:10pt;min-height:54px;page-break-inside:avoid}
-.notes-empty{color:#7A8090;font-style:italic}
-.attest{font-size:9.5pt;font-style:italic;color:#4A5160;border:0.75px solid #D9CCD3;border-left:3px solid #D6336C;background:#FAF2F6;border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.55;page-break-inside:avoid}
-.sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;page-break-inside:avoid}
-.sign-block .role{font-size:8.5pt;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:#D6336C;margin-bottom:8px}
-.sign-block table.kv td{border-bottom:none;padding:2px 0}
-.sign-line{border-bottom:1px solid #1A1F2B;height:38px}
-.sign-cap{font-size:8pt;color:#7A8090;text-align:center;margin-top:3px;letter-spacing:0.08em;text-transform:uppercase}
-.foot{margin-top:18px;border-top:0.75px solid #F06AA8;padding-top:5px;font-size:7.5pt;color:#7A8090;text-align:center;letter-spacing:0.06em}
-.rd-stamp{font-size:7.5pt;color:#7A8090;letter-spacing:0.05em;margin:-10px 0 12px}
-.pr-rd{border:0.75px solid #D9CCD3;border-left:3px solid #A4690B;border-radius:8px;padding:7px 10px;font-size:8.5pt;color:#4A5160;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
-.pr-prior{border:0.75px solid #D9CCD3;border-left:3px solid #2C5F8A;border-radius:8px;padding:7px 10px;font-size:8.5pt;color:#4A5160;margin:0 0 12px;line-height:1.5;page-break-inside:avoid}
-.rd-mark{color:#A4690B;font-size:8pt;margin-left:3px}
-
+/* ── PRINT REPORT (brand-matched A4 — hidden on screen) ── */
+#printReport{display:none}
 @media print{
-  body{background:#FFFFFF}
+  body{background:#FFFFFF;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   body::before{display:none}
   .app,.toast{display:none!important}
   #printReport{display:block!important}
-  @page{size:A4;margin:9mm 0}
+  @page{size:A4;margin:0}
+  #printReport .page{break-after:page}
+  #printReport .page:last-child{break-after:auto}
 }
+#printReport{--ink:#15171F;--body:#3B404C;--muted:#737A88;--faint:#9AA0AC;--hair:#E7E2D9;--hair2:#ECE7F0;--purple:#6B45D6;--accent:#C0306B;--dark:#15171E;--amber:#B7791F;--red:#C0392B;--green:#1F7A53;font-family:'Arial Narrow','Helvetica Neue Condensed',Arial,sans-serif;color:var(--body);line-height:1.5;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+#printReport .page{box-sizing:border-box;position:relative;display:flex;flex-direction:column;min-height:297mm;background:#fff;padding:14mm 15mm 12mm;overflow:hidden;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+#printReport .page::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#FF5CA8,#B45CFF 55%,#5BC8D8)}
+#printReport .page-body{flex:1}
+#printReport .mast{display:flex;justify-content:space-between;align-items:flex-start;background:var(--dark);color:#fff;border-radius:11px;padding:16px 20px;margin-bottom:14px;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+#printReport .mast-brand{display:flex;align-items:center;gap:13px}
+#printReport .avatar{width:46px;height:46px;border-radius:50%;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(91,200,216,.55);box-shadow:0 0 16px rgba(122,79,224,.45);background:#0B101A}
+#printReport .avatar>div{width:100%;height:100%;background-image:url('assets/persona-sterling.png');background-size:135%;background-position:38% 32%}
+#printReport .mast-name{font-size:21px;font-weight:700;letter-spacing:.12em;line-height:1;background:linear-gradient(90deg,#FF5CA8,#B45CFF 82%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;print-color-adjust:exact}
+#printReport .mast-tag{font-size:8px;letter-spacing:.18em;color:#8C93A4;text-transform:uppercase;margin-top:6px}
+#printReport .mast-doc{text-align:right}
+#printReport .mast-doc .t{font-size:12.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#fff;white-space:nowrap}
+#printReport .mast-doc .s{font-size:8px;letter-spacing:.2em;color:#8C93A4;text-transform:uppercase;margin-top:5px}
+#printReport .mast-doc .conf{display:inline-block;margin-top:9px;font-size:8px;letter-spacing:.18em;color:#FF8FB6;border:1px solid rgba(255,143,182,.5);border-radius:99px;padding:3px 9px;text-transform:uppercase}
+#printReport .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);border-radius:9px;overflow:hidden;margin-bottom:14px}
+#printReport .meta>div{background:#fff;padding:6px 11px}
+#printReport .meta .k{font-size:7px;letter-spacing:.16em;color:var(--purple);text-transform:uppercase;margin-bottom:2px;font-weight:700}
+#printReport .meta .v{font-size:11px;font-weight:700;color:var(--ink)}
+#printReport .verdict{display:grid;grid-template-columns:132px 1fr;gap:20px;align-items:center;background:var(--dark);color:#fff;border-radius:14px;padding:12px 22px;margin-bottom:14px;break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+#printReport .gauge-col{display:flex;flex-direction:column;align-items:center;gap:5px}
+#printReport .gauge{position:relative;width:124px;height:124px}
+#printReport .gauge svg{overflow:visible;width:124px;height:124px}
+#printReport .gauge .arc{stroke:rgb(var(--bc))}
+#printReport .gauge .ring{stroke:rgba(var(--bc),.28)}
+#printReport .g-face{position:absolute;top:16px;left:16px;width:92px;height:92px;border-radius:50%;overflow:hidden;border:2px solid rgba(var(--bc),.8);box-shadow:0 0 16px rgba(var(--bc),.42),inset 0 0 14px rgba(0,0,0,.55)}
+#printReport .g-face>div{width:100%;height:100%}
+#printReport .g-read{display:flex;align-items:baseline;gap:6px;margin-bottom:5px}
+#printReport .g-num{font-size:28px;font-weight:700;line-height:1;letter-spacing:-1px;color:rgb(var(--bc));text-shadow:0 0 14px rgba(var(--bc),.5)}
+#printReport .g-cap{font-size:8px;letter-spacing:.12em;color:#B7BDC9;text-transform:uppercase}
+#printReport .v-title{font-size:19px;font-weight:700;color:#fff;line-height:1.05;margin-bottom:6px}
+#printReport .v-sub{font-size:8.5px;color:#B7BDC9;letter-spacing:.02em;margin:-2px 0 7px}
+#printReport .v-desc{font-size:10.5px;color:#C2C7D2;line-height:1.45;margin-bottom:10px}
+#printReport .v-thresh{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+#printReport .v-thresh b{font-size:8.5px;font-weight:600;letter-spacing:.04em;padding:3px 10px;border:1px solid rgba(255,255,255,.18);border-radius:99px;color:#9AA0AE;white-space:nowrap}
+#printReport .v-thresh b.on{border-color:rgb(var(--bc));color:rgb(var(--bc));background:rgba(var(--bc),.1)}
+#printReport .advise{display:flex;gap:9px;align-items:flex-start;border:1px solid var(--hair);border-left:3px solid var(--amber);border-radius:9px;padding:9px 13px;margin-bottom:12px;background:#FDFAF3;break-inside:avoid}
+#printReport .advise .ic{font-weight:700;color:var(--amber);font-size:13px;line-height:1.2}
+#printReport .advise .tx{font-size:10px;color:#5A5042;line-height:1.5}
+#printReport .advise .tx b{color:var(--amber)}
+#printReport .advise.crit{border-left-color:var(--red);background:#FCF1EF}
+#printReport .advise.crit .ic,#printReport .advise.crit .tx b{color:var(--red)}
+#printReport .advise.info{border-left-color:#2C5F8A;background:#F2F6FB}
+#printReport .advise.info .ic,#printReport .advise.info .tx b{color:#2C5F8A}
+#printReport h2.sec{display:flex;align-items:center;gap:10px;margin:17px 0 9px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--purple);break-after:avoid}
+#printReport h2.sec .n{font-size:9px;font-weight:700;color:var(--purple);border:1px solid rgba(107,69,214,.35);background:rgba(107,69,214,.07);border-radius:5px;padding:2px 7px;letter-spacing:.04em}
+#printReport h2.sec::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(107,69,214,.45),var(--hair) 60%,transparent)}
+#printReport table.kv{width:100%;border-collapse:collapse;margin-bottom:2px}
+#printReport table.kv td{padding:6px 8px;border-bottom:1px solid var(--hair);vertical-align:top;font-size:11px}
+#printReport table.kv tr:last-child td{border-bottom:none}
+#printReport table.kv tr{break-inside:avoid}
+#printReport td.k{width:33%;font-size:11px;color:var(--body);font-weight:400}
+#printReport td.v{font-weight:600;color:var(--ink)}
+#printReport td.s{width:96px;text-align:right;white-space:nowrap}
+#printReport table.qs td{padding:5px 8px}
+#printReport td.q{font-size:10.5px;color:var(--body);line-height:1.4}
+#printReport td.qa{width:46px;text-align:center;font-weight:700;font-size:10.5px;color:var(--ink)}
+#printReport .chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:8px;font-weight:600;letter-spacing:.03em;color:#fff;white-space:nowrap;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+#printReport .c0{background:#7A8090}#printReport .c1{background:var(--green)}#printReport .c2{background:var(--amber)}#printReport .c3{background:var(--red)}
+#printReport .rd-mark{margin-left:3px;color:var(--amber);font-weight:700}
+#printReport .notes{border:1px solid var(--hair);border-left:3px solid var(--accent);border-radius:9px;padding:11px 14px;font-size:11px;color:var(--ink);line-height:1.6;background:#fff}
+#printReport .notes-empty{color:var(--faint);font-style:italic}
+#printReport .attest{font-size:10.5px;font-style:italic;color:#5A5042;background:#FCF4F8;border:1px solid var(--hair2);border-left:3px solid var(--accent);border-radius:9px;padding:11px 14px;margin:0 0 14px;line-height:1.6;break-inside:avoid}
+#printReport .signs{display:grid;grid-template-columns:1fr 1fr;gap:24px;break-inside:avoid}
+#printReport .sign .role{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--purple);margin-bottom:9px}
+#printReport .sign table{width:100%;border-collapse:collapse}
+#printReport .sign td{padding:2px 0;font-size:10.5px;vertical-align:top;border:none}
+#printReport .sign td.k{font-size:10.5px;color:var(--body);width:54px;font-weight:400}
+#printReport .sign td.v{font-weight:600;color:var(--ink)}
+#printReport .sign-line{border-bottom:1.2px solid var(--ink);height:40px;margin-top:6px}
+#printReport .sign-cap{font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:center;margin-top:4px}
+#printReport .audit{margin-top:16px;border:1px solid var(--hair);border-radius:9px;overflow:hidden;break-inside:avoid}
+#printReport .audit-h{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);background:#F7F5F0;padding:7px 12px;border-bottom:1px solid var(--hair)}
+#printReport .audit table{width:100%;border-collapse:collapse}
+#printReport .audit td{padding:5px 12px;border-bottom:1px solid var(--hair);font-size:9.5px;color:var(--body)}
+#printReport .audit tr:last-child td{border-bottom:none}
+#printReport .audit td.t{font-size:8.5px;color:var(--faint);white-space:nowrap;width:118px}
+#printReport .foot{margin-top:auto;padding-top:9px;border-top:1px solid var(--hair);font-size:7.5px;letter-spacing:.08em;color:var(--faint);display:flex;justify-content:space-between;align-items:center}
+#printReport .foot .pg{color:var(--accent)}
 
 /* ── Responsive ───────────────────────── */
 @media(max-width:800px){
@@ -1160,11 +1188,11 @@ function _auditReportBlock(){
   const log = auditAll();
   if(!log.length) return '';
   const rows = log.slice(-15).map(e =>
-    '<tr><td class="k" style="white-space:nowrap">'+esc(fmtDateTime(e.ts))+'</td>'
-    + '<td class="v">'+esc(e.event)+(e.detail?' — '+esc(e.detail):'')+'</td>'
-    + '<td class="s">'+esc(e.who||'—')+'</td></tr>').join('');
-  return '<h2 class="sec"><span class="n">08</span>Activity Log <span style="font-weight:400;font-size:9pt">(tamper-evident, hash-chained — last '+Math.min(15,log.length)+' of '+log.length+')</span></h2>'
-    + '<table class="kv"><tbody>'+rows+'</tbody></table>';
+    '<tr><td class="t">'+esc(fmtDateTime(e.ts))+'</td>'
+    + '<td>'+esc(e.event)+(e.detail?' - '+esc(e.detail):'')+(e.who?' - '+esc(e.who):'')+'</td></tr>').join('');
+  return '<div class="audit"><div class="audit-h">Audit trail - assessment lifecycle '
+    + '(tamper-evident, hash-chained - last '+Math.min(15,log.length)+' of '+log.length+')</div>'
+    + '<table><tbody>'+rows+'</tbody></table></div>';
 }
 function scoreFromYesNo(val, type) {
   if(type==='vlok')  return val==='Yes' ? 3 : 1;
@@ -2485,8 +2513,8 @@ $('importFile').addEventListener('change', function(e){
 function buildPrintReport(){
   const a = computeAssessment();
   const s = state;
-  const dash = v => (v && String(v).trim()) ? esc(v) : '—';
-  const dDate = iso => { const f = fmtDate(iso); return f ? esc(f) : '—'; };
+  const dash = v => (v && String(v).trim()) ? esc(v) : '-';
+  const dDate = iso => { const f = fmtDate(iso); return f ? esc(f) : '-'; };
   const chip = sc => `<span class="chip c${sc}">${sc} · ${ratingLabel(sc)}</span>`;
 
   const jC = effCountry(s.entity.jurisdiction);
@@ -2498,23 +2526,23 @@ function buildPrintReport(){
 
   /* Risk-data overrides applied to factors used by THIS assessment */
   const ovNotes = [], ovMark = '<span class="rd-mark">✱</span>';
-  const ovWhen = e => fmtDate(e.at) || e.at || '—';
+  const ovWhen = e => fmtDate(e.at) || e.at || '-';
   if(jC && jC.overridden){
     let chg = jC.baseScore + ' → ' + jC.score;
     if(!!jC.cfa !== !!jC.baseCfa) chg += jC.cfa ? ' (CFA flag added)' : ' (CFA flag removed)';
-    ovNotes.push('Jurisdiction — ' + s.entity.jurisdiction + ': ' + chg + ', overridden ' + ovWhen(jC) + ' — ' + jC.reason);
+    ovNotes.push('Jurisdiction - ' + s.entity.jurisdiction + ': ' + chg + ', overridden ' + ovWhen(jC) + ' - ' + jC.reason);
   }
-  if(act && act.overridden) ovNotes.push('Business activity — ' + s.profile.activity + ': ' + act.baseScore + ' → ' + act.score + ', overridden ' + ovWhen(act) + ' — ' + act.reason);
+  if(act && act.overridden) ovNotes.push('Business activity - ' + s.profile.activity + ': ' + act.baseScore + ' → ' + act.score + ', overridden ' + ovWhen(act) + ' - ' + act.reason);
 
-  const qRows = QUESTIONS_OC.map((q,i) =>
-    `<tr><td class="k">${String(i+1).padStart(2,'0')}</td><td class="q">${esc(q.text)}</td><td class="a">${esc(s.questions[q.id])}</td><td class="s">${chip(scoreFromYesNo(s.questions[q.id], q.type))}</td></tr>`).join('');
+  const qRows = QUESTIONS_OC.map(q =>
+    `<tr><td class="q">${esc(q.text)}</td><td class="qa">${esc(s.questions[q.id])}</td><td class="s">${chip(scoreFromYesNo(s.questions[q.id], q.type))}</td></tr>`).join('');
 
   const scrRows = SCREENING_GROUPS.map(([g,label]) => {
     const v = s.screening[g];
     const has = (v.system || v.date || v.ref);
     const txt = has
-      ? [(v.system || '—'), (v.date ? (fmtDate(v.date)||v.date) : '—'), (v.ref ? 'Ref ' + v.ref : '—')].join(' · ')
-      : '—';
+      ? [(v.system || '-'), (v.date ? (fmtDate(v.date)||v.date) : '-'), (v.ref ? 'Ref ' + v.ref : '-')].join(' · ')
+      : '-';
     return `<tr><td class="k">${esc(label)}</td><td class="v">${esc(txt)}</td><td class="s"></td></tr>`;
   }).join('');
 
@@ -2523,120 +2551,141 @@ function buildPrintReport(){
     s.suppliers[key].forEach((v,i) => {
       if(v && v!=='N/A'){
         const item = effOf(key, v);
-        if(item && item.overridden) ovNotes.push(label + ' material — ' + v + ': ' + item.baseScore + ' → ' + item.score + ', overridden ' + ovWhen(item) + ' — ' + item.reason);
-        supRows += `<tr><td class="k">${label} — Supplier ${i+1}</td><td class="v">${esc(v)}</td><td class="s">${chip(item?item.score:0)}${item && item.overridden ? ovMark : ''}</td></tr>`;
+        if(item && item.overridden) ovNotes.push(label + ' material - ' + v + ': ' + item.baseScore + ' → ' + item.score + ', overridden ' + ovWhen(item) + ' - ' + item.reason);
+        supRows += `<tr><td class="k">${label} - Supplier ${i+1}</td><td class="v">${esc(v)}</td><td class="s">${chip(item?item.score:0)}${item && item.overridden ? ovMark : ''}</td></tr>`;
       }
     });
   });
   if(!supRows) supRows = '<tr><td class="k">Material sources</td><td class="v">None declared</td><td class="s"></td></tr>';
-  const ovBox = ovNotes.length ? '<div class="pr-rd"><b>✱ Risk data overrides applied:</b> ' + esc(ovNotes.join('; ')) + '.</div>' : '';
+  const ovBox = ovNotes.length ? '<div class="advise info"><div class="ic">✱</div><div class="tx"><b>Risk data overrides applied:</b> ' + esc(ovNotes.join('; ')) + '.</div></div>' : '';
   const pCh = s.prior ? (priorChanges(a) || []) : [];
   const priorBox = s.prior
-    ? `<div class="pr-prior"><b>Periodic re-assessment</b> of ${dash(s.prior.ref)} (${fmtDate(s.prior.date) ? esc(fmtDate(s.prior.date)) : dash(s.prior.date)} — ${s.prior.total} · ${esc(s.prior.outcome)}). ${pCh.length ? 'Changes since prior: ' + esc(pCh.join('; ')) + '.' : 'No factor changes since the prior review.'}</div>`
+    ? `<div class="advise info"><div class="ic">⟳</div><div class="tx"><b>Periodic re-assessment</b> of ${dash(s.prior.ref)} (${fmtDate(s.prior.date) ? esc(fmtDate(s.prior.date)) : dash(s.prior.date)} - ${s.prior.total} · ${esc(s.prior.outcome)}). ${pCh.length ? 'Changes since prior: ' + esc(pCh.join('; ')) + '.' : 'No factor changes since the prior review.'}</div></div>`
     : '';
-  const ovCount = rdCount();
-  const rdStamp = 'Risk data: baseline ' + RISK_DATA_VERSION
-    + (ovCount ? ' · ' + ovCount + ' local override' + (ovCount===1?'':'s') + ' in effect'
-       + (riskData.updatedAt ? ' (sheet updated ' + (fmtDate(riskData.updatedAt) || riskData.updatedAt) + ')' : '') : '');
 
   const prohibitReasons = a.escalations.filter(e=>e.level==='prohibit').map(e=>e.reason);
   const eddReasons = a.escalations.filter(e=>e.level==='edd').map(e=>e.reason);
   const escBoxes =
-    (prohibitReasons.length ? `<div class="pr-crit">⛔ PROHIBITED — designated-party exposure: ${esc(prohibitReasons.join('; '))}. Do not onboard. Freeze funds where held and file a report with the FIU / relevant authority.</div>` : '')
-    + (eddReasons.length ? `<div class="pr-floor">⚠ Enhanced Due Diligence mandatory — ${esc(eddReasons.join('; '))}.</div>` : '')
-    + (a.analystOv ? `<div class="pr-floor">⚑ Analyst override — required diligence raised to ${a.analystOv.band} (computed ${a.analystOv.from}): ${esc(a.analystOv.reason)}${a.analystOv.at ? ' (' + (fmtDate(a.analystOv.at) || esc(a.analystOv.at)) + ')' : ''}.</div>` : '');
+    (prohibitReasons.length ? `<div class="advise crit"><div class="ic">⛔</div><div class="tx"><b>PROHIBITED - designated-party exposure:</b> ${esc(prohibitReasons.join('; '))}. Do not onboard. Freeze funds where held and file a report with the FIU / relevant authority.</div></div>` : '')
+    + (eddReasons.length ? `<div class="advise"><div class="ic">⚠</div><div class="tx"><b>Enhanced Due Diligence mandatory</b> - ${esc(eddReasons.join('; '))}.</div></div>` : '')
+    + (a.analystOv ? `<div class="advise"><div class="ic">⚑</div><div class="tx"><b>Analyst override</b> - required diligence raised to ${a.analystOv.band} (computed ${a.analystOv.from}): ${esc(a.analystOv.reason)}${a.analystOv.at ? ' (' + (fmtDate(a.analystOv.at) || esc(a.analystOv.at)) + ')' : ''}.</div></div>` : '');
 
-  /* When prohibited, the red DO-NOT-ONBOARD line carries the outcome; the verdict
-     line then shows the numeric band the chips track instead of repeating it. */
-  const verdictCls = {CDD:'v-cdd', SDD:'v-sdd', EDD:'v-edd'}[a.prohibited ? a.numericBand : a.outcome];
-  const verdictLine = a.prohibited
-    ? 'Numeric band: ' + a.numericBand + ' — ' + BAND_FULL[a.numericBand]
-    : a.outcome + ' — ' + BAND_FULL[a.outcome];
+  /* Verdict graphic — mini gauge + band robot, recoloured by band (low green /
+     med gold / high red); the score sits at the top where the band line used to. */
+  const kind = advisorKind(a.outcome);
+  const g = GAUGE_ROBOTS[kind];
+  const arcLen = (Math.min(a.total/30, 1)*250).toFixed(0);
+  const verdictTitle = a.prohibited ? 'PROHIBITED - DO NOT ONBOARD' : (a.outcome + ' - ' + BAND_FULL[a.outcome]);
+  const verdictDesc = ADVISORS[kind].note;
   const thOn = {CDD:'L', SDD:'M', EDD:'H'}[a.numericBand];
   const nextReview = a.prohibited
-    ? 'None — relationship prohibited'
-    : (s.signoff.nextReview ? (fmtDate(s.signoff.nextReview) || s.signoff.nextReview) : '—');
+    ? 'None - relationship prohibited'
+    : (s.signoff.nextReview ? (fmtDate(s.signoff.nextReview) || s.signoff.nextReview) : '-');
 
   $('printReport').innerHTML = `
-    <div class="letterhead">
-      <div class="lh-brand"><div class="lh-mark">HS</div><div class="lh-name">HAWKEYE STERLING</div></div>
-      <div class="lh-doc"><div class="t">Entity Risk Assessment</div><div class="s">AML / CFT — DPMS Template</div></div>
-    </div>
-    <div class="meta-line">
-      <span>Ref: <b>${dash(s.meta.ref)}</b></span>
-      <span>Assessment date: <b>${dDate(s.meta.date)}</b></span>
-      <span>Next review: <b>${esc(nextReview)}</b></span>
-      <span>Status: <b class="conf">CONFIDENTIAL</b></span>
-    </div>
-    <div class="rd-stamp">${esc(rdStamp)}</div>
-    <div class="result-box">
-      <div class="rb-score">
-        <div class="rb-num">${a.total}</div>
-        <div class="rb-cap">Risk score / 30+</div>
-      </div>
-      <div>
-        ${a.prohibited ? '<div class="rb-proh">⛔ PROHIBITED — DO NOT ONBOARD</div>' : ''}
-        <div class="rb-verdict ${verdictCls}">${verdictLine}</div>
-        ${a.analystOv ? '<div class="rb-sub">Computed outcome: ' + a.analystOv.from + ' — raised by analyst override ✱</div>' : ''}
-        <div class="rb-thresh">
-          <b${thOn==='L'?' class="on"':''}>CDD: 0–19</b><b${thOn==='M'?' class="on"':''}>SDD: 20–22</b><b${thOn==='H'?' class="on"':''}>EDD: 23+</b>
+    <section class="page">
+      <div class="page-body">
+        <div class="mast">
+          <div class="mast-brand">
+            <div class="avatar"><div></div></div>
+            <div>
+              <div class="mast-name">HAWKEYE STERLING</div>
+              <div class="mast-tag">Entity Risk Assessment · AML / CFT - DPMS</div>
+            </div>
+          </div>
+          <div class="mast-doc">
+            <div class="s">DPMS Template · v3.2</div>
+            <div class="conf">Confidential</div>
+          </div>
         </div>
-      </div>
-    </div>
-    ${escBoxes}${ovBox}${priorBox}
-    <h2 class="sec"><span class="n">01</span>Assessment Administration</h2>
-    <table class="kv"><tbody>
-      <tr><td class="k">Assessed by</td><td class="v">${dash(s.meta.assessor)}</td><td class="s"></td></tr>
-      <tr><td class="k">Role / Department</td><td class="v">${dash(s.meta.role)}</td><td class="s"></td></tr>
-    </tbody></table>
-    <h2 class="sec"><span class="n">02</span>Entity Identification</h2>
-    <table class="kv"><tbody>
-      <tr><td class="k">Legal entity name</td><td class="v">${dash(s.entity.name)}</td><td class="s"></td></tr>
-      <tr><td class="k">Trading name</td><td class="v">${dash(s.entity.trading)}</td><td class="s"></td></tr>
-      <tr><td class="k">Registration / licence no.</td><td class="v">${dash(s.entity.regno)}</td><td class="s"></td></tr>
-      <tr><td class="k">Jurisdiction &amp; incorporation</td><td class="v">${dash(s.entity.jurisdiction)}</td><td class="s">${chip(jScore)}${jC && jC.overridden ? ovMark : ''}</td></tr>
-      <tr><td class="k">Registered address</td><td class="v">${dash(s.entity.address)}</td><td class="s"></td></tr>
-      <tr><td class="k">Website / email</td><td class="v">${dash(s.entity.contact)}</td><td class="s"></td></tr>
-      <tr><td class="k">Principals</td><td class="v">${dash(s.entity.principals)}</td><td class="s"></td></tr>
-    </tbody></table>
-    <h2 class="sec"><span class="n">03</span>Business Profile</h2>
-    <table class="kv"><tbody>
-      <tr><td class="k">Business activity</td><td class="v">${dash(s.profile.activity)}</td><td class="s">${chip(aScore)}${act && act.overridden ? ovMark : ''}</td></tr>
-      <tr><td class="k">Onboarding channel</td><td class="v">${s.profile.onboard==='Yes'?'Remote / Non-F2F':'In-Person'}</td><td class="s">${chip(obScore)}</td></tr>
-      <tr><td class="k">Operational history</td><td class="v">${esc(String(s.profile.entityYears))} years in operation</td><td class="s">${chip(eyScore)}</td></tr>
-      <tr><td class="k">Relationship duration</td><td class="v">${esc(String(s.profile.relYears))} years with entity</td><td class="s">${chip(ryScore)}</td></tr>
-    </tbody></table>
-    <h2 class="sec"><span class="n">04</span>Ownership, Control &amp; Compliance</h2>
-    <table class="kv qs"><tbody>${qRows}</tbody></table>
-    <table class="kv"><tbody>${scrRows}</tbody></table>
-    <h2 class="sec"><span class="n">05</span>Supply Chain — Material Sources</h2>
-    <table class="kv"><tbody>${supRows}</tbody></table>
-    <h2 class="sec"><span class="n">06</span>Assessment Notes &amp; Risk Rationale</h2>
-    <div class="notes-box">${s.notes.trim() ? esc(s.notes).replace(/\n/g,'<br>') : '<span class="notes-empty">No additional notes recorded.</span>'}</div>
-    <h2 class="sec"><span class="n">07</span>Sign-Off &amp; Attestation</h2>
-    <div class="attest">I confirm that this risk assessment has been completed in accordance with Hawkeye Sterling LLC&rsquo;s AML/CFT Risk Assessment Policy, the applicable DPMS regulatory guidelines, and all relevant national and international sanctions obligations. The information provided is accurate to the best of my knowledge.</div>
-    <div class="sign-grid">
-      <div class="sign-block">
-        <div class="role">First-Line — Assessed By</div>
+        <div class="meta">
+          <div><div class="k">Reference</div><div class="v">${dash(s.meta.ref)}</div></div>
+          <div><div class="k">Assessment date</div><div class="v">${dDate(s.meta.date)}</div></div>
+          <div><div class="k">Next review</div><div class="v">${esc(nextReview)}</div></div>
+        </div>
+        <div class="verdict" style="--bc:${g.rgb}">
+          <div class="gauge-col">
+            <div class="gauge">
+              <svg viewBox="0 0 152 152" width="124" height="124" aria-hidden="true">
+                <circle cx="76" cy="76" r="53" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="6" stroke-dasharray="250 84" stroke-linecap="round" transform="rotate(135,76,76)"></circle>
+                <circle class="arc" cx="76" cy="76" r="53" fill="none" stroke-width="6" stroke-dasharray="${arcLen} 250" stroke-linecap="round" transform="rotate(135,76,76)"></circle>
+                <circle class="ring" cx="76" cy="76" r="59" fill="none" stroke-width="1" stroke-dasharray="2 6"></circle>
+              </svg>
+              <div class="g-face"><div style="background-image:url('${g.img}');background-size:${g.size||'cover'};background-position:${g.pos}"></div></div>
+            </div>
+          </div>
+          <div class="v-main">
+            <div class="g-read"><span class="g-num">${a.total}</span><span class="g-cap">/ 30+</span></div>
+            <div class="v-title">${verdictTitle}</div>
+            ${a.analystOv ? '<div class="v-sub">Computed outcome: ' + a.analystOv.from + ' - raised by analyst override ✱</div>' : ''}
+            <div class="v-desc">${esc(verdictDesc)}</div>
+            <div class="v-thresh">
+              <b${thOn==='L'?' class="on"':''}>CDD · 0-19</b><b${thOn==='M'?' class="on"':''}>SDD · 20-22</b><b${thOn==='H'?' class="on"':''}>EDD · 23+</b>
+            </div>
+          </div>
+        </div>
+        ${escBoxes}${ovBox}${priorBox}
+        <h2 class="sec"><span class="n">01</span>Assessment Administration</h2>
         <table class="kv"><tbody>
-          <tr><td class="k">Name</td><td class="v">${dash(s.signoff.completedBy)}</td></tr>
-          <tr><td class="k">Title</td><td class="v">${dash(s.signoff.completedTitle)}</td></tr>
-          <tr><td class="k">Date</td><td class="v">${dDate(s.signoff.completedDate)}</td></tr>
+          <tr><td class="k">Assessed by</td><td class="v">${dash(s.meta.assessor)}</td><td class="s"></td></tr>
+          <tr><td class="k">Role / Department</td><td class="v">${dash(s.meta.role)}</td><td class="s"></td></tr>
         </tbody></table>
-        <div class="sign-line"></div><div class="sign-cap">Signature</div>
-      </div>
-      <div class="sign-block">
-        <div class="role">Second-Line — Reviewed &amp; Approved By</div>
+        <h2 class="sec"><span class="n">02</span>Entity Identification</h2>
         <table class="kv"><tbody>
-          <tr><td class="k">Name</td><td class="v">${dash(s.signoff.approvedBy)}</td></tr>
-          <tr><td class="k">Title</td><td class="v">${dash(s.signoff.approvedTitle)}</td></tr>
-          <tr><td class="k">Date</td><td class="v">${dDate(s.signoff.approvedDate)}</td></tr>
+          <tr><td class="k">Legal entity name</td><td class="v">${dash(s.entity.name)}</td><td class="s"></td></tr>
+          <tr><td class="k">Trading name</td><td class="v">${dash(s.entity.trading)}</td><td class="s"></td></tr>
+          <tr><td class="k">Registration / licence no.</td><td class="v">${dash(s.entity.regno)}</td><td class="s"></td></tr>
+          <tr><td class="k">Jurisdiction &amp; incorporation</td><td class="v">${dash(s.entity.jurisdiction)}</td><td class="s">${chip(jScore)}${jC && jC.overridden ? ovMark : ''}</td></tr>
+          <tr><td class="k">Registered address</td><td class="v">${dash(s.entity.address)}</td><td class="s"></td></tr>
+          <tr><td class="k">Website / email</td><td class="v">${dash(s.entity.contact)}</td><td class="s"></td></tr>
+          <tr><td class="k">Principals / UBOs</td><td class="v">${dash(s.entity.principals)}</td><td class="s"></td></tr>
         </tbody></table>
-        <div class="sign-line"></div><div class="sign-cap">Signature</div>
+        <h2 class="sec"><span class="n">03</span>Business Profile</h2>
+        <table class="kv"><tbody>
+          <tr><td class="k">Business activity</td><td class="v">${dash(s.profile.activity)}</td><td class="s">${chip(aScore)}${act && act.overridden ? ovMark : ''}</td></tr>
+          <tr><td class="k">Onboarding channel</td><td class="v">${s.profile.onboard==='Yes'?'Remote / Non-face-to-face':'In-Person'}</td><td class="s">${chip(obScore)}</td></tr>
+          <tr><td class="k">Operational history</td><td class="v">${esc(String(s.profile.entityYears))} years in operation</td><td class="s">${chip(eyScore)}</td></tr>
+          <tr><td class="k">Relationship duration</td><td class="v">${esc(String(s.profile.relYears))} years with entity</td><td class="s">${chip(ryScore)}</td></tr>
+        </tbody></table>
       </div>
-    </div>
-    ${_auditReportBlock()}
-    <div class="foot">CONFIDENTIAL — Hawkeye Sterling LLC — AML/CFT Entity Risk Assessment — Ref: ${dash(s.meta.ref)} — DPMS Template</div>`;
+      <div class="foot"><span>CONFIDENTIAL · Entity Risk Assessment</span><span class="pg">Page 1 / 2</span></div>
+    </section>
+    <section class="page">
+      <div class="page-body">
+        <h2 class="sec"><span class="n">04</span>Ownership, Control &amp; Compliance</h2>
+        <table class="kv qs"><tbody>${qRows}</tbody></table>
+        <h2 class="sec"><span class="n">05</span>Supply Chain - Material Sources</h2>
+        <table class="kv"><tbody>${supRows}</tbody></table>
+        <h2 class="sec"><span class="n">06</span>Assessment Notes &amp; Risk Rationale</h2>
+        <div class="notes">${s.notes.trim() ? esc(s.notes).replace(/\n/g,'<br>') : '<span class="notes-empty">No additional notes recorded.</span>'}</div>
+        <h2 class="sec"><span class="n">07</span>Screening &amp; Register Checks</h2>
+        <table class="kv"><tbody>${scrRows}</tbody></table>
+        <h2 class="sec"><span class="n">08</span>Sign-Off &amp; Attestation</h2>
+        <div class="attest">I confirm that this risk assessment has been completed in accordance with Hawkeye Sterling LLC&rsquo;s AML/CFT Risk Assessment Policy, the applicable DPMS regulatory guidelines, and all relevant national and international sanctions obligations. The information provided is accurate to the best of my knowledge.</div>
+        <div class="signs">
+          <div class="sign">
+            <div class="role">First Line - Assessed By</div>
+            <table><tbody>
+              <tr><td class="k">Name</td><td class="v">${dash(s.signoff.completedBy)}</td></tr>
+              <tr><td class="k">Title</td><td class="v">${dash(s.signoff.completedTitle)}</td></tr>
+              <tr><td class="k">Date</td><td class="v">${dDate(s.signoff.completedDate)}</td></tr>
+            </tbody></table>
+            <div class="sign-line"></div><div class="sign-cap">Signature</div>
+          </div>
+          <div class="sign">
+            <div class="role">Second Line - Reviewed &amp; Approved By</div>
+            <table><tbody>
+              <tr><td class="k">Name</td><td class="v">${dash(s.signoff.approvedBy)}</td></tr>
+              <tr><td class="k">Title</td><td class="v">${dash(s.signoff.approvedTitle)}</td></tr>
+              <tr><td class="k">Date</td><td class="v">${dDate(s.signoff.approvedDate)}</td></tr>
+            </tbody></table>
+            <div class="sign-line"></div><div class="sign-cap">Signature</div>
+          </div>
+        </div>
+        ${_auditReportBlock()}
+      </div>
+      <div class="foot"><span>CONFIDENTIAL · Entity Risk Assessment</span><span class="pg">Page 2 / 2</span></div>
+    </section>`;
 }
 function printReport(){
   buildPrintReport();

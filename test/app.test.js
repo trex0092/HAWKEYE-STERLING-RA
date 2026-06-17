@@ -208,12 +208,12 @@ A.state.entity.name = '<img src=x onerror=alert(1)> & Co';
 A.state.notes = 'line1\nline2 <script>';
 A.buildPrintReport();
 let pr = els.printReport._inner;
-check('print shows PROHIBITED — DO NOT ONBOARD', pr.includes('PROHIBITED — DO NOT ONBOARD'));
+check('print shows PROHIBITED - DO NOT ONBOARD', pr.includes('PROHIBITED - DO NOT ONBOARD'));
 check('print prohibition box cites factor + instruction', pr.includes('Proliferation financing connections')
   && pr.includes('Freeze funds where held'));
 check('print escapes HTML in name', pr.includes('&lt;img src=x onerror=alert(1)&gt; &amp; Co') && !pr.includes('<img src=x'));
 check('print escapes notes + newlines', pr.includes('line1<br>line2 &lt;script&gt;'));
-check('print shows score caption (0–30 display scale)', pr.includes('Risk score / 30+'));
+check('print shows score caption (0-30 display scale)', pr.includes('/ 30+'));
 reset();
 A.setToggle('pep','Yes');
 A.buildPrintReport();
@@ -308,7 +308,7 @@ check('jurisdiction tag marks override', txt(els.jurisdictionScore).includes('�
 A.buildPrintReport();
 pr = els.printReport._inner;
 check('report flags the override with audit detail', pr.includes('United Kingdom: 1 → 3') && pr.includes('Test escalation'));
-check('report carries risk-data version stamp', pr.includes('Risk data: baseline') && pr.includes('1 local override'));
+check('report flags risk-data overrides applied', pr.includes('Risk data overrides applied') && pr.includes('Test escalation'));
 check('cfa-only override is a stored delta', A.rdSetOverride('countries','United Kingdom',{score:1, cfa:true, reason:'CFA test'}) === true && A.rdCount() === 1);
 a = A.computeAssessment();
 check('CFA override triggers the EDD floor', a.outcome === 'EDD'
