@@ -45,6 +45,9 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
 .live i{width:7px;height:7px;border-radius:50%;background:#3BC48F;box-shadow:0 0 8px #3BC48F;animation:pulseDot 2s ease-in-out infinite}
 .clock{font-family:var(--mono);font-size:12px;color:#A3ADC0;letter-spacing:0.06em;white-space:nowrap}
 .clock b{color:#646F86;font-weight:400}
+.sess-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:#E9C86A;background:rgba(210,166,72,0.12);border:1px solid rgba(210,166,72,0.42);border-radius:999px;padding:5px 11px;white-space:nowrap}
+.sess-chip .sess-ic{opacity:0.85}
+.sess-chip.warn{color:#FF8A8A;background:rgba(255,87,87,0.13);border-color:rgba(255,87,87,0.5)}
 
 .grid{display:grid;grid-template-columns:430px minmax(0,1fr);gap:18px;padding:20px 26px 30px;align-items:start}
 .col-l{display:flex;flex-direction:column;gap:16px}
@@ -144,6 +147,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
       </nav>
       <div class="live"><i></i>ALL SYSTEMS LIVE</div>
       <div class="clock" id="clock">--:--:-- <b>UTC</b></div>
+      <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session"><span class="sess-ic">⏱</span><span class="sess-t">--:--</span></span>
     </div>
   </header>
 
@@ -416,6 +420,38 @@ renderAlerts();
 renderAnimated();
 tween();
 startClock();
+
+/* ── 1-hour unlock session — read-only countdown chip (see index.html for the owner) ── */
+(function(){
+  var KEY = 'hsra.sess.v1', IDLE = 15*60*1000, el = document.getElementById('sessTimer');
+  if(!el) return;
+  function read(){
+    try{ var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if(!s || !s.exp) return null;
+      var n = Date.now();
+      if(n >= s.exp) return null;
+      if(s.seen && (n - s.seen) >= IDLE) return null;
+      return s;
+    }catch(e){ return null; }
+  }
+  function touch(){
+    try{ var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if(!s) return;
+      var n = Date.now(); if(!s.seen || n - s.seen > 15000){ s.seen = n; localStorage.setItem(KEY, JSON.stringify(s)); }
+    }catch(e){}
+  }
+  function render(){
+    var s = read();
+    if(!s){ el.style.display = 'none'; return; }
+    var ms = Math.max(0, s.exp - Date.now());
+    var m = Math.floor(ms/60000), sec = Math.floor((ms%60000)/1000);
+    el.style.display = '';
+    el.classList.toggle('warn', ms <= 5*60000);
+    var t = el.querySelector('.sess-t');
+    if(t) t.textContent = (m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;
+  }
+  ['click','keydown','mousemove','touchstart'].forEach(function(ev){ window.addEventListener(ev, touch, {passive:true}); });
+  render(); setInterval(render, 1000);
+})();
 </script>
 </body>
 </html>

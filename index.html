@@ -99,6 +99,9 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 .live-dot{width:7px;height:7px;border-radius:50%;background:#3BC48F;box-shadow:0 0 8px #3BC48F;flex-shrink:0}
 .live-clock{font-family:var(--mono);font-size:11px;color:var(--text2);white-space:nowrap}
 .live-clock b{color:var(--text3);font-weight:400}
+.sess-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:#E9C86A;background:rgba(210,166,72,0.12);border:1px solid rgba(210,166,72,0.42);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.sess-chip .sess-ic{opacity:0.85}
+.sess-chip.warn{color:#FF8A8A;background:rgba(255,87,87,0.13);border-color:rgba(255,87,87,0.5)}
 .lock-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;font-family:var(--mono);font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;transition:all .16s;border:1px solid var(--border2);color:var(--text2);background:rgba(255,255,255,0.04)}
 .lock-btn:hover{color:var(--text);border-color:rgba(255,255,255,0.25)}
 .lock-btn.locked{color:#5FDCAB;background:rgba(59,196,143,0.12);border-color:rgba(59,196,143,0.45)}
@@ -510,6 +513,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       </nav>
       <div class="live-status" title="Live engine status"><span class="live-dot"></span><span class="lbl">ALL SYSTEMS LIVE</span></div>
       <span class="live-clock" id="utcClock">--:--:--&nbsp;<b>UTC</b></span>
+      <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session — re-enter your passphrase when it ends"><span class="sess-ic">⏱</span><span class="sess-t">60:00</span></span>
       <button class="lock-btn" id="hdrLock" onclick="headerLock()" title="Lock this device">⚿ Lock</button>
     </div>
   </header>
@@ -966,6 +970,10 @@ const SEC_META_KEY = 'hsra.sec.v1';        /* {v,salt,iter,iv,ct} passphrase ver
 const SEC_OPTOUT_KEY = 'hsra.sec.optout';  /* '1' when the officer chose to store unencrypted */
 const PBKDF2_ITER = 250000;
 const IDLE_LOCK_MS = 15 * 60 * 1000;       /* auto-lock after inactivity (zero-trust session) */
+const SESS_KEY = 'hsra.sess.v1';           /* {k,exp,seen}: 1-hour cross-page unlock session (officer-enabled) */
+const SESS_MAX_MS = 60 * 60 * 1000;        /* hard 1-hour cap from unlock, regardless of activity */
+let _sessExp = 0;                          /* current session expiry (ms epoch); 0 = none */
+let _sessTimer = null;                     /* countdown interval handle */
 let _secKey = null;        /* CryptoKey, in memory only while unlocked */
 let _secActive = false;    /* true once unlocked: reads/writes use the decrypted in-memory mirror */
 let _secMode = 'unlock';
@@ -980,7 +988,7 @@ const _ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 async function _deriveKey(pass, salt, iter){
   const base = await crypto.subtle.importKey('raw', _u8(pass), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'},
-    base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+    base, {name:'AES-GCM', length:256}, true, ['encrypt','decrypt']);  /* extractable: lets the 1-hour session cache the key (SESS_KEY) */
 }
 async function encryptStr(key, str){
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -1085,6 +1093,9 @@ async function _secActivate(){
     catch(e){ _secMem[k] = raw; _secPersist(k, raw); }   /* legacy plaintext → upgrade in place */
   }
   _secArmIdle();
+  if(!_sessExp || Date.now() >= _sessExp) _sessExp = Date.now() + SESS_MAX_MS;  /* a fresh unlock starts the hour; a silent resume keeps the stored expiry */
+  await _sessSave();
+  _sessStartChip();
 }
 function _secFinish(msg){
   _secHide();
@@ -1098,15 +1109,92 @@ function _secArmIdle(){
   ['click','keydown','mousemove','touchstart'].forEach(ev => window.addEventListener(ev, _secBumpIdle, {passive:true}));
   _secBumpIdle();
 }
-function _secBumpIdle(){ if(_idleTimer) clearTimeout(_idleTimer); _idleTimer = setTimeout(secLock, IDLE_LOCK_MS); }
+function _secBumpIdle(){ if(_idleTimer) clearTimeout(_idleTimer); _idleTimer = setTimeout(secLock, IDLE_LOCK_MS); _sessTouch(); }
 function secLock(){
   if(!_secActive) return;
   _secKey = null; _secActive = false;
   for(const k in _secMem) delete _secMem[k];
   if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer = null; }
+  _sessClear();         /* destroy the 1-hour session so a reload cannot resume it */
   if($('btnLock')) $('btnLock').style.display = 'none';
   _syncHeaderLock(true);
   _secShow('unlock');   /* opaque overlay hides the on-screen data until re-unlocked */
+}
+
+/* ── 1-hour unlock session (cross-page) ────────────────────────────────────
+   Officer chose: cache the unlock so navigating between Assessment / Console /
+   Advisor (each a full page load) does not re-prompt, for up to one hour. We
+   persist the derived AES key + a hard expiry in localStorage; the passphrase
+   itself is never stored. Locking (idle / manual / expiry) destroys the session
+   so it cannot be resumed by reloading. */
+async function _sessSave(){
+  try{
+    if(!_secKey || typeof localStorage === 'undefined') return;
+    const raw = await crypto.subtle.exportKey('raw', _secKey);
+    localStorage.setItem(SESS_KEY, JSON.stringify({k:_b64(raw), exp:_sessExp, seen:Date.now()}));
+  }catch(e){}
+}
+function _sessRead(){
+  try{
+    const s = JSON.parse(localStorage.getItem(SESS_KEY) || 'null');
+    if(!s || !s.k || !s.exp) return null;
+    const now = Date.now();
+    if(now >= s.exp) return null;                              /* 1-hour cap reached */
+    if(s.seen && (now - s.seen) >= IDLE_LOCK_MS) return null;  /* idle beyond the lock window */
+    return s;
+  }catch(e){ return null; }
+}
+function _sessClear(){
+  try{ if(typeof localStorage !== 'undefined') localStorage.removeItem(SESS_KEY); }catch(e){}
+  _sessExp = 0;
+  if(_sessTimer){ try{ clearInterval(_sessTimer); }catch(e){} _sessTimer = null; }
+  _sessRenderChip();
+}
+function _sessTouch(){   /* throttled last-activity stamp so the idle window spans all three pages */
+  try{
+    const s = JSON.parse(localStorage.getItem(SESS_KEY) || 'null');
+    if(!s) return;
+    const now = Date.now();
+    if(!s.seen || now - s.seen > 15000){ s.seen = now; localStorage.setItem(SESS_KEY, JSON.stringify(s)); }
+  }catch(e){}
+}
+async function _sessRestore(s){   /* silent unlock from a stored session key — no passphrase prompt */
+  try{
+    const meta = JSON.parse(localStorage.getItem(SEC_META_KEY) || 'null');
+    if(!meta || !meta.salt) return false;
+    _secKey = await crypto.subtle.importKey('raw', _ub64(s.k), {name:'AES-GCM'}, true, ['encrypt','decrypt']);
+    const check = await crypto.subtle.decrypt({name:'AES-GCM', iv:_ub64(meta.iv)}, _secKey, _ub64(meta.ct));
+    if(new TextDecoder().decode(check) !== 'hsra-verify') throw new Error('bad-session');
+    _sessExp = s.exp;
+    await _secActivate();          /* load the encrypted register/draft into the mirror + arm idle */
+    _secHide();
+    if($('btnLock')) $('btnLock').style.display = '';
+    _syncHeaderLock(false);
+    hydrateApp();
+    return true;
+  }catch(e){ _secKey = null; _secActive = false; _sessClear(); return false; }
+}
+function _sessStartChip(){
+  if(typeof setInterval === 'undefined') return;
+  if(_sessTimer){ clearInterval(_sessTimer); }
+  _sessRenderChip();
+  _sessTimer = setInterval(_sessTick, 1000);
+}
+function _sessTick(){
+  if(!_secActive){ if(_sessTimer){ clearInterval(_sessTimer); _sessTimer = null; } return; }
+  if(_sessExp && Date.now() >= _sessExp){ secLock(); return; }   /* 1-hour cap → re-login */
+  _sessRenderChip();
+}
+function _sessRenderChip(){
+  const el = (typeof $ === 'function') ? $('sessTimer') : null;
+  if(!el) return;
+  if(!_secActive || !_sessExp){ el.style.display = 'none'; return; }
+  const ms = Math.max(0, _sessExp - Date.now());
+  const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+  el.style.display = '';
+  el.classList.toggle('warn', ms <= 5 * 60000);
+  const t = el.querySelector('.sess-t');
+  if(t) t.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
 }
 /* Boot entry point: decide whether to gate. Runs after the app has rendered, so
    a thrown error here can never blank the page (and the engine/CI smoke test
@@ -1119,7 +1207,11 @@ function initSecurity(){
     if(p && p.addEventListener) p.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
     const p2 = $('secPass2');
     if(p2 && p2.addEventListener) p2.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
-    if(meta && meta.salt) _secShow('unlock');               /* returning, encrypted device */
+    if(meta && meta.salt){                                  /* returning, encrypted device */
+      const sess = _sessRead();                             /* resume a live 1-hour session without re-prompting */
+      if(sess) _sessRestore(sess).then(ok => { if(!ok) _secShow('unlock'); });
+      else _secShow('unlock');
+    }
     else if(localStorage.getItem(SEC_OPTOUT_KEY) === '1') return;  /* opted out previously */
     else _secShow('setup');                                 /* first run → offer protection */
   }catch(e){}

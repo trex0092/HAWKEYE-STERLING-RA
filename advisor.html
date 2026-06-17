@@ -45,6 +45,9 @@ header{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify
 .nav a.active{color:#FCE3EF;background:rgba(var(--glow),0.14);border-color:rgba(var(--glow),0.5);box-shadow:0 0 14px rgba(var(--glow),0.22)}
 .status{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;border:1px solid rgba(59,196,143,0.40);background:rgba(59,196,143,0.08);font-family:var(--mono);font-size:11px;color:#4FD6A0;white-space:nowrap;box-shadow:0 0 14px rgba(59,196,143,0.14)}
 .status i{width:8px;height:8px;border-radius:50%;background:#3BC48F;box-shadow:0 0 8px #3BC48F;animation:ping 2.2s ease-in-out infinite}
+.sess-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:#E9C86A;background:rgba(210,166,72,0.12);border:1px solid rgba(210,166,72,0.42);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.sess-chip .sess-ic{opacity:0.85}
+.sess-chip.warn{color:#FF8A8A;background:rgba(255,87,87,0.13);border-color:rgba(255,87,87,0.5)}
 
 .tabs{display:flex;gap:12px;padding:22px 30px 0}
 .tab{padding:11px 21px;border-radius:11px;font-family:var(--display);font-weight:600;font-size:13.5px;cursor:pointer;white-space:nowrap;transition:all .18s;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.03);color:#A3ADC0}
@@ -192,6 +195,7 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
         <a href="advisor.html" class="active" aria-current="page">Advisor</a>
       </nav>
       <div class="status"><i></i>healthy · LLM live</div>
+      <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session"><span class="sess-ic">⏱</span><span class="sess-t">--:--</span></span>
     </div>
   </header>
 
@@ -582,6 +586,41 @@ function render(){
 /* Boot */
 renderAvatar();
 render();
+
+/* ── 1-hour unlock session — read-only countdown chip ──
+   The Assessment page owns the encrypted session (key + expiry in localStorage);
+   here we only display the time left and bump the shared "last activity" stamp so
+   the 15-minute idle lock spans all three pages. No key is read or used here. */
+(function(){
+  var KEY = 'hsra.sess.v1', IDLE = 15*60*1000, el = document.getElementById('sessTimer');
+  if(!el) return;
+  function read(){
+    try{ var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if(!s || !s.exp) return null;
+      var n = Date.now();
+      if(n >= s.exp) return null;
+      if(s.seen && (n - s.seen) >= IDLE) return null;
+      return s;
+    }catch(e){ return null; }
+  }
+  function touch(){
+    try{ var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if(!s) return;
+      var n = Date.now(); if(!s.seen || n - s.seen > 15000){ s.seen = n; localStorage.setItem(KEY, JSON.stringify(s)); }
+    }catch(e){}
+  }
+  function render(){
+    var s = read();
+    if(!s){ el.style.display = 'none'; return; }
+    var ms = Math.max(0, s.exp - Date.now());
+    var m = Math.floor(ms/60000), sec = Math.floor((ms%60000)/1000);
+    el.style.display = '';
+    el.classList.toggle('warn', ms <= 5*60000);
+    var t = el.querySelector('.sess-t');
+    if(t) t.textContent = (m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;
+  }
+  ['click','keydown','mousemove','touchstart'].forEach(function(ev){ window.addEventListener(ev, touch, {passive:true}); });
+  render(); setInterval(render, 1000);
+})();
 </script>
 </body>
 </html>
