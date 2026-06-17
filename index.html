@@ -1032,13 +1032,20 @@ function _secPersist(k, v){
 }
 
 function _secError(msg){ const e = $('secErr'); if(e){ e.textContent = msg; e.style.display = ''; } }
-function _secShow(mode){
+function _secShow(mode, reason){
   _secMode = mode;
   const setup = mode === 'setup';
-  if($('secTitle')) $('secTitle').textContent = setup ? 'Protect this device' : 'Unlock';
-  if($('secMsg')) $('secMsg').textContent = setup
-    ? 'Encrypt every assessment, register entry and risk-data override stored in this browser with a passphrase (AES-256-GCM). You will enter it each time you open the tool on this device.'
-    : 'Enter your passphrase to decrypt this device’s assessments.';
+  const R = {
+    expired: {t:'Session expired', m:'Your 1-hour session has ended — please re-enter your passphrase to continue.'},
+    idle:    {t:'Session locked',  m:'Locked after 15 minutes of inactivity — please re-enter your passphrase to continue.'}
+  }[reason];
+  if($('secTitle')) $('secTitle').textContent = setup ? 'Protect this device' : (R ? R.t : 'Unlock');
+  if($('secMsg')){
+    $('secMsg').textContent = setup
+      ? 'Encrypt every assessment, register entry and risk-data override stored in this browser with a passphrase (AES-256-GCM). You will enter it each time you open the tool on this device.'
+      : (R ? R.m : 'Enter your passphrase to decrypt this device’s assessments.');
+    $('secMsg').style.color = (R && !setup) ? '#E9C86A' : '';
+  }
   if($('secPass')) $('secPass').value = '';
   if($('secPass2')){ $('secPass2').value = ''; $('secPass2').style.display = setup ? '' : 'none'; }
   if($('secPrimary')) $('secPrimary').textContent = setup ? 'Set passphrase & encrypt' : 'Unlock';
@@ -1109,8 +1116,8 @@ function _secArmIdle(){
   ['click','keydown','mousemove','touchstart'].forEach(ev => window.addEventListener(ev, _secBumpIdle, {passive:true}));
   _secBumpIdle();
 }
-function _secBumpIdle(){ if(_idleTimer) clearTimeout(_idleTimer); _idleTimer = setTimeout(secLock, IDLE_LOCK_MS); _sessTouch(); }
-function secLock(){
+function _secBumpIdle(){ if(_idleTimer) clearTimeout(_idleTimer); _idleTimer = setTimeout(() => secLock('idle'), IDLE_LOCK_MS); _sessTouch(); }
+function secLock(reason){
   if(!_secActive) return;
   _secKey = null; _secActive = false;
   for(const k in _secMem) delete _secMem[k];
@@ -1118,7 +1125,7 @@ function secLock(){
   _sessClear();         /* destroy the 1-hour session so a reload cannot resume it */
   if($('btnLock')) $('btnLock').style.display = 'none';
   _syncHeaderLock(true);
-  _secShow('unlock');   /* opaque overlay hides the on-screen data until re-unlocked */
+  _secShow('unlock', reason);   /* opaque overlay hides the on-screen data until re-unlocked */
 }
 
 /* ── 1-hour unlock session (cross-page) ────────────────────────────────────
@@ -1142,6 +1149,19 @@ function _sessRead(){
     if(now >= s.exp) return null;                              /* 1-hour cap reached */
     if(s.seen && (now - s.seen) >= IDLE_LOCK_MS) return null;  /* idle beyond the lock window */
     return s;
+  }catch(e){ return null; }
+}
+function _sessExpiredReason(){   /* a session blob exists but is no longer valid — why? (drives the unlock note) */
+  try{
+    const raw = localStorage.getItem(SESS_KEY);
+    if(!raw) return null;
+    let s = null; try{ s = JSON.parse(raw); }catch(e){}
+    if(typeof localStorage !== 'undefined') localStorage.removeItem(SESS_KEY);   /* clear the stale blob */
+    if(!s || !s.exp) return null;
+    const now = Date.now();
+    if(now >= s.exp) return 'expired';
+    if(s.seen && (now - s.seen) >= IDLE_LOCK_MS) return 'idle';
+    return null;
   }catch(e){ return null; }
 }
 function _sessClear(){
@@ -1182,7 +1202,7 @@ function _sessStartChip(){
 }
 function _sessTick(){
   if(!_secActive){ if(_sessTimer){ clearInterval(_sessTimer); _sessTimer = null; } return; }
-  if(_sessExp && Date.now() >= _sessExp){ secLock(); return; }   /* 1-hour cap → re-login */
+  if(_sessExp && Date.now() >= _sessExp){ secLock('expired'); return; }   /* 1-hour cap → re-login */
   _sessRenderChip();
 }
 function _sessRenderChip(){
@@ -1210,7 +1230,7 @@ function initSecurity(){
     if(meta && meta.salt){                                  /* returning, encrypted device */
       const sess = _sessRead();                             /* resume a live 1-hour session without re-prompting */
       if(sess) _sessRestore(sess).then(ok => { if(!ok) _secShow('unlock'); });
-      else _secShow('unlock');
+      else _secShow('unlock', _sessExpiredReason());
     }
     else if(localStorage.getItem(SEC_OPTOUT_KEY) === '1') return;  /* opted out previously */
     else _secShow('setup');                                 /* first run → offer protection */
