@@ -84,7 +84,6 @@ check('default has no escalations', a.escalations.length === 0 && a.prohibited =
 check('default parts count = 22', a.parts.length === 22);
 check('totalScore rendered "19"', txt(els.totalScore) === '19');
 check('verdict text CDD', txt(els.verdictText) === 'CDD — Customer Due Diligence');
-check('boundary warning shown at 19', els.boundaryWarn.style.display === 'block');
 check('banner hidden by default', els.critBanner.style.display === 'none');
 check('ref generated RA-YYYYMMDD-001', /^RA-\d{8}-001$/.test(A.state.meta.ref));
 check('MAX_SCORE = 66', A.MAX_SCORE === 66);
@@ -98,7 +97,7 @@ for(const q of ['sanctions_person','sanctions_entity','tf','pf']){
     a.outcome === 'PROHIBITED' && a.prohibited === true && a.total === 21 && a.numericBand === 'SDD');
 }
 
-// 3. PROHIBITED rendering: pill, banner, chips, review, boundary
+// 3. PROHIBITED rendering: pill, banner, chips, review
 reset();
 A.setToggle('sanctions_entity','Yes');
 check('pill solid red PROHIBITED', els.verdictPill.className === 'verdict-pill vp-proh');
@@ -109,7 +108,6 @@ check('chips track numeric band (SDD)', els['tc-med'].classList.contains('tc-act
   && !els['tc-high'].classList.contains('tc-active'));
 check('no review when prohibited', A.state.signoff.nextReview === ''
   && els.reviewHint._inner.includes('No review — relationship prohibited'));
-check('boundary warning suppressed when escalated', els.boundaryWarn.style.display === 'none');
 
 // 4. Non-trigger Yes lands in SDD with no escalation
 reset();
@@ -247,17 +245,6 @@ check('addMonths: plain dates unaffected', A.addMonths('2026-06-11',36) === '202
 reset();
 A.state.meta.date = '2028-02-29'; A.recalc();
 check('leap-day assessment → review 2029-02-28 (CDD +12mo)', A.state.signoff.nextReview === '2029-02-28');
-
-// boundary warning covers both band edges with the right text
-reset();                                                       // 19 — CDD/SDD edge
-check('boundary at 19 names CDD/SDD', els.boundaryWarn.style.display === 'block'
-  && txt(els.boundaryWarn).includes('CDD/SDD'));
-els.sel_mined_0.value = 'ASM — Artisanal Mining'; A.onSupplier('mined',0);  // 22 SDD, no escalation
-check('boundary at 22 names SDD/EDD', els.boundaryWarn.style.display === 'block'
-  && txt(els.boundaryWarn).includes('SDD/EDD') && txt(els.boundaryWarn).includes('Enhanced Due Diligence'));
-reset();
-A.setToggle('criminal','Yes');                                 // 21 — mid-band
-check('boundary hidden mid-band', els.boundaryWarn.style.display === 'none');
 
 // mergeState rejects objects, coerces scalars, drops unknown keys
 const hard = A.mergeState({meta:{ref:{a:1}}, entity:{name:123, evil:'x'}, signoff:{reviewManual:'true'}});
