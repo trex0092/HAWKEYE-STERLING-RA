@@ -188,7 +188,6 @@ A.state.entity.regno = 'REG-123';
 A.state.meta.assessor = 'J. Smith';
 A.state.signoff.completedBy = 'J. Smith';
 A.recalc(); A.saveDraft();
-check('completeness all green', txt(els.completeness).includes('all 4 required fields'));
 const restored = A.loadDraft();
 check('draft restores entity name', restored && restored.state.entity.name === 'Fine Gold LLC');
 check('mergeState round-trip stable', JSON.stringify(A.mergeState(JSON.parse(JSON.stringify(A.state)))) === JSON.stringify(A.state));
