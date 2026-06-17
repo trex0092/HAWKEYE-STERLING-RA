@@ -197,7 +197,7 @@ async function fetchSource(s, timeoutMs = 25000) {
 function loadState() {
   if (!existsSync(STATE_FILE)) return { updated: null, sources: {} };
   try { return JSON.parse(readFileSync(STATE_FILE, 'utf8')); }
-  catch { return { updated: null, sources: {} }; }
+  catch (e) { console.warn('reg-watch: state file unreadable, starting fresh (' + e.message + ')'); return { updated: null, sources: {} }; }
 }
 
 function setOutput(key, val) {

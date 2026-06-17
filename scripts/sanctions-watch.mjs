@@ -91,7 +91,7 @@ async function fetchSource(s, timeoutMs = 45000) {
 
 function loadState() {
   if (!existsSync(STATE_FILE)) return { updated: null, sources: {} };
-  try { return JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch { return { updated: null, sources: {} }; }
+  try { return JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch (e) { console.warn('sanctions-watch: state file unreadable, starting fresh (' + e.message + ')'); return { updated: null, sources: {} }; }
 }
 function setOutput(key, val) {
   if (process.env.GITHUB_OUTPUT) { try { writeFileSync(process.env.GITHUB_OUTPUT, key + '=' + val + '\n', { flag: 'a' }); } catch {} }

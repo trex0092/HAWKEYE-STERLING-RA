@@ -647,7 +647,9 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
   r = await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x'})});
   check('fn fails clearly without token', r.statusCode === 500 && JSON.parse(r.body).error.includes('ASANA_ACCESS_TOKEN'));
 
-  /* origin guard: cross-site browser origin is rejected; same-origin / header-less pass */
+  /* origin guard: cross-site browser origin is rejected; same-origin / header-less pass.
+     Restore the token so a passing CORS check reaches the Asana path, not the 500 path. */
+  process.env.ASANA_ACCESS_TOKEN = 'test-token';
   r = await fn.handler({httpMethod:'POST', headers:{origin:'https://evil.example', host:'hawkeye-sterling-ra.netlify.app'}, body:JSON.stringify({name:'x'})});
   check('fn rejects a foreign browser origin (403)', r.statusCode === 403);
   r = await fn.handler({httpMethod:'POST', headers:{origin:'https://hawkeye-sterling-ra.netlify.app', host:'hawkeye-sterling-ra.netlify.app'}, body:JSON.stringify({name:'x'})});
