@@ -146,7 +146,6 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
         <a href="advisor.html">Advisor</a>
       </nav>
       <div class="live"><i></i>ALL SYSTEMS LIVE</div>
-      <div class="clock" id="clock">--:--:-- <b>UTC</b></div>
       <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session"><span class="sess-ic">⏱</span><span class="sess-t">--:--</span></span>
     </div>
   </header>
@@ -402,7 +401,6 @@ function tween(){
 
 function startClock(){
   const tick = ()=>{
-    try{ $('clock').innerHTML = new Date().toLocaleTimeString('en-GB',{timeZone:'UTC'}) + ' <b>UTC</b>'; }catch(e){}
     state.uptime++; $('uptime').textContent = fmtUptime(state.uptime);
   };
   $('uptime').textContent = fmtUptime(state.uptime);

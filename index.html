@@ -19,7 +19,7 @@
   --med-bg:rgba(224,163,60,0.10);--med-text:#E0A33C;--med-bd:rgba(224,163,60,0.30);
   --high-bg:rgba(255,87,87,0.10);--high-text:#FF5757;--high-bd:rgba(255,87,87,0.45);
   --none-bg:rgba(130,140,165,0.10);--none-text:#828CA5;--none-bd:rgba(130,140,165,0.26);
-  --cdd-bg:rgba(91,155,216,0.10);--cdd-text:#5B9BD8;--cdd-bd:rgba(91,155,216,0.30);
+  --cdd-bg:rgba(59,196,143,0.10);--cdd-text:#3BC48F;--cdd-bd:rgba(59,196,143,0.30);
   --sdd-bg:rgba(255,148,52,0.10);--sdd-text:#FF9434;--sdd-bd:rgba(255,148,52,0.42);
   --sans:'Manrope','Helvetica Neue',Arial,sans-serif;
   --mono:'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono',monospace;
@@ -53,7 +53,7 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
   .side-panel .sp-block:nth-of-type(4){animation-delay:.42s}
   .side-panel .sp-actions{animation-delay:.5s}
   .doc-header{animation:fgFade .5s ease-out backwards}
-  .boundary-warn,.crit-banner{animation:fgWarnIn .45s cubic-bezier(.22,.7,.25,1)}
+  .crit-banner{animation:fgWarnIn .45s cubic-bezier(.22,.7,.25,1)}
   #totalScore{transform-origin:center;display:inline-block}
   #totalScore.score-pop{animation:fgPop .45s cubic-bezier(.3,1.4,.4,1)}
   .verdict-pill{transition:background .3s,color .3s,border-color .3s}
@@ -80,6 +80,11 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
   .gr-ring-svg.s1{animation:advSpin 22s linear infinite}
   .gr-ring-svg.s2{animation:advSpinRev 15s linear infinite}
   .gr-orbit{animation:advSpin 3.4s linear infinite}
+  .sec-bot{animation:secBotFloat 4.5s ease-in-out infinite}
+  .sec-bot-glow{animation:advPulse 2.8s ease-in-out infinite}
+  .sec-bot-orbit{animation:advSpin 6s linear infinite}
+  .sec-bot-orbit2{animation:advSpinRev 9s linear infinite}
+  .sec-bot-dash{animation:advSpinRev 26s linear infinite}
 }
 
 /* ── Header (persona command-center) ──── */
@@ -294,7 +299,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .completeness{font-size:9px;color:var(--text3);margin-top:10px;font-family:var(--mono);letter-spacing:0.3px;line-height:1.5}
 .completeness.ok{color:var(--low-text)}
 .sb-bar-track{display:flex;height:4px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,0.06)}
-.sb-seg-low{background:rgba(91,155,216,0.5);flex:0 0 63.3%}
+.sb-seg-low{background:rgba(59,196,143,0.5);flex:0 0 63.3%}
 .sb-seg-med{background:rgba(255,148,52,0.55);flex:0 0 10%}
 .sb-seg-high{background:rgba(255,87,87,0.55);flex:1}
 .sb-bar-pointer-wrap{position:relative;height:14px;margin-top:3px}
@@ -302,7 +307,6 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sb-bar-pointer span{font-size:9px;font-weight:600;color:var(--text);white-space:nowrap;font-family:var(--mono)}
 .sb-bar-pointer::before{content:'\25B2';font-size:6px;color:var(--text2)}
 .sb-axis{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
-.boundary-warn{font-size:10px;color:var(--yneon);background:rgba(247,229,90,0.08);border:1px solid rgba(247,229,90,0.50);border-radius:var(--r-sm);padding:7px 10px;margin-top:10px;display:none;line-height:1.4;box-shadow:0 0 12px rgba(247,229,90,0.25),inset 0 0 8px rgba(247,229,90,0.05)}
 .prior-info{font-size:10px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.5;letter-spacing:0.3px}
 .prior-list{font-size:10px;color:var(--text2);line-height:1.7}
 .breakdown-toggle{background:none;border:none;font-size:9px;color:var(--text2);cursor:pointer;font-family:var(--sans);padding:0;display:flex;align-items:center;gap:5px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600}
@@ -365,6 +369,25 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sec-err{font-size:11.5px;color:var(--high-text);margin:2px 0 10px}
 .sec-actions{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .sec-note{font-size:10.5px;color:var(--text3);line-height:1.5;margin-top:13px;font-family:var(--mono)}
+/* Interactive unlock bot — animated, tappable avatar on the security gate */
+.sec-bot{position:relative;display:block;width:128px;height:128px;margin:2px auto 0;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;outline:none}
+.sec-bot-glow{position:absolute;inset:-10px;border-radius:50%;background:radial-gradient(circle at 50% 42%,rgba(180,92,255,0.45),rgba(255,92,168,0.18) 55%,transparent 72%)}
+.sec-bot-dash{position:absolute;inset:-4px;border-radius:50%;border:1px dashed rgba(180,92,255,0.40)}
+.sec-bot-orbit{position:absolute;inset:3px;border-radius:50%;pointer-events:none}
+.sec-bot-orbit2{inset:9px}
+.sec-bot-dot{position:absolute;top:-2px;left:50%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:#FF5CA8;box-shadow:0 0 9px 2px rgba(255,92,168,0.85)}
+.sec-bot-dot2{top:auto;bottom:-2px;width:5px;height:5px;margin-left:-2.5px;background:#5FE6FF;box-shadow:0 0 9px 2px rgba(95,230,255,0.80)}
+.sec-bot-ring{position:absolute;inset:7px;border-radius:50%;overflow:hidden;border:2px solid transparent;background:linear-gradient(#0B101A,#0B101A) padding-box,linear-gradient(135deg,#B45CFF,#FF5CA8 55%,#5FE6FF) border-box;box-shadow:inset 0 0 14px rgba(180,92,255,0.35);transition:transform .5s cubic-bezier(.22,.7,.25,1),box-shadow .3s ease}
+.sec-bot-img{display:block;width:100%;height:100%;border-radius:50%;background:url('assets/persona-cypher.png') 50% 24%/cover}
+.sec-bot-badge{position:absolute;right:5px;bottom:5px;width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#1A1206;background:linear-gradient(180deg,#F1CE6B,#D2A648);box-shadow:0 0 10px rgba(210,166,72,0.55),0 2px 5px rgba(0,0,0,0.45);border:1.5px solid rgba(12,16,26,0.85)}
+.sec-bot:hover .sec-bot-glow{background:radial-gradient(circle at 50% 42%,rgba(180,92,255,0.62),rgba(255,92,168,0.30) 55%,transparent 74%)}
+.sec-bot:hover .sec-bot-ring{transform:scale(1.04);box-shadow:inset 0 0 16px rgba(180,92,255,0.5),0 0 18px rgba(255,92,168,0.35)}
+.sec-bot:active .sec-bot-ring{transform:scale(.95)}
+.sec-bot:focus-visible .sec-bot-dash{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.sec-bot.tapped .sec-bot-ring{animation:secBotPop .5s ease}
+.sec-bot-cap{margin:9px 0 16px;text-align:center;font-family:var(--mono);font-size:9.5px;letter-spacing:3px;text-transform:uppercase;color:#9DA6BC}
+@keyframes secBotFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes secBotPop{40%{transform:scale(1.12)}72%{transform:scale(.97)}}
 
 /* ── Assessment Register (filing cabinet) ─ */
 .reg-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
@@ -512,7 +535,6 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <a href="advisor.html">Advisor</a>
       </nav>
       <div class="live-status" title="Live engine status"><span class="live-dot"></span><span class="lbl">ALL SYSTEMS LIVE</span></div>
-      <span class="live-clock" id="utcClock">--:--:--&nbsp;<b>UTC</b></span>
       <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session — re-enter your passphrase when it ends"><span class="sess-ic">⏱</span><span class="sess-t">60:00</span></span>
       <button class="lock-btn" id="hdrLock" onclick="headerLock()" title="Lock this device">⚿ Lock</button>
     </div>
@@ -700,8 +722,8 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
           <svg viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="Risk score gauge">
             <defs>
               <linearGradient id="gaugeGrad" x1="24" y1="120" x2="216" y2="120" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#5B9BD8"></stop>
-                <stop offset="55%" stop-color="#5B9BD8"></stop>
+                <stop offset="0%" stop-color="#3BC48F"></stop>
+                <stop offset="55%" stop-color="#3BC48F"></stop>
                 <stop offset="72%" stop-color="#FF9434"></stop>
                 <stop offset="88%" stop-color="#FF5757"></stop>
                 <stop offset="100%" stop-color="#FF5757"></stop>
@@ -777,7 +799,6 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="sb-bar-track"><div class="sb-seg-low"></div><div class="sb-seg-med"></div><div class="sb-seg-high"></div></div>
         <div class="sb-bar-pointer-wrap"><div class="sb-bar-pointer" id="barPointer" style="left:0%"><span id="pointerLabel">0</span></div></div>
         <div class="sb-axis"><span>0</span><span>10</span><span>20</span><span>30</span></div>
-        <div class="boundary-warn" id="boundaryWarn"></div>
       </div>
 
       <div class="sp-block" id="priorBlock" style="display:none">
@@ -796,7 +817,6 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <button class="btn btn-secondary btn-full" onclick="openRegister()">≡ Register</button>
         <button class="btn btn-orange btn-full" onclick="openAudit()">▤ Activity Log</button>
         <button class="btn btn-lilac btn-full" onclick="sendToAsana()">↗ Send to Asana</button>
-        <button class="btn btn-red btn-full" onclick="newAssessment()">↺ Reset</button>
         <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
         <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
@@ -876,6 +896,15 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
      app; the engine still boots underneath so the page always computes. -->
 <div class="sec-overlay" id="secOverlay" role="dialog" aria-modal="true" aria-label="Device security">
   <div class="sec-box">
+    <button type="button" class="sec-bot" id="secBot" onclick="secBotTap()" aria-label="Tap the bot to enter your passphrase" title="Tap to unlock">
+      <span class="sec-bot-glow"></span>
+      <span class="sec-bot-dash"></span>
+      <span class="sec-bot-orbit"><span class="sec-bot-dot"></span></span>
+      <span class="sec-bot-orbit sec-bot-orbit2"><span class="sec-bot-dot sec-bot-dot2"></span></span>
+      <span class="sec-bot-ring"><span class="sec-bot-img"></span></span>
+      <span class="sec-bot-badge" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><rect x="5.5" y="10" width="13" height="8.5" rx="2" fill="currentColor"></rect><circle cx="12" cy="14" r="1.3" fill="#1A1206"></circle></svg></span>
+    </button>
+    <div class="sec-bot-cap" id="secBotCap">Tap the bot to unlock</div>
     <div class="sec-title" id="secTitle">Unlock</div>
     <div class="sec-msg" id="secMsg"></div>
     <input type="password" id="secPass" class="sec-input" placeholder="Passphrase" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -1053,11 +1082,18 @@ function _secShow(mode, reason){
   if($('secNote')) $('secNote').textContent = setup
     ? '⚠ There is no recovery. If the passphrase is forgotten the stored data cannot be read — store the passphrase securely.'
     : '';
+  if($('secBotCap')) $('secBotCap').textContent = setup ? 'Tap the bot to begin' : 'Tap the bot to unlock';
   if($('secErr')) $('secErr').style.display = 'none';
   if($('secOverlay')) $('secOverlay').classList.add('open');
   const p = $('secPass'); if(p && p.focus) try{ p.focus(); }catch(e){}
 }
 function _secHide(){ if($('secOverlay')) $('secOverlay').classList.remove('open'); if($('secPass')) $('secPass').value=''; if($('secPass2')) $('secPass2').value=''; }
+/* Tap-the-bot: playful nudge that drops focus into the passphrase field. */
+function secBotTap(){
+  const b = $('secBot');
+  if(b && b.classList){ b.classList.add('tapped'); setTimeout(function(){ if(b.classList) b.classList.remove('tapped'); }, 500); }
+  const p = $('secPass'); if(p && p.focus){ try{ p.focus(); }catch(e){} }
+}
 
 async function secSubmit(){
   if(!_hasCrypto()) return;
@@ -2301,17 +2337,6 @@ function recalc() {
     banner.style.display = 'none';
   }
 
-  /* Boundary warning — one point below the next band (both band edges) */
-  const bw = $('boundaryWarn');
-  if(!a.escalations.length && (a.total===19 || a.total===22)){
-    bw.style.display = 'block';
-    bw.textContent = a.total===19
-      ? '⚠ At CDD/SDD boundary — one point higher triggers Simplified Due Diligence review.'
-      : '⚠ At SDD/EDD boundary — one point higher triggers Enhanced Due Diligence.';
-  } else {
-    bw.style.display = 'none';
-  }
-
   /* Bar pointer: display scale 0–30 */
   $('barPointer').style.left = Math.min(a.total/30*100, 100) + '%';
   $('pointerLabel').textContent = a.total;
@@ -2867,16 +2892,6 @@ function initAnimations(){
   }));
 }
 
-/* Live UTC clock in the header (command-center status strip). */
-function startUtcClock(){
-  const el = $('utcClock');
-  if(!el) return;
-  const tick = () => { try{ el.innerHTML = new Date().toLocaleTimeString('en-GB',{timeZone:'UTC'}) + '&nbsp;<b>UTC</b>'; }catch(e){} };
-  tick();
-  /* Browser-only ticking; the test DOM stub has no matchMedia, so it stays static. */
-  if(typeof window!=='undefined' && typeof window.matchMedia==='function' && typeof setInterval==='function') setInterval(tick, 1000);
-}
-
 /* Header lock toggle. When device encryption is configured it performs the real
    at-rest lock (secLock); otherwise it is a visual indicator, matching the
    prototype where "Lock" is cosmetic until encryption is enabled. */
@@ -2929,7 +2944,6 @@ function hydrateApp(){
 const draft = hydrateApp();
 if(draft) toast('Draft restored'+(draft.savedAt?' — last saved '+new Date(draft.savedAt).toLocaleString():''));
 initAnimations();
-startUtcClock();  /* live UTC clock in the header status strip */
 initSecurity();   /* gate the app behind the passphrase, if configured/offered */
 </script>
 </body>
