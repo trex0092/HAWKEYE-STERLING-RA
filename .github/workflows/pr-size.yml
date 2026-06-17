@@ -1,0 +1,56 @@
+name: PR Size Gate
+
+# Warns (non-blocking) when a pull request touches more than 500 lines.
+# Large diffs are harder to review for a compliance tool where
+# auditability matters — the comment nudges authors to split if possible.
+# The check never fails CI; it only adds a comment when the threshold is crossed.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Count lines changed
+        id: count
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          ADDED=$(git diff --numstat "$BASE" "$HEAD" | awk '{a+=$1} END{print a+0}')
+          REMOVED=$(git diff --numstat "$BASE" "$HEAD" | awk '{a+=$2} END{print a+0}')
+          TOTAL=$((ADDED + REMOVED))
+          echo "added=$ADDED"   >> "$GITHUB_OUTPUT"
+          echo "removed=$REMOVED" >> "$GITHUB_OUTPUT"
+          echo "total=$TOTAL"   >> "$GITHUB_OUTPUT"
+          echo "Lines changed: +$ADDED / -$REMOVED = $TOTAL total"
+
+      - name: Warn on large PR
+        if: ${{ fromJson(steps.count.outputs.total) > 500 }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const total   = ${{ steps.count.outputs.total }};
+            const added   = ${{ steps.count.outputs.added }};
+            const removed = ${{ steps.count.outputs.removed }};
+            const body = [
+              `> ⚠️ **Large PR — ${total} lines changed** (+${added} / −${removed})`,
+              '',
+              'PRs over 500 lines are harder to audit for a compliance tool.',
+              'Consider splitting into smaller, focused changes where possible.',
+              'This is a warning only — it does not block merge.'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

@@ -1,0 +1,70 @@
+name: Function Health
+
+# Weekly check that the live Netlify functions (asana-task, risk-backup)
+# are reachable, have ASANA_ACCESS_TOKEN configured, and return 400 for a
+# known-bad payload rather than 500 (missing token) or a connection error
+# (function not deployed). On failure it creates an alert task in Asana
+# and GitHub sends the normal Actions failure email.
+#
+# Why 400 is the "healthy" signal:
+#   Both functions validate the request body before touching Asana.
+#   An empty-body POST returns 400 "name required" / "sheet with overrides
+#   required" — that proves the function started, passed CORS, found the
+#   token, and reached body validation. A 500 means the token is gone;
+#   anything else (502, 0) means the function crashed or is undeployed.
+
+on:
+  schedule:
+    - cron: '15 5 * * 1'   # 05:15 UTC every Monday (just after site-health)
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Probe asana-task function
+        id: asana_task
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-task" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "asana-task → HTTP $STATUS"
+          if [ "$STATUS" != "400" ]; then
+            echo "FAIL: expected 400 (name required), got $STATUS — 500 = token missing, other = function down"
+            exit 1
+          fi
+          echo "ok: asana-task is live and token is present"
+
+      - name: Probe risk-backup function
+        id: risk_backup
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/risk-backup" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "risk-backup → HTTP $STATUS"
+          if [ "$STATUS" != "400" ]; then
+            echo "FAIL: expected 400 (sheet required), got $STATUS — 500 = token missing, other = function down"
+            exit 1
+          fi
+          echo "ok: risk-backup is live and token is present"
+
+      - name: Alert in Asana on failure
+        if: failure()
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ASANA_STATUS: ${{ steps.asana_task.outputs.status }}
+          BACKUP_STATUS: ${{ steps.risk_backup.outputs.status }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "FUNCTION DOWN: Netlify functions failed health check" \
+            "One or more Netlify functions returned an unexpected status. asana-task: HTTP ${ASANA_STATUS:-unreachable}, risk-backup: HTTP ${BACKUP_STATUS:-unreachable}. HTTP 500 = ASANA_ACCESS_TOKEN missing or revoked. Anything else = function crashed or undeployed. Check Netlify deploys: https://app.netlify.com/projects/hawkeye-sterling-ra — Run log: $RUN_URL"
