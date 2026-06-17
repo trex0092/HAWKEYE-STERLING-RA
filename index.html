@@ -296,8 +296,6 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .ov-form select option{background:#121826;color:var(--text)}
 .ov-form input::placeholder{color:#4A5468}
 .ov-hint{font-size:9px;color:var(--text3);font-family:var(--mono);line-height:1.4}
-.completeness{font-size:9px;color:var(--text3);margin-top:10px;font-family:var(--mono);letter-spacing:0.3px;line-height:1.5}
-.completeness.ok{color:var(--low-text)}
 .sb-bar-track{display:flex;height:4px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,0.06)}
 .sb-seg-low{background:rgba(59,196,143,0.5);flex:0 0 63.3%}
 .sb-seg-med{background:rgba(255,148,52,0.55);flex:0 0 10%}
@@ -772,7 +770,6 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
             <div class="ov-hint" id="ovHint"></div>
           </div>
         </div>
-        <div class="completeness" id="completeness"></div>
       </div>
 
       <div class="sp-block">
@@ -1725,7 +1722,7 @@ function refreshSelectLabels(){
   if(jSel && jSel.options){
     for(const opt of jSel.options){
       const e = effCountry(opt.value);
-      if(e) opt.textContent = opt.value + ' — ' + ratingLabel(e.score) + (e.overridden ? ' ✱' : '');
+      if(e) opt.textContent = opt.value + (e.overridden ? ' ✱' : '');
     }
   }
   const aSel = $('activitySelect');
@@ -1784,7 +1781,7 @@ function buildCountrySelect() {
   sorted.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.name;
-    opt.textContent = c.name + ' — ' + ratingLabel(c.score);
+    opt.textContent = c.name;
     sel.appendChild(opt);
   });
 }
@@ -1950,7 +1947,6 @@ function onField(section, key, val) {
   }
   state[section][key] = val;
   if(section==='meta' && key==='date'){ recalc(); return; }
-  updateCompleteness();
   scheduleSave();
 }
 function onNotes(val){ state.notes = val; scheduleSave(); }
@@ -2113,7 +2109,6 @@ function doSendToAsana(p, ref, isRetry){
 function onSign(key, val) {
   state.signoff[key] = val;
   if(key==='nextReview'){ state.signoff.reviewManual = true; recalc(); return; }
-  updateCompleteness();
   scheduleSave();
 }
 function useSuggestedReview(){ state.signoff.reviewManual = false; recalc(); }
@@ -2368,24 +2363,7 @@ function recalc() {
     + (s.signoff.reviewManual ? ' · <a onclick="useSuggestedReview()">use suggested</a>' : '')
     + (manualLate ? ' <b style="color:#ff8c42">⚠ manual date is later than the ' + a.outcome + ' schedule</b>' : '');
 
-  updateCompleteness();
   scheduleSave();
-}
-
-function updateCompleteness() {
-  const s = state;
-  const req = [
-    ['legal entity name', s.entity.name],
-    ['registration / licence no.', s.entity.regno],
-    ['assessor name', s.meta.assessor],
-    ['completed by', s.signoff.completedBy],
-  ];
-  const missing = req.filter(r=>!String(r[1]||'').trim()).map(r=>r[0]);
-  const el = $('completeness');
-  el.className = 'completeness' + (missing.length ? '' : ' ok');
-  el.textContent = missing.length
-    ? 'Record completeness: '+(req.length-missing.length)+'/'+req.length+' required fields — missing: '+missing.join(', ')
-    : 'Record completeness: all '+req.length+' required fields completed ✓';
 }
 
 /* ══════════════════════════════════════════
