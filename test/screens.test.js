@@ -78,12 +78,14 @@ function runScreen(file, bridge, seed){
   global.performance = { now: () => Date.now() };
   global.setInterval = () => 0;  global.clearInterval = () => {};
   global.setTimeout = (cb) => { timers.push(cb); return timers.length; };  global.clearTimeout = () => {};
+  const fetches = [];
+  global.fetch = (url, opts) => { fetches.push({ url: String(url), opts }); return new Promise(() => {}); };
 
   let api = {};
   for(const p of dataSrcs){ try{ (0, eval)(fs.readFileSync(path.join(__dirname, '..', p), 'utf8')); }catch(e){} }
   (0, eval)(script + '\n;globalThis.__screenAPI = (' + bridge + ');');
   api = globalThis.__screenAPI;
-  return { els, timers, api, docStyle: global.document.documentElement.style };
+  return { els, timers, fetches, api, docStyle: global.document.documentElement.style };
 }
 
 /* ── 1a. AI Operations Console — NEW APP (empty register → zeros, no mock data) ── */
@@ -137,8 +139,8 @@ function runScreen(file, bridge, seed){
 
 /* ── 2. Hawkeye Sterling Advisor ── */
 (function(){
-  const { els, timers, api } = runScreen('advisor.html',
-    '{ get state(){return state;}, render, renderAsk, renderQa, renderRegGroups, regGroups, askQuestion, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, PERSONAS }');
+  const { els, timers, fetches, api } = runScreen('advisor.html',
+    '{ get state(){return state;}, render, renderAsk, renderQa, renderRegGroups, regGroups, askQuestion, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, heroHtml, PERSONAS }');
 
   check('advisor: boots on the Ask tab with all three tabs', els.tabs.innerHTML.includes('Ask the advisor')
     && els.tabs.innerHTML.includes('Regulatory Q&amp;A') && els.tabs.innerHTML.includes('Super Tools'));
@@ -160,8 +162,10 @@ function runScreen(file, bridge, seed){
   api.ask();
   check('advisor: Ask enters the reasoning phase', api.state.phase === 'reasoning'
     && els.hero.innerHTML.includes('Reviewing the cited legal sources'));
-  check('advisor: reasoning timer was scheduled', timers.length >= 1);
-  timers[timers.length - 1]();   /* flush the 1.5s reasoning timer */
+  check('advisor: brain fetch was dispatched on ask', fetches.length >= 1 && fetches[0].url.includes('brain-soul'));
+  /* Simulate the static fallback answer path (liveAnswer null → renders ANSWER object) */
+  api.state.phase = 'answer'; api.state.liveAnswer = null;
+  document.getElementById('hero').innerHTML = api.heroHtml();
   check('advisor: answer renders verdict, citation and steps', api.state.phase === 'answer'
     && els.hero.innerHTML.includes('Enhanced Due Diligence')
     && els.hero.innerHTML.includes('FATF Rec. 22 &amp; 23')
