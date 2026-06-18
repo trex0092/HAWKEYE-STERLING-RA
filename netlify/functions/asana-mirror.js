@@ -1,0 +1,185 @@
+/* Two-way mirror of the on-device ASSESSMENT REGISTER and ACTIVITY LOG to Asana,
+   so a summary survives off-device and can be pulled back ("disclosed") on any
+   device after login.
+
+   action:"write"  → upserts two dedicated tasks in the RISK ASSESSMENTS project:
+                       • "ASSESSMENT REGISTER (auto-backup)"
+                       • "ACTIVITY LOG (auto-backup)"
+                     each storing a JSON summary between sheet markers in its notes.
+   action:"read"   → finds those two tasks and returns the parsed {register, audit}.
+
+   The Asana token never leaves the server. Modeled on risk-backup.js / asana-task.js
+   (same CORS, origin guard and API helper conventions). */
+const DEFAULT_PROJECT_GID = '1215653768729951'; /* RISK ASSESSMENTS */
+const REG_TASK = 'ASSESSMENT REGISTER (auto-backup)';
+const LOG_TASK = 'ACTIVITY LOG (auto-backup)';
+const SHEET_OPEN = '===HS SHEET===';
+const SHEET_CLOSE = '===END===';
+const MAX_NOTES = 60000; /* Asana note field practical ceiling */
+
+/* ── pure helpers (exported for unit tests) ───────────────────────────────── */
+function buildNotes(kind, data){
+  const json = JSON.stringify(data, null, 2);
+  return 'Automatic mirror of the in-app ' + kind + '. Do not edit by hand.\n'
+    + 'Updated: ' + new Date().toISOString() + '\n\n'
+    + SHEET_OPEN + '\n' + json + '\n' + SHEET_CLOSE;
+}
+function parseSheet(notes){
+  const s = String(notes || '');
+  const a = s.indexOf(SHEET_OPEN); if(a === -1) return null;
+  const b = s.indexOf(SHEET_CLOSE, a + SHEET_OPEN.length); if(b === -1) return null;
+  try { return JSON.parse(s.slice(a + SHEET_OPEN.length, b).trim()); } catch(e){ return null; }
+}
+/* Normalise whatever the client sends into compact, size-bounded structures. */
+function normalizeRegister(reg){
+  let items = [];
+  if(Array.isArray(reg)) items = reg;
+  else if(reg && typeof reg === 'object') items = Object.keys(reg).map(ref => ({ ref, ...(reg[ref] || {}) }));
+  return items.map(r => ({
+    ref: String(r.ref || ''),
+    entity: String(r.entity || ''),
+    outcome: String(r.outcome || ''),
+    total: r.total == null ? '' : r.total,
+    prohibited: !!r.prohibited,
+    complete: !!r.complete,
+    date: String(r.date || ''),
+    nextReview: String(r.nextReview || ''),
+    jurisdiction: String(r.jurisdiction || ''),
+    activity: String(r.activity || ''),
+    savedAt: String(r.savedAt || '')
+  })).filter(r => r.ref);
+}
+function normalizeAudit(audit){
+  if(!Array.isArray(audit)) return [];
+  return audit.slice(-1000).map(e => ({
+    ts: String(e.ts || ''), who: String(e.who || ''), ref: String(e.ref || ''),
+    event: String(e.event || ''), detail: String(e.detail || ''), hash: String(e.hash || '')
+  }));
+}
+
+exports._buildNotes = buildNotes;
+exports._parseSheet = parseSheet;
+exports._normalizeRegister = normalizeRegister;
+exports._normalizeAudit = normalizeAudit;
+
+/* ── handler ──────────────────────────────────────────────────────────────── */
+exports.handler = async (event) => {
+  const cors = corsHeaders(event);
+  if ((event.httpMethod || '').toUpperCase() === 'OPTIONS') {
+    return originAllowed(event) ? { statusCode: 204, headers: cors, body: '' }
+                                : resp(403, { ok: false, error: 'origin not allowed' }, cors);
+  }
+  const res = await handle(event);
+  res.headers = { ...(res.headers || {}), ...cors };
+  return res;
+};
+
+const handle = async (event) => {
+  if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
+  if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
+
+  const token = process.env.ASANA_ACCESS_TOKEN;
+  if (!token) return resp(500, { ok: false, error: 'ASANA_ACCESS_TOKEN not configured' });
+
+  let payload;
+  try { payload = JSON.parse(event.body || '{}'); }
+  catch (e) { return resp(400, { ok: false, error: 'invalid JSON' }); }
+
+  const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
+  const action = payload.action === 'read' ? 'read' : 'write';
+
+  try {
+    if (action === 'read') {
+      const reg = await findTask(token, project, REG_TASK);
+      const log = await findTask(token, project, LOG_TASK);
+      return resp(200, {
+        ok: true,
+        register: reg ? (parseSheet(reg.notes) || []) : [],
+        audit: log ? (parseSheet(log.notes) || []) : []
+      });
+    }
+
+    /* write */
+    const register = normalizeRegister(payload.register);
+    const audit = normalizeAudit(payload.audit);
+    const regNotes = buildNotes('assessment register', register);
+    const logNotes = buildNotes('activity log', audit);
+    if (regNotes.length > MAX_NOTES || logNotes.length > MAX_NOTES) {
+      return resp(413, { ok: false, error: 'backup too large for a single Asana note' });
+    }
+    const r1 = await upsertTask(token, project, REG_TASK, regNotes);
+    const r2 = await upsertTask(token, project, LOG_TASK, logNotes);
+    if (!r1.ok || !r2.ok) return resp(502, { ok: false, error: 'asana write failed' });
+    return resp(200, { ok: true, register: { gid: r1.gid }, audit: { gid: r2.gid }, counts: { register: register.length, audit: audit.length } });
+  } catch (e) {
+    return resp(502, { ok: false, error: 'asana unreachable' });
+  }
+};
+
+/* Find a task by exact name within the project (handles pagination). */
+async function findTask(token, project, name) {
+  let path = '/projects/' + project + '/tasks?limit=100&opt_fields=name,notes';
+  let it = 0;
+  while (path && it < 50) {
+    it++;
+    const page = await api(token, 'GET', path);
+    if (!page.ok) return null;
+    const hit = (page.body.data || []).find(t => String(t.name || '') === name);
+    if (hit) return hit;
+    path = (page.body.next_page && page.body.next_page.offset)
+      ? '/projects/' + project + '/tasks?limit=100&opt_fields=name,notes&offset=' + page.body.next_page.offset : null;
+  }
+  return null;
+}
+
+/* Update the dedicated task in place, or create it if missing (no duplicates). */
+async function upsertTask(token, project, name, notes) {
+  const found = await findTask(token, project, name);
+  if (found && found.gid) {
+    const upd = await api(token, 'PUT', '/tasks/' + found.gid, { data: { notes } });
+    if (upd.ok) return { ok: true, gid: found.gid, updated: true };
+  }
+  const made = await api(token, 'POST', '/tasks', { data: { name, notes, projects: [project] } });
+  return made.ok ? { ok: true, gid: made.body.data.gid, updated: false } : { ok: false };
+}
+
+async function api(token, method, path, body) {
+  const r = await fetch('https://app.asana.com/api/1.0' + path, {
+    method,
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const d = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, body: d };
+}
+
+/* ── CORS / origin (identical policy to risk-backup.js) ───────────────────── */
+const PRIMARY_ORIGIN = process.env.PRIMARY_ORIGIN || 'https://hawkeye-sterling-ra.netlify.app';
+function allowedOrigins() {
+  const extra = String(process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  return [PRIMARY_ORIGIN, ...extra];
+}
+function originAllowed(event) {
+  const h = (event && event.headers) || {};
+  const origin = h.origin || h.Origin;
+  if (!origin) return true;
+  const host = h.host || h.Host || '';
+  const originHost = String(origin).replace(/^[a-z]+:\/\//i, '').split('/')[0];
+  if (host && originHost === host) return true;
+  return allowedOrigins().includes(origin);
+}
+function corsHeaders(event) {
+  const h = (event && event.headers) || {};
+  const origin = h.origin || h.Origin;
+  const headers = { 'Vary': 'Origin' };
+  if (origin && originAllowed(event)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+    headers['Access-Control-Max-Age'] = '86400';
+  }
+  return headers;
+}
+function resp(statusCode, obj, extra) {
+  return { statusCode, headers: { 'Content-Type': 'application/json', ...(extra || {}) }, body: JSON.stringify(obj) };
+}

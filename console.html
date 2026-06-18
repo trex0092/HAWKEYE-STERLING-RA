@@ -193,7 +193,10 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
         <div class="stream">
           <div class="stream-h">
             <div class="panel-h">Live Alert Stream</div>
-            <div class="streaming"><i></i>ON DEVICE</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <button id="asanaRefresh" type="button" title="Refresh from Asana" aria-label="Refresh from Asana" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;cursor:pointer;color:#9fb0c9;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:8px;font-size:14px;line-height:1">&#8635;</button>
+              <div class="streaming"><i></i>ON DEVICE</div>
+            </div>
           </div>
           <div id="alertStream"></div>
         </div>
@@ -238,7 +241,10 @@ const OPERATORS = [
 /* ── Data source: the assessment register (localStorage). Absent (new app) or
       encrypted-at-rest ("hsx1:" prefix) → treated as empty. ── */
 const REG_KEY = 'hsra.register.v1';
-function readRegister(){
+/* Register pulled from Asana via the Refresh button — display-only, never
+   written to localStorage (avoids clashing with index.html's encrypted store). */
+let _asanaFetched = [];
+function readLocalRegister(){
   let raw=null;
   try{ raw = localStorage.getItem(REG_KEY); }catch(e){}
   if(!raw || raw.indexOf('hsx1:')===0) return [];        /* none filed, or locked/encrypted */
@@ -258,6 +264,33 @@ function readRegister(){
       savedAt: it.savedAt || ''
     };
   });
+}
+/* Merge local + Asana-fetched by reference, local taking precedence. */
+function readRegister(){
+  const byRef = {};
+  (_asanaFetched||[]).forEach(r=>{ if(r&&r.ref) byRef[r.ref]=r; });
+  readLocalRegister().forEach(r=>{ if(r&&r.ref) byRef[r.ref]=r; });
+  return Object.keys(byRef).map(k=>byRef[k]);
+}
+/* Pull the Register/Activity-Log summary back from Asana and re-render (display
+   only — does not write localStorage, so an encrypted device is never touched). */
+const ASANA_MIRROR_EP = '/.netlify/functions/asana-mirror';
+function rerenderConsole(){ AGG = aggregate(readRegister()); updateThreat(); renderStats(); renderMix(); renderJur(); renderAlerts(); }
+function refreshFromAsana(btn){
+  if(typeof fetch==='undefined') return;
+  if(btn){ btn.disabled=true; btn.style.opacity='0.5'; btn.setAttribute('title','Refreshing…'); }
+  const done = t => { if(btn){ btn.disabled=false; btn.style.opacity=''; btn.setAttribute('title', t); } };
+  fetch(ASANA_MIRROR_EP, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'read'})})
+    .then(r=>r.json()).then(d=>{
+      if(d && d.ok && Array.isArray(d.register)){
+        _asanaFetched = d.register.map(r=>({ ref:String(r.ref||''), entity:String(r.entity||r.ref||''),
+          outcome:String(r.outcome||'CDD'), prohibited:!!r.prohibited, complete:!!r.complete,
+          date:String(r.date||''), nextReview:String(r.nextReview||''), jurisdiction:String(r.jurisdiction||'—'),
+          savedAt:String(r.savedAt||'') })).filter(r=>r.ref);
+        rerenderConsole();
+        done('Refreshed '+_asanaFetched.length+' from Asana');
+      } else done('Refresh failed — try again');
+    }).catch(()=> done('Refresh failed — try again'));
 }
 function aggregate(items){
   const today=new Date().toISOString().slice(0,10);
@@ -417,6 +450,7 @@ renderAlerts();
 renderAnimated();
 tween();
 startClock();
+(function(){ var b=document.getElementById('asanaRefresh'); if(b&&b.addEventListener) b.addEventListener('click', function(){ refreshFromAsana(b); }); })();
 
 /* ── 1-hour unlock session — read-only countdown chip (see index.html for the owner) ── */
 (function(){
