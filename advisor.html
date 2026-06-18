@@ -128,7 +128,7 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 .again:hover{background:rgba(59,196,143,0.16);box-shadow:0 0 16px rgba(59,196,143,0.3)}
 
 /* Q&A */
-.qa-wrap{max-width:1240px;margin:0 auto}
+.qa-wrap{max-width:none;margin:0 auto}
 .qa-desc{font-size:14px;color:#A3ADC0;margin-bottom:18px}
 .qa-filter{width:100%;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:11px;padding:13px 16px;color:#EDEFF4;font-family:var(--sans);font-size:14px;outline:none;margin-bottom:16px}
 .qa-filter:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0.22)}
@@ -137,7 +137,7 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 .qa-item::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.45),rgba(255,92,168,0.38),transparent)}
 .qa-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px 20px;background:transparent;border:none;cursor:pointer;text-align:left;color:#EDEFF4;font-family:var(--sans);font-size:15.5px;font-weight:600;line-height:1.4}
 .qa-q .chev{color:#A3ADC0;font-size:13px;flex-shrink:0;transition:transform .2s}
-.reg-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:10px;align-items:start}
+.reg-groups{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}
 .reg-cat{position:relative;background:#10161F;border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,0.26)}
 .reg-cat.open{border-color:rgba(var(--glow),0.32)}
 .reg-cat-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;background:transparent;border:none;cursor:pointer;text-align:left;color:#EDEFF4;font-family:var(--sans);font-size:14.5px;font-weight:600;line-height:1.4;transition:background .15s}
@@ -163,14 +163,18 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 .tool-select option{background:#10161F;color:#EDEFF4}
 .tool-title{font-family:var(--display);font-weight:700;font-size:19px;color:#EDEFF4;margin-bottom:5px}
 .tool-desc{font-size:13.5px;line-height:1.6;color:#A3ADC0;margin-bottom:18px}
-.tool-form{display:flex;flex-direction:column;gap:13px}
+.tool-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .tf-row{display:flex;flex-direction:column;gap:6px}
+.tf-area{grid-column:1/-1}
 .tf-label{font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#A3ADC0}
 .tf-input{width:100%;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:9px;padding:10px 13px;color:#EDEFF4;font-family:var(--sans);font-size:14px;line-height:1.5;outline:none;resize:vertical}
 .tf-input:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0.22)}
 .tool-err{margin-top:16px;font-family:var(--mono);font-size:12px;color:#FF6B6B}
 .tool-result{animation:fadeUp .4s cubic-bezier(.22,.7,.25,1)}
 
+@media(max-width:1500px){.reg-groups{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1100px){.reg-groups{grid-template-columns:repeat(2,minmax(0,1fr))}.tool-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.reg-groups{grid-template-columns:1fr}.tool-form{grid-template-columns:1fr}}
 @media(max-width:900px){.sub,.status{display:none}
   header{flex-wrap:wrap;height:auto;padding:9px 18px;row-gap:9px}.hdr-right{flex:1 1 100%}
   .nav{display:flex;width:100%}.nav a{flex:1;text-align:center;padding:8px 6px}}
@@ -185,7 +189,6 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
       <div class="avatar" id="advAvatar"><div></div></div>
       <div class="brand-text">
         <div class="wordmark">Hawkeye Sterling advisor.</div>
-        <div class="sub">Regulator-grade AML decisioning · every answer cited</div>
       </div>
     </div>
     <div class="hdr-right">
@@ -194,7 +197,6 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
         <a href="console.html">Console</a>
         <a href="advisor.html" class="active" aria-current="page">Advisor</a>
       </nav>
-      <div class="status"><i></i>healthy · LLM live</div>
       <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session"><span class="sess-ic">⏱</span><span class="sess-t">--:--</span></span>
     </div>
   </header>
@@ -489,9 +491,9 @@ function stripEmoji(s){ return String(s||'').replace(/^[^\p{L}\p{N}]+/u,'').trim
 const TOOL_BAND = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence', EDD:'Enhanced Due Diligence', PROHIBITED:'Prohibited — do not onboard'};
 const TOOL_CFA = {IR:'Iran', KP:'North Korea', MM:'Myanmar', IRAN:'Iran', 'NORTH KOREA':'North Korea', MYANMAR:'Myanmar'};
 const CITED_FRAMEWORK = [
-  {label:'UAE Federal Decree-Law No. 10 of 2025', ref:'AML/CFT framework — CDD, record-keeping, STR and targeted financial sanctions.'},
-  {label:'Cabinet Decision No. 134 of 2025', ref:'Implementing regulation — risk-based procedures and reporting obligations.'},
-  {label:'FATF Recommendations', ref:'International AML/CFT standards (Recs 1, 6, 10, 12, 19, 20, 22-25).'}
+  {ref:'UAE Federal Decree-Law No. 10 of 2025', note:'AML/CFT framework — CDD, record-keeping, STR and targeted financial sanctions.'},
+  {ref:'Cabinet Decision No. 134 of 2025', note:'Implementing regulation — risk-based procedures and reporting obligations.'},
+  {ref:'FATF Recommendations', note:'International AML/CFT standards (Recs 1, 6, 10, 12, 19, 20, 22-25).'}
 ];
 const GROUP_PLAY = {
   'Core Tools': {intro:'Apply the firm’s risk-based AML/CFT controls to the scenario.', steps:['Identify and verify the subject and its beneficial owners (KYC/CDD).','Screen against sanctions, PEP and adverse-media lists.','Risk-rate the relationship and set the diligence level (CDD / SDD / EDD).','Document the rationale and set the ongoing-monitoring cadence.']},
@@ -559,7 +561,7 @@ function renderField(f){
   const inp = f.area
     ? '<textarea class="tf-input" id="tf_'+f.key+'" rows="4" placeholder="'+esc(f.ph)+'"></textarea>'
     : '<input class="tf-input" id="tf_'+f.key+'"'+(f.num?' inputmode="numeric"':'')+' placeholder="'+esc(f.ph)+'">';
-  return '<div class="tf-row">'+lab+inp+'</div>';
+  return '<div class="tf-row'+(f.area?' tf-area':'')+'">'+lab+inp+'</div>';
 }
 function renderToolResult(){
   const r = state.toolResult;
@@ -572,7 +574,7 @@ function renderToolResult(){
       +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
       +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
       + '</div>'
-      + '<div style="font-family:var(--mono);font-size:12px;color:#646F86">Brain processing…</div>'
+      + '<div style="font-family:var(--mono);font-size:12px;color:#646F86">Compiling cited guidance…</div>'
       + '</div>';
   }
   if(r.kind==='brain'){
@@ -588,7 +590,10 @@ function renderToolResult(){
   const head = r.kind==='generic'
     ? '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle('low')+'">Deterministic guidance</span></div>'
     : '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle(r.tone)+'">'+esc(r.verdict)+'</span></div>';
-  const trig = r.triggers.map(t=>'<div class="qa-basis"><div class="ref">'+esc(t.ref)+'</div><div class="note">'+esc(t.note)+'</div></div>').join('');
+  const trig = r.triggers.map(t=>{
+    const cite = esc(t.ref||t.label||''), note = esc(t.note||(t.ref?t.label:'')||'');
+    return '<div class="qa-basis"><div class="ref">'+cite+'</div>'+(note&&note!==cite?'<div class="note">'+note+'</div>':'')+'</div>';
+  }).join('');
   const acts = r.actions.map(a=>'<div class="step-row"><span class="ck">&#10003;</span><span class="tx">'+esc(a)+'</span></div>').join('');
   return '<div class="tool-result">'
     + head
@@ -616,7 +621,7 @@ function renderTools(){
   $('main').innerHTML =
     '<div class="qa-wrap">'
     + '<div class="sec-lbl"><span>Super Tools</span><i></i></div>'
-    + '<div class="qa-desc">Specialist MLRO tools — the Escalation Decision Engine is deterministic and rule-based; all other tools use brain-powered analysis. Pick a tool, fill the inputs, and run.</div>'
+    + '<div class="qa-desc">Specialist MLRO tools — every tool returns an instant, deterministic, citation-backed result keyed to the scenario. Pick a tool, fill the inputs, and run.</div>'
     + '<select class="tool-select" id="toolSelect" aria-label="Select tool">'+opts+'</select>'
     + '<div class="card" style="margin-top:14px"><div class="card-pad">'
     +   '<div class="tool-title">'+esc(tool.label)+'</div>'
@@ -638,19 +643,8 @@ function renderTools(){
       if(!ctx){ state.toolResult={error:'Please add some case context.'}; renderResultOnly(); const el=$('tf_context'); if(el&&el.focus) el.focus(); return; }
       state.toolResult = {kind:'loading'};
       renderResultOnly();
-      const toolQuestion = stripEmoji(t.label) + ': ' + ctx;
-      fetch('/.netlify/functions/brain-soul', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          question: toolQuestion,
-          mode: 'balanced',
-          persona: state.personaId,
-        }),
-      })
-      .then(r => r.json())
-      .then(data => { state.toolResult = {kind:'brain', ...data}; renderResultOnly(); })
-      .catch(() => { state.toolResult = {kind:'brain', ok:false, text:'Brain unavailable — check ANTHROPIC_API_KEY in Netlify environment.'}; renderResultOnly(); });
+      const result = genericRun(t, ctx);
+      setTimeout(()=>{ if(currentTool().id===t.id){ state.toolResult = result; renderResultOnly(); } }, 600);
     }
   });
 }
