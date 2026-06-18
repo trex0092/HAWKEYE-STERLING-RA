@@ -109,7 +109,7 @@ function runScreen(file, bridge, seed){
   check('console(new): diligence mix + jurisdictions show empty states',
     els.riskBars.innerHTML.includes('No assessments yet') && els.jurWatch.innerHTML.includes('No jurisdictions yet'));
   check('console(new): threat level NOMINAL when nothing is filed', els.threatLevel.textContent === 'NOMINAL');
-  check('console(new): operator strip offers all twenty robots', countOcc(els.operatorStrip.innerHTML, 'class="op-btn"') === 20);
+  check('console(new): operator strip offers all seventeen robots', countOcc(els.operatorStrip.innerHTML, 'class="op-btn"') === 17);
   check('console(new): default accent is Cypher pink', docStyle.getPropertyValue('--ac') === '255,92,168');
 
   api.state.operatorId = 'ember'; api.renderOperator();
@@ -146,7 +146,7 @@ function runScreen(file, bridge, seed){
     && els.tabs.innerHTML.includes('Regulatory Q&amp;A') && els.tabs.innerHTML.includes('Super Tools'));
   check('advisor: composer + idle hero render', els.main.innerHTML.includes('Your question')
     && els.main.innerHTML.includes('Ask me anything about AML compliance.'));
-  check('advisor: persona picker offers nineteen advisors, Sterling default', countOcc(els.main.innerHTML, 'class="p-btn"') === 19
+  check('advisor: persona picker offers sixteen advisors, Sterling default', countOcc(els.main.innerHTML, 'class="p-btn"') === 16
     && els.main.innerHTML.includes('<b>Sterling</b>'));
   check('advisor: mode toggle offers four depths, no fake "directives" claim',
     els.main.innerHTML.includes('data-mode="Quick"') && els.main.innerHTML.includes('data-mode="Deep"')
