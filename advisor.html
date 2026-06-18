@@ -400,7 +400,8 @@ function ask(){
   state.askedQuestion = q; state.phase = 'reasoning'; state.liveAnswer = null;
   $('hero').innerHTML = heroHtml();
 
-  fetch('/.netlify/functions/brain-soul', {
+  const minDelay = new Promise(r => { reasoningTimer = setTimeout(r, 1000); });
+  const brainFetch = fetch('/.netlify/functions/brain-soul', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -408,9 +409,10 @@ function ask(){
       mode: MODE_TO_REASONING[state.mode] || 'balanced',
       persona: state.personaId,
     }),
-  })
-  .then(r => r.json())
-  .then(data => {
+  }).then(r => r.json());
+
+  Promise.all([brainFetch, minDelay])
+  .then(([data]) => {
     state.liveAnswer = data;
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml();
