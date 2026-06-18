@@ -1150,6 +1150,7 @@ function _secArmIdle(){
 function _secBumpIdle(){ if(_idleTimer) clearTimeout(_idleTimer); _idleTimer = setTimeout(() => secLock('idle'), IDLE_LOCK_MS); _sessTouch(); }
 function secLock(reason){
   if(!_secActive) return;
+  try{ mirrorBeacon(); }catch(e){}   /* flush a last summary to Asana before the in-memory data is cleared */
   _secKey = null; _secActive = false;
   for(const k in _secMem) delete _secMem[k];
   if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer = null; }
@@ -1287,6 +1288,7 @@ async function auditAppend(event, detail){
     e.hash = await sha256Hex(prev + '|' + e.ts + '|' + e.who + '|' + e.ref + '|' + e.event + '|' + e.detail);
     log.push(e);
     SS.setItem(AUDIT_KEY, JSON.stringify(log));
+    scheduleMirror();
   }catch(err){}
 }
 async function auditVerify(){
@@ -2419,6 +2421,45 @@ function regAll(){
 function regWrite(items){
   try{ SS.setItem(REG_KEY, JSON.stringify({version:1, items})); }catch(e){}
 }
+
+/* ── Off-device mirror: push a summary of the Register + Activity Log to Asana
+   (best-effort; failures never block the UI). Pulled back on the Console via a
+   "Refresh from Asana" button. Disabled outside a browser (no navigator). ── */
+const ASANA_MIRROR_EP = '/.netlify/functions/asana-mirror';
+function mirrorPayload(){
+  const items = regAll();
+  const register = Object.keys(items).map(ref=>{
+    const it = items[ref]||{}, s = it.summary||{}, st = it.state||{};
+    return { ref, entity: s.entity||'', outcome: s.outcome||'', total: (s.total==null?'':s.total),
+      prohibited: !!s.prohibited, complete: !!s.complete, date: s.date||'',
+      nextReview: s.nextReview||'', jurisdiction: (st.entity&&st.entity.jurisdiction)||'',
+      activity: (st.profile&&st.profile.activity)||'', savedAt: it.savedAt||'' };
+  });
+  return { action:'write', register, audit: (typeof auditAll==='function'?auditAll():[]).slice(-1000) };
+}
+let _mirrorTimer = null;
+function scheduleMirror(){
+  if(typeof navigator==='undefined') return;          /* browser-only */
+  if(_mirrorTimer) clearTimeout(_mirrorTimer);
+  _mirrorTimer = setTimeout(mirrorPush, 8000);         /* debounce bursts of edits */
+}
+function mirrorPush(){
+  if(typeof navigator==='undefined' || typeof fetch==='undefined') return;
+  try{
+    const p = mirrorPayload();
+    if(!p.register.length && !p.audit.length) return;
+    fetch(ASANA_MIRROR_EP, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(p)}).then(()=>{}).catch(()=>{});
+  }catch(e){}
+}
+function mirrorBeacon(){
+  if(typeof navigator==='undefined') return;
+  try{
+    const p = mirrorPayload();
+    if(!p.register.length && !p.audit.length) return;
+    if(navigator.sendBeacon) navigator.sendBeacon(ASANA_MIRROR_EP, new Blob([JSON.stringify(p)], {type:'application/json'}));
+    else mirrorPush();
+  }catch(e){}
+}
 function regUpsert(){
   const ref = String(state.meta.ref||'').trim();
   if(!ref || !String(state.entity.name||'').trim()) return false; /* files are labelled by customer */
@@ -2431,6 +2472,7 @@ function regUpsert(){
     state: JSON.parse(JSON.stringify(state))
   };
   regWrite(items);
+  scheduleMirror();
   return true;
 }
 function regDelete(ref){
@@ -2818,6 +2860,11 @@ function printPreflight(){
 window.addEventListener('beforeprint', buildPrintReport);
 /* Flush the debounced autosave so closing the tab right after typing loses nothing */
 window.addEventListener('beforeunload', saveDraft);
+/* Flush a last Register/Log summary to Asana when the tab is hidden or closed. */
+if(typeof window!=='undefined' && window.addEventListener){
+  window.addEventListener('pagehide', function(){ try{ mirrorBeacon(); }catch(e){} });
+  window.addEventListener('visibilitychange', function(){ try{ if(typeof document!=='undefined' && document.hidden) mirrorBeacon(); }catch(e){} });
+}
 
 /* ══════════════════════════════════════════
    INTRO MOTION — gauge draw-in, count-up, pop

@@ -121,6 +121,13 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
 .empty-note{font-family:var(--mono);font-size:11px;color:#646F86;line-height:1.55}
 .stream .empty-note{padding:22px 16px}
 
+/* Asana refresh control — purple/pink neon, animated */
+@keyframes arGlow{0%,100%{filter:drop-shadow(0 0 3px rgba(180,92,255,.75)) drop-shadow(0 0 7px rgba(255,92,168,.5))}50%{filter:drop-shadow(0 0 8px rgba(180,92,255,1)) drop-shadow(0 0 15px rgba(255,92,168,.9))}}
+.asana-refresh{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer;background:rgba(255,255,255,0.03);border:1px solid rgba(180,92,255,0.5);border-radius:9px;padding:0;transition:border-color .2s,box-shadow .2s,transform .2s}
+.asana-refresh:hover{border-color:rgba(255,92,168,0.85);box-shadow:0 0 16px rgba(255,92,168,0.4),inset 0 0 9px rgba(180,92,255,0.2);transform:translateY(-1px)}
+.asana-refresh .ar-ico{display:inline-block;font-size:16px;line-height:1;font-weight:700;background:linear-gradient(135deg,#B45CFF,#FF5CA8 80%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:arGlow 2.2s ease-in-out infinite}
+.asana-refresh:hover .ar-ico{animation-duration:1.1s}
+.asana-refresh.spinning .ar-ico{animation:spin .8s linear infinite}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 @media(max-width:1080px){.grid{grid-template-columns:1fr}}
 @media(max-width:760px){.tiles{grid-template-columns:1fr 1fr}.lower{grid-template-columns:1fr}.sub,.live,.clock{display:none}
@@ -193,7 +200,10 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
         <div class="stream">
           <div class="stream-h">
             <div class="panel-h">Live Alert Stream</div>
-            <div class="streaming"><i></i>ON DEVICE</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <button id="asanaRefresh" class="asana-refresh" type="button" title="Refresh from Asana" aria-label="Refresh from Asana"><span class="ar-ico">&#8635;</span></button>
+              <div class="streaming"><i></i>ON DEVICE</div>
+            </div>
           </div>
           <div id="alertStream"></div>
         </div>
@@ -232,13 +242,27 @@ const OPERATORS = [
   {id:'vale',    img:'assets/persona-vale.png',    pos:'50% 22%', name:'Vale',    role:'KYC & Onboarding',           ac:'120,170,255'},
   {id:'ember',   img:'assets/persona-ember.png',   pos:'50% 26%', name:'Ember',   role:'Sanctions & PEP Screening',  ac:'255,87,87'},
   {id:'brass',   img:'assets/persona-brass.png',   pos:'46% 26%', name:'Brass',   role:'Records & Audit',            ac:'247,197,60'},
-  {id:'iris',    img:'assets/persona-iris.png',    pos:'42% 26%', name:'Iris',    role:'Typologies & Training',      ac:'180,92,255'}
+  {id:'iris',    img:'assets/persona-iris.png',    pos:'42% 26%', name:'Iris',    role:'Typologies & Training',      ac:'180,92,255'},
+  {id:'bullion', img:'assets/persona-bullion.png', pos:'50% 20%', name:'Bullion', role:'Precious Metals & Stones (DPMS)',     ac:'255,90,200'},
+  {id:'cinder',  img:'assets/persona-cinder.png',  pos:'40% 30%', name:'Cinder',  role:'Terrorism & Proliferation Financing', ac:'70,150,255'},
+  {id:'verde',   img:'assets/persona-verde.png',   pos:'46% 26%', name:'Verde',   role:'ESG & Human Rights',                  ac:'60,200,130'},
+  {id:'haven',   img:'assets/persona-cypher.png',  pos:'42% 30%', name:'Haven',   role:'Artificial Intelligence',             ac:'150,90,255'},
+  {id:'axiom',   img:'assets/persona-vale.png',    pos:'50% 22%', name:'Axiom',   role:'AI Governance & Data Protection',     ac:'90,200,255'},
+  {id:'cobalt',  img:'assets/persona-sterling.png',pos:'36% 24%', name:'Cobalt',  role:'Trade-Based ML & Trade Finance',      ac:'70,140,255'},
+  {id:'sentinel',img:'assets/persona-ember.png',   pos:'50% 26%', name:'Sentinel',role:'Sanctions Evasion & Watchlists',      ac:'255,90,90'},
+  {id:'lattice', img:'assets/persona-iris.png',    pos:'40% 24%', name:'Lattice', role:'Beneficial Ownership & UBO',          ac:'180,120,255'},
+  {id:'vector',  img:'assets/persona-cypher.png',  pos:'42% 30%', name:'Vector',  role:'Fraud & Cyber-Enabled Crime',         ac:'0,210,200'},
+  {id:'ledger',  img:'assets/persona-brass.png',   pos:'46% 28%', name:'Ledger',  role:'goAML Reporting & FIU Liaison',       ac:'200,205,220'},
+  {id:'atlas',   img:'assets/persona-vale.png',    pos:'50% 22%', name:'Atlas',   role:'Correspondent Banking & Wire',        ac:'120,180,240'}
 ];
 
 /* ── Data source: the assessment register (localStorage). Absent (new app) or
       encrypted-at-rest ("hsx1:" prefix) → treated as empty. ── */
 const REG_KEY = 'hsra.register.v1';
-function readRegister(){
+/* Register pulled from Asana via the Refresh button — display-only, never
+   written to localStorage (avoids clashing with index.html's encrypted store). */
+let _asanaFetched = [];
+function readLocalRegister(){
   let raw=null;
   try{ raw = localStorage.getItem(REG_KEY); }catch(e){}
   if(!raw || raw.indexOf('hsx1:')===0) return [];        /* none filed, or locked/encrypted */
@@ -258,6 +282,33 @@ function readRegister(){
       savedAt: it.savedAt || ''
     };
   });
+}
+/* Merge local + Asana-fetched by reference, local taking precedence. */
+function readRegister(){
+  const byRef = {};
+  (_asanaFetched||[]).forEach(r=>{ if(r&&r.ref) byRef[r.ref]=r; });
+  readLocalRegister().forEach(r=>{ if(r&&r.ref) byRef[r.ref]=r; });
+  return Object.keys(byRef).map(k=>byRef[k]);
+}
+/* Pull the Register/Activity-Log summary back from Asana and re-render (display
+   only — does not write localStorage, so an encrypted device is never touched). */
+const ASANA_MIRROR_EP = '/.netlify/functions/asana-mirror';
+function rerenderConsole(){ AGG = aggregate(readRegister()); updateThreat(); renderStats(); renderMix(); renderJur(); renderAlerts(); }
+function refreshFromAsana(btn){
+  if(typeof fetch==='undefined') return;
+  if(btn){ btn.disabled=true; btn.classList.add('spinning'); btn.setAttribute('title','Refreshing…'); }
+  const done = t => { if(btn){ btn.disabled=false; btn.classList.remove('spinning'); btn.setAttribute('title', t); } };
+  fetch(ASANA_MIRROR_EP, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'read'})})
+    .then(r=>r.json()).then(d=>{
+      if(d && d.ok && Array.isArray(d.register)){
+        _asanaFetched = d.register.map(r=>({ ref:String(r.ref||''), entity:String(r.entity||r.ref||''),
+          outcome:String(r.outcome||'CDD'), prohibited:!!r.prohibited, complete:!!r.complete,
+          date:String(r.date||''), nextReview:String(r.nextReview||''), jurisdiction:String(r.jurisdiction||'—'),
+          savedAt:String(r.savedAt||'') })).filter(r=>r.ref);
+        rerenderConsole();
+        done('Refreshed '+_asanaFetched.length+' from Asana');
+      } else done('Refresh failed — try again');
+    }).catch(()=> done('Refresh failed — try again'));
 }
 function aggregate(items){
   const today=new Date().toISOString().slice(0,10);
@@ -417,6 +468,7 @@ renderAlerts();
 renderAnimated();
 tween();
 startClock();
+(function(){ var b=document.getElementById('asanaRefresh'); if(b&&b.addEventListener) b.addEventListener('click', function(){ refreshFromAsana(b); }); })();
 
 /* ── 1-hour unlock session — read-only countdown chip (see index.html for the owner) ── */
 (function(){
