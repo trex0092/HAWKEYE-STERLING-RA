@@ -250,7 +250,7 @@ const PERSONAS = [
   {id:'iris',     name:'Iris',     role:'Typologies & training',   img:'assets/persona-iris.png',     accent:'180,92,255',  pos:'40% 24%'}
 ];
 
-let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null};
+let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', liveAnswer:null, regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null};
 let reasoningTimer = null;
 
 function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
@@ -314,6 +314,24 @@ function heroReasoningHtml(){
     + '</div></div>';
 }
 function heroAnswerHtml(){
+  const la = state.liveAnswer;
+  if(la){
+    const p = persona();
+    const ok = la.ok !== false;
+    const modelChip = la.model ? ' · '+la.model : '';
+    return '<div class="card ans"><div class="card-pad">'
+      + '<div class="sec-lbl"><span>Advisor response</span><i></i></div>'
+      + '<div class="eyebrow">You asked</div>'
+      + '<div class="asked">'+esc(state.askedQuestion)+'</div>'
+      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
+      +   '<span class="pill" style="'+pillStyle(ok?'low':'high')+'">'+esc(p.role)+'</span>'
+      +   '<span class="conf">'+(ok?'<i></i>':'')+esc(state.mode+' mode'+modelChip)+'</span>'
+      + '</div>'
+      + '<div class="summary" style="white-space:pre-line">'+esc(la.text)+'</div>'
+      + (la.auditLine ? '<div style="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" style="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(la.auditLine)+'</div></div>' : '')
+      + '<button class="again" id="askAgain" style="margin-top:18px"><span>&#8634;</span> Ask another</button>'
+      + '</div></div>';
+  }
   const a = ANSWER;
   const basis = a.basis.map(b=>'<div class="basis"><div class="ref">'+esc(b.ref)+'</div><div class="note">'+esc(b.note)+'</div></div>').join('');
   const guide = a.guide.map(g=>'<div class="guide-row"><span class="n">'+esc(g.n)+'</span><span class="tx">'+esc(g.text)+'</span></div>').join('');
@@ -374,14 +392,38 @@ function bindPersona(){
 }
 function bindHero(){ const aa=$('askAgain'); if(aa) aa.addEventListener('click', reset); }
 
+const MODE_TO_REASONING = {Quick:'speed', Speed:'speed', Balanced:'balanced', Deep:'deep'};
+
 function ask(){
   const q = (state.question||'').trim() || 'What CDD is required for a UAE gold trader?';
   clearTimeout(reasoningTimer);
-  state.askedQuestion = q; state.phase = 'reasoning';
+  state.askedQuestion = q; state.phase = 'reasoning'; state.liveAnswer = null;
   $('hero').innerHTML = heroHtml();
-  reasoningTimer = setTimeout(()=>{ state.phase='answer'; $('hero').innerHTML = heroHtml(); bindHero(); }, 1500);
+
+  fetch('/.netlify/functions/brain-soul', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      question: q,
+      mode: MODE_TO_REASONING[state.mode] || 'balanced',
+      persona: state.personaId,
+    }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    state.liveAnswer = data;
+    state.phase = 'answer';
+    $('hero').innerHTML = heroHtml();
+    bindHero();
+  })
+  .catch(() => {
+    state.liveAnswer = {ok: false, text: 'The brain is unavailable — ensure ANTHROPIC_API_KEY is set in Netlify environment variables and redeploy.'};
+    state.phase = 'answer';
+    $('hero').innerHTML = heroHtml();
+    bindHero();
+  });
 }
-function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; $('hero').innerHTML = heroHtml(); }
+function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; state.liveAnswer=null; $('hero').innerHTML = heroHtml(); }
 
 function regGroups(){ return (typeof window!=='undefined' && Array.isArray(window.REG_GROUPS)) ? window.REG_GROUPS : []; }
 function askQuestion(q){ state.tab='ask'; state.question=q; render(); }
@@ -520,7 +562,27 @@ function renderField(f){
 function renderToolResult(){
   const r = state.toolResult;
   if(!r) return '';
-  if(r.error) return '<div class="tool-err">⚠ '+esc(r.error)+'</div>';
+  if(r.error) return '<div class="tool-err">&#9888; '+esc(r.error)+'</div>';
+  if(r.kind==='loading'){
+    return '<div class="tool-result" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 0">'
+      + '<div class="dots">'
+      +   '<span style="background:var(--ac1);box-shadow:0 0 8px var(--ac1)"></span>'
+      +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
+      +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
+      + '</div>'
+      + '<div style="font-family:var(--mono);font-size:12px;color:#646F86">Brain processing…</div>'
+      + '</div>';
+  }
+  if(r.kind==='brain'){
+    return '<div class="tool-result">'
+      + '<div style="margin:20px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +   '<span class="pill" style="'+pillStyle(r.ok!==false?'low':'high')+'">Brain-powered analysis</span>'
+      +   (r.model ? '<span class="conf"><i></i>'+esc(r.model)+'</span>' : '')
+      + '</div>'
+      + '<div class="summary" style="white-space:pre-line">'+esc(r.text)+'</div>'
+      + (r.auditLine ? '<div style="margin-top:18px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" style="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(r.auditLine)+'</div></div>' : '')
+      + '</div>';
+  }
   const head = r.kind==='generic'
     ? '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle('low')+'">Deterministic guidance</span></div>'
     : '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle(r.tone)+'">'+esc(r.verdict)+'</span></div>';
@@ -568,11 +630,26 @@ function renderTools(){
     if(t.id==='escalation'){
       if(!String(state.toolInputs.subject||'').trim()){ state.toolResult={error:'Subject name is required.'}; renderResultOnly(); const el=$('tf_subject'); if(el&&el.focus) el.focus(); return; }
       state.toolResult = escalationRun(state.toolInputs);
+      renderResultOnly();
     } else {
-      if(!String(state.toolInputs.context||'').trim()){ state.toolResult={error:'Please add some case context.'}; renderResultOnly(); const el=$('tf_context'); if(el&&el.focus) el.focus(); return; }
-      state.toolResult = genericRun(t, state.toolInputs.context);
+      const ctx = String(state.toolInputs.context||'').trim();
+      if(!ctx){ state.toolResult={error:'Please add some case context.'}; renderResultOnly(); const el=$('tf_context'); if(el&&el.focus) el.focus(); return; }
+      state.toolResult = {kind:'loading'};
+      renderResultOnly();
+      const toolQuestion = stripEmoji(t.label) + ': ' + ctx;
+      fetch('/.netlify/functions/brain-soul', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          question: toolQuestion,
+          mode: 'balanced',
+          persona: state.personaId,
+        }),
+      })
+      .then(r => r.json())
+      .then(data => { state.toolResult = {kind:'brain', ...data}; renderResultOnly(); })
+      .catch(() => { state.toolResult = {kind:'brain', ok:false, text:'Brain unavailable — check ANTHROPIC_API_KEY in Netlify environment.'}; renderResultOnly(); });
     }
-    renderResultOnly();
   });
 }
 
