@@ -174,10 +174,10 @@ function runScreen(file, bridge, seed){
   check('advisor: Ask another returns to the idle hero', api.state.phase === 'idle'
     && els.hero.innerHTML.includes('Ask me anything'));
 
-  /* Regulatory Q&A — full 56-group catalogue from window.REG_GROUPS */
+  /* Regulatory Q&A — full 59-group catalogue from window.REG_GROUPS */
   api.state.tab = 'qa'; api.render();
-  check('advisor: Q&A renders all 56 regulatory groups', els.main.innerHTML.includes('Regulatory Q&amp;A')
-    && api.regGroups().length === 56 && countOcc(els.regGroups.innerHTML, '<div class="reg-cat') === 56
+  check('advisor: Q&A renders all 59 regulatory groups', els.main.innerHTML.includes('Regulatory Q&amp;A')
+    && api.regGroups().length === 59 && countOcc(els.regGroups.innerHTML, '<div class="reg-cat') === 59
     && els.regGroups.innerHTML.includes('UAE FDL &amp; Cabinet Resolution'));
   api.state.regOpen = 0; api.renderRegGroups();
   check('advisor: opening a group reveals its cited questions', countOcc(els.regGroups.innerHTML, 'class="reg-q"') >= 1);
@@ -236,8 +236,8 @@ function runScreen(file, bridge, seed){
     if(q && typeof q==='object' && q.a && q.a.length > 20) withAnswer++;
     if(q && Array.isArray(q.refs) && q.refs.length) withRefs++;
   }));
-  check('qa-data: 311 questions each carry a substantive cited answer',
-    totalQ === 311 && withAnswer === 311 && withRefs === 311);
+  check('qa-data: 336 questions each carry a substantive cited answer',
+    totalQ === 336 && withAnswer === 336 && withRefs === 336);
 
   /* Opening a question renders its answer + cited basis inline (not the canned reply) */
   api.state.tab = 'qa'; api.render();
