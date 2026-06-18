@@ -195,6 +195,8 @@ function runScreen(file, bridge, seed){
     els.main.innerHTML.includes('Super Tools') && els.main.innerHTML.includes('Escalation Decision Engine')
     && els.main.innerHTML.includes('id="tf_subject"') && els.main.innerHTML.includes('Get Escalation Decision')
     && els.main.innerHTML.includes('<optgroup'));
+  check('advisor: tool form fields are programmatically labelled (a11y)',
+    els.main.innerHTML.includes('<label class="tf-label" for="tf_subject">'));
   check('advisor: the picker carries the full 186-tool catalogue across 7 groups',
     api.toolsList().length === 186 && countOcc(els.main.innerHTML, '<optgroup') === 7
     && els.main.innerHTML.includes('Sanctions Nexus') && els.main.innerHTML.includes('STR Drafter'));

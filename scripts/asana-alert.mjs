@@ -18,6 +18,12 @@ const r = await fetch('https://app.asana.com/api/1.0/tasks', {
   },
   body: JSON.stringify({ data: { name: title, notes, projects: [PROJECT_GID], due_on: new Date().toISOString().slice(0, 10), assignee: 'me' } })
 });
-const d = await r.json();
+/* Read the body as text first so a non-JSON response (e.g. an HTML 502 page from
+   a gateway) reports cleanly instead of throwing an unhandled rejection — this
+   script runs in CI failure paths, so its own error handling must not crash. */
+const raw = await r.text();
+let d;
+try { d = JSON.parse(raw); }
+catch { console.error('Asana ' + r.status + ': non-JSON response: ' + raw.slice(0, 300)); process.exit(1); }
 if (!r.ok) { console.error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300)); process.exit(1); }
-console.log('alert task created: ' + d.data.permalink_url);
+console.log('alert task created: ' + (d?.data?.permalink_url || '(task created; no permalink returned)'));

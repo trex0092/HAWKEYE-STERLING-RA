@@ -1,8 +1,8 @@
 name: Function Health
 
-# Weekly check that the live Netlify functions (asana-task, risk-backup)
-# are reachable, have ASANA_ACCESS_TOKEN configured, and return 400 for a
-# known-bad payload rather than 500 (missing token) or a connection error
+# Weekly check that the live Netlify functions (asana-task, risk-backup,
+# brain-soul) are reachable, have their secrets configured, and return 400 for a
+# known-bad payload rather than 500/503 (missing secret) or a connection error
 # (function not deployed). On failure it creates an alert task in Asana
 # and GitHub sends the normal Actions failure email.
 #
@@ -10,7 +10,8 @@ name: Function Health
 #   Both functions validate the request body before touching Asana.
 #   An empty-body POST returns 400 "name required" / "sheet with overrides
 #   required" — that proves the function started, passed CORS, found the
-#   token, and reached body validation. A 500 means the token is gone;
+#   token, and reached body validation. A 500/503 means the secret is gone
+#   (asana-task / risk-backup -> ASANA_ACCESS_TOKEN; brain-soul -> ANTHROPIC_API_KEY);
 #   anything else (502, 0) means the function crashed or is undeployed.
 
 on:
@@ -57,6 +58,21 @@ jobs:
           fi
           echo "ok: risk-backup is live and token is present"
 
+      - name: Probe brain-soul function
+        id: brain_soul
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/brain-soul" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "brain-soul → HTTP $STATUS"
+          if [ "$STATUS" != "400" ]; then
+            echo "FAIL: expected 400 (question required), got $STATUS — 503 = ANTHROPIC_API_KEY missing, other = function down"
+            exit 1
+          fi
+          echo "ok: brain-soul is live and ANTHROPIC_API_KEY is present"
+
       - name: Alert in Asana on failure
         if: failure()
         env:
@@ -64,7 +80,8 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ASANA_STATUS: ${{ steps.asana_task.outputs.status }}
           BACKUP_STATUS: ${{ steps.risk_backup.outputs.status }}
+          BRAIN_STATUS: ${{ steps.brain_soul.outputs.status }}
         run: |
           node scripts/asana-alert.mjs \
             "FUNCTION DOWN: Netlify functions failed health check" \
-            "One or more Netlify functions returned an unexpected status. asana-task: HTTP ${ASANA_STATUS:-unreachable}, risk-backup: HTTP ${BACKUP_STATUS:-unreachable}. HTTP 500 = ASANA_ACCESS_TOKEN missing or revoked. Anything else = function crashed or undeployed. Check Netlify deploys: https://app.netlify.com/projects/hawkeye-sterling-ra — Run log: $RUN_URL"
+            "One or more Netlify functions returned an unexpected status. asana-task: HTTP ${ASANA_STATUS:-unreachable}, risk-backup: HTTP ${BACKUP_STATUS:-unreachable}, brain-soul: HTTP ${BRAIN_STATUS:-unreachable}. HTTP 500/503 = a required secret (ASANA_ACCESS_TOKEN / ANTHROPIC_API_KEY) is missing or revoked. Anything else = function crashed or undeployed. Check Netlify deploys: https://app.netlify.com/projects/hawkeye-sterling-ra — Run log: $RUN_URL"

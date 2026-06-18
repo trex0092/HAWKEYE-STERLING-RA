@@ -555,7 +555,7 @@ function genericRun(tool, ctx){
     triggers: refs, actions: play.steps };
 }
 function renderField(f){
-  const lab='<label class="tf-label">'+esc(f.label)+(f.req?' <span style="color:var(--ac2)">*</span>':'')+'</label>';
+  const lab='<label class="tf-label" for="tf_'+f.key+'">'+esc(f.label)+(f.req?' <span style="color:var(--ac2)">*</span>':'')+'</label>';
   const inp = f.area
     ? '<textarea class="tf-input" id="tf_'+f.key+'" rows="4" placeholder="'+esc(f.ph)+'"></textarea>'
     : '<input class="tf-input" id="tf_'+f.key+'"'+(f.num?' inputmode="numeric"':'')+' placeholder="'+esc(f.ph)+'">';

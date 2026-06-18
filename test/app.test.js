@@ -734,6 +734,20 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
   check('retry Asana button wired in HTML', html.includes('onclick="retryAsanaDelivery()"'));
   check('print preflight wired in HTML', html.includes('onclick="printPreflight()"'));
 
+  /* a11y: every form control is programmatically labelled (WCAG2AA 1.3.1 / 4.1.2).
+     Guards the label/for associations so they can't silently regress. */
+  check('jurisdiction select has an associated label', html.includes('<label for="jurisdictionSelect">'));
+  check('activity select has an associated label', html.includes('<label for="activitySelect">'));
+  check('entity name input has an associated label', html.includes('<label for="entityName">'));
+  check('year inputs have associated labels', html.includes('<label for="entityYearsInput">') && html.includes('<label for="relYearsInput">'));
+  check('screening + sign-off fields are labelled', html.includes('<label for="scr_sanctions_date">') && html.includes('<label for="approvedDate">'));
+  check('onboarding toggle-group is a labelled group',
+    html.includes('<label id="onboardLbl">') && html.includes('aria-labelledby="onboardLbl"'));
+  check('generated question toggle-groups are labelled groups',
+    html.includes('id="qtext_${q.id}"') && html.includes('role="group" aria-labelledby="qtext_${q.id}"'));
+  check('generated supplier select is labelled', html.includes('<label for="sel_${prefix}_${i}">'));
+  check('no bare <label> remains — all are associated', !/<label>/.test(html));
+
   /* ── 27. Encryption-at-rest primitives (WebCrypto) ── */
   await (async function(){
     const salt = crypto.getRandomValues(new Uint8Array(16));
