@@ -6,10 +6,6 @@ A single-file web application for **AML/CFT customer (entity) risk assessment**,
 
 **Live:** https://hawkeye-sterling-ra.netlify.app
 
-| Assessment form (dark neon UI) | Print report (A4) |
-|---|---|
-| ![Assessment form](docs/form.png) | ![Print report](docs/report.png) |
-
 The core application lives in [`index.html`](index.html) — no build step, no backend, no bundler. It deploys to any static host and keeps all data on the user's device. (The dark-neon "command-center" redesign pulls in three Google Fonts — Space Grotesk, JetBrains Mono, Manrope — and falls back to the system stack when offline.)
 
 ## The command-center suite

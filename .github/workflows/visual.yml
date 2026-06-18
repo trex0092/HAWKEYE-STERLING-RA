@@ -7,6 +7,9 @@ name: Visual Regression
 #     the HTML report is uploaded as an artifact so you can inspect diffs).
 
 on:
+  push:
+    branches: [main]
+    paths: ['index.html', 'console.html', 'advisor.html', 'assets/**', 'test/visual.spec.mjs', 'playwright.config.mjs']
   pull_request:
     paths: ['index.html', 'console.html', 'advisor.html', 'assets/**', 'test/visual.spec.mjs', 'playwright.config.mjs']
   workflow_dispatch:

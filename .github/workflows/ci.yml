@@ -26,6 +26,8 @@ jobs:
         run: node scripts/reg-sources-doc.mjs --check
       - name: Run console + advisor screen smoke tests
         run: node test/screens.test.js
+      - name: Run advisor full-surface smoke tests (every Q&A subject + tool + ask phase)
+        run: node test/advisor-smoke.test.js
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight

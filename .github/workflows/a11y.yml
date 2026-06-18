@@ -5,6 +5,9 @@ name: Accessibility (a11y)
 # on day one). To enforce, remove `continue-on-error: true` on the audit step.
 
 on:
+  push:
+    branches: [main]
+    paths: ['index.html', 'console.html', 'advisor.html']
   pull_request:
     paths: ['index.html', 'console.html', 'advisor.html']
   schedule:
