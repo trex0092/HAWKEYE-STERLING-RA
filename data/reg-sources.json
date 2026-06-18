@@ -162,6 +162,33 @@
       "narrative": "Basel Institute composite country ML/TF risk scoring. Watched so the country-risk weighting in the EWRA and customer risk-rating logic can be recalibrated when scores are republished.",
       "url": "https://index.baselgovernance.org/",
       "type": "html"
+    },
+    {
+      "id": "unodc",
+      "name": "UNODC — Money Laundering & Organised Crime",
+      "jurisdiction": "Global",
+      "category": "Standard-setter",
+      "narrative": "UN Office on Drugs and Crime publishes money-laundering, organised-crime and predicate-offence typologies, the Vienna/Palermo convention guidance and the GPML programme outputs. Watched so the typology, predicate-offence and international-cooperation answers reflect current UN crime research and methodologies.",
+      "url": "https://www.unodc.org/unodc/en/money-laundering/",
+      "type": "html"
+    },
+    {
+      "id": "eu-high-risk",
+      "name": "EU — High-Risk Third Countries (AML/CFT)",
+      "jurisdiction": "Global",
+      "category": "Risk data",
+      "narrative": "The European Commission list of third countries with strategic AML/CFT deficiencies (Delegated Regulation), which triggers mandatory EDD on relationships involving listed jurisdictions. Watched so the high-risk-jurisdiction EDD answers and country-risk weighting in the EWRA stay aligned with EU additions/removals.",
+      "url": "https://finance.ec.europa.eu/financial-crime/high-risk-third-countries-and-international-context_en",
+      "type": "html"
+    },
+    {
+      "id": "rjc",
+      "name": "Responsible Jewellery Council (RJC)",
+      "jurisdiction": "Global",
+      "category": "Sector body",
+      "narrative": "Sets the RJC Code of Practices and Chain-of-Custody standard for the jewellery and watch supply chain (responsible sourcing, KYC, conflict-sensitive due diligence). Watched so the gold/jewellery sector answers and responsible-sourcing tools reflect current RJC certification requirements.",
+      "url": "https://www.responsiblejewellery.com/",
+      "type": "html"
     }
   ]
 }
