@@ -15,4 +15,9 @@ paths = [
 regexes = [
   # EU FSF public access token embedded in the sanctions-list download URL
   '''token=dG9rZW4tMjAxNw''',
+  # Asana project GIDs are public object identifiers (they appear in task URLs),
+  # not secrets. The default asana-client-id rule false-positives on any 16-digit
+  # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
+  '''1215844297069727''',  # Regulations / Governance / Sanctions project
+  '''1215653768729951''',  # RISK ASSESSMENTS project
 ]
