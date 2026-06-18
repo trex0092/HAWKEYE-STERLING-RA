@@ -429,8 +429,11 @@ const handle = async (event) => {
   const start = Date.now();
   let text = '', ok = true;
 
+  const ctrl = new AbortController();
+  const abortTimer = setTimeout(() => ctrl.abort(), 26000);
   try {
     const apiResp = await fetch('https://api.anthropic.com/v1/messages', {
+      signal: ctrl.signal,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -455,12 +458,17 @@ const handle = async (event) => {
     }
   } catch (err) {
     ok = false;
-    text = '[Brain error: ' + (err && err.message ? err.message : String(err)) + ']';
+    text = err && err.name === 'AbortError'
+      ? '[Brain timeout: Anthropic API did not respond within 26 s.]'
+      : '[Brain error: ' + (err && err.message ? err.message : String(err)) + ']';
+  } finally {
+    clearTimeout(abortTimer);
   }
 
   const elapsedMs = Date.now() - start;
 
-  if (tippingOffGuard(text)) {
+  const tippingOffFlagged = tippingOffGuard(text);
+  if (tippingOffFlagged) {
     text = '[TIPPING-OFF GUARD ACTIVATED — output withheld per P4 of the compliance charter. ' +
       'The draft contained language that could alert a subject to a pending regulatory action. ' +
       'Please reformulate without reference to internal suspicion reports, STR/SAR filings, ' +
@@ -473,5 +481,5 @@ const handle = async (event) => {
     ' | hash=' + simpleHash(question) +
     ' | "This output is decision support, not a decision. MLRO review required."';
 
-  return resp(200, { ok, text, mode, model, elapsedMs, tippingOffFlagged: tippingOffGuard(text), auditLine });
+  return resp(200, { ok, text, mode, model, elapsedMs, tippingOffFlagged, auditLine });
 };

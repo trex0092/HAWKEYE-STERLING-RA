@@ -325,7 +325,7 @@ function heroAnswerHtml(){
       + '<div class="asked">'+esc(state.askedQuestion)+'</div>'
       + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
       +   '<span class="pill" style="'+pillStyle(ok?'low':'high')+'">'+esc(p.role)+'</span>'
-      +   '<span class="conf">'+(ok?'<i></i>':'')+esc(state.mode+' mode'+modelChip)+'</span>'
+      +   '<span class="conf"'+(ok?'':' style="color:#FF8A8A"')+'>'+(ok?'<i></i>':'&#9888; ')+esc(state.mode+' mode'+modelChip)+'</span>'
       + '</div>'
       + '<div class="summary" style="white-space:pre-line">'+esc(la.text)+'</div>'
       + (la.auditLine ? '<div style="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" style="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(la.auditLine)+'</div></div>' : '')
@@ -616,7 +616,7 @@ function renderTools(){
   $('main').innerHTML =
     '<div class="qa-wrap">'
     + '<div class="sec-lbl"><span>Super Tools</span><i></i></div>'
-    + '<div class="qa-desc">Specialist MLRO tools — each runs on a deterministic, citation-backed engine (rule-based, no free-text inference). Pick a tool, fill the inputs, and run.</div>'
+    + '<div class="qa-desc">Specialist MLRO tools — the Escalation Decision Engine is deterministic and rule-based; all other tools use brain-powered analysis. Pick a tool, fill the inputs, and run.</div>'
     + '<select class="tool-select" id="toolSelect" aria-label="Select tool">'+opts+'</select>'
     + '<div class="card" style="margin-top:14px"><div class="card-pad">'
     +   '<div class="tool-title">'+esc(tool.label)+'</div>'
