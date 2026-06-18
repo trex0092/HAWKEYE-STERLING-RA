@@ -113,7 +113,8 @@ P4.  YOU WILL NOT PRODUCE ANY OUTPUT THAT COULD CONSTITUTE TIPPING-OFF. Do
      reasonably alert a subject to the existence of an internal suspicion,
      investigation, STR, SAR, FFR, PNMR, consent request, or regulatory
      enquiry. If requested, refuse, cite Article 25 of Federal Decree-Law
-     No. 10 of 2025, and propose a compliant alternative.
+     No. 10 of 2025 (and its Executive Regulation, Cabinet Resolution No. 134
+     of 2025, Article 19), and propose a compliant alternative.
 
 P5.  YOU WILL NOT UPGRADE ALLEGATIONS TO FINDINGS. Use:
        - "Alleged," "reported," "accused" — for unproven claims.
@@ -239,6 +240,30 @@ const TYPOLOGIES = [
   { id: 'funnel_account', displayName: 'Funnel Account', describes: 'Account receiving deposits from many sources then rapidly wire-transferring abroad.' },
   { id: 'adverse_media', displayName: 'Adverse Media', describes: 'Credible reporting linking subject to financial crime, enforcement, or serious misconduct.' },
   { id: 'governance', displayName: 'Internal Governance Failure', describes: 'Control breakdowns: four-eyes bypass, record gaps, training failures, policy drift.' },
+  // Precious metals & stones (UAE FIU PMS 2025 typology report)
+  { id: 'pms_conflict_gold', displayName: 'Conflict-Gold Smuggling', describes: 'Smuggling and trading of gold from conflict-affected/high-risk areas into refining and trading chains.', fatfReference: 'FATF DPMS / OECD DDG; UAE FIU PMS 2025' },
+  { id: 'pms_front_shell', displayName: 'PMS Front & Shell Companies', describes: 'Front or shell companies in the precious-metals/stones sector disguising ownership and laundering value.', fatfReference: 'FATF R.22/24; UAE FIU PMS 2025' },
+  { id: 'pms_cash_structuring', displayName: 'DPMS Cash Structuring', describes: 'High-volume cash and structuring just below the AED 55,000 DPMS reporting threshold.', fatfReference: 'MoE Circular 08/2021; Cabinet Resolution 134/2025 Art.7' },
+  { id: 'pms_tbml_invoicing', displayName: 'Precious-Metals TBML', describes: 'Over/under-invoicing, multiple invoicing or phantom shipments of gold and stones to move value.', fatfReference: 'FATF TBML; UAE FIU PMS 2025' },
+  { id: 'pms_tf_metals', displayName: 'Terrorism Financing via Metals/Stones', describes: 'Use of portable, high-value precious metals/stones to store and move terrorist funds.', fatfReference: 'FATF R.5/6; UAE FIU PMS 2025' },
+  // Terrorism financing sub-typologies (UAE FIU TF report — reconcile with report wording)
+  { id: 'tf_npo_abuse', displayName: 'NPO / Charity Abuse (TF)', describes: 'Abuse of non-profit organisations and charitable fundraising to raise or move terrorist funds.', fatfReference: 'FATF R.8; UAE FIU TF report' },
+  { id: 'tf_cash_courier', displayName: 'Cash Courier (TF)', describes: 'Physical cross-border movement of cash or value by couriers for terrorism financing.', fatfReference: 'FATF R.32; UAE FIU TF report' },
+  { id: 'tf_mvts_hawala', displayName: 'MVTS / Hawala (TF)', describes: 'Misuse of money/value transfer services and hawala to move terrorist funds with limited trail.', fatfReference: 'FATF R.14; UAE FIU TF report' },
+  { id: 'tf_social_media_funding', displayName: 'Online / Social-Media Fundraising (TF)', describes: 'Crowdfunding and social-media solicitation channels used to collect terrorist funds.', fatfReference: 'FATF TF typologies; UAE FIU TF report' },
+  { id: 'tf_self_funding', displayName: 'Self-Funding / Low-Value (TF)', describes: 'Small, legitimate-looking self-funding (salary, benefits, micro-transfers) supporting terrorism.', fatfReference: 'FATF TF typologies; UAE FIU TF report' },
+  { id: 'tf_ftf_travel', displayName: 'Foreign-Terrorist-Fighter Travel (TF)', describes: 'Financial support for travel and logistics of foreign terrorist fighters.', fatfReference: 'UNSCR 2178; UAE FIU TF report' },
+  // Environmental crime sub-typologies (UAE FIU Env report — reconcile with report wording)
+  { id: 'env_wildlife_trafficking', displayName: 'Illegal Wildlife Trade', describes: 'Laundering proceeds from trafficking in protected species and wildlife products.', fatfReference: 'FATF Environmental Crime 2021; UAE FIU Env report' },
+  { id: 'env_illegal_logging', displayName: 'Illegal Logging / Timber', describes: 'Proceeds from illegal logging and timber trafficking laundered via trade and front companies.', fatfReference: 'FATF Environmental Crime 2021; UAE FIU Env report' },
+  { id: 'env_illegal_mining', displayName: 'Illegal Mining (incl. Gold)', describes: 'Illegal/artisanal mining proceeds — including conflict gold — entering trade and DPMS chains.', fatfReference: 'FATF Environmental Crime 2021; OECD DDG; UAE FIU Env report' },
+  { id: 'env_waste_trafficking', displayName: 'Waste / Hazardous-Material Trafficking', describes: 'Illegal waste and hazardous-material trafficking generating launderable proceeds.', fatfReference: 'FATF Environmental Crime 2021; UAE FIU Env report' },
+  { id: 'env_iuu_fishing', displayName: 'Illegal (IUU) Fishing', describes: 'Illegal, unreported and unregulated fishing proceeds laundered through seafood trade.', fatfReference: 'FATF Environmental Crime 2021; UAE FIU Env report' },
+  // Human trafficking & modern slavery sub-typologies (UAE FIU HT report — reconcile with report wording)
+  { id: 'ht_labour_exploitation', displayName: 'Labour Exploitation', describes: 'Forced-labour proceeds with consolidated worker wages, recruitment-fee and debt-bondage flows.', fatfReference: 'FATF HT 2018; UAE FIU HT report' },
+  { id: 'ht_sexual_exploitation', displayName: 'Sexual Exploitation', describes: 'Proceeds from sexual exploitation moved via third-party-controlled accounts and cash.', fatfReference: 'FATF HT 2018; UAE FIU HT report' },
+  { id: 'ht_domestic_servitude', displayName: 'Domestic Servitude', describes: 'Control of victims in domestic servitude evidenced by third-party-controlled finances.', fatfReference: 'FATF HT 2018; UAE FIU HT report' },
+  { id: 'ht_forced_criminality', displayName: 'Forced Criminality', describes: 'Victims coerced into criminal activity with proceeds funnelled to controllers.', fatfReference: 'FATF HT 2018; UAE FIU HT report' },
 ];
 
 // ── RED FLAGS (high-severity) ─────────────────────────────────────────────────
@@ -271,6 +296,22 @@ const RED_FLAGS_HIGH = [
   { id: 'rf_bearer_share_fz_holding', typology: 'bearer_share_fz_loophole', indicator: 'UAE/GCC free-zone entity registered with bearer-share equivalent or undisclosed beneficial owner.' },
   { id: 'rf_shell_director_overlap', typology: 'shell_company_chain', indicator: 'Same nominee director appears across 5+ shell entities that are counterparties to each other.' },
   { id: 'rf_npo_field_office_cash', typology: 'npo_diversion', indicator: 'Charity field office in conflict zone issues large cash payouts with no beneficiary register.' },
+  // Precious metals & stones (UAE FIU PMS 2025)
+  { id: 'rf_pms_high_volume_cash', typology: 'pms_cash_structuring', indicator: 'High-volume cash purchase/sale of precious metals or stones with no commercial rationale.' },
+  { id: 'rf_pms_unverifiable_sof', typology: 'pms_front_shell', indicator: 'Unknown or unverifiable source of funds/wealth for a high-value metals/stones transaction.' },
+  { id: 'rf_pms_third_party_mule', typology: 'pms_front_shell', indicator: 'Transaction conducted via third-party intermediary or apparent money mule.' },
+  { id: 'rf_pms_fraudulent_docs', typology: 'pms_tbml_invoicing', indicator: 'Incomplete, inconsistent or fraudulent documentation / chain-of-custody for gold or stones.' },
+  { id: 'rf_pms_complex_structure', typology: 'pms_front_shell', indicator: 'Structuring through complex corporate networks obscuring the ultimate beneficial owner.' },
+  // Terrorism financing (UAE FIU TF report — reconcile)
+  { id: 'rf_tf_lowvalue_conflict', typology: 'tf_self_funding', indicator: 'Small structured transfers to/from conflict zones inconsistent with customer profile.' },
+  { id: 'rf_tf_npo_opaque', typology: 'tf_npo_abuse', indicator: 'NPO account with opaque onward transfers or cash withdrawals near conflict areas.' },
+  { id: 'rf_tf_crowdfunding', typology: 'tf_social_media_funding', indicator: 'Inbound crowdfunding/social-media donations inconsistent with stated purpose.' },
+  // Environmental crime (UAE FIU Env report — reconcile)
+  { id: 'rf_env_commodity_doc_mismatch', typology: 'environmental_crime', indicator: 'Commodity trade (timber/minerals/seafood/wildlife) with documents inconsistent with goods or volumes.' },
+  { id: 'rf_env_out_of_business', typology: 'environmental_crime', indicator: 'Company trading environmental commodities outside its stated line of business.' },
+  // Human trafficking & modern slavery (UAE FIU HT report — reconcile)
+  { id: 'rf_ht_salary_consolidation', typology: 'ht_labour_exploitation', indicator: 'Wages for many workers consolidated into a single third-party-controlled account.' },
+  { id: 'rf_ht_recruitment_fee', typology: 'human_trafficking', indicator: 'Recruitment-fee or debt-bondage deductions plus frequent low-value remittances to source countries.' },
 ];
 
 // ── KRIS ─────────────────────────────────────────────────────────────────────
@@ -295,6 +336,9 @@ const KRIS = [
   { id: 'kri_privacy_request_overdue', label: 'Privacy requests past statutory window', band: { green: [0, 0], amber: [1, 2], red: [2, Infinity] } },
   { id: 'kri_training_completion', label: 'Staff AML/AI training completion', band: { green: [98, Infinity], amber: [90, 98], red: [0, 90] } },
   { id: 'kri_repeat_control_failures', label: 'Repeat control failures (rolling 12 months)', band: { green: [0, 0], amber: [1, 2], red: [2, Infinity] } },
+  { id: 'kri_env_doc_mismatch_count', label: 'Environmental-commodity document mismatches', band: { green: [0, 0], amber: [1, 2], red: [2, Infinity] } },
+  { id: 'kri_ht_salary_consolidation_accounts', label: 'Many-to-one payroll consolidation accounts', band: { green: [0, 0], amber: [1, 2], red: [2, Infinity] } },
+  { id: 'kri_tf_conflict_lowvalue_transfers', label: 'Low-value transfers to conflict-zone counterparties', band: { green: [0, 1], amber: [1, 3], red: [3, Infinity] } },
 ];
 
 // ── ZERO-TOLERANCE APPETITE ──────────────────────────────────────────────────
