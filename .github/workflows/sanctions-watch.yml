@@ -47,7 +47,9 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
-        run: node scripts/watch-notify.mjs "${{ steps.watch.outputs.pr_title }}" sanctions-watch-report.md
+          # "Sanctions updates" section of the Regulations/Governance/Sanctions project
+          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1215857714525481' }}
+        run: node scripts/watch-notify.mjs "${{ steps.watch.outputs.pr_title }}" sanctions-watch-report.md sanctions-watch-changes.json
 
       - name: Commit refreshed fingerprint state to main
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'

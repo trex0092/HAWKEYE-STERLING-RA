@@ -19,6 +19,8 @@ const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1215653768729951'; /* RISK
    "Regulations / Governance / Sanctions" project so all monitoring alerts stay
    together; the client-assessment digest/backup stay in RISK ASSESSMENTS. */
 const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1215844297069727';
+/* "FATF list moves" section of that project, so list-change alerts file neatly. */
+const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1215844241048837';
 
 /* FATF naming → the app's baseline naming */
 const ALIASES = {
@@ -268,10 +270,15 @@ async function findAffected(changedCountries) {
   return affected;
 }
 
-async function createTask(name, notes, due, project) {
+async function createTask(name, notes, due, project, section) {
   due = due || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   /* Assigned so the alert reaches the compliance officer's Asana inbox. */
   const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name, notes, projects: [project || PROJECT_GID], due_on: due, assignee: 'me' } }) });
+  /* File under a section when given so the project stays organised. Non-fatal. */
+  if (section && d.data && d.data.gid) {
+    try { await asana('/sections/' + section + '/addTask', { method: 'POST', body: JSON.stringify({ data: { task: d.data.gid } }) }); }
+    catch (e) { console.warn('watchdog: could not move task to section ' + section + ' (' + (e && e.message || e) + ')'); }
+  }
   return d.data.permalink_url;
 }
 
@@ -304,7 +311,7 @@ export async function main(mode) {
   if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN secret is not configured in GitHub Actions');
 
   if (mode === 'test-alert') {
-    const url = await createTask('[TEST] FATF Watchdog connectivity check', 'The watchdog can reach Asana and create tasks. Close this task. Created ' + new Date().toISOString().slice(0, 10) + '.', undefined, REG_PROJECT_GID);
+    const url = await createTask('[TEST] FATF Watchdog connectivity check', 'The watchdog can reach Asana and create tasks. Close this task. Created ' + new Date().toISOString().slice(0, 10) + '.', undefined, REG_PROJECT_GID, REG_FATF_SECTION_GID);
     console.log('test task created: ' + url);
     return;
   }
@@ -414,7 +421,7 @@ export async function main(mode) {
   const today = new Date().toISOString().slice(0, 10).split('-').reverse().join('/');
   const affected = await findAffected(changed);
   const notes = buildAlert(diff, baseline, affected, today) + '\n\nDetected via: ' + source + '. Verify on the official FATF site before acting.';
-  const url = await createTask('FATF list change: ' + changed.join(', '), notes, undefined, REG_PROJECT_GID);
+  const url = await createTask('FATF list change: ' + changed.join(', '), notes, undefined, REG_PROJECT_GID, REG_FATF_SECTION_GID);
   console.log('alert task created: ' + url);
   writeFileSync(STATE_FILE, JSON.stringify({ ...current, updated: new Date().toISOString().slice(0, 10) }, null, 2) + '\n');
 }
