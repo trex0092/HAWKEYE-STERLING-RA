@@ -20,4 +20,8 @@ regexes = [
   # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
   '''1215844297069727''',  # Regulations / Governance / Sanctions project
   '''1215653768729951''',  # RISK ASSESSMENTS project
+  # Section GIDs within the Regulations/Governance/Sanctions project (also public).
+  '''1215844241216116''',  # section: Regulatory changes
+  '''1215857714525481''',  # section: Sanctions updates
+  '''1215844241048837''',  # section: FATF list moves
 ]
