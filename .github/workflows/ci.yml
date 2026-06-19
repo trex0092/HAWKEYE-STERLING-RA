@@ -22,6 +22,12 @@ jobs:
         run: node test/sanctions-watch.test.mjs
       - name: Run sanctions-screen unit tests
         run: node test/sanctions-screen.test.mjs
+      - name: Run sanctions matcher unit tests
+        run: node test/sanctions-match.test.mjs
+      - name: Run adverse-media unit tests
+        run: node test/adverse-media.test.mjs
+      - name: Run PEP-check unit tests
+        run: node test/pep-check.test.mjs
       - name: Run link-check unit tests
         run: node test/link-check.test.mjs
       - name: Run Asana Netlify-function tests (timeout + non-JSON handling)

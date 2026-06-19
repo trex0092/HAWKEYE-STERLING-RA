@@ -7,30 +7,40 @@
    customers/counterparties now ON a list?"
 
    Flow (runner): read the active counterparties from the Asana "Customer
-   Database" project → batch-screen them against the Hawkeye Sterling engine
-   (POST <HAWKEYE_API_URL>/api/screen/batch — OFAC SDN/non-SDN, UN, EU, UK OFSI,
-   UAE EOCN + Local Terrorist List, INTERPOL red notices and adverse media, per
-   the engine's loaded corpus) → diff the results against the last run → on any
-   NEW match raise one alert card in the "Regulations / Governance / Sanctions"
-   Asana project for MLRO / four-eyes review. Ongoing monitoring: a standing match
-   is recorded once, not re-alerted every day; a new or CHANGED match always alerts.
+   Database" project → screen them IN THIS PROCESS against the free consolidated
+   lists (OFAC SDN/non-SDN, UN, EU, UK OFSI, the maintained UAE EOCN list, plus
+   any extra source) via scripts/sanctions-match.mjs, with free adverse-media
+   (Google News RSS) and a best-effort PEP signal (Wikidata) layered on → diff the
+   results against the last run → on any NEW match raise one alert card in the
+   "Sanctions updates" section of the "Regulations / Governance / Sanctions" Asana
+   project for MLRO / four-eyes review. There is no external engine and no API key.
+   Ongoing monitoring: a standing match is recorded once, not re-alerted every day;
+   a new or CHANGED match always alerts.
 
    Detection is automatic; the freeze / decline / report action stays a reviewed
    decision (MLRO sign-off + dual attestation — UAE Federal Decree-Law No. 10 of
-   2025 Art.16/18; FATF R.26). A "no match" is NEVER treated as clearance when the
-   engine could not be reached or a batch errored — that surfaces loudly (the
-   subject is marked errored and its prior status kept) instead of passing silently.
+   2025 Art.16/18; FATF R.26). A "no match" is NEVER treated as clearance when no
+   list could be loaded — that surfaces loudly (the run bails as unscreened, or is
+   flagged degraded) instead of passing silently.
 
-   Engine response shape (per subject), from /api/screen/batch:
-     { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
-   A subject is a match when the engine recommends one, or its band is high/critical,
-   or its score clears the threshold, or it has any list hit.
+   Per-subject result shape (from sanctions-match.mjs, same as the old engine):
+     { name, topScore (0-100), band, recommendation, hitCount, lists[] }
+   A subject is a match when its band is high/critical, its score clears the
+   threshold, or it has any list hit (sanctions, adverse media or PEP).
 
-   Network (Asana read + engine screen + Asana post) is isolated from the pure
-   logic below so test/sanctions-screen.test.mjs runs fully offline. */
+   Network (Asana read + list fetch + media/PEP lookups + Asana post) is isolated
+   from the pure logic below so test/sanctions-screen.test.mjs runs fully offline. */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled } from './asana-notify.mjs';
+import { loadSources } from './reg-watch.mjs';
+import { normalizeName, parseList, buildIndex, screenName } from './sanctions-match.mjs';
+import { checkAdverseMedia } from './adverse-media.mjs';
+import { checkPep } from './pep-check.mjs';
+
+/* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
+   re-exported here so existing importers (tests, runner) are unchanged. */
+export { normalizeName };
 
 export const STATE_FILE   = 'data/sanctions-screen-state.json';
 export const REPORT_FILE  = 'sanctions-screen-report.md';
@@ -41,12 +51,12 @@ export const CHANGES_FILE = 'sanctions-screen-changes.json';
 export const CUSTOMER_PROJECT_GID =
   process.env.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121';
 
-/* Default engine screen path (POST). Override with HAWKEYE_SCREEN_PATH. */
-export const DEFAULT_SCREEN_PATH = '/api/screen/batch';
+/* Consolidated designation lists screened against (data/sanctions-sources.json).
+   Override the file with SANCTIONS_SOURCES_FILE. */
+export const SANCTIONS_SOURCES_FILE = process.env.SANCTIONS_SOURCES_FILE || 'data/sanctions-sources.json';
 
-/* The lists the engine screens against (for the report/alert provenance line).
-   Coverage is the engine's, not this repo's — kept here only for the human note. */
-export const COVERAGE = 'OFAC SDN/non-SDN · UN · EU · UK OFSI · UAE EOCN + Local Terrorist List · INTERPOL red notices · adverse media';
+/* The lists/signals screening covers (for the report/alert provenance line). */
+export const COVERAGE = 'OFAC SDN/non-SDN · UN · EU · UK OFSI · UAE EOCN Local Terrorist List · adverse media (Google News) · PEP (Wikidata)';
 
 /* A score at/above this fraction (engine scores are 0-100) is treated as a match
    even absent an explicit recommendation. Override with SCREEN_MATCH_THRESHOLD. */
@@ -58,14 +68,6 @@ const CLEAR_RE = /^(clear|no[_\s-]?match|no[_\s-]?hit|pass|passed|negative|none|
 const HIGH_BANDS = new Set(['critical', 'high', 'severe', 'elevated', 'red', 'amber']);
 
 /* ── Pure helpers (no network; unit-tested) ───────────────────────────────── */
-
-/* Fold a name to a stable comparison key: strip diacritics, lower-case, collapse
-   non-alphanumerics. Turkish/Arabic trade names compare cleanly across runs. */
-export function normalizeName(s) {
-  return String(s == null ? '' : s)
-    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
 
 function matchField(notes, re) {
   const m = re.exec(String(notes || ''));
@@ -326,42 +328,131 @@ async function fetchAsanaSubjects(projectGid, token) {
   return parseSubjects(tasks);
 }
 
-async function postEngine(cfg, body) {
+/* Fetch one consolidated list — a remote URL, or an in-repo curated file
+   (source.file, e.g. the UAE EOCN list). Returns the raw body or throws. */
+async function fetchListBody(source, timeoutMs = 60000) {
+  if (source.file) {
+    if (!existsSync(source.file)) throw new Error('curated file missing: ' + source.file);
+    return readFileSync(source.file, 'utf8');
+  }
+  /* The URL comes from the in-repo sources config; still validate the scheme so a
+     tampered/extra source can only ever trigger an ordinary http(s) GET (never
+     file:, ftp:, etc.) before it reaches fetch. */
+  let parsed;
+  try { parsed = new URL(source.url); } catch { throw new Error('invalid url'); }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('unsupported url scheme: ' + parsed.protocol);
   return withTimeout(async (signal) => {
-    /* The /api/screen/batch endpoint requires an API key. Send it both ways the
-       engine accepts — Authorization: Bearer <key> and X-Api-Key — for compatibility. */
-    const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
-    if (cfg.key) { headers.Authorization = 'Bearer ' + cfg.key; headers['X-Api-Key'] = cfg.key; }
-    const r = await fetch(cfg.url.replace(/\/$/, '') + cfg.path, { method: 'POST', signal, headers, body: JSON.stringify(body) });
-    const d = await r.json().catch(() => null);
-    if (!r.ok) throw new Error('engine ' + r.status + ': ' + JSON.stringify((d && (d.error || d.errors)) || d || '').slice(0, 200));
-    return d;
-  }, cfg.timeoutMs || 240000);
+    const r = await fetch(parsed.href, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
+    const body = await r.text();
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return body;
+  }, timeoutMs);
 }
 
-async function screenViaEngine(subjects, cfg) {
-  const results = [];
-  let anyOk = false, degraded = false, errored = 0;
-  const batches = Math.ceil(subjects.length / cfg.batchSize);
-  for (let i = 0; i < subjects.length; i += cfg.batchSize) {
-    const batch = subjects.slice(i, i + cfg.batchSize);
-    const n = Math.floor(i / cfg.batchSize) + 1;
+/* Fetch + parse every enabled source into [{ id, name, names[] }]. A source that
+   fails to fetch or yields zero names degrades coverage (reported, never a silent
+   all-clear); a curated list with no entries degrades too. */
+async function loadSanctionsLists(cfg) {
+  let sources;
+  try { sources = loadSources(readFileSync(cfg.sourcesFile, 'utf8')).filter(s => s.enabled !== false); }
+  catch (e) { return { lists: [], degraded: true, fetched: 0, total: 0, notes: ['sources file unreadable: ' + (e && e.message || e)] }; }
+
+  /* Extra / curated lists (e.g. the UAE EOCN file, or extra national XML lists)
+     are loaded leniently — a curated entry has `file` instead of `url`, which the
+     strict loadSources validator rejects. */
+  if (existsSync(cfg.extraFile)) {
     try {
-      const json = await postEngine(cfg, { subjects: batch.map(s => ({ name: s.name, entityType: s.entityType, jurisdiction: s.jurisdiction, idNumber: s.idNumber })) });
-      const norm = normalizeScreenResponse(json, batch);
-      anyOk = true;
-      if (norm.degraded) degraded = true;
-      const got = new Set(norm.results.map(r => r.key));
-      for (const r of norm.results) results.push(r);
-      /* A subject the engine didn't return is NOT assumed clean — mark errored. */
-      for (const s of batch) if (!got.has(s.key)) { results.push({ key: s.key, name: s.name, jurisdiction: s.jurisdiction, gid: s.gid, errored: true }); errored++; }
-      console.log('sanctions-screen: batch ' + n + '/' + batches + ' ok (' + norm.results.length + ' results)');
-    } catch (e) {
-      console.error('sanctions-screen: batch ' + n + '/' + batches + ' failed — ' + (e && e.message || e));
-      for (const s of batch) { results.push({ key: s.key, name: s.name, jurisdiction: s.jurisdiction, gid: s.gid, errored: true }); errored++; }
-    }
+      const extra = JSON.parse(readFileSync(cfg.extraFile, 'utf8'));
+      for (const s of ((extra && extra.sources) || [])) if (s && s.enabled !== false && (s.url || s.file)) sources.push(s);
+    } catch (e) { console.error('sanctions-screen: extra sources unreadable (' + (e && e.message || e) + ')'); }
   }
-  return { results, anyOk, degraded, errored };
+
+  const lists = [], notes = [];
+  let fetched = 0;
+  await Promise.all(sources.map(async (s) => {
+    try {
+      const body = await fetchListBody(s, cfg.listTimeoutMs);
+      const names = parseList(s, body);
+      if (!names.length) { notes.push(s.name + ' parsed 0 names — coverage degraded'); console.error('sanctions-screen: ' + s.id + ' parsed 0 names'); return; }
+      lists.push({ id: s.id, name: s.name, names });
+      fetched++;
+      console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');
+    } catch (e) {
+      notes.push(s.name + ' could not be loaded (' + (e && e.message || e) + ') — coverage degraded');
+      console.error('sanctions-screen: ' + s.id + ' failed — ' + (e && e.message || e));
+    }
+  }));
+  return { lists, degraded: fetched < sources.length, fetched, total: sources.length, notes };
+}
+
+/* Run an async fn over items with bounded concurrency (keeps the per-subject
+   adverse-media / PEP lookups polite). */
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length || 1) }, async () => {
+    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx]); }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+const BAND_RANK = { critical: 4, high: 3, medium: 2, low: 1, '': 0 };
+const strongerBand = (a, b) => ((BAND_RANK[a] || 0) >= (BAND_RANK[b] || 0) ? a : b);
+
+/* Screen every subject locally: sanctions name-match against the loaded lists,
+   plus (optional) adverse-media and PEP signals. Produces the SAME normalised
+   per-subject rows the engine path produced, so diff/alert/report are unchanged.
+   Each signal contributes a `lists[]` entry; a subject with any hit is material. */
+async function screenLocally(subjects, cfg) {
+  const loaded = await loadSanctionsLists(cfg);
+  /* No list at all = we cannot screen sanctions — never infer a clean result. */
+  if (!loaded.lists.length) return { results: [], anyOk: false, degraded: true, errored: 0, notes: loaded.notes, coverage: loaded };
+
+  const index = buildIndex(loaded.lists);
+  const thr = cfg.threshold * 100;
+  console.log('sanctions-screen: indexed ' + index.size + ' designated names from ' + loaded.lists.length + ' list(s); matching ' + subjects.length + ' subjects (threshold ' + thr + ')');
+
+  let degraded = loaded.degraded, amErrors = 0, pepErrors = 0;
+  const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
+    const raw = screenName(s.name, index, thr);   // { name, topScore, band, recommendation, hitCount, lists[] }
+    const lists = [...raw.lists];
+    let band = raw.lists.length ? raw.band : '';
+    let topScore = raw.lists.length ? raw.topScore : 0;
+
+    if (cfg.adverseMedia) {
+      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (am.errored) { amErrors++; degraded = true; }
+      else if (am.hit) {
+        lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : ''), score: am.score });
+        band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
+      }
+    }
+    if (cfg.pep) {
+      const pp = await checkPep(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (pp.errored) { pepErrors++; degraded = true; }
+      else if (pp.hit) {
+        lists.push({ list: 'PEP (Wikidata)', hitName: (pp.match && (pp.match.label + ' — ' + pp.match.description) || '').slice(0, 180), score: pp.score });
+        band = strongerBand(band, pp.band); topScore = Math.max(topScore, pp.score);
+      }
+    }
+
+    const hasSanctions = raw.lists.length > 0;
+    const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
+    const merged = {
+      name: s.name,
+      topScore: lists.length ? topScore : raw.topScore,
+      band: lists.length ? band : 'low',
+      recommendation,
+      hitCount: lists.length,
+      lists
+    };
+    return normalizeResult(merged, s);
+  });
+
+  if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
+  if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
+  return { results, anyOk: true, degraded, errored: 0, notes: loaded.notes, coverage: loaded };
 }
 
 function loadState() {
@@ -399,26 +490,28 @@ function bailUnscreened(reason, today) {
 async function main() {
   const today = new Date().toISOString().slice(0, 10);
   const cfg = {
-    url: process.env.HAWKEYE_API_URL || '',
-    key: process.env.HAWKEYE_API_KEY || '',
-    path: process.env.HAWKEYE_SCREEN_PATH || DEFAULT_SCREEN_PATH,
-    batchSize: Number(process.env.SCREEN_BATCH_SIZE) || 20,
-    timeoutMs: Number(process.env.SCREEN_TIMEOUT_MS) || 240000,
-    threshold: DEFAULT_THRESHOLD
+    sourcesFile: SANCTIONS_SOURCES_FILE,
+    extraFile: process.env.SANCTIONS_EXTRA_FILE || 'data/sanctions-extra.json',
+    threshold: Number(process.env.SCREEN_MATCH_THRESHOLD) || DEFAULT_THRESHOLD,
+    adverseMedia: process.env.SCREEN_ADVERSE_MEDIA !== '0',   // default on
+    pep: process.env.SCREEN_PEP !== '0',                      // default on
+    listTimeoutMs: Number(process.env.SCREEN_LIST_TIMEOUT_MS) || 60000,
+    checkTimeoutMs: Number(process.env.SCREEN_CHECK_TIMEOUT_MS) || 20000,
+    concurrency: Number(process.env.SCREEN_CONCURRENCY) || 4
   };
   const asanaToken = process.env.ASANA_ACCESS_TOKEN || '';
 
   if (!asanaToken) return bailUnscreened('ASANA_ACCESS_TOKEN not set — cannot read the Customer Database', today);
-  if (!cfg.url) return bailUnscreened('HAWKEYE_API_URL not set — screening engine not configured', today);
 
   let subjects;
   try { subjects = await fetchAsanaSubjects(CUSTOMER_PROJECT_GID, asanaToken); }
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
 
-  console.log('sanctions-screen: screening ' + subjects.length + ' active customers via ' + cfg.path + ' (batch ' + cfg.batchSize + ')');
-  const screen = await screenViaEngine(subjects, cfg);
-  if (!screen.anyOk) return bailUnscreened('the screening engine was unreachable for every batch', today);
+  console.log('sanctions-screen: screening ' + subjects.length + ' active customers against the free consolidated lists'
+    + (cfg.adverseMedia ? ' + adverse media' : '') + (cfg.pep ? ' + PEP' : ''));
+  const screen = await screenLocally(subjects, cfg);
+  if (!screen.anyOk) return bailUnscreened('no sanctions list could be loaded — ' + ((screen.notes || []).join('; ') || 'all sources failed'), today);
 
   const prevState = loadState();
   const { alerts, cleared, matchCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold);

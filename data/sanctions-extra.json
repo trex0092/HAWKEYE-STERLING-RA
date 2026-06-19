@@ -1,0 +1,35 @@
+{
+  "_README": "Additional / curated sanctions lists loaded ONLY by scripts/sanctions-screen.mjs (not by the watcher's strict loader). A source may be remote (`url` + `parser`) or in-repo curated (`file`, parser 'curated'). Set `enabled:false` to keep a source configured but skipped. A remote source that fails or parses 0 names, or a curated list with no entries, degrades coverage (reported loudly) — never a silent all-clear.",
+  "sources": [
+    {
+      "id": "uae-eocn-local-terrorist",
+      "name": "UAE EOCN — Local Terrorist List",
+      "jurisdiction": "United Arab Emirates",
+      "file": "data/eocn-local-terrorist-list.json",
+      "type": "curated",
+      "parser": "curated",
+      "enabled": true,
+      "_note": "EOCN publishes this only as PDF/Excel behind bot protection — no free machine-readable feed. Maintain the names in data/eocn-local-terrorist-list.json from the official EOCN download (https://www.uaeiec.gov.ae). While unpopulated it flags 'coverage incomplete', never a clean result."
+    },
+    {
+      "id": "ca-sema",
+      "name": "Canada — Consolidated Autonomous Sanctions (SEMA, XML)",
+      "jurisdiction": "Global",
+      "url": "https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml",
+      "type": "xml",
+      "parser": "xml",
+      "enabled": true,
+      "_note": "Best-effort generic-XML parse; if the structure changes it degrades visibly rather than silently."
+    },
+    {
+      "id": "ch-seco",
+      "name": "Switzerland — SECO sanctions list (XML)",
+      "jurisdiction": "Global",
+      "url": "",
+      "type": "xml",
+      "parser": "xml",
+      "enabled": false,
+      "_note": "Disabled until the current SECO overall-list XML download URL is confirmed (https://www.seco.admin.ch/en/searching-for-subjects-sanctions). Set the url and enabled:true to switch on."
+    }
+  ]
+}
