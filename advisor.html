@@ -37,7 +37,7 @@ header{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify
 .avatar>div{width:100%;height:100%;background-size:cover;background-repeat:no-repeat}
 .brand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .wordmark{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-0.01em;line-height:1;background:linear-gradient(90deg,var(--ac1),var(--ac2) 82%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;filter:drop-shadow(0 0 10px rgba(var(--glow),0.35));white-space:nowrap}
-.sub{font-family:var(--mono);font-size:10.5px;letter-spacing:0.04em;color:#646F86;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-family:var(--mono);font-size:10.5px;letter-spacing:0.04em;color:#828DA4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hdr-right{display:flex;align-items:center;gap:14px}
 .nav{display:flex;align-items:center;gap:4px}
 .nav a{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#A3ADC0;text-decoration:none;padding:6px 11px;border-radius:7px;border:1px solid transparent;transition:all .16s;white-space:nowrap}
@@ -71,11 +71,11 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 .ask-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;background:rgba(var(--glow),0.15);border:1px solid rgba(var(--glow),0.55);color:#FCE3EF;font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:0.01em;cursor:pointer;white-space:nowrap;box-shadow:0 0 12px rgba(var(--glow),0.26),inset 0 0 9px rgba(var(--glow),0.06);transition:transform .18s,box-shadow .18s,background .18s}
 .ask-btn:hover{transform:translateY(-1px);background:rgba(var(--glow),0.24);box-shadow:0 0 26px rgba(var(--glow),0.5)}
 .mode-strip{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-top:22px}
-.mode-strip .ml{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#646F86;text-transform:uppercase}
+.mode-strip .ml{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#828DA4;text-transform:uppercase}
 .mode-group{display:flex;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:10px;padding:4px;gap:3px}
 .mode-btn{padding:8px 15px;border-radius:7px;font-family:var(--mono);font-size:12px;cursor:pointer;border:none;white-space:nowrap;transition:all .18s;background:transparent;color:#A3ADC0;font-weight:500}
 .mode-btn.active{background:rgba(var(--glow),0.16);color:#FCE3EF;box-shadow:inset 0 0 0 1px rgba(var(--glow),0.5);font-weight:600}
-.mode-hint{margin-top:14px;font-family:var(--mono);font-size:10.5px;color:#646F86;display:flex;align-items:center;gap:8px}
+.mode-hint{margin-top:14px;font-family:var(--mono);font-size:10.5px;color:#828DA4;display:flex;align-items:center;gap:8px}
 .mode-hint b{color:var(--ac2);font-weight:400}
 
 .persona-name{font-family:var(--mono);font-size:11px;color:#A3ADC0}
@@ -107,7 +107,7 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 
 /* Answer */
 .ans{animation:fadeUp .5s cubic-bezier(.22,.7,.25,1)}
-.eyebrow{font-family:var(--mono);font-size:10.5px;color:#646F86;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px}
+.eyebrow{font-family:var(--mono);font-size:10.5px;color:#828DA4;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px}
 .asked{font-size:14px;color:#C9D2E2;line-height:1.5;margin-bottom:18px}
 .pill{display:inline-flex;align-items:center;padding:6px 14px;border-radius:8px;font-family:var(--display);font-weight:600;font-size:13px;border:1px solid}
 .conf{font-family:var(--mono);font-size:11px;color:#4FD6A0;display:inline-flex;align-items:center;gap:6px}
@@ -155,7 +155,7 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
 .qa-basis{background:#0B101A;border:1px solid rgba(255,255,255,0.08);border-left:2px solid var(--ac2);border-radius:8px;padding:9px 12px}
 .qa-basis .ref{font-family:var(--mono);font-size:11px;font-weight:600;color:#D7A24E;margin-bottom:2px}
 .qa-basis .note{font-size:12.5px;color:#A3ADC0;line-height:1.5}
-.empty{font-size:14px;color:#646F86;text-align:center;padding:30px 0;font-family:var(--mono)}
+.empty{font-size:14px;color:#828DA4;text-align:center;padding:30px 0;font-family:var(--mono)}
 
 /* Super Tools */
 .tool-select{width:100%;background:#0B101A;border:1px solid rgba(255,255,255,0.11);border-radius:11px;padding:13px 16px;color:#EDEFF4;font-family:var(--sans);font-size:14px;outline:none;cursor:pointer}
@@ -380,7 +380,7 @@ function renderAsk(){
     '<div class="ask-grid">'
     + '<div class="card"><div class="card-pad">'
     +   '<div class="sec-lbl"><span>Your question</span><i></i></div>'
-    +   '<textarea class="q" id="qInput" placeholder="Ask a compliance question, e.g. what CDD applies to a cross-border gold shipment?"></textarea>'
+    +   '<textarea class="q" id="qInput" aria-label="Compliance question" placeholder="Ask a compliance question, e.g. what CDD applies to a cross-border gold shipment?"></textarea>'
     +   '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px">'
     +     '<button class="ask-btn" id="askBtn">Ask the advisor <span style="font-size:11px">&#9658;</span></button>'
     +   '</div>'
@@ -585,7 +585,7 @@ function renderToolResult(){
       +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
       +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
       + '</div>'
-      + '<div style="font-family:var(--mono);font-size:12px;color:#646F86">Compiling cited guidance…</div>'
+      + '<div style="font-family:var(--mono);font-size:12px;color:#828DA4">Compiling cited guidance…</div>'
       + '</div>';
   }
   if(r.kind==='brain'){
