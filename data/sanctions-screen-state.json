@@ -1,4 +1,73 @@
 {
-  "updated": null,
-  "subjects": {}
+  "updated": "2026-06-19",
+  "subjects": {
+    "uya enerji uretim sanayi ve ticaret anonim sirketi": {
+      "name": "UYA ENERJİ ÜRETİM SANAYİ VE TİCARET ANONİM ŞİRKETİ",
+      "jurisdiction": "Turkey",
+      "band": "high",
+      "topScore": 94,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "US OFAC — SDN list (CSV)",
+        "US OFAC — SDN list (CSV)"
+      ],
+      "signature": "high|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
+      "firstSeen": "2026-06-19",
+      "lastSeen": "2026-06-19"
+    },
+    "kovanlik enerji uretim sanayi ve ticaretanonim sirketi": {
+      "name": "KOVANLIK ENERJİ ÜRETİM SANAYİ VE TİCARETANONİM ŞİRKETİ",
+      "jurisdiction": "Turkey",
+      "band": "high",
+      "topScore": 87,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "US OFAC — SDN list (CSV)",
+        "US OFAC — SDN list (CSV)"
+      ],
+      "signature": "high|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
+      "firstSeen": "2026-06-19",
+      "lastSeen": "2026-06-19"
+    },
+    "global precious metals pte ltd": {
+      "name": "Global Precious Metals Pte. Ltd",
+      "jurisdiction": "Singapore",
+      "band": "high",
+      "topScore": 87,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "US OFAC — SDN list (CSV)"
+      ],
+      "signature": "high|sanctions-match|US OFAC — SDN list (CSV)",
+      "firstSeen": "2026-06-19",
+      "lastSeen": "2026-06-19"
+    },
+    "amber international fzco": {
+      "name": "Amber International FZCO",
+      "jurisdiction": "United Arab Emirates",
+      "band": "critical",
+      "topScore": 100,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "US OFAC — SDN list (CSV)",
+        "US OFAC — SDN list (CSV)"
+      ],
+      "signature": "critical|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
+      "firstSeen": "2026-06-19",
+      "lastSeen": "2026-06-19"
+    },
+    "aurum international fze": {
+      "name": "Aurum International (FZE)",
+      "jurisdiction": "United Arab Emirates",
+      "band": "critical",
+      "topScore": 100,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "US OFAC — SDN list (CSV)"
+      ],
+      "signature": "critical|sanctions-match|US OFAC — SDN list (CSV)",
+      "firstSeen": "2026-06-19",
+      "lastSeen": "2026-06-19"
+    }
+  }
 }
