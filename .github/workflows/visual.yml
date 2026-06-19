@@ -79,9 +79,16 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            await github.rest.issues.create({
-              owner, repo,
-              title: 'Visual regression: baseline ready to open',
-              body: `Baseline snapshots were pushed to branch \`visual/baseline\`. Open the PR: https://github.com/${owner}/${repo}/pull/new/visual/baseline`,
-              labels: ['visual-regression'],
+            const title = 'Visual regression: baseline ready to open';
+            const body = `Baseline snapshots were pushed to branch \`visual/baseline\`. Open the PR: https://github.com/${owner}/${repo}/pull/new/visual/baseline`;
+            // Idempotent: reuse an already-open fallback issue instead of piling up duplicates.
+            const existing = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', labels: 'visual-regression', per_page: 100,
             });
+            const open = existing.data.find(i => !i.pull_request && i.title === title);
+            if (open) {
+              core.info(`Fallback issue already open: #${open.number} — not creating a duplicate.`);
+            } else {
+              const created = await github.rest.issues.create({ owner, repo, title, body, labels: ['visual-regression'] });
+              core.info(`Opened fallback issue #${created.data.number}.`);
+            }
