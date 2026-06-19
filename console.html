@@ -237,23 +237,23 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 const OPERATORS = [
-  {id:'cypher',  img:'assets/persona-cypher.png',  pos:'42% 30%', name:'Cypher',  role:'Transaction Monitoring Unit', ac:'255,92,168'},
-  {id:'sterling',img:'assets/persona-sterling.png',pos:'36% 22%', name:'Sterling',role:'Entity Risk Assessment',     ac:'59,229,208'},
-  {id:'vale',    img:'assets/persona-vale.png',    pos:'50% 22%', name:'Vale',    role:'KYC & Onboarding',           ac:'120,170,255'},
-  {id:'ember',   img:'assets/persona-ember.png',   pos:'50% 26%', name:'Ember',   role:'PEP & Adverse Media Screening',  ac:'255,87,87'},
-  {id:'brass',   img:'assets/persona-brass.png',   pos:'46% 26%', name:'Brass',   role:'Records & Audit',            ac:'247,197,60'},
-  {id:'iris',    img:'assets/persona-iris.png',    pos:'42% 26%', name:'Iris',    role:'Typologies & Training',      ac:'180,92,255'},
-  {id:'bullion', img:'assets/persona-bullion.png', pos:'50% 20%', name:'Bullion', role:'Precious Metals & Stones (DPMS)',     ac:'255,90,200'},
-  {id:'cinder',  img:'assets/persona-cinder.png',  pos:'40% 30%', name:'Cinder',  role:'Terrorism & Proliferation Financing', ac:'70,150,255'},
-  {id:'verde',   img:'assets/persona-verde.png',   pos:'46% 26%', name:'Verde',   role:'ESG & Human Rights',                  ac:'60,200,130'},
-  {id:'haven',   img:'assets/persona-haven.png',   pos:'42% 26%', name:'Haven',   role:'Artificial Intelligence',             ac:'230,180,70'},
-  {id:'cobalt',  img:'assets/persona-cobalt.png', pos:'55% 22%', name:'Cobalt',  role:'Trade-Based ML & Trade Finance',      ac:'235,190,90'},
-  {id:'sentinel',img:'assets/persona-sentinel.png',pos:'55% 20%', name:'Sentinel',role:'Sanctions Evasion & Watchlists',      ac:'255,70,90'},
-  {id:'lattice', img:'assets/persona-lattice.png', pos:'55% 18%', name:'Lattice', role:'Beneficial Ownership & UBO',          ac:'90,160,255'},
-  {id:'talon',   img:'assets/persona-talon.png',   pos:'55% 20%', name:'Talon',   role:'Trade Sanctions & Export Controls',    ac:'170,90,255'},
-  {id:'quartz',  img:'assets/persona-quartz.png',  pos:'55% 20%', name:'Quartz',  role:'Source of Wealth / Source of Funds',   ac:'60,210,120'},
-  {id:'beacon',  img:'assets/persona-beacon.png',  pos:'55% 20%', name:'Beacon',  role:'Whistleblowing & Internal Investigations', ac:'255,150,40'},
-  {id:'warden',  img:'assets/persona-warden.png',  pos:'52% 18%', name:'Warden',  role:'Board & MLRO Governance',              ac:'210,80,200'}
+  {id:'cypher',  img:'assets/persona-cypher.webp',  pos:'42% 30%', name:'Cypher',  role:'Transaction Monitoring Unit', ac:'255,92,168'},
+  {id:'sterling',img:'assets/persona-sterling.webp',pos:'36% 22%', name:'Sterling',role:'Entity Risk Assessment',     ac:'59,229,208'},
+  {id:'vale',    img:'assets/persona-vale.webp',    pos:'50% 22%', name:'Vale',    role:'KYC & Onboarding',           ac:'120,170,255'},
+  {id:'ember',   img:'assets/persona-ember.webp',   pos:'50% 26%', name:'Ember',   role:'PEP & Adverse Media Screening',  ac:'255,87,87'},
+  {id:'brass',   img:'assets/persona-brass.webp',   pos:'46% 26%', name:'Brass',   role:'Records & Audit',            ac:'247,197,60'},
+  {id:'iris',    img:'assets/persona-iris.webp',    pos:'42% 26%', name:'Iris',    role:'Typologies & Training',      ac:'180,92,255'},
+  {id:'bullion', img:'assets/persona-bullion.webp', pos:'50% 20%', name:'Bullion', role:'Precious Metals & Stones (DPMS)',     ac:'255,90,200'},
+  {id:'cinder',  img:'assets/persona-cinder.webp',  pos:'40% 30%', name:'Cinder',  role:'Terrorism & Proliferation Financing', ac:'70,150,255'},
+  {id:'verde',   img:'assets/persona-verde.webp',   pos:'46% 26%', name:'Verde',   role:'ESG & Human Rights',                  ac:'60,200,130'},
+  {id:'haven',   img:'assets/persona-haven.webp',   pos:'42% 26%', name:'Haven',   role:'Artificial Intelligence',             ac:'230,180,70'},
+  {id:'cobalt',  img:'assets/persona-cobalt.webp', pos:'55% 22%', name:'Cobalt',  role:'Trade-Based ML & Trade Finance',      ac:'235,190,90'},
+  {id:'sentinel',img:'assets/persona-sentinel.webp',pos:'55% 20%', name:'Sentinel',role:'Sanctions Evasion & Watchlists',      ac:'255,70,90'},
+  {id:'lattice', img:'assets/persona-lattice.webp', pos:'55% 18%', name:'Lattice', role:'Beneficial Ownership & UBO',          ac:'90,160,255'},
+  {id:'talon',   img:'assets/persona-talon.webp',   pos:'55% 20%', name:'Talon',   role:'Trade Sanctions & Export Controls',    ac:'170,90,255'},
+  {id:'quartz',  img:'assets/persona-quartz.webp',  pos:'55% 20%', name:'Quartz',  role:'Source of Wealth / Source of Funds',   ac:'60,210,120'},
+  {id:'beacon',  img:'assets/persona-beacon.webp',  pos:'55% 20%', name:'Beacon',  role:'Whistleblowing & Internal Investigations', ac:'255,150,40'},
+  {id:'warden',  img:'assets/persona-warden.webp',  pos:'52% 18%', name:'Warden',  role:'Board & MLRO Governance',              ac:'210,80,200'}
 ];
 
 /* ── Data source: the assessment register (localStorage). Absent (new app) or

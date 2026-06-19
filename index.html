@@ -91,7 +91,7 @@ body::before{content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
 .doc-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 30px;height:var(--hdr-h);position:sticky;top:0;z-index:200;background:rgba(8,11,18,0.88);border-bottom:1px solid var(--border2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .brand-area{display:flex;align-items:center;gap:13px;min-width:0}
 .brand-avatar{width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#0B101A;border:1.5px solid rgba(var(--glow),0.55);box-shadow:0 0 16px rgba(var(--glow),0.30)}
-.brand-avatar>span{display:block;width:100%;height:100%;background-image:url('assets/persona-sterling.png');background-size:cover;background-position:36% 24%}
+.brand-avatar>span{display:block;width:100%;height:100%;background-image:url('assets/persona-sterling.webp');background-size:cover;background-position:36% 24%}
 .brand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .brand-name{font-family:var(--display);font-size:18px;font-weight:700;letter-spacing:0.06em;line-height:1;white-space:nowrap;background:linear-gradient(90deg,var(--ac1),var(--ac2) 82%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 10px rgba(var(--glow),0.30))}
 .brand-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -377,7 +377,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .sec-bot-dot{position:absolute;top:-2px;left:50%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:#FF5CA8;box-shadow:0 0 9px 2px rgba(255,92,168,0.85)}
 .sec-bot-dot2{top:auto;bottom:-2px;width:5px;height:5px;margin-left:-2.5px;background:#5FE6FF;box-shadow:0 0 9px 2px rgba(95,230,255,0.80)}
 .sec-bot-ring{position:absolute;inset:7px;border-radius:50%;overflow:hidden;border:2px solid transparent;background:linear-gradient(#0B101A,#0B101A) padding-box,linear-gradient(135deg,#B45CFF,#FF5CA8 55%,#5FE6FF) border-box;box-shadow:inset 0 0 14px rgba(180,92,255,0.35);transition:transform .5s cubic-bezier(.22,.7,.25,1),box-shadow .3s ease}
-.sec-bot-img{display:block;width:100%;height:100%;border-radius:50%;background:url('assets/persona-lock.png') 55% 18%/cover}
+.sec-bot-img{display:block;width:100%;height:100%;border-radius:50%;background:url('assets/persona-lock.webp') 55% 18%/cover}
 @keyframes cuteWiggle{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-9deg) scale(1.06)}55%{transform:rotate(9deg) scale(1.06)}80%{transform:rotate(-4deg) scale(1.02)}}
 .sec-bot-badge{position:absolute;right:3px;bottom:3px;width:31px;height:31px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(180deg,#FFA6DA,#C46BFF);box-shadow:0 0 14px rgba(255,140,210,0.6),0 2px 6px rgba(0,0,0,0.4);border:2px solid rgba(255,255,255,0.9);transform-origin:50% 50%;animation:cuteWiggle 3.4s ease-in-out infinite}
 .sec-bot:hover .sec-bot-badge{animation-duration:1.4s}
@@ -433,7 +433,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 #printReport .mast{display:flex;justify-content:space-between;align-items:flex-start;background:var(--dark);color:#fff;border-radius:11px;padding:16px 20px;margin-bottom:14px;print-color-adjust:exact;-webkit-print-color-adjust:exact}
 #printReport .mast-brand{display:flex;align-items:center;gap:13px}
 #printReport .avatar{width:46px;height:46px;border-radius:50%;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(91,200,216,.55);box-shadow:0 0 16px rgba(122,79,224,.45);background:#0B101A}
-#printReport .avatar>div{width:100%;height:100%;background-image:url('assets/persona-sterling.png');background-size:135%;background-position:38% 32%}
+#printReport .avatar>div{width:100%;height:100%;background-image:url('assets/persona-sterling.webp');background-size:135%;background-position:38% 32%}
 #printReport .mast-name{font-size:21px;font-weight:700;letter-spacing:.12em;line-height:1;background:linear-gradient(90deg,#FF5CA8,#B45CFF 82%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;print-color-adjust:exact}
 #printReport .mast-tag{font-size:8px;letter-spacing:.18em;color:#8C93A4;text-transform:uppercase;margin-top:6px}
 #printReport .mast-doc{text-align:right}
@@ -2237,20 +2237,20 @@ function toggleOvForm(){
    advisory note follow the operative outcome (CDD → Vale, SDD → Cypher,
    EDD / PROHIBITED → Ember). Mirrors the design's advisorFor() mapping. */
 const ADVISORS = {
-  high: {img:'assets/persona-ember.png',  pos:'50% 26%', name:'Ember',  role:'Sanctions & high-risk', rgb:'255,87,87',
+  high: {img:'assets/persona-ember.webp',  pos:'50% 26%', name:'Ember',  role:'Sanctions & high-risk', rgb:'255,87,87',
          note:'High risk. Escalate for enhanced due diligence, full sanctions screening, and senior-management sign-off.'},
-  med:  {img:'assets/persona-cypher.png', pos:'42% 30%', name:'Cypher', role:'Active monitoring',      rgb:'247,197,60',
+  med:  {img:'assets/persona-cypher.webp', pos:'42% 30%', name:'Cypher', role:'Active monitoring',      rgb:'247,197,60',
          note:'Elevated risk. Apply enhanced monitoring, refresh KYC records, and document the rationale for the rating.'},
-  low:  {img:'assets/persona-vale.png',   pos:'50% 22%', name:'Vale',   role:'KYC & onboarding',       rgb:'59,229,208',
+  low:  {img:'assets/persona-vale.webp',   pos:'50% 22%', name:'Vale',   role:'KYC & onboarding',       rgb:'59,229,208',
          note:'Standard customer due diligence is sufficient. Proceed with routine onboarding and a periodic review cycle.'}
 };
 
 /* Gauge-core robot — face + accent for the score gauge, swapped by risk band:
    green robot (low) → gold robot (medium) → red robot (high). */
 const GAUGE_ROBOTS = {
-  high: {img:'assets/robot-high.png', pos:'50% 16%', size:'170%', rgb:'255,87,87'},
-  med:  {img:'assets/robot-med.png',  pos:'50% 20%', size:'176%', rgb:'247,197,60'},
-  low:  {img:'assets/robot-low.png',  pos:'52% 32%', size:'172%', rgb:'52,211,120'}
+  high: {img:'assets/robot-high.webp', pos:'50% 16%', size:'170%', rgb:'255,87,87'},
+  med:  {img:'assets/robot-med.webp',  pos:'50% 20%', size:'176%', rgb:'247,197,60'},
+  low:  {img:'assets/robot-low.webp',  pos:'52% 32%', size:'172%', rgb:'52,211,120'}
 };
 function advisorKind(outcome){ return (outcome==='EDD'||outcome==='PROHIBITED') ? 'high' : outcome==='SDD' ? 'med' : 'low'; }
 function updateAdvisor(outcome){
