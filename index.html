@@ -322,6 +322,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .rd-panel{width:min(940px,94vw);height:min(86vh,840px);display:flex;flex-direction:column;background:var(--card-bg);border:1px solid var(--border2);border-radius:16px;box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);position:relative;overflow:hidden}
 .rd-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent);pointer-events:none}
 .rd-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border2)}
+.rd-note{margin:0;padding:8px 18px;font-size:10.5px;line-height:1.5;color:var(--text3);border-bottom:1px solid var(--border);background:rgba(255,255,255,0.015)}
 .rd-meta{font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.4px}
 .rd-spacer{flex:1}
 .rd-close{background:none;border:1px solid var(--border2);color:var(--text2);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1;transition:all .18s;flex-shrink:0}
@@ -830,6 +831,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeRiskData()" title="Close" aria-label="Close risk data panel">✕</button>
       </div>
+      <p class="rd-note">Baseline scores are firm-maintained template values &mdash; review and maintain them against your firm&rsquo;s risk methodology and current sources. Record any change as a reason-stamped override.</p>
       <div class="rd-toolbar">
         <button class="rd-tab active" id="rdTab_countries" onclick="rdSetTab('countries')">Countries</button>
         <button class="rd-tab" id="rdTab_activities" onclick="rdSetTab('activities')">Activities</button>
