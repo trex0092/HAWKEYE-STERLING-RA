@@ -288,10 +288,14 @@ async function fetchAsanaSubjects(projectGid, token) {
 
 async function postEngine(cfg, body, timeoutMs = 90000) {
   return withTimeout(async (signal) => {
+    /* Bearer auth only when a key is configured — the engine's screen endpoint
+       may be open (read-only screening), in which case the URL alone suffices. */
+    const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+    if (cfg.key) headers.Authorization = 'Bearer ' + cfg.key;
     const r = await fetch(cfg.url.replace(/\/$/, '') + cfg.path, {
       method: 'POST',
       signal,
-      headers: { Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers,
       body: JSON.stringify(body)
     });
     const d = await r.json().catch(() => null);
@@ -366,7 +370,7 @@ async function main() {
   const asanaToken = process.env.ASANA_ACCESS_TOKEN || '';
 
   if (!asanaToken) return bailUnscreened('ASANA_ACCESS_TOKEN not set — cannot read the Customer Database', today);
-  if (!cfg.url || !cfg.key) return bailUnscreened('HAWKEYE_API_URL / HAWKEYE_API_KEY not set — screening engine not configured', today);
+  if (!cfg.url) return bailUnscreened('HAWKEYE_API_URL not set — screening engine not configured', today);
 
   let subjects;
   try { subjects = await fetchAsanaSubjects(CUSTOMER_PROJECT_GID, asanaToken); }
