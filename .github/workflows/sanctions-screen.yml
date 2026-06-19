@@ -25,8 +25,13 @@ name: Sanctions Screen
 #   SCREEN_MATCH_THRESHOLD        material-match score (default 0.85)
 
 on:
-  schedule:
-    - cron: '0 6 * * *'   # 06:00 UTC daily (after Sanctions Watch at 05:00)
+  # Daily schedule PAUSED until the engine accepts the screening key.
+  # The screen endpoint (/api/screen/batch) rejects HAWKEYE_API_KEY because the
+  # engine validates its own internal API key, which can't be set from here.
+  # Re-enable by uncommenting the schedule below once the engine developer either
+  # accepts ONGOING_RUN_TOKEN, hands over the screening key, or redeploys.
+  # schedule:
+  #   - cron: '0 6 * * *'   # 06:00 UTC daily (after Sanctions Watch at 05:00)
   workflow_dispatch:
 
 permissions:
