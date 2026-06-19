@@ -226,7 +226,7 @@ export function matchSummary(a) {
   if (a.band) bits.push(a.band.toUpperCase());
   if (typeof a.topScore === 'number') bits.push('score ' + a.topScore);
   if (a.recommendation) bits.push(a.recommendation);
-  const lists = (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean);
+  const lists = [...new Set((a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean))];
   if (lists.length) bits.push('lists: ' + lists.join(', '));
   return bits.join(' · ') || 'flagged';
 }
@@ -413,7 +413,13 @@ async function screenLocally(subjects, cfg) {
   const thr = cfg.threshold * 100;
   console.log('sanctions-screen: indexed ' + index.size + ' designated names from ' + loaded.lists.length + ' list(s); matching ' + subjects.length + ' subjects (threshold ' + thr + ')');
 
-  let degraded = loaded.degraded, amErrors = 0, pepErrors = 0;
+  /* `degraded` reflects SANCTIONS coverage only (a list failed to load / parsed
+     0 names). Adverse-media and PEP are best-effort enrichment signals — when
+     they're unavailable (e.g. Wikidata rate-limits the PEP lookups) we record it
+     and report it, but it does NOT degrade the sanctions screen or weaken its
+     "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
+  const degraded = loaded.degraded;
+  let amErrors = 0, pepErrors = 0;
   const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr);   // { name, topScore, band, recommendation, hitCount, lists[] }
     const lists = [...raw.lists];
@@ -422,7 +428,7 @@ async function screenLocally(subjects, cfg) {
 
     if (cfg.adverseMedia) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
-      if (am.errored) { amErrors++; degraded = true; }
+      if (am.errored) { amErrors++; }
       else if (am.hit) {
         lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : ''), score: am.score });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
@@ -430,7 +436,7 @@ async function screenLocally(subjects, cfg) {
     }
     if (cfg.pep) {
       const pp = await checkPep(s.name, { timeoutMs: cfg.checkTimeoutMs });
-      if (pp.errored) { pepErrors++; degraded = true; }
+      if (pp.errored) { pepErrors++; }
       else if (pp.hit) {
         lists.push({ list: 'PEP (Wikidata)', hitName: (pp.match && (pp.match.label + ' — ' + pp.match.description) || '').slice(0, 180), score: pp.score });
         band = strongerBand(band, pp.band); topScore = Math.max(topScore, pp.score);
