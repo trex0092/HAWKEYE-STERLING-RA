@@ -4,6 +4,12 @@
 **Assessed against:** *AI Governance & Security Periodic Table (2026)* — 36 building blocks
 **Date:** 2026-06-14 · **Prepared by:** Compliance engineering
 
+> **Revision 2026-06-19 (QA correction):** scope corrected — the suite ships an
+> optional **LLM-backed Advisor** (`netlify/functions/brain-soul.js` → Anthropic
+> API), so the generative-AI tiles are assessed for it in **§1a** rather than
+> marked product-wide Not Applicable. The serverless-function count is corrected
+> (four, not two). The deterministic RA engine (`index.html`) posture is unchanged.
+
 ---
 
 ## 1. Scope and framing
@@ -12,21 +18,24 @@ The periodic table enumerates building blocks for securing **enterprise AI/LLM
 systems** (model drift, hallucination, vector databases, identity providers,
 data-protection pipelines, and so on).
 
-Hawkeye Sterling RA is **not an AI system**. It is a single-file static web app
-(`index.html`) with:
+The Hawkeye Sterling RA **scoring engine** is **not an AI system**. It is a
+single-file static web app (`index.html`) with:
 
 - **no AI/LLM** — scoring is a deterministic, rules-based AML/CFT engine;
 - **no backend / no server-side state** — it runs entirely in the browser and
   deploys to a static host (Netlify);
 - **no user accounts** — a single compliance officer operates it on their device;
-- **two thin serverless functions** (`netlify/functions/*`) whose only job is to
-  relay completed-assessment and risk-data-backup events to Asana with a
-  server-held token.
+- **four serverless functions** (`netlify/functions/*`): three relay
+  completed-assessment, entity-mirror and risk-data-backup events to Asana with a
+  server-held token; one (`brain-soul.js`) backs the optional **Advisor** screen
+  (`advisor.html`) by calling the **Anthropic API** with a server-held key — see §1a.
 
-Consequently, a large share of the table is **Not Applicable (N-A)**: there is no
-model to drift, bias, hallucinate, or red-team; no vector store; no data pipeline;
-and no backend on which to host an enterprise identity provider. Those tiles are
-marked N-A with the architectural precondition that would make them relevant.
+For the **RA scoring engine itself** (`index.html`), a large share of the table is
+**Not Applicable (N-A)**: there is no model to drift, bias, hallucinate, or
+red-team; no vector store; no data pipeline; and no backend on which to host an
+enterprise identity provider. The tile-by-tile table in §2 assesses **that engine**
+and marks those tiles N-A with the architectural precondition that would make them
+relevant. The separate Advisor AI component is assessed in §1a.
 
 This release **closes the genuinely-applicable gaps** for an on-device tool:
 encryption-at-rest, a passphrase access gate with idle auto-lock, a tamper-evident
@@ -34,6 +43,34 @@ activity log, and edge/function hardening. See §3.
 
 **Status key:** ✅ implemented · 🟡 partial / analogue · ❌ absent (applicable) ·
 N-A not applicable to a non-AI, on-device app.
+
+---
+
+## 1a. AI component — the Advisor
+
+The suite also ships an **optional, LLM-backed Advisor** (`advisor.html`) served by
+`netlify/functions/brain-soul.js`, which calls the **Anthropic API** (server-held
+`ANTHROPIC_API_KEY`; the key never reaches the browser). For this component the
+generative-AI tiles — **HALL, BIAS, DRIFT, REDT, VDB** (if embeddings are added),
+**ISO 42001** and the **EU AI Act** — are **in scope**, not N-A.
+
+Guardrails already present in `brain-soul.js` are **prompt/charter-level**, enforced
+through the `SOUL_CHARTER` system prompt, which instructs the model to:
+
+- **not generate legal conclusions** — describe observable facts and flag them as
+  indicators, red flags, or typology matches (P3);
+- treat **training-data knowledge as non-current** and disclose the cutoff rather
+  than presenting it as a live source (P8);
+- **not assign a risk score without stating its methodology** (P9);
+- flag **disambiguation gaps** instead of merging distinct candidates.
+
+The function also applies a **tipping-off guard** on the output, a **request
+timeout**, and emits an **audit line**. These reduce — but do **not formally
+measure** — hallucination and bias.
+
+**Open AI-governance gaps for the Advisor:** documented model-output evaluation,
+bias testing, AI red-teaming, and a DPIA covering the Anthropic processing. Track
+these separately from the RA engine's posture in §2.
 
 ---
 
@@ -72,6 +109,10 @@ N-A not applicable to a non-AI, on-device app.
 | **REDT** | Red teaming | N-A → 🟡 | CodeQL SAST (`.github/workflows/codeql.yml`), security review skill | No AI to red-team; application-security testing exists. |
 | **THREAT** | Threat intelligence | 🟡 | CSP, security headers, origin guard | Application threat-surface hardened. No AI-specific threat intel. |
 
+> **Note:** the DRIFT / BIAS / HALL / REDT markings above are for the deterministic
+> RA engine. For the LLM-backed Advisor (`brain-soul.js`) these tiles are
+> **applicable** — see §1a for current guardrails and open gaps.
+
 ### Monitoring & Observability
 
 | Tile | Intent | Status | Evidence | Applicability & recommendation |
@@ -105,6 +146,10 @@ N-A not applicable to a non-AI, on-device app.
 | **AIACT** | EU AI Act | N-A | — | No AI system; the app is not within the AI Act's material scope. |
 | **GDPR** | Data protection law | 🟡 | on-device storage, encryption-at-rest, export (portability) & register delete (erasure), no trackers | Privacy-by-design posture; formal DPIA/records would complete it. |
 
+> **Note:** ISO42K and AIACT are N-A for the deterministic RA engine, but **apply to
+> the LLM-backed Advisor** (`brain-soul.js`); see §1a. GDPR also extends to the
+> Advisor's Anthropic processing, which needs a DPIA.
+
 ---
 
 ## 3. What changed in this release (gaps closed)
@@ -115,20 +160,22 @@ N-A not applicable to a non-AI, on-device app.
 | **Passphrase access gate** | IAM 🟡, MFA 🟡 | First-run setup (or opt-out), unlock-on-return, wrong-passphrase rejection via an AES-GCM verifier. The engine still boots underneath the overlay so the page always renders. |
 | **Idle auto-lock** | ZTA 🟡 | Clears the in-memory key and re-locks after 15 minutes of inactivity; manual **Lock device** control. |
 | **Tamper-evident activity log** | LOG ✅, AUDIT ✅, TRACE ✅, RCause 🟡 | Append-only, SHA-256 hash-chained record of completions, overrides, exports, deletions, and unlocks; viewable, exportable, printed as a report appendix, with chain-integrity verification. |
-| **Edge & function hardening** | THREAT 🟡, ZTA 🟡, POLICY 🟡 | Strict CSP + HSTS + anti-clickjacking/Referrer/Permissions headers (`netlify.toml`); cross-origin allow-list guard on both Netlify functions. |
+| **Edge & function hardening** | THREAT 🟡, ZTA 🟡, POLICY 🟡 | Strict CSP + HSTS + anti-clickjacking/Referrer/Permissions headers (`netlify.toml`); cross-origin allow-list guard on the Netlify functions. |
 
 ---
 
 ## 4. Out of scope (architectural preconditions)
 
-The following would require a **backend service** and/or introducing an **AI/LLM
-component**, which this project deliberately does not have (it is offline-capable,
-zero-backend, and keeps all data on the user's device):
+The following would require a **backend service**, which this project deliberately
+does not have (it is offline-capable, zero-backend, and keeps all data on the
+user's device):
 
 - **Backend identity:** real RBAC/ABAC/MFA/SSO/IAM, centralised audit.
-- **AI controls:** DRIFT, BIAS, HALL, REDT (model), VDB, TOKEN, PIPE, and
-  conformity to **ISO/IEC 42001** and the **EU AI Act**.
+- **Data-platform controls:** TOKEN, PIPE (no backend ingestion to secure).
 
-These remain correctly **Not Applicable** unless and until the product's
-architecture changes. This document should be revisited if a backend or any
-AI/ML component is introduced.
+These remain **Not Applicable** to the deterministic RA engine unless its
+architecture changes. The **generative-AI controls** — DRIFT, BIAS, HALL, REDT,
+VDB (if embeddings are added), **ISO/IEC 42001** and the **EU AI Act** — are
+**N-A for the RA engine but applicable to the LLM-backed Advisor** (`brain-soul.js`);
+their current guardrails and open gaps are in §1a. Revisit this document whenever
+the Advisor's model usage changes, or if a backend is introduced.

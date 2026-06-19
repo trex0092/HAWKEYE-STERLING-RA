@@ -11,7 +11,7 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 :root{
   --bg:#0A0E16;--card-bg:#10161F;--card-border:rgba(255,255,255,0.07);
-  --text:#EDEFF4;--text2:#A3ADC0;--text3:#646F86;
+  --text:#EDEFF4;--text2:#A3ADC0;--text3:#828DA4;
   --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
   --gold:#D2A648;--gold-dim:rgba(210,166,72,0.10);--gold-ring:rgba(210,166,72,0.22);
   --neon1:#B45CFF;--neon2:#FF5CA8;--yneon:#F7E55A;
@@ -322,6 +322,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .rd-panel{width:min(940px,94vw);height:min(86vh,840px);display:flex;flex-direction:column;background:var(--card-bg);border:1px solid var(--border2);border-radius:16px;box-shadow:var(--shadow),0 0 44px rgba(180,92,255,0.16);position:relative;overflow:hidden}
 .rd-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(180,92,255,0.55),rgba(255,92,168,0.45),transparent);pointer-events:none}
 .rd-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border2)}
+.rd-note{margin:0;padding:8px 18px;font-size:10.5px;line-height:1.5;color:var(--text3);border-bottom:1px solid var(--border);background:rgba(255,255,255,0.015)}
 .rd-meta{font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.4px}
 .rd-spacer{flex:1}
 .rd-close{background:none;border:1px solid var(--border2);color:var(--text2);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1;transition:all .18s;flex-shrink:0}
@@ -766,7 +767,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
               <option value="SDD">Raise to SDD</option>
               <option value="EDD">Raise to EDD</option>
             </select>
-            <input type="text" id="ovReason" placeholder="Justification (required)" oninput="onOvField()">
+            <input type="text" id="ovReason" aria-label="Override justification" placeholder="Justification (required)" oninput="onOvField()">
             <div class="ov-hint" id="ovHint"></div>
           </div>
         </div>
@@ -830,12 +831,13 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeRiskData()" title="Close" aria-label="Close risk data panel">✕</button>
       </div>
+      <p class="rd-note">Baseline scores are firm-maintained template values &mdash; review and maintain them against your firm&rsquo;s risk methodology and current sources. Record any change as a reason-stamped override.</p>
       <div class="rd-toolbar">
         <button class="rd-tab active" id="rdTab_countries" onclick="rdSetTab('countries')">Countries</button>
         <button class="rd-tab" id="rdTab_activities" onclick="rdSetTab('activities')">Activities</button>
         <button class="rd-tab" id="rdTab_recycled" onclick="rdSetTab('recycled')">Recycled</button>
         <button class="rd-tab" id="rdTab_mined" onclick="rdSetTab('mined')">Mined</button>
-        <input class="rd-search" id="rdSearch" placeholder="Filter by name…" oninput="rdSearchInput()">
+        <input class="rd-search" id="rdSearch" aria-label="Filter risk data by name" placeholder="Filter by name…" oninput="rdSearchInput()">
         <button class="rd-tab" id="rdOvOnly" onclick="rdToggleOvOnly()">✱ Overridden only</button>
       </div>
       <div class="rd-rows" id="rdRows"></div>
@@ -904,8 +906,8 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
     <div class="sec-bot-cap" id="secBotCap">Tap the bot to unlock</div>
     <div class="sec-title" id="secTitle">Unlock</div>
     <div class="sec-msg" id="secMsg"></div>
-    <input type="password" id="secPass" class="sec-input" placeholder="Passphrase" autocomplete="off" autocapitalize="off" spellcheck="false">
-    <input type="password" id="secPass2" class="sec-input" placeholder="Confirm passphrase" autocomplete="off" autocapitalize="off" spellcheck="false" style="display:none">
+    <input type="password" id="secPass" class="sec-input" aria-label="Passphrase" placeholder="Passphrase" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <input type="password" id="secPass2" class="sec-input" aria-label="Confirm passphrase" placeholder="Confirm passphrase" autocomplete="off" autocapitalize="off" spellcheck="false" style="display:none">
     <div class="sec-err" id="secErr" style="display:none"></div>
     <div class="sec-actions">
       <button class="btn btn-primary btn-full" id="secPrimary" onclick="secSubmit()">Unlock</button>
@@ -915,8 +917,8 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
   </div>
 </div>
 
-<input type="file" id="importFile" accept=".json,application/json" style="display:none">
-<input type="file" id="rdImportFile" accept=".json,application/json" style="display:none">
+<input type="file" id="importFile" aria-label="Import assessment JSON file" accept=".json,application/json" style="display:none">
+<input type="file" id="rdImportFile" aria-label="Import risk data sheet JSON file" accept=".json,application/json" style="display:none">
 <div class="toast" id="toast"></div>
 <div class="storage-warn" id="storageWarn" role="alert" aria-live="assertive" style="display:none">⚠ Autosave unavailable — your browser's local storage is blocked or full. Export your assessment to avoid losing work.</div>
 <div id="printReport"></div>

@@ -22,6 +22,8 @@ jobs:
         run: node test/sanctions-watch.test.mjs
       - name: Run link-check unit tests
         run: node test/link-check.test.mjs
+      - name: Run Asana Netlify-function tests (timeout + non-JSON handling)
+        run: node test/asana-functions.test.js
       - name: Check Regulatory Watch docs are in sync with the registry
         run: node scripts/reg-sources-doc.mjs --check
       - name: Run console + advisor screen smoke tests

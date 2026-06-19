@@ -80,17 +80,31 @@ const handle = async (event) => {
   }
 };
 
+/* Abort a hung Asana call rather than letting it block until the platform kills
+   the function. Overridable via ASANA_TIMEOUT_MS (kept small in tests). */
+const ASANA_TIMEOUT_MS = Number(process.env.ASANA_TIMEOUT_MS) || 15000;
+
 async function api(token, method, path, body) {
-  const r = await fetch('https://app.asana.com/api/1.0' + path, {
-    method,
-    headers: {
-      Authorization: 'Bearer ' + token,
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const d = await r.json();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ASANA_TIMEOUT_MS);
+  let r;
+  try {
+    r = await fetch('https://app.asana.com/api/1.0' + path, {
+      method,
+      signal: ctrl.signal,
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  /* Asana normally returns JSON; tolerate an empty or non-JSON body (e.g. a 5xx
+     gateway page) so the caller surfaces the real status instead of throwing. */
+  const d = await r.json().catch(() => null);
   return { ok: r.ok, status: r.status, body: d };
 }
 
