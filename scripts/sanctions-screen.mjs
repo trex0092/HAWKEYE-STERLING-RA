@@ -335,8 +335,14 @@ async function fetchListBody(source, timeoutMs = 60000) {
     if (!existsSync(source.file)) throw new Error('curated file missing: ' + source.file);
     return readFileSync(source.file, 'utf8');
   }
+  /* The URL comes from the in-repo sources config; still validate the scheme so a
+     tampered/extra source can only ever trigger an ordinary http(s) GET (never
+     file:, ftp:, etc.) before it reaches fetch. */
+  let parsed;
+  try { parsed = new URL(source.url); } catch { throw new Error('invalid url'); }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('unsupported url scheme: ' + parsed.protocol);
   return withTimeout(async (signal) => {
-    const r = await fetch(source.url, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
+    const r = await fetch(parsed.href, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
     const body = await r.text();
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return body;
@@ -385,7 +391,7 @@ async function mapLimit(items, limit, fn) {
   const out = new Array(items.length);
   let i = 0;
   const workers = Array.from({ length: Math.min(limit, items.length || 1) }, async () => {
-    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx], idx); }
+    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx]); }
   });
   await Promise.all(workers);
   return out;
