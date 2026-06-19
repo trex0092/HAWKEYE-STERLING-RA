@@ -1,0 +1,101 @@
+name: Sanctions Screen
+
+# Daily ongoing screening of the LIVE customer base against the consolidated
+# designation + watchlists (OFAC, UN, EU, UK OFSI, UAE EOCN + Local Terrorist
+# List, INTERPOL red notices, adverse media — per the engine's loaded corpus).
+#
+# Reads the active counterparties from the Asana "Customer Database" project,
+# batch-screens them through the Hawkeye Sterling engine, and on any NEW match
+# raises one alert card in the "Regulations / Governance / Sanctions" project for
+# MLRO / four-eyes review. A standing match is recorded once, not re-alerted
+# daily. The refreshed state is committed to main so the next run only flags what
+# changed. Runs AFTER the Sanctions Watch (05:00) so it screens against fresh lists.
+#
+# A run that could not screen (no engine/token, engine unreachable, empty
+# database) NEVER reports all-clear — it opens a GitHub issue instead.
+#
+# Secrets / vars:
+#   ASANA_ACCESS_TOKEN  (secret)  read the Customer Database + post the alert
+#   HAWKEYE_API_URL     (secret/var) screening engine base URL
+#   HAWKEYE_API_KEY     (secret)  screening engine bearer token
+#   ASANA_REG_PROJECT_GID         alert destination project (default in script)
+#   ASANA_CUSTOMER_PROJECT_GID    screening subject project (default in script)
+#   ASANA_SANCTIONS_SECTION_GID   section to file alerts under
+#   HAWKEYE_SCREEN_PATH           engine screen path (default /api/screen)
+#   SCREEN_MATCH_THRESHOLD        material-match score (default 0.85)
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC daily (after Sanctions Watch at 05:00)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sanctions-screen
+  cancel-in-progress: false
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Screen the customer base
+        id: screen
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+          ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
+          # "Sanctions updates" section of the Regulations/Governance/Sanctions project
+          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1215857714525481' }}
+          HAWKEYE_API_URL: ${{ secrets.HAWKEYE_API_URL || vars.HAWKEYE_API_URL }}
+          HAWKEYE_API_KEY: ${{ secrets.HAWKEYE_API_KEY }}
+          HAWKEYE_SCREEN_PATH: ${{ vars.HAWKEYE_SCREEN_PATH }}
+          SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
+        run: node scripts/sanctions-screen.mjs
+
+      - name: Commit refreshed screening state to main
+        if: steps.screen.outputs.screen_error != 'true'
+        run: |
+          if [ -n "$(git status --porcelain data/sanctions-screen-state.json 2>/dev/null)" ]; then
+            git config user.name "sanctions-screen"
+            git config user.email "actions@github.com"
+            git add data/sanctions-screen-state.json
+            git commit -m "${{ steps.screen.outputs.title }} [skip ci]"
+            git push
+          else
+            echo "state unchanged"
+          fi
+
+      - name: Open a GitHub issue if the screen could not run, or a hit was not delivered
+        if: steps.screen.outputs.screen_error == 'true' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true')
+        uses: actions/github-script@v9
+        env:
+          TITLE: ${{ steps.screen.outputs.title }}
+          SCREEN_ERROR: ${{ steps.screen.outputs.screen_error }}
+        with:
+          script: |
+            const fs = require('fs');
+            let report = '';
+            try { report = fs.readFileSync('sanctions-screen-report.md', 'utf8'); } catch {}
+            const failed = process.env.SCREEN_ERROR === 'true';
+            const note = failed
+              ? ['', '---',
+                 '> The daily customer screen **could not run**, so no clearance can be inferred.',
+                 '> Check the `ASANA_ACCESS_TOKEN`, `HAWKEYE_API_URL` and `HAWKEYE_API_KEY` configuration and re-run.'].join('\n')
+              : ['', '---',
+                 '> A customer match was detected but **could not be delivered to Asana** (token missing or the API call failed),',
+                 '> so this issue was opened instead. The match must still be reviewed (MLRO + four-eyes).'].join('\n');
+            const { owner, repo } = context.repo;
+            await github.rest.issues.create({
+              owner, repo,
+              title: process.env.TITLE || 'Sanctions Screen — attention required',
+              body: (report || 'See the workflow run.') + note,
+              labels: ['sanctions-screen'],
+            });

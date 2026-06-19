@@ -78,7 +78,11 @@ export async function notifyAsana(name, notes, opts = {}) {
 /* Escape text for safe inclusion in Asana html_notes (XML-strict). */
 export function esc(s) {
   return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /* Build an Asana-safe rich-text body from a watcher's structured changes
