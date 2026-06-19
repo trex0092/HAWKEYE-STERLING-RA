@@ -1,19 +1,21 @@
 {
-  "_README": "Sanctions consolidated lists watched by scripts/sanctions-watch.mjs. Sibling to the FATF Watchdog (which watches country black/grey lists) and Regulatory Watch (which watches regulations/guidance). This watcher fingerprints the machine-readable designation lists and flags when designations change, feeding the sanctions answers, escalation/CFA logic and risk data. Each source: id, name, jurisdiction, url, type (csv|xml), optional marker (a substring counted once per record to report an approximate entry-count delta).",
+  "_README": "Free, official consolidated designation lists. Used by BOTH scripts/sanctions-watch.mjs (fingerprints each list for changes) AND scripts/sanctions-screen.mjs (screens the Asana customer base against them — no external engine, no API key). Each source: id, name, jurisdiction, url, type (csv|xml), `parser` (ofac|un|ofsi|eu|xml — which extractor sanctions-match.mjs uses), optional marker (a substring counted once per record for an approximate entry-count delta). Additional / curated lists (UAE EOCN, extra national XML lists) live in data/sanctions-extra.json.",
   "sources": [
     {
       "id": "ofac-sdn",
       "name": "US OFAC — SDN list (CSV)",
       "jurisdiction": "Global",
       "url": "https://www.treasury.gov/ofac/downloads/sdn.csv",
-      "type": "csv"
+      "type": "csv",
+      "parser": "ofac"
     },
     {
       "id": "ofac-consolidated",
       "name": "US OFAC — Consolidated (non-SDN) list (CSV)",
       "jurisdiction": "Global",
       "url": "https://www.treasury.gov/ofac/downloads/consolidated/cons_prim.csv",
-      "type": "csv"
+      "type": "csv",
+      "parser": "ofac"
     },
     {
       "id": "un-consolidated",
@@ -21,21 +23,24 @@
       "jurisdiction": "Global",
       "url": "https://scsanctions.un.org/resources/xml/en/consolidated.xml",
       "type": "xml",
-      "marker": "<DATAID>"
+      "marker": "<DATAID>",
+      "parser": "un"
     },
     {
       "id": "uk-ofsi",
       "name": "UK OFSI — Consolidated list of targets (CSV)",
       "jurisdiction": "Global",
       "url": "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv",
-      "type": "csv"
+      "type": "csv",
+      "parser": "ofsi"
     },
     {
       "id": "eu-fsf",
       "name": "EU — Consolidated financial sanctions list (CSV)",
       "jurisdiction": "Global",
       "url": "https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw",
-      "type": "csv"
+      "type": "csv",
+      "parser": "eu"
     }
   ]
 }
