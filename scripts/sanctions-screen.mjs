@@ -328,15 +328,15 @@ async function fetchAsanaSubjects(projectGid, token) {
 
 async function postEngine(cfg, body) {
   return withTimeout(async (signal) => {
-    /* Bearer auth only when a key is configured — the engine's screen endpoint is
-       open in the default deployment, so the URL alone suffices. */
+    /* The /api/screen/batch endpoint requires an API key. Send it both ways the
+       engine accepts — Authorization: Bearer <key> and X-Api-Key — for compatibility. */
     const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
-    if (cfg.key) headers.Authorization = 'Bearer ' + cfg.key;
+    if (cfg.key) { headers.Authorization = 'Bearer ' + cfg.key; headers['X-Api-Key'] = cfg.key; }
     const r = await fetch(cfg.url.replace(/\/$/, '') + cfg.path, { method: 'POST', signal, headers, body: JSON.stringify(body) });
     const d = await r.json().catch(() => null);
     if (!r.ok) throw new Error('engine ' + r.status + ': ' + JSON.stringify((d && (d.error || d.errors)) || d || '').slice(0, 200));
     return d;
-  }, cfg.timeoutMs || 150000);
+  }, cfg.timeoutMs || 240000);
 }
 
 async function screenViaEngine(subjects, cfg) {
@@ -403,7 +403,7 @@ async function main() {
     key: process.env.HAWKEYE_API_KEY || '',
     path: process.env.HAWKEYE_SCREEN_PATH || DEFAULT_SCREEN_PATH,
     batchSize: Number(process.env.SCREEN_BATCH_SIZE) || 20,
-    timeoutMs: Number(process.env.SCREEN_TIMEOUT_MS) || 150000,
+    timeoutMs: Number(process.env.SCREEN_TIMEOUT_MS) || 240000,
     threshold: DEFAULT_THRESHOLD
   };
   const asanaToken = process.env.ASANA_ACCESS_TOKEN || '';
