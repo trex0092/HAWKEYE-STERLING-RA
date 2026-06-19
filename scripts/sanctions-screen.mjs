@@ -8,18 +8,23 @@
 
    Flow (runner): read the active counterparties from the Asana "Customer
    Database" project → batch-screen them against the Hawkeye Sterling engine
-   (OFAC SDN/non-SDN, UN, EU, UK OFSI, UAE EOCN + Local Terrorist List, INTERPOL
-   red notices and adverse media, per the engine's loaded corpus) → diff the
-   results against the last run → on any NEW match raise one alert card in the
-   "Regulations / Governance / Sanctions" Asana project for MLRO / four-eyes
-   review. Ongoing monitoring: a standing match is recorded once, not re-alerted
-   every day; a brand-new match always alerts.
+   (POST <HAWKEYE_API_URL>/api/screen/batch — OFAC SDN/non-SDN, UN, EU, UK OFSI,
+   UAE EOCN + Local Terrorist List, INTERPOL red notices and adverse media, per
+   the engine's loaded corpus) → diff the results against the last run → on any
+   NEW match raise one alert card in the "Regulations / Governance / Sanctions"
+   Asana project for MLRO / four-eyes review. Ongoing monitoring: a standing match
+   is recorded once, not re-alerted every day; a new or CHANGED match always alerts.
 
    Detection is automatic; the freeze / decline / report action stays a reviewed
    decision (MLRO sign-off + dual attestation — UAE Federal Decree-Law No. 10 of
-   2025 Art.16/18; FATF R.26). A "0 hits" result is NEVER treated as clearance
-   when the engine could not be reached or reports itself degraded — that surfaces
-   loudly instead of passing silently.
+   2025 Art.16/18; FATF R.26). A "no match" is NEVER treated as clearance when the
+   engine could not be reached or a batch errored — that surfaces loudly (the
+   subject is marked errored and its prior status kept) instead of passing silently.
+
+   Engine response shape (per subject), from /api/screen/batch:
+     { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
+   A subject is a match when the engine recommends one, or its band is high/critical,
+   or its score clears the threshold, or it has any list hit.
 
    Network (Asana read + engine screen + Asana post) is isolated from the pure
    logic below so test/sanctions-screen.test.mjs runs fully offline. */
@@ -36,13 +41,21 @@ export const CHANGES_FILE = 'sanctions-screen-changes.json';
 export const CUSTOMER_PROJECT_GID =
   process.env.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121';
 
+/* Default engine screen path (POST). Override with HAWKEYE_SCREEN_PATH. */
+export const DEFAULT_SCREEN_PATH = '/api/screen/batch';
+
 /* The lists the engine screens against (for the report/alert provenance line).
    Coverage is the engine's, not this repo's — kept here only for the human note. */
 export const COVERAGE = 'OFAC SDN/non-SDN · UN · EU · UK OFSI · UAE EOCN + Local Terrorist List · INTERPOL red notices · adverse media';
 
-/* A score at/above this is treated as a material match. Conservative: a hit with
-   no score is kept (never silently dropped). Override with SCREEN_MATCH_THRESHOLD. */
+/* A score at/above this fraction (engine scores are 0-100) is treated as a match
+   even absent an explicit recommendation. Override with SCREEN_MATCH_THRESHOLD. */
 export const DEFAULT_THRESHOLD = Number(process.env.SCREEN_MATCH_THRESHOLD) || 0.85;
+
+/* Recommendations / bands that mean "no action". Anything else the engine returns
+   is treated as a positive signal (conservative — errs toward flagging). */
+const CLEAR_RE = /^(clear|no[_\s-]?match|no[_\s-]?hit|pass|passed|negative|none|nil|ok|false[_\s-]?positive|not[_\s-]?listed|low)$/i;
+const HIGH_BANDS = new Set(['critical', 'high', 'severe', 'elevated', 'red', 'amber']);
 
 /* ── Pure helpers (no network; unit-tested) ───────────────────────────────── */
 
@@ -93,91 +106,111 @@ export function parseSubjects(tasks) {
 
 function num(v) { return typeof v === 'number' && isFinite(v) ? v : (typeof v === 'string' && v.trim() && isFinite(Number(v)) ? Number(v) : null); }
 
-/* Normalise a single engine hit (the REST/MCP shapes vary across fields). */
+/* Normalise one entry of a result's `lists` detail (string or object). */
 export function normalizeHit(h) {
-  if (!h || typeof h !== 'object') return null;
-  const hitName = h.hitName || h.name || h.caption || h.matchedName || h.entity || '';
-  const list = h.list || h.listName || h.source || h.dataset || h.programme || h.program || h.regime || h.sanctionsList || '';
+  if (h == null) return null;
+  if (typeof h === 'string') return { list: h, hitName: '', score: null };
+  if (typeof h !== 'object') return null;
+  const list = h.list || h.listName || h.source || h.dataset || h.programme || h.program || h.regime || h.sanctionsList || h.name || '';
+  const hitName = h.hitName || h.matchedName || h.caption || h.entity || (h.list ? h.name : '') || '';
   const score = num(h.matchScore != null ? h.matchScore : (h.score != null ? h.score : h.confidence));
-  const hitId = h.hitId || h.id || h.entityId || h.canonicalId || '';
-  const category = h.hitCategory || h.category || h.topic || h.schema || h.type || '';
-  return { hitName: String(hitName), list: String(list), score, hitId: String(hitId), category: String(category) };
+  return { list: String(list), hitName: String(hitName || ''), score };
 }
 
-/* Normalise the whole engine response to {results:[{key,name,hits,degraded}], degraded}.
-   Tolerates {results:[…]} | {data:[…]} | […] | a single {subject,hits}. Each result
-   is re-keyed to the subject it screened so jurisdiction/gid survive. */
+/* Normalise one engine result row (keyed back to the subject it screened so
+   jurisdiction/gid survive). */
+export function normalizeResult(r, src) {
+  const raw = Array.isArray(r.lists) ? r.lists : (Array.isArray(r.hits) ? r.hits : (Array.isArray(r.matches) ? r.matches : []));
+  const subjName = r.name || (r.subject && (r.subject.name || r.subject)) || r.query || '';
+  return {
+    key: src ? src.key : normalizeName(subjName),
+    name: (src && src.name) || String(subjName),
+    jurisdiction: src && src.jurisdiction,
+    gid: src && src.gid,
+    topScore: num(r.topScore != null ? r.topScore : (r.score != null ? r.score : r.matchScore)),
+    band: String(r.band || r.riskBand || '').toLowerCase(),
+    recommendation: String(r.recommendation || r.disposition || r.decision || '').toLowerCase(),
+    hitCount: num(r.hitCount != null ? r.hitCount : r.elevatedCount) || 0,
+    lists: raw.map(normalizeHit).filter(Boolean)
+  };
+}
+
+/* Normalise the whole engine response to {results:[…], degraded}. Tolerates
+   {results:[…]} | {data:[…]} | […] | a single result object. */
 export function normalizeScreenResponse(json, subjects = []) {
   const byKey = new Map(subjects.map(s => [s.key, s]));
   let rows = [];
   if (Array.isArray(json)) rows = json;
   else if (json && Array.isArray(json.results)) rows = json.results;
   else if (json && Array.isArray(json.data)) rows = json.data;
-  else if (json && (json.subject || json.name || json.hits)) rows = [json];
-
-  let degraded = !!(json && (json.degraded || (json._provenance && json._provenance.degraded)));
+  else if (json && (json.name || json.subject)) rows = [json];
+  const degraded = !!(json && (json.degraded || (json._provenance && json._provenance.degraded)));
   const results = rows.map(r => {
-    const subjName = (r.subject && (r.subject.name || r.subject)) || r.name || r.query || r.input || '';
-    const key = normalizeName(subjName);
-    const src = byKey.get(key);
-    const rawHits = Array.isArray(r.hits) ? r.hits : (Array.isArray(r.matches) ? r.matches : []);
-    const hits = rawHits.map(normalizeHit).filter(Boolean);
-    if (r.degraded) degraded = true;
-    return {
-      key,
-      name: (src && src.name) || String(subjName),
-      jurisdiction: src && src.jurisdiction,
-      gid: src && src.gid,
-      hits,
-      degraded: !!r.degraded
-    };
+    const key = normalizeName(r.name || (r.subject && (r.subject.name || r.subject)) || '');
+    return normalizeResult(r, byKey.get(key));
   });
   return { results, degraded };
 }
 
-export function isMaterial(hit, threshold) {
-  if (!hit) return false;
-  if (hit.score == null) return true;            /* unscored hit → keep (conservative) */
-  return hit.score >= (typeof threshold === 'number' ? threshold : DEFAULT_THRESHOLD);
+/* Is this subject a material match? Trust the engine's own recommendation first;
+   otherwise fall back to band / score / list hits. Threshold is a fraction (0-1);
+   engine scores are 0-100. A "clear" recommendation is only overridden by a hard
+   signal (an actual list hit or a maxed score). */
+export function isMatch(r, threshold) {
+  if (!r) return false;
+  const thr = (typeof threshold === 'number' ? threshold : DEFAULT_THRESHOLD) * 100;
+  const hasList = !!(r.lists && r.lists.length);
+  if (r.recommendation && CLEAR_RE.test(r.recommendation)) {
+    return hasList || (typeof r.topScore === 'number' && r.topScore >= 100);
+  }
+  if (r.recommendation) return true;                       /* any non-clear recommendation */
+  if (r.band && HIGH_BANDS.has(r.band)) return true;
+  if (typeof r.topScore === 'number' && r.topScore >= thr) return true;
+  if (r.hitCount > 0) return true;
+  return hasList;
 }
 
-export function hitKey(hit) {
-  return normalizeName((hit.list || 'list') + ' :: ' + (hit.hitId || hit.hitName || 'hit'));
+/* A stable signature of the match so a standing match is not re-alerted but a
+   CHANGED one (new list, escalated band) is. */
+export function matchSignature(r) {
+  const lists = (r.lists || []).map(h => h.list).filter(Boolean).sort().join(',');
+  return [r.band || '', r.recommendation || '', lists].join('|');
 }
 
-/* Diff this run's material hits against the recorded state. Returns the NEW
-   matches to alert on (a standing match recorded last run does not re-alert),
-   the cleared matches (informational), and the next state to persist. Subjects
-   that errored this run carry their prior state forward untouched. */
+/* Diff this run's matches against the recorded state. Returns the NEW/CHANGED
+   matches to alert on, the cleared matches (informational), and the next state.
+   Subjects that errored this run carry their prior state forward untouched —
+   never wiped, never silently cleared. */
 export function diffState(prevState, results, today, threshold) {
   const prev = (prevState && prevState.subjects) || {};
   const nextSubjects = { ...prev };
   const alerts = [];
   const cleared = [];
-  let materialCount = 0;
+  let matchCount = 0;
 
   for (const r of results) {
-    if (r.errored) continue;                      /* keep prior state; never wipe on an error */
-    const material = (r.hits || []).filter(h => isMaterial(h, threshold));
-    materialCount += material.length;
-    const prevHits = (prev[r.key] && prev[r.key].hits) || {};
-    const nextHits = {};
-    const newHits = [];
-    for (const h of material) {
-      const k = hitKey(h);
-      const firstSeen = (prevHits[k] && prevHits[k].firstSeen) || today;
-      nextHits[k] = { hitName: h.hitName, list: h.list, score: h.score, category: h.category, firstSeen };
-      if (!prevHits[k]) newHits.push(h);
+    if (r.errored) continue;
+    if (isMatch(r, threshold)) {
+      matchCount++;
+      const sig = matchSignature(r);
+      const prior = prev[r.key];
+      const firstSeen = (prior && prior.firstSeen) || today;
+      nextSubjects[r.key] = {
+        name: r.name, jurisdiction: r.jurisdiction, band: r.band, topScore: r.topScore,
+        recommendation: r.recommendation, lists: (r.lists || []).map(h => h.list).filter(Boolean),
+        signature: sig, firstSeen, lastSeen: today
+      };
+      if (!prior || prior.signature !== sig) {
+        alerts.push({ key: r.key, name: r.name, jurisdiction: r.jurisdiction, gid: r.gid,
+          band: r.band, topScore: r.topScore, recommendation: r.recommendation, lists: r.lists || [], isNew: !prior });
+      }
+    } else if (prev[r.key]) {
+      cleared.push({ key: r.key, name: r.name, prior: prev[r.key] });
+      delete nextSubjects[r.key];
     }
-    for (const k of Object.keys(prevHits)) {
-      if (!nextHits[k]) cleared.push({ key: r.key, name: r.name, hit: prevHits[k] });
-    }
-    if (material.length) nextSubjects[r.key] = { name: r.name, jurisdiction: r.jurisdiction, lastScreenedAt: today, hits: nextHits };
-    else if (nextSubjects[r.key]) delete nextSubjects[r.key]; /* fully cleared */
-    if (newHits.length) alerts.push({ key: r.key, name: r.name, jurisdiction: r.jurisdiction, gid: r.gid, newHits });
   }
 
-  return { alerts, cleared, materialCount, nextState: { updated: today, subjects: nextSubjects } };
+  return { alerts, cleared, matchCount, nextState: { updated: today, subjects: nextSubjects } };
 }
 
 /* The governance footer every screening output carries — detection is automatic,
@@ -185,10 +218,15 @@ export function diffState(prevState, results, today, threshold) {
 export const GOVERNANCE_NOTE =
   'Detection is automatic. Do NOT freeze, decline or report on a match before MLRO review and a two-person (four-eyes) sign-off — UAE Federal Decree-Law No. 10 of 2025 Art.16/18; FATF R.26. A possible name match is not confirmation: disambiguate against the customer’s identifiers first.';
 
-function hitLine(h) {
-  const score = h.score == null ? '' : ' (' + Math.round(h.score * 100) + '%)';
-  const list = h.list ? ' [' + h.list + ']' : '';
-  return (h.hitName || 'match') + list + score;
+/* One-line summary of a match for tables/cards. */
+export function matchSummary(a) {
+  const bits = [];
+  if (a.band) bits.push(a.band.toUpperCase());
+  if (typeof a.topScore === 'number') bits.push('score ' + a.topScore);
+  if (a.recommendation) bits.push(a.recommendation);
+  const lists = (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean);
+  if (lists.length) bits.push('lists: ' + lists.join(', '));
+  return bits.join(' · ') || 'flagged';
 }
 
 /* Plain-text report — the no-token preview, the issue-fallback body, the run log. */
@@ -196,22 +234,22 @@ export function buildScreenReport(alerts, cleared, today, meta = {}) {
   const lines = [];
   lines.push('# Sanctions Screen — ' + today, '');
   lines.push('Screened **' + (meta.screened != null ? meta.screened : '?') + '** active counterparties from the Customer Database against: ' + COVERAGE + '.', '');
-  if (meta.degraded) lines.push('> ⚠ The screening engine reported **degraded** coverage on this run — treat any "no match" as provisional and re-run. Hits below are still valid.', '');
-  if (meta.errored) lines.push('> ⚠ **' + meta.errored + '** subject(s) could not be screened this run (engine error) — their prior status was kept, not cleared.', '');
+  if (meta.degraded) lines.push('> ⚠ The screening engine reported **degraded** coverage on this run — treat any "no match" as provisional and re-run.', '');
+  if (meta.errored) lines.push('> ⚠ **' + meta.errored + '** subject(s) could not be screened this run (engine error/timeout) — their prior status was kept, not cleared.', '');
 
   if (!alerts.length) {
     lines.push('No **new** sanctions/watchlist matches.', '');
   } else {
-    lines.push('**' + alerts.length + ' customer(s) with a NEW match — review immediately.**', '');
-    lines.push('| Customer | Jurisdiction | Matched |', '| --- | --- | --- |');
+    lines.push('**' + alerts.length + ' customer(s) with a new/changed match — review immediately.**', '');
+    lines.push('| Customer | Jurisdiction | Match |', '| --- | --- | --- |');
     for (const a of alerts) {
-      lines.push('| ' + a.name + ' | ' + (a.jurisdiction || '') + ' | ' + a.newHits.map(hitLine).join('; ') + ' |');
+      lines.push('| ' + a.name + ' | ' + (a.jurisdiction || '') + ' | ' + matchSummary(a) + ' |');
     }
     lines.push('');
   }
   if (cleared && cleared.length) {
     lines.push('<details><summary>' + cleared.length + ' previously-recorded match(es) no longer returned (no action — informational)</summary>', '');
-    for (const c of cleared) lines.push('- ' + c.name + ' — ' + hitLine(c.hit));
+    for (const c of cleared) lines.push('- ' + c.name + ' — was ' + matchSummary(c.prior || {}));
     lines.push('', '</details>', '');
   }
   lines.push('_' + GOVERNANCE_NOTE + '_');
@@ -222,8 +260,7 @@ export function buildScreenReport(alerts, cleared, today, meta = {}) {
 export function buildScreenHtml(alerts, { runLink, today, degraded } = {}) {
   const items = alerts.map(a => {
     const juris = a.jurisdiction ? ' (' + esc(a.jurisdiction) + ')' : '';
-    const hits = a.newHits.map(h => esc(hitLine(h))).join('; ');
-    return '<li><strong>' + esc(a.name) + '</strong>' + juris + ' — matched ' + hits + '</li>';
+    return '<li><strong>' + esc(a.name) + '</strong>' + juris + ' — ' + esc(matchSummary(a)) + '</li>';
   }).join('');
   const n = alerts.length;
   const parts = ['<body>'];
@@ -245,10 +282,13 @@ export function buildChangesArtifact(alerts, today) {
     date: today,
     mode: 'screen',
     changes: alerts.map(a => ({
-      name: a.name + ' — sanctions match: ' + a.newHits.map(h => h.list || 'list').filter(Boolean).join(', '),
+      name: a.name + ' — sanctions match (' + matchSummary(a) + ')',
       jurisdiction: a.jurisdiction || '',
       status: 'new',
-      hits: a.newHits
+      band: a.band,
+      topScore: a.topScore,
+      recommendation: a.recommendation,
+      lists: (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean)
     }))
   };
 }
@@ -286,41 +326,39 @@ async function fetchAsanaSubjects(projectGid, token) {
   return parseSubjects(tasks);
 }
 
-async function postEngine(cfg, body, timeoutMs = 90000) {
+async function postEngine(cfg, body) {
   return withTimeout(async (signal) => {
-    /* Bearer auth only when a key is configured — the engine's screen endpoint
-       may be open (read-only screening), in which case the URL alone suffices. */
+    /* Bearer auth only when a key is configured — the engine's screen endpoint is
+       open in the default deployment, so the URL alone suffices. */
     const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
     if (cfg.key) headers.Authorization = 'Bearer ' + cfg.key;
-    const r = await fetch(cfg.url.replace(/\/$/, '') + cfg.path, {
-      method: 'POST',
-      signal,
-      headers,
-      body: JSON.stringify(body)
-    });
+    const r = await fetch(cfg.url.replace(/\/$/, '') + cfg.path, { method: 'POST', signal, headers, body: JSON.stringify(body) });
     const d = await r.json().catch(() => null);
     if (!r.ok) throw new Error('engine ' + r.status + ': ' + JSON.stringify((d && (d.error || d.errors)) || d || '').slice(0, 200));
     return d;
-  }, timeoutMs);
+  }, cfg.timeoutMs || 150000);
 }
 
 async function screenViaEngine(subjects, cfg) {
   const results = [];
   let anyOk = false, degraded = false, errored = 0;
+  const batches = Math.ceil(subjects.length / cfg.batchSize);
   for (let i = 0; i < subjects.length; i += cfg.batchSize) {
     const batch = subjects.slice(i, i + cfg.batchSize);
+    const n = Math.floor(i / cfg.batchSize) + 1;
     try {
       const json = await postEngine(cfg, { subjects: batch.map(s => ({ name: s.name, entityType: s.entityType, jurisdiction: s.jurisdiction, idNumber: s.idNumber })) });
       const norm = normalizeScreenResponse(json, batch);
       anyOk = true;
       if (norm.degraded) degraded = true;
-      /* engine may return fewer rows than subjects — backfill missing as clean-but-screened */
       const got = new Set(norm.results.map(r => r.key));
       for (const r of norm.results) results.push(r);
-      for (const s of batch) if (!got.has(s.key)) results.push({ key: s.key, name: s.name, jurisdiction: s.jurisdiction, gid: s.gid, hits: [] });
+      /* A subject the engine didn't return is NOT assumed clean — mark errored. */
+      for (const s of batch) if (!got.has(s.key)) { results.push({ key: s.key, name: s.name, jurisdiction: s.jurisdiction, gid: s.gid, errored: true }); errored++; }
+      console.log('sanctions-screen: batch ' + n + '/' + batches + ' ok (' + norm.results.length + ' results)');
     } catch (e) {
-      console.error('sanctions-screen: batch ' + (Math.floor(i / cfg.batchSize) + 1) + ' failed — ' + (e && e.message || e));
-      for (const s of batch) { results.push({ key: s.key, name: s.name, jurisdiction: s.jurisdiction, gid: s.gid, hits: [], errored: true }); errored++; }
+      console.error('sanctions-screen: batch ' + n + '/' + batches + ' failed — ' + (e && e.message || e));
+      for (const s of batch) { results.push({ key: s.key, name: s.name, jurisdiction: s.jurisdiction, gid: s.gid, errored: true }); errored++; }
     }
   }
   return { results, anyOk, degraded, errored };
@@ -363,8 +401,9 @@ async function main() {
   const cfg = {
     url: process.env.HAWKEYE_API_URL || '',
     key: process.env.HAWKEYE_API_KEY || '',
-    path: process.env.HAWKEYE_SCREEN_PATH || '/api/screen',
-    batchSize: Number(process.env.SCREEN_BATCH_SIZE) || 100,
+    path: process.env.HAWKEYE_SCREEN_PATH || DEFAULT_SCREEN_PATH,
+    batchSize: Number(process.env.SCREEN_BATCH_SIZE) || 20,
+    timeoutMs: Number(process.env.SCREEN_TIMEOUT_MS) || 150000,
     threshold: DEFAULT_THRESHOLD
   };
   const asanaToken = process.env.ASANA_ACCESS_TOKEN || '';
@@ -377,11 +416,12 @@ async function main() {
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
 
+  console.log('sanctions-screen: screening ' + subjects.length + ' active customers via ' + cfg.path + ' (batch ' + cfg.batchSize + ')');
   const screen = await screenViaEngine(subjects, cfg);
   if (!screen.anyOk) return bailUnscreened('the screening engine was unreachable for every batch', today);
 
   const prevState = loadState();
-  const { alerts, cleared, materialCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold);
+  const { alerts, cleared, matchCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold);
   const meta = { screened: subjects.length, degraded: screen.degraded, errored: screen.errored };
   const report = buildScreenReport(alerts, cleared, today, meta);
   const changes = buildChangesArtifact(alerts, today);
@@ -392,7 +432,7 @@ async function main() {
   writeFileSync(CHANGES_FILE, JSON.stringify(changes, null, 2) + '\n');
 
   console.log(report);
-  console.log('\nscreened=' + subjects.length + '  new-matches=' + alerts.length + '  material-hits=' + materialCount + '  degraded=' + screen.degraded + '  errored=' + screen.errored);
+  console.log('\nscreened=' + subjects.length + '  new-matches=' + alerts.length + '  total-matches=' + matchCount + '  degraded=' + screen.degraded + '  errored=' + screen.errored);
 
   const title = alerts.length
     ? '⚠ Sanctions Screen — ' + alerts.length + ' customer match' + (alerts.length === 1 ? '' : 'es')
