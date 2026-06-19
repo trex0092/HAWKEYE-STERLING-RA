@@ -15,6 +15,10 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 export const STATE_FILE = 'data/fatf-state.json';
 const FATF_URL = 'https://www.fatf-gafi.org/en/countries/black-and-grey-lists.html';
 const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1215653768729951'; /* RISK ASSESSMENTS */
+/* Regulatory/sanctions changes (FATF list moves) go to the dedicated
+   "Regulations / Governance / Sanctions" project so all monitoring alerts stay
+   together; the client-assessment digest/backup stay in RISK ASSESSMENTS. */
+const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1215844297069727';
 
 /* FATF naming → the app's baseline naming */
 const ALIASES = {
@@ -264,10 +268,10 @@ async function findAffected(changedCountries) {
   return affected;
 }
 
-async function createTask(name, notes, due) {
+async function createTask(name, notes, due, project) {
   due = due || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   /* Assigned so the alert reaches the compliance officer's Asana inbox. */
-  const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name, notes, projects: [PROJECT_GID], due_on: due, assignee: 'me' } }) });
+  const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name, notes, projects: [project || PROJECT_GID], due_on: due, assignee: 'me' } }) });
   return d.data.permalink_url;
 }
 
@@ -300,7 +304,7 @@ export async function main(mode) {
   if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN secret is not configured in GitHub Actions');
 
   if (mode === 'test-alert') {
-    const url = await createTask('[TEST] FATF Watchdog connectivity check', 'The watchdog can reach Asana and create tasks. Close this task. Created ' + new Date().toISOString().slice(0, 10) + '.');
+    const url = await createTask('[TEST] FATF Watchdog connectivity check', 'The watchdog can reach Asana and create tasks. Close this task. Created ' + new Date().toISOString().slice(0, 10) + '.', undefined, REG_PROJECT_GID);
     console.log('test task created: ' + url);
     return;
   }
@@ -410,7 +414,7 @@ export async function main(mode) {
   const today = new Date().toISOString().slice(0, 10).split('-').reverse().join('/');
   const affected = await findAffected(changed);
   const notes = buildAlert(diff, baseline, affected, today) + '\n\nDetected via: ' + source + '. Verify on the official FATF site before acting.';
-  const url = await createTask('FATF list change: ' + changed.join(', '), notes);
+  const url = await createTask('FATF list change: ' + changed.join(', '), notes, undefined, REG_PROJECT_GID);
   console.log('alert task created: ' + url);
   writeFileSync(STATE_FILE, JSON.stringify({ ...current, updated: new Date().toISOString().slice(0, 10) }, null, 2) + '\n');
 }

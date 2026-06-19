@@ -3,17 +3,20 @@ name: Regulatory Watch
 # Weekly worldwide (UAE-weighted) check of the regulatory sources in
 # data/reg-sources.json (MoE, FIU, NAMLCFTC, EOCN, CBUAE, VARA, jewellery
 # sector; FATF guidance, Wolfsberg, RMI, LBMA, OECD, OFAC, UN, EU, UK OFSI,
-# Egmont, Basel). On any content change it opens a PULL REQUEST carrying the
-# updated fingerprint state, a change report, and — if an ANTHROPIC_API_KEY
-# secret is set — an AI-drafted update proposal for MLRO review.
+# Egmont, Basel, UNODC, EU high-risk third countries, RJC). On any content
+# change it creates a task in the "Regulations / Governance / Sanctions" Asana
+# project, commits the refreshed fingerprint state to main (so the same change
+# is not re-alerted), and — if an ANTHROPIC_API_KEY secret is set — drafts an
+# AI update proposal. If Asana delivery fails (no token / API error) it falls
+# back to a labelled GitHub issue so a change is never lost.
 #
 # Detection is automatic; the regulator-grade wording change stays a reviewed
 # decision (no auto-publish). Country black/grey LIST moves are handled by the
 # separate FATF Watchdog workflow.
 #
+# Needs the ASANA_ACCESS_TOKEN repository secret to route alerts to Asana.
 # First-time setup: run once via "Run workflow" with mode = seed to record the
-# current fingerprints without raising a PR. Thereafter the weekly run flags
-# only genuine changes.
+# current fingerprints without raising alerts.
 
 on:
   schedule:
@@ -21,12 +24,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check (compare + open PR on change) | seed (record baseline fingerprints, open a baseline PR)'
+        description: 'check (compare + alert on change) | seed (record baseline fingerprints, no alert)'
         default: 'check'
 
 permissions:
   contents: write
-  pull-requests: write
   issues: write
 
 concurrency:
@@ -52,30 +54,35 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/reg-draft.mjs
 
-      - name: Open pull request with detected changes
-        id: pr
-        # Don't fail the run if the repo forbids Actions from creating PRs
-        # (Settings -> Actions -> General -> Workflow permissions). The branch is
-        # still pushed; the fallback step below opens an issue with the link.
+      - name: Notify Asana — Regulations / Governance / Sanctions project
+        id: asana
+        # Don't fail the run if Asana is unreachable; the issue fallback covers it.
         continue-on-error: true
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: regulatory-watch/update
-          base: main
-          # No add-paths: commit every non-ignored change (the fingerprint state
-          # and any AI draft under docs/research/auto). The per-run artifacts
-          # reg-watch-report.md and reg-watch-changes.json are gitignored, so
-          # they are never committed; the report is used only as the PR body.
-          commit-message: ${{ steps.watch.outputs.pr_title }}
-          title: ${{ steps.watch.outputs.pr_title }}
-          body-path: reg-watch-report.md
-          labels: regulatory-watch
-          delete-branch: true
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+        run: node scripts/watch-notify.mjs "${{ steps.watch.outputs.pr_title }}" reg-watch-report.md
 
-      - name: Fallback to an issue if PR creation is blocked
-        if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.pr.outcome == 'failure'
+      - name: Commit refreshed fingerprint state to main
+        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        run: |
+          # The per-run artifacts (reg-watch-report.md / reg-watch-changes.json)
+          # are gitignored; this commits the fingerprint state and any AI draft so
+          # the same change is not re-alerted next run.
+          if [ -n "$(git status --porcelain data/ docs/research/auto 2>/dev/null)" ]; then
+            git config user.name "regulatory-watch"
+            git config user.email "actions@github.com"
+            git add data/reg-watch-state.json
+            git add docs/research/auto 2>/dev/null || true
+            git commit -m "${{ steps.watch.outputs.pr_title }} [skip ci]"
+            git push
+          else
+            echo "state unchanged"
+          fi
+
+      - name: Fallback to a GitHub issue if Asana delivery failed
+        if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.asana.outcome == 'failure'
         uses: actions/github-script@v9
         env:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
@@ -84,13 +91,11 @@ jobs:
             const fs = require('fs');
             const report = fs.readFileSync('reg-watch-report.md', 'utf8');
             const { owner, repo } = context.repo;
-            const link = `https://github.com/${owner}/${repo}/pull/new/regulatory-watch/update`;
             const body = report + [
               '', '---',
-              '> Automated pull-request creation is disabled for this repository, so this issue was opened instead.',
-              '> The change branch `regulatory-watch/update` has already been pushed.',
-              `> **Open the PR:** ${link}`,
-              '> To get PRs automatically, enable *Settings -> Actions -> General -> Workflow permissions -> "Allow GitHub Actions to create and approve pull requests"*.',
+              '> This change could not be delivered to the Asana "Regulations / Governance / Sanctions" project',
+              '> (no `ASANA_ACCESS_TOKEN` repository secret, or the Asana API call failed), so this issue was opened instead.',
+              '> Set the `ASANA_ACCESS_TOKEN` secret to route future changes to Asana automatically.',
             ].join('\n');
             await github.rest.issues.create({
               owner, repo,

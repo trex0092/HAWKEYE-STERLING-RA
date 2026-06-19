@@ -68,6 +68,9 @@ Worldwide, UAE-weighted. The narrative is what each source is, why it is watched
 | **UK OFSI — Consolidated List of Targets** | UK Office of Financial Sanctions Implementation consolidated list and guidance. Watched for UK designations relevant to correspondent and trade-finance exposure. |
 | **Egmont Group of FIUs** | Global network of Financial Intelligence Units governing FIU-to-FIU information exchange. Watched so the Egmont information-request and cross-border cooperation answers/tools stay current. |
 | **Basel AML Index** | Basel Institute composite country ML/TF risk scoring. Watched so the country-risk weighting in the EWRA and customer risk-rating logic can be recalibrated when scores are republished. |
+| **UNODC — Money Laundering & Organised Crime** | UN Office on Drugs and Crime publishes money-laundering, organised-crime and predicate-offence typologies, the Vienna/Palermo convention guidance and the GPML programme outputs. Watched so the typology, predicate-offence and international-cooperation answers reflect current UN crime research and methodologies. |
+| **EU — High-Risk Third Countries (AML/CFT)** | The European Commission list of third countries with strategic AML/CFT deficiencies (Delegated Regulation), which triggers mandatory EDD on relationships involving listed jurisdictions. Watched so the high-risk-jurisdiction EDD answers and country-risk weighting in the EWRA stay aligned with EU additions/removals. |
+| **Responsible Jewellery Council (RJC)** | Sets the RJC Code of Practices and Chain-of-Custody standard for the jewellery and watch supply chain (responsible sourcing, KYC, conflict-sensitive due diligence). Watched so the gold/jewellery sector answers and responsible-sourcing tools reflect current RJC certification requirements. |
 
 <!-- END:reg-sources -->
 

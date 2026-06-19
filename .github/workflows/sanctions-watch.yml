@@ -2,11 +2,12 @@ name: Sanctions Watch
 
 # Daily check of the major consolidated designation lists (OFAC SDN + non-SDN,
 # UN Security Council, UK OFSI, EU FSF) defined in data/sanctions-sources.json.
-# On any change it opens a pull request (falling back to a labelled issue if
-# Actions cannot create PRs) with the change report so the sanctions answers,
-# escalation/CFA logic and risk data can be reviewed. Country black/grey list
+# On any change it creates a task in the "Regulations / Governance / Sanctions"
+# Asana project, commits the refreshed fingerprint state to main, and falls back
+# to a labelled GitHub issue if Asana delivery fails. Country black/grey list
 # moves are handled by the FATF Watchdog.
 #
+# Needs the ASANA_ACCESS_TOKEN repository secret to route alerts to Asana.
 # First run: dispatch with mode = seed to record the baseline quietly.
 
 on:
@@ -15,12 +16,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check (compare + open PR on change) | seed (record baseline)'
+        description: 'check (compare + alert on change) | seed (record baseline)'
         default: 'check'
 
 permissions:
   contents: write
-  pull-requests: write
   issues: write
 
 concurrency:
@@ -40,23 +40,30 @@ jobs:
         id: watch
         run: node scripts/sanctions-watch.mjs "${{ inputs.mode || 'check' }}"
 
-      - name: Open pull request with detected changes
-        id: pr
+      - name: Notify Asana — Regulations / Governance / Sanctions project
+        id: asana
         continue-on-error: true
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: sanctions-watch/update
-          base: main
-          commit-message: ${{ steps.watch.outputs.pr_title }}
-          title: ${{ steps.watch.outputs.pr_title }}
-          body-path: sanctions-watch-report.md
-          labels: sanctions-watch
-          delete-branch: true
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+        run: node scripts/watch-notify.mjs "${{ steps.watch.outputs.pr_title }}" sanctions-watch-report.md
 
-      - name: Fallback to an issue if PR creation is blocked
-        if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.pr.outcome == 'failure'
+      - name: Commit refreshed fingerprint state to main
+        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        run: |
+          if [ -n "$(git status --porcelain data/ 2>/dev/null)" ]; then
+            git config user.name "sanctions-watch"
+            git config user.email "actions@github.com"
+            git add data/sanctions-state.json
+            git commit -m "${{ steps.watch.outputs.pr_title }} [skip ci]"
+            git push
+          else
+            echo "state unchanged"
+          fi
+
+      - name: Fallback to a GitHub issue if Asana delivery failed
+        if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.asana.outcome == 'failure'
         uses: actions/github-script@v9
         env:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
@@ -65,12 +72,11 @@ jobs:
             const fs = require('fs');
             const report = fs.readFileSync('sanctions-watch-report.md', 'utf8');
             const { owner, repo } = context.repo;
-            const link = `https://github.com/${owner}/${repo}/pull/new/sanctions-watch/update`;
             const body = report + [
               '', '---',
-              '> Automated pull-request creation is disabled for this repository, so this issue was opened instead.',
-              '> The change branch `sanctions-watch/update` has already been pushed.',
-              `> **Open the PR:** ${link}`,
+              '> This change could not be delivered to the Asana "Regulations / Governance / Sanctions" project',
+              '> (no `ASANA_ACCESS_TOKEN` repository secret, or the Asana API call failed), so this issue was opened instead.',
+              '> Set the `ASANA_ACCESS_TOKEN` secret to route future changes to Asana automatically.',
             ].join('\n');
             await github.rest.issues.create({
               owner, repo,
