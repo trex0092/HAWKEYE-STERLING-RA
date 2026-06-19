@@ -5,6 +5,8 @@
    backup and a git audit trail. Token stays server side. */
 const DEFAULT_PROJECT_GID = '1215653768729951'; /* RISK ASSESSMENTS */
 const TASK_NAME = 'RISK DATA SHEET (auto-backup)';
+/* Housekeeping mirror — file it under the ACTIVITY LOG section, not the default first one. */
+const LOG_SECTION = 'ACTIVITY LOG';
 const SHEET_OPEN = '===RISK DATA SHEET===';
 const SHEET_CLOSE = '===END===';
 
@@ -64,9 +66,18 @@ const handle = async (event) => {
         ? '/projects/' + project + '/tasks?limit=100&opt_fields=name&offset=' + page.body.next_page.offset : null;
     }
 
+    /* File the mirror under the ACTIVITY LOG section; a section problem must never lose it. */
+    let section = null;
+    try { section = await ensureSection(token, project, LOG_SECTION); } catch (e) { section = null; }
+    const fileInSection = async (taskGid) => {
+      if (!section) return;
+      try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: taskGid } }); }
+      catch (e) { /* leave the task where it is rather than lose it */ }
+    };
+
     if (gid) {
       const upd = await api(token, 'PUT', '/tasks/' + gid, { data: { notes } });
-      if (upd.ok) return resp(200, { ok: true, gid, updated: true });
+      if (upd.ok) { await fileInSection(gid); return resp(200, { ok: true, gid, updated: true }); }
       /* mirror task deleted between lookup and update — fall through to create */
     }
     const made = await api(token, 'POST', '/tasks', { data: { name: TASK_NAME, notes, projects: [project] } });
@@ -74,6 +85,7 @@ const handle = async (event) => {
       const msg = (made.body && made.body.errors && made.body.errors[0] && made.body.errors[0].message) || ('asana responded ' + made.status);
       return resp(made.status, { ok: false, error: msg });
     }
+    await fileInSection(made.body.data.gid);
     return resp(200, { ok: true, gid: made.body.data.gid, updated: false });
   } catch (e) {
     return resp(502, { ok: false, error: 'asana unreachable' });
@@ -106,6 +118,17 @@ async function api(token, method, path, body) {
      gateway page) so the caller surfaces the real status instead of throwing. */
   const d = await r.json().catch(() => null);
   return { ok: r.ok, status: r.status, body: d };
+}
+
+/* Find the section by name (case-insensitive) or create it. Mirrors asana-task.js. */
+async function ensureSection(token, project, name) {
+  const list = await api(token, 'GET', '/projects/' + project + '/sections?limit=100');
+  if (list.ok) {
+    const hit = (list.body.data || []).find(s => String(s.name || '').trim().toUpperCase() === name.toUpperCase());
+    if (hit) return hit.gid;
+  }
+  const made = await api(token, 'POST', '/projects/' + project + '/sections', { data: { name } });
+  return made.ok ? made.body.data.gid : null;
 }
 
 /* The site's own production origin — see asana-task.js. Override the whole

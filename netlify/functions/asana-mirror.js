@@ -13,6 +13,9 @@
 const DEFAULT_PROJECT_GID = '1215653768729951'; /* RISK ASSESSMENTS */
 const REG_TASK = 'ASSESSMENT REGISTER (auto-backup)';
 const LOG_TASK = 'ACTIVITY LOG (auto-backup)';
+/* Both auto-backup tasks are housekeeping mirrors — file them under the ACTIVITY LOG
+   section, not the project's default first section (which is LOW RISK (CDD)). */
+const LOG_SECTION = 'ACTIVITY LOG';
 const SHEET_OPEN = '===HS SHEET===';
 const SHEET_CLOSE = '===END===';
 const MAX_NOTES = 60000; /* Asana note field practical ceiling */
@@ -107,8 +110,11 @@ const handle = async (event) => {
     if (regNotes.length > MAX_NOTES || logNotes.length > MAX_NOTES) {
       return resp(413, { ok: false, error: 'backup too large for a single Asana note' });
     }
-    const r1 = await upsertTask(token, project, REG_TASK, regNotes);
-    const r2 = await upsertTask(token, project, LOG_TASK, logNotes);
+    /* Resolve the ACTIVITY LOG section once; a section problem must never lose a backup. */
+    let section = null;
+    try { section = await ensureSection(token, project, LOG_SECTION); } catch (e) { section = null; }
+    const r1 = await upsertTask(token, project, REG_TASK, regNotes, section);
+    const r2 = await upsertTask(token, project, LOG_TASK, logNotes, section);
     if (!r1.ok || !r2.ok) return resp(502, { ok: false, error: 'asana write failed' });
     return resp(200, { ok: true, register: { gid: r1.gid }, audit: { gid: r2.gid }, counts: { register: register.length, audit: audit.length } });
   } catch (e) {
@@ -132,15 +138,37 @@ async function findTask(token, project, name) {
   return null;
 }
 
-/* Update the dedicated task in place, or create it if missing (no duplicates). */
-async function upsertTask(token, project, name, notes) {
+/* Update the dedicated task in place, or create it if missing (no duplicates), then file it
+   into `section`. Filing both places new tasks and self-heals existing ones a user dragged
+   elsewhere; a section error must never lose the backup. */
+async function upsertTask(token, project, name, notes, section) {
   const found = await findTask(token, project, name);
+  let gid = null, updated = false;
   if (found && found.gid) {
     const upd = await api(token, 'PUT', '/tasks/' + found.gid, { data: { notes } });
-    if (upd.ok) return { ok: true, gid: found.gid, updated: true };
+    if (upd.ok) { gid = found.gid; updated = true; }
   }
-  const made = await api(token, 'POST', '/tasks', { data: { name, notes, projects: [project] } });
-  return made.ok ? { ok: true, gid: made.body.data.gid, updated: false } : { ok: false };
+  if (!gid) {
+    const made = await api(token, 'POST', '/tasks', { data: { name, notes, projects: [project] } });
+    if (!made.ok) return { ok: false };
+    gid = made.body.data.gid;
+  }
+  if (section) {
+    try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: gid } }); }
+    catch (e) { /* leave the task where it is rather than lose it */ }
+  }
+  return { ok: true, gid, updated };
+}
+
+/* Find the section by name (case-insensitive) or create it. Mirrors asana-task.js. */
+async function ensureSection(token, project, name) {
+  const list = await api(token, 'GET', '/projects/' + project + '/sections?limit=100');
+  if (list.ok) {
+    const hit = (list.body.data || []).find(s => String(s.name || '').trim().toUpperCase() === name.toUpperCase());
+    if (hit) return hit.gid;
+  }
+  const made = await api(token, 'POST', '/projects/' + project + '/sections', { data: { name } });
+  return made.ok ? made.body.data.gid : null;
 }
 
 async function api(token, method, path, body) {
