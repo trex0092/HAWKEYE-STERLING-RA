@@ -663,6 +663,7 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
     overrides:{countries:{Hungary:{score:3, reason:'FATF grey-listing', at:'2026-06-12'}}, activities:{}, recycled:{}, mined:{}}};
   process.env.ASANA_ACCESS_TOKEN = 'test-token';
   calls = []; projectTasksOnServer = [];
+  sectionsOnServer = [{ gid: 's-low', name: 'LOW RISK (CDD)' }, { gid: 's-act', name: 'ACTIVITY LOG' }];
   r = await rb.handler({httpMethod:'POST', body:JSON.stringify({sheet})});
   const rbMade = calls.find(c => c.opts.method === 'POST' && c.url.endsWith('/tasks'));
   check('risk-backup creates the mirror task with the sheet between markers', r.statusCode === 200
@@ -670,15 +671,47 @@ check('risk-backup scheduler is inert without fetch (test/file://)', (A.schedule
     && JSON.parse(rbMade.opts.body).data.name === 'RISK DATA SHEET (auto-backup)'
     && JSON.parse(rbMade.opts.body).data.notes.includes('===RISK DATA SHEET===')
     && JSON.parse(rbMade.opts.body).data.notes.includes('FATF grey-listing'));
+  check('risk-backup files the mirror into the ACTIVITY LOG section',
+    calls.some(c => c.url.includes('/sections?')) && calls.some(c => c.url.endsWith('/sections/s-act/addTask')));
   calls = []; projectTasksOnServer = [{gid:'rb1', name:'RISK DATA SHEET (auto-backup)'}];
   r = await rb.handler({httpMethod:'POST', body:JSON.stringify({sheet})});
   check('risk-backup updates the existing mirror task in place', r.statusCode === 200
     && JSON.parse(r.body).updated === true
     && calls.some(c => c.opts.method === 'PUT' && c.url.endsWith('/tasks/rb1')));
+  check('risk-backup re-files the updated mirror into ACTIVITY LOG',
+    calls.some(c => c.url.endsWith('/sections/s-act/addTask')));
   r = await rb.handler({httpMethod:'POST', body:JSON.stringify({sheet:{nope:1}})});
   check('risk-backup rejects payloads without overrides', r.statusCode === 400);
   r = await rb.handler({httpMethod:'GET'});
   check('risk-backup rejects non-POST', r.statusCode === 405);
+
+  /* asana-mirror function: register + activity-log backups → ACTIVITY LOG section */
+  const mirror = require('../netlify/functions/asana-mirror.js');
+  sectionsOnServer = [{ gid: 's-low', name: 'LOW RISK (CDD)' }, { gid: 's-act', name: 'ACTIVITY LOG' }];
+  const mirrorBody = JSON.stringify({action:'write', register:[{ref:'RA-1', entity:'Acme'}], audit:[{ts:'2026-06-18T09:47:28.041Z', event:'security.enabled', detail:'on'}]});
+  calls = []; projectTasksOnServer = [];
+  r = await mirror.handler({httpMethod:'POST', body: mirrorBody});
+  check('asana-mirror creates both backups and files them under ACTIVITY LOG', r.statusCode === 200
+    && JSON.parse(r.body).ok === true
+    && calls.some(c => c.url.includes('/sections?'))
+    && calls.filter(c => c.url.endsWith('/sections/s-act/addTask')).length === 2
+    && !calls.some(c => c.url.endsWith('/sections/s-low/addTask')));
+  calls = []; projectTasksOnServer = [{gid:'m-reg', name:'ASSESSMENT REGISTER (auto-backup)'}, {gid:'m-log', name:'ACTIVITY LOG (auto-backup)'}];
+  r = await mirror.handler({httpMethod:'POST', body: mirrorBody});
+  check('asana-mirror updates existing backups in place and re-files them into ACTIVITY LOG', r.statusCode === 200
+    && calls.some(c => c.opts.method === 'PUT' && c.url.endsWith('/tasks/m-reg'))
+    && calls.some(c => c.opts.method === 'PUT' && c.url.endsWith('/tasks/m-log'))
+    && calls.filter(c => c.url.endsWith('/sections/s-act/addTask')).length === 2
+    && !calls.some(c => c.opts.method === 'POST' && c.url.endsWith('/tasks')));
+  const baseFetch = global.fetch;
+  global.fetch = async (url, opts) => { if (String(url).includes('/addTask')) throw new Error('section boom'); return baseFetch(url, opts); };
+  calls = []; projectTasksOnServer = [];
+  r = await mirror.handler({httpMethod:'POST', body: mirrorBody});
+  check('asana-mirror keeps the backup even when section filing fails', r.statusCode === 200 && JSON.parse(r.body).ok === true);
+  global.fetch = baseFetch;
+  r = await mirror.handler({httpMethod:'GET'});
+  check('asana-mirror rejects non-POST', r.statusCode === 405);
+
   delete process.env.ASANA_ACCESS_TOKEN;
   delete global.fetch;
 
