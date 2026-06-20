@@ -40,6 +40,8 @@ const ALIASES = {
   'british virgin islands (uk)': 'British Virgin Islands',
   'lao pdr': "Lao People's Democratic Republic",
   "lao people's democratic republic": "Lao People's Democratic Republic",
+  'bosnia and herzegovina': 'Bosnia-Herzegovina',
+  'bosnia herzegovina': 'Bosnia-Herzegovina',
   'türkiye': 'Turkey',
   'turkiye': 'Turkey',
   'russia': 'Russian Federation',
@@ -144,6 +146,24 @@ export function classifyCountries(html, baseline) {
   return { black: [...black].sort(), grey: [...grey].sort() };
 }
 
+/* Domain-invariant sanity check on a parsed pair of lists, so a broken source
+   (e.g. a page whose "current" section was not isolated and that scoops up every
+   historically-listed country) can never raise a false alert or overwrite the
+   saved state. The FATF "call for action" list is tiny — only ever
+   ~3 jurisdictions (Iran, Myanmar, DPRK) — the grey list runs ~20-30, and the
+   two are always disjoint. A pair that violates these bounds is a parse failure,
+   not a real list this large, so we stop loudly rather than persist garbage. */
+export function assertPlausible(current) {
+  const overlap = current.black.filter(c => current.grey.includes(c));
+  if (current.black.length < 1 || current.black.length > 5
+    || current.grey.length < 5 || current.grey.length > 40
+    || overlap.length) {
+    throw new Error('FATF parse safety stop: black=' + current.black.length
+      + ' grey=' + current.grey.length + ' overlap=' + overlap.length
+      + ' — the source/page structure looks unreliable; not alerting or persisting');
+  }
+}
+
 export function diffLists(prev, curr) {
   const d = (a, b) => b.filter(x => !a.includes(x));
   return {
@@ -171,13 +191,12 @@ export function buildAlert(diff, baseline, affected, today) {
   return notes;
 }
 
-/* A Wayback snapshot older than this is treated as possibly pre-plenary: it
-   could pre-date a just-published FATF list change and so mask it. When the
-   closest snapshot is staler than this, we prefer the faster-updating Wikipedia
-   mirror and fall back to the stale snapshot only if Wikipedia is unreachable. */
+/* A capture older than this many days is treated as possibly pre-plenary and
+   rejected: it could pre-date a just-published FATF list change and so mask it.
+   Used to confirm that a forced archive capture is genuinely fresh. */
 export const SNAPSHOT_STALE_DAYS = 7;
 
-/* Whole days since a Wayback capture. Timestamp is YYYYMMDDhhmmss (UTC); an
+/* Whole days since an archive capture. Timestamp is YYYYMMDDhhmmss (UTC); an
    unparseable value is treated as infinitely stale so it never masks a change. */
 export function snapshotAgeDays(ts, now = Date.now()) {
   const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(String(ts || ''));
@@ -185,80 +204,73 @@ export function snapshotAgeDays(ts, now = Date.now()) {
   return (now - Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) / 86400000;
 }
 
-/* fatf-gafi.org 403s datacenter IPs, and archive.org now 403s runner IPs for
-   page content (its JSON API still answers). Sources, in order of preference:
-   1. fatf-gafi.org live page;
-   2. the Wayback snapshot named by the availability API — but only when it is
-      recent; a stale snapshot can pre-date a just-published plenary, so it is
-      held aside and used only if Wikipedia also fails (see SNAPSHOT_STALE_DAYS);
-   3. Wikipedia's FATF blacklist/greylist articles via the Wikimedia REST API
-      (explicitly automation-friendly; editors update it within hours of a
-      plenary), reading only the "Current" sections.
-   Alerts always tell the officer to verify on the official FATF site. */
-export function sliceCurrentSection(html, marker) {
-  const lower = html.toLowerCase();
-  let i = lower.indexOf('id="current');
-  if (i === -1) i = lower.indexOf(marker);
-  if (i === -1) throw new Error('wikipedia structure changed: current-list section not found');
-  const j = lower.indexOf('<h2', i + 10);
-  return html.slice(i, j === -1 ? undefined : j);
-}
-
+/* The only authoritative source is the official FATF page. It 403s our
+   datacenter runner directly, so when that fails we (2) ask archive.org to fetch
+   the live page *now* (Save Page Now) and (3) failing that, take archive.org's
+   most recent existing capture — but only if it is fresh. Every source is
+   FATF's own HTML; the only thing we refuse is STALE data, because diffing the
+   saved state against a pre-plenary capture would raise reversed/false alerts.
+   When no fresh authoritative capture is reachable (e.g. archive.org is briefly
+   down) the caller SKIPS the run cleanly rather than alerting, persisting, or
+   failing red. Alerts still tell the officer to verify on fatf-gafi.org.
+   Returns { html, source } on success, or null when nothing fresh is reachable. */
 async function fetchFatfSegments() {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en'
   };
-  /* 1. Official page */
+  /* 1. The official FATF page, fetched directly. */
   try {
     const r = await fetch(FATF_URL, { headers, redirect: 'follow' });
     console.log('fatf-gafi.org direct: ' + r.status);
-    if (r.ok) {
-      return { html: await r.text(), source: 'fatf-gafi.org (live)' };
-    }
+    if (r.ok) return { html: await r.text(), source: 'fatf-gafi.org (live)' };
   } catch (e) { console.log('fatf direct error: ' + e.message); }
-  /* 2. Wayback snapshot via the availability API — trusted only when recent.
-        A stale snapshot is held aside as a last-resort fallback (staleFallback)
-        rather than returned, so it cannot mask a just-published plenary. */
-  let staleFallback = null;
+  /* 2. The same official page, captured fresh via archive.org Save Page Now.
+        archive.org reaches fatf-gafi.org even though our runner is 403'd, and the
+        response is FATF's own HTML. Anonymous SPN is rate-limited and often
+        returns a transient 5xx/429, so retry with backoff. We trust the result
+        only when SPN redirected to a genuinely fresh /web/<timestamp>/ capture —
+        never an interstitial or an old snapshot it fell back to. */
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const r = await fetch('https://web.archive.org/save/' + FATF_URL, { headers, redirect: 'follow' });
+      console.log('archive.org Save Page Now (attempt ' + attempt + '): ' + r.status + ' -> ' + r.url);
+      if (r.ok) {
+        const ts = (/\/web\/(\d{14})\//.exec(r.url || '') || [])[1] || '';
+        const age = snapshotAgeDays(ts);
+        if (ts && age <= SNAPSHOT_STALE_DAYS) {
+          return { html: await r.text(), source: 'fatf-gafi.org via archive.org Save Page Now ' + ts };
+        }
+        console.log('Save Page Now did not yield a fresh timestamped capture (ts=' + (ts || 'none') + ') — not trusting it');
+        break; /* a clean 200 without a fresh capture won't improve on retry */
+      }
+      if (r.status !== 429 && r.status < 500) break; /* only 429/5xx are worth retrying */
+    } catch (e) { console.log('save-page-now error (attempt ' + attempt + '): ' + e.message); }
+    if (attempt < 3) await new Promise(res => setTimeout(res, attempt * 8000)); /* 8s, then 16s */
+  }
+  /* 3. archive.org's most recent existing capture of the official page, via the
+        availability API — used only when it is fresh (a recent crawl), so it is
+        an authoritative current capture and never a pre-plenary one. */
   try {
     const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(FATF_URL), { headers });
     console.log('wayback availability API: ' + av.status);
     if (av.ok) {
-      const j = await av.json();
-      const closest = j && j.archived_snapshots && j.archived_snapshots.closest;
-      if (closest && closest.url) {
+      const closest = (await av.json())?.archived_snapshots?.closest;
+      const ts = closest && closest.timestamp;
+      const age = snapshotAgeDays(ts);
+      console.log('latest existing snapshot: ' + (ts || 'none') + (ts ? ' (' + Math.round(age) + 'd old)' : ''));
+      if (closest && closest.url && ts && age <= SNAPSHOT_STALE_DAYS) {
         const s = await fetch(closest.url.replace(/^http:/, 'https:'), { headers, redirect: 'follow' });
-        console.log('wayback snapshot ' + (closest.timestamp || '') + ': ' + s.status);
-        if (s.ok) {
-          const age = snapshotAgeDays(closest.timestamp);
-          const src = 'web.archive.org snapshot ' + (closest.timestamp || '');
-          if (age <= SNAPSHOT_STALE_DAYS) return { html: await s.text(), source: src };
-          console.log('wayback snapshot is ' + Math.round(age) + 'd old (> ' + SNAPSHOT_STALE_DAYS + 'd) — preferring Wikipedia mirror');
-          staleFallback = { html: await s.text(), source: src + ' [stale; verify on fatf-gafi.org]' };
-        }
+        console.log('fetch snapshot ' + ts + ': ' + s.status);
+        if (s.ok) return { html: await s.text(), source: 'fatf-gafi.org via web.archive.org snapshot ' + ts };
       }
     }
-  } catch (e) { console.log('wayback attempt error: ' + e.message); }
-  /* 3. Wikipedia mirror via the Wikimedia REST API */
-  try {
-    const wikiHeaders = { ...headers, 'Api-User-Agent': 'hawkeye-sterling-ra-fatf-watchdog/1.0 (compliance list monitoring)' };
-    const get = async (title) => {
-      const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/html/' + title, { headers: wikiHeaders, redirect: 'follow' });
-      console.log('wikipedia ' + title + ': ' + r.status);
-      if (!r.ok) throw new Error('wikipedia ' + title + ' returned ' + r.status);
-      return await r.text();
-    };
-    const blackSeg = sliceCurrentSection(await get('FATF_blacklist'), 'call for action');
-    const greySeg = sliceCurrentSection(await get('FATF_greylist'), 'increased monitoring');
-    return { blackSeg, greySeg, source: 'en.wikipedia.org mirror (verify on fatf-gafi.org)' };
-  } catch (e) {
-    console.log('wikipedia attempt error: ' + e.message);
-    /* Wikipedia unreachable: a stale Wayback snapshot beats no signal at all. */
-    if (staleFallback) { console.log('using stale wayback snapshot as last resort'); return staleFallback; }
-    throw e;
-  }
+  } catch (e) { console.log('wayback availability error: ' + e.message); }
+  /* No fresh authoritative capture reachable. Signal a clean skip — do NOT diff
+     against stale or third-party data (it would raise reversed/false alerts) and
+     do NOT fail red over a transient archive outage. */
+  return null;
 }
 
 async function asana(path, opts = {}) {
@@ -375,14 +387,12 @@ export async function main(mode) {
        so list discrepancies can be traced to source content vs parsing. */
     const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
     const fetched = await fetchFatfSegments();
+    if (!fetched) { console.log('no fresh authoritative FATF capture reachable — nothing to probe. Verify manually on ' + FATF_URL); return; }
     console.log('source: ' + fetched.source);
-    const current = fetched.html
-      ? classifyCountries(fetched.html, baseline)
-      : { black: extractCountries(fetched.blackSeg, baseline), grey: extractCountries(fetched.greySeg, baseline) };
+    const current = classifyCountries(fetched.html, baseline);
     console.log('black: ' + current.black.join(', '));
     console.log('grey (' + current.grey.length + '): ' + current.grey.join(', '));
-    const flat = (fetched.html || (String(fetched.blackSeg) + ' ||GREY|| ' + String(fetched.greySeg)))
-      .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    const flat = fetched.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
     for (const probe of ['virgin islands', 'congo', 'guinea', 'sudan', 'no longer subject', 'find out more']) {
       const fl = flat.toLowerCase();
       let i = -1, n = 0;
@@ -426,15 +436,19 @@ export async function main(mode) {
 
   const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
   const fetched = await fetchFatfSegments();
+  if (!fetched) {
+    /* No fresh authoritative capture this run (e.g. archive.org briefly down).
+       Skip cleanly: never diff against stale data, never fail red. The weekly
+       cadence retries; the saved state is unchanged. */
+    console.log('no fresh authoritative FATF capture reachable this run — skipping (state unchanged). Verify manually on ' + FATF_URL);
+    return;
+  }
   console.log('list source: ' + fetched.source);
   const source = fetched.source;
-  const current = fetched.html
-    ? classifyCountries(fetched.html, baseline)
-    : { black: extractCountries(fetched.blackSeg, baseline), grey: extractCountries(fetched.greySeg, baseline) };
-  /* Safety: a sudden empty/tiny list means the page changed shape, not mass delisting. */
-  if (current.black.length < 1 || current.grey.length < 5) {
-    throw new Error('FATF parse safety stop: black=' + current.black.length + ' grey=' + current.grey.length + ' — page structure likely changed');
-  }
+  const current = classifyCountries(fetched.html, baseline);
+  /* Safety: an empty/tiny list, an implausibly large "black" list, or black/grey
+     overlap all mean the source was parsed wrong — stop before alerting or persisting. */
+  assertPlausible(current);
   console.log('FATF now — black:', current.black.join(', '), '| grey:', current.grey.length, 'countries');
 
   if (mode === 'seed' || !existsSync(STATE_FILE)) {
