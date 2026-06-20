@@ -1,14 +1,14 @@
 name: FATF Watchdog
 
-# Weekly check of FATF's black (call-for-action) and grey (increased
+# Daily check of FATF's black (call-for-action) and grey (increased
 # monitoring) lists against the app's country data. On any change it creates
 # a review task in the RISK ASSESSMENTS Asana project naming the affected
 # assessments. Needs the ASANA_ACCESS_TOKEN repository secret.
-# Weekly (not monthly) so a mid-month FATF plenary outcome is caught within days
-# rather than waiting for the next month-start run.
+# Daily so a mid-cycle FATF plenary outcome is caught within a day. The check is
+# silent unless the lists actually move, so the daily cadence adds no noise.
 on:
   schedule:
-    - cron: '0 6 * * 1' # 06:00 UTC every Monday
+    - cron: '0 6 * * *' # 06:00 UTC daily
   workflow_dispatch:
     inputs:
       mode:

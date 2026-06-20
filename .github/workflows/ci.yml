@@ -16,6 +16,8 @@ jobs:
         run: node test/app.test.js
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
+      - name: Run daily-brief unit tests
+        run: node test/daily-brief.test.mjs
       - name: Run regulatory-watch unit tests
         run: node test/reg-watch.test.mjs
       - name: Run sanctions-watch unit tests

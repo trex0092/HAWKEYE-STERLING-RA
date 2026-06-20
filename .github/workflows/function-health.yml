@@ -16,7 +16,7 @@ name: Function Health
 
 on:
   schedule:
-    - cron: '15 5 * * 1'   # 05:15 UTC every Monday (just after site-health)
+    - cron: '15 5 * * *'   # 05:15 UTC daily (just after site-health)
   workflow_dispatch:
 
 jobs:
