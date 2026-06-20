@@ -23,6 +23,8 @@ const LOOKBACK_HOURS = Number(process.env.BRIEF_LOOKBACK_HOURS) || 24;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export function dateLabel(d) { return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
 
+export function isHealthAlert(name) { return /\b(SITE|FUNCTION) DOWN\b|health check/i.test(String(name || '')); }
+
 /* Sort the day's new tasks into the categories the brief reports on. The brief's
    own tasks and the risk-data backup task are never counted. Categorisation is
    by the stable name prefixes the individual watchers use. */
@@ -35,7 +37,7 @@ export function categorize(tasks) {
     if (/^FATF/i.test(n)) b.fatf.push(t);
     else if (/Sanctions Screen/i.test(n)) b.screen.push(t);
     else if (/Sanctions Watch/i.test(n)) b.watch.push(t);
-    else if (/\b(SITE|FUNCTION) DOWN\b|health check/i.test(n)) b.health.push(t);
+    else if (isHealthAlert(n)) b.health.push(t);
     else if (/regulat/i.test(n)) b.regulatory.push(t);
     else b.other.push(t);
   }
@@ -125,8 +127,10 @@ async function main() {
   const regTasks = await listTasks(REG_PROJECT_GID, 'name,created_at,permalink_url');
   if (regTasks.some(t => String(t.name || '') === title)) { console.log('brief already exists: ' + title); return; }
 
-  /* Health alerts live in the RISK ASSESSMENTS project; pull only their recent ones. */
-  const riskTasks = await listTasks(RISK_PROJECT_GID, 'name,created_at,permalink_url');
+  /* The RISK ASSESSMENTS project also holds non-alert items (assessment
+     templates, the backup mirror), so take ONLY health alerts from it; the REG
+     project is all monitoring alerts and is taken in full. */
+  const riskTasks = (await listTasks(RISK_PROJECT_GID, 'name,created_at,permalink_url')).filter(t => isHealthAlert(t.name));
   const recent = [...regTasks, ...riskTasks].filter(t => {
     const ts = Date.parse(t.created_at || '');
     return Number.isFinite(ts) && ts >= cutoff;
