@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, sliceCurrentSection, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible } from '../scripts/fatf-watchdog.mjs';
 
 function throws(fn) { try { fn(); return false; } catch { return true; } }
 
@@ -62,11 +62,9 @@ check('alert lists affected assessments and re-assess instruction',
 check('alert with no affected says none', buildAlert(diff, baseline, [], '24/10/2026').includes('none found'));
 check('normalize strips accents and case', normalize('CÔTE  d’IvoirE'.replace('’', "'")) === "cote d'ivoire");
 
-const wiki = '<h2 id="Current_FATF_blacklist">Current</h2><ul><li>Iran</li><li>North Korea</li><li>Myanmar</li></ul><h2 id="Former">Former</h2><ul><li>Panama</li><li>Nigeria</li></ul>';
-const wikiSlice = sliceCurrentSection(wiki, 'call for action');
-const wikiBlack = extractCountries(wikiSlice, baseline);
-check('wikipedia slice keeps only the current section',
-  wikiBlack.join('|') === 'Islamic Republic of Iran|Myanmar|North Korea' && !wikiSlice.includes('Panama'));
+const seg = '<h2>Increased Monitoring</h2><ul><li>Angola</li><li>Bulgaria</li><li>Nigeria</li></ul>';
+check('extractCountries pulls known names from a text segment',
+  extractCountries(seg, baseline).join('|') === 'Angola|Bulgaria|Nigeria');
 
 const digestTasks = [
   { name: 'RA-1 · Alpha Gold DMCC · CDD 19', due_on: '2026-06-15', completed: false },
@@ -109,7 +107,7 @@ check('unparseable snapshot timestamp is treated as infinitely stale',
 check('plausible lists pass the sanity guard',
   !throws(() => assertPlausible({ black: ['Islamic Republic of Iran', 'Myanmar', 'North Korea'],
     grey: ['Angola', 'Bolivia', 'Bulgaria', 'Monaco', 'Nepal', 'Yemen'] })));
-check('oversized black list is rejected (Wikipedia-mirror garbage)',
+check('oversized black list is rejected (broken-source garbage)',
   throws(() => assertPlausible({ black: Array.from({ length: 54 }, (_, i) => 'C' + i),
     grey: Array.from({ length: 54 }, (_, i) => 'C' + i) })));
 check('black/grey overlap is rejected',
