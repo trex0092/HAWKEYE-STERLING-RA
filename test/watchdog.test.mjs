@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, sliceCurrentSection, collectReviewsDue, extractSheet } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, sliceCurrentSection, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS } from '../scripts/fatf-watchdog.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -90,6 +90,17 @@ check('backup extraction rejects garbage and missing markers',
   extractSheet('no markers {"overrides":{}}') === null
   && extractSheet('===RISK DATA SHEET===\n{broken\n===END===') === null
   && extractSheet('===RISK DATA SHEET===\n{"noOverrides":1}\n===END===') === null);
+
+/* Source freshness: a stale Wayback snapshot must read as older than the
+   threshold (so the watchdog prefers Wikipedia), a same-day one as fresh, and
+   an unparseable timestamp as infinitely stale (never masks a change). */
+const now = Date.UTC(2026, 5, 20, 5, 0, 0); // 2026-06-20
+check('stale snapshot (10 Jun) exceeds the staleness threshold',
+  snapshotAgeDays('20260610220941', now) > SNAPSHOT_STALE_DAYS);
+check('fresh snapshot (same day) is within the threshold',
+  snapshotAgeDays('20260620010000', now) <= SNAPSHOT_STALE_DAYS);
+check('unparseable snapshot timestamp is treated as infinitely stale',
+  snapshotAgeDays('', now) === Infinity && snapshotAgeDays('not-a-date', now) === Infinity);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
