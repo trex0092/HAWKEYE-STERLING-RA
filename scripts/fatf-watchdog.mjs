@@ -171,12 +171,29 @@ export function buildAlert(diff, baseline, affected, today) {
   return notes;
 }
 
+/* A Wayback snapshot older than this is treated as possibly pre-plenary: it
+   could pre-date a just-published FATF list change and so mask it. When the
+   closest snapshot is staler than this, we prefer the faster-updating Wikipedia
+   mirror and fall back to the stale snapshot only if Wikipedia is unreachable. */
+export const SNAPSHOT_STALE_DAYS = 7;
+
+/* Whole days since a Wayback capture. Timestamp is YYYYMMDDhhmmss (UTC); an
+   unparseable value is treated as infinitely stale so it never masks a change. */
+export function snapshotAgeDays(ts, now = Date.now()) {
+  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(String(ts || ''));
+  if (!m) return Infinity;
+  return (now - Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) / 86400000;
+}
+
 /* fatf-gafi.org 403s datacenter IPs, and archive.org now 403s runner IPs for
    page content (its JSON API still answers). Sources, in order of preference:
    1. fatf-gafi.org live page;
-   2. the Wayback snapshot named by the availability API;
+   2. the Wayback snapshot named by the availability API — but only when it is
+      recent; a stale snapshot can pre-date a just-published plenary, so it is
+      held aside and used only if Wikipedia also fails (see SNAPSHOT_STALE_DAYS);
    3. Wikipedia's FATF blacklist/greylist articles via the Wikimedia REST API
-      (explicitly automation-friendly), reading only the "Current" sections.
+      (explicitly automation-friendly; editors update it within hours of a
+      plenary), reading only the "Current" sections.
    Alerts always tell the officer to verify on the official FATF site. */
 export function sliceCurrentSection(html, marker) {
   const lower = html.toLowerCase();
@@ -201,7 +218,10 @@ async function fetchFatfSegments() {
       return { html: await r.text(), source: 'fatf-gafi.org (live)' };
     }
   } catch (e) { console.log('fatf direct error: ' + e.message); }
-  /* 2. Wayback snapshot via the availability API */
+  /* 2. Wayback snapshot via the availability API — trusted only when recent.
+        A stale snapshot is held aside as a last-resort fallback (staleFallback)
+        rather than returned, so it cannot mask a just-published plenary. */
+  let staleFallback = null;
   try {
     const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(FATF_URL), { headers });
     console.log('wayback availability API: ' + av.status);
@@ -212,22 +232,33 @@ async function fetchFatfSegments() {
         const s = await fetch(closest.url.replace(/^http:/, 'https:'), { headers, redirect: 'follow' });
         console.log('wayback snapshot ' + (closest.timestamp || '') + ': ' + s.status);
         if (s.ok) {
-          return { html: await s.text(), source: 'web.archive.org snapshot ' + (closest.timestamp || '') };
+          const age = snapshotAgeDays(closest.timestamp);
+          const src = 'web.archive.org snapshot ' + (closest.timestamp || '');
+          if (age <= SNAPSHOT_STALE_DAYS) return { html: await s.text(), source: src };
+          console.log('wayback snapshot is ' + Math.round(age) + 'd old (> ' + SNAPSHOT_STALE_DAYS + 'd) — preferring Wikipedia mirror');
+          staleFallback = { html: await s.text(), source: src + ' [stale; verify on fatf-gafi.org]' };
         }
       }
     }
   } catch (e) { console.log('wayback attempt error: ' + e.message); }
   /* 3. Wikipedia mirror via the Wikimedia REST API */
-  const wikiHeaders = { ...headers, 'Api-User-Agent': 'hawkeye-sterling-ra-fatf-watchdog/1.0 (compliance list monitoring)' };
-  const get = async (title) => {
-    const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/html/' + title, { headers: wikiHeaders, redirect: 'follow' });
-    console.log('wikipedia ' + title + ': ' + r.status);
-    if (!r.ok) throw new Error('wikipedia ' + title + ' returned ' + r.status);
-    return await r.text();
-  };
-  const blackSeg = sliceCurrentSection(await get('FATF_blacklist'), 'call for action');
-  const greySeg = sliceCurrentSection(await get('FATF_greylist'), 'increased monitoring');
-  return { blackSeg, greySeg, source: 'en.wikipedia.org mirror (verify on fatf-gafi.org)' };
+  try {
+    const wikiHeaders = { ...headers, 'Api-User-Agent': 'hawkeye-sterling-ra-fatf-watchdog/1.0 (compliance list monitoring)' };
+    const get = async (title) => {
+      const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/html/' + title, { headers: wikiHeaders, redirect: 'follow' });
+      console.log('wikipedia ' + title + ': ' + r.status);
+      if (!r.ok) throw new Error('wikipedia ' + title + ' returned ' + r.status);
+      return await r.text();
+    };
+    const blackSeg = sliceCurrentSection(await get('FATF_blacklist'), 'call for action');
+    const greySeg = sliceCurrentSection(await get('FATF_greylist'), 'increased monitoring');
+    return { blackSeg, greySeg, source: 'en.wikipedia.org mirror (verify on fatf-gafi.org)' };
+  } catch (e) {
+    console.log('wikipedia attempt error: ' + e.message);
+    /* Wikipedia unreachable: a stale Wayback snapshot beats no signal at all. */
+    if (staleFallback) { console.log('using stale wayback snapshot as last resort'); return staleFallback; }
+    throw e;
+  }
 }
 
 async function asana(path, opts = {}) {
