@@ -40,6 +40,8 @@ const ALIASES = {
   'british virgin islands (uk)': 'British Virgin Islands',
   'lao pdr': "Lao People's Democratic Republic",
   "lao people's democratic republic": "Lao People's Democratic Republic",
+  'bosnia and herzegovina': 'Bosnia-Herzegovina',
+  'bosnia herzegovina': 'Bosnia-Herzegovina',
   'türkiye': 'Turkey',
   'turkiye': 'Turkey',
   'russia': 'Russian Federation',
@@ -142,6 +144,24 @@ export function classifyCountries(html, baseline) {
     masked = masked.replace(rx, (all, p1, p2) => p1 + '#'.repeat(p2.length));
   }
   return { black: [...black].sort(), grey: [...grey].sort() };
+}
+
+/* Domain-invariant sanity check on a parsed pair of lists, so a broken source
+   (e.g. a Wikipedia mirror whose "current" section was not isolated and that
+   scoops up every historically-listed country) can never raise a false alert or
+   overwrite the saved state. The FATF "call for action" list is tiny — only ever
+   ~3 jurisdictions (Iran, Myanmar, DPRK) — the grey list runs ~20-30, and the
+   two are always disjoint. A pair that violates these bounds is a parse failure,
+   not a real list this large, so we stop loudly rather than persist garbage. */
+export function assertPlausible(current) {
+  const overlap = current.black.filter(c => current.grey.includes(c));
+  if (current.black.length < 1 || current.black.length > 5
+    || current.grey.length < 5 || current.grey.length > 40
+    || overlap.length) {
+    throw new Error('FATF parse safety stop: black=' + current.black.length
+      + ' grey=' + current.grey.length + ' overlap=' + overlap.length
+      + ' — the source/page structure looks unreliable; not alerting or persisting');
+  }
 }
 
 export function diffLists(prev, curr) {
@@ -431,10 +451,9 @@ export async function main(mode) {
   const current = fetched.html
     ? classifyCountries(fetched.html, baseline)
     : { black: extractCountries(fetched.blackSeg, baseline), grey: extractCountries(fetched.greySeg, baseline) };
-  /* Safety: a sudden empty/tiny list means the page changed shape, not mass delisting. */
-  if (current.black.length < 1 || current.grey.length < 5) {
-    throw new Error('FATF parse safety stop: black=' + current.black.length + ' grey=' + current.grey.length + ' — page structure likely changed');
-  }
+  /* Safety: an empty/tiny list, an implausibly large "black" list, or black/grey
+     overlap all mean the source was parsed wrong — stop before alerting or persisting. */
+  assertPlausible(current);
   console.log('FATF now — black:', current.black.join(', '), '| grey:', current.grey.length, 'countries');
 
   if (mode === 'seed' || !existsSync(STATE_FILE)) {
