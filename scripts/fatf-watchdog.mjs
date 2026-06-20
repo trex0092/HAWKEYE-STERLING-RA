@@ -205,13 +205,15 @@ export function snapshotAgeDays(ts, now = Date.now()) {
 }
 
 /* The only authoritative source is the official FATF page. It 403s our
-   datacenter runner directly, so when that fails we ask archive.org to fetch the
-   live page *now* (Save Page Now) and read that capture — still FATF's own HTML,
-   just retrieved by a crawler the site does not block, at a current timestamp.
-   We never fall back to a stale capture or a third-party mirror (e.g. Wikipedia):
-   diffing the saved state against stale or non-authoritative data can raise
-   reversed/false alerts, so if no fresh authoritative source is reachable we
-   stop loudly instead. Alerts still tell the officer to verify on fatf-gafi.org. */
+   datacenter runner directly, so when that fails we (2) ask archive.org to fetch
+   the live page *now* (Save Page Now) and (3) failing that, take archive.org's
+   most recent existing capture — but only if it is fresh. Every source is
+   FATF's own HTML; the only thing we refuse is STALE data, because diffing the
+   saved state against a pre-plenary capture would raise reversed/false alerts.
+   When no fresh authoritative capture is reachable (e.g. archive.org is briefly
+   down) the caller SKIPS the run cleanly rather than alerting, persisting, or
+   failing red. Alerts still tell the officer to verify on fatf-gafi.org.
+   Returns { html, source } on success, or null when nothing fresh is reachable. */
 async function fetchFatfSegments() {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
@@ -226,23 +228,49 @@ async function fetchFatfSegments() {
   } catch (e) { console.log('fatf direct error: ' + e.message); }
   /* 2. The same official page, captured fresh via archive.org Save Page Now.
         archive.org reaches fatf-gafi.org even though our runner is 403'd, and the
-        response is FATF's own HTML. We confirm the capture is genuinely fresh
-        (SPN can redirect to an older snapshot when rate-limited) before trusting it. */
-  try {
-    const r = await fetch('https://web.archive.org/save/' + FATF_URL, { headers, redirect: 'follow' });
-    console.log('archive.org Save Page Now: ' + r.status + ' -> ' + r.url);
-    if (r.ok) {
-      const ts = (/\/web\/(\d{14})\//.exec(r.url || '') || [])[1] || '';
-      const age = snapshotAgeDays(ts);
-      if (!ts || age <= SNAPSHOT_STALE_DAYS) {
-        return { html: await r.text(), source: 'fatf-gafi.org via archive.org Save Page Now' + (ts ? ' ' + ts : '') };
+        response is FATF's own HTML. Anonymous SPN is rate-limited and often
+        returns a transient 5xx/429, so retry with backoff. We trust the result
+        only when SPN redirected to a genuinely fresh /web/<timestamp>/ capture —
+        never an interstitial or an old snapshot it fell back to. */
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const r = await fetch('https://web.archive.org/save/' + FATF_URL, { headers, redirect: 'follow' });
+      console.log('archive.org Save Page Now (attempt ' + attempt + '): ' + r.status + ' -> ' + r.url);
+      if (r.ok) {
+        const ts = (/\/web\/(\d{14})\//.exec(r.url || '') || [])[1] || '';
+        const age = snapshotAgeDays(ts);
+        if (ts && age <= SNAPSHOT_STALE_DAYS) {
+          return { html: await r.text(), source: 'fatf-gafi.org via archive.org Save Page Now ' + ts };
+        }
+        console.log('Save Page Now did not yield a fresh timestamped capture (ts=' + (ts || 'none') + ') — not trusting it');
+        break; /* a clean 200 without a fresh capture won't improve on retry */
       }
-      console.log('Save Page Now returned a stale capture (' + ts + ', ' + Math.round(age) + 'd old) — not trusting it');
+      if (r.status !== 429 && r.status < 500) break; /* only 429/5xx are worth retrying */
+    } catch (e) { console.log('save-page-now error (attempt ' + attempt + '): ' + e.message); }
+    if (attempt < 3) await new Promise(res => setTimeout(res, attempt * 8000)); /* 8s, then 16s */
+  }
+  /* 3. archive.org's most recent existing capture of the official page, via the
+        availability API — used only when it is fresh (a recent crawl), so it is
+        an authoritative current capture and never a pre-plenary one. */
+  try {
+    const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(FATF_URL), { headers });
+    console.log('wayback availability API: ' + av.status);
+    if (av.ok) {
+      const closest = (await av.json())?.archived_snapshots?.closest;
+      const ts = closest && closest.timestamp;
+      const age = snapshotAgeDays(ts);
+      console.log('latest existing snapshot: ' + (ts || 'none') + (ts ? ' (' + Math.round(age) + 'd old)' : ''));
+      if (closest && closest.url && ts && age <= SNAPSHOT_STALE_DAYS) {
+        const s = await fetch(closest.url.replace(/^http:/, 'https:'), { headers, redirect: 'follow' });
+        console.log('fetch snapshot ' + ts + ': ' + s.status);
+        if (s.ok) return { html: await s.text(), source: 'fatf-gafi.org via web.archive.org snapshot ' + ts };
+      }
     }
-  } catch (e) { console.log('save-page-now error: ' + e.message); }
-  /* No fresh, authoritative source reachable. Do NOT diff against stale or
-     third-party data — stop so the degraded monitoring is visible and acted on. */
-  throw new Error('Could not reach an authoritative FATF source (the live fatf-gafi.org page or a fresh archive.org capture of it). Skipping rather than diffing against stale data; verify manually on ' + FATF_URL);
+  } catch (e) { console.log('wayback availability error: ' + e.message); }
+  /* No fresh authoritative capture reachable. Signal a clean skip — do NOT diff
+     against stale or third-party data (it would raise reversed/false alerts) and
+     do NOT fail red over a transient archive outage. */
+  return null;
 }
 
 async function asana(path, opts = {}) {
@@ -359,6 +387,7 @@ export async function main(mode) {
        so list discrepancies can be traced to source content vs parsing. */
     const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
     const fetched = await fetchFatfSegments();
+    if (!fetched) { console.log('no fresh authoritative FATF capture reachable — nothing to probe. Verify manually on ' + FATF_URL); return; }
     console.log('source: ' + fetched.source);
     const current = classifyCountries(fetched.html, baseline);
     console.log('black: ' + current.black.join(', '));
@@ -407,6 +436,13 @@ export async function main(mode) {
 
   const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
   const fetched = await fetchFatfSegments();
+  if (!fetched) {
+    /* No fresh authoritative capture this run (e.g. archive.org briefly down).
+       Skip cleanly: never diff against stale data, never fail red. The weekly
+       cadence retries; the saved state is unchanged. */
+    console.log('no fresh authoritative FATF capture reachable this run — skipping (state unchanged). Verify manually on ' + FATF_URL);
+    return;
+  }
   console.log('list source: ' + fetched.source);
   const source = fetched.source;
   const current = classifyCountries(fetched.html, baseline);
