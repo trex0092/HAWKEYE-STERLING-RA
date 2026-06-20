@@ -6,7 +6,7 @@ name: Site Health
 # RISK ASSESSMENTS Asana project (plus GitHub's own failure email).
 on:
   schedule:
-    - cron: '0 5 * * 1' # 05:00 UTC every Monday (09:00 UAE)
+    - cron: '0 5 * * *' # 05:00 UTC daily (09:00 UAE)
   workflow_dispatch:
 
 jobs:

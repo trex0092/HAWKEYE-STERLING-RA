@@ -1,0 +1,28 @@
+name: Daily Compliance Brief
+
+# One consolidated Asana task each morning that rolls up the last 24h of
+# monitoring (FATF, sanctions list changes, customer-screening hits, regulatory
+# changes, site/function health) plus the current standing posture. It always
+# files — "all clear" on a quiet day — so there is a daily record that monitoring
+# ran. Runs after the daily watchers (sanctions 05:00/06:00, FATF/regulatory
+# 06:00) so it captures the day's alerts. Needs the ASANA_ACCESS_TOKEN secret.
+on:
+  schedule:
+    - cron: '0 7 * * *' # 07:00 UTC daily (11:00 UAE), after the daily watchers
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compose and file the daily brief
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+        run: node scripts/daily-brief.mjs
