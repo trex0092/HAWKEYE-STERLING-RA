@@ -2408,6 +2408,29 @@ function loadDraft(){
   }catch(e){ return null; }
 }
 
+/* Retention control (data-governance, Layer 2): drop a loose working draft that
+   has gone untouched beyond the retention window. Assessments already filed in
+   the register are the AML record (5-yr retention) and are NEVER purged here —
+   only an abandoned, unfiled draft is. Returns true if it purged. */
+const RETENTION_DAYS = 90;
+function purgeStaleDraft(now){
+  try{
+    const raw = SS.getItem(STORAGE_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    const savedAt = data && data.savedAt ? Date.parse(data.savedAt) : NaN;
+    if(!isFinite(savedAt)) return false;
+    const ref = data && data.state && data.state.meta ? data.state.meta.ref : '';
+    const reg = regAll();
+    if(ref && reg && reg[ref]) return false; /* already filed in the register → keep */
+    const ageDays = ((now || Date.now()) - savedAt) / 86400000;
+    if(ageDays < RETENTION_DAYS) return false;
+    SS.removeItem(STORAGE_KEY);
+    auditAppend('retention.purge', 'Stale working draft purged ('+Math.floor(ageDays)+'d ≥ '+RETENTION_DAYS+'d retention)');
+    return true;
+  }catch(e){ return false; }
+}
+
 /* ══════════════════════════════════════════
    ASSESSMENT REGISTER — the filing cabinet
    Every assessment with an entity legal name files itself here on save,
@@ -2962,6 +2985,7 @@ function hydrateApp(){
   refreshSelectLabels();
   paintJurisdiction();
   paintActivity();
+  purgeStaleDraft();
   const draft = loadDraft();
   state = draft ? draft.state : freshState();
   syncUI();

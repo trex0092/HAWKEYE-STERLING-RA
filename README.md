@@ -123,8 +123,12 @@ A full mapping of this app against the *AI Governance & Security Periodic Table 
 The suite is also mapped against the **6 Layers of Agentic AI Governance** (AI visibility → AI assurance) in [`docs/governance/agentic-ai-governance-6layers-2026.md`](docs/governance/agentic-ai-governance-6layers-2026.md), supported by:
 
 - [`docs/governance/ai-asset-register.md`](docs/governance/ai-asset-register.md) (+ machine-readable [`data/ai-assets.json`](data/ai-assets.json)) — the AI inventory and risk tiering (Layer 1);
-- [`docs/governance/data-retention.md`](docs/governance/data-retention.md) — data stores, retention and lineage (Layer 2);
-- `test/advisor-assurance.test.js` (offline, in CI) and `scripts/advisor-eval.mjs` (key-gated, weekly) — Advisor red-team, charter-drift and live behavioural assurance (Layer 4).
+- [`docs/governance/data-retention.md`](docs/governance/data-retention.md) — data stores, retention and lineage (Layer 2); enforced by `purgeStaleDraft` in `index.html`;
+- [`docs/governance/dpia-2026.md`](docs/governance/dpia-2026.md) — Data Protection Impact Assessment (Layer 2);
+- [`docs/governance/advisor-bias-review-2026.md`](docs/governance/advisor-bias-review-2026.md) — paired-prompt bias-review method + log (Layer 2/4);
+- [`docs/governance/nist-ai-rmf-mapping-2026.md`](docs/governance/nist-ai-rmf-mapping-2026.md) and [`docs/governance/iso-42001-soa-2026.md`](docs/governance/iso-42001-soa-2026.md) — NIST AI RMF crosswalk + ISO 42001 Statement of Applicability (Layer 6);
+- [`docs/governance/ai-incident-runbook.md`](docs/governance/ai-incident-runbook.md) and [`docs/governance/ai-acceptable-use-policy.md`](docs/governance/ai-acceptable-use-policy.md) — incident response/kill switch + acceptable use (Layer 6);
+- `test/advisor-assurance.test.js` + `test/ai-assets.test.js` (offline, in CI) and `scripts/advisor-eval.mjs` (key-gated, weekly) — Advisor red-team, charter-drift, register-schema and live behavioural assurance (Layer 1/4).
 
 ## Setup
 

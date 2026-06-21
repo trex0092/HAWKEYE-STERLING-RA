@@ -42,6 +42,8 @@ jobs:
         run: node test/advisor-smoke.test.js
       - name: Run Advisor assurance tests (charter integrity + tipping-off red-team + routing)
         run: node test/advisor-assurance.test.js
+      - name: Run AI asset register schema test
+        run: node test/ai-assets.test.js
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight
@@ -87,7 +89,7 @@ jobs:
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/advisor.html" > /tmp/dom-advisor.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-advisor.html
-          for s in 'Hawkeye Sterling advisor.' 'Ask the advisor' 'Regulatory Q&amp;A' 'Super Tools' 'Ask me anything about AML compliance.' 'Advisor persona'; do
+          for s in 'Hawkeye Sterling advisor.' 'Ask the advisor' 'Regulatory Q&amp;A' 'Super Tools' 'Ask me anything about AML compliance.' 'Advisor persona' 'You are interacting with an AI system'; do
             grep -q "$s" /tmp/dom-advisor.html || { echo "MISSING (advisor): $s"; exit 1; }
           done
           echo "advisor smoke ok — composer, persona picker and hero render"

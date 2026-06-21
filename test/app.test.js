@@ -52,7 +52,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   get state(){ return state; }, set state(v){ state = v; },
   computeAssessment, setToggle, onYears, onJurisdiction, onActivity, onSupplier,
   onSign, onField, useSuggestedReview, recalc, syncUI, freshState, mergeState,
-  saveDraft, loadDraft, exportJSON, buildPrintReport, newAssessment, MAX_SCORE,
+  saveDraft, loadDraft, purgeStaleDraft, RETENTION_DAYS, exportJSON, buildPrintReport, newAssessment, MAX_SCORE,
   addMonths, exportFileName, toggleComplete,
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
@@ -581,7 +581,32 @@ A.dateFieldChanged(goodDate, v => {});
 check('valid date still normalises in place', goodDate.value === '01/06/2026');
 check('risk-backup scheduler is inert without fetch (test/file://)', (A.scheduleRiskBackup(), true));
 
+/* ── 27. Retention control: purge a stale, unfiled draft (Layer 2 data governance) ── */
+localStorage.removeItem('hsra.register.v1');
+localStorage.removeItem('hsra.draft.v2');
+const DAY = 86400000;
+const ageDraft = days => { const d = JSON.parse(localStorage.getItem('hsra.draft.v2'));
+  d.savedAt = new Date(Date.now() - days * DAY).toISOString();
+  localStorage.setItem('hsra.draft.v2', JSON.stringify(d)); };
+// A fresh, unfiled working draft must survive.
+reset(); A.saveDraft();
+check('retention: a fresh draft is NOT purged', A.purgeStaleDraft(Date.now()) === false && A.loadDraft() != null);
+// An unfiled (unnamed) draft older than the window is purged + logged.
+ageDraft(A.RETENTION_DAYS + 5);
+check('retention: a stale unfiled draft IS purged', A.purgeStaleDraft(Date.now()) === true && A.loadDraft() == null);
+// (the purge's activity-log entry is checked in the async block below, after the fire-and-forget append flushes)
+// A stale draft that is already filed in the register (an AML record) must be kept.
+reset();
+A.state.entity.name = 'Filed Co';
+A.saveDraft();                        // regUpsert files it under its ref (named ⇒ a record)
+ageDraft(A.RETENTION_DAYS + 30);
+check('retention: a filed (registered) assessment is NEVER purged', A.purgeStaleDraft(Date.now()) === false && A.loadDraft() != null);
+
 (async () => {
+  // Flush the fire-and-forget audit append from purgeStaleDraft (block 27) before asserting.
+  await new Promise(r => setTimeout(r, 0));
+  check('retention: the purge is recorded in the activity log', A.auditAll().some(e => e.event === 'retention.purge'));
+
   const fn = require('../netlify/functions/asana-task.js');
   let sent = null, calls = [];
   let sectionsOnServer = [{ gid: 's-low', name: 'LOW RISK (CDD)' }];

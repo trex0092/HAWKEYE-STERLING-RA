@@ -33,11 +33,11 @@ automations** (lineage, quality, audit) rather than as models.
 | # | Layer | Before | After this change |
 |---|-------|--------|-------------------|
 | 1 | AI Discovery & Inventory | 🟡 | ✅ register + risk tiering added |
-| 2 | Data Governance Foundation | 🟡 | 🟡→✅ retention/lineage documented (DPIA still open) |
+| 2 | Data Governance Foundation | 🟡 | ✅ retention auto-purge + DPIA + bias-review method |
 | 3 | Security & Resilience | ✅ | ✅ |
-| 4 | Model & Agent Assurance | 🔴 | 🟡→✅ red-team + charter-drift tests + live eval added |
+| 4 | Model & Agent Assurance | 🔴 | ✅ red-team + charter-drift + schema tests, live eval, runbook |
 | 5 | Human Oversight | ✅ | ✅ |
-| 6 | Governance, Compliance & Audit | ✅ | ✅ |
+| 6 | Governance, Compliance & Audit | ✅ | ✅ NIST/ISO crosswalks + incident runbook + AUP |
 
 ---
 
@@ -61,11 +61,11 @@ automations** (lineage, quality, audit) rather than as models.
 |---|---|---|
 | Data lineage | ✅ | Versioned risk data (`RISK_DATA_VERSION`); fingerprint state in `data/*-state.json`; git history |
 | Data quality | ✅ | Watcher fingerprinting ignores markup churn; fetch errors never counted as changes; `ai-assets.json` schema |
-| Bias screening | 🟡 | Deterministic engine has no model bias; Advisor bias is a tracked human review ([`data-retention.md`](data-retention.md)) |
-| Retention controls | 🟡→✅ | [`data-retention.md`](data-retention.md): on-device, Asana, git, Anthropic stores; 5-yr AML record-keeping |
-| Third-party data risk | ✅ | Anthropic (sole LLM processor) + Asana documented; regulatory sources are public |
+| Bias screening | 🟡→✅ | Deterministic engine has no model bias; Advisor bias review method + log: [`advisor-bias-review-2026.md`](advisor-bias-review-2026.md) |
+| Retention controls | ✅ | [`data-retention.md`](data-retention.md) + `purgeStaleDraft` auto-purge of abandoned drafts (`index.html`); 5-yr AML record-keeping for filed records |
+| Third-party data risk | ✅ | Anthropic (sole LLM processor) + Asana documented; regulatory sources are public; [`dpia-2026.md`](dpia-2026.md) §3 |
 
-**Verdict:** 🟡→✅ on documentation. Residual: a formal **DPIA**.
+**Verdict:** 🟡→✅. DPIA now in place ([`dpia-2026.md`](dpia-2026.md)); residual: first bias-review cycle.
 
 ## Layer 3 — Security & Resilience
 *"Protect AI systems, data, and tools."*
@@ -113,23 +113,27 @@ guard — reversed-order "a SAR was filed" and "we are reporting".)*
 
 | Sub-block | Status | Evidence |
 |---|---|---|
-| NIST AI RMF | 🟡 | Mapped at framework level (this doc + gap analysis); not a formal conformity assessment |
-| ISO 42001 | 🟡 | Prompt-charter-level AI management controls; open items tracked |
-| EU AI Act | ✅ | Advisor classed **limited risk** (transparency) in the register; not high-risk (human decides) |
+| NIST AI RMF | ✅ | Control-by-control crosswalk: [`nist-ai-rmf-mapping-2026.md`](nist-ai-rmf-mapping-2026.md) (self-assessment) |
+| ISO 42001 | ✅ | Statement of Applicability: [`iso-42001-soa-2026.md`](iso-42001-soa-2026.md) (self-assessment) |
+| EU AI Act | ✅ | Advisor classed **limited risk** (transparency) in the register; on-screen notice in `advisor.html`; not high-risk (human decides) |
 | Audit trails | ✅ | Tamper-evident hash-chained log (`index.html`); git + Asana trails; Advisor audit line |
-| Continuous assurance | ✅ | Daily brief proves monitoring ran; daily/weekly watchers; CI on every push incl. assurance tests |
+| Continuous assurance | ✅ | Daily brief; daily/weekly watchers; CI incl. assurance + register-schema tests; weekly live eval |
+| Incident response | ✅ | [`ai-incident-runbook.md`](ai-incident-runbook.md) + kill switch (unset `ANTHROPIC_API_KEY` → 503) |
+| Acceptable use | ✅ | [`ai-acceptable-use-policy.md`](ai-acceptable-use-policy.md) |
 
-**Verdict:** ✅ operationally; residual: formal NIST/ISO conformity mapping.
+**Verdict:** ✅. NIST/ISO are now mapped (self-assessment); a third-party conformity audit is optional.
 
 ---
 
 ## Overall verdict
 
-**Broadly aligned.** Strong on Security (3), Human Oversight (5), and Governance/Audit (6); Discovery
-(1) and Data Governance (2) are now documented; and **Model & Agent Assurance (4)** — previously the
-weak point — now has offline red-team + charter-drift tests in CI and a key-gated live eval with
-Asana alerting. Remaining open items are a formal **DPIA** (L2) and formal **NIST AI RMF / ISO 42001
-conformity** mapping (L6); both are appropriate next steps rather than gaps in day-to-day control.
+**Aligned across all six layers.** Strong on Security (3), Human Oversight (5), and Governance/Audit
+(6); Discovery (1) and Data Governance (2) are inventoried, retention-controlled (`purgeStaleDraft`)
+and DPIA'd; and **Model & Agent Assurance (4)** — previously the weak point — now has offline red-team
++ charter-drift + register-schema tests in CI, a key-gated live eval, an incident runbook with a kill
+switch, and NIST/ISO self-assessments. Remaining items are **operational, not control gaps**: run the
+first **bias-review cycle** (L2), and — if desired — engage a **third-party conformity audit** for
+NIST AI RMF / ISO 42001 (L6).
 
 **Re-review** this document whenever an AI surface is added/changed (update the register first), when
 the Advisor's models change, or if a backend is introduced.

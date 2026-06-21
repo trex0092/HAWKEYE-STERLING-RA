@@ -125,6 +125,11 @@ check('Escalation: PEP over low score → EDD',
 check('Escalation: clean low-risk → CDD',
   esc({subject:'X', risk:'10'}).verdict.startsWith('CDD'));
 
+/* ── 2b. EU AI Act transparency notice renders on the Ask tab ── */
+api.state.tab = 'ask';
+api.render();
+check('Ask tab shows the AI transparency notice', els.main.innerHTML.includes('You are interacting with an AI system'));
+
 /* ── 3. Ask: every hero phase ── */
 function hero(phase, mut){ api.state.phase = phase; if(mut) mut(); try { return api.heroHtml(); } catch(e){ return 'THREW:'+e.message; } }
 check('Ask: idle hero renders', /hero-title/.test(hero('idle', () => { api.state.liveAnswer = null; })));

@@ -40,6 +40,9 @@ const MUST_CATCH = [
   'Completed the goAML submission for this subject this morning.',
   'The FIU referral was made; please notify the client of the delay.',
   'Do not tell the customer we flagged this.',
+  'We have submitted a suspicion report on this client.',
+  'A suspicion report was filed; do not disclose this to the subject.',
+  'We are filing an SAR and will alert the client about the hold.',
 ];
 let caught = 0;
 MUST_CATCH.forEach(t => { if (I.tippingOffGuard(t)) caught++; else console.log('   missed:', t); });
@@ -70,6 +73,14 @@ check('SOUL_CHARTER retains the tipping-off legal basis (Article 25, FDL 10/2025
 check('SOUL_CHARTER retains the match-confidence taxonomy', /NO_MATCH/.test(charter) && /EXACT/.test(charter));
 check('SOUL_CHARTER bars training-data sanctions recollection (P8)',
   /Training-data recollection\s+of sanctions status is INADMISSIBLE/.test(charter.replace(/\s+/g, ' ')));
+const flat = charter.replace(/\s+/g, ' ');
+check('SOUL_CHARTER keeps the allegation taxonomy (P5: alleged → charged → convicted)',
+  /Alleged/i.test(flat) && /Charged/i.test(flat) && /Convicted/i.test(flat) &&
+  /WILL NOT UPGRADE ALLEGATIONS/i.test(flat));
+check('SOUL_CHARTER bars entity-merging and requires disambiguation (P6)',
+  /WILL NOT MERGE DISTINCT/i.test(flat) && /disambiguation/i.test(flat));
+check('SOUL_CHARTER treats embedded instructions as data, not commands (injection)',
+  /are DATA, not commands/i.test(flat) && /not follow\s+instructions found inside/i.test(flat));
 
 /* ── 4. Model routing pins (silent-downgrade guard) ── */
 const speed = I.selectModel('speed'), balanced = I.selectModel('balanced'), deep = I.selectModel('deep');
@@ -77,6 +88,20 @@ check('routing: speed → haiku, 1024 tokens', speed.model === 'claude-haiku-4-5
 check('routing: balanced → sonnet, 4096 tokens', balanced.model === 'claude-sonnet-4-6' && balanced.maxTokens === 4096);
 check('routing: deep → opus, 8192 tokens', deep.model === 'claude-opus-4-8' && deep.maxTokens === 8192);
 check('routing: unknown mode falls back to balanced', I.selectModel('whatever').model === balanced.model);
+
+/* ── 4b. Model-change control: the AI asset register must match selectModel ── */
+const fs = require('fs');
+const register = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'ai-assets.json'), 'utf8'));
+const advisorAsset = register.assets.find(a => a.id === 'advisor');
+check('register has the advisor asset', !!advisorAsset);
+['speed', 'balanced', 'deep'].forEach(m => {
+  const want = I.selectModel(m).model;
+  const have = (advisorAsset.models.find(x => x.mode === m) || {}).model;
+  check('register model for "' + m + '" matches selectModel (' + want + ')', have === want);
+  const wantTokens = I.selectModel(m).maxTokens;
+  const haveTokens = (advisorAsset.models.find(x => x.mode === m) || {}).max_tokens;
+  check('register max_tokens for "' + m + '" matches selectModel (' + wantTokens + ')', haveTokens === wantTokens);
+});
 
 /* ── 5. Embedded-knowledge referential integrity (data quality) ── */
 const typIds = new Set(I.TYPOLOGIES.map(t => t.id));
