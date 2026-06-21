@@ -199,8 +199,9 @@ check('mergeState sanitises bad values',
 // 12. Export carries outcome + escalations; print report reflects PROHIBITED and escapes input
 reset();
 A.setToggle('pf','Yes');
-A.exportJSON();
-check('export did not throw', true);
+let exportOk = true;
+try { A.exportJSON(); } catch (e) { exportOk = false; }
+check('export did not throw', exportOk);
 A.state.entity.name = '<img src=x onerror=alert(1)> & Co';
 A.state.notes = 'line1\nline2 <script>';
 A.buildPrintReport();

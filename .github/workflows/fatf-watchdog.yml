@@ -31,7 +31,9 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
         run: node scripts/fatf-watchdog.mjs "${{ inputs.mode || 'check' }}"
       - name: Monthly review digest
-        # Runs with the monthly schedule even if the FATF source check failed.
+        # Idempotent monthly digest — self-skips once this month's "Reviews due"
+        # task exists, so it is safe to run on the daily schedule. Runs even if the
+        # FATF source check above failed.
         if: always() && github.event_name == 'schedule'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
