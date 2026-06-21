@@ -44,6 +44,8 @@ jobs:
         run: node test/advisor-assurance.test.js
       - name: Run AI asset register schema test
         run: node test/ai-assets.test.js
+      - name: Run data/*.json integrity test
+        run: node test/data-json.test.js
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight

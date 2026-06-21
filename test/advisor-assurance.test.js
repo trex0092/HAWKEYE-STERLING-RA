@@ -115,6 +115,25 @@ check('zero-tolerance appetite list is non-empty', Array.isArray(I.ZERO_TOLERANC
 check('knowledge context advertises the real catalogue counts',
   I.buildKnowledgeContext().includes('(' + I.TYPOLOGIES.length + ' typologies)'));
 
+/* ── 5b. PII guard (DPIA risk #1) ── */
+check('PII guard flags an Emirates ID', I.piiGuard('UBO EID 784-1987-7103817-5').includes('emirates_id'));
+check('PII guard flags a passport number', I.piiGuard('passport V9088805 expires 2032').includes('passport'));
+check('PII guard flags an IBAN', I.piiGuard('account AE070331234567890123456').includes('iban'));
+check('PII guard is quiet on identifier-free text', I.piiGuard('What CDD applies to a UAE gold trader?').length === 0);
+
+/* ── 5c. Output-structure validator (P7/P9) ── */
+check('structure guard flags a screening answer missing scope+gaps',
+  I.structureGuard('OFAC SDN screening result: NO_MATCH. The subject appears clean.') === true);
+check('structure guard passes a screening answer with scope+gaps',
+  I.structureGuard('SCOPE: lists checked OFAC SDN (2026-06-01). FINDINGS: NO_MATCH. GAPS: none.') === false);
+check('structure guard ignores a non-screening answer',
+  I.structureGuard('Structuring means breaking deposits below the reporting threshold.') === false);
+
+/* ── 5d. Budget flag ── */
+check('budget flag trips when elapsed exceeds the cap', I.budgetFlag(999999, 'balanced') === true);
+check('budget flag is quiet under the cap', I.budgetFlag(10, 'balanced') === false);
+check('budget flag gives deep mode more headroom', I.budgetFlag(25000, 'deep') === false && I.budgetFlag(25000, 'balanced') === true);
+
 /* ── 6. Handler behaviour with a mocked fetch ── */
 const origFetch = global.fetch;
 const origKey = process.env.ANTHROPIC_API_KEY;
@@ -169,6 +188,25 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   // 6h. Disallowed cross-origin → 403
   r = await call(POST({ question: 'hi' }, { origin: 'https://evil.example', host: 'hawkeye-sterling-ra.netlify.app' }), 'test-key');
   check('handler: disallowed origin → 403', r.statusCode === 403);
+
+  // 6i. Kill switch: ADVISOR_ENABLED=false → 503 (no model call)
+  mockFetch(async () => { throw new Error('should not be called'); });
+  process.env.ADVISOR_ENABLED = 'false';
+  r = await call(POST({ question: 'Anything.' }), 'test-key');
+  check('handler: ADVISOR_ENABLED=false → 503 kill switch', r.statusCode === 503);
+  delete process.env.ADVISOR_ENABLED;
+
+  // 6j. PII in the question is flagged in the response (advisory, not blocked)
+  mockFetch(async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'Noted.' }] }) }));
+  r = await call(POST({ question: 'Screen UBO with Emirates ID 784-1987-7103817-5.' }), 'test-key');
+  b = JSON.parse(r.body);
+  check('handler: PII in input is flagged (not blocked)', r.statusCode === 200 && b.ok === true && Array.isArray(b.piiFlagged) && b.piiFlagged.includes('emirates_id') && /pii=emirates_id/.test(b.auditLine));
+
+  // 6k. Screening answer missing scope/gaps is structure-flagged
+  mockFetch(async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'OFAC SDN screening: NO_MATCH, subject is clean.' }] }) }));
+  r = await call(POST({ question: 'Screen Acme.' }), 'test-key');
+  b = JSON.parse(r.body);
+  check('handler: screening answer without scope/gaps is structureFlagged', b.structureFlagged === true && /structureFlagged/.test(b.auditLine));
 
   // restore environment
   global.fetch = origFetch;

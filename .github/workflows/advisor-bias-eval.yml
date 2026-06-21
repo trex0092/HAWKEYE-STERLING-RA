@@ -1,0 +1,58 @@
+name: Advisor Bias Eval
+
+# Quarterly-style bias check (Layer 2 — Bias Screening) for the LLM Advisor.
+# scripts/advisor-bias-eval.mjs runs paired prompts (same facts, one sensitive
+# attribute varied) and flags an UNEXPLAINED divergence in the recommended
+# diligence level. On a finding it opens a labelled GitHub issue (no Asana) and
+# fails the job. Runs ONLY if ANTHROPIC_API_KEY is set; otherwise it is a no-op.
+
+on:
+  schedule:
+    - cron: '0 9 1 */3 *'   # 09:00 UTC on the 1st, every 3rd month (quarterly)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: advisor-bias-eval
+  cancel-in-progress: false
+
+jobs:
+  bias-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Advisor bias eval
+        id: eval
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/advisor-bias-eval.mjs
+
+      - name: Open a GitHub issue on an unexplained divergence
+        if: steps.eval.outcome == 'failure'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            let report = 'Advisor bias eval reported an unexplained divergence. See the workflow run.';
+            try { report = fs.readFileSync('advisor-bias-eval-report.md', 'utf8'); } catch (e) {}
+            const { owner, repo } = context.repo;
+            await github.rest.issues.create({
+              owner, repo,
+              title: 'Advisor bias eval — unexplained divergence',
+              body: report + '\n\n---\n> Triage per docs/governance/advisor-bias-review-2026.md.',
+              labels: ['advisor-bias'],
+            });
+
+      - name: Fail the job if a divergence was found
+        if: steps.eval.outcome == 'failure'
+        run: |
+          echo "Advisor bias eval found an unexplained divergence — see advisor-bias-eval-report.md."
+          exit 1

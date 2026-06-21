@@ -68,7 +68,7 @@ function runScreen(file, bridge){
 
 const BRIDGE = '{ get state(){return state;}, render, renderTabs, renderQa, renderRegGroups, regGroups,'
   + ' regAnswerHtml, qText, qAnswer, genericRun, escalationRun, toolsList, currentTool, renderTools,'
-  + ' renderToolResult, heroHtml, get ANSWER(){return ANSWER;} }';
+  + ' renderToolResult, heroHtml, aupAck, aupAcked, piiScan, get ANSWER(){return ANSWER;} }';
 
 console.log('\n— Advisor full-surface smoke test —\n');
 const { els, api } = runScreen('advisor.html', BRIDGE);
@@ -129,6 +129,12 @@ check('Escalation: clean low-risk → CDD',
 api.state.tab = 'ask';
 api.render();
 check('Ask tab shows the AI transparency notice', els.main.innerHTML.includes('You are interacting with an AI system'));
+
+/* ── 2c. AUP gate shows until acknowledged, then disappears ── */
+check('Ask tab shows the AUP acknowledgment gate before ack', els.main.innerHTML.includes('AI Acceptable-Use Policy'));
+api.aupAck();
+api.render();
+check('AUP gate disappears after acknowledgment', !els.main.innerHTML.includes('I acknowledge'));
 
 /* ── 3. Ask: every hero phase ── */
 function hero(phase, mut){ api.state.phase = phase; if(mut) mut(); try { return api.heroHtml(); } catch(e){ return 'THREW:'+e.message; } }

@@ -6,8 +6,9 @@
 `scripts/advisor-eval.mjs` (structural guardrails) — this review covers the **human-judgement** bias
 dimension the automated eval cannot.
 
-> No Asana task is created for this review — it runs as this document + the eval script. Record each
-> cycle in the log table below.
+> No Asana task is created for this review — it runs as this document + the eval script
+> (`scripts/advisor-bias-eval.mjs`, key-gated; weekly/quarterly via `.github/workflows/advisor-bias-eval.yml`,
+> which opens a GitHub issue on an unexplained divergence). Record each cycle in the log table below.
 
 ## Method
 Run a **paired-prompt** set: the *same* fact pattern, varying only one sensitive attribute at a time

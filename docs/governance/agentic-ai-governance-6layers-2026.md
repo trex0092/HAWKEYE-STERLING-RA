@@ -61,7 +61,8 @@ automations** (lineage, quality, audit) rather than as models.
 |---|---|---|
 | Data lineage | ✅ | Versioned risk data (`RISK_DATA_VERSION`); fingerprint state in `data/*-state.json`; git history |
 | Data quality | ✅ | Watcher fingerprinting ignores markup churn; fetch errors never counted as changes; `ai-assets.json` schema |
-| Bias screening | 🟡→✅ | Deterministic engine has no model bias; Advisor bias review method + log: [`advisor-bias-review-2026.md`](advisor-bias-review-2026.md) |
+| Bias screening | ✅ | Deterministic engine has no model bias; Advisor: paired-prompt method + log ([`advisor-bias-review-2026.md`](advisor-bias-review-2026.md)) **automated** by `scripts/advisor-bias-eval.mjs` |
+| PII / data-minimisation guard | ✅ | Input PII guard (client warning + server `piiFlagged`) in `advisor.html` / `brain-soul.js` |
 | Retention controls | ✅ | [`data-retention.md`](data-retention.md) + `purgeStaleDraft` auto-purge of abandoned drafts (`index.html`); 5-yr AML record-keeping for filed records |
 | Third-party data risk | ✅ | Anthropic (sole LLM processor) + Asana documented; regulatory sources are public; [`dpia-2026.md`](dpia-2026.md) §3 |
 
@@ -89,11 +90,12 @@ automations** (lineage, quality, audit) rather than as models.
 | Agent testing | ✅ | [`test/advisor-assurance.test.js`](../../test/advisor-assurance.test.js): handler paths, 503/400/403 guards, audit line |
 | Red teaming | ✅ | Tipping-off red-team battery (must-catch) + false-positive control in the same test |
 | Drift monitoring | ✅ | Charter-integrity / model-routing pins (offline) + live [`scripts/advisor-eval.mjs`](../../scripts/advisor-eval.mjs) via [`advisor-eval.yml`](../../.github/workflows/advisor-eval.yml) (weekly) |
-| Performance evaluation | 🟡→✅ | Live eval asserts P1/P4/P7/P9/P10 guardrails hold against the real model; regressions alert to Asana |
+| Performance evaluation | ✅ | Live eval asserts P1/P4/P5/P6/P7/P9/P10 + injection guardrails hold against the real model; bias eval (`advisor-bias-eval.mjs`) |
+| Runtime guards | ✅ | `brain-soul.js`: output-structure validator (`structureFlagged`, P7/P9), PII guard (`piiFlagged`), budget flag (`budgetFlagged`), kill switch (`ADVISOR_ENABLED`) |
 
-**Verdict:** 🔴→✅. This was the weak layer; the red-team + charter-drift tests and the key-gated live
-eval close it. *(The red-team battery already surfaced and fixed two real gaps in the live tipping-off
-guard — reversed-order "a SAR was filed" and "we are reporting".)*
+**Verdict:** 🔴→✅. This was the weak layer; the red-team + charter-drift tests, the key-gated live +
+bias evals, and the runtime guards close it. *(The red-team battery already surfaced and fixed two real
+gaps in the live tipping-off guard — reversed-order "a SAR was filed" and "we are reporting".)*
 
 ## Layer 5 — Human Oversight
 *"Humans decide. AI executes."* (here: AI **advises**; humans decide and execute.)
@@ -119,7 +121,7 @@ guard — reversed-order "a SAR was filed" and "we are reporting".)*
 | Audit trails | ✅ | Tamper-evident hash-chained log (`index.html`); git + Asana trails; Advisor audit line |
 | Continuous assurance | ✅ | Daily brief; daily/weekly watchers; CI incl. assurance + register-schema tests; weekly live eval |
 | Incident response | ✅ | [`ai-incident-runbook.md`](ai-incident-runbook.md) + kill switch (unset `ANTHROPIC_API_KEY` → 503) |
-| Acceptable use | ✅ | [`ai-acceptable-use-policy.md`](ai-acceptable-use-policy.md) |
+| Acceptable use | ✅ | [`ai-acceptable-use-policy.md`](ai-acceptable-use-policy.md) — **enforced in-app** via an acknowledgment gate (`hsra.aup.ack.v1`) |
 
 **Verdict:** ✅. NIST/ISO are now mapped (self-assessment); a third-party conformity audit is optional.
 

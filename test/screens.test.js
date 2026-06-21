@@ -140,7 +140,7 @@ function runScreen(file, bridge, seed){
 /* ── 2. Hawkeye Sterling Advisor ── */
 (function(){
   const { els, timers, fetches, api } = runScreen('advisor.html',
-    '{ get state(){return state;}, render, renderAsk, renderQa, renderRegGroups, regGroups, askQuestion, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, heroHtml, PERSONAS }');
+    '{ get state(){return state;}, render, renderAsk, renderQa, renderRegGroups, regGroups, askQuestion, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, heroHtml, aupAck, PERSONAS }');
 
   check('advisor: boots on the Ask tab with all three tabs', els.tabs.innerHTML.includes('Ask the advisor')
     && els.tabs.innerHTML.includes('Regulatory Q&amp;A') && els.tabs.innerHTML.includes('Super Tools'));
@@ -157,7 +157,9 @@ function runScreen(file, bridge, seed){
   check('advisor: selecting Ember updates the persona caption', els.main.innerHTML.includes('<b>Ember</b>'));
   api.state.personaId = 'sterling'; api.renderAsk();
 
-  /* Ask flow: idle → reasoning → (timer) → answer */
+  /* Ask flow: idle → reasoning → (timer) → answer.
+     Acknowledge the AUP gate first (required before any send). */
+  api.aupAck();
   api.state.question = 'What CDD is required for a UAE gold trader?';
   api.ask();
   check('advisor: Ask enters the reasoning phase', api.state.phase === 'reasoning'

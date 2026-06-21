@@ -29,11 +29,17 @@
         "SOUL_CHARTER system prompt: 10 absolute prohibitions (P1-P10)",
         "Refusal protocol + prompt-injection resistance",
         "Post-output tipping-off guard (Article 25, FDL 10/2025)",
+        "Runtime output-structure validator (P7/P9 scope+gaps): structureFlagged",
+        "Input PII guard (Emirates ID / passport / IBAN): piiFlagged + client warning",
+        "Explicit kill switch: ADVISOR_ENABLED=false -> 503",
+        "Cost/latency budget flag: budgetFlagged (ADVISOR_BUDGET_MS)",
+        "In-app AI Acceptable-Use Policy acknowledgment gate (hsra.aup.ack.v1)",
         "26s request timeout + graceful API-error handling",
         "Audit line: 'decision support, not a decision. MLRO review required.'",
         "CORS origin allow-list; key held server-side",
         "Offline assurance tests: test/advisor-assurance.test.js (CI)",
-        "Key-gated live behavioural eval: scripts/advisor-eval.mjs (weekly)"
+        "Key-gated live behavioural eval: scripts/advisor-eval.mjs (weekly)",
+        "Key-gated bias eval: scripts/advisor-bias-eval.mjs (quarterly)"
       ],
       "human_oversight": "Human-in-the-loop. Every output is advisory; the MLRO makes and records the decision.",
       "data_retention": "Transient. Anthropic API usage (no training on inputs); no server-side persistence in the function. See docs/governance/data-retention.md.",

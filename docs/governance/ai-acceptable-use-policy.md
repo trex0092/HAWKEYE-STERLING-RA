@@ -27,8 +27,8 @@ making, a compliance decision. The MLRO/Compliance Officer remains accountable f
 - Complete AML/AI-use awareness before operating the Advisor.
 
 ## Acknowledgment
-Operators acknowledge this policy before first use. The acknowledgment is recorded as a process
-control and may be logged to the tamper-evident **activity log** (suggested event `policy.ack`) on the
-operator's device. *(An in-app acknowledgment gate is a candidate future enhancement.)*
+The Advisor is **gated in-app**: the composer is blocked until the operator acknowledges this policy,
+recorded on the device as `hsra.aup.ack.v1` (`advisor.html`). The Advisor cannot be used until the
+gate is accepted.
 
 *Reviewed annually and on any change to the Advisor's models or scope.*

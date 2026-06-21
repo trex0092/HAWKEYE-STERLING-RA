@@ -374,6 +374,43 @@ function tippingOffGuard(text) {
   return TIPPING_OFF_PATTERNS.some(re => re.test(text));
 }
 
+// ── PII GUARD ──────────────────────────────────────────────────────────────────
+// Detects personal identifiers in operator input so the UI/audit can flag that
+// data is leaving the device (DPIA risk #1). Advisory only — it does NOT block,
+// because an AML advisor legitimately handles identifiers; it makes the transfer
+// visible and recorded.
+const PII_PATTERNS = [
+  { id: 'emirates_id', re: /\b784-?\d{4}-?\d{7}-?\d\b/ },
+  { id: 'passport',    re: /\b[A-Z]{1,2}\d{6,9}\b/ },
+  { id: 'long_number', re: /\b\d{12,}\b/ },                 // IBANs, card/long account numbers
+  { id: 'iban',        re: /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/ },
+];
+function piiGuard(text) {
+  const s = String(text || '');
+  return PII_PATTERNS.filter(p => p.re.test(s)).map(p => p.id);
+}
+
+// ── OUTPUT-STRUCTURE VALIDATOR ──────────────────────────────────────────────────
+// For screening-shaped responses, the charter requires a SCOPE declaration and a
+// GAPS section (P7/P9). Mirror the tipping-off guard: flag (not withhold) when a
+// screening response is missing them, so the gap is visible at runtime.
+function structureGuard(text) {
+  const s = String(text || '');
+  const looksLikeScreening = /\b(SDN|OFAC|sanctions?|screen(?:ed|ing)?|NO_MATCH|adverse media|PEP)\b/i.test(s);
+  if (!looksLikeScreening) return false;
+  const hasScope = /\bscope\b/i.test(s) || /lists?\s+checked/i.test(s);
+  const hasGaps  = /\bgaps?\b/i.test(s);
+  return !(hasScope && hasGaps);
+}
+
+// ── COST / LATENCY BUDGET ───────────────────────────────────────────────────────
+function budgetFlag(elapsedMs, mode) {
+  const cap = Number(process.env.ADVISOR_BUDGET_MS || 20000);
+  // 'deep' is expected to be slower; give it 50% more headroom.
+  const limit = mode === 'deep' ? cap * 1.5 : cap;
+  return Number(elapsedMs) > limit;
+}
+
 // ── KNOWLEDGE CONTEXT ─────────────────────────────────────────────────────────
 
 function buildKnowledgeContext() {
@@ -445,6 +482,11 @@ exports.handler = async (event) => {
 const handle = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
   if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
+
+  // Explicit kill switch (incident runbook): disable without deleting the key.
+  if (String(process.env.ADVISOR_ENABLED || '').toLowerCase() === 'false') {
+    return resp(503, { ok: false, error: 'Advisor disabled (ADVISOR_ENABLED=false).' });
+  }
 
   const KEY = process.env.ANTHROPIC_API_KEY;
   if (!KEY) return resp(503, { ok: false, error: 'ANTHROPIC_API_KEY not configured in Netlify environment.' });
@@ -521,13 +563,22 @@ const handle = async (event) => {
       'or FIU referrals. Citation: Article 25 of Federal Decree-Law No. 10 of 2025.]';
   }
 
+  // Advisory flags (do not withhold): input PII, missing screening structure, budget overrun.
+  const piiFlagged = ok ? piiGuard(question + ' ' + context) : [];
+  const structureFlagged = ok && !tippingOffFlagged ? structureGuard(text) : false;
+  const budgetFlagged = budgetFlag(elapsedMs, mode);
+
   const auditLine = 'AUDIT | ' + new Date().toISOString() +
     ' | model=' + model + ' | mode=' + mode +
     ' | elapsedMs=' + elapsedMs + ' | ok=' + ok +
     ' | hash=' + simpleHash(question) +
+    (piiFlagged.length ? ' | pii=' + piiFlagged.join('+') : '') +
+    (structureFlagged ? ' | structureFlagged' : '') +
+    (budgetFlagged ? ' | budgetFlagged' : '') +
     ' | "This output is decision support, not a decision. MLRO review required."';
 
-  return resp(200, { ok, text, mode, model, elapsedMs, tippingOffFlagged, auditLine });
+  return resp(200, { ok, text, mode, model, elapsedMs, tippingOffFlagged,
+    piiFlagged, structureFlagged, budgetFlagged, auditLine });
 };
 
 // ── TEST HANDLE ────────────────────────────────────────────────────────────────
@@ -536,6 +587,7 @@ const handle = async (event) => {
 // `exports.handler`; this changes no runtime behaviour.
 exports.__internals = {
   SOUL_CHARTER, KNOWLEDGE_CONTEXT, TIPPING_OFF_PATTERNS, tippingOffGuard,
+  PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
   selectModel, simpleHash, buildKnowledgeContext,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
 };

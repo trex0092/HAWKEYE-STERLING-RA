@@ -128,7 +128,7 @@ The suite is also mapped against the **6 Layers of Agentic AI Governance** (AI v
 - [`docs/governance/advisor-bias-review-2026.md`](docs/governance/advisor-bias-review-2026.md) — paired-prompt bias-review method + log (Layer 2/4);
 - [`docs/governance/nist-ai-rmf-mapping-2026.md`](docs/governance/nist-ai-rmf-mapping-2026.md) and [`docs/governance/iso-42001-soa-2026.md`](docs/governance/iso-42001-soa-2026.md) — NIST AI RMF crosswalk + ISO 42001 Statement of Applicability (Layer 6);
 - [`docs/governance/ai-incident-runbook.md`](docs/governance/ai-incident-runbook.md) and [`docs/governance/ai-acceptable-use-policy.md`](docs/governance/ai-acceptable-use-policy.md) — incident response/kill switch + acceptable use (Layer 6);
-- `test/advisor-assurance.test.js` + `test/ai-assets.test.js` (offline, in CI) and `scripts/advisor-eval.mjs` (key-gated, weekly) — Advisor red-team, charter-drift, register-schema and live behavioural assurance (Layer 1/4).
+- `test/advisor-assurance.test.js` + `test/ai-assets.test.js` + `test/data-json.test.js` (offline, in CI) and `scripts/advisor-eval.mjs` / `scripts/advisor-bias-eval.mjs` (key-gated, weekly/quarterly) — Advisor red-team, charter-drift, register-schema, JSON-integrity, plus live behavioural and bias assurance (Layer 1/2/4). Runtime guards in `brain-soul.js`: PII flag, output-structure validator, budget flag, and an `ADVISOR_ENABLED` kill switch; in-app AUP acknowledgment gate in `advisor.html`.
 
 ## Setup
 

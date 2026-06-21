@@ -263,8 +263,18 @@ const PERSONAS = [
   {id:'warden',   name:'Warden',   role:'Board & MLRO Governance',              img:'assets/persona-warden.webp',   accent:'210,80,200',  pos:'52% 18%'}
 ];
 
-let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', liveAnswer:null, regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null};
+let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', liveAnswer:null, regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null, piiConfirmed:false};
 let reasoningTimer = null;
+
+/* AI Acceptable-Use Policy gate — the Advisor is blocked until the operator
+   acknowledges the policy once on this device (recorded locally). */
+const AUP_KEY = 'hsra.aup.ack.v1';
+function aupAcked(){ try{ return !!localStorage.getItem(AUP_KEY); }catch(e){ return false; } }
+function aupAck(){ try{ localStorage.setItem(AUP_KEY, JSON.stringify({at:new Date().toISOString(), version:1})); }catch(e){} }
+
+/* Client PII guard — warns before identifiers leave the device (DPIA risk #1). */
+const PII_RES = [/\b784-?\d{4}-?\d{7}-?\d\b/, /\b[A-Z]{1,2}\d{6,9}\b/, /\b\d{12,}\b/];
+function piiScan(t){ const s = String(t||''); return PII_RES.some(re=>re.test(s)); }
 
 function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
 function tone(t){
@@ -382,6 +392,7 @@ function renderAsk(){
     +   '<div class="sec-lbl"><span>Your question</span><i></i></div>'
     +   '<textarea class="q" id="qInput" aria-label="Compliance question" placeholder="Ask a compliance question, e.g. what CDD applies to a cross-border gold shipment?"></textarea>'
     +   '<p class="ai-transparency" role="note" style="margin:12px 0 0;font-size:11px;line-height:1.5;color:#8590A6">&#9888; You are interacting with an AI system (Anthropic Claude). Output is decision-support only — it is not a compliance decision. MLRO review required.</p>'
+    +   (aupAcked() ? '' : '<div id="aupGate" role="note" style="margin-top:12px;padding:11px 13px;border-radius:8px;background:#1A1206;border:1px solid rgba(255,180,80,0.4);font-size:11.5px;line-height:1.55;color:#E8C28A">By using the Advisor you accept the <strong>AI Acceptable-Use Policy</strong>: decision-support only · MLRO review required · no tipping-off · do not paste data that must not leave the device. <button id="aupAckBtn" type="button" style="margin-left:6px;padding:5px 11px;border-radius:6px;border:1px solid rgba(255,180,80,0.6);background:rgba(255,180,80,0.14);color:#FFD9A0;cursor:pointer;font:inherit;font-size:11px">I acknowledge</button></div>')
     +   '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px">'
     +     '<button class="ask-btn" id="askBtn">Ask the advisor <span style="font-size:11px">&#9658;</span></button>'
     +   '</div>'
@@ -393,8 +404,9 @@ function renderAsk(){
     + '</div>'
     + '</div>';
 
-  const qi = $('qInput'); if(qi){ qi.value = state.question; qi.addEventListener('input', e=>{ state.question = e.target.value; }); }
+  const qi = $('qInput'); if(qi){ qi.value = state.question; qi.addEventListener('input', e=>{ state.question = e.target.value; state.piiConfirmed = false; }); }
   const ab = $('askBtn'); if(ab) ab.addEventListener('click', ask);
+  const ak = $('aupAckBtn'); if(ak) ak.addEventListener('click', ()=>{ aupAck(); renderAsk(); });
   Array.from(document.querySelectorAll('.mode-btn')).forEach(b=>b.addEventListener('click',()=>{ state.mode=b.getAttribute('data-mode'); renderAsk(); }));
   bindPersona();
   bindHero();
@@ -409,7 +421,16 @@ function bindHero(){ const aa=$('askAgain'); if(aa) aa.addEventListener('click',
 const MODE_TO_REASONING = {Quick:'speed', Speed:'speed', Balanced:'balanced', Deep:'deep'};
 
 function ask(){
+  // AUP gate: must acknowledge the Acceptable-Use Policy before any send.
+  if(!aupAcked()){ renderAsk(); return; }
   const q = (state.question||'').trim() || 'What CDD is required for a UAE gold trader?';
+  // PII guard: warn (once) before identifiers leave the device.
+  if(piiScan(q) && !state.piiConfirmed){
+    state.piiConfirmed = true;
+    state.askedQuestion = q; state.phase = 'answer';
+    state.liveAnswer = {ok:false, text:'⚠ Possible personal identifiers detected in your question (e.g. Emirates ID, passport, or a long account/IBAN number). Sending will transfer them off-device to Anthropic for processing. Click "Ask the advisor" again to confirm, or edit your question to remove them.'};
+    $('hero').innerHTML = heroHtml(); bindHero(); return;
+  }
   clearTimeout(reasoningTimer);
   state.askedQuestion = q; state.phase = 'reasoning'; state.liveAnswer = null;
   $('hero').innerHTML = heroHtml();
