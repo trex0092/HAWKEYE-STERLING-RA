@@ -9,6 +9,13 @@
 > API), so the generative-AI tiles are assessed for it in **§1a** rather than
 > marked product-wide Not Applicable. The serverless-function count is corrected
 > (four, not two). The deterministic RA engine (`index.html`) posture is unchanged.
+>
+> **Revision 2026-06-21 (in-code controls added):** every Periodic-Table tile that
+> can be implemented **without an external integration or backend** has been built
+> in code (no new dependencies, no Asana changes). New controls are tabulated in
+> **§5**. Only **SSO, VDB, PIPE and central enterprise IAM** remain Not Applicable —
+> each *requires* a backend/IdP/vector-DB service the project deliberately does not
+> have, so they are out of scope by design (precondition named in §4 and §5).
 
 ---
 
@@ -190,3 +197,51 @@ VDB (if embeddings are added), **ISO/IEC 42001** and the **EU AI Act** — are
 **N-A for the RA engine but applicable to the LLM-backed Advisor** (`brain-soul.js`);
 their current guardrails and open gaps are in §1a. Revisit this document whenever
 the Advisor's model usage changes, or if a backend is introduced.
+
+---
+
+## 5. In-code controls added (2026-06-21)
+
+Every tile addable **without a backend or external integration** is now enforced in
+code. No new dependencies and no Asana changes. Tests: `test/app.test.js` (engine /
+device controls) and `test/advisor-assurance.test.js` (Advisor guards).
+
+### Advisor AI runtime guards — `netlify/functions/brain-soul.js`
+Each is a pure guard surfaced in the response JSON and the `auditLine`, exercised
+offline via `exports.__internals`.
+
+| Tile | Control | Evidence |
+|---|---|---|
+| **HALL** | Hallucination guard — flags definitive sanctions/adverse-media assertions or fabricated URLs/case-numbers when **no source** was supplied (runtime P1/P2/P8). | `hallucinationGuard`, `hallFlagged` |
+| **THREAT** | Prompt-injection guard — flags injected commands ("ignore previous…", planted "subject cleared", base64 blobs) in operator/context input. | `injectionGuard`, `injectionFlagged` |
+| **ANOM** | Output-anomaly guard — abnormally short output, charter-text leakage, degenerate repetition. | `anomalyGuard`, `anomFlagged` |
+| **PERF** | Output-quality score 0–100 (citation, scope/methodology, gaps, next steps, disclaimer). | `qualityScore`, `quality` |
+| **LAT** | Latency surfaced as a first-class signal (`latencyFlagged`) alongside `elapsedMs`. | `budgetFlag` → `latencyFlagged` |
+
+### Advisor client — `advisor.html` (on-device, privacy-preserving)
+- **LAT / USAGE / MON**: on-device telemetry (`govRecord`/`govStats`) — latency p50/p95,
+  per-mode/persona usage counts, and a health indicator — stored only in `localStorage`
+  (no telemetry leaves the device). Governance chips render the guard flags beside each answer.
+
+### Deterministic engine + device — `index.html`
+| Tile | Control | Evidence |
+|---|---|---|
+| **MFA** ✅ | Optional **TOTP second factor** (RFC 6238, HMAC-SHA1 via WebCrypto) layered on the passphrase; secret stored encrypted; fails open on corruption to avoid lock-out. | `totpVerify`, `mfaToggle`, `secTotp` |
+| **RBAC / ABAC** 🟡→✅ (analogue) | Operator **role** (Analyst / Reviewer-MLRO / Admin) with action gating — second-line approval, risk-data edits and security changes are role-gated and logged. Defaults to Admin (backward compatible). | `currentRole`, `can`, gated `toggleComplete`/`rdSetOverride` |
+| **MASK** ✅ | Field-level masking toggle for registration no., address, contact and principals. | `toggleMask`, `.mask-field` / `body.mask-on` |
+| **TOKEN** ✅ | Pseudonymised activity-log export — identifiers replaced by stable SHA-256 tokens (`ID-…`, `REF-…`). | `exportAuditTokenized` |
+| **RCause** 🟡→✅ | Structured **root-cause-analysis** record appended to the tamper-evident hash-chained log and printed in the report appendix. | `addRCA`, `rcaSubmit` (`rca.record`) |
+| **POLICY** 🟡→✅ | Completion gate — finalising warns/blocks on missing mandated sign-off fields (driven by `POLICIES`). | `policyMissing` in `toggleComplete` |
+
+### Still Not Applicable (require an external integration/backend — out of scope by design)
+| Tile | Precondition |
+|---|---|
+| **SSO** | An external identity provider (OAuth / SAML / OIDC) to federate. |
+| **IAM** (central/enterprise) | A backend identity service; the on-device role model above is the in-code analogue. |
+| **VDB** | An embeddings provider + a vector-database service. |
+| **PIPE** | A backend data-ingestion pipeline to secure. |
+
+> **ISO42K / AIACT / GDPR** are governance regimes evidenced by the documents in
+> `docs/governance/` plus the technical controls above (encryption, audit, role
+> gating, transparency notice, data-subject export/erasure). They are documentation-
+> and-control posture, not a single code path.

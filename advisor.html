@@ -276,6 +276,68 @@ function aupAck(){ try{ localStorage.setItem(AUP_KEY, JSON.stringify({at:new Dat
 const PII_RES = [/\b784-?\d{4}-?\d{7}-?\d\b/, /\b[A-Z]{1,2}\d{6,9}\b/, /\b\d{12,}\b/];
 function piiScan(t){ const s = String(t||''); return PII_RES.some(re=>re.test(s)); }
 
+/* ── AI governance telemetry (on-device, privacy-preserving) ──────────────────
+   LAT (latency), USAGE (call analytics) and MON (health) for the Advisor. All
+   data stays in this browser's localStorage — nothing is sent anywhere, in
+   keeping with the suite's no-telemetry-by-design posture. */
+const GOV_KEY = 'hsra.advisor.telemetry.v1';
+function govLoad(){ try{ return JSON.parse(localStorage.getItem(GOV_KEY) || 'null') || {lat:[], usage:{}, flags:{}, lastOk:null, lastErr:null, calls:0}; }catch(e){ return {lat:[], usage:{}, flags:{}, lastOk:null, lastErr:null, calls:0}; } }
+function govSave(g){ try{ localStorage.setItem(GOV_KEY, JSON.stringify(g)); }catch(e){} }
+function govRecord(data){
+  const g = govLoad();
+  const ok = data && data.ok !== false;
+  g.calls = (g.calls||0) + 1;
+  if(typeof data.elapsedMs === 'number'){ g.lat.push(data.elapsedMs); if(g.lat.length > 200) g.lat = g.lat.slice(-200); }
+  const day = new Date().toISOString().slice(0,10);
+  g.usage[day] = g.usage[day] || {n:0, modes:{}, personas:{}};
+  g.usage[day].n++;
+  g.usage[day].modes[state.mode] = (g.usage[day].modes[state.mode]||0) + 1;
+  g.usage[day].personas[state.personaId] = (g.usage[day].personas[state.personaId]||0) + 1;
+  // prune usage to the last 30 days
+  const keep = Object.keys(g.usage).sort().slice(-30);
+  g.usage = keep.reduce((o,k)=>{ o[k]=g.usage[k]; return o; }, {});
+  ['hallFlagged','injectionFlagged','anomFlagged','structureFlagged','latencyFlagged','tippingOffFlagged'].forEach(f=>{ if(data[f]) g.flags[f] = (g.flags[f]||0) + 1; });
+  if(Array.isArray(data.piiFlagged) && data.piiFlagged.length) g.flags.piiFlagged = (g.flags.piiFlagged||0) + 1;
+  if(ok) g.lastOk = new Date().toISOString(); else g.lastErr = new Date().toISOString();
+  govSave(g);
+}
+function pct(arr, p){ if(!arr.length) return null; const s = arr.slice().sort((a,b)=>a-b); return s[Math.min(s.length-1, Math.floor((p/100)*s.length))]; }
+function govStats(){
+  const g = govLoad();
+  const today = new Date().toISOString().slice(0,10);
+  return { calls:g.calls||0, today:(g.usage[today]&&g.usage[today].n)||0,
+    p50:pct(g.lat,50), p95:pct(g.lat,95), lastOk:g.lastOk, lastErr:g.lastErr, flags:g.flags||{} };
+}
+/* Governance chips rendered beside the Advisor response (HALL/THREAT/ANOM/PERF/LAT). */
+function govFlagsHtml(la){
+  if(!la || la.ok === false) return '';
+  const chips = [];
+  const mk = (txt, tn) => '<span class="pill" style="'+pillStyle(tn)+';font-size:9px;padding:3px 8px">'+esc(txt)+'</span>';
+  if(typeof la.quality === 'number') chips.push(mk('quality '+la.quality+'/100', la.quality>=70?'low':la.quality>=40?'med':'high'));
+  if(la.hallFlagged)      chips.push(mk('⚠ HALL — unsourced assertion', 'high'));
+  if(la.injectionFlagged) chips.push(mk('⚠ THREAT — injection in input', 'high'));
+  if(la.anomFlagged)      chips.push(mk('⚠ ANOM — output anomaly', 'med'));
+  if(la.structureFlagged) chips.push(mk('⚠ scope/gaps missing', 'med'));
+  if(la.latencyFlagged)   chips.push(mk('⚠ LAT — slow', 'med'));
+  if(Array.isArray(la.piiFlagged) && la.piiFlagged.length) chips.push(mk('PII: '+la.piiFlagged.join('+'), 'med'));
+  if(!chips.length) return '';
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">'+chips.join('')+'</div>';
+}
+/* On-device USAGE/LAT/MON strip for the Ask view. */
+function govStatsHtml(){
+  const s = govStats();
+  if(!s.calls) return '';
+  const item = (lbl,val)=>'<span style="display:inline-flex;flex-direction:column;line-height:1.3"><b style="color:#9FB0C8;font-size:12px">'+esc(val)+'</b><span style="font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#5A657A">'+esc(lbl)+'</span></span>';
+  const health = s.lastErr && (!s.lastOk || s.lastErr > s.lastOk) ? '⚠ last call failed' : (s.lastOk ? 'healthy' : '—');
+  return '<div class="sec-lbl" style="margin:18px 0 9px"><span>Advisor telemetry (on-device)</span><i></i></div>'
+    + '<div style="display:flex;gap:18px;flex-wrap:wrap;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)">'
+    +   item('calls', s.calls) + item('today', s.today)
+    +   item('latency p50', s.p50!=null ? Math.round(s.p50)+'ms' : '—')
+    +   item('latency p95', s.p95!=null ? Math.round(s.p95)+'ms' : '—')
+    +   item('health', health)
+    + '</div>';
+}
+
 function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
 function tone(t){
   if(t==='high') return {c:'#FF6B6B', bg:'rgba(255,87,87,0.10)',  bd:'rgba(255,87,87,0.45)'};
@@ -351,6 +413,7 @@ function heroAnswerHtml(){
       +   '<span class="conf"'+(ok?'':' style="color:#FF8A8A"')+'>'+(ok?'<i></i>':'&#9888; ')+esc(state.mode+' mode'+modelChip)+'</span>'
       + '</div>'
       + '<div class="summary" style="white-space:pre-line">'+esc(la.text)+'</div>'
+      + govFlagsHtml(la)
       + (la.auditLine ? '<div style="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" style="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(la.auditLine)+'</div></div>' : '')
       + '<button class="again" id="askAgain" style="margin-top:18px"><span>&#8634;</span> Ask another</button>'
       + '</div></div>';
@@ -401,6 +464,7 @@ function renderAsk(){
     + '<div>'
     +   '<div style="margin-bottom:16px"><div class="sec-lbl" style="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'
     +   '<div id="hero">'+heroHtml()+'</div>'
+    +   govStatsHtml()
     + '</div>'
     + '</div>';
 
@@ -449,12 +513,14 @@ function ask(){
   Promise.all([brainFetch, minDelay])
   .then(([data]) => {
     state.liveAnswer = data;
+    try{ govRecord(data); }catch(e){}
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml();
     bindHero();
   })
   .catch(() => {
     state.liveAnswer = {ok: false, text: 'The brain is unavailable — ensure ANTHROPIC_API_KEY is set in Netlify environment variables and redeploy.'};
+    try{ govRecord({ok:false}); }catch(e){}
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml();
     bindHero();

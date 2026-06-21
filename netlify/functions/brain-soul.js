@@ -411,6 +411,90 @@ function budgetFlag(elapsedMs, mode) {
   return Number(elapsedMs) > limit;
 }
 
+// ── HALLUCINATION GUARD (HALL) ──────────────────────────────────────────────────
+// The charter (P1/P2/P8) forbids asserting sanctions / adverse-media status or
+// citing sources that are not present in the supplied input. This is the runtime
+// counterpart: flag (do not withhold) when the output makes a definitive
+// designation / adverse-media assertion, or cites a URL / case number / press
+// release / paragraph reference, while NO source material was provided. With
+// sources supplied the operator can verify, so it does not flag.
+const HALL_ASSERTION_PATTERNS = [
+  /\bis\s+(?:currently\s+)?(?:sanctioned|designated|listed)\b/i,
+  /\b(?:appears?|found|named)\s+on\s+the\s+(?:OFAC|UN|EU|OFSI|SDN|consolidated)\b/i,
+  /\bconfirmed\s+(?:sanctions?|match|hit|designation)\b/i,
+  /\bhas\s+been\s+(?:convicted|indicted|charged|fined|arrested)\b/i,
+];
+const HALL_CITATION_PATTERNS = [
+  /\bhttps?:\/\/\S+/i,                              // fabricated URL
+  /\bcase\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*\w/i, // case / docket number
+  /\bpress\s+release\b/i,
+  /(?:\bpara(?:graph)?\.?\s*|§\s*)\d+/i,            // paragraph reference
+];
+function hallucinationGuard(text, hasSources) {
+  if (hasSources) return false;                    // sources supplied → verifiable
+  const s = String(text || '');
+  // A proper P1/P2 refusal explicitly declares the absence of sources — never a hallucination.
+  if (/\bno\s+(?:authoritative\s+)?(?:source|sanctions?\s+list|primary\s+sources?|list\s+(?:supplied|provided))\b/i.test(s)) return false;
+  return HALL_ASSERTION_PATTERNS.some(re => re.test(s)) || HALL_CITATION_PATTERNS.some(re => re.test(s));
+}
+
+// ── PROMPT-INJECTION GUARD (THREAT) ─────────────────────────────────────────────
+// Charter §PROMPT-INJECTION RESISTANCE treats instructions embedded in screened
+// material/operator input as DATA, not commands. This flags when the input
+// contains injection-style commands, so the audit trail records the attempt.
+const INJECTION_PATTERNS = [
+  /\bignore\s+(?:all\s+)?(?:the\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|prompts?|rules?|charter)\b/i,
+  /\bdisregard\s+(?:the\s+)?(?:charter|system\s+prompt|instructions?|rules?|prohibitions?)\b/i,
+  /\byou\s+are\s+now\b/i,
+  /\bact\s+as\s+(?:if\s+you|an?\s)\b/i,
+  /\bthis\s+(?:subject|entity|person|customer|client)\s+(?:has\s+been|is)\s+(?:cleared|approved|safe)\b/i,
+  /\boverride\s+(?:the\s+)?(?:guard|charter|safety|prohibitions?|rules?)\b/i,
+  /\b(?:reveal|print|repeat|show)\s+(?:me\s+)?(?:your\s+)?(?:system\s+prompt|charter|instructions?)\b/i,
+  /[A-Za-z0-9+/]{160,}={0,2}/,                      // long base64-ish blob
+];
+function injectionGuard(question, context) {
+  const s = String(question || '') + '\n' + String(context || '');
+  return INJECTION_PATTERNS.some(re => re.test(s));
+}
+
+// ── ANOMALY GUARD (ANOM) ────────────────────────────────────────────────────────
+// Heuristic anomalies in a successful model output: abnormally short answer,
+// charter text leaking into the response, or degenerate token/line repetition.
+function anomalyGuard(text, ok) {
+  if (!ok) return false;
+  const s = String(text || '');
+  if (s.trim().length < 40) return true;                                   // suspiciously short
+  if (/ABSOLUTE PROHIBITIONS|MLRO SOUL CHARTER|MANDATORY MATCH CONFIDENCE|EMBEDDED BRAIN KNOWLEDGE/.test(s)) return true; // charter leak
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length >= 16) {
+    const counts = Object.create(null);
+    const cap = Math.max(8, Math.floor(words.length * 0.25));
+    for (const w of words) { if (w.length >= 6) { counts[w] = (counts[w] || 0) + 1; if (counts[w] >= cap) return true; } }
+  }
+  const seen = Object.create(null);
+  for (const l of s.split('\n').map(l => l.trim()).filter(l => l.length >= 20)) {
+    seen[l] = (seen[l] || 0) + 1; if (seen[l] >= 4) return true;
+  }
+  return false;
+}
+
+// ── OUTPUT QUALITY SCORE (PERF) ─────────────────────────────────────────────────
+// A 0–100 heuristic of answer quality: adequate length, cited typology/red-flag
+// IDs, scope/methodology, a GAPS section, actionable next steps and the
+// decision-support disclaimer. Surfaced per call so output quality is tracked.
+function qualityScore(text) {
+  const s = String(text || '');
+  if (!s.trim()) return 0;
+  let score = 0;
+  if (s.length >= 200) score += 20; else if (s.length >= 80) score += 10;
+  if (/\b(?:rf_[a-z0-9_]+|structuring|tbml|sanctions_evasion|pep|ubo|layering|kri_[a-z0-9_]+)\b/i.test(s)) score += 20;
+  if (/\bgaps?\b/i.test(s)) score += 20;
+  if (/\b(?:recommend(?:ed|ation)?|next\s+steps?|edd|request)\b/i.test(s)) score += 15;
+  if (/\b(?:scope|lists?\s+checked|methodology)\b/i.test(s)) score += 15;
+  if (/\bdecision\s+support\b/i.test(s) || /\bMLRO\b/.test(s)) score += 10;
+  return Math.min(100, score);
+}
+
 // ── KNOWLEDGE CONTEXT ─────────────────────────────────────────────────────────
 
 function buildKnowledgeContext() {
@@ -563,22 +647,35 @@ const handle = async (event) => {
       'or FIU referrals. Citation: Article 25 of Federal Decree-Law No. 10 of 2025.]';
   }
 
-  // Advisory flags (do not withhold): input PII, missing screening structure, budget overrun.
+  // Advisory flags (do not withhold): input PII, missing screening structure,
+  // budget/latency overrun, hallucination (HALL), prompt-injection (THREAT),
+  // output anomaly (ANOM) and an output-quality score (PERF).
+  const hasSources = !!context.trim();
   const piiFlagged = ok ? piiGuard(question + ' ' + context) : [];
   const structureFlagged = ok && !tippingOffFlagged ? structureGuard(text) : false;
   const budgetFlagged = budgetFlag(elapsedMs, mode);
+  const latencyFlagged = budgetFlagged;                       // LAT: latency is a first-class signal
+  const injectionFlagged = injectionGuard(question, context); // THREAT: input-side, independent of output
+  const hallFlagged = ok && !tippingOffFlagged ? hallucinationGuard(text, hasSources) : false;
+  const anomFlagged = ok && !tippingOffFlagged ? anomalyGuard(text, ok) : false;
+  const quality = ok && !tippingOffFlagged ? qualityScore(text) : 0;
 
   const auditLine = 'AUDIT | ' + new Date().toISOString() +
     ' | model=' + model + ' | mode=' + mode +
     ' | elapsedMs=' + elapsedMs + ' | ok=' + ok +
     ' | hash=' + simpleHash(question) +
+    ' | quality=' + quality +
     (piiFlagged.length ? ' | pii=' + piiFlagged.join('+') : '') +
     (structureFlagged ? ' | structureFlagged' : '') +
-    (budgetFlagged ? ' | budgetFlagged' : '') +
+    (hallFlagged ? ' | hallFlagged' : '') +
+    (injectionFlagged ? ' | injectionFlagged' : '') +
+    (anomFlagged ? ' | anomFlagged' : '') +
+    (latencyFlagged ? ' | latencyFlagged' : '') +
     ' | "This output is decision support, not a decision. MLRO review required."';
 
   return resp(200, { ok, text, mode, model, elapsedMs, tippingOffFlagged,
-    piiFlagged, structureFlagged, budgetFlagged, auditLine });
+    piiFlagged, structureFlagged, budgetFlagged, latencyFlagged,
+    hallFlagged, injectionFlagged, anomFlagged, quality, auditLine });
 };
 
 // ── TEST HANDLE ────────────────────────────────────────────────────────────────
@@ -588,6 +685,7 @@ const handle = async (event) => {
 exports.__internals = {
   SOUL_CHARTER, KNOWLEDGE_CONTEXT, TIPPING_OFF_PATTERNS, tippingOffGuard,
   PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
+  hallucinationGuard, injectionGuard, anomalyGuard, qualityScore,
   selectModel, simpleHash, buildKnowledgeContext,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
 };

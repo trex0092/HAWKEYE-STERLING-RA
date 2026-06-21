@@ -592,23 +592,23 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
           </div>
           <div class="fg">
             <label for="entityRegno">Registration / Licence No.</label>
-            <input type="text" id="entityRegno" placeholder="Company or trade licence number" oninput="onField('entity','regno',this.value)">
+            <input type="text" id="entityRegno" class="mask-field" placeholder="Company or trade licence number" oninput="onField('entity','regno',this.value)">
           </div>
         </div>
         <div class="field-row">
           <div class="fg">
             <label for="entityAddress">Registered Address</label>
-            <input type="text" id="entityAddress" placeholder="Street, city, country" oninput="onField('entity','address',this.value)">
+            <input type="text" id="entityAddress" class="mask-field" placeholder="Street, city, country" oninput="onField('entity','address',this.value)">
           </div>
           <div class="fg">
             <label for="entityContact">Website / Email</label>
-            <input type="text" id="entityContact" placeholder="Optional" oninput="onField('entity','contact',this.value)">
+            <input type="text" id="entityContact" class="mask-field" placeholder="Optional" oninput="onField('entity','contact',this.value)">
           </div>
         </div>
         <div class="field-row single">
           <div class="fg">
             <label for="entityPrincipals">Principals — Beneficial Owners / Controllers / Directors</label>
-            <input type="text" id="entityPrincipals" placeholder="e.g. John Smith, Jane Doe (comma-separated)" oninput="onField('entity','principals',this.value)">
+            <input type="text" id="entityPrincipals" class="mask-field" placeholder="e.g. John Smith, Jane Doe (comma-separated)" oninput="onField('entity','principals',this.value)">
           </div>
         </div>
       </div>
@@ -814,6 +814,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <button class="btn btn-orange btn-full" id="btnRetryAsana" onclick="retryAsanaDelivery()" style="display:none">↻ Retry Asana Delivery</button>
         <button class="btn btn-secondary btn-full" onclick="openRegister()">≡ Register</button>
         <button class="btn btn-orange btn-full" onclick="openAudit()">▤ Activity Log</button>
+        <button class="btn btn-ghost btn-full" id="btnMask" onclick="toggleMask()">🙈 Mask sensitive fields</button>
         <button class="btn btn-lilac btn-full" onclick="sendToAsana()">↗ Send to Asana</button>
         <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
         <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
@@ -886,10 +887,46 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <span class="rd-count" id="auditCountLbl"></span>
         <span class="rd-spacer"></span>
         <button class="btn btn-blue" onclick="exportAudit()">⇩ Export Log</button>
+        <button class="btn btn-lilac" onclick="exportAuditTokenized()" title="Export with identifiers replaced by stable tokens">⇩ Export (tokenised)</button>
+      </div>
+      <!-- Governance controls: operator role (RBAC/ABAC), MFA, and a structured RCA record (RCause) -->
+      <div class="gov-panel">
+        <div class="gov-row">
+          <label for="govRole">Operator role</label>
+          <select id="govRole" class="sec-input" onchange="onRoleChange(this.value)" style="max-width:280px">
+            <option value="analyst">Analyst (first line)</option>
+            <option value="reviewer">Reviewer / MLRO (second line)</option>
+            <option value="admin">Administrator</option>
+          </select>
+          <span class="rd-meta">Gates second-line approval, risk-data edits and security changes.</span>
+        </div>
+        <div class="gov-row">
+          <span class="rd-meta" id="mfaStatus">Two-factor (TOTP): off</span>
+          <button class="btn btn-gold btn-mini" id="btnMfa" onclick="mfaToggle()">Enable 2FA</button>
+        </div>
+        <div class="gov-rca">
+          <div class="rd-meta" style="margin-bottom:6px">Record a root-cause analysis (appended to the tamper-evident log)</div>
+          <input class="sec-input" id="rcaIncident" placeholder="Incident reference / what happened *">
+          <input class="sec-input" id="rcaTrigger" placeholder="Trigger — what surfaced it">
+          <input class="sec-input" id="rcaRoot" placeholder="Root cause *">
+          <input class="sec-input" id="rcaAction" placeholder="Corrective action">
+          <input class="sec-input" id="rcaOwner" placeholder="Owner">
+          <button class="btn btn-blue btn-mini" onclick="rcaSubmit()">＋ Record RCA</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
+<style>
+  /* MASK — field-level masking toggle for sensitive identifiers (DPMS PII) */
+  body.mask-on .mask-field{ -webkit-text-security:disc; text-security:disc; }
+  /* Governance panel inside the Activity Log overlay */
+  .gov-panel{ border-top:1px solid rgba(255,255,255,0.08); margin-top:12px; padding-top:12px; display:flex; flex-direction:column; gap:12px; }
+  .gov-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .gov-row label{ font-size:11px; letter-spacing:.04em; color:#9aa6bd; }
+  .gov-rca{ display:flex; flex-direction:column; gap:7px; }
+  .gov-rca .sec-input{ width:100%; }
+</style>
 
 <!-- Device security gate: passphrase unlock + encryption-at-rest. Renders over the
      app; the engine still boots underneath so the page always computes. -->
@@ -908,6 +945,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
     <div class="sec-msg" id="secMsg"></div>
     <input type="password" id="secPass" class="sec-input" aria-label="Passphrase" placeholder="Passphrase" autocomplete="off" autocapitalize="off" spellcheck="false">
     <input type="password" id="secPass2" class="sec-input" aria-label="Confirm passphrase" placeholder="Confirm passphrase" autocomplete="off" autocapitalize="off" spellcheck="false" style="display:none">
+    <input type="text" id="secTotp" class="sec-input" aria-label="Two-factor code" placeholder="6-digit 2FA code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="display:none">
     <div class="sec-err" id="secErr" style="display:none"></div>
     <div class="sec-actions">
       <button class="btn btn-primary btn-full" id="secPrimary" onclick="secSubmit()">Unlock</button>
@@ -1076,6 +1114,7 @@ function _secShow(mode, reason){
   }
   if($('secPass')) $('secPass').value = '';
   if($('secPass2')){ $('secPass2').value = ''; $('secPass2').style.display = setup ? '' : 'none'; }
+  if($('secTotp')){ $('secTotp').value = ''; $('secTotp').style.display = (!setup && mfaOn()) ? '' : 'none'; }
   if($('secPrimary')) $('secPrimary').textContent = setup ? 'Set passphrase & encrypt' : 'Unlock';
   if($('secSkip')) $('secSkip').style.display = setup ? '' : 'none';
   if($('secNote')) $('secNote').textContent = setup
@@ -1117,6 +1156,11 @@ async function secSubmit(){
       _secKey = await _deriveKey(pass, _ub64(meta.salt), meta.iter || PBKDF2_ITER);
       const check = await crypto.subtle.decrypt({name:'AES-GCM', iv:_ub64(meta.iv)}, _secKey, _ub64(meta.ct));
       if(new TextDecoder().decode(check) !== 'hsra-verify') throw new Error('bad');
+      if(mfaOn()){                                   /* MFA step-up — require a valid TOTP code */
+        const secret = await _mfaReadSecret();
+        const code = ($('secTotp') && $('secTotp').value) || '';
+        if(secret && !(await totpVerify(secret, code))){ _secKey = null; return _secError('Incorrect 2FA code.'); }
+      }
       await _secActivate();
       await auditAppend('security.unlock', 'Device unlocked');
       _secFinish('Unlocked.');
@@ -1263,6 +1307,8 @@ function initSecurity(){
     if(p && p.addEventListener) p.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
     const p2 = $('secPass2');
     if(p2 && p2.addEventListener) p2.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
+    const pt = $('secTotp');
+    if(pt && pt.addEventListener) pt.addEventListener('keydown', e => { if(e.key === 'Enter') secSubmit(); });
     if(meta && meta.salt){                                  /* returning, encrypted device */
       const sess = _sessRead();                             /* resume a live 1-hour session without re-prompting */
       if(sess) _sessRestore(sess).then(ok => { if(!ok) _secShow('unlock'); });
@@ -1318,6 +1364,7 @@ async function openAudit(){
     : '<div class="rd-empty">No activity recorded yet.</div>';
   if($('auditCountLbl')) $('auditCountLbl').textContent = log.length + (log.length===1?' entry':' entries');
   if($('auditMeta')) $('auditMeta').textContent = '';
+  paintRole(); paintMfa();
   if($('auditOverlay')) $('auditOverlay').classList.add('open');
   const ok = await auditVerify();
   if($('auditMeta')) $('auditMeta').textContent = log.length ? (ok ? '✓ chain intact' : '⚠ integrity check failed') : '';
@@ -1343,6 +1390,146 @@ function _auditReportBlock(){
     + '(tamper-evident, hash-chained - last '+Math.min(15,log.length)+' of '+log.length+')</div>'
     + '<table><tbody>'+rows+'</tbody></table></div>';
 }
+/* ══════════════════════════════════════════
+   AI GOVERNANCE & SECURITY CONTROLS (in-code, no backend, no new deps)
+   Closes the genuinely-addable Periodic-Table tiles for an on-device tool:
+   RBAC/ABAC (operator-role gating), MFA (TOTP second factor), MASK (field
+   masking), TOKEN (pseudonymised export) and RCause (structured RCA in the
+   tamper-evident log). SSO / VDB / PIPE / central enterprise IAM remain N-A —
+   they require an external integration/backend, out of scope by design.
+══════════════════════════════════════════ */
+
+/* ── Operator role — RBAC / ABAC (segregation of duties, recorded in the log) ──
+   Defaults to 'admin' so the single-operator flow is unchanged; selecting a
+   lower role enforces SoD (e.g. an analyst cannot record a second-line approval). */
+const ROLE_KEY = 'hsra.role.v1';
+const ROLES = ['analyst','reviewer','admin'];
+const ROLE_LABEL = {analyst:'Analyst (first line)', reviewer:'Reviewer / MLRO (second line)', admin:'Administrator'};
+function currentRole(){ try{ return localStorage.getItem(ROLE_KEY) || 'admin'; }catch(e){ return 'admin'; } }
+function setRole(r){ if(ROLES.indexOf(r) < 0) return false; try{ localStorage.setItem(ROLE_KEY, r); }catch(e){} auditAppend('role.set', ROLE_LABEL[r] || r); paintRole(); return true; }
+function roleAtLeast(min){ return ROLES.indexOf(currentRole()) >= ROLES.indexOf(min); }
+/* ABAC: action → role predicate */
+function can(action){
+  switch(action){
+    case 'approve':  return roleAtLeast('reviewer');   /* second-line sign-off / completion */
+    case 'riskdata': return roleAtLeast('reviewer');   /* edit baseline overrides */
+    case 'security': return roleAtLeast('admin');      /* change 2FA / reset security */
+    default:         return true;
+  }
+}
+function denyToast(what){ toast('Permission denied — role “'+(ROLE_LABEL[currentRole()] || currentRole())+'” cannot '+what+'.'); }
+function paintRole(){ const sel = $('govRole'); if(sel) sel.value = currentRole(); }
+function onRoleChange(v){ setRole(v); }
+
+/* ── POLICY enforcement — completeness gate before an assessment is finalised ── */
+function policyMissing(){
+  const s = (typeof state !== 'undefined' && state.signoff) || {};
+  const m = (typeof state !== 'undefined' && state.meta) || {};
+  const out = [];
+  if(!String(s.completedBy || '').trim()) out.push('First-line assessor (Assessed By) — ' + POLICIES.RCP);
+  if(!String(s.approvedBy || '').trim()) out.push('Second-line approver (MLRO) — ' + POLICIES.RCP);
+  if(!String(m.assessor || '').trim())   out.push('Assessor name (' + POLICIES.KYC + ')');
+  return out;
+}
+
+/* ── MASK — field-level masking of sensitive identifiers ── */
+let _maskOn = false;
+function toggleMask(){
+  _maskOn = !_maskOn;
+  try{ if(document.body && document.body.classList) document.body.classList.toggle('mask-on', _maskOn); }catch(e){}
+  if($('btnMask')) $('btnMask').textContent = _maskOn ? '🙉 Unmask sensitive fields' : '🙈 Mask sensitive fields';
+}
+
+/* ── TOKEN — pseudonymised export of the activity log (stable SHA-256 tokens) ── */
+async function exportAuditTokenized(){
+  const entries = auditAll();
+  const map = {};
+  const tok = async (s, pfx) => { s = String(s || ''); if(!s) return s; if(!map[s]) map[s] = pfx + '-' + (await sha256Hex('hsra-token|' + s)).slice(0, 8).toUpperCase(); return map[s]; };
+  const out = [];
+  for(const e of entries) out.push(Object.assign({}, e, { who: await tok(e.who, 'ID'), ref: await tok(e.ref, 'REF') }));
+  const payload = { app: 'Hawkeye Sterling — Activity Log (pseudonymised)', note: 'Identifiers replaced by stable tokens; original hash chain is not re-verifiable against this file.', exportedAt: new Date().toISOString(), entries: out };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'activity-log-tokenised.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  auditAppend('export.audit.tokenised', out.length + ' entries');
+  toast('Pseudonymised activity log exported');
+}
+
+/* ── RCause — structured root-cause analysis appended to the hash-chained log ── */
+async function addRCA(rec){
+  rec = rec || {};
+  const detail = ['incident=' + String(rec.incident || '').trim(),
+    'trigger=' + String(rec.trigger || '').trim(),
+    'rootCause=' + String(rec.rootCause || '').trim(),
+    'corrective=' + String(rec.corrective || '').trim(),
+    'owner=' + String(rec.owner || '').trim()].join(' | ');
+  await auditAppend('rca.record', detail);
+  return detail;
+}
+function rcaSubmit(){
+  const g = id => ($(id) && $(id).value) || '';
+  const rec = { incident:g('rcaIncident'), trigger:g('rcaTrigger'), rootCause:g('rcaRoot'), corrective:g('rcaAction'), owner:g('rcaOwner') };
+  if(!rec.incident.trim() || !rec.rootCause.trim()){ toast('Record an RCA needs at least an incident and a root cause.'); return; }
+  addRCA(rec).then(() => {
+    ['rcaIncident','rcaTrigger','rcaRoot','rcaAction','rcaOwner'].forEach(i => { if($(i)) $(i).value = ''; });
+    openAudit();
+    toast('Root-cause analysis recorded in the activity log.');
+  });
+}
+
+/* ── MFA — TOTP second factor (RFC 6238, HMAC-SHA1, WebCrypto, no deps) ──
+   The secret is stored encrypted under the device passphrase; a plaintext flag
+   tells the unlock gate to require a code. Missing/corrupt secret fails open
+   (skips 2FA) so the device can never be permanently locked out. */
+const MFA_KEY = 'hsra.mfa.v1';      /* AES-GCM-encrypted base32 secret */
+const MFA_FLAG = 'hsra.mfa.on';     /* '1' when 2FA is enabled */
+const _B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function _b32encode(bytes){ let bits = 0, val = 0, out = ''; for(const b of bytes){ val = (val << 8) | b; bits += 8; while(bits >= 5){ out += _B32[(val >>> (bits - 5)) & 31]; bits -= 5; } } if(bits > 0) out += _B32[(val << (5 - bits)) & 31]; return out; }
+function _b32decode(str){ str = String(str).toUpperCase().replace(/[^A-Z2-7]/g, ''); let bits = 0, val = 0; const out = []; for(const c of str){ const idx = _B32.indexOf(c); if(idx < 0) continue; val = (val << 5) | idx; bits += 5; if(bits >= 8){ out.push((val >>> (bits - 8)) & 0xff); bits -= 8; } } return new Uint8Array(out); }
+function mfaGenSecret(){ return _b32encode(crypto.getRandomValues(new Uint8Array(20))); }
+async function totpAt(secretB32, counter){
+  const ck = await crypto.subtle.importKey('raw', _b32decode(secretB32), {name:'HMAC', hash:'SHA-1'}, false, ['sign']);
+  const buf = new ArrayBuffer(8), dv = new DataView(buf);
+  dv.setUint32(4, counter >>> 0); dv.setUint32(0, Math.floor(counter / 4294967296) >>> 0);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', ck, buf));
+  const off = sig[sig.length - 1] & 0xf;
+  const bin = ((sig[off] & 0x7f) << 24) | ((sig[off+1] & 0xff) << 16) | ((sig[off+2] & 0xff) << 8) | (sig[off+3] & 0xff);
+  return String(bin % 1000000).padStart(6, '0');
+}
+function totpNow(secretB32){ return totpAt(secretB32, Math.floor(Date.now() / 30000)); }
+async function totpVerify(secretB32, code){
+  code = String(code || '').trim();
+  if(!/^\d{6}$/.test(code)) return false;
+  const c = Math.floor(Date.now() / 30000);
+  for(const w of [-1, 0, 1]) if((await totpAt(secretB32, c + w)) === code) return true;   /* ±30s drift */
+  return false;
+}
+function mfaOn(){ try{ return localStorage.getItem(MFA_FLAG) === '1'; }catch(e){ return false; } }
+async function _mfaReadSecret(){ try{ const raw = localStorage.getItem(MFA_KEY); return raw ? await decryptStr(_secKey, raw) : null; }catch(e){ return null; } }
+function paintMfa(){
+  if($('mfaStatus')) $('mfaStatus').textContent = 'Two-factor (TOTP): ' + (mfaOn() ? 'on' : 'off');
+  if($('btnMfa')) $('btnMfa').textContent = mfaOn() ? 'Disable 2FA' : 'Enable 2FA';
+}
+async function mfaToggle(){
+  if(!can('security')) return denyToast('change security settings');
+  if(mfaOn()){
+    try{ localStorage.removeItem(MFA_FLAG); localStorage.removeItem(MFA_KEY); }catch(e){}
+    await auditAppend('security.mfa', 'Two-factor disabled');
+    paintMfa(); toast('Two-factor disabled.'); return;
+  }
+  if(!_secActive || !_secKey){ toast('Enable device encryption first, then 2FA.'); return; }
+  const secret = mfaGenSecret();
+  try{ localStorage.setItem(MFA_KEY, await encryptStr(_secKey, secret)); localStorage.setItem(MFA_FLAG, '1'); }
+  catch(e){ toast('Could not enable 2FA.'); return; }
+  await auditAppend('security.mfa', 'Two-factor enabled');
+  paintMfa();
+  if($('mfaStatus')) $('mfaStatus').innerHTML = 'Two-factor (TOTP): ON — add this key to your authenticator: <code style="user-select:all;color:#7fe7c4">' + esc(secret) + '</code>';
+  toast('2FA enabled — store the key shown in your authenticator app.');
+}
+
 function scoreFromYesNo(val, type) {
   if(type==='vlok')  return val==='Yes' ? 3 : 1;
   if(type==='vlok2') return val==='Yes' ? 1 : 3;
@@ -1602,6 +1789,7 @@ function scheduleRiskBackup(){
 function rdSetOverride(kind, name, vals){
   const b = rdBase(kind, name);
   if(!b || b.name==='N/A' || !vals) return false;
+  if(!can('riskdata')){ denyToast('edit risk-data overrides'); return false; }
   const score = parseInt(vals.score);
   if(isNaN(score) || score < RD_KINDS[kind].min || score > 3) return false;
   const cfa = kind==='countries' ? !!vals.cfa : undefined;
@@ -1629,6 +1817,7 @@ function rdResetAll(){
   rdAfterChange();
 }
 function rdResetConfirm(){
+  if(!can('riskdata')){ denyToast('reset risk data'); return; }
   if(!confirm('Remove all risk-data overrides and restore the baseline scores?')) return;
   rdResetAll();
   toast('Risk data reset to baseline');
@@ -2147,6 +2336,12 @@ function onSupplier(prefix, i) {
   recalc();
 }
 function toggleComplete() {
+  if(!state.complete){                                 /* finalising — enforce RBAC + POLICY */
+    if(!can('approve')){ denyToast('mark an assessment complete (second-line approval)'); return; }
+    const missing = policyMissing();
+    if(missing.length && typeof confirm === 'function'
+       && !confirm('Policy check — these are incomplete before completion:\n• ' + missing.join('\n• ') + '\n\nMark complete anyway?')) return;
+  }
   state.complete = !state.complete;
   paintStatus();
   scheduleSave();
