@@ -120,6 +120,12 @@ For an offline, zero-backend tool, sensitive data is protected **on the device**
 
 A full mapping of this app against the *AI Governance & Security Periodic Table (2026)* — what applies, what is implemented, and what is out of scope for the deterministic, on-device RA engine, plus the tiles that apply to the optional LLM-backed Advisor (`brain-soul.js`) — is in [`docs/governance/ai-governance-gap-analysis-2026.md`](docs/governance/ai-governance-gap-analysis-2026.md).
 
+The suite is also mapped against the **6 Layers of Agentic AI Governance** (AI visibility → AI assurance) in [`docs/governance/agentic-ai-governance-6layers-2026.md`](docs/governance/agentic-ai-governance-6layers-2026.md), supported by:
+
+- [`docs/governance/ai-asset-register.md`](docs/governance/ai-asset-register.md) (+ machine-readable [`data/ai-assets.json`](data/ai-assets.json)) — the AI inventory and risk tiering (Layer 1);
+- [`docs/governance/data-retention.md`](docs/governance/data-retention.md) — data stores, retention and lineage (Layer 2);
+- `test/advisor-assurance.test.js` (offline, in CI) and `scripts/advisor-eval.mjs` (key-gated, weekly) — Advisor red-team, charter-drift and live behavioural assurance (Layer 4).
+
 ## Setup
 
 ### Asana integration

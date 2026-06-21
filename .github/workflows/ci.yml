@@ -40,6 +40,8 @@ jobs:
         run: node test/screens.test.js
       - name: Run advisor full-surface smoke tests (every Q&A subject + tool + ask phase)
         run: node test/advisor-smoke.test.js
+      - name: Run Advisor assurance tests (charter integrity + tipping-off red-team + routing)
+        run: node test/advisor-assurance.test.js
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight

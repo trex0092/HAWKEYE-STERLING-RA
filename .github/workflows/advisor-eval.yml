@@ -1,0 +1,75 @@
+name: Advisor Eval
+
+# Weekly Model & Agent Assurance check (Layer 4 of the 6 Layers of Agentic AI
+# Governance) for the LLM-backed Advisor (netlify/functions/brain-soul.js).
+# scripts/advisor-eval.mjs runs a fixed prompt battery through the production
+# system prompt (SOUL_CHARTER) and asserts the charter guardrails (P1/P4/P7/P9/P10)
+# held against the real model. On a behavioural regression it files a card in the
+# "Regulations / Governance / Sanctions" Asana project, falling back to a labelled
+# GitHub issue if Asana is unreachable so a regression is never lost.
+#
+# Runs ONLY if the ANTHROPIC_API_KEY secret is set; otherwise the eval skips and
+# the job is a no-op. The offline guardrail tests (test/advisor-assurance.test.js)
+# always run in CI regardless.
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'   # 08:00 UTC every Monday, after the daily watchers
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: advisor-eval
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Advisor behavioural eval
+        id: eval
+        # Don't fail the whole job here; we want to route a regression to Asana/issue first.
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/advisor-eval.mjs
+
+      - name: Notify Asana on regression — Regulations / Governance / Sanctions project
+        id: asana
+        continue-on-error: true
+        if: steps.eval.outcome == 'failure'
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1215844241216116' }}
+        run: node scripts/watch-notify.mjs "Advisor guardrail regression detected" advisor-eval-report.md
+
+      - name: Fallback to a GitHub issue if Asana delivery failed
+        if: steps.eval.outcome == 'failure' && steps.asana.outcome == 'failure'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            let report = 'Advisor eval reported a guardrail regression. See the workflow run.';
+            try { report = fs.readFileSync('advisor-eval-report.md', 'utf8'); } catch (e) {}
+            const { owner, repo } = context.repo;
+            await github.rest.issues.create({
+              owner, repo,
+              title: 'Advisor guardrail regression detected',
+              body: report + '\n\n---\n> Filed because the Asana delivery was unavailable. Set the `ASANA_ACCESS_TOKEN` secret to route future regressions to Asana.',
+              labels: ['advisor-eval'],
+            });
+
+      - name: Fail the job if a guardrail regressed
+        if: steps.eval.outcome == 'failure'
+        run: |
+          echo "Advisor eval reported a guardrail regression — see advisor-eval-report.md and the alert above."
+          exit 1

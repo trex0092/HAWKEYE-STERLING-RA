@@ -1,0 +1,69 @@
+{
+  "schema": "hawkeye-sterling.ai-asset-register/v1",
+  "description": "Authoritative inventory of every AI/LLM surface in the Hawkeye Sterling suite. Layer 1 (AI Discovery & Inventory) of the 6 Layers of Agentic AI Governance. The deterministic RA scoring engine (index.html) is intentionally NOT an AI asset and is excluded by design.",
+  "owner_role": "MLRO (accountable) / Compliance Engineering (operational)",
+  "review_cadence": "Quarterly, and on any change to model id, provider, prompt charter, or data flow.",
+  "last_reviewed": "2026-06-21",
+  "assets": [
+    {
+      "id": "advisor",
+      "name": "MLRO Advisor",
+      "classification": "Assistive generative-AI (advisory, human-in-the-loop)",
+      "agentic": false,
+      "autonomy": "Responds on explicit user request only; takes no actions and writes no records.",
+      "surface_file": "netlify/functions/brain-soul.js",
+      "ui": "advisor.html",
+      "provider": "Anthropic (API, server-held ANTHROPIC_API_KEY; key never reaches the browser)",
+      "models": [
+        { "mode": "speed", "model": "claude-haiku-4-5-20251001", "max_tokens": 1024 },
+        { "mode": "balanced", "model": "claude-sonnet-4-6", "max_tokens": 4096 },
+        { "mode": "deep", "model": "claude-opus-4-8", "max_tokens": 8192 }
+      ],
+      "personas": 14,
+      "risk_tier": "MEDIUM",
+      "risk_tier_rationale": "Decision-support only; never auto-decides, files, or freezes. Outputs are advisory and gated behind MLRO review. Failure mode is a misleading suggestion, mitigated by human sign-off and the SOUL_CHARTER guardrails.",
+      "eu_ai_act_class": "Limited risk (transparency obligations). Not a high-risk system: it does not make or automate the compliance decision; the human MLRO does.",
+      "inputs": ["Officer question (<=4000 chars)", "Optional pasted context (<=2000 chars)", "Persona + mode selection"],
+      "outputs": ["Cited advisory text", "Audit line (timestamp, model, mode, elapsed, hash, disclaimer)"],
+      "controls": [
+        "SOUL_CHARTER system prompt: 10 absolute prohibitions (P1-P10)",
+        "Refusal protocol + prompt-injection resistance",
+        "Post-output tipping-off guard (Article 25, FDL 10/2025)",
+        "26s request timeout + graceful API-error handling",
+        "Audit line: 'decision support, not a decision. MLRO review required.'",
+        "CORS origin allow-list; key held server-side",
+        "Offline assurance tests: test/advisor-assurance.test.js (CI)",
+        "Key-gated live behavioural eval: scripts/advisor-eval.mjs (weekly)"
+      ],
+      "human_oversight": "Human-in-the-loop. Every output is advisory; the MLRO makes and records the decision.",
+      "data_retention": "Transient. Anthropic API usage (no training on inputs); no server-side persistence in the function. See docs/governance/data-retention.md.",
+      "status": "active"
+    },
+    {
+      "id": "reg-draft",
+      "name": "Regulatory-Watch AI Draft",
+      "classification": "Assistive generative-AI (draft proposal, human-reviewed)",
+      "agentic": false,
+      "autonomy": "Runs only inside the Regulatory Watch workflow when a content change is detected AND ANTHROPIC_API_KEY is set. Produces a draft proposal; never auto-publishes.",
+      "surface_file": "scripts/reg-draft.mjs",
+      "ui": "GitHub PR / docs/research/auto",
+      "provider": "Anthropic (API, ANTHROPIC_API_KEY GitHub secret)",
+      "models": [],
+      "personas": 0,
+      "risk_tier": "LOW",
+      "risk_tier_rationale": "Optional, off by default, output is a reviewed draft committed for human ratification. No customer data; reads public regulatory sources only.",
+      "eu_ai_act_class": "Minimal risk. Internal drafting aid; output is reviewed before any use.",
+      "inputs": ["Detected regulatory-source change (public text)"],
+      "outputs": ["Draft update proposal (markdown) for human review"],
+      "controls": [
+        "Detection is automatic; wording change stays a reviewed decision (no auto-publish)",
+        "Runs only if ANTHROPIC_API_KEY is set (steps in .github/workflows/regulatory-watch.yml)",
+        "All output lands in a commit/PR for human review"
+      ],
+      "human_oversight": "Human-on-the-loop. Reviewer ratifies or discards every draft.",
+      "data_retention": "Draft committed to git (docs/research/auto) with full history. No customer data.",
+      "status": "optional"
+    }
+  ],
+  "shadow_ai_note": "No other AI surfaces exist in the suite. The RA scoring engine (index.html), the operations console (console.html), and all watcher scripts (fatf-watchdog, sanctions-watch/screen, regulatory-watch detection, daily-brief, expiry notifier) are deterministic and rules-based, not AI. Any new AI surface MUST be added to this register before deployment."
+}

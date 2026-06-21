@@ -72,6 +72,17 @@ measure** — hallucination and bias.
 bias testing, AI red-teaming, and a DPIA covering the Anthropic processing. Track
 these separately from the RA engine's posture in §2.
 
+> **Update 2026-06-21.** REDT / DRIFT / model-output evaluation for the Advisor are
+> now **closed at the assurance level**: `test/advisor-assurance.test.js` (offline,
+> in CI) runs a tipping-off red-team battery plus charter-integrity and
+> model-routing drift guards, and `scripts/advisor-eval.mjs` (key-gated, weekly via
+> `.github/workflows/advisor-eval.yml`) evaluates the live model against the charter
+> guardrails. The AI surfaces are now inventoried in
+> [`ai-asset-register.md`](ai-asset-register.md), retention in
+> [`data-retention.md`](data-retention.md), and the full framework mapping in
+> [`agentic-ai-governance-6layers-2026.md`](agentic-ai-governance-6layers-2026.md).
+> **BIAS testing** and the **DPIA** remain open.
+
 ---
 
 ## 2. Tile-by-tile assessment

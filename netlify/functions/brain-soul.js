@@ -359,11 +359,13 @@ const ZERO_TOLERANCE = [
 const TIPPING_OFF_PATTERNS = [
   /\bfiled\s+an?\s+STR\b/i,
   /\bfiled\s+an?\s+SAR\b/i,
+  /\b(?:STR|SAR)\b[^.]*\bfiled\b/i,                       // reversed order: "a SAR was filed"
   /\bsuspicion\s+report\b/i,
-  /\bwe\s+(have|are)\s+(submitted?|filing|reported?)\b/i,
-  /\bunder\s+investigation\b.*\bto\s+the\s+customer\b/i,
-  /\balert(?:ing|ed)?\s+the\s+(customer|client|subject)\b/i,
-  /\bdo\s+not\s+tell\s+(us|the\s+customer)/i,
+  /\bwe\s+(?:have|are)\s+(?:submitted?|filing|filed|report(?:ed|ing)?)\b/i,
+  /\breport(?:ing|ed)\b[^.]*\btransactions?\b[^.]*\bto\s+the\s+(?:authorit|regulat|fiu)/i,
+  /\bunder\s+investigation\b[^.]*\b(?:customer|client|subject)\b/i,
+  /\balert(?:ing|ed)?\s+the\s+(?:customer|client|subject)\b/i,
+  /\bdo\s+not\s+(?:tell|disclose)\b[^.]*\b(?:us|customer|client|subject)\b/i,
   /\bgoAML\s+submission\b/i,
   /\bFIU\s+referral\b.*\bnotif/i,
 ];
@@ -526,4 +528,14 @@ const handle = async (event) => {
     ' | "This output is decision support, not a decision. MLRO review required."';
 
   return resp(200, { ok, text, mode, model, elapsedMs, tippingOffFlagged, auditLine });
+};
+
+// ── TEST HANDLE ────────────────────────────────────────────────────────────────
+// Non-breaking export of the pure internals so the Advisor's guardrails can be
+// exercised offline (test/advisor-assurance.test.js). Netlify only invokes
+// `exports.handler`; this changes no runtime behaviour.
+exports.__internals = {
+  SOUL_CHARTER, KNOWLEDGE_CONTEXT, TIPPING_OFF_PATTERNS, tippingOffGuard,
+  selectModel, simpleHash, buildKnowledgeContext,
+  TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
 };
