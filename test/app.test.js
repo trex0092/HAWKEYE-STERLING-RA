@@ -63,6 +63,9 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   openRegister, closeRegister,
   storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
   _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
+  currentRole, setRole, can, roleAtLeast, ROLES, ROLE_KEY, policyMissing,
+  addRCA, exportAuditTokenized,
+  mfaGenSecret, totpNow, totpVerify, _b32encode, _b32decode,
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -604,7 +607,8 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
 
 (async () => {
   // Flush the fire-and-forget audit append from purgeStaleDraft (block 27) before asserting.
-  await new Promise(r => setTimeout(r, 0));
+  // auditAppend chains async WebCrypto, so poll a few ticks rather than relying on a single one.
+  for (let i = 0; i < 50 && !A.auditAll().some(e => e.event === 'retention.purge'); i++) await new Promise(r => setTimeout(r, 1));
   check('retention: the purge is recorded in the activity log', A.auditAll().some(e => e.event === 'retention.purge'));
 
   const fn = require('../netlify/functions/asana-task.js');
@@ -836,6 +840,78 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     check('sha256Hex is deterministic 64-hex', sameHash === sameHash2 && /^[0-9a-f]{64}$/.test(sameHash));
     log[0].detail = 'tampered'; global.localStorage.setItem('hsra.audit.v1', JSON.stringify(log));
     check('audit chain detects a tampered earlier entry', (await A.auditVerify()) === false);
+    global.localStorage.removeItem('hsra.audit.v1');
+  })();
+
+  /* ── 29. Operator role gating (RBAC / ABAC) ── */
+  (function(){
+    global.localStorage.removeItem(A.ROLE_KEY);
+    check('role defaults to admin (single-operator, backward compatible)', A.currentRole() === 'admin');
+    check('admin can approve, edit risk data and change security',
+      A.can('approve') && A.can('riskdata') && A.can('security'));
+    A.setRole('analyst');
+    check('analyst cannot approve / edit risk data / change security',
+      !A.can('approve') && !A.can('riskdata') && !A.can('security'));
+    check('analyst role blocks a risk-data override', A.rdSetOverride('countries','United Kingdom',{score:3, reason:'x'}) === false);
+    A.setRole('reviewer');
+    check('reviewer (MLRO) can approve + edit risk data but not security',
+      A.can('approve') && A.can('riskdata') && !A.can('security'));
+    check('roleAtLeast orders analyst < reviewer < admin', A.roleAtLeast('reviewer') && !A.roleAtLeast('admin'));
+    A.setRole('admin');
+    global.localStorage.removeItem(A.ROLE_KEY);
+  })();
+
+  /* ── 30. POLICY completeness gate ── */
+  (function(){
+    A.state = A.freshState();
+    check('policyMissing lists assessor + both sign-off lines when empty', A.policyMissing().length === 3);
+    A.state.meta.assessor = 'A. Officer';
+    A.state.signoff.completedBy = 'J. Smith';
+    A.state.signoff.approvedBy = 'M. Lro';
+    check('policyMissing is empty once the mandated fields are filled', A.policyMissing().length === 0);
+  })();
+
+  /* ── 31. TOTP second factor (MFA, RFC 6238) ── */
+  await (async function(){
+    check('base32 round-trips', A._b32encode(A._b32decode('JBSWY3DPEHPK3PXP')) === 'JBSWY3DPEHPK3PXP');
+    const secret = A.mfaGenSecret();
+    check('generated TOTP secret is base32, length ~32', /^[A-Z2-7]+$/.test(secret) && secret.length >= 30);
+    const code = await A.totpNow(secret);
+    check('totpNow yields a 6-digit code', /^\d{6}$/.test(code));
+    check('totpVerify accepts the current code', (await A.totpVerify(secret, code)) === true);
+    check('totpVerify rejects a wrong code', (await A.totpVerify(secret, '000000')) === false || code === '000000');
+    check('totpVerify rejects malformed input', (await A.totpVerify(secret, 'abc')) === false);
+  })();
+
+  /* ── 32. RCA record (RCause) appends to the hash-chained log ── */
+  await (async function(){
+    global.localStorage.removeItem('hsra.audit.v1');
+    await A.addRCA({incident:'Advisor returned uncited claim', trigger:'weekly eval', rootCause:'missing source in prompt', corrective:'add source gate', owner:'MLRO'});
+    const log = A.auditAll();
+    check('addRCA appends an rca.record entry', log.length === 1 && log[0].event === 'rca.record' && /rootCause=missing source/.test(log[0].detail));
+    check('RCA record keeps the chain intact', (await A.auditVerify()) === true);
+    global.localStorage.removeItem('hsra.audit.v1');
+  })();
+
+  /* ── 33. Tokenised export (TOKEN) ── */
+  await (async function(){
+    global.localStorage.removeItem('hsra.audit.v1');
+    A.state = A.freshState(); A.state.meta.assessor = 'Jane Analyst'; A.state.meta.ref = 'RA-20260621-001';
+    await A.auditAppend('assessment.complete', 'Marked complete');
+    let captured = null;
+    const origCreate = global.document.createElement;
+    global.document.createElement = () => ({ set href(v){}, get href(){ return 'blob:test'; }, download:'', click(){ captured = true; } });
+    const origBlob = global.Blob;
+    global.Blob = class { constructor(parts){ this.text = String(parts[0]); } };
+    // capture the serialised payload via Blob
+    let payloadText = '';
+    global.Blob = class { constructor(parts){ payloadText = String(parts[0]); } };
+    await A.exportAuditTokenized();
+    global.document.createElement = origCreate; global.Blob = origBlob;
+    check('tokenised export replaces the assessor identifier with a stable token',
+      payloadText.includes('ID-') && !payloadText.includes('Jane Analyst'));
+    check('tokenised export replaces the reference with a stable token',
+      payloadText.includes('REF-') && !payloadText.includes('RA-20260621-001'));
     global.localStorage.removeItem('hsra.audit.v1');
   })();
 
