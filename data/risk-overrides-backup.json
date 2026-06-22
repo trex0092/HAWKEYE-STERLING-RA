@@ -1,0 +1,37 @@
+{
+  "app": "Hawkeye Sterling — Entity Risk Assessment",
+  "version": "3.7.0",
+  "riskDataVersion": "2026-06",
+  "updatedAt": "2026-06-22",
+  "overrides": {
+    "countries": {
+      "Algeria": {
+        "score": 2,
+        "reason": "Removed from FATF - Gray List",
+        "at": "2026-06-22",
+        "cfa": true
+      },
+      "Namibia": {
+        "score": 2,
+        "reason": "Removed from FATF - Gray List",
+        "at": "2026-06-22",
+        "cfa": true
+      },
+      "Bosnia-Herzegovina": {
+        "score": 2,
+        "reason": "Added to FATF - Gray List",
+        "at": "2026-06-22",
+        "cfa": true
+      },
+      "Iraq": {
+        "score": 3,
+        "reason": "Added to FATF - Gray List",
+        "at": "2026-06-22",
+        "cfa": true
+      }
+    },
+    "activities": {},
+    "recycled": {},
+    "mined": {}
+  }
+}
