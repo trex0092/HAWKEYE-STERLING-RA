@@ -1,9 +1,8 @@
 {
-  "updated": "2026-06-21",
+  "updated": "2026-06-22",
   "subjects": {
     "uya enerji uretim sanayi ve ticaret anonim sirketi": {
       "name": "UYA ENERJİ ÜRETİM SANAYİ VE TİCARET ANONİM ŞİRKETİ",
-      "jurisdiction": "Turkey",
       "band": "high",
       "topScore": 94,
       "recommendation": "sanctions-match",
@@ -13,7 +12,7 @@
       ],
       "signature": "high|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-21"
+      "lastSeen": "2026-06-22"
     },
     "kovanlik enerji uretim sanayi ve ticaretanonim sirketi": {
       "name": "KOVANLIK ENERJİ ÜRETİM SANAYİ VE TİCARETANONİM ŞİRKETİ",
@@ -27,7 +26,7 @@
       ],
       "signature": "high|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-21"
+      "lastSeen": "2026-06-22"
     },
     "global precious metals pte ltd": {
       "name": "Global Precious Metals Pte. Ltd",
@@ -40,7 +39,7 @@
       ],
       "signature": "high|sanctions-match|US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-21"
+      "lastSeen": "2026-06-22"
     },
     "amber international fzco": {
       "name": "Amber International FZCO",
@@ -54,7 +53,7 @@
       ],
       "signature": "critical|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-21"
+      "lastSeen": "2026-06-22"
     },
     "aurum international fze": {
       "name": "Aurum International (FZE)",
@@ -67,7 +66,7 @@
       ],
       "signature": "critical|sanctions-match|US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-21"
+      "lastSeen": "2026-06-22"
     }
   }
 }
