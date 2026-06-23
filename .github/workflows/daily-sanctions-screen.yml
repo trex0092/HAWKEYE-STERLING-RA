@@ -110,8 +110,8 @@ jobs:
       # --------------------------------------------------------
       - name: Fetch customer list from Asana
         env:
-          ASANA_PAT: ${{ secrets.ASANA_PAT }}
-          CUSTOMER_DB_GID: ${{ vars.ASANA_CUSTOMER_DB_GID }}
+          ASANA_PAT: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_PAT }}
+          CUSTOMER_DB_GID: ${{ vars.ASANA_CUSTOMER_DB_GID || '1214107620220121' }}
         run: |
           python3 << 'PYEOF'
           import requests, json, os
@@ -364,10 +364,10 @@ jobs:
       # --------------------------------------------------------
       - name: Create Asana screening task
         env:
-          ASANA_PAT: ${{ secrets.ASANA_PAT }}
-          ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_SECTION_GID }}
-          ASANA_ASSIGNEE_GID: ${{ vars.ASANA_ASSIGNEE_GID }}
+          ASANA_PAT: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_PAT }}
+          ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID || '1213914392047129' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_SECTION_GID || '1213914392047131' }}
+          ASANA_ASSIGNEE_GID: ${{ vars.ASANA_ASSIGNEE_GID || '1213645083721304' }}
           DATE_ISO: ${{ steps.date.outputs.DATE_ISO }}
           DATE_DISPLAY: ${{ steps.date.outputs.DATE_DISPLAY }}
           TIME_GST: ${{ steps.date.outputs.TIME_GST }}
