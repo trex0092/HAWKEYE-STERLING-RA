@@ -72,7 +72,7 @@ jobs:
       - name: Download UN Consolidated list
         run: |
           curl -sL \
-            "https://scsanctions.un.org/resources/xml/en/consolidated.xml" \
+            "https://main.un.org/securitycouncil/content/un-sc-consolidated-list/en/consolidated.xml" \
             -o /tmp/un_consolidated.xml
           echo "UN_HASH=$(sha256sum /tmp/un_consolidated.xml | cut -d' ' -f1)" \
             >> $GITHUB_ENV
@@ -80,7 +80,7 @@ jobs:
       - name: Download EU Financial Sanctions list
         run: |
           curl -sL \
-            "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw" \
+            "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content" \
             -o /tmp/eu_sanctions.xml
           echo "EU_HASH=$(sha256sum /tmp/eu_sanctions.xml | cut -d' ' -f1)" \
             >> $GITHUB_ENV
@@ -95,13 +95,27 @@ jobs:
 
       - name: Download UAE EOCN PDF
         run: |
-          curl -sL \
-            "https://www.uaefiu.gov.ae/content/dam/uaefiu/terrorist-list.pdf" \
-            -o /tmp/uae_eocn.pdf || echo "UAE_PDF_FAILED=true" >> $GITHUB_ENV
+          # The UAE FIU publishes the Local Terrorist List from its site; the
+          # direct PDF path changes, so discover any PDF linked from the page.
+          curl -sL "https://www.uaefiu.gov.ae/en/" -o /tmp/uae_page.html || true
+          PDF_URL=$(grep -oiE 'href="[^"]+\.pdf"' /tmp/uae_page.html 2>/dev/null \
+            | head -1 | sed -E 's/.*href="([^"]+)".*/\1/I')
+          if [ -n "$PDF_URL" ]; then
+            case "$PDF_URL" in
+              http*) : ;;
+              //*)   PDF_URL="https:$PDF_URL" ;;
+              /*)    PDF_URL="https://www.uaefiu.gov.ae$PDF_URL" ;;
+              *)     PDF_URL="https://www.uaefiu.gov.ae/$PDF_URL" ;;
+            esac
+            curl -sL "$PDF_URL" -o /tmp/uae_eocn.pdf || rm -f /tmp/uae_eocn.pdf
+          fi
           if [ -f /tmp/uae_eocn.pdf ]; then
             echo "UAE_HASH=$(sha256sum /tmp/uae_eocn.pdf | cut -d' ' -f1)" \
               >> $GITHUB_ENV
             echo "UAE_PDF_FAILED=false" >> $GITHUB_ENV
+          else
+            echo "UAE EOCN PDF not available — manual check required"
+            echo "UAE_PDF_FAILED=true" >> $GITHUB_ENV
           fi
 
 
@@ -266,7 +280,7 @@ jobs:
               with open("/tmp/uk_ofsi.csv", encoding="utf-8-sig", errors="replace") as f:
                   reader = csv.DictReader(f)
                   for row in reader:
-                      name = row.get("Name 6","") or row.get("Name","") or row.get("name","")
+                      name = row.get("Name 6","") or row.get("Name","") or row.get("LastName","") or row.get("name","") or list(row.values())[0] if row else ""
                       if name and name.strip():
                           sanctioned.append({"name": name.strip(), "list": "UK OFSI", "programme": row.get("Regime","UK Sanctions")})
               print(f"UK OFSI: {len(sanctioned)-before} entries")
@@ -275,18 +289,22 @@ jobs:
 
           # UAE EOCN PDF
           uae_names = []
-          try:
-              with pdfplumber.open("/tmp/uae_eocn.pdf") as pdf:
-                  for page in pdf.pages:
-                      text = page.extract_text() or ""
-                      for line in text.split("\n"):
-                          line = line.strip()
-                          if len(line) > 5:
-                              uae_names.append(line)
-                              sanctioned.append({"name": line, "list": "UAE EOCN", "programme": "UAE Local Terrorist List"})
-              print(f"UAE EOCN: {len(uae_names)} entries extracted from PDF")
-          except Exception as e:
-              print(f"UAE EOCN PDF error: {e}")
+          if os.path.exists("/tmp/uae_eocn.pdf"):
+              try:
+                  with pdfplumber.open("/tmp/uae_eocn.pdf") as pdf:
+                      for page in pdf.pages:
+                          text = page.extract_text() or ""
+                          for line in text.split("\n"):
+                              line = line.strip()
+                              if len(line) > 5:
+                                  uae_names.append(line)
+                                  sanctioned.append({"name": line, "list": "UAE EOCN", "programme": "UAE Local Terrorist List"})
+                  print(f"UAE EOCN: {len(uae_names)} entries extracted from PDF")
+              except Exception as e:
+                  print(f"UAE EOCN PDF error: {e}")
+                  os.environ["UAE_PDF_FAILED"] = "true"
+          else:
+              print("UAE EOCN PDF not available — manual check required")
               os.environ["UAE_PDF_FAILED"] = "true"
 
           # ---- normalise all sanctioned names ----
