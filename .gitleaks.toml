@@ -11,6 +11,10 @@ paths = [
   '''data/sanctions-sources\.json''',
   '''data/reg-sources\.json''',
   '''\.env\.example''',
+  # Daily sanctions-screen workflow: contains only public Asana object GIDs (in a
+  # setup comment), the public EU FSF download token, and ${{ secrets.* }} refs —
+  # no real secrets are inlined.
+  '''\.github/workflows/daily-sanctions-screen\.yml''',
 ]
 regexes = [
   # EU FSF public access token embedded in the sanctions-list download URL
