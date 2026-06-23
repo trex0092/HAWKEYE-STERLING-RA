@@ -11,6 +11,9 @@ paths = [
   '''data/sanctions-sources\.json''',
   '''data/reg-sources\.json''',
   '''\.env\.example''',
+  # screen.py screening engine: holds only public Asana object GIDs and
+  # ${{ env }} secret references — no real secrets are inlined.
+  '''screen\.py''',
   # Daily sanctions-screen workflow: contains only public Asana object GIDs (in a
   # setup comment), the public EU FSF download token, and ${{ secrets.* }} refs —
   # no real secrets are inlined.
