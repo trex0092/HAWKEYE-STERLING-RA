@@ -1,19 +1,19 @@
 {
-  "updated": "2026-06-23",
+  "updated": "2026-06-24",
   "sources": {
     "ofac-sdn": {
-      "hash": "5445406294bb24bcbdb7516ead28e74da44d3a3d5396cd14e2f0f07c5e15322a",
-      "bytes": 5394073,
-      "checkedAt": "2026-06-23",
-      "changedAt": "2026-06-23",
+      "hash": "09583dc1bc76d542c878a8b376e9ec3c4e10336b6549408026b14e7fb39de304",
+      "bytes": 5403654,
+      "checkedAt": "2026-06-24",
+      "changedAt": "2026-06-24",
       "status": 200,
-      "prevHash": "0e38b028c6c461d261aa64896c95e1341775ffcedf8488a9bd1adfc6606ff1aa",
-      "count": 19082
+      "prevHash": "5445406294bb24bcbdb7516ead28e74da44d3a3d5396cd14e2f0f07c5e15322a",
+      "count": 19119
     },
     "ofac-consolidated": {
       "hash": "428b713b7e518033e376a8859f650840f6d280ad39e29e557789ddc4fc3369f3",
       "bytes": 230168,
-      "checkedAt": "2026-06-23",
+      "checkedAt": "2026-06-24",
       "changedAt": "2026-06-16",
       "status": 200,
       "count": 442
@@ -21,7 +21,7 @@
     "un-consolidated": {
       "hash": "60e933781022670dcf219252f0b17a816c8876917b17908fc3dd1e74d80b2bab",
       "bytes": 667131,
-      "checkedAt": "2026-06-23",
+      "checkedAt": "2026-06-24",
       "changedAt": "2026-06-16",
       "status": 200,
       "count": 1002
@@ -29,7 +29,7 @@
     "uk-ofsi": {
       "hash": "7a1df99a31bd06dbe4ad3e47f43c3ef98eea53bc6cdce3f8f0e05ac900080b70",
       "bytes": 15708355,
-      "checkedAt": "2026-06-23",
+      "checkedAt": "2026-06-24",
       "changedAt": "2026-06-16",
       "status": 200,
       "count": 19762
@@ -37,7 +37,7 @@
     "eu-fsf": {
       "hash": "5396c953828fdb4f5ab473e51c203c4f94991f9fb2cfb7111707efc1fd3a0822",
       "bytes": 20531679,
-      "checkedAt": "2026-06-23",
+      "checkedAt": "2026-06-24",
       "changedAt": "2026-06-16",
       "status": 200,
       "count": 42347
