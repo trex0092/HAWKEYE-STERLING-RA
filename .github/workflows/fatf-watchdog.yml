@@ -51,7 +51,12 @@ jobs:
             git config user.email "actions@github.com"
             git add data/
             git commit -m "Watchdog: record list state / risk-data backup [skip ci]"
-            git push
+            for attempt in 1 2 3 4 5; do
+              git push && break
+              echo "push rejected (attempt $attempt) — rebasing on origin/main"
+              git pull --rebase origin main || git rebase --abort
+              sleep $((attempt * 3))
+            done
           else
             echo "state unchanged"
           fi

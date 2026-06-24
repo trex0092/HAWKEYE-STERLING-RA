@@ -78,7 +78,12 @@ jobs:
             git add data/reg-watch-state.json
             git add docs/research/auto 2>/dev/null || true
             git commit -m "${{ steps.watch.outputs.pr_title }} [skip ci]"
-            git push
+            for attempt in 1 2 3 4 5; do
+              git push && break
+              echo "push rejected (attempt $attempt) — rebasing on origin/main"
+              git pull --rebase origin main || git rebase --abort
+              sleep $((attempt * 3))
+            done
           else
             echo "state unchanged"
           fi
