@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName } from './sanctions-match.mjs';
-import { checkAdverseMedia } from './adverse-media.mjs';
+import { checkAdverseMedia, ADVERSE_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
@@ -57,6 +57,29 @@ export const SANCTIONS_SOURCES_FILE = process.env.SANCTIONS_SOURCES_FILE || 'dat
 
 /* The lists/signals screening covers (for the report/alert provenance line). */
 export const COVERAGE = 'OFAC SDN/non-SDN · UN · EU · UK OFSI · UAE EOCN Local Terrorist List · adverse media (Google News) · PEP (Wikidata)';
+
+/* ── Ongoing Monitoring project — daily audit-trail tasks ────────────────────
+   Separate from the Regulations alert path: every run (match or clear) leaves a
+   record here so there is always evidence monitoring actually executed. Sections
+   are resolved by name at runtime (created if missing), so no manual Asana setup
+   is required; the *_SECTION_GID env vars are optional overrides. */
+export const OM_PROJECT_GID = process.env.ASANA_OM_PROJECT_GID || '1213914392047129';
+export const OM_SECTION_AM_PEP = 'Adverse Media & PEP Monitoring';
+export const OM_SECTION_TM = 'Transaction Monitoring Alerts';
+export const OM_SECTION_LOG = 'Monitoring Run Log';
+export const OM_TM_TEMPLATE_NAME = '⚙ TEMPLATE — Transaction Monitoring Alert';
+/* Audit tasks are assigned to the token bearer by default; override with a user GID. */
+const OM_ASSIGNEE = process.env.ASANA_OM_ASSIGNEE_GID || 'me';
+/* Number of adverse-media risk keywords queried per subject (provenance line). */
+export const AM_KEYWORD_COUNT = ADVERSE_TERMS.length;
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/* Render an ISO date (YYYY-MM-DD) as "24 Jun 2026" for human-facing task names. */
+export function formatHumanDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  if (!m) return String(iso || '');
+  return Number(m[3]) + ' ' + (MONTHS[Number(m[2]) - 1] || '???') + ' ' + m[1];
+}
 
 /* A score at/above this fraction (engine scores are 0-100) is treated as a match
    even absent an explicit recommendation. Override with SCREEN_MATCH_THRESHOLD. */
@@ -295,6 +318,226 @@ export function buildChangesArtifact(alerts, today) {
   };
 }
 
+/* ── Ongoing Monitoring — pure note builders (offline-testable) ────────────── */
+
+const RULE = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+
+/* One result row from screen.results → a short adverse-media hit line. The risk
+   category travels in the "[terms]" suffix the screener appends to hitName. */
+function amHitLine(r) {
+  const h = (r.lists || []).find(x => x.list && x.list.includes('Adverse media')) || {};
+  const headline = String(h.hitName || '').slice(0, 120);
+  return '  ' + r.name + ' | Google News | ' + headline + (h.score != null ? ' | score ' + h.score : '');
+}
+/* One result row from screen.results → a short PEP hit line. */
+function pepHitLine(r) {
+  const h = (r.lists || []).find(x => x.list && x.list.includes('PEP')) || {};
+  return '  ' + r.name + ' | Wikidata | ' + String(h.hitName || '').slice(0, 120) + (h.score != null ? ' | score ' + h.score : '');
+}
+
+/* PART B — Adverse Media & PEP monitoring task body (CLEAR or HIT variant). */
+export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], pepHits = [], regUrl = '', amKeywordCount = AM_KEYWORD_COUNT } = {}) {
+  const hasHits = amHits.length > 0 || pepHits.length > 0;
+  const L = [];
+  L.push('ADVERSE MEDIA & PEP MONITORING REPORT');
+  L.push('Date: ' + today + ' | Run: ' + (run || 'local'));
+  L.push('Script: scripts/sanctions-screen.mjs');
+  L.push('Legal basis: Article 19(1)(b) FDL No. 10/2025 | Article 13 CR No. 134/2025');
+  L.push('Sources: Google News RSS (adverse media) | Wikidata (PEP)');
+  L.push('');
+  L.push(RULE);
+  L.push('A. SCOPE');
+  L.push(RULE);
+  L.push('Subjects checked:             ' + (subjects != null ? subjects : '?'));
+  L.push('Adverse media module:         ACTIVE (Google News RSS — ' + amKeywordCount + ' keywords)');
+  L.push('PEP module:                   ACTIVE (Wikidata — Tier 1/2/3 + family/associates)');
+  L.push('');
+  L.push('Risk categories (adverse media):');
+  L.push('  ☑ Money laundering / financial crime');
+  L.push('  ☑ Fraud / corruption / bribery');
+  L.push('  ☑ Sanctions evasion');
+  L.push('  ☑ Arms / proliferation financing');
+  L.push('  ☑ Human rights / conflict minerals');
+  L.push('  ☑ Environmental crime / illegal mining');
+  L.push('  ☑ Regulatory enforcement / fines / debarment');
+  L.push('');
+  L.push('PEP tiers monitored:');
+  L.push('  ☑ Tier 1 — Heads of state / senior government / judiciary / military');
+  L.push('  ☑ Tier 2 — Senior political party officials / legislative bodies');
+  L.push('  ☑ Tier 3 — SOE executives / international organisation officials');
+  L.push('  ☑ Family members and close associates (all tiers)');
+  L.push('');
+  L.push(RULE);
+  L.push('B. RESULTS');
+  L.push(RULE);
+  if (!hasHits) {
+    L.push('New adverse media hits:       NONE');
+    L.push('New PEP identifications:      NONE');
+    L.push('PEP status changes:           NONE');
+    L.push('False positives cleared:      NONE');
+  } else {
+    L.push('New adverse media hits:       ' + amHits.length);
+    for (const r of amHits) L.push(amHitLine(r));
+    L.push('New PEP identifications:      ' + pepHits.length);
+    for (const r of pepHits) L.push(pepHitLine(r));
+    L.push('False positives cleared:      [to be reviewed by MLRO]');
+  }
+  L.push('');
+  L.push('Sanctions screening result:   → see Daily Screening Report (same day)');
+  L.push('');
+  L.push(RULE);
+  L.push('C. ACTIONS TAKEN');
+  L.push(RULE);
+  L.push('EDD triggered:                N/A');
+  L.push('Risk rating upgraded:         N/A');
+  L.push('Senior management notified:   N/A');
+  L.push('STR consideration opened:     N/A');
+  L.push('Relationship paused/exited:   N/A');
+  L.push('');
+  L.push(RULE);
+  if (!hasHits) {
+    L.push('STATUS: ✅ CLEAR');
+    L.push(RULE);
+    L.push('Detection automatic. Action requires MLRO review.');
+    L.push('Next run: ' + (tomorrow || ''));
+  } else {
+    L.push('STATUS: ⚠ REVIEW REQUIRED — see alert card in Regulations project');
+    L.push(RULE);
+    if (regUrl) L.push('Link to the Regulations alert: ' + regUrl);
+    L.push('Detection automatic. Action requires MLRO review.');
+    L.push('Next run: ' + (tomorrow || ''));
+  }
+  return L.join('\n');
+}
+
+/* PART C — Monitoring Run Log task body. */
+export function buildRunLogNotes({ today, run, subjects, coverage = {}, degraded, errored = 0, cfg = {}, amErrors = 0, pepErrors = 0, alerts = 0, matchCount = 0, asanaPosted, amPep } = {}) {
+  const exit = errored ? '❌ ERROR' : (alerts ? '⚠ MATCHES' : '✅ CLEAN');
+  const amPepLine = amPep && amPep.posted
+    ? 'YES — ' + (amPep.url || amPep.name || 'posted')
+    : (amPep && amPep.skipped ? 'SKIPPED (already posted)' : 'NO');
+  const note = String(GOVERNANCE_NOTE).slice(0, 100);
+  const L = [];
+  L.push('MONITORING RUN LOG');
+  L.push('Date: ' + today);
+  L.push('Run URL: ' + (run || 'local'));
+  L.push('Script: scripts/sanctions-screen.mjs');
+  L.push('');
+  L.push('Subjects screened:            ' + (subjects != null ? subjects : '?'));
+  L.push('Sanctions lists loaded:       ' + (coverage.fetched != null ? coverage.fetched : '?') + '/' + (coverage.total != null ? coverage.total : '?'));
+  L.push('Coverage degraded:            ' + (degraded ? 'YES' : 'NO'));
+  L.push('Screened errored:             ' + errored);
+  L.push('');
+  L.push('Adverse media module:         ' + (cfg.adverseMedia ? 'ON' : 'OFF') + ' — ' + amErrors + ' errors');
+  L.push('PEP module:                   ' + (cfg.pep ? 'ON' : 'OFF') + ' — ' + pepErrors + ' errors');
+  L.push('');
+  L.push('New sanctions matches:        ' + alerts);
+  L.push('Total standing matches:       ' + matchCount);
+  L.push('Asana alert posted:           ' + (asanaPosted ? 'YES' : 'NO'));
+  L.push('');
+  L.push('AM/PEP task posted:           ' + amPepLine);
+  L.push('Run log task:                 THIS TASK');
+  L.push('');
+  L.push('Exit status:                  ' + exit);
+  L.push('Note: ' + note + '...');
+  return L.join('\n');
+}
+
+/* PART D — Transaction Monitoring alert template body (copied per alert). */
+export function buildTransactionTemplateNotes() {
+  return [
+    'TRANSACTION MONITORING ALERT',
+    '[COPY THIS TASK FOR EACH ALERT — DO NOT EDIT THIS TEMPLATE]',
+    'Legal basis: MoET Circular 08/AML/2021 (DPMSR) | Art.19(1)(b) FDL No. 10/2025',
+    '',
+    RULE,
+    'A. ALERT IDENTIFICATION',
+    RULE,
+    'Alert ref:        TM-{YYYY-MM-DD}-{NNN}',
+    'Generated:        {Date} | {Time} UAE',
+    'Alert type:',
+    '  ☐ Cash threshold — above DPMSR reporting threshold',
+    '  ☐ International wire — above DPMSR threshold',
+    '  ☐ Structuring — multiple below-threshold transactions',
+    '  ☐ Smurfing — multiple customers / same beneficiary',
+    '  ☐ Round-number / unusual denomination',
+    '  ☐ Velocity — unusual frequency vs customer profile',
+    '  ☐ Counterparty first seen — unknown payee',
+    '  ☐ High-risk jurisdiction — FATF grey/black list country',
+    '  ☐ CAHRA-linked — conflict-affected area nexus',
+    '  ☐ Crypto / TRON wallet address match',
+    '  ☐ TBML — invoice discrepancy / over-under invoicing',
+    '  ☐ Other: [describe]',
+    '',
+    RULE,
+    'B. TRANSACTION DETAIL',
+    RULE,
+    'Customer (full legal name):   [Name]',
+    'Customer risk rating:         [CDD / SDD / EDD]',
+    'Transaction date:             [DD Month YYYY]',
+    'Amount:                       [AED / USD]',
+    'Payment method:               [Cash / Wire / Crypto / Cheque / Other]',
+    'Asset class:                  [Gold / Silver / Platinum / Diamonds / Stones]',
+    'Counterparty name:            [Name]',
+    'Counterparty jurisdiction:    [Country]',
+    'Counterparty first seen:      [YES — date / NO]',
+    'SWIFT / account ref:          [if wire]',
+    'Purpose stated:               [Customer statement]',
+    'Supporting docs:              [Invoice / Contract / None]',
+    '',
+    RULE,
+    'C. RED FLAGS ASSESSED',
+    RULE,
+    '  ☐ Transaction inconsistent with customer profile / business type',
+    '  ☐ Counterparty in FATF grey or black list jurisdiction',
+    '  ☐ Counterparty in CAHRA / MoET high-risk country',
+    '  ☐ Amount inconsistent with known turnover',
+    '  ☐ Unusual payment route / third-party payment',
+    '  ☐ Customer reluctance to provide documentation',
+    '  ☐ Cash above threshold (structuring indicator)',
+    '  ☐ Multiple transactions structured below threshold',
+    '  ☐ Counterparty is sanctioned / adverse media hit',
+    '  ☐ Linked to screened TRON / crypto wallet',
+    '  ☐ Pricing inconsistency vs. market rate (TBML)',
+    '  ☐ No apparent legitimate business reason',
+    '  ☐ Other: [describe]',
+    '',
+    RULE,
+    'D. DPMSR ASSESSMENT (MoET Circular 08/AML/2021)',
+    RULE,
+    'Threshold triggered:          YES / NO',
+    'DPMSR required:               YES / NO',
+    '  goAML reference:            [if filed]',
+    '  Filed date:                 [DD Month YYYY]',
+    '',
+    RULE,
+    'E. STR / SAR ASSESSMENT',
+    RULE,
+    'Grounds for suspicion:        YES / NO / INCONCLUSIVE',
+    'STR decision:                 [Filed / No reasonable grounds / Pending]',
+    '  goAML reference:            [if filed]',
+    '  Filed date:                 [DD Month YYYY]',
+    '  Tipping-off risk noted:     YES / NO',
+    '',
+    RULE,
+    'F. DISPOSITION',
+    RULE,
+    'Reviewed by:        [Name] | [Date]',
+    'False positive:     YES / NO',
+    'Outcome:',
+    '  ☐ False positive — closed',
+    '  ☐ DPMSR filed — transaction processed',
+    '  ☐ STR filed — transaction processed / blocked',
+    '  ☐ Transaction rejected',
+    '  ☐ EDD triggered — enhanced monitoring',
+    '  ☐ Relationship under review',
+    '  ☐ Relationship exited',
+    '',
+    'STATUS: ✅ CLOSED / ⚠ OPEN',
+    '[TEMPLATE — copy for each alert]'
+  ].join('\n');
+}
+
 /* ── Network (runner only; not imported by tests) ─────────────────────────── */
 
 async function withTimeout(promiseFactory, timeoutMs) {
@@ -326,6 +569,151 @@ async function fetchAsanaSubjects(projectGid, token) {
     offset = json.next_page && json.next_page.offset;
   } while (offset && ++pages < 50);
   return parseSubjects(tasks);
+}
+
+/* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
+
+async function asanaPost(path, body, token, timeoutMs = 30000) {
+  return withTimeout(async (signal) => {
+    const r = await fetch('https://app.asana.com/api/1.0' + path, {
+      signal, method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ data: body })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 200));
+    return d;
+  }, timeoutMs);
+}
+
+/* Resolve a section GID by name within a project, creating it if absent. Lets
+   the daily run self-provision the Ongoing Monitoring sections — no manual setup,
+   idempotent (a name that already exists is reused). */
+async function ensureSection(projectGid, name, token) {
+  const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + '/sections');
+  u.searchParams.set('opt_fields', 'name');
+  u.searchParams.set('limit', '100');
+  const json = await asanaGet(u, token);
+  const want = String(name).trim().toLowerCase();
+  const found = (json.data || []).find(s => String(s.name || '').trim().toLowerCase() === want);
+  if (found) return found.gid;
+  const created = await asanaPost('/projects/' + projectGid + '/sections', { name }, token);
+  return created.data && created.data.gid;
+}
+
+/* All task names in a project (paginated) — used for same-day dedup. */
+async function fetchTaskNames(projectGid, token) {
+  const names = [];
+  let offset = null, pages = 0;
+  do {
+    const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + '/tasks');
+    u.searchParams.set('opt_fields', 'name');
+    u.searchParams.set('limit', '100');
+    if (offset) u.searchParams.set('offset', offset);
+    const json = await asanaGet(u, token);
+    for (const t of (json.data || [])) names.push(String(t.name || ''));
+    offset = json.next_page && json.next_page.offset;
+  } while (offset && ++pages < 50);
+  return names;
+}
+
+/* Create a task in the Ongoing Monitoring project and file it under its section.
+   Returns the task permalink (or null). Filing under the section is non-fatal. */
+async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
+  const data = { name: String(name).slice(0, 250), notes: String(notes).slice(0, 60000), projects: [projectGid] };
+  if (due) data.due_on = due;
+  if (OM_ASSIGNEE) data.assignee = OM_ASSIGNEE;
+  const d = await asanaPost('/tasks', data, token);
+  const gid = d.data && d.data.gid;
+  if (gid && sectionGid) {
+    try { await asanaPost('/sections/' + sectionGid + '/addTask', { task: gid }, token); }
+    catch (e) { console.warn('sanctions-screen: could not file task under section ' + sectionGid + ' (' + (e && e.message || e) + ')'); }
+  }
+  return d.data && d.data.permalink_url;
+}
+
+/* PART D — seed the Transaction Monitoring alert template once (idempotent). */
+async function ensureTransactionMonitoringTemplate(projectGid, token) {
+  try {
+    const sectionGid = await ensureSection(projectGid, OM_SECTION_TM, token);
+    const names = await fetchTaskNames(projectGid, token);
+    if (names.some(n => n.trim() === OM_TM_TEMPLATE_NAME)) {
+      console.log('sanctions-screen: TM template already present — skipping');
+      return;
+    }
+    await createOmTask({ name: OM_TM_TEMPLATE_NAME, notes: buildTransactionTemplateNotes(), projectGid, sectionGid }, token);
+    console.log('sanctions-screen: created Transaction Monitoring template task');
+  } catch (e) {
+    console.error('sanctions-screen: TM template setup failed (' + (e && e.message || e) + ') — non-fatal');
+  }
+}
+
+/* PART B — post the daily Adverse Media & PEP task (CLEAR or HIT). Never throws;
+   returns { posted, skipped, url, name } for the run log. */
+async function postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, token, regUrl) {
+  if (!token) { console.log('sanctions-screen: no Asana token — skipping AM/PEP task'); return { posted: false }; }
+  const dateStr = formatHumanDate(today);
+  try {
+    const projectGid = OM_PROJECT_GID;
+    await ensureTransactionMonitoringTemplate(projectGid, token);
+    const sectionGid = process.env.ASANA_OM_AM_PEP_SECTION_GID || await ensureSection(projectGid, OM_SECTION_AM_PEP, token);
+
+    const results = screen.results || [];
+    const amHits = results.filter(r => (r.lists || []).some(h => h.list && h.list.includes('Adverse media')));
+    const pepHits = results.filter(r => (r.lists || []).some(h => h.list && h.list.includes('PEP')));
+    const hitCount = new Set([...amHits, ...pepHits].map(r => r.key || r.name)).size;
+    const hasHits = amHits.length > 0 || pepHits.length > 0;
+
+    const name = hasHits
+      ? '⚠ Adverse Media / PEP HIT — ' + dateStr + ' — ' + hitCount + ' subject(s)'
+      : 'Adverse Media & PEP — CLEAR — ' + dateStr;
+
+    const names = await fetchTaskNames(projectGid, token);
+    const already = names.find(n => n.includes(dateStr) && (n.includes('Adverse Media') || n.includes('PEP')));
+    if (already) { console.log('sanctions-screen: already posted: ' + already); return { posted: false, skipped: true, name: already }; }
+
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const notes = buildAmPepNotes({ today, tomorrow, run: runUrl(), subjects: subjects.length, amHits, pepHits, regUrl });
+    const url = await createOmTask({ name, notes, projectGid, sectionGid }, token);
+    console.log('sanctions-screen: AM/PEP task created — ' + name + (url ? ' — ' + url : ''));
+    return { posted: true, url, name };
+  } catch (e) {
+    console.error('sanctions-screen: AM/PEP task failed (' + (e && e.message || e) + ') — screening output unaffected');
+    return { posted: false, error: String(e && e.message || e) };
+  }
+}
+
+/* PART C — post the daily Monitoring Run Log task. Never throws. */
+async function postRunLogTask(subjects, screen, alerts, matchCount, today, cfg, token, asanaPosted, amPep) {
+  if (!token) { console.log('sanctions-screen: no Asana token — skipping run log task'); return { posted: false }; }
+  const dateStr = formatHumanDate(today);
+  try {
+    const projectGid = OM_PROJECT_GID;
+    const sectionGid = process.env.ASANA_OM_LOG_SECTION_GID || await ensureSection(projectGid, OM_SECTION_LOG, token);
+
+    const emoji = alerts.length ? '⚠' : '✅';
+    const summary = alerts.length
+      ? alerts.length + ' new match' + (alerts.length === 1 ? '' : 'es') + ' (' + subjects.length + ' screened)'
+      : 'no new matches (' + subjects.length + ' screened)';
+    const name = 'Screening Run — ' + dateStr + ' — ' + emoji + ' ' + summary;
+
+    const names = await fetchTaskNames(projectGid, token);
+    const already = names.find(n => n.includes(dateStr) && n.includes('Screening Run'));
+    if (already) { console.log('sanctions-screen: already posted: ' + already); return { posted: false, skipped: true, name: already }; }
+
+    const notes = buildRunLogNotes({
+      today, run: runUrl(), subjects: subjects.length, coverage: screen.coverage || {},
+      degraded: screen.degraded, errored: screen.errored || 0, cfg,
+      amErrors: screen.amErrors || 0, pepErrors: screen.pepErrors || 0,
+      alerts: alerts.length, matchCount, asanaPosted, amPep
+    });
+    const url = await createOmTask({ name, notes, projectGid, sectionGid }, token);
+    console.log('sanctions-screen: run log task created — ' + name + (url ? ' — ' + url : ''));
+    return { posted: true, url, name };
+  } catch (e) {
+    console.error('sanctions-screen: run log task failed (' + (e && e.message || e) + ') — screening output unaffected');
+    return { posted: false, error: String(e && e.message || e) };
+  }
 }
 
 /* Fetch one consolidated list — a remote URL, or an in-repo curated file
@@ -458,7 +846,7 @@ async function screenLocally(subjects, cfg) {
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
-  return { results, anyOk: true, degraded, errored: 0, notes: loaded.notes, coverage: loaded };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, notes: loaded.notes, coverage: loaded };
 }
 
 function loadState() {
@@ -538,6 +926,7 @@ async function main() {
     : 'Sanctions Screen — no new matches (' + subjects.length + ' screened)';
 
   let asanaPosted = false;
+  let regUrl = '';
   if (alerts.length && asanaEnabled()) {
     try {
       const html = buildScreenHtml(alerts, { runLink: runUrl(), today, degraded: screen.degraded });
@@ -546,6 +935,7 @@ async function main() {
       const due = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
       const url = await notifyAsana(title, report, { project: REG_PROJECT_GID, html, section, due });
       asanaPosted = true;
+      regUrl = url || '';
       console.log('sanctions-screen: Asana alert created' + (url ? ' — ' + url : ''));
     } catch (e) {
       console.error('sanctions-screen: Asana alert failed (' + (e && e.message || e) + ') — workflow will open a GitHub issue.');
@@ -557,6 +947,12 @@ async function main() {
   setOutput('screen_error', 'false');
   setOutput('asana_posted', asanaPosted ? 'true' : 'false');
   setOutput('title', title);
+
+  /* Ongoing Monitoring audit trail — daily AM/PEP task + run log, every run
+     regardless of result. Self-contained (each swallows its own errors), so a
+     failure here never blocks the screening output above. */
+  const amPep = await postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, asanaToken, regUrl);
+  await postRunLogTask(subjects, screen, alerts, matchCount, today, cfg, asanaToken, asanaPosted, amPep);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

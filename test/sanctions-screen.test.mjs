@@ -5,7 +5,8 @@
 import {
   normalizeName, parseSubject, parseSubjects, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, matchSignature, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
-  GOVERNANCE_NOTE, DEFAULT_THRESHOLD
+  GOVERNANCE_NOTE, DEFAULT_THRESHOLD,
+  formatHumanDate, buildAmPepNotes, buildRunLogNotes, buildTransactionTemplateNotes, AM_KEYWORD_COUNT
 } from '../scripts/sanctions-screen.mjs';
 
 let passed = 0, failed = 0;
@@ -91,6 +92,47 @@ check('html alert is one rooted body with the customer + four-eyes note',
 const artifact = buildChangesArtifact(d1.alerts, '2026-06-19');
 check('changes artifact carries {date,mode,changes[]} with the matched list',
   artifact.mode === 'screen' && artifact.changes.length === 1 && artifact.changes[0].status === 'new' && artifact.changes[0].lists.includes('OFAC SDN'));
+
+/* ── Ongoing Monitoring — audit-trail note builders ── */
+check('formatHumanDate renders ISO as "DD Mon YYYY"', formatHumanDate('2026-06-24') === '24 Jun 2026');
+check('formatHumanDate is tolerant of junk', formatHumanDate('') === '' && formatHumanDate('2026-12-01') === '1 Dec 2026');
+
+const amClear = buildAmPepNotes({ today: '2026-06-24', tomorrow: '2026-06-25', run: 'https://example/run', subjects: 325 });
+check('AM/PEP CLEAR note shows the clear status and NONE results',
+  amClear.includes('STATUS: ✅ CLEAR') && amClear.includes('New adverse media hits:       NONE') && amClear.includes('Subjects checked:             325'));
+check('AM/PEP CLEAR note names the keyword count and next run',
+  amClear.includes(AM_KEYWORD_COUNT + ' keywords') && amClear.includes('Next run: 2026-06-25'));
+
+const amResults = [
+  { key: 'a', name: 'Acme DMCC', lists: [{ list: 'Adverse media (Google News)', hitName: 'Acme probed for fraud [fraud]', score: 80 }] },
+  { key: 'b', name: 'Beta FZE', lists: [{ list: 'PEP (Wikidata)', hitName: 'Jane Beta — minister', score: 90 }] }
+];
+const amHit = buildAmPepNotes({ today: '2026-06-24', tomorrow: '2026-06-25', subjects: 325,
+  amHits: amResults.filter(r => r.lists.some(h => h.list.includes('Adverse media'))),
+  pepHits: amResults.filter(r => r.lists.some(h => h.list.includes('PEP'))),
+  regUrl: 'https://app.asana.com/0/1/2' });
+check('AM/PEP HIT note flags review, counts hits and lists each subject',
+  amHit.includes('STATUS: ⚠ REVIEW REQUIRED') && amHit.includes('New adverse media hits:       1') &&
+  amHit.includes('New PEP identifications:      1') && amHit.includes('Acme DMCC') && amHit.includes('Beta FZE'));
+check('AM/PEP HIT note links the Regulations alert when provided',
+  amHit.includes('https://app.asana.com/0/1/2'));
+
+const log = buildRunLogNotes({ today: '2026-06-24', run: 'https://example/run', subjects: 325,
+  coverage: { fetched: 5, total: 6 }, degraded: true, errored: 0, cfg: { adverseMedia: true, pep: false },
+  amErrors: 2, pepErrors: 0, alerts: 0, matchCount: 3, asanaPosted: false, amPep: { posted: true, url: 'https://t/1' } });
+check('run log note reports subjects, coverage and exit status',
+  log.includes('Subjects screened:            325') && log.includes('Sanctions lists loaded:       5/6') &&
+  log.includes('Coverage degraded:            YES') && log.includes('Exit status:                  ✅ CLEAN'));
+check('run log note reflects module on/off, errors and the AM/PEP link',
+  log.includes('Adverse media module:         ON — 2 errors') && log.includes('PEP module:                   OFF — 0 errors') &&
+  log.includes('AM/PEP task posted:           YES — https://t/1'));
+const logMatch = buildRunLogNotes({ today: '2026-06-24', subjects: 10, coverage: {}, alerts: 2, matchCount: 2, cfg: {} });
+check('run log note marks ⚠ MATCHES when there are alerts', logMatch.includes('Exit status:                  ⚠ MATCHES'));
+
+const tmpl = buildTransactionTemplateNotes();
+check('TM template carries the legal basis, all sections and the copy banner',
+  tmpl.includes('MoET Circular 08/AML/2021') && tmpl.includes('A. ALERT IDENTIFICATION') &&
+  tmpl.includes('F. DISPOSITION') && tmpl.includes('[TEMPLATE — copy for each alert]'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

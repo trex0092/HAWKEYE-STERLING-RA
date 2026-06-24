@@ -25,6 +25,9 @@ name: Sanctions Screen
 #   SCREEN_MATCH_THRESHOLD        material-match score 0-1 (default 0.85)
 #   SCREEN_ADVERSE_MEDIA          '0' to disable Google News adverse-media (default on)
 #   SCREEN_PEP                    '0' to disable the Wikidata PEP signal (default on)
+#   ASANA_OM_PROJECT_GID          "Ongoing Monitoring" project for the daily audit tasks
+#   ASANA_OM_AM_PEP_SECTION_GID   optional override (sections are found/created by name)
+#   ASANA_OM_LOG_SECTION_GID      optional override (sections are found/created by name)
 
 on:
   schedule:
@@ -59,6 +62,11 @@ jobs:
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           SCREEN_PEP: ${{ vars.SCREEN_PEP }}
+          # Ongoing Monitoring audit trail — sections are found/created by name at
+          # runtime, so the section GID vars are optional overrides.
+          ASANA_OM_PROJECT_GID: ${{ vars.ASANA_OM_PROJECT_GID || '1213914392047129' }}
+          ASANA_OM_AM_PEP_SECTION_GID: ${{ vars.ASANA_OM_AM_PEP_SECTION_GID }}
+          ASANA_OM_LOG_SECTION_GID: ${{ vars.ASANA_OM_LOG_SECTION_GID }}
         run: node scripts/sanctions-screen.mjs
 
       - name: Commit refreshed screening state to main
