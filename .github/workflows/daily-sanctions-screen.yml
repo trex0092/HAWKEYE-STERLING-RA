@@ -20,6 +20,8 @@ on:
   schedule:
     # 06:00 UAE time (GST = UTC+4) = 02:00 UTC, daily
     - cron: '0 2 * * *'
+    # 18:00 UAE time (GST = UTC+4) = 14:00 UTC, daily
+    - cron: '0 14 * * *'
 
   # Manual trigger from GitHub Actions tab
   workflow_dispatch:
