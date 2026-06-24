@@ -1,0 +1,64 @@
+# Throwaway manual smoke test for screen.py — validates Asana post (point 4)
+# and Google News RSS adverse-media search (point 5) against 2 names in ~1 min.
+# Safe to delete after use.
+name: screen.py Smoke Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install rapidfuzz requests pdfplumber
+
+      - name: Smoke test screen.py (Asana + Google News)
+        env:
+          ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
+          TRIGGER_TYPE: workflow_dispatch
+          RUN_MODE: full_batch
+        run: |
+          python3 << 'PYEOF'
+          import requests, screen
+
+          print("=== screen.py version banner ===")
+          print(screen.__doc__.strip().splitlines()[2])
+
+          # ---- POINT 5: Google News RSS adverse-media search ----
+          print("\n=== POINT 5: Google News RSS (screen.search_adverse_media) ===")
+          total = 0
+          for name in ["Vladimir Putin", "Bashar al-Assad"]:
+              arts = screen.search_adverse_media(name, max_results=5)
+              total += len(arts)
+              print(f"GNEWS::{name}::count={len(arts)}")
+              for a in arts[:3]:
+                  print(f"   - [{'FLAG' if a['flagged'] else '   '}] {a['title'][:80]}  ({a['source']})")
+          assert total > 0, "FAIL point 5: Google News returned no results"
+          print(f"POINT 5 PASS: {total} articles returned across test names")
+
+          # ---- POINT 4: Asana connectivity + post a task (screen.py's own config) ----
+          print("\n=== POINT 4: Asana post (screen.ASANA_HEADERS / endpoint) ===")
+          payload = {"data": {
+              "name": "\U0001F9EA SMOKE TEST — screen.py manual smoke (safe to delete)",
+              "notes": "Automated smoke test of screen.py Asana connectivity via GitHub Actions. Safe to delete.",
+              "assignee": screen.ASANA_ASSIGNEE_GID,
+              "projects": [screen.ASANA_ONGOING_MON_GID],
+              "memberships": [{"project": screen.ASANA_ONGOING_MON_GID,
+                               "section": screen.ASANA_SECTION_GID}],
+          }}
+          r = requests.post("https://app.asana.com/api/1.0/tasks",
+                            headers=screen.ASANA_HEADERS, json=payload, timeout=30)
+          print("ASANA_POST_STATUS:", r.status_code)
+          assert r.status_code in (200, 201), f"FAIL point 4: Asana POST {r.status_code} {r.text[:300]}"
+          gid = r.json()["data"]["gid"]
+          print("ASANA_TASK_GID:", gid)
+          print("POINT 4 PASS: task created in Ongoing Monitoring project")
+
+          print("\n=== SMOKE TEST PASSED: points 4 and 5 confirmed ===")
+          PYEOF
