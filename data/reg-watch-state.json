@@ -10,12 +10,12 @@
       "prevHash": "27c2a43b84cf45838e7d40966f3754f468783154ae48f91979a341d6ae093a53"
     },
     "uae-fiu": {
-      "hash": "0f87e5208bb5c8892085b7eee05d6bac6cca4a35ff159d2100ee114da97b5e0f",
+      "hash": "b587df3d782b4ccb7509b24fd1cfa0c149535f6a80065661aa0e682ce964c1ed",
       "bytes": 4427,
       "checkedAt": "2026-06-25",
       "changedAt": "2026-06-25",
       "status": 200,
-      "prevHash": "931bdc0ce4dfaa21fe7fcb00ca48aa2ed255aeb23e021e576b76b5ed54861b14"
+      "prevHash": "0f87e5208bb5c8892085b7eee05d6bac6cca4a35ff159d2100ee114da97b5e0f"
     },
     "uae-namlcftc": {
       "hash": null,
@@ -69,8 +69,9 @@
       "bytes": 5564,
       "checkedAt": "2026-06-25",
       "changedAt": "2026-06-23",
-      "status": 200,
-      "prevHash": "8c3195c1b8300994f3e1522f92f179ce9c60b76e4ad70e6acd3d5c958d5f23e0"
+      "status": "error",
+      "prevHash": "8c3195c1b8300994f3e1522f92f179ce9c60b76e4ad70e6acd3d5c958d5f23e0",
+      "error": "This operation was aborted"
     },
     "rmi": {
       "hash": "9aa3026cf8e364a6a29bc5d595ea6bcd2a84522dfdbc3c33b2bb4d3796810f21",
@@ -132,7 +133,7 @@
       "bytes": 5061,
       "checkedAt": "2026-06-25",
       "changedAt": "2026-06-21",
-      "status": 200,
+      "status": "error",
       "prevHash": "e79bfcef5ad8ddd37046f63df83b1e64bf66640e05fd0221e12538daebb05061",
       "error": "fetch failed"
     },
