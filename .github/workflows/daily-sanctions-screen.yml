@@ -45,6 +45,10 @@ jobs:
 
     steps:
 
+      # Check out the repo so the maintained UAE EOCN list
+      # (data/eocn-local-terrorist-list.json) is available to the screen.
+      - uses: actions/checkout@v4
+
       # --------------------------------------------------------
       # STEP 1 — SET UAE DATE
       # --------------------------------------------------------
