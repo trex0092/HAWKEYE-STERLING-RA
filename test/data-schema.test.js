@@ -1,0 +1,75 @@
+/* data/*.json SCHEMA test — Layer 2 (Data Quality), stricter than the
+   parse-only data-json.test.js. A malformed but still-valid-JSON state or
+   sources file (a renamed key, a dropped `sources` array, a hash that is no
+   longer a hash) would parse fine yet silently break sanctions screening. This
+   asserts the *shape* of the files screening depends on. Usage:
+   node test/data-schema.test.js */
+const fs = require('fs');
+const path = require('path');
+
+let passed = 0, failed = 0;
+function check(name, cond) {
+  if (cond) { passed++; console.log('  ok  ' + name); }
+  else { failed++; console.log('FAIL  ' + name); }
+}
+const dir = path.join(__dirname, '..', 'data');
+const read = f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+const isHex64 = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+const isStr = v => typeof v === 'string' && v.length > 0;
+
+console.log('\n— data/*.json schema test —\n');
+
+// ── data/sanctions-sources.json ───────────────────────────────────────────
+try {
+  const s = read('sanctions-sources.json');
+  check('sanctions-sources: sources is a non-empty array', Array.isArray(s.sources) && s.sources.length > 0);
+  const types = new Set(['csv', 'xml']);
+  let allOk = true, ids = new Set();
+  for (const src of s.sources || []) {
+    if (!isStr(src.id) || !isStr(src.name) || !isStr(src.url) || !isStr(src.parser) || !types.has(src.type)) allOk = false;
+    if (ids.has(src.id)) allOk = false;
+    ids.add(src.id);
+  }
+  check('sanctions-sources: every source has id/name/url/parser and a csv|xml type', allOk);
+  check('sanctions-sources: source ids are unique', ids.size === (s.sources || []).length);
+  // The lists ongoing screening must cover (regression guard against a dropped list).
+  for (const id of ['ofac-sdn', 'un-consolidated', 'uk-ofsi', 'eu-fsf']) {
+    check('sanctions-sources: includes mandatory source ' + id, ids.has(id));
+  }
+} catch (e) { check('sanctions-sources.json schema (' + e.message + ')', false); }
+
+// ── data/sanctions-state.json ─────────────────────────────────────────────
+try {
+  const st = read('sanctions-state.json');
+  check('sanctions-state: updated is a date', isDate(st.updated));
+  check('sanctions-state: sources is an object', st.sources && typeof st.sources === 'object' && !Array.isArray(st.sources));
+  let allOk = true;
+  for (const [id, e] of Object.entries(st.sources || {})) {
+    if (!isHex64(e.hash)) { allOk = false; console.log('     bad hash for ' + id); }
+    if (typeof e.bytes !== 'number') allOk = false;
+    if (!isDate(e.checkedAt)) allOk = false;
+    if ('count' in e && typeof e.count !== 'number') allOk = false;
+  }
+  check('sanctions-state: every source entry has a sha256 hash, numeric bytes and a checkedAt date', allOk);
+} catch (e) { check('sanctions-state.json schema (' + e.message + ')', false); }
+
+// ── data/sanctions-screen-state.json ──────────────────────────────────────
+try {
+  const sc = read('sanctions-screen-state.json');
+  check('screen-state: updated is a date', isDate(sc.updated));
+  check('screen-state: subjects is an object', sc.subjects && typeof sc.subjects === 'object' && !Array.isArray(sc.subjects));
+  const bands = new Set(['critical', 'high', 'medium', 'low', 'clear', 'none']);
+  let allOk = true;
+  for (const [, s] of Object.entries(sc.subjects || {})) {
+    if (!isStr(s.name)) allOk = false;
+    if (!bands.has(s.band)) allOk = false;
+    if (typeof s.topScore !== 'number') allOk = false;
+    if (!Array.isArray(s.lists)) allOk = false;
+    if (!isDate(s.firstSeen) || !isDate(s.lastSeen)) allOk = false;
+  }
+  check('screen-state: every subject has name/band/topScore/lists/firstSeen/lastSeen', allOk);
+} catch (e) { check('sanctions-screen-state.json schema (' + e.message + ')', false); }
+
+console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
+if (failed) process.exitCode = 1;

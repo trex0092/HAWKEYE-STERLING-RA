@@ -52,13 +52,17 @@ jobs:
           ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1215857714525481' }}
         run: node scripts/watch-notify.mjs "${{ steps.watch.outputs.pr_title }}" sanctions-watch-report.md sanctions-watch-changes.json
 
+      - name: Retain dated snapshot + integrity manifest
+        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        run: node scripts/retain-state.mjs
+
       - name: Commit refreshed fingerprint state to main
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         run: |
           if [ -n "$(git status --porcelain data/ 2>/dev/null)" ]; then
             git config user.name "sanctions-watch"
             git config user.email "actions@github.com"
-            git add data/sanctions-state.json
+            git add data/sanctions-state.json data/retention
             git commit -m "${{ steps.watch.outputs.pr_title }} [skip ci]"
             for attempt in 1 2 3 4 5; do
               git push && break

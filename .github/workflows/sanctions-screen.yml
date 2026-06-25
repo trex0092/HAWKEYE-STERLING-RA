@@ -70,6 +70,11 @@ jobs:
           ASANA_OM_LOG_SECTION_GID: ${{ vars.ASANA_OM_LOG_SECTION_GID }}
         run: node scripts/sanctions-screen.mjs
 
+      - name: Screening metrics (non-blocking observability)
+        if: always()
+        continue-on-error: true
+        run: node scripts/screening-metrics.mjs
+
       - name: Commit refreshed screening state to main
         if: steps.screen.outputs.screen_error != 'true'
         run: |
