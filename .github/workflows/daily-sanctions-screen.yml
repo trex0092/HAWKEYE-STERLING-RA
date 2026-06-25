@@ -26,6 +26,18 @@ on:
   # Manual trigger from GitHub Actions tab
   workflow_dispatch:
 
+# Least privilege: the screen reads the repo and posts results to Asana via
+# ASANA_ACCESS_TOKEN (a secret). It never pushes to the repo, so the default
+# GITHUB_TOKEN needs read-only contents and nothing else.
+permissions:
+  contents: read
+
+# A mandatory daily control must not run twice concurrently (manual dispatch
+# overlapping the 02:00/14:00 schedule) and double-post to Asana.
+concurrency:
+  group: daily-sanctions-screen
+  cancel-in-progress: false
+
 jobs:
   sanctions-screen:
     runs-on: ubuntu-latest

@@ -45,6 +45,7 @@ concurrency:
 jobs:
   screen:
     runs-on: ubuntu-latest
+    timeout-minutes: 20 # bound the daily re-screen; a hang must fail loudly, not stall the control
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6

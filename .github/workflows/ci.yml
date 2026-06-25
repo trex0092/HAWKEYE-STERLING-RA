@@ -4,9 +4,16 @@ on:
   push:
   pull_request:
 
+# Least privilege: CI only reads the repo and runs tests — it never writes
+# back, opens issues, or needs a token. Without this block the default
+# GITHUB_TOKEN is broadly scoped on every push/PR.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25 # cap runaway browser-smoke / virtual-time hangs
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
