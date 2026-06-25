@@ -37,6 +37,7 @@ import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName } from './sanctions-match.mjs';
 import { checkAdverseMedia, ADVERSE_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
+import { checkInterpol } from './interpol-check.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -411,7 +412,7 @@ export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], p
 }
 
 /* PART C — Monitoring Run Log task body. */
-export function buildRunLogNotes({ today, run, subjects, coverage = {}, degraded, errored = 0, cfg = {}, amErrors = 0, pepErrors = 0, alerts = 0, matchCount = 0, asanaPosted, amPep } = {}) {
+export function buildRunLogNotes({ today, run, subjects, coverage = {}, degraded, errored = 0, cfg = {}, amErrors = 0, pepErrors = 0, interpolErrors = 0, alerts = 0, matchCount = 0, asanaPosted, amPep } = {}) {
   const exit = errored ? '❌ ERROR' : (alerts ? '⚠ MATCHES' : '✅ CLEAN');
   const amPepLine = amPep && amPep.posted
     ? 'YES — ' + (amPep.url || amPep.name || 'posted')
@@ -430,6 +431,7 @@ export function buildRunLogNotes({ today, run, subjects, coverage = {}, degraded
   L.push('');
   L.push('Adverse media module:         ' + (cfg.adverseMedia ? 'ON' : 'OFF') + ' — ' + amErrors + ' errors');
   L.push('PEP module:                   ' + (cfg.pep ? 'ON' : 'OFF') + ' — ' + pepErrors + ' errors');
+  L.push('Interpol module:              ' + (cfg.interpol ? 'ON' : 'OFF') + ' — ' + interpolErrors + ' errors');
   L.push('');
   L.push('New sanctions matches:        ' + alerts);
   L.push('Total standing matches:       ' + matchCount);
@@ -704,7 +706,7 @@ async function postRunLogTask(subjects, screen, alerts, matchCount, today, cfg, 
     const notes = buildRunLogNotes({
       today, run: runUrl(), subjects: subjects.length, coverage: screen.coverage || {},
       degraded: screen.degraded, errored: screen.errored || 0, cfg,
-      amErrors: screen.amErrors || 0, pepErrors: screen.pepErrors || 0,
+      amErrors: screen.amErrors || 0, pepErrors: screen.pepErrors || 0, interpolErrors: screen.interpolErrors || 0,
       alerts: alerts.length, matchCount, asanaPosted, amPep
     });
     const url = await createOmTask({ name, notes, projectGid, sectionGid }, token);
@@ -807,7 +809,7 @@ async function screenLocally(subjects, cfg) {
      and report it, but it does NOT degrade the sanctions screen or weaken its
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
-  let amErrors = 0, pepErrors = 0;
+  let amErrors = 0, pepErrors = 0, interpolErrors = 0;
   const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr);   // { name, topScore, band, recommendation, hitCount, lists[] }
     const lists = [...raw.lists];
@@ -830,6 +832,15 @@ async function screenLocally(subjects, cfg) {
         band = strongerBand(band, pp.band); topScore = Math.max(topScore, pp.score);
       }
     }
+    if (cfg.interpol) {
+      const ip = await checkInterpol(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (ip.errored) { interpolErrors++; }
+      else if (ip.hit) {
+        const nats = (ip.match && ip.match.nationalities.length) ? ' [' + ip.match.nationalities.join(', ') + ']' : '';
+        lists.push({ list: 'Interpol Red Notice', hitName: ((ip.match && ip.match.name || '') + nats).slice(0, 180), score: ip.score });
+        band = strongerBand(band, ip.band); topScore = Math.max(topScore, ip.score);
+      }
+    }
 
     const hasSanctions = raw.lists.length > 0;
     const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
@@ -846,7 +857,8 @@ async function screenLocally(subjects, cfg) {
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, notes: loaded.notes, coverage: loaded };
+  if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
+  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, notes: loaded.notes, coverage: loaded };
 }
 
 function loadState() {
@@ -889,6 +901,7 @@ async function main() {
     threshold: Number(process.env.SCREEN_MATCH_THRESHOLD) || DEFAULT_THRESHOLD,
     adverseMedia: process.env.SCREEN_ADVERSE_MEDIA !== '0',   // default on
     pep: process.env.SCREEN_PEP !== '0',                      // default on
+    interpol: process.env.SCREEN_INTERPOL === '1',            // default OFF (opt-in; verify the public API on the runner before enabling)
     listTimeoutMs: Number(process.env.SCREEN_LIST_TIMEOUT_MS) || 60000,
     checkTimeoutMs: Number(process.env.SCREEN_CHECK_TIMEOUT_MS) || 20000,
     concurrency: Number(process.env.SCREEN_CONCURRENCY) || 4
