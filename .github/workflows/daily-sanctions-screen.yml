@@ -107,28 +107,19 @@ jobs:
           echo "UK_HASH=$(sha256sum /tmp/uk_ofsi.csv | cut -d' ' -f1)" \
             >> $GITHUB_ENV
 
-      - name: Download UAE EOCN PDF
+      - name: Load UAE EOCN list (maintained in-repo)
         run: |
-          # The UAE FIU publishes the Local Terrorist List from its site; the
-          # direct PDF path changes, so discover any PDF linked from the page.
-          curl -sL "https://www.uaefiu.gov.ae/en/" -o /tmp/uae_page.html || true
-          PDF_URL=$(grep -oiE 'href="[^"]+\.pdf"' /tmp/uae_page.html 2>/dev/null \
-            | head -1 | sed -E 's/.*href="([^"]+)".*/\1/I')
-          if [ -n "$PDF_URL" ]; then
-            case "$PDF_URL" in
-              http*) : ;;
-              //*)   PDF_URL="https:$PDF_URL" ;;
-              /*)    PDF_URL="https://www.uaefiu.gov.ae$PDF_URL" ;;
-              *)     PDF_URL="https://www.uaefiu.gov.ae/$PDF_URL" ;;
-            esac
-            curl -sL "$PDF_URL" -o /tmp/uae_eocn.pdf || rm -f /tmp/uae_eocn.pdf
-          fi
-          if [ -f /tmp/uae_eocn.pdf ]; then
-            echo "UAE_HASH=$(sha256sum /tmp/uae_eocn.pdf | cut -d' ' -f1)" \
-              >> $GITHUB_ENV
+          # The UAE EOCN Local Terrorist List is published ONLY as a bot-protected
+          # PDF/Excel (no machine-readable feed), so scraping a PDF at runtime failed
+          # every day. It is maintained in-repo as data/eocn-local-terrorist-list.json
+          # — the same source the Node screener uses. Hash it for the audit trail;
+          # only flag failure if the file is genuinely missing.
+          EOCN_FILE=data/eocn-local-terrorist-list.json
+          if [ -f "$EOCN_FILE" ]; then
+            echo "UAE_HASH=$(sha256sum "$EOCN_FILE" | cut -d' ' -f1)" >> $GITHUB_ENV
             echo "UAE_PDF_FAILED=false" >> $GITHUB_ENV
           else
-            echo "UAE EOCN PDF not available — manual check required"
+            echo "UAE EOCN list file missing — manual check required"
             echo "UAE_PDF_FAILED=true" >> $GITHUB_ENV
           fi
 
@@ -187,7 +178,6 @@ jobs:
           import xml.etree.ElementTree as ET
           from rapidfuzz import fuzz, process
           import unicodedata
-          import pdfplumber
 
           # ---- helpers ----
           def normalise(name):
@@ -301,24 +291,26 @@ jobs:
           except Exception as e:
               print(f"UK parse error: {e}")
 
-          # UAE EOCN PDF
+          # UAE EOCN — maintained in-repo machine-readable list (bot-protected at source)
           uae_names = []
-          if os.path.exists("/tmp/uae_eocn.pdf"):
-              try:
-                  with pdfplumber.open("/tmp/uae_eocn.pdf") as pdf:
-                      for page in pdf.pages:
-                          text = page.extract_text() or ""
-                          for line in text.split("\n"):
-                              line = line.strip()
-                              if len(line) > 5:
-                                  uae_names.append(line)
-                                  sanctioned.append({"name": line, "list": "UAE EOCN", "programme": "UAE Local Terrorist List"})
-                  print(f"UAE EOCN: {len(uae_names)} entries extracted from PDF")
-              except Exception as e:
-                  print(f"UAE EOCN PDF error: {e}")
-                  os.environ["UAE_PDF_FAILED"] = "true"
-          else:
-              print("UAE EOCN PDF not available — manual check required")
+          try:
+              with open("data/eocn-local-terrorist-list.json", encoding="utf-8") as f:
+                  _eocn = json.load(f)
+              for entry in _eocn.get("entries", []):
+                  if isinstance(entry, str):
+                      cands = [entry]
+                  elif isinstance(entry, dict):
+                      cands = [entry.get("name", "")] + list(entry.get("aliases", []) or [])
+                  else:
+                      cands = []
+                  for cand in cands:
+                      cand = str(cand).strip()
+                      if len(cand) > 3:
+                          uae_names.append(cand)
+                          sanctioned.append({"name": cand, "list": "UAE EOCN", "programme": "UAE Local Terrorist List"})
+              print(f"UAE EOCN: {len(uae_names)} names loaded from in-repo list")
+          except Exception as e:
+              print(f"UAE EOCN load error: {e}")
               os.environ["UAE_PDF_FAILED"] = "true"
 
           # ---- normalise all sanctioned names ----
@@ -435,11 +427,21 @@ jobs:
 
           # ---- UAE EOCN status line ----
           if uae_failed:
-              uae_b_status = "⚠️  PDF EXTRACTION FAILED — manual check required"
+              uae_b_status = "⚠️  EOCN LIST UNAVAILABLE — manual check required"
               uae_b_hash   = "N/A"
           else:
               uae_b_status = "SCREENED"
               uae_b_hash   = uae_hash
+
+          # ---- in-repo EOCN list metadata (entry count + last review) ----
+          try:
+              with open("data/eocn-local-terrorist-list.json", encoding="utf-8") as _f:
+                  _eocn_meta = json.load(_f)
+              eocn_count = _eocn_meta.get("count") or len(_eocn_meta.get("entries", []))
+              eocn_last_reviewed = _eocn_meta.get("lastReviewed", "see file")
+          except Exception:
+              eocn_count = "?"
+              eocn_last_reviewed = "?"
 
           # ---- confirmed hits section ----
           if not confirmed:
@@ -539,23 +541,21 @@ jobs:
              File Hash: {uk_hash}
              Status:    SCREENED
 
-          ✅ UAE EOCN — Local Terrorist List (Primary — PDF Extraction)
-             Source:    UAE Cabinet / UAE FIU
-             URL:       https://www.uaefiu.gov.ae/en/
-             Method:    Automated PDF extraction at run time
+          ✅ UAE EOCN — Local Terrorist List (Executive Office / EOCN)
+             Source:    UAE Executive Office for Control & Non-Proliferation
+             Reference: data/eocn-local-terrorist-list.json (maintained in-repo —
+                        EOCN publishes only a bot-protected PDF/Excel, no machine feed)
+             Entries:   {eocn_count}
              File Hash: {uae_b_hash}
              Status:    {uae_b_status}
 
-          ✅ UAE EOCN — Supplementary Cross-Reference
-             Method:    UN Consolidated + OFAC SDN used as proxy
-                        for UAE-specific designations not captured
-                        in PDF extraction.
-             Gap:       UAE Cabinet designations published between
-                        PDF update cycles may not be captured until
-                        next PDF version is released.
-             Mitigation: MLRO to perform manual spot-check of
-                         https://www.uaefiu.gov.ae/en/ weekly.
-             Last Manual Check: [DATE — to be completed by MLRO]
+          ✅ UAE EOCN — Maintenance & Cross-Reference
+             Method:    The in-repo EOCN list is screened directly; UN Consolidated
+                        + OFAC SDN are screened in parallel as an additional
+                        cross-reference for UAE-relevant designations.
+             Mitigation: MLRO to reconcile the in-repo list against the official
+                         EOCN publication (https://www.uaeiec.gov.ae) periodically.
+             Last Reconciled:   {eocn_last_reviewed}
 
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           SCOPE
@@ -619,7 +619,7 @@ jobs:
           UN Consolidated Hash:     {un_hash}
           EU FSF File Hash:         {eu_hash}
           UK OFSI File Hash:        {uk_hash}
-          UAE EOCN PDF Hash:        {uae_b_hash}
+          UAE EOCN List Hash:       {uae_b_hash}
 
           Customer List Source:     Asana — Customer Database
                                     Project GID: 1214107620220121
