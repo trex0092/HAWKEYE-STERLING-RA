@@ -33,7 +33,14 @@ jobs:
             --virtual-time-budget=8000 \
             --dump-dom "https://hawkeye-sterling-ra.netlify.app" > /tmp/dom.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom.html
-          for s in 'HAWKEYE STERLING — ENTITY RISK ASSESSMENT' 'CDD — Customer Due Diligence' 'stroke-dasharray: 250.8, 600'; do
+          # Assert the brand and title as the two strings that actually exist in
+          # the DOM. The header's all-caps look is CSS (text-transform:uppercase),
+          # so the combined 'HAWKEYE STERLING — ENTITY RISK ASSESSMENT' is never
+          # present in a --dump-dom and made this check fail every run. The brand
+          # ('HAWKEYE STERLING', line ~528) and title ('Hawkeye Sterling — Entity
+          # Risk Assessment', the <title>) are the real source strings — same
+          # assertions ci.yml uses against this index.html.
+          for s in 'HAWKEYE STERLING' 'Entity Risk Assessment' 'CDD — Customer Due Diligence' 'stroke-dasharray: 250.8, 600'; do
             grep -q "$s" /tmp/dom.html || { echo "MISSING: $s"; exit 1; }
           done
           echo "live site healthy — renders and computes"
