@@ -1,0 +1,51 @@
+name: Freshness Check
+
+# Silent-failure alarm for the mandatory-daily controls. A scheduled compliance
+# watcher that simply stops running (bad cron, disabled workflow, runner outage)
+# produces no failure — just nothing — which GitHub never alerts on. This guard
+# runs after the watchers each day and asks the Actions API whether each
+# mandatory-daily control has a SUCCESSFUL run dated today (UTC); if any is
+# missing it fails loudly (red + Actions email) and opens an Asana alert.
+#
+# Needs the ASANA_ACCESS_TOKEN repository secret to route the alert to Asana.
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # 09:00 UTC daily — after sanctions-watch (05:00), screen (02:00/06:00) and regulatory-watch (06:00)
+  workflow_dispatch:
+
+# Least privilege: read the repo + read Actions run history. The Asana alert on
+# failure uses ASANA_ACCESS_TOKEN (a secret), not GITHUB_TOKEN.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: freshness-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Verify mandatory-daily controls ran today
+        id: freshness
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/freshness-check.mjs
+
+      - name: Alert in Asana on stale control
+        if: failure()
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "CONTROL STALE: a mandatory-daily compliance watcher did not run today" \
+            "The Freshness Check found that at least one mandatory-daily control (Sanctions Watch / Sanctions Screen / Daily Sanctions Screening / Regulatory Watch) has no successful run today. A daily ingestion/screening control that silently stops is a potential regulatory breach (e.g. UNSC / EOCN must run daily without delay). Review the schedules and the run log: $RUN_URL"

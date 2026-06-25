@@ -53,6 +53,14 @@ jobs:
         run: node test/ai-assets.test.js
       - name: Run data/*.json integrity test
         run: node test/data-json.test.js
+      - name: Run data/*.json schema test (sanctions sources + state shape)
+        run: node test/data-schema.test.js
+      - name: Run freshness-check unit tests
+        run: node test/freshness-check.test.mjs
+      - name: Run retain-state unit tests
+        run: node test/retain-state.test.mjs
+      - name: Run screening-metrics unit tests
+        run: node test/screening-metrics.test.mjs
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight
