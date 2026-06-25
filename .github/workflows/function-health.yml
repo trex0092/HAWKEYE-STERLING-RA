@@ -19,9 +19,20 @@ on:
     - cron: '15 5 * * *'   # 05:15 UTC daily (just after site-health)
   workflow_dispatch:
 
+# Read-only probe: checks out the repo and curls live functions. The Asana
+# alert on failure uses ASANA_ACCESS_TOKEN (a secret), not GITHUB_TOKEN.
+permissions:
+  contents: read
+
+# A manual dispatch must not race the scheduled run (duplicate alert tasks).
+concurrency:
+  group: function-health
+  cancel-in-progress: false
+
 jobs:
   probe:
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # a hung curl must not pin a runner
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6

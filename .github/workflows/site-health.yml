@@ -9,9 +9,19 @@ on:
     - cron: '0 5 * * *' # 05:00 UTC daily (09:00 UAE)
   workflow_dispatch:
 
+# Read-only probe of the live site; failure alert uses ASANA_ACCESS_TOKEN.
+permissions:
+  contents: read
+
+# Manual dispatch must not race the scheduled run (duplicate "SITE DOWN" tasks).
+concurrency:
+  group: site-health
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # a hung headless-Chrome render must not pin a runner
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6

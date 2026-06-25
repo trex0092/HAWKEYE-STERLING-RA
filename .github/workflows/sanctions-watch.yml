@@ -30,6 +30,7 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
+    timeout-minutes: 20 # a hung list fetch must surface as a failure, not a silent hang on a mandatory-daily control
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6

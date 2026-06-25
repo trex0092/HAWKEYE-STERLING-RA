@@ -18,9 +18,16 @@ on:
 permissions:
   contents: write
 
+# Serialize: this job commits + pushes list-state / risk-data. Overlapping
+# runs (manual dispatch vs the 06:00 schedule) would race the push.
+concurrency:
+  group: fatf-watchdog
+  cancel-in-progress: false
+
 jobs:
   watch:
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # bound external list fetches
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6

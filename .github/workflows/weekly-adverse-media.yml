@@ -14,6 +14,15 @@ on:
     - cron: '0 3 * * 1'    # 07:00 UAE (UTC+4) every Monday
   workflow_dispatch:        # Manual trigger
 
+# Read-only checkout; results are posted to Asana via the screen's own token.
+permissions:
+  contents: read
+
+# A 3-hour sweep must never have a manual run overlap the Monday schedule.
+concurrency:
+  group: weekly-adverse-media
+  cancel-in-progress: false
+
 jobs:
   adverse-media:
     runs-on: ubuntu-latest
