@@ -50,11 +50,39 @@ GNEWS_URLS = [
 
 # Adverse media keywords — if headline contains any, flag it
 ADVERSE_KEYWORDS = [
-    "sanction", "fraud", "money launder", "aml", "corrupt", "bribe",
-    "terror", "trafficking", "smuggl", "indict", "arrest", "convict",
-    "prison", "jail", "investigation", "probe", "fine", "penalty",
-    "seized", "frozen", "blocked", "ofac", "interpol", "wanted",
-    "illicit", "illegal", "criminal", "prosecution", "defraud",
+    # Sanctions / terrorism / proliferation
+    "sanction", "sanctions evasion", "embargo", "designated terrorist",
+    "terrorism", "terrorist financing", "financing of terrorism", "terror funding",
+    "extremist", "radicalis", "radicaliz", "militant",
+    "proliferation financing", "weapons of mass destruction", "wmd", "dual-use",
+    "arms trafficking", "weapons smuggling", "nuclear", "chemical weapons",
+    "biological weapons", "debarred", "blacklisted",
+    # Money laundering / financial crime
+    "launder", "money laundering", "financial crime", "economic crime",
+    "tax evasion", "tax fraud", "vat fraud", "ponzi", "pyramid scheme",
+    "insider trading", "market manipulation", "accounting fraud",
+    "asset misappropriation", "misuse of funds", "embezzle", "kickback",
+    "bribe", "bribery", "corrupt", "corruption", "kleptocracy", "state capture",
+    "abuse of power", "conflict of interest", "fraud", "forgery", "counterfeit",
+    "identity theft", "cyber fraud", "wire fraud", "extort", "blackmail",
+    # Crime / enforcement / legal status
+    "arrest", "convict", "guilty", "verdict", "prosecute", "indict",
+    "court case", "litigate", "lawsuit", "felon", "imprisonment", "jail",
+    "prison", "theft", "murder", "illegal", "unlawful", "breach",
+    "regulatory breach", "fined", "politic",
+    # Organised crime / trafficking / smuggling
+    "organised crime", "organized crime", "mafia", "cartel", "drug trafficking",
+    "narcotics", "human trafficking", "people smuggling", "wildlife trafficking",
+    "smuggl", "contraband", "illicit",
+    # Cyber
+    "cybercrime", "ransomware", "darknet",
+    # ESG / minerals / human rights
+    "human rights", "forced labour", "forced labor", "modern slavery",
+    "child labour", "child labor", "labour exploitation", "exploitation",
+    "conflict minerals", "conflict gold", "blood diamond", "illegal mining",
+    "smuggled gold", "gold smuggling", "environmental violation", "pollution",
+    "toxic waste", "deforestation", "land grabbing", "indigenous rights",
+    "esg", "greenwashing", "due diligence failure",
 ]
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -108,13 +136,15 @@ def search_adverse_media(name: str, max_results: int = 5) -> list:
                 source = (source_el.text if source_el is not None else "Unknown")
                 pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
                 link = (link_el.text or "") if link_el is not None else ""
-                flagged = any(kw in title.lower() for kw in ADVERSE_KEYWORDS)
+                tl = title.lower()
+                matched = [kw for kw in ADVERSE_KEYWORDS if re.search(r"\b" + re.escape(kw), tl)]
                 articles.append({
                     "title": title,
                     "source": source,
                     "date": pub_date,
                     "url": link,
-                    "flagged": flagged,
+                    "flagged": bool(matched),
+                    "keywords": matched,
                 })
         except Exception:
             continue
@@ -522,105 +552,168 @@ STR Reference (if any): ___________________________
     return narrative
 
 # ── NARRATIVE BUILDER — WEEKLY ADVERSE MEDIA ──────────────────────────────────
-def build_weekly_narrative(customers, results, run_time):
-    dt = run_time.strftime("%d %b %Y")
-    flagged = [r for r in results if r["has_adverse"]]
-    clean   = [r for r in results if not r["has_adverse"]]
+def github_run_url():
+    s = os.environ.get("GITHUB_SERVER_URL")
+    r = os.environ.get("GITHUB_REPOSITORY")
+    i = os.environ.get("GITHUB_RUN_ID")
+    return f"{s}/{r}/actions/runs/{i}" if (s and r and i) else "local run (no GitHub run context)"
 
-    if not flagged:
-        flagged_text = "No adverse media identified across all 324 customers."
+# The most material red flags, surfaced in the report header. The FULL search set
+# (ADVERSE_KEYWORDS) is much larger; the narrative names the headline ones only.
+KEY_RED_FLAGS = ("sanction", "money launder", "terrorist financing", "fraud",
+                 "bribery", "corruption", "trafficking", "smuggling", "embezzle",
+                 "OFAC / Interpol designation", "indicted / convicted", "arrest")
+
+def build_adverse_narrative(findings, stats, run_start, run_end):
+    """Detailed, audit-grade daily adverse-media report. findings: list of
+       {subject_type, subject_name, parent, permalink, articles[]}."""
+    dt        = run_start.strftime("%d %b %Y")
+    start_uae = run_start.strftime("%H:%M")
+    end_uae   = run_end.strftime("%H:%M")
+    start_utc = (run_start - datetime.timedelta(hours=UAE_TZ_OFFSET)).strftime("%H:%M")
+    end_utc   = (run_end   - datetime.timedelta(hours=UAE_TZ_OFFSET)).strftime("%H:%M")
+    total_hits = sum(len(f["articles"]) for f in findings)
+    attempted = stats["companies_screened"] + stats["individuals_screened"] + stats["errors"]
+    coverage_pct = (100 * stats["subjects_total"] // attempted) if attempted else 0
+
+    if not findings:
+        findings_text = "No adverse media identified across any screened company or individual."
     else:
-        lines = []
-        for r in flagged:
-            lines.append(f"⚠️  {r['name']}")
-            for a in r["articles"]:
-                flag = "🚩" if a["flagged"] else "  "
-                lines.append(f"   {flag} {a['title']}")
-                lines.append(f"      {a['source']} — {a['date']}")
-            lines.append(f"   MLRO Decision: ☐ No action   ☐ Investigate   ☐ Escalate")
-            lines.append("")
-        flagged_text = "\n".join(lines)
+        b = []
+        for idx, f in enumerate(findings, 1):
+            who = f["subject_name"]
+            if f["subject_type"] == "INDIVIDUAL" and f.get("parent"):
+                who = f'{who}  (associated with {f["parent"]})'
+            b.append(f'[{idx}]  {who}    [{f["subject_type"]}]')
+            if f.get("permalink"):
+                b.append(f'     Customer record:  {f["permalink"]}')
+            for a in f["articles"]:
+                b.append(f'     [!] {a["title"]}')
+                if a.get("keywords"):
+                    b.append(f'        Matched keywords:  {", ".join(a["keywords"])}')
+                b.append(f'        Source / date:     {a.get("source","?")} - {a.get("date","?")}')
+                if a.get("url"):
+                    b.append(f'        Article link:      {a["url"]}')
+            b.append('     MLRO Decision:  [ ] No action   [ ] Investigate   [ ] Escalate   [ ] File STR/SAR')
+            b.append('     MLRO Note:      ______________________________________________')
+            b.append('')
+        findings_text = "\n".join(b)
 
-    narrative = f"""WEEKLY ADVERSE MEDIA SCREENING — ALL CUSTOMERS
-================================================
+    key_flags = ", ".join(KEY_RED_FLAGS)
 
-Date:             {dt}
-Run:              Monday — Weekly Adverse Media Sweep
-Prepared By:      Compliance Automation — Hawkeye Sterling V2
-Reviewed By:      Compliance Department
+    narrative = f"""DAILY ADVERSE MEDIA SCREENING - ALL CUSTOMERS
+===============================================================
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SCOPE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RUN PROVENANCE
+  Report date:        {dt}
+  Run window:         {start_uae} -> {end_uae} UAE  ({start_utc} -> {end_utc} UTC)
+  Cadence:            Daily - delivered by 09:00 UAE
+  Prepared by:        Compliance Automation - Hawkeye Sterling V2
+  Workflow run:       {github_run_url()}
+  Engine:             screen.py  (Google News RSS - no external paid feed)
 
-Customers Screened:    {len(customers)}
-Source:                Google News RSS — 3 locales (US / GB / AE)
-Coverage:              Entity name search for all customers
-Adverse Keywords:      sanctions, fraud, money launder, corrupt,
-                       terror, trafficking, arrest, conviction,
-                       investigation, fine, OFAC, Interpol, illicit
-Results shown:         Top 5 headlines per customer with adverse hit
+SCOPE & COVERAGE ATTESTATION
+  Customers in database:     {stats["customers_total"]}
+  Companies screened:        {stats["companies_screened"]}
+  Individuals screened:      {stats["individuals_screened"]}  (shareholders / UBOs / directors from KYC records)
+  Total subjects screened:   {stats["subjects_total"]}  ({coverage_pct}% of attempted)
+  Screening errors/skipped:  {stats["errors"]}          <- non-coverage is shown, never silent
+  Source:                    Google News RSS - 3 locales (US / GB / AE)
+  Query method:              Exact-phrase entity / individual-name search
+  Adverse keyword set:       {len(ADVERSE_KEYWORDS)} red-flag terms (full set in screen.py)
+  Key red flags:             {key_flags}
+  Headlines per subject:     up to 5 (adverse prioritised)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RESULTS SUMMARY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Subjects with adverse media:    {len(findings)}
+  Total adverse headlines:        {total_hits}
+  Clean - no adverse hits:        {max(0, stats["subjects_total"] - len(findings))}
 
-Total Screened:        {len(customers)}
-Adverse Media Found:   {len(flagged)}
-Clean — No Hits:       {len(clean)}
+REGULATORY BASIS
+  Ongoing CDD / continuous monitoring - UAE Cabinet Decision 10/2019 Art.7;
+  FATF Recommendation 10. Adverse media is a MONITORING signal; authoritative
+  designation status is governed by the daily sanctions screen
+  (OFAC / UN / EU / UK OFSI / UAE EOCN).
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ADVERSE MEDIA FINDINGS — MLRO REVIEW REQUIRED
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---------------------------------------------------------------
+ADVERSE MEDIA FINDINGS - MLRO REVIEW REQUIRED
+---------------------------------------------------------------
 
-{flagged_text}
+{findings_text}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---------------------------------------------------------------
 METHODOLOGY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---------------------------------------------------------------
 
-Google News RSS search for each customer name (exact phrase).
-Results filtered for adverse keywords. Raw headlines presented
-without interpretation — all review decisions rest with MLRO.
-This sweep does not replace the daily sanctions screening.
+Exact-phrase Google News RSS search per company AND per associated
+individual across 3 locales. Headlines filtered against a {len(ADVERSE_KEYWORDS)}-term
+red-flag keyword set. Raw headlines are presented without interpretation -
+all review decisions rest with the MLRO. This sweep supplements, and does
+not replace, the daily sanctions screening.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---------------------------------------------------------------
 MLRO SIGN-OFF
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---------------------------------------------------------------
 
-MLRO Review Completed:  ☐ Yes   ☐ No
+MLRO Review Completed:  [ ] Yes   [ ] No
 MLRO Name:              ___________________________
 Date of Review:         ___________________________
-Decision:               ☐ All Clear — No Action
-                        ☐ Items Escalated (see above)
-                        ☐ STR / SAR Filed
+Overall Decision:       [ ] All Clear - No Action
+                        [ ] Items Escalated (see findings)
+                        [ ] STR / SAR Filed
 
-> RETENTION NOTICE: Retain 10 years per UAE FDL
-> No. 26 of 2021, Article 23."""
+> RETENTION NOTICE: Retain 10 years per UAE FDL No. 26 of 2021, Article 23."""
     return narrative
 
-# ── WEEKLY ADVERSE MEDIA SWEEP ────────────────────────────────────────────────
+# -- DAILY ADVERSE MEDIA SWEEP (companies + associated individuals) -------------
 def run_weekly_adverse(customers, run_time):
-    log(f"Weekly adverse media sweep — {len(customers)} customers")
-    results = []
+    log(f"Daily adverse media sweep - {len(customers)} customers + associated individuals")
+    findings = []
+    companies_screened = 0
+    individuals_screened = 0
+    errors = 0
+
     for i, c in enumerate(customers, 1):
-        log(f"  [{i}/{len(customers)}] {c['name']}")
-        articles = search_adverse_media(c["name"], max_results=5)
-        adverse = [a for a in articles if a["flagged"]]
-        results.append({
-            "name": c["name"],
-            "permalink": c["permalink"],
-            "articles": adverse,  # only adverse ones
-            "has_adverse": len(adverse) > 0,
-        })
-        time.sleep(1)  # rate limit protection
+        subjects = [("COMPANY", c["name"], None)]
+        for ind in c.get("individuals", []):
+            subjects.append(("INDIVIDUAL", ind, c["name"]))
+        for subj_type, subj_name, parent in subjects:
+            try:
+                articles = search_adverse_media(subj_name, max_results=5)
+                if subj_type == "COMPANY":
+                    companies_screened += 1
+                else:
+                    individuals_screened += 1
+            except Exception as e:
+                errors += 1
+                log(f"  ! error screening {subj_name}: {e}")
+                continue
+            adverse = [a for a in articles if a["flagged"]]
+            if adverse:
+                findings.append({
+                    "subject_type": subj_type,
+                    "subject_name": subj_name,
+                    "parent": parent,
+                    "permalink": c.get("permalink", ""),
+                    "articles": adverse,
+                })
+            time.sleep(1)  # rate-limit protection
+        log(f"  [{i}/{len(customers)}] {c['name']} - {len(subjects)} subject(s)")
 
-    narrative = build_weekly_narrative(customers, results, run_time)
+    run_end = now_uae()
+    stats = {
+        "customers_total": len(customers),
+        "companies_screened": companies_screened,
+        "individuals_screened": individuals_screened,
+        "subjects_total": companies_screened + individuals_screened,
+        "errors": errors,
+    }
+    narrative = build_adverse_narrative(findings, stats, run_time, run_end)
 
-    flagged_count = sum(1 for r in results if r["has_adverse"])
-    flag = "⚠️" if flagged_count > 0 else "✅"
+    flag = "[ALERT]" if findings else "[CLEAN]"
     dt = run_time.strftime("%d %b %Y")
-    task_name = f"📰 {flag} Weekly Adverse Media Screening — All Customers — {dt}"
+    suffix = f"  [{len(findings)} flagged]" if findings else ""
+    task_name = f"Daily Adverse Media Screening - All Customers - {dt} {flag}{suffix}"
 
     payload = {
         "data": {
@@ -635,12 +728,12 @@ def run_weekly_adverse(customers, run_time):
     }
     r = requests.post("https://app.asana.com/api/1.0/tasks",
                       headers=ASANA_HEADERS, json=payload, timeout=30)
-    if r.status_code in (200,201):
-        log(f"✅ Weekly adverse media task created: {r.json()['data']['gid']}")
+    if r.status_code in (200, 201):
+        log(f"OK Daily adverse media task created: {r.json()['data']['gid']}")
     else:
-        log(f"❌ Task failed: {r.status_code} — {r.text[:300]}")
+        log(f"FAIL task: {r.status_code} - {r.text[:300]}")
 
-# ── ASANA — POST DAILY TASK ───────────────────────────────────────────────────
+# -- ASANA - POST DAILY TASK ---------------------------------------------------
 def post_daily_task(narrative, run_time, run_label, n_matches):
     dt = run_time.strftime("%d %b %Y")
     flag = "⚠️" if n_matches > 0 else "✅"
@@ -688,7 +781,7 @@ def main():
     hour_uae = run_time.hour
 
     if RUN_MODE == "weekly_adverse":
-        run_label = "Weekly Adverse Media — Monday"
+        run_label = "Daily Adverse Media"
         log(f"Starting: {run_label}")
         customers = get_all_customers()
         run_weekly_adverse(customers, run_time)

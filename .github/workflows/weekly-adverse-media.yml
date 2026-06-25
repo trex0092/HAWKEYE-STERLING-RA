@@ -1,32 +1,33 @@
 # ============================================================
-# FINE GOLD LLC — WEEKLY ADVERSE MEDIA SCREENING
+# FINE GOLD LLC — DAILY ADVERSE MEDIA SCREENING
 # GitHub Actions Workflow — Hawkeye Sterling V2
 # ============================================================
-# Runs every Monday at 07:00 UAE (03:00 UTC)
-# Screens ALL 324 customers via Google News RSS
-# Posts results as separate Asana task in Ongoing Monitoring
+# Runs daily at 06:00 UAE (02:00 UTC) so the audit report lands in
+# Asana by ~09:00 UAE. Screens ALL companies AND their associated
+# individuals (shareholders / UBOs / directors) via Google News RSS.
+# Posts one audit-grade summary task in Ongoing Monitoring.
 # ============================================================
 
-name: Weekly Adverse Media Screening
+name: Daily Adverse Media Screening
 
 on:
   schedule:
-    - cron: '0 3 * * 1'    # 07:00 UAE (UTC+4) every Monday
+    - cron: '0 2 * * *'    # 02:00 UTC = 06:00 UAE, daily — report delivered by ~09:00 UAE
   workflow_dispatch:        # Manual trigger
 
 # Read-only checkout; results are posted to Asana via the screen's own token.
 permissions:
   contents: read
 
-# A 3-hour sweep must never have a manual run overlap the Monday schedule.
+# A multi-hour sweep must never have a manual run overlap the daily schedule.
 concurrency:
-  group: weekly-adverse-media
+  group: daily-adverse-media
   cancel-in-progress: false
 
 jobs:
   adverse-media:
     runs-on: ubuntu-latest
-    timeout-minutes: 180    # 324 customers × 3 locales — full-coverage sweep needs headroom
+    timeout-minutes: 350    # companies + ~2x individuals × 3 locales — daily full-coverage sweep needs headroom (GitHub job cap is 360)
 
     steps:
       - uses: actions/checkout@v4
@@ -38,9 +39,9 @@ jobs:
       - name: Install dependencies
         run: pip install rapidfuzz requests pdfplumber
 
-      - name: Run weekly adverse media sweep
+      - name: Run daily adverse media sweep (companies + individuals)
         env:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
-          RUN_MODE: weekly_adverse
+          RUN_MODE: weekly_adverse   # internal mode switch (unchanged); cadence is now daily
         run: python screen.py
