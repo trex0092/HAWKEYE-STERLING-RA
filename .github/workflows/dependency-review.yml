@@ -3,9 +3,9 @@ name: Dependency Review
 # Flags known-vulnerable dependencies introduced by a pull request. This repo is
 # vanilla (no runtime npm deps), so this only runs when an actual dependency
 # manifest changes — which is why it does NOT run on docs/data/workflow PRs.
-# It also requires the repo's Dependency Graph to be enabled
-# (Settings -> Code security and analysis); until then the step is non-blocking,
-# so it can never hard-fail a PR.
+# It requires the repo's Dependency Graph (Settings -> Code security and
+# analysis), which is now enabled — so the step BLOCKS a PR that introduces a
+# high-severity vulnerable dependency.
 
 on:
   pull_request:
@@ -27,7 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Dependency review
-        continue-on-error: true   # needs Dependency Graph enabled; never block on it
         uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
