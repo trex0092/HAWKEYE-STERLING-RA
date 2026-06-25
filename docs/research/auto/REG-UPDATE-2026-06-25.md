@@ -5,18 +5,18 @@
 ### UAE Financial Intelligence Unit (FIU) — goAML
 
 - **What appears to have changed**:
-  - The page footer shows a copyright year of "© 2026" while the content "last updated" date remains 9 February 2024 — suggesting a template/footer refresh rather than substantive content change.
-  - No new publications, STR/goAML process guidance, or reporting-entity material is visible in the extracted text beyond previously dated items (most recent listed: Annual Report 2021, dated 7 October 2022).
-  - This looks consistent with routine site churn (footer/template year roll-over, dynamic visitor counter) rather than a regulatory update.
+  - The extracted content reflects standard goAML/FIU landing-page elements (navigation, focus areas, "what's new" list, contact details) with a page "last updated on 9 February 2024."
+  - The most recent dated items shown remain old (Annual Report 2021, 2020–2022 press releases/MOUs); footer shows a "© 2026" date, which is likely an auto-generated/rolling copyright rather than substantive content.
+  - This looks like routine site churn (boilerplate/footer/template refresh) rather than a substantive AML/CFT policy or reporting-process change.
 
 - **Likely app impact**:
-  - **Minimal to none.** No change to STR/SAR filing obligations, goAML registration, or reporting-entity processes is evident from this snapshot.
-  - If any Regulatory Q&A topic references the FIU "last updated" date or cites a current FIU annual report/typology report, verify those remain accurate — but no edit is triggered by this churn.
-  - Super Tools citations in `assets/super-data.js` pointing to goAML/FIU reporting processes: confirm URL (`https://www.uaefiu.gov.ae/en/`) still resolves; no content-level update needed.
-  - Country/risk data in `index.html`: no impact — no risk-rating, sanctions, or typology change visible.
+  - Low. No new STR/SAR process rules, reporting-entity obligations, or typology guidance are visible that would require edits.
+  - Verify that existing Regulatory Q&A entries referencing FIU/goAML reporting (e.g., STR/SAR submission via goAML, reporting-entity registration) still cite a live URL and remain accurate.
+  - Confirm Super Tools citations in `assets/super-data.js` pointing to UAE FIU/goAML still resolve to the correct landing/STR-process pages.
+  - No change indicated to country/risk data in `index.html`.
 
-- **Suggested citation**:
-  - No update warranted at this time. If a refresh of the source reference is desired, cite generically: **UAE Financial Intelligence Unit (FIU) — goAML portal, uaefiu.gov.ae (page last updated 9 February 2024)**.
-  - Do **not** introduce new circular/report references; the only dated publications visible (e.g., Annual Report 2021; TBML and legal-entity-abuse strategic analysis reports, 2 September 2021) are pre-existing and unchanged.
+- **Suggested citation** (only if an update is warranted after manual check):
+  - UAE Financial Intelligence Unit (FIU) — goAML portal, https://www.uaefiu.gov.ae/en/ (page last updated 9 February 2024).
+  - If citing process content specifically, reference the FIU "STR Process" / "Reporting Entities" pages by title rather than any article/circular number (none visible in the text).
 
-*Recommendation: Treat as routine site churn. No action required pending MLRO confirmation.*
+*Proposal for reviewer; no live edit made. Recommend a manual diff of the FIU "STR Process," "Publications," and "Reporting Entities" pages to confirm whether any substantive update accompanies this refresh.*
