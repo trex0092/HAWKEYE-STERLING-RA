@@ -61,6 +61,8 @@ jobs:
         run: node test/retain-state.test.mjs
       - name: Run screening-metrics unit tests
         run: node test/screening-metrics.test.mjs
+      - name: Run Interpol Red Notice signal unit tests
+        run: node test/interpol-check.test.mjs
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight
