@@ -10,12 +10,12 @@
       "prevHash": "27c2a43b84cf45838e7d40966f3754f468783154ae48f91979a341d6ae093a53"
     },
     "uae-fiu": {
-      "hash": "931bdc0ce4dfaa21fe7fcb00ca48aa2ed255aeb23e021e576b76b5ed54861b14",
+      "hash": "0f87e5208bb5c8892085b7eee05d6bac6cca4a35ff159d2100ee114da97b5e0f",
       "bytes": 4427,
       "checkedAt": "2026-06-25",
       "changedAt": "2026-06-25",
       "status": 200,
-      "prevHash": "406b822caff57b89b434fadd00d830eb109a031f36420f519a0ff58281a3c47c"
+      "prevHash": "931bdc0ce4dfaa21fe7fcb00ca48aa2ed255aeb23e021e576b76b5ed54861b14"
     },
     "uae-namlcftc": {
       "hash": null,
@@ -160,12 +160,12 @@
       "error": "HTTP 404"
     },
     "rjc": {
-      "hash": "66715424ba68b3d7aca01bb174f09d3a3ea06a628594330b799f5676cd1d1088",
-      "bytes": 106030,
+      "hash": "b4e3efd1e645294ec23579df4571c3237871e1d28aeab0297236000532463ecd",
+      "bytes": 106074,
       "checkedAt": "2026-06-25",
       "changedAt": "2026-06-25",
       "status": 200,
-      "prevHash": "46a881171dc9fd8490d006712f1fd1b681b12e52b1ab9fe26165aea83e5df00f"
+      "prevHash": "66715424ba68b3d7aca01bb174f09d3a3ea06a628594330b799f5676cd1d1088"
     }
   }
 }
