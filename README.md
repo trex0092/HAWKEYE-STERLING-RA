@@ -205,6 +205,20 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 └── README.md
 ```
 
+## Contributing & support
+
+- **Contributing:** see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the test suite, branch/commit conventions, and the gates a PR must pass.
+- **Community standards:** [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+- **Getting help:** [`SUPPORT.md`](SUPPORT.md), or open an issue with the templates in [`.github/ISSUE_TEMPLATE`](.github/ISSUE_TEMPLATE).
+
+## Security
+
+Found a vulnerability? **Do not open a public issue** — follow the disclosure process in [`SECURITY.md`](SECURITY.md). Incident response and the Advisor kill switch are documented in [`docs/governance/ai-incident-runbook.md`](docs/governance/ai-incident-runbook.md).
+
+## License
+
+**Proprietary — All Rights Reserved.** See [`LICENSE`](LICENSE). The source is provided for authorized internal compliance use; redistribution, modification, or commercial use requires written permission.
+
 ## Disclaimer
 
 This tool is for **internal compliance use only**. It supports — and does not replace — professional judgement, firm policy, and applicable AML/CFT regulatory obligations. Country, activity, and material risk scores are template values sourced from the firm's risk data sheet and should be reviewed and maintained by the compliance function.

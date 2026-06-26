@@ -1,0 +1,57 @@
+name: Compliance review
+description: Flag a regulatory, sanctions, or FATF change, or request a risk-data review
+title: "[Compliance]: "
+labels: ["compliance", "review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this to flag a regulatory / sanctions / FATF development or to request
+        a review of the risk-data baseline (countries, activities, materials).
+        **Detection may be automated, but score and policy changes are human decisions.**
+        **Never paste customer data or secrets.**
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type of review
+      options:
+        - FATF black/grey list change (country)
+        - Sanctions list change (OFAC / UN / EU / UK OFSI / UAE EOCN)
+        - Regulatory source update (guidance, rule, typology)
+        - Risk-data baseline review (country / activity / material score)
+        - Adverse-media or red-flag follow-up
+        - Other compliance matter
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What changed / what needs review?
+      description: Describe the development and its source.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source / reference
+      description: Link or citation (e.g. FATF statement, regulator notice, list URL).
+    validations:
+      required: false
+  - type: textarea
+    id: impact
+    attributes:
+      label: Suggested impact on the app
+      description: Which countries, activities, materials, or Q&A answers may be affected?
+    validations:
+      required: false
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Urgent (sanctions / prohibited exposure)
+        - High (mandatory EDD trigger)
+        - Normal
+        - Low / informational
+    validations:
+      required: true

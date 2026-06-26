@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you reference this software, please cite it as below."
+title: "Hawkeye Sterling — Entity Risk Assessment (RA)"
+abstract: >-
+  A single-file web application for AML/CFT customer (entity) risk assessment,
+  built as a template for Dealers in Precious Metals and Stones (DPMS) and
+  adaptable to other reporting entities. Includes a deterministic on-device
+  risk-scoring engine, an optional LLM-backed advisor, and automated
+  regulatory, sanctions, and FATF watchdogs.
+type: software
+authors:
+  - name: "Hawkeye Sterling"
+version: "3.7.0"
+date-released: "2026-06-26"
+license: LicenseRef-Proprietary
+repository-code: "https://github.com/trex0092/HAWKEYE-STERLING-RA"
+url: "https://hawkeye-sterling-ra.netlify.app"
+keywords:
+  - AML
+  - CFT
+  - compliance
+  - risk-assessment
+  - sanctions-screening
+  - FATF
+  - DPMS
+  - AI-governance
