@@ -13,6 +13,12 @@ on:
     - cron: '0 6 * * 1' # 06:00 UTC every Monday (one hour after site-health)
   workflow_dispatch:
 
+# Least privilege at the top level; the analyze job widens to the minimum it
+# needs (security-events: write to upload SARIF). Scorecard's Token-Permissions
+# check wants an explicit top-level block.
+permissions:
+  contents: read
+
 jobs:
   analyze:
     runs-on: ubuntu-latest
@@ -21,17 +27,21 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
         with:
           languages: javascript-typescript
           queries: security-and-quality
       - name: Run CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
       - name: Alert in Asana
         if: failure() && github.event_name == 'schedule'
         env:
