@@ -112,7 +112,9 @@ jobs:
             grep -q "$s" /tmp/dom-console.html || { echo "MISSING (console): $s"; exit 1; }
           done
           for s in 'Meridian Bullion DMCC' '9,471'; do
-            grep -q "$s" /tmp/dom-console.html && { echo "UNEXPECTED mock data in console: $s"; exit 1; } || true
+            if grep -q "$s" /tmp/dom-console.html; then
+              echo "UNEXPECTED mock data in console: $s"; exit 1
+            fi
           done
           echo "console smoke ok — HUD + panels render, zero mock data on a fresh app"
       - name: Browser smoke test (Hawkeye Sterling Advisor)
