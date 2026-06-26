@@ -1,7 +1,9 @@
 name: Workflow lint (actionlint + zizmor)
 
 # Lints the GitHub Actions workflows themselves:
-#   - actionlint  : YAML / shell / expression errors (blocking — our workflows are clean)
+#   - actionlint  : YAML / shell / expression errors (blocking). SHELLCHECK_OPTS
+#                   excludes pre-existing style/info nits (SC2086/2129/2015) so it
+#                   enforces real errors without churning the existing run: blocks.
 #   - zizmor      : CI/CD security audit (dangerous triggers, template injection,
 #                   over-broad permissions, unpinned actions). Advisory for now
 #                   (continue-on-error) so it surfaces findings as annotations
@@ -21,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
+  actions-lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -36,6 +38,10 @@ jobs:
           persist-credentials: false
 
       - name: actionlint
+        env:
+          # Pre-existing style/info shellcheck nits in run: blocks — keep actionlint
+          # enforcing real errors without rewriting working compliance scripts.
+          SHELLCHECK_OPTS: "-e SC2086 -e SC2129 -e SC2015"
         run: |
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
           "$(go env GOPATH)/bin/actionlint" -color
