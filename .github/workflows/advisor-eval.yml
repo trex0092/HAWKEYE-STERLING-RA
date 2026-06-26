@@ -28,6 +28,7 @@ concurrency:
 jobs:
   eval:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Harden the runner (egress block)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2

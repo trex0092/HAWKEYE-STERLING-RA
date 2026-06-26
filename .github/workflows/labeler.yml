@@ -1,9 +1,14 @@
 name: Labeler
 
 # Auto-labels pull requests by changed paths (.github/labeler.yml) and by size.
+#
+# Safe use of pull_request_target: neither job checks out or executes PR code —
+# path-labels uses actions/labeler (no checkout), size-label only reads PR
+# metadata (additions/deletions/labels) via the API. Do NOT add a checkout of
+# the PR head ref to this workflow.
 
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
 
 permissions:
   contents: read
@@ -12,14 +17,26 @@ permissions:
 jobs:
   path-labels:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: audit
       - uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213 # v6
         with:
           sync-labels: true
 
   size-label:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: audit
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
