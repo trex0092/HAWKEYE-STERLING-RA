@@ -32,8 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20 # a hung list fetch must surface as a failure, not a silent hang on a mandatory-daily control
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
 
@@ -76,7 +80,7 @@ jobs:
 
       - name: Fallback to a GitHub issue if Asana delivery failed
         if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.asana.outcome == 'failure'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
         with:
