@@ -1,0 +1,27 @@
+# Code owners for Hawkeye Sterling — Entity Risk Assessment (RA)
+#
+# These owners are automatically requested for review when a matching path
+# changes. See: https://docs.github.com/articles/about-code-owners
+#
+# Order matters: the last matching pattern takes precedence.
+
+# Default owner for everything in the repo
+*                           @trex0092
+
+# Compliance-sensitive automation and serverless relays
+/scripts/                   @trex0092
+/netlify/                   @trex0092
+
+# CI/CD, watchdogs, and repository policy
+/.github/                   @trex0092
+
+# Governance documentation — changes here track system behavior and controls
+/docs/governance/           @trex0092
+
+# Risk baseline data (countries, activities, materials, source registries)
+/data/                      @trex0092
+
+# Core application logic
+/index.html                 @trex0092
+/advisor.html               @trex0092
+/console.html               @trex0092
