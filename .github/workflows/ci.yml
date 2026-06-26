@@ -41,6 +41,8 @@ jobs:
         run: node test/link-check.test.mjs
       - name: Run Asana Netlify-function tests (timeout + non-JSON handling)
         run: node test/asana-functions.test.js
+      - name: Run per-IP rate-limiter tests (429 throttling on the functions)
+        run: node test/ratelimit.test.js
       - name: Check Regulatory Watch docs are in sync with the registry
         run: node scripts/reg-sources-doc.mjs --check
       - name: Run console + advisor screen smoke tests

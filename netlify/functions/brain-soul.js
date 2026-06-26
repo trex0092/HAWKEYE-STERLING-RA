@@ -6,6 +6,8 @@
    Calls the Anthropic API directly via fetch() — no SDK, no npm dep.
    ANTHROPIC_API_KEY must be set in the Netlify environment. */
 
+const { rateLimit } = require('./_ratelimit');
+
 // ── CORS (mirrors asana-task.js) ─────────────────────────────────────────────
 
 function allowedOrigins() {
@@ -566,6 +568,12 @@ exports.handler = async (event) => {
 const handle = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
   if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
+
+  /* Per-IP rate limit — SENSITIVE/COSTLY endpoint (calls the Anthropic API per
+     request). Much stricter than the Asana endpoints: default 10 req/min,
+     tunable via RATE_LIMIT_BRAIN_SOUL. */
+  const limited = rateLimit(event, { name: 'brain-soul', limit: Number(process.env.RATE_LIMIT_BRAIN_SOUL) || 10, windowMs: 60000 });
+  if (limited) return limited;
 
   // Explicit kill switch (incident runbook): disable without deleting the key.
   if (String(process.env.ADVISOR_ENABLED || '').toLowerCase() === 'false') {
