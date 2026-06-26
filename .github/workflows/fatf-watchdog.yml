@@ -29,10 +29,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15 # bound external list fetches
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
         with:
-          egress-policy: audit
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+            www.fatf-gafi.org:443
+            web.archive.org:443
+            archive.org:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
