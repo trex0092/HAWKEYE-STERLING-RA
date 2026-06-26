@@ -32,11 +32,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20 # a hung list fetch must surface as a failure, not a silent hang on a mandatory-daily control
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
         with:
           disable-sudo: true
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            www.treasury.gov:443
+            sanctionslistservice.ofac.treas.gov:443
+            wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
+            scsanctions.un.org:443
+            unsolprodfiles.blob.core.windows.net:443
+            webgate.ec.europa.eu:443
+            ofsistorage.blob.core.windows.net:443
+            app.asana.com:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
