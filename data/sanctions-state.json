@@ -2,13 +2,13 @@
   "updated": "2026-06-26",
   "sources": {
     "ofac-sdn": {
-      "hash": "4bed6bc7fafee0f41ab4ab8423b25f5e75944f1a0a3a31d8fb34e22bca1d6131",
-      "bytes": 5402031,
+      "hash": "ec3fb53e27b550bcf36c7fdbf85ff2ee84a6d8995a4a548302d12af59985a7ef",
+      "bytes": 5404183,
       "checkedAt": "2026-06-26",
       "changedAt": "2026-06-26",
       "status": 200,
-      "prevHash": "f1094beaeca8bb0c1e73345f1ed7843cfd0e44d3af9c568077ee4650b9d2acd4",
-      "count": 19114
+      "prevHash": "4bed6bc7fafee0f41ab4ab8423b25f5e75944f1a0a3a31d8fb34e22bca1d6131",
+      "count": 19122
     },
     "ofac-consolidated": {
       "hash": "428b713b7e518033e376a8859f650840f6d280ad39e29e557789ddc4fc3369f3",
