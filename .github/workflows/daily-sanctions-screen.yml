@@ -77,11 +77,13 @@ jobs:
         id: date
         run: |
           export TZ="Asia/Dubai"
-          echo "DATE_ISO=$(date +'%Y-%m-%d')"            >> $GITHUB_OUTPUT
-          echo "DATE_DISPLAY=$(date +'%-d %b %Y')"       >> $GITHUB_OUTPUT
-          echo "DATE_SLUG=$(date +'%Y-%m-%d')"           >> $GITHUB_OUTPUT
-          echo "TIME_GST=$(date +'%H:%M')"               >> $GITHUB_OUTPUT
-          echo "DATETIME_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          {
+            echo "DATE_ISO=$(date +'%Y-%m-%d')"
+            echo "DATE_DISPLAY=$(date +'%-d %b %Y')"
+            echo "DATE_SLUG=$(date +'%Y-%m-%d')"
+            echo "TIME_GST=$(date +'%H:%M')"
+            echo "DATETIME_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_OUTPUT"
 
 
       # --------------------------------------------------------
@@ -106,7 +108,7 @@ jobs:
             "https://www.treasury.gov/ofac/downloads/sdn.xml" \
             -o /tmp/ofac_sdn.xml
           echo "OFAC_HASH=$(sha256sum /tmp/ofac_sdn.xml | cut -d' ' -f1)" \
-            >> $GITHUB_ENV
+            >> "$GITHUB_ENV"
 
       - name: Download UN Consolidated list
         run: |
@@ -114,7 +116,7 @@ jobs:
             "https://main.un.org/securitycouncil/content/un-sc-consolidated-list/en/consolidated.xml" \
             -o /tmp/un_consolidated.xml
           echo "UN_HASH=$(sha256sum /tmp/un_consolidated.xml | cut -d' ' -f1)" \
-            >> $GITHUB_ENV
+            >> "$GITHUB_ENV"
 
       - name: Download EU Financial Sanctions list
         run: |
@@ -122,7 +124,7 @@ jobs:
             "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content" \
             -o /tmp/eu_sanctions.xml
           echo "EU_HASH=$(sha256sum /tmp/eu_sanctions.xml | cut -d' ' -f1)" \
-            >> $GITHUB_ENV
+            >> "$GITHUB_ENV"
 
       - name: Download UK OFSI Consolidated list
         run: |
@@ -130,7 +132,7 @@ jobs:
             "https://assets.publishing.service.gov.uk/media/uk-sanctions-consolidated-list.csv" \
             -o /tmp/uk_ofsi.csv
           echo "UK_HASH=$(sha256sum /tmp/uk_ofsi.csv | cut -d' ' -f1)" \
-            >> $GITHUB_ENV
+            >> "$GITHUB_ENV"
 
       - name: Load UAE EOCN list (maintained in-repo)
         run: |
@@ -141,11 +143,11 @@ jobs:
           # only flag failure if the file is genuinely missing.
           EOCN_FILE=data/eocn-local-terrorist-list.json
           if [ -f "$EOCN_FILE" ]; then
-            echo "UAE_HASH=$(sha256sum "$EOCN_FILE" | cut -d' ' -f1)" >> $GITHUB_ENV
-            echo "UAE_PDF_FAILED=false" >> $GITHUB_ENV
+            echo "UAE_HASH=$(sha256sum "$EOCN_FILE" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+            echo "UAE_PDF_FAILED=false" >> "$GITHUB_ENV"
           else
             echo "UAE EOCN list file missing — manual check required"
-            echo "UAE_PDF_FAILED=true" >> $GITHUB_ENV
+            echo "UAE_PDF_FAILED=true" >> "$GITHUB_ENV"
           fi
 
 

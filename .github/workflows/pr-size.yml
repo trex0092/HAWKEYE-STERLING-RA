@@ -39,9 +39,11 @@ jobs:
           ADDED=$(git diff --numstat "$BASE" "$HEAD" | awk '{a+=$1} END{print a+0}')
           REMOVED=$(git diff --numstat "$BASE" "$HEAD" | awk '{a+=$2} END{print a+0}')
           TOTAL=$((ADDED + REMOVED))
-          echo "added=$ADDED"   >> "$GITHUB_OUTPUT"
-          echo "removed=$REMOVED" >> "$GITHUB_OUTPUT"
-          echo "total=$TOTAL"   >> "$GITHUB_OUTPUT"
+          {
+            echo "added=$ADDED"
+            echo "removed=$REMOVED"
+            echo "total=$TOTAL"
+          } >> "$GITHUB_OUTPUT"
           echo "Lines changed: +$ADDED / -$REMOVED = $TOTAL total"
 
       - name: Warn on large PR
