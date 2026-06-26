@@ -10,6 +10,12 @@ Thumbs.db
 *.log
 node_modules/
 
+# Secrets — real values live only in Netlify env / local .env, NEVER in git.
+# .env.example is the committed template (names only, no values).
+.env
+.env.*
+!.env.example
+
 # Watcher runtime artifacts (state is committed; these are per-run)
 reg-watch-report.md
 reg-watch-changes.json
