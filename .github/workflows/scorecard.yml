@@ -16,6 +16,10 @@ on:
 # Least privilege at the top level; the analysis job widens to only what it needs.
 permissions: read-all
 
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: false
+
 jobs:
   analysis:
     name: Scorecard analysis
