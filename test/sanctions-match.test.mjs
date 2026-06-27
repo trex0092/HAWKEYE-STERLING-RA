@@ -2,7 +2,7 @@
    Usage: node test/sanctions-match.test.mjs */
 import {
   normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseUnXml, parseOfsiCsv,
-  parseEuCsv, parseGenericXml, parseCuratedList, parseList, levenshtein, similarity,
+  parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName
 } from '../scripts/sanctions-match.mjs';
 
@@ -51,6 +51,21 @@ check('parseEuCsv prefers WholeName, falls back to first+last',
 const gx = parseGenericXml('<record><GivenName>John</GivenName><LastName>Smith</LastName><Aliases>Johnny Smith/J. Smith</Aliases></record><record><Entity>BAD CORP LLC</Entity></record>');
 check('parseGenericXml extracts given+last, entity, split aliases',
   gx.includes('John Smith') && gx.includes('Johnny Smith') && gx.includes('J. Smith') && gx.includes('BAD CORP LLC'));
+
+/* ── SECO XML (nested <name>/<name-part>/<value>; individuals + entities + aliases) ── */
+const seco = parseSecoXml(
+  '<sanctions>' +
+  '<target ssid="1"><identity main="true">' +
+  '<name name-type="primary-name"><name-part name-part-type="given-name"><value>Vladimir</value></name-part>' +
+  '<name-part name-part-type="family-name"><value>Putin</value></name-part></name>' +
+  '<name name-type="alias"><name-part name-part-type="whole-name"><value>V. Putin</value></name-part></name>' +
+  '</identity></target>' +
+  '<target ssid="2"><identity><name name-type="primary-name"><name-part name-part-type="whole-name"><value>ROSNEFT OIL COMPANY</value></name-part></name></identity></target>' +
+  '</sanctions>');
+check('parseSecoXml joins name-parts and collects entities + aliases',
+  seco.includes('Vladimir Putin') && seco.includes('V. Putin') && seco.includes('ROSNEFT OIL COMPANY'));
+check('parseList routes the seco parser', parseList({ id: 'ch-seco', parser: 'seco', type: 'xml' },
+  '<name><name-part><value>ACME</value></name-part><name-part><value>FZE</value></name-part></name>').join('|') === 'ACME FZE');
 
 /* ── curated list (strings + objects with aliases) ── */
 const cur = parseCuratedList({ entries: ['Foo Bar', { name: 'Baz Co', aliases: ['Baz Limited'] }] });

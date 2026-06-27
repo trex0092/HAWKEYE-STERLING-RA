@@ -190,6 +190,26 @@ export function parseGenericXml(body) {
   return matched ? names.filter(Boolean) : [];
 }
 
+/* Switzerland SECO "Gesamtliste" XML: <target> blocks whose <identity> carries
+   one or more <name> blocks, each assembled from nested <name-part><value>
+   elements (whole-name for entities; given-name + family-name for individuals).
+   Every <name> block — primary name and aliases — yields one screenable name.
+   The generic XML parser assumes flat <Name>text</Name> tags, so SECO needs
+   this dedicated extractor. */
+export function parseSecoXml(body) {
+  const s = String(body), names = [];
+  const nameRe = /<name\b[^>]*>([\s\S]*?)<\/name>/gi;
+  let m;
+  while ((m = nameRe.exec(s))) {
+    const parts = [], valRe = /<value>([\s\S]*?)<\/value>/gi;
+    let v;
+    while ((v = valRe.exec(m[1]))) { const t = decodeXml(v[1]).replace(/\s+/g, ' ').trim(); if (t) parts.push(t); }
+    const full = parts.join(' ').replace(/\s+/g, ' ').trim();
+    if (full) names.push(full);
+  }
+  return names;
+}
+
 /* A curated / local list (e.g. the UAE EOCN Local Terrorist List kept in-repo).
    Accepts an array of strings, an array of {name, aliases[]} objects, or
    {entries:[…]} / {names:[…]}. */
@@ -217,6 +237,7 @@ export function parseList(source, body) {
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
   if (p === 'curated' || source.type === 'curated' || source.type === 'json') return parseCuratedList(body);
+  if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
   if (p === 'xml' || source.type === 'xml') return parseGenericXml(body);
   const xml = parseGenericXml(body);
   if (xml.length) return xml;

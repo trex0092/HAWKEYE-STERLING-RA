@@ -25,11 +25,11 @@
       "id": "ch-seco",
       "name": "Switzerland — SECO sanctions list (XML)",
       "jurisdiction": "Global",
-      "url": "",
+      "url": "https://www.sesam.search.admin.ch/sesam-search-web/pages/downloadXmlGesamtliste.xhtml?lang=en",
       "type": "xml",
-      "parser": "xml",
-      "enabled": false,
-      "_note": "Disabled until the current SECO overall-list XML download URL is confirmed (https://www.seco.admin.ch/en/searching-for-subjects-sanctions). Set the url and enabled:true to switch on."
+      "parser": "seco",
+      "enabled": true,
+      "_note": "SECO's official 'Gesamtliste' (overall list) XML, published since Dec 2023 at sesam.search.admin.ch and documented at https://www.seco.admin.ch/en/searching-for-subjects-sanctions. Parsed by the dedicated `seco` extractor (sanctions-match.mjs), which handles the nested <name>/<name-part>/<value> structure (unit-tested). Best-effort like Canada SEMA: the live fetch is verified on the first daily-screen run — if the host/format ever changes the screen degrades VISIBLY (opens a GitHub issue), never a silent all-clear."
     },
     {
       "id": "au-dfat",
