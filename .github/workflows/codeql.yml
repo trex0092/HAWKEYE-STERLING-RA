@@ -7,7 +7,13 @@ name: CodeQL
 # On a failed *scheduled* run it opens an assigned alert task in the RISK
 # ASSESSMENTS Asana project, mirroring site-health.yml.
 on:
+  # Push is scoped to main only: feature branches are already analysed by the
+  # pull_request trigger. Running on every branch push too spawns a second,
+  # redundant analysis whose code-scanning upload races the PR run and fails
+  # with "ref ... not found in this repository". main + PRs + the weekly
+  # schedule keep full coverage. (lint.yml scopes push the same way.)
   push:
+    branches: [main]
   pull_request:
   schedule:
     - cron: '0 6 * * 1' # 06:00 UTC every Monday (one hour after site-health)
