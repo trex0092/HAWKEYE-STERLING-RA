@@ -421,6 +421,17 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .reg-review-summary{font-size:10px;font-family:var(--mono);color:var(--text3);white-space:nowrap}
 .reg-review-summary.reg-over{color:var(--high-text);font-weight:600}
 .reg-review-summary.reg-soon{color:var(--med-text)}
+.ubo-graph{margin-top:12px;border:1px solid var(--border2);border-radius:var(--r-sm);background:#0B101A;padding:6px 4px}
+.ubo-graph svg{width:100%;height:auto;display:block}
+.ubo-empty{font-size:11px;color:var(--text3);font-family:var(--mono);padding:12px 6px;text-align:center}
+.ubo-edge{stroke:var(--border2);stroke-width:1.4}
+.ubo-ring{fill:#0E1422;stroke:var(--low-text);stroke-width:1.6}
+.ubo-ring-entity{fill:#0E1422;stroke:var(--gold);stroke-width:2}
+.ubo-init{fill:var(--low-text);font-family:var(--mono);font-size:11px;font-weight:600;text-anchor:middle}
+.ubo-init-entity{fill:var(--gold);font-family:var(--mono);font-size:13px;font-weight:700;text-anchor:middle}
+.ubo-label{fill:var(--text2);font-family:var(--sans);font-size:9px}
+.ubo-name-entity{fill:var(--gold);font-family:var(--sans);font-size:10px;font-weight:700;text-anchor:middle}
+.ubo-empty-svg{fill:var(--text3);font-family:var(--mono);font-size:9px;text-anchor:middle}
 .btn-mini{padding:3px 10px;font-size:8.5px}
 @media(max-width:520px){.reg-review{display:none}}
 
@@ -626,6 +637,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
             <input type="text" id="entityPrincipals" class="mask-field" placeholder="e.g. John Smith, Jane Doe (comma-separated)" oninput="onField('entity','principals',this.value)">
           </div>
         </div>
+        <div class="ubo-graph" id="uboGraph"></div>
       </div>
 
       <!-- 03 · Business Profile -->
@@ -2108,6 +2120,64 @@ function paintStatus() {
   paintRetryButton();
 }
 
+/* ── UBO / ownership graph ── */
+/* Parse the comma/semicolon-separated principals string into a deduped name
+   list (case-insensitive dedupe, original spelling kept). Pure + unit-tested. */
+function parsePrincipals(str){
+  const seen = new Set(), out = [];
+  for(const raw of String(str==null?'':str).split(/[,;]/)){
+    const t = raw.trim().replace(/\s+/g, ' ');
+    if(!t) continue;
+    const k = t.toLowerCase();
+    if(seen.has(k)) continue;
+    seen.add(k); out.push(t);
+  }
+  return out;
+}
+function uboTrunc(s, n){ s = String(s==null?'':s); return s.length>n ? s.slice(0,n-1).trim()+'…' : s; }
+function uboInitials(name){
+  const parts = String(name==null?'':name).trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '?';
+  return (parts[0][0] + (parts.length>1 ? parts[parts.length-1][0] : '')).toUpperCase();
+}
+/* Render an entity-centred radial ownership graph (entity → each principal).
+   The data model is a flat principals list, so this is a one-level star. */
+function renderUboGraph(){
+  const box = $('uboGraph');
+  if(!box) return;
+  const name = String((state.entity && state.entity.name) || '').trim();
+  const ppl = parsePrincipals(state.entity && state.entity.principals);
+  if(!name && !ppl.length){
+    box.innerHTML = '<div class="ubo-empty">Add a legal name and principals to see the ownership graph.</div>';
+    return;
+  }
+  const W = 320, H = 244, cx = W/2, cy = 122, R = 84, n = ppl.length;
+  let edges = '', nodes = '';
+  ppl.forEach((p, i) => {
+    const ang = (-Math.PI/2) + (i * 2*Math.PI / Math.max(n,1));
+    const x = cx + R*Math.cos(ang), y = cy + R*Math.sin(ang);
+    edges += '<line class="ubo-edge" x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'"/>';
+    const anchor = x < cx-8 ? 'end' : (x > cx+8 ? 'start' : 'middle');
+    const lx = x + (anchor==='end' ? -20 : anchor==='start' ? 20 : 0);
+    const ly = anchor==='middle' ? (y >= cy ? y+30 : y-22) : y+3;
+    nodes += '<g>'
+      + '<circle class="ubo-ring" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="16"/>'
+      + '<text class="ubo-init" x="'+x.toFixed(1)+'" y="'+(y+3.5).toFixed(1)+'">'+esc(uboInitials(p))+'</text>'
+      + '<text class="ubo-label" text-anchor="'+anchor+'" x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'">'+esc(uboTrunc(p,16))+'</text>'
+      + '</g>';
+  });
+  const summary = 'Ownership graph: ' + (name||'subject entity') + ' with ' + n + ' principal' + (n===1?'':'s');
+  box.innerHTML =
+    '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(summary)+'">'
+    + edges
+    + '<circle class="ubo-ring-entity" cx="'+cx+'" cy="'+cy+'" r="30"/>'
+    + '<text class="ubo-init-entity" x="'+cx+'" y="'+(cy+4)+'">'+esc(uboInitials(name)||'•')+'</text>'
+    + '<text class="ubo-name-entity" x="'+cx+'" y="'+(cy+50)+'">'+esc(uboTrunc(name||'Subject entity',24))+'</text>'
+    + nodes
+    + (n===0 ? '<text class="ubo-empty-svg" x="'+cx+'" y="'+(cy-44)+'">No principals recorded yet</text>' : '')
+    + '</svg>';
+}
+
 function syncUI() {
   const s = state;
   $('refInput').value = s.meta.ref;
@@ -2120,6 +2190,7 @@ function syncUI() {
   $('entityAddress').value = s.entity.address;
   $('entityContact').value = s.entity.contact;
   $('entityPrincipals').value = s.entity.principals;
+  renderUboGraph();
   $('jurisdictionSelect').value = s.entity.jurisdiction; paintJurisdiction();
   $('activitySelect').value = s.profile.activity; paintActivity();
   paintToggle('onboard', s.profile.onboard, 'onboard');
@@ -2161,6 +2232,7 @@ function onField(section, key, val) {
     if(prev && prev!==next) regDelete(prev);
   }
   state[section][key] = val;
+  if(section==='entity' && (key==='principals' || key==='name')) renderUboGraph();
   if(section==='meta' && key==='date'){ recalc(); return; }
   scheduleSave();
 }

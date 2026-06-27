@@ -61,6 +61,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   scheduleRiskBackup,
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
   openRegister, closeRegister, reviewStatus, reviewCounts,
+  parsePrincipals, uboInitials, uboTrunc, renderUboGraph,
   storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
   _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
   currentRole, setRole, can, roleAtLeast, ROLES, ROLE_KEY, policyMissing,
@@ -931,6 +932,26 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     const cts = A.reviewCounts(items, today, soon);
     check('reviewCounts tallies overdue + due-soon', cts.overdue === 2 && cts.soon === 1);
     check('reviewCounts tolerates empty/null', A.reviewCounts({}, today, soon).overdue === 0 && A.reviewCounts(null, today, soon).soon === 0);
+  }
+
+  /* ── UBO / ownership graph ── */
+  {
+    check('parsePrincipals splits, trims and dedupes case-insensitively',
+      JSON.stringify(A.parsePrincipals('John Smith, jane doe; John  Smith ,, JANE DOE')) === JSON.stringify(['John Smith','jane doe']));
+    check('parsePrincipals tolerates empty/null', A.parsePrincipals('').length === 0 && A.parsePrincipals(null).length === 0);
+    check('uboInitials takes first + last initial', A.uboInitials('John Quincy Adams') === 'JA' && A.uboInitials('Cher') === 'C' && A.uboInitials('') === '?');
+    check('uboTrunc adds an ellipsis past the limit', A.uboTrunc('abcdefghij', 5) === 'abcd…' && A.uboTrunc('abc', 5) === 'abc');
+    A.state = A.freshState();
+    A.state.entity.name = 'Acme Trading FZE';
+    A.state.entity.principals = 'John Smith, Jane Doe';
+    A.renderUboGraph();
+    const g = document.getElementById('uboGraph');
+    check('renderUboGraph paints an SVG with the entity and one node per principal',
+      g && /<svg/.test(g.innerHTML) && g.innerHTML.includes('Acme Trading FZE') && (g.innerHTML.match(/ubo-ring"/g) || []).length === 2);
+    A.state.entity.name = ''; A.state.entity.principals = '';
+    A.renderUboGraph();
+    check('renderUboGraph shows the empty hint when there is nothing to graph',
+      /ubo-empty/.test(document.getElementById('uboGraph').innerHTML));
   }
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
