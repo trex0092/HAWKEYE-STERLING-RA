@@ -14,6 +14,8 @@
      { name, topScore (0-100), band, recommendation, hitCount, lists[] }
    so the existing normalise/diff/alert pipeline consumes it unchanged. */
 
+import { inflateRawSync } from 'node:zlib';
+
 /* Fold a name to a stable comparison key: strip diacritics, lower-case, collapse
    non-alphanumerics. Turkish/Arabic/Cyrillic trade names compare cleanly. The
    single source of truth — sanctions-screen.mjs re-exports this. */
@@ -217,6 +219,131 @@ export function parseSecoXml(body) {
   return names;
 }
 
+/* ── XLSX reader — for lists published ONLY as .xlsx ──────────────────────────
+   An .xlsx file is a ZIP of XML parts. Australia's DFAT Consolidated List
+   (regulation8_consolidated.xlsx) has no CSV/XML feed, so — with zero deps, the
+   same node:zlib already used for the PNG icon rasteriser — we read the ZIP
+   central directory, inflate the two parts we need (sharedStrings + the first
+   worksheet) and walk the cells. Best-effort like SECO/Canada: if the file or
+   layout ever changes the parse yields fewer (or zero) names and the screen
+   degrades VISIBLY — it never fabricates a clean result. */
+
+function bufStr(b) { return b ? (Buffer.isBuffer(b) ? b.toString('utf8') : String(b)) : ''; }
+
+/* Spreadsheet column letters → 0-based index ("A"→0, "AB"→27). */
+function colToIndex(letters) {
+  let n = 0;
+  for (const ch of String(letters)) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+/* Minimal ZIP reader → Map(entryName → decompressed Buffer). Reads the central
+   directory (authoritative on sizes even when a local header streams with a data
+   descriptor) and supports STORED (0) + DEFLATE (8); a corrupt entry is skipped,
+   never silently substituted. Pure (node:zlib only), so it stays unit-testable. */
+export function unzipEntries(buf) {
+  const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf || []);
+  const out = new Map();
+  let eocd = -1;
+  for (let i = b.length - 22; i >= 0; i--) { if (b.readUInt32LE(i) === 0x06054b50) { eocd = i; break; } }
+  if (eocd < 0) return out;
+  const count = b.readUInt16LE(eocd + 10);
+  let p = b.readUInt32LE(eocd + 16);
+  for (let n = 0; n < count && p + 46 <= b.length; n++) {
+    if (b.readUInt32LE(p) !== 0x02014b50) break;
+    const method = b.readUInt16LE(p + 10);
+    const compSize = b.readUInt32LE(p + 20);
+    const nameLen = b.readUInt16LE(p + 28);
+    const extraLen = b.readUInt16LE(p + 30);
+    const commentLen = b.readUInt16LE(p + 32);
+    const localOff = b.readUInt32LE(p + 42);
+    const name = b.toString('utf8', p + 46, p + 46 + nameLen);
+    if (b.readUInt32LE(localOff) === 0x04034b50) {
+      const dataStart = localOff + 30 + b.readUInt16LE(localOff + 26) + b.readUInt16LE(localOff + 28);
+      const comp = b.subarray(dataStart, dataStart + compSize);
+      try { out.set(name, method === 8 ? inflateRawSync(comp) : Buffer.from(comp)); }
+      catch { /* skip a corrupt entry; a short read degrades coverage, never an all-clear */ }
+    }
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+/* sharedStrings.xml → string[] indexed by shared-string id. A <si> may hold
+   several <t> runs (rich text) which concatenate into one string. */
+export function parseSharedStrings(xml) {
+  const out = [];
+  const siRe = /<si\b[^>]*>([\s\S]*?)<\/si>/gi;
+  let m;
+  while ((m = siRe.exec(String(xml || '')))) {
+    const tRe = /<t\b[^>]*>([\s\S]*?)<\/t>/gi;
+    let t, s = '';
+    while ((t = tRe.exec(m[1]))) s += decodeXml(t[1]);
+    out.push(s.replace(/\s+/g, ' ').trim());
+  }
+  return out;
+}
+
+/* worksheet XML → rows (each an array of cell strings), resolving shared-string
+   ('s') and inline-string ('inlineStr') cells. The column letter in each cell's
+   r="A1" ref places the value at its true column so blank cells never shift the
+   row. */
+export function parseSheetRows(xml, shared = []) {
+  const rows = [];
+  const rowRe = /<row\b[^>]*>([\s\S]*?)<\/row>/gi;
+  let rm;
+  while ((rm = rowRe.exec(String(xml || '')))) {
+    const cells = [];
+    const cRe = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/gi;
+    let cm;
+    while ((cm = cRe.exec(rm[1]))) {
+      const attrs = cm[1] || '';
+      const inner = cm[2] || '';
+      const refM = /r="([A-Z]+)\d+"/.exec(attrs);
+      const col = refM ? colToIndex(refM[1]) : cells.length;
+      const typeM = /t="([^"]+)"/.exec(attrs);
+      const type = typeM ? typeM[1] : '';
+      const vM = /<v\b[^>]*>([\s\S]*?)<\/v>/i.exec(inner);
+      let val = '';
+      if (type === 's') val = vM ? (shared[+vM[1]] || '') : '';
+      else if (type === 'inlineStr') { const tM = /<t\b[^>]*>([\s\S]*?)<\/t>/i.exec(inner); val = tM ? decodeXml(tM[1]) : ''; }
+      else val = vM ? decodeXml(vM[1]) : '';
+      cells[col] = String(val).replace(/\s+/g, ' ').trim();
+    }
+    for (let i = 0; i < cells.length; i++) if (cells[i] == null) cells[i] = '';
+    rows.push(cells);
+  }
+  return rows;
+}
+
+/* Australia DFAT Consolidated List (regulation8_consolidated.xlsx). Reads the
+   first worksheet, locates the header row, and collects every value in the
+   name-bearing columns (the primary "Name of Individual or Entity"/"Name" and any
+   original-script name column), skipping the "Name Type" metadata column. Each
+   alias is its own row in the DFAT layout, so this captures primary names and
+   aliases alike. Accepts a Buffer (the .xlsx bytes). */
+export function parseDfatXlsx(buf) {
+  const files = unzipEntries(buf);
+  if (!files.size) return [];
+  const shared = parseSharedStrings(bufStr(files.get('xl/sharedStrings.xml')));
+  let sheetXml = bufStr(files.get('xl/worksheets/sheet1.xml'));
+  if (!sheetXml) for (const [k, v] of files) { if (/^xl\/worksheets\/.*\.xml$/i.test(k)) { sheetXml = bufStr(v); break; } }
+  const rows = parseSheetRows(sheetXml, shared);
+  if (!rows.length) return [];
+  let h = 0;
+  while (h < rows.length && !rows[h].some(c => c && c.trim())) h++;
+  const header = (rows[h] || []).map(c => String(c).toLowerCase().trim());
+  const nameCols = [];
+  header.forEach((c, i) => { if (/name/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
+  if (!nameCols.length) header.forEach((c, i) => { if (c === 'name') nameCols.push(i); });
+  if (!nameCols.length) return [];
+  const names = [];
+  for (let i = h + 1; i < rows.length; i++) {
+    for (const ci of nameCols) { const v = (rows[i][ci] || '').trim(); if (v) names.push(v); }
+  }
+  return names;
+}
+
 /* A curated / local list (e.g. the UAE EOCN Local Terrorist List kept in-repo).
    Accepts an array of strings, an array of {name, aliases[]} objects, or
    {entries:[…]} / {names:[…]}. */
@@ -244,6 +371,7 @@ export function parseList(source, body) {
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
   if (p === 'curated' || source.type === 'curated' || source.type === 'json') return parseCuratedList(body);
+  if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
   if (p === 'xml' || source.type === 'xml') return parseGenericXml(body);
   const xml = parseGenericXml(body);

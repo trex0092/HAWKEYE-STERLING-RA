@@ -1,4 +1,15 @@
-# Arabic legal-text translation — for review (NOT in production)
+# Arabic legal-text translation — archived reference (NOT in production)
+
+> **DECISION (2026-06-27): the long-form legal/report text stays English-only.**
+> The firm has chosen to keep the narrative-rationale templates and the printed
+> compliance report in **English** — the authoritative language for filed
+> records. The Arabic UI toggle (field labels, buttons, on-screen content) is
+> unaffected and remains live; only the long-form *legal* prose is out of scope
+> for translation. **No qualified-reviewer sign-off is required, and the
+> integration steps below are NOT to be applied.** This file is retained as an
+> archived reference only — none of its Arabic is wired into `buildNarrative()`
+> or the printed report, so no machine-translated legal text can reach a filed
+> document.
 
 This file holds **machine-assisted Arabic** for the long-form legal text that the
 in-app Arabic mode deliberately leaves in English: the four **narrative-rationale

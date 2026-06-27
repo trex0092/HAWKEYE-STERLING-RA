@@ -3,8 +3,10 @@
 import {
   normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseUnXml, parseOfsiCsv,
   parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
-  buildIndex, screenName
+  buildIndex, screenName,
+  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx
 } from '../scripts/sanctions-match.mjs';
+import { deflateRawSync } from 'node:zlib';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -74,6 +76,68 @@ const secoAttr = parseSecoXml(
   '<name name-type="alias"><name-part name-part-type="whole-name"><value><![CDATA[Al-Qaeda]]></value></name-part></name>');
 check('parseSecoXml keeps attributed <value> tags and unwraps CDATA (no dropped names)',
   secoAttr.includes('Vladimir Putin') && secoAttr.includes('Al-Qaeda'));
+
+/* ── XLSX reader (Australia DFAT is published only as .xlsx) ── */
+/* Build a real, minimal .xlsx (ZIP of DEFLATE-compressed XML parts) so the whole
+   path — ZIP central-directory read → inflate → sharedStrings → worksheet →
+   name-column extraction — is exercised end to end, offline. */
+function makeZip(entries) {
+  const fileChunks = [], cdChunks = [];
+  let offset = 0;
+  for (const e of entries) {
+    const nameBuf = Buffer.from(e.name, 'utf8');
+    const raw = Buffer.from(e.data, 'utf8');
+    const comp = deflateRawSync(raw);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(comp.length, 18); local.writeUInt32LE(raw.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    fileChunks.push(local, nameBuf, comp);
+    const cd = Buffer.alloc(46);
+    cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(8, 10);
+    cd.writeUInt32LE(comp.length, 20); cd.writeUInt32LE(raw.length, 24);
+    cd.writeUInt16LE(nameBuf.length, 28); cd.writeUInt32LE(offset, 42);
+    cdChunks.push(cd, nameBuf);
+    offset += 30 + nameBuf.length + comp.length;
+  }
+  const fileData = Buffer.concat(fileChunks), cdData = Buffer.concat(cdChunks);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(cdData.length, 12); eocd.writeUInt32LE(fileData.length, 16);
+  return Buffer.concat([fileData, cdData, eocd]);
+}
+
+const SHARED = '<sst>' +
+  ['Reference', 'Name Type', 'Name', 'Type', 'Primary Name', 'Vladimir Putin',
+   'alias', 'V. V. Putin', 'Rosneft Oil Company', 'Individual', 'Entity']
+    .map(s => '<si><t>' + s + '</t></si>').join('') + '</sst>';
+const SHEET = '<worksheet><sheetData>' +
+  '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c></row>' +
+  '<row r="2"><c r="A2"><v>1</v></c><c r="B2" t="s"><v>4</v></c><c r="C2" t="s"><v>5</v></c><c r="D2" t="s"><v>9</v></c></row>' +
+  '<row r="3"><c r="A3"><v>1</v></c><c r="B3" t="s"><v>6</v></c><c r="C3" t="s"><v>7</v></c><c r="D3" t="s"><v>9</v></c></row>' +
+  '<row r="4"><c r="A4"><v>2</v></c><c r="B4" t="s"><v>4</v></c><c r="C4" t="s"><v>8</v></c><c r="D4" t="s"><v>10</v></c></row>' +
+  '</sheetData></worksheet>';
+const xlsx = makeZip([
+  { name: 'xl/sharedStrings.xml', data: SHARED },
+  { name: 'xl/worksheets/sheet1.xml', data: SHEET },
+]);
+
+const zentries = unzipEntries(xlsx);
+check('unzipEntries reads the ZIP central directory + inflates parts',
+  zentriesHas(zentries, 'xl/sharedStrings.xml') && zentriesHas(zentries, 'xl/worksheets/sheet1.xml'));
+function zentriesHas(map, k) { return map.has(k) && map.get(k).length > 0; }
+check('parseSharedStrings indexes shared strings by id',
+  parseSharedStrings(SHARED)[5] === 'Vladimir Putin');
+check('parseSheetRows resolves shared-string cells at the right columns',
+  parseSheetRows(SHEET, parseSharedStrings(SHARED))[1][2] === 'Vladimir Putin');
+const dfat = parseDfatXlsx(xlsx);
+check('parseDfatXlsx pulls the Name column (primary + alias rows), skips "Name Type"',
+  dfat.length === 3 && dfat.includes('Vladimir Putin') && dfat.includes('V. V. Putin') && dfat.includes('Rosneft Oil Company'));
+check('parseList routes the dfat/xlsx parser on a Buffer body',
+  parseList({ id: 'au-dfat', parser: 'dfat', type: 'xlsx' }, xlsx).length === 3);
+check('unzipEntries tolerates a non-zip buffer (degrades to empty, never throws)',
+  unzipEntries(Buffer.from('not a zip')).size === 0 && parseDfatXlsx(Buffer.from('xx')).length === 0);
 
 /* ── curated list (strings + objects with aliases) ── */
 const cur = parseCuratedList({ entries: ['Foo Bar', { name: 'Baz Co', aliases: ['Baz Limited'] }] });

@@ -731,11 +731,16 @@ async function fetchListBody(source, timeoutMs = 60000) {
   let parsed;
   try { parsed = new URL(source.url); } catch { throw new Error('invalid url'); }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('unsupported url scheme: ' + parsed.protocol);
+  /* XLSX sources (e.g. Australia DFAT) are binary ZIP containers — read the raw
+     bytes as a Buffer; reading them as text would corrupt the archive. Text lists
+     (CSV/XML) stay on the string path the parsers expect. */
+  const binary = /^(xlsx|dfat)$/.test(String(source.parser || '').toLowerCase())
+    || String(source.type || '').toLowerCase() === 'xlsx'
+    || /\.xlsx(\?|$)/i.test(parsed.href);
   return withTimeout(async (signal) => {
     const r = await fetch(parsed.href, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
-    const body = await r.text();
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    return body;
+    return binary ? Buffer.from(await r.arrayBuffer()) : await r.text();
   }, timeoutMs);
 }
 
