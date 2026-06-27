@@ -37,12 +37,16 @@ bump merged to `main`.
   STIX 2.1 bundle (OpenCTI / MISP / TAXII export) of threat-actors, intrusion-sets
   and identities (`scripts/threat-intel.mjs`); supplementary "must verify", never
   an authoritative designation.
-- **Switzerland (SECO) + Australia (DFAT) sanctions sources:** the daily customer
-  screen now covers SECO's "Gesamtliste" XML and Australia's DFAT Consolidated
-  List. DFAT is published only as `.xlsx`, so the engine gained a dependency-free
-  XLSX reader (ZIP + sharedStrings + worksheet walk via `node:zlib`) in
-  `scripts/sanctions-match.mjs`. Both degrade visibly on any fetch/layout change —
-  never a silent all-clear.
+- **Dependency-free XLSX reader** in `scripts/sanctions-match.mjs` (ZIP +
+  sharedStrings + first-worksheet walk via `node:zlib`) plus a dedicated SECO
+  XML parser, so the engine can ingest lists published only as `.xlsx` or in
+  SECO's nested `<name>/<name-part>/<value>` shape. Both parsers are unit-tested.
+  The Switzerland (SECO) and Australia (DFAT) sources are **configured but
+  disabled** in `data/sanctions-extra.json`: a live screen showed SECO's `.xhtml`
+  endpoint returns an HTML wrapper (0 names) and DFAT's file 404s to automated
+  fetches (browser/bot-gated). They will be enabled once a verified
+  machine-readable endpoint is confirmed on the runner — until then they stay off
+  rather than leave the screen permanently flagged "degraded".
 - **Cybersecurity Skills plugin:** pre-registers the Apache-2.0
   [Anthropic Cybersecurity Skills](https://github.com/mukul975/Anthropic-Cybersecurity-Skills)
   library as a Claude Code plugin ([`.claude/settings.json`](.claude/settings.json));
