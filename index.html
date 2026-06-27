@@ -1075,6 +1075,10 @@ const QUESTIONS_OC = [
 ];
 
 const BAND_FULL = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence', EDD:'Enhanced Due Diligence', PROHIBITED:'Do Not Onboard'};
+/* Arabic band labels (machine-assisted; see #i18nCaveat). getLang() is defined
+   later in the engine and resolved at call time. */
+const BAND_FULL_AR = {CDD:'العناية الواجبة تجاه العميل', SDD:'العناية الواجبة المبسّطة', EDD:'العناية الواجبة المعزّزة', PROHIBITED:'عدم بدء العلاقة — محظور'};
+function bandFull(code){ const ar = (typeof getLang==='function' && getLang()==='ar'); return (ar ? BAND_FULL_AR[code] : BAND_FULL[code]) || BAND_FULL[code] || code; }
 const BAND_ICON = {CDD:'✓', SDD:'!', EDD:'⚠', PROHIBITED:'⛔'};
 const REVIEW_MONTHS = {CDD:12, SDD:6, EDD:3}; /* KYC review cycles per compliance manual: low 12m, medium 6m, high 3m */
 
@@ -1513,10 +1517,17 @@ function policyMissing(){
 
 /* ── MASK — field-level masking of sensitive identifiers ── */
 let _maskOn = false;
+function paintMaskBtn(){
+  if(!$('btnMask')) return;
+  const ar = (typeof getLang==='function' && getLang()==='ar');
+  $('btnMask').textContent = ar
+    ? (_maskOn ? '🙉 إظهار الحقول الحساسة' : '🙈 إخفاء الحقول الحساسة')
+    : (_maskOn ? '🙉 Unmask sensitive fields' : '🙈 Mask sensitive fields');
+}
 function toggleMask(){
   _maskOn = !_maskOn;
   try{ if(document.body && document.body.classList) document.body.classList.toggle('mask-on', _maskOn); }catch(e){}
-  if($('btnMask')) $('btnMask').textContent = _maskOn ? '🙉 Unmask sensitive fields' : '🙈 Mask sensitive fields';
+  paintMaskBtn();
 }
 
 /* ── TOKEN — pseudonymised export of the activity log (stable SHA-256 tokens) ── */
@@ -2161,7 +2172,12 @@ function paintSupplier(prefix, i) {
 }
 function paintStatus() {
   const btn = $('btnComplete');
-  if(btn) btn.textContent = state.complete ? '✓ Mark as Draft' : '✓ Complete Assessment';
+  if(btn){
+    const ar = (typeof getLang==='function' && getLang()==='ar');
+    btn.textContent = ar
+      ? (state.complete ? '✓ وضع كمسودة' : '✓ إكمال التقييم')
+      : (state.complete ? '✓ Mark as Draft' : '✓ Complete Assessment');
+  }
   paintRetryButton();
 }
 
@@ -2626,7 +2642,7 @@ function recalc() {
   /* Verdict pill (operative outcome) + threshold chips (numeric band) */
   const vpEl = $('verdictPill');
   vpEl.className = 'verdict-pill ' + {CDD:'vp-cdd', SDD:'vp-sdd', EDD:'vp-edd', PROHIBITED:'vp-proh'}[a.outcome];
-  $('verdictText').textContent = a.outcome + ' — ' + BAND_FULL[a.outcome] + (a.analystOv ? ' ✱' : '');
+  $('verdictText').textContent = a.outcome + ' — ' + bandFull(a.outcome) + (a.analystOv ? ' ✱' : '');
   $('verdictIcon').textContent = BAND_ICON[a.outcome];
 
   /* AI Risk Advisor — robot persona recolours to the operative outcome */
@@ -3190,6 +3206,12 @@ function applyLang(lang){
   });
   const tog = $('langToggle'); if(tog) tog.textContent = (lang==='ar') ? 'EN' : 'عربي';
   const cav = $('i18nCaveat'); if(cav) cav.style.display = (lang==='ar') ? '' : 'none';
+  /* Repaint JS-set strings (verdict, complete/mask buttons) in the new language.
+     Guarded: at first load state may not be ready yet — the normal init paint
+     handles it then; on a user toggle these run with state ready. */
+  try{ if(typeof recalc==='function') recalc(); }catch(e){}
+  try{ if(typeof paintStatus==='function') paintStatus(); }catch(e){}
+  try{ if(typeof paintMaskBtn==='function') paintMaskBtn(); }catch(e){}
 }
 function toggleLang(){ applyLang(getLang()==='ar' ? 'en' : 'ar'); }
 function initLang(){ applyLang(getLang()); }
