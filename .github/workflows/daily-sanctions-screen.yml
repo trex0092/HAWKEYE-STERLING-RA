@@ -160,7 +160,34 @@ jobs:
           CUSTOMER_DB_GID: ${{ vars.ASANA_CUSTOMER_DB_GID || '1214107620220121' }}
         run: |
           python3 << 'PYEOF'
-          import requests, json, os
+          import requests, json, os, re
+
+          def extract_principals(notes):
+              # Pull natural-person principals (UBOs / shareholders / directors) out
+              # of the CDD record's "SECTION 4 — IDENTIFICATIONS" block so each is
+              # screened in their own right, not just the company name.
+              if not notes: return []
+              m = re.search(r'SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)([\s\S]*?)(?=\n\s*SECTION\s*\d|$)', notes, re.I)
+              if not m: return []
+              block = m.group(0); people = []; seen = set()
+              def push(name, role, nat):
+                  n = re.sub(r'\s+', ' ', (name or '')).strip()
+                  k = n.lower()
+                  if not n or k in seen: return
+                  if re.match(r'^(n/?a|none|nil|not applicable|pending|tbc)$', n, re.I): return
+                  seen.add(k); people.append({"name": n, "role": re.sub(r'\s+', ' ', (role or 'Principal')).strip(), "nationality": (nat or '').strip()})
+              structured = False
+              for p in re.split(r'(?=Individual\s*\d+\s*[—–\-:])', block):
+                  rm = re.match(r'Individual\s*\d+\s*[—–\-:]\s*([^\n]*)', p, re.I)
+                  nm = re.search(r'\bName\s*:\s*([^\n]+)', p, re.I)
+                  if rm and nm:
+                      structured = True
+                      nat = re.search(r'\bNationality\s*:\s*([^\n]+)', p, re.I)
+                      push(nm.group(1), rm.group(1), nat.group(1) if nat else '')
+              if not structured:
+                  for nm in re.finditer(r'\bName\s*:\s*([^\n]+)', block, re.I):
+                      push(nm.group(1), 'Principal', '')
+              return people
 
           pat = os.environ["ASANA_PAT"]
           project_gid = os.environ["CUSTOMER_DB_GID"]
@@ -169,7 +196,7 @@ jobs:
           url = f"https://app.asana.com/api/1.0/tasks"
           params = {
               "project": project_gid,
-              "opt_fields": "name,gid,permalink_url",
+              "opt_fields": "name,gid,permalink_url,notes",
               "limit": 100
           }
 
@@ -178,11 +205,25 @@ jobs:
               data = r.json()
               for t in data.get("data", []):
                   if t.get("name","").strip():
+                      cname = t["name"].strip()
                       customers.append({
-                          "name": t["name"].strip(),
+                          "name": cname,
                           "gid": t["gid"],
-                          "url": t.get("permalink_url","")
+                          "url": t.get("permalink_url",""),
+                          "kind": "entity",
+                          "parent": ""
                       })
+                      # Screen every recorded principal / UBO / director too.
+                      for pr in extract_principals(t.get("notes","")):
+                          customers.append({
+                              "name": pr["name"],
+                              "gid": t["gid"],
+                              "url": t.get("permalink_url",""),
+                              "kind": "individual",
+                              "parent": cname,
+                              "role": pr.get("role",""),
+                              "nationality": pr.get("nationality","")
+                          })
               next_page = data.get("next_page")
               if not next_page:
                   break
@@ -191,7 +232,9 @@ jobs:
           with open("/tmp/customers.json","w") as f:
               json.dump(customers, f, ensure_ascii=False)
 
-          print(f"Fetched {len(customers)} customers from Asana")
+          entity_count = sum(1 for c in customers if c.get("kind") != "individual")
+          individual_count = len(customers) - entity_count
+          print(f"Fetched {entity_count} customers + {individual_count} principals/UBOs = {len(customers)} subjects to screen")
           PYEOF
 
 
@@ -368,6 +411,9 @@ jobs:
                           "customer": cname,
                           "customer_gid": customer["gid"],
                           "customer_url": customer["url"],
+                          "kind": customer.get("kind","entity"),
+                          "parent": customer.get("parent",""),
+                          "role": customer.get("role",""),
                           "matched_name": sanctioned_norm[idx][1]["name"],
                           "matched_list": sanctioned_norm[idx][1]["list"],
                           "programme": sanctioned_norm[idx][1]["programme"],
@@ -380,6 +426,9 @@ jobs:
                           "customer": cname,
                           "customer_gid": customer["gid"],
                           "customer_url": customer["url"],
+                          "kind": customer.get("kind","entity"),
+                          "parent": customer.get("parent",""),
+                          "role": customer.get("role",""),
                           "matched_name": sanctioned_norm[idx][1]["name"],
                           "matched_list": sanctioned_norm[idx][1]["list"],
                           "programme": sanctioned_norm[idx][1]["programme"],
@@ -394,6 +443,8 @@ jobs:
           # ---- save results ----
           results_data = {
               "total": len(customers),
+              "entity_count": sum(1 for c in customers if c.get("kind") != "individual"),
+              "individual_count": sum(1 for c in customers if c.get("kind") == "individual"),
               "confirmed": confirmed_hits,
               "potential": potential_matches,
               "clear_count": len(clear),
@@ -448,6 +499,8 @@ jobs:
           script_ver  = os.environ["SCRIPT_VERSION"]
 
           total       = results["total"]
+          entity_count     = results.get("entity_count", total)
+          individual_count = results.get("individual_count", 0)
           confirmed   = results["confirmed"]
           potential   = results["potential"]
           clear_count = results["clear_count"]
@@ -476,9 +529,10 @@ jobs:
           else:
               lines = []
               for i, h in enumerate(confirmed, 1):
+                  subj = h['customer'] + ("  [INDIVIDUAL — " + (h.get('role') or 'Principal') + " of " + h.get('parent','') + "]" if h.get('kind') == 'individual' else "  [LEGAL ENTITY]")
                   lines.append(
                       f"⛔ HIT {i}\n"
-                      f"   Customer:        {h['customer']}\n"
+                      f"   Subject:         {subj}\n"
                       f"   Customer Record: {h['customer_url']}\n"
                       f"   Matched List:    {h['matched_list']}\n"
                       f"   Matched Entity:  {h['matched_name']}\n"
@@ -497,9 +551,10 @@ jobs:
           else:
               lines = []
               for i, p in enumerate(potential, 1):
+                  subj = p['customer'] + ("  [INDIVIDUAL — " + (p.get('role') or 'Principal') + " of " + p.get('parent','') + "]" if p.get('kind') == 'individual' else "  [LEGAL ENTITY]")
                   lines.append(
                       f"⚠️  POTENTIAL MATCH {i}\n"
-                      f"   Customer:        {p['customer']}\n"
+                      f"   Subject:         {subj}\n"
                       f"   Customer Record: {p['customer_url']}\n"
                       f"   Matched List:    {p['matched_list']}\n"
                       f"   Matched Entity:  {p['matched_name']}\n"
@@ -606,19 +661,21 @@ jobs:
           SCOPE
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-          Entities Screened:     {total} customers — Customer Database
+          Subjects Screened:     {total} — FULL Customer Database
+                                 ({entity_count} legal entities + {individual_count} principals/UBOs)
           Screening Type:        Fuzzy name matching + alias matching
           Match Threshold:       85% minimum similarity score
           Transliteration:       Arabic / Turkish / Latin variants included
-          Entity Types:          Legal entities and associated individuals
-                                 (shareholders, directors, UBOs where
-                                 recorded in customer assessment)
+          Entity Types:          Legal entities AND their associated individuals
+                                 (every shareholder, director and UBO recorded
+                                 in SECTION 4 of the customer assessment is
+                                 screened in their own right, not just the company)
 
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           RESULTS SUMMARY
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-          Total Customers Screened:              {total}
+          Total Subjects Screened:               {total}  ({entity_count} entities + {individual_count} principals/UBOs)
           Confirmed Hits:                        {len(confirmed)}
           Potential Matches — Pending Review:    {len(potential)}
           Clear — No Match:                      {clear_count}

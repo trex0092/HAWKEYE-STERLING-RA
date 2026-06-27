@@ -116,7 +116,51 @@ export function parseSubject(task) {
   };
 }
 
-/* Active customers only (completed tasks are off-boarded / archived). */
+/* Pull the natural-person principals (UBOs / shareholders / directors / signatories)
+   out of a customer record so each is screened in their OWN right — not only the
+   company name. The CDD notes record them under "SECTION 4 — IDENTIFICATIONS" as
+   repeated "Individual N — <role>" blocks, each with a "Name:" (and usually a
+   "Nationality:"). Returns [{ name, role, nationality }]. Tolerant: if the block
+   isn't structured that way it falls back to every "Name:" inside the section. */
+export function parsePrincipals(task) {
+  const notes = String((task && task.notes) || '');
+  if (!notes) return [];
+  // Isolate the identifications section (stop at the next "SECTION n" or EOF).
+  const sec = /SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)[\s\S]*?(?=\n\s*SECTION\s*\d|$)/i.exec(notes);
+  const block = sec ? sec[0] : '';
+  if (!block) return [];
+  const people = [];
+  const seen = new Set();
+  const push = (name, role, nationality) => {
+    const n = String(name || '').replace(/\s+/g, ' ').trim();
+    const k = normalizeName(n);
+    if (!n || !k || seen.has(k)) return;
+    // Guard against label rows being read as a name.
+    if (/^(n\/?a|none|nil|not applicable|pending|tbc)$/i.test(n)) return;
+    seen.add(k);
+    people.push({ name: n, role: String(role || 'Principal').replace(/\s+/g, ' ').trim(), nationality: String(nationality || '').trim() });
+  };
+  const partRe = /Individual\s*\d+\s*[—\-–:]\s*([^\n]*)([\s\S]*?)(?=Individual\s*\d+\s*[—\-–:]|$)/gi;
+  let m, structured = false;
+  while ((m = partRe.exec(block))) {
+    const role = m[1].trim();
+    const sub = m[2] || '';
+    const nm = /\bName\s*:\s*([^\n]+)/i.exec(sub);
+    if (nm) { structured = true; const nat = /\bNationality\s*:\s*([^\n]+)/i.exec(sub); push(nm[1], role || 'Principal', nat ? nat[1] : ''); }
+  }
+  if (!structured) {
+    const nameRe = /\bName\s*:\s*([^\n]+)/gi;
+    let n;
+    while ((n = nameRe.exec(block))) push(n[1], 'Principal', '');
+  }
+  return people;
+}
+
+/* Active customers only (completed tasks are off-boarded / archived). Each active
+   customer yields the legal entity PLUS every recorded principal (UBO / director /
+   shareholder) as its own screening subject, so natural persons are screened, not
+   just the company name. Individuals carry the parent customer's gid so an alert
+   still points at the right record. */
 export function parseSubjects(tasks) {
   const out = [];
   const seen = new Set();
@@ -126,6 +170,18 @@ export function parseSubjects(tasks) {
     if (!s.name || seen.has(s.key)) continue;
     seen.add(s.key);
     out.push(s);
+    for (const p of parsePrincipals(t)) {
+      if (seen.has(p.name && normalizeName(p.name))) continue;
+      const key = normalizeName(p.name);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        key, name: p.name, entityType: 'individual',
+        jurisdiction: p.nationality || undefined,
+        gid: (t && t.gid) || undefined,
+        parent: s.name, role: p.role || 'Principal',
+      });
+    }
   }
   return out;
 }
@@ -153,6 +209,9 @@ export function normalizeResult(r, src) {
     name: (src && src.name) || String(subjName),
     jurisdiction: src && src.jurisdiction,
     gid: src && src.gid,
+    entityType: (src && src.entityType) || 'organisation',
+    parent: src && src.parent,
+    role: src && src.role,
     topScore: num(r.topScore != null ? r.topScore : (r.score != null ? r.score : r.matchScore)),
     band: String(r.band || r.riskBand || '').toLowerCase(),
     recommendation: String(r.recommendation || r.disposition || r.decision || '').toLowerCase(),
@@ -228,6 +287,7 @@ export function diffState(prevState, results, today, threshold) {
       };
       if (!prior || prior.signature !== sig) {
         alerts.push({ key: r.key, name: r.name, jurisdiction: r.jurisdiction, gid: r.gid,
+          entityType: r.entityType, parent: r.parent, role: r.role,
           band: r.band, topScore: r.topScore, recommendation: r.recommendation, lists: r.lists || [], isNew: !prior });
       }
     } else if (prev[r.key]) {
@@ -244,6 +304,17 @@ export function diffState(prevState, results, today, threshold) {
 export const GOVERNANCE_NOTE =
   'Detection is automatic. Do NOT freeze, decline or report on a match before MLRO review and a two-person (four-eyes) sign-off — UAE Federal Decree-Law No. 10 of 2025 Art.16/18; FATF R.26. A possible name match is not confirmation: disambiguate against the customer’s identifiers first.';
 
+/* Label a subject for an alert row — natural-person principals carry their role
+   and the customer they belong to, so the MLRO sees "a UBO of X is listed", not a
+   bare name. Legal entities show their own name. */
+export function subjectLabel(a) {
+  if (a && a.entityType === 'individual') {
+    const ctx = [a.role || 'Principal', a.parent ? 'of ' + a.parent : ''].filter(Boolean).join(' ');
+    return a.name + (ctx ? ' — ' + ctx : '') + ' [individual]';
+  }
+  return a ? a.name : '';
+}
+
 /* One-line summary of a match for tables/cards. */
 export function matchSummary(a) {
   const bits = [];
@@ -259,7 +330,9 @@ export function matchSummary(a) {
 export function buildScreenReport(alerts, cleared, today, meta = {}) {
   const lines = [];
   lines.push('# Sanctions Screen — ' + today, '');
-  lines.push('Screened **' + (meta.screened != null ? meta.screened : '?') + '** active counterparties from the Customer Database against: ' + COVERAGE + '.', '');
+  const breakdown = (meta.entities != null && meta.individuals != null)
+    ? ' (' + meta.entities + ' legal entities + ' + meta.individuals + ' principals/UBOs)' : '';
+  lines.push('Screened **' + (meta.screened != null ? meta.screened : '?') + '** subjects from the FULL Customer Database' + breakdown + ' against: ' + COVERAGE + '.', '');
   if (meta.degraded) lines.push('> ⚠ The screening engine reported **degraded** coverage on this run — treat any "no match" as provisional and re-run.', '');
   if (meta.errored) lines.push('> ⚠ **' + meta.errored + '** subject(s) could not be screened this run (engine error/timeout) — their prior status was kept, not cleared.', '');
 
@@ -267,9 +340,9 @@ export function buildScreenReport(alerts, cleared, today, meta = {}) {
     lines.push('No **new** sanctions/watchlist matches.', '');
   } else {
     lines.push('**' + alerts.length + ' customer(s) with a new/changed match — review immediately.**', '');
-    lines.push('| Customer | Jurisdiction | Match |', '| --- | --- | --- |');
+    lines.push('| Subject | Jurisdiction | Match |', '| --- | --- | --- |');
     for (const a of alerts) {
-      lines.push('| ' + a.name + ' | ' + (a.jurisdiction || '') + ' | ' + matchSummary(a) + ' |');
+      lines.push('| ' + subjectLabel(a) + ' | ' + (a.jurisdiction || '') + ' | ' + matchSummary(a) + ' |');
     }
     lines.push('');
   }
@@ -286,7 +359,10 @@ export function buildScreenReport(alerts, cleared, today, meta = {}) {
 export function buildScreenHtml(alerts, { runLink, today, degraded } = {}) {
   const items = alerts.map(a => {
     const juris = a.jurisdiction ? ' (' + esc(a.jurisdiction) + ')' : '';
-    return '<li><strong>' + esc(a.name) + '</strong>' + juris + ' — ' + esc(matchSummary(a)) + '</li>';
+    const who = a.entityType === 'individual'
+      ? '<strong>' + esc(a.name) + '</strong> <em>(' + esc([a.role || 'Principal', a.parent ? 'of ' + a.parent : ''].filter(Boolean).join(' ')) + ')</em>'
+      : '<strong>' + esc(a.name) + '</strong>';
+    return '<li>' + who + juris + ' — ' + esc(matchSummary(a)) + '</li>';
   }).join('');
   const n = alerts.length;
   const parts = ['<body>'];
@@ -569,7 +645,7 @@ async function fetchAsanaSubjects(projectGid, token) {
     const json = await asanaGet(u, token);
     for (const t of (json.data || [])) tasks.push(t);
     offset = json.next_page && json.next_page.offset;
-  } while (offset && ++pages < 50);
+  } while (offset && ++pages < 500);
   return parseSubjects(tasks);
 }
 
@@ -615,7 +691,7 @@ async function fetchTaskNames(projectGid, token) {
     const json = await asanaGet(u, token);
     for (const t of (json.data || [])) names.push(String(t.name || ''));
     offset = json.next_page && json.next_page.offset;
-  } while (offset && ++pages < 50);
+  } while (offset && ++pages < 500);
   return names;
 }
 
@@ -920,14 +996,16 @@ async function main() {
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
 
-  console.log('sanctions-screen: screening ' + subjects.length + ' active customers against the free consolidated lists'
+  const individuals = subjects.filter(s => s.entityType === 'individual').length;
+  const entities = subjects.length - individuals;
+  console.log('sanctions-screen: screening ' + subjects.length + ' subjects (' + entities + ' entities + ' + individuals + ' principals/UBOs) from the FULL Customer Database against the free consolidated lists'
     + (cfg.adverseMedia ? ' + adverse media' : '') + (cfg.pep ? ' + PEP' : ''));
   const screen = await screenLocally(subjects, cfg);
   if (!screen.anyOk) return bailUnscreened('no sanctions list could be loaded — ' + ((screen.notes || []).join('; ') || 'all sources failed'), today);
 
   const prevState = loadState();
   const { alerts, cleared, matchCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold);
-  const meta = { screened: subjects.length, degraded: screen.degraded, errored: screen.errored };
+  const meta = { screened: subjects.length, entities, individuals, degraded: screen.degraded, errored: screen.errored };
   const report = buildScreenReport(alerts, cleared, today, meta);
   const changes = buildChangesArtifact(alerts, today);
 

@@ -3,7 +3,7 @@
      { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
    Usage: node test/sanctions-screen.test.mjs */
 import {
-  normalizeName, parseSubject, parseSubjects, normalizeHit, normalizeResult, normalizeScreenResponse,
+  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, matchSignature, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD,
   formatHumanDate, buildAmPepNotes, buildRunLogNotes, buildTransactionTemplateNotes, AM_KEYWORD_COUNT
@@ -26,6 +26,44 @@ check('parseSubject pulls name + jurisdiction + licence + gid',
   s.name === 'WPM INT LLC' && s.jurisdiction === 'United Arab Emirates' && s.idNumber === 'DMCC-12345' && s.gid === '111' && s.entityType === 'organisation');
 const subs = parseSubjects([task, { name: 'Done Co', completed: true }, { name: 'WPM Int  LLC', completed: false }, { name: 'Xafari DMCC', completed: false }]);
 check('parseSubjects skips completed + dedups by key', subs.length === 2 && subs.map(x => x.name).sort().join('|') === 'WPM INT LLC|Xafari DMCC');
+
+/* ── principal / UBO extraction (so individuals are screened, not just the company) ── */
+const cddNotes = [
+  'SECTION 1 — CUSTOMER INFORMATION',
+  '    Company: AMBER INTERNATIONAL FZCO',
+  '    Country: United Arab Emirates',
+  'SECTION 4 — IDENTIFICATIONS',
+  '    Individual 1 — Shareholder & Director',
+  '    Name: Rahul Natvarlal Acharya',
+  '    Nationality: India',
+  '    Shares %: 50%',
+  '    Individual 2 — Shareholder & Director',
+  '    Name: Raj Hasmukhbhai Majithia',
+  '    Nationality: New Zealand',
+  'SECTION 5 — PROLIFERATION FINANCING (PF) ASSESSMENT',
+  '    UN PF Sanctions Match: Low — Name: should-not-be-captured (outside section 4)',
+].join('\n');
+const cddTask = { gid: '777', name: 'Amber International FZCO', completed: false, notes: cddNotes };
+const principals = parsePrincipals(cddTask);
+check('parsePrincipals extracts every Section-4 individual (name + role + nationality)',
+  principals.length === 2 &&
+  principals[0].name === 'Rahul Natvarlal Acharya' && /Shareholder/.test(principals[0].role) && principals[0].nationality === 'India' &&
+  principals[1].name === 'Raj Hasmukhbhai Majithia' && principals[1].nationality === 'New Zealand');
+check('parsePrincipals does NOT capture names outside the identifications section',
+  !principals.some(p => /should-not-be-captured/.test(p.name)));
+check('parsePrincipals is empty for a record with no identifications section',
+  parsePrincipals({ name: 'Co', notes: 'SECTION 1 — CUSTOMER INFORMATION\n    Company: CO' }).length === 0);
+
+const withPpl = parseSubjects([cddTask]);
+check('parseSubjects emits the entity PLUS each principal as its own subject',
+  withPpl.length === 3 &&
+  withPpl[0].entityType === 'organisation' && withPpl[0].name === 'Amber International FZCO' &&
+  withPpl.filter(x => x.entityType === 'individual').length === 2);
+check('each individual subject carries the parent customer gid + role for the alert',
+  withPpl.filter(x => x.entityType === 'individual').every(x => x.gid === '777' && x.parent === 'Amber International FZCO' && x.role && x.jurisdiction));
+check('subjectLabel marks an individual with role + parent, entity stays plain',
+  subjectLabel(withPpl.find(x => x.entityType === 'individual')).includes('[individual]') &&
+  subjectLabel(withPpl[0]) === 'Amber International FZCO');
 
 /* ── hit/list entry normalisation (string OR object) ── */
 check('normalizeHit handles a plain string list name', normalizeHit('OFAC SDN').list === 'OFAC SDN');
