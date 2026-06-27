@@ -258,12 +258,15 @@ export function unzipEntries(buf) {
     const commentLen = b.readUInt16LE(p + 32);
     const localOff = b.readUInt32LE(p + 42);
     const name = b.toString('utf8', p + 46, p + 46 + nameLen);
-    if (b.readUInt32LE(localOff) === 0x04034b50) {
-      const dataStart = localOff + 30 + b.readUInt16LE(localOff + 26) + b.readUInt16LE(localOff + 28);
-      const comp = b.subarray(dataStart, dataStart + compSize);
-      try { out.set(name, method === 8 ? inflateRawSync(comp) : Buffer.from(comp)); }
-      catch { /* skip a corrupt entry; a short read degrades coverage, never an all-clear */ }
-    }
+    try {
+      // The local-header offset comes from the archive; bound-check it before
+      // reading so a truncated/garbage file degrades to fewer names, never throws.
+      if (localOff + 30 <= b.length && b.readUInt32LE(localOff) === 0x04034b50) {
+        const dataStart = localOff + 30 + b.readUInt16LE(localOff + 26) + b.readUInt16LE(localOff + 28);
+        const comp = b.subarray(dataStart, dataStart + compSize);
+        out.set(name, method === 8 ? inflateRawSync(comp) : Buffer.from(comp));
+      }
+    } catch { /* skip a corrupt entry; a short read degrades coverage, never an all-clear */ }
     p += 46 + nameLen + extraLen + commentLen;
   }
   return out;

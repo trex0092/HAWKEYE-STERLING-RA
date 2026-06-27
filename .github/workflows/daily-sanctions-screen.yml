@@ -167,7 +167,7 @@ jobs:
               # of the CDD record's "SECTION 4 — IDENTIFICATIONS" block so each is
               # screened in their own right, not just the company name.
               if not notes: return []
-              m = re.search(r'SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)([\s\S]*?)(?=\n\s*SECTION\s*\d|$)', notes, re.I)
+              m = re.search(r'SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)([\s\S]*?)(?=\n\s*(?:SECTION|PART)\b|$)', notes, re.I)
               if not m: return []
               block = m.group(0); people = []; seen = set()
               def push(name, role, nat):
@@ -185,7 +185,7 @@ jobs:
                       nat = re.search(r'\bNationality\s*:\s*([^\n]+)', p, re.I)
                       push(nm.group(1), rm.group(1), nat.group(1) if nat else '')
               if not structured:
-                  for nm in re.finditer(r'\bName\s*:\s*([^\n]+)', block, re.I):
+                  for nm in re.finditer(r'\b(?:Name|UBO|Beneficial Owner|Authori[sz]ed Signatory|Signatory|Shareholder|Director|Partner)\s*:\s*([^\n]+)', block, re.I):
                       push(nm.group(1), 'Principal', '')
               return people
 
@@ -725,7 +725,7 @@ jobs:
 
           Customer List Source:     Asana — Customer Database
                                     Project GID: 1214107620220121
-          Customers at Time of Run: {total}
+          Subjects at Time of Run:  {total} ({entity_count} entities + {individual_count} principals/UBOs)
 
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           MLRO SIGN-OFF
