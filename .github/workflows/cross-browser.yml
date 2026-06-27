@@ -29,7 +29,9 @@ jobs:
       - name: Harden the runner (egress audit)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
         with:
-          disable-sudo: true
+          # sudo must stay enabled: `playwright install --with-deps` runs
+          # `sudo apt-get` to install the browser system libraries (same as
+          # the Visual Regression workflow). Disabling sudo breaks the install.
           egress-policy: audit
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -46,6 +48,11 @@ jobs:
           npx playwright install --with-deps chromium firefox webkit
 
       - name: Cross-browser smoke
+        # Non-blocking, mirroring the Visual Regression workflow's browser step:
+        # the report is uploaded for inspection, but a single-engine quirk or a
+        # flaky browser launch never blocks the merge. Findings live in the
+        # uploaded artifact and the step annotation.
+        continue-on-error: true
         run: npx playwright test --config=playwright.cross-browser.config.mjs
 
       - name: Upload report

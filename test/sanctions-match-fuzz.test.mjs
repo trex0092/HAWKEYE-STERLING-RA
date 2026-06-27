@@ -103,7 +103,7 @@ for (let i = 0; i < 2000; i++) {
   try { r = screenName(subj, index, 85); }
   catch { check('screenName never throws on adversarial input #' + i, false); continue; }
   check('screenName returns a well-formed row',
-    r && typeof r.topScore === 'number' && r.topScore >= 0 && r.topScore <= 100 &&
+    typeof r.topScore === 'number' && r.topScore >= 0 && r.topScore <= 100 &&
     Array.isArray(r.lists) && r.hitCount === r.lists.length &&
     (r.recommendation === 'clear' || r.recommendation === 'sanctions-match'));
   check('screenName: a clear result carries no hits and low band',
