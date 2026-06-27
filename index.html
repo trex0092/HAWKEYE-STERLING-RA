@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0A0E16">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hawkeye RA">
+<script src="sw-register.js"></script>
 <title>Hawkeye Sterling — Entity Risk Assessment</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -406,6 +416,31 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .reg-review{font-size:9px;font-family:var(--mono);color:var(--text3);white-space:nowrap}
 .reg-review.reg-over{color:var(--high-text);font-weight:600}
 .reg-review.reg-soon{color:var(--med-text)}
+#regReviewFilter{flex:0 0 auto;background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:4px 8px;font-size:11.5px;font-family:var(--sans);outline:none}
+#regReviewFilter:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.reg-review-summary{font-size:10px;font-family:var(--mono);color:var(--text3);white-space:nowrap}
+.reg-review-summary.reg-over{color:var(--high-text);font-weight:600}
+.reg-review-summary.reg-soon{color:var(--med-text)}
+.ubo-graph{margin-top:12px;border:1px solid var(--border2);border-radius:var(--r-sm);background:#0B101A;padding:6px 4px}
+.ubo-graph svg{width:100%;height:auto;display:block}
+.ubo-empty{font-size:11px;color:var(--text3);font-family:var(--mono);padding:12px 6px;text-align:center}
+.ubo-edge{stroke:var(--border2);stroke-width:1.4}
+.ubo-ring{fill:#0E1422;stroke:var(--low-text);stroke-width:1.6}
+.ubo-ring-entity{fill:#0E1422;stroke:var(--gold);stroke-width:2}
+.ubo-init{fill:var(--low-text);font-family:var(--mono);font-size:11px;font-weight:600;text-anchor:middle}
+.ubo-init-entity{fill:var(--gold);font-family:var(--mono);font-size:13px;font-weight:700;text-anchor:middle}
+.ubo-label{fill:var(--text2);font-family:var(--sans);font-size:9px}
+.ubo-name-entity{fill:var(--gold);font-family:var(--sans);font-size:10px;font-weight:700;text-anchor:middle}
+.ubo-empty-svg{fill:var(--text3);font-family:var(--mono);font-size:9px;text-anchor:middle}
+.batch-toolbar{flex-wrap:wrap}
+.batch-input{display:block;margin:2px 18px 10px;min-height:84px;resize:vertical;background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:8px 10px;font-size:11px;font-family:var(--mono);outline:none}
+.batch-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.batch-row{display:grid;grid-template-columns:1.4fr 1fr auto 1.6fr;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--border)}
+.batch-row.batch-head{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-family:var(--mono);border-bottom:1px solid var(--border2)}
+.batch-name{font-weight:600;color:var(--text);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-jur{color:var(--text2);font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-note{color:var(--text3);font-size:9.5px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:560px){.batch-row{grid-template-columns:1fr auto}.batch-jur,.batch-note{display:none}}
 .btn-mini{padding:3px 10px;font-size:8.5px}
 @media(max-width:520px){.reg-review{display:none}}
 
@@ -505,6 +540,13 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 #printReport .foot{margin-top:auto;padding-top:9px;border-top:1px solid var(--hair);font-size:7.5px;letter-spacing:.08em;color:var(--faint);display:flex;justify-content:space-between;align-items:center}
 #printReport .foot .pg{color:var(--accent)}
 
+/* ── Bilingual / RTL ─────────────────────── */
+.i18n-caveat{background:var(--gold-dim);border-bottom:1px solid var(--gold-ring);color:var(--med-text);font-size:11px;line-height:1.7;padding:8px 18px;text-align:center;font-family:var(--sans)}
+#langToggle{font-family:var(--sans);min-width:46px}
+[dir=rtl] input,[dir=rtl] textarea,[dir=rtl] select{text-align:right}
+[dir=rtl] .mask-field{direction:ltr;text-align:right}
+[dir=rtl] .save-stamp,[dir=rtl] .reg-review,[dir=rtl] .batch-note{direction:rtl}
+
 /* ── Responsive ───────────────────────── */
 @media(max-width:800px){
   .main-layout{grid-template-columns:1fr}.side-panel{position:static;height:auto;border-left:none;border-top:1px solid var(--border2)}
@@ -530,43 +572,45 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
     </div>
     <div class="hdr-right">
       <nav class="hdr-nav" aria-label="Suite navigation">
-        <a href="index.html" class="active" aria-current="page">Assessment</a>
-        <a href="console.html">Console</a>
-        <a href="advisor.html">Advisor</a>
+        <a href="index.html" class="active" aria-current="page" data-i18n="nav.assessment">Assessment</a>
+        <a href="console.html" data-i18n="nav.console">Console</a>
+        <a href="advisor.html" data-i18n="nav.advisor">Advisor</a>
       </nav>
       <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session — re-enter your passphrase when it ends"><span class="sess-ic">⏱</span><span class="sess-t">60:00</span></span>
-      <button class="lock-btn" id="hdrLock" onclick="headerLock()" title="Lock this device">⚿ Lock</button>
+      <button class="lock-btn" id="langToggle" onclick="toggleLang()" title="Switch language / تبديل اللغة" aria-label="Switch language">عربي</button>
+      <button class="lock-btn" id="hdrLock" onclick="headerLock()" title="Lock this device" data-i18n="btn.lock">⚿ Lock</button>
     </div>
   </header>
+  <div class="i18n-caveat" id="i18nCaveat" style="display:none" role="note">ترجمة آلية للواجهة — للاسترشاد فقط، ويجب مراجعتها من مختصّ قبل الاعتماد الرسمي. المحتوى القانوني التفصيلي (الأسئلة والأجوبة التنظيمية والسرديات) يبقى بالإنجليزية إلى حين المراجعة.</div>
 
   <div class="main-layout">
     <div class="form-panel">
 
       <!-- 01 · Assessment Administration -->
       <div class="card">
-        <div class="section-hd"><span class="sn">01</span><span class="st">Assessment Administration</span></div>
+        <div class="section-hd"><span class="sn">01</span><span class="st" data-i18n="sec.01">Assessment Administration</span></div>
         <div class="field-row three">
           <div class="fg">
-            <label for="refInput">Reference Number</label>
+            <label for="refInput" data-i18n="fld.ref">Reference Number</label>
             <input type="text" id="refInput" placeholder="RA-20260612-001" oninput="onField('meta','ref',this.value)">
           </div>
           <div class="fg">
-            <label for="assessDate">Assessment Date</label>
+            <label for="assessDate" data-i18n="fld.assessDate">Assessment Date</label>
             <input type="text" id="assessDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onField('meta','date', v))">
           </div>
           <div class="fg">
-            <label for="nextReview">Next Review Date</label>
+            <label for="nextReview" data-i18n="fld.nextReview">Next Review Date</label>
             <input type="text" id="nextReview" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('nextReview', v))">
             <span class="review-hint" id="reviewHint"></span>
           </div>
         </div>
         <div class="field-row">
           <div class="fg">
-            <label for="assessorName">Assessed By</label>
+            <label for="assessorName" data-i18n="fld.assessedBy">Assessed By</label>
             <input type="text" id="assessorName" placeholder="Full name" oninput="onField('meta','assessor',this.value)">
           </div>
           <div class="fg">
-            <label for="assessorRole">Role / Department</label>
+            <label for="assessorRole" data-i18n="fld.role">Role / Department</label>
             <input type="text" id="assessorRole" placeholder="e.g. Compliance Officer" oninput="onField('meta','role',this.value)">
           </div>
         </div>
@@ -574,55 +618,56 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
       <!-- 02 · Entity Identification -->
       <div class="card">
-        <div class="section-hd"><span class="sn">02</span><span class="st">Entity Identification</span></div>
+        <div class="section-hd"><span class="sn">02</span><span class="st" data-i18n="sec.02">Entity Identification</span></div>
         <div class="field-row">
           <div class="fg">
-            <label for="entityName">Legal Entity Name</label>
+            <label for="entityName" data-i18n="fld.legalName">Legal Entity Name</label>
             <input type="text" id="entityName" placeholder="Registered legal name" oninput="onField('entity','name',this.value)">
           </div>
           <div class="fg">
-            <label for="jurisdictionSelect">Jurisdiction &amp; Incorporation <span id="jurisdictionScore" class="score-tag st-1"></span></label>
+            <label for="jurisdictionSelect"><span data-i18n="fld.jurisdiction">Jurisdiction &amp; Incorporation</span> <span id="jurisdictionScore" class="score-tag st-1"></span></label>
             <select id="jurisdictionSelect" onchange="onJurisdiction()"></select>
           </div>
         </div>
         <div class="field-row">
           <div class="fg">
-            <label for="entityTrading">Trading Name (If Different)</label>
+            <label for="entityTrading" data-i18n="fld.trading">Trading Name (If Different)</label>
             <input type="text" id="entityTrading" placeholder="Optional" oninput="onField('entity','trading',this.value)">
           </div>
           <div class="fg">
-            <label for="entityRegno">Registration / Licence No.</label>
+            <label for="entityRegno" data-i18n="fld.regno">Registration / Licence No.</label>
             <input type="text" id="entityRegno" class="mask-field" placeholder="Company or trade licence number" oninput="onField('entity','regno',this.value)">
           </div>
         </div>
         <div class="field-row">
           <div class="fg">
-            <label for="entityAddress">Registered Address</label>
+            <label for="entityAddress" data-i18n="fld.address">Registered Address</label>
             <input type="text" id="entityAddress" class="mask-field" placeholder="Street, city, country" oninput="onField('entity','address',this.value)">
           </div>
           <div class="fg">
-            <label for="entityContact">Website / Email</label>
+            <label for="entityContact" data-i18n="fld.contact">Website / Email</label>
             <input type="text" id="entityContact" class="mask-field" placeholder="Optional" oninput="onField('entity','contact',this.value)">
           </div>
         </div>
         <div class="field-row single">
           <div class="fg">
-            <label for="entityPrincipals">Principals — Beneficial Owners / Controllers / Directors</label>
+            <label for="entityPrincipals" data-i18n="fld.principals">Principals — Beneficial Owners / Controllers / Directors</label>
             <input type="text" id="entityPrincipals" class="mask-field" placeholder="e.g. John Smith, Jane Doe (comma-separated)" oninput="onField('entity','principals',this.value)">
           </div>
         </div>
+        <div class="ubo-graph" id="uboGraph"></div>
       </div>
 
       <!-- 03 · Business Profile -->
       <div class="card">
-        <div class="section-hd"><span class="sn">03</span><span class="st">Business Profile</span></div>
+        <div class="section-hd"><span class="sn">03</span><span class="st" data-i18n="sec.03">Business Profile</span></div>
         <div class="field-row">
           <div class="fg">
-            <label for="activitySelect">Business Activity <span id="activityScore" class="score-tag st-3"></span></label>
+            <label for="activitySelect"><span data-i18n="fld.activity">Business Activity</span> <span id="activityScore" class="score-tag st-3"></span></label>
             <select id="activitySelect" onchange="onActivity()"></select>
           </div>
           <div class="fg">
-            <label id="onboardLbl">Onboarding Channel <span id="onboard_score_tag" class="score-tag st-1"></span></label>
+            <label id="onboardLbl"><span data-i18n="fld.onboard">Onboarding Channel</span> <span id="onboard_score_tag" class="score-tag st-1"></span></label>
             <div class="toggle-group" role="group" aria-labelledby="onboardLbl">
               <button class="toggle-btn" id="btn_onboard_no" onclick="setToggle('onboard','No')">In-Person</button>
               <button class="toggle-btn" id="btn_onboard_yes" onclick="setToggle('onboard','Yes')">Remote / Non-F2F</button>
@@ -631,14 +676,14 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         </div>
         <div class="field-row">
           <div class="fg">
-            <label for="entityYearsInput">Operational History — Entity <span id="entityYearsScore" class="score-tag st-1"></span></label>
+            <label for="entityYearsInput"><span data-i18n="fld.opHistory">Operational History — Entity</span> <span id="entityYearsScore" class="score-tag st-1"></span></label>
             <div style="display:flex;align-items:center;gap:8px">
               <input type="number" id="entityYearsInput" min="0" max="99" oninput="onYears('entity')" style="width:72px">
               <span style="font-size:12px;color:var(--text3)">years in operation</span>
             </div>
           </div>
           <div class="fg">
-            <label for="relYearsInput">Relationship Duration <span id="relYearsScore" class="score-tag st-1"></span></label>
+            <label for="relYearsInput"><span data-i18n="fld.relDuration">Relationship Duration</span> <span id="relYearsScore" class="score-tag st-1"></span></label>
             <div style="display:flex;align-items:center;gap:8px">
               <input type="number" id="relYearsInput" min="0" max="99" oninput="onYears('rel')" style="width:72px">
               <span style="font-size:12px;color:var(--text3)">years with entity</span>
@@ -649,29 +694,29 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
       <!-- 04 · Ownership, Control & Compliance -->
       <div class="card">
-        <div class="section-hd"><span class="sn">04</span><span class="st">Ownership, Control &amp; Compliance</span></div>
+        <div class="section-hd"><span class="sn">04</span><span class="st" data-i18n="sec.04">Ownership, Control &amp; Compliance</span></div>
         <div id="questions-oc"></div>
         <div class="sec-divider">Screening Evidence</div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_sanctions_system">Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" oninput="onScreening('sanctions','system',this.value)"></div>
-          <div class="fg"><label for="scr_sanctions_date">Screened On</label><input type="text" id="scr_sanctions_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('sanctions','date', v))"></div>
-          <div class="fg"><label for="scr_sanctions_ref">Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" oninput="onScreening('sanctions','ref',this.value)"></div>
+          <div class="fg"><label for="scr_sanctions_system" data-i18n="fld.sanctionsScreening">Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" oninput="onScreening('sanctions','system',this.value)"></div>
+          <div class="fg"><label for="scr_sanctions_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_sanctions_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('sanctions','date', v))"></div>
+          <div class="fg"><label for="scr_sanctions_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" oninput="onScreening('sanctions','ref',this.value)"></div>
         </div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_pep_system">PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" oninput="onScreening('pep','system',this.value)"></div>
-          <div class="fg"><label for="scr_pep_date">Screened On</label><input type="text" id="scr_pep_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('pep','date', v))"></div>
-          <div class="fg"><label for="scr_pep_ref">Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" oninput="onScreening('pep','ref',this.value)"></div>
+          <div class="fg"><label for="scr_pep_system" data-i18n="fld.pepScreening">PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" oninput="onScreening('pep','system',this.value)"></div>
+          <div class="fg"><label for="scr_pep_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_pep_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('pep','date', v))"></div>
+          <div class="fg"><label for="scr_pep_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" oninput="onScreening('pep','ref',this.value)"></div>
         </div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_adverse_system">Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" oninput="onScreening('adverse','system',this.value)"></div>
-          <div class="fg"><label for="scr_adverse_date">Screened On</label><input type="text" id="scr_adverse_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('adverse','date', v))"></div>
-          <div class="fg"><label for="scr_adverse_ref">Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" oninput="onScreening('adverse','ref',this.value)"></div>
+          <div class="fg"><label for="scr_adverse_system" data-i18n="fld.adverseScreening">Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" oninput="onScreening('adverse','system',this.value)"></div>
+          <div class="fg"><label for="scr_adverse_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_adverse_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('adverse','date', v))"></div>
+          <div class="fg"><label for="scr_adverse_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" oninput="onScreening('adverse','ref',this.value)"></div>
         </div>
       </div>
 
       <!-- 05 · Supply Chain -->
       <div class="card">
-        <div class="section-hd"><span class="sn">05</span><span class="st">Supply Chain — Material Sources</span></div>
+        <div class="section-hd"><span class="sn">05</span><span class="st" data-i18n="sec.05">Supply Chain — Material Sources</span></div>
         <div class="sec-divider">Recycled Material Sources</div>
         <div class="supplier-grid" id="recycled-grid"></div>
         <div class="sec-divider">Mined Material Sources</div>
@@ -680,27 +725,27 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
       <!-- 06 · Sign-Off & Attestation -->
       <div class="card">
-        <div class="section-hd"><span class="sn">06</span><span class="st">Sign-Off &amp; Attestation</span></div>
+        <div class="section-hd"><span class="sn">06</span><span class="st" data-i18n="sec.06">Sign-Off &amp; Attestation</span></div>
         <div class="attest-statement">I confirm that this risk assessment has been completed in accordance with Hawkeye Sterling LLC&rsquo;s AML/CFT Risk Assessment Policy, the applicable DPMS regulatory guidelines, and all relevant national and international sanctions obligations. The information provided is accurate to the best of my knowledge.</div>
         <div class="attest-grid">
           <div class="attest-block">
             <div class="attest-role">First-Line — Assessed By</div>
-            <div class="fg"><label for="completedBy">Full Name</label><input type="text" id="completedBy" placeholder="Full name" oninput="onSign('completedBy',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label for="completedTitle">Title / Role</label><input type="text" id="completedTitle" placeholder="e.g. Compliance Analyst" oninput="onSign('completedTitle',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label for="completedDate">Date</label><input type="text" id="completedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('completedDate', v))"></div>
+            <div class="fg"><label for="completedBy" data-i18n="fld.fullName">Full Name</label><input type="text" id="completedBy" placeholder="Full name" oninput="onSign('completedBy',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label for="completedTitle" data-i18n="fld.titleRole">Title / Role</label><input type="text" id="completedTitle" placeholder="e.g. Compliance Analyst" oninput="onSign('completedTitle',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label for="completedDate" data-i18n="fld.date">Date</label><input type="text" id="completedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('completedDate', v))"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
           <div class="attest-block">
             <div class="attest-role">Second-Line — Reviewed &amp; Approved By</div>
-            <div class="fg"><label for="approvedBy">Full Name</label><input type="text" id="approvedBy" placeholder="Full name" oninput="onSign('approvedBy',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label for="approvedTitle">Title / Role</label><input type="text" id="approvedTitle" placeholder="e.g. MLRO / Head of Compliance" oninput="onSign('approvedTitle',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label for="approvedDate">Date</label><input type="text" id="approvedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('approvedDate', v))"></div>
+            <div class="fg"><label for="approvedBy" data-i18n="fld.fullName">Full Name</label><input type="text" id="approvedBy" placeholder="Full name" oninput="onSign('approvedBy',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label for="approvedTitle" data-i18n="fld.titleRole">Title / Role</label><input type="text" id="approvedTitle" placeholder="e.g. MLRO / Head of Compliance" oninput="onSign('approvedTitle',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label for="approvedDate" data-i18n="fld.date">Date</label><input type="text" id="approvedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('approvedDate', v))"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
         </div>
         <div class="fg">
           <div class="notes-hd">
-            <label class="neon-title" for="notesInput">Assessment Notes &amp; Risk Rationale</label>
+            <label class="neon-title" for="notesInput" data-i18n="fld.notes">Assessment Notes &amp; Risk Rationale</label>
             <button class="tmpl-btn no-print" type="button" onclick="insertNarrative()" title="Generate a band-matching risk rationale narrative in line with the Company's AML/CFT Compliance Manual">✎ Narrative Template</button>
           </div>
           <textarea id="notesInput" placeholder="Document any overrides, mitigating factors, escalation rationale, or additional risk considerations…" oninput="onNotes(this.value)"></textarea>
@@ -745,12 +790,12 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="sp-indicator" id="scoreIndicator"></div>
         <div class="sp-readout">
           <span class="sp-readout-num" id="totalScore">0</span>
-          <span class="sp-readout-cap">Out of 30+ &middot; Risk Score</span>
+          <span class="sp-readout-cap" data-i18n="fld.riskScore">Out of 30+ &middot; Risk Score</span>
         </div>
       </div>
 
       <div class="sp-block">
-        <div class="sp-label">Required Diligence</div>
+        <div class="sp-label" data-i18n="fld.requiredDiligence">Required Diligence</div>
         <div class="verdict-pill vp-cdd" id="verdictPill"><span id="verdictIcon">✓</span><span id="verdictText"></span></div>
         <div class="sb-thresholds">
           <span class="thresh-chip tc-low" id="tc-low">CDD: 0–19</span>
@@ -760,7 +805,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="crit-banner" id="critBanner"></div>
         <div class="ov-banner" id="ovBanner"></div>
         <div class="ov-ctl no-print">
-          <button class="breakdown-toggle" onclick="toggleOvForm()"><span id="ovArrow">▶</span>&nbsp;Analyst Override</button>
+          <button class="breakdown-toggle" onclick="toggleOvForm()"><span id="ovArrow">▶</span>&nbsp;<span data-i18n="fld.analystOverride">Analyst Override</span></button>
           <div class="ov-form" id="ovForm">
             <select id="ovBand" onchange="onOvField()" aria-label="Override band">
               <option value="">— No override —</option>
@@ -774,7 +819,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       </div>
 
       <div class="sp-block">
-        <div class="sp-label">AI Risk Advisor</div>
+        <div class="sp-label" data-i18n="fld.aiAdvisor">AI Risk Advisor</div>
         <div class="adv-block">
           <div class="adv-hud">
             <div class="adv-glow" id="advGlow"></div>
@@ -793,7 +838,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       </div>
 
       <div class="sp-block">
-        <div class="sp-label">Risk Position</div>
+        <div class="sp-label" data-i18n="fld.riskPosition">Risk Position</div>
         <div class="sb-bar-track"><div class="sb-seg-low"></div><div class="sb-seg-med"></div><div class="sb-seg-high"></div></div>
         <div class="sb-bar-pointer-wrap"><div class="sb-bar-pointer" id="barPointer" style="left:0%"><span id="pointerLabel">0</span></div></div>
         <div class="sb-axis"><span>0</span><span>10</span><span>20</span><span>30</span></div>
@@ -809,15 +854,16 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       <div class="sp-spacer"></div>
 
       <div class="sp-actions no-print">
-        <button class="btn btn-primary btn-full" onclick="printPreflight()">⎙ Print / Export PDF</button>
+        <button class="btn btn-primary btn-full" onclick="printPreflight()" data-i18n="btn.print">⎙ Print / Export PDF</button>
         <button class="btn btn-ghost btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
         <button class="btn btn-orange btn-full" id="btnRetryAsana" onclick="retryAsanaDelivery()" style="display:none">↻ Retry Asana Delivery</button>
-        <button class="btn btn-secondary btn-full" onclick="openRegister()">≡ Register</button>
-        <button class="btn btn-orange btn-full" onclick="openAudit()">▤ Activity Log</button>
+        <button class="btn btn-secondary btn-full" onclick="openRegister()" data-i18n="btn.register">≡ Register</button>
+        <button class="btn btn-blue btn-full" onclick="openBatch()" data-i18n="btn.batch">⊞ Batch Screening</button>
+        <button class="btn btn-orange btn-full" onclick="openAudit()" data-i18n="btn.audit">▤ Activity Log</button>
         <button class="btn btn-ghost btn-full" id="btnMask" onclick="toggleMask()">🙈 Mask sensitive fields</button>
-        <button class="btn btn-lilac btn-full" onclick="sendToAsana()">↗ Send to Asana</button>
-        <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
-        <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
+        <button class="btn btn-lilac btn-full" onclick="sendToAsana()" data-i18n="btn.asana">↗ Send to Asana</button>
+        <button class="btn btn-blue btn-full" onclick="reassess()" data-i18n="btn.reassess">⟳ Re-assess</button>
+        <button class="btn btn-gold btn-full" onclick="openRiskData()" data-i18n="btn.riskdata">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
       </div>
     </aside>
@@ -827,7 +873,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
   <div class="rd-overlay" id="rdOverlay">
     <div class="rd-panel">
       <div class="rd-head">
-        <span class="st">Risk Data — Reference Scores</span>
+        <span class="st" data-i18n="panel.riskdata">Risk Data — Reference Scores</span>
         <span class="rd-meta" id="rdMeta"></span>
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeRiskData()" title="Close" aria-label="Close risk data panel">✕</button>
@@ -856,13 +902,20 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
   <div class="rd-overlay" id="regOverlay">
     <div class="rd-panel">
       <div class="rd-head">
-        <span class="st">Assessment Register</span>
+        <span class="st" data-i18n="panel.register">Assessment Register</span>
         <span class="rd-meta" id="regMeta"></span>
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeRegister()" title="Close" aria-label="Close assessment register">✕</button>
       </div>
       <div class="rd-toolbar">
         <input class="rd-search" id="regSearch" placeholder="Filter by entity name or reference…" oninput="regRender()" aria-label="Filter register">
+        <select id="regReviewFilter" onchange="regRender()" aria-label="Filter by review status">
+          <option value="all">All reviews</option>
+          <option value="due">Due or overdue</option>
+          <option value="overdue">Overdue only</option>
+          <option value="soon">Due within 30 days</option>
+        </select>
+        <span class="reg-review-summary" id="regReviewSummary" aria-live="polite"></span>
       </div>
       <div class="rd-rows" id="regRows"></div>
       <div class="rd-foot">
@@ -873,11 +926,37 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
     </div>
   </div>
 
+  <!-- Batch Screening — triage many entities from a CSV through the same engine -->
+  <div class="rd-overlay" id="batchOverlay">
+    <div class="rd-panel">
+      <div class="rd-head">
+        <span class="st" data-i18n="panel.batch">Batch Screening</span>
+        <span class="rd-meta" id="batchMeta"></span>
+        <span class="rd-spacer"></span>
+        <button class="rd-close" onclick="closeBatch()" title="Close" aria-label="Close batch screening">✕</button>
+      </div>
+      <p class="rd-note">Preliminary <strong>triage</strong> only — scores many entities through the same risk engine and risk-data overrides. A header row is required; columns in any order: <code>name, jurisdiction, activity, onboard, entityYears, relYears</code> plus optional Yes/No flags <code>sanctions, pep, adverse, tf, pf</code>. An unmatched jurisdiction or activity scores low and is flagged. This is not a full assessment and is never filed to the register.</p>
+      <div class="rd-toolbar batch-toolbar">
+        <input type="file" id="batchFile" accept=".csv,text/csv" onchange="onBatchFile(event)" aria-label="Choose a CSV file">
+        <button class="btn btn-ghost" onclick="downloadBatchTemplate()">⇩ Template</button>
+        <button class="btn btn-blue" onclick="runBatch()">▶ Score batch</button>
+        <button class="btn btn-lilac" id="batchExportBtn" onclick="exportBatchResults()" style="display:none">⇧ Export results</button>
+      </div>
+      <textarea id="batchInput" class="batch-input" placeholder="…or paste CSV here — first line is the header (name,jurisdiction,activity,onboard,entityYears,relYears,sanctions,pep,adverse,tf,pf)" aria-label="Paste CSV"></textarea>
+      <div class="rd-rows batch-rows" id="batchRows"></div>
+      <div class="rd-foot">
+        <span class="rd-count" id="batchCountLbl"></span>
+        <span class="rd-spacer"></span>
+        <span class="rd-meta">Triage only — verify each escalation in a full assessment.</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Activity Log — tamper-evident, hash-chained record of key actions on this device -->
   <div class="rd-overlay" id="auditOverlay">
     <div class="rd-panel">
       <div class="rd-head">
-        <span class="st">Activity Log</span>
+        <span class="st" data-i18n="panel.audit">Activity Log</span>
         <span class="rd-meta" id="auditMeta"></span>
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeAudit()" title="Close" aria-label="Close activity log">✕</button>
@@ -892,7 +971,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       <!-- Governance controls: operator role (RBAC/ABAC), MFA, and a structured RCA record (RCause) -->
       <div class="gov-panel">
         <div class="gov-row">
-          <label for="govRole">Operator role</label>
+          <label for="govRole" data-i18n="fld.operatorRole">Operator role</label>
           <select id="govRole" class="sec-input" onchange="onRoleChange(this.value)" style="max-width:280px">
             <option value="analyst">Analyst (first line)</option>
             <option value="reviewer">Reviewer / MLRO (second line)</option>
@@ -996,6 +1075,10 @@ const QUESTIONS_OC = [
 ];
 
 const BAND_FULL = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence', EDD:'Enhanced Due Diligence', PROHIBITED:'Do Not Onboard'};
+/* Arabic band labels (machine-assisted; see #i18nCaveat). getLang() is defined
+   later in the engine and resolved at call time. */
+const BAND_FULL_AR = {CDD:'العناية الواجبة تجاه العميل', SDD:'العناية الواجبة المبسّطة', EDD:'العناية الواجبة المعزّزة', PROHIBITED:'عدم بدء العلاقة — محظور'};
+function bandFull(code){ const ar = (typeof getLang==='function' && getLang()==='ar'); return (ar ? BAND_FULL_AR[code] : BAND_FULL[code]) || BAND_FULL[code] || code; }
 const BAND_ICON = {CDD:'✓', SDD:'!', EDD:'⚠', PROHIBITED:'⛔'};
 const REVIEW_MONTHS = {CDD:12, SDD:6, EDD:3}; /* KYC review cycles per compliance manual: low 12m, medium 6m, high 3m */
 
@@ -1434,10 +1517,17 @@ function policyMissing(){
 
 /* ── MASK — field-level masking of sensitive identifiers ── */
 let _maskOn = false;
+function paintMaskBtn(){
+  if(!$('btnMask')) return;
+  const ar = (typeof getLang==='function' && getLang()==='ar');
+  $('btnMask').textContent = ar
+    ? (_maskOn ? '🙉 إظهار الحقول الحساسة' : '🙈 إخفاء الحقول الحساسة')
+    : (_maskOn ? '🙉 Unmask sensitive fields' : '🙈 Mask sensitive fields');
+}
 function toggleMask(){
   _maskOn = !_maskOn;
   try{ if(document.body && document.body.classList) document.body.classList.toggle('mask-on', _maskOn); }catch(e){}
-  if($('btnMask')) $('btnMask').textContent = _maskOn ? '🙉 Unmask sensitive fields' : '🙈 Mask sensitive fields';
+  paintMaskBtn();
 }
 
 /* ── TOKEN — pseudonymised export of the activity log (stable SHA-256 tokens) ── */
@@ -1995,17 +2085,17 @@ function buildQuestions() {
     const div = document.createElement('div');
     div.className = 'q-row';
     const crit = q.prohibit
-      ? '<span class="crit-tag" title="If Yes, the outcome is PROHIBITED — the relationship must not be onboarded; freeze funds where held and report to the FIU.">Prohibitive</span>'
+      ? '<span class="crit-tag" data-i18n="tag.prohibitive" title="If Yes, the outcome is PROHIBITED — the relationship must not be onboarded; freeze funds where held and report to the FIU.">Prohibitive</span>'
       : q.eddTrigger
-        ? '<span class="edd-tag" title="If Yes, Enhanced Due Diligence is mandatory regardless of the numeric score.">EDD trigger</span>'
+        ? '<span class="edd-tag" data-i18n="tag.edd" title="If Yes, Enhanced Due Diligence is mandatory regardless of the numeric score.">EDD trigger</span>'
         : '';
     div.innerHTML = `
       <span class="q-num">${String(idx+1).padStart(2,'0')}</span>
-      <span class="q-text" id="qtext_${q.id}">${q.text}${crit}</span>
+      <span class="q-text" id="qtext_${q.id}"><span data-i18n="q.${q.id}">${q.text}</span>${crit}</span>
       <div class="q-controls">
         <div class="toggle-group" role="group" aria-labelledby="qtext_${q.id}">
-          <button class="toggle-btn" id="btn_${q.id}_yes" onclick="setToggle('${q.id}','Yes')">Yes</button>
-          <button class="toggle-btn" id="btn_${q.id}_no" onclick="setToggle('${q.id}','No')">No</button>
+          <button class="toggle-btn" id="btn_${q.id}_yes" onclick="setToggle('${q.id}','Yes')" data-i18n="btn.yes">Yes</button>
+          <button class="toggle-btn" id="btn_${q.id}_no" onclick="setToggle('${q.id}','No')" data-i18n="btn.no">No</button>
         </div>
         <span class="q-score-pill" id="pill_${q.id}"></span>
       </div>`;
@@ -2082,8 +2172,71 @@ function paintSupplier(prefix, i) {
 }
 function paintStatus() {
   const btn = $('btnComplete');
-  if(btn) btn.textContent = state.complete ? '✓ Mark as Draft' : '✓ Complete Assessment';
+  if(btn){
+    const ar = (typeof getLang==='function' && getLang()==='ar');
+    btn.textContent = ar
+      ? (state.complete ? '✓ وضع كمسودة' : '✓ إكمال التقييم')
+      : (state.complete ? '✓ Mark as Draft' : '✓ Complete Assessment');
+  }
   paintRetryButton();
+}
+
+/* ── UBO / ownership graph ── */
+/* Parse the comma/semicolon-separated principals string into a deduped name
+   list (case-insensitive dedupe, original spelling kept). Pure + unit-tested. */
+function parsePrincipals(str){
+  const seen = new Set(), out = [];
+  for(const raw of String(str==null?'':str).split(/[,;]/)){
+    const t = raw.trim().replace(/\s+/g, ' ');
+    if(!t) continue;
+    const k = t.toLowerCase();
+    if(seen.has(k)) continue;
+    seen.add(k); out.push(t);
+  }
+  return out;
+}
+function uboTrunc(s, n){ s = String(s==null?'':s); return s.length>n ? s.slice(0,n-1).trim()+'…' : s; }
+function uboInitials(name){
+  const parts = String(name==null?'':name).trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '?';
+  return (parts[0][0] + (parts.length>1 ? parts[parts.length-1][0] : '')).toUpperCase();
+}
+/* Render an entity-centred radial ownership graph (entity → each principal).
+   The data model is a flat principals list, so this is a one-level star. */
+function renderUboGraph(){
+  const box = $('uboGraph');
+  if(!box) return;
+  const name = String((state.entity && state.entity.name) || '').trim();
+  const ppl = parsePrincipals(state.entity && state.entity.principals);
+  if(!name && !ppl.length){
+    box.innerHTML = '<div class="ubo-empty">Add a legal name and principals to see the ownership graph.</div>';
+    return;
+  }
+  const W = 320, H = 244, cx = W/2, cy = 122, R = 84, n = ppl.length;
+  let edges = '', nodes = '';
+  ppl.forEach((p, i) => {
+    const ang = (-Math.PI/2) + (i * 2*Math.PI / Math.max(n,1));
+    const x = cx + R*Math.cos(ang), y = cy + R*Math.sin(ang);
+    edges += '<line class="ubo-edge" x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'"/>';
+    const anchor = x < cx-8 ? 'end' : (x > cx+8 ? 'start' : 'middle');
+    const lx = x + (anchor==='end' ? -20 : anchor==='start' ? 20 : 0);
+    const ly = anchor==='middle' ? (y >= cy ? y+30 : y-22) : y+3;
+    nodes += '<g>'
+      + '<circle class="ubo-ring" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="16"/>'
+      + '<text class="ubo-init" x="'+x.toFixed(1)+'" y="'+(y+3.5).toFixed(1)+'">'+esc(uboInitials(p))+'</text>'
+      + '<text class="ubo-label" text-anchor="'+anchor+'" x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'">'+esc(uboTrunc(p,16))+'</text>'
+      + '</g>';
+  });
+  const summary = 'Ownership graph: ' + (name||'subject entity') + ' with ' + n + ' principal' + (n===1?'':'s');
+  box.innerHTML =
+    '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(summary)+'">'
+    + edges
+    + '<circle class="ubo-ring-entity" cx="'+cx+'" cy="'+cy+'" r="30"/>'
+    + '<text class="ubo-init-entity" x="'+cx+'" y="'+(cy+4)+'">'+esc(uboInitials(name)||'•')+'</text>'
+    + '<text class="ubo-name-entity" x="'+cx+'" y="'+(cy+50)+'">'+esc(uboTrunc(name||'Subject entity',24))+'</text>'
+    + nodes
+    + (n===0 ? '<text class="ubo-empty-svg" x="'+cx+'" y="'+(cy-44)+'">No principals recorded yet</text>' : '')
+    + '</svg>';
 }
 
 function syncUI() {
@@ -2098,6 +2251,7 @@ function syncUI() {
   $('entityAddress').value = s.entity.address;
   $('entityContact').value = s.entity.contact;
   $('entityPrincipals').value = s.entity.principals;
+  renderUboGraph();
   $('jurisdictionSelect').value = s.entity.jurisdiction; paintJurisdiction();
   $('activitySelect').value = s.profile.activity; paintActivity();
   paintToggle('onboard', s.profile.onboard, 'onboard');
@@ -2139,6 +2293,7 @@ function onField(section, key, val) {
     if(prev && prev!==next) regDelete(prev);
   }
   state[section][key] = val;
+  if(section==='entity' && (key==='principals' || key==='name')) renderUboGraph();
   if(section==='meta' && key==='date'){ recalc(); return; }
   scheduleSave();
 }
@@ -2487,7 +2642,7 @@ function recalc() {
   /* Verdict pill (operative outcome) + threshold chips (numeric band) */
   const vpEl = $('verdictPill');
   vpEl.className = 'verdict-pill ' + {CDD:'vp-cdd', SDD:'vp-sdd', EDD:'vp-edd', PROHIBITED:'vp-proh'}[a.outcome];
-  $('verdictText').textContent = a.outcome + ' — ' + BAND_FULL[a.outcome] + (a.analystOv ? ' ✱' : '');
+  $('verdictText').textContent = a.outcome + ' — ' + bandFull(a.outcome) + (a.analystOv ? ' ✱' : '');
   $('verdictIcon').textContent = BAND_ICON[a.outcome];
 
   /* AI Risk Advisor — robot persona recolours to the operative outcome */
@@ -2717,27 +2872,53 @@ function regOpenEntry(ref){
   return true;
 }
 
+/* Pure review-scheduler helpers (unit-tested). A summary's review state is one
+   of: 'prohibited' (no review), 'overdue' (next review in the past),
+   'soon' (due within the window, default 30d), 'scheduled' (further out), or
+   'none' (no valid next-review date). */
+function reviewStatus(sm, today, soon){
+  if(sm && sm.prohibited) return 'prohibited';
+  const nr = String((sm && sm.nextReview) || '');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(nr)) return 'none';
+  if(nr < today) return 'overdue';
+  if(nr <= soon) return 'soon';
+  return 'scheduled';
+}
+/* Count overdue / due-soon reviews across a register items map. */
+function reviewCounts(items, today, soon){
+  let overdue = 0, soon_ = 0;
+  for(const ref of Object.keys(items || {})){
+    const st = reviewStatus((items[ref] || {}).summary || {}, today, soon);
+    if(st === 'overdue') overdue++; else if(st === 'soon') soon_++;
+  }
+  return { overdue, soon: soon_ };
+}
+
 let regView = [];
 function regRender(){
   const rows = $('regRows');
   if(!rows) return;
   const items = regAll();
   const q = (($('regSearch') && $('regSearch').value) || '').toLowerCase();
+  const fv = (($('regReviewFilter') && $('regReviewFilter').value) || 'all');
   const refs = Object.keys(items).sort((x,y)=>String(items[y].savedAt||'').localeCompare(String(items[x].savedAt||'')));
   regView = [];
   const today = todayISO(), soon = addMonths(today, 1);
   const html = refs.map(ref => {
     const it = items[ref] || {}, sm = it.summary || {};
     if(q && (ref+' '+(sm.entity||'')).toLowerCase().indexOf(q)===-1) return '';
+    const rs = reviewStatus(sm, today, soon);
+    if(fv==='due' && !(rs==='overdue' || rs==='soon')) return '';
+    if(fv==='overdue' && rs!=='overdue') return '';
+    if(fv==='soon' && rs!=='soon') return '';
     const i = regView.push(ref) - 1;
     const band = {CDD:'reg-cdd', SDD:'reg-sdd', EDD:'reg-edd', PROHIBITED:'reg-proh'}[sm.outcome] || 'reg-st-draft';
     const result = sm.outcome==='PROHIBITED' ? 'PROHIBITED' : (sm.outcome||'?') + ' · ' + (isNaN(parseInt(sm.total)) ? '?' : sm.total);
     let review = '', revCls = '';
-    if(sm.prohibited){ review = 'no review — prohibited'; }
-    else if(/^\d{4}-\d{2}-\d{2}$/.test(String(sm.nextReview||''))){
-      if(sm.nextReview < today){ review = 'REVIEW OVERDUE — ' + fmtDate(sm.nextReview); revCls = ' reg-over'; }
-      else { review = 'review ' + fmtDate(sm.nextReview); if(sm.nextReview <= soon) revCls = ' reg-soon'; }
-    }
+    if(rs==='prohibited'){ review = 'no review — prohibited'; }
+    else if(rs==='overdue'){ review = 'REVIEW OVERDUE — ' + fmtDate(sm.nextReview); revCls = ' reg-over'; }
+    else if(rs==='soon'){ review = 'review ' + fmtDate(sm.nextReview); revCls = ' reg-soon'; }
+    else if(rs==='scheduled'){ review = 'review ' + fmtDate(sm.nextReview); }
     const cur = state.meta.ref===ref;
     return '<div class="reg-row'+(cur?' reg-cur':'')+'">'
       + '<span class="reg-ref">'+esc(ref)+(cur?' ✱':'')+'</span>'
@@ -2754,7 +2935,157 @@ function regRender(){
   if(c) c.textContent = refs.length + ' assessment' + (refs.length===1?'':'s') + ' filed';
   const m = $('regMeta');
   if(m) m.textContent = regView.length===refs.length ? '' : regView.length + ' of ' + refs.length + ' shown';
+  const rsum = $('regReviewSummary');
+  if(rsum){
+    const cts = reviewCounts(items, today, soon);
+    const parts = [];
+    if(cts.overdue) parts.push(cts.overdue + ' overdue');
+    if(cts.soon) parts.push(cts.soon + ' due ≤30d');
+    rsum.textContent = parts.length ? ('Reviews: ' + parts.join(' · ')) : 'No reviews due';
+    rsum.className = 'reg-review-summary' + (cts.overdue ? ' reg-over' : (cts.soon ? ' reg-soon' : ''));
+  }
 }
+/* ══════════════════════════════════════════
+   BATCH SCREENING (CSV triage — pure helpers + UI)
+══════════════════════════════════════════ */
+/* RFC4180-ish CSV → { headers, rows:[{lower-cased-header: value}] }. */
+function batchParseCsv(text){
+  const s = String(text==null?'':text);
+  const grid = [];
+  let row = [], field = '', inQ = false;
+  for(let i=0;i<s.length;i++){
+    const c = s[i];
+    if(inQ){
+      if(c==='"'){ if(s[i+1]==='"'){ field+='"'; i++; } else inQ=false; }
+      else field += c;
+      continue;
+    }
+    if(c==='"'){ inQ = true; continue; }
+    if(c===','){ row.push(field); field=''; continue; }
+    if(c==='\r'){ continue; }
+    if(c==='\n'){ row.push(field); grid.push(row); row=[]; field=''; continue; }
+    field += c;
+  }
+  if(field.length || row.length){ row.push(field); grid.push(row); }
+  const nonEmpty = grid.filter(r => r.some(c => String(c).trim()!==''));
+  if(!nonEmpty.length) return { headers:[], rows:[] };
+  const headers = nonEmpty[0].map(h => String(h).trim());
+  const rows = nonEmpty.slice(1).map(r => {
+    const o = {};
+    headers.forEach((h,idx) => { o[h.toLowerCase()] = r[idx]!=null ? String(r[idx]).trim() : ''; });
+    return o;
+  });
+  return { headers, rows };
+}
+function batchPick(o, keys){ for(const k of keys){ if(o[k]!=null && o[k]!=='') return o[k]; } return ''; }
+function batchYes(v){ return /^(y|yes|true|1)$/i.test(String(v==null?'':v).trim()); }
+/* Map a raw CSV row (lower-cased keys) to the engine's input factors. */
+function mapBatchRow(o){
+  o = o || {};
+  const onboardRaw = batchPick(o, ['onboard','remote','channel','non-face-to-face']);
+  return {
+    name: batchPick(o, ['name','entity','entity name','legal name','client']),
+    jurisdiction: batchPick(o, ['jurisdiction','country','country of incorporation']),
+    activity: batchPick(o, ['activity','business activity','nature of business']),
+    onboard: /^(y|yes|true|1|remote|non.?face)/i.test(String(onboardRaw).trim()) ? 'Yes' : 'No',
+    entityYears: batchPick(o, ['entityyears','entity years','years trading','operational history']),
+    relYears: batchPick(o, ['relyears','relationship years','relationship duration']),
+    flags: {
+      sanctions_entity: batchYes(batchPick(o, ['sanctions','sanctioned'])) ? 'Yes' : 'No',
+      pep: batchYes(batchPick(o, ['pep'])) ? 'Yes' : 'No',
+      adverse: batchYes(batchPick(o, ['adverse','adverse media'])) ? 'Yes' : 'No',
+      tf: batchYes(batchPick(o, ['tf','terrorist','terrorism'])) ? 'Yes' : 'No',
+      pf: batchYes(batchPick(o, ['pf','proliferation'])) ? 'Yes' : 'No',
+    }
+  };
+}
+/* Score one mapped row through computeAssessment by temporarily swapping the
+   live state, then restoring it (synchronous; no renders fire in between). */
+function scoreBatchRow(m){
+  const saved = state, notes = [];
+  try{
+    const s = freshState();
+    s.entity.name = m.name || '';
+    if(m.jurisdiction){ s.entity.jurisdiction = m.jurisdiction; if(!effCountry(m.jurisdiction)) notes.push('jurisdiction not in risk data — scored low'); }
+    if(m.activity){ s.profile.activity = m.activity; if(!effOf('activities', m.activity)) notes.push('activity not in risk data — scored low'); }
+    s.profile.onboard = m.onboard;
+    const ey = parseInt(m.entityYears, 10); if(!isNaN(ey)) s.profile.entityYears = ey;
+    const ry = parseInt(m.relYears, 10); if(!isNaN(ry)) s.profile.relYears = ry;
+    if(m.flags){ Object.keys(m.flags).forEach(k => { if(s.questions[k]!==undefined && m.flags[k]==='Yes') s.questions[k]='Yes'; }); }
+    state = s;
+    const r = computeAssessment();
+    return { name:m.name||'', jurisdiction:s.entity.jurisdiction, activity:s.profile.activity,
+      total:r.total, outcome:r.outcome, prohibited:r.prohibited, escalations:r.escalations.map(e=>e.reason), notes };
+  } finally { state = saved; }
+}
+function scoreBatch(text){ return batchParseCsv(text).rows.map(o => scoreBatchRow(mapBatchRow(o))); }
+function batchCsvCell(v){ v = String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+function batchToCsv(results){
+  const head = ['Name','Jurisdiction','Activity','Score','Outcome','Prohibited','Escalations','Notes'];
+  const lines = [head.join(',')];
+  (results||[]).forEach(r => {
+    lines.push([r.name, r.jurisdiction, r.activity, r.total, r.outcome, r.prohibited?'YES':'',
+      (r.escalations||[]).join('; '), (r.notes||[]).join('; ')].map(batchCsvCell).join(','));
+  });
+  return lines.join('\n');
+}
+function batchDownload(filename, text, mime){
+  const blob = new Blob([text], {type: mime||'text/csv'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  setTimeout(() => { try{ URL.revokeObjectURL(link.href); }catch(e){} }, 0);
+}
+let batchResults = [];
+function batchOutcomeClass(o){ return {CDD:'reg-cdd', SDD:'reg-sdd', EDD:'reg-edd', PROHIBITED:'reg-proh'}[o] || 'reg-st-draft'; }
+function renderBatchResults(results){
+  const box = $('batchRows');
+  if(!box) return;
+  if(!results.length){ box.innerHTML = '<div class="rd-empty">No rows scored — add a header row and at least one entity.</div>'; return; }
+  const body = results.map(r => {
+    const label = r.prohibited ? 'PROHIBITED' : (r.outcome + ' · ' + r.total);
+    const cls = batchOutcomeClass(r.prohibited ? 'PROHIBITED' : r.outcome);
+    const note = (r.notes && r.notes.length) ? r.notes.join('; ') : (r.escalations && r.escalations.length ? r.escalations.join('; ') : '');
+    return '<div class="batch-row">'
+      + '<span class="batch-name">'+esc(r.name||'—')+'</span>'
+      + '<span class="batch-jur">'+esc(r.jurisdiction||'—')+'</span>'
+      + '<span class="reg-chip '+cls+'">'+esc(label)+'</span>'
+      + '<span class="batch-note">'+esc(note)+'</span>'
+      + '</div>';
+  }).join('');
+  box.innerHTML = '<div class="batch-row batch-head"><span class="batch-name">Entity</span><span class="batch-jur">Jurisdiction</span><span>Outcome</span><span class="batch-note">Notes / escalations</span></div>' + body;
+}
+function runBatch(){
+  const text = ($('batchInput') && $('batchInput').value) || '';
+  if(!text.trim()){ toast('Paste CSV or choose a file first'); return; }
+  batchResults = scoreBatch(text);
+  renderBatchResults(batchResults);
+  const c = $('batchCountLbl'); if(c) c.textContent = batchResults.length + ' entit' + (batchResults.length===1?'y':'ies') + ' scored';
+  const prohibited = batchResults.filter(r=>r.prohibited).length;
+  const m = $('batchMeta'); if(m) m.textContent = prohibited ? (prohibited + ' PROHIBITED') : '';
+  const xb = $('batchExportBtn'); if(xb) xb.style.display = batchResults.length ? '' : 'none';
+}
+function onBatchFile(e){
+  const f = e && e.target && e.target.files && e.target.files[0];
+  if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { const ta = $('batchInput'); if(ta) ta.value = String(rd.result||''); toast('Loaded '+f.name); };
+  rd.readAsText(f);
+}
+function downloadBatchTemplate(){
+  const tmpl = 'name,jurisdiction,activity,onboard,entityYears,relYears,sanctions,pep,adverse,tf,pf\n'
+    + 'Acme Trading FZE,United Arab Emirates,Non-Manufactured Precious Metal Trading,No,3,2,No,No,No,No,No\n'
+    + 'Example Holdings Ltd,United Kingdom,Non-Manufactured Precious Metal Trading,Yes,1,1,No,Yes,No,No,No\n';
+  batchDownload('batch-template.csv', tmpl, 'text/csv');
+}
+function exportBatchResults(){
+  if(!batchResults.length){ toast('Score a batch first'); return; }
+  batchDownload('batch-results-' + todayISO().replace(/-/g,'') + '.csv', batchToCsv(batchResults), 'text/csv');
+}
+function openBatch(){ const o = $('batchOverlay'); if(o) o.classList.add('open'); }
+function closeBatch(){ const o = $('batchOverlay'); if(o) o.classList.remove('open'); }
+
 function openRegister(){
   regUpsert(); /* show the current assessment as it stands right now */
   regRender();
@@ -2778,9 +3109,118 @@ function regDeleteIdx(i){
   regRender();
   toast('Removed from register — '+ref);
 }
+/* ══════════════════════════════════════════
+   BILINGUAL (EN / AR) — interface i18n + RTL
+   Machine-assisted UI translation for accessibility. The detailed legal /
+   regulatory content (the Q&A corpus, legal narratives, risk-data text)
+   intentionally stays English until a qualified Arabic AML reviewer signs it
+   off — surfaced to the user via #i18nCaveat in Arabic mode.
+══════════════════════════════════════════ */
+const LANG_KEY = 'hsra.lang';
+const I18N = {
+  'nav.assessment': {en:'Assessment', ar:'التقييم'},
+  'nav.console':    {en:'Console', ar:'لوحة العمليات'},
+  'nav.advisor':    {en:'Advisor', ar:'المستشار'},
+  'btn.lock':       {en:'⚿ Lock', ar:'⚿ قفل'},
+  'sec.01': {en:'Assessment Administration', ar:'إدارة التقييم'},
+  'sec.02': {en:'Entity Identification', ar:'تعريف الكيان'},
+  'sec.03': {en:'Business Profile', ar:'ملف النشاط التجاري'},
+  'sec.04': {en:'Ownership, Control & Compliance', ar:'الملكية والسيطرة والامتثال'},
+  'sec.05': {en:'Supply Chain — Material Sources', ar:'سلسلة التوريد — مصادر المواد'},
+  'sec.06': {en:'Sign-Off & Attestation', ar:'التوقيع والإقرار'},
+  'panel.riskdata': {en:'Risk Data — Reference Scores', ar:'بيانات المخاطر — الدرجات المرجعية'},
+  'panel.register': {en:'Assessment Register', ar:'سجل التقييمات'},
+  'panel.batch':    {en:'Batch Screening', ar:'الفحص المجمّع'},
+  'panel.audit':    {en:'Activity Log', ar:'سجل النشاط'},
+  'btn.print':    {en:'⎙ Print / Export PDF', ar:'⎙ طباعة / تصدير PDF'},
+  'btn.register': {en:'≡ Register', ar:'≡ السجل'},
+  'btn.batch':    {en:'⊞ Batch Screening', ar:'⊞ الفحص المجمّع'},
+  'btn.audit':    {en:'▤ Activity Log', ar:'▤ سجل النشاط'},
+  'btn.asana':    {en:'↗ Send to Asana', ar:'↗ إرسال إلى Asana'},
+  'btn.reassess': {en:'⟳ Re-assess', ar:'⟳ إعادة التقييم'},
+  'btn.riskdata': {en:'⚙ Risk Data', ar:'⚙ بيانات المخاطر'},
+  'fld.ref':        {en:'Reference Number', ar:'الرقم المرجعي'},
+  'fld.assessDate': {en:'Assessment Date', ar:'تاريخ التقييم'},
+  'fld.nextReview': {en:'Next Review Date', ar:'تاريخ المراجعة القادمة'},
+  'fld.assessedBy': {en:'Assessed By', ar:'أجري التقييم بواسطة'},
+  'fld.role':       {en:'Role / Department', ar:'الدور / القسم'},
+  'fld.legalName':  {en:'Legal Entity Name', ar:'الاسم القانوني للكيان'},
+  'fld.trading':    {en:'Trading Name (If Different)', ar:'الاسم التجاري (إن اختلف)'},
+  'fld.regno':      {en:'Registration / Licence No.', ar:'رقم التسجيل / الرخصة'},
+  'fld.address':    {en:'Registered Address', ar:'العنوان المسجَّل'},
+  'fld.contact':    {en:'Website / Email', ar:'الموقع الإلكتروني / البريد الإلكتروني'},
+  'fld.principals': {en:'Principals — Beneficial Owners / Controllers / Directors', ar:'الأطراف الرئيسية — المالكون المستفيدون / المسيطرون / المديرون'},
+  'fld.jurisdiction': {en:'Jurisdiction & Incorporation', ar:'الولاية القضائية والتأسيس'},
+  'fld.activity':     {en:'Business Activity', ar:'النشاط التجاري'},
+  'fld.onboard':      {en:'Onboarding Channel', ar:'قناة الإلحاق'},
+  'fld.opHistory':    {en:'Operational History — Entity', ar:'السجل التشغيلي — الكيان'},
+  'fld.relDuration':  {en:'Relationship Duration', ar:'مدة العلاقة'},
+  'fld.fullName':     {en:'Full Name', ar:'الاسم الكامل'},
+  'fld.titleRole':    {en:'Title / Role', ar:'المسمى الوظيفي / الدور'},
+  'fld.date':         {en:'Date', ar:'التاريخ'},
+  'tag.prohibitive':  {en:'Prohibitive', ar:'مانع'},
+  'tag.edd':          {en:'EDD trigger', ar:'موجب للعناية المعزّزة'},
+  'btn.yes':          {en:'Yes', ar:'نعم'},
+  'btn.no':           {en:'No', ar:'لا'},
+  'fld.sanctionsScreening': {en:'Sanctions Screening — System / Provider', ar:'فحص العقوبات — النظام / المزوّد'},
+  'fld.pepScreening':       {en:'PEP Screening — System / Provider', ar:'فحص الأشخاص المعرَّضين سياسياً — النظام / المزوّد'},
+  'fld.adverseScreening':   {en:'Adverse Media — System / Provider', ar:'الإعلام السلبي — النظام / المزوّد'},
+  'fld.screenedOn':   {en:'Screened On', ar:'تاريخ الفحص'},
+  'fld.refId':        {en:'Reference ID', ar:'المعرّف المرجعي'},
+  'fld.notes':        {en:'Assessment Notes & Risk Rationale', ar:'ملاحظات التقييم ومسوّغات المخاطر'},
+  'fld.operatorRole': {en:'Operator role', ar:'دور المشغّل'},
+  'fld.riskScore':        {en:'Out of 30+ · Risk Score', ar:'من أصل 30+ · درجة المخاطر'},
+  'fld.requiredDiligence':{en:'Required Diligence', ar:'العناية الواجبة المطلوبة'},
+  'fld.aiAdvisor':        {en:'AI Risk Advisor', ar:'مستشار المخاطر الذكي'},
+  'fld.riskPosition':     {en:'Risk Position', ar:'موضع المخاطر'},
+  'fld.analystOverride':  {en:'Analyst Override', ar:'تجاوز المحلِّل'},
+};
+/* Arabic for the ownership/compliance questions (section 04). Machine-assisted
+   per #i18nCaveat — review before official use. Folded into I18N keyed q.<id>
+   so applyLang translates the rendered question text. */
+const Q_AR = {
+  aml:'هل لدى الكيان القانوني بيئة رقابة كافية وفعّالة لمكافحة غسل الأموال وتمويل الإرهاب (حيثما ينطبق)؟',
+  sanctions_person:'هل يخضع أيٌّ من المالكين المستفيدين أو المسيطرين أو المديرين أو الإدارة العليا لعقوبات؟',
+  criminal:'هل يخضع الكيان لأي إجراءات جنائية أو تحقيقات قانونية جارية؟',
+  adverse:'هل يخضع أيٌّ من المالكين المستفيدين أو المسيطرين أو المديرين أو الإدارة العليا لتغطية إعلامية سلبية أو نتائج تمسّ السمعة؟',
+  sanctions_entity:'هل يخضع الكيان القانوني نفسه لأي عقوبات وطنية أو دولية؟',
+  sof:'هل توجد أي مخاوف بشأن مصدر الأموال و/أو مصدر الثروة للمالكين المستفيدين أو الكيان القانوني (حيثما ينطبق)؟',
+  high_risk_ind:'هل يعمل الكيان في أي صناعات عالية المخاطر (الأسلحة، المقامرة، الكازينوهات)؟',
+  tf:'هل يرتبط أيٌّ من المالكين المستفيدين أو المسيطرين أو المديرين بتمويل الإرهاب أو بمنظمات إرهابية مُدرجة؟',
+  pf:'هل يرتبط أيٌّ من المالكين المستفيدين أو المسيطرين أو المديرين بتمويل انتشار التسلح أو بتجارة المواد أو التقنيات المتصلة بأسلحة الدمار الشامل؟',
+  pep:'هل يُعدّ أيٌّ من المالكين المستفيدين أو المسيطرين أو الإدارة العليا من الأشخاص المعرَّضين سياسياً (PEPs)؟',
+  gov:'هل يملك الكيانَ القانوني أو يسيطر عليه حكومة أو سلطة حكومية أو جهة من القطاع العام؟',
+};
+QUESTIONS_OC.forEach(q => { if(Q_AR[q.id]) I18N['q.'+q.id] = {en:q.text, ar:Q_AR[q.id]}; });
+function translateKey(key, lang){ const t = I18N[key]; return t ? (t[lang]!=null ? t[lang] : t.en) : null; }
+function getLang(){ try{ return localStorage.getItem(LANG_KEY)==='ar' ? 'ar' : 'en'; }catch(e){ return 'en'; } }
+function applyLang(lang){
+  lang = (lang==='ar') ? 'ar' : 'en';
+  try{ localStorage.setItem(LANG_KEY, lang); }catch(e){}
+  const html = document.documentElement;
+  if(html){ html.lang = lang; if(html.setAttribute) html.setAttribute('dir', lang==='ar' ? 'rtl' : 'ltr'); }
+  const nodes = (document.querySelectorAll) ? document.querySelectorAll('[data-i18n]') : null;
+  if(nodes && nodes.forEach) nodes.forEach(el => {
+    const t = translateKey(el.getAttribute('data-i18n'), lang);
+    if(t!=null) el.textContent = t;
+  });
+  const tog = $('langToggle'); if(tog) tog.textContent = (lang==='ar') ? 'EN' : 'عربي';
+  const cav = $('i18nCaveat'); if(cav) cav.style.display = (lang==='ar') ? '' : 'none';
+  /* Repaint JS-set strings (verdict, complete/mask buttons) in the new language.
+     Guarded: at first load state may not be ready yet — the normal init paint
+     handles it then; on a user toggle these run with state ready. */
+  try{ if(typeof recalc==='function') recalc(); }catch(e){}
+  try{ if(typeof paintStatus==='function') paintStatus(); }catch(e){}
+  try{ if(typeof paintMaskBtn==='function') paintMaskBtn(); }catch(e){}
+}
+function toggleLang(){ applyLang(getLang()==='ar' ? 'en' : 'ar'); }
+function initLang(){ applyLang(getLang()); }
+
 function initRegisterPanel(){
   const ov = $('regOverlay');
   if(ov && ov.addEventListener) ov.addEventListener('click', function(e){ if(e.target===ov) closeRegister(); });
+  const bo = $('batchOverlay');
+  if(bo && bo.addEventListener) bo.addEventListener('click', function(e){ if(e.target===bo) closeBatch(); });
 }
 
 function newAssessment(){
@@ -3172,6 +3612,7 @@ buildSuppliers();
 refreshSelectLabels(); /* add override marks (✱) to the now-built selects */
 initRiskDataPanel();
 initRegisterPanel();
+initLang();
 
 /* (Re)load persisted risk data + draft into the UI. Safe to re-run after the
    device is unlocked, when the encrypted store first becomes readable. */

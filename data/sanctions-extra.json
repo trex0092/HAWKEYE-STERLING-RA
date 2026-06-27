@@ -30,6 +30,26 @@
       "parser": "xml",
       "enabled": false,
       "_note": "Disabled until the current SECO overall-list XML download URL is confirmed (https://www.seco.admin.ch/en/searching-for-subjects-sanctions). Set the url and enabled:true to switch on."
+    },
+    {
+      "id": "au-dfat",
+      "name": "Australia — DFAT Consolidated List",
+      "jurisdiction": "Global",
+      "url": "",
+      "type": "xml",
+      "parser": "xml",
+      "enabled": false,
+      "_note": "DFAT publishes the Consolidated List as XLSX (regulation8_consolidated.xlsx) at https://www.dfat.gov.au/international-relations/security/sanctions/consolidated-list — the current parsers handle csv/xml only, so this needs an XLSX→CSV export (or an xlsx parser) plus the confirmed URL before enabling."
+    },
+    {
+      "id": "wb-debarred",
+      "name": "World Bank — Listing of Ineligible (Debarred) Firms & Individuals",
+      "jurisdiction": "Global",
+      "url": "",
+      "type": "csv",
+      "parser": "curated",
+      "enabled": false,
+      "_note": "Debarment (not a sanctions designation) — a useful EDD signal for procurement-linked entities. Published as HTML/JSON at https://www.worldbank.org/en/projects-operations/procurement/debarred-firms with no stable bulk CSV; maintain as a curated file or confirm a machine-readable endpoint before enabling."
     }
   ]
 }

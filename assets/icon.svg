@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Hawkeye Sterling">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A0E16"/>
+      <stop offset="1" stop-color="#0B101A"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#14E0C0" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#14E0C0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="150" fill="url(#glow)"/>
+  <g fill="none" stroke="#2AF0D2" stroke-width="22">
+    <circle cx="256" cy="256" r="159"/>
+    <circle cx="256" cy="256" r="87" stroke-width="19"/>
+  </g>
+  <circle cx="256" cy="256" r="38" fill="#5CFFE6"/>
+  <g stroke="#5CFFE6" stroke-width="18" stroke-linecap="round">
+    <line x1="256" y1="44"  x2="256" y2="92"/>
+    <line x1="256" y1="420" x2="256" y2="468"/>
+    <line x1="44"  y1="256" x2="92"  y2="256"/>
+    <line x1="420" y1="256" x2="468" y2="256"/>
+  </g>
+</svg>

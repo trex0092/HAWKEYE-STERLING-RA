@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0A0E16">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hawkeye RA">
+<script src="sw-register.js"></script>
+<script src="i18n.js"></script>
 <title>Hawkeye Sterling — Advisor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -193,13 +204,15 @@ textarea.q:focus{border-color:var(--ac2);box-shadow:0 0 0 3px rgba(var(--glow),0
     </div>
     <div class="hdr-right">
       <nav class="nav" aria-label="Suite navigation">
-        <a href="index.html">Assessment</a>
-        <a href="console.html">Console</a>
-        <a href="advisor.html" class="active" aria-current="page">Advisor</a>
+        <a href="index.html" data-i18n="nav.assessment">Assessment</a>
+        <a href="console.html" data-i18n="nav.console">Console</a>
+        <a href="advisor.html" class="active" aria-current="page" data-i18n="nav.advisor">Advisor</a>
       </nav>
+      <button id="langToggle" onclick="hsToggleLang()" title="Switch language / تبديل اللغة" aria-label="Switch language">عربي</button>
       <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session"><span class="sess-ic">⏱</span><span class="sess-t">--:--</span></span>
     </div>
   </header>
+  <div class="i18n-caveat" id="i18nCaveat" style="display:none" role="note">ترجمة آلية للواجهة — للاسترشاد فقط، ويجب مراجعتها من مختصّ قبل الاعتماد الرسمي. محتوى الأسئلة والأجوبة التنظيمية وأدلة الأدوات يبقى بالإنجليزية.</div>
 
   <div class="tabs" id="tabs"></div>
   <main id="main"></main>

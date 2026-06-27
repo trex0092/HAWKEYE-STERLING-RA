@@ -60,7 +60,10 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   buildNarrative, insertNarrative, asanaPayload, sendToAsana, deliveredGid, rememberDelivered,
   scheduleRiskBackup,
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
-  openRegister, closeRegister,
+  openRegister, closeRegister, reviewStatus, reviewCounts,
+  parsePrincipals, uboInitials, uboTrunc, renderUboGraph,
+  batchParseCsv, mapBatchRow, scoreBatchRow, scoreBatch, batchToCsv,
+  I18N, translateKey, applyLang, getLang, toggleLang,
   storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
   _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
   currentRole, setRole, can, roleAtLeast, ROLES, ROLE_KEY, policyMissing,
@@ -801,9 +804,9 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
      Guards the label/for associations so they can't silently regress. */
   check('jurisdiction select has an associated label', html.includes('<label for="jurisdictionSelect">'));
   check('activity select has an associated label', html.includes('<label for="activitySelect">'));
-  check('entity name input has an associated label', html.includes('<label for="entityName">'));
+  check('entity name input has an associated label', html.includes('<label for="entityName"'));
   check('year inputs have associated labels', html.includes('<label for="entityYearsInput">') && html.includes('<label for="relYearsInput">'));
-  check('screening + sign-off fields are labelled', html.includes('<label for="scr_sanctions_date">') && html.includes('<label for="approvedDate">'));
+  check('screening + sign-off fields are labelled', html.includes('<label for="scr_sanctions_date"') && html.includes('<label for="approvedDate"'));
   check('onboarding toggle-group is a labelled group',
     html.includes('<label id="onboardLbl">') && html.includes('aria-labelledby="onboardLbl"'));
   check('generated question toggle-groups are labelled groups',
@@ -914,6 +917,85 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
       payloadText.includes('REF-') && !payloadText.includes('RA-20260621-001'));
     global.localStorage.removeItem('hsra.audit.v1');
   })();
+
+  /* ── review scheduler (pure helpers) ── */
+  {
+    const today = '2026-06-27', soon = '2026-07-27';
+    check('reviewStatus: prohibited → no review', A.reviewStatus({prohibited:true, nextReview:'2020-01-01'}, today, soon) === 'prohibited');
+    check('reviewStatus: past date → overdue', A.reviewStatus({nextReview:'2026-06-01'}, today, soon) === 'overdue');
+    check('reviewStatus: within window → soon', A.reviewStatus({nextReview:'2026-07-10'}, today, soon) === 'soon');
+    check('reviewStatus: far future → scheduled', A.reviewStatus({nextReview:'2027-01-01'}, today, soon) === 'scheduled');
+    check('reviewStatus: missing/invalid date → none',
+      A.reviewStatus({}, today, soon) === 'none' && A.reviewStatus({nextReview:'nope'}, today, soon) === 'none');
+    const items = {
+      A:{summary:{nextReview:'2026-06-01'}}, B:{summary:{nextReview:'2026-07-10'}},
+      C:{summary:{nextReview:'2027-01-01'}}, D:{summary:{prohibited:true}}, E:{summary:{nextReview:'2026-05-01'}},
+    };
+    const cts = A.reviewCounts(items, today, soon);
+    check('reviewCounts tallies overdue + due-soon', cts.overdue === 2 && cts.soon === 1);
+    check('reviewCounts tolerates empty/null', A.reviewCounts({}, today, soon).overdue === 0 && A.reviewCounts(null, today, soon).soon === 0);
+  }
+
+  /* ── UBO / ownership graph ── */
+  {
+    check('parsePrincipals splits, trims and dedupes case-insensitively',
+      JSON.stringify(A.parsePrincipals('John Smith, jane doe; John  Smith ,, JANE DOE')) === JSON.stringify(['John Smith','jane doe']));
+    check('parsePrincipals tolerates empty/null', A.parsePrincipals('').length === 0 && A.parsePrincipals(null).length === 0);
+    check('uboInitials takes first + last initial', A.uboInitials('John Quincy Adams') === 'JA' && A.uboInitials('Cher') === 'C' && A.uboInitials('') === '?');
+    check('uboTrunc adds an ellipsis past the limit', A.uboTrunc('abcdefghij', 5) === 'abcd…' && A.uboTrunc('abc', 5) === 'abc');
+    A.state = A.freshState();
+    A.state.entity.name = 'Acme Trading FZE';
+    A.state.entity.principals = 'John Smith, Jane Doe';
+    A.renderUboGraph();
+    const g = document.getElementById('uboGraph');
+    check('renderUboGraph paints an SVG with the entity and one node per principal',
+      g && /<svg/.test(g.innerHTML) && g.innerHTML.includes('Acme Trading FZE') && (g.innerHTML.match(/ubo-ring"/g) || []).length === 2);
+    A.state.entity.name = ''; A.state.entity.principals = '';
+    A.renderUboGraph();
+    check('renderUboGraph shows the empty hint when there is nothing to graph',
+      /ubo-empty/.test(document.getElementById('uboGraph').innerHTML));
+  }
+
+  /* ── batch screening (CSV triage) ── */
+  {
+    const csv = 'name,jurisdiction,activity,sanctions,pep\n'
+      + '"Smith, John Co",United Kingdom,Non-Manufactured Precious Metal Trading,No,Yes\n'
+      + 'Bad Actor Ltd,Nowhereland,Non-Manufactured Precious Metal Trading,Yes,No\n';
+    const parsed = A.batchParseCsv(csv);
+    check('batchParseCsv reads headers + quoted comma fields',
+      parsed.headers[0]==='name' && parsed.rows.length===2 && parsed.rows[0]['name']==='Smith, John Co');
+    const m = A.mapBatchRow({name:'X', country:'France', 'business activity':'Refining', onboard:'remote', pep:'yes'});
+    check('mapBatchRow resolves header aliases + yes/remote detection',
+      m.name==='X' && m.jurisdiction==='France' && m.activity==='Refining' && m.onboard==='Yes' && m.flags.pep==='Yes');
+    const before = A.state;
+    const results = A.scoreBatch(csv);
+    check('scoreBatch scores every data row', results.length===2);
+    check('a sanctions flag forces PROHIBITED', results[1].prohibited===true && results[1].outcome==='PROHIBITED');
+    check('a PEP flag escalates to EDD', results[0].outcome==='EDD');
+    check('an unmatched jurisdiction is flagged in notes', results[1].notes.some(n=>/jurisdiction/i.test(n)));
+    check('scoring a batch restores the live state', A.state===before);
+    const out = A.batchToCsv(results);
+    const outLines = out.split('\n');
+    check('batchToCsv emits a header + one row per result', outLines.length===3 && /Prohibited/i.test(outLines[0]));
+    check('batchToCsv quotes fields containing commas', /"Smith, John Co"/.test(out));
+  }
+
+  /* ── bilingual (EN/AR) interface i18n ── */
+  {
+    const keys = Object.keys(A.I18N);
+    check('i18n dictionary carries a non-empty EN + AR string for every key',
+      keys.length >= 18 && keys.every(k => A.I18N[k] && typeof A.I18N[k].en === 'string' &&
+        typeof A.I18N[k].ar === 'string' && A.I18N[k].ar.trim().length > 0));
+    check('translateKey returns the requested language',
+      A.translateKey('nav.advisor','ar') === 'المستشار' && A.translateKey('nav.advisor','en') === 'Advisor');
+    check('translateKey falls back to English for an unknown language', A.translateKey('nav.console','xx') === 'Console');
+    check('translateKey returns null for an unknown key', A.translateKey('nope','ar') === null);
+    A.applyLang('ar');
+    check('applyLang persists the chosen language', global.localStorage.getItem('hsra.lang') === 'ar');
+    check('applyLang flips the toggle label to EN in Arabic mode', document.getElementById('langToggle').textContent === 'EN');
+    A.applyLang('en');
+    check('applyLang back to English restores the عربي toggle label', document.getElementById('langToggle').textContent === 'عربي');
+  }
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);

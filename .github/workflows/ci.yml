@@ -44,6 +44,14 @@ jobs:
         run: node test/sanctions-screen.test.mjs
       - name: Run sanctions matcher unit tests
         run: node test/sanctions-match.test.mjs
+      - name: Run sanctions matcher property/fuzz tests
+        run: node test/sanctions-match-fuzz.test.mjs
+      - name: Run GLEIF LEI-check unit tests
+        run: node test/lei-check.test.mjs
+      - name: Run threat-intel (STIX) unit tests
+        run: node test/threat-intel.test.mjs
+      - name: Run PWA icon-generator unit tests
+        run: node test/gen-icons.test.mjs
       - name: Run adverse-media unit tests
         run: node test/adverse-media.test.mjs
       - name: Run PEP-check unit tests
