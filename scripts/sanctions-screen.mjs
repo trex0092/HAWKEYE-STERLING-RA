@@ -898,14 +898,23 @@ async function screenLocally(subjects, cfg) {
      and report it, but it does NOT degrade the sanctions screen or weaken its
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
-  let amErrors = 0, pepErrors = 0, interpolErrors = 0;
+  let amErrors = 0, pepErrors = 0, interpolErrors = 0, enrichSkipped = 0;
+  /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
+     adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
+     bound the whole enrichment phase by a wall-clock budget: once it elapses the
+     remaining subjects are still fully sanctions-screened but skip enrichment, so a
+     large (and growing) customer base can never push the job past its timeout.
+     Skipped enrichment is recorded, NOT treated as degraded sanctions coverage. */
+  const enrichDeadline = Date.now() + cfg.enrichBudgetMs;
   const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr);   // { name, topScore, band, recommendation, hitCount, lists[] }
     const lists = [...raw.lists];
     let band = raw.lists.length ? raw.band : '';
     let topScore = raw.lists.length ? raw.topScore : 0;
+    const enrich = Date.now() < enrichDeadline;
+    if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol)) enrichSkipped++;
 
-    if (cfg.adverseMedia) {
+    if (cfg.adverseMedia && enrich) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (am.errored) { amErrors++; }
       else if (am.hit) {
@@ -913,7 +922,7 @@ async function screenLocally(subjects, cfg) {
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
     }
-    if (cfg.pep) {
+    if (cfg.pep && enrich) {
       const pp = await checkPep(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (pp.errored) { pepErrors++; }
       else if (pp.hit) {
@@ -921,7 +930,7 @@ async function screenLocally(subjects, cfg) {
         band = strongerBand(band, pp.band); topScore = Math.max(topScore, pp.score);
       }
     }
-    if (cfg.interpol) {
+    if (cfg.interpol && enrich) {
       const ip = await checkInterpol(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (ip.errored) { interpolErrors++; }
       else if (ip.hit) {
@@ -947,7 +956,8 @@ async function screenLocally(subjects, cfg) {
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, notes: loaded.notes, coverage: loaded };
+  if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
+  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded };
 }
 
 function loadState() {
@@ -992,8 +1002,13 @@ async function main() {
     pep: process.env.SCREEN_PEP !== '0',                      // default on
     interpol: process.env.SCREEN_INTERPOL === '1',            // default OFF (opt-in; verify the public API on the runner before enabling)
     listTimeoutMs: Number(process.env.SCREEN_LIST_TIMEOUT_MS) || 60000,
-    checkTimeoutMs: Number(process.env.SCREEN_CHECK_TIMEOUT_MS) || 20000,
-    concurrency: Number(process.env.SCREEN_CONCURRENCY) || 4
+    checkTimeoutMs: Number(process.env.SCREEN_CHECK_TIMEOUT_MS) || 12000,
+    concurrency: Number(process.env.SCREEN_CONCURRENCY) || 8,
+    /* Wall-clock budget for the best-effort enrichment phase (adverse-media/PEP).
+       Sanctions matching is always run for every subject; once this elapses the
+       remaining subjects skip enrichment so the job never approaches its timeout.
+       Default 12 min leaves headroom under the 20-min job timeout. */
+    enrichBudgetMs: Number(process.env.SCREEN_ENRICH_BUDGET_MS) || 720000
   };
   const asanaToken = process.env.ASANA_ACCESS_TOKEN || '';
 
