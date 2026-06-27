@@ -806,7 +806,7 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
   check('activity select has an associated label', html.includes('<label for="activitySelect">'));
   check('entity name input has an associated label', html.includes('<label for="entityName"'));
   check('year inputs have associated labels', html.includes('<label for="entityYearsInput">') && html.includes('<label for="relYearsInput">'));
-  check('screening + sign-off fields are labelled', html.includes('<label for="scr_sanctions_date">') && html.includes('<label for="approvedDate"'));
+  check('screening + sign-off fields are labelled', html.includes('<label for="scr_sanctions_date"') && html.includes('<label for="approvedDate"'));
   check('onboarding toggle-group is a labelled group',
     html.includes('<label id="onboardLbl">') && html.includes('aria-labelledby="onboardLbl"'));
   check('generated question toggle-groups are labelled groups',

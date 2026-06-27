@@ -698,19 +698,19 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div id="questions-oc"></div>
         <div class="sec-divider">Screening Evidence</div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_sanctions_system">Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" oninput="onScreening('sanctions','system',this.value)"></div>
-          <div class="fg"><label for="scr_sanctions_date">Screened On</label><input type="text" id="scr_sanctions_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('sanctions','date', v))"></div>
-          <div class="fg"><label for="scr_sanctions_ref">Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" oninput="onScreening('sanctions','ref',this.value)"></div>
+          <div class="fg"><label for="scr_sanctions_system" data-i18n="fld.sanctionsScreening">Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" oninput="onScreening('sanctions','system',this.value)"></div>
+          <div class="fg"><label for="scr_sanctions_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_sanctions_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('sanctions','date', v))"></div>
+          <div class="fg"><label for="scr_sanctions_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" oninput="onScreening('sanctions','ref',this.value)"></div>
         </div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_pep_system">PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" oninput="onScreening('pep','system',this.value)"></div>
-          <div class="fg"><label for="scr_pep_date">Screened On</label><input type="text" id="scr_pep_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('pep','date', v))"></div>
-          <div class="fg"><label for="scr_pep_ref">Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" oninput="onScreening('pep','ref',this.value)"></div>
+          <div class="fg"><label for="scr_pep_system" data-i18n="fld.pepScreening">PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" oninput="onScreening('pep','system',this.value)"></div>
+          <div class="fg"><label for="scr_pep_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_pep_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('pep','date', v))"></div>
+          <div class="fg"><label for="scr_pep_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" oninput="onScreening('pep','ref',this.value)"></div>
         </div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_adverse_system">Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" oninput="onScreening('adverse','system',this.value)"></div>
-          <div class="fg"><label for="scr_adverse_date">Screened On</label><input type="text" id="scr_adverse_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('adverse','date', v))"></div>
-          <div class="fg"><label for="scr_adverse_ref">Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" oninput="onScreening('adverse','ref',this.value)"></div>
+          <div class="fg"><label for="scr_adverse_system" data-i18n="fld.adverseScreening">Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" oninput="onScreening('adverse','system',this.value)"></div>
+          <div class="fg"><label for="scr_adverse_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_adverse_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onScreening('adverse','date', v))"></div>
+          <div class="fg"><label for="scr_adverse_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" oninput="onScreening('adverse','ref',this.value)"></div>
         </div>
       </div>
 
@@ -745,7 +745,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         </div>
         <div class="fg">
           <div class="notes-hd">
-            <label class="neon-title" for="notesInput">Assessment Notes &amp; Risk Rationale</label>
+            <label class="neon-title" for="notesInput" data-i18n="fld.notes">Assessment Notes &amp; Risk Rationale</label>
             <button class="tmpl-btn no-print" type="button" onclick="insertNarrative()" title="Generate a band-matching risk rationale narrative in line with the Company's AML/CFT Compliance Manual">✎ Narrative Template</button>
           </div>
           <textarea id="notesInput" placeholder="Document any overrides, mitigating factors, escalation rationale, or additional risk considerations…" oninput="onNotes(this.value)"></textarea>
@@ -971,7 +971,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       <!-- Governance controls: operator role (RBAC/ABAC), MFA, and a structured RCA record (RCause) -->
       <div class="gov-panel">
         <div class="gov-row">
-          <label for="govRole">Operator role</label>
+          <label for="govRole" data-i18n="fld.operatorRole">Operator role</label>
           <select id="govRole" class="sec-input" onchange="onRoleChange(this.value)" style="max-width:280px">
             <option value="analyst">Analyst (first line)</option>
             <option value="reviewer">Reviewer / MLRO (second line)</option>
@@ -3146,6 +3146,13 @@ const I18N = {
   'tag.edd':          {en:'EDD trigger', ar:'موجب للعناية المعزّزة'},
   'btn.yes':          {en:'Yes', ar:'نعم'},
   'btn.no':           {en:'No', ar:'لا'},
+  'fld.sanctionsScreening': {en:'Sanctions Screening — System / Provider', ar:'فحص العقوبات — النظام / المزوّد'},
+  'fld.pepScreening':       {en:'PEP Screening — System / Provider', ar:'فحص الأشخاص المعرَّضين سياسياً — النظام / المزوّد'},
+  'fld.adverseScreening':   {en:'Adverse Media — System / Provider', ar:'الإعلام السلبي — النظام / المزوّد'},
+  'fld.screenedOn':   {en:'Screened On', ar:'تاريخ الفحص'},
+  'fld.refId':        {en:'Reference ID', ar:'المعرّف المرجعي'},
+  'fld.notes':        {en:'Assessment Notes & Risk Rationale', ar:'ملاحظات التقييم ومسوّغات المخاطر'},
+  'fld.operatorRole': {en:'Operator role', ar:'دور المشغّل'},
 };
 /* Arabic for the ownership/compliance questions (section 04). Machine-assisted
    per #i18nCaveat — review before official use. Folded into I18N keyed q.<id>
