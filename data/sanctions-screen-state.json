@@ -66,6 +66,61 @@
       "signature": "critical|sanctions-match|US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
       "lastSeen": "2026-06-27"
+    },
+    "dinesh kumar|ubo|1214107921925846": {
+      "name": "Dinesh Kumar",
+      "jurisdiction": "India",
+      "band": "high",
+      "topScore": 90,
+      "recommendation": "review",
+      "lists": [
+        "Adverse media (Google News)"
+      ],
+      "signature": "high|review|Adverse media (Google News)",
+      "firstSeen": "2026-06-27",
+      "lastSeen": "2026-06-27"
+    },
+    "abdul aziz sultan|ubo|1214107985842154": {
+      "name": "Abdul Aziz Sultan",
+      "jurisdiction": "Dominica",
+      "band": "high",
+      "topScore": 87,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "UN Security Council — Consolidated list (XML)",
+        "US OFAC — SDN list (CSV)",
+        "UK OFSI — Consolidated list of targets (CSV)",
+        "EU — Consolidated financial sanctions list (CSV)"
+      ],
+      "signature": "high|sanctions-match|EU — Consolidated financial sanctions list (CSV),UK OFSI — Consolidated list of targets (CSV),UN Security Council — Consolidated list (XML),US OFAC — SDN list (CSV)",
+      "firstSeen": "2026-06-27",
+      "lastSeen": "2026-06-27"
+    },
+    "abde ali|ubo|1214106870100359": {
+      "name": "Abde Ali",
+      "jurisdiction": "India",
+      "band": "high",
+      "topScore": 88,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "US OFAC — SDN list (CSV)"
+      ],
+      "signature": "high|sanctions-match|US OFAC — SDN list (CSV)",
+      "firstSeen": "2026-06-27",
+      "lastSeen": "2026-06-27"
+    },
+    "ram dev|ubo|1214106870100357": {
+      "name": "Ram Dev",
+      "jurisdiction": "India",
+      "band": "medium",
+      "topScore": 80,
+      "recommendation": "review",
+      "lists": [
+        "Adverse media (Google News)"
+      ],
+      "signature": "medium|review|Adverse media (Google News)",
+      "firstSeen": "2026-06-27",
+      "lastSeen": "2026-06-27"
     }
   }
 }
