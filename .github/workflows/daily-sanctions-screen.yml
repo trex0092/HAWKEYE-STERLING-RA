@@ -17,13 +17,10 @@
 name: Daily Sanctions Screening
 
 on:
-  schedule:
-    # 06:00 UAE time (GST = UTC+4) = 02:00 UTC, daily
-    - cron: '0 2 * * *'
-    # 18:00 UAE time (GST = UTC+4) = 14:00 UTC, daily
-    - cron: '0 14 * * *'
-
-  # Manual trigger from GitHub Actions tab
+  # RETIRED (schedule removed): superseded by the single unified "Daily Screening
+  # (Sanctions + Adverse Media + PEP)" workflow (weekly-adverse-media.yml,
+  # RUN_MODE=unified), delivered daily by 09:00 UAE. Kept as manual-only so it can
+  # still be re-run on demand; no longer posts a duplicate daily task.
   workflow_dispatch:
 
 # Least privilege: the screen reads the repo and posts results to Asana via

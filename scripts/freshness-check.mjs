@@ -21,8 +21,7 @@ import { pathToFileURL } from 'node:url';
    accepts the file name as the workflow identifier); name = human label. */
 export const MANDATORY = [
   { id: 'sanctions-watch.yml',         name: 'Sanctions Watch' },
-  { id: 'sanctions-screen.yml',        name: 'Sanctions Screen' },
-  { id: 'daily-sanctions-screen.yml',  name: 'Daily Sanctions Screening' },
+  { id: 'weekly-adverse-media.yml',    name: 'Daily Screening (Sanctions + Adverse Media + PEP)' },
   { id: 'regulatory-watch.yml',        name: 'Regulatory Watch' },
 ];
 

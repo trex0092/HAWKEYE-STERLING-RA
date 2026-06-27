@@ -31,8 +31,10 @@ name: Sanctions Screen
 #   ASANA_OM_LOG_SECTION_GID      optional override (sections are found/created by name)
 
 on:
-  schedule:
-    - cron: '0 6 * * *'   # 06:00 UTC daily (after Sanctions Watch at 05:00)
+  # RETIRED (schedule removed): superseded by the single unified "Daily Screening
+  # (Sanctions + Adverse Media + PEP)" workflow (weekly-adverse-media.yml,
+  # RUN_MODE=unified). Kept as manual-only (the in-engine Node screener stays
+  # available for ad-hoc runs); no longer posts a duplicate daily task.
   workflow_dispatch:
 
 permissions:

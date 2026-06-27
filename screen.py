@@ -170,6 +170,61 @@ def format_adverse_block(name: str, articles: list, subject_type: str) -> str:
     lines.append("")
     return "\n".join(lines)
 
+# ── PEP — POLITICALLY EXPOSED PERSONS (free, Wikidata, individuals only) ──────
+# No genuinely free commercial-use PEP *list* exists (OpenSanctions etc. are
+# licensed). As a $0 signal we use Wikidata's public entity-search API (CC0, no
+# key): a same-name entity whose description names a political role is a possible
+# PEP for MLRO review. WEAK / high-recall — a hit means "verify"; absence is NOT
+# assurance. PEP applies to natural persons, so this runs on INDIVIDUALS only.
+PEP_KEYWORDS = [
+    "politician","president","prime minister","minister","senator","governor",
+    "mayor","member of parliament","parliament","congressman","congresswoman",
+    "diplomat","ambassador","head of state","head of government","party leader",
+    "monarch","king","queen","crown prince","prince","princess","sheikh",
+    "emir","sultan","ruler","secretary of state","chancellor","legislator",
+    "deputy prime","foreign minister","defence minister","defense minister",
+    "central bank governor","supreme court","attorney general","state official",
+]
+_PEP_CACHE = {}
+
+def _norm_lower(s):
+    s = unicodedata.normalize("NFD", str(s or ""))
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", s.lower())).strip()
+
+def check_pep(name):
+    """Returns {hit, id, label, description} | {hit:False} | {errored:True}."""
+    key = _norm_lower(name)
+    if not key or len(key) < 5:
+        return {"hit": False}
+    if key in _PEP_CACHE:
+        return _PEP_CACHE[key]
+    url = ("https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json"
+           "&language=en&uselang=en&type=item&limit=7&search="
+           + requests.utils.quote(str(name).strip()))
+    try:
+        r = requests.get(url, timeout=20, headers={
+            "User-Agent": "HawkeyeSterling-PEP/1.0 (compliance screening)",
+            "Accept": "application/json"})
+        if r.status_code != 200:
+            return {"errored": True, "error": f"HTTP {r.status_code}"}
+        results = (r.json() or {}).get("search", []) or []
+    except Exception as e:
+        return {"errored": True, "error": str(e)[:200]}
+    want = [t for t in key.split(" ") if len(t) >= 3]
+    out = {"hit": False}
+    for res in results:
+        desc = _norm_lower(res.get("description", ""))
+        if not desc or not any(_norm_lower(k) in desc for k in PEP_KEYWORDS):
+            continue
+        label = _norm_lower(res.get("label", "") or (res.get("match", {}) or {}).get("text", ""))
+        if want and all(t in label for t in want):
+            out = {"hit": True, "id": res.get("id", ""),
+                   "label": res.get("label", ""), "description": res.get("description", "")}
+            break
+    _PEP_CACHE[key] = out
+    return out
+
 # ── LIST DOWNLOADS ────────────────────────────────────────────────────────────
 def download(url, label):
     log(f"Downloading {label}...")
@@ -775,10 +830,233 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
     if r.status_code in (200,201):
         log(f"✅ Comment on {customer_gid}")
 
+# ── UNIFIED DAILY REPORT (Sanctions + Adverse Media + PEP, ONE narrative) ─────
+def load_all_lists():
+    ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
+    un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
+    uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
+    eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
+    ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
+    un_names,   un_date,   un_hash   = parse_un(un_data)
+    uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
+    eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
+    eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
+    list_meta = {
+        "ofac": {"count":len(ofac_names),"date":ofac_date,"hash":ofac_hash},
+        "un":   {"count":len(un_names),"date":un_date,"hash":un_hash},
+        "uk":   {"count":len(uk_names),"date":uk_date,"hash":uk_hash},
+        "eu":   {"count":len(eu_names),"date":eu_date,"hash":eu_hash},
+        "eocn": {"count":len(eocn_names),"date":eocn_date,"hash":eocn_hash},
+    }
+    all_lists = {
+        "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
+        "UN Consolidated": [(normalize(n),n) for n in un_names],
+        "UK OFSI":         [(normalize(n),n) for n in uk_names],
+        "EU FSF":          [(normalize(n),n) for n in eu_names],
+        "UAE EOCN":        [(normalize(n),n) for n in eocn_names],
+    }
+    return all_lists, list_meta
+
+def _list_status_line(list_meta, key, label):
+    m = list_meta.get(key, {})
+    status = "OK" if m.get("count", 0) > 0 else "UNAVAILABLE"
+    return f"      {label}: {status}  ({m.get('count',0):,} names · {m.get('date','?')})"
+
+def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findings,
+                            list_meta, stats, run_time):
+    dt = run_time.strftime("%d %b %Y")
+    confirmed = [m for m in possible_matches if any(h["score"] >= 100 for h in m["hits"])]
+    potential = [m for m in possible_matches if all(h["score"] < 100 for h in m["hits"])]
+    pep_degraded = stats.get("pep_errors", 0) > 0 and not pep_findings
+    sanc_ok = any(list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu"))
+    L = []; A = L.append
+
+    A(f"DAILY SCREENING REPORT — {dt}")
+    A(f"Subjects screened: {stats['subjects_total']}   "
+      f"({stats['companies_screened']} companies + {stats['individuals_screened']} owners / directors / UBOs)")
+    A("Delivered daily by 09:00 UAE   ·   Engine: screen.py (free — no paid feed, no API key)")
+    A(f"Workflow run: {github_run_url()}")
+    A("")
+    A("MODULES")
+    A(f"   1 · Sanctions / watchlists   {'OK' if sanc_ok else 'DEGRADED'}    OFAC SDN · UN · EU FSF · UK OFSI · UAE EOCN")
+    A(f"   2 · Adverse media            OK    Google News RSS · 3 locales (US/GB/AE) · {len(ADVERSE_KEYWORDS)} red-flag terms")
+    A(f"   3 · PEP (auto-detected)      {'DEGRADED — re-run' if pep_degraded else 'OK'}    Wikidata (free) · individuals only")
+    A("")
+    A("RESULTS SUMMARY")
+    A(f"   Sanctions — confirmed hits (>=95%) ... {len(confirmed)}")
+    A(f"   Sanctions — potential matches ........ {len(potential)}")
+    A(f"   Adverse media — subjects flagged ..... {len(adverse_findings)}")
+    A(f"   PEP — individuals flagged ............ {len(pep_findings)}" + ("  (PROVISIONAL — module degraded)" if pep_degraded else ""))
+    A("")
+
+    A("=" * 70)
+    A("SANCTIONS")
+    A("=" * 70)
+    if not possible_matches:
+        A("   No sanctions / watchlist matches — all subjects clear.")
+    else:
+        for m in (confirmed + potential):
+            tag = ("CONFIRMED HIT" if m in confirmed
+                   else ("HIGH" if any(h["score"] >= 92 for h in m["hits"]) else "POTENTIAL"))
+            A(f"{m['name']}   [{tag}]")
+            A(f"   Customer record: {m['permalink']}")
+            shown = sorted(m["hits"], key=lambda h: -h["score"])[:10]
+            for h in shown:
+                A(f"   -> [{h['subject_type']}] {h['subject_name']}  —  {h['list']}: \"{h['matched_entry']}\"   {h['score']:.0f}%")
+            if len(m["hits"]) > 10:
+                A(f"   -> … +{len(m['hits']) - 10} more similar candidates (see run log)")
+            A("   MLRO Decision:  [ ] false positive   [ ] escalate / freeze   [ ] investigate")
+            A("")
+        A("   Lists screened:")
+        A(_list_status_line(list_meta, "ofac", "OFAC SDN"))
+        A(_list_status_line(list_meta, "un",   "UN Consolidated"))
+        A(_list_status_line(list_meta, "eu",   "EU FSF"))
+        A(_list_status_line(list_meta, "uk",   "UK OFSI"))
+        A(_list_status_line(list_meta, "eocn", "UAE EOCN"))
+    A("")
+
+    A("=" * 70)
+    A("ADVERSE MEDIA")
+    A("=" * 70)
+    if not adverse_findings:
+        A("   No adverse media identified across any company or individual.")
+    else:
+        for f in adverse_findings:
+            who = f["subject_name"]
+            if f["subject_type"] == "INDIVIDUAL" and f.get("parent"):
+                who = f"{who}  (owner / director — {f['parent']})"
+            A(f"{who}   [{f['subject_type']}]")
+            if f.get("permalink"):
+                A(f"   Customer record: {f['permalink']}")
+            for a in f["articles"]:
+                A(f"   [!] {a['title']}")
+                kw = f"   [{', '.join(a['keywords'])}]" if a.get("keywords") else ""
+                A(f"       {a.get('source','?')} — {a.get('date','?')}{kw}")
+                A(f"       Link: {a.get('url','(no link)')}")
+            A("   MLRO Decision:  [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR")
+            A("")
+        A(f"   Source: Google News RSS · {len(ADVERSE_KEYWORDS)} red-flag terms · raw headlines, MLRO decides.")
+    A("")
+
+    A("=" * 70)
+    A("PEP  (POLITICALLY EXPOSED PERSONS)")
+    A("=" * 70)
+    A("   You do NOT supply a PEP list — matches are detected automatically.")
+    A("   Source: Wikidata (free) — politicians, ministers, MPs, judges, military / SOE chiefs + families.")
+    A(f"   Scope:  {stats['individuals_screened']} individuals checked (companies are not PEPs).")
+    if pep_degraded:
+        A(f"   Status: DEGRADED this run ({stats.get('pep_errors',0)} lookups failed) — treat 'no PEP' as provisional; re-run.")
+    if not pep_findings:
+        A("   No PEP matches identified." + ("  (provisional — see status above)" if pep_degraded else ""))
+    else:
+        A("")
+        for p in pep_findings:
+            who = p["subject_name"]
+            if p.get("parent"):
+                who = f"{who}  (owner / director — {p['parent']})"
+            A(f"{who}   [INDIVIDUAL]")
+            A(f"   PEP — {p.get('description','(position recorded on Wikidata)')}")
+            if p.get("id"):
+                A(f"   Source: https://www.wikidata.org/wiki/{p['id']}")
+            if p.get("permalink"):
+                A(f"   Customer record: {p['permalink']}")
+            A("   MLRO Decision:  [ ] not a PEP   [ ] confirmed PEP — apply EDD   [ ] investigate")
+            A("")
+    A("")
+
+    A("-" * 70)
+    A("METHODOLOGY")
+    A("   One engine screens the SAME subjects (every customer + every recorded UBO /")
+    A("   director) through three modules in one pass: (1) fuzzy name-match vs. live")
+    A("   government designation lists, (2) Google News adverse-media search, (3) PEP")
+    A("   detection vs. Wikidata. Decision-support only. A 'no match' is never a")
+    A("   clearance when a module is degraded — that is shown, never hidden.")
+    A("")
+    A("MLRO SIGN-OFF")
+    A("   Reviewed by: ____________________   Date: __________")
+    A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
+    A("")
+    A("> Detection is automatic; no freeze / decline / report before MLRO + four-eyes review.")
+    A("> RETENTION: retain 10 years — UAE FDL No. 26 of 2021, Art. 23; Cabinet Decision 74/2020.")
+    return "\n".join(L)
+
+def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings):
+    dt = run_time.strftime("%d %b %Y")
+    n_s, n_a, n_p = len(possible_matches), len(adverse_findings), len(pep_findings)
+    flag = "⚠️" if (n_s + n_a + n_p) > 0 else "✅"
+    task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
+    payload = {"data": {
+        "name": task_name[:250],
+        "notes": narrative[:65000],
+        "due_on": run_time.strftime("%Y-%m-%d"),
+        "assignee": ASANA_ASSIGNEE_GID,
+        "projects": [ASANA_ONGOING_MON_GID],
+        "memberships": [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}],
+    }}
+    r = requests.post("https://app.asana.com/api/1.0/tasks",
+                      headers=ASANA_HEADERS, json=payload, timeout=30)
+    if r.status_code in (200, 201):
+        log(f"OK Unified daily task created: {r.json()['data']['gid']}")
+    else:
+        log(f"FAIL unified task: {r.status_code} - {r.text[:300]}")
+
+def run_unified(run_time):
+    log("UNIFIED daily screening — sanctions + adverse media + PEP")
+    all_lists, list_meta = load_all_lists()
+    customers = get_all_customers()
+
+    # 1) SANCTIONS — entities + individuals, ALL matching candidates
+    possible_matches, clear = screen_customers(customers, all_lists)
+    log(f"Sanctions: {len(possible_matches)} flagged · {len(clear)} clear")
+    for m in possible_matches:
+        if any(h["score"] >= 100 for h in m["hits"]):
+            post_confirmed_hit_comment(m["gid"], m["hits"], run_time)
+
+    # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual
+    adverse_findings, pep_findings = [], []
+    companies = individuals = am_errors = pep_errors = 0
+    for i, c in enumerate(customers, 1):
+        subjects = [("COMPANY", c["name"], None)]
+        for ind in c.get("individuals", []):
+            subjects.append(("INDIVIDUAL", ind, c["name"]))
+        for subj_type, subj_name, parent in subjects:
+            try:
+                articles = search_adverse_media(subj_name, max_results=5)
+                if subj_type == "COMPANY": companies += 1
+                else: individuals += 1
+                adverse = [a for a in articles if a["flagged"]]
+                if adverse:
+                    adverse_findings.append({"subject_type": subj_type, "subject_name": subj_name,
+                        "parent": parent, "permalink": c.get("permalink", ""), "articles": adverse})
+            except Exception as e:
+                am_errors += 1; log(f"  ! adverse error {subj_name}: {e}")
+            if subj_type == "INDIVIDUAL":
+                p = check_pep(subj_name)
+                if p.get("errored"):
+                    pep_errors += 1
+                elif p.get("hit"):
+                    pep_findings.append({"subject_name": subj_name, "parent": parent,
+                        "permalink": c.get("permalink", ""), "id": p.get("id", ""),
+                        "label": p.get("label", ""), "description": p.get("description", "")})
+            time.sleep(0.7)  # rate-limit protection (Google News + Wikidata)
+        log(f"  [{i}/{len(customers)}] {c['name']}")
+
+    stats = {"customers_total": len(customers), "companies_screened": companies,
+             "individuals_screened": individuals, "subjects_total": companies + individuals,
+             "am_errors": am_errors, "pep_errors": pep_errors}
+    narrative = build_unified_narrative(possible_matches, clear, adverse_findings,
+                                        pep_findings, list_meta, stats, run_time)
+    post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings)
+    log("Unified run done.")
+
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
     run_time = now_uae()
     hour_uae = run_time.hour
+
+    if RUN_MODE == "unified":
+        run_unified(run_time)
+        return
 
     if RUN_MODE == "weekly_adverse":
         run_label = "Daily Adverse Media"
