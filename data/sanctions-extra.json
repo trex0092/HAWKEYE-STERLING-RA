@@ -28,8 +28,8 @@
       "url": "https://gels-avoirs.dgtresor.gouv.fr/api/v1/publication/derniere-publication-fichier-json",
       "type": "json",
       "parser": "json",
-      "enabled": true,
-      "_note": "France's national asset-freeze register, published by the Direction Générale du Trésor as an official machine-readable JSON file (documented API: gels-avoirs.dgtresor.gouv.fr, /api/v1/publication/derniere-publication-fichier-json). Read by the generic JSON parser in sanctions-match.mjs (Nom/Prenom assembly + aliases; unit-tested). Best-effort like the other extra sources — verified on the runner; if the host/shape ever changes the screen degrades VISIBLY, never a silent all-clear."
+      "enabled": false,
+      "_note": "DISABLED after live verification (2026-06-27 customer screen): the host gels-avoirs.dgtresor.gouv.fr connects but this exact API path returns HTTP 404 from the runner, so it parsed 0 names and degraded coverage. The feed IS real (DGT publishes the register as machine-readable JSON/XML — see https://api.gouv.fr/les-api/api-gels-avoirs) and the generic JSON parser (sanctions-match.mjs, Nom/Prenom assembly + aliases) is unit-tested; the exact base path just needs confirming (the sandbox/proxy blocks .gouv.fr so it can't be probed from here). Set the confirmed URL + enabled:true to screen France directly. Until then, France implements the EU consolidated list already screened daily."
     },
     {
       "id": "nz-terror",
