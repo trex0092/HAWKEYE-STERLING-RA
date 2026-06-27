@@ -222,7 +222,7 @@ Found a vulnerability? **Do not open a public issue** — follow the disclosure 
 
 ### Cybersecurity Skills (Claude Code plugin)
 
-This repo pre-registers the Apache-2.0 [**Anthropic Cybersecurity Skills**](https://github.com/mukul975/Anthropic-Cybersecurity-Skills) library (817 agent skills across 29 domains, mapped to MITRE ATT&CK / F3, NIST CSF / AI RMF, ATLAS and D3FEND) as a Claude Code plugin via [`.claude/settings.json`](.claude/settings.json). It gives Claude Code expert decision-workflows for the fraud-typology, threat-intelligence, and deployment-security work around this AML/CFT tool — see [`docs/cybersecurity-skills.md`](docs/cybersecurity-skills.md) for what installs, how it maps to Hawkeye Sterling, and the authorized-use scope.
+This repo pre-registers the Apache-2.0 [**Anthropic Cybersecurity Skills**](https://github.com/mukul975/Anthropic-Cybersecurity-Skills) library (817 agent skills across 29 domains, mapped to MITRE ATT&CK / F3, NIST CSF / AI RMF, ATLAS and D3FEND) as a Claude Code plugin via [`.claude/settings.json`](.claude/settings.json). It gives Claude Code expert decision-workflows for the fraud-typology, threat-intelligence, and deployment-security work around this AML/CFT tool — see [`docs/cybersecurity-skills.md`](docs/cybersecurity-skills.md) for what installs, how it maps to Hawkeye Sterling, and the authorized-use scope. The Advisor's own typologies are mapped to the **MITRE F3 (Fight Fraud Framework)** tactics in [`docs/fraud-f3-mapping.md`](docs/fraud-f3-mapping.md).
 
 ## License
 

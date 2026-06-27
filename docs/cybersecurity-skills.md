@@ -108,7 +108,7 @@ skills are out of scope. The slices that are directly useful here:
 
 | Need in this repo | Relevant skill domains |
 |---|---|
-| **Fraud typologies & financial-crime TTPs** — informing risk factors, EDD triggers, and narrative rationale | **MITRE F3** fraud skills (Positioning / Monetization tactics), Compliance & Governance |
+| **Fraud typologies & financial-crime TTPs** — informing risk factors, EDD triggers, and narrative rationale | **MITRE F3** fraud skills (Positioning / Monetization tactics), Compliance & Governance — see the [F3 mapping](fraud-f3-mapping.md) of this tool's own typologies |
 | **Adverse-media & threat-feed enrichment** (`scripts/adverse-media.mjs`, `scripts/interpol-check.mjs`) | **Threat Intelligence** (STIX/TAXII, MISP, OpenCTI, IOC analysis, actor profiling) |
 | **Phishing / BEC context** for onboarding-risk and impersonation narratives | **Phishing Defense** (BEC detection, phishing IR) |
 | **Securing the deployment & supply chain** (the static site, GitHub Actions, dependencies) | Web Application Security, DevSecOps, Supply Chain Security, CodeQL/Scorecard-adjacent workflows |
