@@ -2586,13 +2586,21 @@ function toggleOvForm(){
 /* AI Risk Advisor personas — the sidebar robot whose head, HUD colour, and
    advisory note follow the operative outcome (CDD → Vale, SDD → Cypher,
    EDD / PROHIBITED → Ember). Mirrors the design's advisorFor() mapping. */
+/* role/note carry Arabic variants (roleAr/noteAr) used in Arabic mode;
+   machine-assisted per #i18nCaveat. The persona names stay as-is. */
 const ADVISORS = {
   high: {img:'assets/persona-ember.webp',  pos:'50% 26%', name:'Ember',  role:'Sanctions & high-risk', rgb:'255,87,87',
-         note:'High risk. Escalate for enhanced due diligence, full sanctions screening, and senior-management sign-off.'},
+         note:'High risk. Escalate for enhanced due diligence, full sanctions screening, and senior-management sign-off.',
+         roleAr:'العقوبات والمخاطر العالية',
+         noteAr:'مخاطر عالية. صعّد المعاملة للعناية الواجبة المعزّزة، والفحص الكامل للعقوبات، واعتماد الإدارة العليا.'},
   med:  {img:'assets/persona-cypher.webp', pos:'42% 30%', name:'Cypher', role:'Active monitoring',      rgb:'247,197,60',
-         note:'Elevated risk. Apply enhanced monitoring, refresh KYC records, and document the rationale for the rating.'},
+         note:'Elevated risk. Apply enhanced monitoring, refresh KYC records, and document the rationale for the rating.',
+         roleAr:'مراقبة نشطة',
+         noteAr:'مخاطر مرتفعة. طبّق مراقبة معزّزة، وحدّث سجلات «اعرف عميلك»، ووثّق مسوّغات التصنيف.'},
   low:  {img:'assets/persona-vale.webp',   pos:'50% 22%', name:'Vale',   role:'KYC & onboarding',       rgb:'59,229,208',
-         note:'Standard customer due diligence is sufficient. Proceed with routine onboarding and a periodic review cycle.'}
+         note:'Standard customer due diligence is sufficient. Proceed with routine onboarding and a periodic review cycle.',
+         roleAr:'«اعرف عميلك» والإلحاق',
+         noteAr:'العناية الواجبة المعيارية كافية. تابع الإلحاق الاعتيادي مع دورة مراجعة دورية.'}
 };
 
 /* Gauge-core robot — face + accent for the score gauge, swapped by risk band:
@@ -2613,9 +2621,10 @@ function updateAdvisor(outcome){
   set('advCircle1', el=>el.setAttribute('stroke','rgba('+a.rgb+',0.45)'));
   set('advCircle2', el=>el.setAttribute('stroke','rgba('+a.rgb+',0.65)'));
   set('advDot',     el=>{ el.style.background='rgb('+a.rgb+')'; el.style.boxShadow='0 0 9px rgb('+a.rgb+')'; });
+  const ar = (typeof getLang==='function' && getLang()==='ar');
   set('advName',    el=>el.textContent=a.name);
-  set('advRole',    el=>{ el.textContent=a.role; el.style.color='rgb('+a.rgb+')'; });
-  set('advNote',    el=>el.textContent=a.note);
+  set('advRole',    el=>{ el.textContent=(ar && a.roleAr) ? a.roleAr : a.role; el.style.color='rgb('+a.rgb+')'; });
+  set('advNote',    el=>el.textContent=(ar && a.noteAr) ? a.noteAr : a.note);
   /* Gauge-core robot — head image + accent swap to match the band. */
   const g = GAUGE_ROBOTS[advisorKind(outcome)];
   set('grImg',     el=>{ el.style.backgroundImage="url('"+g.img+"')"; el.style.backgroundPosition=g.pos; el.style.backgroundSize=g.size||'cover'; });
