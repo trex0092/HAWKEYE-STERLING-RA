@@ -63,6 +63,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   openRegister, closeRegister, reviewStatus, reviewCounts,
   parsePrincipals, uboInitials, uboTrunc, renderUboGraph,
   batchParseCsv, mapBatchRow, scoreBatchRow, scoreBatch, batchToCsv,
+  I18N, translateKey, applyLang, getLang, toggleLang,
   storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
   _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
   currentRole, setRole, can, roleAtLeast, ROLES, ROLE_KEY, policyMissing,
@@ -977,6 +978,23 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     const outLines = out.split('\n');
     check('batchToCsv emits a header + one row per result', outLines.length===3 && /Prohibited/i.test(outLines[0]));
     check('batchToCsv quotes fields containing commas', /"Smith, John Co"/.test(out));
+  }
+
+  /* ── bilingual (EN/AR) interface i18n ── */
+  {
+    const keys = Object.keys(A.I18N);
+    check('i18n dictionary carries a non-empty EN + AR string for every key',
+      keys.length >= 18 && keys.every(k => A.I18N[k] && typeof A.I18N[k].en === 'string' &&
+        typeof A.I18N[k].ar === 'string' && A.I18N[k].ar.trim().length > 0));
+    check('translateKey returns the requested language',
+      A.translateKey('nav.advisor','ar') === 'المستشار' && A.translateKey('nav.advisor','en') === 'Advisor');
+    check('translateKey falls back to English for an unknown language', A.translateKey('nav.console','xx') === 'Console');
+    check('translateKey returns null for an unknown key', A.translateKey('nope','ar') === null);
+    A.applyLang('ar');
+    check('applyLang persists the chosen language', global.localStorage.getItem('hsra.lang') === 'ar');
+    check('applyLang flips the toggle label to EN in Arabic mode', document.getElementById('langToggle').textContent === 'EN');
+    A.applyLang('en');
+    check('applyLang back to English restores the عربي toggle label', document.getElementById('langToggle').textContent === 'عربي');
   }
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');

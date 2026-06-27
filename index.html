@@ -540,6 +540,13 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 #printReport .foot{margin-top:auto;padding-top:9px;border-top:1px solid var(--hair);font-size:7.5px;letter-spacing:.08em;color:var(--faint);display:flex;justify-content:space-between;align-items:center}
 #printReport .foot .pg{color:var(--accent)}
 
+/* ── Bilingual / RTL ─────────────────────── */
+.i18n-caveat{background:var(--gold-dim);border-bottom:1px solid var(--gold-ring);color:var(--med-text);font-size:11px;line-height:1.7;padding:8px 18px;text-align:center;font-family:var(--sans)}
+#langToggle{font-family:var(--sans);min-width:46px}
+[dir=rtl] input,[dir=rtl] textarea,[dir=rtl] select{text-align:right}
+[dir=rtl] .mask-field{direction:ltr;text-align:right}
+[dir=rtl] .save-stamp,[dir=rtl] .reg-review,[dir=rtl] .batch-note{direction:rtl}
+
 /* ── Responsive ───────────────────────── */
 @media(max-width:800px){
   .main-layout{grid-template-columns:1fr}.side-panel{position:static;height:auto;border-left:none;border-top:1px solid var(--border2)}
@@ -565,21 +572,23 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
     </div>
     <div class="hdr-right">
       <nav class="hdr-nav" aria-label="Suite navigation">
-        <a href="index.html" class="active" aria-current="page">Assessment</a>
-        <a href="console.html">Console</a>
-        <a href="advisor.html">Advisor</a>
+        <a href="index.html" class="active" aria-current="page" data-i18n="nav.assessment">Assessment</a>
+        <a href="console.html" data-i18n="nav.console">Console</a>
+        <a href="advisor.html" data-i18n="nav.advisor">Advisor</a>
       </nav>
       <span class="sess-chip" id="sessTimer" style="display:none" title="Time left in this unlocked session — re-enter your passphrase when it ends"><span class="sess-ic">⏱</span><span class="sess-t">60:00</span></span>
-      <button class="lock-btn" id="hdrLock" onclick="headerLock()" title="Lock this device">⚿ Lock</button>
+      <button class="lock-btn" id="langToggle" onclick="toggleLang()" title="Switch language / تبديل اللغة" aria-label="Switch language">عربي</button>
+      <button class="lock-btn" id="hdrLock" onclick="headerLock()" title="Lock this device" data-i18n="btn.lock">⚿ Lock</button>
     </div>
   </header>
+  <div class="i18n-caveat" id="i18nCaveat" style="display:none" role="note">ترجمة آلية للواجهة — للاسترشاد فقط، ويجب مراجعتها من مختصّ قبل الاعتماد الرسمي. المحتوى القانوني التفصيلي (الأسئلة والأجوبة التنظيمية والسرديات) يبقى بالإنجليزية إلى حين المراجعة.</div>
 
   <div class="main-layout">
     <div class="form-panel">
 
       <!-- 01 · Assessment Administration -->
       <div class="card">
-        <div class="section-hd"><span class="sn">01</span><span class="st">Assessment Administration</span></div>
+        <div class="section-hd"><span class="sn">01</span><span class="st" data-i18n="sec.01">Assessment Administration</span></div>
         <div class="field-row three">
           <div class="fg">
             <label for="refInput">Reference Number</label>
@@ -609,7 +618,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
       <!-- 02 · Entity Identification -->
       <div class="card">
-        <div class="section-hd"><span class="sn">02</span><span class="st">Entity Identification</span></div>
+        <div class="section-hd"><span class="sn">02</span><span class="st" data-i18n="sec.02">Entity Identification</span></div>
         <div class="field-row">
           <div class="fg">
             <label for="entityName">Legal Entity Name</label>
@@ -651,7 +660,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
       <!-- 03 · Business Profile -->
       <div class="card">
-        <div class="section-hd"><span class="sn">03</span><span class="st">Business Profile</span></div>
+        <div class="section-hd"><span class="sn">03</span><span class="st" data-i18n="sec.03">Business Profile</span></div>
         <div class="field-row">
           <div class="fg">
             <label for="activitySelect">Business Activity <span id="activityScore" class="score-tag st-3"></span></label>
@@ -685,7 +694,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
       <!-- 04 · Ownership, Control & Compliance -->
       <div class="card">
-        <div class="section-hd"><span class="sn">04</span><span class="st">Ownership, Control &amp; Compliance</span></div>
+        <div class="section-hd"><span class="sn">04</span><span class="st" data-i18n="sec.04">Ownership, Control &amp; Compliance</span></div>
         <div id="questions-oc"></div>
         <div class="sec-divider">Screening Evidence</div>
         <div class="field-row three">
@@ -707,7 +716,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
       <!-- 05 · Supply Chain -->
       <div class="card">
-        <div class="section-hd"><span class="sn">05</span><span class="st">Supply Chain — Material Sources</span></div>
+        <div class="section-hd"><span class="sn">05</span><span class="st" data-i18n="sec.05">Supply Chain — Material Sources</span></div>
         <div class="sec-divider">Recycled Material Sources</div>
         <div class="supplier-grid" id="recycled-grid"></div>
         <div class="sec-divider">Mined Material Sources</div>
@@ -716,7 +725,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
       <!-- 06 · Sign-Off & Attestation -->
       <div class="card">
-        <div class="section-hd"><span class="sn">06</span><span class="st">Sign-Off &amp; Attestation</span></div>
+        <div class="section-hd"><span class="sn">06</span><span class="st" data-i18n="sec.06">Sign-Off &amp; Attestation</span></div>
         <div class="attest-statement">I confirm that this risk assessment has been completed in accordance with Hawkeye Sterling LLC&rsquo;s AML/CFT Risk Assessment Policy, the applicable DPMS regulatory guidelines, and all relevant national and international sanctions obligations. The information provided is accurate to the best of my knowledge.</div>
         <div class="attest-grid">
           <div class="attest-block">
@@ -845,16 +854,16 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       <div class="sp-spacer"></div>
 
       <div class="sp-actions no-print">
-        <button class="btn btn-primary btn-full" onclick="printPreflight()">⎙ Print / Export PDF</button>
+        <button class="btn btn-primary btn-full" onclick="printPreflight()" data-i18n="btn.print">⎙ Print / Export PDF</button>
         <button class="btn btn-ghost btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
         <button class="btn btn-orange btn-full" id="btnRetryAsana" onclick="retryAsanaDelivery()" style="display:none">↻ Retry Asana Delivery</button>
-        <button class="btn btn-secondary btn-full" onclick="openRegister()">≡ Register</button>
-        <button class="btn btn-blue btn-full" onclick="openBatch()">⊞ Batch Screening</button>
-        <button class="btn btn-orange btn-full" onclick="openAudit()">▤ Activity Log</button>
+        <button class="btn btn-secondary btn-full" onclick="openRegister()" data-i18n="btn.register">≡ Register</button>
+        <button class="btn btn-blue btn-full" onclick="openBatch()" data-i18n="btn.batch">⊞ Batch Screening</button>
+        <button class="btn btn-orange btn-full" onclick="openAudit()" data-i18n="btn.audit">▤ Activity Log</button>
         <button class="btn btn-ghost btn-full" id="btnMask" onclick="toggleMask()">🙈 Mask sensitive fields</button>
-        <button class="btn btn-lilac btn-full" onclick="sendToAsana()">↗ Send to Asana</button>
-        <button class="btn btn-blue btn-full" onclick="reassess()">⟳ Re-assess</button>
-        <button class="btn btn-gold btn-full" onclick="openRiskData()">⚙ Risk Data</button>
+        <button class="btn btn-lilac btn-full" onclick="sendToAsana()" data-i18n="btn.asana">↗ Send to Asana</button>
+        <button class="btn btn-blue btn-full" onclick="reassess()" data-i18n="btn.reassess">⟳ Re-assess</button>
+        <button class="btn btn-gold btn-full" onclick="openRiskData()" data-i18n="btn.riskdata">⚙ Risk Data</button>
         <div class="save-stamp" id="saveStamp"></div>
       </div>
     </aside>
@@ -864,7 +873,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
   <div class="rd-overlay" id="rdOverlay">
     <div class="rd-panel">
       <div class="rd-head">
-        <span class="st">Risk Data — Reference Scores</span>
+        <span class="st" data-i18n="panel.riskdata">Risk Data — Reference Scores</span>
         <span class="rd-meta" id="rdMeta"></span>
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeRiskData()" title="Close" aria-label="Close risk data panel">✕</button>
@@ -893,7 +902,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
   <div class="rd-overlay" id="regOverlay">
     <div class="rd-panel">
       <div class="rd-head">
-        <span class="st">Assessment Register</span>
+        <span class="st" data-i18n="panel.register">Assessment Register</span>
         <span class="rd-meta" id="regMeta"></span>
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeRegister()" title="Close" aria-label="Close assessment register">✕</button>
@@ -921,7 +930,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
   <div class="rd-overlay" id="batchOverlay">
     <div class="rd-panel">
       <div class="rd-head">
-        <span class="st">Batch Screening</span>
+        <span class="st" data-i18n="panel.batch">Batch Screening</span>
         <span class="rd-meta" id="batchMeta"></span>
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeBatch()" title="Close" aria-label="Close batch screening">✕</button>
@@ -947,7 +956,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
   <div class="rd-overlay" id="auditOverlay">
     <div class="rd-panel">
       <div class="rd-head">
-        <span class="st">Activity Log</span>
+        <span class="st" data-i18n="panel.audit">Activity Log</span>
         <span class="rd-meta" id="auditMeta"></span>
         <span class="rd-spacer"></span>
         <button class="rd-close" onclick="closeAudit()" title="Close" aria-label="Close activity log">✕</button>
@@ -3084,6 +3093,55 @@ function regDeleteIdx(i){
   regRender();
   toast('Removed from register — '+ref);
 }
+/* ══════════════════════════════════════════
+   BILINGUAL (EN / AR) — interface i18n + RTL
+   Machine-assisted UI translation for accessibility. The detailed legal /
+   regulatory content (the Q&A corpus, legal narratives, risk-data text)
+   intentionally stays English until a qualified Arabic AML reviewer signs it
+   off — surfaced to the user via #i18nCaveat in Arabic mode.
+══════════════════════════════════════════ */
+const LANG_KEY = 'hsra.lang';
+const I18N = {
+  'nav.assessment': {en:'Assessment', ar:'التقييم'},
+  'nav.console':    {en:'Console', ar:'لوحة العمليات'},
+  'nav.advisor':    {en:'Advisor', ar:'المستشار'},
+  'btn.lock':       {en:'⚿ Lock', ar:'⚿ قفل'},
+  'sec.01': {en:'Assessment Administration', ar:'إدارة التقييم'},
+  'sec.02': {en:'Entity Identification', ar:'تعريف الكيان'},
+  'sec.03': {en:'Business Profile', ar:'ملف النشاط التجاري'},
+  'sec.04': {en:'Ownership, Control & Compliance', ar:'الملكية والسيطرة والامتثال'},
+  'sec.05': {en:'Supply Chain — Material Sources', ar:'سلسلة التوريد — مصادر المواد'},
+  'sec.06': {en:'Sign-Off & Attestation', ar:'التوقيع والإقرار'},
+  'panel.riskdata': {en:'Risk Data — Reference Scores', ar:'بيانات المخاطر — الدرجات المرجعية'},
+  'panel.register': {en:'Assessment Register', ar:'سجل التقييمات'},
+  'panel.batch':    {en:'Batch Screening', ar:'الفحص المجمّع'},
+  'panel.audit':    {en:'Activity Log', ar:'سجل النشاط'},
+  'btn.print':    {en:'⎙ Print / Export PDF', ar:'⎙ طباعة / تصدير PDF'},
+  'btn.register': {en:'≡ Register', ar:'≡ السجل'},
+  'btn.batch':    {en:'⊞ Batch Screening', ar:'⊞ الفحص المجمّع'},
+  'btn.audit':    {en:'▤ Activity Log', ar:'▤ سجل النشاط'},
+  'btn.asana':    {en:'↗ Send to Asana', ar:'↗ إرسال إلى Asana'},
+  'btn.reassess': {en:'⟳ Re-assess', ar:'⟳ إعادة التقييم'},
+  'btn.riskdata': {en:'⚙ Risk Data', ar:'⚙ بيانات المخاطر'},
+};
+function translateKey(key, lang){ const t = I18N[key]; return t ? (t[lang]!=null ? t[lang] : t.en) : null; }
+function getLang(){ try{ return localStorage.getItem(LANG_KEY)==='ar' ? 'ar' : 'en'; }catch(e){ return 'en'; } }
+function applyLang(lang){
+  lang = (lang==='ar') ? 'ar' : 'en';
+  try{ localStorage.setItem(LANG_KEY, lang); }catch(e){}
+  const html = document.documentElement;
+  if(html){ html.lang = lang; if(html.setAttribute) html.setAttribute('dir', lang==='ar' ? 'rtl' : 'ltr'); }
+  const nodes = (document.querySelectorAll) ? document.querySelectorAll('[data-i18n]') : null;
+  if(nodes && nodes.forEach) nodes.forEach(el => {
+    const t = translateKey(el.getAttribute('data-i18n'), lang);
+    if(t!=null) el.textContent = t;
+  });
+  const tog = $('langToggle'); if(tog) tog.textContent = (lang==='ar') ? 'EN' : 'عربي';
+  const cav = $('i18nCaveat'); if(cav) cav.style.display = (lang==='ar') ? '' : 'none';
+}
+function toggleLang(){ applyLang(getLang()==='ar' ? 'en' : 'ar'); }
+function initLang(){ applyLang(getLang()); }
+
 function initRegisterPanel(){
   const ov = $('regOverlay');
   if(ov && ov.addEventListener) ov.addEventListener('click', function(e){ if(e.target===ov) closeRegister(); });
@@ -3480,6 +3538,7 @@ buildSuppliers();
 refreshSelectLabels(); /* add override marks (✱) to the now-built selects */
 initRiskDataPanel();
 initRegisterPanel();
+initLang();
 
 /* (Re)load persisted risk data + draft into the UI. Safe to re-run after the
    device is unlocked, when the encrypted store first becomes readable. */
