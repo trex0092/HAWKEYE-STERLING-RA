@@ -2074,17 +2074,17 @@ function buildQuestions() {
     const div = document.createElement('div');
     div.className = 'q-row';
     const crit = q.prohibit
-      ? '<span class="crit-tag" title="If Yes, the outcome is PROHIBITED — the relationship must not be onboarded; freeze funds where held and report to the FIU.">Prohibitive</span>'
+      ? '<span class="crit-tag" data-i18n="tag.prohibitive" title="If Yes, the outcome is PROHIBITED — the relationship must not be onboarded; freeze funds where held and report to the FIU.">Prohibitive</span>'
       : q.eddTrigger
-        ? '<span class="edd-tag" title="If Yes, Enhanced Due Diligence is mandatory regardless of the numeric score.">EDD trigger</span>'
+        ? '<span class="edd-tag" data-i18n="tag.edd" title="If Yes, Enhanced Due Diligence is mandatory regardless of the numeric score.">EDD trigger</span>'
         : '';
     div.innerHTML = `
       <span class="q-num">${String(idx+1).padStart(2,'0')}</span>
-      <span class="q-text" id="qtext_${q.id}">${q.text}${crit}</span>
+      <span class="q-text" id="qtext_${q.id}"><span data-i18n="q.${q.id}">${q.text}</span>${crit}</span>
       <div class="q-controls">
         <div class="toggle-group" role="group" aria-labelledby="qtext_${q.id}">
-          <button class="toggle-btn" id="btn_${q.id}_yes" onclick="setToggle('${q.id}','Yes')">Yes</button>
-          <button class="toggle-btn" id="btn_${q.id}_no" onclick="setToggle('${q.id}','No')">No</button>
+          <button class="toggle-btn" id="btn_${q.id}_yes" onclick="setToggle('${q.id}','Yes')" data-i18n="btn.yes">Yes</button>
+          <button class="toggle-btn" id="btn_${q.id}_no" onclick="setToggle('${q.id}','No')" data-i18n="btn.no">No</button>
         </div>
         <span class="q-score-pill" id="pill_${q.id}"></span>
       </div>`;
@@ -3142,7 +3142,28 @@ const I18N = {
   'fld.fullName':     {en:'Full Name', ar:'الاسم الكامل'},
   'fld.titleRole':    {en:'Title / Role', ar:'المسمى الوظيفي / الدور'},
   'fld.date':         {en:'Date', ar:'التاريخ'},
+  'tag.prohibitive':  {en:'Prohibitive', ar:'مانع'},
+  'tag.edd':          {en:'EDD trigger', ar:'موجب للعناية المعزّزة'},
+  'btn.yes':          {en:'Yes', ar:'نعم'},
+  'btn.no':           {en:'No', ar:'لا'},
 };
+/* Arabic for the ownership/compliance questions (section 04). Machine-assisted
+   per #i18nCaveat — review before official use. Folded into I18N keyed q.<id>
+   so applyLang translates the rendered question text. */
+const Q_AR = {
+  aml:'هل لدى الكيان القانوني بيئة رقابة كافية وفعّالة لمكافحة غسل الأموال وتمويل الإرهاب (حيثما ينطبق)؟',
+  sanctions_person:'هل يخضع أيٌّ من المالكين المستفيدين أو المسيطرين أو المديرين أو الإدارة العليا لعقوبات؟',
+  criminal:'هل يخضع الكيان لأي إجراءات جنائية أو تحقيقات قانونية جارية؟',
+  adverse:'هل يخضع أيٌّ من المالكين المستفيدين أو المسيطرين أو المديرين أو الإدارة العليا لتغطية إعلامية سلبية أو نتائج تمسّ السمعة؟',
+  sanctions_entity:'هل يخضع الكيان القانوني نفسه لأي عقوبات وطنية أو دولية؟',
+  sof:'هل توجد أي مخاوف بشأن مصدر الأموال و/أو مصدر الثروة للمالكين المستفيدين أو الكيان القانوني (حيثما ينطبق)؟',
+  high_risk_ind:'هل يعمل الكيان في أي صناعات عالية المخاطر (الأسلحة، المقامرة، الكازينوهات)؟',
+  tf:'هل يرتبط أيٌّ من المالكين المستفيدين أو المسيطرين أو المديرين بتمويل الإرهاب أو بمنظمات إرهابية مُدرجة؟',
+  pf:'هل يرتبط أيٌّ من المالكين المستفيدين أو المسيطرين أو المديرين بتمويل انتشار التسلح أو بتجارة المواد أو التقنيات المتصلة بأسلحة الدمار الشامل؟',
+  pep:'هل يُعدّ أيٌّ من المالكين المستفيدين أو المسيطرين أو الإدارة العليا من الأشخاص المعرَّضين سياسياً (PEPs)؟',
+  gov:'هل يملك الكيانَ القانوني أو يسيطر عليه حكومة أو سلطة حكومية أو جهة من القطاع العام؟',
+};
+QUESTIONS_OC.forEach(q => { if(Q_AR[q.id]) I18N['q.'+q.id] = {en:q.text, ar:Q_AR[q.id]}; });
 function translateKey(key, lang){ const t = I18N[key]; return t ? (t[lang]!=null ? t[lang] : t.en) : null; }
 function getLang(){ try{ return localStorage.getItem(LANG_KEY)==='ar' ? 'ar' : 'en'; }catch(e){ return 'en'; } }
 function applyLang(lang){
