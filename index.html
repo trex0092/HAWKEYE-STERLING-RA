@@ -3013,10 +3013,15 @@ function mapBatchRow(o){
 function scoreBatchRow(m){
   const saved = state, notes = [];
   try{
-    const s = freshState();
+    /* defaultState() — NOT freshState(): freshState() calls newRef() which
+       increments the persisted RA sequence (hsra.seq). Batch rows are never
+       filed, so they must not consume real reference numbers. */
+    const s = defaultState();
     s.entity.name = m.name || '';
     if(m.jurisdiction){ s.entity.jurisdiction = m.jurisdiction; if(!effCountry(m.jurisdiction)) notes.push('jurisdiction not in risk data — scored low'); }
+    else notes.push('no jurisdiction provided — scored on the default');
     if(m.activity){ s.profile.activity = m.activity; if(!effOf('activities', m.activity)) notes.push('activity not in risk data — scored low'); }
+    else notes.push('no activity provided — scored on the default');
     s.profile.onboard = m.onboard;
     const ey = parseInt(m.entityYears, 10); if(!isNaN(ey)) s.profile.entityYears = ey;
     const ry = parseInt(m.relYears, 10); if(!isNaN(ry)) s.profile.relYears = ry;
