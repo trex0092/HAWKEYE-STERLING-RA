@@ -22,6 +22,36 @@
       "_note": "Best-effort generic-XML parse; if the structure changes it degrades visibly rather than silently."
     },
     {
+      "id": "fr-dgt",
+      "name": "France — Registre national des gels (DGT)",
+      "jurisdiction": "Global",
+      "url": "https://gels-avoirs.dgtresor.gouv.fr/api/v1/publication/derniere-publication-fichier-json",
+      "type": "json",
+      "parser": "json",
+      "enabled": true,
+      "_note": "France's national asset-freeze register, published by the Direction Générale du Trésor as an official machine-readable JSON file (documented API: gels-avoirs.dgtresor.gouv.fr, /api/v1/publication/derniere-publication-fichier-json). Read by the generic JSON parser in sanctions-match.mjs (Nom/Prenom assembly + aliases; unit-tested). Best-effort like the other extra sources — verified on the runner; if the host/shape ever changes the screen degrades VISIBLY, never a silent all-clear."
+    },
+    {
+      "id": "nz-terror",
+      "name": "New Zealand — Designated Terrorist Entities",
+      "jurisdiction": "Global",
+      "url": "",
+      "type": "json",
+      "parser": "json",
+      "enabled": false,
+      "_note": "NZ Police designated terrorist entities (data.govt.nz). DISABLED: data.govt.nz exposes it via a CKAN datastore resource whose resource_id ROTATES on each quarterly update, so a hardcoded URL would silently serve STALE data (worse than degraded for a sanctions list). Enable only with a confirmed STABLE resource_id / download URL (then set url + enabled:true), or maintain as a curated file. Small list; heavily overlaps the UN Consolidated list already screened."
+    },
+    {
+      "id": "ua-nsdc",
+      "name": "Ukraine — NSDC State Register of Sanctions",
+      "jurisdiction": "Global",
+      "url": "",
+      "type": "json",
+      "parser": "json",
+      "enabled": false,
+      "_note": "Ukraine NSDC State Register (drs.nsdc.gov.ua) publishes JSON, but a stable machine-readable download endpoint is not yet confirmed (the egress proxy here blocks .gov.ua so it cannot be verified). DISABLED until a confirmed JSON URL is set (then url + enabled:true). ~17k entries, overwhelmingly Russia/Belarus-related and already largely covered by the OFAC/EU/UK lists screened daily."
+    },
+    {
       "id": "ch-seco",
       "name": "Switzerland — SECO sanctions list (XML)",
       "jurisdiction": "Global",
