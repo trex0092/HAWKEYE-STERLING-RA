@@ -1,0 +1,8 @@
+{
+  "_README": "Switzerland SECO consolidated sanctions ('Gesamtliste') — maintained in-repo because SECO's portal (sesam.search.admin.ch) serves an HTML page to automated GETs, not raw XML, so it cannot be fetched directly. To turn SECO into a DIRECTLY-screened list: download the official list (CSV or XML) from https://www.seco.admin.ch/en/searching-for-subjects-sanctions, paste each designated party's full name into `entries` (a plain string, or {\"name\":\"...\",\"aliases\":[\"...\"]} for AKAs), update `count` + `lastReviewed`, then set this source's `enabled:true` in data/sanctions-extra.json. While `entries` is empty the source stays disabled so it never reports a false clear or a permanent 'degraded' flag. Most SECO designations already mirror the UN/EU lists screened directly.",
+  "source": "https://www.seco.admin.ch/en/searching-for-subjects-sanctions",
+  "jurisdiction": "Switzerland (SECO)",
+  "lastReviewed": "",
+  "count": 0,
+  "entries": []
+}

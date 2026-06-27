@@ -25,21 +25,21 @@
       "id": "ch-seco",
       "name": "Switzerland — SECO sanctions list (XML)",
       "jurisdiction": "Global",
-      "url": "https://www.sesam.search.admin.ch/sesam-search-web/pages/downloadXmlGesamtliste.xhtml?lang=en",
-      "type": "xml",
-      "parser": "seco",
+      "file": "data/seco-curated-list.json",
+      "type": "curated",
+      "parser": "curated",
       "enabled": false,
-      "_note": "DISABLED after live verification (2026-06-27 customer screen): the host is reachable but a plain GET to this `.xhtml` endpoint returns the JSF HTML page wrapper, not the raw 'Gesamtliste' XML, so the parser extracts 0 names — leaving the screen permanently 'degraded'. The dedicated `seco` parser (sanctions-match.mjs, nested <name>/<name-part>/<value>) is correct and unit-tested; re-enable only once a confirmed direct-download XML URL (or a JSF session POST flow) is verified ON THE RUNNER. Until then SECO designations are covered indirectly via the UN/EU/OFAC lists already loaded."
+      "_note": "SECO's portal (sesam.search.admin.ch) serves an HTML page to automated GETs, not raw XML (verified 2026-06-27 customer screen — parsed 0 names), so it is maintained as a curated in-repo list instead. POPULATE data/seco-curated-list.json from the official download, then set enabled:true to screen SECO directly. While empty it stays disabled (no false clear, no permanent 'degraded'). The dedicated `seco` XML parser and the curated parser are both unit-tested. Until populated, SECO designations are covered indirectly via the UN/EU/OFAC lists already loaded."
     },
     {
       "id": "au-dfat",
       "name": "Australia — DFAT Consolidated List",
       "jurisdiction": "Global",
-      "url": "https://www.dfat.gov.au/sites/default/files/regulation8_consolidated.xlsx",
-      "type": "xlsx",
-      "parser": "dfat",
+      "file": "data/dfat-curated-list.json",
+      "type": "curated",
+      "parser": "curated",
       "enabled": false,
-      "_note": "DISABLED after live verification (2026-06-27 customer screen): the host resolves and connects but this path returns HTTP 404 to the automated fetch — DFAT appears to bot-protect the file (it serves to browsers only), the same pattern as the UAE EOCN download. The dependency-free XLSX reader in sanctions-match.mjs (ZIP + sharedStrings + first worksheet via node:zlib; collects the name columns) is correct and unit-tested. Re-enable once a confirmed, fetchable URL is verified ON THE RUNNER, or maintain the names in-repo as a curated file (parser 'curated') like the UAE EOCN list. DFAT designations are partly covered indirectly via the UN/OFAC/EU lists already loaded."
+      "_note": "DFAT bot-gates regulation8_consolidated.xlsx (HTTP 404 to automated fetches; verified 2026-06-27 customer screen), so it is maintained as a curated in-repo list. POPULATE data/dfat-curated-list.json from the official download, then set enabled:true to screen DFAT directly. While empty it stays disabled (no false clear, no permanent 'degraded'). The dependency-free XLSX reader in sanctions-match.mjs (ZIP + sharedStrings + worksheet via node:zlib) and the curated parser are both unit-tested; the XLSX path can be used instead if a fetchable URL is ever confirmed. Until populated, DFAT designations are covered indirectly via the UN/OFAC/EU lists already loaded."
     },
     {
       "id": "wb-debarred",

@@ -89,6 +89,28 @@ const handle = async (event) => {
       /* The remembered task was deleted in Asana or is inaccessible — create a fresh one. */
     }
 
+    /* Cross-instance dedup: the in-memory cache misses when two near-simultaneous
+       submits land on different (cold-started) function instances, so confirm
+       Asana doesn't already hold a task with this exact name before creating one.
+       If it does, update it in place instead of duplicating. Best-effort — a
+       lookup failure falls through to a normal create. */
+    if (!gid) {
+      let existing = null;
+      try { existing = await findTaskByName(token, project, name); } catch (e) { existing = null; }
+      if (existing && existing.gid) {
+        const upd = await api(token, 'PUT', '/tasks/' + existing.gid, { data: { notes, due_on: dueOn } });
+        if (upd.ok) {
+          if (section) {
+            try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: existing.gid } }); }
+            catch (e) { section = null; }
+          }
+          const dres = { ok: true, gid: existing.gid, url: (upd.body && upd.body.data && upd.body.data.permalink_url) || existing.permalink_url || null, section: section ? sectionName : null, deduplicated: true };
+          _recentCache.set(cacheKey, { ...dres, ts: Date.now() });
+          return resp(200, dres);
+        }
+      }
+    }
+
     const data = { name, notes, projects: [project], assignee: process.env.ASANA_ASSIGNEE || 'me' };
     if (dueOn) data.due_on = dueOn;
     const made = await api(token, 'POST', '/tasks', { data });
@@ -134,6 +156,25 @@ async function api(token, method, path, body) {
      gateway page) so the caller surfaces the real status instead of throwing. */
   const d = await r.json().catch(() => null);
   return { ok: r.ok, status: r.status, body: d };
+}
+
+/* Find an existing task by EXACT name within the project (paginated) — the
+   authoritative cross-instance dedup check, since the in-memory cache cannot see
+   other (cold-started) function instances. Returns the task or null. */
+async function findTaskByName(token, project, name) {
+  let path = '/projects/' + project + '/tasks?limit=100&opt_fields=name,permalink_url';
+  let it = 0;
+  while (path && it < 50) {
+    it++;
+    const page = await api(token, 'GET', path);
+    if (!page.ok || !page.body) return null;
+    const data = Array.isArray(page.body.data) ? page.body.data : [];
+    const hit = data.find(t => String(t.name || '') === name);
+    if (hit) return hit;
+    const off = page.body.next_page && page.body.next_page.offset;
+    path = off ? '/projects/' + project + '/tasks?limit=100&opt_fields=name,permalink_url&offset=' + off : null;
+  }
+  return null;
 }
 
 /* Find the section by name (case-insensitive) or create it. */
