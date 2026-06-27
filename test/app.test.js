@@ -60,7 +60,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   buildNarrative, insertNarrative, asanaPayload, sendToAsana, deliveredGid, rememberDelivered,
   scheduleRiskBackup,
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
-  openRegister, closeRegister,
+  openRegister, closeRegister, reviewStatus, reviewCounts,
   storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
   _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
   currentRole, setRole, can, roleAtLeast, ROLES, ROLE_KEY, policyMissing,
@@ -914,6 +914,24 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
       payloadText.includes('REF-') && !payloadText.includes('RA-20260621-001'));
     global.localStorage.removeItem('hsra.audit.v1');
   })();
+
+  /* ── review scheduler (pure helpers) ── */
+  {
+    const today = '2026-06-27', soon = '2026-07-27';
+    check('reviewStatus: prohibited → no review', A.reviewStatus({prohibited:true, nextReview:'2020-01-01'}, today, soon) === 'prohibited');
+    check('reviewStatus: past date → overdue', A.reviewStatus({nextReview:'2026-06-01'}, today, soon) === 'overdue');
+    check('reviewStatus: within window → soon', A.reviewStatus({nextReview:'2026-07-10'}, today, soon) === 'soon');
+    check('reviewStatus: far future → scheduled', A.reviewStatus({nextReview:'2027-01-01'}, today, soon) === 'scheduled');
+    check('reviewStatus: missing/invalid date → none',
+      A.reviewStatus({}, today, soon) === 'none' && A.reviewStatus({nextReview:'nope'}, today, soon) === 'none');
+    const items = {
+      A:{summary:{nextReview:'2026-06-01'}}, B:{summary:{nextReview:'2026-07-10'}},
+      C:{summary:{nextReview:'2027-01-01'}}, D:{summary:{prohibited:true}}, E:{summary:{nextReview:'2026-05-01'}},
+    };
+    const cts = A.reviewCounts(items, today, soon);
+    check('reviewCounts tallies overdue + due-soon', cts.overdue === 2 && cts.soon === 1);
+    check('reviewCounts tolerates empty/null', A.reviewCounts({}, today, soon).overdue === 0 && A.reviewCounts(null, today, soon).soon === 0);
+  }
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);

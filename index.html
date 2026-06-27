@@ -416,6 +416,11 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .reg-review{font-size:9px;font-family:var(--mono);color:var(--text3);white-space:nowrap}
 .reg-review.reg-over{color:var(--high-text);font-weight:600}
 .reg-review.reg-soon{color:var(--med-text)}
+#regReviewFilter{flex:0 0 auto;background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:4px 8px;font-size:11.5px;font-family:var(--sans);outline:none}
+#regReviewFilter:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.reg-review-summary{font-size:10px;font-family:var(--mono);color:var(--text3);white-space:nowrap}
+.reg-review-summary.reg-over{color:var(--high-text);font-weight:600}
+.reg-review-summary.reg-soon{color:var(--med-text)}
 .btn-mini{padding:3px 10px;font-size:8.5px}
 @media(max-width:520px){.reg-review{display:none}}
 
@@ -873,6 +878,13 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       </div>
       <div class="rd-toolbar">
         <input class="rd-search" id="regSearch" placeholder="Filter by entity name or reference…" oninput="regRender()" aria-label="Filter register">
+        <select id="regReviewFilter" onchange="regRender()" aria-label="Filter by review status">
+          <option value="all">All reviews</option>
+          <option value="due">Due or overdue</option>
+          <option value="overdue">Overdue only</option>
+          <option value="soon">Due within 30 days</option>
+        </select>
+        <span class="reg-review-summary" id="regReviewSummary" aria-live="polite"></span>
       </div>
       <div class="rd-rows" id="regRows"></div>
       <div class="rd-foot">
@@ -2727,27 +2739,53 @@ function regOpenEntry(ref){
   return true;
 }
 
+/* Pure review-scheduler helpers (unit-tested). A summary's review state is one
+   of: 'prohibited' (no review), 'overdue' (next review in the past),
+   'soon' (due within the window, default 30d), 'scheduled' (further out), or
+   'none' (no valid next-review date). */
+function reviewStatus(sm, today, soon){
+  if(sm && sm.prohibited) return 'prohibited';
+  const nr = String((sm && sm.nextReview) || '');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(nr)) return 'none';
+  if(nr < today) return 'overdue';
+  if(nr <= soon) return 'soon';
+  return 'scheduled';
+}
+/* Count overdue / due-soon reviews across a register items map. */
+function reviewCounts(items, today, soon){
+  let overdue = 0, soon_ = 0;
+  for(const ref of Object.keys(items || {})){
+    const st = reviewStatus((items[ref] || {}).summary || {}, today, soon);
+    if(st === 'overdue') overdue++; else if(st === 'soon') soon_++;
+  }
+  return { overdue, soon: soon_ };
+}
+
 let regView = [];
 function regRender(){
   const rows = $('regRows');
   if(!rows) return;
   const items = regAll();
   const q = (($('regSearch') && $('regSearch').value) || '').toLowerCase();
+  const fv = (($('regReviewFilter') && $('regReviewFilter').value) || 'all');
   const refs = Object.keys(items).sort((x,y)=>String(items[y].savedAt||'').localeCompare(String(items[x].savedAt||'')));
   regView = [];
   const today = todayISO(), soon = addMonths(today, 1);
   const html = refs.map(ref => {
     const it = items[ref] || {}, sm = it.summary || {};
     if(q && (ref+' '+(sm.entity||'')).toLowerCase().indexOf(q)===-1) return '';
+    const rs = reviewStatus(sm, today, soon);
+    if(fv==='due' && !(rs==='overdue' || rs==='soon')) return '';
+    if(fv==='overdue' && rs!=='overdue') return '';
+    if(fv==='soon' && rs!=='soon') return '';
     const i = regView.push(ref) - 1;
     const band = {CDD:'reg-cdd', SDD:'reg-sdd', EDD:'reg-edd', PROHIBITED:'reg-proh'}[sm.outcome] || 'reg-st-draft';
     const result = sm.outcome==='PROHIBITED' ? 'PROHIBITED' : (sm.outcome||'?') + ' · ' + (isNaN(parseInt(sm.total)) ? '?' : sm.total);
     let review = '', revCls = '';
-    if(sm.prohibited){ review = 'no review — prohibited'; }
-    else if(/^\d{4}-\d{2}-\d{2}$/.test(String(sm.nextReview||''))){
-      if(sm.nextReview < today){ review = 'REVIEW OVERDUE — ' + fmtDate(sm.nextReview); revCls = ' reg-over'; }
-      else { review = 'review ' + fmtDate(sm.nextReview); if(sm.nextReview <= soon) revCls = ' reg-soon'; }
-    }
+    if(rs==='prohibited'){ review = 'no review — prohibited'; }
+    else if(rs==='overdue'){ review = 'REVIEW OVERDUE — ' + fmtDate(sm.nextReview); revCls = ' reg-over'; }
+    else if(rs==='soon'){ review = 'review ' + fmtDate(sm.nextReview); revCls = ' reg-soon'; }
+    else if(rs==='scheduled'){ review = 'review ' + fmtDate(sm.nextReview); }
     const cur = state.meta.ref===ref;
     return '<div class="reg-row'+(cur?' reg-cur':'')+'">'
       + '<span class="reg-ref">'+esc(ref)+(cur?' ✱':'')+'</span>'
@@ -2764,6 +2802,15 @@ function regRender(){
   if(c) c.textContent = refs.length + ' assessment' + (refs.length===1?'':'s') + ' filed';
   const m = $('regMeta');
   if(m) m.textContent = regView.length===refs.length ? '' : regView.length + ' of ' + refs.length + ' shown';
+  const rsum = $('regReviewSummary');
+  if(rsum){
+    const cts = reviewCounts(items, today, soon);
+    const parts = [];
+    if(cts.overdue) parts.push(cts.overdue + ' overdue');
+    if(cts.soon) parts.push(cts.soon + ' due ≤30d');
+    rsum.textContent = parts.length ? ('Reviews: ' + parts.join(' · ')) : 'No reviews due';
+    rsum.className = 'reg-review-summary' + (cts.overdue ? ' reg-over' : (cts.soon ? ' reg-soon' : ''));
+  }
 }
 function openRegister(){
   regUpsert(); /* show the current assessment as it stands right now */
