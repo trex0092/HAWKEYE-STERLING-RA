@@ -591,26 +591,26 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="section-hd"><span class="sn">01</span><span class="st" data-i18n="sec.01">Assessment Administration</span></div>
         <div class="field-row three">
           <div class="fg">
-            <label for="refInput">Reference Number</label>
+            <label for="refInput" data-i18n="fld.ref">Reference Number</label>
             <input type="text" id="refInput" placeholder="RA-20260612-001" oninput="onField('meta','ref',this.value)">
           </div>
           <div class="fg">
-            <label for="assessDate">Assessment Date</label>
+            <label for="assessDate" data-i18n="fld.assessDate">Assessment Date</label>
             <input type="text" id="assessDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onField('meta','date', v))">
           </div>
           <div class="fg">
-            <label for="nextReview">Next Review Date</label>
+            <label for="nextReview" data-i18n="fld.nextReview">Next Review Date</label>
             <input type="text" id="nextReview" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('nextReview', v))">
             <span class="review-hint" id="reviewHint"></span>
           </div>
         </div>
         <div class="field-row">
           <div class="fg">
-            <label for="assessorName">Assessed By</label>
+            <label for="assessorName" data-i18n="fld.assessedBy">Assessed By</label>
             <input type="text" id="assessorName" placeholder="Full name" oninput="onField('meta','assessor',this.value)">
           </div>
           <div class="fg">
-            <label for="assessorRole">Role / Department</label>
+            <label for="assessorRole" data-i18n="fld.role">Role / Department</label>
             <input type="text" id="assessorRole" placeholder="e.g. Compliance Officer" oninput="onField('meta','role',this.value)">
           </div>
         </div>
@@ -621,7 +621,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="section-hd"><span class="sn">02</span><span class="st" data-i18n="sec.02">Entity Identification</span></div>
         <div class="field-row">
           <div class="fg">
-            <label for="entityName">Legal Entity Name</label>
+            <label for="entityName" data-i18n="fld.legalName">Legal Entity Name</label>
             <input type="text" id="entityName" placeholder="Registered legal name" oninput="onField('entity','name',this.value)">
           </div>
           <div class="fg">
@@ -631,27 +631,27 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         </div>
         <div class="field-row">
           <div class="fg">
-            <label for="entityTrading">Trading Name (If Different)</label>
+            <label for="entityTrading" data-i18n="fld.trading">Trading Name (If Different)</label>
             <input type="text" id="entityTrading" placeholder="Optional" oninput="onField('entity','trading',this.value)">
           </div>
           <div class="fg">
-            <label for="entityRegno">Registration / Licence No.</label>
+            <label for="entityRegno" data-i18n="fld.regno">Registration / Licence No.</label>
             <input type="text" id="entityRegno" class="mask-field" placeholder="Company or trade licence number" oninput="onField('entity','regno',this.value)">
           </div>
         </div>
         <div class="field-row">
           <div class="fg">
-            <label for="entityAddress">Registered Address</label>
+            <label for="entityAddress" data-i18n="fld.address">Registered Address</label>
             <input type="text" id="entityAddress" class="mask-field" placeholder="Street, city, country" oninput="onField('entity','address',this.value)">
           </div>
           <div class="fg">
-            <label for="entityContact">Website / Email</label>
+            <label for="entityContact" data-i18n="fld.contact">Website / Email</label>
             <input type="text" id="entityContact" class="mask-field" placeholder="Optional" oninput="onField('entity','contact',this.value)">
           </div>
         </div>
         <div class="field-row single">
           <div class="fg">
-            <label for="entityPrincipals">Principals — Beneficial Owners / Controllers / Directors</label>
+            <label for="entityPrincipals" data-i18n="fld.principals">Principals — Beneficial Owners / Controllers / Directors</label>
             <input type="text" id="entityPrincipals" class="mask-field" placeholder="e.g. John Smith, Jane Doe (comma-separated)" oninput="onField('entity','principals',this.value)">
           </div>
         </div>
@@ -3123,6 +3123,17 @@ const I18N = {
   'btn.asana':    {en:'↗ Send to Asana', ar:'↗ إرسال إلى Asana'},
   'btn.reassess': {en:'⟳ Re-assess', ar:'⟳ إعادة التقييم'},
   'btn.riskdata': {en:'⚙ Risk Data', ar:'⚙ بيانات المخاطر'},
+  'fld.ref':        {en:'Reference Number', ar:'الرقم المرجعي'},
+  'fld.assessDate': {en:'Assessment Date', ar:'تاريخ التقييم'},
+  'fld.nextReview': {en:'Next Review Date', ar:'تاريخ المراجعة القادمة'},
+  'fld.assessedBy': {en:'Assessed By', ar:'أجري التقييم بواسطة'},
+  'fld.role':       {en:'Role / Department', ar:'الدور / القسم'},
+  'fld.legalName':  {en:'Legal Entity Name', ar:'الاسم القانوني للكيان'},
+  'fld.trading':    {en:'Trading Name (If Different)', ar:'الاسم التجاري (إن اختلف)'},
+  'fld.regno':      {en:'Registration / Licence No.', ar:'رقم التسجيل / الرخصة'},
+  'fld.address':    {en:'Registered Address', ar:'العنوان المسجَّل'},
+  'fld.contact':    {en:'Website / Email', ar:'الموقع الإلكتروني / البريد الإلكتروني'},
+  'fld.principals': {en:'Principals — Beneficial Owners / Controllers / Directors', ar:'الأطراف الرئيسية — المالكون المستفيدون / المسيطرون / المديرون'},
 };
 function translateKey(key, lang){ const t = I18N[key]; return t ? (t[lang]!=null ? t[lang] : t.en) : null; }
 function getLang(){ try{ return localStorage.getItem(LANG_KEY)==='ar' ? 'ar' : 'en'; }catch(e){ return 'en'; } }
