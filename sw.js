@@ -21,6 +21,7 @@ const SHELL = [
   './advisor.html',
   './manifest.webmanifest',
   './sw-register.js',
+  './i18n.js',
   './assets/super-data.js',
   './assets/icon.svg',
   './assets/icon-192.png',
