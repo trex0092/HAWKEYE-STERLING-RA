@@ -31,6 +31,7 @@ ASANA_ASSIGNEE_GID    = "1213645083721304"   # Luisa Fernanda
 
 THRESHOLD             = 85
 EOCN_PDF_PATH         = "eocn_list.pdf"
+EOCN_JSON_PATH        = "data/eocn-local-terrorist-list.json"
 UAE_TZ_OFFSET         = 4
 
 ASANA_HEADERS = {
@@ -308,10 +309,38 @@ def parse_eu(data):
     return names, "live", sha256_of(data)
 
 def parse_eocn(pdf_path):
+    """UAE EOCN Local Terrorist List.
+
+    Primary source is the maintained in-repo JSON (data/eocn-local-terrorist-list.json),
+    populated from the official EOCN publication — the EOCN site offers no free
+    machine-readable feed and bot-gates its PDF/XLSX, so the list is kept here.
+    A raw PDF at repo root (eocn_list.pdf), if present, is still parsed as a fallback."""
     names = set()
+    # 1) Preferred: the maintained JSON list (zero-dependency, no PDF parsing).
+    if os.path.exists(EOCN_JSON_PATH):
+        try:
+            raw = open(EOCN_JSON_PATH, "rb").read()
+            data = json.loads(raw)
+            for e in data.get("entries", []):
+                if isinstance(e, str):
+                    n = e.strip()
+                    if n: names.add(n)
+                elif isinstance(e, dict):
+                    n = (e.get("name") or "").strip()
+                    if n: names.add(n)
+                    for a in e.get("aliases", []) or []:
+                        a = (a or "").strip()
+                        if a: names.add(a)
+            if names:
+                log(f"  EOCN: {len(names)} names from {EOCN_JSON_PATH}")
+                return names, "from maintained list (data/eocn-local-terrorist-list.json)", sha256_of(raw)
+            log(f"  EOCN JSON present but 'entries' is empty — manual update required")
+        except Exception as e:
+            log(f"  EOCN JSON parse error: {e}")
+    # 2) Fallback: a raw PDF uploaded to repo root.
     if not os.path.exists(pdf_path):
-        log(f"  EOCN PDF not found — manual check required")
-        return names, "NOT AVAILABLE — upload eocn_list.pdf to repo root", ""
+        log(f"  EOCN list not found — manual check required")
+        return names, "NOT AVAILABLE — populate data/eocn-local-terrorist-list.json", ""
     try:
         raw = open(pdf_path,"rb").read()
         pdf_hash = sha256_of(raw)
@@ -528,7 +557,7 @@ LISTS SCREENED
            "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv")}
 
 {list_line("eocn","UAE EOCN — Local Terrorist List",
-           "Uploaded PDF — eocn_list.pdf in repository root")}
+           "Maintained in-repo — data/eocn-local-terrorist-list.json")}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCOPE
