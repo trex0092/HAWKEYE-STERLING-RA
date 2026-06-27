@@ -66,7 +66,7 @@ function recordFields(rec) {
   const ent = a.entity || {};
   const legalName = (ent.legalName && ent.legalName.name) || '';
   return {
-    lei: a.lei || rec.id || '',
+    lei: a.lei || (rec && rec.id) || '',
     legalName,
     jurisdiction: ent.jurisdiction || '',
     entityStatus: ent.status || '',
@@ -81,7 +81,7 @@ function nameMatches(subject, candidate) {
   const want = sigTokens(normalizeName(subject));
   const haveNorm = normalizeName(candidate);
   const have = new Set(normalizeName(candidate).split(' ').filter(Boolean));
-  if (!want.length) return false;
+  if (!want.length) return { exact: false, all: false };
   return { exact: normalizeName(subject) === haveNorm, all: want.every(t => have.has(t)) };
 }
 
@@ -91,6 +91,7 @@ export function scoreLei(name, json) {
   const recs = recordsOf(json);
   const hits = [];
   for (const rec of recs) {
+    if (!rec || typeof rec !== 'object') continue;
     const f = recordFields(rec);
     if (!f.legalName || !isValidLei(f.lei)) continue;
     const m = nameMatches(name, f.legalName);

@@ -26,6 +26,7 @@ const SHELL = [
   './assets/icon.svg',
   './assets/icon-192.png',
   './assets/icon-512.png',
+  './assets/icon-512-maskable.png',
   './assets/apple-touch-icon-180.png',
 ];
 

@@ -62,6 +62,7 @@ const lookup = { data: { id: 'HWUPKR0MPOU8FGXBT394',
   attributes: { lei: 'HWUPKR0MPOU8FGXBT394', entity: { legalName: { name: 'APPLE INC.' } } } } };
 check('tolerates a single-object lookup response', scoreLei('Apple Inc.', lookup).hit === true);
 check('tolerates an empty/odd response', scoreLei('x', {}).hit === false && scoreLei('x', null).hit === false);
+check('tolerates a null/garbage element in data[]', scoreLei('Ghost', { data: [null, 'nope', { id: 'X' }] }).hit === false);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;

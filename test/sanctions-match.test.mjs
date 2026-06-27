@@ -66,6 +66,14 @@ check('parseSecoXml joins name-parts and collects entities + aliases',
   seco.includes('Vladimir Putin') && seco.includes('V. Putin') && seco.includes('ROSNEFT OIL COMPANY'));
 check('parseList routes the seco parser', parseList({ id: 'ch-seco', parser: 'seco', type: 'xml' },
   '<name><name-part><value>ACME</value></name-part><name-part><value>FZE</value></name-part></name>').join('|') === 'ACME FZE');
+/* real SECO values carry attributes (lang/script) and sometimes CDATA — both
+   must still be screened or a designated name is silently dropped (false negative) */
+const secoAttr = parseSecoXml(
+  '<name name-type="primary-name"><name-part name-part-type="given-name"><value lang="en">Vladimir</value></name-part>' +
+  '<name-part name-part-type="family-name"><value lang="en">Putin</value></name-part></name>' +
+  '<name name-type="alias"><name-part name-part-type="whole-name"><value><![CDATA[Al-Qaeda]]></value></name-part></name>');
+check('parseSecoXml keeps attributed <value> tags and unwraps CDATA (no dropped names)',
+  secoAttr.includes('Vladimir Putin') && secoAttr.includes('Al-Qaeda'));
 
 /* ── curated list (strings + objects with aliases) ── */
 const cur = parseCuratedList({ entries: ['Foo Bar', { name: 'Baz Co', aliases: ['Baz Limited'] }] });

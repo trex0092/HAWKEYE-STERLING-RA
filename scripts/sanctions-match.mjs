@@ -201,9 +201,16 @@ export function parseSecoXml(body) {
   const nameRe = /<name\b[^>]*>([\s\S]*?)<\/name>/gi;
   let m;
   while ((m = nameRe.exec(s))) {
-    const parts = [], valRe = /<value>([\s\S]*?)<\/value>/gi;
+    /* <value> tags may carry attributes (e.g. <value lang="en">) and may wrap
+       the text in CDATA — both occur in the real SECO feed. Missing either
+       would silently drop a designated name (a false negative). */
+    const parts = [], valRe = /<value\b[^>]*>([\s\S]*?)<\/value>/gi;
     let v;
-    while ((v = valRe.exec(m[1]))) { const t = decodeXml(v[1]).replace(/\s+/g, ' ').trim(); if (t) parts.push(t); }
+    while ((v = valRe.exec(m[1]))) {
+      const raw = v[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+      const t = decodeXml(raw).replace(/\s+/g, ' ').trim();
+      if (t) parts.push(t);
+    }
     const full = parts.join(' ').replace(/\s+/g, ' ').trim();
     if (full) names.push(full);
   }

@@ -978,6 +978,15 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     const outLines = out.split('\n');
     check('batchToCsv emits a header + one row per result', outLines.length===3 && /Prohibited/i.test(outLines[0]));
     check('batchToCsv quotes fields containing commas', /"Smith, John Co"/.test(out));
+    // batch must NOT consume real RA reference numbers (defaultState, not freshState)
+    const seqBefore = global.localStorage.getItem('hsra.seq');
+    A.scoreBatch('name,jurisdiction,activity\nA,United Kingdom,Non-Manufactured Precious Metal Trading\nB,United Kingdom,Non-Manufactured Precious Metal Trading\n');
+    check('scoreBatch does not consume RA reference numbers (hsra.seq unchanged)',
+      global.localStorage.getItem('hsra.seq') === seqBefore);
+    // a row with no jurisdiction/activity is flagged, not silently scored on the default
+    const blank = A.scoreBatch('name\nNo Factors Co\n')[0];
+    check('scoreBatch flags a row with no jurisdiction/activity provided',
+      blank.notes.some(n=>/no jurisdiction provided/i.test(n)) && blank.notes.some(n=>/no activity provided/i.test(n)));
   }
 
   /* ── bilingual (EN/AR) interface i18n ── */
