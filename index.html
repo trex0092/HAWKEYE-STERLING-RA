@@ -625,7 +625,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
             <input type="text" id="entityName" placeholder="Registered legal name" oninput="onField('entity','name',this.value)">
           </div>
           <div class="fg">
-            <label for="jurisdictionSelect">Jurisdiction &amp; Incorporation <span id="jurisdictionScore" class="score-tag st-1"></span></label>
+            <label for="jurisdictionSelect"><span data-i18n="fld.jurisdiction">Jurisdiction &amp; Incorporation</span> <span id="jurisdictionScore" class="score-tag st-1"></span></label>
             <select id="jurisdictionSelect" onchange="onJurisdiction()"></select>
           </div>
         </div>
@@ -663,11 +663,11 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="section-hd"><span class="sn">03</span><span class="st" data-i18n="sec.03">Business Profile</span></div>
         <div class="field-row">
           <div class="fg">
-            <label for="activitySelect">Business Activity <span id="activityScore" class="score-tag st-3"></span></label>
+            <label for="activitySelect"><span data-i18n="fld.activity">Business Activity</span> <span id="activityScore" class="score-tag st-3"></span></label>
             <select id="activitySelect" onchange="onActivity()"></select>
           </div>
           <div class="fg">
-            <label id="onboardLbl">Onboarding Channel <span id="onboard_score_tag" class="score-tag st-1"></span></label>
+            <label id="onboardLbl"><span data-i18n="fld.onboard">Onboarding Channel</span> <span id="onboard_score_tag" class="score-tag st-1"></span></label>
             <div class="toggle-group" role="group" aria-labelledby="onboardLbl">
               <button class="toggle-btn" id="btn_onboard_no" onclick="setToggle('onboard','No')">In-Person</button>
               <button class="toggle-btn" id="btn_onboard_yes" onclick="setToggle('onboard','Yes')">Remote / Non-F2F</button>
@@ -676,14 +676,14 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         </div>
         <div class="field-row">
           <div class="fg">
-            <label for="entityYearsInput">Operational History — Entity <span id="entityYearsScore" class="score-tag st-1"></span></label>
+            <label for="entityYearsInput"><span data-i18n="fld.opHistory">Operational History — Entity</span> <span id="entityYearsScore" class="score-tag st-1"></span></label>
             <div style="display:flex;align-items:center;gap:8px">
               <input type="number" id="entityYearsInput" min="0" max="99" oninput="onYears('entity')" style="width:72px">
               <span style="font-size:12px;color:var(--text3)">years in operation</span>
             </div>
           </div>
           <div class="fg">
-            <label for="relYearsInput">Relationship Duration <span id="relYearsScore" class="score-tag st-1"></span></label>
+            <label for="relYearsInput"><span data-i18n="fld.relDuration">Relationship Duration</span> <span id="relYearsScore" class="score-tag st-1"></span></label>
             <div style="display:flex;align-items:center;gap:8px">
               <input type="number" id="relYearsInput" min="0" max="99" oninput="onYears('rel')" style="width:72px">
               <span style="font-size:12px;color:var(--text3)">years with entity</span>
@@ -730,16 +730,16 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="attest-grid">
           <div class="attest-block">
             <div class="attest-role">First-Line — Assessed By</div>
-            <div class="fg"><label for="completedBy">Full Name</label><input type="text" id="completedBy" placeholder="Full name" oninput="onSign('completedBy',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label for="completedTitle">Title / Role</label><input type="text" id="completedTitle" placeholder="e.g. Compliance Analyst" oninput="onSign('completedTitle',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label for="completedDate">Date</label><input type="text" id="completedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('completedDate', v))"></div>
+            <div class="fg"><label for="completedBy" data-i18n="fld.fullName">Full Name</label><input type="text" id="completedBy" placeholder="Full name" oninput="onSign('completedBy',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label for="completedTitle" data-i18n="fld.titleRole">Title / Role</label><input type="text" id="completedTitle" placeholder="e.g. Compliance Analyst" oninput="onSign('completedTitle',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label for="completedDate" data-i18n="fld.date">Date</label><input type="text" id="completedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('completedDate', v))"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
           <div class="attest-block">
             <div class="attest-role">Second-Line — Reviewed &amp; Approved By</div>
-            <div class="fg"><label for="approvedBy">Full Name</label><input type="text" id="approvedBy" placeholder="Full name" oninput="onSign('approvedBy',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label for="approvedTitle">Title / Role</label><input type="text" id="approvedTitle" placeholder="e.g. MLRO / Head of Compliance" oninput="onSign('approvedTitle',this.value)"></div>
-            <div class="fg" style="margin-top:10px"><label for="approvedDate">Date</label><input type="text" id="approvedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('approvedDate', v))"></div>
+            <div class="fg"><label for="approvedBy" data-i18n="fld.fullName">Full Name</label><input type="text" id="approvedBy" placeholder="Full name" oninput="onSign('approvedBy',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label for="approvedTitle" data-i18n="fld.titleRole">Title / Role</label><input type="text" id="approvedTitle" placeholder="e.g. MLRO / Head of Compliance" oninput="onSign('approvedTitle',this.value)"></div>
+            <div class="fg" style="margin-top:10px"><label for="approvedDate" data-i18n="fld.date">Date</label><input type="text" id="approvedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" onchange="dateFieldChanged(this, v => onSign('approvedDate', v))"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
         </div>
@@ -3134,6 +3134,14 @@ const I18N = {
   'fld.address':    {en:'Registered Address', ar:'العنوان المسجَّل'},
   'fld.contact':    {en:'Website / Email', ar:'الموقع الإلكتروني / البريد الإلكتروني'},
   'fld.principals': {en:'Principals — Beneficial Owners / Controllers / Directors', ar:'الأطراف الرئيسية — المالكون المستفيدون / المسيطرون / المديرون'},
+  'fld.jurisdiction': {en:'Jurisdiction & Incorporation', ar:'الولاية القضائية والتأسيس'},
+  'fld.activity':     {en:'Business Activity', ar:'النشاط التجاري'},
+  'fld.onboard':      {en:'Onboarding Channel', ar:'قناة الإلحاق'},
+  'fld.opHistory':    {en:'Operational History — Entity', ar:'السجل التشغيلي — الكيان'},
+  'fld.relDuration':  {en:'Relationship Duration', ar:'مدة العلاقة'},
+  'fld.fullName':     {en:'Full Name', ar:'الاسم الكامل'},
+  'fld.titleRole':    {en:'Title / Role', ar:'المسمى الوظيفي / الدور'},
+  'fld.date':         {en:'Date', ar:'التاريخ'},
 };
 function translateKey(key, lang){ const t = I18N[key]; return t ? (t[lang]!=null ? t[lang] : t.en) : null; }
 function getLang(){ try{ return localStorage.getItem(LANG_KEY)==='ar' ? 'ar' : 'en'; }catch(e){ return 'en'; } }
