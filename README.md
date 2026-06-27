@@ -198,6 +198,8 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 ├── data/reg-sources.json       # Regulatory Watch source registry + per-source narratives
 ├── data/reg-watch-state.json   # Regulatory Watch content fingerprints (committed by the action)
 ├── docs/regulatory-watch.md    # Regulatory Watch: source narratives + how it works
+├── docs/cybersecurity-skills.md # Claude Code plugin: Anthropic Cybersecurity Skills (817 skills)
+├── .claude/settings.json       # Pre-registers the cybersecurity-skills plugin marketplace
 ├── .github/workflows/          # CI, FATF watchdog, Regulatory Watch, site health, releases
 ├── scripts/asana-alert.mjs     # Asana alert task helper (used by site health)
 ├── netlify.toml                # Static publish config (repo root, no build)
@@ -217,6 +219,10 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 ## Security
 
 Found a vulnerability? **Do not open a public issue** — follow the disclosure process in [`SECURITY.md`](SECURITY.md). Incident response and the Advisor kill switch are documented in [`docs/governance/ai-incident-runbook.md`](docs/governance/ai-incident-runbook.md).
+
+### Cybersecurity Skills (Claude Code plugin)
+
+This repo pre-registers the Apache-2.0 [**Anthropic Cybersecurity Skills**](https://github.com/mukul975/Anthropic-Cybersecurity-Skills) library (817 agent skills across 29 domains, mapped to MITRE ATT&CK / F3, NIST CSF / AI RMF, ATLAS and D3FEND) as a Claude Code plugin via [`.claude/settings.json`](.claude/settings.json). It gives Claude Code expert decision-workflows for the fraud-typology, threat-intelligence, and deployment-security work around this AML/CFT tool — see [`docs/cybersecurity-skills.md`](docs/cybersecurity-skills.md) for what installs, how it maps to Hawkeye Sterling, and the authorized-use scope.
 
 ## License
 
