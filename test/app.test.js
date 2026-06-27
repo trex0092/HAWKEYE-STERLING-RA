@@ -62,6 +62,7 @@ const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
   openRegister, closeRegister, reviewStatus, reviewCounts,
   parsePrincipals, uboInitials, uboTrunc, renderUboGraph,
+  batchParseCsv, mapBatchRow, scoreBatchRow, scoreBatch, batchToCsv,
   storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
   _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
   currentRole, setRole, can, roleAtLeast, ROLES, ROLE_KEY, policyMissing,
@@ -952,6 +953,30 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     A.renderUboGraph();
     check('renderUboGraph shows the empty hint when there is nothing to graph',
       /ubo-empty/.test(document.getElementById('uboGraph').innerHTML));
+  }
+
+  /* ── batch screening (CSV triage) ── */
+  {
+    const csv = 'name,jurisdiction,activity,sanctions,pep\n'
+      + '"Smith, John Co",United Kingdom,Non-Manufactured Precious Metal Trading,No,Yes\n'
+      + 'Bad Actor Ltd,Nowhereland,Non-Manufactured Precious Metal Trading,Yes,No\n';
+    const parsed = A.batchParseCsv(csv);
+    check('batchParseCsv reads headers + quoted comma fields',
+      parsed.headers[0]==='name' && parsed.rows.length===2 && parsed.rows[0]['name']==='Smith, John Co');
+    const m = A.mapBatchRow({name:'X', country:'France', 'business activity':'Refining', onboard:'remote', pep:'yes'});
+    check('mapBatchRow resolves header aliases + yes/remote detection',
+      m.name==='X' && m.jurisdiction==='France' && m.activity==='Refining' && m.onboard==='Yes' && m.flags.pep==='Yes');
+    const before = A.state;
+    const results = A.scoreBatch(csv);
+    check('scoreBatch scores every data row', results.length===2);
+    check('a sanctions flag forces PROHIBITED', results[1].prohibited===true && results[1].outcome==='PROHIBITED');
+    check('a PEP flag escalates to EDD', results[0].outcome==='EDD');
+    check('an unmatched jurisdiction is flagged in notes', results[1].notes.some(n=>/jurisdiction/i.test(n)));
+    check('scoring a batch restores the live state', A.state===before);
+    const out = A.batchToCsv(results);
+    const outLines = out.split('\n');
+    check('batchToCsv emits a header + one row per result', outLines.length===3 && /Prohibited/i.test(outLines[0]));
+    check('batchToCsv quotes fields containing commas', /"Smith, John Co"/.test(out));
   }
 
   console.log('\n' + passed + ' passed, ' + failed + ' failed');

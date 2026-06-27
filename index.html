@@ -432,6 +432,15 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .ubo-label{fill:var(--text2);font-family:var(--sans);font-size:9px}
 .ubo-name-entity{fill:var(--gold);font-family:var(--sans);font-size:10px;font-weight:700;text-anchor:middle}
 .ubo-empty-svg{fill:var(--text3);font-family:var(--mono);font-size:9px;text-anchor:middle}
+.batch-toolbar{flex-wrap:wrap}
+.batch-input{display:block;margin:2px 18px 10px;min-height:84px;resize:vertical;background:#0B101A;border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);padding:8px 10px;font-size:11px;font-family:var(--mono);outline:none}
+.batch-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-ring)}
+.batch-row{display:grid;grid-template-columns:1.4fr 1fr auto 1.6fr;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--border)}
+.batch-row.batch-head{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-family:var(--mono);border-bottom:1px solid var(--border2)}
+.batch-name{font-weight:600;color:var(--text);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-jur{color:var(--text2);font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-note{color:var(--text3);font-size:9.5px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:560px){.batch-row{grid-template-columns:1fr auto}.batch-jur,.batch-note{display:none}}
 .btn-mini{padding:3px 10px;font-size:8.5px}
 @media(max-width:520px){.reg-review{display:none}}
 
@@ -840,6 +849,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <button class="btn btn-ghost btn-full" id="btnComplete" onclick="toggleComplete()">✓ Complete Assessment</button>
         <button class="btn btn-orange btn-full" id="btnRetryAsana" onclick="retryAsanaDelivery()" style="display:none">↻ Retry Asana Delivery</button>
         <button class="btn btn-secondary btn-full" onclick="openRegister()">≡ Register</button>
+        <button class="btn btn-blue btn-full" onclick="openBatch()">⊞ Batch Screening</button>
         <button class="btn btn-orange btn-full" onclick="openAudit()">▤ Activity Log</button>
         <button class="btn btn-ghost btn-full" id="btnMask" onclick="toggleMask()">🙈 Mask sensitive fields</button>
         <button class="btn btn-lilac btn-full" onclick="sendToAsana()">↗ Send to Asana</button>
@@ -903,6 +913,32 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <span class="rd-count" id="regCountLbl"></span>
         <span class="rd-spacer"></span>
         <span class="rd-meta">Opening another assessment files the current one first — nothing is lost.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch Screening — triage many entities from a CSV through the same engine -->
+  <div class="rd-overlay" id="batchOverlay">
+    <div class="rd-panel">
+      <div class="rd-head">
+        <span class="st">Batch Screening</span>
+        <span class="rd-meta" id="batchMeta"></span>
+        <span class="rd-spacer"></span>
+        <button class="rd-close" onclick="closeBatch()" title="Close" aria-label="Close batch screening">✕</button>
+      </div>
+      <p class="rd-note">Preliminary <strong>triage</strong> only — scores many entities through the same risk engine and risk-data overrides. A header row is required; columns in any order: <code>name, jurisdiction, activity, onboard, entityYears, relYears</code> plus optional Yes/No flags <code>sanctions, pep, adverse, tf, pf</code>. An unmatched jurisdiction or activity scores low and is flagged. This is not a full assessment and is never filed to the register.</p>
+      <div class="rd-toolbar batch-toolbar">
+        <input type="file" id="batchFile" accept=".csv,text/csv" onchange="onBatchFile(event)" aria-label="Choose a CSV file">
+        <button class="btn btn-ghost" onclick="downloadBatchTemplate()">⇩ Template</button>
+        <button class="btn btn-blue" onclick="runBatch()">▶ Score batch</button>
+        <button class="btn btn-lilac" id="batchExportBtn" onclick="exportBatchResults()" style="display:none">⇧ Export results</button>
+      </div>
+      <textarea id="batchInput" class="batch-input" placeholder="…or paste CSV here — first line is the header (name,jurisdiction,activity,onboard,entityYears,relYears,sanctions,pep,adverse,tf,pf)" aria-label="Paste CSV"></textarea>
+      <div class="rd-rows batch-rows" id="batchRows"></div>
+      <div class="rd-foot">
+        <span class="rd-count" id="batchCountLbl"></span>
+        <span class="rd-spacer"></span>
+        <span class="rd-meta">Triage only — verify each escalation in a full assessment.</span>
       </div>
     </div>
   </div>
@@ -2884,6 +2920,147 @@ function regRender(){
     rsum.className = 'reg-review-summary' + (cts.overdue ? ' reg-over' : (cts.soon ? ' reg-soon' : ''));
   }
 }
+/* ══════════════════════════════════════════
+   BATCH SCREENING (CSV triage — pure helpers + UI)
+══════════════════════════════════════════ */
+/* RFC4180-ish CSV → { headers, rows:[{lower-cased-header: value}] }. */
+function batchParseCsv(text){
+  const s = String(text==null?'':text);
+  const grid = [];
+  let row = [], field = '', inQ = false;
+  for(let i=0;i<s.length;i++){
+    const c = s[i];
+    if(inQ){
+      if(c==='"'){ if(s[i+1]==='"'){ field+='"'; i++; } else inQ=false; }
+      else field += c;
+      continue;
+    }
+    if(c==='"'){ inQ = true; continue; }
+    if(c===','){ row.push(field); field=''; continue; }
+    if(c==='\r'){ continue; }
+    if(c==='\n'){ row.push(field); grid.push(row); row=[]; field=''; continue; }
+    field += c;
+  }
+  if(field.length || row.length){ row.push(field); grid.push(row); }
+  const nonEmpty = grid.filter(r => r.some(c => String(c).trim()!==''));
+  if(!nonEmpty.length) return { headers:[], rows:[] };
+  const headers = nonEmpty[0].map(h => String(h).trim());
+  const rows = nonEmpty.slice(1).map(r => {
+    const o = {};
+    headers.forEach((h,idx) => { o[h.toLowerCase()] = r[idx]!=null ? String(r[idx]).trim() : ''; });
+    return o;
+  });
+  return { headers, rows };
+}
+function batchPick(o, keys){ for(const k of keys){ if(o[k]!=null && o[k]!=='') return o[k]; } return ''; }
+function batchYes(v){ return /^(y|yes|true|1)$/i.test(String(v==null?'':v).trim()); }
+/* Map a raw CSV row (lower-cased keys) to the engine's input factors. */
+function mapBatchRow(o){
+  o = o || {};
+  const onboardRaw = batchPick(o, ['onboard','remote','channel','non-face-to-face']);
+  return {
+    name: batchPick(o, ['name','entity','entity name','legal name','client']),
+    jurisdiction: batchPick(o, ['jurisdiction','country','country of incorporation']),
+    activity: batchPick(o, ['activity','business activity','nature of business']),
+    onboard: /^(y|yes|true|1|remote|non.?face)/i.test(String(onboardRaw).trim()) ? 'Yes' : 'No',
+    entityYears: batchPick(o, ['entityyears','entity years','years trading','operational history']),
+    relYears: batchPick(o, ['relyears','relationship years','relationship duration']),
+    flags: {
+      sanctions_entity: batchYes(batchPick(o, ['sanctions','sanctioned'])) ? 'Yes' : 'No',
+      pep: batchYes(batchPick(o, ['pep'])) ? 'Yes' : 'No',
+      adverse: batchYes(batchPick(o, ['adverse','adverse media'])) ? 'Yes' : 'No',
+      tf: batchYes(batchPick(o, ['tf','terrorist','terrorism'])) ? 'Yes' : 'No',
+      pf: batchYes(batchPick(o, ['pf','proliferation'])) ? 'Yes' : 'No',
+    }
+  };
+}
+/* Score one mapped row through computeAssessment by temporarily swapping the
+   live state, then restoring it (synchronous; no renders fire in between). */
+function scoreBatchRow(m){
+  const saved = state, notes = [];
+  try{
+    const s = freshState();
+    s.entity.name = m.name || '';
+    if(m.jurisdiction){ s.entity.jurisdiction = m.jurisdiction; if(!effCountry(m.jurisdiction)) notes.push('jurisdiction not in risk data — scored low'); }
+    if(m.activity){ s.profile.activity = m.activity; if(!effOf('activities', m.activity)) notes.push('activity not in risk data — scored low'); }
+    s.profile.onboard = m.onboard;
+    const ey = parseInt(m.entityYears, 10); if(!isNaN(ey)) s.profile.entityYears = ey;
+    const ry = parseInt(m.relYears, 10); if(!isNaN(ry)) s.profile.relYears = ry;
+    if(m.flags){ Object.keys(m.flags).forEach(k => { if(s.questions[k]!==undefined && m.flags[k]==='Yes') s.questions[k]='Yes'; }); }
+    state = s;
+    const r = computeAssessment();
+    return { name:m.name||'', jurisdiction:s.entity.jurisdiction, activity:s.profile.activity,
+      total:r.total, outcome:r.outcome, prohibited:r.prohibited, escalations:r.escalations.map(e=>e.reason), notes };
+  } finally { state = saved; }
+}
+function scoreBatch(text){ return batchParseCsv(text).rows.map(o => scoreBatchRow(mapBatchRow(o))); }
+function batchCsvCell(v){ v = String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+function batchToCsv(results){
+  const head = ['Name','Jurisdiction','Activity','Score','Outcome','Prohibited','Escalations','Notes'];
+  const lines = [head.join(',')];
+  (results||[]).forEach(r => {
+    lines.push([r.name, r.jurisdiction, r.activity, r.total, r.outcome, r.prohibited?'YES':'',
+      (r.escalations||[]).join('; '), (r.notes||[]).join('; ')].map(batchCsvCell).join(','));
+  });
+  return lines.join('\n');
+}
+function batchDownload(filename, text, mime){
+  const blob = new Blob([text], {type: mime||'text/csv'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  setTimeout(() => { try{ URL.revokeObjectURL(link.href); }catch(e){} }, 0);
+}
+let batchResults = [];
+function batchOutcomeClass(o){ return {CDD:'reg-cdd', SDD:'reg-sdd', EDD:'reg-edd', PROHIBITED:'reg-proh'}[o] || 'reg-st-draft'; }
+function renderBatchResults(results){
+  const box = $('batchRows');
+  if(!box) return;
+  if(!results.length){ box.innerHTML = '<div class="rd-empty">No rows scored — add a header row and at least one entity.</div>'; return; }
+  const body = results.map(r => {
+    const label = r.prohibited ? 'PROHIBITED' : (r.outcome + ' · ' + r.total);
+    const cls = batchOutcomeClass(r.prohibited ? 'PROHIBITED' : r.outcome);
+    const note = (r.notes && r.notes.length) ? r.notes.join('; ') : (r.escalations && r.escalations.length ? r.escalations.join('; ') : '');
+    return '<div class="batch-row">'
+      + '<span class="batch-name">'+esc(r.name||'—')+'</span>'
+      + '<span class="batch-jur">'+esc(r.jurisdiction||'—')+'</span>'
+      + '<span class="reg-chip '+cls+'">'+esc(label)+'</span>'
+      + '<span class="batch-note">'+esc(note)+'</span>'
+      + '</div>';
+  }).join('');
+  box.innerHTML = '<div class="batch-row batch-head"><span class="batch-name">Entity</span><span class="batch-jur">Jurisdiction</span><span>Outcome</span><span class="batch-note">Notes / escalations</span></div>' + body;
+}
+function runBatch(){
+  const text = ($('batchInput') && $('batchInput').value) || '';
+  if(!text.trim()){ toast('Paste CSV or choose a file first'); return; }
+  batchResults = scoreBatch(text);
+  renderBatchResults(batchResults);
+  const c = $('batchCountLbl'); if(c) c.textContent = batchResults.length + ' entit' + (batchResults.length===1?'y':'ies') + ' scored';
+  const prohibited = batchResults.filter(r=>r.prohibited).length;
+  const m = $('batchMeta'); if(m) m.textContent = prohibited ? (prohibited + ' PROHIBITED') : '';
+  const xb = $('batchExportBtn'); if(xb) xb.style.display = batchResults.length ? '' : 'none';
+}
+function onBatchFile(e){
+  const f = e && e.target && e.target.files && e.target.files[0];
+  if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { const ta = $('batchInput'); if(ta) ta.value = String(rd.result||''); toast('Loaded '+f.name); };
+  rd.readAsText(f);
+}
+function downloadBatchTemplate(){
+  const tmpl = 'name,jurisdiction,activity,onboard,entityYears,relYears,sanctions,pep,adverse,tf,pf\n'
+    + 'Acme Trading FZE,United Arab Emirates,Non-Manufactured Precious Metal Trading,No,3,2,No,No,No,No,No\n'
+    + 'Example Holdings Ltd,United Kingdom,Non-Manufactured Precious Metal Trading,Yes,1,1,No,Yes,No,No,No\n';
+  batchDownload('batch-template.csv', tmpl, 'text/csv');
+}
+function exportBatchResults(){
+  if(!batchResults.length){ toast('Score a batch first'); return; }
+  batchDownload('batch-results-' + todayISO().replace(/-/g,'') + '.csv', batchToCsv(batchResults), 'text/csv');
+}
+function openBatch(){ const o = $('batchOverlay'); if(o) o.classList.add('open'); }
+function closeBatch(){ const o = $('batchOverlay'); if(o) o.classList.remove('open'); }
+
 function openRegister(){
   regUpsert(); /* show the current assessment as it stands right now */
   regRender();
@@ -2910,6 +3087,8 @@ function regDeleteIdx(i){
 function initRegisterPanel(){
   const ov = $('regOverlay');
   if(ov && ov.addEventListener) ov.addEventListener('click', function(e){ if(e.target===ov) closeRegister(); });
+  const bo = $('batchOverlay');
+  if(bo && bo.addEventListener) bo.addEventListener('click', function(e){ if(e.target===bo) closeBatch(); });
 }
 
 function newAssessment(){
