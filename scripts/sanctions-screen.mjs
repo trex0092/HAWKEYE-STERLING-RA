@@ -126,7 +126,7 @@ export function parsePrincipals(task) {
   const notes = String((task && task.notes) || '');
   if (!notes) return [];
   // Isolate the identifications section (stop at the next "SECTION n" or EOF).
-  const sec = /SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)[\s\S]*?(?=\n\s*SECTION\s*\d|$)/i.exec(notes);
+  const sec = /SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)[\s\S]*?(?=\n\s*(?:SECTION|PART)\b|$)/i.exec(notes);
   const block = sec ? sec[0] : '';
   if (!block) return [];
   const people = [];
@@ -149,7 +149,9 @@ export function parsePrincipals(task) {
     if (nm) { structured = true; const nat = /\bNationality\s*:\s*([^\n]+)/i.exec(sub); push(nm[1], role || 'Principal', nat ? nat[1] : ''); }
   }
   if (!structured) {
-    const nameRe = /\bName\s*:\s*([^\n]+)/gi;
+    // No "Individual N —" structure: harvest names from explicit name-bearing
+    // labels too (UBO / beneficial owner / signatory), not only "Name:".
+    const nameRe = /\b(?:Name|UBO|Beneficial Owner|Authori[sz]ed Signatory|Signatory|Shareholder|Director|Partner)\s*:\s*([^\n]+)/gi;
     let n;
     while ((n = nameRe.exec(block))) push(n[1], 'Principal', '');
   }
@@ -171,9 +173,15 @@ export function parseSubjects(tasks) {
     seen.add(s.key);
     out.push(s);
     for (const p of parsePrincipals(t)) {
-      if (seen.has(p.name && normalizeName(p.name))) continue;
-      const key = normalizeName(p.name);
-      if (!key || seen.has(key)) continue;
+      const norm = normalizeName(p.name);
+      if (!norm) continue;
+      /* Key an individual by (name + parent customer), NOT by name alone, so a
+         principal is never dropped by a normalized-name collision with a legal
+         entity or with a same-named principal of a DIFFERENT customer — every
+         recorded person is screened and linked to their own record. A repeat of
+         the same person under the SAME customer is deduped. */
+      const key = norm + '|ubo|' + ((t && t.gid) || s.key);
+      if (seen.has(key)) continue;
       seen.add(key);
       out.push({
         key, name: p.name, entityType: 'individual',

@@ -65,6 +65,24 @@ check('subjectLabel marks an individual with role + parent, entity stays plain',
   subjectLabel(withPpl.find(x => x.entityType === 'individual')).includes('[individual]') &&
   subjectLabel(withPpl[0]) === 'Amber International FZCO');
 
+/* a principal whose name collides with a legal entity (or a same-named principal
+   of another customer) must NOT be dropped — every recorded person is screened */
+const collide = parseSubjects([
+  { gid: 'A', name: 'Ali Hassan', completed: false, notes: '' },                       // entity named like a person
+  { gid: 'B', name: 'Beta Trading FZE', completed: false,
+    notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Ali Hassan\n' },  // UBO with the SAME name
+  { gid: 'C', name: 'Gamma DMCC', completed: false,
+    notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Ali Hassan\n' },  // another UBO, same name, different customer
+]);
+const aliSubjects = collide.filter(x => normalizeName(x.name) === normalizeName('Ali Hassan'));
+check('name collision never drops a subject: entity + both UBOs all screened (3), keyed distinctly',
+  aliSubjects.length === 3 && new Set(collide.map(x => x.key)).size === collide.length &&
+  aliSubjects.filter(x => x.entityType === 'individual').length === 2);
+check('the same person repeated under the SAME customer is deduped',
+  parseSubjects([{ gid: 'D', name: 'Delta', completed: false,
+    notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Sam Lee\n    Individual 2 — Shareholder\n    Name: Sam Lee\n' }])
+    .filter(x => x.entityType === 'individual').length === 1);
+
 /* ── hit/list entry normalisation (string OR object) ── */
 check('normalizeHit handles a plain string list name', normalizeHit('OFAC SDN').list === 'OFAC SDN');
 check('normalizeHit maps an object entry', (() => { const h = normalizeHit({ list: 'EU FSF', matchScore: 96, hitName: 'ACME' }); return h.list === 'EU FSF' && h.score === 96 && h.hitName === 'ACME'; })());
