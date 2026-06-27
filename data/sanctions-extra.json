@@ -35,11 +35,11 @@
       "id": "au-dfat",
       "name": "Australia — DFAT Consolidated List",
       "jurisdiction": "Global",
-      "url": "",
-      "type": "xml",
-      "parser": "xml",
-      "enabled": false,
-      "_note": "DFAT publishes the Consolidated List as XLSX (regulation8_consolidated.xlsx) at https://www.dfat.gov.au/international-relations/security/sanctions/consolidated-list — the current parsers handle csv/xml only, so this needs an XLSX→CSV export (or an xlsx parser) plus the confirmed URL before enabling."
+      "url": "https://www.dfat.gov.au/sites/default/files/regulation8_consolidated.xlsx",
+      "type": "xlsx",
+      "parser": "dfat",
+      "enabled": true,
+      "_note": "DFAT publishes the Consolidated List ONLY as XLSX (regulation8_consolidated.xlsx, ~1.3 MB) — https://www.dfat.gov.au/international-relations/security/sanctions/consolidated-list. Read in-process by the dependency-free XLSX reader in sanctions-match.mjs (ZIP + sharedStrings + first worksheet, via node:zlib), which collects the name-bearing columns (unit-tested). Binary source: the screen fetches it as bytes (arrayBuffer), not text. Best-effort like SECO/Canada — the live fetch is verified on the first daily-screen run; if the host/layout ever changes the screen degrades VISIBLY (opens a GitHub issue), never a silent all-clear."
     },
     {
       "id": "wb-debarred",

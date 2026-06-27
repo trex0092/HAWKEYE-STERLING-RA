@@ -28,6 +28,16 @@ check('extracts only named SDO types (5 named, relationship/marking dropped)', p
 check('captures STIX aliases', parsed.find(e => e.id === 'threat-actor--1').aliases.join(',') === 'HIDDEN COBRA,APT38');
 check('captures ATT&CK x_mitre_aliases', parsed.find(e => e.id === 'intrusion-set--2').aliases.includes('Voodoo Bear'));
 check('drops an alias equal to the primary name', !parsed.some(e => e.aliases.includes(e.name)));
+
+/* case/spacing/diacritic variants of the same alias collapse to one entry
+   (normalised dedupe), keeping the first raw spelling for display */
+const dupes = parseStixBundle({ objects: [
+  { type: 'threat-actor', id: 'ta--dup', name: 'Fancy Bear',
+    aliases: ['HIDDEN COBRA', 'hidden cobra', 'Hidden  Cobra', 'Fancy Bear'],
+    x_mitre_aliases: ['Hìdden Cobra'] },
+]});
+check('collapses normalised-duplicate aliases and the name-equal variant',
+  dupes[0].aliases.length === 1 && dupes[0].aliases[0] === 'HIDDEN COBRA');
 check('stixNames flattens names + aliases', stixNames(bundle).includes('HIDDEN COBRA') && stixNames(bundle).includes('WannaCry'));
 check('tolerates a bare objects array', parseStixBundle(bundle.objects).length === 4);
 

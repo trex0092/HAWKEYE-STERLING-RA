@@ -36,12 +36,24 @@ export function parseStixBundle(bundle) {
   const out = [];
   for (const o of objects) {
     if (!o || !NAMED_SDO_TYPES.has(o.type) || !o.name) continue;
-    const aliases = []
-      .concat(Array.isArray(o.aliases) ? o.aliases : [])
-      .concat(Array.isArray(o.x_mitre_aliases) ? o.x_mitre_aliases : [])
-      .map(a => String(a).trim())
-      .filter(a => a && a !== o.name);
-    out.push({ id: o.id || '', type: o.type, name: String(o.name), aliases: [...new Set(aliases)] });
+    // Dedupe by NORMALISED form (not raw string) so case/spacing/diacritic
+    // variants — and an alias that only differs from the primary name in
+    // punctuation — collapse to one entry instead of bloating the screen index
+    // with near-identical candidates. The first raw spelling seen is kept for
+    // display; the primary name is pre-seeded so a name-equal alias is dropped.
+    const seen = new Set([normalizeName(o.name)]);
+    const aliases = [];
+    for (const a of [].concat(
+      Array.isArray(o.aliases) ? o.aliases : [],
+      Array.isArray(o.x_mitre_aliases) ? o.x_mitre_aliases : [],
+    )) {
+      const raw = String(a).trim();
+      const key = normalizeName(raw);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      aliases.push(raw);
+    }
+    out.push({ id: o.id || '', type: o.type, name: String(o.name), aliases });
   }
   return out;
 }
