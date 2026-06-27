@@ -4,7 +4,7 @@ import {
   normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseUnXml, parseOfsiCsv,
   parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName,
-  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx
+  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList
 } from '../scripts/sanctions-match.mjs';
 import { deflateRawSync } from 'node:zlib';
 
@@ -138,6 +138,29 @@ check('parseList routes the dfat/xlsx parser on a Buffer body',
   parseList({ id: 'au-dfat', parser: 'dfat', type: 'xlsx' }, xlsx).length === 3);
 check('unzipEntries tolerates a non-zip buffer (degrades to empty, never throws)',
   unzipEntries(Buffer.from('not a zip')).size === 0 && parseDfatXlsx(Buffer.from('xx')).length === 0);
+
+/* ── JSON list parser (national registers that publish JSON: France DGT, NZ, Ukraine) ── */
+/* France DGT "Registre national des gels" shape: nested Publications →
+   PublicationDetail[], individuals split Nom/Prenom, entities carry Nom, plus aliases. */
+const frJson = JSON.stringify({
+  Publications: {
+    PublicationDetail: [
+      { Nature: 'Personne physique', Nom: 'PUTIN', Prenom: 'Vladimir', Alias: ['Poutine'] },
+      { Nature: 'Personne morale', Nom: 'ROSNEFT OIL COMPANY' },
+    ],
+  },
+});
+const fr = parseJsonList(frJson);
+check('parseJsonList assembles Prenom+Nom for individuals and Nom for entities (France DGT)',
+  fr.includes('Vladimir PUTIN') && fr.includes('ROSNEFT OIL COMPANY'));
+check('parseJsonList collects string aliases', fr.includes('Poutine'));
+/* CKAN datastore shape (data.govt.nz): { result: { records: [ { Name: ... } ] } } */
+const nz = parseJsonList({ result: { records: [{ Name: 'Some Entity' }, { fullName: 'A Person' }] } });
+check('parseJsonList walks nested result.records and common name keys', nz.includes('Some Entity') && nz.includes('A Person'));
+check('parseJsonList does not invent names from a nameless payload', parseJsonList({ meta: { count: 0 }, data: [] }).length === 0);
+check('parseJsonList tolerates a bare array of {name} and dedups', JSON.stringify(parseJsonList([{ name: 'X' }, { name: 'X' }, { name: 'Y' }])) === JSON.stringify(['X', 'Y']));
+check('parseList routes the json parser', parseList({ id: 'fr-dgt', parser: 'json' }, frJson).includes('ROSNEFT OIL COMPANY'));
+check('parseJsonList tolerates malformed JSON (returns [])', parseJsonList('{not json').length === 0);
 
 /* ── curated list (strings + objects with aliases) ── */
 const cur = parseCuratedList({ entries: ['Foo Bar', { name: 'Baz Co', aliases: ['Baz Limited'] }] });

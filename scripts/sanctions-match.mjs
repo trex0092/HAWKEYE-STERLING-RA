@@ -347,6 +347,50 @@ export function parseDfatXlsx(buf) {
   return names;
 }
 
+/* Generic JSON list parser — several national registers publish JSON rather than
+   CSV/XML (France DGT "gels", Ukraine NSDC register, NZ data.govt.nz datastore).
+   Each has its own shape, so we walk the payload and harvest plausible designated
+   names from the common name-bearing keys (and assemble first+last where a record
+   splits them), plus aliases. Best-effort: returns [] if nothing recognisable, so
+   the caller flags coverage degraded rather than inferring a false clear. */
+const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination)$/i;
+const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename)$/i;
+const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom)$/i;
+const JSON_ALIAS = /^(alias|aliases|aka|akas|othernames|other_names|alternativenames|alternative_names|alternatename|alternative_spelling|autresnoms)$/i;
+export function parseJsonList(body) {
+  let data;
+  try { data = typeof body === 'string' ? JSON.parse(body) : body; } catch { return []; }
+  const out = [];
+  const visit = (node, depth) => {
+    if (node == null || depth > 8) return;
+    if (Array.isArray(node)) { for (const x of node) visit(x, depth + 1); return; }
+    if (typeof node !== 'object') return;
+    let whole = '', first = '', last = '';
+    for (const [k, v] of Object.entries(node)) {
+      if (typeof v === 'string' && v.trim()) {
+        if (!whole && JSON_WHOLE.test(k)) whole = v.trim();
+        else if (!first && JSON_FIRST.test(k)) first = v.trim();
+        else if (!last && JSON_LAST.test(k)) last = v.trim();
+      }
+    }
+    const assembled = (whole || [first, last].filter(Boolean).join(' ')).replace(/\s+/g, ' ').trim();
+    if (assembled) out.push(assembled);
+    for (const [k, v] of Object.entries(node)) {
+      if (JSON_ALIAS.test(k)) {
+        if (typeof v === 'string') for (const piece of v.split(/[;/|]/)) { const t = piece.trim(); if (t) out.push(t); }
+        else if (Array.isArray(v)) for (const a of v) {
+          if (typeof a === 'string' && a.trim()) out.push(a.trim());
+          else if (a && typeof a === 'object') { const n = a.name || a.alias || a.wholeName || a.value; if (typeof n === 'string' && n.trim()) out.push(n.trim()); }
+        }
+      } else if (v && typeof v === 'object' && !JSON_WHOLE.test(k)) {
+        visit(v, depth + 1);   // recurse into nested containers (results/data/items/publications)
+      }
+    }
+  };
+  visit(data, 0);
+  return [...new Set(out.filter(Boolean))];
+}
+
 /* A curated / local list (e.g. the UAE EOCN Local Terrorist List kept in-repo).
    Accepts an array of strings, an array of {name, aliases[]} objects, or
    {entries:[…]} / {names:[…]}. */
@@ -373,7 +417,8 @@ export function parseList(source, body) {
   if (p === 'un' || /^un[-_]/.test(id)) return parseUnXml(body);
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
-  if (p === 'curated' || source.type === 'curated' || source.type === 'json') return parseCuratedList(body);
+  if (p === 'json') return parseJsonList(body);
+  if (p === 'curated' || source.type === 'curated') return parseCuratedList(body);
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
   if (p === 'xml' || source.type === 'xml') return parseGenericXml(body);
