@@ -790,12 +790,12 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="sp-indicator" id="scoreIndicator"></div>
         <div class="sp-readout">
           <span class="sp-readout-num" id="totalScore">0</span>
-          <span class="sp-readout-cap">Out of 30+ &middot; Risk Score</span>
+          <span class="sp-readout-cap" data-i18n="fld.riskScore">Out of 30+ &middot; Risk Score</span>
         </div>
       </div>
 
       <div class="sp-block">
-        <div class="sp-label">Required Diligence</div>
+        <div class="sp-label" data-i18n="fld.requiredDiligence">Required Diligence</div>
         <div class="verdict-pill vp-cdd" id="verdictPill"><span id="verdictIcon">✓</span><span id="verdictText"></span></div>
         <div class="sb-thresholds">
           <span class="thresh-chip tc-low" id="tc-low">CDD: 0–19</span>
@@ -805,7 +805,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
         <div class="crit-banner" id="critBanner"></div>
         <div class="ov-banner" id="ovBanner"></div>
         <div class="ov-ctl no-print">
-          <button class="breakdown-toggle" onclick="toggleOvForm()"><span id="ovArrow">▶</span>&nbsp;Analyst Override</button>
+          <button class="breakdown-toggle" onclick="toggleOvForm()"><span id="ovArrow">▶</span>&nbsp;<span data-i18n="fld.analystOverride">Analyst Override</span></button>
           <div class="ov-form" id="ovForm">
             <select id="ovBand" onchange="onOvField()" aria-label="Override band">
               <option value="">— No override —</option>
@@ -819,7 +819,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       </div>
 
       <div class="sp-block">
-        <div class="sp-label">AI Risk Advisor</div>
+        <div class="sp-label" data-i18n="fld.aiAdvisor">AI Risk Advisor</div>
         <div class="adv-block">
           <div class="adv-hud">
             <div class="adv-glow" id="advGlow"></div>
@@ -838,7 +838,7 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
       </div>
 
       <div class="sp-block">
-        <div class="sp-label">Risk Position</div>
+        <div class="sp-label" data-i18n="fld.riskPosition">Risk Position</div>
         <div class="sb-bar-track"><div class="sb-seg-low"></div><div class="sb-seg-med"></div><div class="sb-seg-high"></div></div>
         <div class="sb-bar-pointer-wrap"><div class="sb-bar-pointer" id="barPointer" style="left:0%"><span id="pointerLabel">0</span></div></div>
         <div class="sb-axis"><span>0</span><span>10</span><span>20</span><span>30</span></div>
@@ -3153,6 +3153,11 @@ const I18N = {
   'fld.refId':        {en:'Reference ID', ar:'المعرّف المرجعي'},
   'fld.notes':        {en:'Assessment Notes & Risk Rationale', ar:'ملاحظات التقييم ومسوّغات المخاطر'},
   'fld.operatorRole': {en:'Operator role', ar:'دور المشغّل'},
+  'fld.riskScore':        {en:'Out of 30+ · Risk Score', ar:'من أصل 30+ · درجة المخاطر'},
+  'fld.requiredDiligence':{en:'Required Diligence', ar:'العناية الواجبة المطلوبة'},
+  'fld.aiAdvisor':        {en:'AI Risk Advisor', ar:'مستشار المخاطر الذكي'},
+  'fld.riskPosition':     {en:'Risk Position', ar:'موضع المخاطر'},
+  'fld.analystOverride':  {en:'Analyst Override', ar:'تجاوز المحلِّل'},
 };
 /* Arabic for the ownership/compliance questions (section 04). Machine-assisted
    per #i18nCaveat — review before official use. Folded into I18N keyed q.<id>
