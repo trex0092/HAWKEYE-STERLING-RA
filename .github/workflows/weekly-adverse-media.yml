@@ -8,11 +8,11 @@
 # Posts one audit-grade summary task in Ongoing Monitoring.
 # ============================================================
 
-name: Daily Adverse Media Screening
+name: Daily Screening (Sanctions + Adverse Media + PEP)
 
 on:
   schedule:
-    - cron: '0 2 * * *'    # 02:00 UTC = 06:00 UAE, daily — report delivered by ~09:00 UAE
+    - cron: '0 2 * * *'    # 02:00 UTC = 06:00 UAE, daily — ONE unified report delivered by ~09:00 UAE
   workflow_dispatch:        # Manual trigger
 
 # Read-only checkout; results are posted to Asana via the screen's own token.
@@ -46,9 +46,9 @@ jobs:
       - name: Install dependencies
         run: pip install rapidfuzz requests pdfplumber
 
-      - name: Run daily adverse media sweep (companies + individuals)
+      - name: Run unified daily screening (sanctions + adverse media + PEP)
         env:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
-          RUN_MODE: weekly_adverse   # internal mode switch (unchanged); cadence is now daily
+          RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
         run: python screen.py
