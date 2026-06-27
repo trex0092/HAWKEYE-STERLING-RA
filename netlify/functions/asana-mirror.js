@@ -176,12 +176,24 @@ async function ensureSection(token, project, name) {
   return made.ok ? made.body.data.gid : null;
 }
 
+/* Abort a hung Asana call rather than letting it pin the function until the
+   platform kills it. Overridable via ASANA_TIMEOUT_MS (kept small in tests). */
+const ASANA_TIMEOUT_MS = Number(process.env.ASANA_TIMEOUT_MS) || 15000;
+
 async function api(token, method, path, body) {
-  const r = await fetch('https://app.asana.com/api/1.0' + path, {
-    method,
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ASANA_TIMEOUT_MS);
+  let r;
+  try {
+    r = await fetch('https://app.asana.com/api/1.0' + path, {
+      method,
+      signal: ctrl.signal,
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   const d = await r.json().catch(() => ({}));
   return { ok: r.ok, status: r.status, body: d };
 }

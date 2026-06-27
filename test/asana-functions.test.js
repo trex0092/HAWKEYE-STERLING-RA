@@ -66,6 +66,19 @@ const event = (body) => ({ httpMethod: 'POST', headers: {}, body: JSON.stringify
   body = JSON.parse(res.body);
   check('risk-backup: happy path returns 200 with gid', res.statusCode === 200 && body.ok === true && body.gid === 'B1');
 
+  /* 6. asana-task: a same-name task already in Asana → updated in place, not duplicated. */
+  setFetch(async (url, opts) => {
+    const u = String(url);
+    if (opts.method === 'GET' && /\/projects\/.*\/tasks/.test(u)) {
+      return { ok: true, status: 200, json: () => Promise.resolve({ data: [{ gid: 'EXIST', name: 'Dup Co', permalink_url: 'u/EXIST' }] }) };
+    }
+    if (opts.method === 'PUT') return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'EXIST', permalink_url: 'u/EXIST' } }) };
+    return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'NEW' } }) }; /* a create would (wrongly) return NEW */
+  });
+  res = await asanaTask.handler(event({ name: 'Dup Co' }));
+  body = JSON.parse(res.body);
+  check('asana-task: existing same-name task is updated in place (no duplicate)', res.statusCode === 200 && body.gid === 'EXIST' && body.deduplicated === true);
+
   global.fetch = origFetch;
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);
