@@ -94,6 +94,25 @@ UAE National AI Strategy 2031 · UAE AI Ethics Principles · UAE PDPL ·
 UAE Federal Decree-Law No. 20 of 2018 (AML/CFT) · Cabinet Decision 10/2019 ·
 Cabinet Resolution 74/2020 (TFS) · FATF Recommendations 6, 10, 12.
 
+## 8a. Governance ⇄ Compliance traceability matrix
+Governance is the strategy ("how should we manage AI?"); compliance is the proof
+("are we meeting requirements?"). Both are implemented and **attested in every
+report** (report section ⑥, derived from live run state) and **enforced in CI**
+(`test/engine_test.py`).
+
+| Pillar | Control | Implementation | Attested / tested |
+| --- | --- | --- | --- |
+| Governance | Policies & Standards | this document | report §⑥ |
+| Governance | AI Principles (fairness/transparency/accountability) | labelled outputs + raw evidence; transliteration fairness sets | §4, §5; report §⑥ |
+| Governance | Risk Framework | `ai.compute_risk_rating` (FATF R.10) + QA gate | engine_test; report §⑥ |
+| Governance | Accountability | `agents.py` identities + authorization; MLRO ownership | preflight test; report §⑤/⑥ |
+| Governance | Decision Oversight | MLRO human-in-the-loop; degrade-loudly | report §⑥ |
+| Compliance | Regulations | UAE FDL 26/2021 · Cabinet 74/2020 · FATF R.6/10/12 · AI Strategy 2031 | report header + §⑥ |
+| Compliance | Data Privacy | PDPL; no-egress default; LLM opt-in gated | §3; report §⑥ |
+| Compliance | Security Controls | prompt-injection defence + credential broker (least privilege) | engine_test; report §⑤/⑥ |
+| Compliance | Audits | agent audit trail + QA gate; 10-yr retention (Asana + GitHub) | report §⑤/⑥ |
+| Compliance | Documentation | this doc · README · CI-tested engine | repo |
+
 ## 9. Review
 This model card is reviewed whenever the AI layer changes and at least annually by
 the MLRO / compliance function. Last updated with the initial AI-layer release.

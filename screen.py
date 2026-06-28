@@ -1394,6 +1394,12 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("━" * 70)
         A(agents.build_audit_section(audit))
         A("")
+        A("━" * 70)
+        A("⑥  AI GOVERNANCE & COMPLIANCE ATTESTATION")
+        A("━" * 70)
+        A(agents.build_attestation(audit, stats.get("ai_mode", "deterministic"),
+                                   stats.get("injection_blocked", 0), list_meta))
+        A("")
 
     A("━" * 70)
     A("MLRO SIGN-OFF")
