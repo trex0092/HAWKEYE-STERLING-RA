@@ -84,6 +84,13 @@ jobs:
         run: node test/screening-metrics.test.mjs
       - name: Run Interpol Red Notice signal unit tests
         run: node test/interpol-check.test.mjs
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+      - name: Compile the Python screening engine
+        run: python -m py_compile screen.py ai.py agents.py
+      - name: Run Python engine unit tests (screen + ai + agents)
+        run: python test/engine_test.py
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight
