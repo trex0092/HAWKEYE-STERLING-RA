@@ -170,6 +170,39 @@ def now_uae():
 def log(msg):
     print(f"[{datetime.datetime.utcnow().strftime('%H:%M:%S')}] {msg}", flush=True)
 
+# ── ASANA TRANSPORT (honours 429 rate-limit; retries transient errors) ────────
+ASANA_NOTES_MAX = 65000  # Asana notes hard limit is ~65,535; stay under
+
+def asana_request(method, url, **kw):
+    """Single Asana call path. Retries on 429 (respecting Retry-After) and 5xx so a
+    burst of reads/posts never crashes the run. Returns the final response (caller
+    inspects status); returns None only if the network failed every attempt."""
+    kw.setdefault("headers", ASANA_HEADERS)
+    kw.setdefault("timeout", 30)
+    last = None
+    for attempt in range(5):
+        try:
+            last = requests.request(method, url, **kw)
+        except Exception as e:
+            log(f"  Asana network error (attempt {attempt+1}): {e}")
+            time.sleep(2 ** attempt); continue
+        if last.status_code == 429 or last.status_code >= 500:
+            wait = last.headers.get("Retry-After")
+            time.sleep(int(wait) if (wait and wait.isdigit()) else 2 ** attempt)
+            continue
+        return last
+    return last
+
+def cap_notes(narrative):
+    """Cap a report to Asana's notes limit WITHOUT amputating the sign-off / retention
+    footer at the end — truncate the body, keep the tail."""
+    if len(narrative) <= ASANA_NOTES_MAX:
+        return narrative
+    log(f"  notes truncated ({len(narrative)} → {ASANA_NOTES_MAX}); sign-off/retention preserved")
+    tail = narrative[-1200:]
+    head = narrative[: ASANA_NOTES_MAX - len(tail) - 40]
+    return head + "\n…[body truncated — see workflow run log]…\n" + tail
+
 # ── ADVERSE MEDIA ─────────────────────────────────────────────────────────────
 # How many Google News locales to sweep per subject (US/GB/AE/TR/AR). 5 = deepest.
 ADVERSE_LOCALES = int(os.environ.get("ADVERSE_LOCALES", "5"))
@@ -431,12 +464,21 @@ def parse_uk(data):
     if not data: return names, date_str, ""
     try:
         lines = data.decode("utf-8-sig").splitlines()
+        # OFSI's ConList carries a title line on row 0, then the CSV header on row 1.
+        # If that title line is ever absent (format change) or an HTML error page is
+        # served with HTTP 200, blindly skipping row 0 would discard the real header
+        # and parse EVERY row to blanks → a silently zeroed list. Detect the header.
         reader = csv.DictReader(io.StringIO("\n".join(lines[1:])))
+        if not (reader.fieldnames and "Name 6" in reader.fieldnames):
+            reader = csv.DictReader(io.StringIO("\n".join(lines)))  # no title row
+        if not (reader.fieldnames and "Name 6" in reader.fieldnames):
+            log("  UK parse error: expected 'Name 6' column not found — list NOT parsed")
+            return names, "PARSE ERROR — unexpected format", sha256_of(data)
         for row in reader:
-            n6 = row.get("Name 6","").strip()
-            n1 = row.get("Name 1","").strip()
-            n2 = row.get("Name 2","").strip()
-            n3 = row.get("Name 3","").strip()
+            n6 = (row.get("Name 6") or "").strip()
+            n1 = (row.get("Name 1") or "").strip()
+            n2 = (row.get("Name 2") or "").strip()
+            n3 = (row.get("Name 3") or "").strip()
             if n6: names.add(n6)
             combined = " ".join(p for p in [n1,n2,n3] if p)
             if combined: names.add(combined)
@@ -566,12 +608,15 @@ def get_all_customers():
         "limit": 100,
     }
     while True:
-        r = requests.get("https://app.asana.com/api/1.0/tasks",
-                         headers=ASANA_HEADERS, params=params, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-        for t in data["data"]:
-            notes = t.get("notes","")
+        r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=params)
+        if r is None or r.status_code not in (200, 201):
+            raise RuntimeError(f"Asana customer fetch failed: "
+                               f"{getattr(r,'status_code','network')} {getattr(r,'text','')[:200]}")
+        data = r.json() if isinstance(r.json(), dict) else {}
+        for t in (data.get("data") or []):
+            if not t.get("gid") or not t.get("name"):
+                continue  # skip malformed row, never crash the whole run
+            notes = t.get("notes") or ""
             customers.append({
                 "gid": t["gid"],
                 "name": t["name"],
@@ -580,8 +625,9 @@ def get_all_customers():
                 "individuals": extract_individuals(notes),
                 "has_assessment": len(notes.strip()) > 100,
             })
-        next_page = data.get("next_page")
-        if not next_page: break
+        next_page = data.get("next_page") or None
+        if not next_page or not next_page.get("offset"):
+            break
         params["offset"] = next_page["offset"]
     log(f"Loaded {len(customers)} customers")
     return customers
@@ -708,14 +754,20 @@ def classify_deltas(possible_matches, adverse_findings, pep_findings, state, tod
     for f in adverse_findings:
         f_new = False
         for a in f["articles"]:
-            sig = a.get("url") or a.get("title", "")
+            # Key on the NORMALIZED TITLE, not the URL: Google News links carry
+            # volatile tracking params that change every fetch, which would make the
+            # same standing story re-appear as NEW forever. Title is stable.
+            sig = normalize(a.get("title", "")) or (a.get("url", "") or "")
             key = f"AM|{normalize(f['subject_name'])}|{sig}"
             is_new, first = _delta_mark(state, key, today)
             a["is_new"], a["first_seen"] = is_new, first
             if is_new: n_a += 1; f_new = True
         f["is_new"] = f_new
     for p in pep_findings:
-        key = f"PEP|{normalize(p['subject_name'])}|{p.get('id','')}"
+        # Fall back to description/label when the Wikidata id is empty, so two
+        # different same-named PEP subjects don't collide to one blank key.
+        pid = p.get("id") or normalize(p.get("description", ""))[:48] or normalize(p.get("label", ""))
+        key = f"PEP|{normalize(p['subject_name'])}|{pid}"
         is_new, first = _delta_mark(state, key, today)
         p["is_new"], p["first_seen"] = is_new, first
         if is_new: n_p += 1
@@ -1086,7 +1138,7 @@ def run_weekly_adverse(customers, run_time):
     payload = {
         "data": {
             "name": task_name,
-            "notes": narrative,
+            "notes": cap_notes(narrative),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
             "projects": [ASANA_ONGOING_MON_GID],
@@ -1094,12 +1146,11 @@ def run_weekly_adverse(customers, run_time):
                              "section": ASANA_SECTION_GID}],
         }
     }
-    r = requests.post("https://app.asana.com/api/1.0/tasks",
-                      headers=ASANA_HEADERS, json=payload, timeout=30)
-    if r.status_code in (200, 201):
+    r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+    if r is not None and r.status_code in (200, 201):
         log(f"OK Daily adverse media task created: {r.json()['data']['gid']}")
     else:
-        log(f"FAIL task: {r.status_code} - {r.text[:300]}")
+        log(f"FAIL task: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:300]}")
 
 # -- ASANA - POST DAILY TASK ---------------------------------------------------
 def post_daily_task(narrative, run_time, run_label, n_matches):
@@ -1110,7 +1161,7 @@ def post_daily_task(narrative, run_time, run_label, n_matches):
     payload = {
         "data": {
             "name": task_name,
-            "notes": narrative,
+            "notes": cap_notes(narrative),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
             "projects": [ASANA_ONGOING_MON_GID],
@@ -1118,12 +1169,11 @@ def post_daily_task(narrative, run_time, run_label, n_matches):
                              "section": ASANA_SECTION_GID}],
         }
     }
-    r = requests.post("https://app.asana.com/api/1.0/tasks",
-                      headers=ASANA_HEADERS, json=payload, timeout=30)
-    if r.status_code in (200,201):
+    r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+    if r is not None and r.status_code in (200,201):
         log(f"✅ Daily task created: {r.json()['data']['gid']}")
     else:
-        log(f"❌ Task failed: {r.status_code} — {r.text[:300]}")
+        log(f"❌ Task failed: {getattr(r,'status_code','network')} — {getattr(r,'text','')[:300]}")
 
 def post_confirmed_hit_comment(customer_gid, hits, run_time):
     dt = run_time.strftime("%d %b %Y %H:%M GST")
@@ -1131,16 +1181,12 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
              "MLRO review required immediately.",
              "Do NOT tip off customer. CR 74/2020 applies.\n"]
     for h in hits:
-        lines += [f"List:    {h['list']}",
-                  f"Matched: {h['matched_entry']}",
-                  f"Score:   {h['score']:.0f}%\n"]
-    r = requests.post(
-        f"https://app.asana.com/api/1.0/tasks/{customer_gid}/stories",
-        headers=ASANA_HEADERS,
-        json={"data": {"text": "\n".join(lines)}},
-        timeout=30,
-    )
-    if r.status_code in (200,201):
+        lines += [f"List:    {h.get('list','?')}",
+                  f"Matched: {h.get('matched_entry','?')}",
+                  f"Score:   {h.get('score',0):.0f}%\n"]
+    r = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{customer_gid}/stories",
+                      json={"data": {"text": "\n".join(lines)}})
+    if r is not None and r.status_code in (200,201):
         log(f"✅ Comment on {customer_gid}")
 
 # ── UNIFIED DAILY REPORT (Sanctions + Adverse Media + PEP, ONE narrative) ─────
@@ -1373,36 +1419,31 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
         task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
     payload = {"data": {
         "name": task_name[:250],
-        "notes": narrative[:65000],
+        "notes": cap_notes(narrative),
         "due_on": run_time.strftime("%Y-%m-%d"),
         "assignee": ASANA_ASSIGNEE_GID,
         "projects": [ASANA_ONGOING_MON_GID],
         "memberships": [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}],
     }}
-    r = requests.post("https://app.asana.com/api/1.0/tasks",
-                      headers=ASANA_HEADERS, json=payload, timeout=30)
-    if r.status_code in (200, 201):
+    r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+    if r is not None and r.status_code in (200, 201):
         gid = r.json()["data"]["gid"]
         log(f"OK Unified daily task created: {gid}")
         return gid
-    log(f"FAIL unified task: {r.status_code} - {r.text[:300]}")
+    log(f"FAIL unified task: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:300]}")
     return None
 
 def create_case_subtask(parent_gid, name, notes, due_on):
     """One trackable MLRO case per NEW hit — assigned, with a disposition to set."""
     if not parent_gid: return False
     payload = {"data": {
-        "name": name[:250], "notes": notes[:8000], "assignee": ASANA_ASSIGNEE_GID,
+        "name": name[:250], "notes": (notes or "")[:8000], "assignee": ASANA_ASSIGNEE_GID,
         "due_on": due_on, "parent": parent_gid,
     }}
-    try:
-        r = requests.post("https://app.asana.com/api/1.0/tasks",
-                          headers=ASANA_HEADERS, json=payload, timeout=30)
-        if r.status_code in (200, 201):
-            return True
-        log(f"  case subtask failed: {r.status_code} - {r.text[:160]}")
-    except Exception as e:
-        log(f"  case subtask error: {e}")
+    r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+    if r is not None and r.status_code in (200, 201):
+        return True
+    log(f"  case subtask failed: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
     return False
 
 def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time):
@@ -1579,6 +1620,9 @@ def run_onboarding(run_time):
         try:
             created = datetime.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")
         except Exception:
+            # Non-coverage is never silent: a customer we cannot date-stamp is
+            # flagged so it is screened by the daily batch and reviewed.
+            log(f"  onboarding: unparseable created_at for '{c.get('name','?')}' — left to daily batch")
             continue
         if created >= cutoff:
             fresh.append(c)

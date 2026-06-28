@@ -117,6 +117,33 @@ qa_bad = agents.qa_gate(
     {"ofac": {"count": 0}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}}, {})  # OFAC down
 check("QA gate catches integrity violations", (not qa_bad["passed"]) and len(qa_bad["issues"]) >= 4)
 
+# ── regression tests for the deep-audit fixes ────────────────────────────────
+print("regression — deep-audit fixes")
+# parse_uk: list WITHOUT the title row must still parse (header auto-detect), and
+# an HTML/error body must NOT silently yield 0 names — it must flag a parse error.
+uk_no_title = b"Name 6,Name 1,Name 2,Name 3\nAL-SOMEONE,,,\nOTHER NAME,First,,\n"
+uknames, ukstatus, _ = screen.parse_uk(uk_no_title)
+check("parse_uk handles a missing title row (no silent zero)", "AL-SOMEONE" in uknames and len(uknames) >= 1)
+uk_html = b"<html><body>Service unavailable</body></html>"
+_, uk_html_status, _ = screen.parse_uk(uk_html)
+check("parse_uk flags an unexpected (HTML) body instead of 0 silent names", "PARSE ERROR" in uk_html_status)
+
+# delta: same adverse story with a DIFFERENT (volatile) URL must stay STANDING.
+st2 = {}
+af1 = [{"subject_name": "Acme", "articles": [{"title": "Acme boss charged with fraud", "url": "http://x?t=1", "flagged": True}]}]
+screen.classify_deltas([], af1, [], st2, "2026-06-28")
+af2 = [{"subject_name": "Acme", "articles": [{"title": "Acme boss charged with fraud", "url": "http://x?t=999", "flagged": True}]}]
+d_am = screen.classify_deltas([], af2, [], st2, "2026-06-29")
+check("delta keys adverse on title, not volatile URL", d_am["adverse"] == 0 and af2[0]["articles"][0]["is_new"] is False)
+
+# risk rating must not crash on an out-of-range triage severity (clamped via .get)
+rr = ai.compute_risk_rating(sanctions_hits=[], is_control=False, pep=False,
+                            adverse_articles=[{"triage": {"severity": "SEVERE-BOGUS"}}])
+check("risk rating tolerates an unknown severity (no KeyError)", rr["rating"] in ("LOW", "MEDIUM", "HIGH"))
+
+# _mask must never emit secret-derived bytes
+check("credential mask is presence-only (no secret bytes)", agents._mask("supersecretvalue") == "present" and agents._mask("") == "unset")
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

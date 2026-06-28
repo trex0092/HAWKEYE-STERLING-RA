@@ -222,8 +222,13 @@ def triage_adverse(subject: str, article: dict):
         if txt:
             try:
                 j = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
+                # Clamp the model's severity to the allowed set — a stray value like
+                # "SEVERE"/"N/A" must never reach the bare dict lookups downstream.
+                sev = str(j.get("severity", severity)).upper()
+                if sev not in _SEV_RANK:
+                    sev = severity
                 out.update({
-                    "severity": str(j.get("severity", severity)).upper(),
+                    "severity": sev,
                     "relevance": "HIGH" if j.get("is_about_subject") else "LOW",
                     "confidence": "HIGH" if j.get("is_about_subject") and j.get("is_adverse") else "LOW",
                     "ai": True})
@@ -261,11 +266,13 @@ def compute_risk_rating(*, sanctions_hits, is_control, pep, adverse_articles,
 
     sev = "NONE"
     for a in (adverse_articles or []):
-        t = triage_adverse("", a)["severity"]  # severity only (no subject needed)
-        if _SEV_RANK[t] > _SEV_RANK[sev]:
+        # Reuse the severity already computed during enrichment (avoids a second,
+        # redundant — and with a key, a second BILLED — triage call per article).
+        t = (a.get("triage") or {}).get("severity") or triage_adverse("", a)["severity"]
+        if _SEV_RANK.get(t, 0) > _SEV_RANK.get(sev, 0):
             sev = t
     if sev != "NONE":
-        bump = {"CRITICAL": 5, "HIGH": 3, "MEDIUM": 2, "LOW": 1}[sev]
+        bump = {"CRITICAL": 5, "HIGH": 3, "MEDIUM": 2, "LOW": 1}.get(sev, 0)
         score += bump; factors.append(f"Adverse media — max severity {sev} ({len(adverse_articles)} item(s))")
 
     rating = "HIGH" if score >= 6 else ("MEDIUM" if score >= 3 else "LOW")

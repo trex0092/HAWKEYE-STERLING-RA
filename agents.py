@@ -69,9 +69,9 @@ ACTION_CREDENTIAL = {
 }
 
 def _mask(secret):
-    if not secret:
-        return "unset"
-    return f"present(••{secret[-3:]})" if len(secret) > 3 else "present"
+    # Presence ONLY — never any secret-derived bytes. This string is rendered into
+    # the filed Asana report, so even a masked tail would be an unacceptable leak.
+    return "present" if secret else "unset"
 
 class CredentialBroker:
     def __init__(self, env=None):
