@@ -23,15 +23,22 @@ No automated TFS freeze, no automated STR filing — STRs are drafted for the ML
 to verify, complete, and file via the UAE FIU **goAML** portal.
 
 ## 2a. No hallucinations / no fabricated data (HARD RULE)
-Filed reports contain **only real, sourced, deterministic data** — every item
-traces to a real designation-list entry, a real news article link, or a real
-Wikidata record. There is **no generative text and no model-inferred facts** in
-any report. Risk ratings and triage labels are computed by transparent rules and
-list their contributing factors. The LLM is **locked out of the report path**
-(`REPORT_ALLOW_LLM=0` by default) — it stays deterministic **even if an LLM key is
-present**. Enabling generative text in reports requires explicitly setting
-`REPORT_ALLOW_LLM=1` **and** a key — a separate, documented decision, never the
-default.
+Filed reports contain **only real, sourced data** — every sanctions hit shows the
+real matched list entry, every adverse item shows the real headline + source +
+**clickable article link**, every PEP shows the real Wikidata record. **No
+model-generated facts ever enter a report.**
+
+Two precise boundaries:
+- **Generative prose (free-text summaries) is OFF** by default and stays off even
+  with a key (`REPORT_ALLOW_LLM=0`). Enabling it needs `REPORT_ALLOW_LLM=1` **and**
+  a key — a separate, documented decision. The `[Auto]` summary is a deterministic
+  template filled with the real matched values.
+- **Grounded triage MAY use the LLM** when a key is present (`LLM_TRIAGE=1`,
+  default): it only **classifies** the supplied real headline (is this about the
+  subject? how severe?) under a hard grounding contract that forbids inventing any
+  fact. It generates no new information, the raw headline + link are always shown,
+  the result is labelled, and any model failure falls back to deterministic. Set
+  `LLM_TRIAGE=0` to make even this deterministic.
 
 ## 3. LLM use is opt-in; data residency (UAE PDPL)
 - Any feature that would send customer data to an external model is **gated behind

@@ -37,7 +37,24 @@ _AI_ENDPOINT  = "https://api.anthropic.com/v1/messages"
 # documented decision, not the default.
 REPORT_ALLOW_LLM = os.environ.get("REPORT_ALLOW_LLM", "0") == "1"
 def _llm_in_reports() -> bool:
+    """Generative prose (free-text summaries) in reports — OFF unless explicitly
+    opted in AND a key is present. This is the fabrication-prone surface."""
     return AI_ENABLED and REPORT_ALLOW_LLM
+
+# Grounded classification (relevance/severity of REAL headlines) is allowed when a
+# key is present: it judges provided text, it does NOT generate facts. Disable with
+# LLM_TRIAGE=0. Even here the raw headline + link is always shown and the result is
+# labelled, so a human verifies — the LLM never replaces the evidence.
+LLM_TRIAGE = AI_ENABLED and os.environ.get("LLM_TRIAGE", "1") == "1"
+
+# Hard grounding contract for any model call — forbids inventing facts.
+GROUNDING_SYSTEM = (
+    "You are an AML/CFT analyst assistant. ABSOLUTE RULES: Use ONLY the facts in the "
+    "user's message. Never add, infer, assume, or invent any name, date, allegation, "
+    "entity, number, or detail that is not explicitly present in the input. You only "
+    "classify and judge relevance of the supplied text — you do not generate new "
+    "information and you never make decisions. If uncertain, choose the conservative "
+    "answer (treat as NOT about the subject). Output only what is asked.")
 
 def llm_available() -> bool:
     """True only when the firm has provisioned a key (authorising data egress)."""
@@ -149,14 +166,18 @@ def triage_adverse(subject: str, article: dict):
            ("MEDIUM" if relevance in ("HIGH", "MEDIUM") else "LOW")
     out = {"severity": severity, "relevance": relevance, "confidence": conf, "ai": False}
 
-    if _llm_in_reports():
-        prompt = (f"Subject under screening: \"{subject}\".\n"
-                  f"News headline: \"{article.get('title','')}\" "
+    if LLM_TRIAGE:
+        # Grounded classification ONLY: judge the supplied headline against the
+        # supplied name. No new facts. Raw headline + link stay in the report.
+        prompt = ("Classify this news headline against the screening subject. "
+                  "Judge ONLY from the headline text given — do not assume facts.\n"
+                  f"Subject: \"{subject}\".\n"
+                  f"Headline: \"{article.get('title','')}\" "
                   f"({article.get('source','?')}, {article.get('date','?')}).\n"
-                  "Answer as compact JSON only: "
+                  "Return compact JSON only: "
                   '{"is_about_subject": true|false, "is_adverse": true|false, '
-                  '"severity": "CRITICAL|HIGH|MEDIUM|LOW|NONE", "one_line": "..."}')
-        txt = llm_complete(prompt, max_tokens=180)
+                  '"severity": "CRITICAL|HIGH|MEDIUM|LOW|NONE"}')
+        txt = llm_complete(prompt, system=GROUNDING_SYSTEM, max_tokens=120)
         if txt:
             try:
                 j = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
@@ -164,9 +185,9 @@ def triage_adverse(subject: str, article: dict):
                     "severity": str(j.get("severity", severity)).upper(),
                     "relevance": "HIGH" if j.get("is_about_subject") else "LOW",
                     "confidence": "HIGH" if j.get("is_about_subject") and j.get("is_adverse") else "LOW",
-                    "note": j.get("one_line", ""), "ai": True})
+                    "ai": True})
             except Exception:
-                pass
+                pass  # any failure → deterministic result already in `out`
     return out
 
 # ── CUSTOMER RISK RATING (deterministic, explainable) ─────────────────────────
@@ -232,9 +253,10 @@ def alert_summary(subject_name, risk, sanctions_hits, pep, adverse_articles):
         prompt = (f"Customer: \"{subject_name}\". Risk rating: {risk['rating']}.\n"
                   f"Evidence: {evidence}.\n"
                   f"Risk factors: {', '.join(risk['factors'])}.\n"
-                  "Write 2 sentences for the MLRO: (1) why this was flagged, "
-                  "(2) the single most important next check. No decision, no advice to freeze.")
-        txt = llm_complete(prompt, max_tokens=160)
+                  "Using ONLY the evidence above (invent nothing), write 2 sentences "
+                  "for the MLRO: (1) why this was flagged, (2) the single most important "
+                  "next check. No decision, no advice to freeze.")
+        txt = llm_complete(prompt, system=GROUNDING_SYSTEM, max_tokens=160)
         if txt:
             return {"text": txt, "ai": True}
     # Deterministic fallback
@@ -341,9 +363,12 @@ def governance_footer():
     # text, no model-inferred facts. Every datum traces to a real list entry,
     # article link, or Wikidata record.
     if _llm_in_reports():
-        mode = "AI-ASSISTED (LLM explicitly enabled for reports)"
+        mode = "AI-ASSISTED + generative summaries (explicitly enabled)"
+    elif LLM_TRIAGE:
+        mode = ("AI-ASSISTED triage (LLM classifies real headlines for relevance — "
+                "no generated facts). All sanctions/PEP/links remain deterministic & source-verified")
     else:
         mode = "DETERMINISTIC — every item traces to a real source; no generated text, no assumptions"
     return (f"DATA INTEGRITY: {mode}. Human-in-the-loop: MLRO decides & files. "
-            "Outputs are decision-support, explainable, and logged. "
+            "Every finding carries its raw evidence (list entry / article link / Wikidata). "
             "Governance: UAE AI Ethics Principles + PDPL; see docs/AI-GOVERNANCE.md.")

@@ -52,6 +52,10 @@ jobs:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
           RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          # AI layer: key enables GROUNDED triage only (classifies real headlines, cannot invent
+          # facts). Generative report prose stays OFF unless REPORT_ALLOW_LLM=1 is also set.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_MODEL: ${{ vars.AI_MODEL || 'claude-haiku-4-5-20251001' }}
         run: python screen.py
 
       - name: Commit delta-state (what has already been reported)
