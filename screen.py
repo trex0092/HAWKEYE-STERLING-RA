@@ -169,51 +169,67 @@ def log(msg):
     print(f"[{datetime.datetime.utcnow().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 # ── ADVERSE MEDIA ─────────────────────────────────────────────────────────────
-def search_adverse_media(name: str, max_results: int = 5) -> list:
+# How many Google News locales to sweep per subject (US/GB/AE/TR/AR). 5 = deepest.
+ADVERSE_LOCALES = int(os.environ.get("ADVERSE_LOCALES", "5"))
+# A targeted second pass: the name AND a cluster of material risk terms, so adverse
+# coverage surfaces even when it isn't in the subject's top general-news headlines.
+RISK_QUERY = ("fraud OR sanctions OR \"money laundering\" OR arrest OR investigation OR "
+              "court OR bribery OR corruption OR smuggling OR terrorism OR embezzlement OR "
+              "convicted OR indicted OR seized OR raid OR probe OR lawsuit OR charged")
+
+def search_adverse_media(name: str, max_results: int = 8) -> list:
     """
-    Search Google News RSS for a name.
-    Returns list of dicts: {title, source, date, url, flagged}
-    flagged=True if headline contains adverse keywords.
+    Deep adverse-media search via Google News RSS.
+      Pass 1 — exact name across ALL configured locales (US/GB/AE/TR/AR).
+      Pass 2 — exact name AND a material-risk-term cluster (en) to surface
+               wrongdoing coverage that isn't in the general headlines.
+    Headlines are flagged against the {len(ADVERSE_KEYWORDS)}-term keyword set,
+    bucketed by typology, deduplicated across outlets, and ranked recent-first.
+    Returns list of dicts: {title, source, date, ts, url, flagged, keywords, categories}.
     """
-    query = requests.utils.quote(f'"{name}"')
     seen_titles = set()
     articles = []
-
-    for url_template in GNEWS_URLS[:3]:  # limit to 3 locales to avoid rate limits
-        url = url_template.format(query=query)
-        try:
-            r = requests.get(url, timeout=15,
-                             headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
-            if r.status_code != 200:
+    passes = [
+        (f'"{name}"', GNEWS_URLS[:ADVERSE_LOCALES]),   # broad: exact name, every locale
+        (f'"{name}" ({RISK_QUERY})', GNEWS_URLS[:1]),  # targeted: name + risk terms, en-US
+    ]
+    for q, locales in passes:
+        query = requests.utils.quote(q)
+        for url_template in locales:
+            url = url_template.format(query=query)
+            try:
+                r = requests.get(url, timeout=15,
+                                 headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
+                if r.status_code != 200:
+                    continue
+                root = ET.fromstring(r.content)
+                for item in root.findall(".//item")[:max_results]:
+                    title_el = item.find("title")
+                    source_el = item.find("source")
+                    pubdate_el = item.find("pubDate")
+                    link_el = item.find("link")
+                    if title_el is None: continue
+                    title = (title_el.text or "").strip()
+                    if title in seen_titles: continue
+                    seen_titles.add(title)
+                    source = (source_el.text if source_el is not None else "Unknown")
+                    pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
+                    link = (link_el.text or "") if link_el is not None else ""
+                    tl = title.lower()
+                    matched = [kw for kw in ADVERSE_KEYWORDS if re.search(r"\b" + re.escape(kw), tl)]
+                    articles.append({
+                        "title": title,
+                        "source": source,
+                        "date": pub_date,
+                        "ts": _parse_rss_date(pubdate_el.text if pubdate_el is not None else ""),
+                        "url": link,
+                        "flagged": bool(matched),
+                        "keywords": matched,
+                        "categories": typology_for(matched),
+                    })
+            except Exception:
                 continue
-            root = ET.fromstring(r.content)
-            for item in root.findall(".//item")[:max_results]:
-                title_el = item.find("title")
-                source_el = item.find("source")
-                pubdate_el = item.find("pubDate")
-                link_el = item.find("link")
-                if title_el is None: continue
-                title = (title_el.text or "").strip()
-                if title in seen_titles: continue
-                seen_titles.add(title)
-                source = (source_el.text if source_el is not None else "Unknown")
-                pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
-                link = (link_el.text or "") if link_el is not None else ""
-                tl = title.lower()
-                matched = [kw for kw in ADVERSE_KEYWORDS if re.search(r"\b" + re.escape(kw), tl)]
-                articles.append({
-                    "title": title,
-                    "source": source,
-                    "date": pub_date,
-                    "ts": _parse_rss_date(pubdate_el.text if pubdate_el is not None else ""),
-                    "url": link,
-                    "flagged": bool(matched),
-                    "keywords": matched,
-                    "categories": typology_for(matched),
-                })
-        except Exception:
-            continue
-        time.sleep(0.5)  # polite delay between locale requests
+            time.sleep(0.4)  # polite delay between requests
 
     articles = dedup_stories(articles)
     # Sort: flagged first, then most-recent first (recency ranking).
@@ -951,7 +967,7 @@ SCOPE & COVERAGE ATTESTATION
   Individuals screened:      {stats["individuals_screened"]}  (shareholders / UBOs / directors from KYC records)
   Total subjects screened:   {stats["subjects_total"]}  ({coverage_pct}% of attempted)
   Screening errors/skipped:  {stats["errors"]}          <- non-coverage is shown, never silent
-  Source:                    Google News RSS - 3 locales (US / GB / AE)
+  Source:                    Google News RSS - 5 locales (US / GB / AE / TR / AR) + targeted risk query
   Query method:              Exact-phrase entity / individual-name search
   Adverse keyword set:       {len(ADVERSE_KEYWORDS)} red-flag terms (full set in screen.py)
   Key red flags:             {key_flags}
@@ -979,7 +995,8 @@ METHODOLOGY
 ---------------------------------------------------------------
 
 Exact-phrase Google News RSS search per company AND per associated
-individual across 3 locales. Headlines filtered against a {len(ADVERSE_KEYWORDS)}-term
+individual across 5 locales (US/GB/AE/TR/AR) plus a targeted risk-term query.
+Headlines filtered against a {len(ADVERSE_KEYWORDS)}-term
 red-flag keyword set. Raw headlines are presented without interpretation -
 all review decisions rest with the MLRO. This sweep supplements, and does
 not replace, the daily sanctions screening.

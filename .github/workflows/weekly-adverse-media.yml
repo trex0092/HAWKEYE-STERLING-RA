@@ -2,9 +2,10 @@
 # FINE GOLD LLC — DAILY ADVERSE MEDIA SCREENING
 # GitHub Actions Workflow — Hawkeye Sterling V2
 # ============================================================
-# Runs daily at 06:00 UAE (02:00 UTC) so the audit report lands in
-# Asana by ~09:00 UAE. Screens ALL companies AND their associated
-# individuals (shareholders / UBOs / directors) via Google News RSS.
+# Runs daily at 04:00 UAE (00:00 UTC) so the DEEPER ~4-4.5h sweep (5 locales
+# US/GB/AE/TR/AR + a targeted risk-term query) still lands in Asana before
+# ~09:00 UAE. Screens ALL companies AND their associated individuals
+# (shareholders / UBOs / directors) via Google News RSS.
 # Posts one audit-grade summary task in Ongoing Monitoring.
 # ============================================================
 
@@ -12,7 +13,7 @@ name: Daily Screening (Sanctions + Adverse Media + PEP)
 
 on:
   schedule:
-    - cron: '0 2 * * *'    # 02:00 UTC = 06:00 UAE, daily — ONE unified report delivered by ~09:00 UAE
+    - cron: '0 0 * * *'    # 00:00 UTC = 04:00 UAE, daily — early start lets the DEEPER ~4-4.5h sweep (5 locales + targeted query) still deliver by ~08:30 UAE, same UTC day (keeps freshness-check valid)
   workflow_dispatch:        # Manual trigger
 
 # Results are posted to Asana via the screen's own token. contents:write is used
