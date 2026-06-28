@@ -1294,9 +1294,6 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("━" * 70)
     A("③  PEP  (POLITICALLY EXPOSED PERSONS)")
     A("━" * 70)
-    A("   You do NOT supply a PEP list — and you do not need to know who is a PEP.")
-    A("   The engine AUTO-DETECTS PEPs by screening EVERY individual in the whole")
-    A("   customer database against Wikidata, automatically, on every run.")
     A("   Source: Wikidata (free) — politicians, ministers, MPs, judges, military / SOE chiefs,")
     A("           state-owned-enterprise heads + their relatives & close associates (RCA).")
     A(f"   Scope:  {stats['individuals_screened']} individuals auto-screened across the full database "
