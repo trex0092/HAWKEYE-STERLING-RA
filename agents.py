@@ -19,6 +19,7 @@ Pillar 3 of "Securing Agentic AI": Agent Identity & Authorization · Observabili
 & Audit Trails · Human-in-the-Loop · Governance & Compliance.
 No third-party dependencies.
 """
+import os
 
 # ── AGENT REGISTRY: identity + least-privilege authorization ───────────────────
 # Each agent may ONLY perform actions in its allow-list. The orchestrator denies
@@ -53,6 +54,58 @@ class AgentLog:
             "authorized": allowed, "ok": bool(ok and allowed),
         })
         return allowed and ok
+
+# ── RUNTIME CREDENTIAL SCOPING (least privilege; Agent Identity & Authorization) ─
+# Privileged actions require a specific secret. The broker is the SINGLE authority
+# that hands a secret to an agent — and only if that agent is authorized for an
+# action that needs it. Every grant/denial is logged; the secret VALUE is never
+# logged (only whether it is present, masked). This makes credential access
+# least-privilege and auditable even inside one process.
+ACTION_CREDENTIAL = {
+    "asana.read":  "ASANA_TOKEN",
+    "asana.write": "ASANA_TOKEN",
+    "llm.classify": "ANTHROPIC_API_KEY",
+    "state.commit": "GITHUB_TOKEN",
+}
+
+def _mask(secret):
+    if not secret:
+        return "unset"
+    return f"present(••{secret[-3:]})" if len(secret) > 3 else "present"
+
+class CredentialBroker:
+    def __init__(self, env=None):
+        self.env = env if env is not None else os.environ
+        self.events = []
+    def issue(self, agent, action):
+        """Return the secret value iff `agent` is authorized for `action` and the
+        action requires a credential that is present. Otherwise None. Audited."""
+        secret_name = ACTION_CREDENTIAL.get(action)
+        authorized = is_authorized(agent, action)
+        value = self.env.get(secret_name) if (authorized and secret_name) else None
+        self.events.append({
+            "agent": agent, "action": action, "secret": secret_name or "—",
+            "authorized": authorized, "granted": value is not None,
+            "presence": _mask(self.env.get(secret_name)) if secret_name else "—",
+        })
+        return value
+    def summary(self):
+        return {
+            "issued":  sum(1 for e in self.events if e["granted"]),
+            "denied":  sum(1 for e in self.events if not e["authorized"]),
+            "events":  self.events,
+        }
+
+def preflight_credentials():
+    """Static policy self-test: assert no agent is authorized for a privileged
+    action it must not hold. Returns a list of violations (empty = compliant)."""
+    violations = []
+    for a in AGENTS:
+        if "asana.write" in a["authz"] and a["name"] != "DeliveryAgent":
+            violations.append(f"{a['name']} must not hold asana.write")
+        if "state.commit" in a["authz"] and a["name"] not in ("DeliveryAgent",):
+            violations.append(f"{a['name']} must not hold state.commit")
+    return violations
 
 # ── QA / GOVERNANCE GATE (deterministic integrity checks) ─────────────────────
 def qa_gate(possible_matches, adverse_findings, pep_findings, list_meta, stats):
@@ -100,7 +153,7 @@ def qa_gate(possible_matches, adverse_findings, pep_findings, list_meta, stats):
 
 # ── ORCHESTRATION: build the audit manifest for one run ───────────────────────
 def run_pipeline_audit(stats, possible_matches, adverse_findings, pep_findings,
-                       list_meta, cases_proposed, ai_mode):
+                       list_meta, cases_proposed, ai_mode, env=None):
     """Record what each agent did this run (observability) and run the QA gate.
     Returns {log, qa}. Counts come from the already-completed screening pass."""
     log = AgentLog()
@@ -120,7 +173,16 @@ def run_pipeline_audit(stats, possible_matches, adverse_findings, pep_findings,
     qa = qa_gate(possible_matches, adverse_findings, pep_findings, list_meta, stats)
     log.record("QAAgent", "audit", "PASSED" if qa["passed"] else f"{len(qa['issues'])} integrity issue(s)", ok=True)
     log.record("DeliveryAgent", "asana.write", "post unified report to Ongoing Monitoring")
-    return {"log": log, "qa": qa}
+
+    # Runtime credential scoping: issue only the secrets each agent is authorized
+    # to use (values never logged). Plus a static policy self-test.
+    broker = CredentialBroker(env)
+    broker.issue("IngestAgent", "asana.read")
+    if ai_mode != "deterministic":
+        broker.issue("AdverseMediaAgent", "llm.classify")
+    broker.issue("DeliveryAgent", "asana.write")
+    violations = preflight_credentials()
+    return {"log": log, "qa": qa, "creds": broker.summary(), "cred_violations": violations}
 
 # ── REPORT SECTION ────────────────────────────────────────────────────────────
 def build_audit_section(audit):
@@ -139,4 +201,17 @@ def build_audit_section(audit):
     for e in audit["log"].entries:
         mark = "ok" if e["ok"] else ("DENIED" if not e["authorized"] else "fail")
         L.append(f"      [{mark:6}] {e['agent']:17} {e['action']:13} — {e['detail']}")
+
+    creds = audit.get("creds")
+    if creds:
+        viol = audit.get("cred_violations") or []
+        L.append("")
+        L.append(f"   Credential scoping (least privilege): {creds['issued']} issued · "
+                 f"{creds['denied']} denied · policy violations: {len(viol)}"
+                 + (" ✅" if not viol else " ⚠"))
+        for e in creds["events"]:
+            tag = "granted" if e["granted"] else ("DENIED" if not e["authorized"] else "absent")
+            L.append(f"      [{tag:7}] {e['agent']:17} {e['secret']:18} ({e['action']}) — {e['presence']}")
+        for v in viol:
+            L.append(f"      ⚠ POLICY VIOLATION: {v}")
     return "\n".join(L)
