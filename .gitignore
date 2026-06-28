@@ -29,3 +29,7 @@ link-check-report.md
 playwright-report/
 test-results/
 .lighthouseci/
+
+# Python build artifacts
+__pycache__/
+*.pyc
