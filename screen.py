@@ -10,6 +10,7 @@ Modes:
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
 import xml.etree.ElementTree as ET
+import ai  # AI layer — risk rating, adverse triage, summaries, transliteration, governance
 
 try:
     from rapidfuzz import fuzz
@@ -609,11 +610,24 @@ def confidence_tier(core):
 def screen_name(name, all_lists):
     n = normalize(name)
     if len(n) < 4: return []
+    # Transliteration-aware recall: also screen Arabic/Turkish spelling variants
+    # (Mohammed/Muhammad, Abdul/Abdel, bin/ibn …). Usually 1 variant; a handful
+    # only for names containing a known particle, so cost stays bounded.
+    variants = {n}
+    for v in ai.name_variants(name):
+        nv = normalize(v)
+        if len(nv) >= 4:
+            variants.add(nv)
     hits = []
     for list_name, entries in all_lists.items():
         for en, orig in entries:
             if len(en) < 6: continue
-            score, full, core = match_score(n, en)
+            best = None
+            for cand in variants:
+                score, full, core = match_score(cand, en)
+                if best is None or score > best[0]:
+                    best = (score, full, core)
+            score, full, core = best
             if score >= THRESHOLD and core >= CORE_THRESHOLD:
                 hits.append({"list": list_name, "matched_entry": orig, "score": score,
                              "name_score": full, "core_score": core,
@@ -1205,8 +1219,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                    else ("HIGH" if any(h["score"] >= 92 for h in m["hits"]) else "POTENTIAL"))
             newtag = " 🆕 NEW" if m.get("is_new") else " [STANDING]"
             ctrl = "  ⚠ OWNERSHIP/CONTROL" if any(h.get("control_linkage") for h in m["hits"]) else ""
-            A(f"{m['name']}   [{tag}]{newtag}{ctrl}")
+            risk = m.get("risk")
+            risk_tag = f"  ·  RISK: {risk['rating']}" if risk else ""
+            A(f"{m['name']}   [{tag}]{newtag}{ctrl}{risk_tag}")
             A(f"   Customer record: {m['permalink']}")
+            if m.get("ai_summary"):
+                ai_lbl = "AI" if m["ai_summary"].get("ai") else "Auto"
+                A(f"   [{ai_lbl}] {m['ai_summary']['text']}")
+            if risk:
+                A(f"   Risk factors: {'; '.join(risk['factors'])}")
+                A(f"   EDD: {risk['edd']}")
             shown = sorted(m["hits"], key=lambda h: -h["score"])[:10]
             for h in shown:
                 conf = f" · {h.get('confidence','')}" if h.get("confidence") else ""
@@ -1254,7 +1276,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A(f"   Customer record: {f['permalink']}")
             for a in f["articles"]:
                 nflag = " 🆕" if a.get("is_new") else ""
-                A(f"   [!] {a['title']}{nflag}")
+                tr = a.get("triage") or {}
+                sev = f"  [{tr.get('severity','')} · relevance {tr.get('relevance','')}]" if tr else ""
+                A(f"   [!] {a['title']}{nflag}{sev}")
                 cat = f"   {{{', '.join(a['categories'])}}}" if a.get("categories") else ""
                 A(f"       {a.get('source','?')} — {a.get('date','?')}{cat}")
                 if a.get("also_reported_by"):
@@ -1299,14 +1323,30 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             A("")
     A("")
 
+    related = stats.get("related_parties") or []
+    A("━" * 70)
+    A("④  RELATED PARTIES  (network / hidden links)")
+    A("━" * 70)
+    if not related:
+        A("   No shared owners / UBOs or entity-to-UBO links detected across the book.")
+    else:
+        A("   Hidden connections across the customer base — review for collusion / structuring:")
+        for cl in related[:25]:
+            A(f"   • {cl['key'].title()}  ({cl['type']})")
+            A(f"       Linked: {', '.join(cl['members'])}")
+        if len(related) > 25:
+            A(f"   • … +{len(related) - 25} more clusters (see run log)")
+    A("")
+
     A("━" * 70)
     A("MLRO SIGN-OFF")
     A("━" * 70)
     A("   Reviewed by: ____________________   Date: __________")
     A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
     A("")
-    A(f"Engine: screen.py (free — no paid feed / API key) · one pass: name-match vs live designation")
-    A(f"lists, Google News adverse media, Wikidata PEP · {github_run_url()}")
+    A(f"Engine: screen.py · one pass: name-match vs live designation lists, Google News adverse")
+    A(f"media, Wikidata PEP, AI risk-rating & triage · {github_run_url()}")
+    A("> " + ai.governance_footer())
     A("> Decision-support only; a 'no match' is never a clearance when a module is degraded (shown, never hidden).")
     A("> Detection is automatic; no freeze / decline / report before MLRO + four-eyes review.")
     A("> RETENTION: retain 10 years — UAE FDL No. 26 of 2021, Art. 23; Cabinet Decision 74/2020.")
@@ -1372,6 +1412,11 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
                          + ("  [owner/UBO → 50%/control rule]" if h.get("control_linkage") else ""))
         notes += ["", "Disposition: [ ] false positive   [ ] escalate / freeze (TFS)   [ ] investigate",
                   "Do not tip off. UAE Cabinet Resolution 74/2020 applies."]
+        # Attach an AI-assisted STR/SAR DRAFT for HIGH-risk / confirmed cases (human files).
+        risk = m.get("risk")
+        if risk and (risk["rating"] == "HIGH" or any(h["score"] >= 95 for h in new_hits)):
+            notes += ["", ai.draft_str(m["name"], m.get("permalink", ""), new_hits,
+                                       False, [], risk)]
         queue.append((0, nm, "\n".join(notes)))
     for p in pep_findings:
         if not p.get("is_new"): continue
@@ -1453,9 +1498,33 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     save_delta_state(state)
     log(f"Delta: {delta['sanctions']} new sanctions · {delta['adverse']} new adverse · {delta['pep']} new PEP")
 
+    # ── AI ENRICHMENT (decision-support; deterministic unless an LLM key is set) ──
+    # Per flagged customer: a Low/Med/High risk rating (explainable factors) and a
+    # short "why flagged / what to check" summary. Adverse-media items get a
+    # severity/relevance triage. Network links are surfaced across the book.
+    adv_by_link = {}
+    for f in adverse_findings:
+        adv_by_link.setdefault(f.get("permalink", ""), []).extend(f.get("articles", []))
+        for a in f["articles"]:
+            a["triage"] = ai.triage_adverse(f["subject_name"], a)
+    pep_links = {p.get("permalink", "") for p in pep_findings}
+    for m in possible_matches:
+        link = m.get("permalink", "")
+        m_adverse = adv_by_link.get(link, [])
+        m_pep = link in pep_links
+        m["risk"] = ai.compute_risk_rating(
+            sanctions_hits=m["hits"],
+            is_control=any(h.get("control_linkage") for h in m["hits"]),
+            pep=m_pep, adverse_articles=m_adverse)
+        m["ai_summary"] = ai.alert_summary(m["name"], m["risk"], m["hits"], m_pep, m_adverse)
+    related = ai.related_parties(customers)
+    log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
+        f"mode={'LLM' if ai.llm_available() else 'deterministic'}")
+
     stats = {"customers_total": len(customers), "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": companies + individuals,
-             "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta}
+             "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
+             "related_parties": related, "ai_mode": "LLM" if ai.llm_available() else "deterministic"}
     narrative = build_unified_narrative(possible_matches, clear, adverse_findings,
                                         pep_findings, list_meta, stats, run_time)
     parent_gid = post_unified_task(narrative, run_time, possible_matches,
