@@ -10,7 +10,8 @@ Modes:
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
 import xml.etree.ElementTree as ET
-import ai  # AI layer — risk rating, adverse triage, summaries, transliteration, governance
+import ai      # AI layer — risk rating, adverse triage, summaries, transliteration, governance
+import agents  # Agentic operating model — identity/authorization, audit trail, QA gate
 
 try:
     from rapidfuzz import fuzz
@@ -450,11 +451,14 @@ def parse_eu(data):
     try:
         reader = csv.DictReader(io.StringIO(data.decode("utf-8")))
         for row in reader:
-            n = row.get("name","").strip()
-            if n: names.add(n)
-            for a in row.get("aliases","").split(";"):
-                a = a.strip()
-                if a: names.add(a)
+            try:
+                n = (row.get("name") or "").strip()
+                if n: names.add(n)
+                for a in (row.get("aliases") or "").split(";"):
+                    a = a.strip()
+                    if a: names.add(a)
+            except Exception:
+                continue  # one malformed row never zeroes the whole list
     except Exception as e:
         log(f"  EU parse error: {e}")
     return names, "live", sha256_of(data)
@@ -1337,6 +1341,14 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             A(f"   • … +{len(related) - 25} more clusters (see run log)")
     A("")
 
+    audit = stats.get("agent_audit")
+    if audit:
+        A("━" * 70)
+        A("⑤  AGENTIC OPERATING MODEL  (audit trail + QA gate)")
+        A("━" * 70)
+        A(agents.build_audit_section(audit))
+        A("")
+
     A("━" * 70)
     A("MLRO SIGN-OFF")
     A("━" * 70)
@@ -1502,10 +1514,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # short "why flagged / what to check" summary. Adverse-media items get a
     # severity/relevance triage. Network links are surfaced across the book.
     adv_by_link = {}
+    injection_blocked = 0
     for f in adverse_findings:
         adv_by_link.setdefault(f.get("permalink", ""), []).extend(f.get("articles", []))
         for a in f["articles"]:
             a["triage"] = ai.triage_adverse(f["subject_name"], a)
+            if a["triage"].get("injection_suspected"):
+                injection_blocked += 1
     pep_links = {p.get("permalink", "") for p in pep_findings}
     for m in possible_matches:
         link = m.get("permalink", "")
@@ -1523,7 +1538,20 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     stats = {"customers_total": len(customers), "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": companies + individuals,
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
-             "related_parties": related, "ai_mode": "LLM" if ai.llm_available() else "deterministic"}
+             "related_parties": related, "injection_blocked": injection_blocked,
+             "ai_mode": "AI-assisted triage" if ai.llm_available() else "deterministic"}
+
+    # ── AGENTIC OPERATING MODEL: audit trail + QA / governance gate ──
+    new_s = sum(1 for m in possible_matches if any(h.get("is_new") for h in m["hits"]))
+    new_p = sum(1 for p in pep_findings if p.get("is_new"))
+    new_a = sum(1 for f in adverse_findings if any(a.get("is_new") for a in f["articles"]))
+    cases_proposed = min(new_s + new_p + new_a, CASE_SUBTASK_CAP)
+    stats["agent_audit"] = agents.run_pipeline_audit(
+        stats, possible_matches, adverse_findings, pep_findings,
+        list_meta, cases_proposed, stats["ai_mode"])
+    if not stats["agent_audit"]["qa"]["passed"]:
+        log(f"QA GATE: {len(stats['agent_audit']['qa']['issues'])} integrity issue(s) — see report")
+
     narrative = build_unified_narrative(possible_matches, clear, adverse_findings,
                                         pep_findings, list_meta, stats, run_time)
     parent_gid = post_unified_task(narrative, run_time, possible_matches,
