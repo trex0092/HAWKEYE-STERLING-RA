@@ -29,6 +29,16 @@ AI_MODEL      = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 AI_ENABLED    = bool(os.environ.get("ANTHROPIC_API_KEY"))
 _AI_ENDPOINT  = "https://api.anthropic.com/v1/messages"
 
+# HARD ANTI-HALLUCINATION RULE: filed reports must contain ONLY real, sourced,
+# deterministic data — never model-generated prose or model-inferred facts.
+# This switch keeps every report path deterministic even if an LLM key is set.
+# An LLM is therefore NOT used in anything that gets filed; opt-in generative
+# use would require explicitly setting REPORT_ALLOW_LLM=1 AND a key — a separate,
+# documented decision, not the default.
+REPORT_ALLOW_LLM = os.environ.get("REPORT_ALLOW_LLM", "0") == "1"
+def _llm_in_reports() -> bool:
+    return AI_ENABLED and REPORT_ALLOW_LLM
+
 def llm_available() -> bool:
     """True only when the firm has provisioned a key (authorising data egress)."""
     return AI_ENABLED
@@ -139,7 +149,7 @@ def triage_adverse(subject: str, article: dict):
            ("MEDIUM" if relevance in ("HIGH", "MEDIUM") else "LOW")
     out = {"severity": severity, "relevance": relevance, "confidence": conf, "ai": False}
 
-    if AI_ENABLED:
+    if _llm_in_reports():
         prompt = (f"Subject under screening: \"{subject}\".\n"
                   f"News headline: \"{article.get('title','')}\" "
                   f"({article.get('source','?')}, {article.get('date','?')}).\n"
@@ -218,7 +228,7 @@ def alert_summary(subject_name, risk, sanctions_hits, pep, adverse_articles):
         bullets.append(f"{len(adverse_articles)} adverse-media item(s)")
     evidence = "; ".join(bullets) or "no material findings"
 
-    if AI_ENABLED:
+    if _llm_in_reports():
         prompt = (f"Customer: \"{subject_name}\". Risk rating: {risk['rating']}.\n"
                   f"Evidence: {evidence}.\n"
                   f"Risk factors: {', '.join(risk['factors'])}.\n"
@@ -327,7 +337,13 @@ MODEL_CARD = {
 }
 
 def governance_footer():
-    mode = "AI-ASSISTED (LLM key present)" if AI_ENABLED else "DETERMINISTIC (no LLM key — no data egress)"
-    return (f"AI MODE: {mode}. Human-in-the-loop: MLRO decides & files. "
+    # Filed reports are deterministic and source-verified by default — no generative
+    # text, no model-inferred facts. Every datum traces to a real list entry,
+    # article link, or Wikidata record.
+    if _llm_in_reports():
+        mode = "AI-ASSISTED (LLM explicitly enabled for reports)"
+    else:
+        mode = "DETERMINISTIC — every item traces to a real source; no generated text, no assumptions"
+    return (f"DATA INTEGRITY: {mode}. Human-in-the-loop: MLRO decides & files. "
             "Outputs are decision-support, explainable, and logged. "
             "Governance: UAE AI Ethics Principles + PDPL; see docs/AI-GOVERNANCE.md.")

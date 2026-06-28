@@ -22,6 +22,17 @@ Every output is reviewed by the **MLRO**, who retains the decision and signs off
 No automated TFS freeze, no automated STR filing — STRs are drafted for the MLRO
 to verify, complete, and file via the UAE FIU **goAML** portal.
 
+## 2a. No hallucinations / no fabricated data (HARD RULE)
+Filed reports contain **only real, sourced, deterministic data** — every item
+traces to a real designation-list entry, a real news article link, or a real
+Wikidata record. There is **no generative text and no model-inferred facts** in
+any report. Risk ratings and triage labels are computed by transparent rules and
+list their contributing factors. The LLM is **locked out of the report path**
+(`REPORT_ALLOW_LLM=0` by default) — it stays deterministic **even if an LLM key is
+present**. Enabling generative text in reports requires explicitly setting
+`REPORT_ALLOW_LLM=1` **and** a key — a separate, documented decision, never the
+default.
+
 ## 3. LLM use is opt-in; data residency (UAE PDPL)
 - Any feature that would send customer data to an external model is **gated behind
   the `ANTHROPIC_API_KEY` secret**.
