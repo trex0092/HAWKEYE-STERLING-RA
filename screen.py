@@ -10,6 +10,12 @@ Modes:
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
 import xml.etree.ElementTree as ET
+import concurrent.futures
+
+# How many subjects to enrich (adverse media + PEP) in parallel. The sweep is
+# network-bound, so a bounded thread pool cuts wall-clock from hours to minutes
+# without raising the per-host request RATE much (each worker still paces itself).
+SCREEN_CONCURRENCY = int(os.environ.get("SCREEN_CONCURRENCY", "8"))
 import ai      # AI layer — risk rating, adverse triage, summaries, transliteration, governance
 import agents  # Agentic operating model — identity/authorization, audit trail, QA gate
 
@@ -1519,35 +1525,58 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         if any(h["score"] >= 100 for h in m["hits"]):
             post_confirmed_hit_comment(m["gid"], m["hits"], run_time)
 
-    # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual
+    # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual — run the
+    # network-bound sweep in PARALLEL (bounded pool) so a full book screens in
+    # minutes, not hours. Each worker still paces its own requests for politeness.
     adverse_findings, pep_findings = [], []
     companies = individuals = am_errors = pep_errors = 0
-    for i, c in enumerate(customers, 1):
-        subjects = [("COMPANY", c["name"], None)]
+    subjects_all = []
+    for c in customers:
+        subjects_all.append(("COMPANY", c["name"], None, c))
         for ind in c.get("individuals", []):
-            subjects.append(("INDIVIDUAL", ind, c["name"]))
-        for subj_type, subj_name, parent in subjects:
+            subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
+
+    def _enrich(subj):
+        subj_type, subj_name, parent, c = subj
+        r = {"type": subj_type, "name": subj_name, "parent": parent,
+             "permalink": c.get("permalink", ""), "adverse": None, "pep": None, "am_error": False}
+        try:
+            articles = search_adverse_media(subj_name, max_results=5)
+            r["adverse"] = [a for a in articles if a["flagged"]]
+        except Exception as e:
+            r["am_error"] = True; r["am_msg"] = str(e)[:120]
+        if subj_type == "INDIVIDUAL":
             try:
-                articles = search_adverse_media(subj_name, max_results=5)
-                if subj_type == "COMPANY": companies += 1
-                else: individuals += 1
-                adverse = [a for a in articles if a["flagged"]]
-                if adverse:
-                    adverse_findings.append({"subject_type": subj_type, "subject_name": subj_name,
-                        "parent": parent, "permalink": c.get("permalink", ""), "articles": adverse})
+                r["pep"] = check_pep(subj_name)
             except Exception as e:
-                am_errors += 1; log(f"  ! adverse error {subj_name}: {e}")
-            if subj_type == "INDIVIDUAL":
-                p = check_pep(subj_name)
+                r["pep"] = {"errored": True, "error": str(e)[:120]}
+        return r
+
+    total = len(subjects_all)
+    log(f"Enriching {total} subjects with {SCREEN_CONCURRENCY} parallel workers...")
+    done = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY) as ex:
+        for r in ex.map(_enrich, subjects_all):
+            done += 1
+            if r["am_error"]:
+                am_errors += 1
+            else:
+                if r["type"] == "COMPANY": companies += 1
+                else: individuals += 1
+                if r["adverse"]:
+                    adverse_findings.append({"subject_type": r["type"], "subject_name": r["name"],
+                        "parent": r["parent"], "permalink": r["permalink"], "articles": r["adverse"]})
+            p = r.get("pep")
+            if r["type"] == "INDIVIDUAL" and p is not None:
                 if p.get("errored"):
                     pep_errors += 1
                 elif p.get("hit"):
-                    pep_findings.append({"subject_name": subj_name, "parent": parent,
-                        "permalink": c.get("permalink", ""), "id": p.get("id", ""),
+                    pep_findings.append({"subject_name": r["name"], "parent": r["parent"],
+                        "permalink": r["permalink"], "id": p.get("id", ""),
                         "category": p.get("category", ""),
                         "label": p.get("label", ""), "description": p.get("description", "")})
-            time.sleep(0.7)  # rate-limit protection (Google News + Wikidata)
-        log(f"  [{i}/{len(customers)}] {c['name']}")
+            if done % 50 == 0 or done == total:
+                log(f"  enriched {done}/{total}")
 
     # DELTA — flag only what is new since the last run (state committed by workflow)
     today = run_time.strftime("%Y-%m-%d")
