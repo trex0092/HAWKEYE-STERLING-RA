@@ -67,6 +67,16 @@ Two precise boundaries:
 - A "no match" is **never** treated as a clearance when a module is degraded — the
   degradation is shown, never hidden (avoids false assurance).
 
+## 5a. Prompt security (UAE "Securing Agentic AI")
+Adverse-media headlines and source names come from the open web and are treated as
+**untrusted input**. Before any text reaches the model it is (1) stripped of control
+characters, (2) length-capped, (3) wrapped in explicit untrusted markers, and (4)
+screened for prompt-injection patterns (`ai.py::detect_injection`). On any detection
+the item is **never sent to the model** — it is classified deterministically and the
+attempt is flagged in the report and audit trail. The model's system prompt also
+carries a hard contract to ignore any instruction embedded in untrusted text and to
+invent no facts. "Secure by design. Trust by default."
+
 ## 6. Accountability & audit
 - Every run is an immutable GitHub Actions record + an Asana task (10-year
   retention, UAE FDL No. 26 of 2021 Art. 23).

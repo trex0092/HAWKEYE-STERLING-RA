@@ -1279,6 +1279,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 tr = a.get("triage") or {}
                 sev = f"  [{tr.get('severity','')} · relevance {tr.get('relevance','')}]" if tr else ""
                 A(f"   [!] {a['title']}{nflag}{sev}")
+                if tr.get("injection_suspected"):
+                    A(f"       ⚠ input flagged (possible prompt-injection) — classified deterministically, model not used")
                 cat = f"   {{{', '.join(a['categories'])}}}" if a.get("categories") else ""
                 A(f"       {a.get('source','?')} — {a.get('date','?')}{cat}")
                 if a.get("also_reported_by"):

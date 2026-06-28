@@ -47,6 +47,46 @@ The **AI Risk Advisor** in the assessment sidebar is a robot whose head and HUD 
 - **Persistence** — drafts autosave to the browser (`localStorage`) and are restored on reload; named assessments are also filed in the on-device register. All dates are entered and displayed as DD/MM/YYYY.
 - **Record completeness indicator** in the risk-summary sidebar.
 
+## Automated daily screening engine + AI layer
+
+Beyond the on-device assessment tool, the repository runs an **automated, audit-grade
+daily screening engine** ([`screen.py`](screen.py)) over the firm's live customer base,
+augmented by a governance-first **AI layer** ([`ai.py`](ai.py)). It is free to run —
+no paid data feed and no API key are required; an LLM is strictly optional and opt-in.
+
+**One unified daily report** (workflow [`weekly-adverse-media.yml`](.github/workflows/weekly-adverse-media.yml),
+`RUN_MODE=unified`) screens **every company and every recorded owner / director / UBO**
+through three modules in a single pass and posts one MLRO-ready task to Asana, delivered
+by **09:00 UAE**:
+
+| # | Module | What it does |
+|---|---|---|
+| ① | **Sanctions / watchlists** | Fuzzy name-match against the live **OFAC SDN · UN · EU FSF · UK OFSI · UAE EOCN** lists (plus **Canada SEMA** as a best-effort supplementary list). Shows every candidate with the matched entry and score. |
+| ② | **Adverse media** | Google News RSS across **5 locales** (US/GB/AE/TR/AR) plus a targeted risk-term query; duplicate stories merged across outlets, bucketed by typology, ranked recent-first, every item carrying its **real article link**. |
+| ③ | **PEP** | Auto-detected against **Wikidata** (no list supplied by the firm) — politicians, judges, military/SOE heads **and their relatives & close associates (RCA)**. |
+
+**Screening intelligence**
+- **False-positive suppression** — a decisive second match on the distinctive name "core" after stripping corporate/legal boilerplate, so two firms sharing only suffixes don't match.
+- **Ownership / control (50 % rule)** — when an owner/UBO matches a designation, the company is flagged by control linkage even if its own name is clear.
+- **Delta engine** — each report leads with what is **new since the last run**; standing items are marked, never dropped (state in [`data/screen-delta-state.json`](data)).
+- **Transliteration recall** — Arabic/Turkish spelling variants (Mohammed/Muhammad, Abdul/Abdel, bin/ibn …) widen sanctions matching.
+- **MLRO case subtasks** — each new hit becomes an assigned Asana subtask with a disposition to set.
+- **Onboarding screen** ([`onboarding-screen.yml`](.github/workflows/onboarding-screen.yml)) — screens newly-added customers every 6 h, not only in the daily batch.
+- **Degrade loudly** — a run that cannot screen never reports all-clear; reduced coverage is shown, and the [`freshness-check`](scripts/freshness-check.mjs) raises a loud alarm if a mandatory-daily control fails to run.
+
+**AI layer** ([`ai.py`](ai.py)) — adopted in line with the **UAE National AI Strategy 2031**, governance-first:
+- **Customer risk rating** (Low / Medium / High) with explainable factors + EDD cadence (FATF R.10).
+- **Adverse-media triage** — severity · relevance · confidence per article.
+- **Related-party / network detection** — shared owners/UBOs surfaced across the book.
+- **goAML STR/SAR draft** — drafted for HIGH-risk/confirmed cases; a human always reviews and files.
+- **AI decision-support summaries** — "why flagged / what to check" per alert.
+
+**AI governance & security** (see [`docs/AI-GOVERNANCE.md`](docs/AI-GOVERNANCE.md))
+- **No hallucinations / no fabricated data** — filed reports contain only real, sourced data; every item traces to a real list entry, article link, or Wikidata record.
+- **LLM is opt-in & bounded** — gated behind `ANTHROPIC_API_KEY`. With no key the engine runs fully on-runner, deterministic, with **no data egress**. When enabled, the LLM is used **only for grounded classification** (adverse-media triage); generative report prose stays off unless `REPORT_ALLOW_LLM=1` is explicitly set.
+- **Prompt security** (UAE "Securing Agentic AI") — all fetched web text is treated as **untrusted**: sanitized, wrapped, and screened for prompt-injection; a detected attempt **never reaches the model** and is flagged in the audit trail.
+- **Human-in-the-loop** — nothing decides, freezes, or files; the MLRO does. Every run is retained 10 years (Asana + GitHub Actions).
+
 ## Risk methodology
 
 ### Scored factors
