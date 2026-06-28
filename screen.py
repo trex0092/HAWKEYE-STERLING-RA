@@ -1156,38 +1156,28 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     sanc_ok = any(list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu"))
     L = []; A = L.append
 
-    A(f"DAILY SCREENING REPORT — {dt}")
-    A(f"Subjects screened: {stats['subjects_total']}   "
-      f"({stats['companies_screened']} companies + {stats['individuals_screened']} owners / directors / UBOs)")
-    A("Delivered daily by 09:00 UAE   ·   Engine: screen.py (free — no paid feed, no API key)")
-    A(f"Workflow run: {github_run_url()}")
-    A("")
     delta = stats.get("delta", {})
     supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
     supp_ok = [k for k, v in supp.items() if v.get("count", 0) > 0]
-    A("MODULES")
-    A(f"   1 · Sanctions / watchlists   {'OK' if sanc_ok else 'DEGRADED'}    OFAC SDN · UN · EU FSF · UK OFSI · UAE EOCN"
-      + (f" · +{len(supp_ok)} supplementary" if supp_ok else ""))
-    A(f"   2 · Adverse media            OK    Google News RSS · 3 locales (US/GB/AE) · {len(ADVERSE_KEYWORDS)} red-flag terms")
-    A(f"   3 · PEP (auto-detected)      {'DEGRADED — re-run' if pep_degraded else 'OK'}    Wikidata (free) · individuals only")
-    A("")
+    sanc_status = "OK" if sanc_ok else "DEGRADED"
+    pep_status = "DEGRADED" if pep_degraded else "OK"
+
+    # ── Compact header — three result blocks (Sanctions · Adverse media · PEP)
+    #    lead the report; everything here is a one-line snapshot. ──
+    A(f"🛡️  DAILY SCREENING — {dt}")
+    A(f"Subjects: {stats['subjects_total']}  ({stats['companies_screened']} companies + "
+      f"{stats['individuals_screened']} owners / directors / UBOs)  ·  delivered by 09:00 UAE")
+    A(f"Modules:  Sanctions {sanc_status}  ·  Adverse media OK  ·  PEP {pep_status}")
     if delta:
-        A("CHANGES SINCE LAST RUN")
-        A(f"   🆕 New sanctions matches ...... {delta.get('sanctions',0)}")
-        A(f"   🆕 New adverse-media items .... {delta.get('adverse',0)}")
-        A(f"   🆕 New PEP matches ............ {delta.get('pep',0)}")
-        A("   (Items already reported on an earlier day are marked [STANDING] below — shown, not dropped.)")
-        A("")
-    A("RESULTS SUMMARY")
-    A(f"   Sanctions — confirmed hits (>=95%) ... {len(confirmed)}")
-    A(f"   Sanctions — potential matches ........ {len(potential)}")
-    A(f"   Adverse media — subjects flagged ..... {len(adverse_findings)}")
-    A(f"   PEP — individuals flagged ............ {len(pep_findings)}" + ("  (PROVISIONAL — module degraded)" if pep_degraded else ""))
+        A(f"New since last run:  {delta.get('sanctions',0)} sanctions  ·  "
+          f"{delta.get('adverse',0)} adverse  ·  {delta.get('pep',0)} PEP")
+    A(f"Totals:  {len(possible_matches)} sanctions match(es)  ·  "
+      f"{len(adverse_findings)} adverse subject(s)  ·  {len(pep_findings)} PEP")
     A("")
 
-    A("=" * 70)
-    A("SANCTIONS")
-    A("=" * 70)
+    A("━" * 70)
+    A("①  SANCTIONS / WATCHLISTS")
+    A("━" * 70)
     if not possible_matches:
         A("   No sanctions / watchlist matches — all subjects clear.")
     else:
@@ -1231,9 +1221,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                     A(f"      {label}: not reached this run (supplementary — core lists unaffected)")
     A("")
 
-    A("=" * 70)
-    A("ADVERSE MEDIA")
-    A("=" * 70)
+    A("━" * 70)
+    A("②  ADVERSE MEDIA")
+    A("━" * 70)
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
@@ -1260,12 +1250,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A(f"   Source: Google News RSS · {len(ADVERSE_KEYWORDS)} red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
     A("")
 
-    A("=" * 70)
-    A("PEP  (POLITICALLY EXPOSED PERSONS)")
-    A("=" * 70)
-    A("   You do NOT supply a PEP list — matches are detected automatically.")
-    A("   Source: Wikidata (free) — politicians, ministers, MPs, judges, military / SOE chiefs + families.")
-    A(f"   Scope:  {stats['individuals_screened']} individuals checked (companies are not PEPs).")
+    A("━" * 70)
+    A("③  PEP  (POLITICALLY EXPOSED PERSONS)")
+    A("━" * 70)
+    A("   You do NOT supply a PEP list — and you do not need to know who is a PEP.")
+    A("   The engine AUTO-DETECTS PEPs by screening EVERY individual in the whole")
+    A("   customer database against Wikidata, automatically, on every run.")
+    A("   Source: Wikidata (free) — politicians, ministers, MPs, judges, military / SOE chiefs,")
+    A("           state-owned-enterprise heads + their relatives & close associates (RCA).")
+    A(f"   Scope:  {stats['individuals_screened']} individuals auto-screened across the full database "
+      f"(companies are not natural persons → not PEP-screened, but ARE sanctions + adverse-media screened).")
     if pep_degraded:
         A(f"   Status: DEGRADED this run ({stats.get('pep_errors',0)} lookups failed) — treat 'no PEP' as provisional; re-run.")
     if not pep_findings:
@@ -1288,18 +1282,15 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             A("")
     A("")
 
-    A("-" * 70)
-    A("METHODOLOGY")
-    A("   One engine screens the SAME subjects (every customer + every recorded UBO /")
-    A("   director) through three modules in one pass: (1) fuzzy name-match vs. live")
-    A("   government designation lists, (2) Google News adverse-media search, (3) PEP")
-    A("   detection vs. Wikidata. Decision-support only. A 'no match' is never a")
-    A("   clearance when a module is degraded — that is shown, never hidden.")
-    A("")
+    A("━" * 70)
     A("MLRO SIGN-OFF")
+    A("━" * 70)
     A("   Reviewed by: ____________________   Date: __________")
     A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
     A("")
+    A(f"Engine: screen.py (free — no paid feed / API key) · one pass: name-match vs live designation")
+    A(f"lists, Google News adverse media, Wikidata PEP · {github_run_url()}")
+    A("> Decision-support only; a 'no match' is never a clearance when a module is degraded (shown, never hidden).")
     A("> Detection is automatic; no freeze / decline / report before MLRO + four-eyes review.")
     A("> RETENTION: retain 10 years — UAE FDL No. 26 of 2021, Art. 23; Cabinet Decision 74/2020.")
     return "\n".join(L)
