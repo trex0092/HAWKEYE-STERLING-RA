@@ -1,35 +1,39 @@
 # ============================================================
-# FINE GOLD LLC — DAILY ADVERSE MEDIA SCREENING
+# FINE GOLD LLC — ONBOARDING SCREENING (new customers)
 # GitHub Actions Workflow — Hawkeye Sterling V2
 # ============================================================
-# Runs daily at 06:00 UAE (02:00 UTC) so the audit report lands in
-# Asana by ~09:00 UAE. Screens ALL companies AND their associated
-# individuals (shareholders / UBOs / directors) via Google News RSS.
-# Posts one audit-grade summary task in Ongoing Monitoring.
+# Screens customers ADDED in the last ~26h immediately (sanctions +
+# adverse media + PEP), so a new counterparty is screened at onboarding
+# rather than waiting for the next daily batch. Posts an "Onboarding
+# Screening" task in Ongoing Monitoring only when there are new customers.
+# This SUPPLEMENTS the daily unified screen; it does not replace it.
 # ============================================================
 
-name: Daily Screening (Sanctions + Adverse Media + PEP)
+name: Onboarding Screening (new customers)
 
 on:
   schedule:
-    - cron: '0 2 * * *'    # 02:00 UTC = 06:00 UAE, daily — ONE unified report delivered by ~09:00 UAE
-  workflow_dispatch:        # Manual trigger
+    - cron: '0 */6 * * *'   # every 6 hours — near-onboarding turnaround
+  workflow_dispatch:
+    inputs:
+      window_hours:
+        description: 'Look-back window in hours (default 26)'
+        required: false
+        default: '26'
 
-# Results are posted to Asana via the screen's own token. contents:write is used
-# only to commit the delta-state file (what has already been reported) so the
-# next run flags just what is NEW.
+# contents:write only to commit the shared delta-state (what has been reported).
 permissions:
   contents: write
 
-# A multi-hour sweep must never have a manual run overlap the daily schedule.
+# Never overlap the daily sweep's delta-state commit, and never overlap itself.
 concurrency:
-  group: daily-adverse-media
+  group: onboarding-screen
   cancel-in-progress: false
 
 jobs:
-  adverse-media:
+  onboarding:
     runs-on: ubuntu-latest
-    timeout-minutes: 350    # companies + ~2x individuals × 3 locales — daily full-coverage sweep needs headroom (GitHub job cap is 360)
+    timeout-minutes: 60   # only the new-customer subset is enriched; the full DB is just listed
 
     steps:
       - name: Harden the runner (egress audit)
@@ -46,21 +50,22 @@ jobs:
       - name: Install dependencies
         run: pip install rapidfuzz requests pdfplumber
 
-      - name: Run unified daily screening (sanctions + adverse media + PEP)
+      - name: Screen newly-added customers
         env:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
-          RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          RUN_MODE: onboarding
+          ONBOARDING_WINDOW_HOURS: ${{ github.event.inputs.window_hours || '26' }}
         run: python screen.py
 
       - name: Commit delta-state (what has already been reported)
         if: always()
         run: |
           if [ -n "$(git status --porcelain data/screen-delta-state.json 2>/dev/null)" ]; then
-            git config user.name "daily-screening"
+            git config user.name "onboarding-screen"
             git config user.email "actions@github.com"
             git add data/screen-delta-state.json
-            git commit -m "chore(screen): update delta-state [skip ci]"
+            git commit -m "chore(screen): update delta-state (onboarding) [skip ci]"
             for attempt in 1 2 3 4 5; do
               git push && break
               echo "push rejected (attempt $attempt) — rebasing on origin/main"

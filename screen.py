@@ -29,10 +29,72 @@ ASANA_ONGOING_MON_GID = "1213914392047129"
 ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
 ASANA_ASSIGNEE_GID    = "1213645083721304"   # Luisa Fernanda
 
-THRESHOLD             = 85
+THRESHOLD             = 85   # combined (full + core) similarity to flag a match
+CORE_THRESHOLD        = 82   # distinctive-token similarity required (false-positive guard)
 EOCN_PDF_PATH         = "eocn_list.pdf"
 EOCN_JSON_PATH        = "data/eocn-local-terrorist-list.json"
+DELTA_STATE_PATH      = "data/screen-delta-state.json"  # what we've already reported (delta engine)
 UAE_TZ_OFFSET         = 4
+ONBOARDING_WINDOW_HOURS = int(os.environ.get("ONBOARDING_WINDOW_HOURS", "26"))  # "new customer" window
+CASE_SUBTASK_CAP        = int(os.environ.get("CASE_SUBTASK_CAP", "40"))         # max MLRO case subtasks/run
+
+# Common corporate / legal-form / sector boilerplate that inflates name-match
+# scores between two completely different companies (e.g. two Turkish firms that
+# merely share "SANAYI VE TICARET ANONIM SIRKETI"). Stripped to a distinctive
+# "core" before a second, decisive similarity check. NOT applied to the stored
+# list (only to the comparison), so designations are never weakened.
+STOPWORD_TOKENS = {
+    # legal forms
+    "LLC","L","C","LTD","LIMITED","INC","CORP","CORPORATION","CO","COMPANY",
+    "PLC","GMBH","SA","SARL","SRL","SPA","BV","NV","AG","PTE","PVT","PJSC","PSC",
+    "FZE","FZCO","FZC","DMCC","DWC","FZ","JLT","WLL","EST","TRADING","GENERAL",
+    # UAE / GCC free-zone & generic
+    "INTERNATIONAL","GROUP","HOLDING","HOLDINGS","ENTERPRISE","ENTERPRISES",
+    "INDUSTRIES","INDUSTRY","COMMODITIES","GLOBAL","OVERSEAS","COMMERCIAL",
+    "BUSINESS","SERVICES","SOLUTIONS","INVESTMENT","INVESTMENTS","CAPITAL",
+    # Turkish corporate boilerplate (very common in this book of business)
+    "ANONIM","SIRKETI","SIRKET","SANAYI","SANAYII","TICARET","VE","URETIM",
+    "MADENCILIK","ENERJI","TURIZM","INSAAT","ITHALAT","IHRACAT","LIMITED",
+    "GAYRIMENKUL","YATIRIM","KIYMETLI","MADENLER","METAL","ALTIN",
+    # generic connectors
+    "AND","OF","THE","FOR","AL","BIN","BINT",
+}
+
+# Map an adverse-media keyword to a typology bucket for MLRO triage.
+KEYWORD_TYPOLOGY = [
+    ("Terrorism / CFT", ["terror","terrorist financing","financing of terrorism","terror funding",
+        "extremist","radicalis","radicaliz","militant","designated terrorist"]),
+    ("Sanctions / Proliferation", ["sanction","embargo","proliferation","weapons of mass destruction",
+        "wmd","dual-use","nuclear","chemical weapons","biological weapons","arms trafficking",
+        "weapons smuggling","debarred","blacklisted"]),
+    ("Money Laundering", ["launder","money laundering"]),
+    ("Fraud / Financial Crime", ["fraud","ponzi","pyramid scheme","insider trading","market manipulation",
+        "accounting fraud","asset misappropriation","misuse of funds","embezzle","forgery","counterfeit",
+        "identity theft","cyber fraud","wire fraud","financial crime","economic crime"]),
+    ("Tax", ["tax evasion","tax fraud","vat fraud"]),
+    ("Bribery / Corruption", ["bribe","bribery","corrupt","corruption","kickback","kleptocracy",
+        "state capture","abuse of power","conflict of interest"]),
+    ("Organised Crime / Trafficking", ["organised crime","organized crime","mafia","cartel",
+        "drug trafficking","narcotics","human trafficking","people smuggling","wildlife trafficking",
+        "smuggl","contraband","illicit"]),
+    ("Cyber", ["cybercrime","ransomware","darknet"]),
+    ("ESG / Human Rights / Minerals", ["human rights","forced labour","forced labor","modern slavery",
+        "child labour","child labor","labour exploitation","exploitation","conflict minerals",
+        "conflict gold","blood diamond","illegal mining","smuggled gold","gold smuggling",
+        "environmental violation","pollution","toxic waste","deforestation","land grabbing",
+        "indigenous rights","greenwashing"]),
+    ("Enforcement / Legal", ["arrest","convict","guilty","verdict","prosecute","indict","court case",
+        "litigate","lawsuit","felon","imprisonment","jail","prison","theft","murder","fined",
+        "extort","blackmail","regulatory breach"]),
+]
+
+def typology_for(keywords):
+    """Buckets a list of matched adverse keywords into typology categories."""
+    cats = []
+    for cat, terms in KEYWORD_TYPOLOGY:
+        if any(any(t in kw for t in terms) for kw in keywords):
+            cats.append(cat)
+    return cats
 
 ASANA_HEADERS = {
     "Authorization": f"Bearer {ASANA_TOKEN}",
@@ -143,17 +205,63 @@ def search_adverse_media(name: str, max_results: int = 5) -> list:
                     "title": title,
                     "source": source,
                     "date": pub_date,
+                    "ts": _parse_rss_date(pubdate_el.text if pubdate_el is not None else ""),
                     "url": link,
                     "flagged": bool(matched),
                     "keywords": matched,
+                    "categories": typology_for(matched),
                 })
         except Exception:
             continue
         time.sleep(0.5)  # polite delay between locale requests
 
-    # Sort: flagged first, then by date
-    articles.sort(key=lambda x: (not x["flagged"], x.get("date", "")), reverse=False)
+    articles = dedup_stories(articles)
+    # Sort: flagged first, then most-recent first (recency ranking).
+    articles.sort(key=lambda x: (not x["flagged"], -(x.get("ts") or 0)))
     return articles[:max_results]
+
+# RFC-822 dates from Google News RSS -> epoch seconds for recency ranking.
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"], 1)}
+def _parse_rss_date(s):
+    if not s: return None
+    m = re.search(r"(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})", s)
+    if not m: return None
+    try:
+        day, mon, yr = int(m.group(1)), _MONTHS.get(m.group(2).lower()), int(m.group(3))
+        if not mon: return None
+        return int(datetime.datetime(yr, mon, day).timestamp())
+    except Exception:
+        return None
+
+def _story_tokens(title):
+    toks = [t for t in re.sub(r"[^a-z0-9 ]", " ", title.lower()).split()
+            if len(t) > 3 and t not in ("with","from","that","this","says","said","over","into")]
+    return set(toks)
+
+def dedup_stories(articles, overlap=0.6):
+    """Collapse the same story carried by multiple outlets (e.g. four near-identical
+    'Rs 38 crore bank fraud' headlines) into one, by significant-token overlap."""
+    kept = []
+    for a in articles:
+        toks = _story_tokens(a["title"])
+        dup = False
+        for k in kept:
+            kt = k["_toks"]
+            if toks and kt:
+                inter = len(toks & kt); union = len(toks | kt)
+                if union and inter / union >= overlap:
+                    k.setdefault("also_reported_by", [])
+                    if a["source"] not in k["also_reported_by"] and a["source"] != k["source"]:
+                        k["also_reported_by"].append(a["source"])
+                    dup = True
+                    break
+        if not dup:
+            a = {**a, "_toks": toks}
+            kept.append(a)
+    for k in kept:
+        k.pop("_toks", None)
+    return kept
 
 def format_adverse_block(name: str, articles: list, subject_type: str) -> str:
     if not articles:
@@ -185,7 +293,22 @@ PEP_KEYWORDS = [
     "emir","sultan","ruler","secretary of state","chancellor","legislator",
     "deputy prime","foreign minister","defence minister","defense minister",
     "central bank governor","supreme court","attorney general","state official",
+    # judiciary / military / law enforcement
+    "judge","justice","magistrate","general","admiral","colonel","field marshal",
+    "chief of staff","commander","police chief","military officer",
+    # state-owned enterprise (SOE) / public sector
+    "state-owned","state owned","sovereign wealth","public enterprise",
+    "government official","civil servant","state company","chairman of",
+    "director general","permanent secretary","governor of",
 ]
+# State-owned-enterprise signal (sub-class of PEP under FATF R.12 guidance).
+PEP_SOE_HINTS = ["state-owned","state owned","sovereign wealth","public enterprise",
+                 "state company","national oil","national bank"]
+# Relatives & Close Associates (RCA) — same EDD treatment as the PEP themselves.
+PEP_RCA_HINTS = ["son of","daughter of","wife of","husband of","brother of","sister of",
+                 "father of","mother of","spouse of","nephew of","niece of","cousin of",
+                 "family of","relative of","widow of","heir of","close associate","ally of",
+                 "business partner of","advisor to","aide to"]
 _PEP_CACHE = {}
 
 def _norm_lower(s):
@@ -215,13 +338,24 @@ def check_pep(name):
     want = [t for t in key.split(" ") if len(t) >= 3]
     out = {"hit": False}
     for res in results:
-        desc = _norm_lower(res.get("description", ""))
-        if not desc or not any(_norm_lower(k) in desc for k in PEP_KEYWORDS):
+        raw_desc = res.get("description", "")
+        desc = _norm_lower(raw_desc)
+        is_role = any(_norm_lower(k) in desc for k in PEP_KEYWORDS)
+        is_rca  = any(h in desc for h in PEP_RCA_HINTS)
+        if not desc or not (is_role or is_rca):
             continue
         label = _norm_lower(res.get("label", "") or (res.get("match", {}) or {}).get("text", ""))
         if want and all(t in label for t in want):
-            out = {"hit": True, "id": res.get("id", ""),
-                   "label": res.get("label", ""), "description": res.get("description", "")}
+            # A "wife of / son of …" subject is the RELATIVE, not the official —
+            # classify as RCA even if the description also names the office.
+            if is_rca:
+                category = "RCA (relative / close associate)"
+            elif any(h in desc for h in PEP_SOE_HINTS):
+                category = "SOE (state-owned enterprise)"
+            else:
+                category = "PEP (political / public office)"
+            out = {"hit": True, "id": res.get("id", ""), "category": category,
+                   "label": res.get("label", ""), "description": raw_desc}
             break
     _PEP_CACHE[key] = out
     return out
@@ -308,6 +442,31 @@ def parse_eu(data):
         log(f"  EU parse error: {e}")
     return names, "live", sha256_of(data)
 
+def parse_canada(data):
+    """Canada Consolidated Autonomous Sanctions (SEMA), Global Affairs Canada — free XML.
+    Tolerant parse: pulls entity names and combined given/last person names."""
+    names = set()
+    if not data: return names, "unavailable", ""
+    try:
+        root = ET.fromstring(data)
+        for rec in root.iter():
+            # Each record groups name parts as child elements; collect name-ish fields.
+            entity = given = last = ""
+            for ch in list(rec):
+                tag = ch.tag.split("}")[-1].lower()
+                val = (ch.text or "").strip()
+                if not val: continue
+                if "entity" in tag or tag == "name": entity = entity or val
+                elif "given" in tag or tag == "firstname": given = given or val
+                elif "last" in tag or tag == "surname" or tag == "lastname": last = last or val
+            if entity: names.add(entity)
+            person = " ".join(p for p in [given, last] if p)
+            if person and len(person) > 3: names.add(person)
+    except Exception as e:
+        log(f"  Canada SEMA parse error: {e}")
+    if not names: return names, "unavailable", ""
+    return names, "live", sha256_of(data)
+
 def parse_eocn(pdf_path):
     """UAE EOCN Local Terrorist List.
 
@@ -382,7 +541,7 @@ def get_all_customers():
     customers = []
     params = {
         "project": ASANA_CUSTOMER_DB_GID,
-        "opt_fields": "gid,name,notes,permalink_url",
+        "opt_fields": "gid,name,notes,permalink_url,created_at",
         "limit": 100,
     }
     while True:
@@ -396,6 +555,7 @@ def get_all_customers():
                 "gid": t["gid"],
                 "name": t["name"],
                 "permalink": t.get("permalink_url",""),
+                "created_at": t.get("created_at",""),
                 "individuals": extract_individuals(notes),
                 "has_assessment": len(notes.strip()) > 100,
             })
@@ -406,6 +566,30 @@ def get_all_customers():
     return customers
 
 # ── SCREENING ─────────────────────────────────────────────────────────────────
+def core_tokens(norm):
+    """Distinctive tokens of a normalized name (boilerplate removed)."""
+    return [t for t in norm.split() if t not in STOPWORD_TOKENS and len(t) > 1]
+
+def match_score(n_norm, e_norm):
+    """Returns (decisive_score, full_score, core_score).
+
+    decisive_score = min(full, core): a pair only scores high if BOTH the whole
+    string AND its distinctive core agree. Two firms sharing only legal-form /
+    sector boilerplate ("SANAYI VE TICARET ANONIM SIRKETI") score high on `full`
+    but low on `core`, so the min collapses the false positive. When neither side
+    has a distinctive core (e.g. a pure person-name), we fall back to `full`."""
+    full = fuzz.token_sort_ratio(n_norm, e_norm)
+    cn, ce = core_tokens(n_norm), core_tokens(e_norm)
+    if not cn or not ce:
+        return full, full, full
+    core = fuzz.token_sort_ratio(" ".join(cn), " ".join(ce))
+    return min(full, core), full, core
+
+def confidence_tier(core):
+    if core >= 92: return "STRONG"
+    if core >= 85: return "MODERATE"
+    return "WEAK"
+
 def screen_name(name, all_lists):
     n = normalize(name)
     if len(n) < 4: return []
@@ -413,9 +597,11 @@ def screen_name(name, all_lists):
     for list_name, entries in all_lists.items():
         for en, orig in entries:
             if len(en) < 6: continue
-            score = fuzz.token_sort_ratio(n, en)
-            if score >= THRESHOLD:
-                hits.append({"list": list_name, "matched_entry": orig, "score": score})
+            score, full, core = match_score(n, en)
+            if score >= THRESHOLD and core >= CORE_THRESHOLD:
+                hits.append({"list": list_name, "matched_entry": orig, "score": score,
+                             "name_score": full, "core_score": core,
+                             "confidence": confidence_tier(core)})
     best = {}
     for h in hits:
         key = (h["list"], h["matched_entry"])
@@ -428,15 +614,78 @@ def screen_customers(customers, all_lists):
     for c in customers:
         hits = []
         for h in screen_name(c["name"], all_lists):
-            hits.append({"subject_type":"ENTITY","subject_name":c["name"],**h})
+            hits.append({"subject_type":"ENTITY","subject_name":c["name"],
+                         "control_linkage": False, **h})
         for ind in c["individuals"]:
             for h in screen_name(ind, all_lists):
-                hits.append({"subject_type":"INDIVIDUAL","subject_name":ind,**h})
+                # An owner / director / UBO matching a designation flags the
+                # COMPANY by ownership/control linkage (the 50%/control rule),
+                # even though the company name itself did not match.
+                hits.append({"subject_type":"INDIVIDUAL","subject_name":ind,
+                             "control_linkage": True, **h})
         if hits:
             possible_matches.append({**c,"hits":hits})
         else:
             clear.append(c)
     return possible_matches, clear
+
+# ── DELTA ENGINE — "what changed since last run" ──────────────────────────────
+# A daily control that re-reports the same standing matches every morning buries
+# new risk in noise. We persist a fingerprint of everything already reported and
+# flag only what is NEW. State is committed back to main by the workflow so the
+# next run diffs against it. (A standing match is shown, but clearly marked as
+# previously-seen, never dropped — coverage is never silently reduced.)
+def load_delta_state():
+    try:
+        with open(DELTA_STATE_PATH) as f:
+            d = json.load(f)
+            return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+def save_delta_state(state):
+    try:
+        os.makedirs(os.path.dirname(DELTA_STATE_PATH), exist_ok=True)
+        with open(DELTA_STATE_PATH, "w") as f:
+            json.dump(state, f, indent=0, sort_keys=True)
+        log(f"  delta state saved ({len(state)} fingerprints)")
+    except Exception as e:
+        log(f"  delta state save error: {e}")
+
+def _delta_mark(state, key, today):
+    """Returns (is_new, first_seen). Records `today` as first_seen for new keys."""
+    first = state.get(key)
+    if first:
+        return False, first
+    state[key] = today
+    return True, today
+
+def classify_deltas(possible_matches, adverse_findings, pep_findings, state, today):
+    """Annotate every hit/finding with is_new / first_seen. Returns new-counts."""
+    n_s = n_a = n_p = 0
+    for m in possible_matches:
+        m_new = False
+        for h in m["hits"]:
+            key = f"SANC|{normalize(m['name'])}|{h['list']}|{normalize(h['matched_entry'])}"
+            is_new, first = _delta_mark(state, key, today)
+            h["is_new"], h["first_seen"] = is_new, first
+            if is_new: n_s += 1; m_new = True
+        m["is_new"] = m_new
+    for f in adverse_findings:
+        f_new = False
+        for a in f["articles"]:
+            sig = a.get("url") or a.get("title", "")
+            key = f"AM|{normalize(f['subject_name'])}|{sig}"
+            is_new, first = _delta_mark(state, key, today)
+            a["is_new"], a["first_seen"] = is_new, first
+            if is_new: n_a += 1; f_new = True
+        f["is_new"] = f_new
+    for p in pep_findings:
+        key = f"PEP|{normalize(p['subject_name'])}|{p.get('id','')}"
+        is_new, first = _delta_mark(state, key, today)
+        p["is_new"], p["first_seen"] = is_new, first
+        if is_new: n_p += 1
+    return {"sanctions": n_s, "adverse": n_a, "pep": n_p}
 
 # ── NARRATIVE BUILDER — DAILY ─────────────────────────────────────────────────
 def build_daily_narrative(customers, possible_matches, clear, list_meta,
@@ -871,11 +1120,11 @@ def load_all_lists():
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
     list_meta = {
-        "ofac": {"count":len(ofac_names),"date":ofac_date,"hash":ofac_hash},
-        "un":   {"count":len(un_names),"date":un_date,"hash":un_hash},
-        "uk":   {"count":len(uk_names),"date":uk_date,"hash":uk_hash},
-        "eu":   {"count":len(eu_names),"date":eu_date,"hash":eu_hash},
-        "eocn": {"count":len(eocn_names),"date":eocn_date,"hash":eocn_hash},
+        "ofac": {"count":len(ofac_names),"date":ofac_date,"hash":ofac_hash,"tier":"core"},
+        "un":   {"count":len(un_names),"date":un_date,"hash":un_hash,"tier":"core"},
+        "uk":   {"count":len(uk_names),"date":uk_date,"hash":uk_hash,"tier":"core"},
+        "eu":   {"count":len(eu_names),"date":eu_date,"hash":eu_hash,"tier":"core"},
+        "eocn": {"count":len(eocn_names),"date":eocn_date,"hash":eocn_hash,"tier":"core"},
     }
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
@@ -884,6 +1133,13 @@ def load_all_lists():
         "EU FSF":          [(normalize(n),n) for n in eu_names],
         "UAE EOCN":        [(normalize(n),n) for n in eocn_names],
     }
+    # ── Supplementary lists (best-effort): broaden coverage when reachable, but a
+    # fetch miss is reported as "not reached", NOT as a degraded core control. ──
+    ca_data = download("https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml","Canada SEMA")
+    ca_names, ca_date, ca_hash = parse_canada(ca_data)
+    list_meta["canada"] = {"count":len(ca_names),"date":ca_date,"hash":ca_hash,"tier":"supplementary"}
+    if ca_names:
+        all_lists["Canada (SEMA)"] = [(normalize(n),n) for n in ca_names]
     return all_lists, list_meta
 
 def _list_status_line(list_meta, key, label):
@@ -906,11 +1162,22 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("Delivered daily by 09:00 UAE   ·   Engine: screen.py (free — no paid feed, no API key)")
     A(f"Workflow run: {github_run_url()}")
     A("")
+    delta = stats.get("delta", {})
+    supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
+    supp_ok = [k for k, v in supp.items() if v.get("count", 0) > 0]
     A("MODULES")
-    A(f"   1 · Sanctions / watchlists   {'OK' if sanc_ok else 'DEGRADED'}    OFAC SDN · UN · EU FSF · UK OFSI · UAE EOCN")
+    A(f"   1 · Sanctions / watchlists   {'OK' if sanc_ok else 'DEGRADED'}    OFAC SDN · UN · EU FSF · UK OFSI · UAE EOCN"
+      + (f" · +{len(supp_ok)} supplementary" if supp_ok else ""))
     A(f"   2 · Adverse media            OK    Google News RSS · 3 locales (US/GB/AE) · {len(ADVERSE_KEYWORDS)} red-flag terms")
     A(f"   3 · PEP (auto-detected)      {'DEGRADED — re-run' if pep_degraded else 'OK'}    Wikidata (free) · individuals only")
     A("")
+    if delta:
+        A("CHANGES SINCE LAST RUN")
+        A(f"   🆕 New sanctions matches ...... {delta.get('sanctions',0)}")
+        A(f"   🆕 New adverse-media items .... {delta.get('adverse',0)}")
+        A(f"   🆕 New PEP matches ............ {delta.get('pep',0)}")
+        A("   (Items already reported on an earlier day are marked [STANDING] below — shown, not dropped.)")
+        A("")
     A("RESULTS SUMMARY")
     A(f"   Sanctions — confirmed hits (>=95%) ... {len(confirmed)}")
     A(f"   Sanctions — potential matches ........ {len(potential)}")
@@ -924,16 +1191,27 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     if not possible_matches:
         A("   No sanctions / watchlist matches — all subjects clear.")
     else:
-        for m in (confirmed + potential):
+        # NEW subjects first, then standing — most actionable at the top.
+        ordered = sorted(confirmed + potential, key=lambda m: (not m.get("is_new"), m["name"]))
+        for m in ordered:
             tag = ("CONFIRMED HIT" if m in confirmed
                    else ("HIGH" if any(h["score"] >= 92 for h in m["hits"]) else "POTENTIAL"))
-            A(f"{m['name']}   [{tag}]")
+            newtag = " 🆕 NEW" if m.get("is_new") else " [STANDING]"
+            ctrl = "  ⚠ OWNERSHIP/CONTROL" if any(h.get("control_linkage") for h in m["hits"]) else ""
+            A(f"{m['name']}   [{tag}]{newtag}{ctrl}")
             A(f"   Customer record: {m['permalink']}")
             shown = sorted(m["hits"], key=lambda h: -h["score"])[:10]
             for h in shown:
-                A(f"   -> [{h['subject_type']}] {h['subject_name']}  —  {h['list']}: \"{h['matched_entry']}\"   {h['score']:.0f}%")
+                conf = f" · {h.get('confidence','')}" if h.get("confidence") else ""
+                nflag = " 🆕" if h.get("is_new") else ""
+                link = " · owner/UBO → 50%/control rule" if h.get("control_linkage") else ""
+                A(f"   -> [{h['subject_type']}] {h['subject_name']}  —  {h['list']}: "
+                  f"\"{h['matched_entry']}\"   {h['score']:.0f}%{conf}{nflag}{link}")
             if len(m["hits"]) > 10:
                 A(f"   -> … +{len(m['hits']) - 10} more similar candidates (see run log)")
+            if ctrl:
+                A("   NOTE: company flagged because an owner / director / UBO matches a designation —"
+                  " apply OFAC/EU 50%/control aggregation; treat the entity as designated by extension pending review.")
             A("   MLRO Decision:  [ ] false positive   [ ] escalate / freeze   [ ] investigate")
             A("")
         A("   Lists screened:")
@@ -942,6 +1220,15 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A(_list_status_line(list_meta, "eu",   "EU FSF"))
         A(_list_status_line(list_meta, "uk",   "UK OFSI"))
         A(_list_status_line(list_meta, "eocn", "UAE EOCN"))
+        if supp:
+            A("   Supplementary lists (best-effort — never affect core coverage):")
+            for k in supp:
+                m_ = supp[k]
+                label = {"canada": "Canada (SEMA)"}.get(k, k)
+                if m_.get("count", 0) > 0:
+                    A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
+                else:
+                    A(f"      {label}: not reached this run (supplementary — core lists unaffected)")
     A("")
 
     A("=" * 70)
@@ -950,21 +1237,27 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
-        for f in adverse_findings:
+        for f in sorted(adverse_findings, key=lambda f: (not f.get("is_new"), f["subject_name"])):
             who = f["subject_name"]
             if f["subject_type"] == "INDIVIDUAL" and f.get("parent"):
                 who = f"{who}  (owner / director — {f['parent']})"
-            A(f"{who}   [{f['subject_type']}]")
+            newtag = " 🆕 NEW" if f.get("is_new") else " [STANDING]"
+            A(f"{who}   [{f['subject_type']}]{newtag}")
             if f.get("permalink"):
                 A(f"   Customer record: {f['permalink']}")
             for a in f["articles"]:
-                A(f"   [!] {a['title']}")
-                kw = f"   [{', '.join(a['keywords'])}]" if a.get("keywords") else ""
-                A(f"       {a.get('source','?')} — {a.get('date','?')}{kw}")
+                nflag = " 🆕" if a.get("is_new") else ""
+                A(f"   [!] {a['title']}{nflag}")
+                cat = f"   {{{', '.join(a['categories'])}}}" if a.get("categories") else ""
+                A(f"       {a.get('source','?')} — {a.get('date','?')}{cat}")
+                if a.get("also_reported_by"):
+                    extra = a["also_reported_by"]
+                    shown_src = ", ".join(extra[:4]) + (f" +{len(extra)-4} more" if len(extra) > 4 else "")
+                    A(f"       Also reported by: {shown_src}")
                 A(f"       Link: {a.get('url','(no link)')}")
             A("   MLRO Decision:  [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR")
             A("")
-        A(f"   Source: Google News RSS · {len(ADVERSE_KEYWORDS)} red-flag terms · raw headlines, MLRO decides.")
+        A(f"   Source: Google News RSS · {len(ADVERSE_KEYWORDS)} red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
     A("")
 
     A("=" * 70)
@@ -979,12 +1272,14 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("   No PEP matches identified." + ("  (provisional — see status above)" if pep_degraded else ""))
     else:
         A("")
-        for p in pep_findings:
+        for p in sorted(pep_findings, key=lambda p: (not p.get("is_new"), p["subject_name"])):
             who = p["subject_name"]
             if p.get("parent"):
                 who = f"{who}  (owner / director — {p['parent']})"
-            A(f"{who}   [INDIVIDUAL]")
-            A(f"   PEP — {p.get('description','(position recorded on Wikidata)')}")
+            newtag = " 🆕 NEW" if p.get("is_new") else " [STANDING]"
+            A(f"{who}   [INDIVIDUAL]{newtag}")
+            A(f"   Class: {p.get('category','PEP (political / public office)')}")
+            A(f"   {p.get('description','(position recorded on Wikidata)')}")
             if p.get("id"):
                 A(f"   Source: https://www.wikidata.org/wiki/{p['id']}")
             if p.get("permalink"):
@@ -1009,11 +1304,14 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("> RETENTION: retain 10 years — UAE FDL No. 26 of 2021, Art. 23; Cabinet Decision 74/2020.")
     return "\n".join(L)
 
-def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings):
+def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily"):
     dt = run_time.strftime("%d %b %Y")
     n_s, n_a, n_p = len(possible_matches), len(adverse_findings), len(pep_findings)
     flag = "⚠️" if (n_s + n_a + n_p) > 0 else "✅"
-    task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
+    if mode == "onboarding":
+        task_name = f"🆕 {flag} Onboarding Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
+    else:
+        task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
     payload = {"data": {
         "name": task_name[:250],
         "notes": narrative[:65000],
@@ -1025,15 +1323,84 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     r = requests.post("https://app.asana.com/api/1.0/tasks",
                       headers=ASANA_HEADERS, json=payload, timeout=30)
     if r.status_code in (200, 201):
-        log(f"OK Unified daily task created: {r.json()['data']['gid']}")
+        gid = r.json()["data"]["gid"]
+        log(f"OK Unified daily task created: {gid}")
+        return gid
+    log(f"FAIL unified task: {r.status_code} - {r.text[:300]}")
+    return None
+
+def create_case_subtask(parent_gid, name, notes, due_on):
+    """One trackable MLRO case per NEW hit — assigned, with a disposition to set."""
+    if not parent_gid: return False
+    payload = {"data": {
+        "name": name[:250], "notes": notes[:8000], "assignee": ASANA_ASSIGNEE_GID,
+        "due_on": due_on, "parent": parent_gid,
+    }}
+    try:
+        r = requests.post("https://app.asana.com/api/1.0/tasks",
+                          headers=ASANA_HEADERS, json=payload, timeout=30)
+        if r.status_code in (200, 201):
+            return True
+        log(f"  case subtask failed: {r.status_code} - {r.text[:160]}")
+    except Exception as e:
+        log(f"  case subtask error: {e}")
+    return False
+
+def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time):
+    """Create an assigned subtask for each NEW item (sanctions, PEP, adverse),
+    capped at CASE_SUBTASK_CAP; any overflow is logged, never silently dropped."""
+    due_on = run_time.strftime("%Y-%m-%d")
+    queue = []  # (priority, name, notes)
+    for m in possible_matches:
+        new_hits = [h for h in m["hits"] if h.get("is_new")]
+        if not new_hits: continue
+        top = max(new_hits, key=lambda h: h["score"])
+        ctrl = " [OWNERSHIP/CONTROL]" if top.get("control_linkage") else ""
+        nm = f"🔴 SANCTIONS case: {m['name']} — {top['list']} {top['score']:.0f}%{ctrl}"
+        notes = [f"Customer: {m['name']}", f"Record: {m.get('permalink','')}", ""]
+        for h in new_hits:
+            notes.append(f"- [{h['subject_type']}] {h['subject_name']} → {h['list']}: "
+                         f"\"{h['matched_entry']}\"  {h['score']:.0f}% ({h.get('confidence','')})"
+                         + ("  [owner/UBO → 50%/control rule]" if h.get("control_linkage") else ""))
+        notes += ["", "Disposition: [ ] false positive   [ ] escalate / freeze (TFS)   [ ] investigate",
+                  "Do not tip off. UAE Cabinet Resolution 74/2020 applies."]
+        queue.append((0, nm, "\n".join(notes)))
+    for p in pep_findings:
+        if not p.get("is_new"): continue
+        nm = f"🟠 PEP case: {p['subject_name']} — {p.get('category','PEP')}"
+        notes = [f"Subject: {p['subject_name']}" + (f"  (owner/director — {p['parent']})" if p.get("parent") else ""),
+                 f"Wikidata: https://www.wikidata.org/wiki/{p.get('id','')}",
+                 f"Description: {p.get('description','')}", f"Record: {p.get('permalink','')}",
+                 "", "Disposition: [ ] not a PEP   [ ] confirmed PEP — apply EDD   [ ] investigate"]
+        queue.append((1, nm, "\n".join(notes)))
+    for f in adverse_findings:
+        new_arts = [a for a in f["articles"] if a.get("is_new")]
+        if not new_arts: continue
+        nm = f"🟡 Adverse-media case: {f['subject_name']}"
+        notes = [f"Subject: {f['subject_name']}" + (f"  (owner/director — {f['parent']})" if f.get("parent") else ""),
+                 f"Record: {f.get('permalink','')}", ""]
+        for a in new_arts:
+            notes.append(f"- {a['title']}  [{', '.join(a.get('categories',[])) or 'uncategorised'}]")
+            notes.append(f"  {a.get('source','?')} — {a.get('date','?')}  {a.get('url','')}")
+        notes += ["", "Disposition: [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR"]
+        queue.append((2, nm, "\n".join(notes)))
+
+    queue.sort(key=lambda x: x[0])  # sanctions first, then PEP, then adverse
+    created = 0
+    for _, nm, notes in queue[:CASE_SUBTASK_CAP]:
+        if create_case_subtask(parent_gid, nm, notes, due_on):
+            created += 1
+    if len(queue) > CASE_SUBTASK_CAP:
+        log(f"  case cap: created {created}, {len(queue) - CASE_SUBTASK_CAP} additional NEW item(s) "
+            f"not turned into subtasks (see report body)")
     else:
-        log(f"FAIL unified task: {r.status_code} - {r.text[:300]}")
+        log(f"  MLRO cases created: {created}")
+    return created
 
-def run_unified(run_time):
-    log("UNIFIED daily screening — sanctions + adverse media + PEP")
-    all_lists, list_meta = load_all_lists()
-    customers = get_all_customers()
-
+def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
+    """Shared core: sanctions + adverse media + PEP over a set of customers, with
+    delta classification, one Asana report and MLRO case subtasks. mode controls
+    the task title only ('daily' vs 'onboarding')."""
     # 1) SANCTIONS — entities + individuals, ALL matching candidates
     possible_matches, clear = screen_customers(customers, all_lists)
     log(f"Sanctions: {len(possible_matches)} flagged · {len(clear)} clear")
@@ -1066,17 +1433,58 @@ def run_unified(run_time):
                 elif p.get("hit"):
                     pep_findings.append({"subject_name": subj_name, "parent": parent,
                         "permalink": c.get("permalink", ""), "id": p.get("id", ""),
+                        "category": p.get("category", ""),
                         "label": p.get("label", ""), "description": p.get("description", "")})
             time.sleep(0.7)  # rate-limit protection (Google News + Wikidata)
         log(f"  [{i}/{len(customers)}] {c['name']}")
 
+    # DELTA — flag only what is new since the last run (state committed by workflow)
+    today = run_time.strftime("%Y-%m-%d")
+    state = load_delta_state()
+    delta = classify_deltas(possible_matches, adverse_findings, pep_findings, state, today)
+    save_delta_state(state)
+    log(f"Delta: {delta['sanctions']} new sanctions · {delta['adverse']} new adverse · {delta['pep']} new PEP")
+
     stats = {"customers_total": len(customers), "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": companies + individuals,
-             "am_errors": am_errors, "pep_errors": pep_errors}
+             "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta}
     narrative = build_unified_narrative(possible_matches, clear, adverse_findings,
                                         pep_findings, list_meta, stats, run_time)
-    post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings)
+    parent_gid = post_unified_task(narrative, run_time, possible_matches,
+                                   adverse_findings, pep_findings, mode=mode)
+    # MLRO case subtasks for the NEW items only (keeps the case list actionable)
+    open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time)
+    return possible_matches, adverse_findings, pep_findings
+
+def run_unified(run_time):
+    log("UNIFIED daily screening — sanctions + adverse media + PEP")
+    all_lists, list_meta = load_all_lists()
+    customers = get_all_customers()
+    screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily")
     log("Unified run done.")
+
+def run_onboarding(run_time):
+    """Screen only customers created within the last ONBOARDING_WINDOW_HOURS, so a
+    new customer is screened at onboarding rather than waiting for the daily batch."""
+    log(f"ONBOARDING screening — customers created in the last {ONBOARDING_WINDOW_HOURS}h")
+    customers = get_all_customers()
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=ONBOARDING_WINDOW_HOURS)
+    fresh = []
+    for c in customers:
+        ts = c.get("created_at", "") or ""
+        try:
+            created = datetime.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")
+        except Exception:
+            continue
+        if created >= cutoff:
+            fresh.append(c)
+    log(f"  {len(fresh)} new customer(s) in window (of {len(customers)} total)")
+    if not fresh:
+        log("  No new customers to screen — no onboarding task posted.")
+        return
+    all_lists, list_meta = load_all_lists()
+    screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
+    log("Onboarding run done.")
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
@@ -1085,6 +1493,10 @@ def main():
 
     if RUN_MODE == "unified":
         run_unified(run_time)
+        return
+
+    if RUN_MODE == "onboarding":
+        run_onboarding(run_time)
         return
 
     if RUN_MODE == "weekly_adverse":
