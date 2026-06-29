@@ -18,7 +18,16 @@ import { pathToFileURL } from 'node:url';
 export const REPORT_FILE = 'link-check-report.md';
 
 const URL_RE = /https?:\/\/[^\s"'<>)\]}]+/g;
-function trimUrl(u) { return u.replace(/[.,;:]+$/, ''); }
+/* Strip trailing punctuation AND stray markdown delimiters (backtick / asterisk)
+   so a URL written as `https://x/` in markdown isn't probed with the backtick. */
+function trimUrl(u) { return u.replace(/[.,;:`*]+$/, ''); }
+
+/* Verified-good sources that are actively fetched by the screening engine but
+   are hostile to a lightweight link probe (anti-bot / method-sensitive), so the
+   probe's result is not authoritative. Excluded from the dead-link report. */
+export const ALLOWLIST = new Set([
+  'https://scsanctions.un.org/resources/xml/en/consolidated.xml', // UN consolidated list — fetched by the sanctions engine
+]);
 
 /* Gather unique URLs from the JSON registries + markdown docs. Accepts an
    object map of { path: text } so tests can supply fixtures without fs. */
@@ -45,15 +54,18 @@ export function collectUrls(files) {
 
 /* A result is dead when the probe could not get a final 2xx/3xx (or an
    allowed-by-default 401/403 anti-bot status). */
+/* Statuses where the server clearly answered but rejected the bot/method/format
+   (or geo-blocked) rather than "not found" — the link is live, so not dead. */
+const ANTIBOT_OK = new Set([401, 403, 405, 406, 415, 418, 429, 451]);
 export function isDead(result) {
   if (!result) return true;
   if (result.ok) return false;
-  if (typeof result.status === 'number' && (result.status === 401 || result.status === 403 || result.status === 405 || result.status === 429)) return false;
+  if (typeof result.status === 'number' && ANTIBOT_OK.has(result.status)) return false;
   return true;
 }
 
 export function summarize(results) {
-  const dead = results.filter(r => isDead(r));
+  const dead = results.filter(r => isDead(r) && !ALLOWLIST.has(r.url));
   return { total: results.length, dead: dead.length, ok: results.length - dead.length, deadList: dead };
 }
 

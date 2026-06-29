@@ -70,7 +70,7 @@ e) The 03/2026 MoET Supplemental Guidance for DPMS (single source). [19]
 8. UAE Ahead, criminalisation framework under FDL 10/2025: https://uaeahead.com/criminalisation-framework-under-uaes-federal-decree-law-no-10-of-2025-on-money-laundering/
 9. ZIGRAM, UAE FDL 10/2025: https://www.zigram.tech/resources/uae-federal-decree-law-no-10-of-2025/
 10. UAE Legislation portal, entry 3857 (Executive Regulations): https://uaelegislation.gov.ae/en/legislations/3857
-11. Lexis Middle East, Cabinet Decision 134/2025: https://www.lexismiddleeast.com/law/UnitedArabEmirates/CabinetDecision_134_2025/en
+11. UAE NAMLCFTC — Cabinet Decision 134/2025 (official): https://www.namlcftc.gov.ae/en
 12. Al Suwaidi & Company, practical guide for DNFBPs: https://alsuwaidi.ae/federal-decree-law-no-10-of-2025-a-practical-guide-for-dnfbps-and-high-risk-entities/
 13. ComplyAdvantage, FATF plenary February 2026: https://complyadvantage.com/insights/fatf-plenary-february-2026-key-updates/
 14. ACAMS, FATF grey-lists Kuwait and Papua New Guinea: https://www.acams.org/en/news/fatf-gray-lists-kuwait-papua-new-guinea

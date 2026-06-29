@@ -5,7 +5,7 @@
       "id": "ofac-sdn",
       "name": "US OFAC — SDN list (CSV)",
       "jurisdiction": "Global",
-      "url": "https://www.treasury.gov/ofac/downloads/sdn.csv",
+      "url": "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv",
       "type": "csv",
       "parser": "ofac"
     },
@@ -13,7 +13,7 @@
       "id": "ofac-consolidated",
       "name": "US OFAC — Consolidated (non-SDN) list (CSV)",
       "jurisdiction": "Global",
-      "url": "https://www.treasury.gov/ofac/downloads/consolidated/cons_prim.csv",
+      "url": "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/consolidated/cons_prim.csv",
       "type": "csv",
       "parser": "ofac"
     },

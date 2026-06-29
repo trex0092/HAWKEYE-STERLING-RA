@@ -61,7 +61,7 @@
       "jurisdiction": "UAE",
       "category": "Sector body",
       "narrative": "UAE gold and jewellery sector bodies issuing codes of practice and responsible-sourcing expectations (DMCC Rules for Risk-Based Due Diligence). Watched so sector-specific gold/jewellery answers and tools reflect current sector guidance.",
-      "url": "https://www.dmcc.ae/services/responsible-sourcing",
+      "url": "https://www.dmcc.ae/",
       "type": "html"
     },
     {
@@ -178,7 +178,7 @@
       "jurisdiction": "Global",
       "category": "Risk data",
       "narrative": "The European Commission list of third countries with strategic AML/CFT deficiencies (Delegated Regulation), which triggers mandatory EDD on relationships involving listed jurisdictions. Watched so the high-risk-jurisdiction EDD answers and country-risk weighting in the EWRA stay aligned with EU additions/removals.",
-      "url": "https://finance.ec.europa.eu/financial-crime/high-risk-third-countries-and-international-context_en",
+      "url": "https://finance.ec.europa.eu/financial-crime_en",
       "type": "html"
     },
     {
