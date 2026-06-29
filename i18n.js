@@ -17,16 +17,9 @@
   function t(key, lang) { var e = I18N[key]; return e ? (e[lang] != null ? e[lang] : e.en) : null; }
   function getLang() { try { return localStorage.getItem(LANG_KEY) === 'ar' ? 'ar' : 'en'; } catch (e) { return 'en'; } }
 
-  function injectStyle() {
-    if (document.getElementById('hs-i18n-style')) return;
-    var st = document.createElement('style');
-    st.id = 'hs-i18n-style';
-    st.textContent =
-      '.i18n-caveat{background:rgba(210,166,72,0.10);border-bottom:1px solid rgba(210,166,72,0.22);color:#E0A33C;font-size:11px;line-height:1.7;padding:8px 18px;text-align:center}' +
-      '#langToggle{cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,0.18);color:inherit;border-radius:8px;padding:3px 10px;font:inherit;min-width:46px}' +
-      '[dir=rtl] input,[dir=rtl] textarea,[dir=rtl] select{text-align:right}';
-    (document.head || document.documentElement).appendChild(st);
-  }
+  /* Note: the i18n CSS (caveat bar, #langToggle, [dir=rtl] inputs) lives in the
+     page stylesheets (console.css / advisor.css), not injected at runtime, so the
+     CSP needs no inline <style> (style-src stays 'self'). */
 
   function apply(lang) {
     lang = lang === 'ar' ? 'ar' : 'en';
@@ -39,13 +32,13 @@
       if (v != null) nodes[i].textContent = v;
     }
     var tog = document.getElementById('langToggle'); if (tog) tog.textContent = lang === 'ar' ? 'EN' : 'عربي';
-    var cav = document.getElementById('i18nCaveat'); if (cav) cav.style.display = lang === 'ar' ? '' : 'none';
+    var cav = document.getElementById('i18nCaveat'); if (cav) cav.classList.toggle('hidden', lang !== 'ar');
   }
 
   window.hsToggleLang = function () { apply(getLang() === 'ar' ? 'en' : 'ar'); };
   window.hsApplyLang = apply;
 
-  function boot() { injectStyle(); apply(getLang()); }
+  function boot() { apply(getLang()); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();

@@ -16,7 +16,6 @@ function check(name, cond){
   if(cond){ passed++; console.log('  ok  ' + name); }
   else { failed++; console.log('FAIL  ' + name); }
 }
-const countOcc = (hay, needle) => hay.split(needle).length - 1;
 
 /* ── Minimal DOM stub (same technique as screens.test.js) ── */
 function makeEl(){
@@ -42,15 +41,21 @@ function runScreen(file, bridge){
     const seg = html.slice(si, tagEnd), k = seg.indexOf('src="');
     if(k !== -1){ const v = seg.slice(k + 5, seg.indexOf('"', k + 5)); if(/\.js$/i.test(v)) dataSrcs.push(v.replace(/^\//, '')); }
   }
+  /* Boot logic now lives in an external same-origin file (advisor.js) so the
+     CSP can drop 'unsafe-inline'; load it directly, with an inline-block fallback. */
+  const boot = file.replace(/\.html$/, '.js');
+  const dataOnly = dataSrcs.filter(p => p.split('/').pop() !== boot);
   const open = lower.indexOf('<script>');
   const start = open === -1 ? -1 : open + '<script>'.length;
   const end = start > 0 ? lower.indexOf('</script', start) : -1;
-  if(open === -1 || start <= 0 || end === -1) throw new Error('no inline script in ' + file);
-  const script = html.slice(start, end);
+  const script = (open !== -1 && start > 0 && end !== -1)
+    ? html.slice(start, end)
+    : fs.readFileSync(path.join(__dirname, '..', boot), 'utf8');
   const els = {};
   global.document = {
     getElementById(id){ return els[id] || (els[id] = makeEl()); },
     createElement(){ return makeEl(); }, querySelectorAll(){ return []; },
+    addEventListener(){},                            /* delegation layer registers here */
     documentElement: { style: { _p:{}, setProperty(k,v){ this._p[k]=v; }, getPropertyValue(k){ return this._p[k]||''; } } }
   };
   global.window = { matchMedia(){ return { matches:true }; }, addEventListener(){} };
@@ -61,7 +66,7 @@ function runScreen(file, bridge){
   global.setInterval = () => 0; global.clearInterval = () => {};
   global.setTimeout = () => 0; global.clearTimeout = () => {};
   global.fetch = () => new Promise(() => {});
-  for(const p of dataSrcs){ try{ (0, eval)(fs.readFileSync(path.join(__dirname, '..', p), 'utf8')); }catch(e){} }
+  for(const p of dataOnly){ try{ (0, eval)(fs.readFileSync(path.join(__dirname, '..', p), 'utf8')); }catch(e){} }
   (0, eval)(script + '\n;globalThis.__screenAPI = (' + bridge + ');');
   return { els, api: globalThis.__screenAPI };
 }

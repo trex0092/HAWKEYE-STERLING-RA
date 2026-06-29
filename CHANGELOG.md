@@ -3,12 +3,42 @@
 All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and the application follows the `APP_VERSION` constant in [`index.html`](index.html).
+and the application follows the `APP_VERSION` constant in [`app.js`](app.js).
 Release tags and notes are also generated automatically by the
 [Auto Release workflow](.github/workflows/auto-release.yml) on every version
 bump merged to `main`.
 
 ## [Unreleased]
+
+### Security & hardening
+
+- **Pure-`'self'` Content-Security-Policy.** Removed `'unsafe-inline'` from both
+  `script-src` and `style-src` and all third-party origins: page logic and CSS
+  are external same-origin files (`app.js`/`app.css` + siblings), former inline
+  `on*` handlers use event delegation, former inline styles use the CSSOM, and
+  the Space Grotesk / JetBrains Mono / Manrope fonts are self-hosted under
+  `assets/fonts/` (`fonts.css`). A `report-to`/`report-uri` sink
+  ([`netlify/functions/csp-report.js`](netlify/functions/csp-report.js)) collects
+  violations; `test/csp.test.mjs` + `test/csp-runtime.spec.mjs` guard against
+  regressions (static + real-browser zero-violation checks).
+- **Stricter linting.** Re-enabled `no-unused-vars`/`no-empty` and added the
+  built-in injection-sink rules (`no-eval`, `no-implied-eval`, `no-new-func`,
+  `no-script-url`); the app logic is now linted too.
+- **Model validation.** Golden/regression set for the DPMS 0–30 scoring
+  (`test/scoring-golden.test.js`) plus
+  [`docs/governance/model-validation-2026.md`](docs/governance/model-validation-2026.md)
+  with a quarterly MLRO sign-off log.
+- **Disclosure → operational policy.** `SECURITY.md` gained a CVSS v3.1 severity
+  matrix, remediation SLAs, evidence retention, and a blameless
+  [post-incident template](docs/governance/incident-postmortem-template.md).
+- **Tamper-evident log** appends are now serialised so concurrent events cannot
+  lose an entry; **exports** carry a verifiable SHA-256 integrity envelope
+  ([backup-recovery runbook](docs/governance/backup-recovery.md)).
+- **Supply-chain provenance.** A CycloneDX SBOM
+  ([`scripts/gen-sbom.mjs`](scripts/gen-sbom.mjs)) is generated in CI and
+  attached to each release.
+- **Test coverage.** Keyboard-only, print/PDF, mobile-viewport and runtime-CSP
+  Playwright specs; a deterministic CSP guardrail; Lighthouse resource budgets.
 
 ### Added
 

@@ -9,9 +9,9 @@ name: Visual Regression
 on:
   push:
     branches: [main]
-    paths: ['index.html', 'console.html', 'advisor.html', 'assets/**', 'test/visual.spec.mjs', 'playwright.config.mjs']
+    paths: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'advisor.js', 'i18n.js', 'app.css', 'console.css', 'advisor.css', 'fonts.css', 'assets/**', 'test/visual.spec.mjs', 'playwright.config.mjs']
   pull_request:
-    paths: ['index.html', 'console.html', 'advisor.html', 'assets/**', 'test/visual.spec.mjs', 'playwright.config.mjs']
+    paths: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'advisor.js', 'i18n.js', 'app.css', 'console.css', 'advisor.css', 'fonts.css', 'assets/**', 'test/visual.spec.mjs', 'playwright.config.mjs']
   workflow_dispatch:
     inputs:
       mode:

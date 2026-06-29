@@ -11,9 +11,16 @@ the feature itself. Please read this guide before opening a pull request.
 
 ## Project model
 
-- **No build step, no backend, no bundler.** The core application is a single
-  file — [`index.html`](index.html) — with two sibling pages (`console.html`,
-  `advisor.html`). It deploys to any static host as-is.
+- **No build step, no backend, no bundler.** The core application is
+  [`index.html`](index.html) with its logic in [`app.js`](app.js) and styles in
+  [`app.css`](app.css), plus two more pages (`console.html`/`console.js`/`console.css`,
+  `advisor.html`/`advisor.js`/`advisor.css`). Logic AND CSS live in same-origin
+  external files (never inline) so the CSP is a pure `'self'` policy (no
+  `'unsafe-inline'` in `script-src` or `style-src`, no third-party origins);
+  former inline `on*` handlers use event delegation and former inline styles use
+  the CSSOM. Fonts are self-hosted (`fonts.css` + `assets/fonts/`). Keep it that
+  way — the `test/csp.test.mjs` guardrail fails the build if an inline
+  script/style or a Google Fonts link reappears. It deploys to any static host as-is.
 - All assessment data stays on the user's device (`localStorage`). Server-side
   secrets live only in Netlify/GitHub environment variables.
 - Automation (FATF watchdog, Regulatory Watch, Sanctions Watch/Screen, site
@@ -49,6 +56,33 @@ Other gates that run automatically on your PR:
 - **PR size** (`.github/workflows/pr-size.yml`) — keep PRs focused and small;
   large diffs are flagged. Split unrelated changes into separate PRs.
 - **Lighthouse / a11y / link-check / visual** — front-end quality gates.
+- **CSP guardrail** (`test/csp.test.mjs`) and **scoring golden set**
+  (`test/scoring-golden.test.js`) — blocking; a re-introduced inline handler or
+  an unintended change to a frozen scoring outcome fails the PR.
+- **CHANGELOG + SBOM** — `test/changelog.test.mjs` checks the Keep-a-Changelog
+  format and a non-empty `[Unreleased]`; `test/sbom.test.mjs` validates the
+  CycloneDX generator. Add a bullet under `## [Unreleased]` in
+  [`CHANGELOG.md`](CHANGELOG.md) for any user-visible change; on an `APP_VERSION`
+  bump, move `[Unreleased]` into a dated version section. The release workflow
+  attaches a CycloneDX SBOM (`sbom.cdx.json`) automatically.
+
+## Branch protection & protected environments
+
+The following repository settings are the intended baseline (configured in
+GitHub Settings, not in the diff):
+
+- **Branch protection on `main`:** require a pull request before merging;
+  require CODEOWNERS review (`.github/CODEOWNERS` routes compliance-sensitive
+  paths to the MLRO); require status checks to pass (CI, CodeQL, gitleaks,
+  Dependency Review); require branches to be up to date; restrict force-pushes
+  and deletion.
+- **Protected `release` environment:** `auto-release.yml` runs in the `release`
+  environment — add **required reviewers** to it so publishing a GitHub release
+  requires human approval. (Until configured, GitHub auto-creates it unprotected.)
+- **Autonomous daily controls are intentionally NOT gated by required reviewers**
+  (Sanctions/Regulatory/FATF watchers, freshness, site-health): they must run
+  unattended. They are instead hardened with least-privilege `permissions:`,
+  `step-security/harden-runner` egress policies, and "degrade-loudly" alerting.
 
 ## Branches and commits
 

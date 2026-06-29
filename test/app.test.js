@@ -4,6 +4,10 @@
 const fs = require('fs');
 const path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+/* App logic now lives in an external same-origin file (app.js) so the CSP can
+   drop 'unsafe-inline' from script-src; load it directly rather than scraping
+   an inline <script> block out of the HTML. */
+const appjs = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
 /* ── DOM stub ── */
 const els = {};
@@ -31,7 +35,8 @@ for(const m of html.matchAll(/id="([^"]+)"/g)) register(m[1]);
 
 global.document = {
   getElementById(id){ return els[id] || null; },  // browser-accurate: null for unknown
-  createElement(){ return makeEl(); }
+  createElement(){ return makeEl(); },
+  addEventListener(){}  // event-delegation layer in app.js registers here
 };
 global.window = { addEventListener(){} };
 global.localStorage = {
@@ -46,7 +51,7 @@ global.Blob = class { constructor(parts){ this.parts = parts; } };
 global.URL = { createObjectURL(){ return 'blob:test'; }, revokeObjectURL(){} };
 
 /* ── Load app script; let/const are eval-scoped, so export a bridge ── */
-const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
+const script = appjs;
 (0, eval)(script + `
 ;globalThis.__app = {
   get state(){ return state; }, set state(v){ state = v; },
@@ -796,9 +801,9 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
   // UI entry-point regression: these functions are tested above; the buttons
   // ensure users can actually reach them without the browser console.
   // (Export/Import JSON are intentionally code-only — no UI button.)
-  check('reassess button wired in HTML', html.includes('onclick="reassess()"'));
-  check('retry Asana button wired in HTML', html.includes('onclick="retryAsanaDelivery()"'));
-  check('print preflight wired in HTML', html.includes('onclick="printPreflight()"'));
+  check('reassess button wired in HTML', html.includes('data-act="reassess"'));
+  check('retry Asana button wired in HTML', html.includes('data-act="retryAsanaDelivery"'));
+  check('print preflight wired in HTML', html.includes('data-act="printPreflight"'));
 
   /* a11y: every form control is programmatically labelled (WCAG2AA 1.3.1 / 4.1.2).
      Guards the label/for associations so they can't silently regress. */
@@ -810,8 +815,8 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
   check('onboarding toggle-group is a labelled group',
     html.includes('<label id="onboardLbl">') && html.includes('aria-labelledby="onboardLbl"'));
   check('generated question toggle-groups are labelled groups',
-    html.includes('id="qtext_${q.id}"') && html.includes('role="group" aria-labelledby="qtext_${q.id}"'));
-  check('generated supplier select is labelled', html.includes('<label for="sel_${prefix}_${i}">'));
+    appjs.includes('id="qtext_${q.id}"') && appjs.includes('role="group" aria-labelledby="qtext_${q.id}"'));
+  check('generated supplier select is labelled', appjs.includes('<label for="sel_${prefix}_${i}">'));
   check('no bare <label> remains — all are associated', !/<label>/.test(html));
 
   /* ── 27. Encryption-at-rest primitives (WebCrypto) ── */
@@ -901,9 +906,8 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     global.localStorage.removeItem('hsra.audit.v1');
     A.state = A.freshState(); A.state.meta.assessor = 'Jane Analyst'; A.state.meta.ref = 'RA-20260621-001';
     await A.auditAppend('assessment.complete', 'Marked complete');
-    let captured = null;
     const origCreate = global.document.createElement;
-    global.document.createElement = () => ({ set href(v){}, get href(){ return 'blob:test'; }, download:'', click(){ captured = true; } });
+    global.document.createElement = () => ({ set href(v){}, get href(){ return 'blob:test'; }, download:'', click(){} });
     const origBlob = global.Blob;
     global.Blob = class { constructor(parts){ this.text = String(parts[0]); } };
     // capture the serialised payload via Blob

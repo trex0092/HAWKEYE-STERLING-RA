@@ -58,9 +58,11 @@ function keyToRx(key) {
   return key.split(' ').map(escapeRx).join('\\s+');
 }
 
-export function loadBaseline(indexHtml) {
-  const m = indexHtml.match(/const COUNTRIES = (\[.*?\]);/s);
-  if (!m) throw new Error('COUNTRIES baseline not found in index.html');
+export function loadBaseline(appJs) {
+  /* The COUNTRIES baseline lives in app.js (extracted from index.html so the
+     CSP can drop 'unsafe-inline' from script-src). */
+  const m = appJs.match(/const COUNTRIES = (\[.*?\]);/s);
+  if (!m) throw new Error('COUNTRIES baseline not found in app.js');
   return JSON.parse(m[1]);
 }
 
@@ -385,7 +387,7 @@ export async function main(mode) {
   if (mode === 'probe') {
     /* Diagnostic: print what the source chain returns and how it classifies,
        so list discrepancies can be traced to source content vs parsing. */
-    const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
+    const baseline = loadBaseline(readFileSync('app.js', 'utf8'));
     const fetched = await fetchFatfSegments();
     if (!fetched) { console.log('no fresh authoritative FATF capture reachable — nothing to probe. Verify manually on ' + FATF_URL); return; }
     console.log('source: ' + fetched.source);
@@ -434,7 +436,7 @@ export async function main(mode) {
     return;
   }
 
-  const baseline = loadBaseline(readFileSync('index.html', 'utf8'));
+  const baseline = loadBaseline(readFileSync('app.js', 'utf8'));
   const fetched = await fetchFatfSegments();
   if (!fetched) {
     /* No fresh authoritative capture this run (e.g. archive.org briefly down).

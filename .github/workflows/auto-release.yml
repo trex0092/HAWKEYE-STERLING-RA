@@ -1,7 +1,7 @@
 name: Auto Release
 
 # Publishes a GitHub release whenever main carries a new APP_VERSION:
-# every feature/fix lands with a version bump in index.html, so each merge
+# every feature/fix lands with a version bump in app.js, so each merge
 # to main that changes the version is tagged automatically with generated
 # notes (the PR titles since the previous release). Pushes that do not
 # change APP_VERSION are a green no-op.
@@ -21,6 +21,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Protected environment: configure required reviewers on the `release`
+    # environment in repo settings to gate publishing (see CONTRIBUTING.md).
+    # Until configured, GitHub auto-creates it unprotected (no-op gating).
+    environment: release
     steps:
       - name: Harden the runner (egress audit)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
@@ -32,12 +36,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          V=$(grep -oE "APP_VERSION = '[0-9]+\.[0-9]+\.[0-9]+'" index.html | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
-          test -n "$V" || { echo "could not read APP_VERSION from index.html"; exit 1; }
+          V=$(grep -oE "APP_VERSION = '[0-9]+\.[0-9]+\.[0-9]+'" app.js | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          test -n "$V" || { echo "could not read APP_VERSION from app.js"; exit 1; }
           if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "v$V already released — nothing to do"
           else
             gh release create "v$V" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "v$V" --generate-notes
+            # Attach a CycloneDX SBOM as a release artifact (supply-chain provenance).
+            if node scripts/gen-sbom.mjs; then
+              gh release upload "v$V" sbom.cdx.json --repo "$GITHUB_REPOSITORY" --clobber || echo "SBOM upload skipped"
+            else
+              echo "SBOM generation skipped"
+            fi
             echo "released v$V"
           fi

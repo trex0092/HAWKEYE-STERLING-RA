@@ -34,8 +34,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: ESLint (scripts, tests, functions)
-        run: npx --yes eslint@9 scripts test netlify
+      - name: ESLint (app logic, scripts, tests, functions)
+        run: npx --yes eslint@9 app.js console.js advisor.js scripts test netlify
 
       - name: HTMLHint (screens) — report only
         continue-on-error: true

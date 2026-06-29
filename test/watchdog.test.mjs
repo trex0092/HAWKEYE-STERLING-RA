@@ -11,7 +11,7 @@ function check(name, cond) {
   else { failed++; console.log('FAIL  ' + name); }
 }
 
-const baseline = loadBaseline(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
+const baseline = loadBaseline(readFileSync(new URL('../app.js', import.meta.url), 'utf8'));
 check('baseline loads all countries', baseline.length === 245);
 check('baseline CFA flags are Iran, North Korea, Myanmar',
   baseline.filter(c => c.cfa).map(c => c.name).sort().join('|') === 'Islamic Republic of Iran|Myanmar|North Korea');
