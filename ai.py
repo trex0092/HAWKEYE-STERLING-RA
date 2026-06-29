@@ -41,11 +41,15 @@ def _llm_in_reports() -> bool:
     opted in AND a key is present. This is the fabrication-prone surface."""
     return AI_ENABLED and REPORT_ALLOW_LLM
 
-# Grounded classification (relevance/severity of REAL headlines) is allowed when a
-# key is present: it judges provided text, it does NOT generate facts. Disable with
-# LLM_TRIAGE=0. Even here the raw headline + link is always shown and the result is
-# labelled, so a human verifies — the LLM never replaces the evidence.
-LLM_TRIAGE = AI_ENABLED and os.environ.get("LLM_TRIAGE", "1") == "1"
+# Grounded classification (relevance/severity of REAL headlines): it judges
+# provided text, it does NOT generate facts. Even here the raw headline + link is
+# always shown and the result is labelled, so a human verifies — the LLM never
+# replaces the evidence. It still sends a subject name + headline to Anthropic (a
+# cross-border transfer of customer data), so it is FAIL-CLOSED: OFF unless a key
+# is present AND LLM_TRIAGE=1 is set explicitly. This keeps the PDPL gate intact
+# for any non-workflow caller (local/manual run, a new workflow) — the production
+# workflows already set LLM_TRIAGE=0 until the Anthropic DPA is executed.
+LLM_TRIAGE = AI_ENABLED and os.environ.get("LLM_TRIAGE", "0") == "1"
 
 # Hard grounding + PROMPT-SECURITY contract for any model call (UAE "Securing
 # Agentic AI" → Prompt Security). Forbids inventing facts AND obeying instructions

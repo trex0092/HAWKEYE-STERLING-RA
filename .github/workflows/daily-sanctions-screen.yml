@@ -193,6 +193,12 @@ jobs:
 
           while True:
               r = requests.get(url, headers=headers, params=params)
+              # Fail LOUDLY on an auth/rate error. Without this, a 401 (expired
+              # ASANA_PAT) / 403 / 429 returns a JSON error body that parses fine,
+              # data.get("data") is [], and the run posts an all-clear for a
+              # customer base it never actually read — a silent false negative.
+              if not r.ok:
+                  raise SystemExit(f"FATAL: Asana customer fetch failed — HTTP {r.status_code}: {r.text[:300]}")
               data = r.json()
               for t in data.get("data", []):
                   if t.get("name","").strip():
@@ -219,6 +225,12 @@ jobs:
               if not next_page:
                   break
               params["offset"] = next_page["offset"]
+
+          # An empty customer base is never a valid "all clear" — it means the
+          # project GID is wrong or the read was blocked. Fail rather than post a
+          # vacuous clean screen.
+          if not customers:
+              raise SystemExit("FATAL: 0 customers read from the Asana Customer Database — refusing to post an all-clear. Check ASANA_CUSTOMER_DB_GID and the token's access.")
 
           with open("/tmp/customers.json","w") as f:
               json.dump(customers, f, ensure_ascii=False)
@@ -273,11 +285,15 @@ jobs:
                   if first is not None and first.text:
                       name_parts.append(first.text)
                   full = " ".join(name_parts).strip()
+                  # Compute programmes per entry BEFORE the name guard: the alias
+                  # loop below references `programmes`, so a name-less primary entry
+                  # would otherwise raise NameError (aborting the whole OFAC parse)
+                  # or, worse, tag an alias with the PREVIOUS entry's programme.
+                  programmes = []
+                  for prog in entry.iter(f"{prefix}program"):
+                      if prog.text:
+                          programmes.append(prog.text)
                   if full:
-                      programmes = []
-                      for prog in entry.iter(f"{prefix}program"):
-                          if prog.text:
-                              programmes.append(prog.text)
                       sanctioned.append({
                           "name": full,
                           "list": "OFAC SDN",
@@ -359,7 +375,12 @@ jobs:
               with open("/tmp/uk_ofsi.csv", encoding="utf-8-sig", errors="replace") as f:
                   reader = csv.DictReader(f)
                   for row in reader:
-                      name = row.get("Name 6","") or row.get("Name","") or row.get("LastName","") or row.get("name","") or list(row.values())[0] if row else ""
+                      # Use only the known OFSI name columns. The old bare
+                      # `... or list(row.values())[0] if row else ""` both mis-parsed
+                      # (precedence made `else ""` dead) and, when name columns were
+                      # empty, injected the first column's value (e.g. "Group Type")
+                      # as a sanctioned "name".
+                      name = (row.get("Name 6") or row.get("Name") or row.get("LastName") or row.get("name") or "")
                       if name and name.strip():
                           sanctioned.append({"name": name.strip(), "list": "UK OFSI", "programme": row.get("Regime","UK Sanctions")})
               print(f"UK OFSI: {len(sanctioned)-before} entries")
@@ -387,6 +408,13 @@ jobs:
           except Exception as e:
               print(f"UAE EOCN load error: {e}")
               os.environ["UAE_PDF_FAILED"] = "true"
+
+          # ---- guard: never screen against an empty list ----
+          # If every download/parse failed, `sanctioned` is empty and
+          # process.extract(..., []) returns [] for every customer → all "clear".
+          # That is a universal false negative; fail loudly instead.
+          if not sanctioned:
+              raise SystemExit("FATAL: no sanctions entries loaded from ANY list — refusing to screen (every customer would be reported 'clear'). Check the list downloads/parsers above.")
 
           # ---- normalise all sanctioned names ----
           sanctioned_norm = [(normalise(s["name"]), s) for s in sanctioned]

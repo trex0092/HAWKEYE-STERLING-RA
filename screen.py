@@ -463,12 +463,20 @@ def parse_un(data):
             sec = root.find(section)
             if sec is None: continue
             tag = "INDIVIDUAL" if section == "INDIVIDUALS" else "ENTITY"
+            alias_tag = "INDIVIDUAL_ALIAS" if section == "INDIVIDUALS" else "ENTITY_ALIAS"
             for entry in sec.findall(tag):
                 parts = []
                 for field in ["FIRST_NAME","SECOND_NAME","THIRD_NAME","FOURTH_NAME","NAME"]:
                     el = entry.find(field)
                     if el is not None and el.text: parts.append(el.text.strip())
                 if parts: names.add(" ".join(parts))
+                # Designated a.k.a. names are real designations the party operates
+                # under — capture them too (EU/UK parsers already do). Missing these
+                # was a false-negative gap: a UN alias-only match would screen clear.
+                for alias in entry.findall(alias_tag):
+                    an = alias.find("ALIAS_NAME")
+                    if an is not None and an.text and an.text.strip():
+                        names.add(an.text.strip())
     except Exception as e:
         log(f"  UN parse error: {e}")
     return names, date_str, sha256_of(data)
@@ -1633,7 +1641,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     today = run_time.strftime("%Y-%m-%d")
     state = load_delta_state()
     delta = classify_deltas(possible_matches, adverse_findings, pep_findings, state, today)
-    save_delta_state(state)
+    # NOTE: state is persisted only AFTER the report is successfully delivered to
+    # Asana (see end of function). Saving it here would let a failed post — which
+    # the workflow commits anyway (`if: always()`) — permanently mark a brand-new
+    # match as "already seen", so it would never become an MLRO case. Fail-safe:
+    # if delivery fails, leave the on-disk state untouched so the match re-alerts.
     log(f"Delta: {delta['sanctions']} new sanctions · {delta['adverse']} new adverse · {delta['pep']} new PEP")
 
     # ── AI ENRICHMENT (decision-support; deterministic unless an LLM key is set) ──
@@ -1730,6 +1742,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                    adverse_findings, pep_findings, mode=mode)
     # MLRO case subtasks for the NEW items only (keeps the case list actionable)
     open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time)
+    # Persist the delta-state ONLY once the report was delivered. If the post
+    # failed (parent_gid is None), keep the prior state so today's new matches are
+    # flagged new again on the next run instead of being silently suppressed.
+    if parent_gid:
+        save_delta_state(state)
+    else:
+        log("Delta-state NOT persisted: Asana delivery failed — new matches will re-alert next run.")
     return possible_matches, adverse_findings, pep_findings
 
 def run_unified(run_time):
