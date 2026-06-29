@@ -21,7 +21,11 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; report-to csp-endpoint; report-uri /.netlify/functions/csp-report"
+    # Reporting API endpoint for the CSP `report-to` directive (modern browsers);
+    # the legacy `report-uri` above covers older ones. Both POST violation
+    # reports to the same-origin csp-report function (logged, never blocked).
+    Reporting-Endpoints = "csp-endpoint=\"/.netlify/functions/csp-report\""
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "no-referrer"

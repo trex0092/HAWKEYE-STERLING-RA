@@ -38,6 +38,8 @@ jobs:
         run: node test/csp.test.mjs
       - name: Run export-integrity + round-trip tests
         run: node test/export-integrity.test.js
+      - name: Run CSP-report function tests
+        run: node test/csp-report.test.js
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
       - name: Run daily-brief unit tests

@@ -24,6 +24,8 @@ check("script-src does NOT allow 'unsafe-inline'", !/'unsafe-inline'/.test(scrip
 check("script-src allows 'self'", /'self'/.test(scriptSrc));
 check("object-src is 'none'", /object-src 'none'/.test(cspLine));
 check("base-uri is 'self'", /base-uri 'self'/.test(cspLine));
+check('CSP declares a violation report sink (report-to/report-uri)', /report-to\s+csp-endpoint/.test(cspLine) && /report-uri\s+\/\.netlify\/functions\/csp-report/.test(cspLine));
+check('Reporting-Endpoints header maps csp-endpoint to the function', /Reporting-Endpoints\s*=\s*"csp-endpoint=\\?"\/\.netlify\/functions\/csp-report\\?""/.test(toml));
 
 const styleSrc = (cspLine.match(/style-src([^;]*)/) || [])[1] || '';
 check('style-src directive present', styleSrc.trim().length > 0);
