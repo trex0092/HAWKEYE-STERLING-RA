@@ -15,7 +15,12 @@
         "categories:performance": ["warn", { "minScore": 0.8 }],
         "categories:accessibility": ["warn", { "minScore": 0.9 }],
         "categories:best-practices": ["warn", { "minScore": 0.9 }],
-        "categories:seo": ["warn", { "minScore": 0.85 }]
+        "categories:seo": ["warn", { "minScore": 0.85 }],
+        "resource-summary:third-party:count": ["error", { "maxNumericValue": 0 }],
+        "resource-summary:script:size": ["warn", { "maxNumericValue": 1700000 }],
+        "resource-summary:stylesheet:size": ["warn", { "maxNumericValue": 200000 }],
+        "resource-summary:font:count": ["warn", { "maxNumericValue": 12 }],
+        "resource-summary:total:size": ["warn", { "maxNumericValue": 2600000 }]
       }
     }
   }

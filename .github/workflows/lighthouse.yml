@@ -1,8 +1,13 @@
 name: Lighthouse
 
 # Runs Lighthouse against the three screens on each PR and uploads the report.
-# Assertions are at "warn" level (non-blocking) so scores are surfaced without
-# gating merges; tighten to "error" in lighthouserc.json to enforce a budget.
+# Decision: Lighthouse is ADVISORY (report-only) — the step is continue-on-error
+# and category/size assertions are "warn", because Lighthouse scores are
+# environment-sensitive and should not gate merges on infra flakiness.
+# lighthouserc.json also sets resource budgets (script/stylesheet/font/total
+# size) and a third-party-request budget of ZERO; the no-third-party guarantee
+# is additionally HARD-enforced (blocking) by test/csp.test.mjs and the
+# real-browser test/csp-runtime.spec.mjs, so this is a secondary signal.
 
 on:
   pull_request:
