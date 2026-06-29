@@ -55,6 +55,12 @@ jobs:
           # AI layer: key enables GROUNDED triage only (classifies real headlines, cannot invent
           # facts). Generative report prose stays OFF unless REPORT_ALLOW_LLM=1 is also set.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # PDPL GATE: triage sends a subject name + headline to Anthropic (a cross-border
+          # transfer). It is held OFF until the Anthropic DPA is executed and the transfer
+          # basis recorded (see third-party-register.md / pdpl-data-processing-assessment.md).
+          # Re-enable WITHOUT a code change by setting the repo variable LLM_TRIAGE=1 once the
+          # DPA is signed. Default '0' = no customer-data egress.
+          LLM_TRIAGE: ${{ vars.LLM_TRIAGE || '0' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'claude-haiku-4-5-20251001' }}
         run: python screen.py
 

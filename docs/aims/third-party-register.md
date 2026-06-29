@@ -6,7 +6,7 @@ basis/safeguard, and DPA status. Owner: MLRO / DPO. Review: annually + on change
 | Vendor | Service | Data shared | Direction | Safeguard / DPA | Notes |
 |---|---|---|---|---|---|
 | **Asana** | Customer database (read) + report/case delivery (write) | Customer records, UBOs, screening results | In + Out | Vendor DPA — **confirm on file** | Token is a repo secret; never in browser. System of record. |
-| **Anthropic** | LLM grounded triage (optional) | Subject **name + one public headline** only | Out | Vendor DPA + this DPIA — **required before enabling key** | OFF by default (`ANTHROPIC_API_KEY` unset ⇒ no egress) |
+| **Anthropic** | LLM grounded triage (optional) | Subject **name + one public headline** only | Out | Vendor DPA + this DPIA — **DPA PENDING signature; egress GATED OFF** until executed | Key now wired, so triage is held off by `vars.LLM_TRIAGE` (default `0`). Set `=1` only after the DPA is signed and the transfer basis (below) is confirmed. |
 | **Google (News RSS)** | Adverse-media search | Subject name + risk terms (query) | Out | Public service; no account; no PII beyond the queried name | No customer record sent |
 | **Wikimedia (Wikidata)** | PEP detection | Individual name (query) | Out | Public CC0 API | No customer record sent |
 | **GitHub (Actions)** | Compute runner, code, run history, secrets | Code + run logs (no customer record persisted in logs) | In + Out | GitHub DPA | harden-runner egress controls; secrets encrypted |
@@ -26,10 +26,34 @@ from the vendor against the firm's contracted plan and recorded here.
 
 ## Actions / gaps
 - [ ] **Confirm Asana DPA** on file and note ref here.
-- [ ] **Sign Anthropic DPA** and attach this DPIA **before** provisioning the LLM key in production.
+- [ ] **Sign Anthropic DPA** (authorised signatory) and attach this DPIA. ⚠ The
+  `ANTHROPIC_API_KEY` secret was wired **ahead of** signature, so on 2026-06-29 the
+  triage egress was **gated OFF** (`vars.LLM_TRIAGE` default `0`, applied in the
+  screening workflows) to prevent an unauthorised cross-border transfer. **After
+  signing**, record the DPA reference + date below and set the `LLM_TRIAGE` repo
+  variable to `1` to re-enable.
 - [x] Record data-residency region for each processor (PDPL) — see the table above; vendor-side
   regions still to be **confirmed** for Anthropic, Asana, and GitHub.
 - [ ] Annual re-review of this register; update on any new processor.
+
+## Anthropic DPA & cross-border transfer record  *(DRAFT — pending signature)*
+> This block is **prepared for the firm's legal/compliance function to confirm and
+> sign**. It is NOT evidence of an executed agreement until the reference and
+> signatory below are completed by an authorised person. An AI assistant cannot
+> execute the DPA; do not treat empty fields as satisfied.
+
+| Field | Value |
+|---|---|
+| Processor | Anthropic, PBC |
+| Agreement | Anthropic Commercial Terms / Data Processing Addendum | 
+| DPA reference no. | _☐ to be completed on signature_ |
+| Signed by (authorised signatory) | _☐_ |
+| Date executed | _☐_ |
+| Data exported | Subject name + one public adverse-media headline only (no full customer record) |
+| Purpose / instruction | Grounded relevance/severity classification of a real headline; no generative prose in filed reports (`REPORT_ALLOW_LLM=0`) |
+| Cross-border transfer basis (UAE PDPL Art. 22/23) | _Draft basis to confirm with counsel_: transfer to a processor under an adequate-safeguard contract (the executed Anthropic DPA incorporating the standard data-protection commitments), with data minimisation (name + headline only) and the DPIA on file. Confirm the specific PDPL mechanism (adequacy decision vs contractual safeguards vs explicit consent) before reliance. |
+| Data residency | _☐ confirm Anthropic processing region_ |
+| Retention at processor | Per Anthropic terms; no training on submitted data; content not retained by the firm |
 
 ## Data-minimisation note
 The only processors that receive any subject identifier are Anthropic (name + one
