@@ -9,8 +9,8 @@
 # Single source of truth for those workflows AND the screen.py fallback, so the
 # same versions run everywhere and supply-chain drift is removed.
 # Kept current by Dependabot (pip ecosystem; see .github/dependabot.yml).
-rapidfuzz==3.10.1
-pdfplumber==0.11.4
-requests==2.33.0
+rapidfuzz==3.14.5
+pdfplumber==0.11.10
+requests==2.34.2
 lxml==6.1.1
-unicodedata2==15.1.0
+unicodedata2==17.0.1
