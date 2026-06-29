@@ -10,12 +10,12 @@
       "prevHash": "eee0fd65e1d3948d44b09c0fb02046212a2a4b24ff173bd58b508db30779caeb"
     },
     "uae-fiu": {
-      "hash": "bdda51d7d84eae5ed62753862631609eb1836d9845ece82c70a31bc8b185b1b3",
+      "hash": "24e7650f12702ed7c36a5567013a17be66f4d49fb8d55adc8b5ee15d77f27c4c",
       "bytes": 4427,
       "checkedAt": "2026-06-29",
       "changedAt": "2026-06-29",
       "status": 200,
-      "prevHash": "ed719ab3bd8c8f53e67087a37a7175829d55a9bee76f7ee062a9e08a1c7ea501"
+      "prevHash": "bdda51d7d84eae5ed62753862631609eb1836d9845ece82c70a31bc8b185b1b3"
     },
     "uae-namlcftc": {
       "hash": null,
@@ -49,12 +49,11 @@
       "prevHash": "db43741ad03345f00bd7eadd3e4bca7c1072d81bf74f01b3ae9f96bf2cb18447"
     },
     "uae-jewellery": {
-      "hash": null,
-      "bytes": 0,
+      "hash": "e490bd1eb2502593f511756ea4cc678919324a251f6eaddbac57c10e6ccdf35b",
+      "bytes": 9953,
       "checkedAt": "2026-06-29",
-      "changedAt": null,
-      "status": 404,
-      "error": "HTTP 404"
+      "changedAt": "2026-06-29",
+      "status": 200
     },
     "fatf-guidance": {
       "hash": null,
@@ -109,8 +108,8 @@
       "bytes": 0,
       "checkedAt": "2026-06-29",
       "changedAt": null,
-      "status": "error",
-      "error": "This operation was aborted"
+      "status": 403,
+      "error": "HTTP 403"
     },
     "eu-sanctions": {
       "hash": "c5bc43ac43300e7125b10e10d4e9bda08cb83a0d3062b05d7c2df4db9e16f6a8",
@@ -153,12 +152,11 @@
       "error": "fetch failed"
     },
     "eu-high-risk": {
-      "hash": null,
-      "bytes": 0,
+      "hash": "b0e4f141bce0272e751a29d20d2d330cc51d107783a125b0509fa7c21ef66cdf",
+      "bytes": 5820,
       "checkedAt": "2026-06-29",
-      "changedAt": null,
-      "status": 404,
-      "error": "HTTP 404"
+      "changedAt": "2026-06-29",
+      "status": 200
     },
     "rjc": {
       "hash": "5c8e27d0e2bc956d29d7294be742ddaffe7e6f0d32be6b2bdba94e8558cbf882",
