@@ -1,0 +1,16 @@
+# Pinned runtime dependencies for the Python screening engine (screen.py, ai.py).
+#
+# Located under ci/ (NOT the repo root) on purpose: the static-site host
+# (Netlify, publish=".") auto-installs a root-level requirements.txt during the
+# deploy build, which is pointless for a no-build static app and broke the deploy.
+# These deps are only needed by the GitHub Actions screening workflows and the
+# screen.py import fallback — so they live here, out of the host's auto-detect path.
+#
+# Single source of truth for those workflows AND the screen.py fallback, so the
+# same versions run everywhere and supply-chain drift is removed.
+# Kept current by Dependabot (pip ecosystem; see .github/dependabot.yml).
+rapidfuzz==3.10.1
+pdfplumber==0.11.4
+requests==2.32.3
+lxml==6.1.1
+unicodedata2==15.1.0

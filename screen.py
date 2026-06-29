@@ -31,7 +31,7 @@ except ImportError:
     # current interpreter — never an unpinned, shell-invoked `pip install`.
     import subprocess
     import sys
-    _req = os.path.join(os.path.dirname(os.path.abspath(__file__)), "requirements.txt")
+    _req = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ci", "requirements.txt")
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", _req], check=False)
     from rapidfuzz import fuzz
     import pdfplumber

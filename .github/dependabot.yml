@@ -15,9 +15,9 @@ updates:
         patterns:
           - "*"
 
-  # Keep the pinned Python screening dependencies (requirements.txt) patched.
+  # Keep the pinned Python screening dependencies (ci/requirements.txt) patched.
   - package-ecosystem: pip
-    directory: /
+    directory: /ci
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

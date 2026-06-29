@@ -87,7 +87,7 @@ jobs:
       # STEP 2 — INSTALL DEPENDENCIES
       # --------------------------------------------------------
       - name: Install Python dependencies
-        run: pip install --quiet -r requirements.txt
+        run: pip install --quiet -r ci/requirements.txt
 
 
       # --------------------------------------------------------
