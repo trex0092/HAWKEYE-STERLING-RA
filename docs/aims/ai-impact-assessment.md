@@ -46,3 +46,21 @@ Residual risk **acceptable** with the controls above, provided: (a) the LLM key 
 only provisioned alongside a signed DPA + this DPIA, and (b) human review remains
 mandatory before any freeze/decline/report. Re-assess on any change to data sent to
 third parties.
+
+## 8. Go-live sign-off (LLM enablement)
+LLM triage egress is **gated OFF** (`LLM_TRIAGE=0`) until this sign-off is completed.
+Complete every ☐ before setting the `LLM_TRIAGE` repo variable to `1`. This is the
+condition in §7(a) made operational; it ties the executed DPA to enablement.
+
+| Check | Status |
+|---|---|
+| Anthropic DPA executed — ref + date | _☐ (record in `anthropic-dpa-execution-pack.md` Schedule C)_ |
+| UAE PDPL cross-border transfer basis confirmed by counsel | _☐_ |
+| Processing region / zero-retention / no-training confirmed with Anthropic | _☐_ |
+| Data minimisation verified (name + one headline only; `REPORT_ALLOW_LLM=0`) | _☐_ |
+| DPIA reviewed and residual risk **accepted** | _☐_ |
+| **Authorised sign-off** — MLRO / DPO (name · date) | _☐_ |
+| `LLM_TRIAGE` set to `1` (go-live date) | _☐_ |
+
+> Reverting: setting `LLM_TRIAGE` back to `0` (or unsetting the key) stops egress
+> immediately and returns the engine to the fully deterministic state.
