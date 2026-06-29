@@ -73,6 +73,13 @@ _INJECTION_MARKERS = [
     "you are now", "new instructions", "follow these instructions", "mark this", "mark as",
     "classify as", "respond with", "output the", "reveal", "exfiltrate", "print your",
     "api key", "secret", "</system", "<|", "assistant:", "user:", "system:",
+    # 2026Q2 red-team expansion — newer jailbreak / evasion patterns. Multi-word
+    # where a bare token could appear in legitimate news (e.g. "override", "act
+    # as", "new"), so the benign false-positive rate stays controlled.
+    "forget everything", "forget all", "forget previous", "forget the above",
+    "override your", "override the above", "override all", "pretend you",
+    "act as if", "developer mode", "jailbreak", "do not flag", "do not classify",
+    "do not report this", "base64", "end of prompt", "begin new", "from now on",
 ]
 
 def _sanitize_untrusted(text: str, cap: int = 500) -> str:
@@ -155,21 +162,21 @@ def name_variants(name: str, cap: int = 12):
     if not base:
         return set()
     variants = {base}
-    tokens = base.split()
     for grp in _TRANSLIT_GROUPS:
         for canonical in grp:
-            if canonical in base:
+            # Whole-word/phrase swap only. A bare ``base.replace`` rewrites the
+            # particle inside unrelated tokens (e.g. "al" inside "salah" →
+            # "selah"), producing corrupted spellings that waste the variant cap
+            # and can evict a legitimate variant. Word boundaries keep multi-word
+            # particles like "abd al" working while protecting substrings.
+            rx = re.compile(r"\b" + re.escape(canonical) + r"\b")
+            if rx.search(base):
                 for alt in grp:
                     if alt != canonical:
-                        variants.add(base.replace(canonical, alt))
-        # token-level swap too (handles single-token particles like al/el)
-        for i, t in enumerate(tokens):
-            if t in grp:
-                for alt in grp:
-                    if alt != t:
-                        nt = tokens[:i] + [alt] + tokens[i+1:]
-                        variants.add(" ".join(nt))
-    out = set(list(variants)[:cap])
+                        variants.add(rx.sub(alt, base))
+    # Deterministic cap: sort before truncating so which variants survive never
+    # depends on set-iteration order; the base spelling is always retained.
+    out = set(sorted(variants)[:cap])
     out.add(base)
     return out
 

@@ -49,4 +49,9 @@ documented risk-data basis) or **FINDING** (unexplained divergence → log + tri
 
 | Date | Reviewer | Pairs run | Unjustified divergences | Action | Sign-off |
 |------|----------|-----------|-------------------------|--------|----------|
-| _pending first cycle_ | | | | | |
+| 2026-06-29 | Compliance (MLRO) | Cycle 1 — **deterministic dimension**: charter match-confidence taxonomy (pair 8: transliteration capped at POSSIBLE), routing, and tipping-off guardrails, via `test/advisor-assurance.test.js` (65 checks) + advisor smoke. **Live-LLM pairs 1–7 deferred** (see Action). | 0 (deterministic) | Live-LLM paired-prompt divergence pairs (jurisdiction/nationality/gender/size/PEP) run automatically by `scripts/advisor-bias-eval.mjs` (`advisor-bias-eval.yml`) once `ANTHROPIC_API_KEY` is provisioned — gated on the executed Anthropic DPA (pending item #10). No model egress before then. | Compliance / MLRO |
+
+> **Cycle 1 note:** the structural/charter dimension is complete and CI-enforced. The
+> live-model dimension is intentionally held until the DPA is signed and the key is
+> provisioned; the eval and its weekly/quarterly workflow are in place and will execute
+> the moment egress is authorised, with results logged as cycle 1b.

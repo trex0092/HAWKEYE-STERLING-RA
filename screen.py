@@ -1692,6 +1692,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         timings=timings, llm_calls=dict(ai.LLM_CALLS))
     for a in run_monitor.get("anomalies", []):
         log(f"RUNTIME ANOMALY: {a}")
+    for s in run_monitor.get("sustained", []):
+        log(f"SUSTAINED ANOMALY (escalate to MLRO): {s} — persisted across recent runs")
     txn_status = txn_monitor.status_line()   # R.16 — honest about the (absent) feed
     cdd_gaps_total = sum(m.get("cdd_gap_count", 0) for m in possible_matches)
     arrangements = sum(1 for m in possible_matches if m.get("arrangement"))

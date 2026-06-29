@@ -5,7 +5,7 @@ Parties relevant to the AI management system and their requirements. Review: ann
 | Interested party | Their requirement / expectation | How met |
 |---|---|---|
 | **UAE regulators** (CBUAE, EOCN, MoE, FIU/goAML) | Effective AML/CFT screening; TFS; STR filing; daily ingestion; records | Daily screening; STR drafts; 10-yr retention; freshness-check |
-| **MLRO / Compliance** | Reliable, explainable, reviewable alerts; no silent failure | Decision-support outputs; degrade-loudly; §⑤/§⑥ attestation |
+| **MLRO / Compliance** | Reliable, explainable, reviewable alerts; no silent failure | Decision-support outputs; degrade-loudly; §⑥/§⑦ attestation |
 | **Senior management / board** | Risk visibility; assurance; defensible AI use | Risk ratings; governance pack; CI-enforced controls |
 | **Customers / data subjects** | Lawful, proportionate, fair processing; privacy | DPIA; PDPL; minimal LLM payload; human review |
 | **Auditors / four-eyes** | Traceability; evidence; document control | Audit trail; git history; this document pack |

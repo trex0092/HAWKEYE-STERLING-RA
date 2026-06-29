@@ -93,3 +93,46 @@ e) The 03/2026 MoET Supplemental Guidance for DPMS (single source). [19]
 31. Farahat & Co, goAML registration fines: https://www.farahatco.net/blog/goaml-registration-in-uae/
 
 Disclaimer: research summary for internal compliance use; confirm the open items in section 5 with the supervisory authority or legal counsel before relying on them.
+
+---
+
+## Addendum — June 2026 FATF Paris plenary ingested (29/06/2026)
+
+This addendum closes the open item flagged in section 2 (the 15–19/06/2026 Paris
+plenary, whose outcomes were not yet published when this note was prepared on
+12/06/2026). It is the dated record of the post-plenary jurisdiction refresh.
+
+**Plenary outcomes (17–19/06/2026, Paris — final under the Mexican presidency).**
+- Grey list (increased monitoring): **ADDED** Bosnia and Herzegovina and Iraq;
+  **REMOVED** Algeria and Namibia. The list stays at **22** jurisdictions.
+- Call-for-action (black) list: **unchanged** — Iran, North Korea (DPRK) and
+  Myanmar. [a][b][c]
+
+**App data reconciled (29/06/2026).**
+- `data/jurisdiction-risk.json` (the R.10 nudge list) resynced to the post-June
+  22-grey + 3-high set, using the app's `COUNTRIES` canonical names so the lookup
+  exact-matches customer country/nationality fields.
+- `data/fatf-state.json` (the watchdog reference state) already reflected the June
+  lists (the FATF Watchdog reconciled it on 20/06/2026); the two are now identical.
+- `index.html` `COUNTRIES`: **Bosnia-Herzegovina** raised from 2 (Medium) to **3
+  (High)** on its grey-listing. Iraq was already 3. All 22 grey jurisdictions now
+  score 3; Iran/DPRK/Myanmar carry the call-for-action flag.
+
+**De-listing decision — Algeria & Namibia (risk owner: Compliance / MLRO).**
+Both were removed from the grey list in June 2026 but are **retained at score 3
+(High)** in the app's country data as a conservative post-delisting cooldown.
+They are correctly **absent from the grey nudge list** (`jurisdiction-risk.json`),
+so they no longer attract a FATF-grey factor; only their base country score is
+held at 3. Relaxing that base score is a senior-management decision and is
+**diarised for review at the next plenary (Oct 2026)**.
+
+**Refresh cadence (operational control).** The jurisdiction lists are reviewed
+every FATF plenary (Feb / Jun / Oct). Detection is automated: the `fatf-watchdog`
+workflow runs daily, diffs FATF's published lists against the app's state, and
+raises an Asana alert (GitHub-issue fallback) on any change; the officer applies
+score changes via the Risk Data panel. **Next scheduled refresh: October 2026.**
+
+Addendum sources:
+- [a] FATF, Outcomes FATF Plenary, 17–19 June 2026: https://www.fatf-gafi.org/en/publications/Fatfgeneral/outcomes-fatf-plenary-june-2026.html
+- [b] FATF, Jurisdictions under Increased Monitoring — 19 June 2026: https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html
+- [c] ComplyAdvantage, FATF plenary June 2026 outcomes: https://complyadvantage.com/insights/fatf-plenary-june-2026-outcomes/

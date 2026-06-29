@@ -75,7 +75,7 @@ def _norm(s):
 def mask_id(raw):
     """Render an ID number as presence + last 3 chars only (privacy / PDPL)."""
     s = re.sub(r"\s+", "", str(raw or ""))
-    if not s or s.upper() in ("NA", "N/A", "PENDING", "-"):
+    if not s or s.upper() in ("NA", "N/A", "PENDING", "-", "—", "–"):
         return ""
     return ("•" * max(0, len(s) - 3)) + s[-3:] if len(s) > 3 else "•••"
 

@@ -19,6 +19,7 @@ and on change. Owner: MLRO.
 | R-11 | **Model/provider change** alters LLM behaviour | Medium | `AI_MODEL` pinned; deterministic fallback on any LLM error/format change; severity clamped | Low | Accept; review on model change |
 | R-12 | **Job timeout / capacity** — sweep exceeds runner budget | Medium | Parallelized sweep (minutes); 350-min cap; degrade-loudly; runtime latency anomaly alarm | Low | Accept |
 | R-13 | **Transaction-layer blind spot** — no monitoring of transaction behaviour (R.16) | High | R.16 rules engine built & tested (`txn_monitor.py`); INACTIVE pending a real feed; status shown honestly in every report (§⑤); no fabricated data | Medium | Mitigate: connect a transaction feed (`TXN_FEED_PATH`) — owner: firm |
+| R-14 | **Silent degradation goes unactioned** — a runtime/coverage anomaly recurs run-after-run but no one is told | Medium | Per-run anomalies surfaced in §⑤; SUSTAINED anomalies (persisting across consecutive runs) auto-escalate to a GitHub issue via `monitoring.sustained_anomalies` + the `anomaly-watch` workflow; logic unit-tested | Low | Mitigate; MLRO reviews each escalation — owner: Compliance |
 
 **Top residual risks:** R-03 (false negative) and R-13 (no transaction feed
 connected) — R-05, R-06, R-08, R-09 reduced to **Low** by the hardening pass

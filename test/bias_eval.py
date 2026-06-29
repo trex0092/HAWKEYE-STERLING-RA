@@ -81,6 +81,25 @@ EQUIV = {
         ("Ozgur Anik", "Ozgur Anik"),
         ("Mustafa Kardaslar", "Mustafa Kardaslar"),
     ],
+    # Cyrillic-origin (Slavic) names reach the lists in Latin transliteration;
+    # customer files carry the common spelling variant (Sergei/Sergey, Yuri/Yuriy,
+    # Aleksandr/Alexander). A fair matcher should still link them.
+    "Cyrillic": [
+        ("Sergei Ivanov", "Sergey Ivanov"),
+        ("Aleksandr Volkov", "Alexander Volkov"),
+        ("Dmitri Sokolov", "Dmitry Sokolov"),
+        ("Yuriy Popov", "Yuri Popov"),
+        ("Mikhail Kuznetsov", "Mikhail Kuznetsov"),
+    ],
+    # CJK / SE-Asian romanisation: the same name appears with different spacing
+    # or hyphenation of the syllables (Wei Ming / Wei-ming). True equivalents.
+    "CJK": [
+        ("Chen Wei Ming", "Chen Wei-ming"),
+        ("Kang Min Ho", "Kang Min-ho"),
+        ("Lee Jong Su", "Lee Jong-su"),
+        ("Zhang Wei Jun", "Zhang Wei-jun"),
+        ("Nguyen Van An", "Nguyen Van An"),
+    ],
 }
 
 # ── Labelled NON-equivalence set: pairs a matcher should NOT link ─────────────
@@ -89,6 +108,8 @@ NON_EQUIV = [
      "Dal Enerji Madencilik Turizm Sanayi Ve Ticaret Anonim Sirketi"),   # only boilerplate shared
     ("Ahmed Hassan", "Mohammed Khalil"),
     ("Zoe Precious Metals FZE", "Acme General Trading LLC"),
+    ("Sergei Ivanov", "Aleksandr Volkov"),       # two distinct Slavic names
+    ("Chen Wei Ming", "Zhang Wei Jun"),           # two distinct CJK-romanised names
 ]
 
 

@@ -32,7 +32,7 @@ subject name + a single public headline** — never the full customer record.
 |---|---|
 | Wrongful flag / reputational impact | Human-in-the-loop; decision-support only; raw evidence shown; no automated decision |
 | Mis-identification (same-name) | Confidence tiers; relevance triage; MLRO verification before any action |
-| Bias against non-Latin names | Transliteration recall; uniform thresholds; CI-enforced cross-script recall-parity test (`bias-fairness-testing.md`, `test/bias_eval.py`) |
+| Bias against non-Latin names | Transliteration recall; uniform thresholds; fairness review implemented (`bias-fairness-testing.md`; cross-script recall-parity test in CI, R-05) |
 | Excessive data exposure | Minimal payload to LLM; no-egress default; masking; 10-yr controlled retention |
 | Tipping-off | "Do not tip off" controls; STR drafted for MLRO, never auto-filed |
 

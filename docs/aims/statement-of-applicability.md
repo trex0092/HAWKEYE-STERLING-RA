@@ -16,15 +16,21 @@ exclusion. Status: Implemented / Partial / Planned / Not Applicable (N/A).
 | A.6 Lifecycle | Business continuity / resilience | Partial | `bcp.md`; degrade-loudly; retries |
 | A.7 Data | Data governance / quality | Implemented | retention, source provenance; `aims/data-quality-plan.md` (dimensions, controls, checks) |
 | A.7 Data | Data privacy (PDPL) | Implemented | no-egress default; LLM gated; DPIA |
-| A.8 Information for users | Explainability / transparency | Implemented | labelled outputs + raw evidence; report §⑥ |
+| A.8 Information for users | Explainability / transparency | Implemented | labelled outputs + raw evidence; report §⑦ |
 | A.9 Use | Human oversight (HITL) | Implemented | MLRO sign-off; nothing auto-files |
 | A.9 Use | Stakeholder feedback | Partial | `stakeholder-feedback.md` (channels + triage process + operating log) |
 | A.10 Third parties | Supplier/processor management | Implemented | `third-party-register.md` |
-| — Security | Prompt security / adversarial controls | Implemented | `detect_injection`; grounding contract; standing red-team (`red-team-procedure.md`) |
+| — Security | Prompt security / adversarial controls | Implemented | `detect_injection`; grounding contract |
+| — Security | Adversarial red-team (prompt-injection corpus) | Implemented | `red-team-procedure.md`; CI-run injection corpus exercising `detect_injection` (R-02) |
 | — Security | Access control & least privilege | Implemented | agent authorization + credential broker |
 | — Security | Secrets handling | Implemented | masking; gitleaks; no secrets in logs |
-| — Monitoring | Monitoring & logging | Implemented | freshness-check, screening-metrics, audit trail; runtime metrics + coverage drift (`runtime-monitoring.md`, `monitoring.py`) |
-| — Monitoring | Bias & fairness testing | Implemented | `bias-fairness-testing.md`; `test/bias_eval.py` (cross-script recall parity, CI-enforced) |
+| — Monitoring | Monitoring & logging | Implemented | freshness-check, screening-metrics, audit trail |
+| — Monitoring | Runtime monitoring & drift detection | Implemented | `monitoring.py`; report §⑤; QA gate; `runtime-monitoring.md` |
+| — Monitoring | Source-coverage drift detection | Implemented | `monitoring.py` coverage-drift alarms; report §⑤; `in-domain-aml-coverage.md` |
+| — Monitoring | Bias & fairness testing | Implemented | `bias-fairness-testing.md`; cross-script recall-parity test in `test/engine_test.py` (R-05) |
+| — AML coverage | FATF R.10 — jurisdiction risk (risk-based approach) | Implemented | `kyc.jurisdiction_risk_for`; maintained `data/jurisdiction-risk.json`; `in-domain-aml-coverage.md` |
+| — AML coverage | FATF R.25 — legal-arrangement (trust/foundation) flag | Implemented | `kyc.py` arrangement detection, surfaced per match; `in-domain-aml-coverage.md` |
+| — AML coverage | FATF R.16 — transaction monitoring | Implemented (inactive) | `txn_monitor.py` engine built & tested; INACTIVE pending a real feed `TXN_FEED_PATH` (risk R-13) |
 | — Improvement | Nonconformity / corrective action | Implemented | `corrective-actions.md` |
 
 **Exclusions (N/A, justified):** model-training controls (no models are trained —
