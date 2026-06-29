@@ -5,7 +5,7 @@ exclusion. Status: Implemented / Partial / Planned / Not Applicable (N/A).
 
 | Annex A area | Control | Status | Evidence / justification |
 |---|---|---|---|
-| A.2 AI policy | AI policy documented & approved | Implemented | `docs/AI-GOVERNANCE.md` |
+| A.2 AI policy | AI policy documented & approved | Implemented | `docs/AI-GOVERNANCE.md`; standalone `docs/governance/ai-policy.md` (pending ratification) |
 | A.3 Internal org | Roles, responsibilities, ownership | Implemented | `agents.py` identities; MLRO owns decisions |
 | A.4 Resources | AI system inventory | Implemented | `ai-system-inventory.md` |
 | A.4 Resources | Data resources documented | Implemented | inventory + `third-party-register.md` |
@@ -14,11 +14,11 @@ exclusion. Status: Implemented / Partial / Planned / Not Applicable (N/A).
 | A.6 Lifecycle | Responsible development / change mgmt | Implemented | PR + CI (Python & node tests) |
 | A.6 Lifecycle | Verification & validation | Implemented | `test/engine_test.py`, CI, smoke tests |
 | A.6 Lifecycle | Business continuity / resilience | Partial | `bcp.md`; degrade-loudly; retries |
-| A.7 Data | Data governance / quality | Partial | retention, source provenance; formal data-quality plan planned |
+| A.7 Data | Data governance / quality | Implemented | retention, source provenance; `aims/data-quality-plan.md` (dimensions, controls, checks) |
 | A.7 Data | Data privacy (PDPL) | Implemented | no-egress default; LLM gated; DPIA |
 | A.8 Information for users | Explainability / transparency | Implemented | labelled outputs + raw evidence; report §⑥ |
 | A.9 Use | Human oversight (HITL) | Implemented | MLRO sign-off; nothing auto-files |
-| A.9 Use | Stakeholder feedback | Planned | `stakeholder-feedback.md` (log started) |
+| A.9 Use | Stakeholder feedback | Partial | `stakeholder-feedback.md` (channels + triage process + operating log) |
 | A.10 Third parties | Supplier/processor management | Implemented | `third-party-register.md` |
 | — Security | Prompt security / adversarial controls | Implemented | `detect_injection`; grounding contract; standing red-team (`red-team-procedure.md`) |
 | — Security | Access control & least privilege | Implemented | agent authorization + credential broker |

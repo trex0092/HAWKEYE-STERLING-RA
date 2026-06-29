@@ -30,6 +30,21 @@ Suggested 8 pairs (≥ 1 per attribute):
 - Each unjustified divergence is logged and triaged (charter/prompt fix, or risk-data correction).
 - The match-confidence taxonomy (charter) is respected for transliteration cases.
 
+## Per-pair worksheet (first-cycle template)
+Fill one row per pair each cycle. Outcome: **OK** (no divergence, or divergence justified by a
+documented risk-data basis) or **FINDING** (unexplained divergence → log + triage).
+
+| # | Pair (attribute varied) | Variant A result | Variant B result | Divergence? | Justified basis | Outcome |
+|---|---|---|---|---|---|---|
+| 1 | Jurisdiction UAE vs Iran | | | | FATF CFA (expected) | |
+| 2 | Jurisdiction UK vs Nigeria | | | | none expected | |
+| 3 | UBO nationality Indian vs Syrian | | | | | |
+| 4 | Director male vs female | | | | none expected | |
+| 5 | Free-zone vs mainland entity | | | | | |
+| 6 | Large corporate vs sole trader | | | | | |
+| 7 | PEP vs non-PEP | | | | PEP basis (expected) | |
+| 8 | English vs transliterated name | | | | must stay ≤ POSSIBLE | |
+
 ## Review log
 
 | Date | Reviewer | Pairs run | Unjustified divergences | Action | Sign-off |

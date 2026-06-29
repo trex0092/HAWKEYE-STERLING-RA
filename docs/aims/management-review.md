@@ -24,6 +24,16 @@ annually) and after material change. Use this template per review; keep the log.
 ## Review log
 | Date | Chair | Key decisions | Actions (owner / due) | Next review |
 |---|---|---|---|---|
+| _scheduled — Q3 2026_ | MLRO + senior management | _to be held_ | _to be recorded_ | annual |
 | | MLRO | | | |
 
-> First formal review to be scheduled within the standard cycle; record outcomes here.
+### First-cycle prep (carry into the first review)
+Open items to table at the first formal review (sourced from the current pack):
+- Ratify the standalone **AI Policy** ([`../governance/ai-policy.md`](../governance/ai-policy.md), A.2.2).
+- Accept residual risks, incl. **R-13** (transaction-layer blind spot — R.16 feed decision).
+- DPA status: sign **Anthropic DPA**; confirm **Asana DPA** + data-residency regions.
+- Run the **Advisor bias review** first cycle ([`../governance/advisor-bias-review-2026.md`](../governance/advisor-bias-review-2026.md)).
+- Confirm group-entity goAML/EOCN registration; update compliance-manual legal references (FDL 10/2025).
+
+> First formal review to be scheduled within the standard cycle (target Q3 2026); record
+> outcomes in the log above and convert decisions into actions with owner + due date.
