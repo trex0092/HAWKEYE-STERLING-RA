@@ -55,8 +55,12 @@ export function collectUrls(files) {
 /* A result is dead when the probe could not get a final 2xx/3xx (or an
    allowed-by-default 401/403 anti-bot status). */
 /* Statuses where the server clearly answered but rejected the bot/method/format
-   (or geo-blocked) rather than "not found" — the link is live, so not dead. */
-const ANTIBOT_OK = new Set([401, 403, 405, 406, 415, 418, 429, 451]);
+   (or geo-blocked) rather than "not found" — the link is live, so not dead.
+   Includes transient gateway/availability errors (502/503/504): the origin is up
+   but timed out or was briefly unavailable to an automated probe (e.g. the UN
+   Security Council consolidated-list page intermittently 504s) — that is an
+   availability hiccup, not a rotted citation, so it must not block. */
+const ANTIBOT_OK = new Set([401, 403, 405, 406, 415, 418, 429, 451, 502, 503, 504]);
 export function isDead(result) {
   if (!result) return true;
   if (result.ok) return false;
