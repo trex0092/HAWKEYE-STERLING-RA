@@ -12,10 +12,23 @@ basis/safeguard, and DPA status. Owner: MLRO / DPO. Review: annually + on change
 | **GitHub (Actions)** | Compute runner, code, run history, secrets | Code + run logs (no customer record persisted in logs) | In + Out | GitHub DPA | harden-runner egress controls; secrets encrypted |
 | **GitHub (gov-list hosts)** | OFAC/UN/EU/UK/EOCN/Canada downloads | None (public lists fetched) | In | Public sources | — |
 
+## Data residency (PDPL)
+Declared/processing region per processor. Items marked **confirm** need written confirmation
+from the vendor against the firm's contracted plan and recorded here.
+
+| Processor | Processing region (declared) | Status |
+|---|---|---|
+| **Anthropic** | United States (API) | Confirm contracted region/zero-retention terms at DPA signing |
+| **Asana** | US (Asana default; EU data centre available on plan) | **Confirm** the workspace's contracted region |
+| **Google (News RSS)** | Global edge; query only (subject name) | No PII record stored; residency N/A |
+| **Wikimedia (Wikidata)** | Global; query only (name) | No PII record stored; residency N/A |
+| **GitHub (Actions)** | US-hosted runners | Confirm runner region if EU residency is required |
+
 ## Actions / gaps
 - [ ] **Confirm Asana DPA** on file and note ref here.
 - [ ] **Sign Anthropic DPA** and attach this DPIA **before** provisioning the LLM key in production.
-- [ ] Record data-residency region for each processor (PDPL).
+- [x] Record data-residency region for each processor (PDPL) — see the table above; vendor-side
+  regions still to be **confirmed** for Anthropic, Asana, and GitHub.
 - [ ] Annual re-review of this register; update on any new processor.
 
 ## Data-minimisation note
