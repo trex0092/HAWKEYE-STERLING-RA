@@ -5,11 +5,11 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/trex0092/HAWKEYE-STERLING-RA/badge)](https://scorecard.dev/viewer/?uri=github.com/trex0092/HAWKEYE-STERLING-RA)
 [![License: Proprietary](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
-A single-file web application for **AML/CFT customer (entity) risk assessment**, built as a template for **Dealers in Precious Metals and Stones (DPMS)** and adaptable to other reporting entities.
+A static web application for **AML/CFT customer (entity) risk assessment**, built as a template for **Dealers in Precious Metals and Stones (DPMS)** and adaptable to other reporting entities.
 
 **Live:** https://hawkeye-sterling-ra.netlify.app
 
-The core application lives in [`index.html`](index.html) — no build step, no backend, no bundler. It deploys to any static host and keeps all data on the user's device. (The dark-neon "command-center" redesign pulls in three Google Fonts — Space Grotesk, JetBrains Mono, Manrope — and falls back to the system stack when offline.)
+The core application lives in [`index.html`](index.html) with its logic in the sibling [`app.js`](app.js) — no build step, no backend, no bundler. Page logic was moved out of the HTML into same-origin external files (`app.js`, `console.js`, `advisor.js`, alongside `i18n.js` / `sw-register.js`) so the Content-Security-Policy can drop `'unsafe-inline'` from `script-src`; former inline `on*` handlers are wired through event delegation. It deploys to any static host and keeps all data on the user's device. (The dark-neon "command-center" redesign pulls in three Google Fonts — Space Grotesk, JetBrains Mono, Manrope — and falls back to the system stack when offline.)
 
 ## The command-center suite
 
@@ -203,11 +203,11 @@ python3 -m http.server 8000
 # → http://localhost:8000
 ```
 
-**Deploy** — the Netlify project [`hawkeye-sterling-ra`](https://app.netlify.com/projects/hawkeye-sterling-ra) publishes the repo root as-is (`netlify.toml`, no build step). Link the repository to the project in the Netlify UI for continuous deploys, or deploy any other static host — the app is a single `index.html`.
+**Deploy** — the Netlify project [`hawkeye-sterling-ra`](https://app.netlify.com/projects/hawkeye-sterling-ra) publishes the repo root as-is (`netlify.toml`, no build step). Link the repository to the project in the Netlify UI for continuous deploys, or deploy any other static host — the app is `index.html` plus its same-origin `app.js` (and the `console.html`/`advisor.html` pages with their `*.js`).
 
 ## Tests
 
-The scoring engine, hard-outcome escalations, persistence, and report rendering are covered by a dependency-free test suite that executes the app's full inline script against a DOM stub:
+The scoring engine, hard-outcome escalations, persistence, and report rendering are covered by a dependency-free test suite that executes the app's full script (`app.js`) against a DOM stub:
 
 ```bash
 node test/app.test.js        # checks — engine, register, report, Asana delivery & backup, edge cases
@@ -231,7 +231,9 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 
 ```
 .
-├── index.html                  # The complete application (markup, styles, data, logic)
+├── index.html                  # Application markup + styles (CSP: no inline scripts)
+├── app.js                      # Application logic (scoring, data, persistence, UI wiring)
+├── console.js / advisor.js     # Logic for the console + advisor pages
 ├── test/app.test.js            # Functional test suite (no dependencies)
 ├── test/watchdog.test.mjs      # FATF watchdog unit tests
 ├── test/reg-watch.test.mjs     # Regulatory Watch unit tests

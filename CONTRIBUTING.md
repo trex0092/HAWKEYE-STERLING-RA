@@ -11,9 +11,12 @@ the feature itself. Please read this guide before opening a pull request.
 
 ## Project model
 
-- **No build step, no backend, no bundler.** The core application is a single
-  file — [`index.html`](index.html) — with two sibling pages (`console.html`,
-  `advisor.html`). It deploys to any static host as-is.
+- **No build step, no backend, no bundler.** The core application is
+  [`index.html`](index.html) with its logic in the sibling [`app.js`](app.js),
+  plus two more pages (`console.html`/`console.js`, `advisor.html`/`advisor.js`).
+  Page logic lives in same-origin external `.js` files (not inline) so the CSP
+  blocks inline script; former inline `on*` handlers are wired via event
+  delegation in those files. It deploys to any static host as-is.
 - All assessment data stays on the user's device (`localStorage`). Server-side
   secrets live only in Netlify/GitHub environment variables.
 - Automation (FATF watchdog, Regulatory Watch, Sanctions Watch/Screen, site
