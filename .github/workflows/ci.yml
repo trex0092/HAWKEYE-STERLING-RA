@@ -88,9 +88,13 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile the Python screening engine
-        run: python -m py_compile screen.py ai.py agents.py
-      - name: Run Python engine unit tests (screen + ai + agents)
+        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py
+      - name: Run Python engine unit tests (screen + ai + agents + kyc + txn + monitoring)
         run: python test/engine_test.py
+      - name: Run formal bias / fairness evaluation (R-05 — cross-script recall parity)
+        run: python test/bias_eval.py
+      - name: Run prompt-injection red-team (R-02 — detection + non-execution)
+        run: python test/redteam_injection.py
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight

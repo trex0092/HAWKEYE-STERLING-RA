@@ -30,6 +30,9 @@ def _load(name):
 
 ai = _load("ai")
 agents = _load("agents")
+kyc = _load("kyc")
+txn_monitor = _load("txn_monitor")
+monitoring = _load("monitoring")
 screen = _load("screen")
 
 _fail = []
@@ -162,6 +165,107 @@ att = agents.build_attestation(
     {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}})
 check("attestation lists all 10 framework controls", att.count("GOVERNANCE ·") == 5 and att.count("COMPLIANCE ·") == 5)
 check("attestation reports ALL CONTROLS ATTESTED on a clean run", "ALL CONTROLS ATTESTED" in att)
+
+# ── kyc.py: FATF R.10 (CDD/identity) + R.25 (legal arrangements) ─────────────
+print("kyc.py — R.10 identity / CDD + R.25 arrangements")
+import datetime as _dt
+_NOTE = """SECTION 1 — CUSTOMER INFORMATION
+    Company: Test Co
+    Country: Turkey
+    Entity PEP Status: Negative
+SECTION 4 — IDENTIFICATIONS
+    Individual 1 — Shareholder & Director
+    Name: Huseyin Kursat Yamac
+    Nationality: Turkey
+    Shares %: 100%
+    Passport / ID: 18397269566
+    Passport Expiry: August 03, 2030
+    Date of Birth: August 26, 1994
+    Proof of Address: Electricity Bill
+    PEP Status: Negative
+    Individual 2 — Trustee
+    Name: Jane Roe
+    Nationality: Iran
+    Passport / ID: N/A
+    Date of Birth: N/A
+    Proof of Address: Pending
+SECTION 5 — PF
+"""
+_k = kyc.parse_customer(_NOTE, today=_dt.date(2026, 6, 29))
+check("kyc parses structured individuals", len(_k["individuals"]) == 2 and _k["individuals"][0]["name"] == "Huseyin Kursat Yamac")
+check("kyc parses DOB / nationality / share%", _k["individuals"][0]["nationality"] == "Turkey" and _k["individuals"][0]["share_pct"] == 100.0)
+check("R.25 detects a legal-arrangement role (Trustee)", _k["is_arrangement"] and "Trustee" in _k["arrangement_type"])
+check("R.10 CDD gaps surfaced for incomplete party", any("identification" in g for g in _k["individuals"][1]["cdd_gaps"]))
+check("R.10 complete party with proof-of-address has no doc gap", not any("proof of address" in g for g in _k["individuals"][0]["cdd_gaps"]))
+check("ID number is masked (presence + last 3 only, no full value)", kyc.mask_id("18397269566") == ("•" * 8) + "566")
+check("mask_id hides N/A and blanks", kyc.mask_id("N/A") == "" and kyc.mask_id("") == "")
+_jt = {"iran": "high", "syria": "grey"}
+check("jurisdiction risk picks worst of country+nationalities", kyc.jurisdiction_risk_for("Turkey", ["Turkey", "Iran"], _jt)[0] == "high")
+check("jurisdiction risk neutral when no table", kyc.jurisdiction_risk_for("Turkey", ["Turkey"], {})[0] is None)
+check("maintained jurisdiction list excludes de-listed home jurisdictions", "turkey" not in kyc.load_jurisdiction_risk() and "united arab emirates" not in kyc.load_jurisdiction_risk())
+# risk model wires R.10 jurisdiction + CDD gaps
+_rj = ai.compute_risk_rating(sanctions_hits=[], is_control=False, pep=False, adverse_articles=[], jurisdiction_high_risk=True)
+check("high-risk jurisdiction raises risk + factor", any("call-for-action" in f for f in _rj["factors"]))
+_rg = ai.compute_risk_rating(sanctions_hits=[], is_control=False, pep=False, adverse_articles=[], jurisdiction_grey=True, cdd_gaps=2)
+check("grey jurisdiction + CDD gaps add explainable factors", any("grey" in f for f in _rg["factors"]) and any("CDD" in f for f in _rg["factors"]))
+
+# ── txn_monitor.py: FATF R.16 (engine tested on synthetic; inert without feed) ─
+print("txn_monitor.py — R.16 rules (synthetic) + inert-without-feed")
+_struct = [{"customer": "X", "date": f"2026-06-0{i}", "amount": 53000, "direction": "in", "method": "cash"} for i in (1, 2, 3)]
+_sr = txn_monitor.evaluate(_struct)
+check("R.16 detects structuring (sub-threshold cluster)", any(a["rule"] == "STRUCTURING" for a in _sr["alerts"]))
+_thr = txn_monitor.evaluate([{"customer": "X", "date": "2026-06-01", "amount": 90000, "direction": "in", "method": "cash"}])
+check("R.16 detects at/over-threshold cash", any(a["rule"] == "THRESHOLD" for a in _thr["alerts"]))
+_geo = txn_monitor.evaluate([{"customer": "X", "date": "2026-06-01", "amount": 100, "direction": "in", "method": "wire", "counterparty": "Z", "counterparty_country": "Iran"}], {"iran": "high"})
+check("R.16 detects high-risk-geo counterparty", any(a["rule"] == "HIGH_RISK_GEO" for a in _geo["alerts"]))
+check("R.16 returns nothing on an empty/no-feed input", txn_monitor.evaluate([])["alerts"] == [])
+check("R.16 is INACTIVE without a configured feed (honest status)", "INACTIVE" in txn_monitor.status_line() and txn_monitor.load_transactions("/nonexistent/path.json") == [])
+check("R.16 a single rule error never blocks the others", isinstance(txn_monitor.evaluate_customer([{"bad": "row"}]), list))
+
+# ── monitoring.py: runtime metrics + source-coverage drift ────────────────────
+print("monitoring.py — runtime metrics + coverage drift")
+import tempfile as _tf
+_dir = _tf.mkdtemp()
+_cov = os.path.join(_dir, "cov.json")
+monitoring.check_source_coverage({"ofac": {"count": 17000, "tier": "core"}}, "2026-06-25", _cov)
+monitoring.check_source_coverage({"ofac": {"count": 17000, "tier": "core"}}, "2026-06-26", _cov)
+_drop = monitoring.check_source_coverage({"ofac": {"count": 9000, "tier": "core"}}, "2026-06-27", _cov)
+check("coverage drift alarms on a sharp core-list drop", len(_drop["alarms"]) == 1 and "OFAC" in _drop["alarms"][0])
+_supp = monitoring.check_source_coverage({"canada": {"count": 100, "tier": "supplementary"}}, "2026-06-28", os.path.join(_dir, "c2.json"))
+check("supplementary list drop is not a core alarm", _supp["alarms"] == [])
+_mp = os.path.join(_dir, "m.json")
+monitoring.monitor_run("2026-06-25", {"subjects": 500, "errors": 1}, {"total": 100}, {"attempted": 2, "ok": 2, "failed": 0}, _mp)
+monitoring.monitor_run("2026-06-26", {"subjects": 500, "errors": 1}, {"total": 100}, {"attempted": 2, "ok": 2, "failed": 0}, _mp)
+_lat = monitoring.monitor_run("2026-06-27", {"subjects": 500, "errors": 1}, {"total": 900}, {"attempted": 2, "ok": 2, "failed": 0}, _mp)
+check("runtime monitor flags a latency blow-out vs baseline", any("latency" in a for a in _lat["anomalies"]))
+_err = monitoring.monitor_run("2026-06-28", {"subjects": 100, "errors": 30}, {"total": 100}, {}, _mp)
+check("runtime monitor flags an error-rate spike", any("error rate" in a for a in _err["anomalies"]))
+_sec = monitoring.build_monitoring_section(_lat, _drop, txn_monitor.status_line())
+check("monitoring section renders coverage drift + R.16 status", "SOURCE-COVERAGE DRIFT" in _sec and "R.16" in _sec)
+# coverage + runtime anomalies feed the QA gate (degrade loudly)
+_qa_cov = agents.qa_gate(
+    [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}], "risk": {"rating": "HIGH"}}], [], [],
+    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}},
+    {"coverage": {"alarms": ["OFAC dropped 50%"]}, "monitoring": {"anomalies": ["latency 900s"]}})
+check("QA gate surfaces coverage drift + runtime anomaly as issues", (not _qa_cov["passed"]) and len(_qa_cov["issues"]) == 2)
+
+# ── bias/fairness: cross-script matching parity (R-05) ────────────────────────
+print("bias — cross-script matching parity (R-05)")
+def _matches(customer_spelling, designation):
+    lst = {"OFAC SDN": [(screen.normalize(designation), designation)]}
+    return len(screen.screen_name(customer_spelling, lst)) >= 1
+# Arabic transliteration variants must still match the designation spelling.
+_arabic = [("Mohammed Al Hussein", "Muhammad Al Husain"),
+           ("Abdul Rahman Bin Saleh", "Abdel Rahman Ibn Saleh"),
+           ("Yousef El Sayed", "Yusuf Al Sayed")]
+_ar_recall = sum(1 for c, d in _arabic if _matches(c, d)) / len(_arabic)
+check("Arabic transliteration recall is high (≥0.66)", _ar_recall >= 0.66)
+# Latin baseline (near-identical spellings) should match.
+_latin = [("Petropars International", "Petropars International"),
+          ("Marmara Gold Trading", "Marmara Gold Trading")]
+_lat_recall = sum(1 for c, d in _latin if _matches(c, d)) / len(_latin)
+check("Latin baseline recall is high", _lat_recall >= 0.9)
+check("no large recall gap between Latin and Arabic groups (fairness)", (_lat_recall - _ar_recall) <= 0.5)
 
 print()
 if _fail:

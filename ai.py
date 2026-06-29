@@ -91,11 +91,16 @@ def llm_available() -> bool:
     """True only when the firm has provisioned a key (authorising data egress)."""
     return AI_ENABLED
 
+# Usage telemetry (presence-only counts; no prompt/response content retained).
+# Read by monitoring.py to track LLM call volume & failures per run.
+LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0}
+
 def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
     """Single-shot completion. Returns text, or None on any failure / no key.
     Never raises — the caller always has a deterministic fallback."""
     if not AI_ENABLED:
         return None
+    LLM_CALLS["attempted"] += 1
     try:
         import requests
         r = requests.post(_AI_ENDPOINT, timeout=30,
@@ -106,12 +111,18 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
                   "system": system or "You are an AML/CFT analyst assistant. Be precise, factual, and never decide — only support the MLRO.",
                   "messages": [{"role": "user", "content": prompt}]})
         if r.status_code != 200:
+            LLM_CALLS["failed"] += 1
             return None
         data = r.json()
         parts = data.get("content", []) or []
         text = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+        if text:
+            LLM_CALLS["ok"] += 1
+        else:
+            LLM_CALLS["failed"] += 1
         return text or None
     except Exception:
+        LLM_CALLS["failed"] += 1
         return None
 
 # ── TRANSLITERATION (Arabic / Turkish name variants for better recall) ────────
@@ -238,7 +249,8 @@ def triage_adverse(subject: str, article: dict):
 
 # ── CUSTOMER RISK RATING (deterministic, explainable) ─────────────────────────
 def compute_risk_rating(*, sanctions_hits, is_control, pep, adverse_articles,
-                        sector_high_risk=True, jurisdiction_high_risk=False):
+                        sector_high_risk=True, jurisdiction_high_risk=False,
+                        jurisdiction_grey=False, cdd_gaps=0):
     """Low / Medium / High customer rating with the factors that drove it
     (FATF R.10 risk-based approach). Deterministic and fully explainable.
       sanctions_hits      : list of hit dicts (with 'score')
@@ -251,7 +263,9 @@ def compute_risk_rating(*, sanctions_hits, is_control, pep, adverse_articles,
     if sector_high_risk:
         score += 1; factors.append("Inherent sector risk: precious metals / DPMS (FATF high-risk)")
     if jurisdiction_high_risk:
-        score += 2; factors.append("Jurisdiction risk: FATF grey/black-list nexus")
+        score += 3; factors.append("Jurisdiction risk: FATF call-for-action (high-risk) nexus")
+    elif jurisdiction_grey:
+        score += 1; factors.append("Jurisdiction risk: FATF increased-monitoring (grey-list) nexus")
 
     confirmed = [h for h in (sanctions_hits or []) if h.get("score", 0) >= 95]
     potential = [h for h in (sanctions_hits or []) if 0 < h.get("score", 0) < 95]
@@ -263,6 +277,10 @@ def compute_risk_rating(*, sanctions_hits, is_control, pep, adverse_articles,
         score += 4; factors.append("Designated owner / UBO — ownership/control (50% rule)")
     if pep:
         score += 3; factors.append("PEP / RCA / SOE exposure")
+    if cdd_gaps:
+        # Open identity/verification gaps (R.10) mean the match cannot be cleared
+        # on identity — a real impediment to disposition, so it raises attention.
+        score += 1; factors.append(f"CDD/identity verification gap(s): {cdd_gaps} open (FATF R.10)")
 
     sev = "NONE"
     for a in (adverse_articles or []):
@@ -402,8 +420,10 @@ MODEL_CARD = {
                 "fully on-runner with deterministic logic — no customer-data egress."),
     "explainability": "Deterministic features return their contributing factors; LLM outputs are labelled and carry the raw evidence.",
     "data_residency": "No data leaves the runner unless the firm provisions an LLM key (authorising egress). UAE PDPL applies.",
-    "bias_testing": "Name-matching transliteration sets reviewed for fairness across Arabic/Turkish spellings; thresholds documented.",
-    "regulatory": "UAE National AI Strategy 2031; UAE AI Ethics Principles; FATF R.10/R.12/R.6.",
+    "bias_testing": "Formal cross-script recall parity test (test/bias_eval.py, CI-enforced) — Latin/Arabic/Turkish name groups measured for false-negative parity; see docs/aims/bias-fairness-testing.md.",
+    "security_testing": "Standing prompt-injection red-team (test/redteam_injection.py, CI-enforced): detection + non-execution + no-downgrade; see docs/aims/red-team-procedure.md.",
+    "monitoring": "Runtime latency/usage/anomaly metrics + source-coverage drift detection (monitoring.py), surfaced in every report and fed to the QA gate.",
+    "regulatory": "UAE National AI Strategy 2031; UAE AI Ethics Principles; FATF R.6/R.10/R.12/R.16/R.25.",
 }
 
 def governance_footer():
