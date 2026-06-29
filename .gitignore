@@ -33,3 +33,6 @@ test-results/
 # Python build artifacts
 __pycache__/
 *.pyc
+
+# Generated CycloneDX SBOM (built in CI, attached to releases)
+sbom.cdx.json

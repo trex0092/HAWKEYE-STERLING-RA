@@ -43,5 +43,11 @@ jobs:
           else
             gh release create "v$V" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "v$V" --generate-notes
+            # Attach a CycloneDX SBOM as a release artifact (supply-chain provenance).
+            if node scripts/gen-sbom.mjs; then
+              gh release upload "v$V" sbom.cdx.json --repo "$GITHUB_REPOSITORY" --clobber || echo "SBOM upload skipped"
+            else
+              echo "SBOM generation skipped"
+            fi
             echo "released v$V"
           fi

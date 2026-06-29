@@ -40,6 +40,8 @@ jobs:
         run: node test/export-integrity.test.js
       - name: Run CSP-report function tests
         run: node test/csp-report.test.js
+      - name: Validate CycloneDX SBOM generator
+        run: node test/sbom.test.mjs
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
       - name: Run daily-brief unit tests
