@@ -12,11 +12,15 @@ the feature itself. Please read this guide before opening a pull request.
 ## Project model
 
 - **No build step, no backend, no bundler.** The core application is
-  [`index.html`](index.html) with its logic in the sibling [`app.js`](app.js),
-  plus two more pages (`console.html`/`console.js`, `advisor.html`/`advisor.js`).
-  Page logic lives in same-origin external `.js` files (not inline) so the CSP
-  blocks inline script; former inline `on*` handlers are wired via event
-  delegation in those files. It deploys to any static host as-is.
+  [`index.html`](index.html) with its logic in [`app.js`](app.js) and styles in
+  [`app.css`](app.css), plus two more pages (`console.html`/`console.js`/`console.css`,
+  `advisor.html`/`advisor.js`/`advisor.css`). Logic AND CSS live in same-origin
+  external files (never inline) so the CSP is a pure `'self'` policy (no
+  `'unsafe-inline'` in `script-src` or `style-src`, no third-party origins);
+  former inline `on*` handlers use event delegation and former inline styles use
+  the CSSOM. Fonts are self-hosted (`fonts.css` + `assets/fonts/`). Keep it that
+  way — the `test/csp.test.mjs` guardrail fails the build if an inline
+  script/style or a Google Fonts link reappears. It deploys to any static host as-is.
 - All assessment data stays on the user's device (`localStorage`). Server-side
   secrets live only in Netlify/GitHub environment variables.
 - Automation (FATF watchdog, Regulatory Watch, Sanctions Watch/Screen, site

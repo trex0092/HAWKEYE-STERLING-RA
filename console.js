@@ -138,6 +138,10 @@ function renderOperator(){
   $('operatorName').textContent = o.name;
   $('operatorRole').textContent = o.role;
 }
+function applyCssText(root){
+  if(!root || !root.querySelectorAll) return;
+  root.querySelectorAll('[data-csstext]').forEach(function(e){ e.style.cssText = e.getAttribute('data-csstext'); e.removeAttribute('data-csstext'); });
+}
 function renderOperatorStrip(){
   const cur = op();
   $('operatorStrip').innerHTML = OPERATORS.map(o=>{
@@ -146,8 +150,9 @@ function renderOperatorStrip(){
       + "box-shadow:"+(on?'0 0 15px rgba('+o.ac+',0.6)':'none')+";"
       + "opacity:"+(on?'1':'0.55')+";filter:"+(on?'none':'grayscale(0.4)')+";";
     const img = "background-image:url('"+o.img+"');background-position:"+o.pos+";";
-    return '<button class="op-btn" title="'+esc(o.name)+'" data-id="'+o.id+'" style="'+style+'"><div style="'+img+'"></div></button>';
+    return '<button class="op-btn" title="'+esc(o.name)+'" data-id="'+o.id+'" data-csstext="'+style+'"><div data-csstext="'+img+'"></div></button>';
   }).join('');
+  applyCssText($('operatorStrip'));
   Array.from(document.querySelectorAll('.op-btn')).forEach(b=>{
     b.addEventListener('click', ()=>{ state.operatorId = b.getAttribute('data-id'); setAccent(); renderOperator(); renderOperatorStrip(); });
   });
@@ -168,10 +173,11 @@ function renderStats(){
   ];
   $('statTiles').innerHTML = tiles.map(t=>{
     const v = Math.round(t.value*prog).toLocaleString('en-US');
-    return '<div class="tile"><div class="t-l" style="color:'+t.color+'">'+t.label+'</div>'
+    return '<div class="tile"><div class="t-l" data-csstext="color:'+t.color+'">'+t.label+'</div>'
       + '<div class="t-v">'+v+'</div>'
-      + '<div class="t-s" style="color:'+t.color+'">'+esc(t.sub)+'</div></div>';
+      + '<div class="t-s" data-csstext="color:'+t.color+'">'+esc(t.sub)+'</div></div>';
   }).join('');
+  applyCssText($('statTiles'));
 }
 function renderMix(){
   const a=AGG, prog=state.prog;
@@ -182,8 +188,9 @@ function renderMix(){
     const c=rgb[m.band], w=(m.pct*prog).toFixed(1);
     const fill="height:100%;border-radius:99px;width:"+w+"%;background:linear-gradient(90deg,rgba("+c+",0.7),rgb("+c+"));box-shadow:0 0 10px rgba("+c+",0.5)";
     return '<div class="bar-row"><div class="bar-top"><span class="l">'+lab[m.band]+'</span><span class="p">'+m.pct+'%</span></div>'
-      + '<div class="bar-track"><div class="bar-fill" style="'+fill+'"></div></div></div>';
+      + '<div class="bar-track"><div class="bar-fill" data-csstext="'+fill+'"></div></div></div>';
   }).join('');
+  applyCssText($('riskBars'));
 }
 function renderJur(){
   const a=AGG, prog=state.prog;
@@ -194,9 +201,10 @@ function renderJur(){
     const s=sev[j.worst]||sev[1], w=(j.count/maxc*100*prog).toFixed(1);
     const fill="height:100%;border-radius:99px;width:"+w+"%;background:rgb("+s.rgb+");box-shadow:0 0 8px rgba("+s.rgb+",0.5)";
     return '<div class="jur-row"><span class="jn">'+esc(j.name)+'</span>'
-      + '<div class="jt"><div style="'+fill+'"></div></div>'
-      + '<span class="jb" style="color:'+s.c+'">'+s.l+'</span></div>';
+      + '<div class="jt"><div data-csstext="'+fill+'"></div></div>'
+      + '<span class="jb" data-csstext="color:'+s.c+'">'+s.l+'</span></div>';
   }).join('');
+  applyCssText($('jurWatch'));
 }
 function renderAlerts(){
   const a=AGG;
@@ -208,12 +216,13 @@ function renderAlerts(){
     if(it.savedAt){ try{ when=new Date(it.savedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ when=it.date||''; } }
     else when=it.date||'';
     const row='animation-delay:'+(0.2+i*0.07).toFixed(2)+'s';
-    return '<div class="alert-row" style="'+row+'">'
+    return '<div class="alert-row" data-csstext="'+row+'">'
       + '<span class="at">'+esc(when)+'</span>'
-      + '<div style="flex:1;min-width:0"><div class="ae">'+esc(it.entity)+'</div><div class="ay">'+esc(BAND_FULL[key]||key)+'</div></div>'
+      + '<div class="alert-mid"><div class="ae">'+esc(it.entity)+'</div><div class="ay">'+esc(BAND_FULL[key]||key)+'</div></div>'
       + '<span class="aj" title="'+esc(it.jurisdiction)+'">'+esc(it.jurisdiction)+'</span>'
-      + '<span class="ab" style="color:'+t.c+';background:'+t.bg+';border-color:'+t.bd+'">'+t.l+'</span></div>';
+      + '<span class="ab" data-csstext="color:'+t.c+';background:'+t.bg+';border-color:'+t.bd+'">'+t.l+'</span></div>';
   }).join('');
+  applyCssText($('alertStream'));
 }
 function renderAnimated(){ renderStats(); renderMix(); renderJur(); }
 
@@ -267,10 +276,10 @@ startClock();
   }
   function render(){
     var s = read();
-    if(!s){ el.style.display = 'none'; return; }
+    if(!s){ el.classList.add('hidden'); return; }
     var ms = Math.max(0, s.exp - Date.now());
     var m = Math.floor(ms/60000), sec = Math.floor((ms%60000)/1000);
-    el.style.display = '';
+    el.classList.remove('hidden');
     el.classList.toggle('warn', ms <= 5*60000);
     var t = el.querySelector('.sess-t');
     if(t) t.textContent = (m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;

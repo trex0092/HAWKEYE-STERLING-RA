@@ -105,7 +105,7 @@ function govStats(){
 function govFlagsHtml(la){
   if(!la || la.ok === false) return '';
   const chips = [];
-  const mk = (txt, tn) => '<span class="pill" style="'+pillStyle(tn)+';font-size:9px;padding:3px 8px">'+esc(txt)+'</span>';
+  const mk = (txt, tn) => '<span class="pill" data-csstext="'+pillStyle(tn)+';font-size:9px;padding:3px 8px">'+esc(txt)+'</span>';
   if(typeof la.quality === 'number') chips.push(mk('quality '+la.quality+'/100', la.quality>=70?'low':la.quality>=40?'med':'high'));
   if(la.hallFlagged)      chips.push(mk('⚠ HALL — unsourced assertion', 'high'));
   if(la.injectionFlagged) chips.push(mk('⚠ THREAT — injection in input', 'high'));
@@ -114,16 +114,16 @@ function govFlagsHtml(la){
   if(la.latencyFlagged)   chips.push(mk('⚠ LAT — slow', 'med'));
   if(Array.isArray(la.piiFlagged) && la.piiFlagged.length) chips.push(mk('PII: '+la.piiFlagged.join('+'), 'med'));
   if(!chips.length) return '';
-  return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">'+chips.join('')+'</div>';
+  return '<div data-csstext="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">'+chips.join('')+'</div>';
 }
 /* On-device USAGE/LAT/MON strip for the Ask view. */
 function govStatsHtml(){
   const s = govStats();
   if(!s.calls) return '';
-  const item = (lbl,val)=>'<span style="display:inline-flex;flex-direction:column;line-height:1.3"><b style="color:#9FB0C8;font-size:12px">'+esc(val)+'</b><span style="font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#5A657A">'+esc(lbl)+'</span></span>';
+  const item = (lbl,val)=>'<span data-csstext="display:inline-flex;flex-direction:column;line-height:1.3"><b data-csstext="color:#9FB0C8;font-size:12px">'+esc(val)+'</b><span data-csstext="font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#5A657A">'+esc(lbl)+'</span></span>';
   const health = s.lastErr && (!s.lastOk || s.lastErr > s.lastOk) ? '⚠ last call failed' : (s.lastOk ? 'healthy' : '—');
-  return '<div class="sec-lbl" style="margin:18px 0 9px"><span>Advisor telemetry (on-device)</span><i></i></div>'
-    + '<div style="display:flex;gap:18px;flex-wrap:wrap;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)">'
+  return '<div class="sec-lbl" data-csstext="margin:18px 0 9px"><span>Advisor telemetry (on-device)</span><i></i></div>'
+    + '<div data-csstext="display:flex;gap:18px;flex-wrap:wrap;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)">'
     +   item('calls', s.calls) + item('today', s.today)
     +   item('latency p50', s.p50!=null ? Math.round(s.p50)+'ms' : '—')
     +   item('latency p95', s.p95!=null ? Math.round(s.p95)+'ms' : '—')
@@ -145,6 +145,10 @@ function renderAvatar(){
   $('advAvatar').firstElementChild.style.backgroundImage = "url('"+p.img+"')";
   $('advAvatar').firstElementChild.style.backgroundPosition = p.pos;
 }
+function applyCssText(root){
+  if(!root || !root.querySelectorAll) return;
+  root.querySelectorAll('[data-csstext]').forEach(function(e){ e.style.cssText = e.getAttribute('data-csstext'); e.removeAttribute('data-csstext'); });
+}
 function renderTabs(){
   $('tabs').innerHTML =
     '<button class="tab'+(state.tab==='ask'?' active':'')+'" data-tab="ask">Ask the advisor</button>'+
@@ -161,7 +165,7 @@ function personaPickerHtml(){
       + 'box-shadow:'+(on?'0 0 16px rgba('+p.accent+',0.6)':'none')+';'
       + 'transform:'+(on?'scale(1.08)':'scale(1)')+';opacity:'+(on?'1':'0.5')+';filter:'+(on?'none':'grayscale(0.45)')+';';
     const img = "background-image:url('"+p.img+"');";
-    return '<button class="p-btn" title="'+esc(p.name)+'" data-pid="'+p.id+'" style="'+ring+'"><div style="'+img+'"></div></button>';
+    return '<button class="p-btn" title="'+esc(p.name)+'" data-pid="'+p.id+'" data-csstext="'+ring+'"><div data-csstext="'+img+'"></div></button>';
   }).join('');
   return '<div class="persona-pick">'+btns+'</div>'
     + '<div class="persona-name"><b>'+esc(cur.name)+'</b> · '+esc(cur.role)+'</div>';
@@ -170,9 +174,9 @@ function personaPickerHtml(){
 function heroIdleHtml(){
   const p = persona();
   return '<div class="hero">'
-    + '<div class="hero-img" style="background-image:url(\''+p.img+'\');background-position:'+p.pos+'"></div>'
+    + '<div class="hero-img" data-csstext="background-image:url(\''+p.img+'\');background-position:'+p.pos+'"></div>'
     + '<div class="hero-shade1"></div><div class="hero-shade2"></div>'
-    + '<div class="hero-chip"><span class="chip" style="background:rgba('+p.accent+',0.16);border:1px solid rgba('+p.accent+',0.55);box-shadow:0 0 14px rgba('+p.accent+',0.3)"><i style="background:rgb('+p.accent+');box-shadow:0 0 8px rgb('+p.accent+')"></i>'+esc(p.name)+'</span></div>'
+    + '<div class="hero-chip"><span class="chip" data-csstext="background:rgba('+p.accent+',0.16);border:1px solid rgba('+p.accent+',0.55);box-shadow:0 0 14px rgba('+p.accent+',0.3)"><i data-csstext="background:rgb('+p.accent+');box-shadow:0 0 8px rgb('+p.accent+')"></i>'+esc(p.name)+'</span></div>'
     + '<div class="hero-copy">'
     +   '<div class="hero-eyebrow">Ready when you are</div>'
     +   '<div class="hero-title">Ask me anything about AML compliance.</div>'
@@ -183,12 +187,12 @@ function heroReasoningHtml(){
   const p = persona();
   return '<div class="hero-reason">'
     + '<div class="scan"></div>'
-    + '<div class="reason-av"><div style="background-image:url(\''+p.img+'\');background-position:'+p.pos+'"></div></div>'
+    + '<div class="reason-av"><div data-csstext="background-image:url(\''+p.img+'\');background-position:'+p.pos+'"></div></div>'
     + '<div class="reason-txt">Reviewing the cited legal sources…</div>'
     + '<div class="dots">'
-    +   '<span style="background:var(--ac1);box-shadow:0 0 8px var(--ac1)"></span>'
-    +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
-    +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
+    +   '<span data-csstext="background:var(--ac1);box-shadow:0 0 8px var(--ac1)"></span>'
+    +   '<span data-csstext="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
+    +   '<span data-csstext="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
     + '</div></div>';
 }
 function heroAnswerHtml(){
@@ -201,14 +205,14 @@ function heroAnswerHtml(){
       + '<div class="sec-lbl"><span>Advisor response</span><i></i></div>'
       + '<div class="eyebrow">You asked</div>'
       + '<div class="asked">'+esc(state.askedQuestion)+'</div>'
-      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
-      +   '<span class="pill" style="'+pillStyle(ok?'low':'high')+'">'+esc(p.role)+'</span>'
-      +   '<span class="conf"'+(ok?'':' style="color:#FF8A8A"')+'>'+(ok?'<i></i>':'&#9888; ')+esc(state.mode+' mode'+modelChip)+'</span>'
+      + '<div data-csstext="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
+      +   '<span class="pill" data-csstext="'+pillStyle(ok?'low':'high')+'">'+esc(p.role)+'</span>'
+      +   '<span class="conf"'+(ok?'':' data-csstext="color:#FF8A8A"')+'>'+(ok?'<i></i>':'&#9888; ')+esc(state.mode+' mode'+modelChip)+'</span>'
       + '</div>'
-      + '<div class="summary" style="white-space:pre-line">'+esc(la.text)+'</div>'
+      + '<div class="summary" data-csstext="white-space:pre-line">'+esc(la.text)+'</div>'
       + govFlagsHtml(la)
-      + (la.auditLine ? '<div style="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" style="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(la.auditLine)+'</div></div>' : '')
-      + '<button class="again" id="askAgain" style="margin-top:18px"><span>&#8634;</span> Ask another</button>'
+      + (la.auditLine ? '<div data-csstext="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" data-csstext="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(la.auditLine)+'</div></div>' : '')
+      + '<button class="again" id="askAgain" data-csstext="margin-top:18px"><span>&#8634;</span> Ask another</button>'
       + '</div></div>';
   }
   const a = ANSWER;
@@ -219,17 +223,17 @@ function heroAnswerHtml(){
     + '<div class="sec-lbl"><span>Advisor response</span><i></i></div>'
     + '<div class="eyebrow">You asked</div>'
     + '<div class="asked">'+esc(state.askedQuestion)+'</div>'
-    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
-    +   '<span class="pill" style="'+pillStyle(a.tone)+'">'+esc(a.verdict)+'</span>'
+    + '<div data-csstext="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
+    +   '<span class="pill" data-csstext="'+pillStyle(a.tone)+'">'+esc(a.verdict)+'</span>'
     +   '<span class="conf"><i></i>'+esc(a.confidence)+'</span>'
     + '</div>'
     + '<div class="summary">'+esc(a.summary)+'</div>'
     + '<div class="block-h">Cited legal basis<i></i></div>'
-    + '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">'+basis+'</div>'
+    + '<div data-csstext="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">'+basis+'</div>'
     + '<div class="block-h">Decision guide<i></i></div>'
-    + '<div style="display:flex;flex-direction:column;gap:11px;margin-bottom:22px">'+guide+'</div>'
+    + '<div data-csstext="display:flex;flex-direction:column;gap:11px;margin-bottom:22px">'+guide+'</div>'
     + '<div class="block-h">Recommended steps<i></i></div>'
-    + '<div style="display:flex;flex-direction:column;gap:9px;margin-bottom:24px">'+steps+'</div>'
+    + '<div data-csstext="display:flex;flex-direction:column;gap:9px;margin-bottom:24px">'+steps+'</div>'
     + '<button class="again" id="askAgain"><span>&#8634;</span> Ask another</button>'
     + '</div></div>';
 }
@@ -247,19 +251,20 @@ function renderAsk(){
     + '<div class="card"><div class="card-pad">'
     +   '<div class="sec-lbl"><span>Your question</span><i></i></div>'
     +   '<textarea class="q" id="qInput" aria-label="Compliance question" placeholder="Ask a compliance question, e.g. what CDD applies to a cross-border gold shipment?"></textarea>'
-    +   '<p class="ai-transparency" role="note" style="margin:12px 0 0;font-size:11px;line-height:1.5;color:#8590A6">&#9888; You are interacting with an AI system (Anthropic Claude). Output is decision-support only — it is not a compliance decision. MLRO review required.</p>'
-    +   (aupAcked() ? '' : '<div id="aupGate" role="note" style="margin-top:12px;padding:11px 13px;border-radius:8px;background:#1A1206;border:1px solid rgba(255,180,80,0.4);font-size:11.5px;line-height:1.55;color:#E8C28A">By using the Advisor you accept the <strong>AI Acceptable-Use Policy</strong>: decision-support only · MLRO review required · no tipping-off · do not paste data that must not leave the device. <button id="aupAckBtn" type="button" style="margin-left:6px;padding:5px 11px;border-radius:6px;border:1px solid rgba(255,180,80,0.6);background:rgba(255,180,80,0.14);color:#FFD9A0;cursor:pointer;font:inherit;font-size:11px">I acknowledge</button></div>')
-    +   '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px">'
-    +     '<button class="ask-btn" id="askBtn">Ask the advisor <span style="font-size:11px">&#9658;</span></button>'
+    +   '<p class="ai-transparency" role="note" data-csstext="margin:12px 0 0;font-size:11px;line-height:1.5;color:#8590A6">&#9888; You are interacting with an AI system (Anthropic Claude). Output is decision-support only — it is not a compliance decision. MLRO review required.</p>'
+    +   (aupAcked() ? '' : '<div id="aupGate" role="note" data-csstext="margin-top:12px;padding:11px 13px;border-radius:8px;background:#1A1206;border:1px solid rgba(255,180,80,0.4);font-size:11.5px;line-height:1.55;color:#E8C28A">By using the Advisor you accept the <strong>AI Acceptable-Use Policy</strong>: decision-support only · MLRO review required · no tipping-off · do not paste data that must not leave the device. <button id="aupAckBtn" type="button" data-csstext="margin-left:6px;padding:5px 11px;border-radius:6px;border:1px solid rgba(255,180,80,0.6);background:rgba(255,180,80,0.14);color:#FFD9A0;cursor:pointer;font:inherit;font-size:11px">I acknowledge</button></div>')
+    +   '<div data-csstext="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px">'
+    +     '<button class="ask-btn" id="askBtn">Ask the advisor <span data-csstext="font-size:11px">&#9658;</span></button>'
     +   '</div>'
     +   '<div class="mode-strip"><span class="ml">Mode</span><div class="mode-group">'+modes+'</div></div>'
     + '</div></div>'
     + '<div>'
-    +   '<div style="margin-bottom:16px"><div class="sec-lbl" style="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'
+    +   '<div data-csstext="margin-bottom:16px"><div class="sec-lbl" data-csstext="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'
     +   '<div id="hero">'+heroHtml()+'</div>'
     +   govStatsHtml()
     + '</div>'
     + '</div>';
+  applyCssText($('main'));
 
   const qi = $('qInput'); if(qi){ qi.value = state.question; qi.addEventListener('input', e=>{ state.question = e.target.value; state.piiConfirmed = false; }); }
   const ab = $('askBtn'); if(ab) ab.addEventListener('click', ask);
@@ -286,11 +291,11 @@ function ask(){
     state.piiConfirmed = true;
     state.askedQuestion = q; state.phase = 'answer';
     state.liveAnswer = {ok:false, text:'⚠ Possible personal identifiers detected in your question (e.g. Emirates ID, passport, or a long account/IBAN number). Sending will transfer them off-device to Anthropic for processing. Click "Ask the advisor" again to confirm, or edit your question to remove them.'};
-    $('hero').innerHTML = heroHtml(); bindHero(); return;
+    $('hero').innerHTML = heroHtml(); applyCssText($('hero')); bindHero(); return;
   }
   clearTimeout(reasoningTimer);
   state.askedQuestion = q; state.phase = 'reasoning'; state.liveAnswer = null;
-  $('hero').innerHTML = heroHtml();
+  $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
 
   const minDelay = new Promise(r => { reasoningTimer = setTimeout(r, 1000); });
   const brainFetch = fetch('/.netlify/functions/brain-soul', {
@@ -308,18 +313,18 @@ function ask(){
     state.liveAnswer = data;
     try{ govRecord(data); }catch(e){}
     state.phase = 'answer';
-    $('hero').innerHTML = heroHtml();
+    $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
     bindHero();
   })
   .catch(() => {
     state.liveAnswer = {ok: false, text: 'The brain is unavailable — ensure ANTHROPIC_API_KEY is set in Netlify environment variables and redeploy.'};
     try{ govRecord({ok:false}); }catch(e){}
     state.phase = 'answer';
-    $('hero').innerHTML = heroHtml();
+    $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
     bindHero();
   });
 }
-function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; state.liveAnswer=null; $('hero').innerHTML = heroHtml(); }
+function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; state.liveAnswer=null; $('hero').innerHTML = heroHtml(); applyCssText($('hero')); }
 
 function regGroups(){ return (typeof window!=='undefined' && Array.isArray(window.REG_GROUPS)) ? window.REG_GROUPS : []; }
 function askQuestion(q){ state.tab='ask'; state.question=q; render(); }
@@ -344,7 +349,7 @@ function regAnswerHtml(ans){
   const basis = refs.map(r=>'<div class="qa-basis"><div class="ref">'+esc(r.ref)+'</div><div class="note">'+esc(r.note)+'</div></div>').join('');
   return '<div class="qa-body">'
     + (ans.a ? '<div class="qa-summary">'+esc(ans.a)+'</div>' : '')
-    + (basis ? '<div class="block-h">Cited basis<i></i></div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'+basis+'</div>' : '')
+    + (basis ? '<div class="block-h">Cited basis<i></i></div><div data-csstext="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'+basis+'</div>' : '')
     + '<button class="again" data-ask="'+esc(qText(ans))+'"><span>&#8634;</span> Take to the advisor</button>'
     + '</div>';
 }
@@ -366,6 +371,7 @@ function renderRegGroups(){
     html += '</div>';
   });
   $('regGroups').innerHTML = html || '<p class="empty">No questions match “'+esc(fil)+'”.</p>';
+  applyCssText($('regGroups'));
   Array.from(document.querySelectorAll('.reg-cat-head')).forEach(b=>b.addEventListener('click',()=>{ const gi=+b.getAttribute('data-gi'); state.regOpen = state.regOpen===gi?null:gi; state.qOpen=null; renderRegGroups(); }));
   Array.from(document.querySelectorAll('.reg-q')).forEach(b=>b.addEventListener('click',()=>{ const key=b.getAttribute('data-gi')+'␟'+b.getAttribute('data-q'); state.qOpen = state.qOpen===key?null:key; renderRegGroups(); }));
   Array.from(document.querySelectorAll('[data-ask]')).forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); askQuestion(b.getAttribute('data-ask')); }));
@@ -449,7 +455,7 @@ function genericRun(tool, ctx){
     triggers: refs, actions: play.steps };
 }
 function renderField(f){
-  const lab='<label class="tf-label" for="tf_'+f.key+'">'+esc(f.label)+(f.req?' <span style="color:var(--ac2)">*</span>':'')+'</label>';
+  const lab='<label class="tf-label" for="tf_'+f.key+'">'+esc(f.label)+(f.req?' <span data-csstext="color:var(--ac2)">*</span>':'')+'</label>';
   const inp = f.area
     ? '<textarea class="tf-input" id="tf_'+f.key+'" rows="4" placeholder="'+esc(f.ph)+'"></textarea>'
     : '<input class="tf-input" id="tf_'+f.key+'"'+(f.num?' inputmode="numeric"':'')+' placeholder="'+esc(f.ph)+'">';
@@ -460,28 +466,28 @@ function renderToolResult(){
   if(!r) return '';
   if(r.error) return '<div class="tool-err">&#9888; '+esc(r.error)+'</div>';
   if(r.kind==='loading'){
-    return '<div class="tool-result" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 0">'
+    return '<div class="tool-result" data-csstext="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 0">'
       + '<div class="dots">'
-      +   '<span style="background:var(--ac1);box-shadow:0 0 8px var(--ac1)"></span>'
-      +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
-      +   '<span style="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
+      +   '<span data-csstext="background:var(--ac1);box-shadow:0 0 8px var(--ac1)"></span>'
+      +   '<span data-csstext="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
+      +   '<span data-csstext="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
       + '</div>'
-      + '<div style="font-family:var(--mono);font-size:12px;color:#828DA4">Compiling cited guidance…</div>'
+      + '<div data-csstext="font-family:var(--mono);font-size:12px;color:#828DA4">Compiling cited guidance…</div>'
       + '</div>';
   }
   if(r.kind==='brain'){
     return '<div class="tool-result">'
-      + '<div style="margin:20px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-      +   '<span class="pill" style="'+pillStyle(r.ok!==false?'low':'high')+'">Brain-powered analysis</span>'
+      + '<div data-csstext="margin:20px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +   '<span class="pill" data-csstext="'+pillStyle(r.ok!==false?'low':'high')+'">Brain-powered analysis</span>'
       +   (r.model ? '<span class="conf"><i></i>'+esc(r.model)+'</span>' : '')
       + '</div>'
-      + '<div class="summary" style="white-space:pre-line">'+esc(r.text)+'</div>'
-      + (r.auditLine ? '<div style="margin-top:18px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" style="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(r.auditLine)+'</div></div>' : '')
+      + '<div class="summary" data-csstext="white-space:pre-line">'+esc(r.text)+'</div>'
+      + (r.auditLine ? '<div data-csstext="margin-top:18px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" data-csstext="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(r.auditLine)+'</div></div>' : '')
       + '</div>';
   }
   const head = r.kind==='generic'
-    ? '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle('low')+'">Deterministic guidance</span></div>'
-    : '<div style="margin:20px 0 14px"><span class="pill" style="'+pillStyle(r.tone)+'">'+esc(r.verdict)+'</span></div>';
+    ? '<div data-csstext="margin:20px 0 14px"><span class="pill" data-csstext="'+pillStyle('low')+'">Deterministic guidance</span></div>'
+    : '<div data-csstext="margin:20px 0 14px"><span class="pill" data-csstext="'+pillStyle(r.tone)+'">'+esc(r.verdict)+'</span></div>';
   const trig = r.triggers.map(t=>{
     const cite = esc(t.ref||t.label||''), note = esc(t.note||(t.ref?t.label:'')||'');
     return '<div class="qa-basis"><div class="ref">'+cite+'</div>'+(note&&note!==cite?'<div class="note">'+note+'</div>':'')+'</div>';
@@ -491,12 +497,12 @@ function renderToolResult(){
     + head
     + '<div class="summary">'+esc(r.summary)+'</div>'
     + '<div class="block-h">'+(r.kind==='generic'?'Cited basis':'Triggers &amp; cited basis')+'<i></i></div>'
-    + '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">'+trig+'</div>'
+    + '<div data-csstext="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">'+trig+'</div>'
     + '<div class="block-h">'+(r.kind==='generic'?'Recommended steps':'Required actions')+'<i></i></div>'
-    + '<div style="display:flex;flex-direction:column;gap:9px">'+acts+'</div>'
+    + '<div data-csstext="display:flex;flex-direction:column;gap:9px">'+acts+'</div>'
     + '</div>';
 }
-function renderResultOnly(){ const el=$('toolResult'); if(el) el.innerHTML = renderToolResult(); }
+function renderResultOnly(){ const el=$('toolResult'); if(el){ el.innerHTML = renderToolResult(); applyCssText(el); } }
 function renderTools(){
   const tool = currentTool(), isEsc = tool.id==='escalation';
   let opts='', curG=null;
@@ -515,13 +521,14 @@ function renderTools(){
     + '<div class="sec-lbl"><span>Super Tools</span><i></i></div>'
     + '<div class="qa-desc">Specialist MLRO tools — every tool returns an instant, deterministic, citation-backed result keyed to the scenario. Pick a tool, fill the inputs, and run.</div>'
     + '<select class="tool-select" id="toolSelect" aria-label="Select tool">'+opts+'</select>'
-    + '<div class="card" style="margin-top:14px"><div class="card-pad">'
+    + '<div class="card" data-csstext="margin-top:14px"><div class="card-pad">'
     +   '<div class="tool-title">'+esc(tool.label)+'</div>'
     +   '<div class="tool-form">'+form+'</div>'
-    +   '<button class="ask-btn" id="toolRun" style="margin-top:18px">'+esc(cta)+' <span style="font-size:11px">&#9658;</span></button>'
+    +   '<button class="ask-btn" id="toolRun" data-csstext="margin-top:18px">'+esc(cta)+' <span data-csstext="font-size:11px">&#9658;</span></button>'
     +   '<div id="toolResult">'+ renderToolResult() +'</div>'
     + '</div></div>'
     + '</div>';
+  applyCssText($('main'));
   const sel=$('toolSelect'); if(sel) sel.addEventListener('change', e=>{ state.toolId=e.target.value; state.toolInputs={}; state.toolResult=null; renderTools(); });
   (isEsc ? ESC_FIELDS : [{key:'context'}]).forEach(f=>{ const el=$('tf_'+f.key); if(el){ el.value=state.toolInputs[f.key]||''; el.addEventListener('input', e=>{ state.toolInputs[f.key]=e.target.value; }); } });
   const run=$('toolRun'); if(run) run.addEventListener('click', ()=>{
@@ -575,10 +582,10 @@ render();
   }
   function render(){
     var s = read();
-    if(!s){ el.style.display = 'none'; return; }
+    if(!s){ el.classList.add('hidden'); return; }
     var ms = Math.max(0, s.exp - Date.now());
     var m = Math.floor(ms/60000), sec = Math.floor((ms%60000)/1000);
-    el.style.display = '';
+    el.classList.remove('hidden');
     el.classList.toggle('warn', ms <= 5*60000);
     var t = el.querySelector('.sess-t');
     if(t) t.textContent = (m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;

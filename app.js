@@ -135,14 +135,14 @@ const SS = {
     try{ localStorage.removeItem(k); }catch(e){}
   }
 };
-function _secWarn(show){ const w = $('storageWarn'); if(w) w.style.display = show ? '' : 'none'; }
+function _secWarn(show){ const w = $('storageWarn'); if(w) w.classList.toggle('hidden', !show); }
 function _secPersist(k, v){
   encryptStr(_secKey, v)
     .then(blob => { try{ localStorage.setItem(k, blob); _secWarn(false); }catch(e){ _secWarn(true); } })
     .catch(() => _secWarn(true));
 }
 
-function _secError(msg){ const e = $('secErr'); if(e){ e.textContent = msg; e.style.display = ''; } }
+function _secError(msg){ const e = $('secErr'); if(e){ e.textContent = msg; e.classList.remove('hidden'); } }
 function _secShow(mode, reason){
   _secMode = mode;
   const setup = mode === 'setup';
@@ -158,15 +158,15 @@ function _secShow(mode, reason){
     $('secMsg').style.color = (R && !setup) ? '#E9C86A' : '';
   }
   if($('secPass')) $('secPass').value = '';
-  if($('secPass2')){ $('secPass2').value = ''; $('secPass2').style.display = setup ? '' : 'none'; }
-  if($('secTotp')){ $('secTotp').value = ''; $('secTotp').style.display = (!setup && mfaOn()) ? '' : 'none'; }
+  if($('secPass2')){ $('secPass2').value = ''; $('secPass2').classList.toggle('hidden', !setup); }
+  if($('secTotp')){ $('secTotp').value = ''; $('secTotp').classList.toggle('hidden', !(!setup && mfaOn())); }
   if($('secPrimary')) $('secPrimary').textContent = setup ? 'Set passphrase & encrypt' : 'Unlock';
-  if($('secSkip')) $('secSkip').style.display = setup ? '' : 'none';
+  if($('secSkip')) $('secSkip').classList.toggle('hidden', !setup);
   if($('secNote')) $('secNote').textContent = setup
     ? '⚠ There is no recovery. If the passphrase is forgotten the stored data cannot be read — store the passphrase securely.'
     : '';
   if($('secBotCap')) $('secBotCap').textContent = setup ? 'Tap the bot to begin' : 'Tap the bot to unlock';
-  if($('secErr')) $('secErr').style.display = 'none';
+  if($('secErr')) $('secErr').classList.add('hidden');
   if($('secOverlay')) $('secOverlay').classList.add('open');
   const p = $('secPass'); if(p && p.focus) try{ p.focus(); }catch(e){}
 }
@@ -333,10 +333,10 @@ function _sessTick(){
 function _sessRenderChip(){
   const el = (typeof $ === 'function') ? $('sessTimer') : null;
   if(!el) return;
-  if(!_secActive || !_sessExp){ el.style.display = 'none'; return; }
+  if(!_secActive || !_sessExp){ el.classList.add('hidden'); return; }
   const ms = Math.max(0, _sessExp - Date.now());
   const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
-  el.style.display = '';
+  el.classList.remove('hidden');
   el.classList.toggle('warn', ms <= 5 * 60000);
   const t = el.querySelector('.sess-t');
   if(t) t.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
@@ -405,7 +405,7 @@ async function auditVerify(){
   return true;
 }
 function _auditRow(e){
-  return '<div class="rd-row"><span class="rd-at" style="width:auto">'+esc(fmtDateTime(e.ts))+'</span>'
+  return '<div class="rd-row"><span class="rd-at w-auto">'+esc(fmtDateTime(e.ts))+'</span>'
     + '<span class="rd-name">'+esc(e.event)+(e.detail?' — '+esc(e.detail):'')+'</span>'
     + '<span class="rd-base">'+esc(e.who||'—')+(e.ref?' · '+esc(e.ref):'')+'</span></div>';
 }
@@ -588,7 +588,7 @@ async function mfaToggle(){
   catch(e){ toast('Could not enable 2FA.'); return; }
   await auditAppend('security.mfa', 'Two-factor enabled');
   paintMfa();
-  if($('mfaStatus')) $('mfaStatus').innerHTML = 'Two-factor (TOTP): ON — add this key to your authenticator: <code style="user-select:all;color:#7fe7c4">' + esc(secret) + '</code>';
+  if($('mfaStatus')) $('mfaStatus').innerHTML = 'Two-factor (TOTP): ON — add this key to your authenticator: <code class="totp-key">' + esc(secret) + '</code>';
   toast('2FA enabled — store the key shown in your authenticator app.');
 }
 
@@ -964,7 +964,7 @@ function rdRender(){
       + (rdTab==='countries' ? '<label class="rd-cfa"><input type="checkbox" class="rd-cfa-box"'+(effCfa?' checked':'')+'>CFA</label>' : '')
       + '<input class="rd-reason" placeholder="Reason (required)" value="'+esc(o?o.reason:'')+'">'
       + '<span class="rd-at">'+(o?esc(fmtDate(o.at)||o.at):'')+'</span>'
-      + '<button class="rd-clear" title="Clear override — restore baseline" aria-label="Clear override for '+esc(b.name)+'"'+(o?'':' style="visibility:hidden"')+'>✕</button>'
+      + '<button class="rd-clear'+(o?'':' invisible')+'" title="Clear override — restore baseline" aria-label="Clear override for '+esc(b.name)+'">✕</button>'
       + '</div>';
   }).join('');
   rows.innerHTML = html || '<div class="rd-empty">No matches'+(rdShowOvOnly?' — no overrides on this tab':'')+'.</div>';
@@ -1392,7 +1392,7 @@ function paintRetryButton(){
   const btn = $('btnRetryAsana');
   if(!btn) return;
   const ref = String(state.meta.ref||'').trim();
-  btn.style.display = (ref && getFailedPayload(ref)) ? '' : 'none';
+  btn.classList.toggle('hidden', !(ref && getFailedPayload(ref)));
 }
 function sendToAsana(){
   /* Only meaningful on the deployed site (needs the Netlify function + token). */
@@ -1697,7 +1697,7 @@ function recalc() {
       ? 'No review — relationship prohibited'
       : 'Suggested: ' + fmtDate(suggested) + ' (' + REVIEW_MONTHS[a.outcome] + ' months — ' + a.outcome + ')')
     + (s.signoff.reviewManual ? ' · <a data-act="useSuggestedReview">use suggested</a>' : '')
-    + (manualLate ? ' <b style="color:#ff8c42">⚠ manual date is later than the ' + a.outcome + ' schedule</b>' : '');
+    + (manualLate ? ' <b class="warn-amber">⚠ manual date is later than the ' + a.outcome + ' schedule</b>' : '');
 
   scheduleSave();
 }
@@ -1722,11 +1722,11 @@ function saveDraft(){
   try{
     SS.setItem(STORAGE_KEY, JSON.stringify({version:APP_VERSION, savedAt:new Date().toISOString(), state}));
     $('saveStamp').textContent = 'Autosaved '+new Date().toLocaleTimeString();
-    const warn = $('storageWarn'); if(warn) warn.style.display = 'none';
+    const warn = $('storageWarn'); if(warn) warn.classList.add('hidden');
   }catch(e){
     /* Storage blocked (private mode, quota exceeded, or security policy). Show a persistent banner
        so the user knows to export manually before closing the tab. */
-    const warn = $('storageWarn'); if(warn) warn.style.display = '';
+    const warn = $('storageWarn'); if(warn) warn.classList.remove('hidden');
   }
   regUpsert(); /* the register mirrors every named save */
 }
@@ -2051,7 +2051,7 @@ function runBatch(){
   const c = $('batchCountLbl'); if(c) c.textContent = batchResults.length + ' entit' + (batchResults.length===1?'y':'ies') + ' scored';
   const prohibited = batchResults.filter(r=>r.prohibited).length;
   const m = $('batchMeta'); if(m) m.textContent = prohibited ? (prohibited + ' PROHIBITED') : '';
-  const xb = $('batchExportBtn'); if(xb) xb.style.display = batchResults.length ? '' : 'none';
+  const xb = $('batchExportBtn'); if(xb) xb.classList.toggle('hidden', !batchResults.length);
 }
 function onBatchFile(e){
   const f = e && e.target && e.target.files && e.target.files[0];
@@ -2192,7 +2192,7 @@ function applyLang(lang){
     if(t!=null) el.textContent = t;
   });
   const tog = $('langToggle'); if(tog) tog.textContent = (lang==='ar') ? 'EN' : 'عربي';
-  const cav = $('i18nCaveat'); if(cav) cav.style.display = (lang==='ar') ? '' : 'none';
+  const cav = $('i18nCaveat'); if(cav) cav.classList.toggle('hidden', lang!=='ar');
   /* Repaint JS-set strings (verdict, complete/mask buttons) in the new language.
      Guarded: at first load state may not be ready yet — the normal init paint
      handles it then; on a user toggle these run with state ready. */
@@ -2422,7 +2422,7 @@ function buildPrintReport(){
           <div><div class="k">Assessment date</div><div class="v">${dDate(s.meta.date)}</div></div>
           <div><div class="k">Next review</div><div class="v">${esc(nextReview)}</div></div>
         </div>
-        <div class="verdict" style="--bc:${g.rgb}">
+        <div class="verdict">
           <div class="gauge-col">
             <div class="gauge">
               <svg viewBox="0 0 152 152" width="124" height="124" aria-hidden="true">
@@ -2430,7 +2430,7 @@ function buildPrintReport(){
                 <circle class="arc" cx="76" cy="76" r="53" fill="none" stroke-width="6" stroke-dasharray="${arcLen} 250" stroke-linecap="round" transform="rotate(135,76,76)"></circle>
                 <circle class="ring" cx="76" cy="76" r="59" fill="none" stroke-width="1" stroke-dasharray="2 6"></circle>
               </svg>
-              <div class="g-face"><div style="background-image:url('${g.img}');background-size:${g.size||'cover'};background-position:${g.pos}"></div></div>
+              <div class="g-face"><div class="g-face-bg"></div></div>
             </div>
           </div>
           <div class="v-main">
@@ -2505,6 +2505,12 @@ function buildPrintReport(){
       </div>
       <div class="foot"><span>CONFIDENTIAL · Entity Risk Assessment</span><span class="pg">Page 2 / 2</span></div>
     </section>`;
+  const _pr = $('printReport');
+  if(_pr && typeof _pr.querySelector === 'function'){
+    const _v = _pr.querySelector('.verdict'); if(_v) _v.style.setProperty('--bc', g.rgb);
+    const _gf = _pr.querySelector('.g-face-bg');
+    if(_gf){ _gf.style.backgroundImage = "url('" + g.img + "')"; _gf.style.backgroundSize = g.size || 'cover'; _gf.style.backgroundPosition = g.pos; }
+  }
 }
 function printReport(){
   buildPrintReport();

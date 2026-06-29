@@ -25,23 +25,46 @@ check("script-src allows 'self'", /'self'/.test(scriptSrc));
 check("object-src is 'none'", /object-src 'none'/.test(cspLine));
 check("base-uri is 'self'", /base-uri 'self'/.test(cspLine));
 
+const styleSrc = (cspLine.match(/style-src([^;]*)/) || [])[1] || '';
+check('style-src directive present', styleSrc.trim().length > 0);
+check("style-src does NOT allow 'unsafe-inline'", !/'unsafe-inline'/.test(styleSrc));
+check("style-src allows 'self'", /'self'/.test(styleSrc));
+const fontSrc = (cspLine.match(/font-src([^;]*)/) || [])[1] || '';
+check("font-src does NOT reference Google Fonts", !/fonts\.gstatic\.com/.test(fontSrc));
+check('CSP references NO Google Fonts origins (self-hosted)', !/fonts\.(googleapis|gstatic)\.com/.test(cspLine));
+
 const INLINE_HANDLER = /\son[a-z]+\s*=\s*["']/i;
+const INLINE_STYLE = /\sstyle\s*=\s*["']/i;
 for (const file of ['index.html', 'console.html', 'advisor.html']) {
   const html = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   check(`${file}: no inline event handlers`, !INLINE_HANDLER.test(html));
+  check(`${file}: no inline style attributes`, !INLINE_STYLE.test(html));
+  check(`${file}: no Google Fonts <link>`, !/fonts\.(googleapis|gstatic)\.com/.test(html));
 
-  /* Every <script ...> opening tag must carry a src= (no inline executable JS).
+  /* Every <script>/<style> opening tag must carry a src/href (no inline JS/CSS).
      Scan opening tags by index to avoid a tag-matching regex (CodeQL-friendly). */
   const lower = html.toLowerCase();
   let inlineScripts = 0;
   for (let i = lower.indexOf('<script'); i !== -1; i = lower.indexOf('<script', i + 7)) {
     const end = html.indexOf('>', i);
     if (end === -1) break;
-    const tag = html.slice(i, end);
-    if (!/\ssrc\s*=/.test(tag)) inlineScripts++;
+    if (!/\ssrc\s*=/.test(html.slice(i, end))) inlineScripts++;
   }
   check(`${file}: no inline <script> blocks (all external)`, inlineScripts === 0);
+  check(`${file}: no inline <style> blocks (all external)`, !lower.includes('<style'));
 }
+
+/* Inline styles must not reappear in the page logic either (they would be
+   blocked by style-src 'self'); dynamic styling uses the CSSOM instead. */
+for (const js of ['app.js', 'console.js', 'advisor.js']) {
+  const src = readFileSync(new URL('../' + js, import.meta.url), 'utf8');
+  /* Attribute form `style="` (no spaces) — distinct from a `const style = "…"`
+     variable. Inline style attributes in template HTML would be CSP-blocked. */
+  check(`${js}: no inline style="" in template strings`, !/style="/.test(src));
+}
+
+/* Self-hosted fonts are present. */
+check('fonts.css exists and defines @font-face', /@font-face/.test(readFileSync(new URL('../fonts.css', import.meta.url), 'utf8')));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
 if (fail) process.exit(1);

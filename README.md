@@ -9,7 +9,7 @@ A static web application for **AML/CFT customer (entity) risk assessment**, buil
 
 **Live:** https://hawkeye-sterling-ra.netlify.app
 
-The core application lives in [`index.html`](index.html) with its logic in the sibling [`app.js`](app.js) — no build step, no backend, no bundler. Page logic was moved out of the HTML into same-origin external files (`app.js`, `console.js`, `advisor.js`, alongside `i18n.js` / `sw-register.js`) so the Content-Security-Policy can drop `'unsafe-inline'` from `script-src`; former inline `on*` handlers are wired through event delegation. It deploys to any static host and keeps all data on the user's device. (The dark-neon "command-center" redesign pulls in three Google Fonts — Space Grotesk, JetBrains Mono, Manrope — and falls back to the system stack when offline.)
+The core application lives in [`index.html`](index.html) with its logic in the sibling [`app.js`](app.js) and styles in [`app.css`](app.css) — no build step, no backend, no bundler. Page logic and CSS were moved out of the HTML into same-origin external files (`app.js`/`console.js`/`advisor.js` and `app.css`/`console.css`/`advisor.css`, alongside `i18n.js` / `sw-register.js`) so the Content-Security-Policy is a **pure `'self'` policy** — no `'unsafe-inline'` in `script-src` or `style-src` and no third-party origins. Former inline `on*` handlers are wired through event delegation; former inline styles are applied via the CSSOM. It deploys to any static host and keeps all data on the user's device. (The dark-neon "command-center" redesign uses three self-hosted faces — Space Grotesk, JetBrains Mono, Manrope under [`assets/fonts/`](assets/fonts) via [`fonts.css`](fonts.css) — and falls back to the system stack if they fail to load.)
 
 ## The command-center suite
 
@@ -231,9 +231,11 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 
 ```
 .
-├── index.html                  # Application markup + styles (CSP: no inline scripts)
+├── index.html                  # Application markup (CSP: no inline script/style)
 ├── app.js                      # Application logic (scoring, data, persistence, UI wiring)
+├── app.css                     # Application styles (externalised for a pure-'self' CSP)
 ├── console.js / advisor.js     # Logic for the console + advisor pages
+├── fonts.css / assets/fonts/   # Self-hosted web fonts (no third-party origin)
 ├── test/app.test.js            # Functional test suite (no dependencies)
 ├── test/watchdog.test.mjs      # FATF watchdog unit tests
 ├── test/reg-watch.test.mjs     # Regulatory Watch unit tests
