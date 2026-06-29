@@ -1,0 +1,11 @@
+# Pinned runtime dependencies for the Python screening engine (screen.py, ai.py).
+# Single source of truth for the CI workflows AND the screen.py import fallback,
+# so the same versions run everywhere and supply-chain drift is removed.
+#
+# Maintenance: kept current by Dependabot (pip ecosystem; see .github/dependabot.yml).
+# Hash-locking (pip-compile --generate-hashes) is a follow-up hardening step.
+rapidfuzz==3.10.1
+pdfplumber==0.11.4
+requests==2.32.3
+lxml==5.3.0
+unicodedata2==15.1.0

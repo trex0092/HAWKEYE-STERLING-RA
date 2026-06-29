@@ -87,13 +87,7 @@ jobs:
       # STEP 2 — INSTALL DEPENDENCIES
       # --------------------------------------------------------
       - name: Install Python dependencies
-        run: |
-          pip install --quiet \
-            requests \
-            rapidfuzz \
-            lxml \
-            pdfplumber \
-            unicodedata2
+        run: pip install --quiet -r requirements.txt
 
 
       # --------------------------------------------------------
