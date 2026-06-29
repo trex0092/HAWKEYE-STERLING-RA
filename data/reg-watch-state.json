@@ -10,12 +10,12 @@
       "prevHash": "eee0fd65e1d3948d44b09c0fb02046212a2a4b24ff173bd58b508db30779caeb"
     },
     "uae-fiu": {
-      "hash": "b9c1cf2775101ef5bbfa41b318651d83e5a7af4719b0e29a34e0fdc446ebc637",
+      "hash": "ed719ab3bd8c8f53e67087a37a7175829d55a9bee76f7ee062a9e08a1c7ea501",
       "bytes": 4427,
       "checkedAt": "2026-06-29",
       "changedAt": "2026-06-29",
       "status": 200,
-      "prevHash": "6a9a5944eb1413e398e7001b15c6fa9ab65d8e14b015a2762f02b2b174bad16e"
+      "prevHash": "b9c1cf2775101ef5bbfa41b318651d83e5a7af4719b0e29a34e0fdc446ebc637"
     },
     "uae-namlcftc": {
       "hash": null,
@@ -81,12 +81,12 @@
       "status": 200
     },
     "lbma": {
-      "hash": "54beb04bc6eeea93770e67e40bffb33e8cd70f2f50660f1393e690f989ff0c6f",
-      "bytes": 17698,
+      "hash": "fbc39ef6a199d4d513904e9daaea0b5214720466b784ab149103ea3930d4a44a",
+      "bytes": 18073,
       "checkedAt": "2026-06-29",
-      "changedAt": "2026-06-27",
+      "changedAt": "2026-06-29",
       "status": 200,
-      "prevHash": "d17100354c935eb3c32ec45426577ee1a4e28699c6c2f6f0371ccc5ed7ae76c1"
+      "prevHash": "54beb04bc6eeea93770e67e40bffb33e8cd70f2f50660f1393e690f989ff0c6f"
     },
     "oecd": {
       "hash": null,
@@ -149,7 +149,8 @@
       "bytes": 3715,
       "checkedAt": "2026-06-29",
       "changedAt": "2026-06-21",
-      "status": 200
+      "status": "error",
+      "error": "fetch failed"
     },
     "eu-high-risk": {
       "hash": null,
@@ -160,12 +161,12 @@
       "error": "HTTP 404"
     },
     "rjc": {
-      "hash": "5c8e27d0e2bc956d29d7294be742ddaffe7e6f0d32be6b2bdba94e8558cbf882",
-      "bytes": 106082,
+      "hash": "49fa7a75006b70871c7ae333fe2043707303f98aa1e63d9b2cc0108a47b61811",
+      "bytes": 106039,
       "checkedAt": "2026-06-29",
-      "changedAt": "2026-06-27",
+      "changedAt": "2026-06-29",
       "status": 200,
-      "prevHash": "b4e3efd1e645294ec23579df4571c3237871e1d28aeab0297236000532463ecd"
+      "prevHash": "5c8e27d0e2bc956d29d7294be742ddaffe7e6f0d32be6b2bdba94e8558cbf882"
     }
   }
 }
