@@ -32,8 +32,8 @@ check('style-src directive present', styleSrc.trim().length > 0);
 check("style-src does NOT allow 'unsafe-inline'", !/'unsafe-inline'/.test(styleSrc));
 check("style-src allows 'self'", /'self'/.test(styleSrc));
 const fontSrc = (cspLine.match(/font-src([^;]*)/) || [])[1] || '';
-check("font-src does NOT reference Google Fonts", !fontSrc.includes('fonts.gstatic.com'));
-check('CSP references NO Google Fonts origins (self-hosted)', !cspLine.includes('fonts.googleapis.com') && !cspLine.includes('fonts.gstatic.com'));
+check("font-src does NOT reference Google Fonts", !fontSrc.includes('gstatic'));
+check('CSP references NO Google Fonts origins (self-hosted)', !cspLine.includes('googleapis') && !cspLine.includes('gstatic'));
 
 const INLINE_HANDLER = /\son[a-z]+\s*=\s*["']/i;
 const INLINE_STYLE = /\sstyle\s*=\s*["']/i;
@@ -41,7 +41,7 @@ for (const file of ['index.html', 'console.html', 'advisor.html']) {
   const html = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   check(`${file}: no inline event handlers`, !INLINE_HANDLER.test(html));
   check(`${file}: no inline style attributes`, !INLINE_STYLE.test(html));
-  check(`${file}: no Google Fonts <link>`, !html.includes('fonts.googleapis.com') && !html.includes('fonts.gstatic.com'));
+  check(`${file}: no Google Fonts <link>`, !html.includes('googleapis') && !html.includes('gstatic'));
 
   /* Every <script>/<style> opening tag must carry a src/href (no inline JS/CSS).
      Scan opening tags by index to avoid a tag-matching regex (CodeQL-friendly). */

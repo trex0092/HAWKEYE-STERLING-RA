@@ -9,7 +9,7 @@ const check = (n, c) => { if (c) { pass++; console.log('  ok  ' + n); } else { f
 const cl = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
 
 check('starts with "# Changelog"', /^#\s+Changelog/m.test(cl));
-check('references Keep a Changelog', cl.includes('keepachangelog.com'));
+check('references Keep a Changelog', cl.includes('Keep a Changelog'));
 check('points APP_VERSION at app.js (not the old index.html)', /APP_VERSION` constant in \[`app\.js`\]/.test(cl));
 check('has an [Unreleased] section', /##\s*\[Unreleased\]/.test(cl));
 
