@@ -20,11 +20,11 @@ exclusion. Status: Implemented / Partial / Planned / Not Applicable (N/A).
 | A.9 Use | Human oversight (HITL) | Implemented | MLRO sign-off; nothing auto-files |
 | A.9 Use | Stakeholder feedback | Planned | `stakeholder-feedback.md` (log started) |
 | A.10 Third parties | Supplier/processor management | Implemented | `third-party-register.md` |
-| — Security | Prompt security / adversarial controls | Implemented | `detect_injection`; grounding contract |
+| — Security | Prompt security / adversarial controls | Implemented | `detect_injection`; grounding contract; standing red-team (`red-team-procedure.md`) |
 | — Security | Access control & least privilege | Implemented | agent authorization + credential broker |
 | — Security | Secrets handling | Implemented | masking; gitleaks; no secrets in logs |
-| — Monitoring | Monitoring & logging | Implemented | freshness-check, screening-metrics, audit trail |
-| — Monitoring | Bias & fairness testing | Planned | transliteration fairness done; formal test planned |
+| — Monitoring | Monitoring & logging | Implemented | freshness-check, screening-metrics, audit trail; runtime metrics + coverage drift (`runtime-monitoring.md`, `monitoring.py`) |
+| — Monitoring | Bias & fairness testing | Implemented | `bias-fairness-testing.md`; `test/bias_eval.py` (cross-script recall parity, CI-enforced) |
 | — Improvement | Nonconformity / corrective action | Implemented | `corrective-actions.md` |
 
 **Exclusions (N/A, justified):** model-training controls (no models are trained —
