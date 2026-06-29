@@ -41,6 +41,9 @@ from the vendor against the firm's contracted plan and recorded here.
 > sign**. It is NOT evidence of an executed agreement until the reference and
 > signatory below are completed by an authorised person. An AI assistant cannot
 > execute the DPA; do not treat empty fields as satisfied.
+>
+> **Ready-to-sign pack:** [`anthropic-dpa-execution-pack.md`](anthropic-dpa-execution-pack.md)
+> — processing schedule (Annex), PDPL transfer-basis assessment, and signature page.
 
 | Field | Value |
 |---|---|
