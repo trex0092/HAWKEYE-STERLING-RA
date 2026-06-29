@@ -323,17 +323,31 @@ jobs:
           except Exception as e:
               print(f"UN parse error: {e}")
 
-          # EU Sanctions
+          # EU Sanctions — the official EU export (xmlFullSanctionsList_1_1) is
+          # namespaced and stores the name in the `wholeName` ATTRIBUTE of each
+          # <nameAlias> (not as element text), so match tags by local-name and read
+          # the attribute, falling back to firstName/middleName/lastName. The prior
+          # element-text parse (root.iter("sanctionEntity") + name_el.text) silently
+          # returned 0 EU entries on the real feed — a sanctions-coverage gap.
           try:
               tree = ET.parse("/tmp/eu_sanctions.xml")
               root = tree.getroot()
               before = len(sanctioned)
-              for subject in root.iter("sanctionEntity"):
-                  name_el = subject.find(".//wholeName")
-                  if name_el is None:
-                      name_el = subject.find(".//nameAlias")
-                  if name_el is not None and name_el.text:
-                      sanctioned.append({"name": name_el.text.strip(), "list": "EU FSF", "programme": "EU Financial Sanctions"})
+              seen_eu = set()
+              for subject in root.iter():
+                  if subject.tag.split("}")[-1] != "sanctionEntity":
+                      continue
+                  for alias in subject.iter():
+                      if alias.tag.split("}")[-1] != "nameAlias":
+                          continue
+                      nm = (alias.get("wholeName") or "").strip()
+                      if not nm:
+                          nm = " ".join(p for p in (
+                              alias.get("firstName"), alias.get("middleName"), alias.get("lastName")
+                          ) if p).strip()
+                      if nm and nm.lower() not in seen_eu:
+                          seen_eu.add(nm.lower())
+                          sanctioned.append({"name": nm, "list": "EU FSF", "programme": "EU Financial Sanctions"})
               print(f"EU FSF: {len(sanctioned)-before} entries")
           except Exception as e:
               print(f"EU parse error: {e}")
