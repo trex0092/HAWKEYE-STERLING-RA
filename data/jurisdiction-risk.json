@@ -1,26 +1,39 @@
 {
   "_meta": {
     "purpose": "Maintained jurisdiction-risk list for the FATF R.10 risk-based approach. Used ONLY to nudge a deterministic risk score (decision-support); it never decides. Missing/empty => no jurisdiction bump.",
-    "source_of_truth": "FATF public statements — 'Jurisdictions under Increased Monitoring' (grey) and 'High-Risk Jurisdictions subject to a Call for Action' (high/black).",
+    "source_of_truth": "FATF public statements — 'Jurisdictions under Increased Monitoring' (grey) and 'High-Risk Jurisdictions subject to a Call for Action' (high/black). Synced to the June 2026 Paris plenary (17–19 Jun 2026) and reconciled against the firm's research note docs/research/2026-06-aml-regulatory-update.md and the watchdog state data/fatf-state.json.",
+    "naming": "Names mirror the app's COUNTRIES baseline (index.html) exactly, so the lookup exact-matches the customer country/nationality fields it nudges.",
     "maintenance": "REVIEW AND UPDATE after every FATF plenary (Feb / Jun / Oct). Remove de-listed jurisdictions; add new ones. This file is a maintained control, not authoritative legal advice — verify against the latest FATF statement before relying on it.",
     "last_reviewed": "2026-06-29",
+    "plenary_basis": "June 2026 (Paris). Added: Bosnia-Herzegovina, Iraq. Removed: Algeria, Namibia. Call-for-action list unchanged (Iran, North Korea, Myanmar).",
     "note": "Customer-base home jurisdictions (UAE, Turkey) were de-listed by FATF in 2024 and are deliberately NOT included here, to avoid false jurisdiction flags."
   },
   "grey": [
-    "Syria",
-    "Yemen",
-    "South Sudan",
-    "Democratic Republic of the Congo",
-    "Mozambique",
-    "Mali",
-    "Burkina Faso",
+    "Angola",
+    "Bolivia",
+    "Bosnia-Herzegovina",
+    "British Virgin Islands",
+    "Bulgaria",
+    "Cameroon",
+    "Cote D'Ivoire",
+    "The Democratic Republic Of Congo",
     "Haiti",
+    "Iraq",
+    "Kenya",
+    "Kuwait",
+    "Lao People's Democratic Republic",
+    "Lebanon",
+    "Monaco",
+    "Nepal",
+    "Papua New Guinea",
+    "South Sudan",
+    "Syria",
     "Venezuela",
-    "Nigeria",
-    "Vietnam"
+    "Vietnam",
+    "Yemen"
   ],
   "high": [
-    "Iran",
+    "Islamic Republic of Iran",
     "North Korea",
     "Myanmar"
   ]

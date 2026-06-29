@@ -91,7 +91,7 @@ by **09:00 UAE**:
 - **Agent identity & least-privilege authorization** — each module is an agent with an explicit action allow-list; the orchestrator records every action and **denies anything outside it** (e.g. the case agent may *propose* drafts but never *file*; only the delivery agent may write to Asana; no agent holds decision authority).
 - **Runtime credential scoping** — a credential broker hands a secret to an agent only if it is authorized for an action that needs it; every grant/denial is logged and **the secret value is never recorded** (presence is masked).
 - **QA / governance gate** — before publish, a deterministic gate verifies degrade-loudly, that every finding carries its source, that no prompt-injection item was model-classified, and that every flagged subject has a risk rating; failures surface as **⚠ ATTENTION** in the report, never silently passed.
-- **Observability** — the report's **§⑤ Agentic Operating Model** prints the full agent audit trail + QA gate + credential-scoping summary for every run.
+- **Observability** — the report's **§⑥ Agentic Operating Model** prints the full agent audit trail + QA gate + credential-scoping summary for every run.
 
 ## Risk methodology
 
