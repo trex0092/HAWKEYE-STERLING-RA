@@ -212,7 +212,7 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
     if base.get("history_runs"):
         L.append(f"   Baseline: {base['history_runs']} prior run(s); "
                  f"median runtime {(_fmt(base.get('median_total_seconds')))}, "
-                 f"median subjects {(_fmt(base.get('median_subjects')))}")
+                 f"median subjects {(_fmt_count(base.get('median_subjects')))}")
     if anomalies:
         L.append("   ⚠ ANOMALIES:")
         for a in anomalies:
@@ -233,3 +233,8 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
 
 def _fmt(x):
     return "n/a" if x is None else (f"{x:.0f}s" if x and x > 100 else f"{x:.0f}")
+
+
+def _fmt_count(x):
+    # A plain count (subjects/runs) — never carries a seconds unit like _fmt.
+    return "n/a" if x is None else f"{x:.0f}"
