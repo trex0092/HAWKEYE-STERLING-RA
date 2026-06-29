@@ -369,7 +369,15 @@ function initSecurity(){
    edit or deletion to earlier rows is detectable. Stored via the encrypted layer. */
 const AUDIT_KEY = 'hsra.audit.v1';
 function auditAll(){ try{ const r = SS.getItem(AUDIT_KEY); return r ? JSON.parse(r) : []; }catch(e){ return []; } }
-async function auditAppend(event, detail){
+let _auditChain = Promise.resolve();
+/* Serialise appends: concurrent auditAppend calls must not lose entries to a
+   read-modify-write race on the stored log — the hash chain stays complete and
+   verifiable. Callers may still await the returned promise. */
+function auditAppend(event, detail){
+  _auditChain = _auditChain.then(() => _auditAppendInner(event, detail), () => _auditAppendInner(event, detail));
+  return _auditChain;
+}
+async function _auditAppendInner(event, detail){
   if(!_hasCrypto()) return;
   try{
     const log = auditAll();
@@ -415,8 +423,9 @@ async function openAudit(){
   if($('auditMeta')) $('auditMeta').textContent = log.length ? (ok ? '✓ chain intact' : '⚠ integrity check failed') : '';
 }
 function closeAudit(){ if($('auditOverlay')) $('auditOverlay').classList.remove('open'); }
-function exportAudit(){
+async function exportAudit(){
   const out = {app:'Hawkeye Sterling — Activity Log', exportedAt:new Date().toISOString(), entries:auditAll()};
+  out.integrity = await exportIntegrity(out.entries);   /* SHA-256 over JSON.stringify(export.entries); chain head also in each entry */
   const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -875,7 +884,7 @@ function rdResetConfirm(){
   rdResetAll();
   toast('Risk data reset to baseline');
 }
-function rdExportSheet(){
+async function rdExportSheet(){
   const out = {
     app: 'Hawkeye Sterling — Risk Data Sheet',
     version: APP_VERSION,
@@ -884,6 +893,7 @@ function rdExportSheet(){
     updatedAt: riskData.updatedAt,
     overrides: riskData.overrides
   };
+  out.integrity = await exportIntegrity(out.overrides);   /* SHA-256 over JSON.stringify(export.overrides) */
   const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -2262,8 +2272,19 @@ function exportFileName(){
   /* keep the download name safe across platforms */
   return (String(state.meta.ref||'').trim() || 'risk-assessment').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'-') + '.json';
 }
+/* Integrity envelope for exported records — makes an export independently
+   verifiable: `value` is the SHA-256 of the canonical JSON of `record`, and
+   `auditChainHead` binds the export to the tamper-evident activity log. Verify
+   procedure: SHA-256 over JSON.stringify(<the corresponding field in the file>).
+   See docs/governance/backup-recovery.md. */
+async function exportIntegrity(record){
+  let value = null, auditChainHead = null;
+  try{ value = await sha256Hex(JSON.stringify(record)); }catch(e){}
+  try{ const log = auditAll(); auditChainHead = log.length ? log[log.length-1].hash : null; }catch(e){}
+  return { algorithm: 'SHA-256', value, auditChainHead };
+}
 /* eslint-disable-next-line no-unused-vars -- public API exercised by test/app.test.js */
-function exportJSON(){
+async function exportJSON(){
   const a = computeAssessment();
   const out = {
     app: 'Hawkeye Sterling — Entity Risk Assessment',
@@ -2273,13 +2294,14 @@ function exportJSON(){
     result: {totalScore:a.total, maxScore:MAX_SCORE, numericBand:a.numericBand, engineOutcome:a.engineOutcome, outcome:a.outcome, escalations:a.escalations, analystOverride:a.analystOv},
     riskData: {baseline:RISK_DATA_VERSION, overrides:rdCount(), updatedAt:riskData.updatedAt}
   };
+  out.integrity = await exportIntegrity(state);   /* SHA-256 over JSON.stringify(export.state) */
   const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = exportFileName();
   link.click();
   setTimeout(()=>URL.revokeObjectURL(link.href), 1000);
-  auditAppend('export.json', state.meta.ref || '(unsaved)');
+  await auditAppend('export.json', state.meta.ref || '(unsaved)');
   toast('Assessment exported');
 }
 

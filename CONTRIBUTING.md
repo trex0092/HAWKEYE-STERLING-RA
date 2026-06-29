@@ -52,6 +52,27 @@ Other gates that run automatically on your PR:
 - **PR size** (`.github/workflows/pr-size.yml`) — keep PRs focused and small;
   large diffs are flagged. Split unrelated changes into separate PRs.
 - **Lighthouse / a11y / link-check / visual** — front-end quality gates.
+- **CSP guardrail** (`test/csp.test.mjs`) and **scoring golden set**
+  (`test/scoring-golden.test.js`) — blocking; a re-introduced inline handler or
+  an unintended change to a frozen scoring outcome fails the PR.
+
+## Branch protection & protected environments
+
+The following repository settings are the intended baseline (configured in
+GitHub Settings, not in the diff):
+
+- **Branch protection on `main`:** require a pull request before merging;
+  require CODEOWNERS review (`.github/CODEOWNERS` routes compliance-sensitive
+  paths to the MLRO); require status checks to pass (CI, CodeQL, gitleaks,
+  Dependency Review); require branches to be up to date; restrict force-pushes
+  and deletion.
+- **Protected `release` environment:** `auto-release.yml` runs in the `release`
+  environment — add **required reviewers** to it so publishing a GitHub release
+  requires human approval. (Until configured, GitHub auto-creates it unprotected.)
+- **Autonomous daily controls are intentionally NOT gated by required reviewers**
+  (Sanctions/Regulatory/FATF watchers, freshness, site-health): they must run
+  unattended. They are instead hardened with least-privilege `permissions:`,
+  `step-security/harden-runner` egress policies, and "degrade-loudly" alerting.
 
 ## Branches and commits
 

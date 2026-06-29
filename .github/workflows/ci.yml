@@ -36,6 +36,8 @@ jobs:
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
         run: node test/csp.test.mjs
+      - name: Run export-integrity + round-trip tests
+        run: node test/export-integrity.test.js
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
       - name: Run daily-brief unit tests
