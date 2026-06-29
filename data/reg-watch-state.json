@@ -10,12 +10,12 @@
       "prevHash": "eee0fd65e1d3948d44b09c0fb02046212a2a4b24ff173bd58b508db30779caeb"
     },
     "uae-fiu": {
-      "hash": "ed719ab3bd8c8f53e67087a37a7175829d55a9bee76f7ee062a9e08a1c7ea501",
+      "hash": "bdda51d7d84eae5ed62753862631609eb1836d9845ece82c70a31bc8b185b1b3",
       "bytes": 4427,
       "checkedAt": "2026-06-29",
       "changedAt": "2026-06-29",
       "status": 200,
-      "prevHash": "b9c1cf2775101ef5bbfa41b318651d83e5a7af4719b0e29a34e0fdc446ebc637"
+      "prevHash": "ed719ab3bd8c8f53e67087a37a7175829d55a9bee76f7ee062a9e08a1c7ea501"
     },
     "uae-namlcftc": {
       "hash": null,
@@ -97,20 +97,20 @@
       "error": "HTTP 403"
     },
     "ofac": {
-      "hash": "544dfb06897468b5d1464ce85033dde3891a3734707b09031bc82ddeb589e3f1",
-      "bytes": 3769,
+      "hash": "9179e9c4258de0b512d248fd330de7e469757eaed1df327e810b4ab826af4118",
+      "bytes": 3644,
       "checkedAt": "2026-06-29",
-      "changedAt": "2026-06-27",
+      "changedAt": "2026-06-29",
       "status": 200,
-      "prevHash": "8ab14928eaea784dc66f9102438d197211f95c28ea4374ad57612ca29132f9d0"
+      "prevHash": "544dfb06897468b5d1464ce85033dde3891a3734707b09031bc82ddeb589e3f1"
     },
     "unsc": {
       "hash": null,
       "bytes": 0,
       "checkedAt": "2026-06-29",
       "changedAt": null,
-      "status": 403,
-      "error": "HTTP 403"
+      "status": "error",
+      "error": "This operation was aborted"
     },
     "eu-sanctions": {
       "hash": "c5bc43ac43300e7125b10e10d4e9bda08cb83a0d3062b05d7c2df4db9e16f6a8",
@@ -149,7 +149,7 @@
       "bytes": 3715,
       "checkedAt": "2026-06-29",
       "changedAt": "2026-06-21",
-      "status": "error",
+      "status": 200,
       "error": "fetch failed"
     },
     "eu-high-risk": {
@@ -161,12 +161,12 @@
       "error": "HTTP 404"
     },
     "rjc": {
-      "hash": "49fa7a75006b70871c7ae333fe2043707303f98aa1e63d9b2cc0108a47b61811",
-      "bytes": 106039,
+      "hash": "5c8e27d0e2bc956d29d7294be742ddaffe7e6f0d32be6b2bdba94e8558cbf882",
+      "bytes": 106082,
       "checkedAt": "2026-06-29",
       "changedAt": "2026-06-29",
       "status": 200,
-      "prevHash": "5c8e27d0e2bc956d29d7294be742ddaffe7e6f0d32be6b2bdba94e8558cbf882"
+      "prevHash": "49fa7a75006b70871c7ae333fe2043707303f98aa1e63d9b2cc0108a47b61811"
     }
   }
 }

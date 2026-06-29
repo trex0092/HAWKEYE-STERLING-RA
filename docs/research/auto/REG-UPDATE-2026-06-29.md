@@ -5,52 +5,52 @@
 ### UAE Financial Intelligence Unit (FIU) — goAML
 
 - **What appears to have changed**:
-  - The extracted content shows no substantive AML/CFT policy or instrument update; the "what's new" items date back to 2019–2022 and the page content "last updated on 9 February 2024."
-  - The only forward-dated element is a "© 2026" footer, which is most consistent with routine site/template churn rather than a meaningful regulatory change.
-  - No new STR/goAML process changes, guidance, or typology reports are visible in this snapshot.
+  - The page text shows a content "last updated" date of **9 February 2024**, while the footer copyright reads **© 2026** — suggesting only a footer/template refresh rather than substantive content change.
+  - Newest dated items ("What's New") remain old (most recent listed: annual report 2021, dated 7 October 2022; TBML/legal-entity typology reports dated 2 September 2021). No new publications, STR/goAML process notes, or guidance are visible.
+  - This looks like **routine site churn** (template/footer/year update), not a material regulatory change to FIU/goAML obligations.
 
 - **Likely app impact**:
-  - Low/none expected. This looks like routine site churn, so no Regulatory Q&A topics or Super Tools citations in `assets/super-data.js` appear to require updating based on this snapshot.
-  - If reviewers want to confirm currency, check any existing FIU/goAML references (e.g., STR reporting process, reporting-entity obligations, goAML registration) against the live "str process," "reporting entities," and "system guides" pages — these may have changed even if not reflected here.
-  - No country/risk data changes in `index.html` are indicated.
+  - **Low / likely none.** No new goAML reporting requirement, STR process change, or typology guidance is evident.
+  - If our Regulatory Q&A references FIU goAML registration/STR submission, the **process descriptions remain valid** as of the visible 9 Feb 2024 content — no edits indicated.
+  - Super Tools citations in `assets/super-data.js` pointing to FIU goAML / STR process: **verify URL still resolves**, but content/answer text need not change.
+  - Country/risk data in `index.html`: **no impact** — nothing here alters UAE risk posture or counterparty/jurisdiction data.
 
-- **Suggested citation** (only if a live review confirms an update):
-  - UAE Financial Intelligence Unit (FIU) — goAML portal, https://www.uaefiu.gov.ae/en/ (page "last updated 9 February 2024").
-  - For specific obligations, cite the relevant FIU page directly (e.g., "STR Process" or "Reporting Entities") rather than the homepage — pending human verification.
+- **Suggested citation** (only if an update is warranted):
+  - UAE Financial Intelligence Unit (FIU) — goAML portal, https://www.uaefiu.gov.ae/en/ (page content last updated 9 February 2024).
+  - For STR/typology references, cite by visible titles only: "Strategic Analysis Report on Trade-Based Money Laundering (TBML)" and "Strategic Analysis Report on the Abuse of Legal Entities" (both dated 2 September 2021).
 
-*Recommendation: Treat as routine churn; no edit required unless a manual check of the STR/reporting-entity sub-pages reveals substantive changes.*
+**Reviewer note:** No specific article, circular, or decision numbers are visible in the extracted text; none should be invented. Recommendation: **no action beyond a link-health check**, pending confirmation that the © 2026 footer reflects only
 
-### LBMA — Responsible Sourcing
+### US OFAC — Recent Actions
 
 - **What appears to have changed**:
-  - A **public consultation on Responsible Gold Guidance version 10 (RGG10)** is now featured, described as drawing on implementation experience since v9 and developments in responsible sourcing practice.
-  - References to **Disclosure Guidance version 3** and an **ASM (artisanal and small-scale mining) initiative**, including a new report on progress 2022–2025 toward including responsibly sourced ASM gold in formal supply chains.
-  - Much of the remaining content is standard LBMA site navigation/boilerplate (Good Delivery, pricing, events) and appears to be routine site churn rather than substantive change.
+  - The Recent Actions feed shows current entries dated through June 29, 2026, with a total result count of 3,118 — indicating ongoing list updates since the last review.
+  - Recent entries span multiple programs: Russia-related designations/removals, Sudan-related designations, Venezuela general licenses, DRC-related designations, counter-terrorism designations, Iran general licenses, and transnational criminal organization (TCO)/Cuba designations.
+  - This reflects routine, high-frequency OFAC churn (designations, removals, and general license issuances) rather than a single structural or policy change to the page itself.
 
 - **Likely app impact**:
-  - Any Regulatory Q&A topic addressing **precious metals / gold supply chain due diligence** for UAE refiners or DPMSPs may reference the current Responsible Gold Guidance version — if pinned to **v9**, flag for review pending RGG10 finalization (currently consultation stage, not yet in force).
-  - Super Tools citations in `assets/super-data.js` referencing **LBMA Responsible Sourcing Programme / Responsible Gold Guidance** should be checked for version accuracy.
-  - **No country/risk data change** in `index.html` warranted from this page; the ASM/origin material is contextual, not a new risk classification.
+  - **Regulatory Q&A — sanctions screening topics**: Any answer referencing OFAC SDN/Consolidated list currency may warrant a refreshed "last reviewed" date; no substantive content change indicated.
+  - **Super Tools citations (assets/super-data.js)**: Check that OFAC SDN List and Consolidated (non-SDN) List references point to the live sanctions list service/search URLs and note that the list is continuously updated.
+  - **Country/risk data (index.html)**: Sudan, Venezuela, DRC, Cuba, Iran, Russia entries may merit a review for current OFAC program status, but the feed shows no new country-level program creation — likely no change needed beyond confirming existing references remain valid.
 
-- **Suggested citation**:
-  - If updating: **LBMA Responsible Gold Guidance (current in-force version — verify whether v9 or successor)**, LBMA Responsible Sourcing Programme, https://www.lbma.org.uk/responsible-sourcing
-  - Note that **RGG10 is at public-consultation stage**; do not cite as binding until adopted.
+- **Suggested citation**: US OFAC, *Recent Actions*, Office of Foreign Assets Control, U.S. Department of the Treasury (https://ofac.treasury.gov/recent-actions), with reference to the relevant SDN/Consolidated Sanctions List as applicable.
 
-*Reviewer note: version numbers (v9/v10, Disclosure Guidance v3) are visible in the extract; confirm the in-force version before editing, as the page mixes current standards with consultation drafts.*
+*Note: Routine site churn — flagged for confirmation that screening references and list links remain current. No specific designation/GL numbers cited as none are individually identifiable in the extracted text.*
 
 ### Responsible Jewellery Council (RJC)
 
 - **What appears to have changed**:
-  - Navigation/landing page refresh referencing "Standards & Audit Changes Information Pack" indicating updates to standards, audits, and certification requirements.
-  - New officer and board appointments following the 2026 AGM, and publication of the 2026 Annual Progress Report.
-  - Membership figures updated (now stated as 2,000+ members), with a new communications toolkit. Overall this reads largely as routine site churn plus a flagged standards/audit revision worth verifying.
+  - Page now references **2026 governance updates** (new officer and board appointments following the 2026 AGM) and a **2026 Annual Progress Report**.
+  - A **"Standards & Audit Changes Information Pack"** is highlighted, indicating updates to standards, audit, and certification requirements (specifics not visible in extracted text).
+  - Otherwise largely routine site content (membership directory, 20th-anniversary messaging, three core standards: CoP, CoC, LGMS) — appears to be normal site churn aside from the standards/audit changes note.
 
 - **Likely app impact**:
-  - If the "Standards & Audit Changes" pack reflects substantive revisions to the Code of Practices (CoP), Chain of Custody (CoC), or Laboratory Grown Material Standard (LGMS), any Regulatory Q&A topics covering DPMS/jewellery sector due diligence, responsible sourcing, or supply-chain KYC may need review.
-  - Super Tools citations in `assets/super-data.js` referencing RJC standards (CoP/CoC) for the precious metals & stones sector should be checked for currency.
-  - Country/risk data in `index.html` is unlikely to require changes from this update; the member-count-by-country list is directory data, not risk data.
+  - Any Regulatory Q&A topic on **DPMS (Dealers in Precious Metals and Stones) responsible sourcing / supply chain due diligence** referencing RJC standards (Code of Practices, Chain of Custody) may need review if the audit/certification requirements have materially changed.
+  - Super Tools citations in `assets/super-data.js` pointing to RJC's **Code of Practices** or **Chain of Custody** standard versions should be checked for version/date currency.
+  - No direct UAE country/risk data change in `index.html` is indicated; RJC is a voluntary global standard-setter, not a UAE regulatory instrument — low priority unless cited as a best-practice benchmark.
 
-- **Suggested citation**:
-  - RJC Code of Practices (CoP) and/or Chain of Custody (CoC) Standard — cite the specific version only after confirming the revised edition/date from the "Standards & Audit Changes Information Pack" (no version number visible in extracted text).
+- **Suggested citation** (only if update warranted):
+  - Responsible Jewellery Council, *Code of Practices* / *Chain of Custody Standard* (verify current version on RJC site before citing).
+  - For the flagged update: RJC "Standards & Audit Changes Information Pack" — **confirm exact title/version on source before use; no document number visible in extracted text.**
 
-*Note: The extract does not contain specific standard version numbers, effective dates, or circular references. Reviewer should open the standards/audit changes pack to confirm whether a substantive update applies before editing.*
+*Recommendation: Reviewer to open the "Standards & Audit Changes Information Pack" and 2026 APR to confirm whether substantive standard changes affect existing citations before editing.*
