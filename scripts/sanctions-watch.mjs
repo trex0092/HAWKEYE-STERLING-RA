@@ -18,7 +18,7 @@
 */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { loadSources, fingerprint, computeChanges, contentChanges } from './reg-watch.mjs';
+import { loadSources, computeChanges, contentChanges } from './reg-watch.mjs';
 
 export const SOURCES_FILE = 'data/sanctions-sources.json';
 export const STATE_FILE   = 'data/sanctions-state.json';

@@ -551,6 +551,7 @@ async function totpAt(secretB32, counter){
   const bin = ((sig[off] & 0x7f) << 24) | ((sig[off+1] & 0xff) << 16) | ((sig[off+2] & 0xff) << 8) | (sig[off+3] & 0xff);
   return String(bin % 1000000).padStart(6, '0');
 }
+/* eslint-disable-next-line no-unused-vars -- public API exercised by test/app.test.js */
 function totpNow(secretB32){ return totpAt(secretB32, Math.floor(Date.now() / 30000)); }
 async function totpVerify(secretB32, code){
   code = String(code || '').trim();
@@ -2199,6 +2200,7 @@ function initRegisterPanel(){
   if(bo && bo.addEventListener) bo.addEventListener('click', function(e){ if(e.target===bo) closeBatch(); });
 }
 
+/* eslint-disable-next-line no-unused-vars -- public API exercised by test/app.test.js */
 function newAssessment(){
   const named = !!String(state.entity.name||'').trim();
   if(!confirm(named
@@ -2260,6 +2262,7 @@ function exportFileName(){
   /* keep the download name safe across platforms */
   return (String(state.meta.ref||'').trim() || 'risk-assessment').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'-') + '.json';
 }
+/* eslint-disable-next-line no-unused-vars -- public API exercised by test/app.test.js */
 function exportJSON(){
   const a = computeAssessment();
   const out = {
@@ -2280,6 +2283,7 @@ function exportJSON(){
   toast('Assessment exported');
 }
 
+/* eslint-disable-next-line no-unused-vars -- code-only JSON import API (counterpart to exportJSON); see README */
 function importJSON(){ $('importFile').click(); }
 $('importFile').addEventListener('change', function(e){
   const f = e.target.files[0];

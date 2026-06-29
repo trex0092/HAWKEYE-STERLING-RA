@@ -146,7 +146,7 @@ function runScreen(file, bridge, seed){
 
 /* ── 2. Hawkeye Sterling Advisor ── */
 (function(){
-  const { els, timers, fetches, api } = runScreen('advisor.html',
+  const { els, fetches, api } = runScreen('advisor.html',
     '{ get state(){return state;}, render, renderAsk, renderQa, renderRegGroups, regGroups, askQuestion, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, heroHtml, aupAck, PERSONAS }');
 
   check('advisor: boots on the Ask tab with all three tabs', els.tabs.innerHTML.includes('Ask the advisor')

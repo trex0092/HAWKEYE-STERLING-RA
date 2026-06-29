@@ -906,9 +906,8 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     global.localStorage.removeItem('hsra.audit.v1');
     A.state = A.freshState(); A.state.meta.assessor = 'Jane Analyst'; A.state.meta.ref = 'RA-20260621-001';
     await A.auditAppend('assessment.complete', 'Marked complete');
-    let captured = null;
     const origCreate = global.document.createElement;
-    global.document.createElement = () => ({ set href(v){}, get href(){ return 'blob:test'; }, download:'', click(){ captured = true; } });
+    global.document.createElement = () => ({ set href(v){}, get href(){ return 'blob:test'; }, download:'', click(){} });
     const origBlob = global.Blob;
     global.Blob = class { constructor(parts){ this.text = String(parts[0]); } };
     // capture the serialised payload via Blob

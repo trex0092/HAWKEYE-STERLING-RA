@@ -16,7 +16,6 @@ function check(name, cond){
   if(cond){ passed++; console.log('  ok  ' + name); }
   else { failed++; console.log('FAIL  ' + name); }
 }
-const countOcc = (hay, needle) => hay.split(needle).length - 1;
 
 /* ── Minimal DOM stub (same technique as screens.test.js) ── */
 function makeEl(){

@@ -4,7 +4,7 @@
    Usage: node test/sanctions-screen.test.mjs */
 import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
-  isMatch, matchSignature, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
+  isMatch, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD,
   formatHumanDate, buildAmPepNotes, buildRunLogNotes, buildTransactionTemplateNotes, AM_KEYWORD_COUNT
 } from '../scripts/sanctions-screen.mjs';
