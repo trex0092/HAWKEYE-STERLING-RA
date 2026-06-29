@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createServer } from 'node:http';
-import { readFileSync, existsSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve, extname, normalize } from 'node:path';
 
 /* Runtime CSP verification in a real browser. Serves the repo over HTTP with the
@@ -31,12 +31,16 @@ test.beforeAll(async () => {
       let rel = normalize(urlPath).replace(/^(\.\.[/\\])+/, '').replace(/^\/+/, '');
       if (rel === '' || rel.endsWith('/')) rel += 'index.html';
       const file = resolve(ROOT, rel);
-      if (!file.startsWith(ROOT) || !existsSync(file) || !statSync(file).isFile()) {
-        res.writeHead(404); res.end('not found'); return;
-      }
+      if (!file.startsWith(ROOT)) { res.writeHead(403); res.end('forbidden'); return; }
+      /* Single read (no stat-then-read) to avoid a TOCTOU file-system race
+         [CodeQL js/file-system-race]; a missing file or a directory throws and
+         is served as 404. */
+      let data;
+      try { data = readFileSync(file); }
+      catch { res.writeHead(404); res.end('not found'); return; }
       res.setHeader('Content-Security-Policy', CSP);
       res.setHeader('Content-Type', TYPES[extname(file).toLowerCase()] || 'application/octet-stream');
-      res.end(readFileSync(file));
+      res.end(data);
     } catch { res.writeHead(500); res.end('err'); }
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
