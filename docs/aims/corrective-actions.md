@@ -15,6 +15,21 @@ Owner: system maintainer / MLRO. Source of truth for "what went wrong and how we
 | CA-08 | 2026-06-28 | Onboarding silently dropped customers with odd `created_at` | Medium | Bare `except: continue` | Log the skip (left to daily batch) | Code review | Closed |
 | CA-09 | 2026-06-28 | UAE EOCN list read from a non-existent PDF (always degraded) | High | Engine read `eocn_list.pdf` not the maintained JSON | Read `data/eocn-local-terrorist-list.json` (312 names) | Live run: EOCN OK | Closed |
 | CA-10 | 2026-06-28 | Daily sweep exceeded the runner budget (~5h+ → timeout risk) | High | Sequential per-subject network sweep | Parallelized sweep (bounded pool) → minutes | Live run | Closed |
-| CA-11 | 2026-06-28 | Repeated manual run cancellations tripped the freshness-check (no successful daily run) | Process | Operator churn (cancel-and-redeploy) | Stop cancelling; let runs complete; speedup prevents pile-ups | Freshness-check green after a successful run | In progress |
+| CA-11 | 2026-06-28 | Repeated manual run cancellations tripped the freshness-check (no successful daily run) | Process | Operator churn (cancel-and-redeploy) | Stop cancelling; let runs complete; speedup prevents pile-ups | Freshness-check green after a successful run | Closed |
 
 > Append new findings as they arise; every CRITICAL/HIGH should carry a regression test.
+
+## Hardening actions (from the risk register, 2026-06-29)
+Planned mitigations closed in the hardening pass — each lowered a residual risk and
+carries a CI-enforced test or a formal document.
+
+| ID | Risk | Action | Verification | Status |
+|---|---|---|---|---|
+| HA-01 | R-05 bias | Formal cross-script recall-parity test | `test/bias_eval.py` (CI) + bias-fairness-testing.md | Closed |
+| HA-02 | R-02 injection | Standing prompt-injection red-team corpus | `test/redteam_injection.py` (CI) + red-team-procedure.md | Closed |
+| HA-03 | R-08/R-12 | Runtime monitoring (latency/usage/anomaly) → QA gate | `monitoring.py` + engine_test + runtime-monitoring.md | Closed |
+| HA-04 | R-06 privacy | Formal PDPL data-processing assessment + ROPA | pdpl-data-processing-assessment.md | Closed (DPA action open) |
+| HA-05 | R-09 coverage | Source-coverage drift monitor (≥20% core drop) | `monitoring.check_source_coverage` + engine_test | Closed |
+| HA-06 | R-03 / R.10 | Identity corroboration + CDD gaps + jurisdiction risk | `kyc.py` + engine_test + in-domain-aml-coverage.md | Closed |
+| HA-07 | R.25 | Trust / legal-arrangement detection & screening | `kyc.py` + engine_test | Closed |
+| HA-08 | R-13 / R.16 | Transaction-monitoring engine (synthetic; inert until feed) | `txn_monitor.py` + engine_test | Engine closed; feed connection open (firm) |

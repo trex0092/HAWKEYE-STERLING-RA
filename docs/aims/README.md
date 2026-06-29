@@ -21,6 +21,11 @@ technical controls (which are code- and CI-enforced) and the model card in
 | 9 | Stakeholder Feedback Log | A.9 | [stakeholder-feedback.md](stakeholder-feedback.md) |
 | 10 | Business Continuity & Resilience Plan | A.6 | [bcp.md](bcp.md) |
 | 11 | Corrective Actions / CAPA Log | 10.2 | [corrective-actions.md](corrective-actions.md) |
+| 12 | Bias & Fairness Testing | A.5.4 | [bias-fairness-testing.md](bias-fairness-testing.md) |
+| 13 | Prompt-Injection Red-Team Procedure | A.5.5 | [red-team-procedure.md](red-team-procedure.md) |
+| 14 | Runtime Monitoring & Drift Detection | 9.1 / A.6.2 | [runtime-monitoring.md](runtime-monitoring.md) |
+| 15 | PDPL Data-Processing Assessment & ROPA | A.7 | [pdpl-data-processing-assessment.md](pdpl-data-processing-assessment.md) |
+| 16 | In-Domain AML Coverage (FATF R.10/R.16/R.25) | A.4.2 | [in-domain-aml-coverage.md](in-domain-aml-coverage.md) |
 
 **Owner:** MLRO / Compliance. **Review cadence:** at least annually and on any
 material change to the AI system. **Retention:** 10 years (UAE FDL No. 26 of 2021,

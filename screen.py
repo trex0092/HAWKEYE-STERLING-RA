@@ -18,6 +18,9 @@ import concurrent.futures
 SCREEN_CONCURRENCY = int(os.environ.get("SCREEN_CONCURRENCY", "8"))
 import ai      # AI layer — risk rating, adverse triage, summaries, transliteration, governance
 import agents  # Agentic operating model — identity/authorization, audit trail, QA gate
+import kyc      # KYC/identity layer — FATF R.10 (CDD) + R.25 (legal arrangements)
+import txn_monitor  # FATF R.16 transaction-monitoring engine (inert until a feed is configured)
+import monitoring   # Runtime metrics + source-coverage drift detection
 
 try:
     from rapidfuzz import fuzz
@@ -623,12 +626,20 @@ def get_all_customers():
             if not t.get("gid") or not t.get("name"):
                 continue  # skip malformed row, never crash the whole run
             notes = t.get("notes") or ""
+            # Structured KYC (FATF R.10/R.25): DOB, nationality, ID, share %, role,
+            # CDD gaps, legal-arrangement detection. Falls back to the regex name
+            # extractor if the note isn't in the structured format.
+            kyc_data = kyc.parse_customer(notes)
+            struct_inds = kyc_data.get("individuals", [])
+            individuals = [i["name"] for i in struct_inds] or extract_individuals(notes)
             customers.append({
                 "gid": t["gid"],
                 "name": t["name"],
                 "permalink": t.get("permalink_url",""),
                 "created_at": t.get("created_at",""),
-                "individuals": extract_individuals(notes),
+                "individuals": individuals,
+                "kyc": kyc_data,
+                "country": kyc_data.get("country", ""),
                 "has_assessment": len(notes.strip()) > 100,
             })
         next_page = data.get("next_page") or None
@@ -1285,6 +1296,13 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             if risk:
                 A(f"   Risk factors: {'; '.join(risk['factors'])}")
                 A(f"   EDD: {risk['edd']}")
+            # R.10 jurisdiction nexus + R.25 legal-arrangement note (when present).
+            jur = m.get("jurisdiction") or {}
+            if jur.get("reason"):
+                A(f"   Jurisdiction (R.10): {jur['reason']}")
+            if m.get("arrangement"):
+                A(f"   Legal arrangement (R.25): {m['arrangement']} — every party screened; "
+                  "a sanctioned/PEP party flags the arrangement.")
             shown = sorted(m["hits"], key=lambda h: -h["score"])[:10]
             for h in shown:
                 conf = f" · {h.get('confidence','')}" if h.get("confidence") else ""
@@ -1292,6 +1310,11 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 link = " · owner/UBO → 50%/control rule" if h.get("control_linkage") else ""
                 A(f"   -> [{h['subject_type']}] {h['subject_name']}  —  {h['list']}: "
                   f"\"{h['matched_entry']}\"   {h['score']:.0f}%{conf}{nflag}{link}")
+                # R.10 — identity dossier + open CDD gaps for the matched individual.
+                if h.get("identity"):
+                    A(f"        Identity (R.10): {h['identity']}")
+                if h.get("cdd_gaps"):
+                    A(f"        ⚠ CDD gaps: {'; '.join(h['cdd_gaps'])}")
             if len(m["hits"]) > 10:
                 A(f"   -> … +{len(m['hits']) - 10} more similar candidates (see run log)")
             if ctrl:
@@ -1393,15 +1416,27 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             A(f"   • … +{len(related) - 25} more clusters (see run log)")
     A("")
 
+    A("━" * 70)
+    A("⑤  OPERATIONAL MONITORING  (latency · usage · anomaly · coverage · R.16)")
+    A("━" * 70)
+    if stats.get("monitoring") and stats.get("coverage") is not None:
+        A(monitoring.build_monitoring_section(
+            stats["monitoring"], stats["coverage"], stats.get("txn_status")))
+    if stats.get("cdd_gaps_total"):
+        A(f"   CDD/identity gaps (R.10) across flagged subjects: {stats['cdd_gaps_total']} open — see hits above.")
+    if stats.get("arrangements"):
+        A(f"   Legal arrangements (R.25) among flagged subjects: {stats['arrangements']}.")
+    A("")
+
     audit = stats.get("agent_audit")
     if audit:
         A("━" * 70)
-        A("⑤  AGENTIC OPERATING MODEL  (audit trail + QA gate)")
+        A("⑥  AGENTIC OPERATING MODEL  (audit trail + QA gate)")
         A("━" * 70)
         A(agents.build_audit_section(audit))
         A("")
         A("━" * 70)
-        A("⑥  AI GOVERNANCE & COMPLIANCE ATTESTATION")
+        A("⑦  AI GOVERNANCE & COMPLIANCE ATTESTATION")
         A("━" * 70)
         A(agents.build_attestation(audit, stats.get("ai_mode", "deterministic"),
                                    stats.get("injection_blocked", 0), list_meta))
@@ -1518,8 +1553,17 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     """Shared core: sanctions + adverse media + PEP over a set of customers, with
     delta classification, one Asana report and MLRO case subtasks. mode controls
     the task title only ('daily' vs 'onboarding')."""
+    _t_start = time.time()
+    # SOURCE-COVERAGE DRIFT (R-09): a list that silently shrank is the most
+    # dangerous failure mode — it creates false negatives. Check before screening.
+    coverage_result = monitoring.check_source_coverage(
+        list_meta, run_time.strftime("%Y-%m-%d"))
+    for a in coverage_result.get("alarms", []):
+        log(f"COVERAGE ALARM: {a}")
+
     # 1) SANCTIONS — entities + individuals, ALL matching candidates
     possible_matches, clear = screen_customers(customers, all_lists)
+    _t_sanctions = time.time()
     log(f"Sanctions: {len(possible_matches)} flagged · {len(clear)} clear")
     for m in possible_matches:
         if any(h["score"] >= 100 for h in m["hits"]):
@@ -1577,6 +1621,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                         "label": p.get("label", ""), "description": p.get("description", "")})
             if done % 50 == 0 or done == total:
                 log(f"  enriched {done}/{total}")
+    _t_enrich = time.time()
 
     # DELTA — flag only what is new since the last run (state committed by workflow)
     today = run_time.strftime("%Y-%m-%d")
@@ -1598,23 +1643,66 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             if a["triage"].get("injection_suspected"):
                 injection_blocked += 1
     pep_links = {p.get("permalink", "") for p in pep_findings}
+    jtable = kyc.load_jurisdiction_risk()   # FATF R.10 jurisdiction-risk (maintained list)
     for m in possible_matches:
         link = m.get("permalink", "")
         m_adverse = adv_by_link.get(link, [])
         m_pep = link in pep_links
+        kyc_data = m.get("kyc") or {}
+        kyc_inds = {kyc._norm(i.get("name", "")): i for i in kyc_data.get("individuals", [])}
+        # R.10 — attach an identity dossier + open CDD gaps to each individual hit
+        for h in m["hits"]:
+            if h.get("subject_type") == "INDIVIDUAL":
+                rec = kyc_inds.get(kyc._norm(h.get("subject_name", "")))
+                if rec:
+                    h["identity"] = kyc.identity_dossier(rec)
+                    h["cdd_gaps"] = rec.get("cdd_gaps", [])
+        nationalities = [i.get("nationality", "") for i in kyc_data.get("individuals", [])]
+        jtier, jreason = kyc.jurisdiction_risk_for(m.get("country", ""), nationalities, jtable)
+        m["jurisdiction"] = {"tier": jtier, "reason": jreason}
+        # R.25 — legal-arrangement (trust/foundation/partnership) flag
+        m["arrangement"] = kyc_data.get("arrangement_type", "") if kyc_data.get("is_arrangement") else ""
+        cdd_gap_count = sum(len(i.get("cdd_gaps", [])) for i in kyc_data.get("individuals", []))
+        m["cdd_gap_count"] = cdd_gap_count
         m["risk"] = ai.compute_risk_rating(
             sanctions_hits=m["hits"],
             is_control=any(h.get("control_linkage") for h in m["hits"]),
-            pep=m_pep, adverse_articles=m_adverse)
+            pep=m_pep, adverse_articles=m_adverse,
+            jurisdiction_high_risk=(jtier == "high"),
+            jurisdiction_grey=(jtier == "grey"),
+            cdd_gaps=cdd_gap_count)
         m["ai_summary"] = ai.alert_summary(m["name"], m["risk"], m["hits"], m_pep, m_adverse)
     related = ai.related_parties(customers)
     log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
         f"mode={'LLM' if ai.llm_available() else 'deterministic'}")
 
+    _t_ai = time.time()
+    # ── OPERATIONAL MONITORING (latency · usage · anomaly) ──
+    subjects_total = companies + individuals
+    errors_total = am_errors + pep_errors
+    timings = {"sanctions": round(_t_sanctions - _t_start, 2),
+               "enrichment": round(_t_enrich - _t_sanctions, 2),
+               "ai_triage": round(_t_ai - _t_enrich, 2),
+               "total": round(_t_ai - _t_start, 2)}
+    run_monitor = monitoring.monitor_run(
+        run_time.strftime("%Y-%m-%d"),
+        counts={"subjects": subjects_total, "errors": errors_total,
+                "flagged": len(possible_matches), "adverse": len(adverse_findings),
+                "pep": len(pep_findings)},
+        timings=timings, llm_calls=dict(ai.LLM_CALLS))
+    for a in run_monitor.get("anomalies", []):
+        log(f"RUNTIME ANOMALY: {a}")
+    txn_status = txn_monitor.status_line()   # R.16 — honest about the (absent) feed
+    cdd_gaps_total = sum(m.get("cdd_gap_count", 0) for m in possible_matches)
+    arrangements = sum(1 for m in possible_matches if m.get("arrangement"))
+
     stats = {"customers_total": len(customers), "companies_screened": companies,
-             "individuals_screened": individuals, "subjects_total": companies + individuals,
+             "individuals_screened": individuals, "subjects_total": subjects_total,
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
              "related_parties": related, "injection_blocked": injection_blocked,
+             "monitoring": run_monitor, "coverage": coverage_result,
+             "txn_status": txn_status, "cdd_gaps_total": cdd_gaps_total,
+             "arrangements": arrangements,
              "ai_mode": "AI-assisted triage" if ai.llm_available() else "deterministic"}
 
     # ── AGENTIC OPERATING MODEL: audit trail + QA / governance gate ──

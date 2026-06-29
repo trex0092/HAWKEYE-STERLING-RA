@@ -149,6 +149,15 @@ def qa_gate(possible_matches, adverse_findings, pep_findings, list_meta, stats):
         if not m.get("risk"):
             issues.append(f"flagged subject '{m.get('name')}' missing a risk rating")
 
+    # SOURCE-COVERAGE DRIFT (R-09): a core list that silently shrank is a false-
+    # negative risk — surface it as an integrity issue, not just a log line.
+    for a in (stats.get("coverage", {}) or {}).get("alarms", []) or []:
+        issues.append(f"source-coverage drift — {a}")
+
+    # RUNTIME ANOMALY (monitoring): latency/coverage/error anomalies vs baseline.
+    for a in (stats.get("monitoring", {}) or {}).get("anomalies", []) or []:
+        issues.append(f"runtime anomaly — {a}")
+
     return {"passed": not issues, "issues": issues}
 
 # ── ORCHESTRATION: build the audit manifest for one run ───────────────────────
