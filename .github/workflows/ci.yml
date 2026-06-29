@@ -32,6 +32,8 @@ jobs:
           node-version: 22
       - name: Run scoring-engine tests
         run: node test/app.test.js
+      - name: Run scoring model-validation golden set
+        run: node test/scoring-golden.test.js
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
       - name: Run daily-brief unit tests
