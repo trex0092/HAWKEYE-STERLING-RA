@@ -37,11 +37,23 @@ module status; a *partial* collapse is caught here.
 The monitoring section also reports the honest state of the transaction-monitoring
 engine — **INACTIVE** until a real feed is connected (see `in-domain-aml-coverage.md`).
 
+## Sustained-anomaly escalation (R-14)
+A single anomalous run can be noise; an anomaly that **persists across consecutive
+runs** is a real degradation that must be actioned. `monitoring.sustained_anomalies`
+flags any anomaly category (latency, error-rate, subject-coverage) present in every
+one of the last *N* runs (default 3). When that happens:
+- the report's §⑤ block prints a **`SUSTAINED ANOMALY — ESCALATE`** line, and
+- the scheduled **`anomaly-watch`** workflow (`python monitoring.py escalate`) opens —
+  or updates — a single GitHub issue for the MLRO (idempotent: one open issue, not
+  a daily duplicate). It reads the committed metrics history and is a clean no-op
+  until that state exists, so it never fails red on its own.
+
 ## How it surfaces
 - **Report §⑤ Operational Monitoring** — runtime, subjects, errors, LLM usage,
   baseline, and any anomalies / coverage drift, in plain language for the MLRO.
 - **QA gate** — coverage alarms and runtime anomalies become integrity issues, so
   the governance attestation reads "ATTENTION" rather than silently passing.
+- **Escalation** — a sustained anomaly auto-routes to a GitHub issue (see above).
 - **Logs** — every alarm/anomaly is also written to the run log.
 
 ## Privacy

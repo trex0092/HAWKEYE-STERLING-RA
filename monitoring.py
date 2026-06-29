@@ -127,6 +127,55 @@ def analyze_run(snapshot, history):
                          "history_runs": len(prev)}}
 
 
+def _anomaly_types(snapshot, prev):
+    """Category keys of the anomalies firing for one snapshot against its prior
+    runs — the same thresholds analyze_run uses, but reduced to stable keys so an
+    anomaly can be tracked ACROSS runs (the human strings carry run-specific
+    numbers and cannot be compared for identity)."""
+    t = set()
+    med_total = _median([h.get("total_seconds", 0) for h in prev])
+    if med_total and snapshot.get("total_seconds", 0) > LATENCY_FACTOR * med_total:
+        t.add("latency")
+    if snapshot.get("error_rate", 0) > ERROR_RATE_ALARM:
+        t.add("error_rate")
+    med_subj = _median([h.get("counts", {}).get("subjects", 0) for h in prev])
+    subj = snapshot.get("counts", {}).get("subjects", 0)
+    if med_subj and subj < 0.5 * med_subj:
+        t.add("subjects")
+    return t
+
+
+def sustained_anomalies(history, window=3):
+    """Anomaly categories present in EVERY one of the last `window` runs — a
+    persistent degradation worth escalating, as distinct from a single-run blip.
+    Each run is judged against the runs strictly before it. Fewer than `window`
+    runs ⇒ nothing sustained yet. Returns a sorted list of category keys."""
+    hist = [h for h in (history or []) if isinstance(h, dict)]
+    if window < 1 or len(hist) < window:
+        return []
+    per_run = [_anomaly_types(hist[i], hist[:i]) for i in range(len(hist) - window, len(hist))]
+    return sorted(set.intersection(*per_run)) if per_run else []
+
+
+# Human labels for the escalation message / issue body.
+_ANOMALY_LABELS = {
+    "latency": "runtime latency blow-out",
+    "error_rate": "elevated error rate",
+    "subjects": "subject-coverage drop",
+}
+
+
+def escalation(history=None, window=3, path=None):
+    """Decide whether sustained anomalies warrant raising an alert. Reads the
+    persisted metrics history when `history` is not supplied. Safe: missing or
+    short history ⇒ {escalate: False}. Pure given its inputs."""
+    hist = history if history is not None else _load(path or METRICS_STATE_PATH, [])
+    types = sustained_anomalies(hist if isinstance(hist, list) else [], window)
+    return {"escalate": bool(types), "types": types,
+            "summary": "; ".join(_ANOMALY_LABELS.get(t, t) for t in types),
+            "window": window}
+
+
 def persist_run(snapshot, path=None):
     """Append the snapshot to the rolling history file (keeps HISTORY_KEEP)."""
     p = path or METRICS_STATE_PATH
@@ -152,7 +201,8 @@ def monitor_run(today, counts, timings=None, llm_calls=None, path=None):
     p = path or METRICS_STATE_PATH
     hist = _load(p, [])
     res = analyze_run(snap, hist if isinstance(hist, list) else [])
-    persist_run(snap, p)
+    updated = persist_run(snap, p)
+    res["sustained"] = sustained_anomalies(updated)
     return {"snapshot": snap, **res}
 
 
@@ -219,6 +269,12 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
             L.append(f"      ⚠ {a}")
     else:
         L.append("   ✅ no runtime anomalies vs baseline")
+    sustained = run_result.get("sustained", [])
+    if sustained:
+        L.append("   ⚠⚠ SUSTAINED ANOMALY — ESCALATE: "
+                 + ", ".join(_ANOMALY_LABELS.get(s, s) for s in sustained)
+                 + " persisted across recent runs; raise to the MLRO / open an alert "
+                   "(routed automatically by the anomaly-watch workflow).")
     drops = coverage_result.get("drops", [])
     if drops:
         L.append("   ⚠ SOURCE-COVERAGE DRIFT:")
@@ -238,3 +294,19 @@ def _fmt(x):
 def _fmt_count(x):
     # A plain count (subjects/runs) — never carries a seconds unit like _fmt.
     return "n/a" if x is None else f"{x:.0f}"
+
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+# `python monitoring.py escalate [metrics-state.json]` prints a one-line JSON
+# escalation verdict for the anomaly-watch workflow to act on. Always exits 0
+# (a missing/short history is simply "no escalation"), so the workflow stays
+# green and only opens an issue when there is a genuine sustained anomaly.
+if __name__ == "__main__":
+    import sys
+    mode = sys.argv[1] if len(sys.argv) > 1 else "escalate"
+    if mode == "escalate":
+        state = sys.argv[2] if len(sys.argv) > 2 else None
+        print(json.dumps(escalation(path=state)))
+    else:
+        sys.stderr.write(f"unknown mode: {mode}\n")
+        sys.exit(2)

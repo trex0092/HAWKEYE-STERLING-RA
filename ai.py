@@ -73,6 +73,13 @@ _INJECTION_MARKERS = [
     "you are now", "new instructions", "follow these instructions", "mark this", "mark as",
     "classify as", "respond with", "output the", "reveal", "exfiltrate", "print your",
     "api key", "secret", "</system", "<|", "assistant:", "user:", "system:",
+    # 2026Q2 red-team expansion — newer jailbreak / evasion patterns. Multi-word
+    # where a bare token could appear in legitimate news (e.g. "override", "act
+    # as", "new"), so the benign false-positive rate stays controlled.
+    "forget everything", "forget all", "forget previous", "forget the above",
+    "override your", "override the above", "override all", "pretend you",
+    "act as if", "developer mode", "jailbreak", "do not flag", "do not classify",
+    "do not report this", "base64", "end of prompt", "begin new", "from now on",
 ]
 
 def _sanitize_untrusted(text: str, cap: int = 500) -> str:

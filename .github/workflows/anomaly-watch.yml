@@ -1,0 +1,83 @@
+name: Anomaly Watch
+
+# Escalates SUSTAINED runtime/coverage anomalies — an anomaly that has persisted
+# across consecutive screening runs (per monitoring.sustained_anomalies), as
+# opposed to a single-run blip — to a GitHub issue for the MLRO. Detection lives
+# in monitoring.py and is unit-tested; this workflow only ROUTES the verdict.
+# It reads the committed metrics history (data/run-metrics.json); until the
+# engine commits that state the run is a clean, green no-op.
+
+on:
+  schedule:
+    - cron: '30 6 * * *'   # 06:30 UTC daily, just after the morning screening run
+  workflow_dispatch:
+
+# Least privilege: read the repo, write an issue. No other scope.
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: anomaly-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+      - name: Detect sustained anomalies
+        id: detect
+        run: |
+          verdict="$(python monitoring.py escalate data/run-metrics.json)"
+          echo "verdict: $verdict"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          if printf '%s' "$verdict" | grep -q '"escalate": true'; then
+            echo "escalate=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "escalate=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open or update the escalation issue
+        if: steps.detect.outputs.escalate == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          VERDICT: ${{ steps.detect.outputs.verdict }}
+        with:
+          script: |
+            const v = JSON.parse(process.env.VERDICT || '{}');
+            const { owner, repo } = context.repo;
+            const label = 'anomaly-watch';
+            const today = new Date().toISOString().slice(0, 10);
+            const summary = v.summary || (v.types || []).join(', ');
+            const body = [
+              '**The runtime monitor has detected a SUSTAINED anomaly** — one that persisted',
+              `across the last ${v.window || 3} screening runs, not a one-off blip.`,
+              '',
+              `- Categories: **${summary}**`,
+              `- Detected: ${today}`,
+              '',
+              'This is the degrade-loudly escalation from `monitoring.sustained_anomalies`.',
+              'Investigate the screening engine (latency / error rate / subject coverage),',
+              'confirm the sanctions lists are intact, and record the disposition. Close this',
+              'issue once the anomaly has cleared for a full run.',
+            ].join('\n');
+            const open = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: label });
+            if (open.data.length) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: open.data[0].number,
+                body: `Still sustained as of ${today}: ${summary}.` });
+              core.info(`updated existing escalation issue #${open.data[0].number}`);
+            } else {
+              const created = await github.rest.issues.create({ owner, repo, title: 'Sustained screening anomaly detected', body, labels: [label] });
+              core.info(`opened escalation issue #${created.data.number}`);
+            }

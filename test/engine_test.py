@@ -242,6 +242,21 @@ _err = monitoring.monitor_run("2026-06-28", {"subjects": 100, "errors": 30}, {"t
 check("runtime monitor flags an error-rate spike", any("error rate" in a for a in _err["anomalies"]))
 _sec = monitoring.build_monitoring_section(_lat, _drop, txn_monitor.status_line())
 check("monitoring section renders coverage drift + R.16 status", "SOURCE-COVERAGE DRIFT" in _sec and "R.16" in _sec)
+# sustained-anomaly escalation (R-14): an anomaly persisting across the last
+# `window` runs escalates; a single one-off blip does not.
+_sp = os.path.join(_dir, "sustain.json")
+for _d in ("2026-07-01", "2026-07-02", "2026-07-03"):
+    monitoring.monitor_run(_d, {"subjects": 500, "errors": 1}, {"total": 100}, {}, _sp)
+for _d in ("2026-07-04", "2026-07-05", "2026-07-06"):
+    _sus = monitoring.monitor_run(_d, {"subjects": 500, "errors": 150}, {"total": 100}, {}, _sp)
+check("sustained anomaly detected across consecutive runs", "error_rate" in _sus["sustained"])
+check("escalation fires on a sustained anomaly", monitoring.escalation(path=_sp)["escalate"])
+check("report renders a SUSTAINED ANOMALY escalate line", "SUSTAINED ANOMALY" in monitoring.build_monitoring_section(_sus, {}))
+_sp2 = os.path.join(_dir, "blip.json")
+for _d in ("2026-07-01", "2026-07-02", "2026-07-03"):
+    monitoring.monitor_run(_d, {"subjects": 500, "errors": 1}, {"total": 100}, {}, _sp2)
+_blip = monitoring.monitor_run("2026-07-04", {"subjects": 500, "errors": 150}, {"total": 100}, {}, _sp2)
+check("a single one-off anomalous run is not escalated as sustained", _blip["sustained"] == [] and not monitoring.escalation(path=_sp2)["escalate"])
 # coverage + runtime anomalies feed the QA gate (degrade loudly)
 _qa_cov = agents.qa_gate(
     [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}], "risk": {"rating": "HIGH"}}], [], [],
