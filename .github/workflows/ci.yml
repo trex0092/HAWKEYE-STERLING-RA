@@ -42,6 +42,8 @@ jobs:
         run: node test/csp-report.test.js
       - name: Validate CycloneDX SBOM generator
         run: node test/sbom.test.mjs
+      - name: Check CHANGELOG format
+        run: node test/changelog.test.mjs
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
       - name: Run daily-brief unit tests

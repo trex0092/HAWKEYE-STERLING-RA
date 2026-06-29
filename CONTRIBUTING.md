@@ -59,6 +59,12 @@ Other gates that run automatically on your PR:
 - **CSP guardrail** (`test/csp.test.mjs`) and **scoring golden set**
   (`test/scoring-golden.test.js`) — blocking; a re-introduced inline handler or
   an unintended change to a frozen scoring outcome fails the PR.
+- **CHANGELOG + SBOM** — `test/changelog.test.mjs` checks the Keep-a-Changelog
+  format and a non-empty `[Unreleased]`; `test/sbom.test.mjs` validates the
+  CycloneDX generator. Add a bullet under `## [Unreleased]` in
+  [`CHANGELOG.md`](CHANGELOG.md) for any user-visible change; on an `APP_VERSION`
+  bump, move `[Unreleased]` into a dated version section. The release workflow
+  attaches a CycloneDX SBOM (`sbom.cdx.json`) automatically.
 
 ## Branch protection & protected environments
 
