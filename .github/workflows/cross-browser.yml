@@ -9,9 +9,9 @@ name: Cross-Browser Smoke
 on:
   push:
     branches: [main]
-    paths: ['index.html', 'console.html', 'advisor.html', 'assets/**', 'test/cross-browser.spec.mjs', 'playwright.cross-browser.config.mjs']
+    paths: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'advisor.js', 'i18n.js', 'assets/**', 'test/cross-browser.spec.mjs', 'test/keyboard.spec.mjs', 'test/print-report.spec.mjs', 'test/csp-runtime.spec.mjs', 'playwright.cross-browser.config.mjs', 'netlify.toml']
   pull_request:
-    paths: ['index.html', 'console.html', 'advisor.html', 'assets/**', 'test/cross-browser.spec.mjs', 'playwright.cross-browser.config.mjs']
+    paths: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'advisor.js', 'i18n.js', 'assets/**', 'test/cross-browser.spec.mjs', 'test/keyboard.spec.mjs', 'test/print-report.spec.mjs', 'test/csp-runtime.spec.mjs', 'playwright.cross-browser.config.mjs', 'netlify.toml']
   workflow_dispatch:
 
 permissions:
