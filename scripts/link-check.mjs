@@ -27,6 +27,7 @@ function trimUrl(u) { return u.replace(/[.,;:`*]+$/, ''); }
    probe's result is not authoritative. Excluded from the dead-link report. */
 export const ALLOWLIST = new Set([
   'https://scsanctions.un.org/resources/xml/en/consolidated.xml', // UN consolidated list — fetched by the sanctions engine
+  'https://www.un.org/securitycouncil/content/un-sc-consolidated-list', // UN SC Consolidated List landing page — live but heavy/slow, the probe times out (abort) on this canonical un.org page
 ]);
 
 /* Gather unique URLs from the JSON registries + markdown docs. Accepts an

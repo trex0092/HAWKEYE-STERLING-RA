@@ -58,6 +58,12 @@ check('summarize counts dead vs ok', s.total === 3 && s.dead === 2 && s.ok === 1
 const allowUrl = [...ALLOWLIST][0];
 const sAllow = summarize([{ url: allowUrl, sources: ['data/sanctions-sources.json'], ok: false, status: 404 }]);
 check('ALLOWLIST source is not counted dead even on a 404 probe', sAllow.dead === 0);
+/* allowlisted source that the probe could not reach at all (aborted/timeout,
+   null status) is still excluded — e.g. the slow UN SC consolidated-list page */
+const slowAllowUrl = 'https://www.un.org/securitycouncil/content/un-sc-consolidated-list';
+const sSlow = summarize([{ url: slowAllowUrl, sources: ['data/reg-sources.json'], ok: false, status: null, error: 'This operation was aborted' }]);
+check('ALLOWLIST source aborted/timed-out by the probe is not counted dead',
+  ALLOWLIST.has(slowAllowUrl) && sSlow.dead === 0);
 const rep = buildReport(results, '2026-06-16');
 check('report lists dead urls with status + source file', rep.includes('https://dead.example')
   && rep.includes('404') && rep.includes('docs/x.md') && rep.includes('2 of 3'));
