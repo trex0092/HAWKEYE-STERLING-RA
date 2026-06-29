@@ -14,3 +14,15 @@ updates:
       github-actions:
         patterns:
           - "*"
+
+  # Keep the pinned Python screening dependencies (ci/requirements.txt) patched.
+  - package-ecosystem: pip
+    directory: /ci
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    groups:
+      python:
+        patterns:
+          - "*"

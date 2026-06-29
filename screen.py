@@ -26,7 +26,13 @@ try:
     from rapidfuzz import fuzz
     import pdfplumber
 except ImportError:
-    os.system("pip install rapidfuzz pdfplumber -q")
+    # Fallback for environments where deps were not pre-installed. Install the
+    # PINNED versions from requirements.txt (single source of truth) via the
+    # current interpreter — never an unpinned, shell-invoked `pip install`.
+    import subprocess
+    import sys
+    _req = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ci", "requirements.txt")
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", _req], check=False)
     from rapidfuzz import fuzz
     import pdfplumber
 

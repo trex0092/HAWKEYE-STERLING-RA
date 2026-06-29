@@ -45,7 +45,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install rapidfuzz requests pdfplumber
+        run: pip install --quiet -r ci/requirements.txt
 
       - name: Run unified daily screening (sanctions + adverse media + PEP)
         env:
