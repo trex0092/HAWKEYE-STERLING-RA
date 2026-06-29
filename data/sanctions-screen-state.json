@@ -1,5 +1,5 @@
 {
-  "updated": "2026-06-27",
+  "updated": "2026-06-29",
   "subjects": {
     "uya enerji uretim sanayi ve ticaret anonim sirketi": {
       "name": "UYA ENERJİ ÜRETİM SANAYİ VE TİCARET ANONİM ŞİRKETİ",
@@ -13,7 +13,7 @@
       ],
       "signature": "high|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     },
     "kovanlik enerji uretim sanayi ve ticaretanonim sirketi": {
       "name": "KOVANLIK ENERJİ ÜRETİM SANAYİ VE TİCARETANONİM ŞİRKETİ",
@@ -26,7 +26,7 @@
       ],
       "signature": "high|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     },
     "global precious metals pte ltd": {
       "name": "Global Precious Metals Pte. Ltd",
@@ -38,7 +38,7 @@
       ],
       "signature": "high|sanctions-match|US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     },
     "amber international fzco": {
       "name": "Amber International FZCO",
@@ -52,7 +52,7 @@
       ],
       "signature": "critical|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     },
     "aurum international fze": {
       "name": "Aurum International (FZE)",
@@ -65,7 +65,7 @@
       ],
       "signature": "critical|sanctions-match|US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     },
     "dinesh kumar|ubo|1214107921925846": {
       "name": "Dinesh Kumar",
@@ -78,7 +78,7 @@
       ],
       "signature": "high|review|Adverse media (Google News)",
       "firstSeen": "2026-06-27",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     },
     "abdul aziz sultan|ubo|1214107985842154": {
       "name": "Abdul Aziz Sultan",
@@ -94,7 +94,7 @@
       ],
       "signature": "high|sanctions-match|EU — Consolidated financial sanctions list (CSV),UK OFSI — Consolidated list of targets (CSV),UN Security Council — Consolidated list (XML),US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-27",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     },
     "abde ali|ubo|1214106870100359": {
       "name": "Abde Ali",
@@ -107,7 +107,7 @@
       ],
       "signature": "high|sanctions-match|US OFAC — SDN list (CSV)",
       "firstSeen": "2026-06-27",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     },
     "ram dev|ubo|1214106870100357": {
       "name": "Ram Dev",
@@ -120,7 +120,7 @@
       ],
       "signature": "medium|review|Adverse media (Google News)",
       "firstSeen": "2026-06-27",
-      "lastSeen": "2026-06-27"
+      "lastSeen": "2026-06-29"
     }
   }
 }
