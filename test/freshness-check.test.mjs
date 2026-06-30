@@ -32,6 +32,14 @@ const oneStale = allFresh.map((s, i) => i === 1 ? { ...s, lastSuccessDay: '2026-
 r = staleControls(oneStale, today);
 check('flags a control whose last success was an earlier day', r.length === 1 && r[0].name === MANDATORY[1].name);
 
+// a control that is mid-run today (no success yet, but it fired) is NOT stale —
+// the long daily screen must not trip a false "did not run" alarm while running.
+const onePending = allFresh.map((s, i) => i === 1 ? { ...s, lastSuccessDay: '2026-06-24', pendingToday: true } : s);
+check('an in-progress-today control is not flagged stale', staleControls(onePending, today).length === 0);
+// but a control that never succeeded AND is not running today is still stale.
+const pendingElsewhere = allFresh.map((s, i) => i === 1 ? { ...s, lastSuccessDay: null, pendingToday: false } : s);
+check('a control neither successful nor running today is still stale', staleControls(pendingElsewhere, today).length === 1);
+
 // report content
 check('green report mentions all controls fresh', /successful run today/.test(buildReport([], today, MANDATORY.length)));
 check('alarm report lists the stale control', /Sanctions Watch/.test(buildReport([{ id: 'sanctions-watch.yml', name: 'Sanctions Watch', lastSuccessDay: null }], today, MANDATORY.length)));
