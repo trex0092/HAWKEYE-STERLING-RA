@@ -12,7 +12,17 @@ for (const file of ['index.html', 'console.html', 'advisor.html']) {
     await expect(page).toHaveScreenshot(`${file}.png`, {
       fullPage: true,
       animations: 'disabled',
-      maxDiffPixelRatio: 0.02,
+      // Cross-Chromium-build robustness: text glyphs antialias slightly
+      // differently between Chromium releases (the baseline is captured on one
+      // build, contributors/CI may run another), which shows up as faint
+      // fringes on every glyph — heaviest on the text-dense advisor screen at
+      // the Pixel 7 device scale. `threshold` (per-pixel YIQ distance) lets
+      // those low-delta fringes fall below the "changed" cutoff, and
+      // `maxDiffPixelRatio` keeps a small overall budget. A real structural
+      // change (moved/missing/recoloured element) produces high-delta pixels
+      // over a large area and still trips the check.
+      threshold: 0.3,
+      maxDiffPixelRatio: 0.05,
     });
   });
 }
