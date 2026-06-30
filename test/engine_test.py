@@ -49,6 +49,19 @@ check("true entity match survives", len(screen.screen_name("PETROPARS INTERNATIO
 person = {"UK OFSI": [(screen.normalize("MAHMOOD SULTAN"), "MAHMOOD SULTAN")]}
 check("person name match survives", len(screen.screen_name("Mahmoud Sultan", person)) == 1)
 
+# A non-Latin-script name normalises to empty and so cannot be auto-matched — it
+# must NOT be filed "clear"; it is surfaced for manual screening instead.
+_pm, _clr = screen.screen_customers(
+    [{"name": "محمد عبدالله", "individuals": [], "permalink": "x"}], person)
+check("non-Latin (unscreenable) customer is flagged for manual review, not cleared",
+      len(_pm) == 1 and len(_clr) == 0 and any(h.get("unscreenable") for h in _pm[0]["hits"]))
+_pm2, _clr2 = screen.screen_customers(
+    [{"name": "PETROPARS INTERNATIONAL FZE", "individuals": [], "permalink": "x"}], person)
+check("a screenable, non-matching customer is still cleared normally",
+      len(_pm2) == 0 and len(_clr2) == 1)
+# Display floors similarity (99.6 → "99%"), never rounds up to a confirmed-looking 100%.
+check("score display floors, never rounds up to 100%", screen._pct(99.6) == "99%" and screen._pct(100) == "100%")
+
 # ── transliteration recall ───────────────────────────────────────────────────
 print("ai.py — transliteration")
 v = ai.name_variants("Mohammed Al Hussein")
@@ -221,6 +234,15 @@ check("R.16 detects high-risk-geo counterparty", any(a["rule"] == "HIGH_RISK_GEO
 check("R.16 returns nothing on an empty/no-feed input", txn_monitor.evaluate([])["alerts"] == [])
 check("R.16 is INACTIVE without a configured feed (honest status)", "INACTIVE" in txn_monitor.status_line() and txn_monitor.load_transactions("/nonexistent/path.json") == [])
 check("R.16 a single rule error never blocks the others", isinstance(txn_monitor.evaluate_customer([{"bad": "row"}]), list))
+# Velocity baseline must EXCLUDE the spike day from its own mean, otherwise a large
+# single-day spike inflates the threshold and never fires (regression guard).
+_vel = txn_monitor.evaluate([
+    {"customer": "V", "date": "2026-06-01", "amount": 100, "direction": "in", "method": "wire"},
+    {"customer": "V", "date": "2026-06-02", "amount": 100, "direction": "in", "method": "wire"},
+    {"customer": "V", "date": "2026-06-03", "amount": 1000, "direction": "in", "method": "wire"},
+])
+check("R.16 velocity fires on a 10x spike vs the genuine baseline (spike day excluded)",
+      any(a["rule"] == "VELOCITY" for a in _vel["alerts"]))
 
 # ── monitoring.py: runtime metrics + source-coverage drift ────────────────────
 print("monitoring.py — runtime metrics + coverage drift")

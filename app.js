@@ -93,7 +93,19 @@ const _secMem = {};        /* decrypted plaintext mirror, keyed by storage key *
 
 function _hasCrypto(){ try{ return !!(crypto && crypto.subtle && crypto.getRandomValues); }catch(e){ return false; } }
 const _u8 = s => new TextEncoder().encode(s);
-const _b64 = u => btoa(String.fromCharCode.apply(null, new Uint8Array(u)));
+const _b64 = u => {
+  /* Chunk the byte→char conversion: String.fromCharCode.apply on a single large
+     array overflows the call stack (~125 KB), which silently broke at-rest
+     persistence of the (unbounded) audit log and register once they grew. The
+     decrypt path uses atob() with no such limit, so without chunking, data that
+     could be read back could never be re-written. */
+  const bytes = new Uint8Array(u);
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(s);
+};
 const _ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
 async function _deriveKey(pass, salt, iter){

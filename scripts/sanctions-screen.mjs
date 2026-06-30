@@ -90,6 +90,10 @@ export const DEFAULT_THRESHOLD = Number(process.env.SCREEN_MATCH_THRESHOLD) || 0
    is treated as a positive signal (conservative — errs toward flagging). */
 const CLEAR_RE = /^(clear|no[_\s-]?match|no[_\s-]?hit|pass|passed|negative|none|nil|ok|false[_\s-]?positive|not[_\s-]?listed|low)$/i;
 const HIGH_BANDS = new Set(['critical', 'high', 'severe', 'elevated', 'red', 'amber']);
+/* Enrichment signals (best-effort, network-bound) vs. the always-run local
+   sanctions match. A standing match derived solely from these must NOT be cleared
+   on a run where the lookup errored or was time-budget-skipped (see diffState). */
+const ENRICHMENT_LISTS = new Set(['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice']);
 
 /* ── Pure helpers (no network; unit-tested) ───────────────────────────────── */
 
@@ -299,7 +303,19 @@ export function diffState(prevState, results, today, threshold) {
           band: r.band, topScore: r.topScore, recommendation: r.recommendation, lists: r.lists || [], isNew: !prior });
       }
     } else if (prev[r.key]) {
-      cleared.push({ key: r.key, name: r.name, prior: prev[r.key] });
+      const prior = prev[r.key];
+      // A prior match derived ONLY from enrichment signals (PEP / adverse media /
+      // Interpol) must not be silently cleared on a run where that lookup errored
+      // or was budget-skipped — we did not actually re-verify it. Carry it forward
+      // untouched (no alert, no clear); a later run that completes enrichment will
+      // clear it legitimately. (A prior SANCTIONS hit is always re-checked locally,
+      // so a genuine de-listing still clears.)
+      const priorEnrichmentOnly = Array.isArray(prior.lists) && prior.lists.length > 0
+        && prior.lists.every(l => ENRICHMENT_LISTS.has(l));
+      if (r.enrichmentIncomplete && priorEnrichmentOnly) {
+        continue;   // leave nextSubjects[r.key] (the copied prior) in place
+      }
+      cleared.push({ key: r.key, name: r.name, prior });
       delete nextSubjects[r.key];
     }
   }
@@ -912,11 +928,15 @@ async function screenLocally(subjects, cfg) {
     let band = raw.lists.length ? raw.band : '';
     let topScore = raw.lists.length ? raw.topScore : 0;
     const enrich = Date.now() < enrichDeadline;
-    if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol)) enrichSkipped++;
+    // Track whether any requested enrichment signal could NOT be evaluated this
+    // run (errored or budget-skipped) so diffState won't silently clear a standing
+    // enrichment-only match it couldn't re-verify.
+    let enrichmentIncomplete = false;
+    if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol)) { enrichSkipped++; enrichmentIncomplete = true; }
 
     if (cfg.adverseMedia && enrich) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
-      if (am.errored) { amErrors++; }
+      if (am.errored) { amErrors++; enrichmentIncomplete = true; }
       else if (am.hit) {
         lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : ''), score: am.score });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
@@ -924,7 +944,7 @@ async function screenLocally(subjects, cfg) {
     }
     if (cfg.pep && enrich) {
       const pp = await checkPep(s.name, { timeoutMs: cfg.checkTimeoutMs });
-      if (pp.errored) { pepErrors++; }
+      if (pp.errored) { pepErrors++; enrichmentIncomplete = true; }
       else if (pp.hit) {
         lists.push({ list: 'PEP (Wikidata)', hitName: (pp.match && (pp.match.label + ' — ' + pp.match.description) || '').slice(0, 180), score: pp.score });
         band = strongerBand(band, pp.band); topScore = Math.max(topScore, pp.score);
@@ -932,7 +952,7 @@ async function screenLocally(subjects, cfg) {
     }
     if (cfg.interpol && enrich) {
       const ip = await checkInterpol(s.name, { timeoutMs: cfg.checkTimeoutMs });
-      if (ip.errored) { interpolErrors++; }
+      if (ip.errored) { interpolErrors++; enrichmentIncomplete = true; }
       else if (ip.hit) {
         const nats = (ip.match && ip.match.nationalities.length) ? ' [' + ip.match.nationalities.join(', ') + ']' : '';
         lists.push({ list: 'Interpol Red Notice', hitName: ((ip.match && ip.match.name || '') + nats).slice(0, 180), score: ip.score });
@@ -950,7 +970,9 @@ async function screenLocally(subjects, cfg) {
       hitCount: lists.length,
       lists
     };
-    return normalizeResult(merged, s);
+    const nr = normalizeResult(merged, s);
+    nr.enrichmentIncomplete = enrichmentIncomplete;
+    return nr;
   });
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');

@@ -116,12 +116,18 @@ def rule_velocity(txns):
             by_day[d] += _amt(t)
     if len(by_day) < 3:
         return []
-    mean = sum(by_day.values()) / len(by_day)
+    total = sum(by_day.values())
+    n = len(by_day)
     out = []
     for d, v in by_day.items():
-        if mean > 0 and v >= VELOCITY_FACTOR * mean:
+        # Baseline = mean of the OTHER active days. Including the spike day in its
+        # own baseline inflates the threshold and lets large single-day spikes slip
+        # under it (e.g. [100,100,1000] → naive mean 400, so the 10× spike never
+        # fires); excluding it compares the day against the genuine baseline.
+        base_mean = (total - v) / (n - 1)
+        if base_mean > 0 and v >= VELOCITY_FACTOR * base_mean:
             out.append(_alert("VELOCITY", "MEDIUM", {"customer": _any_customer(txns), "date": str(d)},
-                f"day volume {v:,.0f} AED ≥ {VELOCITY_FACTOR:g}× mean daily {mean:,.0f}"))
+                f"day volume {v:,.0f} AED ≥ {VELOCITY_FACTOR:g}× baseline daily {base_mean:,.0f}"))
     return out
 
 
@@ -144,7 +150,9 @@ def rule_high_risk_counterparty(txns, jurisdiction_table=None):
 
 
 def rule_rapid_passthrough(txns):
-    """Funds in then out within 48h for a similar amount — pass-through / layering."""
+    """Funds in then out within ~2 days (≤72h, date-granular) for a similar amount
+    — pass-through / layering. The window is intentionally generous (over-alert is
+    the safe direction for AML); the alert text states the actual day gap."""
     ins = [t for t in txns if _norm(t.get("direction")) == "in" and _d(t.get("date"))]
     outs = [t for t in txns if _norm(t.get("direction")) == "out" and _d(t.get("date"))]
     out = []

@@ -92,9 +92,10 @@ export function parseOfacCsv(body) {
 
 const XML_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 function decodeXml(x) {
+  const cp = n => { try { return String.fromCodePoint(n); } catch { return ''; } };
   return String(x).replace(/&(amp|lt|gt|quot|apos);/g, (_, n) => XML_ENT[n])
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    .replace(/&#(\d+);/g, (_, d) => cp(+d))                       // fromCodePoint: handles astral planes (>U+FFFF), not just the BMP
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => cp(parseInt(h, 16)));
 }
 function firstTag(block, name) {
   const m = new RegExp('<' + name + '>([\\s\\S]*?)<\\/' + name + '>').exec(block);
@@ -395,7 +396,12 @@ export function parseJsonList(body) {
    Accepts an array of strings, an array of {name, aliases[]} objects, or
    {entries:[…]} / {names:[…]}. */
 export function parseCuratedList(json) {
-  const data = typeof json === 'string' ? JSON.parse(json) : json;
+  // Best-effort like every sibling parser: a malformed/truncated curated file
+  // (e.g. the in-repo EOCN local list) must degrade that one list's coverage,
+  // never throw and abort the whole daily screen.
+  let data;
+  try { data = typeof json === 'string' ? JSON.parse(json) : json; } catch { return []; }
+  if (!data || typeof data !== 'object') return [];
   const list = Array.isArray(data) ? data : (data.entries || data.names || []);
   const out = [];
   for (const e of list) {
