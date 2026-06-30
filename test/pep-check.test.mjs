@@ -1,6 +1,6 @@
 /* Unit tests for PEP screening pure logic (no network).
    Usage: node test/pep-check.test.mjs */
-import { pepSearchUrl, scorePep, PEP_KEYWORDS } from '../scripts/pep-check.mjs';
+import { pepSearchUrl, scorePep, PEP_KEYWORDS, checkPep } from '../scripts/pep-check.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -29,6 +29,35 @@ check('scorePep requires the subject name in the result label', wrongName.hit ==
 
 check('scorePep tolerates an empty response', scorePep('Acme Co', {}).hit === false);
 check('PEP_KEYWORDS includes core political roles', PEP_KEYWORDS.includes('president') && PEP_KEYWORDS.includes('minister'));
+
+/* checkPep retries transient rate-limits (stub global fetch: 429 → 200). */
+const _realFetch = globalThis.fetch;
+const jsonRes = (obj, ok = true, status = 200, headers = {}) => ({
+  ok, status, headers: { get: k => headers[k.toLowerCase()] ?? null }, json: async () => obj,
+});
+await (async () => {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1) return jsonRes({}, false, 429, { 'retry-after': '0' });
+    return jsonRes({ search: [{ id: 'Q7747', label: 'Vladimir Putin', description: 'President of Russia' }] });
+  };
+  const r = await checkPep('Vladimir Putin', { retries: 2, backoffMs: 1 });
+  check('checkPep retries a 429 then succeeds (transient rate-limit)', calls === 2 && r.hit === true && !r.errored);
+
+  // Persistent 429 across all attempts → errored (degraded), not a clean PEP.
+  let calls2 = 0;
+  globalThis.fetch = async () => { calls2++; return jsonRes({}, false, 429, {}); };
+  const r2 = await checkPep('Someone', { retries: 2, backoffMs: 1 });
+  check('checkPep gives up after retries on persistent 429 (errored, never clean)', r2.errored === true && calls2 === 3);
+
+  // A 404 is not retryable → fails fast (single call).
+  let calls3 = 0;
+  globalThis.fetch = async () => { calls3++; return jsonRes({}, false, 404, {}); };
+  const r3 = await checkPep('Someone', { retries: 2, backoffMs: 1 });
+  check('checkPep does not retry a non-transient status (404)', r3.errored === true && calls3 === 1);
+})();
+globalThis.fetch = _realFetch;
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

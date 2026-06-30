@@ -61,19 +61,36 @@ export function scorePep(name, json) {
   return { hit: true, score: 80, band: 'medium', match: hits[0], count: hits.length };
 }
 
+/* Wikidata rate-limits (429) and occasionally 5xx's under burst — when the whole
+   customer base is screened at once these are transient, not real failures. */
+const PEP_RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
+const _sleep = ms => new Promise(r => setTimeout(r, ms));
+
 /* Network: look up one subject's PEP signal. Tolerant — on error returns
-   { errored:true } so the caller flags degraded coverage, never a clean PEP. */
-export async function checkPep(name, { timeoutMs = 20000 } = {}) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(pepSearchUrl(name), {
-      signal: ctrl.signal, redirect: 'follow',
-      headers: { 'user-agent': 'HawkeyeSterling-PEP/1.0 (compliance screening)', Accept: 'application/json' }
-    });
-    if (!res.ok) return { errored: true, error: 'HTTP ' + res.status };
-    return scorePep(name, await res.json());
-  } catch (e) {
-    return { errored: true, error: String(e && e.message || e).slice(0, 200) };
-  } finally { clearTimeout(t); }
+   { errored:true } so the caller flags degraded coverage, never a clean PEP.
+   Retries transient rate-limit / 5xx responses with exponential backoff +
+   jitter, honouring a Retry-After header when present. */
+export async function checkPep(name, { timeoutMs = 20000, retries = 2, backoffMs = 600 } = {}) {
+  let lastErr = 'unreachable';
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(pepSearchUrl(name), {
+        signal: ctrl.signal, redirect: 'follow',
+        headers: { 'user-agent': 'HawkeyeSterling-PEP/1.0 (compliance screening)', Accept: 'application/json' }
+      });
+      if (res.ok) return scorePep(name, await res.json());
+      lastErr = 'HTTP ' + res.status;
+      if (!PEP_RETRY_STATUS.has(res.status) || attempt === retries) return { errored: true, error: lastErr };
+      const ra = Number(res.headers && res.headers.get && res.headers.get('retry-after'));
+      const wait = Number.isFinite(ra) && ra > 0 ? ra * 1000 : backoffMs * (2 ** attempt);
+      await _sleep(wait + Math.floor(Math.random() * 250));
+    } catch (e) {
+      lastErr = String(e && e.message || e).slice(0, 200);
+      if (attempt === retries) return { errored: true, error: lastErr };
+      await _sleep(backoffMs * (2 ** attempt) + Math.floor(Math.random() * 250));
+    } finally { clearTimeout(t); }
+  }
+  return { errored: true, error: lastErr };
 }
