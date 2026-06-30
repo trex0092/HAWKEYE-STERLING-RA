@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write       # OIDC for Sigstore-keyless build-provenance attestation
+  attestations: write   # store the attestation in the repo's attestation log
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
@@ -35,6 +37,7 @@ jobs:
         with:
           persist-credentials: false   # no git push here (gh/create-pull-request use the token directly)
       - name: Release the current APP_VERSION if untagged
+        id: rel
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -42,14 +45,30 @@ jobs:
           test -n "$V" || { echo "could not read APP_VERSION from app.js"; exit 1; }
           if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "v$V already released — nothing to do"
+            echo "released=false" >> "$GITHUB_OUTPUT"
           else
             gh release create "v$V" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "v$V" --generate-notes
-            # Attach a CycloneDX SBOM as a release artifact (supply-chain provenance).
+            # Build the supply-chain artifacts: a deterministic source tarball of the
+            # released commit + a CycloneDX SBOM. Both are attested below.
+            git archive --format=tar.gz -o "hawkeye-sterling-ra-$V.tar.gz" "$GITHUB_SHA"
+            gh release upload "v$V" "hawkeye-sterling-ra-$V.tar.gz" --repo "$GITHUB_REPOSITORY" --clobber || echo "tarball upload skipped"
             if node scripts/gen-sbom.mjs; then
               gh release upload "v$V" sbom.cdx.json --repo "$GITHUB_REPOSITORY" --clobber || echo "SBOM upload skipped"
             else
               echo "SBOM generation skipped"
             fi
+            echo "released=true" >> "$GITHUB_OUTPUT"
             echo "released v$V"
           fi
+
+      # Sign the release artifacts with a Sigstore-keyless build-provenance
+      # attestation (OIDC, no long-lived keys). Verify with:
+      #   gh attestation verify hawkeye-sterling-ra-<v>.tar.gz --repo <owner>/<repo>
+      - name: Attest build provenance for the release artifacts
+        if: steps.rel.outputs.released == 'true'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: |
+            hawkeye-sterling-ra-*.tar.gz
+            sbom.cdx.json

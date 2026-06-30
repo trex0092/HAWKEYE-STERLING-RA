@@ -109,6 +109,22 @@ Federal Decree-Law No. (26) of 2021, Art. 23, applied elsewhere in this repo).
 values are redacted before they are attached, consistent with the app's
 no-secret-logging posture.
 
+## Verifying release provenance
+
+Every release publishes a deterministic source tarball and a CycloneDX SBOM, each
+signed with a **Sigstore-keyless build-provenance attestation** (GitHub OIDC — no
+long-lived signing keys). To confirm an artifact was built by this repository's
+release workflow from a specific commit, before trusting it:
+
+```sh
+gh attestation verify hawkeye-sterling-ra-<version>.tar.gz \
+  --repo trex0092/HAWKEYE-STERLING-RA
+```
+
+A failed verification means the artifact was not produced by the official release
+pipeline — do not use it. The architecture and trust boundaries behind this are in
+[docs/architecture.md](docs/architecture.md).
+
 ## Related governance
 
 Incident response, containment, and the Advisor kill switch are documented in
