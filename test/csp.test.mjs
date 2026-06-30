@@ -24,6 +24,15 @@ check("script-src does NOT allow 'unsafe-inline'", !/'unsafe-inline'/.test(scrip
 check("script-src allows 'self'", /'self'/.test(scriptSrc));
 check("object-src is 'none'", /object-src 'none'/.test(cspLine));
 check("base-uri is 'self'", /base-uri 'self'/.test(cspLine));
+check("CSP requires Trusted Types for script sinks", /require-trusted-types-for 'script'/.test(cspLine));
+check('CSP restricts Trusted Types policies to the default', /trusted-types default/.test(cspLine));
+
+/* The Trusted Types default policy is installed by sw-register.js (the first
+   script on every page) and locks down the script sinks. */
+const swReg = readFileSync(new URL('../sw-register.js', import.meta.url), 'utf8');
+check("sw-register.js creates the 'default' Trusted Types policy", /createPolicy\(\s*['"]default['"]/.test(swReg));
+check('Trusted Types policy blocks string-to-script (createScript throws)', /createScript[\s\S]{0,80}throw/.test(swReg));
+check('Trusted Types policy gates createScriptURL to same-origin', /createScriptURL[\s\S]{0,160}url\.origin === location\.origin/.test(swReg));
 check('CSP declares a violation report sink (report-to/report-uri)', /report-to\s+csp-endpoint/.test(cspLine) && /report-uri\s+\/\.netlify\/functions\/csp-report/.test(cspLine));
 check('Reporting-Endpoints header maps csp-endpoint to the function', /Reporting-Endpoints\s*=\s*"csp-endpoint=\\?"\/\.netlify\/functions\/csp-report\\?""/.test(toml));
 
