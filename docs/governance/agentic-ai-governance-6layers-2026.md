@@ -118,6 +118,7 @@ gaps in the live tipping-off guard — reversed-order "a SAR was filed" and "we 
 | NIST AI RMF | ✅ | Control-by-control crosswalk: [`nist-ai-rmf-mapping-2026.md`](nist-ai-rmf-mapping-2026.md) (self-assessment) |
 | ISO 42001 | ✅ | Statement of Applicability: [`iso-42001-soa-2026.md`](iso-42001-soa-2026.md) (self-assessment) |
 | UAE AI Charter | ✅ | Principle-by-principle mapping of all 12 Charter principles: [`uae-ai-charter-mapping-2026.md`](uae-ai-charter-mapping-2026.md) (self-assessment) |
+| Turing FAST/SUM + responsible-AI | ✅ | Ethics-framework crosswalk: [`ai-frameworks-crosswalk-2026.md`](ai-frameworks-crosswalk-2026.md); lifecycle: [`pbg-lifecycle-map-2026.md`](pbg-lifecycle-map-2026.md); stakeholder impact: [`stakeholder-impact-assessment-2026.md`](stakeholder-impact-assessment-2026.md) |
 | EU AI Act | ✅ | Advisor classed **limited risk** (transparency) in the register; on-screen notice in `advisor.html`; not high-risk (human decides) |
 | Audit trails | ✅ | Tamper-evident hash-chained log (`index.html`); git + Asana trails; Advisor audit line |
 | Continuous assurance | ✅ | Daily brief; daily/weekly watchers; CI incl. assurance + register-schema tests; weekly live eval |
