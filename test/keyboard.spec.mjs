@@ -52,3 +52,40 @@ test('index.html: complete core fields by keyboard and see the score update', as
 
   expect(pageErrors, `uncaught errors: ${pageErrors.join(' | ')}`).toEqual([]);
 });
+
+/* Console + Advisor: keyboard operability (2.1.1) + a visible focus indicator
+   (2.4.7), anchored on the language toggle present on every screen. Confirms the
+   page boots without script errors, a control takes keyboard focus and shows an
+   indicator, and Tab advances focus. */
+for (const file of ['console.html', 'advisor.html']) {
+  test(`${file}: keyboard focus, visible focus indicator, and Tab navigation`, async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load' });
+    await page.waitForTimeout(800);
+
+    const toggle = page.locator('#langToggle');
+    await toggle.focus();
+    await expect(toggle).toBeFocused();
+
+    const focusStyle = await toggle.evaluate((el) => {
+      const s = window.getComputedStyle(el);
+      return { outline: s.outlineStyle + ' ' + s.outlineWidth, shadow: s.boxShadow };
+    });
+    expect(
+      focusStyle.outline.trim() !== 'none 0px' || (focusStyle.shadow && focusStyle.shadow !== 'none'),
+      `no visible focus indicator: ${JSON.stringify(focusStyle)}`,
+    ).toBeTruthy();
+
+    await page.keyboard.press('Tab');
+    const movedToFocusable = await page.evaluate(() => {
+      const a = document.activeElement;
+      return !!a && a !== document.body && a.tagName !== 'HTML';
+    });
+    expect(movedToFocusable, 'Tab did not advance focus to a focusable control').toBeTruthy();
+
+    expect(pageErrors, `uncaught errors: ${pageErrors.join(' | ')}`).toEqual([]);
+  });
+}

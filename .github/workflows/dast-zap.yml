@@ -1,0 +1,61 @@
+name: DAST (OWASP ZAP baseline)
+
+# Dynamic application security test of the DEPLOYED site, complementing the static
+# analysis (CodeQL + Semgrep) which only sees source. ZAP's baseline scan spiders
+# the live app and passively checks the running responses — security headers
+# (CSP/HSTS/COOP/COEP), cookie flags, info leakage, mixed content — i.e. that the
+# hardening in netlify.toml is actually present on the wire.
+#
+# Scheduled + manual only (not a PR gate): it scans the production deployment, and
+# the passive baseline is advisory — the HTML/JSON report is uploaded as an
+# artifact for review rather than blocking merges.
+on:
+  schedule:
+    - cron: '37 6 * * 1'   # Mondays 06:37 UTC
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "URL to scan"
+        required: false
+        default: "https://hawkeye-sterling-ra.netlify.app"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: true
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          egress-policy: audit   # ZAP needs outbound HTTP(S) to the target
+
+      - name: Run ZAP baseline scan
+        env:
+          TARGET: ${{ github.event.inputs.target || 'https://hawkeye-sterling-ra.netlify.app' }}
+        run: |
+          mkdir -p zap-out && chmod 777 zap-out
+          # Official ZAP image, pinned to a version tag (swap to an @sha256 digest
+          # to fully pin). -I: do not return failure on warn-level alerts (the
+          # baseline is advisory); reports are written for the artifact upload.
+          docker run --rm -v "$PWD/zap-out:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:2.16.1 \
+            zap-baseline.py -t "$TARGET" -I \
+            -r zap-report.html -J zap-report.json -w zap-report.md || true
+          ls -l zap-out || true
+          if [ -f zap-out/zap-report.md ]; then cat zap-out/zap-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zap-baseline-report
+          path: zap-out
+          if-no-files-found: ignore
+          retention-days: 14

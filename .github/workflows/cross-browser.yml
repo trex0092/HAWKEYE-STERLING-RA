@@ -44,7 +44,7 @@ jobs:
         # Local install so `import '@playwright/test'` resolves (the repo has no
         # package.json). node_modules is gitignored.
         run: |
-          npm install @playwright/test@1.49.1
+          npm install @playwright/test@1.49.1 @axe-core/playwright axe-core
           npx playwright install --with-deps chromium firefox webkit
 
       - name: Cross-browser smoke
