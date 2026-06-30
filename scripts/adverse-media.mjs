@@ -29,10 +29,11 @@ export function adverseMediaUrl(name, terms = ADVERSE_TERMS) {
 
 const RSS_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 function decode(x) {
+  const cp = n => { try { return String.fromCodePoint(n); } catch { return ''; } };
   return String(x).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
     .replace(/&(amp|lt|gt|quot|apos);/g, (_, n) => RSS_ENT[n])
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    .replace(/&#(\d+);/g, (_, d) => cp(+d))                       // fromCodePoint: astral planes (>U+FFFF), not just the BMP
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => cp(parseInt(h, 16)));
 }
 
 /* Parse a Google News RSS feed → [{ title, link, source, date }]. */

@@ -132,6 +132,27 @@ check('diffState clears a subject that is no longer a match', d4.alerts.length =
 const d5 = diffState(d1.nextState, [{ key: 'a', name: 'A Co', errored: true }], '2026-06-20', 0.85);
 check('diffState carries prior state forward for an errored subject (never false-clear)', d5.alerts.length === 0 && d5.cleared.length === 0 && !!d5.nextState.subjects.a);
 
+/* A standing PEP/adverse-media (enrichment-only) match must NOT be cleared on a
+   run whose enrichment lookup errored/was budget-skipped — it wasn't re-verified. */
+const pepListed = normalizeResult({ name: 'P Co', topScore: 80, band: 'high', recommendation: 'review', lists: [{ list: 'PEP (Wikidata)', matchScore: 80 }] }, { key: 'p', name: 'P Co' });
+const p1 = diffState({ updated: null, subjects: {} }, [pepListed], '2026-06-19', 0.85);
+const pIncomplete = normalizeResult({ name: 'P Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] }, { key: 'p', name: 'P Co' });
+pIncomplete.enrichmentIncomplete = true;
+const p2 = diffState(p1.nextState, [pIncomplete], '2026-06-20', 0.85);
+check('enrichment-only match is carried forward (not cleared) when the lookup could not be re-verified',
+  p2.cleared.length === 0 && !!p2.nextState.subjects.p && p2.nextState.subjects.p.firstSeen === '2026-06-19');
+/* …but once enrichment completes and genuinely clears, it IS cleared. */
+const pClear = normalizeResult({ name: 'P Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] }, { key: 'p', name: 'P Co' });
+const p3 = diffState(p1.nextState, [pClear], '2026-06-21', 0.85);
+check('enrichment-only match clears normally once the lookup succeeds and returns no hit',
+  p3.cleared.length === 1 && !p3.nextState.subjects.p);
+/* A prior SANCTIONS hit still clears on genuine de-listing even if enrichment was incomplete. */
+const sIncomplete = normalizeResult({ name: 'A Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] }, { key: 'a', name: 'A Co' });
+sIncomplete.enrichmentIncomplete = true;
+const d6 = diffState(d1.nextState, [sIncomplete], '2026-06-22', 0.85);
+check('a prior sanctions hit (re-checked locally) still clears on de-listing despite incomplete enrichment',
+  d6.cleared.length === 1 && !d6.nextState.subjects.a);
+
 /* ── rendering ── */
 check('matchSummary names band, score and lists', matchSummary(d1.alerts[0]).includes('HIGH') && matchSummary(d1.alerts[0]).includes('OFAC SDN'));
 const report = buildScreenReport(d1.alerts, [], '2026-06-19', { screened: 42, degraded: true, errored: 1 });

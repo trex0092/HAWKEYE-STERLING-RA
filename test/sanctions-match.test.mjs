@@ -166,6 +166,15 @@ check('parseJsonList tolerates malformed JSON (returns [])', parseJsonList('{not
 const cur = parseCuratedList({ entries: ['Foo Bar', { name: 'Baz Co', aliases: ['Baz Limited'] }] });
 check('parseCuratedList reads strings and {name,aliases}', cur.join('|') === 'Foo Bar|Baz Co|Baz Limited');
 check('parseList dispatches by parser field', parseList({ parser: 'ofac' }, '1,ACME,entity').join() === 'ACME');
+/* A malformed curated/local list must degrade to [] (best-effort), never throw and
+   abort the whole daily screen — matches every sibling parser's contract. */
+check('parseCuratedList returns [] on truncated JSON (no throw)', Array.isArray(parseCuratedList('{bad json')) && parseCuratedList('{bad json').length === 0);
+check('parseCuratedList returns [] on a JSON scalar/null body', parseCuratedList('null').length === 0 && parseCuratedList('42').length === 0);
+check('parseList(curated) on a corrupt body degrades to [] instead of crashing', parseList({ type: 'curated' }, '{').length === 0);
+/* Astral-plane (>U+FFFF) numeric XML refs decode to the real glyph, not a NUL. */
+const astral = parseUnXml('<INDIVIDUAL><FIRST_NAME>Test &#131072; Name</FIRST_NAME></INDIVIDUAL>');
+check('XML numeric entity above the BMP decodes via fromCodePoint (no NUL truncation)',
+  astral.length === 1 && astral[0].includes('\u{20000}') && !astral[0].includes(' '));
 
 /* ── similarity ── */
 check('levenshtein basic', levenshtein('kitten', 'sitting') === 3);

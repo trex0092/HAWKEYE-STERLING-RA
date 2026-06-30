@@ -40,6 +40,8 @@ jobs:
         run: node test/security-headers.test.mjs
       - name: Run export-integrity + round-trip tests
         run: node test/export-integrity.test.js
+      - name: Run base64 helper regression test (large-payload persistence)
+        run: node test/crypto-b64.test.mjs
       - name: Run CSP-report function tests
         run: node test/csp-report.test.js
       - name: Validate CycloneDX SBOM generator

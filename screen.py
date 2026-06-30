@@ -175,6 +175,14 @@ def normalize(name):
     name = re.sub(r"\s+", " ", name).strip()
     return name
 
+def _pct(score) -> str:
+    # Floor, never round: a 99.6 similarity must read "99%", not "100%" — only a
+    # genuine >=100 (exact) match may display 100% (which is the confirmed-hit gate).
+    try:
+        return f"{int(float(score))}%"
+    except (TypeError, ValueError):
+        return "0%"
+
 def sha256_of(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -720,14 +728,33 @@ def screen_name(name, all_lists):
             best[key] = h
     return sorted(best.values(), key=lambda x: -x["score"])
 
+def _unscreenable(name):
+    # A name that carries content but collapses to fewer than 4 matchable chars
+    # after normalize() (e.g. recorded only in Arabic/Cyrillic/CJK script, which
+    # the Latin normaliser strips to empty) cannot be auto-screened. Returning no
+    # hits would file it as "clear" — a silent sanctions false negative — so these
+    # are surfaced for manual screening instead.
+    return bool(name and str(name).strip()) and len(normalize(name)) < 4
+
+def _manual_review_hit(subject_type, subject_name, control_linkage):
+    return {"subject_type": subject_type, "subject_name": subject_name,
+            "control_linkage": control_linkage, "unscreenable": True,
+            "list": "MANUAL REVIEW",
+            "matched_entry": "name not auto-screenable (non-Latin script or too short) — screen this subject manually against all lists",
+            "score": 0, "name_score": 0, "core_score": 0, "confidence": "REVIEW"}
+
 def screen_customers(customers, all_lists):
     possible_matches, clear = [], []
     for c in customers:
         hits = []
+        if _unscreenable(c["name"]):
+            hits.append(_manual_review_hit("ENTITY", c["name"], False))
         for h in screen_name(c["name"], all_lists):
             hits.append({"subject_type":"ENTITY","subject_name":c["name"],
                          "control_linkage": False, **h})
         for ind in c["individuals"]:
+            if _unscreenable(ind):
+                hits.append(_manual_review_hit("INDIVIDUAL", ind, True))
             for h in screen_name(ind, all_lists):
                 # An owner / director / UBO matching a designation flags the
                 # COMPANY by ownership/control linkage (the 50%/control rule),
@@ -837,7 +864,7 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                 lines += [
                     f"   Matched List:    {h['list']}",
                     f"   Matched Entry:   {h['matched_entry']}",
-                    f"   Score:           {h['score']:.0f}%",
+                    f"   Score:           {_pct(h['score'])}",
                 ]
             lines += [
                 f"   Action:          IMMEDIATE ESCALATION TO MLRO",
@@ -863,7 +890,7 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                     f"   Subject:         [{h['subject_type']}] {h['subject_name']}",
                     f"   Matched List:    {h['list']}",
                     f"   Matched Entry:   {h['matched_entry']}",
-                    f"   Score:           {h['score']:.0f}%",
+                    f"   Score:           {_pct(h['score'])}",
                 ]
             lines += [
                 f"   MLRO Decision:   ☐ False Positive   ☐ Escalate   ☐ Investigate",
@@ -1214,7 +1241,7 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
     for h in hits:
         lines += [f"List:    {h.get('list','?')}",
                   f"Matched: {h.get('matched_entry','?')}",
-                  f"Score:   {h.get('score',0):.0f}%\n"]
+                  f"Score:   {_pct(h.get('score',0))}\n"]
     r = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{customer_gid}/stories",
                       json={"data": {"text": "\n".join(lines)}})
     if r is not None and r.status_code in (200,201):
@@ -1323,7 +1350,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 nflag = " 🆕" if h.get("is_new") else ""
                 link = " · owner/UBO → 50%/control rule" if h.get("control_linkage") else ""
                 A(f"   -> [{h['subject_type']}] {h['subject_name']}  —  {h['list']}: "
-                  f"\"{h['matched_entry']}\"   {h['score']:.0f}%{conf}{nflag}{link}")
+                  f"\"{h['matched_entry']}\"   {_pct(h['score'])}{conf}{nflag}{link}")
                 # R.10 — identity dossier + open CDD gaps for the matched individual.
                 if h.get("identity"):
                     A(f"        Identity (R.10): {h['identity']}")
@@ -1517,11 +1544,11 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         if not new_hits: continue
         top = max(new_hits, key=lambda h: h["score"])
         ctrl = " [OWNERSHIP/CONTROL]" if top.get("control_linkage") else ""
-        nm = f"🔴 SANCTIONS case: {m['name']} — {top['list']} {top['score']:.0f}%{ctrl}"
+        nm = f"🔴 SANCTIONS case: {m['name']} — {top['list']} {_pct(top['score'])}{ctrl}"
         notes = [f"Customer: {m['name']}", f"Record: {m.get('permalink','')}", ""]
         for h in new_hits:
             notes.append(f"- [{h['subject_type']}] {h['subject_name']} → {h['list']}: "
-                         f"\"{h['matched_entry']}\"  {h['score']:.0f}% ({h.get('confidence','')})"
+                         f"\"{h['matched_entry']}\"  {_pct(h['score'])} ({h.get('confidence','')})"
                          + ("  [owner/UBO → 50%/control rule]" if h.get("control_linkage") else ""))
         notes += ["", "Disposition: [ ] false positive   [ ] escalate / freeze (TFS)   [ ] investigate",
                   "Do not tip off. UAE Cabinet Resolution 74/2020 applies."]
