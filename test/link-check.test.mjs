@@ -1,6 +1,6 @@
 /* Unit tests for the Link / citation health pure logic (no network).
    Usage: node test/link-check.test.mjs */
-import { collectUrls, isDead, summarize, buildReport, ALLOWLIST } from '../scripts/link-check.mjs';
+import { collectUrls, isDead, summarize, buildReport, ALLOWLIST, probe } from '../scripts/link-check.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -69,6 +69,21 @@ check('report lists dead urls with status + source file', rep.includes('https://
   && rep.includes('404') && rep.includes('docs/x.md') && rep.includes('2 of 3'));
 check('clean report says no dead citations',
   buildReport([results[0]], '2026-06-16').includes('No dead citations'));
+
+/* probe must retry with GET when HEAD returns a non-OK status (not only 405/501) —
+   some servers 404/403/5xx a HEAD but serve on GET; returning the HEAD status
+   would mis-report a live citation as dead. */
+const _realFetch = globalThis.fetch;
+await (async () => {
+  const calls = [];
+  globalThis.fetch = async (url, opts) => { calls.push(opts.method); return { ok: opts.method === 'GET', status: opts.method === 'GET' ? 200 : 404 }; };
+  const r = await probe('https://example.test/resource', 1000);
+  check('probe retries GET after a 404 HEAD and reports the live link', calls.join(',') === 'HEAD,GET' && r.ok === true && r.status === 200 && isDead(r) === false);
+  globalThis.fetch = async () => ({ ok: false, status: 404 });
+  const d = await probe('https://example.test/gone', 1000);
+  check('probe still reports a truly dead link (GET also 404)', d.ok === false && isDead(d) === true);
+})();
+globalThis.fetch = _realFetch;
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

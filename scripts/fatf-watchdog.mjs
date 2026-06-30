@@ -366,11 +366,14 @@ export async function main(mode) {
        review falls due this month (or is still open from before). Idempotent:
        skipped if this month's digest already exists, silent when nothing is due. */
     const now = new Date();
-    const label = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][now.getMonth()] + ' ' + now.getFullYear();
+    // Compute the month window entirely in UTC so `today` (ISO/UTC) and the
+    // month label/end never disagree near a month boundary in a non-UTC TZ
+    // (`today` was UTC while the month math used local time).
+    const label = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][now.getUTCMonth()] + ' ' + now.getUTCFullYear();
     const title = 'Reviews due: ' + label;
     const today = now.toISOString().slice(0, 10);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const monthEnd = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+    const monthEnd = end.getUTCFullYear() + '-' + String(end.getUTCMonth() + 1).padStart(2, '0') + '-' + String(end.getUTCDate()).padStart(2, '0');
     const tasks = await listProjectTasks('name,due_on,completed');
     if (tasks.some(t => String(t.name || '') === title)) { console.log('digest already exists: ' + title); return; }
     const lines = collectReviewsDue(tasks, today, monthEnd);

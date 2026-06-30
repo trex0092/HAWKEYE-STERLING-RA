@@ -1,6 +1,6 @@
 /* Unit tests for retain-state pure helpers (offline; no filesystem writes).
    Usage: node test/retain-state.test.mjs */
-import { snapshotName, sha256, nextManifest } from '../scripts/retain-state.mjs';
+import { snapshotName, sha256, nextManifest, parseManifest } from '../scripts/retain-state.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -38,6 +38,14 @@ const m3 = nextManifest(m2, e2b);
 check('nextManifest replaces a same-day entry (no dupes)', m3.length === 2);
 check('nextManifest keeps the latest hash for that date', m3.find(e => e.file === e2.file).sha256 === 'c'.repeat(64));
 check('nextManifest does not mutate the input array', m2.length === 2);
+
+// parseManifest must FAIL LOUD on a corrupt/tampered manifest (never silently
+// reset the tamper-evident chain). The runner turns a throw into exit 1 + no overwrite.
+check('parseManifest returns the array for valid JSON', JSON.stringify(parseManifest('[{"file":"x"}]')) === '[{"file":"x"}]');
+let threwCorrupt = false; try { parseManifest('{not valid json'); } catch { threwCorrupt = true; }
+check('parseManifest throws on corrupt JSON (fails loud, no silent reset)', threwCorrupt);
+let threwNonArray = false; try { parseManifest('{"file":"x"}'); } catch { threwNonArray = true; }
+check('parseManifest throws on a non-array', threwNonArray);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
