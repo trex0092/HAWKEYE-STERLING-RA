@@ -18,13 +18,44 @@ export const ADVERSE_TERMS = [
   'fraud', 'money laundering', 'sanctions', 'terrorism', 'terrorist financing',
   'bribery', 'corruption', 'embezzlement', 'arrested', 'indicted', 'convicted'
 ];
-const STRONG_TERMS = new Set(['money laundering', 'sanctions', 'terrorism', 'terrorist financing']);
+
+/* Arabic-language risk terms — for a UAE deployment, adverse media often breaks
+   in Arabic press first. Querying these (against Arabic Google News) closes a
+   recall gap English-only screening leaves open. Matching is Unicode-aware (see
+   normalize), so an Arabic-script subject name matches an Arabic headline; a
+   Latin-only name simply finds nothing in Arabic press (correct — not a false
+   clear, since the English + GDELT queries still run). */
+export const ADVERSE_TERMS_AR = [
+  'احتيال', 'غسل الأموال', 'عقوبات', 'إرهاب', 'تمويل الإرهاب',
+  'رشوة', 'فساد', 'اختلاس', 'اعتقال', 'إدانة'
+];
+
+const STRONG_TERMS = new Set([
+  'money laundering', 'sanctions', 'terrorism', 'terrorist financing',
+  'غسل الأموال', 'عقوبات', 'إرهاب', 'تمويل الإرهاب'
+]);
 
 /* Build the Google News RSS search URL for a subject. The OR-joined risk terms
    keep it to a single request per customer. hl/gl/ceid pin English results. */
 export function adverseMediaUrl(name, terms = ADVERSE_TERMS) {
   const q = '"' + String(name).trim() + '" (' + terms.map(t => '"' + t + '"').join(' OR ') + ')';
   return 'https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=en-US&gl=US&ceid=US:en';
+}
+
+/* Arabic-language Google News RSS — same shape, Arabic risk terms, AE/Arabic
+   locale so Arabic-language press is returned. */
+export function adverseMediaUrlAr(name, terms = ADVERSE_TERMS_AR) {
+  const q = '"' + String(name).trim() + '" (' + terms.map(t => '"' + t + '"').join(' OR ') + ')';
+  return 'https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=ar&gl=AE&ceid=AE:ar';
+}
+
+/* GDELT DOC 2.0 API — a free, no-key global news index spanning many languages
+   and outlets that Google News RSS does not surface. An independent second
+   source reduces single-feed dependence. Returns JSON; kept deliberately small. */
+export function gdeltUrl(name, terms = ['sanctions', 'money laundering', 'fraud', 'corruption', 'terrorism']) {
+  const q = '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
+  return 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q)
+    + '&mode=artlist&format=json&maxrecords=25&sort=datedesc&timespan=12m';
 }
 
 const RSS_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
@@ -80,25 +111,63 @@ export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
 }
 
 function normalize(s) {
-  return String(s == null ? '' : s).normalize('NFKD').replace(/[̀-ͯ]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return String(s == null ? '' : s).normalize('NFKD')
+    // Strip combining marks: Latin diacritics + Arabic harakat/tatweel, so
+    // "Muḥammad"→"muhammad" and "مُحَمَّد"→"محمد" both normalise stably.
+    .replace(/[̀-ًͯ-ْٰـ]/g, '')
+    .toLowerCase()
+    // Keep letters/numbers of ANY script (Latin + Arabic + …); previously
+    // [^a-z0-9] which silently dropped all Arabic, defeating Arabic matching.
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
-/* Network: fetch + screen one subject's adverse media. Tolerant — on any error
-   returns { errored:true } so the caller can flag degraded coverage rather than
-   imply a clean result. */
-export async function checkAdverseMedia(name, { timeoutMs = 20000 } = {}) {
+/* Parse a GDELT DOC 2.0 artlist JSON response → [{ title, link, source, date }],
+   the same item shape parseRss yields, so scoreAdverseMedia handles both. */
+export function parseGdelt(body) {
+  let json;
+  try { json = typeof body === 'string' ? JSON.parse(body) : body; } catch { return []; }
+  const arts = json && Array.isArray(json.articles) ? json.articles : [];
+  return arts.map(a => ({
+    title: decode(String(a.title || '')),
+    link: String(a.url || ''),
+    source: String(a.domain || ''),
+    date: String(a.seendate || '')
+  })).filter(x => x.title);
+}
+
+/* Fetch one source with a per-request timeout. Returns the parsed item array,
+   or null on any failure (so the caller can tell "no hits" from "couldn't ask").*/
+async function fetchSource(url, parse, accept, timeoutMs) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(adverseMediaUrl(name), {
+    const res = await fetch(url, {
       signal: ctrl.signal, redirect: 'follow',
-      headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: 'application/rss+xml, application/xml, text/xml' }
+      headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: accept }
     });
-    if (!res.ok) return { errored: true, error: 'HTTP ' + res.status };
-    const xml = await res.text();
-    return scoreAdverseMedia(name, parseRss(xml));
-  } catch (e) {
-    return { errored: true, error: String(e && e.message || e).slice(0, 200) };
-  } finally { clearTimeout(t); }
+    if (!res.ok) return null;
+    return parse(await res.text());
+  } catch { return null; }
+  finally { clearTimeout(t); }
+}
+
+/* Network: fetch + screen one subject's adverse media across three independent
+   free sources — English Google News (primary), Arabic Google News, and GDELT —
+   merging their items before scoring (combined EN+AR risk terms). Tolerant: if
+   the PRIMARY (English) source is unreachable the result is { errored:true } so
+   the caller flags degraded coverage (never a false clear); a secondary source
+   failing only narrows recall and is surfaced via `partial`, not treated as an
+   all-clear. The return shape is unchanged for existing callers. */
+export async function checkAdverseMedia(name, { timeoutMs = 20000 } = {}) {
+  const xmlAccept = 'application/rss+xml, application/xml, text/xml';
+  const [en, ar, gd] = await Promise.all([
+    fetchSource(adverseMediaUrl(name), parseRss, xmlAccept, timeoutMs),
+    fetchSource(adverseMediaUrlAr(name), parseRss, xmlAccept, timeoutMs),
+    fetchSource(gdeltUrl(name), parseGdelt, 'application/json', timeoutMs),
+  ]);
+  if (en === null) return { errored: true, error: 'primary source unreachable' };
+  const items = [...en, ...(ar || []), ...(gd || [])];
+  const result = scoreAdverseMedia(name, items, [...ADVERSE_TERMS, ...ADVERSE_TERMS_AR]);
+  const partial = (ar === null) || (gd === null);
+  return partial ? { ...result, partial: true } : result;
 }

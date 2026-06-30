@@ -7,10 +7,11 @@ import { defineConfig, devices } from '@playwright/test';
      - print-report.spec.mjs   : print/PDF report build (Chromium-only; self-skips)
      - csp-runtime.spec.mjs    : real-browser CSP verification (served with the
                                  netlify.toml header; zero securitypolicyviolations)
+     - axe.spec.mjs            : axe-core a11y assertions (no serious/critical)
    Separate from playwright.config.mjs (viewport screenshot diff). */
 export default defineConfig({
   testDir: './test',
-  testMatch: /(cross-browser|keyboard|print-report|csp-runtime)\.spec\.mjs/,
+  testMatch: /(cross-browser|keyboard|print-report|csp-runtime|axe)\.spec\.mjs/,
   reporter: [['html', { outputFolder: 'playwright-report', open: 'never' }]],
   retries: 1, // absorb cold-start flakiness; a real failure still repeats
   projects: [
