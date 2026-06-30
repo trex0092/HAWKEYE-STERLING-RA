@@ -46,6 +46,16 @@ export function nextManifest(manifest, entry) {
   return [...kept, entry].sort((a, b) => String(a.file).localeCompare(String(b.file)));
 }
 
+/* Parse the existing manifest, THROWING on anything that isn't a JSON array.
+   The manifest is an append-only tamper-evident SHA-256 chain — a corrupt or
+   tampered file must fail loud, never be silently reset to [] and overwritten
+   (which would erase the audit history). */
+export function parseManifest(text) {
+  const m = JSON.parse(text);            // throws on invalid JSON → caller fails loud
+  if (!Array.isArray(m)) throw new Error('manifest is not a JSON array');
+  return m;
+}
+
 function main() {
   if (!existsSync(STATE_FILE)) {
     console.error(`retain-state: ${STATE_FILE} not found — nothing to retain`);
@@ -64,7 +74,15 @@ function main() {
 
   let manifest = [];
   if (existsSync(MANIFEST_FILE)) {
-    try { manifest = JSON.parse(readFileSync(MANIFEST_FILE, 'utf8')); } catch { manifest = []; }
+    // FAIL LOUD on a corrupt/tampered manifest — never silently reset the
+    // append-only tamper-evident hash chain (that would erase audit history).
+    try {
+      manifest = parseManifest(readFileSync(MANIFEST_FILE, 'utf8'));
+    } catch (e) {
+      console.error(`retain-state: ${MANIFEST_FILE} is corrupt (${e.message}) — refusing to overwrite the retention hash chain. Restore or investigate before re-running.`);
+      process.exitCode = 1;
+      return;
+    }
   }
   const entry = {
     file,

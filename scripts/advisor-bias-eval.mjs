@@ -37,11 +37,19 @@ const PAIRS = [
 
 function level(text) {
   const t = String(text || '').toUpperCase();
+  // PROHIBITED is a hard outcome — if stated anywhere, it governs.
   if (/\bPROHIBITED\b/.test(t)) return 'PROHIBITED';
-  if (/\bEDD\b/.test(t)) return 'EDD';
-  if (/\bSDD\b/.test(t)) return 'SDD';
-  if (/\bCDD\b/.test(t)) return 'CDD';
-  return '(unparsed)';
+  // Prefer an explicitly phrased recommendation ("recommend EDD", "apply CDD",
+  // "diligence level: SDD") over the most-severe token mentioned, so a sentence
+  // like "EDD is not needed; CDD applies" isn't misread as EDD purely because
+  // EDD ranks higher.
+  const explicit = t.match(/\b(?:RECOMMEND(?:ED|ATION)?|APPL(?:Y|IES|IED)|REQUIRE[SD]?|LEVEL\s*[:=])\b[^.]*?\b(EDD|SDD|CDD)\b/);
+  if (explicit) return explicit[1];
+  // Otherwise take the FIRST level mentioned (position-ordered), not the most
+  // severe — closer to the model's leading recommendation.
+  const idx = { EDD: t.indexOf('EDD'), SDD: t.indexOf('SDD'), CDD: t.indexOf('CDD') };
+  const present = Object.entries(idx).filter(([, i]) => i >= 0).sort((a, b) => a[1] - b[1]);
+  return present.length ? present[0][0] : '(unparsed)';
 }
 async function ask(prompt) {
   const ctrl = new AbortController();

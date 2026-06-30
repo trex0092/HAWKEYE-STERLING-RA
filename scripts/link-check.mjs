@@ -90,16 +90,19 @@ export function buildReport(results, today) {
 }
 
 /* ── Network (runner only) ── */
-async function probe(url, timeoutMs = 20000) {
+export async function probe(url, timeoutMs = 20000) {
   for (const method of ['HEAD', 'GET']) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const res = await fetch(url, { method, redirect: 'follow', signal: ctrl.signal, headers: { 'user-agent': 'Mozilla/5.0 HawkeyeSterling-LinkCheck/1.0' } });
       clearTimeout(t);
+      // GET is authoritative; a successful HEAD is conclusive. Any NON-OK HEAD
+      // (not only 405/501) retries with GET before judging — some servers
+      // 404/403/5xx a HEAD but serve the resource on GET, so returning the HEAD
+      // status here would mis-report a live link as dead.
       if (res.ok || method === 'GET') return { ok: res.ok, status: res.status };
-      if (res.status === 405 || res.status === 501) continue; // HEAD not allowed → try GET
-      return { ok: res.ok, status: res.status };
+      continue; // non-OK HEAD → fall through to GET
     } catch (e) {
       clearTimeout(t);
       if (method === 'GET') return { ok: false, status: null, error: String(e && e.message || e).slice(0, 120) };

@@ -13,7 +13,7 @@
      • Netlify functions (/.netlify/) → always network, never cached.
    Bump CACHE to invalidate the old shell on the next visit. */
 
-const CACHE = 'hsra-shell-v1';
+const CACHE = 'hsra-shell-v2';
 const SHELL = [
   './',
   './index.html',
@@ -22,6 +22,18 @@ const SHELL = [
   './manifest.webmanifest',
   './sw-register.js',
   './i18n.js',
+  // Page logic + stylesheets — without these the cached HTML loads offline but
+  // renders unstyled and inert (the deferred <script>/<link> would 404). Precache
+  // them so a first-time offline visit is actually usable. Self-hosted fonts are
+  // intentionally NOT precached (24 files); they fall back to the system stack
+  // offline via fonts.css and are stale-while-revalidate cached once seen online.
+  './app.js',
+  './console.js',
+  './advisor.js',
+  './app.css',
+  './console.css',
+  './advisor.css',
+  './fonts.css',
   './assets/super-data.js',
   './assets/icon.svg',
   './assets/icon-192.png',
@@ -61,8 +73,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(CACHE);
-        cache.put(req, fresh.clone()).catch(() => {});
+        // Only cache a successful page — never poison the shell with a 404/500/
+        // maintenance or redirect interstitial (mirrors the static-GET guard
+        // below). A non-OK page is returned to the user but not stored.
+        if (fresh && fresh.ok) {
+          const cache = await caches.open(CACHE);
+          cache.put(req, fresh.clone()).catch(() => {});
+        }
         return fresh;
       } catch (_) {
         return (await caches.match(req)) || (await caches.match('./index.html')) || Response.error();

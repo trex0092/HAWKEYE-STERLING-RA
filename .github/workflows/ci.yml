@@ -36,6 +36,8 @@ jobs:
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
         run: node test/csp.test.mjs
+      - name: Run service-worker guardrail (offline precache + cache hygiene)
+        run: node test/sw.test.mjs
       - name: Run security-headers regression guardrail
         run: node test/security-headers.test.mjs
       - name: Run export-integrity + round-trip tests
