@@ -173,9 +173,16 @@ export function parseSubjects(tasks) {
   for (const t of (Array.isArray(tasks) ? tasks : [])) {
     if (t && t.completed) continue;
     const s = parseSubject(t);
-    if (!s.name || seen.has(s.key)) continue;
-    seen.add(s.key);
-    out.push(s);
+    // Dedupe the legal ENTITY by normalized name, but do NOT skip the whole
+    // record on a collision: two distinct active customers can share a legal
+    // name (duplicate onboarding / same trade name), and the second one's
+    // principals (UBOs/directors) must still be screened — they are keyed by
+    // parent gid below, so they never collide. Only the duplicate entity row is
+    // suppressed; principals are always processed.
+    if (s.name && !seen.has(s.key)) {
+      seen.add(s.key);
+      out.push(s);
+    }
     for (const p of parsePrincipals(t)) {
       const norm = normalizeName(p.name);
       if (!norm) continue;

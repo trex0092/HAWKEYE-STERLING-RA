@@ -65,6 +65,18 @@ check('subjectLabel marks an individual with role + parent, entity stays plain',
   subjectLabel(withPpl.find(x => x.entityType === 'individual')).includes('[individual]') &&
   subjectLabel(withPpl[0]) === 'Amber International FZCO');
 
+/* Two DISTINCT active customers sharing a legal name: the duplicate entity row
+   is deduped, but the second customer's principals must STILL be screened (they
+   were previously dropped by the early `continue`). */
+const dupA = { gid: 'A', name: 'Acme LLC', completed: false,
+  notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Alpha Person\n    Nationality: India' };
+const dupB = { gid: 'B', name: 'Acme LLC', completed: false,
+  notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Bravo Person\n    Nationality: UAE' };
+const dupSubs = parseSubjects([dupA, dupB]);
+check('duplicate-named customers: entity deduped but BOTH customers’ principals are screened',
+  dupSubs.filter(x => x.entityType === 'organisation').length === 1 &&
+  dupSubs.some(x => x.name === 'Alpha Person') && dupSubs.some(x => x.name === 'Bravo Person'));
+
 /* a principal whose name collides with a legal entity (or a same-named principal
    of another customer) must NOT be dropped — every recorded person is screened */
 const collide = parseSubjects([

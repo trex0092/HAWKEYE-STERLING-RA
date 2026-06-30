@@ -638,14 +638,29 @@ const handle = async (event) => {
       if (errBody) console.warn('brain-soul: Anthropic API error ' + apiResp.status + ': ' + errBody.slice(0, 300));
       text = '[API error ' + apiResp.status + ']';
     } else {
-      const data = await apiResp.json();
-      text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      // A 200 with a null/empty/invalid body must not throw into the catch below
+      // (which would then leak an internal error string to the client). Parse
+      // defensively and degrade to a generic message.
+      const data = await apiResp.json().catch(() => null);
+      const blocks = (data && Array.isArray(data.content)) ? data.content : [];
+      text = blocks.filter(b => b && b.type === 'text').map(b => b.text).join('');
+      if (!text) {
+        ok = false;
+        console.warn('brain-soul: empty/invalid Anthropic 200 response body');
+        text = '[API error: empty response]';
+      }
     }
   } catch (err) {
     ok = false;
-    text = err && err.name === 'AbortError'
-      ? '[Brain timeout: Anthropic API did not respond within 26 s.]'
-      : '[Brain error: ' + (err && err.message ? err.message : String(err)) + ']';
+    // Never reflect an internal error message to the client (it can be
+    // stack-shaped or carry environment detail) — log it server-side, return a
+    // generic marker. Mirrors the upstream-error hygiene on the !ok path above.
+    if (err && err.name === 'AbortError') {
+      text = '[Brain timeout: Anthropic API did not respond within 26 s.]';
+    } else {
+      console.warn('brain-soul: ' + (err && err.message ? err.message : String(err)));
+      text = '[Brain error]';
+    }
   } finally {
     clearTimeout(abortTimer);
   }

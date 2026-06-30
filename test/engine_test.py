@@ -97,6 +97,18 @@ print("ai.py — risk rating")
 check("control linkage → HIGH", ai.compute_risk_rating(sanctions_hits=[{"score": 88}], is_control=True, pep=False, adverse_articles=[])["rating"] == "HIGH")
 check("sector-only → LOW", ai.compute_risk_rating(sanctions_hits=[], is_control=False, pep=False, adverse_articles=[])["rating"] == "LOW")
 check("risk rating is explainable (factors present)", len(ai.compute_risk_rating(sanctions_hits=[{"score": 88}], is_control=True, pep=False, adverse_articles=[])["factors"]) > 0)
+# An unscreenable subject (score-0 MANUAL REVIEW hit) must NOT band LOW — it
+# needs a manual sanctions screen (mirrors the unscreenable-individual HIGH path).
+check("unscreenable subject is not banded LOW",
+      ai.compute_risk_rating(sanctions_hits=[{"score": 0, "unscreenable": True, "list": "MANUAL REVIEW"}],
+                             is_control=False, pep=False, adverse_articles=[])["rating"] in ("MEDIUM", "HIGH"))
+# An adverse article the screen flagged but that mapped to no typology bucket
+# (orphan keyword e.g. "illegal") must still raise risk, not contribute zero.
+check("flagged-but-uncategorised adverse article is floored to LOW (not NONE)",
+      ai.triage_adverse("Acme", {"title": "Acme in illegal gold exports", "flagged": True,
+                                 "keywords": ["illegal"], "categories": []})["severity"] == "LOW")
+check("a genuinely clean (non-flagged) article stays NONE",
+      ai.triage_adverse("Acme", {"title": "Acme opens a new office", "categories": []})["severity"] == "NONE")
 
 # ── ai.py: adverse triage + prompt-injection defence ─────────────────────────
 print("ai.py — triage + prompt security")
