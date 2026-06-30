@@ -34,10 +34,15 @@ export function utcDay(iso) {
 
 /* Pure decision: given each control's last successful-run day, return the
    controls whose latest success is not `today` (never ran, ran but failed, or
-   last succeeded on an earlier day). statuses: [{ id, name, lastSuccessDay }]. */
+   last succeeded on an earlier day). A control with a run that STARTED today but
+   is still in progress is NOT stale — the alarm is for a control that did not
+   FIRE today (bad cron / disabled / runner outage), not one that is mid-run (the
+   daily full-coverage screen legitimately takes ~45 min). Its own failure path
+   alerts separately if that run later fails, and tomorrow's check re-verifies.
+   statuses: [{ id, name, lastSuccessDay, pendingToday? }]. */
 export function staleControls(statuses, today) {
   return statuses
-    .filter(s => s.lastSuccessDay !== today)
+    .filter(s => s.lastSuccessDay !== today && !s.pendingToday)
     .map(s => ({ id: s.id, name: s.name, lastSuccessDay: s.lastSuccessDay || null }));
 }
 
@@ -72,6 +77,29 @@ async function lastSuccessDay(repo, token, workflowId) {
   return run ? utcDay(run.run_started_at || run.created_at) : null;
 }
 
+/* Whether the workflow has a run that STARTED today and is still executing
+   (queued / in_progress / waiting) — i.e. the control fired today and is mid-run.
+   Used so the long daily screen doesn't trip a false "did not run" alarm while
+   it is still running. */
+async function pendingToday(repo, token, workflowId, today) {
+  const url = `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs`
+    + `?per_page=1`;
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'hawkeye-freshness-check',
+    },
+  });
+  if (!res.ok) throw new Error(`GitHub API ${res.status} for ${workflowId}`);
+  const data = await res.json();
+  const run = (data.workflow_runs || [])[0];
+  if (!run) return false;
+  const active = ['queued', 'in_progress', 'requested', 'waiting', 'pending'].includes(run.status);
+  return active && utcDay(run.run_started_at || run.created_at) === today;
+}
+
 async function main() {
   const repo = process.env.GITHUB_REPOSITORY;
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
@@ -83,10 +111,15 @@ async function main() {
   const today = new Date().toISOString().slice(0, 10);
   const statuses = [];
   for (const c of MANDATORY) {
-    let day = null;
+    let day = null, pending = false;
     try { day = await lastSuccessDay(repo, token, c.id); }
     catch (e) { console.error(`  warn: could not query ${c.id} — ${e.message}`); }
-    statuses.push({ id: c.id, name: c.name, lastSuccessDay: day });
+    if (day !== today) {
+      // Only need the extra call when there's no success today — is it mid-run?
+      try { pending = await pendingToday(repo, token, c.id, today); }
+      catch (e) { console.error(`  warn: could not query in-progress ${c.id} — ${e.message}`); }
+    }
+    statuses.push({ id: c.id, name: c.name, lastSuccessDay: day, pendingToday: pending });
   }
   const stale = staleControls(statuses, today);
   const report = buildReport(stale, today, MANDATORY.length);
