@@ -1,0 +1,75 @@
+# Custom Semgrep rules — Hawkeye Sterling RA domain invariants.
+#
+# These encode security invariants specific to THIS app that a generic scanner
+# (CodeQL) does not know about. They are written to be ERROR-severity and to hold
+# clean against the current tree, so they are run as a BLOCKING gate in CI
+# (semgrep.yml). Generic registry rulesets (p/javascript, p/security-audit) run
+# advisory alongside them.
+#
+# Scope note: these run over app.js / console.js / advisor.js / scripts / netlify
+# (the executable surface). Run locally with:
+#   semgrep --config .semgrep/hawkeye.yml app.js console.js advisor.js scripts netlify
+
+rules:
+  - id: hawkeye-no-string-to-code
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      String-to-code execution (eval / new Function) is forbidden. It is the exact
+      sink the CSP `require-trusted-types-for 'script'` directive and the Trusted
+      Types default policy (sw-register.js, which THROWS on createScript) are built
+      to block. Express behaviour declaratively instead of compiling a string.
+    metadata:
+      category: security
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      confidence: HIGH
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: window.eval(...)
+      - pattern: new Function(...)
+
+  - id: hawkeye-no-document-write
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      document.write()/writeln() is forbidden — it is a DOM-XSS sink and bypasses
+      the app's esc()-then-assign rendering discipline. Build nodes via the DOM API.
+    metadata:
+      category: security
+      cwe: "CWE-79: Cross-site Scripting"
+      confidence: HIGH
+    pattern-either:
+      - pattern: document.write(...)
+      - pattern: document.writeln(...)
+
+  - id: hawkeye-no-child-process
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      child_process is forbidden in application / script / function code. This app
+      never shells out; importing it introduces a command-injection vector with no
+      legitimate use here.
+    metadata:
+      category: security
+      cwe: "CWE-78: OS Command Injection"
+      confidence: HIGH
+    pattern-regex: \bchild_process\b
+
+  - id: hawkeye-no-secret-read-in-client
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      Client-side code must never read a server secret or process.env. The
+      ANTHROPIC_API_KEY / ASANA_ACCESS_TOKEN live only in Netlify functions and
+      GitHub Actions; the browser calls the same-origin function, which holds the
+      key server-side. Referencing process.env in page logic is a key-exposure bug.
+    metadata:
+      category: security
+      cwe: "CWE-200: Exposure of Sensitive Information"
+      confidence: HIGH
+    paths:
+      include:
+        - app.js
+        - console.js
+        - advisor.js
+    pattern: process.env.$ANYTHING

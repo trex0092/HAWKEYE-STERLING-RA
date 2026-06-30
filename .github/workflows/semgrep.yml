@@ -1,0 +1,53 @@
+name: Semgrep SAST
+
+# Static analysis that complements CodeQL:
+#   - .semgrep/hawkeye.yml : app-specific security invariants (blocking, ERROR).
+#   - p/javascript + p/security-audit : community rulesets (advisory; surfaced as
+#     annotations + a step summary, never blocking, to avoid third-party rule
+#     churn gating merges — CodeQL is the blocking generic scanner).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.x'
+
+      - name: Install Semgrep
+        run: python -m pip install --quiet "semgrep>=1"
+
+      - name: Semgrep — app invariants (blocking)
+        run: |
+          semgrep scan --config .semgrep/hawkeye.yml --error --metrics off \
+            app.js console.js advisor.js scripts netlify
+
+      - name: Semgrep — community rulesets (advisory)
+        continue-on-error: true
+        run: |
+          semgrep scan --config p/javascript --config p/security-audit \
+            --metrics off --no-error \
+            app.js console.js advisor.js scripts netlify | tee -a "$GITHUB_STEP_SUMMARY"

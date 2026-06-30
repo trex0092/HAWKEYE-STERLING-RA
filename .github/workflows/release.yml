@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write       # OIDC for Sigstore-keyless build-provenance attestation
+  attestations: write   # store the attestation in the repo's attestation log
 
 jobs:
   release:
@@ -25,7 +27,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false   # no git push here (gh/create-pull-request use the token directly)
-      - name: Create tag and GitHub release
+      - name: Create tag, GitHub release, and supply-chain artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -33,3 +35,22 @@ jobs:
             --target "${{ github.sha }}" \
             --title "${{ inputs.tag }}" \
             --generate-notes
+          # Deterministic source tarball of the released commit + CycloneDX SBOM,
+          # both attested below.
+          git archive --format=tar.gz -o "hawkeye-sterling-ra-${{ inputs.tag }}.tar.gz" "${{ github.sha }}"
+          gh release upload "${{ inputs.tag }}" "hawkeye-sterling-ra-${{ inputs.tag }}.tar.gz" --clobber || echo "tarball upload skipped"
+          if node scripts/gen-sbom.mjs; then
+            gh release upload "${{ inputs.tag }}" sbom.cdx.json --clobber || echo "SBOM upload skipped"
+          else
+            echo "SBOM generation skipped"
+          fi
+
+      # Sign the release artifacts with a Sigstore-keyless build-provenance
+      # attestation (OIDC, no long-lived keys). Verify with:
+      #   gh attestation verify hawkeye-sterling-ra-<tag>.tar.gz --repo <owner>/<repo>
+      - name: Attest build provenance for the release artifacts
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: |
+            hawkeye-sterling-ra-*.tar.gz
+            sbom.cdx.json
