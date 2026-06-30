@@ -106,6 +106,7 @@ branches:
           - lint
           - smoke
           - analyze         # CodeQL
+          - semgrep         # Semgrep SAST (app-invariant blocking rules)
           - gitleaks
           - size
           - Dependency Review

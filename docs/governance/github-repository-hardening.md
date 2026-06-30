@@ -39,7 +39,7 @@ Settings app, or manually at **Settings → Branches → Add branch ruleset / pr
 | Require review from Code Owners | **On** | Enforces [`.github/CODEOWNERS`](../../.github/CODEOWNERS). |
 | Require status checks to pass | **On** | No merging on red CI. |
 | Require branches up to date before merge | **On** (`strict`) | Tests run against the post-merge tree. |
-| Required checks | `test`, `lint`, `smoke`, `analyze` (CodeQL), `gitleaks`, `size`, `Dependency Review` | The blocking gates that prove correctness, style, runtime-CSP/Trusted-Types safety, code scanning, secret scanning, size, and dependency licensing/vulns. |
+| Required checks | `test`, `lint`, `smoke`, `analyze` (CodeQL), `semgrep`, `gitleaks`, `size`, `Dependency Review` | The blocking gates that prove correctness, style, runtime-CSP/Trusted-Types safety, code scanning (CodeQL + Semgrep app-invariants), secret scanning, size, and dependency licensing/vulns. |
 | Require conversation resolution | **On** | No unresolved review threads at merge. |
 | Require linear history | **On** | Matches squash-only merging. |
 | Include administrators | **On** (`enforce_admins`) | The rules bind everyone, including admins. |
