@@ -44,5 +44,10 @@ check('tolerates an empty/odd response', scoreInterpol('x', {}).hit === false);
 check('tolerates a plain-array response', scoreInterpol('John Smith', [{ forename: 'JOHN', name: 'SMITH', entity_id: 'a' }]).hit === true);
 check('tolerates a {notices:[...]} response', scoreInterpol('John Smith', { notices: [{ forename: 'JOHN', name: 'SMITH', entity_id: 'b' }] }).hit === true);
 
+// Short multi-token names (every token <3 chars) must still match a notice —
+// the ≥3-char filter previously emptied the token set → silent false-negative.
+check('matches a short multi-token name (e.g. "Xi Bo")',
+  scoreInterpol('Xi Bo', { _embedded: { notices: [{ forename: 'Bo', name: 'Xi', entity_id: 'c' }] } }).hit === true);
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;

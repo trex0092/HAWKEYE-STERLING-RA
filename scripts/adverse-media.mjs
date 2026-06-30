@@ -87,7 +87,11 @@ export function parseRss(xml) {
    { hit, score, band, top, count, terms[] }. */
 export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
   const nm = normalize(name);
-  const nameTokens = nm.split(' ').filter(t => t.length >= 3);
+  // Prefer tokens ≥3 chars; but for short multi-token names (e.g. "Xi Bo",
+  // common in East-Asian names) that filter is empty — fall back to ≥2 so the
+  // subject is still matchable rather than silently never flagged.
+  let nameTokens = nm.split(' ').filter(t => t.length >= 3);
+  if (!nameTokens.length) nameTokens = nm.split(' ').filter(t => t.length >= 2);
   const matched = [];
   for (const it of (items || [])) {
     const title = normalize(it.title);

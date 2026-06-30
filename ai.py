@@ -213,6 +213,13 @@ def triage_adverse(subject: str, article: dict):
         if cats & group:
             severity = level
             break
+    # An article the screen already FLAGGED as adverse must never contribute zero
+    # to the risk band. Some adverse keywords (e.g. "illegal", "unlawful",
+    # "breach", "due diligence failure", "esg") flag a headline but map to no
+    # typology bucket, leaving categories empty → severity NONE → no score bump.
+    # Floor any flagged-but-uncategorised article to LOW so it still raises risk.
+    if severity == "NONE" and (article.get("flagged") or article.get("keywords")):
+        severity = "LOW"
     relevance = _name_relevance(subject, article.get("title", ""))
     # Confidence: relevance × whether the headline actually names the risk.
     conf = "HIGH" if (relevance == "HIGH" and severity in ("CRITICAL", "HIGH")) else \
@@ -280,10 +287,18 @@ def compute_risk_rating(*, sanctions_hits, is_control, pep, adverse_articles,
 
     confirmed = [h for h in (sanctions_hits or []) if h.get("score", 0) >= 95]
     potential = [h for h in (sanctions_hits or []) if 0 < h.get("score", 0) < 95]
+    # A subject that could NOT be auto-screened (non-Latin script / too-short name)
+    # carries a score-0 "MANUAL REVIEW" hit, so it lands in neither bucket above.
+    # It must not band LOW — it needs a manual sanctions screen — so treat it as a
+    # standing risk factor (mirrors how unscreenable individuals force HIGH via
+    # control linkage; this covers the entity case too).
+    unscreenable = [h for h in (sanctions_hits or []) if h.get("unscreenable")]
     if confirmed:
         score += 6; factors.append(f"Confirmed sanctions match ({len(confirmed)})")
     elif potential:
         score += 3; factors.append(f"Potential sanctions match ({len(potential)})")
+    if unscreenable:
+        score += 3; factors.append(f"Unscreenable subject — manual sanctions screen required ({len(unscreenable)})")
     if is_control:
         score += 4; factors.append("Designated owner / UBO — ownership/control (50% rule)")
     if pep:
@@ -308,6 +323,9 @@ def compute_risk_rating(*, sanctions_hits, is_control, pep, adverse_articles,
     # A confirmed designation or control linkage is HIGH irrespective of score.
     if confirmed or is_control:
         rating = "HIGH"
+    # An unscreenable subject is never LOW — it must be manually screened first.
+    if unscreenable and rating == "LOW":
+        rating = "MEDIUM"
     edd = {"HIGH": "Enhanced Due Diligence + senior sign-off; review every 6 months",
            "MEDIUM": "Standard+ due diligence; review every 12 months",
            "LOW": "Standard due diligence; periodic review"}[rating]

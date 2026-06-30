@@ -71,5 +71,11 @@ check('Arabic matching is harakat-insensitive (diacritics stripped)', arDiacriti
 check('ADVERSE_TERMS_AR covers core Arabic AML predicates',
   ADVERSE_TERMS_AR.includes('عقوبات') && ADVERSE_TERMS_AR.includes('غسل الأموال'));
 
+/* Short multi-token names (every token <3 chars, e.g. East-Asian names) must
+   still be matchable — previously the ≥3-char token filter emptied the set and
+   the subject was silently never flagged. */
+const shortName = scoreAdverseMedia('Xi Bo', [{ title: 'Xi Bo arrested for terrorism financing', link: '' }]);
+check('short multi-token name (e.g. "Xi Bo") is still matched (no silent false-negative)', shortName.hit === true);
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

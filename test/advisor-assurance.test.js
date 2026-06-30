@@ -205,6 +205,25 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   b = JSON.parse(r.body);
   check('handler: upstream API error → ok:false, no throw', r.statusCode === 200 && b.ok === false && /API error 529/.test(b.text));
 
+  // 6d-bis/ter use a DISTINCT client IP so they don't consume the shared default
+  // rate-limit bucket that the later cases rely on.
+  const altIp = { 'x-nf-client-connection-ip': '203.0.113.9' };
+
+  // 6d-bis. A 200 with a null/empty body must NOT throw into the catch and leak
+  // an internal error string to the client — it degrades to a generic marker.
+  mockFetch(async () => ({ ok: true, json: async () => null }));
+  r = await call(POST({ question: 'Anything.' }, altIp), 'test-key');
+  b = JSON.parse(r.body);
+  check('handler: 200 with null body → ok:false, generic message, no internal leak',
+    r.statusCode === 200 && b.ok === false && !/Cannot read|undefined|null|TypeError/.test(b.text));
+
+  // 6d-ter. A 200 whose body is invalid JSON also degrades cleanly (no leak).
+  mockFetch(async () => ({ ok: true, json: async () => { throw new Error('Unexpected token < in JSON'); } }));
+  r = await call(POST({ question: 'Anything.' }, altIp), 'test-key');
+  b = JSON.parse(r.body);
+  check('handler: 200 with invalid JSON → no internal error leaked to client',
+    r.statusCode === 200 && b.ok === false && !/Unexpected token|JSON|TypeError/.test(b.text));
+
   // 6e. Missing API key → 503 (never silently proceeds)
   mockFetch(async () => { throw new Error('should not be called'); });
   r = await call(POST({ question: 'Anything.' }), undefined);

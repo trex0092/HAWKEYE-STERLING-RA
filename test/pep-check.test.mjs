@@ -30,6 +30,11 @@ check('scorePep requires the subject name in the result label', wrongName.hit ==
 check('scorePep tolerates an empty response', scorePep('Acme Co', {}).hit === false);
 check('PEP_KEYWORDS includes core political roles', PEP_KEYWORDS.includes('president') && PEP_KEYWORDS.includes('minister'));
 
+// Short multi-token names (every token <3 chars) must still match a real PEP
+// namesake — the ≥3-char filter previously emptied the token set → silent miss.
+const shortPep = scorePep('Xi Bo', { search: [{ id: 'Q1', label: 'Xi Bo', description: 'Chinese politician and minister' }] });
+check('scorePep matches a short multi-token name (e.g. "Xi Bo")', shortPep.hit === true);
+
 /* checkPep retries transient rate-limits (stub global fetch: 429 → 200). */
 const _realFetch = globalThis.fetch;
 const jsonRes = (obj, ok = true, status = 200, headers = {}) => ({
