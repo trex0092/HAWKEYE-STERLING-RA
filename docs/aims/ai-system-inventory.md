@@ -12,6 +12,25 @@ Reviewed at least annually and on change.
 | AG-1 | `agents.py` — agentic operating model | Agent identity, least-privilege authorization, credential broker, QA gate | Deterministic orchestration | No agent decides/files |
 | WEB-1 | `index.html` / `advisor.html` / `console.html` | On-device entity risk assessment, cited Q&A | Rules-based scoring + retrieval | Analyst-driven |
 
+## Decision-impact classification
+
+Each AI/automated component is tiered by the weight of the decision it influences,
+per FDL 10/2025 expectations. **No component is autonomous** — the highest tier any
+AI surface reaches is *significant-decision support*; none is a *critical decision*
+that executes without a human (see safeguards column).
+
+| ID | Tier | Rationale | Required safeguards (in place) |
+|---|---|---|---|
+| AG-1 | **Administrative automation** | Orchestration/authorization plumbing; makes no risk call | Least-privilege, QA gate, deterministic |
+| WEB-1 | **Administrative automation** | Deterministic rules + retrieval; analyst owns the outcome | Contributing factors shown; analyst-driven |
+| AI-1 | **Significant-decision support** | Sharpens risk rating / adverse-media triage / STR drafts | Decision-support only; `[AI]`-labelled; deterministic fallback; MLRO owns the call |
+| SCR-1 | **Significant-decision support** | Flags sanctions/PEP/adverse-media hits feeding CDD/EDD | **MLRO sign-off before acting**; non-Latin ⇒ MANUAL REVIEW; periodic bias/false-positive review |
+| — | **Critical decision (autonomous, legal/serious effect)** | **None.** No AI surface auto-decides, blocks, files, or de-risks a customer without a human. | N/A — if ever introduced, requires DPIA refresh, explicit lawful basis, and senior-management approval before deployment |
+
+> **Flag.** Any future change that would let an AI surface produce an output with
+> legal or serious effect *without* a human review step moves it into the **critical
+> decision** tier and must not ship until the safeguards in the last row are met.
+
 ## Models / external AI services
 
 | Service | Use | Provider | Data sent | Gating |
