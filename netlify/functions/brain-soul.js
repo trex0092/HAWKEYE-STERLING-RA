@@ -11,7 +11,7 @@ const { rateLimit } = require('./_ratelimit');
 // ── CORS (mirrors asana-task.js) ─────────────────────────────────────────────
 
 function allowedOrigins() {
-  const primary = process.env.PRIMARY_ORIGIN || '';
+  const primary = process.env.PRIMARY_ORIGIN || 'https://hawkeye-sterling-ra.netlify.app';
   const extra = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
   return [primary, ...extra].filter(Boolean);
 }
@@ -630,8 +630,13 @@ const handle = async (event) => {
 
     if (!apiResp.ok) {
       ok = false;
+      // Never reflect the upstream provider's error body to the client — it can
+      // carry auth / quota / billing / org detail. Log it server-side only and
+      // return just the status code (mirrors the generic upstream-failure
+      // messages used by the Asana/backup functions).
       const errBody = await apiResp.text().catch(() => '');
-      text = '[API error ' + apiResp.status + (errBody ? ': ' + errBody.slice(0, 200) : '') + ']';
+      if (errBody) console.warn('brain-soul: Anthropic API error ' + apiResp.status + ': ' + errBody.slice(0, 300));
+      text = '[API error ' + apiResp.status + ']';
     } else {
       const data = await apiResp.json();
       text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
