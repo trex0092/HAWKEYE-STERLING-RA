@@ -90,6 +90,35 @@ export function parseOfacCsv(body) {
   return names;
 }
 
+/* OFAC SDN.XML / CONSOLIDATED.XML: <sdnEntry> blocks. Individuals carry
+   <firstName> + <lastName>; entities/vessels carry the full name in <lastName>.
+   Every <aka> in <akaList> is an alias (its own firstName/lastName). OFAC does
+   NOT publish a single consolidated CSV (only the multi-part CONS_PRIM.CSV …),
+   so the consolidated (non-SDN) list is ingested from CONSOLIDATED.XML. */
+export function parseOfacXml(body) {
+  const s = String(body), names = [];
+  const re = /<sdnEntry\b[^>]*>([\s\S]*?)<\/sdnEntry>/gi;
+  let m;
+  while ((m = re.exec(s))) {
+    const block = m[1];
+    // Primary name from the entry-level tags only (strip akaList first so the
+    // alias first/last names aren't mistaken for the primary).
+    const primaryBlock = block.replace(/<akaList>[\s\S]*?<\/akaList>/i, '');
+    const primary = [firstTag(primaryBlock, 'firstName'), firstTag(primaryBlock, 'lastName')]
+      .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    if (primary) names.push(primary);
+    const akaList = /<akaList>([\s\S]*?)<\/akaList>/i.exec(block);
+    if (akaList) {
+      for (const aka of (akaList[1].match(/<aka\b[^>]*>([\s\S]*?)<\/aka>/gi) || [])) {
+        const an = [firstTag(aka, 'firstName'), firstTag(aka, 'lastName')]
+          .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+        if (an) names.push(an);
+      }
+    }
+  }
+  return [...new Set(names.filter(Boolean))];
+}
+
 const XML_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 function decodeXml(x) {
   const cp = n => { try { return String.fromCodePoint(n); } catch { return ''; } };
@@ -419,6 +448,7 @@ export function parseCuratedList(json) {
 export function parseList(source, body) {
   const id = (source.id || '').toLowerCase();
   const p = (source.parser || '').toLowerCase();
+  if (p === 'ofacxml') return parseOfacXml(body);                 // OFAC SDN/CONSOLIDATED .XML (before the generic ofac→CSV rule)
   if (p === 'ofac' || /^ofac/.test(id)) return parseOfacCsv(body);
   if (p === 'un' || /^un[-_]/.test(id)) return parseUnXml(body);
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);

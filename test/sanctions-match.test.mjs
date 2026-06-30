@@ -1,7 +1,7 @@
 /* Unit tests for the in-repo sanctions matcher (no network).
    Usage: node test/sanctions-match.test.mjs */
 import {
-  normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseUnXml, parseOfsiCsv,
+  normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseOfacXml, parseUnXml, parseOfsiCsv,
   parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName,
   unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList
@@ -30,6 +30,20 @@ check('parseDelimited supports a semicolon delimiter',
 /* ── OFAC (no header, name in col 2, -0- empties) ── */
 const ofac = parseOfacCsv('1,"AEROCARIBBEAN AIRLINES",entity,CUBA,-0-\n2,"DOE, JOHN",individual,SDGT,-0-\n');
 check('parseOfacCsv pulls col-2 names', ofac.length === 2 && ofac[0] === 'AEROCARIBBEAN AIRLINES' && ofac[1] === 'DOE, JOHN');
+
+/* ── OFAC XML (CONSOLIDATED.XML / SDN.XML: sdnEntry, individual first+last,
+   entity full name in lastName, akaList aliases) ── */
+const ofacXml = parseOfacXml(
+  '<sdnList><sdnEntry><uid>1</uid><firstName>John</firstName><lastName>Doe</lastName><sdnType>Individual</sdnType>' +
+  '<akaList><aka><firstName>Johnny</firstName><lastName>Doe</lastName></aka></akaList></sdnEntry>' +
+  '<sdnEntry><uid>2</uid><lastName>ACME TRADING FZE</lastName><sdnType>Entity</sdnType></sdnEntry></sdnList>');
+check('parseOfacXml reads individual first+last, entity full name, and akaList aliases',
+  ofacXml.includes('John Doe') && ofacXml.includes('Johnny Doe') && ofacXml.includes('ACME TRADING FZE'));
+check('parseOfacXml does not leak alias names into the primary entry name',
+  !ofacXml.includes('John Johnny'));
+check('parseList routes parser=ofacxml to the OFAC XML parser (not CSV)',
+  parseList({ id: 'ofac-consolidated', parser: 'ofacxml', type: 'xml' },
+    '<sdnList><sdnEntry><lastName>TEST ENTITY LLC</lastName><sdnType>Entity</sdnType></sdnEntry></sdnList>').includes('TEST ENTITY LLC'));
 
 /* ── UN XML (primary name parts + aliases, entities + individuals) ── */
 const un = parseUnXml(

@@ -11,11 +11,11 @@
     },
     {
       "id": "ofac-consolidated",
-      "name": "US OFAC — Consolidated (non-SDN) list (CSV)",
+      "name": "US OFAC — Consolidated (non-SDN) list (XML)",
       "jurisdiction": "Global",
-      "url": "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/consolidated.csv",
-      "type": "csv",
-      "parser": "ofac"
+      "url": "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/consolidated.xml",
+      "type": "xml",
+      "parser": "ofacxml"
     },
     {
       "id": "un-consolidated",
