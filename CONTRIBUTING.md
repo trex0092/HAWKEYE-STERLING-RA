@@ -68,8 +68,14 @@ Other gates that run automatically on your PR:
 
 ## Branch protection & protected environments
 
-The following repository settings are the intended baseline (configured in
-GitHub Settings, not in the diff):
+The complete, authoritative list of required repository settings — with the
+exact values, the rationale for each, and an audit checklist — lives in
+[`docs/governance/github-repository-hardening.md`](docs/governance/github-repository-hardening.md).
+The general settings, labels, and branch protection are also encoded as
+config-as-code in [`.github/settings.yml`](.github/settings.yml) (applied
+automatically when the [Settings GitHub App](https://github.com/apps/settings)
+is installed). The summary baseline (configured in GitHub Settings, not in the
+diff):
 
 - **Branch protection on `main`:** require a pull request before merging;
   require CODEOWNERS review (`.github/CODEOWNERS` routes compliance-sensitive

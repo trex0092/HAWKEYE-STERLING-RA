@@ -1,0 +1,117 @@
+# Repository configuration as code.
+#
+# This file is the single source of truth for the repository's GitHub settings —
+# general options, labels, and branch protection. It is consumed automatically by
+# the "Settings" GitHub App (https://github.com/apps/settings) when that app is
+# installed on the repo; if the app is NOT installed, this file still serves as
+# declarative, version-controlled documentation of the required configuration and
+# the companion runbook at docs/governance/github-repository-hardening.md tells an
+# admin how to apply each item by hand.
+#
+# Why this exists: a production AML/CFT system needs its repository controls to be
+# auditable and reproducible, not tribal knowledge living in one admin's UI. Every
+# control below maps to a line in the governance runbook.
+
+repository:
+  # ── General ────────────────────────────────────────────────────────────────
+  name: HAWKEYE-STERLING-RA
+  description: "Hawkeye Sterling — AML/CFT Entity Risk Assessment for DPMS, with an AI compliance advisor and operations console (static Netlify app, no build step)."
+  homepage: https://hawkeye-sterling-ra.netlify.app
+  topics: aml, cft, compliance, sanctions-screening, pep-screening, risk-assessment, regtech, dpms, netlify, codeql
+  default_branch: main
+
+  # Discussions/Wiki/Projects are unused — hide the tabs so the repo reflects reality.
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  has_downloads: false
+
+  # Merge hygiene: squash-only (linear history) and auto-delete merged branches so
+  # stale feature/auto-generated branches (e.g. visual/baseline) self-clean.
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+  delete_branch_on_merge: true
+  allow_update_branch: true
+
+  # Security: forbid force-push/deletion of any history via the API surface too.
+  enable_vulnerability_alerts: true
+  enable_automated_security_fixes: true
+
+# ── Labels ─────────────────────────────────────────────────────────────────────
+# Mirrors the auto-labeler (.github/labeler.yml) plus PR-size and triage labels so
+# every label the automation applies actually exists with a stable colour.
+labels:
+  - name: app
+    color: "1d76db"
+    description: Core application pages / assets
+  - name: data
+    color: "0e8a16"
+    description: Risk baseline data and source registries
+  - name: automation
+    color: "5319e7"
+    description: CI/CD workflows and scripts
+  - name: tests
+    color: "fbca04"
+    description: Test suites and fixtures
+  - name: docs
+    color: "0075ca"
+    description: Documentation and governance
+  - name: netlify
+    color: "00ad9f"
+    description: Netlify config and serverless functions
+  - name: visual-regression
+    color: "d4c5f9"
+    description: Visual baseline / screenshot changes
+  - name: compliance
+    color: "b60205"
+    description: Compliance-sensitive change (MLRO review)
+  - name: security
+    color: "ee0701"
+    description: Security-relevant change
+  - name: "size/XS"
+    color: "3cbf00"
+    description: "< 10 lines changed"
+  - name: "size/S"
+    color: "5d9801"
+    description: "10–99 lines changed"
+  - name: "size/M"
+    color: "7f7203"
+    description: "100–499 lines changed"
+  - name: "size/L"
+    color: "a14c05"
+    description: "500–999 lines changed"
+  - name: "size/XL"
+    color: "c32607"
+    description: "≥ 1000 lines changed"
+  - name: dependencies
+    color: "0366d6"
+    description: Dependency / supply-chain update
+
+# ── Branch protection ───────────────────────────────────────────────────────────
+# main is the deploy branch. No direct pushes: every change lands via a reviewed,
+# CI-green, up-to-date PR with a linear history, and admins are included so the
+# rules actually bind.
+branches:
+  - name: main
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+      required_status_checks:
+        strict: true        # branch must be up to date with main before merge
+        contexts:
+          - test
+          - lint
+          - smoke
+          - analyze         # CodeQL
+          - gitleaks
+          - size
+          - Dependency Review
+      enforce_admins: true              # rules apply to admins too
+      required_linear_history: true
+      required_conversation_resolution: true
+      allow_force_pushes: false
+      allow_deletions: false
+      restrictions: null                # no user/team push allowlist (PR-only for all)
