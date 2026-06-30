@@ -2,21 +2,20 @@
   "updated": "2026-06-30",
   "sources": {
     "uae-moe": {
-      "hash": "8a67ab3eee4c98b26161e09ecbdba6497296b6412d55fb4dfbdac568f70cc5d4",
-      "bytes": 11264,
+      "hash": "ffcc1ca24d826e3b7ab7d195dce75b106d95b46672feb65ba6d7186d187313eb",
+      "bytes": 10364,
       "checkedAt": "2026-06-30",
-      "changedAt": "2026-06-29",
-      "status": "error",
-      "prevHash": "eee0fd65e1d3948d44b09c0fb02046212a2a4b24ff173bd58b508db30779caeb",
-      "error": "fetch failed"
+      "changedAt": "2026-06-30",
+      "status": 200,
+      "prevHash": "8a67ab3eee4c98b26161e09ecbdba6497296b6412d55fb4dfbdac568f70cc5d4"
     },
     "uae-fiu": {
-      "hash": "4e673f1bf35ff5972db50ab515217217ef2009cb14511819a918887577a19d48",
+      "hash": "c0ac0514f177298ddffdd68defea4326634873ae1ac842c7fe973055419152b1",
       "bytes": 4427,
       "checkedAt": "2026-06-30",
       "changedAt": "2026-06-30",
       "status": 200,
-      "prevHash": "24e7650f12702ed7c36a5567013a17be66f4d49fb8d55adc8b5ee15d77f27c4c"
+      "prevHash": "4e673f1bf35ff5972db50ab515217217ef2009cb14511819a918887577a19d48"
     },
     "uae-namlcftc": {
       "hash": null,
@@ -50,11 +49,12 @@
       "prevHash": "db43741ad03345f00bd7eadd3e4bca7c1072d81bf74f01b3ae9f96bf2cb18447"
     },
     "uae-jewellery": {
-      "hash": "e490bd1eb2502593f511756ea4cc678919324a251f6eaddbac57c10e6ccdf35b",
-      "bytes": 9953,
+      "hash": "d874b961e384778620ece523b6565d7e2c0cd60ffe9e21ad7b6e790b5c026ede",
+      "bytes": 9779,
       "checkedAt": "2026-06-30",
-      "changedAt": "2026-06-29",
-      "status": 200
+      "changedAt": "2026-06-30",
+      "status": 200,
+      "prevHash": "e490bd1eb2502593f511756ea4cc678919324a251f6eaddbac57c10e6ccdf35b"
     },
     "fatf-guidance": {
       "hash": null,
@@ -65,13 +65,12 @@
       "error": "HTTP 403"
     },
     "wolfsberg": {
-      "hash": "a8d797be6779c7f5e7fb1f3e9f5092ca3ee8aa47a01bbe84e51611cc2cfeec36",
-      "bytes": 5564,
+      "hash": "b95072ad7a3ca960e78d759cd74f46bfbab81c36bad3bb88538f5eff30dfe533",
+      "bytes": 5610,
       "checkedAt": "2026-06-30",
-      "changedAt": "2026-06-23",
+      "changedAt": "2026-06-30",
       "status": 200,
-      "prevHash": "8c3195c1b8300994f3e1522f92f179ce9c60b76e4ad70e6acd3d5c958d5f23e0",
-      "error": "This operation was aborted"
+      "prevHash": "a8d797be6779c7f5e7fb1f3e9f5092ca3ee8aa47a01bbe84e51611cc2cfeec36"
     },
     "rmi": {
       "hash": "9aa3026cf8e364a6a29bc5d595ea6bcd2a84522dfdbc3c33b2bb4d3796810f21",

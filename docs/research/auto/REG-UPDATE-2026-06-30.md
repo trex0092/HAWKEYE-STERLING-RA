@@ -2,54 +2,72 @@
 
 > AI-drafted from monitored-source changes for **human review**. Nothing here is applied automatically. Verify against the primary source before editing `assets/super-data.js` or `index.html`.
 
+### UAE Ministry of Economy (MoE) — DNFBP / DPMS supervisor
+
+- **What appears to have changed**:
+  - The extracted content is predominantly site-wide navigation/chrome (Arabic menu structure, investment/tourism/open-data links, homepage banners) with no substantive AML/CFT body text captured.
+  - No new instrument, circular, dated guidance, or DNFBP/DPMS-specific announcement is visible in the extract.
+  - This looks like routine site churn / navigation or template refresh (note the entity now renders as "وزارة الاقتصاد والسياحة" — Ministry of Economy and Tourism — rather than just Ministry of Economy), rather than a substantive AML/CFT policy update. Visible AML-relevant menu items (مواجهة غسل الأموال وتمويل الإرهاب، العقوبات المالية المستهدفة، التسجيل في نظام goAML) remain present but unchanged in substance.
+
+- **Likely app impact**:
+  - **Low / likely none** based on this extract. No confirmed change to substantive obligations.
+  - Watchpoints only (verify against the live page, not this truncated text):
+    - Regulatory Q&A topics on **DNFBP/DPMS supervision**, **goAML registration**, and **Targeted Financial Sanctions (TFS)** obligations — confirm wording/links still match MoE.
+    - Super Tools citations in `assets/super-data.js` referencing MoE as DNFBP supervisor — check the **supervisor name** ("Ministry of Economy" vs. possible "Ministry of Economy and Tourism" rebrand) and the source URL.
+    - `index.html` country/risk data: no UAE risk-rating impact indicated.
+  - Recommend **no edit** until a substantive page (with a dated title or instrument) is retrieved.
+
+- **Suggested citation**:
+  - If an update is later warranted, cite generically: **UAE Ministry of Economy — "Anti-Money Laundering" (AML/CFT for DNFBPs)**, https://www.moec.gov
+
 ### UAE Financial Intelligence Unit (FIU) — goAML
 
 - **What appears to have changed**:
-  - The extracted content shows no substantive regulatory update: the "website last updated" and "about us" dates both remain **9 February 2024**, and the newest "What's New" items are dated 2019–2022.
-  - The only forward-moving marker is a footer copyright reading **© 2026**, which is a template/rollover artifact rather than a content change.
-  - This looks like **routine site churn** (boilerplate, navigation, copyright year) with no new STR/goAML guidance, publication, or typology report surfaced.
+  - The extracted snapshot shows a content "last updated" date of **9 February 2024**, while the footer copyright reads **© 2026** — suggesting a template/footer refresh rather than substantive content changes.
+  - No new STR/goAML process content, reporting guidance, or publications are visible beyond legacy items (annual report 2021, 2021 typology reports, pre-2021 MoUs). The "what's new" section appears stale.
+  - This looks consistent with **routine site churn** (footer/year auto-update, template tweaks) rather than a material regulatory change.
 
 - **Likely app impact**:
-  - **None warranted at this time.** No change to the goAML reporting workflow, STR process, or reporting-entity obligations is evidenced.
-  - If verifying, check that any Regulatory Q&A topic referencing the **FIU STR/SAR submission process via goAML** still points to the correct portal and contact details (Abu Dhabi address/phone unchanged in this extract).
-  - No update needed to country/risk data in `index.html` or Super Tools citations in `assets/super-data.js` based on this snapshot.
+  - **Low / likely none.** No new instrument, deadline, or process change is evident.
+  - If anything, verify that goAML / STR-reporting references in `assets/super-data.js` (Regulatory Q&A on suspicious transaction reporting, FIU reporting obligations) still point to the live `uaefiu.gov.ae` domain and the goAML portal entry path.
+  - No country/risk data in `index.html` appears affected — this source supports reporting-process Q&A, not jurisdictional risk scoring.
 
-- **Suggested citation**:
-  - If an update is later confirmed, cite generically as: **UAE Financial Intelligence Unit (FIU) — goAML portal / STR reporting process**, https://www.uaefiu.gov.ae/en/ (last updated 9 February 2024). Do not cite a specific report or decision number, as none beyond dated legacy publications are visible in this text.
+- **Suggested citation** (only if an update is warranted after human review):
+  - **UAE Financial Intelligence Unit (FIU) — goAML**, https://www.uaefiu.gov.ae/en/ (content last updated 9 February 2024; accessed [date]).
 
-### US OFAC — Recent Actions
+> **Reviewer note:** No new article, circular, or decision numbers are present in the extracted text. Recommend **no change** pending confirmation that the difference is only the footer year/template. Flag for re-check if a future snapshot shows updated STR-process or publications content.
+
+### Dubai Gold & Jewellery Group / DMCC (sector)
 
 - **What appears to have changed**:
-  - The feed now shows entries dated **June 18–29, 2026** (most recent: "russia-related designations removals," June 29, 2026), with total results at **3,119**.
-  - Notable items include the **launch of an OFAC Reconsideration Portal** (June 29, 2026), a new **TCO-related general license** plus **publication of an OFAC–OFSI comparative overview** (June 24, 2026), and various Russia/Iran/Venezuela/DRC/Cuba/Sudan/counter-terrorism updates.
-  - Most entries are routine designation/list-update churn; the **Reconsideration Portal** and **OFAC–OFSI comparative overview** are the only items that look structurally non-routine.
+  - The extracted content is the DMCC corporate/marketing homepage (business setup, free zone benefits, ecosystems, "Future of Trade Report 2026"). No AML/CFT-specific content (DPMS guidance, goAML, supervisory notices, KYC obligations) is visible in this capture.
+  - Notable non-AML references: corporate tax framing (qualified free zone under Federal Decree-Law No. 47 of 2022), and a "Future of Trade Report 2026" promotion.
+  - This looks like routine homepage/marketing churn rather than a substantive AML/CFT regulatory change.
 
 - **Likely app impact**:
-  - **Regulatory Q&A — sanctions screening topics**: review any answer describing how to challenge/appeal an OFAC listing; the new Reconsideration Portal may change the recommended process.
-  - **Super Tools citations (assets/super-data.js)**: check sanctions-list refresh guidance (SDN/Consolidated list cadence) — confirm references still point to OFAC "Recent Actions" as the authoritative update feed.
-  - **Country/risk data (index.html)**: no clear country-tier change indicated; Russia/Iran/Venezuela/DRC/Cuba/Sudan remain active programs — likely no risk-rating change, just confirm currency of program lists.
+  - **Low / likely none.** No Regulatory Q&A topic or Super Tools citation should be changed based on this homepage capture alone.
+  - If any existing citation in `assets/super-data.js` points to the DMCC homepage URL as an *AML/CFT authority* (e.g., DNFBP/DPMS supervision, registration), flag for revalidation against DMCC's compliance pages — the homepage no longer evidences that content.
+  - No change to country/sector risk data in `index.html` warranted; UAE/DMCC precious-metals-and-stones sector risk classification is unaffected by this marketing update.
 
 - **Suggested citation**:
-  - *US Department of the Treasury, Office of Foreign Assets Control — Recent Actions* (https://ofac.treasury.gov/recent-actions), accessed June 2026.
-  - If updating appeal/reconsideration guidance, cite the **OFAC Reconsideration Portal launch (June 29, 2026)** as listed on the Recent Actions page (no instrument number visible in source).
+  - None warranted from this page. If a DMCC reference must remain, cite the DMCC corporate site generically (DMCC, https://www.dmcc.ae/) and pair AML/CFT claims with the relevant **DMCC compliance / DPMS** page or the **UAE MOE DNFBP supervisory guidance**, not the homepage.
+  - Do **not** cite a specific circular/article number; none is visible in the extracted text.
 
-*Reviewer note: confirm the Reconsideration Portal and OFAC–OFSI comparative overview details against the underlying OFAC notices before any ed
+*Recommendation: No edit; mark source reviewed and re-point any AML-specific dependency to a DMCC compliance subpage before next review cycle.*
 
-### Egmont Group of FIUs
+### Wolfsberg Group
 
-- **What appears to have changed**: 
-  - The news feed now shows items dated through late June 2026, including a featured item on **Egmont–AMLA (EU Anti-Money Laundering Authority) engagement** (June 29, 2026) and a workshop on **virtual assets and financial intelligence** (June 25, 2026).
-  - Other entries reference the **2024–2025 Annual Report**, FATF June 2026 Plenary participation, and customs–FIU/art market integrity collaboration.
-  - This is primarily a **routine news/events refresh** (site churn); no new binding standard, typology, or compliance obligation is visible in the extracted text.
+- **What appears to have changed**:
+  - New **2026 Guidance on the Risk-Based Approach** now appears as the lead resource/headline, alongside a related **2025 Statement on the Risk-Based Approach** (re-committing to RBA and pledging to update legacy 2006 guidance and 2015 risk-assessment FAQs).
+  - New **2025 Guidance on the provision of banking services to fiat-backed stablecoin issuers** and a **second statement on effective monitoring for suspicious activity (Part II: Transitioning to Innovation, 2025)** have been published.
+  - Governance/operational items (new co-chairs, management committee appointments, 2026 Wolfsberg Forum, "htworldcup" 314b note) appear to be routine news churn and likely not citation-relevant.
 
 - **Likely app impact**:
-  - Low/optional. No UAE country-risk or threshold data in `index.html` requires change based on this content.
-  - If the app maintains a **virtual assets / VASP** Regulatory Q&A topic or Super Tool citation, consider noting Egmont's continued focus on VA financial intelligence (no new rule, contextual only).
-  - If a topic references **international FIU cooperation / information sharing** (Egmont Secure Web, cross-border exchange), the Egmont–AMLA tie-strengthening item could refresh a "latest developments" note — context only, not a citation change.
-  - No Super Tools citation in `assets/super-data.js` should be altered solely on this churn unless a specific topic already cites Egmont news.
+  - **Regulatory Q&A — Risk-Based Approach**: answers referencing Wolfsberg RBA guidance may need to point to the 2026 guidance / 2025 statement rather than legacy 2006 material; check for stale "2006" references.
+  - **Regulatory Q&A — Digital Assets / Stablecoins**: any topic on banking services to VASPs/stablecoin issuers should reference the new 2025 stablecoin-issuer guidance.
+  - **Regulatory Q&A — Transaction Monitoring / Suspicious Activity**: answers on effective monitoring should incorporate the Part II (2025) statement on innovation in monitoring.
+  - **Super Tools citations (assets/super-data.js)**: review any Wolfsberg citations for outdated titles/years (RBA, monitoring, digital assets).
+  - **index.html country/risk data**: no direct impact — Wolfsberg is a global standards body, not a jurisdiction-specific source.
 
-- **Suggested citation** (only if an update is warranted): 
-  - Egmont Group of FIUs — *News and Events*, https://egmontgroup.org/news/ (accessed June 2026).
-  - For VA context, the referenced **ECOFEL / A-FIU / UNODC "Virtual Assets" workshop** announcement (June 25, 2026) — title as shown, no document number visible.
-
-*Recommendation: Treat as routine monitoring update. No mandatory edit; defer to MLRO on whether to refresh contextual VA/international-cooperation notes.*
+- **Suggested citation** (pending reviewer confirmation; cite only as supplementary best-practice guidance, not UAE law):
+  - *Wolfsberg Group — Guidance on the Risk-Based Approach (2026)* and/or *
