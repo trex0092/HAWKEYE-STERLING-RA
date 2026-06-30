@@ -77,3 +77,18 @@ AI failures, suspected bias, prompt-injection, or privacy concerns are raised an
 | 1.0 | 2026-06-29 | Compliance Engineering / MLRO | _pending_ | Draft — awaiting ratification |
 
 *Reviewed annually and on any change to AI models, scope, or applicable regulation.*
+
+## 10. References & external frameworks
+This policy is informed by, and mapped to, the following frameworks (binding
+obligations remain UAE FDL 10/2025, PDPL, and FATF standards):
+
+- **Binding/standards crosswalks:** [`nist-ai-rmf-mapping-2026.md`](nist-ai-rmf-mapping-2026.md),
+  [`iso-42001-soa-2026.md`](iso-42001-soa-2026.md),
+  [`uae-ai-charter-mapping-2026.md`](uae-ai-charter-mapping-2026.md).
+- **External ethics frameworks crosswalk** (Alan Turing Institute *FAST principles
+  & SUM values*; EU-AI-Act-oriented responsible-AI lifecycle):
+  [`ai-frameworks-crosswalk-2026.md`](ai-frameworks-crosswalk-2026.md).
+- **Process & assessments:** [`pbg-lifecycle-map-2026.md`](pbg-lifecycle-map-2026.md),
+  [`stakeholder-impact-assessment-2026.md`](stakeholder-impact-assessment-2026.md),
+  [`explainability-statement-2026.md`](explainability-statement-2026.md),
+  [`dpia-2026.md`](dpia-2026.md).
