@@ -70,6 +70,7 @@ const script = appjs;
   batchParseCsv, mapBatchRow, scoreBatchRow, scoreBatch, batchToCsv,
   I18N, translateKey, applyLang, getLang, toggleLang,
   storeFailedDelivery, clearFailedDelivery, getFailedPayload, paintRetryButton, retryAsanaDelivery,
+  asanaTokenised, setAsanaTokenised, toggleAsanaTokenised, asanaStatus,
   _deriveKey, encryptStr, decryptStr, sha256Hex, auditAppend, auditAll, auditVerify,
   currentRole, setRole, can, roleAtLeast, ROLES, ROLE_KEY, policyMissing,
   addRCA, exportAuditTokenized,
@@ -508,6 +509,27 @@ A.rememberDelivered(A.state.meta.ref, '4242');
 check('delivered gid remembered per reference for update-not-duplicate',
   A.deliveredGid(A.state.meta.ref) === '4242' && A.deliveredGid('RA-OTHER') === ''
   && A.asanaPayload().gid === '4242');
+check('asana payload carries the numeric score for the Score custom field', A.asanaPayload().score === 19);
+
+// B2: tokenised delivery keeps customer/staff PII on device.
+A.setAsanaTokenised(true);
+const tp = A.asanaPayload();
+check('tokenised: task title drops the entity name', !tp.name.includes('Fine Gold LLC')
+  && /· CDD 19$/.test(tp.name) && tp.name.startsWith(A.state.meta.ref));
+check('tokenised: notes withhold entity / assessor / MLRO PII', !tp.notes.includes('Fine Gold LLC')
+  && !tp.notes.includes('J. Smith') && !tp.notes.includes('A. Jones')
+  && tp.notes.includes('Tokenised delivery') && tp.notes.includes('Result: 19 / 30+ (CDD)'));
+check('tokenised: band + score still delivered for triage/sectioning', tp.band === 'CDD' && tp.score === 19);
+A.setAsanaTokenised(false);
+check('untokenised: full detail restored', A.asanaPayload().notes.includes('Entity: Fine Gold LLC'));
+
+// A5: register delivery-status chip reflects delivered / failed / pending / none.
+check('asana status: a delivered ref shows the delivered chip', (A.asanaStatus(A.state.meta.ref, true)||{}).cls === 'reg-st-done');
+A.storeFailedDelivery('RA-FAIL-1', {name:'x'});
+check('asana status: a failed ref shows the fail chip', (A.asanaStatus('RA-FAIL-1', true)||{}).cls === 'reg-st-fail');
+check('asana status: a completed-but-undelivered ref shows pending', (A.asanaStatus('RA-NEW-1', true)||{}).cls === 'reg-st-draft');
+check('asana status: a draft (not complete, not delivered) shows no chip', A.asanaStatus('RA-NEW-2', false) === null);
+A.clearFailedDelivery('RA-FAIL-1');
 check('toggleComplete is safe without fetch (sandbox/test)', (A.toggleComplete(), A.state.complete === true));
 A.toggleComplete();
 

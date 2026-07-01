@@ -393,6 +393,9 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .reg-proh{background:rgba(255,87,87,0.92);color:#fff;border-color:#FF5757}
 .reg-st-draft{background:rgba(255,255,255,0.03);color:var(--text3);border-color:var(--border2)}
 .reg-st-done{background:var(--low-bg);color:var(--low-text);border-color:var(--low-bd)}
+/* Asana delivery-status chip: a failed delivery (amber, distinct from the red
+   PROHIBITED result chip and the green COMPLETE chip). */
+.reg-st-fail{background:rgba(255,176,32,0.14);color:#ffb020;border-color:rgba(255,176,32,0.55)}
 .reg-review{font-size:9px;font-family:var(--mono);color:var(--text3);white-space:nowrap}
 .reg-review.reg-over{color:var(--high-text);font-weight:600}
 .reg-review.reg-soon{color:var(--med-text)}

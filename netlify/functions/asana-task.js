@@ -45,6 +45,11 @@ const handle = async (event) => {
   const token = process.env.ASANA_ACCESS_TOKEN;
   if (!token) return resp(500, { ok: false, error: 'ASANA_ACCESS_TOKEN not configured' });
 
+  /* Accept JSON only. A present, non-JSON Content-Type is rejected (415); a missing
+     header is tolerated (some clients omit it). Defence in depth on the body parser. */
+  const ctype = String((event.headers && (event.headers['content-type'] || event.headers['Content-Type'])) || '');
+  if (ctype && !/application\/json/i.test(ctype)) return resp(415, { ok: false, error: 'content-type must be application/json' });
+
   let payload;
   try { payload = JSON.parse(event.body || '{}'); }
   catch (e) { return resp(400, { ok: false, error: 'invalid JSON' }); }
@@ -62,6 +67,15 @@ const handle = async (event) => {
      an empty/placeholder ref falls back to exact-name matching below. */
   const ref = String(payload.ref || '').trim();
   const refSafe = !!ref && ref !== '(no ref)' && ref.length <= 120;
+
+  /* Optional structured values → native Asana custom fields, so the RISK
+     ASSESSMENTS project is filterable/reportable and reconciliation can be
+     field-level rather than name-parsing. Each maps to an env-configured custom-
+     field GID (ASANA_CF_*); the feature is inert until those GIDs are set, and is
+     applied best-effort AFTER the task exists so it can never lose a delivery. */
+  const tier = sectionName ? String(payload.band) : '';
+  const score = (payload.score == null || payload.score === '') ? '' : String(payload.score).slice(0, 40);
+  const customFields = buildCustomFields({ ref, tier, score, nextReview: dueOn || '' });
 
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
   if (!process.env.ASANA_PROJECT_GID) console.warn('ASANA_PROJECT_GID not set — using hardcoded default project GID');
@@ -93,6 +107,7 @@ const handle = async (event) => {
           try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: gid } }); }
           catch (e) { section = null; }
         }
+        await applyCustomFields(token, gid, customFields);
         return resp(200, { ok: true, gid, url: upd.body?.data?.permalink_url ?? null, section: section ? sectionName : null, updated: true });
       }
       /* Only a genuine 404 means the remembered task no longer exists — recreate it.
@@ -113,11 +128,14 @@ const handle = async (event) => {
        lookup failure falls through to a normal create. */
     if (!gid) {
       let existing = null;
-      /* Match by the stable ref prefix when a real ref is present (survives a
-         re-score, where the display name changed); otherwise fall back to exact
-         name. This is what keeps "one task per reference" holding across devices. */
-      try { existing = refSafe ? await findTaskByRef(token, project, ref, name) : await findTaskByName(token, project, name); }
-      catch (e) { existing = null; }
+      /* First try an O(1) idempotency lookup by the task's external id (= ref);
+         if unsupported or not found it returns null and we fall back to the stable
+         ref-prefix scan (survives a re-score), then exact name. Best-effort — any
+         failure never changes the tested behaviour below. */
+      try {
+        if (refSafe) existing = await findTaskByExternal(token, ref);
+        if (!existing) existing = refSafe ? await findTaskByRef(token, project, ref, name) : await findTaskByName(token, project, name);
+      } catch (e) { existing = null; }
       if (existing && existing.gid) {
         /* Include `name` so a task found by ref prefix is renamed to the latest
            outcome+score, not left showing the stale band. */
@@ -127,6 +145,7 @@ const handle = async (event) => {
             try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: existing.gid } }); }
             catch (e) { section = null; }
           }
+          await applyCustomFields(token, existing.gid, customFields);
           const dres = { ok: true, gid: existing.gid, url: (upd.body && upd.body.data && upd.body.data.permalink_url) || existing.permalink_url || null, section: section ? sectionName : null, deduplicated: true };
           _recentCache.set(cacheKey, { ...dres, ts: Date.now() });
           return resp(200, dres);
@@ -142,6 +161,10 @@ const handle = async (event) => {
 
     const data = { name, notes, projects: [project], assignee: process.env.ASANA_ASSIGNEE || 'me' };
     if (dueOn) data.due_on = dueOn;
+    /* Stamp the assessment reference as the task's external id — a stable, unique
+       key that survives re-scores and enables O(1) idempotent lookups and
+       field-level reconciliation. Set only at creation. */
+    if (refSafe) data.external = { gid: ref };
     const made = await api(token, 'POST', '/tasks', { data });
     if (!made.ok) {
       const msg = (made.body && made.body.errors && made.body.errors[0] && made.body.errors[0].message) || ('asana responded ' + made.status);
@@ -155,6 +178,7 @@ const handle = async (event) => {
       try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: newGid } }); }
       catch (e) { section = null; /* task stays in the default section */ }
     }
+    await applyCustomFields(token, newGid, customFields);
     const result = { ok: true, gid: newGid, url: (made.body.data && made.body.data.permalink_url) || null, section: section ? sectionName : null };
     _recentCache.set(cacheKey, { ...result, ts: Date.now() });
     return resp(200, result);
@@ -166,29 +190,80 @@ const handle = async (event) => {
 /* Abort a hung Asana call rather than letting it block until the platform kills
    the function. Overridable via ASANA_TIMEOUT_MS (kept small in tests). */
 const ASANA_TIMEOUT_MS = Number(process.env.ASANA_TIMEOUT_MS) || 15000;
+/* Bounded auto-retry for HTTP 429 (rate limit) only — a 429 means Asana did NOT
+   process the request, so retrying is safe even for a POST. 5xx is NOT retried
+   (a create may have succeeded server-side, so a retry could duplicate). */
+const ASANA_MAX_RETRIES = Number.isFinite(Number(process.env.ASANA_MAX_RETRIES)) && process.env.ASANA_MAX_RETRIES !== ''
+  ? Number(process.env.ASANA_MAX_RETRIES) : 2;
+const ASANA_RETRY_CAP_MS = Number(process.env.ASANA_RETRY_CAP_MS) || 2000;
 
 async function api(token, method, path, body) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), ASANA_TIMEOUT_MS);
-  let r;
-  try {
-    r = await fetch('https://app.asana.com/api/1.0' + path, {
-      method,
-      signal: ctrl.signal,
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: body ? JSON.stringify(body) : undefined
-    });
-  } finally {
-    clearTimeout(timer);
+  let attempt = 0;
+  while (true) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ASANA_TIMEOUT_MS);
+    let r;
+    try {
+      r = await fetch('https://app.asana.com/api/1.0' + path, {
+        method,
+        signal: ctrl.signal,
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: body ? JSON.stringify(body) : undefined
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    /* Asana normally returns JSON; tolerate an empty or non-JSON body (e.g. a 5xx
+       gateway page) so the caller surfaces the real status instead of throwing. */
+    const d = await r.json().catch(() => null);
+    if (r.status === 429 && attempt < ASANA_MAX_RETRIES) {
+      const ra = r.headers && r.headers.get ? Number(r.headers.get('retry-after')) : NaN;
+      const waitMs = Math.min(ASANA_RETRY_CAP_MS, (Number.isFinite(ra) && ra > 0) ? ra * 1000 : 250 * Math.pow(2, attempt));
+      attempt++;
+      await new Promise(res => setTimeout(res, waitMs));
+      continue;
+    }
+    return { ok: r.ok, status: r.status, body: d };
   }
-  /* Asana normally returns JSON; tolerate an empty or non-JSON body (e.g. a 5xx
-     gateway page) so the caller surfaces the real status instead of throwing. */
-  const d = await r.json().catch(() => null);
-  return { ok: r.ok, status: r.status, body: d };
+}
+
+/* Build the { <custom-field-gid>: <text value> } map from the env-configured GIDs.
+   Only text values that have both a configured GID and a non-empty value are
+   included; returns null when nothing is configured (feature stays inert). */
+function buildCustomFields({ ref, tier, score, nextReview }) {
+  const pairs = [
+    [process.env.ASANA_CF_REF, ref],
+    [process.env.ASANA_CF_TIER, tier],
+    [process.env.ASANA_CF_SCORE, score],
+    [process.env.ASANA_CF_NEXT_REVIEW, nextReview]
+  ];
+  const out = {};
+  for (const [gidRaw, val] of pairs) {
+    const g = String(gidRaw || '').trim();
+    if (g && val != null && val !== '') out[g] = String(val);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/* Best-effort: write custom fields on an existing task AFTER it is created/updated,
+   so a custom-field type mismatch or permission error can never lose the task
+   itself (same principle as section filing). No-op when nothing is configured. */
+async function applyCustomFields(token, gid, customFields) {
+  if (!customFields || !gid) return;
+  try { await api(token, 'PUT', '/tasks/' + gid, { data: { custom_fields: customFields } }); }
+  catch (e) { /* leave the task without the fields rather than fail the delivery */ }
+}
+
+/* Best-effort O(1) idempotency lookup: Asana can address a task by its external id
+   as `external:<id>`. Any non-200 (unsupported, not found, error) returns null so
+   the caller falls back to the paginated ref scan — behaviour never regresses. */
+async function findTaskByExternal(token, ref) {
+  const r = await api(token, 'GET', '/tasks/external:' + encodeURIComponent(ref) + '?opt_fields=name,permalink_url');
+  return (r.ok && r.body && r.body.data && r.body.data.gid) ? r.body.data : null;
 }
 
 /* Find an existing task by EXACT name within the project (paginated) — the
