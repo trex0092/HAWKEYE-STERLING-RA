@@ -1,4 +1,4 @@
-/* Creates an alert task in the RISK ASSESSMENTS Asana project, assigned and
+/* Creates an alert task in the HAWKEYE STERLING APP Asana project, assigned and
    due today so it reaches the compliance officer's inbox immediately.
    Used by .github/workflows/site-health.yml on failure.
    Usage: node scripts/asana-alert.mjs "<title>" "<notes>" */

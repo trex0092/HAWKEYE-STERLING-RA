@@ -42,7 +42,8 @@ Asana project  "RISK ASSESSMENTS"  (default GID 1216203370612914)
 
 Separately, the regulatory/sanctions watchers post to a **different** project via
 [`scripts/asana-notify.mjs`](../scripts/asana-notify.mjs)
-(`ASANA_REG_PROJECT_GID`, default `1215844297069727`) — not in scope here.
+(`ASANA_REG_PROJECT_GID`, default `1213914392047129` — Ongoing Monitoring, after the
+Regulations/Governance/Sanctions project was merged into it) — not in scope here.
 
 ### Key facts
 
