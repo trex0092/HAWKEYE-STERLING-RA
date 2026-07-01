@@ -65,7 +65,7 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1215844241216116' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1216203873114460' }}
         run: node scripts/watch-notify.mjs "Advisor guardrail regression detected" advisor-eval-report.md
 
       - name: Fallback to a GitHub issue if Asana delivery failed

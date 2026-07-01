@@ -69,7 +69,7 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
           # "Regulatory changes" section of the Regulations/Governance/Sanctions project
-          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1215844241216116' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1216203873114460' }}
         run: node scripts/watch-notify.mjs "${{ steps.watch.outputs.pr_title }}" reg-watch-report.md reg-watch-changes.json
 
       - name: Commit refreshed fingerprint state to main

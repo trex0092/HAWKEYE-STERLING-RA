@@ -67,7 +67,7 @@ jobs:
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
           # "Sanctions updates" section of the Regulations/Governance/Sanctions project
-          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1215857714525481' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1216203873114462' }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           SCREEN_PEP: ${{ vars.SCREEN_PEP }}

@@ -11,9 +11,9 @@
 
    Reuses the task-creation pattern from scripts/fatf-watchdog.mjs. */
 
-// "Regulations / Governance / Sanctions" (workspace: Compliance Tasks)
+// "Ongoing Monitoring" (merged target; workspace: Compliance Tasks)
 export const REG_PROJECT_GID =
-  process.env.ASANA_REG_PROJECT_GID || '1215844297069727';
+  process.env.ASANA_REG_PROJECT_GID || '1213914392047129';
 
 export function asanaEnabled() {
   return !!process.env.ASANA_ACCESS_TOKEN;
