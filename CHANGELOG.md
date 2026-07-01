@@ -96,6 +96,34 @@ bump merged to `main`.
 - Dependabot now groups GitHub Actions updates into a single weekly PR.
 - `codeql.yml` gained an explicit top-level least-privilege `permissions` block.
 
+### Fixed
+
+- **Asana delivery reliability (source-level audit).** An adversarially-verified
+  audit of the Asana integration ([`docs/asana-integration-audit.md`](docs/asana-integration-audit.md))
+  found and fixed duplicate-task and lost-update paths and improved failure
+  visibility:
+  - **No more cross-device duplicates.** A completed assessment is now deduped in
+    Asana by its stable **reference** (`findTaskByRef`), not by the whole task
+    name — the name embeds the mutable outcome+score, so a re-scored assessment
+    re-completed on another device used to create a second task.
+  - **Transient failures no longer duplicate.** A failed task update only recreates
+    on a genuine `404`; a `429`/`5xx`/auth failure now surfaces the status so the
+    client retries the same reference instead of creating a duplicate.
+  - **No lost updates.** The 60s dedup cache key now includes a hash of the
+    notes + due date, so an edited re-submit is written through rather than masked
+    by a stale cached result. Identical double-clicks still dedup.
+  - **Delivery is auditable.** Every delivery outcome is recorded in the
+    tamper-evident Activity Log (`asana.delivery.ok` / `asana.delivery.failed`),
+    and the Retry control now surfaces and flushes **all** pending failed
+    deliveries, not just the current assessment's.
+  - **`asana-mirror` read surfaces token failure.** An expired token (`401`) now
+    returns `401 "rotate ASANA_ACCESS_TOKEN"` instead of an empty-but-successful
+    register that read as "no backups yet".
+  - **Hardening.** Guarded created-task ids against malformed `2xx` bodies (clear
+    error, not a masked `502`); capped the mirror's request body, item count and
+    field lengths before normalization; and made `ensureSection` converge on a
+    concurrent create instead of duplicating a section.
+
 ## [3.7.0] — 2026-06-26
 
 Baseline release at the time this changelog was introduced. See the

@@ -90,8 +90,12 @@ const handle = async (event) => {
       const msg = (made.body && made.body.errors && made.body.errors[0] && made.body.errors[0].message) || ('asana responded ' + made.status);
       return resp(made.status, { ok: false, error: msg });
     }
-    await fileInSection(made.body.data.gid);
-    return resp(200, { ok: true, gid: made.body.data.gid, updated: false });
+    /* Guard a malformed 2xx (empty/non-JSON body) so a null body can't throw and be
+       masked as a generic 502 'unreachable'. */
+    const newGid = made.body && made.body.data && made.body.data.gid;
+    if (!newGid) return resp(502, { ok: false, error: 'asana returned no task id' });
+    await fileInSection(newGid);
+    return resp(200, { ok: true, gid: newGid, updated: false });
   } catch (e) {
     return resp(502, { ok: false, error: 'asana unreachable' });
   }
@@ -133,7 +137,14 @@ async function ensureSection(token, project, name) {
     if (hit) return hit.gid;
   }
   const made = await api(token, 'POST', '/projects/' + project + '/sections', { data: { name } });
-  return made.ok ? made.body.data.gid : null;
+  if (made.ok && made.body && made.body.data) return made.body.data.gid;
+  /* Create failed or raced a concurrent create — re-list and reuse the existing one. */
+  const relist = await api(token, 'GET', '/projects/' + project + '/sections?limit=100');
+  if (relist.ok) {
+    const hit = (relist.body.data || []).find(s => String(s.name || '').trim().toUpperCase() === name.toUpperCase());
+    if (hit) return hit.gid;
+  }
+  return null;
 }
 
 /* The site's own production origin — see asana-task.js. Override the whole
