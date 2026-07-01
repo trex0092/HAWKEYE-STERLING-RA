@@ -4,7 +4,7 @@
    (data/risk-overrides-backup.json), giving the overrides an off-device
    backup and a git audit trail. Token stays server side. */
 const { rateLimit } = require('./_ratelimit');
-const DEFAULT_PROJECT_GID = '1215653768729951'; /* RISK ASSESSMENTS */
+const DEFAULT_PROJECT_GID = '1216203370612914'; /* HAWKEYE STERLING APP */
 const TASK_NAME = 'RISK DATA SHEET (auto-backup)';
 /* Housekeeping mirror — file it under the ACTIVITY LOG section, not the default first one. */
 const LOG_SECTION = 'ACTIVITY LOG';

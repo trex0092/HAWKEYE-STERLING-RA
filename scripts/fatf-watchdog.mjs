@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
 export const STATE_FILE = 'data/fatf-state.json';
 const FATF_URL = 'https://www.fatf-gafi.org/en/countries/black-and-grey-lists.html';
-const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1215653768729951'; /* RISK ASSESSMENTS */
+const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWKEYE STERLING APP */
 /* Regulatory/sanctions changes (FATF list moves) go to the dedicated
    "Regulations / Governance / Sanctions" project so all monitoring alerts stay
    together; the client-assessment digest/backup stay in RISK ASSESSMENTS. */

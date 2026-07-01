@@ -109,6 +109,13 @@ bump merged to `main`.
 
 ### Changed
 
+- **Asana delivery target moved to the dedicated "HAWKEYE STERLING APP" project**
+  (`1216203370612914`). The default project GID for the delivery functions and the
+  scripts that default to the risk-assessments project (`asana-task`,
+  `asana-mirror`, `risk-backup`, `asana-alert`, `asana-reconcile`, `fatf-watchdog`
+  digest, `daily-brief`) now points there instead of the old per-entity Madison
+  project. Set `ASANA_PROJECT_GID` in Netlify (functions) — and, if the GitHub
+  Actions watchers should target it too, as the `ASANA_PROJECT_GID` repo variable.
 - Dependabot now groups GitHub Actions updates into a single weekly PR.
 - `codeql.yml` gained an explicit top-level least-privilege `permissions` block.
 

@@ -35,7 +35,7 @@ Netlify Functions  (token in ASANA_ACCESS_TOKEN, server-side)
   └─ risk-backup.js   ── mirror of the risk-data score overrides
   │  Asana REST v1.0
   ▼
-Asana project  "RISK ASSESSMENTS"  (default GID 1215653768729951)
+Asana project  "RISK ASSESSMENTS"  (default GID 1216203370612914)
      sections: LOW RISK (CDD) · MEDIUM RISK (SDD) · HIGH RISK (EDD) ·
                PROHIBITED (DO NOT ONBOARD) · ACTIVITY LOG (housekeeping mirrors)
 ```
@@ -48,7 +48,7 @@ Separately, the regulatory/sanctions watchers post to a **different** project vi
 
 | Item | Value | Source |
 |------|-------|--------|
-| Delivery target project | `ASANA_PROJECT_GID` → default `1215653768729951` (RISK ASSESSMENTS) | `asana-task.js:8` |
+| Delivery target project | `ASANA_PROJECT_GID` → default `1216203370612914` (RISK ASSESSMENTS) | `asana-task.js:8` |
 | Token | `ASANA_ACCESS_TOKEN` (server-side only) | `asana-task.js:45` |
 | Assignee | `ASANA_ASSIGNEE` → default `me` | `asana-task.js:114` |
 | Allowed origins | same-origin + `PRIMARY_ORIGIN` + `ALLOWED_ORIGINS` | `asana-task.js:195` |
@@ -178,7 +178,7 @@ tracked like every other Hawkeye Sterling control.
 
 1. Netlify → site **hawkeye-sterling-ra** → **Environment variables**: confirm
    `ASANA_ACCESS_TOKEN` is set and `ASANA_PROJECT_GID` points at RISK ASSESSMENTS
-   (`1215653768729951` unless overridden). If `ASANA_PROJECT_GID` is unset the
+   (`1216203370612914` unless overridden). If `ASANA_PROJECT_GID` is unset the
    functions log a warning and fall back to the hardcoded default.
 2. Netlify → **Functions** logs for `asana-task` / `asana-mirror`: look for `401`
    (token), `429` (rate limit), and the new explicit error strings.
