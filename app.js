@@ -1358,6 +1358,10 @@ function asanaPayload(){
   const name = String(s.entity.name||'').trim() || '[Unnamed entity]';
   return {
     name: (String(s.meta.ref||'').trim() || '(no ref)') + ' · ' + name + ' · ' + a.outcome + ' ' + a.total,
+    /* The stable reference, sent separately from the display name so the function
+       can dedup on it (the name embeds the mutable outcome+score, so it can't).
+       This keeps one task per reference even when re-scored on another device. */
+    ref: String(s.meta.ref||'').trim(),
     /* The serverless function files the task into the matching risk-band
        section: LOW (CDD) / MEDIUM (SDD) / HIGH (EDD) / PROHIBITED. */
     band: a.outcome,
@@ -1399,12 +1403,25 @@ function getFailedPayload(ref){
   if(!ref) return null;
   try{ const m = JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}; return m[ref] || null; }catch(e){ return null; }
 }
-/** Show the retry button only when there is a pending failed delivery for the current ref. */
+/** All references that currently have a stored failed delivery, across every assessment. */
+function pendingFailedRefs(){
+  try{ return Object.keys(JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}); }catch(e){ return []; }
+}
+/** Show the retry button whenever ANY delivery is pending (not only the current ref),
+    so a failure on a different assessment stays visible and recoverable. The count is
+    surfaced in the button title. */
 function paintRetryButton(){
   const btn = $('btnRetryAsana');
   if(!btn) return;
-  const ref = String(state.meta.ref||'').trim();
-  btn.classList.toggle('hidden', !(ref && getFailedPayload(ref)));
+  const pending = pendingFailedRefs();
+  btn.classList.toggle('hidden', pending.length === 0);
+  if(pending.length){
+    const ref = String(state.meta.ref||'').trim();
+    const others = pending.filter(r => r !== ref).length;
+    btn.setAttribute('title', pending.length === 1
+      ? 'Retry the pending Asana delivery'
+      : 'Retry ' + pending.length + ' pending Asana deliveries' + (others && ref && getFailedPayload(ref) ? ' (including this one)' : ''));
+  }
 }
 function sendToAsana(){
   /* Only meaningful on the deployed site (needs the Netlify function + token). */
@@ -1417,11 +1434,14 @@ function sendToAsana(){
   const ref = String(state.meta.ref||'').trim();
   doSendToAsana(p, ref, false);
 }
+/** Retry EVERY pending failed delivery (current ref first), so failures on other
+    assessments are not stranded. Falls back to the current ref if the map is empty. */
 function retryAsanaDelivery(){
-  const ref = String(state.meta.ref||'').trim();
-  const p = getFailedPayload(ref);
-  if(!p) return;
-  doSendToAsana(p, ref, true);
+  const cur = String(state.meta.ref||'').trim();
+  const refs = pendingFailedRefs();
+  const order = refs.includes(cur) ? [cur, ...refs.filter(r => r !== cur)] : refs;
+  const targets = order.length ? order : (cur ? [cur] : []);
+  targets.forEach(ref => { const p = getFailedPayload(ref); if(p) doSendToAsana(p, ref, true); });
 }
 function doSendToAsana(p, ref, isRetry){
   if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) return;
@@ -1430,12 +1450,20 @@ function doSendToAsana(p, ref, isRetry){
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(p)
   }).then(r => r.json()).then(d => {
-    if(d && d.ok && d.gid){ rememberDelivered(ref, d.gid); clearFailedDelivery(ref); }
-    else storeFailedDelivery(ref, p);
+    if(d && d.ok && d.gid){
+      rememberDelivered(ref, d.gid); clearFailedDelivery(ref);
+      /* Durable, tamper-evident record that the assessment reached Asana. */
+      auditAppend('asana.delivery.ok', (d.updated ? 'Updated' : 'Created') + ' Asana task for ' + (p.name||ref) + (d.section ? ' [' + d.section + ']' : ''));
+    } else {
+      storeFailedDelivery(ref, p);
+      /* Log the failure so it is diagnosable later without re-running an audit. */
+      auditAppend('asana.delivery.failed', 'Asana delivery failed for ' + (p.name||ref) + (d && d.error ? ': ' + d.error : ''));
+    }
     toast(d && d.ok ? (d.updated ? 'Updated in Asana: ' : 'Delivered to Asana: ') + p.name
                     : 'Asana delivery failed' + (d && d.error ? ' (' + d.error + ')' : ''));
   }).catch(() => {
     storeFailedDelivery(ref, p);
+    auditAppend('asana.delivery.failed', 'Asana delivery unavailable for ' + (p.name||ref) + (isRetry ? ' (retry)' : ''));
     toast(isRetry ? 'Retry failed — Asana still unavailable' : 'Asana delivery unavailable');
   });
 }

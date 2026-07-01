@@ -789,6 +789,47 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     check('clearFailedDelivery removes payload',    A.getFailedPayload(ref) === null);
   })();
 
+  // Asana delivery observability (#4) + retry-all-pending (#5) from the 2026-07 audit.
+  await (async () => {
+    ['RA-A','RA-B','RA-C','RA-D'].forEach(r => A.clearFailedDelivery(r));
+    // Two failures pending on DIFFERENT references…
+    A.storeFailedDelivery('RA-A', {name:'RA-A · Alpha · CDD 19', ref:'RA-A', band:'CDD'});
+    A.storeFailedDelivery('RA-B', {name:'RA-B · Beta · EDD 24',  ref:'RA-B', band:'EDD'});
+    // …while the current assessment is a THIRD reference with no failure of its own.
+    A.state = A.freshState(); A.state.meta.ref = 'RA-C';
+    const btn = document.getElementById('btnRetryAsana');
+    btn.classList.add('hidden');
+    A.paintRetryButton();
+    check('retry button stays visible when another assessment has a pending failure (#5)',
+      !btn.classList.contains('hidden'));
+
+    // Retry must flush BOTH pending references, not only the current one.
+    let n = 0;
+    global.location = { protocol: 'https:' };
+    global.fetch = async () => ({ json: async () => ({ ok: true, gid: 'DLV' + (++n), updated: false, section: 'LOW RISK (CDD)' }) });
+    A.retryAsanaDelivery();
+    for (let i = 0; i < 300 && (A.getFailedPayload('RA-A') || A.getFailedPayload('RA-B')); i++) await new Promise(r => setTimeout(r, 1));
+    check('retryAsanaDelivery flushes ALL pending failed deliveries, not just the current ref (#5)',
+      A.getFailedPayload('RA-A') === null && A.getFailedPayload('RA-B') === null && n === 2);
+    for (let i = 0; i < 300 && !A.auditAll().some(e => e.event === 'asana.delivery.ok'); i++) await new Promise(r => setTimeout(r, 1));
+    check('a successful Asana delivery is recorded in the tamper-evident activity log (#4)',
+      A.auditAll().some(e => e.event === 'asana.delivery.ok'));
+
+    // A failed delivery is likewise recorded — no silent failures.
+    A.storeFailedDelivery('RA-D', {name:'RA-D · Delta · CDD 19', ref:'RA-D', band:'CDD'});
+    global.fetch = async () => ({ json: async () => ({ ok: false, error: 'name required' }) });
+    A.state.meta.ref = 'RA-D';
+    A.retryAsanaDelivery();
+    for (let i = 0; i < 300 && !A.auditAll().some(e => e.event === 'asana.delivery.failed'); i++) await new Promise(r => setTimeout(r, 1));
+    check('a failed Asana delivery is recorded in the activity log (#4)',
+      A.auditAll().some(e => e.event === 'asana.delivery.failed'));
+
+    delete global.fetch; delete global.location;
+    ['RA-A','RA-B','RA-C','RA-D'].forEach(r => A.clearFailedDelivery(r));
+    A.paintRetryButton();
+    check('retry button hides when no Asana delivery is pending (#5)', btn.classList.contains('hidden'));
+  })();
+
   // NARRATIVE_POLICIES: buildNarrative must still reference all policy long-form names.
   (function(){
     reset(); A.state.entity.name = 'Test Co'; A.state.entity.jurisdiction = 'United Kingdom'; A.recalc();

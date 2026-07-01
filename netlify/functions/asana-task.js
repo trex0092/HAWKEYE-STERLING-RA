@@ -56,12 +56,21 @@ const handle = async (event) => {
   const gid = /^\d{1,30}$/.test(String(payload.gid || '')) ? String(payload.gid) : null;
   if (!name) return resp(400, { ok: false, error: 'name required' });
 
+  /* The stable per-assessment reference. The display `name` embeds the (mutable)
+     outcome+score, so it is NOT a reliable dedup key across a re-score; the ref is.
+     Only trust a real ref — the client sends '(no ref)' inside `name` when empty, so
+     an empty/placeholder ref falls back to exact-name matching below. */
+  const ref = String(payload.ref || '').trim();
+  const refSafe = !!ref && ref !== '(no ref)' && ref.length <= 120;
+
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
   if (!process.env.ASANA_PROJECT_GID) console.warn('ASANA_PROJECT_GID not set — using hardcoded default project GID');
 
-  /* Dedup: a re-submission of the same name+band within DEDUP_WINDOW_MS returns the cached result.
-     The key includes band so two distinct assessments that happen to share a name are never conflated. */
-  const cacheKey = name + '\x00' + String(payload.band || '');
+  /* Dedup: a re-submission of the SAME content within DEDUP_WINDOW_MS returns the
+     cached result (absorbs double-clicks). The key includes band and a hash of the
+     notes+due_on so an EDITED re-submit misses the cache and its new content is
+     written through, rather than being masked by a stale cached gid (lost update). */
+  const cacheKey = name + '\x00' + String(payload.band || '') + '\x00' + contentHash(notes + '\x00' + (dueOn || ''));
   const cached = _recentCache.get(cacheKey);
   if (cached && !gid && (Date.now() - cached.ts) < DEDUP_WINDOW_MS) {
     return resp(200, { ok: true, gid: cached.gid, url: cached.url, section: cached.section, deduplicated: true });
@@ -86,7 +95,15 @@ const handle = async (event) => {
         }
         return resp(200, { ok: true, gid, url: upd.body?.data?.permalink_url ?? null, section: section ? sectionName : null, updated: true });
       }
-      /* The remembered task was deleted in Asana or is inaccessible — create a fresh one. */
+      /* Only a genuine 404 means the remembered task no longer exists — recreate it.
+         A transient (429/5xx) or auth (401/403) failure must NOT fall through to a
+         create, or a still-existing task gets a duplicate. Surface the status so the
+         client retries the SAME reference instead. */
+      if (upd.status !== 404) {
+        const msg = (upd.body && upd.body.errors && upd.body.errors[0] && upd.body.errors[0].message) || ('asana update failed (' + upd.status + ')');
+        return resp(upd.status || 502, { ok: false, error: msg });
+      }
+      /* 404 → the remembered task was deleted in Asana; fall through to create a fresh one. */
     }
 
     /* Cross-instance dedup: the in-memory cache misses when two near-simultaneous
@@ -96,9 +113,15 @@ const handle = async (event) => {
        lookup failure falls through to a normal create. */
     if (!gid) {
       let existing = null;
-      try { existing = await findTaskByName(token, project, name); } catch (e) { existing = null; }
+      /* Match by the stable ref prefix when a real ref is present (survives a
+         re-score, where the display name changed); otherwise fall back to exact
+         name. This is what keeps "one task per reference" holding across devices. */
+      try { existing = refSafe ? await findTaskByRef(token, project, ref, name) : await findTaskByName(token, project, name); }
+      catch (e) { existing = null; }
       if (existing && existing.gid) {
-        const upd = await api(token, 'PUT', '/tasks/' + existing.gid, { data: { notes, due_on: dueOn } });
+        /* Include `name` so a task found by ref prefix is renamed to the latest
+           outcome+score, not left showing the stale band. */
+        const upd = await api(token, 'PUT', '/tasks/' + existing.gid, { data: { name, notes, due_on: dueOn } });
         if (upd.ok) {
           if (section) {
             try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: existing.gid } }); }
@@ -107,6 +130,12 @@ const handle = async (event) => {
           const dres = { ok: true, gid: existing.gid, url: (upd.body && upd.body.data && upd.body.data.permalink_url) || existing.permalink_url || null, section: section ? sectionName : null, deduplicated: true };
           _recentCache.set(cacheKey, { ...dres, ts: Date.now() });
           return resp(200, dres);
+        }
+        /* Found the task but the update failed. A transient/auth failure must not
+           spawn a duplicate; only a 404 (deleted between find and PUT) may create. */
+        if (upd.status !== 404) {
+          const msg = (upd.body && upd.body.errors && upd.body.errors[0] && upd.body.errors[0].message) || ('asana update failed (' + upd.status + ')');
+          return resp(upd.status || 502, { ok: false, error: msg });
         }
       }
     }
@@ -118,11 +147,15 @@ const handle = async (event) => {
       const msg = (made.body && made.body.errors && made.body.errors[0] && made.body.errors[0].message) || ('asana responded ' + made.status);
       return resp(made.status, { ok: false, error: msg });
     }
+    /* Guard a malformed 2xx (e.g. a 200 with an empty/non-JSON body): dereferencing
+       made.body.data.gid would throw and be masked as a generic 502 'unreachable'. */
+    const newGid = made.body && made.body.data && made.body.data.gid;
+    if (!newGid) return resp(502, { ok: false, error: 'asana returned no task id' });
     if (section) {
-      try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: made.body.data.gid } }); }
+      try { await api(token, 'POST', '/sections/' + section + '/addTask', { data: { task: newGid } }); }
       catch (e) { section = null; /* task stays in the default section */ }
     }
-    const result = { ok: true, gid: made.body.data.gid, url: made.body.data.permalink_url, section: section ? sectionName : null };
+    const result = { ok: true, gid: newGid, url: (made.body.data && made.body.data.permalink_url) || null, section: section ? sectionName : null };
     _recentCache.set(cacheKey, { ...result, ts: Date.now() });
     return resp(200, result);
   } catch (e) {
@@ -177,7 +210,34 @@ async function findTaskByName(token, project, name) {
   return null;
 }
 
-/* Find the section by name (case-insensitive) or create it. */
+/* Find the one task for a REFERENCE. A task's display name embeds the mutable
+   outcome+score ("<ref> · <entity> · <band> <score>"), so an exact-name match
+   misses after a re-score and would spawn a duplicate on another device. Match
+   instead on the stable "<ref> · " prefix, preferring an exact-name hit when one
+   exists. The trailing " · " delimiter stops ref "AC-1" from matching "AC-12".
+   Paginated; returns the task or null. */
+async function findTaskByRef(token, project, ref, name) {
+  const prefix = ref + ' · ';
+  let path = '/projects/' + project + '/tasks?limit=100&opt_fields=name,permalink_url';
+  let it = 0, candidate = null;
+  while (path && it < 50) {
+    it++;
+    const page = await api(token, 'GET', path);
+    if (!page.ok || !page.body) return candidate;
+    const data = Array.isArray(page.body.data) ? page.body.data : [];
+    const exact = data.find(t => String(t.name || '') === name);
+    if (exact) return exact;
+    if (!candidate) candidate = data.find(t => String(t.name || '').startsWith(prefix)) || null;
+    const off = page.body.next_page && page.body.next_page.offset;
+    path = off ? '/projects/' + project + '/tasks?limit=100&opt_fields=name,permalink_url&offset=' + off : null;
+  }
+  return candidate;
+}
+
+/* Find the section by name (case-insensitive) or create it. If the create fails
+   or races a concurrent first-time create (two completions of a brand-new band at
+   once), re-list and reuse the section that now exists so both racers converge on
+   one section instead of duplicating it. */
 async function ensureSection(token, project, name) {
   const list = await api(token, 'GET', '/projects/' + project + '/sections?limit=100');
   if (list.ok) {
@@ -185,7 +245,21 @@ async function ensureSection(token, project, name) {
     if (hit) return hit.gid;
   }
   const made = await api(token, 'POST', '/projects/' + project + '/sections', { data: { name } });
-  return made.ok ? made.body.data.gid : null;
+  if (made.ok && made.body && made.body.data) return made.body.data.gid;
+  const relist = await api(token, 'GET', '/projects/' + project + '/sections?limit=100');
+  if (relist.ok) {
+    const hit = (relist.body.data || []).find(s => String(s.name || '').trim().toUpperCase() === name.toUpperCase());
+    if (hit) return hit.gid;
+  }
+  return null;
+}
+
+/* Cheap, stable, non-cryptographic string hash (djb2) — used only to make the
+   double-click dedup cache key sensitive to the task's content. */
+function contentHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
 }
 
 /* The site's own production origin. Same-origin requests (prod + Netlify deploy
