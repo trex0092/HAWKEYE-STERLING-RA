@@ -184,3 +184,41 @@ tracked like every other Hawkeye Sterling control.
    (token), `429` (rate limit), and the new explicit error strings.
 3. Asana → RISK ASSESSMENTS: confirm one task per reference and that band
    sections exist (they are auto-created on demand).
+
+---
+
+## Enhancements & further hardening (2026-07 follow-up)
+
+A second pass added capability and closed hardening gaps. **Shipped** (all tested):
+
+| Ref | Change | Notes |
+|---|---|---|
+| A1 | **Native custom fields** | A completed assessment populates env-configured Asana custom fields (`ASANA_CF_REF/TIER/SCORE/NEXT_REVIEW`) so the project is sortable/reportable and reconciliation can be field-level. Applied best-effort **after** the task exists, so a wrong GID never loses a delivery. Inert until the GIDs are set. |
+| A2 | **External-ID idempotency** | Each task is stamped with `external.gid = <ref>` at creation; delivery first tries an O(1) lookup by external id before the paginated scan. A stable, unique key that survives re-scores. |
+| A3 | **Weekly reconciliation** | `scripts/asana-reconcile.mjs` + `.github/workflows/asana-reconcile.yml` diff the register mirror vs live tasks (delivery gaps / orphans / mismatches / duplicates) and file a **PII-free** card; GitHub-issue fallback if Asana is unreachable. |
+| A5 | **Register delivery-status chip** | Each register row shows `ASANA ✓ / ✗ / …` (delivered / failed / pending) from the delivered & failed maps. |
+| B2 | **Tokenised delivery mode** | A per-device toggle (`🔒 Asana: tokenise`) that keeps customer/staff **PII on the device** and sends Asana only ref + tier + score + dates. |
+| B5 | **429 auto-retry** | Bounded exponential backoff on HTTP 429 (honours `Retry-After`); **5xx is never retried** so a create can't be duplicated. |
+| B6 | **Content-type strictness** | A present, non-JSON `Content-Type` is rejected `415`. |
+
+### Deliberately **not** shipped as originally specced — and why
+
+- **A4 · Two-way sync from Asana → app.** Not architecturally possible here: the
+  register lives in the browser's `localStorage`, and a serverless webhook cannot
+  write to a user's browser. Would require a real backend store (a product
+  decision). A limited *status-mirror* (webhook → update the mirror task) is
+  possible but low value; deferred.
+- **A6 · PDF attachment.** The app builds an HTML report, not a PDF; server-side
+  PDF generation + multipart upload is heavyweight. Deferred. (Backfilling
+  `external.gid` on pre-existing tasks is better handled by the A3 reconcile job.)
+- **B1 · HMAC-signed function requests.** A browser cannot hold a signing secret
+  *secretly* — anyone can read `app.js` — so client-side HMAC is **security
+  theatre**, not real auth. The honest options are the existing origin guard +
+  rate-limit + input caps (in place), or **real user auth** (Netlify Identity /
+  login) if write-access must be restricted. Not shipped rather than fake it.
+- **B3 · Distributed rate limiting.** Needs external infrastructure (Netlify Edge
+  rate limiting or an Upstash Redis `INCR`), not a pure code change; the current
+  limiter is documented as best-effort per-instance. Provision-then-wire.
+- **B4 · Token scoping / rotation.** An Asana-admin/operational task (dedicated
+  service account scoped to the four projects + rotation cadence), not code.
+  Recommended, but must be done in the Asana console.

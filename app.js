@@ -1352,26 +1352,46 @@ function rememberDelivered(ref, gid){
     SS.setItem(ASANA_DELIVERED_KEY, JSON.stringify(m));
   }catch(e){}
 }
+/* ── Tokenised delivery: keep customer PII (entity name, jurisdiction, activity,
+   assessor/MLRO names, the narrative) IN THE BROWSER and send Asana only the
+   non-identifying triage fields (ref, risk tier, score, dates). Off by default;
+   the choice is persisted per device. ── */
+const ASANA_TOKENISED_KEY = 'hsra.asana.tokenised.v1';
+function asanaTokenised(){
+  try{ return SS.getItem(ASANA_TOKENISED_KEY) === '1'; }catch(e){ return false; }
+}
+function setAsanaTokenised(on){
+  try{ SS.setItem(ASANA_TOKENISED_KEY, on ? '1' : '0'); }catch(e){}
+  paintTokeniseBtn();
+}
+function toggleAsanaTokenised(){
+  setAsanaTokenised(!asanaTokenised());
+  toast(asanaTokenised() ? 'Asana delivery: PII kept on device (tokenised)' : 'Asana delivery: full detail');
+}
+function paintTokeniseBtn(){
+  const btn = $('btnTokeniseAsana');
+  if(!btn) return;
+  const on = asanaTokenised();
+  const ar = (typeof getLang==='function' && getLang()==='ar');
+  btn.textContent = ar
+    ? (on ? '🔓 إرسال التفاصيل الكاملة إلى Asana' : '🔒 إرسال مرمّز إلى Asana (بدون بيانات شخصية)')
+    : (on ? '🔓 Asana: send full detail' : '🔒 Asana: tokenise (no PII)');
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
 function asanaPayload(){
   const a = computeAssessment();
   const s = state;
   const name = String(s.entity.name||'').trim() || '[Unnamed entity]';
-  return {
-    name: (String(s.meta.ref||'').trim() || '(no ref)') + ' · ' + name + ' · ' + a.outcome + ' ' + a.total,
-    /* The stable reference, sent separately from the display name so the function
-       can dedup on it (the name embeds the mutable outcome+score, so it can't).
-       This keeps one task per reference even when re-scored on another device. */
-    ref: String(s.meta.ref||'').trim(),
-    /* The serverless function files the task into the matching risk-band
-       section: LOW (CDD) / MEDIUM (SDD) / HIGH (EDD) / PROHIBITED. */
-    band: a.outcome,
-    gid: deliveredGid(String(s.meta.ref||'').trim()),
-    /* Task due date mirrors the Next Review Date field: suggested by risk
-       level (12/6/3 months), auto-updated when risk data changes the band,
-       and always overridable by manual entry (e.g. on a change in law).
-       Prohibited relationships are declined, so they carry no due date. */
-    due_on: (!a.prohibited && /^\d{4}-\d{2}-\d{2}$/.test(String(s.signoff.nextReview||''))) ? s.signoff.nextReview : '',
-    notes: (String(s.notes||'').trim() || buildNarrative())
+  const refPart = String(s.meta.ref||'').trim() || '(no ref)';
+  const tok = asanaTokenised();
+  const notes = tok
+    /* Tokenised: no customer/staff identifiers leave the device — only triage data. */
+    ? 'Tokenised delivery — customer identity withheld and kept on the assessing device.'
+      + '\n\nRef: ' + (s.meta.ref || '-')
+      + '\nAssessment date: ' + (fmtDate(s.meta.date) || '-')
+      + '\nResult: ' + a.total + ' / 30+ (' + a.outcome + ')'
+      + '\nNext review: ' + (fmtDate(s.signoff.nextReview) || '-')
+    : (String(s.notes||'').trim() || buildNarrative())
       + '\n\nRef: ' + (s.meta.ref || '-')
       + '\nAssessment date: ' + (fmtDate(s.meta.date) || '-')
       + '\nEntity: ' + name
@@ -1384,7 +1404,28 @@ function asanaPayload(){
       + (s.signoff.completedDate ? ', ' + (fmtDate(s.signoff.completedDate) || s.signoff.completedDate) : '')
       + '\nApproved by (MLRO): ' + (String(s.signoff.approvedBy||'').trim() || '-')
       + (String(s.signoff.approvedTitle||'').trim() ? ' (' + s.signoff.approvedTitle.trim() + ')' : '')
-      + (s.signoff.approvedDate ? ', ' + (fmtDate(s.signoff.approvedDate) || s.signoff.approvedDate) : '')
+      + (s.signoff.approvedDate ? ', ' + (fmtDate(s.signoff.approvedDate) || s.signoff.approvedDate) : '');
+  return {
+    /* Tokenised drops the entity name from the display title too. */
+    name: tok ? (refPart + ' · ' + a.outcome + ' ' + a.total)
+              : (refPart + ' · ' + name + ' · ' + a.outcome + ' ' + a.total),
+    /* The stable reference, sent separately from the display name so the function
+       can dedup on it (the name embeds the mutable outcome+score, so it can't).
+       This keeps one task per reference even when re-scored on another device. */
+    ref: String(s.meta.ref||'').trim(),
+    /* The serverless function files the task into the matching risk-band
+       section: LOW (CDD) / MEDIUM (SDD) / HIGH (EDD) / PROHIBITED. */
+    band: a.outcome,
+    /* Numeric score — surfaced to the optional Asana "Score" custom field so the
+       project is sortable/reportable without parsing the task name. */
+    score: a.total,
+    gid: deliveredGid(String(s.meta.ref||'').trim()),
+    /* Task due date mirrors the Next Review Date field: suggested by risk
+       level (12/6/3 months), auto-updated when risk data changes the band,
+       and always overridable by manual entry (e.g. on a change in law).
+       Prohibited relationships are declined, so they carry no due date. */
+    due_on: (!a.prohibited && /^\d{4}-\d{2}-\d{2}$/.test(String(s.signoff.nextReview||''))) ? s.signoff.nextReview : '',
+    notes
   };
 }
 const ASANA_FAILED_KEY = 'hsra.asana.failed.v1';
@@ -1406,6 +1447,15 @@ function getFailedPayload(ref){
 /** All references that currently have a stored failed delivery, across every assessment. */
 function pendingFailedRefs(){
   try{ return Object.keys(JSON.parse(SS.getItem(ASANA_FAILED_KEY)) || {}); }catch(e){ return []; }
+}
+/** Asana delivery state for a register row: failed → delivered → (completed but not
+    yet delivered) → none (draft). Drives the small status chip in the register. */
+function asanaStatus(ref, complete){
+  if(!ref) return null;
+  if(getFailedPayload(ref)) return {cls:'reg-st-fail', txt:'ASANA ✗', title:'Asana delivery failed — open and use ↻ Retry'};
+  if(deliveredGid(ref))     return {cls:'reg-st-done', txt:'ASANA ✓', title:'Delivered to Asana'};
+  if(complete)              return {cls:'reg-st-draft', txt:'ASANA …', title:'Marked complete but not yet delivered to Asana'};
+  return null;
 }
 /** Show the retry button whenever ANY delivery is pending (not only the current ref),
     so a failure on a different assessment stays visible and recoverable. The count is
@@ -1947,6 +1997,7 @@ function regRender(){
       + '<span class="reg-name">'+esc(sm.entity||'')+'</span>'
       + '<span class="reg-chip '+band+'">'+esc(result)+'</span>'
       + '<span class="reg-chip '+(sm.complete?'reg-st-done':'reg-st-draft')+'">'+(sm.complete?'COMPLETE':'DRAFT')+'</span>'
+      + (function(as){ return as ? '<span class="reg-chip '+as.cls+'" title="'+esc(as.title)+'">'+esc(as.txt)+'</span>' : ''; })(asanaStatus(ref, sm.complete))
       + '<span class="reg-review'+revCls+'">'+esc(review)+'</span>'
       + '<button class="btn btn-blue btn-mini" data-act="regOpen" data-a1="'+i+'" aria-label="Open '+esc(ref)+'">Open</button>'
       + '<button class="btn btn-red btn-mini" data-act="regDelete" data-a1="'+i+'" aria-label="Remove '+esc(ref)+' from register">Delete</button>'
@@ -2239,6 +2290,7 @@ function applyLang(lang){
   try{ if(typeof recalc==='function') recalc(); }catch(e){}
   try{ if(typeof paintStatus==='function') paintStatus(); }catch(e){}
   try{ if(typeof paintMaskBtn==='function') paintMaskBtn(); }catch(e){}
+  try{ if(typeof paintTokeniseBtn==='function') paintTokeniseBtn(); }catch(e){}
 }
 function toggleLang(){ applyLang(getLang()==='ar' ? 'en' : 'ar'); }
 function initLang(){ applyLang(getLang()); }
@@ -2694,7 +2746,7 @@ initSecurity();   /* gate the app behind the passphrase, if configured/offered *
 -------------------------------------------------------------------------- */
 const UI_ACTIONS = {
   toggleLang, headerLock, insertNarrative, toggleOvForm, togglePrior,
-  printPreflight, toggleComplete, retryAsanaDelivery, openRegister, openBatch,
+  printPreflight, toggleComplete, retryAsanaDelivery, toggleAsanaTokenised, openRegister, openBatch,
   openAudit, toggleMask, sendToAsana, reassess, openRiskData, closeRiskData,
   rdToggleOvOnly, rdExportSheet, rdImportSheet, rdResetConfirm, closeRegister,
   closeBatch, downloadBatchTemplate, runBatch, exportBatchResults, closeAudit,

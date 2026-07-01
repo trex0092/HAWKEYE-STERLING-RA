@@ -42,6 +42,22 @@ bump merged to `main`.
 
 ### Added
 
+- **Asana integration — capability + hardening follow-up.** Building on the
+  delivery-reliability audit ([`docs/asana-integration-audit.md`](docs/asana-integration-audit.md)):
+  - **Native custom fields** — a completed assessment can populate real Asana
+    custom fields (Reference / Risk Tier / Score / Next Review) via env-configured
+    GIDs (`ASANA_CF_*`), applied best-effort so a bad GID never loses a delivery.
+  - **External-ID idempotency** — each task is stamped with `external.gid = <ref>`
+    and looked up by it (O(1)), a stable key that survives re-scores.
+  - **Weekly reconciliation** — `scripts/asana-reconcile.mjs` + an Asana
+    Reconciliation workflow diff the register mirror against live tasks (delivery
+    gaps / orphans / mismatches / duplicates) and file a **PII-free** card, with a
+    GitHub-issue fallback.
+  - **Tokenised delivery mode** — a per-device toggle that keeps customer/staff
+    PII on the device and sends Asana only reference, tier, score and dates.
+  - **Register delivery-status chip** — each row shows `ASANA ✓ / ✗ / …`.
+  - **429 auto-retry** with bounded backoff (5xx is never retried, so a create is
+    never duplicated) and **`Content-Type` strictness** (non-JSON → `415`).
 - **Progressive Web App (offline-capable):** a `manifest.webmanifest`, a
   network-first [service worker](sw.js) that precaches only the static app shell
   (never API responses or on-device risk data), and dependency-free PNG icons

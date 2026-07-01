@@ -10,6 +10,7 @@
 process.env.ASANA_ACCESS_TOKEN = 'test-token';
 process.env.ASANA_PROJECT_GID = '0'; /* avoid the default-GID console.warn noise */
 process.env.ASANA_TIMEOUT_MS = '50'; /* abort fast so the timeout case is quick */
+process.env.ASANA_RETRY_CAP_MS = '5'; /* keep the 429 backoff near-instant in tests */
 
 const path = require('path');
 const asanaTask = require(path.join(__dirname, '..', 'netlify', 'functions', 'asana-task.js'));
@@ -194,6 +195,88 @@ const event = (body) => ({ httpMethod: 'POST', headers: {}, body: JSON.stringify
     const res6 = await asanaMirror.handler(event({ action: 'read' }));
     const b = JSON.parse(res6.body);
     check('asana-mirror: read with an expired token surfaces 401 (not an empty success)', res6.statusCode === 401 && b.ok === false && /ASANA_ACCESS_TOKEN|unauthoriz/i.test(b.error));
+  }
+
+  /* ── New capabilities (2026-07): external-id idempotency, custom fields,
+     429 backoff, content-type strictness ─────────────────────────────────────── */
+
+  /* B6. A present, non-JSON Content-Type is rejected (415); JSON still works. */
+  {
+    const res = await asanaTask.handler({ httpMethod: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ name: 'CT Co' }) });
+    check('asana-task: a non-JSON content-type is rejected (415)', res.statusCode === 415);
+  }
+
+  /* A2. A create stamps the assessment reference as the task's external id. */
+  {
+    let createdBody = null;
+    setFetch(async (url, opts) => {
+      const u = String(url), m = opts && opts.method;
+      if (m === 'GET' && /\/tasks\/external:/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: {} }) };
+      if (m === 'GET' && /\/tasks\?/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: [] }) };
+      if (m === 'POST' && /\/tasks$/.test(u)) { createdBody = JSON.parse(opts.body); return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'EXT1' } }) }; }
+      return { ok: true, status: 200, json: () => Promise.resolve({ data: {} }) };
+    });
+    const res = await asanaTask.handler(event({ name: 'EXT Co · CDD 19', ref: 'EXT-77' }));
+    check('asana-task: a create stamps the ref as the task external id', JSON.parse(res.body).ok === true
+      && createdBody && createdBody.data.external && createdBody.data.external.gid === 'EXT-77');
+  }
+
+  /* A2. An existing task found by external id is updated in place — O(1) dedup,
+     no full-project scan, no duplicate. */
+  {
+    let posts = 0, scanned = false;
+    setFetch(async (url, opts) => {
+      const u = String(url), m = opts && opts.method;
+      if (m === 'GET' && /\/tasks\/external:EXT-9/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'EGID9', name: 'EXT-9 · Old · SDD 8', permalink_url: 'u/EGID9' } }) };
+      if (m === 'GET' && /\/tasks\?/.test(u)) { scanned = true; return { ok: true, status: 200, json: () => Promise.resolve({ data: [] }) }; }
+      if (m === 'PUT' && /\/tasks\/EGID9$/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'EGID9', permalink_url: 'u/EGID9' } }) };
+      if (m === 'POST' && /\/tasks$/.test(u)) { posts++; return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'DUP' } }) }; }
+      return { ok: true, status: 200, json: () => Promise.resolve({ data: {} }) };
+    });
+    const b = JSON.parse((await asanaTask.handler(event({ name: 'EXT-9 · New · EDD 24', ref: 'EXT-9' }))).body);
+    check('asana-task: a task found by external id is updated in place (O(1), no scan, no duplicate)', b.gid === 'EGID9' && b.deduplicated === true && posts === 0 && scanned === false);
+  }
+
+  /* A1. Configured custom-field GIDs are written to the task (best-effort, after
+     the task exists so a field error never loses the delivery). */
+  {
+    process.env.ASANA_CF_REF = '111'; process.env.ASANA_CF_TIER = '222'; process.env.ASANA_CF_SCORE = '333';
+    let cfPut = null;
+    setFetch(async (url, opts) => {
+      const u = String(url), m = opts && opts.method;
+      if (m === 'GET' && /\/tasks\/external:/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: {} }) };
+      if (m === 'GET' && /\/tasks\?/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: [] }) };
+      if (m === 'GET' && /\/sections\?/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: [{ gid: 's-low', name: 'LOW RISK (CDD)' }] }) };
+      if (/\/addTask$/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: {} }) };
+      if (m === 'POST' && /\/tasks$/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'CF1' } }) };
+      if (m === 'PUT' && /\/tasks\/CF1$/.test(u)) { cfPut = JSON.parse(opts.body); return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'CF1' } }) }; }
+      return { ok: true, status: 200, json: () => Promise.resolve({ data: {} }) };
+    });
+    const res = await asanaTask.handler(event({ name: 'CF Co · CDD 19', ref: 'CF-1', band: 'CDD', score: 19 }));
+    const cf = cfPut && cfPut.data && cfPut.data.custom_fields;
+    check('asana-task: configured custom fields (ref/tier/score) are written to the task', JSON.parse(res.body).ok === true
+      && cf && cf['111'] === 'CF-1' && cf['222'] === 'CDD' && cf['333'] === '19');
+    delete process.env.ASANA_CF_REF; delete process.env.ASANA_CF_TIER; delete process.env.ASANA_CF_SCORE;
+  }
+
+  /* B5. A 429 is retried with bounded backoff and then succeeds (no duplicate,
+     since a 429 means Asana did not process the request). */
+  {
+    let posts = 0;
+    setFetch(async (url, opts) => {
+      const u = String(url), m = opts && opts.method;
+      if (m === 'GET' && /\/tasks\?/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: [] }) };
+      if (m === 'POST' && /\/tasks$/.test(u)) {
+        posts++;
+        return posts === 1
+          ? { ok: false, status: 429, json: () => Promise.resolve({ errors: [{ message: 'rate limited' }] }) }
+          : { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'R429' } }) };
+      }
+      return { ok: true, status: 200, json: () => Promise.resolve({ data: {} }) };
+    });
+    const res = await asanaTask.handler(event({ name: 'Retry Co · CDD 19' }));
+    const b = JSON.parse(res.body);
+    check('asana-task: a 429 is retried with backoff and then succeeds', res.statusCode === 200 && b.gid === 'R429' && posts === 2);
   }
 
   global.fetch = origFetch;

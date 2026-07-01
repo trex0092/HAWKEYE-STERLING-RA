@@ -1,0 +1,74 @@
+name: Asana Reconciliation
+
+# Weekly drift check between the RA app and Asana (docs/asana-integration-audit.md,
+# Phase 3). Reads the app's ASSESSMENT REGISTER (auto-backup) mirror and the live
+# per-assessment tasks in the RISK ASSESSMENTS project, diffs them by reference,
+# and files a PII-free discrepancy card in the Regulations / Governance / Sanctions
+# project. Falls back to a labelled GitHub issue if Asana is unreachable.
+#
+# Needs the ASANA_ACCESS_TOKEN repository secret. Observational — a drift finding
+# is filed as a card/issue, not a failed build.
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'   # 10:00 UTC every Monday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: asana-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      - name: Reconcile RA register against Asana
+        id: reconcile
+        continue-on-error: true
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+        run: node scripts/asana-reconcile.mjs
+
+      - name: Fallback to a GitHub issue if the reconciliation could not reach Asana
+        if: steps.reconcile.outcome == 'failure'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            let report = '';
+            try { report = fs.readFileSync('asana-reconcile-report.md', 'utf8'); } catch (e) { /* none */ }
+            const body = (report ? report + '\n\n---\n' : '')
+              + '> The weekly RA ↔ Asana reconciliation could not complete or deliver its card\n'
+              + '> (missing `ASANA_ACCESS_TOKEN`, an expired token, or the Asana API was unreachable),\n'
+              + '> so this issue was opened instead. Check the secret and re-run.';
+            await github.rest.issues.create({
+              owner, repo,
+              title: 'Asana reconciliation could not run',
+              body,
+              labels: ['netlify'],
+            });
