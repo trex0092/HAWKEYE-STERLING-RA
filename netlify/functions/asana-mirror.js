@@ -98,6 +98,11 @@ const handle = async (event) => {
   const token = process.env.ASANA_ACCESS_TOKEN;
   if (!token) return resp(500, { ok: false, error: 'ASANA_ACCESS_TOKEN not configured' });
 
+  /* Accept JSON only (same gate as asana-task.js). A present, non-JSON Content-Type
+     is rejected; the browser callers (fetch + sendBeacon Blob) all send JSON. */
+  const ctype = String((event.headers && (event.headers['content-type'] || event.headers['Content-Type'])) || '');
+  if (ctype && !/application\/json/i.test(ctype)) return resp(415, { ok: false, error: 'content-type must be application/json' });
+
   /* Reject an oversized body before JSON.parse + normalization so a single request
      cannot pin CPU/memory (the output-size 413 below fires only AFTER normalizing). */
   if (String(event.body || '').length > MAX_BODY) return resp(413, { ok: false, error: 'request body too large' });

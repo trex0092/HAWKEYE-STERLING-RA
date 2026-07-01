@@ -37,6 +37,10 @@ const handle = async (event) => {
   const token = process.env.ASANA_ACCESS_TOKEN;
   if (!token) return resp(500, { ok: false, error: 'ASANA_ACCESS_TOKEN not configured' });
 
+  /* Accept JSON only (same gate as asana-task.js) — the browser caller sends JSON. */
+  const ctype = String((event.headers && (event.headers['content-type'] || event.headers['Content-Type'])) || '');
+  if (ctype && !/application\/json/i.test(ctype)) return resp(415, { ok: false, error: 'content-type must be application/json' });
+
   let payload;
   try { payload = JSON.parse(event.body || '{}'); }
   catch (e) { return resp(400, { ok: false, error: 'invalid JSON' }); }
