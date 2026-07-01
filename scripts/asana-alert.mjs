@@ -2,7 +2,7 @@
    due today so it reaches the compliance officer's inbox immediately.
    Used by .github/workflows/site-health.yml on failure.
    Usage: node scripts/asana-alert.mjs "<title>" "<notes>" */
-const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1215653768729951'; /* RISK ASSESSMENTS */
+const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWKEYE STERLING APP */
 const title = process.argv[2];
 const notes = process.argv[3] || '';
 

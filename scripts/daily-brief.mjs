@@ -15,7 +15,7 @@ import { readFileSync, existsSync } from 'node:fs';
 /* The "Regulations / Governance / Sanctions" project holds the monitoring
    alerts; the RISK ASSESSMENTS project holds the site/function-health alerts. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1215844297069727';
-export const RISK_PROJECT_GID = process.env.ASANA_PROJECT_GID || '1215653768729951';
+export const RISK_PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914';
 /* Optional: file the brief under a section so it lands in its own column. */
 const BRIEF_SECTION_GID = process.env.ASANA_BRIEF_SECTION_GID || '';
 const LOOKBACK_HOURS = Number(process.env.BRIEF_LOOKBACK_HOURS) || 24;

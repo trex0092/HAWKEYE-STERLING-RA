@@ -20,7 +20,7 @@
 import { writeFileSync } from 'node:fs';
 import { notifyAsana, esc, asanaEnabled, runUrl } from './asana-notify.mjs';
 
-const RISK_PROJECT_GID = process.env.ASANA_PROJECT_GID || '1215653768729951';
+const RISK_PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914';
 const SHEET_OPEN = '===HS SHEET===';
 const SHEET_CLOSE = '===END===';
 const REG_TASK = 'ASSESSMENT REGISTER (auto-backup)';

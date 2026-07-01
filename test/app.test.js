@@ -663,7 +663,7 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
   check('fn creates the asana task in RISK ASSESSMENTS', r.statusCode === 200 && body.ok === true
     && sent.url === 'https://app.asana.com/api/1.0/tasks'
     && sent.opts.headers.Authorization === 'Bearer test-token'
-    && sentBody.data.projects[0] === '1215653768729951' && sentBody.data.name === 'RA X · Y · CDD 19');
+    && sentBody.data.projects[0] === '1216203370612914' && sentBody.data.name === 'RA X · Y · CDD 19');
   check('fn passes the due date through to asana', sentBody.data.due_on === '2027-06-12');
   await fn.handler({httpMethod:'POST', body:JSON.stringify({name:'x', due_on:'junk'})});
   check('fn drops malformed due dates', !('due_on' in JSON.parse(sent.opts.body).data));

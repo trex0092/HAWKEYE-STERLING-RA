@@ -11,7 +11,7 @@
    The Asana token never leaves the server. Modeled on risk-backup.js / asana-task.js
    (same CORS, origin guard and API helper conventions). */
 const { rateLimit } = require('./_ratelimit');
-const DEFAULT_PROJECT_GID = '1215653768729951'; /* RISK ASSESSMENTS */
+const DEFAULT_PROJECT_GID = '1216203370612914'; /* HAWKEYE STERLING APP */
 const REG_TASK = 'ASSESSMENT REGISTER (auto-backup)';
 const LOG_TASK = 'ACTIVITY LOG (auto-backup)';
 /* Both auto-backup tasks are housekeeping mirrors — file them under the ACTIVITY LOG

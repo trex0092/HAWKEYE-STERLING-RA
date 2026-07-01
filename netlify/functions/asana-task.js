@@ -5,7 +5,7 @@
    The Asana token lives in the Netlify environment (ASANA_ACCESS_TOKEN)
    and never reaches the browser. */
 const { rateLimit } = require('./_ratelimit');
-const DEFAULT_PROJECT_GID = '1215653768729951'; /* RISK ASSESSMENTS */
+const DEFAULT_PROJECT_GID = '1216203370612914'; /* HAWKEYE STERLING APP */
 
 /* Module-level dedup cache: if the same assessment ref is submitted again within
    60 s (e.g. double-click or UI bug) return the cached result instead of creating
