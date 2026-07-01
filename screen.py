@@ -669,6 +669,14 @@ def get_all_customers():
             break
         params["offset"] = next_page["offset"]
     log(f"Loaded {len(customers)} customers")
+    # Fail-safe: 0 customers is never a legitimate state (the Customer Database is
+    # never empty). A 200-with-empty-data — wrong ASANA_CUSTOMER_DB_GID, project
+    # emptied, or a token scoped away — must NOT be screened as an all-clear. Abort
+    # loudly (non-zero exit) rather than post a green ✅ for an unscreened base.
+    if not customers:
+        raise RuntimeError(
+            "FATAL: 0 customers read from the Asana Customer Database — refusing to "
+            "screen or post an all-clear. Check ASANA_CUSTOMER_DB_GID and the token's access.")
     return customers
 
 # ── SCREENING ─────────────────────────────────────────────────────────────────
@@ -1265,6 +1273,13 @@ def load_all_lists():
         "eu":   {"count":len(eu_names),"date":eu_date,"hash":eu_hash,"tier":"core"},
         "eocn": {"count":len(eocn_names),"date":eocn_date,"hash":eocn_hash,"tier":"core"},
     }
+    # Fail-safe: if EVERY core sanctions list failed to load, screening would clear
+    # every customer for sanctions and post a green ✅. Abort instead — a total
+    # list-fetch failure must never masquerade as "all clear".
+    if sum(list_meta[k]["count"] for k in ("ofac","un","uk","eu","eocn")) == 0:
+        raise RuntimeError(
+            "FATAL: no core sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
+            "— refusing to screen or post an all-clear.")
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
         "UN Consolidated": [(normalize(n),n) for n in un_names],

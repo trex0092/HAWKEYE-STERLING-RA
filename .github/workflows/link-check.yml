@@ -46,7 +46,12 @@ jobs:
 
       - name: Job summary
         if: always()
-        run: cat link-check-report.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          if [ -f link-check-report.md ]; then
+            cat link-check-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "link-check produced no report (the check step errored before writing it — see its log)." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Open/refresh tracking issue (scheduled runs only)
         if: github.event_name == 'schedule' && steps.lc.outputs.has_dead == 'true'

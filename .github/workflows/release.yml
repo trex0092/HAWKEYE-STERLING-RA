@@ -30,17 +30,26 @@ jobs:
       - name: Create tag, GitHub release, and supply-chain artifacts
         env:
           GH_TOKEN: ${{ github.token }}
+          # Pass the free-text dispatch input through env (never interpolate it into
+          # the shell), then validate its shape — closes the script-injection path on
+          # this contents/attestations:write job.
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ github.sha }}
         run: |
-          gh release create "${{ inputs.tag }}" \
-            --target "${{ github.sha }}" \
-            --title "${{ inputs.tag }}" \
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) : ;;
+            *) echo "Refusing to release: tag must look like vX.Y.Z (got '$TAG')"; exit 1 ;;
+          esac
+          gh release create "$TAG" \
+            --target "$SHA" \
+            --title "$TAG" \
             --generate-notes
           # Deterministic source tarball of the released commit + CycloneDX SBOM,
           # both attested below.
-          git archive --format=tar.gz -o "hawkeye-sterling-ra-${{ inputs.tag }}.tar.gz" "${{ github.sha }}"
-          gh release upload "${{ inputs.tag }}" "hawkeye-sterling-ra-${{ inputs.tag }}.tar.gz" --clobber || echo "tarball upload skipped"
+          git archive --format=tar.gz -o "hawkeye-sterling-ra-$TAG.tar.gz" "$SHA"
+          gh release upload "$TAG" "hawkeye-sterling-ra-$TAG.tar.gz" --clobber || echo "tarball upload skipped"
           if node scripts/gen-sbom.mjs; then
-            gh release upload "${{ inputs.tag }}" sbom.cdx.json --clobber || echo "SBOM upload skipped"
+            gh release upload "$TAG" sbom.cdx.json --clobber || echo "SBOM upload skipped"
           else
             echo "SBOM generation skipped"
           fi
