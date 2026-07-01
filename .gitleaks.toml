@@ -25,12 +25,17 @@ regexes = [
   # Asana project GIDs are public object identifiers (they appear in task URLs),
   # not secrets. The default asana-client-id rule false-positives on any 16-digit
   # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
-  '''1215844297069727''',  # Regulations / Governance / Sanctions project
-  '''1216203370612914''',  # HAWKEYE STERLING APP project (current RA delivery target)
-  '''1215653768729951''',  # Risk Assessments - Madison LLC (former default target)
-  '''1213914392047129''',  # Ongoing Monitoring project (daily audit-trail tasks)
-  # Section GIDs within the Regulations/Governance/Sanctions project (also public).
-  '''1215844241216116''',  # section: Regulatory changes
-  '''1215857714525481''',  # section: Sanctions updates
-  '''1215844241048837''',  # section: FATF list moves
+  '''1216203370612914''',  # HAWKEYE STERLING APP project (RA delivery target)
+  '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log)
+  '''1215653768729951''',  # Risk Assessments - Madison LLC (former RA default)
+  '''1215844297069727''',  # Regulations / Governance / Sanctions (merged into Ongoing Monitoring, then removed)
+  # Section GIDs in the Ongoing Monitoring project (public identifiers), used by the
+  # watchers after the Reg/Gov/Sanctions project was merged in.
+  '''1216203873114460''',  # section: Regulatory changes
+  '''1216203873114462''',  # section: Sanctions updates
+  '''1216203873114461''',  # section: FATF list moves
+  # Former Reg/Gov/Sanctions section GIDs (kept so history still scans clean).
+  '''1215844241216116''',  # former section: Regulatory changes
+  '''1215857714525481''',  # former section: Sanctions updates
+  '''1215844241048837''',  # former section: FATF list moves
 ]
