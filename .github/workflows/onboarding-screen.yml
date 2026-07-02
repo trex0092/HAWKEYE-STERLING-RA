@@ -90,10 +90,10 @@ jobs:
       - name: Commit delta-state (what has already been reported)
         if: always()
         run: |
-          if [ -n "$(git status --porcelain data/screen-delta-state.json data/adverse-media-evidence.json 2>/dev/null)" ]; then
+          if [ -n "$(git status --porcelain data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json 2>/dev/null)" ]; then
             git config user.name "onboarding-screen"
             git config user.email "actions@github.com"
-            git add data/screen-delta-state.json data/adverse-media-evidence.json
+            git add data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json
             git commit -m "chore(screen): update delta-state (onboarding) [skip ci]"
             for attempt in 1 2 3 4 5; do
               git push && break
