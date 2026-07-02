@@ -16,6 +16,10 @@
    Runs in GitHub Actions (.github/workflows/governance-report.yml).
    Needs ASANA_ACCESS_TOKEN (secret) + the runner's GITHUB_TOKEN (actions:read). */
 
+/* Shared Asana client: bounded retry on 429/5xx so a transient blip never
+   drops the day's report (idempotency is by title-prefix check in main). */
+import { asana } from './asana-notify.mjs';
+
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1213914392047129';
 /* Section resolved BY NAME at runtime (created if missing); GID overrides it. */
@@ -219,24 +223,6 @@ async function countAlerts(repo, token, kind) {
     const d = await gh('/repos/' + repo + '/' + kind + '/alerts?state=open&per_page=100', token);
     return Array.isArray(d) ? (d.length === 100 ? '100+' : d.length) : null;
   } catch { return null; }
-}
-
-async function asana(path, opts = {}) {
-  const r = await fetch('https://app.asana.com/api/1.0' + path, {
-    ...opts,
-    headers: {
-      Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(opts.headers || {})
-    }
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    if (r.status === 401) throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked.');
-    throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
-  }
-  return d;
 }
 
 async function listTaskNames(projectGid) {

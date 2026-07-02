@@ -11,6 +11,9 @@
    Runs in GitHub Actions (.github/workflows/daily-brief.yml).
    Needs the ASANA_ACCESS_TOKEN repository secret. */
 import { readFileSync, existsSync } from 'node:fs';
+/* Shared Asana client: bounded retry on 429/5xx so a transient blip never
+   drops the day's brief (idempotency is by exact-title check below). */
+import { asana } from './asana-notify.mjs';
 
 /* The "Ongoing Monitoring" project holds the monitoring
    alerts; the HAWKEYE STERLING APP project holds the site/function-health alerts. */
@@ -77,24 +80,6 @@ export function buildBrief(b, fatf, label, lookbackHours) {
 }
 
 /* ---- I/O below; the functions above are pure and unit-tested. ---- */
-
-async function asana(path, opts = {}) {
-  const r = await fetch('https://app.asana.com/api/1.0' + path, {
-    ...opts,
-    headers: {
-      Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(opts.headers || {})
-    }
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    if (r.status === 401) throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked.');
-    throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
-  }
-  return d;
-}
 
 async function listTasks(projectGid, fields) {
   const out = [];
