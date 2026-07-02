@@ -206,6 +206,19 @@ const event = (body) => ({ httpMethod: 'POST', headers: {}, body: JSON.stringify
     check('asana-task: a non-JSON content-type is rejected (415)', res.statusCode === 415);
   }
 
+  /* Hardening round 2: content-type gates on the other two functions + raw-body caps. */
+  {
+    const res = await asanaMirror.handler({ httpMethod: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' });
+    check('asana-mirror: a non-JSON content-type is rejected (415)', res.statusCode === 415);
+    const res2 = await riskBackup.handler({ httpMethod: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' });
+    check('risk-backup: a non-JSON content-type is rejected (415)', res2.statusCode === 415);
+    const big = '{"name":"' + 'x'.repeat(1100000) + '"}';
+    const res3 = await asanaTask.handler({ httpMethod: 'POST', body: big });
+    check('asana-task: an oversized body is rejected before parsing (413)', res3.statusCode === 413);
+    const res4 = await riskBackup.handler({ httpMethod: 'POST', body: big });
+    check('risk-backup: an oversized body is rejected before parsing (413)', res4.statusCode === 413);
+  }
+
   /* A2. A create stamps the assessment reference as the task's external id. */
   {
     let createdBody = null;

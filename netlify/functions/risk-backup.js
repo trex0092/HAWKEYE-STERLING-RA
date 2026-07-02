@@ -41,6 +41,10 @@ const handle = async (event) => {
   const ctype = String((event.headers && (event.headers['content-type'] || event.headers['Content-Type'])) || '');
   if (ctype && !/application\/json/i.test(ctype)) return resp(415, { ok: false, error: 'content-type must be application/json' });
 
+  /* Reject an oversized body BEFORE JSON.parse — the 50 KB sheet cap below only
+     fires after the whole body has been parsed. 1 MB is generous headroom. */
+  if (String(event.body || '').length > 1000000) return resp(413, { ok: false, error: 'request body too large' });
+
   let payload;
   try { payload = JSON.parse(event.body || '{}'); }
   catch (e) { return resp(400, { ok: false, error: 'invalid JSON' }); }
