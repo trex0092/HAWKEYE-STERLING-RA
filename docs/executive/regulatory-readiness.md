@@ -7,7 +7,7 @@ Date: 2 Jul 2026.*
 
 | Framework | Position | Primary evidence |
 |---|---|---|
-| **ISO/IEC 42001** (AIMS) | Substantially implemented; awaiting first management review + two ratifications | `docs/governance/iso-42001-soa-2026.md`, `docs/aims/` |
+| **ISO/IEC 42001** (AIMS) | Substantially implemented; AI Policy + SIA + DPIA ratified 2026-07-02; awaiting first management review | `docs/governance/iso-42001-soa-2026.md`, `docs/aims/` |
 | **NIST AI RMF** | Mapped; MEASURE/MANAGE evidenced daily | `docs/governance/nist-ai-rmf-mapping-2026.md`, AI Governance Report |
 | **EU AI Act** | Outside territorial scope today (no EU establishment/market offering); design aligns with high-risk obligations should scope change | §"EU AI Act positioning" below |
 | **OECD AI Principles** | Absorbed via crosswalk | `docs/governance/ai-frameworks-crosswalk-2026.md` |
@@ -47,8 +47,8 @@ review.
 ## Open items to disclose proactively (never discovered mid-exam)
 - Anthropic **DPA pending** — AI features gated OFF until executed.
 - **Transaction-monitoring engine built but inactive** (R-13) pending a data feed.
-- First **ISO 42001 management review** scheduled (Q3 2026); AI Policy + SIA
-  awaiting ratification.
+- First **ISO 42001 management review** scheduled (Q3 2026). (AI Policy, SIA and
+  DPIA §6 were ratified 2026-07-02.)
 - Accepted architectural gap: Netlify Identity on write endpoints (compensating
   controls documented).
 
