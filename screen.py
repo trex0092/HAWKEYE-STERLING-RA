@@ -165,6 +165,39 @@ ADVERSE_KEYWORDS = [
     "esg", "greenwashing", "due diligence failure",
 ]
 
+# Arabic-language risk terms — for a UAE deployment, adverse media often breaks in
+# Arabic press first. Each maps to its English equivalent so typology bucketing and
+# reporting stay uniform. Matched by substring against the raw headline — Arabic
+# has no letter case, and \b word boundaries are unreliable in Arabic script.
+ADVERSE_KEYWORDS_AR = {
+    "احتيال": "fraud",
+    "غسل الأموال": "money laundering",
+    "غسيل الأموال": "money laundering",
+    "عقوبات": "sanction",
+    "إرهاب": "terrorism",
+    "تمويل الإرهاب": "terrorist financing",
+    "رشوة": "bribery",
+    "فساد": "corruption",
+    "اختلاس": "embezzle",
+    "اعتقال": "arrest",
+    "إدانة": "convict",
+    "تهريب": "smuggl",
+    "مخدرات": "narcotics",
+    "تزوير": "forgery",
+}
+
+def match_adverse_keywords(title: str) -> list:
+    """All adverse keywords found in one headline: the English set (word-boundary,
+    case-insensitive) plus the Arabic set (substring; mapped to its English
+    equivalent so typology bucketing and reporting stay uniform). Order kept."""
+    raw = title or ""
+    tl = raw.lower()
+    matched = [kw for kw in ADVERSE_KEYWORDS if re.search(r"\b" + re.escape(kw), tl)]
+    for ar, en in ADVERSE_KEYWORDS_AR.items():
+        if ar in raw and en not in matched:
+            matched.append(en)
+    return matched
+
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def normalize(name):
     if not name: return ""
@@ -234,6 +267,55 @@ ADVERSE_LOCALES = int(os.environ.get("ADVERSE_LOCALES", "5"))
 RISK_QUERY = ("fraud OR sanctions OR \"money laundering\" OR arrest OR investigation OR "
               "court OR bribery OR corruption OR smuggling OR terrorism OR embezzlement OR "
               "convicted OR indicted OR seized OR raid OR probe OR lawsuit OR charged")
+# Arabic counterpart of RISK_QUERY for the AE:ar locale — Arabic-language wrongdoing
+# coverage that never uses the English terms (see ADVERSE_KEYWORDS_AR for mapping).
+AR_RISK_QUERY = " OR ".join('"' + t + '"' for t in (
+    "احتيال", "غسل الأموال", "عقوبات", "فساد", "رشوة", "اعتقال", "تهريب", "إرهاب"))
+
+# GDELT DOC 2.0 — a free, no-key global news index (100+ languages; titles
+# machine-translated to English). The independent SECOND feed, so adverse
+# coverage never depends on Google News alone.
+GDELT_URL = ("https://api.gdeltproject.org/api/v2/doc/doc?query={query}"
+             "&mode=artlist&format=json&maxrecords=20&sort=datedesc&timespan=12m")
+GDELT_RISK_TERMS = ["sanctions", '"money laundering"', "fraud", "corruption", "terrorism"]
+
+def parse_gdelt(payload, max_results: int = 8) -> list:
+    """GDELT artlist JSON → the same article shape the Google News pass emits.
+    Pure (no network) so it is unit-testable offline."""
+    arts = []
+    for a in (payload or {}).get("articles", [])[: max_results * 3]:
+        title = (a.get("title") or "").strip()
+        if not title:
+            continue
+        m = re.match(r"(\d{4})(\d{2})(\d{2})", a.get("seendate") or "")
+        ts = None
+        if m:
+            try:
+                ts = int(datetime.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3))).timestamp())
+            except Exception:
+                ts = None
+        matched = match_adverse_keywords(title)
+        arts.append({
+            "title": title,
+            "source": (a.get("domain") or "GDELT"),
+            "date": (f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else ""),
+            "ts": ts,
+            "url": a.get("url") or "",
+            "flagged": bool(matched),
+            "keywords": matched,
+            "categories": typology_for(matched),
+        })
+    return arts
+
+def search_gdelt(name: str, max_results: int = 8) -> list:
+    """Query GDELT for a subject + risk-term cluster. Raises on HTTP failure so
+    the caller can log it (the Google News passes still stand on their own)."""
+    q = requests.utils.quote(f'"{name}" ({" OR ".join(GDELT_RISK_TERMS)})')
+    r = requests.get(GDELT_URL.format(query=q), timeout=20,
+                     headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
+    if r.status_code != 200:
+        raise RuntimeError(f"GDELT HTTP {r.status_code}")
+    return parse_gdelt(r.json() if r.content else {}, max_results)
 
 def search_adverse_media(name: str, max_results: int = 8) -> list:
     """
@@ -251,6 +333,10 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
         (f'"{name}"', GNEWS_URLS[:ADVERSE_LOCALES]),   # broad: exact name, every locale
         (f'"{name}" ({RISK_QUERY})', GNEWS_URLS[:1]),  # targeted: name + risk terms, en-US
     ]
+    if ADVERSE_LOCALES >= 5:
+        # Targeted Arabic pass — wrongdoing coverage in Arabic press that would
+        # never match the English risk terms (AE:ar locale only).
+        passes.append((f'"{name}" ({AR_RISK_QUERY})', GNEWS_URLS[4:5]))
     for q, locales in passes:
         query = requests.utils.quote(q)
         for url_template in locales:
@@ -273,8 +359,7 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
                     source = (source_el.text if source_el is not None else "Unknown")
                     pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
                     link = (link_el.text or "") if link_el is not None else ""
-                    tl = title.lower()
-                    matched = [kw for kw in ADVERSE_KEYWORDS if re.search(r"\b" + re.escape(kw), tl)]
+                    matched = match_adverse_keywords(title)
                     articles.append({
                         "title": title,
                         "source": source,
@@ -288,6 +373,17 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
             except Exception:
                 continue
             time.sleep(0.4)  # polite delay between requests
+
+    # Independent second source — GDELT. Its failure alone never fails the
+    # subject (the Google News passes above already ran); it is logged so a quiet
+    # feed outage is visible in the run log instead of silently narrowing recall.
+    try:
+        for a in search_gdelt(name, max_results):
+            if a["title"] not in seen_titles:
+                seen_titles.add(a["title"])
+                articles.append(a)
+    except Exception as e:
+        log(f"  GDELT unavailable for this subject ({str(e)[:80]}) — Google News coverage stands")
 
     articles = dedup_stories(articles)
     # Sort: flagged first, then most-recent first (recency ranking).
@@ -352,6 +448,65 @@ def format_adverse_block(name: str, articles: list, subject_type: str) -> str:
         lines.append(f"      {a['source']} — {a['date']}")
     lines.append("")
     return "\n".join(lines)
+
+
+# ── ADVERSE-MEDIA EVIDENCE LOG (examiner trail + repeat-pattern signal) ───────
+EVIDENCE_FILE = os.environ.get("ADVERSE_EVIDENCE_FILE", "data/adverse-media-evidence.json")
+EVIDENCE_RETENTION_DAYS = 400   # > 1 year of committed history, bounded file size
+REPEAT_WINDOW_DAYS = 90         # look-back for the repeat-pattern signal
+REPEAT_THRESHOLD = 3            # ≥ N distinct stories in the window ⇒ pattern
+
+def update_adverse_evidence(adverse_findings, today_iso, path=None):
+    """Append today's flagged articles to the committed evidence log, prune past
+    retention, and return {subject: distinct-story-count} for subjects at/over
+    REPEAT_THRESHOLD inside REPEAT_WINDOW_DAYS. The log is the examiner-ready
+    adverse-media history — every flagged headline, source, URL and typology,
+    by date; the count is the "3rd hit in 90 days" escalation signal."""
+    path = path or EVIDENCE_FILE
+    try:
+        with open(path, encoding="utf-8") as f:
+            entries = json.load(f)
+        if not isinstance(entries, list):
+            entries = []
+    except Exception:
+        entries = []
+    seen = {(e.get("subject"), e.get("title")) for e in entries}
+    for f_ in adverse_findings or []:
+        subj = f_.get("subject_name") or ""
+        for a in f_.get("articles", []):
+            key = (subj, a.get("title"))
+            if not subj or not a.get("title") or key in seen:
+                continue
+            seen.add(key)
+            entries.append({
+                "date": str(today_iso)[:10], "subject": subj,
+                "subject_type": f_.get("subject_type", ""), "parent": f_.get("parent") or "",
+                "title": a.get("title", ""), "source": a.get("source", ""),
+                "url": a.get("url", ""), "keywords": a.get("keywords", []),
+                "categories": a.get("categories", []),
+            })
+
+    def _age_days(e):
+        try:
+            d = datetime.datetime.strptime(str(e.get("date", ""))[:10], "%Y-%m-%d")
+            t = datetime.datetime.strptime(str(today_iso)[:10], "%Y-%m-%d")
+            return (t - d).days
+        except Exception:
+            return 10 ** 6
+    entries = [e for e in entries if _age_days(e) <= EVIDENCE_RETENTION_DAYS]
+    try:
+        d = os.path.dirname(path)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(entries, f, ensure_ascii=False, indent=1)
+    except Exception as e:
+        log(f"  evidence log write failed ({e}) — screening output unaffected")
+    counts = {}
+    for e in entries:
+        if _age_days(e) <= REPEAT_WINDOW_DAYS:
+            counts[e["subject"]] = counts.get(e["subject"], 0) + 1
+    return {subj: n for subj, n in counts.items() if n >= REPEAT_THRESHOLD}
 
 # ── PEP — POLITICALLY EXPOSED PERSONS (free, Wikidata, individuals only) ──────
 # No genuinely free commercial-use PEP *list* exists (OpenSanctions etc. are
@@ -1103,7 +1258,7 @@ SCOPE & COVERAGE ATTESTATION
   Individuals screened:      {stats["individuals_screened"]}  (shareholders / UBOs / directors from KYC records)
   Total subjects screened:   {stats["subjects_total"]}  ({coverage_pct}% of attempted)
   Screening errors/skipped:  {stats["errors"]}          <- non-coverage is shown, never silent
-  Source:                    Google News RSS - 5 locales (US / GB / AE / TR / AR) + targeted risk query
+  Source:                    Google News RSS - 5 locales (US / GB / AE / TR / AR) + Arabic risk query + GDELT global index
   Query method:              Exact-phrase entity / individual-name search
   Adverse keyword set:       {len(ADVERSE_KEYWORDS)} red-flag terms (full set in screen.py)
   Key red flags:             {key_flags}
@@ -1432,7 +1587,14 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A(f"       Link: {a.get('url','(no link)')}")
             A("   MLRO Decision:  [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR")
             A("")
-        A(f"   Source: Google News RSS · {len(ADVERSE_KEYWORDS)} red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
+        rep = stats.get("adverse_repeat") or {}
+        if rep:
+            A(f"   ⚠ REPEAT ADVERSE-MEDIA PATTERN ({REPEAT_WINDOW_DAYS}-day window):")
+            for s_, n_ in sorted(rep.items()):
+                A(f"      {s_} — {n_} distinct stories — a pattern, not an isolated headline;")
+                A( "         EDD review required + assess STR grounds (tipping-off rules apply).")
+            A("")
+        A(f"   Source: Google News RSS (5 locales incl. AR/TR) + GDELT global index · {len(ADVERSE_KEYWORDS)} EN + {len(ADVERSE_KEYWORDS_AR)} AR red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
     A("")
 
     A("━" * 70)
@@ -1750,6 +1912,16 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # ── OPERATIONAL MONITORING (latency · usage · anomaly) ──
     subjects_total = companies + individuals
     errors_total = am_errors + pep_errors
+
+    # Evidence log (committed to git) + repeat-pattern signal: the same entity
+    # flagged in ≥3 distinct stories inside 90 days is a PATTERN, not a headline.
+    repeat_patterns = {}
+    try:
+        repeat_patterns = update_adverse_evidence(adverse_findings, run_time.strftime("%Y-%m-%d"))
+        for s_, n_ in sorted(repeat_patterns.items()):
+            log(f"REPEAT ADVERSE PATTERN: {s_} — {n_} distinct stories in {REPEAT_WINDOW_DAYS}d — escalate to MLRO")
+    except Exception as e:
+        log(f"evidence log skipped ({e})")
     timings = {"sanctions": round(_t_sanctions - _t_start, 2),
                "enrichment": round(_t_enrich - _t_sanctions, 2),
                "ai_triage": round(_t_ai - _t_enrich, 2),
@@ -1757,6 +1929,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     run_monitor = monitoring.monitor_run(
         run_time.strftime("%Y-%m-%d"),
         counts={"subjects": subjects_total, "errors": errors_total,
+                "am_errors": am_errors,
                 "flagged": len(possible_matches), "adverse": len(adverse_findings),
                 "pep": len(pep_findings)},
         timings=timings, llm_calls=dict(ai.LLM_CALLS))
@@ -1771,6 +1944,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     stats = {"customers_total": len(customers), "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": subjects_total,
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
+             "adverse_repeat": repeat_patterns,
              "related_parties": related, "injection_blocked": injection_blocked,
              "monitoring": run_monitor, "coverage": coverage_result,
              "txn_status": txn_status, "cdd_gaps_total": cdd_gaps_total,

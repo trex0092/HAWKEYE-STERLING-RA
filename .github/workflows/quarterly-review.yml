@@ -1,0 +1,48 @@
+name: Quarterly Methodology Review
+
+# Files one Asana task at the start of each quarter: the adverse-media
+# methodology review (keywords, typologies, sources, thresholds, evidence-log
+# sample, false-positive sample) with a two-week due date — so the documented
+# review cadence (FATF RBA / ISO 42001 A.6) is self-enforcing. Idempotent:
+# exact-title check means one task per quarter no matter how often it runs.
+# Needs the ASANA_ACCESS_TOKEN secret.
+on:
+  schedule:
+    - cron: '0 6 1 1,4,7,10 *' # 06:00 UTC on 1 Jan / 1 Apr / 1 Jul / 1 Oct
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quarterly-review
+  cancel-in-progress: false
+
+jobs:
+  file-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+      - name: File the quarterly review task
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+        run: node scripts/quarterly-review.mjs

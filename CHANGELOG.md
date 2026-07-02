@@ -93,6 +93,32 @@ bump merged to `main`.
 
 ### Added
 
+- **Adverse media to full strength (5 upgrades).**
+  - **GDELT second source** — the daily engine (`screen.py`) now queries the
+    GDELT DOC 2.0 global index (100+ languages, machine-translated) alongside
+    Google News, so adverse coverage never depends on a single feed; a GDELT
+    outage is logged, never silent.
+  - **Arabic risk-term pass** — a dedicated AE:ar query using a curated Arabic
+    keyword set (`ADVERSE_KEYWORDS_AR`, mapped to English equivalents so
+    typology bucketing stays uniform) closes the recall gap where Arabic-only
+    press never mentions the English terms.
+  - **Committed evidence log** — every flagged headline (subject, source, URL,
+    typology, date) is appended to `data/adverse-media-evidence.json`
+    (400-day retention, committed by the screening workflows): an
+    examiner-ready adverse-media history.
+  - **Repeat-pattern escalation** — ≥3 distinct stories on the same subject
+    inside 90 days is surfaced in the daily report (⚠ REPEAT ADVERSE-MEDIA
+    PATTERN → EDD + STR assessment) and the run log.
+  - **Sustained-degradation escalation** — a new `adverse_media` anomaly class
+    (`monitoring.py`, >25% of subjects losing their adverse-media pass) feeds
+    the existing Anomaly Watch: three consecutive degraded runs auto-open an
+    MLRO issue, so a quiet feed outage can never hide.
+  - **Quarterly methodology review, self-enforcing** — `quarterly-review.yml`
+    files one Asana task per quarter (keywords, typologies, sources,
+    thresholds, evidence-log sample, false-positive sample; two-week due date)
+    in *Adverse Media & PEP Monitoring*; idempotent by quarter-unique title.
+  - All pure logic unit-tested offline (12 new engine checks + 7 quarterly
+    checks, wired into CI).
 - **Daily AI Governance & Platform Report** (`governance-report.yml` +
   `scripts/governance-report.mjs`): one Asana task each morning in Ongoing
   Monitoring (section *AI & Platform Governance*) rolling up the latest state of

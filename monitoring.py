@@ -28,6 +28,7 @@ HISTORY_KEEP        = int(os.environ.get("MONITOR_HISTORY_KEEP", "30"))   # roll
 COVERAGE_DROP_PCT   = float(os.environ.get("COVERAGE_DROP_PCT", "0.20"))  # >20% drop = alarm
 LATENCY_FACTOR      = float(os.environ.get("LATENCY_ALARM_FACTOR", "3.0"))
 ERROR_RATE_ALARM    = float(os.environ.get("ERROR_RATE_ALARM", "0.10"))   # >10% subjects errored
+AM_ERROR_RATE_ALARM = float(os.environ.get("AM_ERROR_RATE_ALARM", "0.25"))  # >25% of subjects lost adverse-media coverage
 
 
 # ── small JSON helpers (never raise) ──────────────────────────────────────────
@@ -122,6 +123,13 @@ def analyze_run(snapshot, history):
     if med_subj and subj < 0.5 * med_subj:
         anomalies.append(
             f"subjects screened {subj} < 50% of median {med_subj:.0f} — coverage drop")
+    # Adverse-media module degradation (absolute): a large share of subjects lost
+    # their adverse-media pass — recall is silently narrowed even when the rest of
+    # the run is green. Sustained across runs ⇒ escalation (anomaly-watch).
+    am = snapshot["counts"].get("am_errors", 0)
+    if subj and am / subj > AM_ERROR_RATE_ALARM:
+        anomalies.append(
+            f"adverse-media errors {am}/{subj} ({am/subj*100:.0f}%) > {AM_ERROR_RATE_ALARM*100:.0f}% — media recall degraded")
     return {"anomalies": anomalies,
             "baseline": {"median_total_seconds": med_total, "median_subjects": med_subj,
                          "history_runs": len(prev)}}
@@ -142,6 +150,9 @@ def _anomaly_types(snapshot, prev):
     subj = snapshot.get("counts", {}).get("subjects", 0)
     if med_subj and subj < 0.5 * med_subj:
         t.add("subjects")
+    am = snapshot.get("counts", {}).get("am_errors", 0)
+    if subj and am / subj > AM_ERROR_RATE_ALARM:
+        t.add("adverse_media")
     return t
 
 
@@ -162,6 +173,7 @@ _ANOMALY_LABELS = {
     "latency": "runtime latency blow-out",
     "error_rate": "elevated error rate",
     "subjects": "subject-coverage drop",
+    "adverse_media": "adverse-media module degradation (recall narrowed)",
 }
 
 

@@ -71,6 +71,18 @@ export function findRecentDuplicate(tasks, name, nowMs, windowHours = 48) {
     && (Date.parse((t && t.created_at) || '') || 0) >= cutoff) || null;
 }
 
+/* Resolve a section GID by name within a project, creating it if absent —
+   idempotent (an existing name is reused), shared by the schedulers that file
+   under a named column. */
+export async function ensureSection(projectGid, name) {
+  const d = await asana('/projects/' + projectGid + '/sections?limit=100&opt_fields=name');
+  const want = String(name).trim().toLowerCase();
+  const found = (d.data || []).find(sec => String(sec.name || '').trim().toLowerCase() === want);
+  if (found) return found.gid;
+  const created = await asana('/projects/' + projectGid + '/sections', { method: 'POST', body: JSON.stringify({ data: { name } }) });
+  return created.data && created.data.gid;
+}
+
 /* All tasks in a project (name, created_at, permalink) — for the dedup guard. */
 export async function listProjectTasks(projectGid) {
   const out = [];
