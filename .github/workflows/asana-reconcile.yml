@@ -2,8 +2,8 @@ name: Asana Reconciliation
 
 # Weekly drift check between the RA app and Asana (docs/asana-integration-audit.md,
 # Phase 3). Reads the app's ASSESSMENT REGISTER (auto-backup) mirror and the live
-# per-assessment tasks in the RISK ASSESSMENTS project, diffs them by reference,
-# and files a PII-free discrepancy card in the Regulations / Governance / Sanctions
+# per-assessment tasks in the HAWKEYE STERLING APP project, diffs them by reference,
+# and files a PII-free discrepancy card in the Ongoing Monitoring
 # project. Falls back to a labelled GitHub issue if Asana is unreachable.
 #
 # Needs the ASANA_ACCESS_TOKEN repository secret. Observational — a drift finding

@@ -12,7 +12,7 @@
    any extra source) via scripts/sanctions-match.mjs, with free adverse-media
    (Google News RSS) and a best-effort PEP signal (Wikidata) layered on → diff the
    results against the last run → on any NEW match raise one alert card in the
-   "Sanctions updates" section of the "Regulations / Governance / Sanctions" Asana
+   "Sanctions updates" section of the "Ongoing Monitoring" Asana
    project for MLRO / four-eyes review. There is no external engine and no API key.
    Ongoing monitoring: a standing match is recorded once, not re-alerted every day;
    a new or CHANGED match always alerts.

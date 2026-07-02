@@ -12,6 +12,30 @@ bump merged to `main`.
 
 ### Security & hardening
 
+- **Workflow supply-chain hardening (post-audit).** From the full adversarial
+  audit of all 38 GitHub Actions workflows:
+  - **Egress lockdown** — the three internet-fetching jobs that hold
+    `contents: write` (`onboarding-screen`, `weekly-adverse-media`,
+    `regulatory-watch`) moved from harden-runner `egress-policy: audit` to
+    **`block`** with explicit host allowlists derived from their actual fetch
+    calls, closing the data-exfiltration path on the jobs that handle customer
+    data. A missed host fails loudly, never silently.
+  - **Script-injection class closed** — every `${{ steps.*.outputs.* }}` and
+    free-text `${{ inputs.* }}` now crosses into `run:` shells via quoted `env:`
+    (release, sanctions-watch, regulatory-watch, sanctions-screen,
+    fatf-watchdog), and the watchers' `setOutput()` strips CR/LF and caps length
+    before writing to `GITHUB_OUTPUT`, so a hostile value can neither become
+    shell syntax nor forge extra step outputs.
+  - **Function input gates completed** — all three Asana Netlify functions now
+    reject non-JSON `Content-Type` (`415`) and oversized raw bodies (`413`
+    before `JSON.parse`), matching the strictest of the three.
+- **Screening fail-safes (no false all-clear).** The scheduled screening engine
+  (`screen.py`, used by the onboarding + daily sweeps) now **refuses to run** —
+  loudly, with a non-zero exit — when the Asana Customer Database read returns
+  zero customers or when every core sanctions list (OFAC/UN/UK/EU/EOCN) fails to
+  load. Previously such a run could post a green ✅ "all clear" for a customer
+  base that was never actually screened; the manual `.mjs`/inline paths already
+  had these guards, the active path now does too.
 - **Pure-`'self'` Content-Security-Policy.** Removed `'unsafe-inline'` from both
   `script-src` and `style-src` and all third-party origins: page logic and CSS
   are external same-origin files (`app.js`/`app.css` + siblings), former inline
@@ -109,6 +133,16 @@ bump merged to `main`.
 
 ### Changed
 
+- **"Regulations / Governance / Sanctions" merged into "Ongoing Monitoring".**
+  The standalone watcher-alert project was consolidated: its 34 tasks moved into
+  three new Ongoing Monitoring sections (*Regulatory changes* / *FATF list moves*
+  / *Sanctions updates*) and the old project was removed. Every workflow and
+  script that wrote to it (`sanctions-watch`, `regulatory-watch`, `fatf-watchdog`,
+  `advisor-eval`, `daily-brief`, `asana-reconcile`, `sanctions-screen` alerts) now
+  targets Ongoing Monitoring — via the `ASANA_REG_PROJECT_GID` /
+  `ASANA_*_SECTION_GID` repo variables, with matching code defaults — so all
+  monitoring output lives in one project. Comments and step names across the
+  workflows/scripts were updated to the new project names.
 - **Asana delivery target moved to the dedicated "HAWKEYE STERLING APP" project**
   (`1216203370612914`). The default project GID for the delivery functions and the
   scripts that default to the risk-assessments project (`asana-task`,

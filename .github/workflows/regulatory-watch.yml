@@ -4,7 +4,7 @@ name: Regulatory Watch
 # data/reg-sources.json (MoE, FIU, NAMLCFTC, EOCN, CBUAE, VARA, jewellery
 # sector; FATF guidance, Wolfsberg, RMI, LBMA, OECD, OFAC, UN, EU, UK OFSI,
 # Egmont, Basel, UNODC, EU high-risk third countries, RJC). On any content
-# change it creates a task in the "Regulations / Governance / Sanctions" Asana
+# change it creates a task in the "Ongoing Monitoring" Asana
 # project, commits the refreshed fingerprint state to main (so the same change
 # is not re-alerted), and — if an ANTHROPIC_API_KEY secret is set — drafts an
 # AI update proposal. If Asana delivery fails (no token / API error) it falls
@@ -96,7 +96,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/reg-draft.mjs
 
-      - name: Notify Asana — Regulations / Governance / Sanctions project
+      - name: Notify Asana — Ongoing Monitoring project
         id: asana
         # Don't fail the run if Asana is unreachable; the issue fallback covers it.
         continue-on-error: true
@@ -104,7 +104,7 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
-          # "Regulatory changes" section of the Regulations/Governance/Sanctions project
+          # "Regulatory changes" section of the Ongoing Monitoring project
           ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1216203873114460' }}
           # Step output crosses into the shell via env (never inline ${{ }} in run:),
           # so a hostile character in a generated title can never become shell syntax.
@@ -147,7 +147,7 @@ jobs:
             const { owner, repo } = context.repo;
             const body = report + [
               '', '---',
-              '> This change could not be delivered to the Asana "Regulations / Governance / Sanctions" project',
+              '> This change could not be delivered to the Asana "Ongoing Monitoring" project',
               '> (no `ASANA_ACCESS_TOKEN` repository secret, or the Asana API call failed), so this issue was opened instead.',
               '> Set the `ASANA_ACCESS_TOKEN` secret to route future changes to Asana automatically.',
             ].join('\n');

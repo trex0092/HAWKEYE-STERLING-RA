@@ -5,7 +5,7 @@ name: Advisor Eval
 # scripts/advisor-eval.mjs runs a fixed prompt battery through the production
 # system prompt (SOUL_CHARTER) and asserts the charter guardrails (P1/P4/P7/P9/P10)
 # held against the real model. On a behavioural regression it files a card in the
-# "Regulations / Governance / Sanctions" Asana project, falling back to a labelled
+# "Ongoing Monitoring" Asana project, falling back to a labelled
 # GitHub issue if Asana is unreachable so a regression is never lost.
 #
 # Runs ONLY if the ANTHROPIC_API_KEY secret is set; otherwise the eval skips and
@@ -58,7 +58,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/advisor-eval.mjs
 
-      - name: Notify Asana on regression — Regulations / Governance / Sanctions project
+      - name: Notify Asana on regression — Ongoing Monitoring project
         id: asana
         continue-on-error: true
         if: steps.eval.outcome == 'failure'

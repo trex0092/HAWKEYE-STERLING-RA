@@ -2,7 +2,7 @@ name: FATF Watchdog
 
 # Daily check of FATF's black (call-for-action) and grey (increased
 # monitoring) lists against the app's country data. On any change it creates
-# a review task in the RISK ASSESSMENTS Asana project naming the affected
+# a review task in the HAWKEYE STERLING APP Asana project naming the affected
 # assessments. Needs the ASANA_ACCESS_TOKEN repository secret.
 # Daily so a mid-cycle FATF plenary outcome is caught within a day. The check is
 # silent unless the lists actually move, so the daily cadence adds no noise.
