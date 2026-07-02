@@ -40,11 +40,45 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20 # bound external regulator-source fetches
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
         with:
           disable-sudo: true
-          egress-policy: audit
+          # contents:write job fetching external content — block egress to the fixed
+          # source list (every host in data/reg-sources.json) + Anthropic (AI draft)
+          # + Asana + GitHub/node infra. A host missed here fails SAFE and LOUD:
+          # reg-watch records that source as status:error in the daily report (with
+          # recovered-state suppression), it never silently drops a change.
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+            api.anthropic.com:443
+            www.moec.gov.ae:443
+            www.uaefiu.gov.ae:443
+            www.namlcftc.gov.ae:443
+            www.uaeiec.gov.ae:443
+            www.centralbank.ae:443
+            www.vara.ae:443
+            www.dmcc.ae:443
+            www.fatf-gafi.org:443
+            www.wolfsberg-principles.com:443
+            www.responsiblemineralsinitiative.org:443
+            www.responsiblejewellery.com:443
+            www.lbma.org.uk:443
+            mneguidelines.oecd.org:443
+            ofac.treasury.gov:443
+            www.un.org:443
+            www.unodc.org:443
+            finance.ec.europa.eu:443
+            www.gov.uk:443
+            egmontgroup.org:443
+            www.egmontgroup.org:443
+            index.baselgovernance.org:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -52,7 +86,9 @@ jobs:
 
       - name: Run regulatory watch
         id: watch
-        run: node scripts/reg-watch.mjs "${{ inputs.mode || 'check' }}"
+        env:
+          MODE: ${{ inputs.mode || 'check' }}
+        run: node scripts/reg-watch.mjs "$MODE"
 
       - name: AI draft (optional — only if ANTHROPIC_API_KEY is set)
         if: steps.watch.outputs.has_changes == 'true'
@@ -70,10 +106,15 @@ jobs:
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
           # "Regulatory changes" section of the Regulations/Governance/Sanctions project
           ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1216203873114460' }}
-        run: node scripts/watch-notify.mjs "${{ steps.watch.outputs.pr_title }}" reg-watch-report.md reg-watch-changes.json
+          # Step output crosses into the shell via env (never inline ${{ }} in run:),
+          # so a hostile character in a generated title can never become shell syntax.
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
+        run: node scripts/watch-notify.mjs "$PR_TITLE" reg-watch-report.md reg-watch-changes.json
 
       - name: Commit refreshed fingerprint state to main
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        env:
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
         run: |
           # The per-run artifacts (reg-watch-report.md / reg-watch-changes.json)
           # are gitignored; this commits the fingerprint state and any AI draft so
@@ -83,7 +124,7 @@ jobs:
             git config user.email "actions@github.com"
             git add data/reg-watch-state.json
             git add docs/research/auto 2>/dev/null || true
-            git commit -m "${{ steps.watch.outputs.pr_title }} [skip ci]"
+            git commit -m "$PR_TITLE [skip ci]"
             for attempt in 1 2 3 4 5; do
               git push && break
               echo "push rejected (attempt $attempt) — rebasing on origin/main"

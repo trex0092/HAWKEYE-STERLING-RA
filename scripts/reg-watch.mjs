@@ -201,9 +201,11 @@ function loadState() {
 }
 
 function setOutput(key, val) {
-  if (process.env.GITHUB_OUTPUT) {
-    try { writeFileSync(process.env.GITHUB_OUTPUT, key + '=' + val + '\n', { flag: 'a' }); } catch {}
-  }
+  /* Sanitize before writing to GITHUB_OUTPUT: a CR/LF in the value (e.g. an upstream
+     error message folded into a title) could inject additional output lines; cap the
+     length so a pathological message can't bloat the step context. */
+  const clean = String(val == null ? '' : val).replace(/[\r\n]+/g, ' ').slice(0, 300);
+  if (process.env.GITHUB_OUTPUT) { try { writeFileSync(process.env.GITHUB_OUTPUT, key + '=' + clean + '\n', { flag: 'a' }); } catch {} }
 }
 
 async function main() {

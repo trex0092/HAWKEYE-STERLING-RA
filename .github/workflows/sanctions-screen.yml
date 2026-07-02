@@ -86,12 +86,16 @@ jobs:
 
       - name: Commit refreshed screening state to main
         if: steps.screen.outputs.screen_error != 'true'
+        env:
+          # Step output crosses into the shell via env (never inline ${{ }} in run:)
+          # — the title can carry an upstream error message, so this is load-bearing.
+          TITLE: ${{ steps.screen.outputs.title }}
         run: |
           if [ -n "$(git status --porcelain data/sanctions-screen-state.json 2>/dev/null)" ]; then
             git config user.name "sanctions-screen"
             git config user.email "actions@github.com"
             git add data/sanctions-screen-state.json
-            git commit -m "${{ steps.screen.outputs.title }} [skip ci]"
+            git commit -m "$TITLE [skip ci]"
             for attempt in 1 2 3 4 5; do
               git push && break
               echo "push rejected (attempt $attempt) — rebasing on origin/main"

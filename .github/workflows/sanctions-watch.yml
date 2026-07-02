@@ -58,7 +58,9 @@ jobs:
 
       - name: Run sanctions watch
         id: watch
-        run: node scripts/sanctions-watch.mjs "${{ inputs.mode || 'check' }}"
+        env:
+          MODE: ${{ inputs.mode || 'check' }}
+        run: node scripts/sanctions-watch.mjs "$MODE"
 
       - name: Notify Asana — Regulations / Governance / Sanctions project
         id: asana
@@ -69,7 +71,10 @@ jobs:
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
           # "Sanctions updates" section of the Regulations/Governance/Sanctions project
           ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1216203873114462' }}
-        run: node scripts/watch-notify.mjs "${{ steps.watch.outputs.pr_title }}" sanctions-watch-report.md sanctions-watch-changes.json
+          # Step output crosses into the shell via env (never inline ${{ }} in run:),
+          # so a hostile character in a generated title can never become shell syntax.
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
+        run: node scripts/watch-notify.mjs "$PR_TITLE" sanctions-watch-report.md sanctions-watch-changes.json
 
       - name: Retain dated snapshot + integrity manifest
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
@@ -77,12 +82,14 @@ jobs:
 
       - name: Commit refreshed fingerprint state to main
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        env:
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
         run: |
           if [ -n "$(git status --porcelain data/ 2>/dev/null)" ]; then
             git config user.name "sanctions-watch"
             git config user.email "actions@github.com"
             git add data/sanctions-state.json data/retention
-            git commit -m "${{ steps.watch.outputs.pr_title }} [skip ci]"
+            git commit -m "$PR_TITLE [skip ci]"
             for attempt in 1 2 3 4 5; do
               git push && break
               echo "push rejected (attempt $attempt) — rebasing on origin/main"
