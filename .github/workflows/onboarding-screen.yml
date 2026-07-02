@@ -36,11 +36,34 @@ jobs:
     timeout-minutes: 60   # only the new-customer subset is enriched; the full DB is just listed
 
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
         with:
           disable-sudo: true
-          egress-policy: audit
+          # This job holds contents:write and fetches external content while handling
+          # customer data — block egress to a fixed allowlist so it cannot exfiltrate.
+          # Hosts = the sanctions sources + Google-News RSS + Wikidata (PEP) that
+          # screen.py contacts, Asana, Anthropic (LLM triage, when enabled), and the
+          # GitHub/PyPI infra for checkout + pip. A missed host fails LOUD (the
+          # empty-list guard reds the job; adverse/PEP degrade, never a silent clear).
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+            app.asana.com:443
+            api.anthropic.com:443
+            sanctionslistservice.ofac.treas.gov:443
+            scsanctions.un.org:443
+            ofsistorage.blob.core.windows.net:443
+            data.opensanctions.org:443
+            www.international.gc.ca:443
+            news.google.com:443
+            www.wikidata.org:443
+            query.wikidata.org:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
