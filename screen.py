@@ -1332,6 +1332,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("━" * 70)
     A("①  SANCTIONS / WATCHLISTS")
     A("━" * 70)
+    A("   Action class (TFS): a CONFIRMED designation is ILLEGAL TO ENGAGE — freeze without")
+    A("   delay and without prior notice (tipping-off), report to the FIU, reject/offboard.")
+    A("   Distinct from ② and ③ below: sanctions action is mandatory, not risk-based.")
     if not possible_matches:
         A("   No sanctions / watchlist matches — all subjects clear.")
     else:
@@ -1398,6 +1401,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("━" * 70)
     A("②  ADVERSE MEDIA")
     A("━" * 70)
+    A("   Action class: RISK-BASED review — verify the story before acting; media alone is")
+    A("   never conclusive. Source reliability: news = real-time but false-positive-prone;")
+    A("   court/enforcement corroboration is strongest but can lag clearances — always")
+    A("   confirm CURRENT status before an adverse decision.")
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
@@ -1435,6 +1442,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("           state-owned-enterprise heads + their relatives & close associates (RCA).")
     A(f"   Scope:  {stats['individuals_screened']} individuals auto-screened across the full database "
       f"(companies are not natural persons → not PEP-screened, but ARE sanctions + adverse-media screened).")
+    A("   Action class (R.12): PEP status is PERMISSIBLE WITH CONTROLS — a confirmed PEP/RCA")
+    A("   requires EDD, senior-management approval, source-of-funds/wealth establishment and")
+    A("   enhanced ongoing monitoring; it is not, by itself, grounds to decline.")
     if pep_degraded:
         A(f"   Status: DEGRADED this run ({stats.get('pep_errors',0)} lookups failed) — treat 'no PEP' as provisional; re-run.")
     if not pep_findings:
@@ -1453,7 +1463,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A(f"   Source: https://www.wikidata.org/wiki/{p['id']}")
             if p.get("permalink"):
                 A(f"   Customer record: {p['permalink']}")
-            A("   MLRO Decision:  [ ] not a PEP   [ ] confirmed PEP — apply EDD   [ ] investigate")
+            A("   MLRO Decision:  [ ] not a PEP   [ ] confirmed PEP — EDD + senior-mgmt approval   [ ] investigate")
             A("")
     A("")
 
