@@ -39,6 +39,7 @@ jobs:
 
       - name: actionlint
         run: |
+          # Version-pinned; integrity is verified by the Go module checksum DB (sum.golang.org).
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
           "$(go env GOPATH)/bin/actionlint" -color
 

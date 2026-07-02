@@ -41,11 +41,12 @@ jobs:
           TARGET: ${{ github.event.inputs.target || 'https://hawkeye-sterling-ra.netlify.app' }}
         run: |
           mkdir -p zap-out && chmod 777 zap-out
-          # Official ZAP image, pinned to a version tag (swap to an @sha256 digest
-          # to fully pin). -I: do not return failure on warn-level alerts (the
+          # Official ZAP image, pinned to an immutable @sha256 digest (tag kept
+          # alongside for readability) so a repushed upstream tag cannot change
+          # what runs in CI. -I: do not return failure on warn-level alerts (the
           # baseline is advisory); reports are written for the artifact upload.
           docker run --rm -v "$PWD/zap-out:/zap/wrk/:rw" \
-            ghcr.io/zaproxy/zaproxy:2.16.1 \
+            ghcr.io/zaproxy/zaproxy:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab \
             zap-baseline.py -t "$TARGET" -I \
             -r zap-report.html -J zap-report.json -w zap-report.md || true
           ls -l zap-out || true

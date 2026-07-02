@@ -5,6 +5,10 @@ name: Visual Regression
 #     generate and commit the baseline snapshots (PR, or issue fallback).
 #   - On pull requests: compares against the committed baseline (NON-blocking;
 #     the HTML report is uploaded as an artifact so you can inspect diffs).
+#
+# Least privilege: the everyday `compare` job (push/PR) is read-only; only the
+# explicit `baseline` dispatch path carries the write scopes it needs to open
+# the refresh PR / fallback issue.
 
 on:
   push:
@@ -19,16 +23,15 @@ on:
         default: 'compare'
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: read
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
   cancel-in-progress: true
 
 jobs:
-  visual:
+  compare:
+    if: inputs.mode != 'baseline'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -38,7 +41,7 @@ jobs:
           egress-policy: audit
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          persist-credentials: false   # no git push here (gh/create-pull-request use the token directly)
+          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
@@ -51,13 +54,8 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Compare against baseline
-        if: inputs.mode != 'baseline'
         continue-on-error: true
         run: npx playwright test --config=playwright.config.mjs
-
-      - name: Update baseline snapshots
-        if: inputs.mode == 'baseline'
-        run: npx playwright test --config=playwright.config.mjs --update-snapshots
 
       - name: Upload report
         if: always()
@@ -68,9 +66,36 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  baseline:
+    if: inputs.mode == 'baseline'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false   # no git push here (create-pull-request uses the token directly)
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      - name: Install Playwright + Chromium
+        run: |
+          npm install @playwright/test@1.49.1
+          npx playwright install --with-deps chromium
+
+      - name: Update baseline snapshots
+        run: npx playwright test --config=playwright.config.mjs --update-snapshots
+
       - name: Open PR with refreshed baseline
         id: pr
-        if: inputs.mode == 'baseline'
         continue-on-error: true
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
@@ -85,7 +110,7 @@ jobs:
           delete-branch: true
 
       - name: Fallback note if PR creation is blocked
-        if: inputs.mode == 'baseline' && steps.pr.outcome == 'failure'
+        if: steps.pr.outcome == 'failure'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
