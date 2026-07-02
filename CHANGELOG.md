@@ -71,6 +71,17 @@ bump merged to `main`.
 
 ### Added
 
+- **Daily AI Governance & Platform Report** (`governance-report.yml` +
+  `scripts/governance-report.mjs`): one Asana task each morning in Ongoing
+  Monitoring (section *AI & Platform Governance*) rolling up the latest state of
+  the entire non-AML control suite — AI/advisor governance, security &
+  supply-chain scans, CI/code quality, app/site health, release/repo hygiene
+  (25 controls) — plus open code-scanning/Dependabot alert counts. Sibling of
+  the Daily Compliance Brief: daily operating-effectiveness evidence for
+  ISO/IEC 42001 A.6/A.8 and NIST AI RMF MEASURE/MANAGE. Scheduled controls that
+  silently stop running are flagged **STALE** (the same "silence is never
+  evidence" fail-safe as the screening engine); idempotent (one report per
+  day); fully unit-tested offline (`test/governance-report.test.mjs`).
 - **Assurance Coverage Matrix**
   ([`docs/governance/assurance-coverage-matrix.md`](docs/governance/assurance-coverage-matrix.md)):
   a single examiner-facing page mapping every claimed control to its automated
