@@ -2,7 +2,7 @@ name: Sanctions Watch
 
 # Daily check of the major consolidated designation lists (OFAC SDN + non-SDN,
 # UN Security Council, UK OFSI, EU FSF) defined in data/sanctions-sources.json.
-# On any change it creates a task in the "Regulations / Governance / Sanctions"
+# On any change it creates a task in the "Ongoing Monitoring"
 # Asana project, commits the refreshed fingerprint state to main, and falls back
 # to a labelled GitHub issue if Asana delivery fails. Country black/grey list
 # moves are handled by the FATF Watchdog.
@@ -62,14 +62,14 @@ jobs:
           MODE: ${{ inputs.mode || 'check' }}
         run: node scripts/sanctions-watch.mjs "$MODE"
 
-      - name: Notify Asana — Regulations / Governance / Sanctions project
+      - name: Notify Asana — Ongoing Monitoring project
         id: asana
         continue-on-error: true
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
-          # "Sanctions updates" section of the Regulations/Governance/Sanctions project
+          # "Sanctions updates" section of the Ongoing Monitoring project
           ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1216203873114462' }}
           # Step output crosses into the shell via env (never inline ${{ }} in run:),
           # so a hostile character in a generated title can never become shell syntax.
@@ -112,7 +112,7 @@ jobs:
             const { owner, repo } = context.repo;
             const body = report + [
               '', '---',
-              '> This change could not be delivered to the Asana "Regulations / Governance / Sanctions" project',
+              '> This change could not be delivered to the Asana "Ongoing Monitoring" project',
               '> (no `ASANA_ACCESS_TOKEN` repository secret, or the Asana API call failed), so this issue was opened instead.',
               '> Set the `ASANA_ACCESS_TOKEN` secret to route future changes to Asana automatically.',
             ].join('\n');

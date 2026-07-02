@@ -1,4 +1,4 @@
-/* Creates an Asana task in the RISK ASSESSMENTS project when an assessment
+/* Creates an Asana task in the HAWKEYE STERLING APP project when an assessment
    is marked Complete. The task is filed into the section matching its risk
    band (LOW / MEDIUM / HIGH / PROHIBITED — created on demand) and assigned,
    so Asana itself raises reminders as the review due date approaches.

@@ -2,7 +2,7 @@
    so a summary survives off-device and can be pulled back ("disclosed") on any
    device after login.
 
-   action:"write"  → upserts two dedicated tasks in the RISK ASSESSMENTS project:
+   action:"write"  → upserts two dedicated tasks in the HAWKEYE STERLING APP project:
                        • "ASSESSMENT REGISTER (auto-backup)"
                        • "ACTIVITY LOG (auto-backup)"
                      each storing a JSON summary between sheet markers in its notes.

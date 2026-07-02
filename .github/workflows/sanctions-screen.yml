@@ -8,7 +8,7 @@ name: Sanctions Screen
 #
 # Reads the active counterparties from the Asana "Customer Database" project,
 # screens them, and on any NEW match raises one alert card in the "Sanctions
-# updates" section of the "Regulations / Governance / Sanctions" project for
+# updates" section of the "Ongoing Monitoring" project for
 # MLRO / four-eyes review. A standing match is recorded once, not re-alerted
 # daily. The refreshed state is committed to main so the next run only flags what
 # changed. Runs AFTER the Sanctions Watch (05:00) so it screens against fresh lists.
@@ -66,7 +66,7 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
-          # "Sanctions updates" section of the Regulations/Governance/Sanctions project
+          # "Sanctions updates" section of the Ongoing Monitoring project
           ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1216203873114462' }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}

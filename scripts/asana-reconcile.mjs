@@ -1,7 +1,7 @@
 /* Weekly reconciliation of the RA app against Asana — turns the manual runbook
    in docs/asana-integration-audit.md into an automated drift check.
 
-   It reads two things that both live in the RISK ASSESSMENTS project:
+   It reads two things that both live in the HAWKEYE STERLING APP project:
      • the app's ASSESSMENT REGISTER (auto-backup) task (a JSON mirror of the
        on-device register, written by netlify/functions/asana-mirror.js), and
      • the per-assessment tasks delivered by netlify/functions/asana-task.js.
@@ -11,7 +11,7 @@
      • mismatches    — band/score in the app disagree with the task, and
      • duplicates    — more than one task for the same reference.
 
-   Drift is filed as a card in the Regulations/Governance/Sanctions project (same
+   Drift is filed as a card in the Ongoing Monitoring project (same
    channel as the watchers); the GitHub Action opens an issue if Asana is
    unreachable. The token stays server-side (ASANA_ACCESS_TOKEN). No PII is
    printed — only references, tiers and scores.

@@ -1,5 +1,5 @@
 /* CLI bridge: turn a watcher report into one Asana card in the
-   Regulations / Governance / Sanctions project.
+   Ongoing Monitoring project.
 
    Usage: node scripts/watch-notify.mjs "<task title>" <report-file> [changes-file]
 

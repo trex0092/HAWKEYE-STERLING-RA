@@ -1,8 +1,8 @@
 /* Shared Asana notifier for the monitoring workflows (Regulatory Watch,
    Sanctions Watch, FATF Watchdog list moves). Every detected change becomes
-   one card in the dedicated "Regulations / Governance / Sanctions" project so
+   one card in the dedicated "Ongoing Monitoring" project so
    all automated alerts stay in one organised place — separate from the client
-   RISK ASSESSMENTS project.
+   HAWKEYE STERLING APP project.
 
    Notifications target ASANA_REG_PROJECT_GID, falling back to the hardcoded
    project below. The Asana token stays server-side (ASANA_ACCESS_TOKEN, a
@@ -39,7 +39,7 @@ async function asana(path, opts = {}) {
   return d;
 }
 
-/* Create one alert card in the Regulations/Governance/Sanctions project.
+/* Create one alert card in the Ongoing Monitoring project.
    Pass opts.html for an Asana rich-text body (html_notes — bold headings,
    bulleted sources, clickable links); otherwise notes is sent as plain text.
    Pass opts.section (a section GID) to file the card under that section so the

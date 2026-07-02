@@ -12,8 +12,8 @@
    Needs the ASANA_ACCESS_TOKEN repository secret. */
 import { readFileSync, existsSync } from 'node:fs';
 
-/* The "Regulations / Governance / Sanctions" project holds the monitoring
-   alerts; the RISK ASSESSMENTS project holds the site/function-health alerts. */
+/* The "Ongoing Monitoring" project holds the monitoring
+   alerts; the HAWKEYE STERLING APP project holds the site/function-health alerts. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1213914392047129';
 export const RISK_PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914';
 /* Optional: file the brief under a section so it lands in its own column. */
@@ -127,7 +127,7 @@ async function main() {
   const regTasks = await listTasks(REG_PROJECT_GID, 'name,created_at,permalink_url');
   if (regTasks.some(t => String(t.name || '') === title)) { console.log('brief already exists: ' + title); return; }
 
-  /* The RISK ASSESSMENTS project also holds non-alert items (assessment
+  /* The HAWKEYE STERLING APP project also holds non-alert items (assessment
      templates, the backup mirror), so take ONLY health alerts from it; the REG
      project is all monitoring alerts and is taken in full. */
   const riskTasks = (await listTasks(RISK_PROJECT_GID, 'name,created_at,permalink_url')).filter(t => isHealthAlert(t.name));
