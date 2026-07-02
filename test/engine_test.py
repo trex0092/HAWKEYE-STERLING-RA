@@ -316,6 +316,53 @@ _lat_recall = sum(1 for c, d in _latin if _matches(c, d)) / len(_latin)
 check("Latin baseline recall is high", _lat_recall >= 0.9)
 check("no large recall gap between Latin and Arabic groups (fairness)", (_lat_recall - _ar_recall) <= 0.5)
 
+# ── adverse media hardening: GDELT + Arabic + evidence log + degradation ─────
+print("adverse media — GDELT second source, Arabic terms, evidence log, degradation")
+_m = screen.match_adverse_keywords("شركة اكس متهمة في قضية غسل الأموال")
+check("Arabic headline maps to the English keyword for uniform typology", "money laundering" in _m)
+check("mapped Arabic keyword buckets into the Money Laundering typology", "Money Laundering" in screen.typology_for(_m))
+_m2 = screen.match_adverse_keywords("Firm X charged in money laundering probe")
+check("English keyword matching is unchanged by the Arabic extension", "money laundering" in _m2)
+check("clean headline matches nothing", screen.match_adverse_keywords("Local bakery wins pastry award") == [])
+
+_gd = screen.parse_gdelt({"articles": [
+    {"title": "X Trading fined for sanctions evasion", "domain": "example.com",
+     "url": "https://e/1", "seendate": "20260630T060000Z"},
+    {"title": "", "url": "https://e/2"},
+    {"title": "X Trading opens new branch", "domain": "example.org", "url": "https://e/3"},
+]})
+check("GDELT parse emits the standard shape, flags risk, skips blank titles",
+      len(_gd) == 2 and _gd[0]["flagged"] and not _gd[1]["flagged"]
+      and _gd[0]["source"] == "example.com" and _gd[0]["ts"] and _gd[0]["date"] == "2026-06-30")
+
+_ev = os.path.join(_tf.mkdtemp(), "evidence.json")
+def _find(title, day):
+    return [{"subject_type": "COMPANY", "subject_name": "Acme DMCC", "parent": None,
+             "articles": [{"title": title, "source": "s", "url": "u",
+                           "keywords": ["fraud"], "categories": ["Fraud / Financial Crime"]}]}], day
+_r1 = screen.update_adverse_evidence(*_find("Acme fraud story one", "2026-06-01"), path=_ev)
+_r2 = screen.update_adverse_evidence(*_find("Acme fraud story two", "2026-06-15"), path=_ev)
+_r3 = screen.update_adverse_evidence(*_find("Acme fraud story three", "2026-06-29"), path=_ev)
+check("evidence log accumulates; repeat pattern fires at 3 distinct stories/90d",
+      not _r1 and not _r2 and _r3.get("Acme DMCC") == 3)
+_r3b = screen.update_adverse_evidence(*_find("Acme fraud story three", "2026-06-30"), path=_ev)
+check("an identical story is never double-logged", _r3b.get("Acme DMCC") == 3)
+_r_old = screen.update_adverse_evidence([], "2027-09-01", path=_ev)
+check("entries beyond the 400-day retention are pruned", _r_old == {})
+
+_h_bad = [{"date": f"2026-06-{d:02d}", "total_seconds": 100, "error_rate": 0.0,
+           "counts": {"subjects": 100, "am_errors": 40}} for d in (1, 2, 3)]
+check("sustained adverse-media degradation escalates (3 runs > 25% AM errors)",
+      "adverse_media" in monitoring.sustained_anomalies(_h_bad, window=3))
+_h_ok = [{"date": f"2026-06-{d:02d}", "total_seconds": 100, "error_rate": 0.0,
+          "counts": {"subjects": 100, "am_errors": 5}} for d in (1, 2, 3)]
+check("healthy adverse-media error rate does not escalate",
+      "adverse_media" not in monitoring.sustained_anomalies(_h_ok, window=3))
+check("legacy history without am_errors stays silent (backward compatible)",
+      "adverse_media" not in monitoring.sustained_anomalies(
+          [{"date": "2026-06-01", "total_seconds": 100, "error_rate": 0.0,
+            "counts": {"subjects": 100}}] * 3, window=3))
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
