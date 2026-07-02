@@ -29,6 +29,11 @@ bump merged to `main`.
   - **Function input gates completed** — all three Asana Netlify functions now
     reject non-JSON `Content-Type` (`415`) and oversized raw bodies (`413`
     before `JSON.parse`), matching the strictest of the three.
+  - **Residual lockdown sweep** — the OWASP ZAP DAST image is pinned to an
+    immutable `@sha256` digest; the pure-GitHub-API jobs (`stale`, `labeler`,
+    `pr-size`) moved to egress `block`; and `visual.yml` was split so the
+    everyday compare path runs read-only (write scopes only on the explicit
+    baseline dispatch).
 - **Screening fail-safes (no false all-clear).** The scheduled screening engine
   (`screen.py`, used by the onboarding + daily sweeps) now **refuses to run** —
   loudly, with a non-zero exit — when the Asana Customer Database read returns
@@ -66,6 +71,13 @@ bump merged to `main`.
 
 ### Added
 
+- **Assurance Coverage Matrix**
+  ([`docs/governance/assurance-coverage-matrix.md`](docs/governance/assurance-coverage-matrix.md)):
+  a single examiner-facing page mapping every claimed control to its automated
+  proof (workflow/test), run frequency, and evidence location — plus a KPI
+  catalog, the manual-assurance cadence (including a new **annual manual
+  penetration test**), and an explicit known-gaps register so nothing is claimed
+  without a verification path.
 - **Asana integration — capability + hardening follow-up.** Building on the
   delivery-reliability audit ([`docs/asana-integration-audit.md`](docs/asana-integration-audit.md)):
   - **Native custom fields** — a completed assessment can populate real Asana

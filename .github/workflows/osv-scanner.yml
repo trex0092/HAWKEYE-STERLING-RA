@@ -50,6 +50,7 @@ jobs:
       # Install OSV-Scanner with the same `go install` pattern used for actionlint
       # in workflow-lint.yml (no third-party action to pin).
       - name: Install OSV-Scanner
+        # Version-pinned; integrity is verified by the Go module checksum DB (sum.golang.org).
         run: go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
 
       - name: Scan the SBOM and the source tree
