@@ -35,15 +35,28 @@ const MAX_ATTEMPTS = 3;
 
 export async function asana(path, opts = {}) {
   for (let attempt = 0; ; attempt++) {
-    const r = await fetch('https://app.asana.com/api/1.0' + path, {
-      ...opts,
-      headers: {
-        Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(opts.headers || {})
+    let r;
+    try {
+      r = await fetch('https://app.asana.com/api/1.0' + path, {
+        ...opts,
+        headers: {
+          Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(opts.headers || {})
+        }
+      });
+    } catch (e) {
+      /* Network-level failure (reset, DNS, TLS) — as transient as a 503; retry
+         with the same bounded backoff instead of dying on the first blip. */
+      if (attempt < MAX_ATTEMPTS - 1) {
+        const delay = retryDelayMs(attempt);
+        console.warn('asana-notify: network error (' + (e && e.message || e) + ') — retry ' + (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
+        await sleep(delay);
+        continue;
       }
-    });
+      throw e;
+    }
     const d = await r.json().catch(() => ({}));
     if (r.ok) return d;
     if (r.status === 401) {
@@ -63,8 +76,12 @@ export async function asana(path, opts = {}) {
    A workflow re-run (or a retry after a failure DOWNSTREAM of a successful
    post) must not file the same alert card twice. A task in the target project
    with the identical name created inside the window is treated as this alert
-   already delivered. Pure; unit-tested. */
-export function findRecentDuplicate(tasks, name, nowMs, windowHours = 48) {
+   already delivered. The window is deliberately SHORT (6h): re-runs happen
+   within minutes/hours, while the daily watchers run 24h apart and may
+   legitimately produce an identical title two days running ("Sanctions Watch —
+   1 list change") — a wider window would silently suppress day two's real
+   alert. Pure; unit-tested. */
+export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6) {
   const cutoff = nowMs - windowHours * 3600000;
   const want = String(name).slice(0, 250);
   return (tasks || []).find(t => String(t && t.name || '') === want
@@ -120,7 +137,7 @@ export async function notifyAsana(name, notes, opts = {}) {
   try {
     const dup = findRecentDuplicate(await listProjectTasks(project), data.name, Date.now());
     if (dup) {
-      console.log('asana-notify: identical card already filed within 48h — skipping ("' + data.name + '")');
+      console.log('asana-notify: identical card already filed within 6h — skipping ("' + data.name + '")');
       return dup.permalink_url || null;
     }
   } catch (e) {

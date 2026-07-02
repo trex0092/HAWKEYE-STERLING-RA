@@ -307,7 +307,7 @@ async function createTask(name, notes, due, project, section) {
      state commit failed) must not file the same alert twice. Best-effort. */
   try {
     const dup = findRecentDuplicate(await listTasksIn(target), name, Date.now());
-    if (dup) { console.log('watchdog: identical task already filed within 48h — skipping ("' + name + '")'); return dup.permalink_url; }
+    if (dup) { console.log('watchdog: identical task already filed within 6h — skipping ("' + name + '")'); return dup.permalink_url; }
   } catch (e) { console.warn('watchdog: duplicate check failed (' + (e && e.message || e) + ') — posting anyway'); }
   /* Assigned so the alert reaches the compliance officer's Asana inbox. */
   const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name, notes, projects: [target], due_on: due, assignee: 'me' } }) });
