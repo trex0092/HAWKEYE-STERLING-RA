@@ -93,6 +93,26 @@ bump merged to `main`.
 
 ### Added
 
+- **Enterprise documentation package** (executive readiness follow-through):
+  - **Executive layer** (`docs/executive/`) — brief, business value/ROI,
+    regulatory-readiness pack (regulator-question → artefact map + EU AI Act
+    positioning), roadmap, KPI dashboard spec.
+  - **Model cards** (`docs/models/`) — one per AI/analytic feature (scoring
+    engine, sanctions matcher, adverse-media classifier, PEP identifier, Advisor
+    LLM, AI triage) on a fixed 14-field template, grounded in the code.
+  - **Architecture diagrams** (`docs/architecture/`) — Mermaid set: system
+    context, trust boundaries, risk-assessment swimlane, screening workflow,
+    scoring decision flow, audit-trail flow, user journey.
+  - **User/admin/API guides** (`docs/user-guides/`, `docs/api/`) — analyst,
+    reviewer/MLRO and administrator guides plus the Netlify function contracts.
+  - **Demo pack** (`docs/demo/`) — 10-minute demo script, four scenarios,
+    fictional sample data.
+  - **Independent enterprise-readiness review** (`docs/governance/enterprise-readiness-review-2026.md`)
+    scoring the repo against ISO 42001, NIST AI RMF, EU AI Act, COSO, ISO 31000,
+    FATF RBA, Wolfsberg and GDPR/PDPL.
+  - **AI risk register reformatted to a 5×5 L×I model** with a residual heat map
+    and three new rows (vendor failure, regulatory non-compliance, key-person
+    dependency).
 - **Adverse media to full strength (5 upgrades).**
   - **GDELT second source** — the daily engine (`screen.py`) now queries the
     GDELT DOC 2.0 global index (100+ languages, machine-translated) alongside
