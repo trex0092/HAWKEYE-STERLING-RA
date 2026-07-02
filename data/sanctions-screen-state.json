@@ -1,72 +1,6 @@
 {
-  "updated": "2026-06-30",
+  "updated": "2026-07-02",
   "subjects": {
-    "uya enerji uretim sanayi ve ticaret anonim sirketi": {
-      "name": "UYA ENERJİ ÜRETİM SANAYİ VE TİCARET ANONİM ŞİRKETİ",
-      "jurisdiction": "Turkey",
-      "band": "high",
-      "topScore": 94,
-      "recommendation": "sanctions-match",
-      "lists": [
-        "US OFAC — SDN list (CSV)",
-        "US OFAC — SDN list (CSV)"
-      ],
-      "signature": "high|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
-      "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-30"
-    },
-    "kovanlik enerji uretim sanayi ve ticaretanonim sirketi": {
-      "name": "KOVANLIK ENERJİ ÜRETİM SANAYİ VE TİCARETANONİM ŞİRKETİ",
-      "band": "high",
-      "topScore": 87,
-      "recommendation": "sanctions-match",
-      "lists": [
-        "US OFAC — SDN list (CSV)",
-        "US OFAC — SDN list (CSV)"
-      ],
-      "signature": "high|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
-      "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-30"
-    },
-    "global precious metals pte ltd": {
-      "name": "Global Precious Metals Pte. Ltd",
-      "band": "high",
-      "topScore": 87,
-      "recommendation": "sanctions-match",
-      "lists": [
-        "US OFAC — SDN list (CSV)"
-      ],
-      "signature": "high|sanctions-match|US OFAC — SDN list (CSV)",
-      "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-30"
-    },
-    "amber international fzco": {
-      "name": "Amber International FZCO",
-      "jurisdiction": "United Arab Emirates",
-      "band": "critical",
-      "topScore": 100,
-      "recommendation": "sanctions-match",
-      "lists": [
-        "US OFAC — SDN list (CSV)",
-        "US OFAC — SDN list (CSV)"
-      ],
-      "signature": "critical|sanctions-match|US OFAC — SDN list (CSV),US OFAC — SDN list (CSV)",
-      "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-30"
-    },
-    "aurum international fze": {
-      "name": "Aurum International (FZE)",
-      "jurisdiction": "United Arab Emirates",
-      "band": "critical",
-      "topScore": 100,
-      "recommendation": "sanctions-match",
-      "lists": [
-        "US OFAC — SDN list (CSV)"
-      ],
-      "signature": "critical|sanctions-match|US OFAC — SDN list (CSV)",
-      "firstSeen": "2026-06-19",
-      "lastSeen": "2026-06-30"
-    },
     "dinesh kumar|ubo|1214107921925846": {
       "name": "Dinesh Kumar",
       "jurisdiction": "India",
@@ -87,27 +21,12 @@
       "topScore": 87,
       "recommendation": "sanctions-match",
       "lists": [
-        "UN Security Council — Consolidated list (XML)",
-        "US OFAC — SDN list (CSV)",
         "UK OFSI — Consolidated list of targets (CSV)",
         "EU — Consolidated financial sanctions list (CSV)"
       ],
-      "signature": "high|sanctions-match|EU — Consolidated financial sanctions list (CSV),UK OFSI — Consolidated list of targets (CSV),UN Security Council — Consolidated list (XML),US OFAC — SDN list (CSV)",
+      "signature": "high|sanctions-match|EU — Consolidated financial sanctions list (CSV),UK OFSI — Consolidated list of targets (CSV)",
       "firstSeen": "2026-06-27",
-      "lastSeen": "2026-06-30"
-    },
-    "abde ali|ubo|1214106870100359": {
-      "name": "Abde Ali",
-      "jurisdiction": "India",
-      "band": "high",
-      "topScore": 88,
-      "recommendation": "sanctions-match",
-      "lists": [
-        "US OFAC — SDN list (CSV)"
-      ],
-      "signature": "high|sanctions-match|US OFAC — SDN list (CSV)",
-      "firstSeen": "2026-06-27",
-      "lastSeen": "2026-06-30"
+      "lastSeen": "2026-07-02"
     },
     "ram dev|ubo|1214106870100357": {
       "name": "Ram Dev",
@@ -121,6 +40,33 @@
       "signature": "medium|review|Adverse media (Google News)",
       "firstSeen": "2026-06-27",
       "lastSeen": "2026-06-30"
+    },
+    "mohamed ahmed mohamed elradi|ubo|1214107941665634": {
+      "name": "Mohamed Ahmed Mohamed Elradi",
+      "jurisdiction": "Sudan",
+      "band": "high",
+      "topScore": 87,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "UK OFSI — Consolidated list of targets (CSV)",
+        "EU — Consolidated financial sanctions list (CSV)"
+      ],
+      "signature": "high|sanctions-match|EU — Consolidated financial sanctions list (CSV),UK OFSI — Consolidated list of targets (CSV)",
+      "firstSeen": "2026-07-02",
+      "lastSeen": "2026-07-02"
+    },
+    "ahmed salem a alammari|ubo|1214108590766203": {
+      "name": "Ahmed Salem A Alammari",
+      "jurisdiction": "Saudi Arabia",
+      "band": "high",
+      "topScore": 87,
+      "recommendation": "sanctions-match",
+      "lists": [
+        "UK OFSI — Consolidated list of targets (CSV)"
+      ],
+      "signature": "high|sanctions-match|UK OFSI — Consolidated list of targets (CSV)",
+      "firstSeen": "2026-07-02",
+      "lastSeen": "2026-07-02"
     }
   }
 }
