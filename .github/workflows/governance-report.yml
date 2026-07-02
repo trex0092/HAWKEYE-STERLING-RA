@@ -1,0 +1,55 @@
+name: AI Governance Report
+
+# One consolidated Asana task each morning covering the non-AML control suite:
+# AI/advisor governance, security & supply-chain scans, CI/code quality,
+# app/site health and release/repo hygiene — the daily operating-effectiveness
+# evidence for ISO/IEC 42001 A.6/A.8 and NIST AI RMF MEASURE/MANAGE. Sibling of
+# the Daily Compliance Brief (which rolls up the AML monitoring). It always
+# files — "all green" on a quiet day — and flags scheduled controls that have
+# silently stopped running (STALE), so silence is never evidence.
+# Needs the ASANA_ACCESS_TOKEN secret; reads run states with the runner token.
+on:
+  schedule:
+    - cron: '45 7 * * *' # 07:45 UTC daily (11:45 UAE), after the Daily Compliance Brief (07:00)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read # read the latest run state of every control workflow
+  security-events: read # best-effort open code-scanning alert count
+
+# Manual dispatch must not race the 07:45 schedule and double-post the report.
+concurrency:
+  group: governance-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+      - name: Compose and file the governance report
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+          ASANA_GOV_SECTION_GID: ${{ vars.ASANA_GOV_SECTION_GID }}
+        run: node scripts/governance-report.mjs

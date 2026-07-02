@@ -71,6 +71,17 @@ bump merged to `main`.
 
 ### Added
 
+- **Daily AI Governance & Platform Report** (`governance-report.yml` +
+  `scripts/governance-report.mjs`): one Asana task each morning in Ongoing
+  Monitoring (section *AI & Platform Governance*) rolling up the latest state of
+  the entire non-AML control suite — AI/advisor governance, security &
+  supply-chain scans, CI/code quality, app/site health, release/repo hygiene
+  (25 controls) — plus open code-scanning/Dependabot alert counts. Sibling of
+  the Daily Compliance Brief: daily operating-effectiveness evidence for
+  ISO/IEC 42001 A.6/A.8 and NIST AI RMF MEASURE/MANAGE. Scheduled controls that
+  silently stop running are flagged **STALE** (the same "silence is never
+  evidence" fail-safe as the screening engine); idempotent (one report per
+  day); fully unit-tested offline (`test/governance-report.test.mjs`).
 - **Assurance Coverage Matrix**
   ([`docs/governance/assurance-coverage-matrix.md`](docs/governance/assurance-coverage-matrix.md)):
   a single examiner-facing page mapping every claimed control to its automated
@@ -164,6 +175,17 @@ bump merged to `main`.
   Actions watchers should target it too, as the `ASANA_PROJECT_GID` repo variable.
 - Dependabot now groups GitHub Actions updates into a single weekly PR.
 - `codeql.yml` gained an explicit top-level least-privilege `permissions` block.
+
+### Removed
+
+- **"Monitoring Run Log" and "Transaction Monitoring Alerts" streams removed**
+  from the Node screener (`scripts/sanctions-screen.mjs`): the per-run
+  "Screening Run" log task, the auto-seeded ⚙ Transaction Monitoring alert
+  template and their two auto-created Ongoing Monitoring sections no longer
+  exist (the `ASANA_OM_LOG_SECTION_GID` override is gone with them). The daily
+  Adverse Media & PEP audit task, the sanctions match alerts and the unified
+  daily screen are unchanged — run evidence lives in the GitHub Actions run
+  history and the Screening Daily Report section.
 
 ### Fixed
 

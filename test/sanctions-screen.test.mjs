@@ -6,7 +6,7 @@ import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD,
-  formatHumanDate, buildAmPepNotes, buildRunLogNotes, buildTransactionTemplateNotes, AM_KEYWORD_COUNT
+  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT
 } from '../scripts/sanctions-screen.mjs';
 
 let passed = 0, failed = 0;
@@ -205,23 +205,6 @@ check('AM/PEP HIT note flags review, counts hits and lists each subject',
   amHit.includes('New PEP identifications:      1') && amHit.includes('Acme DMCC') && amHit.includes('Beta FZE'));
 check('AM/PEP HIT note links the Regulations alert when provided',
   amHit.includes('https://app.asana.com/0/1/2'));
-
-const log = buildRunLogNotes({ today: '2026-06-24', run: 'https://example/run', subjects: 325,
-  coverage: { fetched: 5, total: 6 }, degraded: true, errored: 0, cfg: { adverseMedia: true, pep: false },
-  amErrors: 2, pepErrors: 0, alerts: 0, matchCount: 3, asanaPosted: false, amPep: { posted: true, url: 'https://t/1' } });
-check('run log note reports subjects, coverage and exit status',
-  log.includes('Subjects screened:            325') && log.includes('Sanctions lists loaded:       5/6') &&
-  log.includes('Coverage degraded:            YES') && log.includes('Exit status:                  ✅ CLEAN'));
-check('run log note reflects module on/off, errors and the AM/PEP link',
-  log.includes('Adverse media module:         ON — 2 errors') && log.includes('PEP module:                   OFF — 0 errors') &&
-  log.includes('AM/PEP task posted:           YES — https://t/1'));
-const logMatch = buildRunLogNotes({ today: '2026-06-24', subjects: 10, coverage: {}, alerts: 2, matchCount: 2, cfg: {} });
-check('run log note marks ⚠ MATCHES when there are alerts', logMatch.includes('Exit status:                  ⚠ MATCHES'));
-
-const tmpl = buildTransactionTemplateNotes();
-check('TM template carries the legal basis, all sections and the copy banner',
-  tmpl.includes('MoET Circular 08/AML/2021') && tmpl.includes('A. ALERT IDENTIFICATION') &&
-  tmpl.includes('F. DISPOSITION') && tmpl.includes('[TEMPLATE — copy for each alert]'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
