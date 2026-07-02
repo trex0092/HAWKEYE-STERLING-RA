@@ -165,6 +165,17 @@ bump merged to `main`.
 - Dependabot now groups GitHub Actions updates into a single weekly PR.
 - `codeql.yml` gained an explicit top-level least-privilege `permissions` block.
 
+### Removed
+
+- **"Monitoring Run Log" and "Transaction Monitoring Alerts" streams removed**
+  from the Node screener (`scripts/sanctions-screen.mjs`): the per-run
+  "Screening Run" log task, the auto-seeded ⚙ Transaction Monitoring alert
+  template and their two auto-created Ongoing Monitoring sections no longer
+  exist (the `ASANA_OM_LOG_SECTION_GID` override is gone with them). The daily
+  Adverse Media & PEP audit task, the sanctions match alerts and the unified
+  daily screen are unchanged — run evidence lives in the GitHub Actions run
+  history and the Screening Daily Report section.
+
 ### Fixed
 
 - **Asana delivery reliability (source-level audit).** An adversarially-verified
