@@ -6,7 +6,7 @@
    checklist of what to review.
 
    Idempotent twice over: an exact-title check across the whole project (one
-   task per quarter, ever) plus notifyAsana's own 48h re-run guard.
+   task per quarter, ever) plus notifyAsana's own short re-run guard.
 
    Runs in GitHub Actions (.github/workflows/quarterly-review.yml).
    Needs the ASANA_ACCESS_TOKEN secret. */

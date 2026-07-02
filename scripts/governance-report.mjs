@@ -104,9 +104,9 @@ export function classifyRun(wf, run, nowMs) {
     return { icon: '🔄', state: 'info', detail: 'in progress (' + dateStr + ')' };
   }
   const limit = STALE_DAYS[wf.cadence];
-  if (limit && age > limit) {
-    /* The fail-safe: a scheduled control that stopped running is a failure of
-       the control, whatever its last conclusion was. */
+  /* A failed last run stays a FAILURE even when it is also stale — staleness
+     must never soften a red control to amber. */
+  if (limit && age > limit && !['failure', 'timed_out', 'startup_failure'].includes(run.conclusion)) {
     return { icon: '⚠', state: 'attention', detail: 'STALE — last run ' + dateStr + ' (' + age + 'd ago, ' + wf.cadence + ' cadence)' };
   }
   switch (run.conclusion) {

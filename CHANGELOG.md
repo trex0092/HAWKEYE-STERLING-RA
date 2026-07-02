@@ -29,7 +29,7 @@ bump merged to `main`.
     paint a control red. (`screen.py` already had this.)
   - **Re-run idempotency on alert cards.** `notifyAsana` and the watchdog's
     task creator now skip creation when an identical-name task already exists
-    in the target project from the last 48h — a workflow re-run after a
+    in the target project from the last 6 hours — a workflow re-run after a
     partial failure (e.g. the state commit failed after a successful post) can
     no longer file the same alert twice. Best-effort: if the check itself
     fails, the card still posts (losing an alert is worse than a rare
@@ -256,6 +256,19 @@ bump merged to `main`.
   history and the Screening Daily Report section.
 
 ### Fixed
+
+- **Deep bug hunt (2026-07-02):**
+  - The re-run dedup window (was 48h) could silently suppress a *legitimate*
+    next-day alert whose title repeats (daily watchers run 24h apart and titles
+    like "Sanctions Watch — 1 list change" or the advisor regression alert are
+    not date-stamped). Window reduced to **6h** — re-run idempotency preserved,
+    daily alerts always survive; regression-tested.
+  - The daily governance report classified a **failed** run that was also stale
+    as ⚠ STALE (amber) instead of ❌ FAIL — staleness can no longer soften a red
+    control; regression-tested.
+  - The shared Asana client now retries **network-level** failures
+    (reset/DNS/TLS) with the same bounded backoff as 429/5xx — previously only
+    HTTP errors were retried and a single network blip killed the delivery.
 
 - **Asana delivery reliability (source-level audit).** An adversarially-verified
   audit of the Asana integration ([`docs/asana-integration-audit.md`](docs/asana-integration-audit.md))

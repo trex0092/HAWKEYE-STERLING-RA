@@ -45,6 +45,10 @@ check('event-driven control is never stale',
   classifyRun(eventDriven, { status: 'completed', conclusion: 'success', created_at: iso(60) }, NOW).state === 'pass');
 check('scheduled control with no run at all is a fail (never ran)',
   classifyRun(daily, null, NOW).state === 'fail');
+check('REGRESSION: a FAILED run that is also stale stays a FAIL — staleness never softens red to amber', (() => {
+  const c = classifyRun(daily, { status: 'completed', conclusion: 'failure', created_at: iso(5) }, NOW);
+  return c.state === 'fail' && c.detail.includes('FAILED');
+})());
 check('event-driven control with no run is informational, not a failure',
   classifyRun(eventDriven, null, NOW).state === 'info');
 check('in-progress run is informational',

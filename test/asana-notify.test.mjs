@@ -31,14 +31,17 @@ const hoursAgo = h => new Date(NOW - h * 3600000).toISOString();
 const tasks = [
   { name: 'Sanctions Watch: 2 source(s) changed', created_at: hoursAgo(3), permalink_url: 'https://t/1' },
   { name: 'FATF list change: Kenya', created_at: hoursAgo(80), permalink_url: 'https://t/2' },
+  { name: 'Regulatory Watch — 3 source changes', created_at: hoursAgo(24), permalink_url: 'https://t/4' },
   { name: 'Some other card', created_at: hoursAgo(1) }
 ];
-check('identical name inside 48h is a duplicate (task returned with its link)', (() => {
+check('identical name inside 6h is a duplicate (task returned with its link)', (() => {
   const d = findRecentDuplicate(tasks, 'Sanctions Watch: 2 source(s) changed', NOW);
   return d && d.permalink_url === 'https://t/1';
 })());
-check('identical name OLDER than 48h is not a duplicate (recurring alerts still file)',
+check('identical name OLDER than the window is not a duplicate (recurring alerts still file)',
   findRecentDuplicate(tasks, 'FATF list change: Kenya', NOW) === null);
+check('REGRESSION: identical title 24h apart is NOT a duplicate — daily watchers may legitimately repeat a title ("3 source changes") on consecutive days',
+  findRecentDuplicate(tasks, 'Regulatory Watch — 3 source changes', NOW) === null);
 check('different name is never a duplicate',
   findRecentDuplicate(tasks, 'FATF list change: Monaco', NOW) === null);
 check('name is compared after the same 250-char clip Asana receives', (() => {
