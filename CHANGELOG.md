@@ -12,6 +12,28 @@ bump merged to `main`.
 
 ### Security & hardening
 
+- **AML monitoring pipeline hardening (round 3).** The ten AML/CTF monitoring
+  workflows and their five Asana delivery streams:
+  - **Egress lockdown completed — 10/10 on `block`.** The last two audit-mode
+    jobs moved to harden-runner `egress-policy: block` with allowlists derived
+    from their actual fetches: `anomaly-watch` (pure GitHub-API job) and
+    `sanctions-screen` (Asana + OFAC/UN/EU/UK lists + Google News/GDELT +
+    Wikidata + Interpol). A compromised dependency can no longer exfiltrate —
+    any unlisted host fails loudly.
+  - **Transient-failure retry on every delivery stream.** One shared policy
+    (`asana-notify.mjs`): 429/5xx retried up to 3 attempts with exponential
+    backoff, `Retry-After` honoured (capped 30s), other 4xx fail fast. Now used
+    by the watch cards (sanctions/regulatory/advisor-eval), FATF watchdog,
+    Daily Compliance Brief, governance report, the Node screener and the
+    reconciliation reads — a rate-limit blip can no longer drop an alert or
+    paint a control red. (`screen.py` already had this.)
+  - **Re-run idempotency on alert cards.** `notifyAsana` and the watchdog's
+    task creator now skip creation when an identical-name task already exists
+    in the target project from the last 48h — a workflow re-run after a
+    partial failure (e.g. the state commit failed after a successful post) can
+    no longer file the same alert twice. Best-effort: if the check itself
+    fails, the card still posts (losing an alert is worse than a rare
+    duplicate). Pure logic unit-tested (`test/asana-notify.test.mjs`, in CI).
 - **Workflow supply-chain hardening (post-audit).** From the full adversarial
   audit of all 38 GitHub Actions workflows:
   - **Egress lockdown** — the three internet-fetching jobs that hold

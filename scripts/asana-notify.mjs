@@ -19,24 +19,69 @@ export function asanaEnabled() {
   return !!process.env.ASANA_ACCESS_TOKEN;
 }
 
-async function asana(path, opts = {}) {
-  const r = await fetch('https://app.asana.com/api/1.0' + path, {
-    ...opts,
-    headers: {
-      Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(opts.headers || {})
-    }
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) {
+/* ── Transient-failure policy (shared by every watcher that posts to Asana) ──
+   Rate limits (429) and server errors (5xx) are retried with bounded backoff so
+   a blip never drops a monitoring alert; other 4xx are real errors and fail
+   fast. Retry-After is honoured when Asana sends one (capped at 30s). */
+const RETRYABLE = new Set([429, 500, 502, 503, 504]);
+export function isRetryable(status) { return RETRYABLE.has(Number(status)); }
+export function retryDelayMs(attempt, retryAfter) {
+  const ra = Number(retryAfter);
+  if (Number.isFinite(ra) && ra > 0) return Math.min(ra * 1000, 30000);
+  return Math.min(1000 * 2 ** attempt, 8000);
+}
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+const MAX_ATTEMPTS = 3;
+
+export async function asana(path, opts = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await fetch('https://app.asana.com/api/1.0' + path, {
+      ...opts,
+      headers: {
+        Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(opts.headers || {})
+      }
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) return d;
     if (r.status === 401) {
       throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked. Rotate it in GitHub Settings → Secrets → ASANA_ACCESS_TOKEN.');
     }
+    if (attempt < MAX_ATTEMPTS - 1 && isRetryable(r.status)) {
+      const delay = retryDelayMs(attempt, r.headers && r.headers.get && r.headers.get('retry-after'));
+      console.warn('asana-notify: Asana ' + r.status + ' — retry ' + (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
+      await sleep(delay);
+      continue;
+    }
     throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
   }
-  return d;
+}
+
+/* ── Re-run idempotency ──────────────────────────────────────────────────────
+   A workflow re-run (or a retry after a failure DOWNSTREAM of a successful
+   post) must not file the same alert card twice. A task in the target project
+   with the identical name created inside the window is treated as this alert
+   already delivered. Pure; unit-tested. */
+export function findRecentDuplicate(tasks, name, nowMs, windowHours = 48) {
+  const cutoff = nowMs - windowHours * 3600000;
+  const want = String(name).slice(0, 250);
+  return (tasks || []).find(t => String(t && t.name || '') === want
+    && (Date.parse((t && t.created_at) || '') || 0) >= cutoff) || null;
+}
+
+/* All tasks in a project (name, created_at, permalink) — for the dedup guard. */
+export async function listProjectTasks(projectGid) {
+  const out = [];
+  const base = '/projects/' + projectGid + '/tasks?limit=100&opt_fields=name,created_at,permalink_url';
+  let path = base;
+  while (path) {
+    const d = await asana(path);
+    out.push(...(d.data || []));
+    path = d.next_page ? base + '&offset=' + d.next_page.offset : null;
+  }
+  return out;
 }
 
 /* Create one alert card in the Ongoing Monitoring project.
@@ -57,6 +102,18 @@ export async function notifyAsana(name, notes, opts = {}) {
     projects: [project],
     due_on: due
   };
+  /* Idempotency guard — never double-post the same card on a workflow re-run.
+     Best-effort: if the check itself fails we still post (losing an alert is
+     worse than a rare duplicate). */
+  try {
+    const dup = findRecentDuplicate(await listProjectTasks(project), data.name, Date.now());
+    if (dup) {
+      console.log('asana-notify: identical card already filed within 48h — skipping ("' + data.name + '")');
+      return dup.permalink_url || null;
+    }
+  } catch (e) {
+    console.warn('asana-notify: duplicate check failed (' + (e && e.message || e) + ') — posting anyway');
+  }
   if (opts.html) data.html_notes = String(opts.html).slice(0, 60000);
   else data.notes = String(notes).slice(0, 60000);
   if (opts.assignee !== null) data.assignee = opts.assignee || 'me';

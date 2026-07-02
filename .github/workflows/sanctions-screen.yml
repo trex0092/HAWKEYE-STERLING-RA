@@ -49,11 +49,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20 # bound the daily re-screen; a hang must fail loudly, not stall the control
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
         with:
           disable-sudo: true
-          egress-policy: audit
+          # Allowlist derived from the job's actual fetches: runner/toolchain
+          # (github/nodejs), Asana (customer read + alert post), the consolidated
+          # designation lists (OFAC/UN/EU/UK — UAE EOCN is an in-repo file), the
+          # adverse-media feeds (Google News RSS + GDELT), the Wikidata PEP
+          # signal, and Interpol (for when SCREEN_INTERPOL=1). Anything else —
+          # including an exfiltration attempt from a compromised dependency —
+          # is blocked and surfaces loudly.
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+            sanctionslistservice.ofac.treas.gov:443
+            scsanctions.un.org:443
+            webgate.ec.europa.eu:443
+            ofsistorage.blob.core.windows.net:443
+            news.google.com:443
+            api.gdeltproject.org:443
+            www.wikidata.org:443
+            ws-public.interpol.int:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:

@@ -11,6 +11,8 @@
    · probe (diagnostic: print source, classified lists, name contexts).
 */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+/* Shared Asana client: bounded retry on 429/5xx + the re-run dedup guard. */
+import { asana, findRecentDuplicate, listProjectTasks as listTasksIn } from './asana-notify.mjs';
 
 export const STATE_FILE = 'data/fatf-state.json';
 const FATF_URL = 'https://www.fatf-gafi.org/en/countries/black-and-grey-lists.html';
@@ -275,23 +277,6 @@ async function fetchFatfSegments() {
   return null;
 }
 
-async function asana(path, opts = {}) {
-  const r = await fetch('https://app.asana.com/api/1.0' + path, {
-    ...opts,
-    headers: {
-      Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(opts.headers || {})
-    }
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    if (r.status === 401) throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked. Rotate it in GitHub Settings → Secrets → ASANA_ACCESS_TOKEN.');
-    throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
-  }
-  return d;
-}
 
 async function listProjectTasks(fields) {
   const out = [];
@@ -317,8 +302,15 @@ async function findAffected(changedCountries) {
 
 async function createTask(name, notes, due, project, section) {
   due = due || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const target = project || PROJECT_GID;
+  /* Re-run idempotency: a workflow retry after a successful post (e.g. the
+     state commit failed) must not file the same alert twice. Best-effort. */
+  try {
+    const dup = findRecentDuplicate(await listTasksIn(target), name, Date.now());
+    if (dup) { console.log('watchdog: identical task already filed within 48h — skipping ("' + name + '")'); return dup.permalink_url; }
+  } catch (e) { console.warn('watchdog: duplicate check failed (' + (e && e.message || e) + ') — posting anyway'); }
   /* Assigned so the alert reaches the compliance officer's Asana inbox. */
-  const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name, notes, projects: [project || PROJECT_GID], due_on: due, assignee: 'me' } }) });
+  const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name, notes, projects: [target], due_on: due, assignee: 'me' } }) });
   /* File under a section when given so the project stays organised. Non-fatal. */
   if (section && d.data && d.data.gid) {
     try { await asana('/sections/' + section + '/addTask', { method: 'POST', body: JSON.stringify({ data: { task: d.data.gid } }) }); }

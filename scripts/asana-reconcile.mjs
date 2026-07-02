@@ -18,7 +18,7 @@
 
    The diff itself is a pure function (reconcile) exported for unit tests. */
 import { writeFileSync } from 'node:fs';
-import { notifyAsana, esc, asanaEnabled, runUrl } from './asana-notify.mjs';
+import { notifyAsana, esc, asanaEnabled, runUrl, isRetryable, retryDelayMs } from './asana-notify.mjs';
 
 const RISK_PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914';
 const SHEET_OPEN = '===HS SHEET===';
@@ -101,19 +101,30 @@ export function renderReport(d) {
 /* ── I/O (only runs as a script, not on import) ───────────────────────────── */
 
 const ASANA_TIMEOUT_MS = Number(process.env.ASANA_TIMEOUT_MS) || 20000;
+/* Reads are idempotent, so 429/5xx retry (shared policy) is always safe here —
+   a rate-limit blip must not paint the reconciliation control red. */
+const sleep = ms => new Promise(res => setTimeout(res, ms));
 async function api(path) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), ASANA_TIMEOUT_MS);
-  try {
-    const r = await fetch('https://app.asana.com/api/1.0' + path, {
-      signal: ctrl.signal,
-      headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' }
-    });
-    if (r.status === 401) throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked. Rotate it in GitHub Settings → Secrets → ASANA_ACCESS_TOKEN.');
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
-    return d;
-  } finally { clearTimeout(timer); }
+  for (let attempt = 0; ; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ASANA_TIMEOUT_MS);
+    try {
+      const r = await fetch('https://app.asana.com/api/1.0' + path, {
+        signal: ctrl.signal,
+        headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' }
+      });
+      if (r.status === 401) throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked. Rotate it in GitHub Settings → Secrets → ASANA_ACCESS_TOKEN.');
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) return d;
+      if (attempt < 2 && isRetryable(r.status)) {
+        const delay = retryDelayMs(attempt, r.headers.get('retry-after'));
+        console.warn('asana-reconcile: Asana ' + r.status + ' — retry in ' + delay + 'ms');
+        await sleep(delay);
+        continue;
+      }
+      throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
+    } finally { clearTimeout(timer); }
+  }
 }
 
 function parseSheet(notes) {

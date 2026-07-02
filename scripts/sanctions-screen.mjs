@@ -32,7 +32,7 @@
    from the pure logic below so test/sanctions-screen.test.mjs runs fully offline. */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled } from './asana-notify.mjs';
+import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName } from './sanctions-match.mjs';
 import { checkAdverseMedia, ADVERSE_TERMS } from './adverse-media.mjs';
@@ -524,13 +524,26 @@ async function withTimeout(promiseFactory, timeoutMs) {
   finally { clearTimeout(t); }
 }
 
+/* 429/5xx are retried with bounded backoff (shared policy from asana-notify);
+   each attempt gets its own timeout so a hang still fails loudly. */
+const asanaSleep = ms => new Promise(res => setTimeout(res, ms));
+
 async function asanaGet(url, token, timeoutMs = 30000) {
-  return withTimeout(async (signal) => {
-    const r = await fetch(url, { signal, headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 200));
-    return d;
-  }, timeoutMs);
+  for (let attempt = 0; ; attempt++) {
+    const { ok, status, retryAfter, data } = await withTimeout(async (signal) => {
+      const r = await fetch(url, { signal, headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+      const d = await r.json().catch(() => ({}));
+      return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
+    }, timeoutMs);
+    if (ok) return data;
+    if (attempt < 2 && isRetryable(status)) {
+      const delay = retryDelayMs(attempt, retryAfter);
+      console.warn('sanctions-screen: Asana ' + status + ' — retry in ' + delay + 'ms');
+      await asanaSleep(delay);
+      continue;
+    }
+    throw new Error('Asana ' + status + ': ' + JSON.stringify(data.errors || data).slice(0, 200));
+  }
 }
 
 async function fetchAsanaSubjects(projectGid, token) {
@@ -551,16 +564,25 @@ async function fetchAsanaSubjects(projectGid, token) {
 /* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
 
 async function asanaPost(path, body, token, timeoutMs = 30000) {
-  return withTimeout(async (signal) => {
-    const r = await fetch('https://app.asana.com/api/1.0' + path, {
-      signal, method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ data: body })
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 200));
-    return d;
-  }, timeoutMs);
+  for (let attempt = 0; ; attempt++) {
+    const { ok, status, retryAfter, data } = await withTimeout(async (signal) => {
+      const r = await fetch('https://app.asana.com/api/1.0' + path, {
+        signal, method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ data: body })
+      });
+      const d = await r.json().catch(() => ({}));
+      return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
+    }, timeoutMs);
+    if (ok) return data;
+    if (attempt < 2 && isRetryable(status)) {
+      const delay = retryDelayMs(attempt, retryAfter);
+      console.warn('sanctions-screen: Asana ' + status + ' — retry in ' + delay + 'ms');
+      await asanaSleep(delay);
+      continue;
+    }
+    throw new Error('Asana ' + status + ': ' + JSON.stringify(data.errors || data).slice(0, 200));
+  }
 }
 
 /* Resolve a section GID by name within a project, creating it if absent. Lets
