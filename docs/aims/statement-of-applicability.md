@@ -5,7 +5,7 @@ exclusion. Status: Implemented / Partial / Planned / Not Applicable (N/A).
 
 | Annex A area | Control | Status | Evidence / justification |
 |---|---|---|---|
-| A.2 AI policy | AI policy documented & approved | Implemented | `docs/AI-GOVERNANCE.md`; standalone `docs/governance/ai-policy.md` (pending ratification) |
+| A.2 AI policy | AI policy documented & approved | Implemented | `docs/AI-GOVERNANCE.md`; standalone `docs/governance/ai-policy.md` (ratified 2026-07-02) |
 | A.3 Internal org | Roles, responsibilities, ownership | Implemented | `agents.py` identities; MLRO owns decisions |
 | A.4 Resources | AI system inventory | Implemented | `ai-system-inventory.md` |
 | A.4 Resources | Data resources documented | Implemented | inventory + `third-party-register.md` |

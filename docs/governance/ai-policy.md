@@ -3,7 +3,7 @@
 **Layer 6 — Governance, Compliance & Audit.** The firm's top-level, standalone policy
 governing the responsible development, deployment, and use of AI in the screening and
 advisory platform. **Owner:** MLRO · Compliance Engineering. **Date:** 2026-06-29.
-**Version:** 1.0 (draft — pending senior-management ratification, see §9).
+**Version:** 1.0 — **ratified 2 July 2026** (see §9).
 
 This is the parent policy. It sits above and references the operational documents:
 [`AI-GOVERNANCE.md`](../AI-GOVERNANCE.md) (control mapping),
@@ -74,7 +74,9 @@ AI failures, suspected bias, prompt-injection, or privacy concerns are raised an
 ## 9. Approval & ratification
 | Version | Date | Author | Approver (senior management) | Status |
 |---|---|---|---|---|
-| 1.0 | 2026-06-29 | Compliance Engineering / MLRO | _pending_ | Draft — awaiting ratification |
+| 1.0 | 2026-06-29 | Compliance Engineering / MLRO | Luisa Fernanda (MLRO) | **Ratified 2026-07-02** |
+
+> Signature evidence: Ratified 2026-07-02 by Luisa Fernanda (MLRO / workspace owner) — evidence: Asana task 1216233454512937 in HAWKEYE STERLING APP (name entered by the workspace owner, 2026-07-02T10:44Z; workspace is single-owner access).
 
 *Reviewed annually and on any change to AI models, scope, or applicable regulation.*
 

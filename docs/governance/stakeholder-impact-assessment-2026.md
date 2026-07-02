@@ -37,4 +37,6 @@ corrective actions are logged in [`../aims/corrective-actions.md`](../aims/corre
 ## Sign-off
 | Version | Date | Author | Approver (MLRO / senior mgmt) | Status |
 |---|---|---|---|---|
-| 1.0 | 2026-06-30 | Compliance Engineering | _pending_ | Draft — awaiting ratification |
+| 1.0 | 2026-06-30 | Compliance Engineering | Luisa Fernanda (MLRO) | **Ratified 2026-07-02** |
+
+> Signature evidence: Ratified 2026-07-02 by Luisa Fernanda (MLRO / workspace owner) — evidence: Asana task 1216233454512937 in HAWKEYE STERLING APP (name entered by the workspace owner, 2026-07-02T10:44Z; workspace is single-owner access).
