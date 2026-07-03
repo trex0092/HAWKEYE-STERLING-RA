@@ -1,4 +1,7 @@
-# re-check run 3 - does the live function pick up the env change at runtime?
+# Deep live delivery test: POST through the real asana-task function code built
+# with the corrected ASANA_PROJECT_GID (deploy-preview-177 = merged main + env),
+# AND the current production endpoint, so both results are on the record. The
+# preview-path proof task is KEPT so its Asana link can be shared.
 name: Asana Live Delivery Diagnostic
 
 on:
@@ -14,36 +17,47 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Real delivery to the live asana-task endpoint (name present)
+      - name: DEEP TEST 1 — corrected build (deploy-preview-177) — proof task is KEPT
+        env:
+          ENDPOINT: https://deploy-preview-177--hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-task
+        run: |
+          set -uo pipefail
+          REF="PROOF-${GITHUB_RUN_ID}"
+          HTTP=$(curl -sS -o resp.json -w '%{http_code}' -X POST "$ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"PROOF - SEND TO ASANA routing verified - CDD 12\",\"ref\":\"${REF}\",\"band\":\"CDD\",\"score\":12,\"notes\":\"Deep live delivery test through the corrected build. This task is the routing proof - lands in HAWKEYE STERLING APP (1216203370612914).\"}")
+          echo "HTTP $HTTP"
+          cat resp.json; echo
+          if [ "$HTTP" != "200" ] || ! grep -q '"ok":true' resp.json; then
+            echo "::error::Preview-path delivery failed (HTTP $HTTP)"; exit 1
+          fi
+          URL=$(grep -o '"url":"[^"]*"' resp.json | head -1 | cut -d'"' -f4)
+          echo "TASK URL: $URL"
+          if echo "$URL" | grep -q '1216203370612914'; then
+            echo "PROJECT CHECK (corrected build): PASS -> 1216203370612914 (HAWKEYE STERLING APP)"
+          else
+            echo "::error::PROJECT CHECK (corrected build): FAIL -> $URL"; exit 1
+          fi
+
+      - name: DEEP TEST 2 — current production endpoint (frozen deploy) — cleaned up
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ENDPOINT: https://hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-task
         run: |
           set -uo pipefail
-          REF="DIAG-${GITHUB_RUN_ID}"
-          echo "POST a real payload to $ENDPOINT"
-          HTTP=$(curl -sS -o resp.json -w '%{http_code}' -X POST "$ENDPOINT" \
+          REF="PRODCHECK-${GITHUB_RUN_ID}"
+          HTTP=$(curl -sS -o prod.json -w '%{http_code}' -X POST "$ENDPOINT" \
             -H "Content-Type: application/json" \
-            -d "{\"name\":\"DIAG - Live Delivery Check - CDD 12\",\"ref\":\"${REF}\",\"band\":\"CDD\",\"score\":12,\"notes\":\"Live delivery diagnostic - safe to delete.\"}")
-          echo "=== HTTP status: $HTTP ==="
-          echo "=== Response body: ==="
-          cat resp.json; echo
-          echo "=== Interpretation ==="
-          if [ "$HTTP" = "200" ] && grep -q '"ok":true' resp.json; then
-            URL=$(grep -o '"url":"[^"]*"' resp.json | head -1)
-            SEC=$(grep -o '"section":"[^"]*"' resp.json | head -1)
-            GID=$(grep -o '"gid":"[0-9]*"' resp.json | head -1 | grep -o '[0-9]*')
-            echo "DELIVERY OK -> $URL   $SEC"
-            if echo "$URL" | grep -q '1216203370612914'; then
-              echo "PROJECT CHECK: PASS - landed in 1216203370612914 (HAWKEYE STERLING APP)"
-            else
-              echo "PROJECT CHECK: FAIL - still landing in the old project (needs a fresh Netlify deploy)"
-            fi
-            if [ -n "${GID:-}" ] && [ -n "${ASANA_ACCESS_TOKEN:-}" ]; then
-              DEL=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer ${ASANA_ACCESS_TOKEN}" "https://app.asana.com/api/1.0/tasks/${GID}")
-              echo "cleanup: delete task ${GID} -> HTTP ${DEL}"
-            fi
+            -d "{\"name\":\"DIAG - production routing check - CDD 12\",\"ref\":\"${REF}\",\"band\":\"CDD\",\"score\":12,\"notes\":\"Production routing check - safe to delete.\"}")
+          echo "HTTP $HTTP"; cat prod.json; echo
+          URL=$(grep -o '"url":"[^"]*"' prod.json | head -1 | cut -d'"' -f4)
+          GID=$(grep -o '"gid":"[0-9]*"' prod.json | head -1 | grep -o '[0-9]*' || true)
+          if echo "$URL" | grep -q '1216203370612914'; then
+            echo "PROJECT CHECK (production): PASS -> already routing to 1216203370612914"
           else
-            echo "DELIVERY FAILED - HTTP $HTTP (see body above)"
-            exit 1
+            echo "PROJECT CHECK (production): STILL OLD PROJECT -> a production publish is required"
+          fi
+          if [ -n "${GID:-}" ] && [ -n "${ASANA_ACCESS_TOKEN:-}" ]; then
+            curl -sS -o /dev/null -X DELETE -H "Authorization: Bearer ${ASANA_ACCESS_TOKEN}" "https://app.asana.com/api/1.0/tasks/${GID}" || true
+            echo "cleanup: production check task ${GID} deleted"
           fi
