@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName } from './sanctions-match.mjs';
-import { checkAdverseMedia, ADVERSE_TERMS } from './adverse-media.mjs';
+import { checkAdverseMedia, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 
@@ -57,7 +57,7 @@ export const CUSTOMER_PROJECT_GID =
 export const SANCTIONS_SOURCES_FILE = process.env.SANCTIONS_SOURCES_FILE || 'data/sanctions-sources.json';
 
 /* The lists/signals screening covers (for the report/alert provenance line). */
-export const COVERAGE = 'OFAC SDN/non-SDN · UN · EU · UK OFSI · UAE EOCN Local Terrorist List · adverse media (Google News) · PEP (Wikidata)';
+export const COVERAGE = 'OFAC SDN/non-SDN · UN · EU · UK OFSI · UAE EOCN Local Terrorist List · worldwide adverse media (Google News × ' + LOCALES.length + ' country/language editions, ' + Object.keys(LANG_TERMS).length + ' languages, + GDELT global index) · PEP (Wikidata)';
 
 /* ── Ongoing Monitoring project — daily audit-trail task ─────────────────────
    Separate from the Regulations alert path: every run (match or clear) leaves an
@@ -68,8 +68,9 @@ export const OM_PROJECT_GID = process.env.ASANA_OM_PROJECT_GID || '1213914392047
 export const OM_SECTION_AM_PEP = 'Adverse Media & PEP Monitoring';
 /* Audit tasks are assigned to the token bearer by default; override with a user GID. */
 const OM_ASSIGNEE = process.env.ASANA_OM_ASSIGNEE_GID || 'me';
-/* Number of adverse-media risk keywords queried per subject (provenance line). */
-export const AM_KEYWORD_COUNT = ADVERSE_TERMS.length;
+/* Number of adverse-media risk keywords queried per subject (provenance line) —
+   the union across every language in the worldwide sweep, not just English. */
+export const AM_KEYWORD_COUNT = ALL_TERMS.length;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /* Render an ISO date (YYYY-MM-DD) as "24 Jun 2026" for human-facing task names. */
@@ -454,7 +455,7 @@ export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], p
   L.push('A. SCOPE');
   L.push(RULE);
   L.push('Subjects checked:             ' + (subjects != null ? subjects : '?'));
-  L.push('Adverse media module:         ACTIVE (Google News RSS — ' + amKeywordCount + ' keywords)');
+  L.push('Adverse media module:         ACTIVE (worldwide — Google News RSS × ' + LOCALES.length + ' locales + GDELT, ' + amKeywordCount + ' keywords across ' + Object.keys(LANG_TERMS).length + ' languages)');
   L.push('PEP module:                   ACTIVE (Wikidata — Tier 1/2/3 + family/associates)');
   L.push('');
   L.push('Risk categories (adverse media):');
