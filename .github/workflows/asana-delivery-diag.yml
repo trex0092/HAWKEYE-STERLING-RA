@@ -1,0 +1,47 @@
+name: Asana Live Delivery Diagnostic
+
+on:
+  push:
+    branches: [diag/asana-live-delivery-check]
+    paths: ['.github/workflows/asana-delivery-diag.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Real delivery to the live asana-task endpoint (name present)
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ENDPOINT: https://hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-task
+        run: |
+          set -uo pipefail
+          REF="DIAG-${GITHUB_RUN_ID}"
+          echo "POST a real payload to $ENDPOINT"
+          HTTP=$(curl -sS -o resp.json -w '%{http_code}' -X POST "$ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"DIAG - Live Delivery Check - CDD 12\",\"ref\":\"${REF}\",\"band\":\"CDD\",\"score\":12,\"notes\":\"Live delivery diagnostic - safe to delete.\"}")
+          echo "=== HTTP status: $HTTP ==="
+          echo "=== Response body: ==="
+          cat resp.json; echo
+          echo "=== Interpretation ==="
+          if [ "$HTTP" = "200" ] && grep -q '"ok":true' resp.json; then
+            URL=$(grep -o '"url":"[^"]*"' resp.json | head -1)
+            SEC=$(grep -o '"section":"[^"]*"' resp.json | head -1)
+            GID=$(grep -o '"gid":"[0-9]*"' resp.json | head -1 | grep -o '[0-9]*')
+            echo "DELIVERY OK -> $URL   $SEC"
+            echo "(the project GID is embedded in the url above)"
+            if [ -n "${GID:-}" ] && [ -n "${ASANA_ACCESS_TOKEN:-}" ]; then
+              DEL=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer ${ASANA_ACCESS_TOKEN}" "https://app.asana.com/api/1.0/tasks/${GID}")
+              echo "cleanup: delete task ${GID} -> HTTP ${DEL}"
+            fi
+          else
+            echo "DELIVERY FAILED - HTTP $HTTP"
+            echo "  500 = ASANA_ACCESS_TOKEN not configured in Netlify"
+            echo "  401/403 = token invalid/expired or has no access to the target project"
+            echo "  other 4xx/5xx = see body above"
+            exit 1
+          fi
