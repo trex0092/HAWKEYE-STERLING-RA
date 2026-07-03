@@ -1,6 +1,7 @@
 /* Unit tests for adverse-media screening pure logic (no network).
    Usage: node test/adverse-media.test.mjs */
-import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR } from '../scripts/adverse-media.mjs';
+import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
+  LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool } from '../scripts/adverse-media.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -76,6 +77,59 @@ check('ADVERSE_TERMS_AR covers core Arabic AML predicates',
    the subject was silently never flagged. */
 const shortName = scoreAdverseMedia('Xi Bo', [{ title: 'Xi Bo arrested for terrorism financing', link: '' }]);
 check('short multi-token name (e.g. "Xi Bo") is still matched (no silent false-negative)', shortName.hit === true);
+
+/* ── Global coverage: worldwide locale matrix + multilingual terms ──────────── */
+check('LOCALES spans many countries incl. the en-US primary and non-English press',
+  LOCALES.length >= 25 && LOCALES.some(l => l.id === 'en-US') &&
+  LOCALES.some(l => l.lang === 'zh') && LOCALES.some(l => l.lang === 'ru') && LOCALES.some(l => l.lang === 'es'));
+
+check('LANG_TERMS covers the major world languages with native AML terms',
+  ['en', 'ar', 'es', 'fr', 'de', 'pt', 'ru', 'zh', 'ja', 'tr', 'hi'].every(k => Array.isArray(LANG_TERMS[k]) && LANG_TERMS[k].length) &&
+  LANG_TERMS.es.includes('lavado de dinero') && LANG_TERMS.zh.includes('洗钱') && LANG_TERMS.ru.includes('отмывание денег'));
+
+check('ALL_TERMS is the de-duplicated union across every language',
+  ALL_TERMS.includes('money laundering') && ALL_TERMS.includes('غسل الأموال') && ALL_TERMS.includes('洗钱') &&
+  ALL_TERMS.length === new Set(ALL_TERMS).size);
+
+check('adverseMediaUrlFor pins a locale and uses that language\'s terms',
+  (() => {
+    const es = LOCALES.find(l => l.id === 'es-MX');
+    const u = adverseMediaUrlFor('Acme SA', es);
+    return u.startsWith('https://news.google.com/rss/search?q=') && u.includes('ceid=MX:es-419') &&
+      u.includes('gl=MX') && decodeURIComponent(u).includes('lavado de dinero');
+  })());
+
+check('a Chinese headline flags via the multilingual union (洗钱 = strong/high)',
+  (() => {
+    const r = scoreAdverseMedia('中国铝业', [{ title: '中国铝业 涉嫌 洗钱', link: 'http://z/1' }], ALL_TERMS);
+    return r.hit === true && r.band === 'high' && r.terms.includes('洗钱');
+  })());
+
+check('a Spanish headline flags via the union (lavado de dinero = strong/high)',
+  (() => {
+    const r = scoreAdverseMedia('Grupo Ejemplo', [{ title: 'Grupo Ejemplo investigado por lavado de dinero', link: 'http://s/1' }], ALL_TERMS);
+    return r.hit === true && r.band === 'high' && r.terms.includes('lavado de dinero');
+  })());
+
+check('a Russian headline flags via the union (санкции)',
+  scoreAdverseMedia('Пример', [{ title: 'Пример попал под санкции', link: 'http://r/1' }], ALL_TERMS).hit === true);
+
+check('activeLocales honours the ADVERSE_MEDIA_LOCALES env override',
+  (() => {
+    process.env.ADVERSE_MEDIA_LOCALES = 'en-US,ar-AE,zh-CN';
+    const sel = activeLocales();
+    delete process.env.ADVERSE_MEDIA_LOCALES;
+    return sel.length === 3 && sel.every(l => ['en-US', 'ar-AE', 'zh-CN'].includes(l.id)) && activeLocales().length === LOCALES.length;
+  })());
+
+check('dedupItems collapses the same story surfaced across editions (by link)',
+  dedupItems([{ title: 'A', link: 'http://x/1' }, { title: 'A (mirror)', link: 'http://x/1' }, { title: 'B', link: 'http://x/2' }]).length === 2);
+
+check('mapPool preserves order and runs every item under a concurrency bound',
+  (await mapPool([1, 2, 3, 4, 5], 2, async n => n * 2)).join(',') === '2,4,6,8,10');
+
+check('gdeltUrl broadened default terms still target the global artlist JSON',
+  gdeltUrl('Acme Co').includes('maxrecords=75') && decodeURIComponent(gdeltUrl('Acme Co')).includes('terrorist financing'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
