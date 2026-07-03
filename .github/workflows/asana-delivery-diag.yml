@@ -1,3 +1,4 @@
+# re-check run 3 - does the live function pick up the env change at runtime?
 name: Asana Live Delivery Diagnostic
 
 on:
@@ -36,7 +37,7 @@ jobs:
             if echo "$URL" | grep -q '1216203370612914'; then
               echo "PROJECT CHECK: PASS - landed in 1216203370612914 (HAWKEYE STERLING APP)"
             else
-              echo "PROJECT CHECK: FAIL - landed in a different project (see url)"
+              echo "PROJECT CHECK: FAIL - still landing in the old project (needs a fresh Netlify deploy)"
             fi
             if [ -n "${GID:-}" ] && [ -n "${ASANA_ACCESS_TOKEN:-}" ]; then
               DEL=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer ${ASANA_ACCESS_TOKEN}" "https://app.asana.com/api/1.0/tasks/${GID}")
