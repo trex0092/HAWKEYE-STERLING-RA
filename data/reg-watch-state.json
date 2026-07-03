@@ -1,10 +1,10 @@
 {
-  "updated": "2026-07-02",
+  "updated": "2026-07-03",
   "sources": {
     "uae-moe": {
       "hash": "9310b7765b15da54b228337a61915f2ecc98ce5cf446476115e40bf869cfe628",
       "bytes": 10364,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-07-01",
       "status": "error",
       "prevHash": "ffcc1ca24d826e3b7ab7d195dce75b106d95b46672feb65ba6d7186d187313eb",
@@ -13,7 +13,7 @@
     "uae-fiu": {
       "hash": "0687086c4b43cef67edb049535b84c774d80c81d500afd91f959ad876c814570",
       "bytes": 4427,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-07-01",
       "status": "error",
       "prevHash": "c0ac0514f177298ddffdd68defea4326634873ae1ac842c7fe973055419152b1",
@@ -22,7 +22,7 @@
     "uae-namlcftc": {
       "hash": null,
       "bytes": 0,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": null,
       "status": "error",
       "error": "fetch failed"
@@ -30,14 +30,14 @@
     "uae-eocn": {
       "hash": "2b52abc1fe81f88bc71ad3eb8c0b45c4d705ae48e946dbf9b9d656e18809428d",
       "bytes": 122,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-06-16",
       "status": 200
     },
     "uae-cbuae": {
       "hash": null,
       "bytes": 0,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": null,
       "status": 403,
       "error": "HTTP 403"
@@ -45,7 +45,7 @@
     "uae-vara": {
       "hash": "c41e68daf6927cbed3f49060b81491cc289cb5634214996c6be372309a4e31cd",
       "bytes": 4042,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-06-21",
       "status": 200,
       "prevHash": "db43741ad03345f00bd7eadd3e4bca7c1072d81bf74f01b3ae9f96bf2cb18447"
@@ -53,7 +53,7 @@
     "uae-jewellery": {
       "hash": "a99d51655a8527a8b4cd8a0f03125b594ba6422e7355724103dca00ab2440fd1",
       "bytes": 9865,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-07-01",
       "status": "error",
       "prevHash": "d874b961e384778620ece523b6565d7e2c0cd60ffe9e21ad7b6e790b5c026ede",
@@ -62,7 +62,7 @@
     "fatf-guidance": {
       "hash": null,
       "bytes": 0,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": null,
       "status": 403,
       "error": "HTTP 403"
@@ -70,7 +70,7 @@
     "wolfsberg": {
       "hash": "b95072ad7a3ca960e78d759cd74f46bfbab81c36bad3bb88538f5eff30dfe533",
       "bytes": 5610,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-06-30",
       "status": "error",
       "prevHash": "a8d797be6779c7f5e7fb1f3e9f5092ca3ee8aa47a01bbe84e51611cc2cfeec36",
@@ -79,7 +79,7 @@
     "rmi": {
       "hash": "964166023f36177ad93c3f63f986fc96bfb84c9acca7c61cb691dc04ccb4a913",
       "bytes": 8727,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-07-02",
       "status": 200,
       "prevHash": "73687b76d097183eca640f206c9f114eb4c28598744ba801688072e51adb1f19"
@@ -87,7 +87,7 @@
     "lbma": {
       "hash": "fbc39ef6a199d4d513904e9daaea0b5214720466b784ab149103ea3930d4a44a",
       "bytes": 18073,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-06-29",
       "status": 200,
       "prevHash": "54beb04bc6eeea93770e67e40bffb33e8cd70f2f50660f1393e690f989ff0c6f"
@@ -95,7 +95,7 @@
     "oecd": {
       "hash": null,
       "bytes": 0,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": null,
       "status": 403,
       "error": "HTTP 403"
@@ -103,7 +103,7 @@
     "ofac": {
       "hash": "7aa9b2dd51cd228b61c6c9a2d1ad9e1b49f678d583f92abe3e1aa9688108c90f",
       "bytes": 3838,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-07-02",
       "status": 200,
       "prevHash": "7262c27280b8c5413ed0e09323204e48a0af3c6fadc178f1c6fc5030adb34824"
@@ -111,23 +111,23 @@
     "unsc": {
       "hash": null,
       "bytes": 0,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": null,
       "status": "error",
       "error": "fetch failed"
     },
     "eu-sanctions": {
-      "hash": "c5bc43ac43300e7125b10e10d4e9bda08cb83a0d3062b05d7c2df4db9e16f6a8",
-      "bytes": 6051,
-      "checkedAt": "2026-07-02",
-      "changedAt": "2026-06-29",
+      "hash": "11583439ff6cc2baa9ed23afebf1e9e48ce38a7e6e6ee9ecd45eb3a2cb781b2e",
+      "bytes": 6013,
+      "checkedAt": "2026-07-03",
+      "changedAt": "2026-07-03",
       "status": 200,
-      "prevHash": "cee79d512c6c51ac7fc456ea5ad5a6321e943ecc34fd66a86bb9da6abaa1ca8c"
+      "prevHash": "c5bc43ac43300e7125b10e10d4e9bda08cb83a0d3062b05d7c2df4db9e16f6a8"
     },
     "uk-ofsi": {
       "hash": "9e2f08db1e30d7a1d04b95a0782da5b105cdea6c6004d33ba26bc55b42ea1744",
       "bytes": 92367,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-06-21",
       "status": 200,
       "prevHash": "7deff10bce66284bdfbc86bb386ec27535efa876c01f67ce1e67de3c45f9fd8c"
@@ -135,7 +135,7 @@
     "egmont": {
       "hash": "93e15c3042ca512145e4e9bb2f6aa0f378f8856e8d8c3b8203b23565fd965dd2",
       "bytes": 4905,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-07-02",
       "status": 200,
       "prevHash": "f003be7731140bd6ccd6d0c7cb536bff171422252076eb089e23a2c68a9fda02"
@@ -143,7 +143,7 @@
     "basel-index": {
       "hash": "c0eb80a1bc8d4394b3a7013a23e8c0d4cdaa844ac76225b0346da3f1c236860f",
       "bytes": 3341,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-06-26",
       "status": 200,
       "prevHash": "3af8454bdba3f88351dd07d4364a8710957477df94a2b2155827bd1bf41fb49c"
@@ -151,25 +151,26 @@
     "unodc": {
       "hash": "02efac4f03816486edabaf71a96879afcb18256539ed47cca8caa66b57f147e1",
       "bytes": 3715,
-      "checkedAt": "2026-07-02",
+      "checkedAt": "2026-07-03",
       "changedAt": "2026-06-21",
       "status": 200,
       "error": "fetch failed"
     },
     "eu-high-risk": {
-      "hash": "b0e4f141bce0272e751a29d20d2d330cc51d107783a125b0509fa7c21ef66cdf",
-      "bytes": 5820,
-      "checkedAt": "2026-07-02",
-      "changedAt": "2026-06-29",
-      "status": 200
+      "hash": "42b785de73927a835b7e1e439aad4bd6c1793d5e06dbc6084d524ad4dcb4ab59",
+      "bytes": 5782,
+      "checkedAt": "2026-07-03",
+      "changedAt": "2026-07-03",
+      "status": 200,
+      "prevHash": "b0e4f141bce0272e751a29d20d2d330cc51d107783a125b0509fa7c21ef66cdf"
     },
     "rjc": {
-      "hash": "a8c1be296bf8e3b827b632c627dafcd321ffc67e6b703a26e280da6c0c6f51ba",
-      "bytes": 106190,
-      "checkedAt": "2026-07-02",
-      "changedAt": "2026-07-01",
+      "hash": "996a1c79d8410d009800f8b366eddb936c9169d6ac600c66a2eb45d65da15cfb",
+      "bytes": 105702,
+      "checkedAt": "2026-07-03",
+      "changedAt": "2026-07-03",
       "status": 200,
-      "prevHash": "f92591556c9961e0d1db772cbf517868c2b6f9ebb128833cd9af72090ed63fa9"
+      "prevHash": "a8c1be296bf8e3b827b632c627dafcd321ffc67e6b703a26e280da6c0c6f51ba"
     }
   }
 }
