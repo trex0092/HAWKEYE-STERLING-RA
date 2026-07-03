@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-02",
+  "updated": "2026-07-03",
   "subjects": {
     "dinesh kumar|ubo|1214107921925846": {
       "name": "Dinesh Kumar",
@@ -26,7 +26,7 @@
       ],
       "signature": "high|sanctions-match|EU — Consolidated financial sanctions list (CSV),UK OFSI — Consolidated list of targets (CSV)",
       "firstSeen": "2026-06-27",
-      "lastSeen": "2026-07-02"
+      "lastSeen": "2026-07-03"
     },
     "ram dev|ubo|1214106870100357": {
       "name": "Ram Dev",
@@ -53,7 +53,7 @@
       ],
       "signature": "high|sanctions-match|EU — Consolidated financial sanctions list (CSV),UK OFSI — Consolidated list of targets (CSV)",
       "firstSeen": "2026-07-02",
-      "lastSeen": "2026-07-02"
+      "lastSeen": "2026-07-03"
     },
     "ahmed salem a alammari|ubo|1214108590766203": {
       "name": "Ahmed Salem A Alammari",
@@ -66,7 +66,7 @@
       ],
       "signature": "high|sanctions-match|UK OFSI — Consolidated list of targets (CSV)",
       "firstSeen": "2026-07-02",
-      "lastSeen": "2026-07-02"
+      "lastSeen": "2026-07-03"
     }
   }
 }
