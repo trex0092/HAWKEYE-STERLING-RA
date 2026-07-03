@@ -1,0 +1,26 @@
+[
+ {
+  "counts": {
+   "adverse": 0,
+   "am_errors": 0,
+   "errors": 5,
+   "flagged": 1,
+   "pep": 2,
+   "subjects": 657
+  },
+  "date": "2026-07-03",
+  "error_rate": 0.0076,
+  "llm_calls": {
+   "attempted": 0,
+   "failed": 0,
+   "ok": 0
+  },
+  "timings": {
+   "ai_triage": 0.0,
+   "enrichment": 4974.56,
+   "sanctions": 127.17,
+   "total": 5101.73
+  },
+  "total_seconds": 5101.73
+ }
+]
