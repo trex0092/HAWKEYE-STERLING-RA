@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName } from './sanctions-match.mjs';
-import { checkAdverseMedia, ADVERSE_TERMS, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
+import { checkAdverseMedia, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 
