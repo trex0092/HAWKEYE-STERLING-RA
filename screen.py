@@ -119,13 +119,66 @@ ASANA_HEADERS = {
     "Accept": "application/json",
 }
 
-# Google News RSS — 7 locales for broader coverage
+# Google News RSS — worldwide locale matrix (36 country/language editions), so
+# adverse coverage can be swept from every part of the world, not just English.
+# Each entry is (hl, gl, ceid, lang). ADVERSE_LOCALES sweeps the FIRST N (default
+# 5). The first five deliberately preserve the historic order — US / GB / AE(en)
+# / TR / AE(ar) — so the default run is behaviour-identical, and index 4 stays
+# the AE:ar edition (the targeted Arabic pass slices GNEWS_URLS[4:5]). Raise
+# ADVERSE_LOCALES (env) up to 36 for a full global sweep; matched multilingually.
+GNEWS_LOCALES = [
+    # historic default sweep (order preserved — do not reorder these five)
+    ("en-US", "US", "US:en", "en"),
+    ("en-GB", "GB", "GB:en", "en"),
+    ("en-AE", "AE", "AE:en", "en"),
+    ("tr",    "TR", "TR:tr", "tr"),
+    ("ar",    "AE", "AE:ar", "ar"),
+    # English — additional regional editions (local press differs by market)
+    ("en-IN", "IN", "IN:en", "en"),
+    ("en-SG", "SG", "SG:en", "en"),
+    ("en-AU", "AU", "AU:en", "en"),
+    ("en-NG", "NG", "NG:en", "en"),
+    ("en-ZA", "ZA", "ZA:en", "en"),
+    ("en-PK", "PK", "PK:en", "en"),
+    ("en-PH", "PH", "PH:en", "en"),
+    # Arabic
+    ("ar",    "SA", "SA:ar", "ar"),
+    ("ar",    "EG", "EG:ar", "ar"),
+    # Spanish
+    ("es",     "ES", "ES:es",     "es"),
+    ("es-419", "MX", "MX:es-419", "es"),
+    ("es-419", "AR", "AR:es-419", "es"),
+    # French
+    ("fr",    "FR", "FR:fr", "fr"),
+    ("fr",    "CA", "CA:fr", "fr"),
+    # German
+    ("de",    "DE", "DE:de", "de"),
+    ("de",    "CH", "CH:de", "de"),
+    # Portuguese
+    ("pt-BR", "BR", "BR:pt-419", "pt"),
+    ("pt-PT", "PT", "PT:pt-150", "pt"),
+    # Russian / Ukrainian
+    ("ru",    "RU", "RU:ru", "ru"),
+    ("uk",    "UA", "UA:uk", "uk"),
+    # Chinese (Simplified / Traditional)
+    ("zh-CN", "CN", "CN:zh-Hans", "zh"),
+    ("zh-TW", "TW", "TW:zh-Hant", "zh"),
+    ("zh-HK", "HK", "HK:zh-Hant", "zh"),
+    # Other major languages
+    ("it",    "IT", "IT:it", "it"),
+    ("ja",    "JP", "JP:ja", "ja"),
+    ("ko",    "KR", "KR:ko", "ko"),
+    ("hi",    "IN", "IN:hi", "hi"),
+    ("id",    "ID", "ID:id", "id"),
+    ("fa",    "IR", "IR:fa", "fa"),
+    ("ur",    "PK", "PK:ur", "ur"),
+    ("nl",    "NL", "NL:nl", "nl"),
+]
+# Derived URL templates ({query} is filled per-request via .format). The literal
+# {query} is preserved; hl/gl/ceid are baked in per locale.
 GNEWS_URLS = [
-    "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en",
-    "https://news.google.com/rss/search?q={query}&hl=en-GB&gl=GB&ceid=GB:en",
-    "https://news.google.com/rss/search?q={query}&hl=en-AE&gl=AE&ceid=AE:en",
-    "https://news.google.com/rss/search?q={query}&hl=tr&gl=TR&ceid=TR:tr",
-    "https://news.google.com/rss/search?q={query}&hl=ar&gl=AE&ceid=AE:ar",
+    "https://news.google.com/rss/search?q={query}&hl=%s&gl=%s&ceid=%s" % (hl, gl, ceid)
+    for (hl, gl, ceid, _lang) in GNEWS_LOCALES
 ]
 
 # Adverse media keywords — if headline contains any, flag it
@@ -186,16 +239,159 @@ ADVERSE_KEYWORDS_AR = {
     "تزوير": "forgery",
 }
 
+# Multilingual risk-term dictionaries — one map per language, each native term
+# pointing at its English canonical so typology bucketing and reporting stay
+# uniform no matter the source language. This is what "weaponises" the sweep
+# globally: a wrongdoing headline in Spanish, Chinese, Russian, Turkish, etc. is
+# recognised even when the English risk words never appear. Coverage per language:
+# money laundering · fraud · sanctions · terrorism · terrorist financing · bribery
+# · corruption · embezzlement · arrested · convicted (+ trafficking/smuggling).
+# Matched diacritic-tolerantly: Latin-script terms use \b word boundaries on the
+# lower-cased headline; non-Latin scripts (Cyrillic, CJK, Devanagari, Hangul,
+# Arabic/Persian/Urdu) match by substring, where case and \b do not apply.
+LANG_KEYWORDS = {
+    "es": {  # Spanish
+        "fraude": "fraud", "lavado de dinero": "money laundering",
+        "blanqueo de capitales": "money laundering", "sanciones": "sanction",
+        "terrorismo": "terrorism", "financiación del terrorismo": "terrorist financing",
+        "soborno": "bribery", "corrupción": "corruption", "malversación": "embezzle",
+        "detenido": "arrest", "condenado": "convict", "narcotráfico": "narcotics",
+        "contrabando": "smuggl",
+    },
+    "fr": {  # French
+        "fraude": "fraud", "blanchiment d'argent": "money laundering",
+        "sanctions": "sanction", "terrorisme": "terrorism",
+        "financement du terrorisme": "terrorist financing", "corruption": "corruption",
+        "pot-de-vin": "bribery", "détournement de fonds": "embezzle",
+        "arrêté": "arrest", "condamné": "convict", "trafic": "human trafficking",
+        "contrebande": "smuggl",
+    },
+    "de": {  # German
+        "betrug": "fraud", "geldwäsche": "money laundering", "sanktionen": "sanction",
+        "terrorismus": "terrorism", "terrorismusfinanzierung": "terrorist financing",
+        "bestechung": "bribery", "korruption": "corruption", "veruntreuung": "embezzle",
+        "verhaftet": "arrest", "verurteilt": "convict", "schmuggel": "smuggl",
+        "menschenhandel": "human trafficking",
+    },
+    "pt": {  # Portuguese
+        "fraude": "fraud", "lavagem de dinheiro": "money laundering",
+        "sanções": "sanction", "terrorismo": "terrorism",
+        "financiamento do terrorismo": "terrorist financing", "suborno": "bribery",
+        "corrupção": "corruption", "desvio de dinheiro": "embezzle", "preso": "arrest",
+        "condenado": "convict", "tráfico": "human trafficking", "contrabando": "smuggl",
+    },
+    "ru": {  # Russian
+        "мошенничество": "fraud", "отмывание денег": "money laundering",
+        "санкции": "sanction", "терроризм": "terrorism",
+        "финансирование терроризма": "terrorist financing", "взяточничество": "bribery",
+        "коррупция": "corruption", "растрата": "embezzle", "арестован": "arrest",
+        "осуждён": "convict", "контрабанда": "smuggl",
+    },
+    "zh": {  # Chinese (Simplified / Traditional)
+        "欺诈": "fraud", "诈骗": "fraud", "洗钱": "money laundering", "制裁": "sanction",
+        "恐怖主义": "terrorism", "恐怖融资": "terrorist financing", "贿赂": "bribery",
+        "腐败": "corruption", "挪用公款": "embezzle", "被捕": "arrest", "定罪": "convict",
+        "走私": "smuggl", "贩运": "human trafficking",
+    },
+    "it": {  # Italian
+        "frode": "fraud", "riciclaggio di denaro": "money laundering",
+        "sanzioni": "sanction", "terrorismo": "terrorism",
+        "finanziamento del terrorismo": "terrorist financing", "corruzione": "corruption",
+        "tangente": "bribery", "appropriazione indebita": "embezzle",
+        "arrestato": "arrest", "condannato": "convict", "traffico": "human trafficking",
+        "contrabbando": "smuggl",
+    },
+    "tr": {  # Turkish
+        "dolandırıcılık": "fraud", "kara para aklama": "money laundering",
+        "yaptırımlar": "sanction", "terörizm": "terrorism",
+        "terörün finansmanı": "terrorist financing", "rüşvet": "bribery",
+        "yolsuzluk": "corruption", "zimmet": "embezzle", "tutuklandı": "arrest",
+        "mahkûm": "convict", "kaçakçılık": "smuggl",
+    },
+    "ja": {  # Japanese
+        "詐欺": "fraud", "マネーロンダリング": "money laundering", "資金洗浄": "money laundering",
+        "制裁": "sanction", "テロ": "terrorism", "テロ資金供与": "terrorist financing",
+        "贈収賄": "bribery", "汚職": "corruption", "横領": "embezzle", "逮捕": "arrest",
+        "有罪": "convict", "密輸": "smuggl",
+    },
+    "ko": {  # Korean
+        "사기": "fraud", "자금세탁": "money laundering", "제재": "sanction",
+        "테러": "terrorism", "테러자금": "terrorist financing", "뇌물": "bribery",
+        "부패": "corruption", "횡령": "embezzle", "체포": "arrest", "유죄": "convict",
+        "밀수": "smuggl",
+    },
+    "hi": {  # Hindi
+        "धोखाधड़ी": "fraud", "मनी लॉन्ड्रिंग": "money laundering", "प्रतिबंध": "sanction",
+        "आतंकवाद": "terrorism", "आतंकी वित्तपोषण": "terrorist financing", "रिश्वत": "bribery",
+        "भ्रष्टाचार": "corruption", "गबन": "embezzle", "गिरफ्तार": "arrest", "दोषी": "convict",
+        "तस्करी": "smuggl",
+    },
+    "id": {  # Indonesian
+        "penipuan": "fraud", "pencucian uang": "money laundering", "sanksi": "sanction",
+        "terorisme": "terrorism", "pendanaan terorisme": "terrorist financing",
+        "suap": "bribery", "korupsi": "corruption", "penggelapan": "embezzle",
+        "ditangkap": "arrest", "terpidana": "convict", "penyelundupan": "smuggl",
+    },
+    "fa": {  # Persian
+        "کلاهبرداری": "fraud", "پولشویی": "money laundering", "تحریم": "sanction",
+        "تروریسم": "terrorism", "تأمین مالی تروریسم": "terrorist financing", "رشوه": "bribery",
+        "فساد": "corruption", "اختلاس": "embezzle", "دستگیر": "arrest", "محکوم": "convict",
+        "قاچاق": "smuggl",
+    },
+    "ur": {  # Urdu
+        "دھوکہ دہی": "fraud", "منی لانڈرنگ": "money laundering", "پابندیاں": "sanction",
+        "دہشت گردی": "terrorism", "دہشت گردی کی مالی معاونت": "terrorist financing",
+        "رشوت": "bribery", "بدعنوانی": "corruption", "غبن": "embezzle", "گرفتار": "arrest",
+        "اسمگلنگ": "smuggl",
+    },
+    "uk": {  # Ukrainian
+        "шахрайство": "fraud", "відмивання грошей": "money laundering",
+        "санкції": "sanction", "тероризм": "terrorism",
+        "фінансування тероризму": "terrorist financing", "хабарництво": "bribery",
+        "корупція": "corruption", "розтрата": "embezzle", "заарештований": "arrest",
+        "засуджений": "convict", "контрабанда": "smuggl",
+    },
+    "nl": {  # Dutch
+        "fraude": "fraud", "witwassen": "money laundering", "sancties": "sanction",
+        "terrorisme": "terrorism", "terrorismefinanciering": "terrorist financing",
+        "omkoping": "bribery", "corruptie": "corruption", "verduistering": "embezzle",
+        "gearresteerd": "arrest", "veroordeeld": "convict", "smokkel": "smuggl",
+    },
+}
+
+# One merged native-term → English-canonical map across all 18 languages (Arabic
+# first, then the rest; first insertion wins on the odd shared spelling).
+FOREIGN_KEYWORDS = dict(ADVERSE_KEYWORDS_AR)
+for _lang_map in LANG_KEYWORDS.values():
+    for _term, _canon in _lang_map.items():
+        FOREIGN_KEYWORDS.setdefault(_term, _canon)
+
+# Total distinct red-flag terms recognised (English + every native language),
+# reported in the provenance/attestation blocks.
+ADVERSE_TERM_COUNT = len(ADVERSE_KEYWORDS) + len(FOREIGN_KEYWORDS)
+
+# Non-Latin scripts where letter-case / \b word boundaries do not apply and terms
+# must be matched by substring: Cyrillic, Arabic (+ supplement, covers fa/ur),
+# Devanagari, Hiragana/Katakana, CJK ideographs, Hangul.
+_NONLATIN_RE = re.compile(
+    "[Ѐ-ӿ؀-ۿݐ-ݿऀ-ॿ぀-ヿ㐀-鿿가-힯]")
+
 def match_adverse_keywords(title: str) -> list:
     """All adverse keywords found in one headline: the English set (word-boundary,
-    case-insensitive) plus the Arabic set (substring; mapped to its English
-    equivalent so typology bucketing and reporting stay uniform). Order kept."""
+    case-insensitive) plus the 18-language multilingual set. Each non-English term
+    maps to its English canonical so typology bucketing and reporting stay uniform.
+    Latin-script foreign terms match on \b word boundaries (lower-cased); non-Latin
+    scripts match by substring on the raw headline. Order preserved, no duplicates."""
     raw = title or ""
     tl = raw.lower()
     matched = [kw for kw in ADVERSE_KEYWORDS if re.search(r"\b" + re.escape(kw), tl)]
-    for ar, en in ADVERSE_KEYWORDS_AR.items():
-        if ar in raw and en not in matched:
-            matched.append(en)
+    for term, canon in FOREIGN_KEYWORDS.items():
+        if canon in matched:
+            continue
+        hit = (term in raw) if _NONLATIN_RE.search(term) \
+            else re.search(r"\b" + re.escape(term.lower()), tl) is not None
+        if hit:
+            matched.append(canon)
     return matched
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -260,7 +456,10 @@ def cap_notes(narrative):
     return head + "\n…[body truncated — see workflow run log]…\n" + tail
 
 # ── ADVERSE MEDIA ─────────────────────────────────────────────────────────────
-# How many Google News locales to sweep per subject (US/GB/AE/TR/AR). 5 = deepest.
+# How many Google News locales (from the worldwide GNEWS_LOCALES matrix) to sweep
+# per subject. Default 5 = the historic US/GB/AE(en)/TR/AE(ar) set (protects the
+# mandatory control runtime); raise up to len(GNEWS_LOCALES) (36) for a full
+# global sweep. Multilingual flagging is always on regardless of this number.
 ADVERSE_LOCALES = int(os.environ.get("ADVERSE_LOCALES", "5"))
 # A targeted second pass: the name AND a cluster of material risk terms, so adverse
 # coverage surfaces even when it isn't in the subject's top general-news headlines.
@@ -320,10 +519,12 @@ def search_gdelt(name: str, max_results: int = 8) -> list:
 def search_adverse_media(name: str, max_results: int = 8) -> list:
     """
     Deep adverse-media search via Google News RSS.
-      Pass 1 — exact name across ALL configured locales (US/GB/AE/TR/AR).
+      Pass 1 — exact name across the first ADVERSE_LOCALES worldwide locales
+               (default US/GB/AE(en)/TR/AE(ar); up to 36 editions when raised).
       Pass 2 — exact name AND a material-risk-term cluster (en) to surface
                wrongdoing coverage that isn't in the general headlines.
-    Headlines are flagged against the {len(ADVERSE_KEYWORDS)}-term keyword set,
+      Pass 3 — targeted Arabic risk-term pass on the AE:ar edition.
+    Headlines are flagged against an 18-language multilingual red-flag set,
     bucketed by typology, deduplicated across outlets, and ranked recent-first.
     Returns list of dicts: {title, source, date, ts, url, flagged, keywords, categories}.
     """
@@ -1258,9 +1459,9 @@ SCOPE & COVERAGE ATTESTATION
   Individuals screened:      {stats["individuals_screened"]}  (shareholders / UBOs / directors from KYC records)
   Total subjects screened:   {stats["subjects_total"]}  ({coverage_pct}% of attempted)
   Screening errors/skipped:  {stats["errors"]}          <- non-coverage is shown, never silent
-  Source:                    Google News RSS - 5 locales (US / GB / AE / TR / AR) + Arabic risk query + GDELT global index
+  Source:                    Google News RSS - worldwide matrix, {ADVERSE_LOCALES} of {len(GNEWS_LOCALES)} country/language editions swept + Arabic risk query + GDELT global index (100+ languages)
   Query method:              Exact-phrase entity / individual-name search
-  Adverse keyword set:       {len(ADVERSE_KEYWORDS)} red-flag terms (full set in screen.py)
+  Adverse keyword set:       {ADVERSE_TERM_COUNT} red-flag terms across 18 languages ({len(ADVERSE_KEYWORDS)} EN + {len(FOREIGN_KEYWORDS)} multilingual; full set in screen.py)
   Key red flags:             {key_flags}
   Headlines per subject:     up to 5 (adverse prioritised)
 
@@ -1286,8 +1487,8 @@ METHODOLOGY
 ---------------------------------------------------------------
 
 Exact-phrase Google News RSS search per company AND per associated
-individual across 5 locales (US/GB/AE/TR/AR) plus a targeted risk-term query.
-Headlines filtered against a {len(ADVERSE_KEYWORDS)}-term
+individual across {ADVERSE_LOCALES} of {len(GNEWS_LOCALES)} worldwide locales plus a targeted risk-term query.
+Headlines filtered against a {ADVERSE_TERM_COUNT}-term multilingual (18-language)
 red-flag keyword set. Raw headlines are presented without interpretation -
 all review decisions rest with the MLRO. This sweep supplements, and does
 not replace, the daily sanctions screening.
@@ -1594,7 +1795,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A(f"      {s_} — {n_} distinct stories — a pattern, not an isolated headline;")
                 A( "         EDD review required + assess STR grounds (tipping-off rules apply).")
             A("")
-        A(f"   Source: Google News RSS (5 locales incl. AR/TR) + GDELT global index · {len(ADVERSE_KEYWORDS)} EN + {len(ADVERSE_KEYWORDS_AR)} AR red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
+        A(f"   Source: Google News RSS ({ADVERSE_LOCALES}/{len(GNEWS_LOCALES)} worldwide locales) + GDELT global index (100+ languages) · {len(ADVERSE_KEYWORDS)} EN + {len(FOREIGN_KEYWORDS)} multilingual (18-language) red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
     A("")
 
     A("━" * 70)
