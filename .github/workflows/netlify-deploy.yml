@@ -1,0 +1,84 @@
+name: Netlify Deploy & Verify (manual)
+
+# GitHub-native way to publish a Netlify production deploy and verify the live
+# "SEND TO ASANA" delivery routes to the correct project. Netlify's auto-deploy
+# from GitHub is not publishing for this site, so this workflow_dispatch is the
+# GitHub-native path to (optionally) kick a production build via a Netlify build
+# hook, then verify the routing.
+#
+# ONE-TIME SETUP for the deploy step:
+#   Netlify -> Site configuration -> Build & deploy -> Build hooks -> "Add build
+#   hook" (branch: main) -> copy the URL. Then GitHub repo -> Settings -> Secrets
+#   and variables -> Actions -> New repository secret:
+#     NETLIFY_BUILD_HOOK_URL = <that URL>
+# The verify step uses the existing ASANA_ACCESS_TOKEN secret.
+# NOTE: a Netlify build consumes build minutes/credits.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: What to do
+        type: choice
+        default: verify-only
+        options:
+          - verify-only
+          - deploy-and-verify
+
+permissions:
+  contents: read
+
+concurrency:
+  group: netlify-deploy-verify
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Trigger Netlify production build via build hook
+        if: inputs.mode == 'deploy-and-verify'
+        env:
+          HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
+        run: |
+          set -u
+          if [ -z "${HOOK_URL:-}" ]; then
+            echo "::error::NETLIFY_BUILD_HOOK_URL secret not set — create a Netlify build hook and add it as that repo secret."
+            exit 1
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOOK_URL")
+          echo "Netlify build hook POST -> HTTP $code"
+          echo "Waiting ~180s for Netlify to build and publish..."
+          sleep 180
+
+      - name: Verify SEND TO ASANA routes to HAWKEYE STERLING APP
+        env:
+          ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ENDPOINT: https://hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-task
+          TARGET_PROJECT: "1216203370612914"
+        run: |
+          set -u
+          REF="VERIFY-${GITHUB_RUN_ID}"
+          HTTP=$(curl -sS -o resp.json -w '%{http_code}' -X POST "$ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"VERIFY delivery routing CDD 12\",\"ref\":\"${REF}\",\"band\":\"CDD\",\"score\":12,\"notes\":\"routing verification - safe to delete\"}")
+          echo "HTTP $HTTP"
+          cat resp.json; echo
+          if [ "$HTTP" != "200" ] || ! grep -q '"ok":true' resp.json; then
+            echo "::error::Live delivery failed (HTTP $HTTP)"
+            exit 1
+          fi
+          GID=$(grep -o '"gid":"[0-9]*"' resp.json | head -n1 | grep -o '[0-9]*' || true)
+          if grep -q "project/${TARGET_PROJECT}/" resp.json; then
+            echo "PROJECT CHECK: PASS - live SEND TO ASANA lands in ${TARGET_PROJECT} (HAWKEYE STERLING APP)"
+            OK=1
+          else
+            echo "PROJECT CHECK: FAIL - still routing to the old project; a fresh Netlify deploy is needed"
+            OK=0
+          fi
+          if [ -n "${GID:-}" ] && [ -n "${ASANA_TOKEN:-}" ]; then
+            curl -sS -o /dev/null -X DELETE -H "Authorization: Bearer ${ASANA_TOKEN}" "https://app.asana.com/api/1.0/tasks/${GID}" || true
+            echo "cleaned up verification task ${GID}"
+          fi
+          [ "$OK" = 1 ] || exit 1
