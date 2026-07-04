@@ -99,8 +99,8 @@ groups.forEach((g, gi) => {
     }
   });
 });
-check('Q&A: all 59 groups render without throwing', grpThrew === 0 && groups.length === 59);
-check('Q&A: every one of '+qTotal+' subjects renders a substantive cited answer', qBad === 0 && qTotal === 336);
+check('Q&A: all 60 groups render without throwing', grpThrew === 0 && groups.length === 60);
+check('Q&A: every one of '+qTotal+' subjects renders a substantive cited answer', qBad === 0 && qTotal === 350);
 
 /* ── 2. Super Tools: every subject ── */
 const tools = api.toolsList();
@@ -119,7 +119,7 @@ tools.forEach(t => {
   if(html.includes('tool-err')) { tBad++; tFails.push([t.id, 'rendered an error']); return; }
   if(!html.includes('step-row') || !html.includes('qa-basis')) { tBad++; tFails.push([t.id, 'missing steps or cited basis']); }
 });
-check('Super Tools: all 186 subjects run + render a cited result', tBad === 0 && tools.length === 186);
+check('Super Tools: all 187 subjects run + render a cited result', tBad === 0 && tools.length === 187);
 
 /* Escalation rule engine — decision correctness across scenarios */
 const esc = (v) => api.escalationRun(v);

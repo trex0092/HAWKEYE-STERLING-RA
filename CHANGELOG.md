@@ -93,6 +93,30 @@ bump merged to `main`.
 
 ### Added
 
+- **AI-governance & cyber-financial-crime reference content** (Advisor knowledge
+  expansion, `assets/super-data.js`):
+  - **EU AI Act Q&A** — added to the "AI Governance, Cybersecurity & Data
+    Protection" group: the four-tier classification (with the Annex III
+    financial-fraud-detection carve-out for AML monitoring), the responsible-AI
+    four-step adoption framework (Qualify → Classify → Risk-assess → Mitigate),
+    and the transparency / human-oversight obligations (AI Act Art. 14 & 50).
+  - **"Cybersecurity Terms (AML Context)" glossary group** — ten terms
+    (Ransomware, BEC/phishing, deepfake & synthetic-identity fraud, threat
+    intelligence, Zero Trust, SIEM, SOAR, SBOM/supply-chain, DLP/DSPM, prompt
+    injection & agentic-AI risk), each defined *and* tied to why it matters to an
+    MLRO, with citations.
+  - **"AI Act Classifier" Super Tool** — a deterministic playbook that tiers an
+    AI use under the AI Act and maps the resulting obligations, feeding the AI
+    asset register (`data/ai-assets.json`).
+  - **Post-Quantum readiness** — one "harvest-now-decrypt-later" Q&A plus
+    [`docs/governance/pqc-readiness.md`](docs/governance/pqc-readiness.md): a
+    crypto-agility watch item scoping this tool's (low) quantum exposure.
+  - **Security tooling reference** — [`docs/security/tooling-reference.md`](docs/security/tooling-reference.md)
+    honestly maps common free security tools to this repo's real attack surface
+    (what is already in CI vs. what is not applicable to a static-site +
+    serverless app).
+  - The Advisor full-surface smoke test counts were updated to 60 groups / 350
+    Q&A subjects / 187 tools (`test/advisor-smoke.test.js`).
 - **Enterprise documentation package** (executive readiness follow-through):
   - **Executive layer** (`docs/executive/`) — brief, business value/ROI,
     regulatory-readiness pack (regulator-question → artefact map + EU AI Act
