@@ -7,6 +7,7 @@
    ANTHROPIC_API_KEY must be set in the Netlify environment. */
 
 const { rateLimit } = require('./_ratelimit');
+const { sharedTokenOk } = require('./_auth');
 
 // ── CORS (mirrors asana-task.js) ─────────────────────────────────────────────
 
@@ -568,6 +569,7 @@ exports.handler = async (event) => {
 const handle = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
   if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
+  if (!sharedTokenOk(event)) return resp(401, { ok: false, error: 'missing or invalid X-App-Token' });
 
   /* Per-IP rate limit — SENSITIVE/COSTLY endpoint (calls the Anthropic API per
      request). Much stricter than the Asana endpoints: default 10 req/min,

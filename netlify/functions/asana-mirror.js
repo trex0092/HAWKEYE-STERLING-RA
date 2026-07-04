@@ -11,6 +11,7 @@
    The Asana token never leaves the server. Modeled on risk-backup.js / asana-task.js
    (same CORS, origin guard and API helper conventions). */
 const { rateLimit } = require('./_ratelimit');
+const { sharedTokenOk } = require('./_auth');
 const DEFAULT_PROJECT_GID = '1216203370612914'; /* HAWKEYE STERLING APP */
 const REG_TASK = 'ASSESSMENT REGISTER (auto-backup)';
 const LOG_TASK = 'ACTIVITY LOG (auto-backup)';
@@ -90,6 +91,7 @@ exports.handler = async (event) => {
 const handle = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
   if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
+  if (!sharedTokenOk(event)) return resp(401, { ok: false, error: 'missing or invalid X-App-Token' });
 
   /* Per-IP rate limit (normal endpoint): default 100 req/min, tunable via env. */
   const limited = rateLimit(event, { name: 'asana-mirror', limit: Number(process.env.RATE_LIMIT_DEFAULT) || 100, windowMs: 60000 });

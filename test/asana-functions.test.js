@@ -292,6 +292,32 @@ const event = (body) => ({ httpMethod: 'POST', headers: {}, body: JSON.stringify
     check('asana-task: a 429 is retried with backoff and then succeeds', res.statusCode === 200 && b.gid === 'R429' && posts === 2);
   }
 
+  /* ── Tier-3 optional shared-secret gate (APP_SHARED_TOKEN) ──────────────────
+     UNSET by default → unchanged (every test above posts with no Origin and no
+     token and still works). When SET, the no-Origin path (server-to-server/curl)
+     requires a matching X-App-Token; the browser (Origin) path does not. */
+  {
+    const okFetch = async (url, opts) => {
+      const u = String(url), m = opts && opts.method;
+      if (m === 'GET' && /\/tasks(\?|\/external:)/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: [] }) };
+      if (m === 'POST' && /\/tasks$/.test(u)) return { ok: true, status: 200, json: () => Promise.resolve({ data: { gid: 'TOK1', permalink_url: 'u/TOK1' } }) };
+      return { ok: true, status: 200, json: () => Promise.resolve({ data: {} }) };
+    };
+    const post = (headers, name) => asanaTask.handler({ httpMethod: 'POST', headers, body: JSON.stringify({ name }) });
+    const ORIGIN = 'https://hawkeye-sterling-ra.netlify.app';
+
+    setFetch(okFetch);
+    process.env.APP_SHARED_TOKEN = 'sekret';
+    check('shared-token: SET + no Origin + no X-App-Token → 401', (await post({}, 'Tok NoHdr · CDD 19')).statusCode === 401);
+    check('shared-token: SET + wrong X-App-Token → 401', (await post({ 'x-app-token': 'nope' }, 'Tok Wrong · CDD 19')).statusCode === 401);
+    check('shared-token: SET + correct X-App-Token → 200', (await post({ 'x-app-token': 'sekret' }, 'Tok Right · CDD 19')).statusCode === 200);
+    check('shared-token: SET + valid browser Origin (no token) → 200', (await post({ origin: ORIGIN }, 'Tok Browser · CDD 19')).statusCode === 200);
+    check('shared-token: gate also applies to asana-mirror (no Origin, no token → 401)',
+      (await asanaMirror.handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ action: 'read' }) })).statusCode === 401);
+    delete process.env.APP_SHARED_TOKEN;
+    check('shared-token: UNSET → no-Origin request allowed again (backward compatible)', (await post({}, 'Tok Unset · CDD 19')).statusCode === 200);
+  }
+
   global.fetch = origFetch;
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);

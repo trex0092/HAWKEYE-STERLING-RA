@@ -217,6 +217,13 @@ A second pass added capability and closed hardening gaps. **Shipped** (all teste
   theatre**, not real auth. The honest options are the existing origin guard +
   rate-limit + input caps (in place), or **real user auth** (Netlify Identity /
   login) if write-access must be restricted. Not shipped rather than fake it.
+  - **Follow-up (2026-07):** an **optional shared-secret gate**
+    (`netlify/functions/_auth.js`, env `APP_SHARED_TOKEN`) now closes the one
+    honest gap — the *header-less* path. It does **not** authenticate the browser
+    (that remains impossible for a static app); it requires an `X-App-Token` on
+    requests that carry no browser `Origin` (curl / server-to-server), which is
+    the path that otherwise slips past the origin guard. Unset by default
+    (behaviour unchanged); enabling it is a per-deployment decision.
 - **B3 · Distributed rate limiting.** Needs external infrastructure (Netlify Edge
   rate limiting or an Upstash Redis `INCR`), not a pure code change; the current
   limiter is documented as best-effort per-instance. Provision-then-wire.

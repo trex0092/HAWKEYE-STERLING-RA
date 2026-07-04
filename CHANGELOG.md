@@ -93,6 +93,14 @@ bump merged to `main`.
 
 ### Added
 
+- **Optional shared-secret endpoint gate** (`netlify/functions/_auth.js`, env
+  `APP_SHARED_TOKEN`) — defence in depth for the Netlify functions. Unset by
+  default (behaviour unchanged); when set, a request carrying no browser `Origin`
+  (curl / server-to-server — the path that otherwise bypasses the origin guard)
+  must present a matching `X-App-Token` header. The browser path stays gated by
+  `Origin` (a static app cannot hold a secret). Wired into asana-task/asana-mirror/
+  risk-backup/brain-soul with six regression tests; documented in `.env.example`
+  and the Asana integration audit (supersedes the deferred B1 note).
 - **AI-governance & cyber-financial-crime reference content** (Advisor knowledge
   expansion, `assets/super-data.js`):
   - **EU AI Act Q&A** — added to the "AI Governance, Cybersecurity & Data
