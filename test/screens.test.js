@@ -183,10 +183,10 @@ function runScreen(file, bridge, seed){
   check('advisor: Ask another returns to the idle hero', api.state.phase === 'idle'
     && els.hero.innerHTML.includes('Ask me anything'));
 
-  /* Regulatory Q&A — full 59-group catalogue from window.REG_GROUPS */
+  /* Regulatory Q&A — full 60-group catalogue from window.REG_GROUPS */
   api.state.tab = 'qa'; api.render();
-  check('advisor: Q&A renders all 59 regulatory groups', els.main.innerHTML.includes('Regulatory Q&amp;A')
-    && api.regGroups().length === 59 && countOcc(els.regGroups.innerHTML, '<div class="reg-cat') === 59
+  check('advisor: Q&A renders all 60 regulatory groups', els.main.innerHTML.includes('Regulatory Q&amp;A')
+    && api.regGroups().length === 60 && countOcc(els.regGroups.innerHTML, '<div class="reg-cat') === 60
     && els.regGroups.innerHTML.includes('UAE FDL &amp; Cabinet Resolution'));
   api.state.regOpen = 0; api.renderRegGroups();
   check('advisor: opening a group reveals its cited questions', countOcc(els.regGroups.innerHTML, 'class="reg-q"') >= 1);
@@ -198,7 +198,7 @@ function runScreen(file, bridge, seed){
   check('advisor: picking a question pre-fills the Ask composer', api.state.tab === 'ask'
     && api.state.question === 'What records must I keep, and for how long?');
 
-  /* Super Tools tab — full 186-tool grouped picker + deterministic engines */
+  /* Super Tools tab — full 187-tool grouped picker + deterministic engines */
   api.state.tab = 'tools'; api.render();
   check('advisor: Super Tools renders the grouped picker + Escalation form',
     els.main.innerHTML.includes('Super Tools') && els.main.innerHTML.includes('Escalation Decision Engine')
@@ -206,8 +206,8 @@ function runScreen(file, bridge, seed){
     && els.main.innerHTML.includes('<optgroup'));
   check('advisor: tool form fields are programmatically labelled (a11y)',
     els.main.innerHTML.includes('<label class="tf-label" for="tf_subject">'));
-  check('advisor: the picker carries the full 186-tool catalogue across 7 groups',
-    api.toolsList().length === 186 && countOcc(els.main.innerHTML, '<optgroup') === 7
+  check('advisor: the picker carries the full 187-tool catalogue across 7 groups',
+    api.toolsList().length === 187 && countOcc(els.main.innerHTML, '<optgroup') === 7
     && els.main.innerHTML.includes('Sanctions Nexus') && els.main.innerHTML.includes('STR Drafter'));
   /* sanctions hit → PROHIBITED escalation */
   api.state.toolInputs = {subject:'Aurum Refining Ltd', sanctions:'OFAC, EU'};
@@ -245,8 +245,8 @@ function runScreen(file, bridge, seed){
     if(q && typeof q==='object' && q.a && q.a.length > 20) withAnswer++;
     if(q && Array.isArray(q.refs) && q.refs.length) withRefs++;
   }));
-  check('qa-data: 336 questions each carry a substantive cited answer',
-    totalQ === 336 && withAnswer === 336 && withRefs === 336);
+  check('qa-data: 350 questions each carry a substantive cited answer',
+    totalQ === 350 && withAnswer === 350 && withRefs === 350);
 
   /* Opening a question renders its answer + cited basis inline (not the canned reply) */
   api.state.tab = 'qa'; api.render();
@@ -268,7 +268,7 @@ function runScreen(file, bridge, seed){
   const tools = api.toolsList();
   const withPlay = tools.filter(t => t.play && t.play.intro && Array.isArray(t.play.steps) && t.play.steps.length >= 3
     && Array.isArray(t.play.refs) && t.play.refs.some(r => r.ref === 'UAE Federal Decree-Law No. 10 of 2025'));
-  check('tools-data: all 186 tools carry a cited deterministic playbook', tools.length === 186 && withPlay.length === 186);
+  check('tools-data: all 187 tools carry a cited deterministic playbook', tools.length === 187 && withPlay.length === 187);
 
   const a = api.genericRun(tools.find(t=>t.id==='flags'), 'cash-intensive dealer');
   const b = api.genericRun(tools.find(t=>t.id==='str-drafter') || tools.find(t=>t.id!=='flags'&&t.id!=='escalation'), 'cash-intensive dealer');
