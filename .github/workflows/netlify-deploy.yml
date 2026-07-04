@@ -37,6 +37,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Harden the runner
+        # This job handles NETLIFY_BUILD_HOOK_URL + ASANA_ACCESS_TOKEN and makes
+        # outbound calls to Netlify + the live site + Asana. Block egress to those
+        # hosts only, so a compromised dependency can't exfiltrate the tokens.
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.netlify.com:443
+            hawkeye-sterling-ra.netlify.app:443
+            app.asana.com:443
       - name: Trigger Netlify production build via build hook
         if: inputs.mode == 'deploy-and-verify'
         env:

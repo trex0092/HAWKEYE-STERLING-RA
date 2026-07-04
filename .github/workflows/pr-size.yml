@@ -38,9 +38,14 @@ jobs:
 
       - name: Count lines changed
         id: count
+        # Pass the SHAs through env (never interpolate into the shell); they are
+        # hex-constrained but this is the safe pattern that keeps zizmor clean.
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          BASE=${{ github.event.pull_request.base.sha }}
-          HEAD=${{ github.event.pull_request.head.sha }}
+          BASE="$BASE_SHA"
+          HEAD="$HEAD_SHA"
           ADDED=$(git diff --numstat "$BASE" "$HEAD" | awk '{a+=$1} END{print a+0}')
           REMOVED=$(git diff --numstat "$BASE" "$HEAD" | awk '{a+=$2} END{print a+0}')
           TOTAL=$((ADDED + REMOVED))
@@ -54,11 +59,16 @@ jobs:
       - name: Warn on large PR
         if: ${{ fromJson(steps.count.outputs.total) > 500 }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        # Read the counts from env (not template-interpolated into the script body).
+        env:
+          TOTAL: ${{ steps.count.outputs.total }}
+          ADDED: ${{ steps.count.outputs.added }}
+          REMOVED: ${{ steps.count.outputs.removed }}
         with:
           script: |
-            const total   = ${{ steps.count.outputs.total }};
-            const added   = ${{ steps.count.outputs.added }};
-            const removed = ${{ steps.count.outputs.removed }};
+            const total   = Number(process.env.TOTAL);
+            const added   = Number(process.env.ADDED);
+            const removed = Number(process.env.REMOVED);
             const body = [
               `> ⚠️ **Large PR — ${total} lines changed** (+${added} / −${removed})`,
               '',

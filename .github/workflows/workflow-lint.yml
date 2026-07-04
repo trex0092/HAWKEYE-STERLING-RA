@@ -5,9 +5,10 @@ name: Workflow lint (actionlint + zizmor)
 #                   embedded shellcheck pass. The run: blocks are clean, so no
 #                   shellcheck rules are suppressed — keep them clean.
 #   - zizmor      : CI/CD security audit (dangerous triggers, template injection,
-#                   over-broad permissions, unpinned actions). Advisory for now
-#                   (continue-on-error) so it surfaces findings as annotations
-#                   without blocking; promote to blocking once the baseline is clean.
+#                   over-broad permissions, unpinned actions). BLOCKING — the
+#                   accepted-baseline suppressions live in .github/zizmor.yml, so
+#                   any new finding (or any of these audits in an unlisted file)
+#                   fails the gate.
 on:
   pull_request:
     paths: ['.github/workflows/**']
@@ -47,8 +48,10 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: zizmor (advisory)
-        continue-on-error: true
+      - name: zizmor (blocking)
+        env:
+          # zizmor's known-vulnerable-actions audit queries the GitHub advisory API.
+          GH_TOKEN: ${{ github.token }}
         run: |
           python -m pip install --quiet "zizmor>=1"
           zizmor .github/workflows/

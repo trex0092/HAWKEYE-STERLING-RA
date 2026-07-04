@@ -583,6 +583,14 @@ const handle = async (event) => {
   const KEY = process.env.ANTHROPIC_API_KEY;
   if (!KEY) return resp(503, { ok: false, error: 'ANTHROPIC_API_KEY not configured in Netlify environment.' });
 
+  /* Accept JSON only; reject an oversized body BEFORE JSON.parse. Mirrors the
+     asana-*.js guards so the costliest (LLM) endpoint is not left more permissive
+     than the write endpoints. Legit payloads are ≤ ~7 KB (4000-char question +
+     2000-char context); 100 KB is generous headroom. */
+  const ctype = String((event.headers && (event.headers['content-type'] || event.headers['Content-Type'])) || '');
+  if (ctype && !/application\/json/i.test(ctype)) return resp(415, { ok: false, error: 'content-type must be application/json' });
+  if (String(event.body || '').length > 100000) return resp(413, { ok: false, error: 'request body too large' });
+
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch (_) { return resp(400, { ok: false, error: 'Invalid JSON body.' }); }
 

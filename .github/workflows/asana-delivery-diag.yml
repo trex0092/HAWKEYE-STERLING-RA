@@ -12,11 +12,26 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
 jobs:
   diag:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Harden the runner
+        # Diagnostic job that uses ASANA_ACCESS_TOKEN and curls the live/preview
+        # site + Asana. Block egress to those hosts only.
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            hawkeye-sterling-ra.netlify.app:443
+            deploy-preview-177--hawkeye-sterling-ra.netlify.app:443
+            app.asana.com:443
       - name: DEEP TEST 1 — corrected build (deploy-preview-177) — proof task is KEPT
         env:
           ENDPOINT: https://deploy-preview-177--hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-task

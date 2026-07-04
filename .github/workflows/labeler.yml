@@ -10,14 +10,21 @@ name: Labeler
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers]
 
-permissions:
-  contents: read
-  pull-requests: write
+# Least privilege: no token scope at the top level; each job widens to only what
+# it needs (both need pull-requests: write; path-labels also reads content).
+permissions: {}
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number }}"
+  cancel-in-progress: true
 
 jobs:
   path-labels:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Harden the runner (egress audit)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
@@ -36,6 +43,8 @@ jobs:
   size-label:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      pull-requests: write
     steps:
       - name: Harden the runner (egress audit)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2

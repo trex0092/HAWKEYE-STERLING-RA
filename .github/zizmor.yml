@@ -1,0 +1,28 @@
+# zizmor configuration — accepted-baseline suppressions.
+#
+# workflow-lint.yml runs zizmor as a BLOCKING gate. The findings ignored below are
+# accepted-by-design for this repo and are documented here (not scattered as inline
+# comments) so the rationale is auditable in one place. Every other zizmor finding —
+# and any NEW instance of these audits in a file not listed — still fails CI.
+rules:
+  artipacked:
+    # These workflows commit state back to the repo (screening snapshots, watch
+    # fingerprints, reconciliation) using the default GITHUB_TOKEN, which REQUIRES
+    # the checkout to persist credentials. `persist-credentials: false` would break
+    # their `git push`. Credential exposure is bounded: none of them upload the
+    # workspace as an artifact.
+    ignore:
+      - asana-reconcile.yml
+      - fatf-watchdog.yml
+      - onboarding-screen.yml
+      - regulatory-watch.yml
+      - sanctions-screen.yml
+      - sanctions-watch.yml
+      - weekly-adverse-media.yml
+  adhoc-packages:
+    # Playwright is installed at an EXACT pinned version for the browser-render
+    # jobs (there is no package-lock in this no-npm-runtime repo). The pin makes
+    # the install reproducible; a lockfile would add no integrity here.
+    ignore:
+      - cross-browser.yml
+      - visual.yml
