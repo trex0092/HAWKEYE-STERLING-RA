@@ -1,0 +1,69 @@
+name: Label sync
+
+# Reconciles the repository's labels from the single source of truth in
+# .github/settings.yml.
+#
+# The "Settings" GitHub App (https://github.com/apps/settings) applies that file
+# automatically *when it is installed*. When it is NOT installed the declared
+# labels are never created, which silently breaks any automation that expects
+# them — most visibly Dependabot: `.github/dependabot.yml` sets
+# `labels: [dependencies]`, and if that label is missing Dependabot fails the
+# update with "The following labels could not be found: dependencies".
+#
+# This workflow closes that gap without depending on the app: it creates (or
+# updates) every label declared in settings.yml, idempotently, so the labeler
+# (.github/labeler.yml) and Dependabot always have the labels they reference.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/settings.yml
+      - .github/workflows/label-sync.yml
+  workflow_dispatch:
+
+# Least privilege: read the repo to load settings.yml, write issues to manage
+# labels. No other scopes are needed.
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: label-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - name: Reconcile labels from settings.yml
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          count=$(yq '.labels | length' .github/settings.yml)
+          echo "Reconciling ${count} label(s) declared in .github/settings.yml"
+          for i in $(seq 0 $((count - 1))); do
+            name=$(yq -r ".labels[$i].name" .github/settings.yml)
+            color=$(yq -r ".labels[$i].color" .github/settings.yml)
+            desc=$(yq -r ".labels[$i].description // \"\"" .github/settings.yml)
+            echo "• ${name}"
+            # --force upserts: creates the label if missing, otherwise updates
+            # its colour/description to match settings.yml.
+            gh label create "$name" --color "$color" --description "$desc" --force
+          done
