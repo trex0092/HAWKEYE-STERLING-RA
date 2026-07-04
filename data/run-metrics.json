@@ -41,10 +41,10 @@
   },
   "timings": {
    "ai_triage": 0.0,
-   "enrichment": 18.27,
-   "sanctions": 0.33,
-   "total": 18.6
+   "enrichment": 14.23,
+   "sanctions": 0.3,
+   "total": 14.53
   },
-  "total_seconds": 18.6
+  "total_seconds": 14.53
  }
 ]
