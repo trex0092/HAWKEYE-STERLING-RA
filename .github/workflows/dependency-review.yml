@@ -31,8 +31,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden the runner (egress block)
-        # Egress = the dependency-review action querying the GitHub dependency
-        # graph API. GitHub hosts only.
+        # Egress = the dependency-review action: the GitHub dependency-graph API
+        # plus api.deps.dev / api.securityscorecards.dev for vulnerability + OSV
+        # enrichment of the changed dependencies.
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
         with:
           disable-sudo: true
@@ -42,6 +43,8 @@ jobs:
             api.github.com:443
             codeload.github.com:443
             objects.githubusercontent.com:443
+            api.deps.dev:443
+            api.securityscorecards.dev:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
