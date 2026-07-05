@@ -1,0 +1,13 @@
+# Source pins for the Python screening engine (screen.py, ai.py). Human-edited.
+#
+# The installed file is the HASH-LOCKED ci/requirements.txt, compiled from this
+# file. Regenerate after any edit (pip-tools):
+#   pip-compile --generate-hashes --output-file=ci/requirements.txt ci/requirements.in
+#
+# Located under ci/ (NOT the repo root) so the static-site host does not auto-run
+# it during deploy. Kept current by Dependabot (pip ecosystem; see dependabot.yml).
+rapidfuzz==3.14.5
+pdfplumber==0.11.10
+requests==2.34.2
+lxml==6.1.1
+unicodedata2==17.0.1

@@ -14,6 +14,11 @@ permissions:
   id-token: write       # OIDC for Sigstore-keyless build-provenance attestation
   attestations: write   # store the attestation in the repo's attestation log
 
+# One release at a time — concurrent runs could race on the same tag/attestation.
+concurrency:
+  group: "release-${{ github.ref }}"
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest

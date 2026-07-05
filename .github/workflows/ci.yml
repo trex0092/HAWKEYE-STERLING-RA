@@ -19,11 +19,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25 # cap runaway browser-smoke / virtual-time hangs
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
+        # Tests run fully offline; the only egress is the toolchain download
+        # (setup-node from nodejs.org, setup-python from the github release mirror).
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
         with:
           disable-sudo: true
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false

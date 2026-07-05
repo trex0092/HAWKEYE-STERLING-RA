@@ -37,6 +37,15 @@ repository:
   # Security: forbid force-push/deletion of any history via the API surface too.
   enable_vulnerability_alerts: true
   enable_automated_security_fixes: true
+  # NOTE — secret-scanning + PUSH PROTECTION are not expressible in the Settings-app
+  # schema (they live under GitHub's security_and_analysis surface). Enable them by
+  # hand in Settings → Code security & analysis, or via:
+  #   gh api -X PATCH repos/:owner/:repo \
+  #     -f 'security_and_analysis[secret_scanning][status]=enabled' \
+  #     -f 'security_and_analysis[secret_scanning_push_protection][status]=enabled'
+  # Gitleaks (gitleaks.yml) catches secrets AFTER they are pushed; push protection
+  # blocks them BEFORE they land in history — defence in depth, not a duplicate.
+  # Tracked in docs/governance/github-repository-hardening.md.
 
 # ── Labels ─────────────────────────────────────────────────────────────────────
 # Mirrors the auto-labeler (.github/labeler.yml) plus PR-size and triage labels so

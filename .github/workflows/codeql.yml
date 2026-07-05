@@ -1,9 +1,12 @@
 name: CodeQL
 
-# Static security analysis (SAST) of the app's JavaScript. CodeQL's JS extractor
-# scans the inline <script> in index.html plus scripts/*.mjs, netlify/functions/*.js
-# and test/*, surfacing findings in the repo's Security → Code scanning tab. This is
-# the one CI gap not covered by ci.yml (which only runs tests + a render smoke).
+# Static security analysis (SAST) of the app's JavaScript AND Python. CodeQL's JS
+# extractor scans the inline <script> in index.html plus scripts/*.mjs,
+# netlify/functions/*.js and test/*; the Python extractor scans the screening
+# engine (screen.py, ai.py, agents.py, kyc.py, monitoring.py, txn_monitor.py) —
+# the network/XML/PDF-parsing code that is otherwise unscanned. Findings surface
+# in the repo's Security → Code scanning tab. This is the one CI gap not covered
+# by ci.yml (which only runs tests + a render smoke).
 # On a failed *scheduled* run it opens an assigned alert task in the RISK
 # ASSESSMENTS Asana project, mirroring site-health.yml.
 on:
@@ -52,7 +55,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
-          languages: javascript-typescript,actions
+          languages: javascript-typescript,actions,python
           queries: security-and-quality
       - name: Run CodeQL analysis
         uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2

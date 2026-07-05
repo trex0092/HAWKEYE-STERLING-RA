@@ -123,6 +123,30 @@ cumulative alert list is clear:
 
 ---
 
+## 6a. Runner egress policy (harden-runner)
+
+Every workflow runs `step-security/harden-runner`. The **egress** posture is
+deliberately split:
+
+- **`egress-policy: block`** (enforced, with a pinned allow-list) — the sensitive
+  or predictable-egress jobs: all token-handling AML/Asana workflows, plus the
+  high-frequency CI gates **`ci`, `lint`, `gitleaks`, `dependency-review`**, and
+  `netlify-deploy` / `asana-delivery-diag`. A compromised dependency here cannot
+  reach an unlisted host — the run fails loudly instead.
+- **`egress-policy: audit`** (observe-only) — jobs whose egress is broad or
+  external and not safely enumerable without risking a **required** check:
+  `codeql` (downloads language packs incl. Python), `semgrep` (rule registry),
+  `scorecard` (many external scoring APIs), `osv-scanner` (reusable workflow),
+  and the site-fetching jobs `dast-zap`, `lighthouse`, `link-check`,
+  `site-health`, `cross-browser`, `visual`, `a11y`, plus the release jobs
+  (`release`, `auto-release`) whose Sigstore endpoints vary. These remain
+  monitored; promote any to `block` once its audited egress is confirmed stable.
+
+The workflow security itself is gated by **zizmor (blocking)** in
+`workflow-lint.yml`; accepted-baseline suppressions live in `.github/zizmor.yml`.
+
+---
+
 ## 7. Audit checklist
 
 Tick with date + initials when verified in the live repo. Re-review quarterly

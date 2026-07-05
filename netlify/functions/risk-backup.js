@@ -4,6 +4,7 @@
    (data/risk-overrides-backup.json), giving the overrides an off-device
    backup and a git audit trail. Token stays server side. */
 const { rateLimit } = require('./_ratelimit');
+const { sharedTokenOk } = require('./_auth');
 const DEFAULT_PROJECT_GID = '1216203370612914'; /* HAWKEYE STERLING APP */
 const TASK_NAME = 'RISK DATA SHEET (auto-backup)';
 /* Housekeeping mirror — file it under the ACTIVITY LOG section, not the default first one. */
@@ -29,6 +30,7 @@ exports.handler = async (event) => {
 const handle = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
   if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
+  if (!sharedTokenOk(event)) return resp(401, { ok: false, error: 'missing or invalid X-App-Token' });
 
   /* Per-IP rate limit (normal endpoint): default 100 req/min, tunable via env. */
   const limited = rateLimit(event, { name: 'risk-backup', limit: Number(process.env.RATE_LIMIT_DEFAULT) || 100, windowMs: 60000 });

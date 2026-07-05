@@ -72,7 +72,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install --quiet -r ci/requirements.txt
+        run: pip install --quiet --require-hashes -r ci/requirements.txt
 
       - name: Screen newly-added customers
         env:

@@ -87,7 +87,7 @@ jobs:
       # STEP 2 — INSTALL DEPENDENCIES
       # --------------------------------------------------------
       - name: Install Python dependencies
-        run: pip install --quiet -r ci/requirements.txt
+        run: pip install --quiet --require-hashes -r ci/requirements.txt
 
 
       # --------------------------------------------------------
@@ -855,11 +855,16 @@ jobs:
       # --------------------------------------------------------
       - name: Print summary
         if: always()
+        # Step outputs passed via env (not interpolated into the shell) — keeps
+        # zizmor's template-injection audit clean.
+        env:
+          DATE_DISPLAY: ${{ steps.date.outputs.DATE_DISPLAY }}
+          TIME_GST: ${{ steps.date.outputs.TIME_GST }}
         run: |
           echo "=============================="
           echo "SCREENING COMPLETE"
-          echo "Date: ${{ steps.date.outputs.DATE_DISPLAY }}"
-          echo "Time: ${{ steps.date.outputs.TIME_GST }} GST"
+          echo "Date: $DATE_DISPLAY"
+          echo "Time: $TIME_GST GST"
           echo "=============================="
           if [ -f /tmp/results.json ]; then
             python3 -c "
