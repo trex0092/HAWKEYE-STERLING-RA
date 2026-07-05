@@ -46,5 +46,29 @@
    "total": 14.53
   },
   "total_seconds": 14.53
+ },
+ {
+  "counts": {
+   "adverse": 0,
+   "am_errors": 0,
+   "errors": 7,
+   "flagged": 1,
+   "pep": 2,
+   "subjects": 657
+  },
+  "date": "2026-07-05",
+  "error_rate": 0.0107,
+  "llm_calls": {
+   "attempted": 0,
+   "failed": 0,
+   "ok": 0
+  },
+  "timings": {
+   "ai_triage": 0.0,
+   "enrichment": 4765.98,
+   "sanctions": 124.63,
+   "total": 4890.61
+  },
+  "total_seconds": 4890.61
  }
 ]
