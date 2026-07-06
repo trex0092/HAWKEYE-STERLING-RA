@@ -408,6 +408,13 @@ jobs:
           except Exception as e:
               print(f"UAE EOCN load error: {e}")
               os.environ["UAE_PDF_FAILED"] = "true"
+              # Persist to $GITHUB_ENV too: the in-process os.environ change is invisible
+              # to the later narrative step, which would otherwise report the UAE list as
+              # "SCREENED" (from the Load step's UAE_PDF_FAILED=false) despite this failure.
+              _gh_env = os.environ.get("GITHUB_ENV")
+              if _gh_env:
+                  with open(_gh_env, "a") as _f:
+                      _f.write("UAE_PDF_FAILED=true\n")
 
           # ---- guard: never screen against an empty list ----
           # If every download/parse failed, `sanctioned` is empty and

@@ -65,6 +65,9 @@ jobs:
       - name: Attest build provenance for the release artifacts
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
+          # Glob (not the literal path) so a best-effort SBOM that failed to
+          # generate is silently skipped rather than erroring the attest step on a
+          # missing subject; the always-present tarball keeps the subject set non-empty.
           subject-path: |
             hawkeye-sterling-ra-*.tar.gz
-            sbom.cdx.json
+            *.cdx.json

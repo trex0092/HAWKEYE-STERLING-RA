@@ -82,7 +82,10 @@ jobs:
             exit 1
           fi
           GID=$(grep -o '"gid":"[0-9]*"' resp.json | head -n1 | grep -o '[0-9]*' || true)
-          if grep -q "project/${TARGET_PROJECT}/" resp.json; then
+          # The project gid appears in the task's permalink_url as a path segment
+          # ("/<pid>/") in BOTH the classic (.../0/<pid>/<task>) and newer
+          # (.../project/<pid>/task/<tid>) Asana URL formats, so match on that.
+          if grep -q "/${TARGET_PROJECT}/" resp.json; then
             echo "PROJECT CHECK: PASS - live SEND TO ASANA lands in ${TARGET_PROJECT} (HAWKEYE STERLING APP)"
             OK=1
           else

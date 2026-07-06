@@ -22,9 +22,11 @@ on:
 permissions:
   contents: write
 
-# A multi-hour sweep must never have a manual run overlap the daily schedule.
+# A multi-hour sweep must never have a manual run overlap the daily schedule, and
+# must never overlap onboarding-screen (which also runs screen.py and commits the shared
+# data/screen-delta-state.json). Both are serialised via this SHARED concurrency group.
 concurrency:
-  group: daily-adverse-media
+  group: screen-delta-state
   cancel-in-progress: false
 
 jobs:

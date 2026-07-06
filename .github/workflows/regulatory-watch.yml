@@ -1,6 +1,6 @@
 name: Regulatory Watch
 
-# Weekly worldwide (UAE-weighted) check of the regulatory sources in
+# Daily worldwide (UAE-weighted) check of the regulatory sources in
 # data/reg-sources.json (MoE, FIU, NAMLCFTC, EOCN, CBUAE, VARA, jewellery
 # sector; FATF guidance, Wolfsberg, RMI, LBMA, OECD, OFAC, UN, EU, UK OFSI,
 # Egmont, Basel, UNODC, EU high-risk third countries, RJC). On any content

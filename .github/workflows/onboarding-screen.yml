@@ -26,8 +26,12 @@ permissions:
   contents: write
 
 # Never overlap the daily sweep's delta-state commit, and never overlap itself.
+# Shares ONE concurrency group with weekly-adverse-media (the daily sweep): both run
+# screen.py and mutate/commit data/screen-delta-state.json and post to Asana, and their
+# schedules collide at 00:00 UTC. A distinct group name would NOT enforce the invariant
+# above (they would run concurrently and could double-report), so the group is shared.
 concurrency:
-  group: onboarding-screen
+  group: screen-delta-state
   cancel-in-progress: false
 
 jobs:
