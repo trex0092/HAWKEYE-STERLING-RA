@@ -93,6 +93,23 @@ bump merged to `main`.
 
 ### Added
 
+- **Regression-proofing tests & gates (QA audit, 2026-07-07):**
+  - **HTML asset-integrity test** (`test/asset-integrity.test.mjs`, in CI) — asserts
+    every `href`/`src`, manifest icon, `sw.js` precache entry, `fonts.css` face and
+    stylesheet `url()` on the three screens resolves to a shipped file, so a renamed
+    or deleted asset can no longer 404 in production unnoticed.
+  - **CI coverage drift guard** (`test/ci-coverage.test.mjs`, in CI) — fails if any
+    `test/*.test.*` or `test/*.py` is not wired into `ci.yml`, or any `*.spec.mjs`
+    is not matched by a Playwright config; new tests can no longer be silently
+    orphaned in this no-runner repo.
+  - **Wider link-check coverage** — `link-check.mjs` now also scans the top-level
+    docs (README, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT, SUPPORT, CHANGELOG), so
+    a rotted README badge/link is caught too. Loopback and reserved-example
+    placeholders (the README's `localhost:8000` quick-start) are skipped via a new
+    `isProbeable()` helper so they aren't mis-reported as dead; unit-tested.
+  - **Accessibility gate is now blocking** — the pa11y WCAG 2.1 AA audit
+    (`a11y.yml`) drops `continue-on-error`; the three screens are clean, so a new
+    violation fails the gate instead of merging silently.
 - **Hash-locked Python dependencies** — `ci/requirements.txt` is now compiled from
   a new `ci/requirements.in` with `pip-compile --generate-hashes` (full transitive
   tree, sha256 for every artifact), and the three screening workflows install with
@@ -295,6 +312,36 @@ bump merged to `main`.
 
 ### Fixed
 
+- **Required-check deadlock on non-code PRs.** `Dependency Review` and the
+  Cross-Browser `smoke` job are REQUIRED statuses in branch protection but were
+  path-gated, so any PR that touched only docs/tests/workflows waited on them
+  forever ("Expected — waiting for status to be reported") and could never
+  merge. Both now run on every pull request: dependency-review passes in
+  seconds on an empty manifest diff, and the smoke always exercises the three
+  committed screens, so the always-run is cheap and meaningful. The push
+  trigger keeps its paths filter (nothing gates on push).
+- **Required-context name mismatch.** Branch protection requires the status
+  context `Dependency Review`, but the workflow's job reported its check as the
+  job id (`review`), so the required slot stayed "Expected" even after the
+  workflow passed. The job now carries `name: Dependency Review`, and
+  `settings.yml` documents that each required context must equal the reporting
+  job's display name.
+- **Unmergeable-by-design review rule on a single-maintainer repo.**
+  `settings.yml` required 1 approving review plus a code-owner review with
+  `enforce_admins: true` — but GitHub never counts the PR author's own
+  approval, and the sole code owner IS the only human with write access, so
+  every owner-authored PR was permanently blocked with no admin bypass.
+  Config-as-code now sets `required_approving_review_count: 0` and
+  `require_code_owner_reviews: false` with the rationale inline (the binding
+  controls are the required status checks); raise both back when a second
+  maintainer joins. The live rule must be mirrored by hand in Settings →
+  Branches if the Settings app is not installed.
+- **QA audit (2026-07-07):** Corrected a truncated citation URL in
+  `docs/research/auto/REG-UPDATE-2026-06-30.md` — the UAE Ministry of Economy AML
+  page was cited as `https://www.moec.gov` (does not resolve). Restored the
+  canonical `https://www.moec.gov.ae/en/anti-money-laundering` already used in
+  `data/reg-sources.json` and every sibling reg-watch doc, clearing the sole dead
+  link the citation-health gate reported.
 - **Deep bug hunt (2026-07-02):**
   - The re-run dedup window (was 48h) could silently suppress a *legitimate*
     next-day alert whose title repeats (daily watchers run 24h apart and titles

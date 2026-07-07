@@ -118,6 +118,10 @@ jobs:
         run: node test/screening-metrics.test.mjs
       - name: Run Interpol Red Notice signal unit tests
         run: node test/interpol-check.test.mjs
+      - name: Run HTML asset-integrity test (every href/src/manifest/precache path resolves)
+        run: node test/asset-integrity.test.mjs
+      - name: Run CI coverage drift guard (every test file is wired into a workflow)
+        run: node test/ci-coverage.test.mjs
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'

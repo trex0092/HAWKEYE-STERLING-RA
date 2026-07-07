@@ -1,7 +1,10 @@
 name: Link Check
 
 # Resolves every source URL in data/reg-sources.json + data/sanctions-sources.json
-# and every link in docs/, to protect the "every answer cited" promise.
+# and every link in docs/ and the top-level docs (README, SECURITY, CONTRIBUTING,
+# CODE_OF_CONDUCT, SUPPORT, CHANGELOG), to protect the "every answer cited" promise
+# and keep README badges/links live. Loopback + reserved-example placeholders
+# (e.g. the README's localhost quick-start) are skipped, never probed.
 # Weekly: opens/updates a tracking issue when links are dead.
 # Pull request: reports to the job summary, non-blocking (external links are flaky).
 
@@ -13,6 +16,12 @@ on:
       - 'data/reg-sources.json'
       - 'data/sanctions-sources.json'
       - 'docs/**'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'CONTRIBUTING.md'
+      - 'CODE_OF_CONDUCT.md'
+      - 'SUPPORT.md'
+      - 'CHANGELOG.md'
   workflow_dispatch:
 
 permissions:

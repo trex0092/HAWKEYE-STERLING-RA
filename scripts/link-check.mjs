@@ -53,6 +53,26 @@ export function collectUrls(files) {
   return [...found.entries()].map(([url, sources]) => ({ url, sources })).sort((a, b) => a.url.localeCompare(b.url));
 }
 
+/* Non-probeable URLs: loopback / dev-server hosts and the RFC-2606/6761 reserved
+   documentation domains that intentionally never resolve — e.g. the
+   `http://localhost:8000` quick-start example in the README, or `example.com`
+   placeholders. They are legitimately in the docs but must never be network-probed
+   (a connection-refused localhost would otherwise be mis-reported as a dead
+   citation). Filtered out of the probe set in the runner; collectUrls stays pure. */
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)$/i;
+const RESERVED_TLD = /\.(test|example|invalid|localhost)$/i;
+const RESERVED_EXAMPLE_DOMAIN = /(^|\.)example\.(com|net|org)$/i;
+export function isProbeable(url) {
+  let host, hostname;
+  try { const u = new URL(url); host = u.host; hostname = u.hostname; }
+  catch { return false; } // unparseable → not something we can probe
+  const bareHost = host.replace(/:\d+$/, '');
+  if (LOOPBACK_HOST.test(bareHost) || LOOPBACK_HOST.test(hostname)) return false;
+  if (RESERVED_TLD.test(hostname)) return false;
+  if (RESERVED_EXAMPLE_DOMAIN.test(hostname)) return false;
+  return true;
+}
+
 /* A result is dead when the probe could not get a final 2xx/3xx (or an
    allowed-by-default 401/403 anti-bot status). */
 /* Statuses where the server clearly answered but rejected the bot/method/format
@@ -113,7 +133,13 @@ export async function probe(url, timeoutMs = 20000) {
 
 function readFiles() {
   const files = {};
-  for (const p of ['data/reg-sources.json', 'data/sanctions-sources.json']) {
+  const roots = [
+    'data/reg-sources.json', 'data/sanctions-sources.json',
+    // Top-level docs carry externally-visible links (badges, code of conduct,
+    // changelog, security policy) that were previously unchecked.
+    'README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'SUPPORT.md', 'CHANGELOG.md',
+  ];
+  for (const p of roots) {
     if (existsSync(p)) files[p] = readFileSync(p, 'utf8');
   }
   const docsDir = 'docs';
@@ -133,7 +159,12 @@ function setOutput(key, val) {
 
 async function main() {
   const today = new Date().toISOString().slice(0, 10);
-  const urls = collectUrls(readFiles());
+  const all = collectUrls(readFiles());
+  /* Skip loopback / reserved-example URLs (README quick-start localhost, etc.):
+     they are intentionally non-resolvable and would be false "dead" links. */
+  const urls = all.filter(u => isProbeable(u.url));
+  const skipped = all.length - urls.length;
+  if (skipped) console.log('(skipped ' + skipped + ' non-probeable URL(s): localhost/example placeholders)');
   const results = [];
   /* small concurrency pool to be polite */
   const pool = 6;

@@ -18,7 +18,7 @@
   - Recommend **no edit** until a substantive page (with a dated title or instrument) is retrieved.
 
 - **Suggested citation**:
-  - If an update is later warranted, cite generically: **UAE Ministry of Economy — "Anti-Money Laundering" (AML/CFT for DNFBPs)**, https://www.moec.gov
+  - If an update is later warranted, cite generically: **UAE Ministry of Economy — "Anti-Money Laundering" (AML/CFT for DNFBPs)**, https://www.moec.gov.ae/en/anti-money-laundering
 
 ### UAE Financial Intelligence Unit (FIU) — goAML
 
