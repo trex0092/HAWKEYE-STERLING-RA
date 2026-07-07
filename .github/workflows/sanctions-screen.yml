@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 20 # bound the daily re-screen; a hang must fail loudly, not stall the control
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           disable-sudo: true
           # Allowlist derived from the job's actual fetches: runner/toolchain
