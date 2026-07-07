@@ -122,6 +122,17 @@ bump merged to `main`.
     with framework refs, and is linked (with the AIMS and model-card indexes)
     from the root README. `docs/aims/README.md` gains the three missing rows
     (Anthropic DPA pack, internal audit, decommissioning).
+- **Code-scanning triage executed (CA-13)** — all 46 open alerts dispositioned
+  ([record](docs/security/code-scanning-triage-2026-07.md)): **10 fixed in
+  code** (backslash escaping in the markdown-cell sanitizer, script/style
+  end-tag regexes, two unclosed file handles in `screen.py`, dead guard in
+  `lei-check.mjs`, unused locals/imports — the rapidfuzz availability probe now
+  uses `importlib.util.find_spec`), **6 scoped out** via a justified CodeQL
+  `paths-ignore` for `design/` mockups and `test/` fixtures, and **30
+  classified for dismissal-with-reason** (by-design Scorecard posture on the
+  state-committing workflows, watcher-pipeline data flows, two non-exploitable
+  single-writer TOCTOU warnings). All 42 node tests + Python suites green after
+  the fixes.
 - **CBUAE April-2026 framework update — impact assessment**
   (`docs/research/2026-07-cbuae-april-2026-update.md`): the five communicated
   changes (standalone Proliferation Financing risk area, TBML/correspondent

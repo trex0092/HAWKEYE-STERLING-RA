@@ -30,10 +30,9 @@ sys.path.insert(0, ROOT)
 
 # Use real rapidfuzz if present (production matcher); else a difflib stand-in so
 # the harness still runs in a bare CI image.
-try:
-    import rapidfuzz  # noqa
+if importlib.util.find_spec("rapidfuzz") is not None:
     _ENGINE = "rapidfuzz"
-except Exception:
+else:
     def _tsr(a, b):
         a = " ".join(sorted(a.split())); b = " ".join(sorted(b.split()))
         return difflib.SequenceMatcher(None, a, b).ratio() * 100

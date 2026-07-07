@@ -95,7 +95,7 @@ export function scoreLei(name, json) {
     const f = recordFields(rec);
     if (!f.legalName || !isValidLei(f.lei)) continue;
     const m = nameMatches(name, f.legalName);
-    if (!m || !m.all) continue;
+    if (!m.all) continue;
     hits.push({ ...f, score: m.exact ? 95 : 80 });
   }
   if (!hits.length) return { hit: false, score: 0, band: 'low', match: null, count: 0 };

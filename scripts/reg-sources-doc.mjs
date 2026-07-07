@@ -13,7 +13,7 @@ const BEGIN = '<!-- BEGIN:reg-sources -->';
 const END = '<!-- END:reg-sources -->';
 
 const HEADINGS = { UAE: 'UAE (primary focus)', Global: 'Global' };
-const cell = s => String(s == null ? '' : s).replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+const cell = s => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
 
 export function buildSection(sources) {
   const order = [];                                   // jurisdictions in first-seen order, UAE then Global first

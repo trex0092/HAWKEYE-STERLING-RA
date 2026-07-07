@@ -49,8 +49,8 @@ export function loadSources(json) {
 export function extractText(raw) {
   return denoise(String(raw || '')
     .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script\b[\s\S]*?<\/script\b[^>]*>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style\b[^>]*>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .toLowerCase())

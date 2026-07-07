@@ -25,7 +25,7 @@ so hardening detection doesn't start blocking legitimate news.
 
 Run: `python test/redteam_injection.py`   (exits non-zero if any contract breaks)
 """
-import sys, os, types, difflib, importlib.util
+import sys, os, types, importlib.util
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
