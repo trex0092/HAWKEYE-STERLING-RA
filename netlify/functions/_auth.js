@@ -15,9 +15,14 @@
  *     token. This closes the "omit Origin to bypass the only access control" hole
  *     for a hardened deployment without breaking browser same-origin POSTs.
  *
- * NOTE: if you set APP_SHARED_TOKEN, update any server-side caller that POSTs to
- * these functions without an Origin (e.g. the verify curls in netlify-deploy.yml /
- * asana-delivery-diag.yml) to send `-H "X-App-Token: <token>"`.
+ * NOTE: if you set APP_SHARED_TOKEN, any server-side caller that POSTs to these
+ * functions without an Origin must either send `-H "X-App-Token: <token>"` or
+ * take the origin-guarded path by sending the site's own Origin header. The
+ * repo's own callers (the verify curls in netlify-deploy.yml /
+ * asana-delivery-diag.yml and the function-health.yml probes) use the Origin
+ * path — they send `Origin: https://hawkeye-sterling-ra.netlify.app`, which the
+ * origin guard allows — so they keep working whether or not the token gate is
+ * armed, and no GitHub-side secret is needed for them.
  */
 const crypto = require('crypto');
 

@@ -39,7 +39,7 @@ jobs:
           set -uo pipefail
           REF="PROOF-${GITHUB_RUN_ID}"
           HTTP=$(curl -sS -o resp.json -w '%{http_code}' -X POST "$ENDPOINT" \
-            -H "Content-Type: application/json" \
+            -H "Content-Type: application/json" -H "Origin: https://hawkeye-sterling-ra.netlify.app" \
             -d "{\"name\":\"PROOF - SEND TO ASANA routing verified - CDD 12\",\"ref\":\"${REF}\",\"band\":\"CDD\",\"score\":12,\"notes\":\"Deep live delivery test through the corrected build. This task is the routing proof - lands in HAWKEYE STERLING APP (1216203370612914).\"}")
           echo "HTTP $HTTP"
           cat resp.json; echo
@@ -62,7 +62,7 @@ jobs:
           set -uo pipefail
           REF="PRODCHECK-${GITHUB_RUN_ID}"
           HTTP=$(curl -sS -o prod.json -w '%{http_code}' -X POST "$ENDPOINT" \
-            -H "Content-Type: application/json" \
+            -H "Content-Type: application/json" -H "Origin: https://hawkeye-sterling-ra.netlify.app" \
             -d "{\"name\":\"DIAG - production routing check - CDD 12\",\"ref\":\"${REF}\",\"band\":\"CDD\",\"score\":12,\"notes\":\"Production routing check - safe to delete.\"}")
           echo "HTTP $HTTP"; cat prod.json; echo
           URL=$(grep -o '"url":"[^"]*"' prod.json | head -1 | cut -d'"' -f4)
