@@ -58,7 +58,7 @@ jobs:
             nodejs.org:443
             app.asana.com:443
             api.anthropic.com:443
-            www.moec.gov.ae:443
+            u.ae:443
             www.uaefiu.gov.ae:443
             www.namlcftc.gov.ae:443
             www.uaeiec.gov.ae:443

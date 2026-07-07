@@ -3,11 +3,11 @@
   "sources": [
     {
       "id": "uae-moe",
-      "name": "UAE Ministry of Economy (MoE) — DNFBP / DPMS supervisor",
+      "name": "UAE Ministry of Economy & Tourism (MoE/MoET) — DNFBP / DPMS supervisor",
       "jurisdiction": "UAE",
       "category": "Supervisor",
-      "narrative": "Federal supervisor for Designated Non-Financial Businesses and Professions, including Dealers in Precious Metals and Stones (DPMS) and real estate. Issues DPMS guidance, goAML registration rules and the cash-transaction reporting threshold (AED 55,000). Watched so DPMS/real-estate Q&A answers and sector tools stay current.",
-      "url": "https://www.moec.gov.ae/en/anti-money-laundering",
+      "narrative": "Federal supervisor for Designated Non-Financial Businesses and Professions, including Dealers in Precious Metals and Stones (DPMS) and real estate. Issues DPMS guidance, goAML registration rules and the cash-transaction reporting threshold (AED 55,000). Watched so DPMS/real-estate Q&A answers and sector tools stay current. Tracked via the official UAE Government Portal AML page after the ministry's moec.gov.ae site was retired in the MoE→MoET rebrand.",
+      "url": "https://u.ae/en/information-and-services/business/combatting-money-laundering",
       "type": "html"
     },
     {

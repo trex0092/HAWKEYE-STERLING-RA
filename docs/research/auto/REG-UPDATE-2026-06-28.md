@@ -15,7 +15,7 @@
   - No country/risk data in `index.html` appears affected by this extract.
 
 - **Suggested citation**: 
-  - UAE Ministry of Economy — "Anti-Money Laundering" (Combating Money Laundering and Terrorism Financing) supervisor page, `https://www.moec.gov.ae/en/anti-money-laundering`.
+  - UAE Ministry of Economy — "Anti-Money Laundering" (Combating Money Laundering and Terrorism Financing) supervisor page, `https://u.ae/en/information-and-services/business/combatting-money-laundering`.
   - Do **not** cite any specific circular/decision number — none is visible in the extracted text.
 
 *Note: Recommend a human reviewer load the live page (and confirm whether the ministry has rebranded to "Economy and

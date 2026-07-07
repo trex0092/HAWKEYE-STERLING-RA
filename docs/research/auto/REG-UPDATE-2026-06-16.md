@@ -16,7 +16,7 @@
   - No country/risk data in `index.html` appears affected by this snapshot.
 
 - **Suggested citation**:
-  - Only if an update is warranted: cite generically as **"UAE Ministry of Economy — Anti-Money Laundering (DNFBP supervision), moec.gov.ae/en/anti-money-laundering"**. Do not attach any specific law, decision, or circular number, as none is visible in the extracted text.
+  - Only if an update is warranted: cite generically as **"UAE Ministry of Economy — Anti-Money Laundering (DNFBP supervision), u.ae/en/information-and-services/business/combatting-money-laundering"**. Do not attach any specific law, decision, or circular number, as none is visible in the extracted text.
 
 *Recommendation: Defer edits pending a clean re-extraction of the page body (current capture is navigation chrome only).
 

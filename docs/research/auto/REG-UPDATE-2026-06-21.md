@@ -15,7 +15,7 @@
   - No clear trigger to change country/risk data in `index.html`. UAE risk scoring/lists appear unaffected by this extract.
 
 - **Suggested citation**:
-  - UAE Ministry of Economy — "مواجهة غسل الأموال وتمويل الإرهاب" (Combating Money Laundering and Terrorism Financing), AML/CFT supervisory page for DNFBPs/DPMS, https://www.moec.gov.ae/en/anti-money-laundering (accessed [date]).
+  - UAE Ministry of Economy — "مواجهة غسل الأموال وتمويل الإرهاب" (Combating Money Laundering and Terrorism Financing), AML/CFT supervisory page for DNFBPs/DPMS, https://u.ae/en/information-and-services/business/combatting-money-laundering (accessed [date]).
 
 ### UAE Financial Intelligence Unit (FIU) — goAML
 

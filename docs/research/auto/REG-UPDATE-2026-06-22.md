@@ -16,7 +16,7 @@
   - No country/risk data in `index.html` appears affected.
 
 - **Suggested citation**:
-  - If an update is warranted, cite generically: **UAE Ministry of Economy — "Anti-Money Laundering" / "مواجهة غسل الأموال وتمويل الإرهاب"**, https://www.moec.gov.ae/en/anti-money-laundering (accessed [date]). Do not cite a specific decision/article number — none is visible
+  - If an update is warranted, cite generically: **UAE Ministry of Economy — "Anti-Money Laundering" / "مواجهة غسل الأموال وتمويل الإرهاب"**, https://u.ae/en/information-and-services/business/combatting-money-laundering (accessed [date]). Do not cite a specific decision/article number — none is visible
 
 ### UAE Financial Intelligence Unit (FIU) — goAML
 

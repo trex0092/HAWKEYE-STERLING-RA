@@ -11,7 +11,7 @@
   - Super Tools citations in `assets/super-data.js` pointing to this MoE AML page — confirm the URL still resolves and links to the intended AML/CFT landing content (note the visible navigation references **goAML registration**, **targeted financial sanctions**, and **AML/CFT legislation**, but no specific instrument text was captured).
   - No country/risk data changes in `index.html` indicated.
 
-- **Suggested citation**: If an update is warranted, cite the page generically as **UAE Ministry of Economy — Anti-Money Laundering (DNFBP supervision)**, URL: https://www.moec.gov.ae/en/anti-money-laundering. Do **not** add specific law/circular numbers, as none are visible in the extracted text; re-fetch the live page to confirm the instrument title before citing.
+- **Suggested citation**: If an update is warranted, cite the page generically as **UAE Ministry of Economy — Anti-Money Laundering (DNFBP supervision)**, URL: https://u.ae/en/information-and-services/business/combatting-money-laundering. Do **not** add specific law/circular numbers, as none are visible in the extracted text; re-fetch the live page to confirm the instrument title before citing.
 
 *Recommendation: Defer substantive edits. Re-extract full page body (non-navigation content) to confirm whether any AML/CFT guidance actually changed, and verify the current official ministry name.*
 

@@ -15,7 +15,7 @@
   - No indication of changes to country/risk lists in `index.html`.
 
 - **Suggested citation**: 
-  - Only if a live recheck confirms updated content, cite generically as: **UAE Ministry of Economy — "Anti-Money Laundering" (DNFBP supervision portal)**, https://www.moec.gov.ae/en/anti-money-laundering. Do not attach specific article/circular numbers — none are visible in the extracted text.
+  - Only if a live recheck confirms updated content, cite generically as: **UAE Ministry of Economy — "Anti-Money Laundering" (DNFBP supervision portal)**, https://u.ae/en/information-and-services/business/combatting-money-laundering. Do not attach specific article/circular numbers — none are visible in the extracted text.
 
 **Reviewer note**: Recommend a manual re-fetch of the live page (JavaScript-rendered content may be missing from this extract) before any data update.
 
