@@ -312,6 +312,14 @@ bump merged to `main`.
 
 ### Fixed
 
+- **Required-check deadlock on non-code PRs.** `Dependency Review` and the
+  Cross-Browser `smoke` job are REQUIRED statuses in branch protection but were
+  path-gated, so any PR that touched only docs/tests/workflows waited on them
+  forever ("Expected — waiting for status to be reported") and could never
+  merge. Both now run on every pull request: dependency-review passes in
+  seconds on an empty manifest diff, and the smoke always exercises the three
+  committed screens, so the always-run is cheap and meaningful. The push
+  trigger keeps its paths filter (nothing gates on push).
 - **QA audit (2026-07-07):** Corrected a truncated citation URL in
   `docs/research/auto/REG-UPDATE-2026-06-30.md` — the UAE Ministry of Economy AML
   page was cited as `https://www.moec.gov` (does not resolve). Restored the

@@ -1,22 +1,18 @@
 name: Dependency Review
 
-# Flags known-vulnerable dependencies introduced by a pull request. This repo is
-# vanilla (no runtime npm deps), so this only runs when an actual dependency
-# manifest changes — which is why it does NOT run on docs/data/workflow PRs.
+# Flags known-vulnerable dependencies introduced by a pull request.
 # It requires the repo's Dependency Graph (Settings -> Code security and
 # analysis), which is now enabled — so the step BLOCKS a PR that introduces a
 # high-severity vulnerable dependency.
+#
+# Runs on EVERY pull request (no paths filter): this check is a REQUIRED status
+# in branch protection, and a required check that is path-gated deadlocks any
+# PR that doesn't touch a manifest — it sits at "Expected — waiting for status"
+# forever and the PR can never merge. When no dependency manifest changed, the
+# action sees an empty diff and passes in seconds, so the always-run is cheap.
 
 on:
   pull_request:
-    paths:
-      - '**/package.json'
-      - '**/package-lock.json'
-      - '**/yarn.lock'
-      - '**/pnpm-lock.yaml'
-      - '**/requirements.txt'
-      - '**/Gemfile.lock'
-      - '**/composer.lock'
 
 permissions:
   contents: read

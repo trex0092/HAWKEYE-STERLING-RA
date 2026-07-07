@@ -5,13 +5,20 @@ name: Cross-Browser Smoke
 # engine-specific JS/CSS breakage: each page must boot, paint substantial
 # content, and raise NO uncaught JS exception in any engine. No screenshot
 # baselines, so it is self-contained.
+#
+# pull_request has NO paths filter: the `smoke` job is a REQUIRED status in
+# branch protection, and a required check that is path-gated deadlocks any PR
+# that doesn't touch the app surface — it sits at "Expected — waiting for
+# status" forever and the PR can never merge. The smoke exercises the committed
+# screens regardless of what the PR changed, so it is always meaningful. The
+# push trigger keeps its paths filter (nothing is gated on push, so skipping
+# data/docs-only main commits there just saves runner minutes).
 
 on:
   push:
     branches: [main]
     paths: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'advisor.js', 'i18n.js', 'app.css', 'console.css', 'advisor.css', 'fonts.css', 'assets/**', 'test/cross-browser.spec.mjs', 'test/keyboard.spec.mjs', 'test/print-report.spec.mjs', 'test/csp-runtime.spec.mjs', 'playwright.cross-browser.config.mjs', 'netlify.toml']
   pull_request:
-    paths: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'advisor.js', 'i18n.js', 'app.css', 'console.css', 'advisor.css', 'fonts.css', 'assets/**', 'test/cross-browser.spec.mjs', 'test/keyboard.spec.mjs', 'test/print-report.spec.mjs', 'test/csp-runtime.spec.mjs', 'playwright.cross-browser.config.mjs', 'netlify.toml']
   workflow_dispatch:
 
 permissions:
