@@ -90,12 +90,14 @@ export function buildReport(results, today) {
 }
 
 /* ── Network (runner only) ── */
-/* Probe like a real browser. Many WAFs (Cloudflare, Imperva) 403 a bare bot
-   User-Agent even though the page loads fine for a human — the point of the check
-   is "does this citation work in a browser", so send a realistic UA + Accept
-   headers. This alone flips most anti-bot 403s to 200; a handful of hardened
-   government/standards WAFs still challenge automation (they answer 403/429, i.e.
-   the origin IS live — the citation works for a human) and are treated as such. */
+/* A citation "works" if it loads in a browser. Many WAFs (Cloudflare, Imperva)
+   403 an obvious bot User-Agent even though the page is fine for a human; a few do
+   the opposite and challenge a spoofed-browser UA. So probe with realistic browser
+   headers first and, if that is anti-bot-blocked, retry once with a plain UA —
+   taking a 2xx from either. Only the hardened government/standards WAFs that block
+   ALL automation (FATF, OECD, CBUAE, the UAE legislation portal, NAMLCFTC) still
+   answer 403/418/429; the origin IS up and the page works for a human, so those are
+   classified anti-bot (not dead) — never as broken links. */
 const BROWSER_HEADERS = {
   'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
   'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -103,17 +105,19 @@ const BROWSER_HEADERS = {
   'accept-encoding': 'gzip, deflate, br',
   'upgrade-insecure-requests': '1'
 };
-export async function probe(url, timeoutMs = 20000) {
+const PLAIN_HEADERS = { 'user-agent': 'Mozilla/5.0 HawkeyeSterling-LinkCheck/1.0' };
+
+/* One HEAD-then-GET pass with a given header set. GET is authoritative; a NON-OK
+   HEAD (not only 405/501) retries with GET before judging — some servers 404/403/
+   5xx a HEAD but serve the resource on GET, so returning the HEAD status would
+   mis-report a live citation as dead. */
+async function attempt(url, headers, timeoutMs) {
   for (const method of ['HEAD', 'GET']) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { method, redirect: 'follow', signal: ctrl.signal, headers: BROWSER_HEADERS });
+      const res = await fetch(url, { method, redirect: 'follow', signal: ctrl.signal, headers });
       clearTimeout(t);
-      // GET is authoritative; a successful HEAD is conclusive. Any NON-OK HEAD
-      // (not only 405/501) retries with GET before judging — some servers
-      // 404/403/5xx a HEAD but serve the resource on GET, so returning the HEAD
-      // status here would mis-report a live link as dead.
       if (res.ok || method === 'GET') return { ok: res.ok, status: res.status };
       continue; // non-OK HEAD → fall through to GET
     } catch (e) {
@@ -122,6 +126,13 @@ export async function probe(url, timeoutMs = 20000) {
     }
   }
   return { ok: false, status: null, error: 'unreachable' };
+}
+
+export async function probe(url, timeoutMs = 20000) {
+  const browser = await attempt(url, BROWSER_HEADERS, timeoutMs);
+  if (browser.ok) return browser;
+  const plain = await attempt(url, PLAIN_HEADERS, timeoutMs);
+  return plain.ok ? plain : browser; // neither worked → report the browser verdict
 }
 
 function readFiles() {
