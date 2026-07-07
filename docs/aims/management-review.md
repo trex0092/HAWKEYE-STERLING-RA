@@ -34,6 +34,9 @@ Open items to table at the first formal review (sourced from the current pack):
 - DPA status: sign **Anthropic DPA**; confirm **Asana DPA** + data-residency regions.
 - Run the **Advisor bias review** first cycle ([`../governance/advisor-bias-review-2026.md`](../governance/advisor-bias-review-2026.md)).
 - Confirm group-entity goAML/EOCN registration; update compliance-manual legal references (FDL 10/2025).
+- Produce the standalone **Proliferation Financing risk assessment** and re-prioritise
+  the **R-13** transaction-feed decision — both raised by the CBUAE April-2026
+  framework update ([`../research/2026-07-cbuae-april-2026-update.md`](../research/2026-07-cbuae-april-2026-update.md)).
 
 > First formal review to be scheduled within the standard cycle (target Q3 2026); record
 > outcomes in the log above and convert decisions into actions with owner + due date.

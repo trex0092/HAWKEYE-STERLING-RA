@@ -122,6 +122,18 @@ bump merged to `main`.
     with framework refs, and is linked (with the AIMS and model-card indexes)
     from the root README. `docs/aims/README.md` gains the three missing rows
     (Anthropic DPA pack, internal audit, decommissioning).
+- **CBUAE April-2026 framework update — impact assessment**
+  (`docs/research/2026-07-cbuae-april-2026-update.md`): the five communicated
+  changes (standalone Proliferation Financing risk area, TBML/correspondent
+  focus, continuous tech-driven transaction monitoring, FATF 5th-round Mutual
+  Evaluation, inspection-readiness) mapped to this system's controls, with
+  provenance caveats (primary text pending via the `uae-cbuae` reg-watch
+  source) and four owned actions — incl. the **standalone PF risk assessment**
+  (new gap, added to the management-review first-cycle prep) and a raised
+  priority on the R-13 transaction-feed decision. Plus a global
+  **AML regulators & FIUs reference directory**
+  (`docs/research/aml-regulators-directory.md`) for counterparty/cross-border
+  orientation, UAE bodies mapped to the watched sources.
 - **Repo-hygiene & triage utilities** (both manual-only, least-privilege,
   egress-blocked to the GitHub API): `branch-cleanup.yml` deletes the 39
   verified squash-merged stale branches from issue #190 (dry-run by default;
