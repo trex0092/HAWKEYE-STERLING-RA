@@ -167,7 +167,6 @@ def run_pipeline_audit(stats, possible_matches, adverse_findings, pep_findings,
     Returns {log, qa}. Counts come from the already-completed screening pass."""
     log = AgentLog()
     subjects = stats.get("subjects_total", 0)
-    companies = stats.get("companies_screened", 0)
     inds = stats.get("individuals_screened", 0)
     am_blocked = stats.get("injection_blocked", 0)
 
@@ -198,7 +197,6 @@ def run_pipeline_audit(stats, possible_matches, adverse_findings, pep_findings,
 # each control reports its LIVE status, derived from this run — not a static claim.
 def build_attestation(audit, ai_mode, injection_blocked, list_meta):
     qa = audit.get("qa", {})
-    creds = audit.get("creds", {})
     viol = audit.get("cred_violations") or []
     core_ok = all(list_meta.get(k, {}).get("count", 0) > 0
                   for k in ("ofac", "un", "uk", "eu", "eocn"))

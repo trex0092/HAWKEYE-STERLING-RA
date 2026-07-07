@@ -928,7 +928,8 @@ def parse_eocn(pdf_path):
     # 1) Preferred: the maintained JSON list (zero-dependency, no PDF parsing).
     if os.path.exists(EOCN_JSON_PATH):
         try:
-            raw = open(EOCN_JSON_PATH, "rb").read()
+            with open(EOCN_JSON_PATH, "rb") as _f:
+                raw = _f.read()
             data = json.loads(raw)
             for e in data.get("entries", []):
                 if isinstance(e, str):
@@ -951,7 +952,8 @@ def parse_eocn(pdf_path):
         log(f"  EOCN list not found — manual check required")
         return names, "NOT AVAILABLE — populate data/eocn-local-terrorist-list.json", ""
     try:
-        raw = open(pdf_path,"rb").read()
+        with open(pdf_path, "rb") as _f:
+            raw = _f.read()
         pdf_hash = sha256_of(raw)
         with pdfplumber.open(pdf_path) as pdf:
             text = "\n".join(page.extract_text() or "" for page in pdf.pages)
@@ -1668,7 +1670,6 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
 
     delta = stats.get("delta", {})
     supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
-    supp_ok = [k for k, v in supp.items() if v.get("count", 0) > 0]
     sanc_status = "OK" if sanc_ok else "DEGRADED"
     pep_status = "DEGRADED" if pep_degraded else "OK"
 
