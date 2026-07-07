@@ -1,0 +1,129 @@
+name: Branch Cleanup (manual)
+
+# One-shot repo-hygiene utility for issue #190: deletes the stale branches whose
+# pull requests were SQUASH-MERGED into main (content fully in main; head SHAs
+# preserved in the issue for recovery). Squash merges rewrite commits, so
+# `git branch --merged` can never identify these — each branch below was
+# verified by mapping it to its PR's merged state via the API.
+#
+# Safety: manual-only (workflow_dispatch); does nothing unless the `confirm`
+# input is the literal string DELETE (any other value = dry-run listing);
+# protected branches cannot be deleted by the API regardless. Branches that no
+# longer exist are skipped, so re-runs are idempotent.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DELETE to actually delete; anything else = dry-run'
+        default: 'dry-run'
+
+permissions:
+  contents: write # ref deletion; nothing else
+
+concurrency:
+  group: branch-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = the GitHub REST API only (ref lookups + deletions).
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+      - name: Delete verified squash-merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIRM: ${{ inputs.confirm }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          # The verified-safe list from issue #190 (PRs squash-merged into main).
+          BRANCHES='
+          claude/admiring-lovelace-2jvl1g
+          claude/asana-actions-pending-3wh5hg
+          claude/asana-register-sync
+          claude/batch-screen-api-auth-1vlhbp
+          claude/code-advisor-help-integration-qb79cj
+          claude/compassionate-noether-jcm5gd
+          claude/compliance-audit-bugs-ba9r7d
+          claude/compliance-hardening-batch
+          claude/cool-davinci-veyivv
+          claude/daily-18h-cron
+          claude/daily-adverse-media
+          claude/daily-sanctions-asana-fix
+          claude/daily-sanctions-source-fixes
+          claude/daily-sanctions-workflow-ydka5m
+          claude/deep-review-bug-fixes-dqw3i4
+          claude/dependency-review-gate
+          claude/eocn-add-checkout
+          claude/eocn-from-repo-list
+          claude/eocn-populate-local-terrorist-list
+          claude/execute-fpd5zc
+          claude/fatf-changes-display-0n2vjh
+          claude/fervent-wright-1mbu7n
+          claude/github-repo-compliance-2hmkb3
+          claude/hawkeye-sterling-qa-8ta0cw
+          claude/inspiring-faraday-c3i1hs
+          claude/interpol-screening-layer
+          claude/race-safe-push
+          claude/remove-smoke-test
+          claude/screen-degraded-pep-noise
+          claude/screen-engine-weekly
+          claude/sharp-lovelace-b0joos
+          claude/site-health-assertion-fix
+          claude/smoke-test
+          claude/sweet-wright-v6lfw7
+          claude/vigilant-archimedes-5i5jdq
+          claude/weekly-timeout-bump
+          claude/workflows-failing-6txcgv
+          regulatory-watch/update
+          visual/baseline
+          '
+          deleted=0; missing=0; failed=0
+          {
+            echo "## Branch cleanup — mode: ${CONFIRM}"
+            echo ""
+            echo "| Branch | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for b in $BRANCHES; do
+            # URL-encode the ref path segment-wise (branch names here only need '/')
+            ref="heads/${b}"
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/git/ref/${ref}")
+            if [ "$code" != "200" ]; then
+              echo "| \`$b\` | already gone (HTTP $code) |" >> "$GITHUB_STEP_SUMMARY"
+              missing=$((missing+1)); continue
+            fi
+            if [ "$CONFIRM" != "DELETE" ]; then
+              echo "| \`$b\` | exists — would delete (dry-run) |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            dcode=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/git/refs/${ref}")
+            if [ "$dcode" = "204" ]; then
+              echo "| \`$b\` | deleted |" >> "$GITHUB_STEP_SUMMARY"
+              deleted=$((deleted+1))
+            else
+              echo "| \`$b\` | DELETE FAILED (HTTP $dcode) |" >> "$GITHUB_STEP_SUMMARY"
+              failed=$((failed+1))
+            fi
+          done
+          {
+            echo ""
+            echo "**deleted=${deleted} · already-gone=${missing} · failed=${failed}**"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "deleted=${deleted} missing=${missing} failed=${failed}"
+          [ "$failed" = "0" ] || exit 1
