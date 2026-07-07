@@ -8,7 +8,7 @@ name: Daily Compliance Brief
 # 06:00) so it captures the day's alerts. Needs the ASANA_ACCESS_TOKEN secret.
 on:
   schedule:
-    - cron: '0 7 * * *' # 07:00 UTC daily (11:00 UAE), after the daily watchers
+    - cron: '9 7 * * *' # 07:09 UTC daily (11:09 UAE), after the daily watchers; odd minute — top-of-hour crons are GitHub's most-delayed slot
   workflow_dispatch:
 
 permissions:

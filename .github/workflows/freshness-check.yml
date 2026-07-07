@@ -11,7 +11,7 @@ name: Freshness Check
 
 on:
   schedule:
-    - cron: '0 9 * * *' # 09:00 UTC daily — after sanctions-watch (05:00), screen (02:00/06:00) and regulatory-watch (06:00)
+    - cron: '9 9 * * *' # 09:09 UTC daily — after sanctions-watch (05:07), the screening runs and regulatory-watch (06:19)
   workflow_dispatch:
 
 # Least privilege: read the repo + read Actions run history. The Asana alert on

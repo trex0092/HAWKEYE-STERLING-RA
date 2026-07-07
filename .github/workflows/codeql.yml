@@ -19,7 +19,7 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: '0 6 * * 1' # 06:00 UTC every Monday (one hour after site-health)
+    - cron: '11 6 * * 1' # 06:11 UTC every Monday (odd minute)
   workflow_dispatch:
 
 # Least privilege at the top level; the analyze job widens to the minimum it

@@ -8,7 +8,7 @@ name: Quarterly Methodology Review
 # Needs the ASANA_ACCESS_TOKEN secret.
 on:
   schedule:
-    - cron: '0 6 1 1,4,7,10 *' # 06:00 UTC on 1 Jan / 1 Apr / 1 Jul / 1 Oct
+    - cron: '9 6 1 1,4,7,10 *' # 06:09 UTC on 1 Jan / 1 Apr / 1 Jul / 1 Oct (odd minute)
   workflow_dispatch:
 
 permissions:

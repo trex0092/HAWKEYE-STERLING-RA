@@ -14,7 +14,7 @@ name: Advisor Eval
 
 on:
   schedule:
-    - cron: '0 8 * * 1'   # 08:00 UTC every Monday, after the daily watchers
+    - cron: '9 8 * * 1'   # 08:09 UTC every Monday, after the daily watchers (odd minute)
   workflow_dispatch:
 
 permissions:

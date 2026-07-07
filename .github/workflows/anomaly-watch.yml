@@ -9,7 +9,7 @@ name: Anomaly Watch
 
 on:
   schedule:
-    - cron: '30 6 * * *'   # 06:30 UTC daily, just after the morning screening run
+    - cron: '37 6 * * *'   # 06:37 UTC daily, just after the morning screening run (odd minute — see daily-brief.yml)
   workflow_dispatch:
 
 # Least privilege: read the repo, write an issue. No other scope.

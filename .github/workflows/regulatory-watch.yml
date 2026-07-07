@@ -20,7 +20,7 @@ name: Regulatory Watch
 
 on:
   schedule:
-    - cron: '0 6 * * *'   # 06:00 UTC daily
+    - cron: '19 6 * * *'   # 06:19 UTC daily (odd minute)
   workflow_dispatch:
     inputs:
       mode:

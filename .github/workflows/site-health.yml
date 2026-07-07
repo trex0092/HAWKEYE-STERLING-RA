@@ -6,7 +6,7 @@ name: Site Health
 # HAWKEYE STERLING APP Asana project (plus GitHub's own failure email).
 on:
   schedule:
-    - cron: '0 5 * * *' # 05:00 UTC daily (09:00 UAE)
+    - cron: '19 5 * * *' # 05:19 UTC daily (09:19 UAE; odd minute)
   workflow_dispatch:
 
 # Read-only probe of the live site; failure alert uses ASANA_ACCESS_TOKEN.

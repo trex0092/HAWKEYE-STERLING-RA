@@ -8,7 +8,7 @@ name: FATF Watchdog
 # silent unless the lists actually move, so the daily cadence adds no noise.
 on:
   schedule:
-    - cron: '0 6 * * *' # 06:00 UTC daily
+    - cron: '7 6 * * *' # 06:07 UTC daily (odd minute)
   workflow_dispatch:
     inputs:
       mode:
