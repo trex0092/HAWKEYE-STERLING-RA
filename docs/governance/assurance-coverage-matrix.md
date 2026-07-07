@@ -158,4 +158,4 @@ workflow has a loud failure path (red run, GitHub-issue fallback, or Asana alert
 | Transaction monitoring (FATF R.16) engine **inactive** pending a real feed | Risk **R-13** in [`ai-risk-register.md`](../aims/ai-risk-register.md) |
 | LLM triage + live-LLM bias pairs **off** pending Anthropic DPA signature | Gated by `LLM_TRIAGE=0`; [`third-party-register.md`](../aims/third-party-register.md) |
 | Write endpoints are unauthenticated by design (browser cannot hold a secret); compensating controls: origin allow-list, rate limit, input gates, no data readback | Deferred decision — Netlify Identity would close it |
-| AI Policy & Stakeholder Impact Assessment await ratification signatures | [`ai-policy.md`](ai-policy.md) §9; [`stakeholder-impact-assessment-2026.md`](stakeholder-impact-assessment-2026.md) |
+| ~~AI Policy & Stakeholder Impact Assessment await ratification signatures~~ **Closed 2026-07-02** — both ratified | [`ai-policy.md`](ai-policy.md) §9 (v1.0 ratified 2 July 2026); [`stakeholder-impact-assessment-2026.md`](stakeholder-impact-assessment-2026.md) sign-off table |

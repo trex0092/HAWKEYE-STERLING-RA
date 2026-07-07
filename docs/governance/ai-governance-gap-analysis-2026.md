@@ -89,6 +89,14 @@ these separately from the RA engine's posture in §2.
 > [`data-retention.md`](data-retention.md), and the full framework mapping in
 > [`agentic-ai-governance-6layers-2026.md`](agentic-ai-governance-6layers-2026.md).
 > **BIAS testing** and the **DPIA** remain open.
+>
+> **Update 2026-07-07.** Both are now closed: **BIAS** by the paired-prompt review
+> programme in [`advisor-bias-review-2026.md`](advisor-bias-review-2026.md) plus the
+> CI-enforced cross-script recall-parity test
+> ([`../aims/bias-fairness-testing.md`](../aims/bias-fairness-testing.md),
+> `test/bias_eval.py`), and the **DPIA** by [`dpia-2026.md`](dpia-2026.md) (PDPL,
+> covering the Anthropic processing). The EU AI Act position (AIACT tile) is now
+> assessed in full in [`eu-ai-act-assessment-2026.md`](eu-ai-act-assessment-2026.md).
 
 ---
 

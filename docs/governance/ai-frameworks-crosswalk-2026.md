@@ -43,7 +43,7 @@ and the **stakeholder impact assessment**
 
 | Framework expectation | How this system aligns |
 |---|---|
-| Risk classification | Advisor classed **limited-risk** (transparency obligations) in the asset register; not high-risk (a human makes every regulated decision). |
+| Risk classification | Advisor classed **limited-risk** (transparency obligations) in the asset register; not high-risk (a human makes every regulated decision). Full article-level assessment — territorial scope, roles, Art. 5 / Annex III sweep, Art. 4 literacy, Art. 73-equivalent clocks — in [`eu-ai-act-assessment-2026.md`](eu-ai-act-assessment-2026.md). |
 | AI inventory | [`../aims/ai-system-inventory.md`](../aims/ai-system-inventory.md) + [`ai-asset-register.md`](ai-asset-register.md), with a decision-impact tier table. |
 | Technical documentation | Model-validation pack, DPIA ([`dpia-2026.md`](dpia-2026.md)), this crosswalk set, architecture + STRIDE ([`../architecture.md`](../architecture.md)). |
 | Human oversight | Human-in-the-loop on every AI surface (Layer 5 of the 6-layer doc). |
