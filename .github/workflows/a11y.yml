@@ -1,8 +1,8 @@
 name: Accessibility (a11y)
 
-# Audits the three screens against WCAG 2.1 AA with pa11y. Reported to the job
-# summary and NON-blocking by default (so pre-existing issues don't block merges
-# on day one). To enforce, remove `continue-on-error: true` on the audit step.
+# Audits the three screens against WCAG 2.1 AA with pa11y. BLOCKING: the three
+# screens are clean (0 issues), so a newly-introduced WCAG2AA violation fails the
+# gate rather than merging silently. Results are still mirrored to the job summary.
 
 on:
   push:
@@ -40,7 +40,6 @@ jobs:
 
       - name: Audit (WCAG 2.1 AA)
         id: a11y
-        continue-on-error: true
         run: |
           set -o pipefail
           fail=0

@@ -1,6 +1,6 @@
 /* Unit tests for the Link / citation health pure logic (no network).
    Usage: node test/link-check.test.mjs */
-import { collectUrls, isDead, summarize, buildReport, ALLOWLIST, probe } from '../scripts/link-check.mjs';
+import { collectUrls, isDead, summarize, buildReport, ALLOWLIST, probe, isProbeable } from '../scripts/link-check.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -84,6 +84,17 @@ await (async () => {
   check('probe still reports a truly dead link (GET also 404)', d.ok === false && isDead(d) === true);
 })();
 globalThis.fetch = _realFetch;
+
+/* isProbeable: loopback + reserved-example placeholders (README quick-start
+   localhost, example.com) are skipped; real citation hosts are probed. */
+check('localhost dev-server example is not probeable', isProbeable('http://localhost:8000') === false);
+check('127.0.0.1 loopback is not probeable', isProbeable('http://127.0.0.1/x') === false);
+check('example.com placeholder is not probeable', isProbeable('https://example.com/a') === false);
+check('.test reserved TLD is not probeable', isProbeable('https://foo.test/bar') === false);
+check('.invalid reserved TLD is not probeable', isProbeable('https://foo.invalid/') === false);
+check('unparseable string is not probeable', isProbeable('not a url') === false);
+check('a real citation host IS probeable', isProbeable('https://www.fatf-gafi.org/') === true);
+check('the GitHub badge/repo host IS probeable', isProbeable('https://github.com/trex0092/HAWKEYE-STERLING-RA') === true);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

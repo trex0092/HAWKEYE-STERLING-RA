@@ -93,6 +93,23 @@ bump merged to `main`.
 
 ### Added
 
+- **Regression-proofing tests & gates (QA audit, 2026-07-07):**
+  - **HTML asset-integrity test** (`test/asset-integrity.test.mjs`, in CI) — asserts
+    every `href`/`src`, manifest icon, `sw.js` precache entry, `fonts.css` face and
+    stylesheet `url()` on the three screens resolves to a shipped file, so a renamed
+    or deleted asset can no longer 404 in production unnoticed.
+  - **CI coverage drift guard** (`test/ci-coverage.test.mjs`, in CI) — fails if any
+    `test/*.test.*` or `test/*.py` is not wired into `ci.yml`, or any `*.spec.mjs`
+    is not matched by a Playwright config; new tests can no longer be silently
+    orphaned in this no-runner repo.
+  - **Wider link-check coverage** — `link-check.mjs` now also scans the top-level
+    docs (README, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT, SUPPORT, CHANGELOG), so
+    a rotted README badge/link is caught too. Loopback and reserved-example
+    placeholders (the README's `localhost:8000` quick-start) are skipped via a new
+    `isProbeable()` helper so they aren't mis-reported as dead; unit-tested.
+  - **Accessibility gate is now blocking** — the pa11y WCAG 2.1 AA audit
+    (`a11y.yml`) drops `continue-on-error`; the three screens are clean, so a new
+    violation fails the gate instead of merging silently.
 - **Hash-locked Python dependencies** — `ci/requirements.txt` is now compiled from
   a new `ci/requirements.in` with `pip-compile --generate-hashes` (full transitive
   tree, sha256 for every artifact), and the three screening workflows install with
@@ -295,6 +312,12 @@ bump merged to `main`.
 
 ### Fixed
 
+- **QA audit (2026-07-07):** Corrected a truncated citation URL in
+  `docs/research/auto/REG-UPDATE-2026-06-30.md` — the UAE Ministry of Economy AML
+  page was cited as `https://www.moec.gov` (does not resolve). Restored the
+  canonical `https://www.moec.gov.ae/en/anti-money-laundering` already used in
+  `data/reg-sources.json` and every sibling reg-watch doc, clearing the sole dead
+  link the citation-health gate reported.
 - **Deep bug hunt (2026-07-02):**
   - The re-run dedup window (was 48h) could silently suppress a *legitimate*
     next-day alert whose title repeats (daily watchers run 24h apart and titles
