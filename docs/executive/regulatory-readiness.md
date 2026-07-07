@@ -42,7 +42,10 @@ labelling, documented risk management, and validation — aligns with the Annex 
 high-risk obligations. The residual delta to conformity would be: a formal
 conformity-assessment procedure, EU database registration, and CE-style
 declaration. This statement should be dated and re-confirmed at each management
-review.
+review. The full article-level assessment — territorial scope, provider/deployer
+roles, Art. 5 and Annex III sweeps, Art. 50 transparency evidence, Art. 4 literacy
+provision, and the Art. 73-equivalent incident clocks — is maintained in
+[`../governance/eu-ai-act-assessment-2026.md`](../governance/eu-ai-act-assessment-2026.md).
 
 ## Open items to disclose proactively (never discovered mid-exam)
 - Anthropic **DPA pending** — AI features gated OFF until executed.

@@ -14,7 +14,11 @@
 1. **Contain (kill switch).** In Netlify, unset `ANTHROPIC_API_KEY` → `brain-soul.js` returns **503**
    and the Advisor is disabled immediately. For reg-draft, the workflow's AI step no-ops without the key.
 2. **Notify.** Inform the MLRO within 24h; if customer PII or a tipping-off risk is involved, treat as
-   a potential data/compliance incident under the firm's IR policy.
+   a potential data/compliance incident under the firm's IR policy. **External clocks:** classify the
+   event against [`eu-ai-act-assessment-2026.md §6`](eu-ai-act-assessment-2026.md) — a breach of a
+   legal duty is assessed ≤ 48h and routed to the UAE notification duties (goAML/EOCN; PDPL breach
+   notification where personal data is affected); a serious malfunction without legal breach is
+   triaged ≤ 5 business days.
 3. **Preserve evidence.** Export the tamper-evident activity log; save `advisor-eval-report.md` and the
    workflow run; capture the offending prompt/response.
 4. **Root-cause.** Diagnose from the eval report + audit line (model, mode, hash, timestamp).

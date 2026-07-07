@@ -28,6 +28,9 @@ technical controls (which are code- and CI-enforced) and the model card in
 | 16 | In-Domain AML Coverage (FATF R.10/R.16/R.25) | A.4.2 | [in-domain-aml-coverage.md](in-domain-aml-coverage.md) |
 | 17 | Information for Interested Parties | A.8.2 | [interested-parties-information.md](interested-parties-information.md) |
 | 18 | Data-Quality Plan | A.7 | [data-quality-plan.md](data-quality-plan.md) |
+| 19 | Anthropic DPA Execution Pack | A.10 | [anthropic-dpa-execution-pack.md](anthropic-dpa-execution-pack.md) |
+| 20 | Internal Audit Programme | 9.2 | [internal-audit.md](internal-audit.md) |
+| 21 | Decommissioning & Retirement | A.6 | [decommissioning.md](decommissioning.md) |
 
 **Owner:** MLRO / Compliance. **Review cadence:** at least annually and on any
 material change to the AI system. **Retention:** 10 years (UAE FDL No. 26 of 2021,

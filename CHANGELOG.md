@@ -93,6 +93,35 @@ bump merged to `main`.
 
 ### Added
 
+- **Governance pack completion (2026-07-07)** — closes the gaps a full corpus
+  audit (all 50+ governance/AIMS/model docs) found against ISO/IEC 42001, the EU
+  AI Act, and lifecycle coverage:
+  - **Internal Audit Programme** (`docs/aims/internal-audit.md`, ISO 42001 §9.2) —
+    the missing leg of the 9.1→9.2→9.3→10.2 Check-Act loop: criteria, three-tier
+    schedule (continuous automated evidence / quarterly thematic / annual
+    full-system), single-maintainer independence handling (automated-evidence
+    primacy, MLRO judgement, external-audit option), clause-by-clause checklist,
+    findings loop into the CAPA log and management review.
+  - **EU AI Act assessment** (`docs/governance/eu-ai-act-assessment-2026.md`) —
+    deepens the one-line crosswalk classification into a full article-level
+    assessment: territorial scope (voluntary benchmark today), provider/deployer
+    role analysis incl. Anthropic as GPAI provider, honest Art. 5 and Annex III
+    sweeps, Art. 50 transparency evidence (the CI-asserted on-screen notice),
+    an **Art. 4 AI-literacy provision** per role recorded in competency-records,
+    and **Art. 73-equivalent serious-incident clocks** wired into the incident
+    runbook and mapped to the binding UAE duties (goAML/EOCN, PDPL breach).
+  - **Decommissioning & retirement procedure** (`docs/aims/decommissioning.md`,
+    ISO 42001 A.6 lifecycle end) — records-first archival (10-year AML retention
+    survives the system), dependency-ordered switch-off incl. a self-destructing
+    service worker so retired PWA clients don't boot from cache forever, key
+    revocation walked from `.env.example`, vendor exit, register updates, and a
+    verification checklist.
+  - **Governance pack index** (`docs/governance/README.md`) — the 24-document
+    pack was the only one without an index; rescues the orphaned
+    `pqc-readiness.md` and `backup-recovery.md`, groups the corpus by function
+    with framework refs, and is linked (with the AIMS and model-card indexes)
+    from the root README. `docs/aims/README.md` gains the three missing rows
+    (Anthropic DPA pack, internal audit, decommissioning).
 - **Regression-proofing tests & gates (QA audit, 2026-07-07):**
   - **HTML asset-integrity test** (`test/asset-integrity.test.mjs`, in CI) — asserts
     every `href`/`src`, manifest icon, `sw.js` precache entry, `fonts.css` face and
@@ -312,6 +341,12 @@ bump merged to `main`.
 
 ### Fixed
 
+- **Stale governance claims corrected (2026-07-07).** The gap-analysis note
+  saying "BIAS testing and the DPIA remain open" now records both as closed
+  (advisor-bias-review + CI recall-parity test; dpia-2026.md), and the
+  assurance-coverage-matrix known-gaps row for "await ratification signatures"
+  records the 2026-07-02 ratification of the AI Policy and Stakeholder Impact
+  Assessment. Docs must never claim a gap that reality has closed — or vice versa.
 - **Required-check deadlock on non-code PRs.** `Dependency Review` and the
   Cross-Browser `smoke` job are REQUIRED statuses in branch protection but were
   path-gated, so any PR that touched only docs/tests/workflows waited on them
