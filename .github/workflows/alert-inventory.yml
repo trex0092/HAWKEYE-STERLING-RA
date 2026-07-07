@@ -1,0 +1,60 @@
+name: Code-Scanning Alert Inventory (manual)
+
+# Triage aid for CAPA item CA-13 (open code-scanning alerts): dumps every OPEN
+# code-scanning alert — number, tool, rule, severity, file:line — to the job
+# summary so the alerts can be triaged (fixed or dismissed-with-reason) from a
+# single list. Read-only: security-events:read + the API host only. The daily
+# AI Governance Report counts these alerts; this workflow enumerates them.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  security-events: read
+
+concurrency:
+  group: alert-inventory
+  cancel-in-progress: true
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = the GitHub REST API only (alert listing).
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+      - name: List open code-scanning alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          page=1; total=0
+          {
+            echo "## Open code-scanning alerts — $REPO"
+            echo ""
+            echo "| # | Tool | Rule | Severity | Location |"
+            echo "|---|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          while :; do
+            resp=$(curl -s \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/code-scanning/alerts?state=open&per_page=100&page=${page}")
+            count=$(echo "$resp" | jq 'length')
+            [ "$count" = "0" ] && break
+            echo "$resp" | jq -r '.[] | "| \(.number) | \(.tool.name) | \(.rule.id) | \(.rule.security_severity_level // .rule.severity) | \(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line) |"' >> "$GITHUB_STEP_SUMMARY"
+            # machine-readable copy in the log for downstream triage
+            echo "$resp" | jq -c '.[] | {number, tool: .tool.name, rule: .rule.id, severity: (.rule.security_severity_level // .rule.severity), path: .most_recent_instance.location.path, line: .most_recent_instance.location.start_line, message: .most_recent_instance.message.text}'
+            total=$((total+count))
+            page=$((page+1))
+          done
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Total open alerts: ${total}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "TOTAL_OPEN_ALERTS=${total}"

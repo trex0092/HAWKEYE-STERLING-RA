@@ -122,6 +122,13 @@ bump merged to `main`.
     with framework refs, and is linked (with the AIMS and model-card indexes)
     from the root README. `docs/aims/README.md` gains the three missing rows
     (Anthropic DPA pack, internal audit, decommissioning).
+- **Repo-hygiene & triage utilities** (both manual-only, least-privilege,
+  egress-blocked to the GitHub API): `branch-cleanup.yml` deletes the 39
+  verified squash-merged stale branches from issue #190 (dry-run by default;
+  literal `DELETE` confirm to act; idempotent), and `alert-inventory.yml`
+  enumerates every open code-scanning alert (tool, rule, severity, location)
+  to the job summary — the triage list for CAPA CA-13 that the daily
+  governance report only counts.
 - **Schedule punctuality: all crons moved off the top of the hour.** Measured
   against fire times, GitHub's best-effort cron was running the daily
   compliance schedules 2–5 h late (e.g. Daily Screening 00:00→03:41, Daily
