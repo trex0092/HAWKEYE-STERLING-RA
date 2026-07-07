@@ -10,7 +10,7 @@ name: AI Governance Report
 # Needs the ASANA_ACCESS_TOKEN secret; reads run states with the runner token.
 on:
   schedule:
-    - cron: '45 7 * * *' # 07:45 UTC daily (11:45 UAE), after the Daily Compliance Brief (07:00)
+    - cron: '51 7 * * *' # 07:51 UTC daily (11:51 UAE), after the Daily Compliance Brief (07:09)
   workflow_dispatch:
 
 permissions:

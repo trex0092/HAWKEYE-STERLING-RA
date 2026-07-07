@@ -5,7 +5,7 @@ name: Stale
 
 on:
   schedule:
-    - cron: '0 1 * * *'   # 01:00 UTC daily
+    - cron: '13 1 * * *'   # 01:13 UTC daily (odd minute)
   workflow_dispatch:
 
 permissions:

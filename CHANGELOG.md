@@ -122,6 +122,15 @@ bump merged to `main`.
     with framework refs, and is linked (with the AIMS and model-card indexes)
     from the root README. `docs/aims/README.md` gains the three missing rows
     (Anthropic DPA pack, internal audit, decommissioning).
+- **Schedule punctuality: all crons moved off the top of the hour.** Measured
+  against fire times, GitHub's best-effort cron was running the daily
+  compliance schedules 2–5 h late (e.g. Daily Screening 00:00→03:41, Daily
+  Brief 07:00→11:39) — `:00` is the platform's most congested, most-delayed
+  slot. All 18 top-of-hour schedules now fire at distinct odd minutes in the
+  same hour (ordering preserved: screening → watchers → brief → governance
+  report → freshness). This follows GitHub's own guidance and reduces —
+  but cannot contractually eliminate — schedule drift; guaranteed-time
+  execution would require an external dispatcher (documented option).
 - **Tier-3 shared-secret gate armed** (`APP_SHARED_TOKEN` set in the Netlify
   environment). The gate ships in `_auth.js` but was dormant; with it armed, a
   request with no browser Origin (curl/bot) must present `X-App-Token`, closing
