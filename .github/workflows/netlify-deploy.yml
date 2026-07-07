@@ -41,7 +41,7 @@ jobs:
         # This job handles NETLIFY_BUILD_HOOK_URL + ASANA_ACCESS_TOKEN and makes
         # outbound calls to Netlify + the live site + Asana. Block egress to those
         # hosts only, so a compromised dependency can't exfiltrate the tokens.
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           disable-sudo: true
           egress-policy: block
