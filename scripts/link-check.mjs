@@ -90,12 +90,25 @@ export function buildReport(results, today) {
 }
 
 /* ── Network (runner only) ── */
+/* Probe like a real browser. Many WAFs (Cloudflare, Imperva) 403 a bare bot
+   User-Agent even though the page loads fine for a human — the point of the check
+   is "does this citation work in a browser", so send a realistic UA + Accept
+   headers. This alone flips most anti-bot 403s to 200; a handful of hardened
+   government/standards WAFs still challenge automation (they answer 403/429, i.e.
+   the origin IS live — the citation works for a human) and are treated as such. */
+const BROWSER_HEADERS = {
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'accept-language': 'en-US,en;q=0.9',
+  'accept-encoding': 'gzip, deflate, br',
+  'upgrade-insecure-requests': '1'
+};
 export async function probe(url, timeoutMs = 20000) {
   for (const method of ['HEAD', 'GET']) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { method, redirect: 'follow', signal: ctrl.signal, headers: { 'user-agent': 'Mozilla/5.0 HawkeyeSterling-LinkCheck/1.0' } });
+      const res = await fetch(url, { method, redirect: 'follow', signal: ctrl.signal, headers: BROWSER_HEADERS });
       clearTimeout(t);
       // GET is authoritative; a successful HEAD is conclusive. Any NON-OK HEAD
       // (not only 405/501) retries with GET before judging — some servers
