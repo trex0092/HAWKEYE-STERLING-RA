@@ -122,6 +122,13 @@ bump merged to `main`.
     with framework refs, and is linked (with the AIMS and model-card indexes)
     from the root README. `docs/aims/README.md` gains the three missing rows
     (Anthropic DPA pack, internal audit, decommissioning).
+- **Branch-protection drift guard** (`test/protection-contexts.test.mjs`, in CI) —
+  locks out both merge-deadlock classes fixed on 2026-07-07: every required
+  status context in `.github/settings.yml` must equal a check name some workflow
+  job actually reports (name mismatch → "Expected" forever), and every workflow
+  carrying a required job must trigger on `pull_request` without a
+  `paths`/`paths-ignore` filter (path-gated required check → non-matching PRs can
+  never merge). Negative-tested against both regression classes.
 - **Regression-proofing tests & gates (QA audit, 2026-07-07):**
   - **HTML asset-integrity test** (`test/asset-integrity.test.mjs`, in CI) — asserts
     every `href`/`src`, manifest icon, `sw.js` precache entry, `fonts.css` face and
