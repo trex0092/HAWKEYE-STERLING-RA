@@ -122,6 +122,15 @@ bump merged to `main`.
     with framework refs, and is linked (with the AIMS and model-card indexes)
     from the root README. `docs/aims/README.md` gains the three missing rows
     (Anthropic DPA pack, internal audit, decommissioning).
+- **Tier-3 shared-secret gate armed** (`APP_SHARED_TOKEN` set in the Netlify
+  environment). The gate ships in `_auth.js` but was dormant; with it armed, a
+  request with no browser Origin (curl/bot) must present `X-App-Token`, closing
+  the omit-Origin bypass of the origin allow-list. The repo's own six
+  server-side callers (netlify-deploy / asana-delivery-diag verify curls,
+  function-health probes) now send the site's own `Origin` header — the
+  origin-guarded front door — so they work identically whether or not the gate
+  is armed and need no GitHub-side secret. Takes live effect on the next
+  production deploy (functions snapshot env at deploy time).
 - **Branch-protection drift guard** (`test/protection-contexts.test.mjs`, in CI) —
   locks out both merge-deadlock classes fixed on 2026-07-07: every required
   status context in `.github/settings.yml` must equal a check name some workflow

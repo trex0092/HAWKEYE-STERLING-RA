@@ -73,7 +73,7 @@ jobs:
           set -u
           REF="VERIFY-${GITHUB_RUN_ID}"
           HTTP=$(curl -sS -o resp.json -w '%{http_code}' -X POST "$ENDPOINT" \
-            -H "Content-Type: application/json" \
+            -H "Content-Type: application/json" -H "Origin: https://hawkeye-sterling-ra.netlify.app" \
             -d "{\"name\":\"VERIFY delivery routing CDD 12\",\"ref\":\"${REF}\",\"band\":\"CDD\",\"score\":12,\"notes\":\"routing verification - safe to delete\"}")
           echo "HTTP $HTTP"
           cat resp.json; echo

@@ -59,7 +59,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-task" \
-            -H "Content-Type: application/json" \
+            -H "Content-Type: application/json" -H "Origin: https://hawkeye-sterling-ra.netlify.app" \
             -d '{}')
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "asana-task → HTTP $STATUS"
@@ -74,7 +74,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/risk-backup" \
-            -H "Content-Type: application/json" \
+            -H "Content-Type: application/json" -H "Origin: https://hawkeye-sterling-ra.netlify.app" \
             -d '{}')
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "risk-backup → HTTP $STATUS"
@@ -89,7 +89,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/brain-soul" \
-            -H "Content-Type: application/json" \
+            -H "Content-Type: application/json" -H "Origin: https://hawkeye-sterling-ra.netlify.app" \
             -d '{}')
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "brain-soul → HTTP $STATUS"
