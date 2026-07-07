@@ -49,6 +49,22 @@ export function taskBandScore(t) {
   return m ? { band: m[1], score: m[2] != null ? m[2] : '' } : { band: '', score: '' };
 }
 
+/* Is this task a per-assessment delivery — the only kind the reconciliation
+   compares against the register? A delivery from netlify/functions/asana-task.js
+   carries a stable fingerprint: the external id stamped at creation (= the
+   assessment ref), or — for tasks predating external-id stamping — a
+   "<ref> · … · <BAND>[ <score>]" name whose trailing segment holds a risk-band
+   token. Housekeeping mirrors and the governance / report / sign-off cards a human
+   files into the same project (policy ratifications, board asks, …) carry neither,
+   so they must never be counted as a delivery gap, orphan or duplicate. */
+export function isAssessmentTask(t) {
+  const name = String((t && t.name) || '');
+  if (HOUSEKEEPING.has(name)) return false;
+  if (t && t.external && t.external.gid) return true;
+  if (name.indexOf(' · ') <= 0) return false;
+  return !!taskBandScore(t).band;
+}
+
 /* Diff the app register against the live Asana tasks. Pure — no I/O. */
 export function reconcile(register, tasks) {
   const regByRef = new Map();
@@ -56,7 +72,9 @@ export function reconcile(register, tasks) {
 
   const taskByRef = new Map();
   for (const t of (tasks || [])) {
-    if (HOUSEKEEPING.has(String((t && t.name) || ''))) continue;
+    /* Skip housekeeping mirrors AND non-delivery cards (governance/report/manual):
+       only real assessment deliveries are reconciled against the register. */
+    if (!isAssessmentTask(t)) continue;
     const ref = taskRef(t);
     if (!ref) continue;
     if (!taskByRef.has(ref)) taskByRef.set(ref, []);
@@ -164,9 +182,13 @@ async function main() {
 
   if (diff.total > 0 && asanaEnabled()) {
     const link = runUrl();
+    /* The report's first line is the count summary; render it once as the bold lead
+       and put only the section detail in the <pre> block (no duplicated summary). */
+    const [summary, ...rest] = report.split('\n');
+    const detail = rest.join('\n').trim();
     const html = '<body><h2>Asana ↔ RA reconciliation — ' + diff.total + ' discrepancy(ies)</h2>'
-      + '<strong>' + esc(report.split('\n')[0]) + '</strong>'
-      + '<pre>' + esc(report) + '</pre>'
+      + '<strong>' + esc(summary) + '</strong>'
+      + (detail ? '<pre>' + esc(detail) + '</pre>' : '')
       + (link ? '<a href="' + esc(link) + '">View the run</a>' : '') + '</body>';
     await notifyAsana('RA ↔ Asana reconciliation — ' + diff.total + ' discrepancy(ies)', report, { html });
   }

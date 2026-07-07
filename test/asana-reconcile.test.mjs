@@ -1,7 +1,7 @@
 /* Unit tests for the pure diff logic in scripts/asana-reconcile.mjs — the weekly
    RA ↔ Asana drift check. No network: only the exported pure helpers are used.
    Usage: node test/asana-reconcile.test.mjs */
-import { reconcile, taskRef, taskBandScore, renderReport } from '../scripts/asana-reconcile.mjs';
+import { reconcile, taskRef, taskBandScore, renderReport, isAssessmentTask } from '../scripts/asana-reconcile.mjs';
 
 let passed = 0, failed = 0;
 const check = (n, c) => { if (c) { passed++; console.log('  ok  ' + n); } else { failed++; console.log('FAIL  ' + n); } };
@@ -13,6 +13,14 @@ check('taskRef is empty for a delimiter-less name', taskRef({ name: 'No delimite
 
 check('taskBandScore parses "· EDD 24"', (() => { const b = taskBandScore({ name: 'R · X · EDD 24' }); return b.band === 'EDD' && b.score === '24'; })());
 check('taskBandScore parses a tokenised name "R · CDD 19"', (() => { const b = taskBandScore({ name: 'R · CDD 19' }); return b.band === 'CDD' && b.score === '19'; })());
+
+/* isAssessmentTask: only real deliveries (external id, or a band-shaped name) are
+   reconciled — housekeeping mirrors and governance/report/manual cards are not. */
+check('isAssessmentTask true for an external-id delivery', isAssessmentTask({ name: 'R-1 · Co · CDD 19', external: { gid: 'R-1' } }) === true);
+check('isAssessmentTask true for a band-shaped name (pre-external-id delivery)', isAssessmentTask({ name: 'R-2 · Co · EDD 24' }) === true);
+check('isAssessmentTask false for a housekeeping mirror', isAssessmentTask({ name: 'ASSESSMENT REGISTER (auto-backup)' }) === false);
+check('isAssessmentTask false for a governance ratification card', isAssessmentTask({ name: '✅ RATIFIED 2026-07-02 — AI Policy v1.0 · Stakeholder Impact Assessment · DPIA §6 (Luisa Fernanda, MLRO)' }) === false);
+check('isAssessmentTask false for a delimiter-less manual note', isAssessmentTask({ name: 'Board deck slide 26 follow-up' }) === false);
 
 const register = [
   { ref: 'A-1', entity: 'Alpha', outcome: 'CDD', total: 19, complete: true },
@@ -48,6 +56,22 @@ const clean = reconcile(
   [{ gid: '9', name: 'B-1 · Co · CDD 19', external: { gid: 'B-1' } }]
 );
 check('a fully-reconciled state reports zero discrepancies', clean.total === 0);
+
+/* Regression (2026-07-06 run): a governance ratification card filed by a human into
+   the app project — no external id, no risk-band token, but a " · " in its name —
+   must NOT be reported as an orphan. Previously taskRef() took its leading name
+   segment as a "ref" and the empty register made it a phantom discrepancy. */
+const govCard = reconcile([], [
+  { gid: 'g1', name: '✅ RATIFIED 2026-07-02 — AI Policy v1.0 · Stakeholder Impact Assessment · DPIA §6 (Luisa Fernanda, MLRO)', completed: true }
+]);
+check('a governance ratification card is not an orphan', govCard.orphans.length === 0);
+check('a governance ratification card is not counted as a task', govCard.counts.tasks === 0);
+check('empty register + only a governance card → zero discrepancies', govCard.total === 0);
+
+/* A genuine assessment orphan (real delivery shape) is still caught even with an
+   empty register — the reconciliation loses no real signal. */
+const realOrphan = reconcile([], [{ gid: 'o1', name: 'Z-1 · Co · EDD 30', external: { gid: 'Z-1' } }]);
+check('a real assessment delivery with no register entry is still an orphan', realOrphan.orphans.some(o => o.ref === 'Z-1'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

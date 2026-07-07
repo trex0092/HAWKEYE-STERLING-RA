@@ -295,6 +295,16 @@ bump merged to `main`.
 
 ### Fixed
 
+- **Asana reconciliation false positive.** The weekly RA ↔ Asana drift check
+  (`scripts/asana-reconcile.mjs`) treated *every* non-housekeeping task in the
+  app project as a per-assessment delivery, so a governance/report card a human
+  files there (e.g. the "✅ RATIFIED — AI Policy v1.0" board sign-off) was
+  reported as an **orphan** discrepancy. It now reconciles only real deliveries
+  from `netlify/functions/asana-task.js`, identified by their stable fingerprint
+  (an `external.gid`, or a `<ref> · … · <BAND> <score>` name) via a new
+  `isAssessmentTask()` guard — genuine assessment orphans are still caught.
+  Also removed a duplicated summary line in the filed card's rich-text body.
+  Regression-tested (`test/asana-reconcile.test.mjs`).
 - **Deep bug hunt (2026-07-02):**
   - The re-run dedup window (was 48h) could silently suppress a *legitimate*
     next-day alert whose title repeats (daily watchers run 24h apart and titles
