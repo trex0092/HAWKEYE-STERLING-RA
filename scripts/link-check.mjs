@@ -146,6 +146,15 @@ async function main() {
   const report = buildReport(results, today);
   writeFileSync(REPORT_FILE, report + '\n');
   console.log(report);
+  /* Full per-URL status table (stdout only — never in the filed report/issue). Lets a
+     maintainer confirm every citation truly resolves, beyond the binary dead/not-dead
+     call: a 403 anti-bot or allowlisted link counts as "not dead" but is worth an eye. */
+  console.log('\n--- all links (tag · status · url) ---');
+  for (const r of [...results].sort((a, b) => a.url.localeCompare(b.url))) {
+    const st = r.status != null ? String(r.status) : (r.error || 'no-response');
+    const tag = r.ok ? 'ok' : (ALLOWLIST.has(r.url) ? 'allow' : (isDead(r) ? 'DEAD' : 'antibot'));
+    console.log('[link] ' + tag + '\t' + st + '\t' + r.url);
+  }
   console.log('\nchecked=' + results.length + '  dead=' + dead);
   setOutput('dead_count', String(dead));
   setOutput('has_dead', dead ? 'true' : 'false');
