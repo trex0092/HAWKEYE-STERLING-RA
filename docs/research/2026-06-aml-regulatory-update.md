@@ -83,7 +83,7 @@ e) The 03/2026 MoET Supplemental Guidance for DPMS (single source). [19]
 21. The National, UAE imposes $11.4m in fines in H1 2025: https://www.thenationalnews.com/business/2025/07/24/uae-imposes-114m-in-fines-during-first-half-of-2025-on-money-laundering-offenders/
 22. UAE MOFA, NAMLCFTC replaces the Executive Office: https://www.mofa.gov.ae/en/mediahub/news/2024/9/23/23-9-2024-uae-national-anti-money-laundering2
 23. CBUAE Rulebook, Federal Decree-Law No. (7) of 2024: https://rulebook.centralbank.ae/en/rulebook/federal-law-decree-no-7-2024-amending-certain-provisions-federal-law-law-no-20-2018-anti
-24. UAE Government Portal, goAML registration (anti-money laundering platform): https://u.ae/en/information-and-services/business/combatting-money-laundering/anti-money-laundering-platform
+24. UAE Financial Intelligence Unit — goAML (company/DNFBP registration): https://www.uaefiu.gov.ae/en/
 25. AML UAE, goAML registration guide: https://amluae.com/goaml-registration-guide/
 26. UAE FIU, DPMS guidance (October 2022): https://www.uaefiu.gov.ae/media/igjeqjap/dealers-in-precious-metals-and-stones-october-2022.pdf
 27. AML UAE, DPMSR: https://amluae.com/dealers-in-precious-metals-and-stones-report-dpmsr/
