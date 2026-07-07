@@ -23,6 +23,12 @@ concurrency:
 
 jobs:
   review:
+    # Display name MUST stay "Dependency Review": branch protection
+    # (.github/settings.yml → required_status_checks.contexts) requires the
+    # status context by this exact string. Without an explicit name the check
+    # reports as the job id ("review"), never matches, and every PR waits on
+    # "Dependency Review — Expected" forever.
+    name: Dependency Review
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

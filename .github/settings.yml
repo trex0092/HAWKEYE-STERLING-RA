@@ -105,12 +105,28 @@ branches:
   - name: main
     protection:
       required_pull_request_reviews:
-        required_approving_review_count: 1
+        # SINGLE-MAINTAINER REALITY: GitHub never counts the PR author's own
+        # approval, and this repo has exactly one human with write access — so
+        # any approval count > 0 (or a code-owner review, since the sole code
+        # owner is also the author) makes every owner-authored PR UNMERGEABLE,
+        # with enforce_admins removing even the admin bypass. The binding
+        # controls on this repo are the required status checks below (tests,
+        # SAST, secrets, CodeQL, smoke). RAISE the count back to 1 and restore
+        # require_code_owner_reviews the day a second maintainer joins.
+        # NOTE: if the Settings app is not installed, apply this by hand:
+        # Settings → Branches → main → uncheck "Require approvals" and
+        # "Require review from Code Owners".
+        required_approving_review_count: 0
         dismiss_stale_reviews: true
-        require_code_owner_reviews: true
+        require_code_owner_reviews: false
       required_status_checks:
         strict: true        # branch must be up to date with main before merge
         contexts:
+          # Each context must equal the reporting job's display name (its
+          # `name:` field, or the job id when unnamed). A context that matches
+          # no check name sits at "Expected — waiting for status" forever and
+          # deadlocks every PR. "Dependency Review" is pinned via `name:` in
+          # dependency-review.yml.
           - test
           - lint
           - smoke

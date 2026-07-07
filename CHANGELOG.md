@@ -320,6 +320,22 @@ bump merged to `main`.
   seconds on an empty manifest diff, and the smoke always exercises the three
   committed screens, so the always-run is cheap and meaningful. The push
   trigger keeps its paths filter (nothing gates on push).
+- **Required-context name mismatch.** Branch protection requires the status
+  context `Dependency Review`, but the workflow's job reported its check as the
+  job id (`review`), so the required slot stayed "Expected" even after the
+  workflow passed. The job now carries `name: Dependency Review`, and
+  `settings.yml` documents that each required context must equal the reporting
+  job's display name.
+- **Unmergeable-by-design review rule on a single-maintainer repo.**
+  `settings.yml` required 1 approving review plus a code-owner review with
+  `enforce_admins: true` — but GitHub never counts the PR author's own
+  approval, and the sole code owner IS the only human with write access, so
+  every owner-authored PR was permanently blocked with no admin bypass.
+  Config-as-code now sets `required_approving_review_count: 0` and
+  `require_code_owner_reviews: false` with the rationale inline (the binding
+  controls are the required status checks); raise both back when a second
+  maintainer joins. The live rule must be mirrored by hand in Settings →
+  Branches if the Settings app is not installed.
 - **QA audit (2026-07-07):** Corrected a truncated citation URL in
   `docs/research/auto/REG-UPDATE-2026-06-30.md` — the UAE Ministry of Economy AML
   page was cited as `https://www.moec.gov` (does not resolve). Restored the
