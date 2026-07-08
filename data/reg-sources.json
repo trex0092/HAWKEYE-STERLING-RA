@@ -189,6 +189,22 @@
       "narrative": "The jewellery and watch industry's standards and certification body: the Code of Practices (COP — full-scope responsible business including AML/KYC provisions), the Chain of Custody (CoC) standard, and the Laboratory Grown Material Standard (LGMS), each with assessment manuals and accredited-auditor requirements. Publishes standards revisions, audit/certification-requirement changes (e.g. Standards & Audit Changes information packs), governance announcements and progress reports. A change usually means revised certification requirements members must meet at next audit. Feeds: gold/jewellery sector answers, responsible-sourcing tools, and RJC-certification citations.",
       "url": "https://www.responsiblejewellery.com/",
       "type": "html"
+    },
+    {
+      "id": "probe-moet-aml",
+      "name": "PROBE MoET AML page (new domain)",
+      "jurisdiction": "UAE",
+      "category": "Probe",
+      "narrative": "Temporary probe: the Ministry of Economy rebranded to Ministry of Economy & Tourism (moet.gov.ae). This checks whether the AML page exists on the new domain and whether the Internet Archive holds captures of it. Branch-only; removed before merge.",
+      "url": "https://www.moet.gov.ae/en/anti-money-laundering"
+    },
+    {
+      "id": "probe-moet-home",
+      "name": "PROBE MoET homepage",
+      "jurisdiction": "UAE",
+      "category": "Probe",
+      "narrative": "Temporary probe: archive-capture coverage check for the ministry's new homepage. Branch-only; removed before merge.",
+      "url": "https://www.moet.gov.ae/"
     }
   ]
 }
