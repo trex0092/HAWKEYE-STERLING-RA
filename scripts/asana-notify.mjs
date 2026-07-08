@@ -176,7 +176,9 @@ export function esc(s) {
    changed source becomes a list item. Returns a single <body>…</body> root. */
 export function buildHtmlBody({ heading, summary, changes = [], runLink }) {
   const items = changes.map(c => {
-    const what = c.status === 'new' ? 'first snapshot recorded' : 'content changed';
+    const what = c.status === 'new' ? 'first snapshot recorded'
+      : c.status === 'unreachable' ? ('UNREACHABLE — ' + esc(c.detail || 'fetch failing repeatedly') + ' — monitoring gap, investigate')
+      : 'content changed';
     const link = c.url ? ' — <a href="' + esc(c.url) + '">open source</a>' : '';
     const juris = c.jurisdiction ? ' (' + esc(c.jurisdiction) + ')' : '';
     return '<li><strong>' + esc(c.name) + '</strong>' + juris + ' — ' + what + link + '</li>';

@@ -1,7 +1,11 @@
 /* Unit tests for the Regulatory Watch pure logic (no network).
    Usage: node test/reg-watch.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport } from '../scripts/reg-watch.mjs';
+import {
+  loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
+  persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
+  captureAcceptable, tsToIsoDate, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
+} from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -111,6 +115,86 @@ check('report names changed sources and the data files to edit',
 check('report folds fetch errors into a no-action note', rep.includes('could not be fetched') && rep.includes('Source D'));
 check('report is quiet when nothing moved',
   buildReport([{ id: 'c', name: 'C', status: 'unchanged' }], '2026-06-16').includes('No regulatory content changes detected'));
+
+/* ── Error streaks: consecutive failures accumulate, success clears ── */
+const zSrc = [{ id: 'z', name: 'Z', jurisdiction: 'Global', url: 'https://z' }];
+const fail = { z: { ok: false, status: 403, error: 'HTTP 403' } };
+let st = { sources: { z: { hash: fingerprint('good z'), bytes: 6, changedAt: '2026-06-01', status: 200 } } };
+let streaks = [];
+for (let day = 1; day <= ERROR_STREAK_ALERT + 1; day++) {
+  const r = computeChanges(zSrc, st, fail, '2026-07-0' + day);
+  streaks.push(r.changes[0].errorStreak);
+  st = r.state;
+}
+check('error streak counts consecutive failed runs', streaks.join() === '1,2,3,4');
+check('persistentErrors fires exactly once, when the streak crosses ' + ERROR_STREAK_ALERT,
+  (() => {
+    let s2 = { sources: { z: { hash: 'h', bytes: 5, changedAt: '2026-06-01', status: 200 } } };
+    const hits = [];
+    for (let day = 1; day <= ERROR_STREAK_ALERT + 2; day++) {
+      const r = computeChanges(zSrc, s2, fail, '2026-07-0' + day);
+      hits.push(persistentErrors(r.changes).length);
+      s2 = r.state;
+    }
+    return hits.join() === '0,0,1,0,0';
+  })());
+check('a clean fetch clears the error streak and stale error fields', (() => {
+  const r = computeChanges(zSrc, st, { z: { ok: true, status: 200, body: 'good z' } }, '2026-07-09');
+  const rec = r.state.sources.z;
+  return rec.errorStreak === undefined && rec.error === undefined && r.changes[0].status === 'unchanged';
+})());
+
+/* ── stateMateriallyChanged: checkedAt alone is not material ── */
+const base1 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-01', changedAt: '2026-06-01', status: 200 } } };
+const base2 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-02', changedAt: '2026-06-01', status: 200 } } };
+const base3 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-02', changedAt: '2026-06-01', status: 403, error: 'HTTP 403', errorStreak: 1 } } };
+check('checkedAt-only refresh is not a material state change', !stateMateriallyChanged(base1, base2));
+check('an advancing error streak IS a material state change', stateMateriallyChanged(base2, base3));
+
+/* ── Wayback fallback plumbing ── */
+check('rawSnapshotUrl adds the id_ flag and upgrades to https',
+  rawSnapshotUrl('http://web.archive.org/web/20260707120000/https://www.centralbank.ae/en/cbuae-amlcft/')
+    === 'https://web.archive.org/web/20260707120000id_/https://www.centralbank.ae/en/cbuae-amlcft/');
+check('snapshotAgeDays: malformed timestamp is Infinity (never trusted)',
+  snapshotAgeDays('nonsense') === Infinity && snapshotAgeDays('') === Infinity);
+check('snapshotAgeDays: a fresh capture is within the stale window', (() => {
+  const now = Date.UTC(2026, 6, 8, 12, 0, 0);
+  return snapshotAgeDays('20260707120000', now) <= SNAPSHOT_STALE_DAYS
+    && snapshotAgeDays('20260601120000', now) > SNAPSHOT_STALE_DAYS;
+})());
+check('tsToIsoDate converts a wayback timestamp, rejects garbage',
+  tsToIsoDate('20260627105659') === '2026-06-27' && tsToIsoDate('junk') === null);
+check('captureAcceptable: reversed-alert guard — a capture older than the recorded content is rejected', (() => {
+  const now = Date.UTC(2026, 6, 8, 12, 0, 0);
+  return !captureAcceptable('20260627105659', '2026-07-01', now)     /* older than baseline: rejected */
+    && captureAcceptable('20260702120000', '2026-07-01', now)        /* newer than baseline: accepted */
+    && captureAcceptable('20260627105659', null, now)                /* no baseline: any recent capture beats zero coverage */
+    && !captureAcceptable('20220702120000', null, now);              /* ...but never past the hard age cap */
+})());
+check('BASELINE_SNAPSHOT_MAX_DAYS caps baseline captures', (() => {
+  const now = Date.UTC(2026, 6, 8, 12, 0, 0);
+  return captureAcceptable('20260501120000', null, now)              /* 68d — inside the cap */
+    && !captureAcceptable('20260401120000', null, now);              /* 98d — outside */
+})());
+check('fetchWithFallback returns the direct response when it succeeds (no wayback call)',
+  await (async () => {
+    let calls = 0;
+    const fn = async () => { calls++; return { ok: true, status: 200, body: 'direct', error: null }; };
+    const r = await fetchWithFallback('https://x', fn);
+    return r.body === 'direct' && !r.via && calls === 1;
+  })());
+
+/* ── Report: persistent failures are loud, transient ones stay folded ── */
+const loudRep = buildReport([
+  { id: 'a', name: 'Alive', status: 'unchanged' },
+  { id: 'b', name: 'Blip', status: 'error', detail: 'HTTP 500', errorStreak: 1, url: 'https://b' },
+  { id: 'c', name: 'Dead', status: 'error', detail: 'HTTP 403', errorStreak: ERROR_STREAK_ALERT, url: 'https://c' }
+], '2026-07-08');
+check('report shouts about persistently unreachable sources',
+  loudRep.includes('persistently unreachable') && loudRep.includes('Dead')
+  && loudRep.includes('failing ' + ERROR_STREAK_ALERT + ' consecutive runs'));
+check('report keeps one-off blips in the folded no-action note',
+  loudRep.includes('could not be fetched') && loudRep.includes('Blip'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

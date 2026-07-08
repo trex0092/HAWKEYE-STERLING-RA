@@ -77,6 +77,51 @@ export function fingerprint(raw) {
   return createHash('sha256').update(extractText(raw), 'utf8').digest('hex');
 }
 
+/* ── Persistent-failure alerting ──
+   A single failed fetch is routine (site hiccup, runner egress blip) and is
+   re-checked next run. A source failing this many CONSECUTIVE runs is a
+   monitoring gap — it gets flagged on the Asana card exactly once, when the
+   streak crosses the threshold, so an outage can never decay silently. */
+export const ERROR_STREAK_ALERT = 3;
+export function persistentErrors(changes) {
+  return changes.filter(c => c.status === 'error' && c.errorStreak === ERROR_STREAK_ALERT);
+}
+
+/* ── Wayback fallback helpers (also used by fatf-watchdog for the same
+   reason: several regulators 403/418 datacenter fetchers). A snapshot is
+   trusted only when fresh, and always requested with the id_ flag so the
+   bytes are the origin's own HTML (no wayback toolbar/rewriting) and the
+   fingerprint stays comparable with direct fetches. */
+export const SNAPSHOT_STALE_DAYS = 7;
+export const BASELINE_SNAPSHOT_MAX_DAYS = 90;
+export function snapshotAgeDays(ts, now = Date.now()) {
+  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(String(ts || ''));
+  if (!m) return Infinity;
+  return (now - Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) / 86400000;
+}
+export function rawSnapshotUrl(url) {
+  return String(url || '').replace(/^http:/, 'https:').replace(/(\/web\/\d{14})\//, '$1id_/');
+}
+export function tsToIsoDate(ts) {
+  const m = /^(\d{4})(\d{2})(\d{2})/.exec(String(ts || ''));
+  return m ? m[1] + '-' + m[2] + '-' + m[3] : null;
+}
+/* Whether an archived capture is safe to fingerprint. Unlike the FATF
+   Watchdog (which diffs list SEMANTICS and must refuse anything stale), the
+   Regulatory Watch only needs a monotonic baseline: a capture can never
+   raise a reversed/false "changed" alert as long as it is not OLDER than
+   the content we already recorded (notBefore = the source's changedAt).
+   For a source with no baseline at all, any capture within
+   BASELINE_SNAPSHOT_MAX_DAYS beats zero coverage — its age is recorded as
+   `via` provenance so the reviewer sees exactly what was fingerprinted. */
+export function captureAcceptable(ts, notBefore, now = Date.now()) {
+  const day = tsToIsoDate(ts);
+  if (!day) return false;
+  if (snapshotAgeDays(ts, now) > BASELINE_SNAPSHOT_MAX_DAYS) return false;
+  if (notBefore) return day >= notBefore;
+  return true;
+}
+
 /* ── Diff fetched content against stored state ──
    fetched: object (or Map) id -> { ok, status, body, error }
    Returns { changes:[...], state }. Each change has a status:
@@ -102,26 +147,31 @@ export function computeChanges(sources, prevState, fetched, today) {
       const detail = okResponse ? 'empty response (no text content)'
         : (f && (f.error || ('HTTP ' + (f && f.status)))) || 'fetch failed';
       const status = (f && f.status) || 'error';
+      const errorStreak = ((old && old.errorStreak) || 0) + 1;
       stateSources[s.id] = old
-        ? { ...old, checkedAt: today, status, error: detail }
-        : { hash: null, bytes: 0, checkedAt: today, changedAt: null, status, error: detail };
-      changes.push({ ...base(s), status: 'error', detail });
+        ? { ...old, checkedAt: today, status, error: detail, errorStreak }
+        : { hash: null, bytes: 0, checkedAt: today, changedAt: null, status, error: detail, errorStreak };
+      changes.push({ ...base(s), status: 'error', detail, errorStreak });
       continue;
     }
     const hash = fingerprint(f.body);
     const bytes = text.length;
+    /* Provenance: how the content was obtained (direct vs wayback fallback). */
+    const via = f.via ? { via: f.via } : {};
     if (!old) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200 };
-      changes.push({ ...base(s), status: 'new', newHash: hash });
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, ...via };
+      changes.push({ ...base(s), status: 'new', newHash: hash, ...via });
     } else if (old.hash == null) {
       /* first good snapshot after a prior error — record silently, no PR */
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200 };
-      changes.push({ ...base(s), status: 'recovered', newHash: hash });
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, ...via };
+      changes.push({ ...base(s), status: 'recovered', newHash: hash, ...via });
     } else if (old.hash !== hash) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, prevHash: old.hash };
-      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes });
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, prevHash: old.hash, ...via };
+      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes, ...via });
     } else {
-      stateSources[s.id] = { ...old, checkedAt: today, status: f.status || 200 };
+      /* Rebuild rather than spread so a stale error/errorStreak from a past
+         failed run is cleared the moment the source fetches clean again. */
+      stateSources[s.id] = { hash: old.hash, bytes: old.bytes, checkedAt: today, changedAt: old.changedAt, status: f.status || 200, ...(old.prevHash ? { prevHash: old.prevHash } : {}), ...via };
       changes.push({ ...base(s), status: 'unchanged' });
     }
   }
@@ -130,6 +180,20 @@ export function computeChanges(sources, prevState, fetched, today) {
 
 export function contentChanges(changes) {
   return changes.filter(c => c.status === 'new' || c.status === 'changed');
+}
+
+/* True when anything other than checkedAt moved (hash, status, error,
+   errorStreak, provenance). Drives the workflow's state commit so error
+   streaks persist across runs even when no content changed — without it a
+   source could fail every day and the streak would reset each run. */
+export function stateMateriallyChanged(prevState, nextState) {
+  const strip = st => JSON.stringify(Object.fromEntries(
+    Object.entries((st && st.sources) || {}).map(([id, v]) => {
+      const { checkedAt: _checkedAt, ...rest } = v || {};
+      return [id, rest];
+    })
+  ));
+  return strip(prevState) !== strip(nextState);
 }
 
 /* ── Human-readable report (PR body + committed artifact) ── */
@@ -160,7 +224,15 @@ export function buildReport(changes, today, mode) {
       lines.push('| ' + c.name + ' | ' + (c.jurisdiction || '') + ' | ' + (c.status === 'new' ? 'first snapshot' : 'content changed') + ' | ' + c.url + ' |');
     }
   }
-  if (errors.length) appendErrors(lines, errors);
+  const stuck = errors.filter(e => (e.errorStreak || 0) >= ERROR_STREAK_ALERT);
+  if (stuck.length) {
+    lines.push('');
+    lines.push('**⚠ ' + stuck.length + ' source(s) persistently unreachable — a monitoring gap, investigate:**');
+    lines.push('');
+    for (const e of stuck) lines.push('- ' + e.name + ' — ' + e.detail + ' — failing ' + e.errorStreak + ' consecutive runs (' + e.url + ')');
+  }
+  const transient = errors.filter(e => (e.errorStreak || 0) < ERROR_STREAK_ALERT);
+  if (transient.length) appendErrors(lines, transient);
   lines.push('');
   lines.push('_Detection is automatic; wording changes are a reviewed decision. Country black/grey list moves are handled by the FATF Watchdog._');
   return lines.join('\n');
@@ -175,23 +247,136 @@ function appendErrors(lines, errors) {
   lines.push('</details>');
 }
 
-/* ── Network (only used by the runner, not by tests) ── */
-async function fetchSource(s, timeoutMs = 25000) {
+/* ── Network (only used by the runner, not by tests) ──
+   Browser-equivalent headers (same as fatf-watchdog): several regulators
+   (CBUAE, FATF, OECD, NAMLCFTC, UN) reject non-browser user-agents from
+   datacenter IPs, which starved those sources of any snapshot at all. */
+const BROWSER_HEADERS = {
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+  'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en'
+};
+
+async function fetchDirect(url, timeoutMs = 25000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(s.url, {
-      signal: ctrl.signal,
-      redirect: 'follow',
-      headers: { 'user-agent': 'HawkeyeSterling-RegWatch/1.0 (+compliance monitor)', 'accept': 'text/html,application/xhtml+xml,application/xml,application/json;q=0.9,*/*;q=0.8' }
-    });
+    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: BROWSER_HEADERS });
     const body = await res.text();
-    return { ok: res.ok, status: res.status, body: res.ok ? body : '' , error: res.ok ? null : ('HTTP ' + res.status) };
+    return { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
   } catch (e) {
-    return { ok: false, status: 'error', body: '', error: String(e && e.message || e).slice(0, 200) };
+    /* undici hides the real network failure (TLS, DNS, reset) in e.cause —
+       surface it, or "fetch failed" is all the state ever records. */
+    const cause = e && e.cause && (e.cause.code || e.cause.message);
+    const msg = String(e && e.message || e) + (cause ? ' (' + cause + ')' : '');
+    return { ok: false, status: 'error', body: '', error: msg.slice(0, 200) };
   } finally {
     clearTimeout(t);
   }
+}
+
+/* Serialize Save Page Now requests: anonymous SPN rate-limits per IP, and
+   GitHub-hosted runners share IP pools, so parallel bursts guarantee 429s.
+   One request at a time with a courtesy gap maximizes the chance of a slot. */
+let spnChain = Promise.resolve();
+function enqueueSpn(fn) {
+  const run = spnChain.then(fn, fn);
+  spnChain = run.then(() => new Promise(r => setTimeout(r, 3000)), () => {});
+  return run;
+}
+
+/* Direct fetch with one retry on transient network failure, then the same
+   two-stage Wayback fallback the FATF Watchdog uses for sources whose bot
+   protection 403/418s the runner outright:
+     2. Save Page Now — archive.org fetches the LIVE page from its side and
+        returns a timestamped capture (their crawler is not bot-blocked);
+     3. failing that, archive.org's most recent EXISTING capture.
+   Only a FRESH capture is ever trusted (never stale — diffing an old
+   snapshot would raise reversed/false alerts), and the content is always
+   re-fetched with the id_ flag so the bytes are the origin's own HTML and
+   fingerprints stay comparable with direct fetches.
+   `fetchFn` is injectable so tests never hit the network. */
+export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
+  const notBefore = opts.notBefore || null; /* ISO date of the content we already hold */
+  let direct = await fetchFn(url);
+  if (direct.ok) return direct;
+  if (direct.status === 'error') {
+    /* transient network failure/timeout — one retry before falling back */
+    await new Promise(r => setTimeout(r, 3000));
+    direct = await fetchFn(url);
+    if (direct.ok) return direct;
+  }
+  /* 2. Save Page Now — serialized (see enqueueSpn) and honoring Retry-After,
+     because anonymous SPN rate-limits shared runner IPs hard. Every outcome
+     is logged — a silent fallback is undiagnosable from a green run. */
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await enqueueSpn(async () => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 75000); /* SPN crawls live — allow longer than a direct fetch */
+        try {
+          return await fetch('https://web.archive.org/save/' + url, { headers: BROWSER_HEADERS, redirect: 'follow', signal: ctrl.signal });
+        } finally { clearTimeout(t); }
+      });
+      const ts = (/\/web\/(\d{14})/.exec(r.url || '') || [])[1] || '';
+      console.log('save-page-now ' + url + ' (attempt ' + attempt + '): HTTP ' + r.status + ' -> ' + (r.url || '(no url)'));
+      if (r.ok && ts && captureAcceptable(ts, notBefore)) {
+        const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+        console.log('save-page-now capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
+        if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts };
+      }
+      if (r.ok) break;
+      if (r.status !== 429 && r.status < 500) break; /* only 429/5xx are worth retrying */
+      if (attempt < 2) {
+        const ra = Math.min(30, Number(r.headers?.get?.('retry-after')) || 0) * 1000;
+        await new Promise(res => setTimeout(res, ra || 8000));
+      }
+    } catch (e) {
+      console.warn('save-page-now failed for ' + url + ' (attempt ' + attempt + '): ' + String(e && e.message || e).slice(0, 120));
+      if (attempt < 2) await new Promise(r => setTimeout(r, 8000));
+    }
+  }
+  /* 3. Most recent existing capture, if acceptable as a baseline. */
+  const ts = await waybackLatestTs(url);
+  if (ts && captureAcceptable(ts, notBefore)) {
+    const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+    console.log('wayback capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
+    if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts };
+  } else if (ts) {
+    console.log('wayback: latest capture of ' + url + ' is ' + ts + ' (' + Math.round(snapshotAgeDays(ts)) + 'd old'
+      + (notBefore ? ', baseline ' + notBefore : '') + ') — not acceptable');
+  } else {
+    console.log('wayback: no capture found for ' + url);
+  }
+  return direct; /* original failure — recorded as status:error, re-checked next run */
+}
+
+/* Newest capture timestamp for a URL. The CDX index is authoritative; the
+   availability API (kept as a backup) often serves a stale cache. */
+async function waybackLatestTs(url) {
+  try {
+    const r = await fetch('https://web.archive.org/cdx/search/cdx?url=' + encodeURIComponent(url)
+      + '&output=json&fl=timestamp,statuscode&filter=statuscode:200&limit=-1', { headers: BROWSER_HEADERS });
+    console.log('wayback cdx ' + url + ': HTTP ' + r.status);
+    if (r.ok) {
+      const rows = await r.json();
+      const last = Array.isArray(rows) && rows.length > 1 ? rows[rows.length - 1] : null;
+      if (last && last[0]) return String(last[0]);
+    }
+  } catch (e) {
+    console.warn('wayback cdx failed for ' + url + ': ' + String(e && e.message || e).slice(0, 120));
+  }
+  try {
+    const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(url), { headers: BROWSER_HEADERS });
+    console.log('wayback availability ' + url + ': HTTP ' + av.status);
+    if (av.ok) {
+      const closest = (await av.json())?.archived_snapshots?.closest;
+      if (closest && closest.timestamp) return String(closest.timestamp);
+    }
+  } catch (e) {
+    console.warn('wayback availability failed for ' + url + ': ' + String(e && e.message || e).slice(0, 120));
+  }
+  return null;
 }
 
 function loadState() {
@@ -215,7 +400,18 @@ async function main() {
   const prevState = loadState();
 
   const fetched = {};
-  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchSource(s); }));
+  await Promise.all(sources.map(async s => {
+    /* A source with recorded content must never be fingerprinted from an
+       archive capture older than that content (reversed-alert guard). */
+    const prev = (prevState.sources || {})[s.id];
+    const notBefore = prev && prev.hash ? (prev.changedAt || null) : null;
+    fetched[s.id] = await fetchWithFallback(s.url, undefined, { notBefore });
+  }));
+  for (const s of sources) {
+    const f = fetched[s.id];
+    if (f && f.via) console.log(s.id + ': via ' + f.via);
+    else if (f && !f.ok) console.log(s.id + ': ' + (f.error || ('HTTP ' + f.status)));
+  }
 
   const { changes, state } = computeChanges(sources, prevState, fetched, today);
   const moved = contentChanges(changes);
@@ -227,18 +423,37 @@ async function main() {
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
   writeFileSync(REPORT_FILE, report + '\n');
 
-  const flagged = mode === 'seed' ? [] : moved;
+  /* A source crossing the persistent-failure threshold is flagged on the
+     Asana card alongside content changes — a dead source is itself a
+     monitoring event, not something to bury in a gitignored report. */
+  const alerts = mode === 'seed' ? [] : persistentErrors(changes).map(c => ({
+    ...c, status: 'unreachable',
+    detail: (c.detail || 'fetch failed') + ' — failing ' + c.errorStreak + ' consecutive runs'
+  }));
+  const flagged = mode === 'seed' ? [] : [...moved, ...alerts];
   writeFileSync(CHANGES_FILE, JSON.stringify({ date: today, mode, changes: flagged }, null, 2) + '\n');
 
-  const count = mode === 'seed' ? seeded : moved.length;
-  const prTitle = mode === 'seed'
-    ? 'Regulatory Watch — baseline (' + seeded + ' source' + (seeded === 1 ? '' : 's') + ')'
-    : 'Regulatory Watch — ' + count + ' source change' + (count === 1 ? '' : 's');
+  const plural = n => n === 1 ? '' : 's';
+  let prTitle;
+  if (mode === 'seed') {
+    prTitle = 'Regulatory Watch — baseline (' + seeded + ' source' + plural(seeded) + ')';
+  } else if (moved.length && alerts.length) {
+    prTitle = 'Regulatory Watch — ' + moved.length + ' source change' + plural(moved.length) + ' + ' + alerts.length + ' unreachable';
+  } else if (alerts.length) {
+    prTitle = 'Regulatory Watch — ' + alerts.length + ' source' + plural(alerts.length) + ' unreachable';
+  } else if (moved.length) {
+    prTitle = 'Regulatory Watch — ' + moved.length + ' source change' + plural(moved.length);
+  } else {
+    prTitle = 'Regulatory Watch — state refresh (no content changes)';
+  }
 
   console.log(report);
-  console.log('\nmode=' + mode + '  content-changes=' + moved.length + '  errors=' + errors.length + '  seeded=' + seeded);
+  console.log('\nmode=' + mode + '  content-changes=' + moved.length + '  errors=' + errors.length + '  unreachable-alerts=' + alerts.length + '  seeded=' + seeded);
   setOutput('has_changes', flagged.length ? 'true' : 'false');
-  setOutput('changed_count', String(count));
+  /* Commit state whenever anything beyond checkedAt moved (e.g. an error
+     streak advanced) so persistent-failure tracking survives between runs. */
+  setOutput('state_dirty', stateMateriallyChanged(prevState, state) ? 'true' : 'false');
+  setOutput('changed_count', String(mode === 'seed' ? seeded : moved.length));
   setOutput('pr_title', prTitle);
   setOutput('report_file', REPORT_FILE);
 }

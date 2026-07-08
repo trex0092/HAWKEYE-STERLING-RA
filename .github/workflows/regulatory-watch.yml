@@ -50,6 +50,15 @@ jobs:
           # reg-watch records that source as status:error in the daily report (with
           # recovered-state suppression), it never silently drops a change.
           egress-policy: block
+          # The list must include every REDIRECT TARGET too, not just the
+          # registry hostnames: www.moec.gov.ae → www.moet.gov.ae,
+          # www.uaefiu.gov.ae → uaefiu.gov.ae, www.namlcftc.gov.ae →
+          # namlcftc.gov.ae, www.dmcc.ae → dmcc.ae, www.wolfsberg-principles.com
+          # → wolfsberg-group.org, www.un.org → main.un.org (all verified from
+          # the 2026-07-01 audit-mode egress log). Blocking a redirect hop
+          # starves that source of every snapshot while the run stays green.
+          # archive.org + web.archive.org serve the Wayback fallback for
+          # sources whose bot protection 403/418s the runner directly.
           allowed-endpoints: >
             github.com:443
             api.github.com:443
@@ -58,21 +67,35 @@ jobs:
             nodejs.org:443
             app.asana.com:443
             api.anthropic.com:443
+            archive.org:443
+            web.archive.org:443
             www.moec.gov.ae:443
+            www.moet.gov.ae:443
+            moet.gov.ae:443
             www.uaefiu.gov.ae:443
+            uaefiu.gov.ae:443
             www.namlcftc.gov.ae:443
+            namlcftc.gov.ae:443
             www.uaeiec.gov.ae:443
+            uaeiec.gov.ae:443
             www.centralbank.ae:443
+            centralbank.ae:443
             www.vara.ae:443
+            vara.ae:443
             www.dmcc.ae:443
+            dmcc.ae:443
             www.fatf-gafi.org:443
+            fatf-gafi.org:443
             www.wolfsberg-principles.com:443
+            wolfsberg-group.org:443
+            www.wolfsberg-group.org:443
             www.responsiblemineralsinitiative.org:443
             www.responsiblejewellery.com:443
             www.lbma.org.uk:443
             mneguidelines.oecd.org:443
             ofac.treasury.gov:443
             www.un.org:443
+            main.un.org:443
             www.unodc.org:443
             finance.ec.europa.eu:443
             www.gov.uk:443
@@ -112,7 +135,10 @@ jobs:
         run: node scripts/watch-notify.mjs "$PR_TITLE" reg-watch-report.md reg-watch-changes.json
 
       - name: Commit refreshed fingerprint state to main
-        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        # state_dirty covers runs with no content change but a material state
+        # move (e.g. a source's error streak advanced) — without committing
+        # those, persistent-failure tracking would reset every run.
+        if: steps.watch.outputs.has_changes == 'true' || steps.watch.outputs.state_dirty == 'true' || inputs.mode == 'seed'
         env:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
         run: |

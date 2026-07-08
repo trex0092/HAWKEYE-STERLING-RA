@@ -12,7 +12,7 @@
    opens. Model id per the repo's Claude usage standard: claude-opus-4-8
    (override with ANTHROPIC_MODEL, e.g. claude-sonnet-4-6 to cut cost). */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { extractText, CHANGES_FILE } from './reg-watch.mjs';
+import { extractText, CHANGES_FILE, fetchWithFallback } from './reg-watch.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
@@ -29,17 +29,17 @@ try {
 } catch (e) {
   skip('changes file unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
 }
+/* Draft only for real content changes — an 'unreachable' alert entry has no
+   new page text to analyse; it is on the card purely to surface the gap. */
+if (Array.isArray(changes)) changes = changes.filter(c => c.status === 'new' || c.status === 'changed');
 if (!Array.isArray(changes) || !changes.length) skip('no content changes');
 
 async function fetchText(url) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 25000);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-RegWatch/1.0' } });
-    const body = await res.text();
-    return extractText(body).slice(0, 6000);
-  } catch (e) { return '(could not fetch: ' + String(e && e.message || e).slice(0, 120) + ')'; }
-  finally { clearTimeout(t); }
+  /* Same direct→wayback fetch chain as the watcher, so bot-blocked sources
+     that were fingerprinted via a snapshot can be drafted from it too. */
+  const res = await fetchWithFallback(url);
+  if (!res.ok) return '(could not fetch: ' + String(res.error || ('HTTP ' + res.status)).slice(0, 120) + ')';
+  return extractText(res.body).slice(0, 6000);
 }
 
 async function draftFor(c) {
