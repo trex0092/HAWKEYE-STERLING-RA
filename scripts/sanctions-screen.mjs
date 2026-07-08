@@ -714,7 +714,9 @@ async function loadSanctionsLists(cfg) {
   let fetched = 0;
   await Promise.all(sources.map(async (s) => {
     try {
-      const body = await fetchListBody(s, cfg.listTimeoutMs);
+      /* Per-source override for slow generators (SECO's SESAM service builds the
+         full-list XML on request and blows the flat 60s budget). */
+      const body = await fetchListBody(s, Number(s.timeoutMs) || cfg.listTimeoutMs);
       const names = parseList(s, body);
       if (!names.length) { notes.push(s.name + ' parsed 0 names — coverage degraded'); console.error('sanctions-screen: ' + s.id + ' parsed 0 names'); return; }
       lists.push({ id: s.id, name: s.name, names });
@@ -770,6 +772,22 @@ async function screenLocally(subjects, cfg) {
      large (and growing) customer base can never push the job past its timeout.
      Skipped enrichment is recorded, NOT treated as degraded sanctions coverage. */
   const enrichDeadline = Date.now() + cfg.enrichBudgetMs;
+  /* Heartbeat with memory readings: on 2026-07-08 two consecutive runs were
+     killed at VM level ("runner received a shutdown signal") ~9.5 min into this
+     phase with zero output in between, leaving no way to tell a CPU stall from
+     enrichment pace from memory growth. The trajectory below makes the next
+     such death diagnosable from the log alone. */
+  const phaseStart = Date.now();
+  let phaseDone = 0;
+  const heartbeat = () => {
+    phaseDone++;
+    if (phaseDone % 50 === 0 || phaseDone === subjects.length) {
+      const mu = process.memoryUsage();
+      console.log('sanctions-screen: progress ' + phaseDone + '/' + subjects.length
+        + ' subjects — ' + Math.round((Date.now() - phaseStart) / 1000) + 's — rss '
+        + Math.round(mu.rss / 1048576) + 'MB heap ' + Math.round(mu.heapUsed / 1048576) + 'MB');
+    }
+  };
   const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr);   // { name, topScore, band, recommendation, hitCount, lists[] }
     const lists = [...raw.lists];
@@ -820,6 +838,7 @@ async function screenLocally(subjects, cfg) {
     };
     const nr = normalizeResult(merged, s);
     nr.enrichmentIncomplete = enrichmentIncomplete;
+    heartbeat();
     return nr;
   });
 

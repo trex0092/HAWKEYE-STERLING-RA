@@ -58,7 +58,8 @@
       "type": "xml",
       "parser": "seco",
       "enabled": true,
-      "_note": "Switzerland SECO consolidated sanctions list (Gesamtliste XML via the SESAM search service). Re-enabled 2026-07-08 with the dedicated parseSecoXml extractor (nested name-part/value blocks). The curated file remains a fallback; a failed fetch or 0-name parse degrades coverage loudly.",
+      "timeoutMs": 150000,
+      "_note": "Switzerland SECO consolidated sanctions list (Gesamtliste XML via the SESAM search service). Re-enabled 2026-07-08 with the dedicated parseSecoXml extractor (nested name-part/value blocks). SESAM generates the full-list XML server-side and needs well over the default 60s (both 2026-07-08 runs aborted at the flat timeout), hence the per-source 150s. A failed fetch or 0-name parse degrades coverage loudly.",
       "url": "https://www.sesam.search.admin.ch/sesam-search-web/pages/downloadXmlGesamtliste.xhtml?action=downloadXmlGesamtlisteAction"
     },
     {
@@ -67,8 +68,8 @@
       "jurisdiction": "Global",
       "type": "xlsx",
       "parser": "dfat",
-      "enabled": true,
-      "_note": "Australia DFAT Consolidated List — published only as .xlsx; parsed by the zero-dependency parseDfatXlsx reader (primary names + per-row aliases). Re-enabled 2026-07-08. A layout change degrades to fewer/zero names, visibly.",
+      "enabled": false,
+      "_note": "Australia DFAT Consolidated List (.xlsx, parseDfatXlsx reader). DISABLED 2026-07-08: the legacy sites/default/files/regulation8_consolidated.xlsx path returns HTTP 404 (verified on two live runs) — DFAT launched an 'Improved Consolidated List' on 6 Nov 2025 and retired the old path; dfat.gov.au bot-blocks automated discovery of the new download URL. To re-enable: open https://www.dfat.gov.au/international-relations/security/sanctions/consolidated-list in a browser, copy the current .xlsx link here, and verify the header row still carries the name columns parseDfatXlsx expects.",
       "url": "https://www.dfat.gov.au/sites/default/files/regulation8_consolidated.xlsx"
     },
     {
@@ -78,8 +79,8 @@
       "url": "https://apigwext.worldbank.org/dvsvc/v1.0/json/APPLICATION/ADOBE_EXPRNC_APP/FIRM/SANCTIONED_FIRM",
       "type": "json",
       "parser": "json",
-      "enabled": true,
-      "_note": "World Bank listing of ineligible (debarred) firms & individuals — public JSON API. Re-enabled 2026-07-08; the generic JSON parser harvests SUPP_NAME records. A failed fetch or 0-name parse degrades coverage loudly."
+      "enabled": false,
+      "_note": "World Bank listing of ineligible (debarred) firms & individuals. DISABLED 2026-07-08: the apigwext gateway now answers HTTP 401 (verified on two live runs) — the endpoint requires an API key, and this system takes no per-source account/key dependencies. Debarment is procurement-eligibility data, not financial sanctions, so daily coverage is not weakened. Re-enable only if the Bank restores keyless access or publishes a static file."
     }
   ]
 }
