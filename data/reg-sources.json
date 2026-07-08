@@ -6,8 +6,8 @@
       "name": "UAE Ministry of Economy (MoE) — DNFBP / DPMS supervisor",
       "jurisdiction": "UAE",
       "category": "Supervisor",
-      "narrative": "Federal supervisor for Designated Non-Financial Businesses and Professions under Federal Decree-Law No. 20 of 2018 (as amended by No. 26 of 2021) and Cabinet Decision No. 10 of 2019 — covering Dealers in Precious Metals and Stones (DPMS), real-estate brokers, auditors and corporate service providers. Publishes DPMS registration and goAML onboarding requirements, supervisory guidance, administrative-penalty decisions, and the AED 55,000 cash-transaction reporting trigger (DPMSR). A change here usually means new DPMS obligations, penalty schedules or reporting-threshold guidance. Feeds: DPMS/real-estate Regulatory Q&A answers, sector tools, and compliance-calendar items in assets/super-data.js. Fetch note: the ministry (rebranded Ministry of Economy & Tourism, moet.gov.ae) blocks all datacenter connections — monitored via the web-capture fallback; persistent failures alert to Asana.",
-      "url": "https://www.moec.gov.ae/en/anti-money-laundering",
+      "narrative": "Federal supervisor for Designated Non-Financial Businesses and Professions under Federal Decree-Law No. 20 of 2018 (as amended by No. 26 of 2021) and Cabinet Decision No. 10 of 2019 — covering Dealers in Precious Metals and Stones (DPMS), real-estate brokers, auditors and corporate service providers. Publishes DPMS registration and goAML onboarding requirements, supervisory guidance, administrative-penalty decisions, and the AED 55,000 cash-transaction reporting trigger (DPMSR). A change here usually means new DPMS obligations, penalty schedules or reporting-threshold guidance. Feeds: DPMS/real-estate Regulatory Q&A answers, sector tools, and compliance-calendar items in assets/super-data.js. Fetch note: the ministry (rebranded Ministry of Economy & Tourism) blocks ALL datacenter connections on both moec.gov.ae and moet.gov.ae, and its deep AML page has no fresh web capture — so the watcher monitors the moet.gov.ae homepage (where announcements land) via Internet Archive captures, verified fetchable. Ministry announcements on DPMS/AML surface there; deep-page changes still require the periodic manual review.",
+      "url": "https://www.moet.gov.ae/",
       "type": "html"
     },
     {
@@ -189,22 +189,6 @@
       "narrative": "The jewellery and watch industry's standards and certification body: the Code of Practices (COP — full-scope responsible business including AML/KYC provisions), the Chain of Custody (CoC) standard, and the Laboratory Grown Material Standard (LGMS), each with assessment manuals and accredited-auditor requirements. Publishes standards revisions, audit/certification-requirement changes (e.g. Standards & Audit Changes information packs), governance announcements and progress reports. A change usually means revised certification requirements members must meet at next audit. Feeds: gold/jewellery sector answers, responsible-sourcing tools, and RJC-certification citations.",
       "url": "https://www.responsiblejewellery.com/",
       "type": "html"
-    },
-    {
-      "id": "probe-moet-aml",
-      "name": "PROBE MoET AML page (new domain)",
-      "jurisdiction": "UAE",
-      "category": "Probe",
-      "narrative": "Temporary probe: the Ministry of Economy rebranded to Ministry of Economy & Tourism (moet.gov.ae). This checks whether the AML page exists on the new domain and whether the Internet Archive holds captures of it. Branch-only; removed before merge.",
-      "url": "https://www.moet.gov.ae/en/anti-money-laundering"
-    },
-    {
-      "id": "probe-moet-home",
-      "name": "PROBE MoET homepage",
-      "jurisdiction": "UAE",
-      "category": "Probe",
-      "narrative": "Temporary probe: archive-capture coverage check for the ministry's new homepage. Branch-only; removed before merge.",
-      "url": "https://www.moet.gov.ae/"
     }
   ]
 }
