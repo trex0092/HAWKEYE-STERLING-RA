@@ -77,6 +77,31 @@ export function fingerprint(raw) {
   return createHash('sha256').update(extractText(raw), 'utf8').digest('hex');
 }
 
+/* ── Persistent-failure alerting ──
+   A single failed fetch is routine (site hiccup, runner egress blip) and is
+   re-checked next run. A source failing this many CONSECUTIVE runs is a
+   monitoring gap — it gets flagged on the Asana card exactly once, when the
+   streak crosses the threshold, so an outage can never decay silently. */
+export const ERROR_STREAK_ALERT = 3;
+export function persistentErrors(changes) {
+  return changes.filter(c => c.status === 'error' && c.errorStreak === ERROR_STREAK_ALERT);
+}
+
+/* ── Wayback fallback helpers (also used by fatf-watchdog for the same
+   reason: several regulators 403/418 datacenter fetchers). A snapshot is
+   trusted only when fresh, and always requested with the id_ flag so the
+   bytes are the origin's own HTML (no wayback toolbar/rewriting) and the
+   fingerprint stays comparable with direct fetches. */
+export const SNAPSHOT_STALE_DAYS = 7;
+export function snapshotAgeDays(ts, now = Date.now()) {
+  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(String(ts || ''));
+  if (!m) return Infinity;
+  return (now - Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) / 86400000;
+}
+export function rawSnapshotUrl(url) {
+  return String(url || '').replace(/^http:/, 'https:').replace(/(\/web\/\d{14})\//, '$1id_/');
+}
+
 /* ── Diff fetched content against stored state ──
    fetched: object (or Map) id -> { ok, status, body, error }
    Returns { changes:[...], state }. Each change has a status:
@@ -102,26 +127,31 @@ export function computeChanges(sources, prevState, fetched, today) {
       const detail = okResponse ? 'empty response (no text content)'
         : (f && (f.error || ('HTTP ' + (f && f.status)))) || 'fetch failed';
       const status = (f && f.status) || 'error';
+      const errorStreak = ((old && old.errorStreak) || 0) + 1;
       stateSources[s.id] = old
-        ? { ...old, checkedAt: today, status, error: detail }
-        : { hash: null, bytes: 0, checkedAt: today, changedAt: null, status, error: detail };
-      changes.push({ ...base(s), status: 'error', detail });
+        ? { ...old, checkedAt: today, status, error: detail, errorStreak }
+        : { hash: null, bytes: 0, checkedAt: today, changedAt: null, status, error: detail, errorStreak };
+      changes.push({ ...base(s), status: 'error', detail, errorStreak });
       continue;
     }
     const hash = fingerprint(f.body);
     const bytes = text.length;
+    /* Provenance: how the content was obtained (direct vs wayback fallback). */
+    const via = f.via ? { via: f.via } : {};
     if (!old) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200 };
-      changes.push({ ...base(s), status: 'new', newHash: hash });
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, ...via };
+      changes.push({ ...base(s), status: 'new', newHash: hash, ...via });
     } else if (old.hash == null) {
       /* first good snapshot after a prior error — record silently, no PR */
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200 };
-      changes.push({ ...base(s), status: 'recovered', newHash: hash });
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, ...via };
+      changes.push({ ...base(s), status: 'recovered', newHash: hash, ...via });
     } else if (old.hash !== hash) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, prevHash: old.hash };
-      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes });
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, prevHash: old.hash, ...via };
+      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes, ...via });
     } else {
-      stateSources[s.id] = { ...old, checkedAt: today, status: f.status || 200 };
+      /* Rebuild rather than spread so a stale error/errorStreak from a past
+         failed run is cleared the moment the source fetches clean again. */
+      stateSources[s.id] = { hash: old.hash, bytes: old.bytes, checkedAt: today, changedAt: old.changedAt, status: f.status || 200, ...(old.prevHash ? { prevHash: old.prevHash } : {}), ...via };
       changes.push({ ...base(s), status: 'unchanged' });
     }
   }
@@ -130,6 +160,20 @@ export function computeChanges(sources, prevState, fetched, today) {
 
 export function contentChanges(changes) {
   return changes.filter(c => c.status === 'new' || c.status === 'changed');
+}
+
+/* True when anything other than checkedAt moved (hash, status, error,
+   errorStreak, provenance). Drives the workflow's state commit so error
+   streaks persist across runs even when no content changed — without it a
+   source could fail every day and the streak would reset each run. */
+export function stateMateriallyChanged(prevState, nextState) {
+  const strip = st => JSON.stringify(Object.fromEntries(
+    Object.entries((st && st.sources) || {}).map(([id, v]) => {
+      const { checkedAt, ...rest } = v || {};
+      return [id, rest];
+    })
+  ));
+  return strip(prevState) !== strip(nextState);
 }
 
 /* ── Human-readable report (PR body + committed artifact) ── */
@@ -160,7 +204,15 @@ export function buildReport(changes, today, mode) {
       lines.push('| ' + c.name + ' | ' + (c.jurisdiction || '') + ' | ' + (c.status === 'new' ? 'first snapshot' : 'content changed') + ' | ' + c.url + ' |');
     }
   }
-  if (errors.length) appendErrors(lines, errors);
+  const stuck = errors.filter(e => (e.errorStreak || 0) >= ERROR_STREAK_ALERT);
+  if (stuck.length) {
+    lines.push('');
+    lines.push('**⚠ ' + stuck.length + ' source(s) persistently unreachable — a monitoring gap, investigate:**');
+    lines.push('');
+    for (const e of stuck) lines.push('- ' + e.name + ' — ' + e.detail + ' — failing ' + e.errorStreak + ' consecutive runs (' + e.url + ')');
+  }
+  const transient = errors.filter(e => (e.errorStreak || 0) < ERROR_STREAK_ALERT);
+  if (transient.length) appendErrors(lines, transient);
   lines.push('');
   lines.push('_Detection is automatic; wording changes are a reviewed decision. Country black/grey list moves are handled by the FATF Watchdog._');
   return lines.join('\n');
@@ -175,23 +227,61 @@ function appendErrors(lines, errors) {
   lines.push('</details>');
 }
 
-/* ── Network (only used by the runner, not by tests) ── */
-async function fetchSource(s, timeoutMs = 25000) {
+/* ── Network (only used by the runner, not by tests) ──
+   Browser-equivalent headers (same as fatf-watchdog): several regulators
+   (CBUAE, FATF, OECD, NAMLCFTC, UN) reject non-browser user-agents from
+   datacenter IPs, which starved those sources of any snapshot at all. */
+const BROWSER_HEADERS = {
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+  'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en'
+};
+
+async function fetchDirect(url, timeoutMs = 25000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(s.url, {
-      signal: ctrl.signal,
-      redirect: 'follow',
-      headers: { 'user-agent': 'HawkeyeSterling-RegWatch/1.0 (+compliance monitor)', 'accept': 'text/html,application/xhtml+xml,application/xml,application/json;q=0.9,*/*;q=0.8' }
-    });
+    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: BROWSER_HEADERS });
     const body = await res.text();
-    return { ok: res.ok, status: res.status, body: res.ok ? body : '' , error: res.ok ? null : ('HTTP ' + res.status) };
+    return { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
   } catch (e) {
     return { ok: false, status: 'error', body: '', error: String(e && e.message || e).slice(0, 200) };
   } finally {
     clearTimeout(t);
   }
+}
+
+/* Direct fetch with one retry on transient network failure, then a Wayback
+   fallback for sources whose bot protection 403/418s the runner outright.
+   Only a FRESH existing capture is trusted (never stale — diffing an old
+   snapshot would raise reversed/false alerts), fetched with the id_ flag so
+   the bytes are the origin's own HTML and fingerprints stay comparable.
+   `fetchFn` is injectable so tests never hit the network. */
+export async function fetchWithFallback(url, fetchFn = fetchDirect) {
+  let direct = await fetchFn(url);
+  if (direct.ok) return direct;
+  if (direct.status === 'error') {
+    /* transient network failure/timeout — one retry before falling back */
+    await new Promise(r => setTimeout(r, 3000));
+    direct = await fetchFn(url);
+    if (direct.ok) return direct;
+  }
+  try {
+    const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(url), { headers: BROWSER_HEADERS });
+    if (av.ok) {
+      const closest = (await av.json())?.archived_snapshots?.closest;
+      const ts = closest && closest.timestamp;
+      if (closest && closest.url && snapshotAgeDays(ts) <= SNAPSHOT_STALE_DAYS) {
+        const snap = await fetchFn(rawSnapshotUrl(closest.url));
+        if (snap.ok && snap.body) {
+          return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('wayback fallback failed for ' + url + ': ' + String(e && e.message || e).slice(0, 120));
+  }
+  return direct; /* original failure — recorded as status:error, re-checked next run */
 }
 
 function loadState() {
@@ -215,7 +305,12 @@ async function main() {
   const prevState = loadState();
 
   const fetched = {};
-  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchSource(s); }));
+  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchWithFallback(s.url); }));
+  for (const s of sources) {
+    const f = fetched[s.id];
+    if (f && f.via) console.log(s.id + ': via ' + f.via);
+    else if (f && !f.ok) console.log(s.id + ': ' + (f.error || ('HTTP ' + f.status)));
+  }
 
   const { changes, state } = computeChanges(sources, prevState, fetched, today);
   const moved = contentChanges(changes);
@@ -227,18 +322,37 @@ async function main() {
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
   writeFileSync(REPORT_FILE, report + '\n');
 
-  const flagged = mode === 'seed' ? [] : moved;
+  /* A source crossing the persistent-failure threshold is flagged on the
+     Asana card alongside content changes — a dead source is itself a
+     monitoring event, not something to bury in a gitignored report. */
+  const alerts = mode === 'seed' ? [] : persistentErrors(changes).map(c => ({
+    ...c, status: 'unreachable',
+    detail: (c.detail || 'fetch failed') + ' — failing ' + c.errorStreak + ' consecutive runs'
+  }));
+  const flagged = mode === 'seed' ? [] : [...moved, ...alerts];
   writeFileSync(CHANGES_FILE, JSON.stringify({ date: today, mode, changes: flagged }, null, 2) + '\n');
 
-  const count = mode === 'seed' ? seeded : moved.length;
-  const prTitle = mode === 'seed'
-    ? 'Regulatory Watch — baseline (' + seeded + ' source' + (seeded === 1 ? '' : 's') + ')'
-    : 'Regulatory Watch — ' + count + ' source change' + (count === 1 ? '' : 's');
+  const plural = n => n === 1 ? '' : 's';
+  let prTitle;
+  if (mode === 'seed') {
+    prTitle = 'Regulatory Watch — baseline (' + seeded + ' source' + plural(seeded) + ')';
+  } else if (moved.length && alerts.length) {
+    prTitle = 'Regulatory Watch — ' + moved.length + ' source change' + plural(moved.length) + ' + ' + alerts.length + ' unreachable';
+  } else if (alerts.length) {
+    prTitle = 'Regulatory Watch — ' + alerts.length + ' source' + plural(alerts.length) + ' unreachable';
+  } else if (moved.length) {
+    prTitle = 'Regulatory Watch — ' + moved.length + ' source change' + plural(moved.length);
+  } else {
+    prTitle = 'Regulatory Watch — state refresh (no content changes)';
+  }
 
   console.log(report);
-  console.log('\nmode=' + mode + '  content-changes=' + moved.length + '  errors=' + errors.length + '  seeded=' + seeded);
+  console.log('\nmode=' + mode + '  content-changes=' + moved.length + '  errors=' + errors.length + '  unreachable-alerts=' + alerts.length + '  seeded=' + seeded);
   setOutput('has_changes', flagged.length ? 'true' : 'false');
-  setOutput('changed_count', String(count));
+  /* Commit state whenever anything beyond checkedAt moved (e.g. an error
+     streak advanced) so persistent-failure tracking survives between runs. */
+  setOutput('state_dirty', stateMateriallyChanged(prevState, state) ? 'true' : 'false');
+  setOutput('changed_count', String(mode === 'seed' ? seeded : moved.length));
   setOutput('pr_title', prTitle);
   setOutput('report_file', REPORT_FILE);
 }

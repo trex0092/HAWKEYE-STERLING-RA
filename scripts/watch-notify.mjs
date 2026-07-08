@@ -50,10 +50,14 @@ if (changesFile) {
 const link = runUrl();
 let html = null;
 if (changes && changes.length) {
-  const n = changes.length;
+  const moved = changes.filter(c => c.status !== 'unreachable').length;
+  const stuck = changes.length - moved;
+  const parts = [];
+  if (moved) parts.push(moved + ' source' + (moved === 1 ? '' : 's') + ' changed');
+  if (stuck) parts.push(stuck + ' source' + (stuck === 1 ? '' : 's') + ' unreachable');
   html = buildHtmlBody({
     heading: title,
-    summary: n + ' source' + (n === 1 ? '' : 's') + ' changed — review and apply any needed updates.',
+    summary: parts.join(', ') + ' — review and apply any needed updates.',
     changes,
     runLink: link
   });
