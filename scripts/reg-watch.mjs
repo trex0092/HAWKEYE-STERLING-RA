@@ -285,6 +285,48 @@ function enqueueSpn(fn) {
   return run;
 }
 
+/* Authenticated Save Page Now (SPN2 job API). With an archive.org API key —
+   set ARCHIVE_SPN_KEYS="accesskey:secret" from https://archive.org/account/s3.php —
+   captures are queued with a real per-account quota instead of the anonymous
+   per-IP lottery that 429s GitHub's shared runners. Returns the header value
+   or null when the env var is missing/malformed. */
+export function spnAuthHeader(keys) {
+  const v = String(keys || '').trim();
+  return /^[^:\s]+:[^:\s]+$/.test(v) ? 'LOW ' + v : null;
+}
+
+async function spnAuthenticatedCapture(url, auth) {
+  const jsonHeaders = { 'accept': 'application/json', 'authorization': auth, 'user-agent': BROWSER_HEADERS['user-agent'] };
+  try {
+    const r = await fetch('https://web.archive.org/save', {
+      method: 'POST',
+      headers: { ...jsonHeaders, 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'url=' + encodeURIComponent(url)
+    });
+    const j = r.ok ? await r.json().catch(() => ({})) : {};
+    console.log('spn2 submit ' + url + ': HTTP ' + r.status + (j.job_id ? ' job ' + j.job_id : ''));
+    if (!r.ok || !j.job_id) return null;
+    for (let i = 0; i < 15; i++) {
+      await new Promise(res => setTimeout(res, 6000));
+      const s = await fetch('https://web.archive.org/save/status/' + j.job_id, { headers: jsonHeaders });
+      if (!s.ok) continue;
+      const st = await s.json().catch(() => ({}));
+      if (st.status === 'success' && st.timestamp) {
+        console.log('spn2 captured ' + url + ' @ ' + st.timestamp);
+        return String(st.timestamp);
+      }
+      if (st.status === 'error') {
+        console.log('spn2 error for ' + url + ': ' + (st.status_ext || st.message || 'unknown'));
+        return null;
+      }
+    }
+    console.log('spn2 timed out waiting for capture of ' + url);
+  } catch (e) {
+    console.warn('spn2 failed for ' + url + ': ' + String(e && e.message || e).slice(0, 120));
+  }
+  return null;
+}
+
 /* Direct fetch with one retry on transient network failure, then the same
    two-stage Wayback fallback the FATF Watchdog uses for sources whose bot
    protection 403/418s the runner outright:
@@ -306,9 +348,22 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
     direct = await fetchFn(url);
     if (direct.ok) return direct;
   }
-  /* 2. Save Page Now — serialized (see enqueueSpn) and honoring Retry-After,
-     because anonymous SPN rate-limits shared runner IPs hard. Every outcome
-     is logged — a silent fallback is undiagnosable from a green run. */
+  /* 2a. Authenticated Save Page Now, when an API key is configured — a real
+     per-account quota, so a capture is guaranteed rather than a rate-limit
+     lottery. Serialized like the anonymous path. */
+  const auth = spnAuthHeader(process.env.ARCHIVE_SPN_KEYS);
+  if (auth) {
+    const ts = await enqueueSpn(() => spnAuthenticatedCapture(url, auth));
+    if (ts && captureAcceptable(ts, notBefore)) {
+      const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+      console.log('spn2 capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
+      if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts };
+    }
+  }
+  /* 2b. Anonymous Save Page Now — serialized (see enqueueSpn) and honoring
+     Retry-After, because anonymous SPN rate-limits shared runner IPs hard.
+     Every outcome is logged — a silent fallback is undiagnosable from a
+     green run. */
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const r = await enqueueSpn(async () => {

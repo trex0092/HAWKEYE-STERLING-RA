@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
   persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
-  captureAcceptable, tsToIsoDate, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
+  captureAcceptable, tsToIsoDate, spnAuthHeader, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
 } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -176,6 +176,11 @@ check('BASELINE_SNAPSHOT_MAX_DAYS caps baseline captures', (() => {
   return captureAcceptable('20260501120000', null, now)              /* 68d — inside the cap */
     && !captureAcceptable('20260401120000', null, now);              /* 98d — outside */
 })());
+check('spnAuthHeader builds a LOW header from valid keys, rejects garbage',
+  spnAuthHeader('abc123:s3cr3t') === 'LOW abc123:s3cr3t'
+  && spnAuthHeader(' abc:def ') === 'LOW abc:def'
+  && spnAuthHeader('') === null && spnAuthHeader(undefined) === null
+  && spnAuthHeader('nocolon') === null && spnAuthHeader('a:b:c') === null && spnAuthHeader('has space:x') === null);
 check('fetchWithFallback returns the direct response when it succeeds (no wayback call)',
   await (async () => {
     let calls = 0;
