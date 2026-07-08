@@ -72,6 +72,9 @@ jobs:
             archive.org:443
             web.archive.org:443
             www.moec.gov.ae:443
+            rulebook.centralbank.ae:443
+            www.oecd.org:443
+            oecd.org:443
             www.moet.gov.ae:443
             moet.gov.ae:443
             www.uaefiu.gov.ae:443

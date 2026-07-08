@@ -42,8 +42,8 @@
       "name": "UAE Central Bank (CBUAE) — AML/CFT",
       "jurisdiction": "UAE",
       "category": "Supervisor",
-      "narrative": "Supervises licensed financial institutions and exchange houses for AML/CFT and issues circulars, the AML Standards/Guidance and examination expectations. Watched so FI-facing answers, examination-readiness and transaction-monitoring tools stay current.",
-      "url": "https://www.centralbank.ae/en/cbuae-amlcft/",
+      "narrative": "Supervises licensed financial institutions and exchange houses for AML/CFT and issues circulars, the AML Standards/Guidance and examination expectations. Watched via the CBUAE Rulebook (the canonical home of regulations and standards; the marketing site centralbank.ae bot-blocks non-browser clients) so FI-facing answers, examination-readiness and transaction-monitoring tools stay current.",
+      "url": "https://rulebook.centralbank.ae/en",
       "type": "html"
     },
     {
@@ -105,8 +105,8 @@
       "name": "OECD — Responsible Mineral Supply Chains (CAHRA)",
       "jurisdiction": "Global",
       "category": "Supply chain",
-      "narrative": "Owns the Due Diligence Guidance for Responsible Supply Chains of Minerals from Conflict-Affected and High-Risk Areas (the 5-step framework) and MNE Guidelines. Watched so OECD answers and the high-risk-country / ASM risk floor reflect current guidance and Annex II shifts.",
-      "url": "https://mneguidelines.oecd.org/mining.htm",
+      "narrative": "Owns the Due Diligence Guidance for Responsible Supply Chains of Minerals from Conflict-Affected and High-Risk Areas (the 5-step framework) and MNE Guidelines. Watched via the Responsible Business Conduct topic hub on oecd.org (the legacy mneguidelines.oecd.org host bot-blocks non-browser clients) so OECD answers and the high-risk-country / ASM risk floor reflect current guidance and Annex II shifts.",
+      "url": "https://www.oecd.org/en/topics/responsible-business-conduct.html",
       "type": "html"
     },
     {

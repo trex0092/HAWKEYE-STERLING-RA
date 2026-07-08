@@ -500,8 +500,15 @@ jobs:
       - name: Create Asana screening task
         env:
           ASANA_PAT: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_PAT }}
-          ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID || '1213914392047129' }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_SECTION_GID || '1213914392047131' }}
+          # Dedicated variable names: the shared vars.ASANA_PROJECT_GID was
+          # repointed to the HAWKEYE STERLING APP project in the 1 July Asana
+          # restructure, while this section lives in Sanctions/Media/PEP —
+          # Monitoring — the mismatch made every task creation 400 ("Section
+          # must be in project"). Defaults are the verified-correct pair:
+          # project "Sanctions/Media/PEP - Monitoring" / section "Screening
+          # Daily Report".
+          ASANA_PROJECT_GID: ${{ vars.ASANA_SCREEN_PROJECT_GID || '1213914392047129' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_SCREEN_SECTION_GID || '1213914392047131' }}
           ASANA_ASSIGNEE_GID: ${{ vars.ASANA_ASSIGNEE_GID || '1213645083721304' }}
           DATE_ISO: ${{ steps.date.outputs.DATE_ISO }}
           DATE_DISPLAY: ${{ steps.date.outputs.DATE_DISPLAY }}
@@ -813,6 +820,22 @@ jobs:
               headers=headers,
               json=payload
           )
+
+          if r.status_code == 400 and "Section must be in project" in r.text:
+              # Config drift (section GID not in the target project) must never
+              # cost the delivery itself: create the task at project level —
+              # it lands untriaged at the top of the project, which is visible,
+              # not silent — and shout about the drift so it gets fixed.
+              print("⚠️ SECTION CONFIG DRIFT — section "
+                    f"{section_gid} is not in project {project_gid}; "
+                    "creating the task without a section. Fix the "
+                    "ASANA_SCREEN_SECTION_GID / ASANA_SCREEN_PROJECT_GID pair.")
+              del payload["data"]["memberships"]
+              r = requests.post(
+                  "https://app.asana.com/api/1.0/tasks",
+                  headers=headers,
+                  json=payload
+              )
 
           if r.status_code == 201:
               task_gid = r.json()["data"]["gid"]
