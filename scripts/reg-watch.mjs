@@ -273,7 +273,8 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect) {
   }
   /* 2. Save Page Now. Anonymous SPN is rate-limited and can return transient
      429/5xx, so retry once with backoff; a clean response that did not yield
-     a fresh timestamped capture will not improve on retry. */
+     a fresh timestamped capture will not improve on retry. Every outcome is
+     logged — a silent fallback is undiagnosable from a green run. */
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const ctrl = new AbortController();
@@ -281,8 +282,10 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect) {
       const r = await fetch('https://web.archive.org/save/' + url, { headers: BROWSER_HEADERS, redirect: 'follow', signal: ctrl.signal });
       clearTimeout(t);
       const ts = (/\/web\/(\d{14})/.exec(r.url || '') || [])[1] || '';
+      console.log('save-page-now ' + url + ' (attempt ' + attempt + '): HTTP ' + r.status + ' -> ' + (r.url || '(no url)'));
       if (r.ok && ts && snapshotAgeDays(ts) <= SNAPSHOT_STALE_DAYS) {
         const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+        console.log('save-page-now capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
         if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts };
       }
       if (r.ok) break;
@@ -293,22 +296,45 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect) {
     if (attempt < 2) await new Promise(r => setTimeout(r, 8000));
   }
   /* 3. Most recent existing capture, only if fresh. */
-  try {
-    const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(url), { headers: BROWSER_HEADERS });
-    if (av.ok) {
-      const closest = (await av.json())?.archived_snapshots?.closest;
-      const ts = closest && closest.timestamp;
-      if (closest && closest.url && snapshotAgeDays(ts) <= SNAPSHOT_STALE_DAYS) {
-        const snap = await fetchFn(rawSnapshotUrl(closest.url));
-        if (snap.ok && snap.body) {
-          return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts };
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('wayback fallback failed for ' + url + ': ' + String(e && e.message || e).slice(0, 120));
+  const ts = await waybackLatestTs(url);
+  if (ts && snapshotAgeDays(ts) <= SNAPSHOT_STALE_DAYS) {
+    const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+    console.log('wayback capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
+    if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts };
+  } else if (ts) {
+    console.log('wayback: latest capture of ' + url + ' is ' + ts + ' (' + Math.round(snapshotAgeDays(ts)) + 'd old) — too stale to trust');
+  } else {
+    console.log('wayback: no capture found for ' + url);
   }
   return direct; /* original failure — recorded as status:error, re-checked next run */
+}
+
+/* Newest capture timestamp for a URL. The CDX index is authoritative; the
+   availability API (kept as a backup) often serves a stale cache. */
+async function waybackLatestTs(url) {
+  try {
+    const r = await fetch('https://web.archive.org/cdx/search/cdx?url=' + encodeURIComponent(url)
+      + '&output=json&fl=timestamp,statuscode&filter=statuscode:200&limit=-1', { headers: BROWSER_HEADERS });
+    console.log('wayback cdx ' + url + ': HTTP ' + r.status);
+    if (r.ok) {
+      const rows = await r.json();
+      const last = Array.isArray(rows) && rows.length > 1 ? rows[rows.length - 1] : null;
+      if (last && last[0]) return String(last[0]);
+    }
+  } catch (e) {
+    console.warn('wayback cdx failed for ' + url + ': ' + String(e && e.message || e).slice(0, 120));
+  }
+  try {
+    const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(url), { headers: BROWSER_HEADERS });
+    console.log('wayback availability ' + url + ': HTTP ' + av.status);
+    if (av.ok) {
+      const closest = (await av.json())?.archived_snapshots?.closest;
+      if (closest && closest.timestamp) return String(closest.timestamp);
+    }
+  } catch (e) {
+    console.warn('wayback availability failed for ' + url + ': ' + String(e && e.message || e).slice(0, 120));
+  }
+  return null;
 }
 
 function loadState() {
