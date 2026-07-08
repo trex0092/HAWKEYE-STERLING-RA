@@ -23,6 +23,7 @@ export const MANDATORY = [
   { id: 'sanctions-watch.yml',         name: 'Sanctions Watch' },
   { id: 'weekly-adverse-media.yml',    name: 'Daily Screening (Sanctions + Adverse Media + PEP)' },
   { id: 'regulatory-watch.yml',        name: 'Regulatory Watch' },
+  { id: 'sanctions-screen.yml',        name: 'Sanctions Screen (case engine)' },
 ];
 
 /* UTC calendar date (YYYY-MM-DD) of an ISO timestamp. */

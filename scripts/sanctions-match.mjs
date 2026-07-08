@@ -383,7 +383,7 @@ export function parseDfatXlsx(buf) {
    names from the common name-bearing keys (and assemble first+last where a record
    splits them), plus aliases. Best-effort: returns [] if nothing recognisable, so
    the caller flags coverage degraded rather than inferring a false clear. */
-const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination)$/i;
+const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination|supp_name|firm_name)$/i;
 const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename)$/i;
 const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom)$/i;
 const JSON_ALIAS = /^(alias|aliases|aka|akas|othernames|other_names|alternativenames|alternative_names|alternatename|alternative_spelling|autresnoms)$/i;

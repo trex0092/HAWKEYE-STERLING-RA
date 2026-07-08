@@ -175,11 +175,15 @@ export function esc(s) {
    ({id,name,jurisdiction,url,status}). Asana rich text has no tables, so each
    changed source becomes a list item. Returns a single <body>…</body> root. */
 export function buildHtmlBody({ heading, summary, changes = [], runLink }) {
+  const SEV_BADGE = { HIGH: '🔴 HIGH', MEDIUM: '🟠 MEDIUM', LOW: '🟢 LOW' };
   const items = changes.map(c => {
+    /* Severity triage first, so the reviewer knows what to read first. */
+    const badge = SEV_BADGE[String(c.severity || '').toUpperCase()] || '';
+    const sev = badge ? badge + (c.severityReason ? ' (' + esc(c.severityReason) + ')' : '') + ' — ' : '';
     const what = c.status === 'new' ? 'first snapshot recorded'
       : c.status === 'unreachable' ? ('UNREACHABLE — ' + esc(c.detail || 'fetch failing repeatedly') + ' — monitoring gap, investigate')
-      : c.diff ? ('content changed — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segment(s)')
-      : 'content changed';
+      : c.diff ? (sev + 'content changed — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segment(s)')
+      : sev + 'content changed';
     const link = c.url ? ' — <a href="' + esc(c.url) + '">open source</a>' : '';
     const juris = c.jurisdiction ? ' (' + esc(c.jurisdiction) + ')' : '';
     /* Detailed delivery: itemise the actual additions/deletions on the card

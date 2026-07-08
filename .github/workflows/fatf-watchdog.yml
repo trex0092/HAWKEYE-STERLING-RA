@@ -48,6 +48,20 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
+      - name: Overlay latest list state (lives on the fatf-state branch)
+        run: |
+          # Branch protection blocks direct pushes to main (GH006), so the
+          # black/grey list state and risk-data backups live on a dedicated
+          # data branch. Without the overlay a list move would re-alert daily
+          # and diff against a stale baseline.
+          if git fetch origin fatf-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/fatf-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/risk-overrides-backup.json 2>/dev/null || true
+            echo "state overlaid from fatf-state"
+          else
+            echo "no fatf-state branch yet — using state from main"
+          fi
+
       - name: Run watchdog
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
@@ -74,10 +88,11 @@ jobs:
             git config user.email "actions@github.com"
             git add data/
             git commit -m "Watchdog: record list state / risk-data backup [skip ci]"
+            # Persist on the fatf-state branch (main is protected): rebuilt as
+            # <current main> + one data commit, force-updated.
             for attempt in 1 2 3 4 5; do
-              git push && break
-              echo "push rejected (attempt $attempt) — rebasing on origin/main"
-              git pull --rebase origin main || git rebase --abort
+              git push --force origin HEAD:refs/heads/fatf-state && break
+              echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
           else

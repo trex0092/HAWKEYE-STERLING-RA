@@ -55,6 +55,22 @@ jobs:
           else
             echo "no reg-watch-state branch — using state from main"
           fi
+          # Each data branch contributes ONLY its own files — a whole-data/
+          # checkout would overwrite one branch's fresh state with another
+          # branch's stale copy of it.
+          if git fetch origin screen-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/sanctions-screen-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/screening-cases-state.json 2>/dev/null || true
+            echo "state overlaid from screen-state"
+          fi
+          if git fetch origin sanctions-watch-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/sanctions-state.json 2>/dev/null || true
+            echo "state overlaid from sanctions-watch-state"
+          fi
+          if git fetch origin fatf-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/fatf-state.json 2>/dev/null || true
+            echo "state overlaid from fatf-state"
+          fi
 
       - name: Build and deliver the weekly summary
         id: summary

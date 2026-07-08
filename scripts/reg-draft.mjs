@@ -30,7 +30,11 @@ try {
   skip('changes file unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
 }
 /* Draft only for real content changes — an 'unreachable' alert entry has no
-   new page text to analyse; it is on the card purely to surface the gap. */
+   new page text to analyse; it is on the card purely to surface the gap.
+   Keep the FULL list for the write-back: filter() returns the same object
+   references, so severity mutations flow through, and unreachable entries
+   must survive onto the card. */
+const allChanges = Array.isArray(changes) ? changes : [];
 if (Array.isArray(changes)) changes = changes.filter(c => c.status === 'new' || c.status === 'changed');
 if (!Array.isArray(changes) || !changes.length) skip('no content changes');
 
@@ -71,7 +75,11 @@ async function draftFor(c) {
     '- **Likely app impact**: which Regulatory Q&A topics/answers or Super Tools citations in assets/super-data.js, or country/risk data in index.html, may need updating.',
     '- **Suggested citation**: the instrument/title to cite if an update is warranted.',
     '',
-    'Be concise and do NOT invent article or circular numbers that are not visible in the text. This is a proposal for human review, not a final edit.'
+    'Be concise and do NOT invent article or circular numbers that are not visible in the text. This is a proposal for human review, not a final edit.',
+    '',
+    'End your reply with exactly one final line of the form:',
+    'SEVERITY: LOW|MEDIUM|HIGH — <one short reason>',
+    '(HIGH = new/changed obligations, thresholds, instruments or deadlines; MEDIUM = substantive update worth review; LOW = routine site churn.)'
   ].join('\n');
 
   try {
@@ -90,7 +98,23 @@ async function draftFor(c) {
 }
 
 const sections = [];
-for (const c of changes) sections.push(await draftFor(c));
+for (const c of changes) {
+  const text = await draftFor(c);
+  const m = /SEVERITY:\s*(LOW|MEDIUM|HIGH)\s*[—-]?\s*(.*)$/im.exec(text);
+  if (m) {
+    c.severity = m[1].toUpperCase();
+    if (m[2]) c.severityReason = m[2].trim().slice(0, 200);
+  }
+  sections.push(text);
+}
+
+/* Persist the (possibly AI-refined) severities so the Asana notify step —
+   which runs after this one — renders the final triage labels. */
+try {
+  writeFileSync(CHANGES_FILE, JSON.stringify({ date, changes: allChanges }, null, 2) + '\n');
+} catch (e) {
+  console.warn('reg-draft: could not write refined severities back (' + (e && e.message || e) + ')');
+}
 
 const doc = [
   '# Regulatory update proposal — ' + date,

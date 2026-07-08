@@ -71,6 +71,21 @@ jobs:
       - name: Install dependencies
         run: pip install --quiet --require-hashes -r ci/requirements.txt
 
+      - name: Overlay latest delta-state (lives on the screen-delta-state branch)
+        run: |
+          # Branch protection blocks direct pushes to main (GH006 — the old
+          # main-push below failed silently since 7 Jul), so the delta-state
+          # lives on a dedicated data branch. Without the overlay every run
+          # re-reports findings already delivered.
+          if git fetch origin screen-delta-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/screen-delta-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/adverse-media-evidence.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/run-metrics.json 2>/dev/null || true
+            echo "delta-state overlaid from screen-delta-state"
+          else
+            echo "no screen-delta-state branch yet — using state from main"
+          fi
+
       - name: Run unified daily screening (sanctions + adverse media + PEP)
         env:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
@@ -96,10 +111,11 @@ jobs:
             git config user.email "actions@github.com"
             git add data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json
             git commit -m "chore(screen): update delta-state [skip ci]"
+            # Persist on the screen-delta-state branch (main is protected):
+            # rebuilt as <current main> + one data commit, force-updated.
             for attempt in 1 2 3 4 5; do
-              git push && break
-              echo "push rejected (attempt $attempt) — rebasing on origin/main"
-              git pull --rebase origin main || git rebase --abort
+              git push --force origin HEAD:refs/heads/screen-delta-state && break
+              echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
           else
