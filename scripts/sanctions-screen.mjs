@@ -46,6 +46,11 @@ export { normalizeName };
 export const STATE_FILE   = 'data/sanctions-screen-state.json';
 export const REPORT_FILE  = 'sanctions-screen-report.md';
 export const CHANGES_FILE = 'sanctions-screen-changes.json';
+/* Per-run results artifact for the case-manager step, which posts the daily
+   results digest to Asana AFTER the cases exist — so every match on the card
+   can link to its lifecycle case. The screening RESULTS surface is Asana;
+   GitHub issues remain only the fallback when Asana itself is unreachable. */
+export const RESULTS_FILE = 'sanctions-screen-results.json';
 
 /* "Customer Database" project (workspace: Compliance Tasks) — the screening
    subject of record. Override with ASANA_CUSTOMER_PROJECT_GID. */
@@ -929,6 +934,21 @@ async function main() {
   writeFileSync(STATE_FILE, JSON.stringify(nextState, null, 2) + '\n');
   writeFileSync(REPORT_FILE, report + '\n');
   writeFileSync(CHANGES_FILE, JSON.stringify(changes, null, 2) + '\n');
+  writeFileSync(RESULTS_FILE, JSON.stringify({
+    date: today,
+    screened: subjects.length, entities, individuals,
+    newMatches: alerts.length, matchCount, clearedCount: cleared.length,
+    degraded: screen.degraded,
+    lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({ name: L.name, count: (L.names || []).length })),
+    failures: screen.notes || [],
+    enrichment: { amErrors: screen.amErrors || 0, pepErrors: screen.pepErrors || 0, skipped: screen.enrichSkipped || 0 },
+    alerts: alerts.map(a => ({
+      key: a.key, name: a.name, jurisdiction: a.jurisdiction || '', band: a.band,
+      topScore: a.topScore, recommendation: a.recommendation,
+      lists: (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean)
+    })),
+    cleared: cleared.map(c => c.name)
+  }, null, 2) + '\n');
 
   console.log(report);
   console.log('\nscreened=' + subjects.length + '  new-matches=' + alerts.length + '  total-matches=' + matchCount + '  degraded=' + screen.degraded + '  errored=' + screen.errored);

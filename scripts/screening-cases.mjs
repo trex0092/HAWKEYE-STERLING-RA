@@ -22,10 +22,14 @@
    Pure planner exported for offline unit tests. */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { asana, asanaEnabled, ensureSection, esc, runUrl } from './asana-notify.mjs';
+import { asana, asanaEnabled, ensureSection, esc, runUrl, notifyAsana } from './asana-notify.mjs';
 
 export const SCREEN_STATE_FILE = 'data/sanctions-screen-state.json';
 export const CASES_FILE = 'data/screening-cases-state.json';
+/* Written by scripts/sanctions-screen.mjs in the preceding workflow step; the
+   daily results digest posts from HERE — after case creation — so every match
+   on the Asana card links to its lifecycle case. */
+export const RESULTS_FILE = 'sanctions-screen-results.json';
 export const CASE_SLA_DAYS = 5;
 export const CASE_SECTIONS = {
   new: '🚨 Screening Cases — New',
@@ -102,6 +106,71 @@ export function caseHtml(key, s, runLink) {
   return h.join('');
 }
 
+/* Daily results digest — the screening run's RESULT surface in Asana. Posted
+   every run (a clean day is affirmative evidence, not silence). Pure builder:
+   `results` is the artifact written by sanctions-screen.mjs; `caseGidFor(alert)`
+   resolves an alert to its case-task GID so the card links straight to it. */
+const BAND_BADGE = { critical: '🔴', high: '🟠', medium: '🟡', low: '🟢' };
+export function buildResultsDigestHtml(results, caseGidFor = () => null) {
+  const r = results || {};
+  const h = ['<body>'];
+  h.push('<h1>Daily sanctions screening — ' + esc(r.date || '') + '</h1>');
+  h.push('<strong>' + esc(String(r.screened ?? '?')) + ' subjects screened ('
+    + esc(String(r.entities ?? '?')) + ' entities + ' + esc(String(r.individuals ?? '?'))
+    + ' principals/UBOs) · ' + esc(String(r.matchCount ?? 0)) + ' standing match(es) · '
+    + esc(String(r.newMatches ?? 0)) + ' new</strong>');
+  if (r.degraded) h.push('<em>⚠ Coverage was DEGRADED this run (a list failed to load) — treat any &quot;no match&quot; as provisional; details under Coverage below.</em>');
+
+  h.push('<h2>New matches</h2>');
+  const alerts = Array.isArray(r.alerts) ? r.alerts : [];
+  if (!alerts.length) {
+    h.push('No new or changed matches — every subject screened clean against the loaded lists today.');
+  } else {
+    h.push('<ul>');
+    for (const a of alerts) {
+      const badge = BAND_BADGE[String(a.band || '').toLowerCase()] || '⚪';
+      const caseGid = caseGidFor(a);
+      h.push('<li>' + badge + ' <strong>' + esc(a.name || '') + '</strong>'
+        + (a.jurisdiction ? ' (' + esc(a.jurisdiction) + ')' : '')
+        + ' — ' + esc(String(a.band || '').toUpperCase()) + ' · score ' + esc(String(a.topScore ?? '?'))
+        + ' · ' + esc(a.recommendation || 'review')
+        + ' — matched on: ' + esc((a.lists || []).join(', ') || 'see case')
+        + (caseGid ? ' — <a data-asana-gid="' + esc(caseGid) + '"/>' : ' — case pending')
+        + '</li>');
+    }
+    h.push('</ul>');
+  }
+  if (r.clearedCount) h.push('<em>' + esc(String(r.clearedCount)) + ' previously recorded match(es) no longer returned — auto-moved to Cleared (informational).</em>');
+
+  const lists = Array.isArray(r.lists) ? r.lists : [];
+  const total = lists.reduce((n, L) => n + (L.count || 0), 0);
+  h.push('<h2>Coverage — ' + lists.length + ' list(s), ' + esc(String(total)) + ' designated names</h2>');
+  h.push('<ul>');
+  for (const L of lists) h.push('<li>✅ ' + esc(L.name || '') + ' — ' + esc(String(L.count ?? '?')) + ' names</li>');
+  for (const f of (r.failures || [])) h.push('<li>⚠️ ' + esc(f) + '</li>');
+  h.push('</ul>');
+  const en = r.enrichment || {};
+  if (en.amErrors || en.pepErrors || en.skipped) {
+    h.push('<em>Enrichment (best-effort, does not weaken the sanctions result): '
+      + (en.amErrors ? en.amErrors + ' adverse-media lookup(s) errored · ' : '')
+      + (en.pepErrors ? en.pepErrors + ' PEP lookup(s) errored · ' : '')
+      + (en.skipped ? en.skipped + ' subject(s) skipped enrichment at the time budget' : '')
+      + '</em>');
+  }
+  h.push('<em>Detection is automatic. Do NOT freeze, decline or report on a match before MLRO review and a two-person (four-eyes) sign-off — UAE Federal Decree-Law No. 10 of 2025 Art. 16/18; FATF R.26.</em>');
+  const link = runUrl();
+  if (link) h.push('<a href="' + esc(link) + '">View the screening run</a>');
+  h.push('</body>');
+  return h.join('');
+}
+
+export function resultsDigestTitle(results) {
+  const r = results || {};
+  return '🛡️ Sanctions Screen — ' + (r.date || '') + ' — '
+    + (r.newMatches ? r.newMatches + ' new match(es)' : 'no new matches')
+    + ' · ' + (r.screened ?? '?') + ' screened';
+}
+
 /* ── Runner ── */
 function readJson(path) {
   try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
@@ -133,16 +202,18 @@ async function main() {
   console.log('screening-cases: ' + actions.length + ' action(s) — '
     + ['create', 'age', 'clear'].map(t => t + '=' + actions.filter(a => a.type === t).length).join(' '));
 
-  if (!actions.length) { console.log('screening-cases: all cases already in the right state.'); return; }
-
-  const secNew = await ensureSection(projectGid, CASE_SECTIONS.new);
-  const secCleared = await ensureSection(projectGid, CASE_SECTIONS.cleared);
-  /* Ensure the two human sections exist too, so the board reads as a flow. */
-  await ensureSection(projectGid, CASE_SECTIONS.review);
-  await ensureSection(projectGid, CASE_SECTIONS.escalated);
-
   const link = runUrl();
   let failed = 0;
+  let secNew, secCleared;
+  if (actions.length) {
+    secNew = await ensureSection(projectGid, CASE_SECTIONS.new);
+    secCleared = await ensureSection(projectGid, CASE_SECTIONS.cleared);
+    /* Ensure the two human sections exist too, so the board reads as a flow. */
+    await ensureSection(projectGid, CASE_SECTIONS.review);
+    await ensureSection(projectGid, CASE_SECTIONS.escalated);
+  } else {
+    console.log('screening-cases: all cases already in the right state.');
+  }
   for (const a of actions) {
     try {
       if (a.type === 'create') {
@@ -194,10 +265,33 @@ async function main() {
     }
   }
 
-  mkdirSync('data', { recursive: true });
-  writeFileSync(CASES_FILE, JSON.stringify(casesState, null, 2) + '\n');
-  console.log('screening-cases: state written (' + Object.keys(casesState).length + ' case(s) tracked)'
-    + (failed ? ' — ' + failed + ' action(s) FAILED (workflow will surface this)' : ''));
+  if (actions.length) {
+    mkdirSync('data', { recursive: true });
+    writeFileSync(CASES_FILE, JSON.stringify(casesState, null, 2) + '\n');
+    console.log('screening-cases: state written (' + Object.keys(casesState).length + ' case(s) tracked)'
+      + (failed ? ' — ' + failed + ' action(s) FAILED (workflow will surface this)' : ''));
+  }
+
+  /* The screening RESULTS live in Asana: post the daily digest every run —
+     a clean day is affirmative evidence, never silence. Runs after case
+     creation so each match links to its case; notifyAsana dedups the title
+     within 6h so a same-day re-run cannot double-post. Failure to deliver
+     the digest fails the step loudly. */
+  const results = readJson(RESULTS_FILE);
+  if (results && results.date === today) {
+    try {
+      const html = buildResultsDigestHtml(results, a => (casesState[a.key] || {}).taskGid || null);
+      const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203873114462';
+      const url = await notifyAsana(resultsDigestTitle(results), '', { project: projectGid, section: sectionGid, html, assignee: assignee });
+      console.log('screening-cases: daily results digest posted to Asana' + (url ? ' — ' + url : ''));
+    } catch (e) {
+      failed++;
+      console.error('screening-cases: daily results digest could NOT be posted (' + String(e && e.message || e).slice(0, 200) + ')');
+    }
+  } else {
+    console.log('screening-cases: no fresh results artifact (' + RESULTS_FILE + ') — digest not posted.');
+  }
+
   if (failed) process.exit(1); /* loud — the workflow's failure path takes over */
 }
 
