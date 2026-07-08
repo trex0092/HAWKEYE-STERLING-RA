@@ -9,15 +9,15 @@
       "status": "error",
       "prevHash": "ffcc1ca24d826e3b7ab7d195dce75b106d95b46672feb65ba6d7186d187313eb",
       "error": "fetch failed",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "uae-fiu": {
-      "hash": "767f7dde03a789bdf24bb112f0dbfcd532f3d09e77b87fd5d1f8add4ea91fb5e",
+      "hash": "de4e17d5952a3db4121c245ffdd90fea577d1175358cb61ba8ad5075e88d7d4e",
       "bytes": 4427,
       "checkedAt": "2026-07-08",
       "changedAt": "2026-07-08",
       "status": 200,
-      "prevHash": "0687086c4b43cef67edb049535b84c774d80c81d500afd91f959ad876c814570"
+      "prevHash": "767f7dde03a789bdf24bb112f0dbfcd532f3d09e77b87fd5d1f8add4ea91fb5e"
     },
     "uae-namlcftc": {
       "hash": null,
@@ -26,7 +26,7 @@
       "changedAt": null,
       "status": 418,
       "error": "HTTP 418",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -43,7 +43,7 @@
       "changedAt": null,
       "status": 403,
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "uae-vara": {
       "hash": "c41e68daf6927cbed3f49060b81491cc289cb5634214996c6be372309a4e31cd",
@@ -68,7 +68,7 @@
       "changedAt": null,
       "status": 403,
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "wolfsberg": {
       "hash": "b95072ad7a3ca960e78d759cd74f46bfbab81c36bad3bb88538f5eff30dfe533",
@@ -101,7 +101,7 @@
       "changedAt": null,
       "status": 403,
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "ofac": {
       "hash": "689b5c480f219791d3bcc5141fbbabe65cbc88d091645c98a9ab45686284a2eb",
