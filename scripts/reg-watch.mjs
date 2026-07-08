@@ -251,11 +251,16 @@ async function fetchDirect(url, timeoutMs = 25000) {
   }
 }
 
-/* Direct fetch with one retry on transient network failure, then a Wayback
-   fallback for sources whose bot protection 403/418s the runner outright.
-   Only a FRESH existing capture is trusted (never stale — diffing an old
-   snapshot would raise reversed/false alerts), fetched with the id_ flag so
-   the bytes are the origin's own HTML and fingerprints stay comparable.
+/* Direct fetch with one retry on transient network failure, then the same
+   two-stage Wayback fallback the FATF Watchdog uses for sources whose bot
+   protection 403/418s the runner outright:
+     2. Save Page Now — archive.org fetches the LIVE page from its side and
+        returns a timestamped capture (their crawler is not bot-blocked);
+     3. failing that, archive.org's most recent EXISTING capture.
+   Only a FRESH capture is ever trusted (never stale — diffing an old
+   snapshot would raise reversed/false alerts), and the content is always
+   re-fetched with the id_ flag so the bytes are the origin's own HTML and
+   fingerprints stay comparable with direct fetches.
    `fetchFn` is injectable so tests never hit the network. */
 export async function fetchWithFallback(url, fetchFn = fetchDirect) {
   let direct = await fetchFn(url);
@@ -266,6 +271,28 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect) {
     direct = await fetchFn(url);
     if (direct.ok) return direct;
   }
+  /* 2. Save Page Now. Anonymous SPN is rate-limited and can return transient
+     429/5xx, so retry once with backoff; a clean response that did not yield
+     a fresh timestamped capture will not improve on retry. */
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 75000); /* SPN crawls live — allow longer than a direct fetch */
+      const r = await fetch('https://web.archive.org/save/' + url, { headers: BROWSER_HEADERS, redirect: 'follow', signal: ctrl.signal });
+      clearTimeout(t);
+      const ts = (/\/web\/(\d{14})/.exec(r.url || '') || [])[1] || '';
+      if (r.ok && ts && snapshotAgeDays(ts) <= SNAPSHOT_STALE_DAYS) {
+        const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+        if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts };
+      }
+      if (r.ok) break;
+      if (r.status !== 429 && r.status < 500) break; /* only 429/5xx are worth retrying */
+    } catch (e) {
+      console.warn('save-page-now failed for ' + url + ' (attempt ' + attempt + '): ' + String(e && e.message || e).slice(0, 120));
+    }
+    if (attempt < 2) await new Promise(r => setTimeout(r, 8000));
+  }
+  /* 3. Most recent existing capture, only if fresh. */
   try {
     const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(url), { headers: BROWSER_HEADERS });
     if (av.ok) {
