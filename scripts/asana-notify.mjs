@@ -178,10 +178,24 @@ export function buildHtmlBody({ heading, summary, changes = [], runLink }) {
   const items = changes.map(c => {
     const what = c.status === 'new' ? 'first snapshot recorded'
       : c.status === 'unreachable' ? ('UNREACHABLE — ' + esc(c.detail || 'fetch failing repeatedly') + ' — monitoring gap, investigate')
+      : c.diff ? ('content changed — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segment(s)')
       : 'content changed';
     const link = c.url ? ' — <a href="' + esc(c.url) + '">open source</a>' : '';
     const juris = c.jurisdiction ? ' (' + esc(c.jurisdiction) + ')' : '';
-    return '<li><strong>' + esc(c.name) + '</strong>' + juris + ' — ' + what + link + '</li>';
+    /* Detailed delivery: itemise the actual additions/deletions on the card
+       (nested list), so the reviewer sees WHAT moved without opening the page. */
+    let detail = '';
+    if (c.diff) {
+      const rows = [];
+      for (const s of c.diff.added) rows.push('<li>➕ added: “' + esc(s) + '”</li>');
+      for (const s of c.diff.removed) rows.push('<li>➖ removed: “' + esc(s) + '”</li>');
+      const more = (c.diff.addedCount - c.diff.added.length) + (c.diff.removedCount - c.diff.removed.length);
+      if (more > 0) rows.push('<li>… ' + more + ' more segment(s) — full excerpts in the workflow run log</li>');
+      if (rows.length) detail = '<ul>' + rows.join('') + '</ul>';
+    } else if (c.diffNote) {
+      detail = '<ul><li>' + esc(c.diffNote) + '</li></ul>';
+    }
+    return '<li><strong>' + esc(c.name) + '</strong>' + juris + ' — ' + what + link + detail + '</li>';
   }).join('');
   const parts = ['<body>'];
   if (heading) parts.push('<h2>' + esc(heading) + '</h2>');
