@@ -120,6 +120,7 @@ jobs:
           # would re-diff against stale state and re-alert the same changes.
           if git fetch origin reg-watch-state --depth=1 2>/dev/null; then
             git checkout FETCH_HEAD -- data/reg-watch-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/reg-watch-snapshots 2>/dev/null || true
             git checkout FETCH_HEAD -- docs/research/auto 2>/dev/null || true
             echo "state overlaid from reg-watch-state"
           else
@@ -177,6 +178,7 @@ jobs:
             git config user.name "regulatory-watch"
             git config user.email "actions@github.com"
             git add data/reg-watch-state.json
+            git add data/reg-watch-snapshots 2>/dev/null || true
             git add docs/research/auto 2>/dev/null || true
             git commit -m "$PR_TITLE [skip ci]"
             for attempt in 1 2 3 4 5; do

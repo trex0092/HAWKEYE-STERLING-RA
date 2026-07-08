@@ -44,12 +44,22 @@ async function fetchText(url) {
 
 async function draftFor(c) {
   const pageText = await fetchText(c.url);
+  /* When the watcher itemised the change, hand the actual additions/deletions
+     to the analyst prompt — a draft grounded in the delta beats one guessing
+     from the full page. */
+  const delta = c.diff ? [
+    'Detected delta (' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segments):',
+    ...c.diff.added.map(s => 'ADDED: "' + s + '"'),
+    ...c.diff.removed.map(s => 'REMOVED: "' + s + '"'),
+    ''
+  ] : [];
   const prompt = [
     'You are a UAE-focused AML/CFT regulatory analyst. A monitored source changed. Draft a SHORT reviewer-facing proposal for an MLRO.',
     '',
     'Source: ' + c.name + ' (' + (c.jurisdiction || '') + ')',
     'URL: ' + c.url,
     '',
+    ...delta,
     'Current page text (extracted, truncated):',
     '"""',
     pageText,

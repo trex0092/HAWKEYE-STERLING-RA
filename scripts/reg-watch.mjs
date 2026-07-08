@@ -21,10 +21,11 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
-export const SOURCES_FILE = 'data/reg-sources.json';
-export const STATE_FILE   = 'data/reg-watch-state.json';
-export const REPORT_FILE  = 'reg-watch-report.md';
-export const CHANGES_FILE = 'reg-watch-changes.json';
+export const SOURCES_FILE  = 'data/reg-sources.json';
+export const STATE_FILE    = 'data/reg-watch-state.json';
+export const SNAPSHOT_DIR  = 'data/reg-watch-snapshots';
+export const REPORT_FILE   = 'reg-watch-report.md';
+export const CHANGES_FILE  = 'reg-watch-changes.json';
 
 /* ── Registry ── */
 export function loadSources(json) {
@@ -120,6 +121,26 @@ export function captureAcceptable(ts, notBefore, now = Date.now()) {
   if (snapshotAgeDays(ts, now) > BASELINE_SNAPSHOT_MAX_DAYS) return false;
   if (notBefore) return day >= notBefore;
   return true;
+}
+
+/* ── Detailed content diff ──
+   The fingerprint says THAT a page changed; this says WHAT changed, so the
+   Asana card can deliver additions/deletions in detail instead of "content
+   changed — go look". Segments are sentences of the normalised extract;
+   membership diffing (not LCS) is deliberate: it is order-insensitive, cheap,
+   and a modification simply shows as one removal plus one addition. Excerpts
+   are capped so a full page rewrite cannot blow up the card. */
+export function diffTexts(oldText, newText, { maxExcerpts = 4, maxLen = 220 } = {}) {
+  const seg = t => String(t || '')
+    .split(/(?<=[.!?;])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 20);
+  const a = seg(oldText), b = seg(newText);
+  const aSet = new Set(a), bSet = new Set(b);
+  const added = b.filter(s => !aSet.has(s));
+  const removed = a.filter(s => !bSet.has(s));
+  const clip = arr => arr.slice(0, maxExcerpts).map(s => s.length > maxLen ? s.slice(0, maxLen - 1) + '…' : s);
+  return { addedCount: added.length, removedCount: removed.length, added: clip(added), removed: clip(removed) };
 }
 
 /* ── Diff fetched content against stored state ──
@@ -230,6 +251,23 @@ export function buildReport(changes, today, mode) {
     lines.push('| --- | --- | --- | --- |');
     for (const c of moved) {
       lines.push('| ' + c.name + ' | ' + (c.jurisdiction || '') + ' | ' + (c.status === 'new' ? 'first snapshot' : 'content changed') + ' | ' + c.url + ' |');
+    }
+    const detailed = moved.filter(c => c.diff || c.diffNote);
+    if (detailed.length) {
+      lines.push('');
+      lines.push('**What changed — additions and deletions in detail:**');
+      for (const c of detailed) {
+        if (c.diff) {
+          lines.push('- **' + c.name + '** — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segment(s)');
+          for (const s of c.diff.added) lines.push('  - ➕ added: “' + s + '”');
+          for (const s of c.diff.removed) lines.push('  - ➖ removed: “' + s + '”');
+          if (c.diff.addedCount > c.diff.added.length || c.diff.removedCount > c.diff.removed.length) {
+            lines.push('  - … excerpts capped; full text in data/reg-watch-snapshots/' + c.id + '.txt history');
+          }
+        } else {
+          lines.push('- **' + c.name + '** — ' + c.diffNote);
+        }
+      }
     }
   }
   const stuck = errors.filter(e => (e.errorStreak || 0) >= ERROR_STREAK_ALERT);
@@ -482,6 +520,30 @@ async function main() {
   const moved = contentChanges(changes);
   const errors = changes.filter(c => c.status === 'error');
   const seeded = changes.filter(c => c.status !== 'error').length;
+
+  /* Detailed delivery: diff each changed source against its previous text
+     snapshot, then refresh snapshots for every good fetch. Snapshots live on
+     the reg-watch-state branch alongside the fingerprint state. */
+  mkdirSync(SNAPSHOT_DIR, { recursive: true });
+  for (const c of changes) {
+    const f = fetched[c.id];
+    if (!f || !f.ok || typeof f.body !== 'string') continue;
+    const newText = extractText(f.body);
+    if (!newText) continue;
+    const snapFile = SNAPSHOT_DIR + '/' + c.id + '.txt';
+    if (c.status === 'changed') {
+      let oldText = '';
+      try { oldText = readFileSync(snapFile, 'utf8'); } catch {}
+      if (oldText) {
+        c.diff = diffTexts(oldText, newText);
+        console.log(c.id + ': diff +' + c.diff.addedCount + ' / -' + c.diff.removedCount + ' segment(s)');
+      } else {
+        c.diffNote = 'first detailed snapshot recorded — additions/deletions will be itemised from the next change';
+      }
+    }
+    writeFileSync(snapFile, newText + '\n');
+  }
+
   const report = buildReport(changes, today, mode);
 
   mkdirSync('data', { recursive: true });

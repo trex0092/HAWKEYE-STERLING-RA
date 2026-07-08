@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
   persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
-  captureAcceptable, tsToIsoDate, spnAuthHeader, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
+  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
 } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -201,6 +201,28 @@ check('fetchWithFallback returns the direct response when it succeeds (no waybac
     const r = await fetchWithFallback('https://x', fn);
     return r.body === 'direct' && !r.via && calls === 1;
   })());
+
+/* ── diffTexts: detailed change delivery ── */
+const oldPage = 'the reporting threshold is aed 55,000 for cash transactions. registration via goaml is mandatory. contact us on the portal.';
+const newPage = 'the reporting threshold is aed 60,000 for cash transactions. registration via goaml is mandatory. new circular 4 of 2026 applies to dealers. contact us on the portal.';
+const dd = diffTexts(oldPage, newPage);
+check('diffTexts reports the addition verbatim',
+  dd.added.some(s => s.includes('circular 4 of 2026')) && dd.addedCount === 2);
+check('diffTexts reports the deletion verbatim (a modification = one removal + one addition)',
+  dd.removed.some(s => s.includes('55,000')) && dd.added.some(s => s.includes('60,000')) && dd.removedCount === 1);
+check('diffTexts is quiet when nothing moved', (() => {
+  const q = diffTexts(oldPage, oldPage);
+  return q.addedCount === 0 && q.removedCount === 0;
+})());
+check('diffTexts caps excerpts but keeps true counts', (() => {
+  const many = Array.from({ length: 12 }, (_, i) => 'brand new obligation number ' + i + ' applies to dealers.').join(' ');
+  const r = diffTexts('', many, { maxExcerpts: 4 });
+  return r.added.length === 4 && r.addedCount === 12;
+})());
+check('diffTexts ignores sub-20-char fragments (nav churn)', (() => {
+  const r = diffTexts('home. about. news. the substantive regulatory obligation text stays here.', 'menu. login. the substantive regulatory obligation text stays here.');
+  return r.addedCount === 0 && r.removedCount === 0;
+})());
 
 /* ── Report: persistent failures are loud, transient ones stay folded ── */
 const loudRep = buildReport([

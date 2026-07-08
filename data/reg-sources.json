@@ -6,7 +6,7 @@
       "name": "UAE Ministry of Economy (MoE) — DNFBP / DPMS supervisor",
       "jurisdiction": "UAE",
       "category": "Supervisor",
-      "narrative": "Federal supervisor for Designated Non-Financial Businesses and Professions, including Dealers in Precious Metals and Stones (DPMS) and real estate. Issues DPMS guidance, goAML registration rules and the cash-transaction reporting threshold (AED 55,000). Watched so DPMS/real-estate Q&A answers and sector tools stay current.",
+      "narrative": "Federal supervisor for Designated Non-Financial Businesses and Professions under Federal Decree-Law No. 20 of 2018 (as amended by No. 26 of 2021) and Cabinet Decision No. 10 of 2019 — covering Dealers in Precious Metals and Stones (DPMS), real-estate brokers, auditors and corporate service providers. Publishes DPMS registration and goAML onboarding requirements, supervisory guidance, administrative-penalty decisions, and the AED 55,000 cash-transaction reporting trigger (DPMSR). A change here usually means new DPMS obligations, penalty schedules or reporting-threshold guidance. Feeds: DPMS/real-estate Regulatory Q&A answers, sector tools, and compliance-calendar items in assets/super-data.js. Fetch note: the ministry (rebranded Ministry of Economy & Tourism, moet.gov.ae) blocks all datacenter connections — monitored via the web-capture fallback; persistent failures alert to Asana.",
       "url": "https://www.moec.gov.ae/en/anti-money-laundering",
       "type": "html"
     },
@@ -15,7 +15,7 @@
       "name": "UAE Financial Intelligence Unit (FIU) — goAML",
       "jurisdiction": "UAE",
       "category": "FIU",
-      "narrative": "Receives Suspicious Transaction/Activity Reports via the goAML platform and issues filing guidance, formats and feedback. Watched so STR/AIF deadlines, narrative requirements and the goAML / FIU-reporting answers and the STR Drafter tool stay current.",
+      "narrative": "The national FIU established under Article 9 of Federal Decree-Law No. 20 of 2018, operationally independent within the CBUAE, and the sole recipient of STRs/SARs via the goAML platform. Publishes goAML registration/filing guidance, report-type specifications (STR, SAR, AIF, RFI responses), typology and strategic-analysis reports (e.g. TBML), and FIU-counterparty MoUs. A change typically signals new filing formats, deadlines, narrative-quality expectations or typologies. Feeds: STR/SAR filing answers, goAML registration guidance, the STR Drafter tool's narrative requirements, and typology references.",
       "url": "https://www.uaefiu.gov.ae/en/",
       "type": "html"
     },
@@ -24,7 +24,7 @@
       "name": "UAE National Committee for AML/CFT (NAMLCFTC)",
       "jurisdiction": "UAE",
       "category": "Policy",
-      "narrative": "National coordination body owning the National Risk Assessment and AML/CFT strategy. Watched for new NRA outputs, national typologies and policy shifts that feed the EWRA, governance and typology answers/tools.",
+      "narrative": "The national policy and coordination committee chaired at ministerial level, owner of the UAE National Risk Assessment (NRA), the national AML/CFT Strategy and Action Plan, and sector risk-assessment publications. Publishes NRA updates, national guidance for supervisors and the private sector, and public-private partnership outputs. A change usually means a new NRA cycle, revised national risk ratings, or strategy documents that supervisors will operationalize. Feeds: the EWRA's national-risk inputs, governance answers, and typology/sector-risk content. Fetch note: bot-protected (HTTP 418); monitored via the web-capture fallback with alerting.",
       "url": "https://www.namlcftc.gov.ae/en",
       "type": "html"
     },
@@ -33,7 +33,7 @@
       "name": "UAE Executive Office for Control & Non-Proliferation (EOCN)",
       "jurisdiction": "UAE",
       "category": "Sanctions",
-      "narrative": "Administers UAE targeted financial sanctions, the local consolidated list and freezing obligations. Watched for list updates and freeze-timeline guidance feeding the sanctions answers, the escalation/CFA logic and the risk data.",
+      "narrative": "The authority administering UAE targeted financial sanctions under Cabinet Resolution No. 74 of 2020: maintains the UAE Local Terrorist List, executes UN Security Council listings 'without delay', and issues freezing, unfreezing and reporting instructions binding on all FIs and DNFBPs. Publishes list amendments, implementation guidance, TFS reporting forms and awareness circulars. A change usually means list movements or new freeze/report obligations with immediate-compliance deadlines. Feeds: sanctions answers, the escalation/CFA logic, freeze-timeline guidance, and the curated EOCN local-terrorist list used by the daily customer screen (data/eocn-local-terrorist-list.json — keep in sync).",
       "url": "https://www.uaeiec.gov.ae/en/",
       "type": "html"
     },
@@ -42,7 +42,7 @@
       "name": "UAE Central Bank (CBUAE) — AML/CFT",
       "jurisdiction": "UAE",
       "category": "Supervisor",
-      "narrative": "Supervises licensed financial institutions and exchange houses for AML/CFT and issues circulars, the AML Standards/Guidance and examination expectations. Watched via the CBUAE Rulebook (the canonical home of regulations and standards; the marketing site centralbank.ae bot-blocks non-browser clients) so FI-facing answers, examination-readiness and transaction-monitoring tools stay current.",
+      "narrative": "Prudential and AML/CFT supervisor of banks, exchange houses, finance companies and payment providers. Monitored via the CBUAE Rulebook — the canonical, consolidated home of its regulations, standards and guidance (the marketing site centralbank.ae bot-blocks non-browser clients and holds only press summaries). Publishes the AML/CFT Regulation and Standards, sectoral guidance (correspondent banking, wire transfers/travel rule, TFS), examination expectations and enforcement actions. A change usually means amended Standards, new guidance or enforcement precedent that examination-readiness content must reflect. Feeds: FI-facing answers, examination-readiness checklists, and transaction-monitoring tool thresholds.",
       "url": "https://rulebook.centralbank.ae/en",
       "type": "html"
     },
@@ -51,7 +51,7 @@
       "name": "Dubai Virtual Assets Regulatory Authority (VARA)",
       "jurisdiction": "UAE",
       "category": "Supervisor",
-      "narrative": "Regulates virtual-asset activity in Dubai (ex-DIFC), including AML/CFT, travel-rule and licensing rulebooks. Watched so VASP / virtual-asset answers and the VARA compliance tool stay current.",
+      "narrative": "Dubai's virtual-asset regulator under Dubai Law No. 4 of 2022, covering all of Dubai except DIFC. Publishes the Virtual Assets and Related Activities Regulations, activity-specific rulebooks (including the Compliance & Risk Management and Market Conduct rulebooks), travel-rule requirements, licensing directives and enforcement notices. A change usually means rulebook amendments or new VASP obligations. Feeds: VASP / virtual-asset Q&A answers, the VARA compliance tool, and travel-rule guidance.",
       "url": "https://www.vara.ae/en/",
       "type": "html"
     },
@@ -60,7 +60,7 @@
       "name": "Dubai Gold & Jewellery Group / DMCC (sector)",
       "jurisdiction": "UAE",
       "category": "Sector body",
-      "narrative": "UAE gold and jewellery sector bodies issuing codes of practice and responsible-sourcing expectations (DMCC Rules for Risk-Based Due Diligence). Watched so sector-specific gold/jewellery answers and tools reflect current sector guidance.",
+      "narrative": "The UAE gold and jewellery sector's principal market bodies. DMCC operates the commodities free zone and issues the DMCC Rules for Risk-Based Due Diligence in the Gold and Precious Metals Supply Chain (aligned to OECD guidance) plus member compliance notices; the Dubai Gold & Jewellery Group sets trade codes of practice. A change usually means revised responsible-sourcing rules, audit expectations for refiners/traders, or market-conduct notices. Feeds: gold/jewellery sector answers, responsible-sourcing tools, and DMCC-member obligations content.",
       "url": "https://www.dmcc.ae/",
       "type": "html"
     },
@@ -69,7 +69,7 @@
       "name": "FATF — guidance, recommendations & news",
       "jurisdiction": "Global",
       "category": "Standard-setter",
-      "narrative": "The global AML/CFT standard-setter. This entry watches FATF publications, guidance and Recommendation revisions (NOT the black/grey lists, which the FATF Watchdog handles). Feeds most Q&A citations and tool reference lists.",
+      "narrative": "The intergovernmental AML/CFT/CPF standard-setter whose 40 Recommendations and Methodology anchor every national regime, including the UAE's. This entry watches the publications feed: Recommendation and Interpretive-Note revisions, mutual-evaluation reports, risk-based-approach guidance (including DPMS-relevant guidance), typologies and best-practice papers. NOT the black/grey country lists — the separate FATF Watchdog diffs those semantically. A change usually means revised standards or new guidance the app's citations must track. Feeds: most Q&A citations, tool reference lists, and methodology content. Fetch note: bot-protected; monitored via the web-capture fallback.",
       "url": "https://www.fatf-gafi.org/en/publications.html",
       "type": "html"
     },
@@ -78,7 +78,7 @@
       "name": "Wolfsberg Group",
       "jurisdiction": "Global",
       "category": "Industry standard",
-      "narrative": "Bank-industry body issuing principles and questionnaires (correspondent banking, CDD, CBDDQ). Watched so correspondent-banking and CDD answers/tools reflect the latest Wolfsberg standards.",
+      "narrative": "Association of thirteen global banks setting de-facto industry standards for financial-crime risk management. Publishes the Correspondent Banking Due Diligence Questionnaire (CBDDQ), the Wolfsberg Principles, payment-transparency and sanctions-screening guidance, and periodic FAQs. A change usually means an updated CBDDQ version or new due-diligence expectations that counterparties will start requesting. Feeds: correspondent-banking and CDD answers, and questionnaire-handling tools.",
       "url": "https://www.wolfsberg-principles.com/",
       "type": "html"
     },
@@ -87,7 +87,7 @@
       "name": "Responsible Minerals Initiative (RMI)",
       "jurisdiction": "Global",
       "category": "Supply chain",
-      "narrative": "Runs the Responsible Minerals Assurance Process (RMAP) smelter audits and the Conflict Minerals Reporting Template (CMRT). Watched so the RMI / minerals answers reflect current audit protocols and templates.",
+      "narrative": "Industry programme (under the Responsible Business Alliance) operating the Responsible Minerals Assurance Process (RMAP) for smelters/refiners and maintaining the Conflict Minerals Reporting Template (CMRT) and Extended Minerals Reporting Template (EMRT). Publishes audit-protocol revisions, template releases, and conformant/active smelter lists. A change usually means new template versions or audit-protocol updates that supply-chain documentation must adopt. Feeds: RMI/minerals answers and template-version references in the sourcing tools.",
       "url": "https://www.responsiblemineralsinitiative.org/news/",
       "type": "html"
     },
@@ -96,7 +96,7 @@
       "name": "LBMA — Responsible Sourcing",
       "jurisdiction": "Global",
       "category": "Supply chain",
-      "narrative": "Sets the Responsible Gold Guidance (RGG) and Good Delivery refiner standards. Watched so LBMA answers and gold-sourcing logic reflect current RGG steps and refiner rules.",
+      "narrative": "The London Bullion Market Association's responsible-sourcing programme for the Good Delivery List. Publishes Responsible Gold/Silver Guidance versions, assurance and country-of-origin requirements, Good Delivery rule changes, and incident notices affecting refiners. A change usually means a new RGG version or refiner-status decisions that gold-sourcing due-diligence steps must reflect. Feeds: LBMA answers, gold-sourcing logic, and refiner-verification steps.",
       "url": "https://www.lbma.org.uk/responsible-sourcing",
       "type": "html"
     },
@@ -105,7 +105,7 @@
       "name": "OECD — Responsible Mineral Supply Chains (CAHRA)",
       "jurisdiction": "Global",
       "category": "Supply chain",
-      "narrative": "Owns the Due Diligence Guidance for Responsible Supply Chains of Minerals from Conflict-Affected and High-Risk Areas (the 5-step framework) and MNE Guidelines. Watched via the Responsible Business Conduct topic hub on oecd.org (the legacy mneguidelines.oecd.org host bot-blocks non-browser clients) so OECD answers and the high-risk-country / ASM risk floor reflect current guidance and Annex II shifts.",
+      "narrative": "Owner of the OECD Due Diligence Guidance for Responsible Supply Chains of Minerals from Conflict-Affected and High-Risk Areas — the five-step framework (incl. Annex II risks) that LBMA, DMCC, RJC and RMI programmes all implement — plus the Gold Supplement and MNE Guidelines. Monitored via the Responsible Business Conduct topic hub on oecd.org (the legacy mneguidelines.oecd.org host permanently bot-blocks non-browser clients). A change usually means revised guidance, new implementation reports, or CAHRA-methodology updates. Feeds: OECD answers, the high-risk-country / ASM risk floor, and Annex II risk mapping.",
       "url": "https://www.oecd.org/en/topics/responsible-business-conduct.html",
       "type": "html"
     },
@@ -114,7 +114,7 @@
       "name": "US OFAC — Recent Actions",
       "jurisdiction": "Global",
       "category": "Sanctions",
-      "narrative": "US Treasury sanctions authority. Watched for designations/de-listings and 50%-rule guidance feeding the sanctions answers and the escalation/CFA logic (secondary-sanctions exposure for UAE gold trade).",
+      "narrative": "The US Treasury's sanctions authority; its Recent Actions feed announces SDN/non-SDN designations and delistings, new or amended programs, General Licenses, FAQs and 50-percent-rule interpretations. UAE gold-trade relevance is direct: secondary-sanctions exposure and USD-clearing risk. A change usually means designations or guidance with same-day compliance impact. Feeds: sanctions answers and the escalation/CFA logic. Note: the machine-readable SDN/consolidated lists are separately fetched and screened daily by the sanctions pipelines; this entry watches announcements and guidance.",
       "url": "https://ofac.treasury.gov/recent-actions",
       "type": "html"
     },
@@ -123,7 +123,7 @@
       "name": "UN Security Council — Consolidated List",
       "jurisdiction": "Global",
       "category": "Sanctions",
-      "narrative": "The UN Security Council consolidated sanctions list, implemented in the UAE without delay. Watched for designations under 1267/1988/1718 etc. feeding the sanctions/TF/PF answers and freeze logic.",
+      "narrative": "The UN's consolidated sanctions list page spanning the 1267/1989/2253 (ISIL/Al-Qaida), 1988 (Taliban), 1718 (DPRK) and other committee regimes — implemented in the UAE without delay under Cabinet Resolution No. 74 of 2020. A change usually means listings/delistings that trigger immediate freeze obligations locally. Feeds: sanctions/TF/PF answers and freeze logic. Note: the XML list itself is screened daily by the sanctions pipelines; this entry watches the page for regime-level announcements.",
       "url": "https://www.un.org/securitycouncil/content/un-sc-consolidated-list",
       "type": "html"
     },
@@ -132,7 +132,7 @@
       "name": "EU — Financial Sanctions",
       "jurisdiction": "Global",
       "category": "Sanctions",
-      "narrative": "EU consolidated financial-sanctions list and ownership-and-control guidance. Watched so the EU 'ownership and control' answers and blocking-statute (Reg 2271/96) content stay current.",
+      "narrative": "The European Commission's financial-sanctions hub: the consolidated list regime, ownership-and-control ('50%+') guidance, best-practice papers and the Blocking Statute (Reg. 2271/96). A change usually means new restrictive-measure packages or interpretive guidance affecting EU-nexus counterparties. Feeds: EU ownership-and-control answers and blocking-statute content. Note: the consolidated CSV list is separately screened daily.",
       "url": "https://finance.ec.europa.eu/eu-and-world/sanctions-restrictive-measures_en",
       "type": "html"
     },
@@ -141,7 +141,7 @@
       "name": "UK OFSI — Consolidated List of Targets",
       "jurisdiction": "Global",
       "category": "Sanctions",
-      "narrative": "UK Office of Financial Sanctions Implementation consolidated list and guidance. Watched for UK designations relevant to correspondent and trade-finance exposure.",
+      "narrative": "HM Treasury's Office of Financial Sanctions Implementation: the UK consolidated list under the Sanctions and Anti-Money Laundering Act 2018, licensing decisions, enforcement (monetary penalties) and guidance. A change usually means UK designations or guidance relevant to correspondent and trade-finance exposure. Feeds: UK-designation answers. Note: the ConList CSV is separately screened daily.",
       "url": "https://www.gov.uk/government/publications/financial-sanctions-consolidated-list-of-targets",
       "type": "html"
     },
@@ -150,7 +150,7 @@
       "name": "Egmont Group of FIUs",
       "jurisdiction": "Global",
       "category": "FIU network",
-      "narrative": "Global network of Financial Intelligence Units governing FIU-to-FIU information exchange. Watched so the Egmont information-request and cross-border cooperation answers/tools stay current.",
+      "narrative": "The 170+-member global network of Financial Intelligence Units governing FIU-to-FIU information exchange through its Principles for Information Exchange and secure channels; publishes operational guidance, typology projects and membership decisions (suspensions matter for cooperation routes). A change usually means new exchange standards or membership events affecting cross-border requests. Feeds: Egmont information-request answers and international-cooperation tools.",
       "url": "https://egmontgroup.org/news/",
       "type": "html"
     },
@@ -159,7 +159,7 @@
       "name": "Basel AML Index",
       "jurisdiction": "Global",
       "category": "Risk data",
-      "narrative": "Basel Institute composite country ML/TF risk scoring. Watched so the country-risk weighting in the EWRA and customer risk-rating logic can be recalibrated when scores are republished.",
+      "narrative": "The Basel Institute on Governance's composite country ML/TF risk score (built from FATF evaluations, TI, WEF and other inputs), re-published annually with methodology revisions. A change usually means the annual release or an interim revision. Feeds: the country-risk weighting in the EWRA and customer risk-rating recalibration — score changes should trigger a jurisdiction-risk review in data/jurisdiction-risk.json.",
       "url": "https://index.baselgovernance.org/",
       "type": "html"
     },
@@ -168,7 +168,7 @@
       "name": "UNODC — Money Laundering & Organised Crime",
       "jurisdiction": "Global",
       "category": "Standard-setter",
-      "narrative": "UN Office on Drugs and Crime publishes money-laundering, organised-crime and predicate-offence typologies, the Vienna/Palermo convention guidance and the GPML programme outputs. Watched so the typology, predicate-offence and international-cooperation answers reflect current UN crime research and methodologies.",
+      "narrative": "The UN Office on Drugs and Crime's AML portal: custodian of the Vienna and Palermo Conventions, publisher of predicate-offence and organised-crime research, the Global Programme against Money Laundering (GPML) outputs and model legislation. A change usually means new typology research or convention-related guidance. Feeds: typology, predicate-offence and international-cooperation answers.",
       "url": "https://www.unodc.org/unodc/en/money-laundering/",
       "type": "html"
     },
@@ -177,7 +177,7 @@
       "name": "EU — High-Risk Third Countries (AML/CFT)",
       "jurisdiction": "Global",
       "category": "Risk data",
-      "narrative": "The European Commission list of third countries with strategic AML/CFT deficiencies (Delegated Regulation), which triggers mandatory EDD on relationships involving listed jurisdictions. Watched so the high-risk-jurisdiction EDD answers and country-risk weighting in the EWRA stay aligned with EU additions/removals.",
+      "narrative": "The European Commission's list of third countries with strategic AML/CFT deficiencies (Delegated Regulation under the 4th/5th AMLD, aligned with but not identical to FATF's grey list), which triggers mandatory enhanced due diligence for EU-obliged entities on any listed-country nexus. A change usually means additions/removals with direct EDD consequences. Feeds: high-risk-jurisdiction EDD answers and the EWRA country-risk weighting — additions/removals must be mirrored the same week.",
       "url": "https://finance.ec.europa.eu/financial-crime_en",
       "type": "html"
     },
@@ -186,7 +186,7 @@
       "name": "Responsible Jewellery Council (RJC)",
       "jurisdiction": "Global",
       "category": "Sector body",
-      "narrative": "Sets the RJC Code of Practices and Chain-of-Custody standard for the jewellery and watch supply chain (responsible sourcing, KYC, conflict-sensitive due diligence). Watched so the gold/jewellery sector answers and responsible-sourcing tools reflect current RJC certification requirements.",
+      "narrative": "The jewellery and watch industry's standards and certification body: the Code of Practices (COP — full-scope responsible business including AML/KYC provisions), the Chain of Custody (CoC) standard, and the Laboratory Grown Material Standard (LGMS), each with assessment manuals and accredited-auditor requirements. Publishes standards revisions, audit/certification-requirement changes (e.g. Standards & Audit Changes information packs), governance announcements and progress reports. A change usually means revised certification requirements members must meet at next audit. Feeds: gold/jewellery sector answers, responsible-sourcing tools, and RJC-certification citations.",
       "url": "https://www.responsiblejewellery.com/",
       "type": "html"
     }
