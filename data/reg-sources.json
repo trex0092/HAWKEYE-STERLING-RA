@@ -196,23 +196,23 @@
       "jurisdiction": "UAE",
       "category": "Probe",
       "narrative": "Temporary probe candidate for the MoE AML page on the official UAE government portal. Branch-only; removed before merge. Exists to verify fetchability from a GitHub runner.",
-      "url": "https://u.ae/en/information-and-services/justice-safety-and-the-law/anti-money-laundering-and-combatting-the-financing-of-terrorism"
+      "url": "https://u.ae/en/information-and-services/justice-safety-and-the-law/anti-money-laundering"
     },
     {
-      "id": "probe-cbuae-rulebook",
-      "name": "PROBE CBUAE rulebook AML section",
+      "id": "probe-uae-strategy",
+      "name": "PROBE u.ae AML national strategy",
       "jurisdiction": "UAE",
       "category": "Probe",
       "narrative": "Temporary probe candidate for the CBUAE AML/CFT rulebook section. Branch-only; removed before merge. Exists to verify fetchability from a GitHub runner.",
-      "url": "https://rulebook.centralbank.ae/en/rulebook/anti-money-laundering-and-combating-financing-terrorism"
+      "url": "https://u.ae/en/about-the-uae/strategies-initiatives-and-awards/strategies-plans-and-visions/finance-and-economy/the-national-strategy-for-anti-money-laundering-and-countering-the-financing-of-terrorism"
     },
     {
-      "id": "probe-oecd-rbc",
-      "name": "PROBE OECD responsible business conduct",
+      "id": "probe-oecd-minerals",
+      "name": "PROBE OECD minerals due diligence publication",
       "jurisdiction": "Global",
       "category": "Probe",
       "narrative": "Temporary probe candidate for OECD mineral supply chain guidance on the new oecd.org site. Branch-only; removed before merge. Exists to verify fetchability from a GitHub runner.",
-      "url": "https://www.oecd.org/en/topics/responsible-business-conduct.html"
+      "url": "https://www.oecd.org/en/publications/oecd-due-diligence-guidance-for-responsible-supply-chains-of-minerals-from-conflict-affected-and-high-risk-areas_9789264252479-en.html"
     }
   ]
 }
