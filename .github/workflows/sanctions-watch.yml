@@ -56,6 +56,19 @@ jobs:
         with:
           node-version: 22
 
+      - name: Overlay latest list state (lives on the sanctions-watch-state branch)
+        run: |
+          # Branch protection blocks direct pushes to main (GH006), so the
+          # fingerprint state lives on a dedicated data branch. Without the
+          # overlay every run re-alerts the same list changes.
+          if git fetch origin sanctions-watch-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/sanctions-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/retention 2>/dev/null || true
+            echo "state overlaid from sanctions-watch-state"
+          else
+            echo "no sanctions-watch-state branch yet — using state from main"
+          fi
+
       - name: Run sanctions watch
         id: watch
         env:
@@ -80,7 +93,7 @@ jobs:
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         run: node scripts/retain-state.mjs
 
-      - name: Commit refreshed fingerprint state to main
+      - name: Persist refreshed fingerprint state (sanctions-watch-state branch)
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         env:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
@@ -90,10 +103,11 @@ jobs:
             git config user.email "actions@github.com"
             git add data/sanctions-state.json data/retention
             git commit -m "$PR_TITLE [skip ci]"
+            # Persist on the sanctions-watch-state branch (main is protected):
+            # rebuilt as <current main> + one data commit, force-updated.
             for attempt in 1 2 3 4 5; do
-              git push && break
-              echo "push rejected (attempt $attempt) — rebasing on origin/main"
-              git pull --rebase origin main || git rebase --abort
+              git push --force origin HEAD:refs/heads/sanctions-watch-state && break
+              echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
           else

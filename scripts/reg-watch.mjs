@@ -143,6 +143,26 @@ export function diffTexts(oldText, newText, { maxExcerpts = 4, maxLen = 220 } = 
   return { addedCount: added.length, removedCount: removed.length, added: clip(added), removed: clip(removed) };
 }
 
+/* ── Change-severity triage ──
+   Labels every detected change LOW / MEDIUM / HIGH so the Asana card says
+   what to read first. Heuristic (always available, offline-testable):
+   regulatory instrument language in the delta → HIGH; a multi-segment delta
+   → MEDIUM; cosmetic churn → LOW. The AI draft step may override with its
+   own judgement (reg-draft.mjs); the heuristic is the floor, never silent. */
+const SEVERITY_HIGH_RE = /(threshold|circular|regulation|decree|resolution|directive|deadline|penalt|prohibit|obligat|must|shall|licen[cs]|freez|sanction|designat|guidance|standard|amendment|article \d)/i;
+export function classifySeverity(diff) {
+  if (!diff) return { severity: 'MEDIUM', reason: 'content changed — no itemised delta available yet, review the page' };
+  const texts = [...(diff.added || []), ...(diff.removed || [])];
+  const hit = texts.find(t => SEVERITY_HIGH_RE.test(t));
+  if (hit) {
+    const term = (hit.match(SEVERITY_HIGH_RE) || [])[0];
+    return { severity: 'HIGH', reason: 'delta contains regulatory-instrument language ("' + term + '")' };
+  }
+  const moved = (diff.addedCount || 0) + (diff.removedCount || 0);
+  if (moved >= 3) return { severity: 'MEDIUM', reason: moved + ' content segments moved — substantive page update' };
+  return { severity: 'LOW', reason: 'small delta with no regulatory-instrument language — likely routine site churn' };
+}
+
 /* ── Diff fetched content against stored state ──
    fetched: object (or Map) id -> { ok, status, body, error }
    Returns { changes:[...], state }. Each change has a status:
@@ -258,7 +278,8 @@ export function buildReport(changes, today, mode) {
       lines.push('**What changed — additions and deletions in detail:**');
       for (const c of detailed) {
         if (c.diff) {
-          lines.push('- **' + c.name + '** — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segment(s)');
+          const sev = c.severity ? ' — severity **' + c.severity + '**' + (c.severityReason ? ' (' + c.severityReason + ')' : '') : '';
+          lines.push('- **' + c.name + '** — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segment(s)' + sev);
           for (const s of c.diff.added) lines.push('  - ➕ added: “' + s + '”');
           for (const s of c.diff.removed) lines.push('  - ➖ removed: “' + s + '”');
           if (c.diff.addedCount > c.diff.added.length || c.diff.removedCount > c.diff.removed.length) {
@@ -540,6 +561,10 @@ async function main() {
       } else {
         c.diffNote = 'first detailed snapshot recorded — additions/deletions will be itemised from the next change';
       }
+      const sev = classifySeverity(c.diff);
+      c.severity = sev.severity;
+      c.severityReason = sev.reason;
+      console.log(c.id + ': severity ' + c.severity + ' — ' + sev.reason);
     }
     writeFileSync(snapFile, newText + '\n');
   }

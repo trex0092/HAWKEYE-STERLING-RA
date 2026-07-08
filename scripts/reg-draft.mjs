@@ -11,7 +11,7 @@
    key is missing or the API errors, it exits 0 so the (detection-only) PR still
    opens. Model id per the repo's Claude usage standard: claude-opus-4-8
    (override with ANTHROPIC_MODEL, e.g. claude-sonnet-4-6 to cut cost). */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { extractText, CHANGES_FILE, fetchWithFallback } from './reg-watch.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
@@ -21,16 +21,21 @@ const OUT_DIR = 'docs/research/auto';
 function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection-only PR).'); process.exit(0); }
 
 if (!KEY) skip('no ANTHROPIC_API_KEY');
-if (!existsSync(CHANGES_FILE)) skip('no changes file');
 
 let date, changes;
 try {
+  /* Read directly (no exists pre-check): a missing file lands here too, and
+     check-then-read is a race the scanner rightly flags. */
   ({ date, changes } = JSON.parse(readFileSync(CHANGES_FILE, 'utf8')));
 } catch (e) {
-  skip('changes file unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
+  skip('changes file missing/unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
 }
 /* Draft only for real content changes — an 'unreachable' alert entry has no
-   new page text to analyse; it is on the card purely to surface the gap. */
+   new page text to analyse; it is on the card purely to surface the gap.
+   Keep the FULL list for the write-back: filter() returns the same object
+   references, so severity mutations flow through, and unreachable entries
+   must survive onto the card. */
+const allChanges = Array.isArray(changes) ? changes : [];
 if (Array.isArray(changes)) changes = changes.filter(c => c.status === 'new' || c.status === 'changed');
 if (!Array.isArray(changes) || !changes.length) skip('no content changes');
 
@@ -71,7 +76,11 @@ async function draftFor(c) {
     '- **Likely app impact**: which Regulatory Q&A topics/answers or Super Tools citations in assets/super-data.js, or country/risk data in index.html, may need updating.',
     '- **Suggested citation**: the instrument/title to cite if an update is warranted.',
     '',
-    'Be concise and do NOT invent article or circular numbers that are not visible in the text. This is a proposal for human review, not a final edit.'
+    'Be concise and do NOT invent article or circular numbers that are not visible in the text. This is a proposal for human review, not a final edit.',
+    '',
+    'End your reply with exactly one final line of the form:',
+    'SEVERITY: LOW|MEDIUM|HIGH — <one short reason>',
+    '(HIGH = new/changed obligations, thresholds, instruments or deadlines; MEDIUM = substantive update worth review; LOW = routine site churn.)'
   ].join('\n');
 
   try {
@@ -90,7 +99,23 @@ async function draftFor(c) {
 }
 
 const sections = [];
-for (const c of changes) sections.push(await draftFor(c));
+for (const c of changes) {
+  const text = await draftFor(c);
+  const m = /SEVERITY:[ \t]*(LOW|MEDIUM|HIGH)(?:[ \t]*[—-][ \t]*([^\n]*))?$/im.exec(text);
+  if (m) {
+    c.severity = m[1].toUpperCase();
+    if (m[2]) c.severityReason = m[2].trim().slice(0, 200);
+  }
+  sections.push(text);
+}
+
+/* Persist the (possibly AI-refined) severities so the Asana notify step —
+   which runs after this one — renders the final triage labels. */
+try {
+  writeFileSync(CHANGES_FILE, JSON.stringify({ date, changes: allChanges }, null, 2) + '\n');
+} catch (e) {
+  console.warn('reg-draft: could not write refined severities back (' + (e && e.message || e) + ')');
+}
 
 const doc = [
   '# Regulatory update proposal — ' + date,

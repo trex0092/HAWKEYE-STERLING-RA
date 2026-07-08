@@ -30,10 +30,14 @@ name: Sanctions Screen
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
 on:
-  # RETIRED (schedule removed): superseded by the single unified "Daily Screening
-  # (Sanctions + Adverse Media + PEP)" workflow (weekly-adverse-media.yml,
-  # RUN_MODE=unified). Kept as manual-only (the in-engine Node screener stays
-  # available for ad-hoc runs); no longer posts a duplicate daily task.
+  # Re-scheduled 2026-07-08 as the SCREENING CASE ENGINE: runs daily after the
+  # Sanctions Watch (05:07) with fresh lists, refreshes the per-subject state,
+  # then the case-manager step turns every flag into a managed lifecycle CASE
+  # (New -> Under Review -> Cleared/Escalated) with a 5-day SLA and aging
+  # alerts. Its own flat alert card and daily audit task stay SUPPRESSED so it
+  # never duplicates the unified Daily Screening digest.
+  schedule:
+    - cron: '37 5 * * *'   # 05:37 UTC = 09:37 UAE daily (odd minute)
   workflow_dispatch:
 
 permissions:
@@ -76,10 +80,29 @@ jobs:
             api.gdeltproject.org:443
             www.wikidata.org:443
             ws-public.interpol.int:443
+            www.international.gc.ca:443
+            gels-avoirs.dgtresor.gouv.fr:443
+            www.sesam.search.admin.ch:443
+            www.dfat.gov.au:443
+            apigwext.worldbank.org:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
+
+      - name: Overlay latest screening + case state (lives on the screen-state branch)
+        run: |
+          # Branch protection blocks direct pushes to main, so per-subject
+          # screening state and case-lifecycle state persist on a dedicated
+          # data branch. Without the overlay every run would re-alert standing
+          # matches and re-create existing cases.
+          if git fetch origin screen-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/sanctions-screen-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/screening-cases-state.json 2>/dev/null || true
+            echo "state overlaid from screen-state"
+          else
+            echo "no screen-state branch yet — using state from main"
+          fi
 
       - name: Screen the customer base
         id: screen
@@ -97,29 +120,47 @@ jobs:
           # at runtime, so the section GID var is an optional override.
           ASANA_OM_PROJECT_GID: ${{ vars.ASANA_OM_PROJECT_GID || '1213914392047129' }}
           ASANA_OM_AM_PEP_SECTION_GID: ${{ vars.ASANA_OM_AM_PEP_SECTION_GID }}
+          # Case-engine mode: the lifecycle cases below ARE the alert surface;
+          # the flat alert card + daily audit task would duplicate the unified
+          # Daily Screening digest. Set the vars to '0' to restore them.
+          SCREEN_SUPPRESS_ALERTS: ${{ vars.SCREEN_SUPPRESS_ALERTS || '1' }}
+          SCREEN_SKIP_AUDIT_TASK: ${{ vars.SCREEN_SKIP_AUDIT_TASK || '1' }}
         run: node scripts/sanctions-screen.mjs
+
+      - name: Manage screening case lifecycle
+        id: cases
+        if: steps.screen.outputs.screen_error != 'true'
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_CASES_PROJECT_GID: ${{ vars.ASANA_CASES_PROJECT_GID || '1213914392047129' }}
+          ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
+        run: node scripts/screening-cases.mjs
 
       - name: Screening metrics (non-blocking observability)
         if: always()
         continue-on-error: true
         run: node scripts/screening-metrics.mjs
 
-      - name: Commit refreshed screening state to main
+      - name: Persist screening + case state (screen-state branch)
         if: steps.screen.outputs.screen_error != 'true'
         env:
           # Step output crosses into the shell via env (never inline ${{ }} in run:)
           # — the title can carry an upstream error message, so this is load-bearing.
           TITLE: ${{ steps.screen.outputs.title }}
         run: |
-          if [ -n "$(git status --porcelain data/sanctions-screen-state.json 2>/dev/null)" ]; then
+          # Branch protection blocks direct pushes to main (GH006 — the old
+          # main-push here failed silently since 7 Jul), so the state lives on
+          # the screen-state branch: rebuilt as <current main> + one data
+          # commit, force-updated each run.
+          if [ -n "$(git status --porcelain data/sanctions-screen-state.json data/screening-cases-state.json 2>/dev/null)" ]; then
             git config user.name "sanctions-screen"
             git config user.email "actions@github.com"
             git add data/sanctions-screen-state.json
+            git add data/screening-cases-state.json 2>/dev/null || true
             git commit -m "$TITLE [skip ci]"
             for attempt in 1 2 3 4 5; do
-              git push && break
-              echo "push rejected (attempt $attempt) — rebasing on origin/main"
-              git pull --rebase origin main || git rebase --abort
+              git push --force origin HEAD:refs/heads/screen-state && break
+              echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
           else

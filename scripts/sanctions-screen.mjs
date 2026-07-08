@@ -920,7 +920,12 @@ async function main() {
 
   let asanaPosted = false;
   let regUrl = '';
-  if (alerts.length && asanaEnabled()) {
+  /* Case-engine mode (SCREEN_SUPPRESS_ALERTS=1): the screening-cases step that
+     follows turns every flag into a managed lifecycle CASE, so the flat alert
+     card would be a duplicate. Suppression is logged, never silent. */
+  const suppressAlerts = process.env.SCREEN_SUPPRESS_ALERTS === '1';
+  if (alerts.length && suppressAlerts) console.log('sanctions-screen: ' + alerts.length + ' new match(es) — alert card suppressed (case engine mode); the case manager files them as lifecycle cases.');
+  if (alerts.length && asanaEnabled() && !suppressAlerts) {
     try {
       const html = buildScreenHtml(alerts, { runLink: runUrl(), today, degraded: screen.degraded });
       const section = process.env.ASANA_SECTION_GID || undefined;
@@ -944,7 +949,11 @@ async function main() {
   /* Ongoing Monitoring audit trail — daily AM/PEP task, every run regardless of
      result. Self-contained (it swallows its own errors), so a failure here never
      blocks the screening output above. */
-  await postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, asanaToken, regUrl);
+  if (process.env.SCREEN_SKIP_AUDIT_TASK === '1') {
+    console.log('sanctions-screen: daily audit task skipped (SCREEN_SKIP_AUDIT_TASK=1 — the unified Daily Screening posts the digest).');
+  } else {
+    await postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, asanaToken, regUrl);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

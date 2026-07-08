@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
   persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
-  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
+  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
 } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -222,6 +222,24 @@ check('diffTexts caps excerpts but keeps true counts', (() => {
 check('diffTexts ignores sub-20-char fragments (nav churn)', (() => {
   const r = diffTexts('home. about. news. the substantive regulatory obligation text stays here.', 'menu. login. the substantive regulatory obligation text stays here.');
   return r.addedCount === 0 && r.removedCount === 0;
+})());
+
+/* ── Severity triage ── */
+check('severity HIGH when the delta carries regulatory-instrument language', (() => {
+  const s = classifySeverity({ addedCount: 1, removedCount: 0, added: ['the reporting threshold is now aed 60,000 for cash transactions.'], removed: [] });
+  return s.severity === 'HIGH' && /threshold/i.test(s.reason);
+})());
+check('severity MEDIUM for a substantive multi-segment delta without instrument language', (() => {
+  const s = classifySeverity({ addedCount: 3, removedCount: 2, added: ['our office moved to a new tower in the marina district recently.'], removed: [] });
+  return s.severity === 'MEDIUM';
+})());
+check('severity LOW for a small cosmetic delta', (() => {
+  const s = classifySeverity({ addedCount: 1, removedCount: 0, added: ['welcome to our redesigned website experience today.'], removed: [] });
+  return s.severity === 'LOW';
+})());
+check('no delta available yet → MEDIUM with an honest reason', (() => {
+  const s = classifySeverity(null);
+  return s.severity === 'MEDIUM' && /no itemised delta/.test(s.reason);
 })());
 
 /* ── Report: persistent failures are loud, transient ones stay folded ── */

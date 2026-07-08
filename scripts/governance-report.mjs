@@ -71,6 +71,7 @@ export const CONTROL_GROUPS = [
       { file: 'function-health.yml', label: 'Function Health (Asana delivery path)', cadence: 'daily' },
       { file: 'freshness-check.yml', label: 'Freshness Check (monitoring data currency)', cadence: 'daily' },
       { file: 'weekly-summary.yml', label: 'Weekly Compliance Summary (Monday 09:00 UAE → Asana)', cadence: 'weekly' },
+      { file: 'sanctions-screen.yml', label: 'Sanctions Screen + case lifecycle engine', cadence: 'daily' },
       { file: 'link-check.yml', label: 'Link Check (docs integrity)', cadence: 'weekly' }
     ]
   },

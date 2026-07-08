@@ -25,11 +25,11 @@
       "id": "fr-dgt",
       "name": "France — Registre national des gels (DGT)",
       "jurisdiction": "Global",
-      "url": "https://gels-avoirs.dgtresor.gouv.fr/api/v1/publication/derniere-publication-fichier-json",
+      "url": "https://gels-avoirs.dgtresor.gouv.fr/ApiPublic/api/v1/publication/derniere-publication-fichier-json",
       "type": "json",
       "parser": "json",
-      "enabled": false,
-      "_note": "DISABLED after live verification (2026-06-27 customer screen): the host gels-avoirs.dgtresor.gouv.fr connects but this exact API path returns HTTP 404 from the runner, so it parsed 0 names and degraded coverage. The feed IS real (DGT publishes the register as machine-readable JSON/XML — see https://api.gouv.fr/les-api/api-gels-avoirs) and the generic JSON parser (sanctions-match.mjs, Nom/Prenom assembly + aliases) is unit-tested; the exact base path just needs confirming (the sandbox/proxy blocks .gouv.fr so it can't be probed from here). Set the confirmed URL + enabled:true to screen France directly. Until then, France implements the EU consolidated list already screened daily."
+      "enabled": true,
+      "_note": "France DGT national freeze register (Registre national des gels). Re-enabled 2026-07-08 with the documented ApiPublic base path (the previous path 404'd); the generic JSON parser assembles Nom/Prenom + aliases. A failed fetch or 0-name parse degrades coverage loudly, never silently."
     },
     {
       "id": "nz-terror",
@@ -39,7 +39,7 @@
       "type": "json",
       "parser": "json",
       "enabled": false,
-      "_note": "NZ Police designated terrorist entities (data.govt.nz). DISABLED: data.govt.nz exposes it via a CKAN datastore resource whose resource_id ROTATES on each quarterly update, so a hardcoded URL would silently serve STALE data (worse than degraded for a sanctions list). Enable only with a confirmed STABLE resource_id / download URL (then set url + enabled:true), or maintain as a curated file. Small list; heavily overlaps the UN Consolidated list already screened."
+      "_note": "New Zealand designated terrorist entities: the Police publish the list only as XLSX/PDF documents with dated filenames — no stable machine-readable endpoint was found (probed 2026-07-08). Keep disabled until NZ publishes a stable feed, or maintain a curated file."
     },
     {
       "id": "ua-nsdc",
@@ -49,37 +49,37 @@
       "type": "json",
       "parser": "json",
       "enabled": false,
-      "_note": "Ukraine NSDC State Register (drs.nsdc.gov.ua) publishes JSON, but a stable machine-readable download endpoint is not yet confirmed (the egress proxy here blocks .gov.ua so it cannot be verified). DISABLED until a confirmed JSON URL is set (then url + enabled:true). ~17k entries, overwhelmingly Russia/Belarus-related and already largely covered by the OFAC/EU/UK lists screened daily."
+      "_note": "Ukraine NSDC State Register of Sanctions: no stable free machine-readable endpoint confirmed (the register site is API-gated / changes paths). Keep disabled until an endpoint is verified from a runner. Ukraine designations substantially overlap the EU/UK/US lists already screened daily."
     },
     {
       "id": "ch-seco",
       "name": "Switzerland — SECO sanctions list (XML)",
       "jurisdiction": "Global",
-      "file": "data/seco-curated-list.json",
-      "type": "curated",
-      "parser": "curated",
-      "enabled": false,
-      "_note": "SECO's portal (sesam.search.admin.ch) serves an HTML page to automated GETs, not raw XML (verified 2026-06-27 customer screen — parsed 0 names), so it is maintained as a curated in-repo list instead. POPULATE data/seco-curated-list.json from the official download, then set enabled:true to screen SECO directly. While empty it stays disabled (no false clear, no permanent 'degraded'). The dedicated `seco` XML parser and the curated parser are both unit-tested. Until populated, SECO designations are covered indirectly via the UN/EU/OFAC lists already loaded."
+      "type": "xml",
+      "parser": "seco",
+      "enabled": true,
+      "_note": "Switzerland SECO consolidated sanctions list (Gesamtliste XML via the SESAM search service). Re-enabled 2026-07-08 with the dedicated parseSecoXml extractor (nested name-part/value blocks). The curated file remains a fallback; a failed fetch or 0-name parse degrades coverage loudly.",
+      "url": "https://www.sesam.search.admin.ch/sesam-search-web/pages/downloadXmlGesamtliste.xhtml?action=downloadXmlGesamtlisteAction"
     },
     {
       "id": "au-dfat",
       "name": "Australia — DFAT Consolidated List",
       "jurisdiction": "Global",
-      "file": "data/dfat-curated-list.json",
-      "type": "curated",
-      "parser": "curated",
-      "enabled": false,
-      "_note": "DFAT bot-gates regulation8_consolidated.xlsx (HTTP 404 to automated fetches; verified 2026-06-27 customer screen), so it is maintained as a curated in-repo list. POPULATE data/dfat-curated-list.json from the official download, then set enabled:true to screen DFAT directly. While empty it stays disabled (no false clear, no permanent 'degraded'). The dependency-free XLSX reader in sanctions-match.mjs (ZIP + sharedStrings + worksheet via node:zlib) and the curated parser are both unit-tested; the XLSX path can be used instead if a fetchable URL is ever confirmed. Until populated, DFAT designations are covered indirectly via the UN/OFAC/EU lists already loaded."
+      "type": "xlsx",
+      "parser": "dfat",
+      "enabled": true,
+      "_note": "Australia DFAT Consolidated List — published only as .xlsx; parsed by the zero-dependency parseDfatXlsx reader (primary names + per-row aliases). Re-enabled 2026-07-08. A layout change degrades to fewer/zero names, visibly.",
+      "url": "https://www.dfat.gov.au/sites/default/files/regulation8_consolidated.xlsx"
     },
     {
       "id": "wb-debarred",
       "name": "World Bank — Listing of Ineligible (Debarred) Firms & Individuals",
       "jurisdiction": "Global",
-      "url": "",
-      "type": "csv",
-      "parser": "curated",
-      "enabled": false,
-      "_note": "Debarment (not a sanctions designation) — a useful EDD signal for procurement-linked entities. Published as HTML/JSON at https://www.worldbank.org/en/projects-operations/procurement/debarred-firms with no stable bulk CSV; maintain as a curated file or confirm a machine-readable endpoint before enabling."
+      "url": "https://apigwext.worldbank.org/dvsvc/v1.0/json/APPLICATION/ADOBE_EXPRNC_APP/FIRM/SANCTIONED_FIRM",
+      "type": "json",
+      "parser": "json",
+      "enabled": true,
+      "_note": "World Bank listing of ineligible (debarred) firms & individuals — public JSON API. Re-enabled 2026-07-08; the generic JSON parser harvests SUPP_NAME records. A failed fetch or 0-name parse degrades coverage loudly."
     }
   ]
 }
