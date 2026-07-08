@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
   persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
-  captureAcceptable, tsToIsoDate, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS, BASELINE_SNAPSHOT_MAX_DAYS
+  captureAcceptable, tsToIsoDate, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
 } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;

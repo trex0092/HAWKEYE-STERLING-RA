@@ -189,7 +189,7 @@ export function contentChanges(changes) {
 export function stateMateriallyChanged(prevState, nextState) {
   const strip = st => JSON.stringify(Object.fromEntries(
     Object.entries((st && st.sources) || {}).map(([id, v]) => {
-      const { checkedAt, ...rest } = v || {};
+      const { checkedAt: _checkedAt, ...rest } = v || {};
       return [id, rest];
     })
   ));
