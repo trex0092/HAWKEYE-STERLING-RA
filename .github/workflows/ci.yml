@@ -64,6 +64,8 @@ jobs:
         run: node test/daily-brief.test.mjs
       - name: Run governance-report unit tests
         run: node test/governance-report.test.mjs
+      - name: Run weekly-summary unit tests
+        run: node test/weekly-summary.test.mjs
       - name: Run asana-notify unit tests (retry policy + re-run dedup)
         run: node test/asana-notify.test.mjs
       - name: Run quarterly-review unit tests
