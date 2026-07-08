@@ -144,6 +144,19 @@ check('a clean fetch clears the error streak and stale error fields', (() => {
   return rec.errorStreak === undefined && rec.error === undefined && r.changes[0].status === 'unchanged';
 })());
 
+/* ── contentAsOf: archive-recovered content keeps the CAPTURE's date ── */
+const capSrc = [{ id: 'w', name: 'W', jurisdiction: 'Global', url: 'https://w' }];
+const capRec = computeChanges(capSrc, { sources: { w: { hash: null, bytes: 0, changedAt: null, status: 403, error: 'HTTP 403' } } },
+  { w: { ok: true, status: 200, body: 'captured content', via: 'web.archive.org snapshot 20260627105659', snapshotTs: '20260627105659' } }, '2026-07-08');
+check('REGRESSION: recovery via an archive capture records contentAsOf as the capture date, not the recording day',
+  capRec.state.sources.w.contentAsOf === '2026-06-27' && capRec.state.sources.w.changedAt === '2026-07-08');
+check('the same capture stays acceptable against that baseline (no error flip-flop)',
+  captureAcceptable('20260627105659', capRec.state.sources.w.contentAsOf, Date.UTC(2026, 6, 9)));
+check('a direct fetch advances contentAsOf forward, never backward', (() => {
+  const r = computeChanges(capSrc, capRec.state, { w: { ok: true, status: 200, body: 'captured content' } }, '2026-07-09');
+  return r.state.sources.w.contentAsOf === '2026-07-09' && r.changes[0].status === 'unchanged';
+})());
+
 /* ── stateMateriallyChanged: checkedAt alone is not material ── */
 const base1 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-01', changedAt: '2026-06-01', status: 200 } } };
 const base2 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-02', changedAt: '2026-06-01', status: 200 } } };
