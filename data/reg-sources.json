@@ -7,7 +7,7 @@
       "jurisdiction": "UAE",
       "category": "Supervisor",
       "narrative": "Federal supervisor for Designated Non-Financial Businesses and Professions, including Dealers in Precious Metals and Stones (DPMS) and real estate. Issues DPMS guidance, goAML registration rules and the cash-transaction reporting threshold (AED 55,000). Watched so DPMS/real-estate Q&A answers and sector tools stay current.",
-      "url": "https://www.moet.gov.ae/en/anti-money-laundering",
+      "url": "https://www.moec.gov.ae/en/anti-money-laundering",
       "type": "html"
     },
     {
@@ -42,7 +42,7 @@
       "name": "UAE Central Bank (CBUAE) — AML/CFT",
       "jurisdiction": "UAE",
       "category": "Supervisor",
-      "narrative": "Supervises licensed financial institutions and exchange houses for AML/CFT and issues circulars, the AML Standards/Guidance and examination expectations. Watched so FI-facing answers, examination-readiness and transaction-monitoring tools stay current.",
+      "narrative": "Supervises licensed financial institutions and exchange houses for AML/CFT and issues circulars, the AML Standards/Guidance and examination expectations. Watched via the CBUAE Rulebook (the canonical home of regulations and standards; the marketing site centralbank.ae bot-blocks non-browser clients) so FI-facing answers, examination-readiness and transaction-monitoring tools stay current.",
       "url": "https://rulebook.centralbank.ae/en",
       "type": "html"
     },
@@ -105,8 +105,8 @@
       "name": "OECD — Responsible Mineral Supply Chains (CAHRA)",
       "jurisdiction": "Global",
       "category": "Supply chain",
-      "narrative": "Owns the Due Diligence Guidance for Responsible Supply Chains of Minerals from Conflict-Affected and High-Risk Areas (the 5-step framework) and MNE Guidelines. Watched so OECD answers and the high-risk-country / ASM risk floor reflect current guidance and Annex II shifts.",
-      "url": "https://www.oecd.org/en/topics/sub-issues/responsible-minerals-supply-chains.html",
+      "narrative": "Owns the Due Diligence Guidance for Responsible Supply Chains of Minerals from Conflict-Affected and High-Risk Areas (the 5-step framework) and MNE Guidelines. Watched via the Responsible Business Conduct topic hub on oecd.org (the legacy mneguidelines.oecd.org host bot-blocks non-browser clients) so OECD answers and the high-risk-country / ASM risk floor reflect current guidance and Annex II shifts.",
+      "url": "https://www.oecd.org/en/topics/responsible-business-conduct.html",
       "type": "html"
     },
     {
@@ -189,30 +189,6 @@
       "narrative": "Sets the RJC Code of Practices and Chain-of-Custody standard for the jewellery and watch supply chain (responsible sourcing, KYC, conflict-sensitive due diligence). Watched so the gold/jewellery sector answers and responsible-sourcing tools reflect current RJC certification requirements.",
       "url": "https://www.responsiblejewellery.com/",
       "type": "html"
-    },
-    {
-      "id": "probe-uae-portal",
-      "name": "PROBE u.ae AML portal",
-      "jurisdiction": "UAE",
-      "category": "Probe",
-      "narrative": "Temporary probe candidate for the MoE AML page on the official UAE government portal. Branch-only; removed before merge. Exists to verify fetchability from a GitHub runner.",
-      "url": "https://u.ae/en/information-and-services/justice-safety-and-the-law/anti-money-laundering"
-    },
-    {
-      "id": "probe-uae-strategy",
-      "name": "PROBE u.ae AML national strategy",
-      "jurisdiction": "UAE",
-      "category": "Probe",
-      "narrative": "Temporary probe candidate for the CBUAE AML/CFT rulebook section. Branch-only; removed before merge. Exists to verify fetchability from a GitHub runner.",
-      "url": "https://u.ae/en/about-the-uae/strategies-initiatives-and-awards/strategies-plans-and-visions/finance-and-economy/the-national-strategy-for-anti-money-laundering-and-countering-the-financing-of-terrorism"
-    },
-    {
-      "id": "probe-oecd-minerals",
-      "name": "PROBE OECD minerals due diligence publication",
-      "jurisdiction": "Global",
-      "category": "Probe",
-      "narrative": "Temporary probe candidate for OECD mineral supply chain guidance on the new oecd.org site. Branch-only; removed before merge. Exists to verify fetchability from a GitHub runner.",
-      "url": "https://www.oecd.org/en/publications/oecd-due-diligence-guidance-for-responsible-supply-chains-of-minerals-from-conflict-affected-and-high-risk-areas_9789264252479-en.html"
     }
   ]
 }
