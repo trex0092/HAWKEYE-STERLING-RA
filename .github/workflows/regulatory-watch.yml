@@ -5,8 +5,10 @@ name: Regulatory Watch
 # sector; FATF guidance, Wolfsberg, RMI, LBMA, OECD, OFAC, UN, EU, UK OFSI,
 # Egmont, Basel, UNODC, EU high-risk third countries, RJC). On any content
 # change it creates a task in the "Ongoing Monitoring" Asana
-# project, commits the refreshed fingerprint state to main (so the same change
-# is not re-alerted), and — if an ANTHROPIC_API_KEY secret is set — drafts an
+# project, persists the refreshed fingerprint state to the reg-watch-state
+# branch (branch protection blocks direct pushes to main; the state branch is
+# rebuilt as <main> + one data commit each run, so the same change is not
+# re-alerted), and — if an ANTHROPIC_API_KEY secret is set — drafts an
 # AI update proposal. If Asana delivery fails (no token / API error) it falls
 # back to a labelled GitHub issue so a change is never lost.
 #
@@ -107,6 +109,20 @@ jobs:
         with:
           node-version: 22
 
+      - name: Overlay latest watcher state (lives on the reg-watch-state branch)
+        run: |
+          # Branch protection blocks direct pushes to main (GH006), so the
+          # fingerprint state and AI drafts persist on a dedicated data branch.
+          # Overlay the newest copies before checking; without this, every run
+          # would re-diff against stale state and re-alert the same changes.
+          if git fetch origin reg-watch-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/reg-watch-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- docs/research/auto 2>/dev/null || true
+            echo "state overlaid from reg-watch-state"
+          else
+            echo "no reg-watch-state branch yet — using state from main"
+          fi
+
       - name: Run regulatory watch
         id: watch
         env:
@@ -140,7 +156,7 @@ jobs:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
         run: node scripts/watch-notify.mjs "$PR_TITLE" reg-watch-report.md reg-watch-changes.json
 
-      - name: Commit refreshed fingerprint state to main
+      - name: Persist refreshed fingerprint state (reg-watch-state branch)
         # state_dirty covers runs with no content change but a material state
         # move (e.g. a source's error streak advanced) — without committing
         # those, persistent-failure tracking would reset every run.
@@ -149,8 +165,11 @@ jobs:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
         run: |
           # The per-run artifacts (reg-watch-report.md / reg-watch-changes.json)
-          # are gitignored; this commits the fingerprint state and any AI draft so
-          # the same change is not re-alerted next run.
+          # are gitignored; this persists the fingerprint state and any AI draft
+          # so the same change is not re-alerted next run. Branch protection
+          # blocks direct pushes to main (GH006 — verified in run 28922304236),
+          # so the data lives on the reg-watch-state branch: always rebuilt as
+          # <current main> + one data commit, force-updated each run.
           if [ -n "$(git status --porcelain data/ docs/research/auto 2>/dev/null)" ]; then
             git config user.name "regulatory-watch"
             git config user.email "actions@github.com"
@@ -158,9 +177,8 @@ jobs:
             git add docs/research/auto 2>/dev/null || true
             git commit -m "$PR_TITLE [skip ci]"
             for attempt in 1 2 3 4 5; do
-              git push && break
-              echo "push rejected (attempt $attempt) — rebasing on origin/main"
-              git pull --rebase origin main || git rebase --abort
+              git push --force origin HEAD:refs/heads/reg-watch-state && break
+              echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
           else

@@ -158,20 +158,28 @@ export function computeChanges(sources, prevState, fetched, today) {
     const bytes = text.length;
     /* Provenance: how the content was obtained (direct vs wayback fallback). */
     const via = f.via ? { via: f.via } : {};
+    /* contentAsOf = the date the content itself is from: the capture's own
+       timestamp for archive fetches, today for direct fetches. This — not
+       the day WE recorded it — is the floor future captures must clear,
+       otherwise a source recovered from a capture rejects that same capture
+       next run (its ts predates our recording day) and flip-flops to error. */
+    const asOf = (f.snapshotTs && tsToIsoDate(f.snapshotTs)) || today;
     if (!old) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, ...via };
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, ...via };
       changes.push({ ...base(s), status: 'new', newHash: hash, ...via });
     } else if (old.hash == null) {
       /* first good snapshot after a prior error — record silently, no PR */
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, ...via };
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, ...via };
       changes.push({ ...base(s), status: 'recovered', newHash: hash, ...via });
     } else if (old.hash !== hash) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, status: f.status || 200, prevHash: old.hash, ...via };
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, prevHash: old.hash, ...via };
       changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes, ...via });
     } else {
       /* Rebuild rather than spread so a stale error/errorStreak from a past
-         failed run is cleared the moment the source fetches clean again. */
-      stateSources[s.id] = { hash: old.hash, bytes: old.bytes, checkedAt: today, changedAt: old.changedAt, status: f.status || 200, ...(old.prevHash ? { prevHash: old.prevHash } : {}), ...via };
+         failed run is cleared the moment the source fetches clean again.
+         contentAsOf only moves forward (same content, newest confirmation). */
+      const prevAsOf = old.contentAsOf || old.changedAt || '';
+      stateSources[s.id] = { hash: old.hash, bytes: old.bytes, checkedAt: today, changedAt: old.changedAt, contentAsOf: asOf > prevAsOf ? asOf : prevAsOf, status: f.status || 200, ...(old.prevHash ? { prevHash: old.prevHash } : {}), ...via };
       changes.push({ ...base(s), status: 'unchanged' });
     }
   }
@@ -357,7 +365,7 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
     if (ts && captureAcceptable(ts, notBefore)) {
       const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
       console.log('spn2 capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
-      if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts };
+      if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts, snapshotTs: ts };
     }
   }
   /* 2b. Anonymous Save Page Now — serialized (see enqueueSpn) and honoring
@@ -378,7 +386,7 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
       if (r.ok && ts && captureAcceptable(ts, notBefore)) {
         const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
         console.log('save-page-now capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
-        if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts };
+        if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts, snapshotTs: ts };
       }
       if (r.ok) break;
       if (r.status !== 429 && r.status < 500) break; /* only 429/5xx are worth retrying */
@@ -396,7 +404,7 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
   if (ts && captureAcceptable(ts, notBefore)) {
     const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
     console.log('wayback capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
-    if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts };
+    if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts, snapshotTs: ts };
   } else if (ts) {
     console.log('wayback: latest capture of ' + url + ' is ' + ts + ' (' + Math.round(snapshotAgeDays(ts)) + 'd old'
       + (notBefore ? ', baseline ' + notBefore : '') + ') — not acceptable');
@@ -457,9 +465,11 @@ async function main() {
   const fetched = {};
   await Promise.all(sources.map(async s => {
     /* A source with recorded content must never be fingerprinted from an
-       archive capture older than that content (reversed-alert guard). */
+       archive capture older than that content (reversed-alert guard).
+       contentAsOf is the content's own date — for archive-recovered sources
+       that is the capture timestamp, so the same capture stays acceptable. */
     const prev = (prevState.sources || {})[s.id];
-    const notBefore = prev && prev.hash ? (prev.changedAt || null) : null;
+    const notBefore = prev && prev.hash ? (prev.contentAsOf || prev.changedAt || null) : null;
     fetched[s.id] = await fetchWithFallback(s.url, undefined, { notBefore });
   }));
   for (const s of sources) {
