@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
   persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
-  ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
+  captureAcceptable, tsToIsoDate, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS, BASELINE_SNAPSHOT_MAX_DAYS
 } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -161,6 +161,20 @@ check('snapshotAgeDays: a fresh capture is within the stale window', (() => {
   const now = Date.UTC(2026, 6, 8, 12, 0, 0);
   return snapshotAgeDays('20260707120000', now) <= SNAPSHOT_STALE_DAYS
     && snapshotAgeDays('20260601120000', now) > SNAPSHOT_STALE_DAYS;
+})());
+check('tsToIsoDate converts a wayback timestamp, rejects garbage',
+  tsToIsoDate('20260627105659') === '2026-06-27' && tsToIsoDate('junk') === null);
+check('captureAcceptable: reversed-alert guard — a capture older than the recorded content is rejected', (() => {
+  const now = Date.UTC(2026, 6, 8, 12, 0, 0);
+  return !captureAcceptable('20260627105659', '2026-07-01', now)     /* older than baseline: rejected */
+    && captureAcceptable('20260702120000', '2026-07-01', now)        /* newer than baseline: accepted */
+    && captureAcceptable('20260627105659', null, now)                /* no baseline: any recent capture beats zero coverage */
+    && !captureAcceptable('20220702120000', null, now);              /* ...but never past the hard age cap */
+})());
+check('BASELINE_SNAPSHOT_MAX_DAYS caps baseline captures', (() => {
+  const now = Date.UTC(2026, 6, 8, 12, 0, 0);
+  return captureAcceptable('20260501120000', null, now)              /* 68d — inside the cap */
+    && !captureAcceptable('20260401120000', null, now);              /* 98d — outside */
 })());
 check('fetchWithFallback returns the direct response when it succeeds (no wayback call)',
   await (async () => {

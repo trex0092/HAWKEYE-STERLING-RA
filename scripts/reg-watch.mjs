@@ -93,6 +93,7 @@ export function persistentErrors(changes) {
    bytes are the origin's own HTML (no wayback toolbar/rewriting) and the
    fingerprint stays comparable with direct fetches. */
 export const SNAPSHOT_STALE_DAYS = 7;
+export const BASELINE_SNAPSHOT_MAX_DAYS = 90;
 export function snapshotAgeDays(ts, now = Date.now()) {
   const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(String(ts || ''));
   if (!m) return Infinity;
@@ -100,6 +101,25 @@ export function snapshotAgeDays(ts, now = Date.now()) {
 }
 export function rawSnapshotUrl(url) {
   return String(url || '').replace(/^http:/, 'https:').replace(/(\/web\/\d{14})\//, '$1id_/');
+}
+export function tsToIsoDate(ts) {
+  const m = /^(\d{4})(\d{2})(\d{2})/.exec(String(ts || ''));
+  return m ? m[1] + '-' + m[2] + '-' + m[3] : null;
+}
+/* Whether an archived capture is safe to fingerprint. Unlike the FATF
+   Watchdog (which diffs list SEMANTICS and must refuse anything stale), the
+   Regulatory Watch only needs a monotonic baseline: a capture can never
+   raise a reversed/false "changed" alert as long as it is not OLDER than
+   the content we already recorded (notBefore = the source's changedAt).
+   For a source with no baseline at all, any capture within
+   BASELINE_SNAPSHOT_MAX_DAYS beats zero coverage — its age is recorded as
+   `via` provenance so the reviewer sees exactly what was fingerprinted. */
+export function captureAcceptable(ts, notBefore, now = Date.now()) {
+  const day = tsToIsoDate(ts);
+  if (!day) return false;
+  if (snapshotAgeDays(ts, now) > BASELINE_SNAPSHOT_MAX_DAYS) return false;
+  if (notBefore) return day >= notBefore;
+  return true;
 }
 
 /* ── Diff fetched content against stored state ──
@@ -245,10 +265,24 @@ async function fetchDirect(url, timeoutMs = 25000) {
     const body = await res.text();
     return { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
   } catch (e) {
-    return { ok: false, status: 'error', body: '', error: String(e && e.message || e).slice(0, 200) };
+    /* undici hides the real network failure (TLS, DNS, reset) in e.cause —
+       surface it, or "fetch failed" is all the state ever records. */
+    const cause = e && e.cause && (e.cause.code || e.cause.message);
+    const msg = String(e && e.message || e) + (cause ? ' (' + cause + ')' : '');
+    return { ok: false, status: 'error', body: '', error: msg.slice(0, 200) };
   } finally {
     clearTimeout(t);
   }
+}
+
+/* Serialize Save Page Now requests: anonymous SPN rate-limits per IP, and
+   GitHub-hosted runners share IP pools, so parallel bursts guarantee 429s.
+   One request at a time with a courtesy gap maximizes the chance of a slot. */
+let spnChain = Promise.resolve();
+function enqueueSpn(fn) {
+  const run = spnChain.then(fn, fn);
+  spnChain = run.then(() => new Promise(r => setTimeout(r, 3000)), () => {});
+  return run;
 }
 
 /* Direct fetch with one retry on transient network failure, then the same
@@ -262,7 +296,8 @@ async function fetchDirect(url, timeoutMs = 25000) {
    re-fetched with the id_ flag so the bytes are the origin's own HTML and
    fingerprints stay comparable with direct fetches.
    `fetchFn` is injectable so tests never hit the network. */
-export async function fetchWithFallback(url, fetchFn = fetchDirect) {
+export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
+  const notBefore = opts.notBefore || null; /* ISO date of the content we already hold */
   let direct = await fetchFn(url);
   if (direct.ok) return direct;
   if (direct.status === 'error') {
@@ -271,38 +306,45 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect) {
     direct = await fetchFn(url);
     if (direct.ok) return direct;
   }
-  /* 2. Save Page Now. Anonymous SPN is rate-limited and can return transient
-     429/5xx, so retry once with backoff; a clean response that did not yield
-     a fresh timestamped capture will not improve on retry. Every outcome is
-     logged — a silent fallback is undiagnosable from a green run. */
+  /* 2. Save Page Now — serialized (see enqueueSpn) and honoring Retry-After,
+     because anonymous SPN rate-limits shared runner IPs hard. Every outcome
+     is logged — a silent fallback is undiagnosable from a green run. */
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 75000); /* SPN crawls live — allow longer than a direct fetch */
-      const r = await fetch('https://web.archive.org/save/' + url, { headers: BROWSER_HEADERS, redirect: 'follow', signal: ctrl.signal });
-      clearTimeout(t);
+      const r = await enqueueSpn(async () => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 75000); /* SPN crawls live — allow longer than a direct fetch */
+        try {
+          return await fetch('https://web.archive.org/save/' + url, { headers: BROWSER_HEADERS, redirect: 'follow', signal: ctrl.signal });
+        } finally { clearTimeout(t); }
+      });
       const ts = (/\/web\/(\d{14})/.exec(r.url || '') || [])[1] || '';
       console.log('save-page-now ' + url + ' (attempt ' + attempt + '): HTTP ' + r.status + ' -> ' + (r.url || '(no url)'));
-      if (r.ok && ts && snapshotAgeDays(ts) <= SNAPSHOT_STALE_DAYS) {
+      if (r.ok && ts && captureAcceptable(ts, notBefore)) {
         const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
         console.log('save-page-now capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
         if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts };
       }
       if (r.ok) break;
       if (r.status !== 429 && r.status < 500) break; /* only 429/5xx are worth retrying */
+      if (attempt < 2) {
+        const ra = Math.min(30, Number(r.headers?.get?.('retry-after')) || 0) * 1000;
+        await new Promise(res => setTimeout(res, ra || 8000));
+      }
     } catch (e) {
       console.warn('save-page-now failed for ' + url + ' (attempt ' + attempt + '): ' + String(e && e.message || e).slice(0, 120));
+      if (attempt < 2) await new Promise(r => setTimeout(r, 8000));
     }
-    if (attempt < 2) await new Promise(r => setTimeout(r, 8000));
   }
-  /* 3. Most recent existing capture, only if fresh. */
+  /* 3. Most recent existing capture, if acceptable as a baseline. */
   const ts = await waybackLatestTs(url);
-  if (ts && snapshotAgeDays(ts) <= SNAPSHOT_STALE_DAYS) {
+  if (ts && captureAcceptable(ts, notBefore)) {
     const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
     console.log('wayback capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
     if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts };
   } else if (ts) {
-    console.log('wayback: latest capture of ' + url + ' is ' + ts + ' (' + Math.round(snapshotAgeDays(ts)) + 'd old) — too stale to trust');
+    console.log('wayback: latest capture of ' + url + ' is ' + ts + ' (' + Math.round(snapshotAgeDays(ts)) + 'd old'
+      + (notBefore ? ', baseline ' + notBefore : '') + ') — not acceptable');
   } else {
     console.log('wayback: no capture found for ' + url);
   }
@@ -358,7 +400,13 @@ async function main() {
   const prevState = loadState();
 
   const fetched = {};
-  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchWithFallback(s.url); }));
+  await Promise.all(sources.map(async s => {
+    /* A source with recorded content must never be fingerprinted from an
+       archive capture older than that content (reversed-alert guard). */
+    const prev = (prevState.sources || {})[s.id];
+    const notBefore = prev && prev.hash ? (prev.changedAt || null) : null;
+    fetched[s.id] = await fetchWithFallback(s.url, undefined, { notBefore });
+  }));
   for (const s of sources) {
     const f = fetched[s.id];
     if (f && f.via) console.log(s.id + ': via ' + f.via);
