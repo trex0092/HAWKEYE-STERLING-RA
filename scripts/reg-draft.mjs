@@ -11,7 +11,7 @@
    key is missing or the API errors, it exits 0 so the (detection-only) PR still
    opens. Model id per the repo's Claude usage standard: claude-opus-4-8
    (override with ANTHROPIC_MODEL, e.g. claude-sonnet-4-6 to cut cost). */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { extractText, CHANGES_FILE, fetchWithFallback } from './reg-watch.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
@@ -21,13 +21,14 @@ const OUT_DIR = 'docs/research/auto';
 function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection-only PR).'); process.exit(0); }
 
 if (!KEY) skip('no ANTHROPIC_API_KEY');
-if (!existsSync(CHANGES_FILE)) skip('no changes file');
 
 let date, changes;
 try {
+  /* Read directly (no exists pre-check): a missing file lands here too, and
+     check-then-read is a race the scanner rightly flags. */
   ({ date, changes } = JSON.parse(readFileSync(CHANGES_FILE, 'utf8')));
 } catch (e) {
-  skip('changes file unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
+  skip('changes file missing/unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
 }
 /* Draft only for real content changes — an 'unreachable' alert entry has no
    new page text to analyse; it is on the card purely to surface the gap.
@@ -100,7 +101,7 @@ async function draftFor(c) {
 const sections = [];
 for (const c of changes) {
   const text = await draftFor(c);
-  const m = /SEVERITY:\s*(LOW|MEDIUM|HIGH)\s*[—-]?\s*(.*)$/im.exec(text);
+  const m = /SEVERITY:[ \t]*(LOW|MEDIUM|HIGH)(?:[ \t]*[—-][ \t]*([^\n]*))?$/im.exec(text);
   if (m) {
     c.severity = m[1].toUpperCase();
     if (m[2]) c.severityReason = m[2].trim().slice(0, 200);

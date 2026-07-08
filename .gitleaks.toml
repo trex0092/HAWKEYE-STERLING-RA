@@ -35,6 +35,7 @@ regexes = [
   '''1216203873114462''',  # section: Sanctions updates
   '''1216203873114461''',  # section: FATF list moves
   '''1216229252787647''',  # section: AI & Platform Governance (weekly summary default)
+  '''1213645083721304''',  # user GID: default case/OM assignee (public object identifier)
   # Former Reg/Gov/Sanctions section GIDs (kept so history still scans clean).
   '''1215844241216116''',  # former section: Regulatory changes
   '''1215857714525481''',  # former section: Sanctions updates
