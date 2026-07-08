@@ -5,17 +5,14 @@
 ### UAE Financial Intelligence Unit (FIU) — goAML
 
 - **What appears to have changed**:
-  - Content "last updated on 9 February 2024" with a footer copyright reading "© 2026", suggesting the snapshot reflects a rollover of site metadata rather than substantive content changes.
-  - No new publications, STR/goAML process updates, or notifications are visible ("no new notifications"); listed "What's New" items are dated 2019–2022.
-  - This looks like routine site churn (framework/metadata refresh) rather than a substantive regulatory or reporting-process change.
+  - Copyright footer now reads "© 2026" while the page content "last updated" date remains **9 February 2024** — suggests an automated footer/template refresh rather than substantive content change.
+  - No new "What's New" items beyond previously seen entries (latest dated 7 October 2022); publications/notifications counts (47 publications, 6 notifications) appear consistent with routine site state.
+  - This looks like **routine site churn** (template/year rollover) with no new regulatory instrument, MoU, or STR-process change visible in the extracted text.
 
 - **Likely app impact**:
-  - Minimal. No change to STR/goAML reporting obligations, reporting-entity process, or FIU mandate is evidenced here.
-  - Verify that any Regulatory Q&A topic referencing goAML/STR filing or FIU contact details still matches (Abu Dhabi address, phone +971 2 691 5599 appear unchanged).
-  - No update needed to country/risk data in `index.html`; no new typology reports, MOUs, or thresholds are shown.
-  - Optional: confirm Super Tools citations in `assets/super-data.js` still point to the live FIU/goAML URL.
+  - **Minimal to none.** No new STR/goAML procedural guidance, typology report, or legal decision is evident to warrant Q&A updates.
+  - If our `assets/super-data.js` Super Tools cite the FIU goAML portal or STR reporting process, verify the **URL and FIU contact details** (Abu Dhabi, Al Bateen address; phone +971 2 691 5599) still match — no change detected, but worth a quick confirmation.
+  - No `index.html` country/risk data change indicated; UAE risk classification is unaffected by this observation.
 
 - **Suggested citation**:
-  - Only if a later review surfaces substantive content: cite "UAE Financial Intelligence Unit (FIU) — goAML," https://www.uaefiu.gov.ae/en/ (page last updated 9 February 2024). No new instrument, circular, or article number is visible in the text to cite.
-
-*Reviewer note: Recommend no edit at this time; flag as routine churn pending confirmation that no substantive publication or process page has changed.*
+  - No update warranted at this time. If a reference refresh is desired for freshness, cite: **UAE Financial Intelligence Unit (FIU) — goAML portal**, https://www.uaefiu.gov.ae/en/ (page content last updated 9 February 2024). Recommend re-check after any new "What's New" publication appears.
