@@ -111,12 +111,18 @@ jobs:
         id: watch
         env:
           MODE: ${{ inputs.mode || 'check' }}
+          # Optional archive.org API key ("accesskey:secret" from
+          # https://archive.org/account/s3.php). When set, bot-blocked sources
+          # are captured via authenticated Save Page Now — a real quota instead
+          # of the anonymous per-IP lottery that 429s shared runners.
+          ARCHIVE_SPN_KEYS: ${{ secrets.ARCHIVE_SPN_KEYS }}
         run: node scripts/reg-watch.mjs "$MODE"
 
       - name: AI draft (optional — only if ANTHROPIC_API_KEY is set)
         if: steps.watch.outputs.has_changes == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ARCHIVE_SPN_KEYS: ${{ secrets.ARCHIVE_SPN_KEYS }}
         run: node scripts/reg-draft.mjs
 
       - name: Notify Asana — Ongoing Monitoring project
