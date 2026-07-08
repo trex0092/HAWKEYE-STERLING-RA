@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, CASE_SECTIONS } from '../scripts/screening-cases.mjs';
+import { planCaseActions, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, CASE_SECTIONS, buildResultsDigestHtml, resultsDigestTitle } from '../scripts/screening-cases.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -85,6 +85,35 @@ check('case body: single <body> root, escalation banner for sanctions-match, SLA
 check('case body links the customer record by GID', html.includes('data-asana-gid="1214107985842154"'));
 check('case body: a plain review flag gets the softer banner',
   caseHtml(KEY, subj({ recommendation: 'review' })).includes('Screening flag — review required'));
+
+/* ── daily results digest (the Asana results surface) ── */
+const RESULTS = {
+  date: TODAY, screened: 778, entities: 334, individuals: 444,
+  newMatches: 1, matchCount: 9, clearedCount: 2, degraded: true,
+  lists: [{ name: 'UK OFSI', count: 19761 }, { name: 'France DGT', count: 18644 }],
+  failures: ['UN consolidated could not be loaded (fetch failed) — coverage degraded'],
+  enrichment: { amErrors: 100, pepErrors: 0, skipped: 644 },
+  alerts: [{ key: KEY, name: 'Abdul Aziz Sultan', jurisdiction: 'Dominica', band: 'high', topScore: 87, recommendation: 'sanctions-match', lists: ['UK OFSI'] }],
+  cleared: ['Old Match Ltd', 'Another One']
+};
+const digest = buildResultsDigestHtml(RESULTS, a => (a.key === KEY ? 'case-gid-1' : null));
+check('digest: single <body> root with headline counts',
+  /^<body>[\s\S]*<\/body>$/.test(digest) && digest.includes('778 subjects screened') && digest.includes('9 standing match(es)'));
+check('digest: match row links its lifecycle case and carries score/band/lists',
+  digest.includes('data-asana-gid="case-gid-1"') && digest.includes('score 87') && digest.includes('UK OFSI'));
+check('digest: coverage totals + failed list + degraded warning are loud',
+  digest.includes('38405 designated names') && digest.includes('⚠️ UN consolidated could not be loaded')
+  && digest.includes('DEGRADED'));
+check('digest: enrichment shortfall and cleared count are reported, MLRO/four-eyes note present',
+  digest.includes('644 subject(s) skipped enrichment') && digest.includes('2 previously recorded match(es)')
+  && digest.includes('four-eyes'));
+check('digest: a clean day is affirmative, never silent', (() => {
+  const clean = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
+  return clean.includes('every subject screened clean') && !clean.includes('DEGRADED');
+})());
+check('digest title states the outcome and volume',
+  resultsDigestTitle(RESULTS) === '🛡️ Sanctions Screen — ' + TODAY + ' — 1 new match(es) · 778 screened'
+  && resultsDigestTitle({ ...RESULTS, newMatches: 0 }).includes('no new matches'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

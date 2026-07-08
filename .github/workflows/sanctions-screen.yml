@@ -127,13 +127,15 @@ jobs:
           SCREEN_SKIP_AUDIT_TASK: ${{ vars.SCREEN_SKIP_AUDIT_TASK || '1' }}
         run: node scripts/sanctions-screen.mjs
 
-      - name: Manage screening case lifecycle
+      - name: Manage screening case lifecycle + post the daily results digest to Asana
         id: cases
         if: steps.screen.outputs.screen_error != 'true'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_CASES_PROJECT_GID: ${{ vars.ASANA_CASES_PROJECT_GID || '1213914392047129' }}
           ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
+          # "Sanctions updates" section — the run's RESULTS surface (Asana, not GitHub)
+          ASANA_SCREEN_RESULTS_SECTION_GID: ${{ vars.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203873114462' }}
         run: node scripts/screening-cases.mjs
 
       - name: Screening metrics (non-blocking observability)
