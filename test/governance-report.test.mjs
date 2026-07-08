@@ -17,8 +17,8 @@ const iso = (daysAgo) => new Date(NOW - daysAgo * 86400000).toISOString();
 /* ── the control map itself ── */
 const allFiles = CONTROL_GROUPS.flatMap(g => g.workflows.map(w => w.file));
 check('control map covers all five pillars', CONTROL_GROUPS.length === 5);
-check('control map lists 25 workflows with no duplicates',
-  allFiles.length === 25 && new Set(allFiles).size === 25);
+check('control map lists 26 workflows with no duplicates',
+  allFiles.length === 26 && new Set(allFiles).size === 26);
 check('every control has a label and a cadence',
   CONTROL_GROUPS.every(g => g.workflows.every(w => w.label && w.cadence)));
 
@@ -62,7 +62,7 @@ for (const f of allFiles) allGreen[f] = { status: 'completed', conclusion: 'succ
 const sGreen = summarise(allGreen, NOW);
 check('all-green suite yields the ALL CONTROLS GREEN verdict',
   sGreen.fail === 0 && sGreen.verdict.includes('✅ ALL CONTROLS GREEN'));
-check('summary counts every control once', sGreen.total === 25);
+check('summary counts every control once', sGreen.total === 26);
 
 const oneRed = { ...allGreen, 'codeql.yml': { status: 'completed', conclusion: 'failure', created_at: iso(0) } };
 const sRed = summarise(oneRed, NOW);

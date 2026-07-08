@@ -36,3 +36,4 @@ __pycache__/
 
 # Generated CycloneDX SBOM (built in CI, attached to releases)
 sbom.cdx.json
+weekly-summary.md

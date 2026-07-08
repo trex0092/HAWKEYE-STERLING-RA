@@ -1,0 +1,86 @@
+name: Weekly Compliance Summary
+
+# Every Monday 09:00 UAE (05:03 UTC — odd minute per repo convention, GitHub
+# delays top-of-hour crons the most). One consolidated Asana card with ALL the
+# week's information: pipeline health, source health, regulatory changes (with
+# links to the AI drafts), FATF list position, sanctions-list movement, and
+# open customer-screening flags. If Asana is unreachable the summary lands as
+# a labelled GitHub issue instead — the weekly delivery is never lost.
+
+on:
+  schedule:
+    - cron: '3 5 * * 1'   # Mondays 05:03 UTC = 09:03 UAE
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: weekly-summary
+  cancel-in-progress: false
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      - name: Overlay latest watcher state (lives on the reg-watch-state branch)
+        run: |
+          if git fetch origin reg-watch-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/reg-watch-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- docs/research/auto 2>/dev/null || true
+            echo "state overlaid from reg-watch-state"
+          else
+            echo "no reg-watch-state branch — using state from main"
+          fi
+
+      - name: Build and deliver the weekly summary
+        id: summary
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+          # "AI & Platform Governance" section of the Ongoing Monitoring project
+          ASANA_WEEKLY_SECTION_GID: ${{ vars.ASANA_WEEKLY_SECTION_GID || '1216229252787647' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Don't fail the run if Asana is unreachable; the issue fallback covers it.
+        continue-on-error: true
+        run: node scripts/weekly-summary.mjs
+
+      - name: Fallback to a GitHub issue if Asana delivery failed
+        if: steps.summary.outcome == 'failure'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const fs = require('fs');
+            let report = 'Weekly summary could not be generated — check the workflow run.';
+            try { report = fs.readFileSync('weekly-summary.md', 'utf8'); } catch {}
+            const { owner, repo } = context.repo;
+            await github.rest.issues.create({
+              owner, repo,
+              title: 'Weekly Compliance Summary — Asana delivery failed',
+              body: report + [
+                '', '---',
+                '> This summary could not be delivered to Asana (no `ASANA_ACCESS_TOKEN`',
+                '> secret, or the API call failed), so this issue was opened instead.',
+              ].join('\n'),
+              labels: ['regulatory-watch'],
+            });
