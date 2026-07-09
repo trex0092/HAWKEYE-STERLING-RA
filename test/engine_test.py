@@ -14,7 +14,14 @@ sys.path.insert(0, ROOT)
 def _tsr(a, b):
     a = " ".join(sorted(a.split())); b = " ".join(sorted(b.split()))
     return difflib.SequenceMatcher(None, a, b).ratio() * 100
-_rf = types.ModuleType("rapidfuzz"); _rf.fuzz = types.SimpleNamespace(token_sort_ratio=_tsr)
+def _tset(a, b):
+    # Offline stand-in for rapidfuzz token_set_ratio: intersection-favouring, so a
+    # subset name scores ~100 (matches the production behaviour we rely on).
+    sa, sb = set(a.split()), set(b.split()); inter = sa & sb
+    if not inter: return _tsr(a, b)
+    i = " ".join(sorted(inter))
+    return max(_tsr(i, " ".join(sorted(sa))), _tsr(i, " ".join(sorted(sb))), _tsr(a, b))
+_rf = types.ModuleType("rapidfuzz"); _rf.fuzz = types.SimpleNamespace(token_sort_ratio=_tsr, token_set_ratio=_tset)
 sys.modules["rapidfuzz"] = _rf
 sys.modules["pdfplumber"] = types.ModuleType("pdfplumber")
 _req = types.ModuleType("requests"); _req.utils = types.SimpleNamespace(quote=lambda s: s)
@@ -55,6 +62,34 @@ check("short designated name (HAMAS) is screened, exact match surfaces",
       len(screen.screen_name("Hamas", short_list)) == 1)
 check("short designated name does not fuzzy-false-positive on an unrelated firm",
       screen.screen_name("Hummus Trading LLC", short_list) == [])
+# OFAC a.k.a. list (alt.csv): alias names (column 3) are folded into the SDN set.
+# OFAC alt.csv is headerless: ent_num, alt_num, alt_type, alt_name, remarks.
+_alt = b'101,1,aka,"ACME LAUNDERING LLC",strong\n102,1,aka,-0-,x\n103,2,fka,,y\n'
+_aliases = screen.parse_ofac_alt(_alt)
+check("parse_ofac_alt extracts a.k.a. names, skips blanks/-0-",
+      "ACME LAUNDERING LLC" in _aliases and len(_aliases) == 1)
+# Token-SUBSET recall: a short patronymic form matches the full listed chain, but
+# an unrelated name (no distinctive-token subset) does not.
+_chain = {"OFAC SDN": [(screen.normalize("USAMA BIN MUHAMMAD BIN AWAD BIN LADIN"), "USAMA BIN MUHAMMAD BIN AWAD BIN LADIN")]}
+check("patronymic short form matches the full designated chain (subset recall)",
+      len(screen.screen_name("Usama bin Ladin", _chain)) == 1)
+check("an unrelated multi-token name is not subset-matched to the chain",
+      screen.screen_name("Ahmed Al Rashid Trading", _chain) == [])
+# Corporate owner/parent extraction (50%/control): a designated ENTITY owner is
+# screened even though only natural persons are in `individuals`.
+_owners = screen.extract_entity_owners("Ultimate Beneficial Owner: Rosneft Holding LLC\nParent Company: Acme Group FZE\nDirector: John Smith")
+check("extract_entity_owners pulls corporate owners, not natural persons",
+      any("Rosneft Holding" in o for o in _owners) and any("Acme Group" in o for o in _owners)
+      and not any("John Smith" in o for o in _owners))
+_ec = {"OFAC SDN": [(screen.normalize("ROSNEFT HOLDING LLC"), "ROSNEFT HOLDING LLC")]}
+_pm_e, _clr_e = screen.screen_customers(
+    [{"name": "Clean Trading DMCC", "individuals": [], "entity_owners": ["Rosneft Holding LLC"], "permalink": "x"}], _ec)
+check("a designated corporate owner flags the customer by control linkage",
+      len(_pm_e) == 1 and any(h["subject_type"].startswith("ENTITY (owner)") and h["control_linkage"] for h in _pm_e[0]["hits"]))
+# PEP: a non-Latin-only name is surfaced for manual review, never a silent "no PEP".
+_pep_nl = screen.check_pep("محمد عبدالله")
+check("non-Latin PEP name is surfaced for manual review (not silently cleared)",
+      _pep_nl.get("hit") is True and _pep_nl.get("review") is True and "MANUAL REVIEW" in _pep_nl.get("category", ""))
 
 # A non-Latin-script name normalises to empty and so cannot be auto-matched — it
 # must NOT be filed "clear"; it is surfaced for manual screening instead.
@@ -111,6 +146,31 @@ pm_b = [{"name": "Al Bogari DMCC", "hits": [{"subject_type": "INDIVIDUAL", "subj
 d_sub = screen.classify_deltas(pm_b, [], [], state_sub, "2026-06-29")
 check("delta: a new subject on the same list entry is a NEW hit, not standing",
       d_sub["sanctions"] == 1 and pm_b[0]["hits"][0]["is_new"] is True)
+# Delta: an item that RESURFACES after a > gap (de-list → re-list) re-alerts as NEW.
+_rs = {}
+pm_r = [{"name": "R Co", "hits": [{"subject_type": "ENTITY", "subject_name": "R Co", "list": "OFAC SDN", "matched_entry": "X", "score": 95}]}]
+screen.classify_deltas(pm_r, [], [], _rs, "2026-01-01")            # first seen
+d_gap = screen.classify_deltas(pm_r, [], [], _rs, "2026-03-01")     # reappears 59 days later
+check("delta: an item resurfacing after a gap re-alerts as NEW (re-listing)",
+      d_gap["sanctions"] == 1 and pm_r[0]["hits"][0]["is_new"] is True)
+# Delta: pruning drops fingerprints unseen beyond the retention window.
+_ps = {"OLD|x": {"first": "2024-01-01", "last": "2024-01-01"}, "NEW|y": {"first": "2026-07-01", "last": "2026-07-01"}}
+_dropped = screen.prune_delta_state(_ps, "2026-07-09")
+check("delta: prune drops stale fingerprints, keeps recent ones",
+      _dropped == 1 and "OLD|x" not in _ps and "NEW|y" in _ps)
+# Report: adverse-media degradation and a down core list are surfaced, and the
+# lists block renders even on a zero-match run.
+import datetime as _dt
+_meta_deg = {"ofac": {"count": 17000, "date": "2026-07-08"}, "un": {"count": 0, "date": "-"},
+             "uk": {"count": 9000, "date": "2026-07-08"}, "eu": {"count": 5000, "date": "2026-07-08"},
+             "eocn": {"count": 40, "date": "2026-07-01"}}
+_narr = screen.build_unified_narrative(
+    [], [], [], [], _meta_deg,
+    {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5, "am_errors": 3, "pep_errors": 0, "delta": {}},
+    _dt.datetime(2026, 7, 9))
+check("report: adverse-media errors surface as DEGRADED (not hardcoded OK)", "Adverse media DEGRADED" in _narr)
+check("report: a down core list surfaces as DEGRADED sanctions coverage", "SANCTIONS COVERAGE DEGRADED" in _narr and "UN" in _narr)
+check("report: lists-screened block renders on a zero-match run", "Lists screened:" in _narr)
 
 # ── parse robustness (EU ragged/None-aliases row must not zero the list) ──────
 print("screen.py — parse robustness")
@@ -287,6 +347,16 @@ check("R.16 detects high-risk-geo counterparty", any(a["rule"] == "HIGH_RISK_GEO
 check("R.16 returns nothing on an empty/no-feed input", txn_monitor.evaluate([])["alerts"] == [])
 check("R.16 is INACTIVE without a configured feed (honest status)", "INACTIVE" in txn_monitor.status_line() and txn_monitor.load_transactions("/nonexistent/path.json") == [])
 check("R.16 a single rule error never blocks the others", isinstance(txn_monitor.evaluate_customer([{"bad": "row"}]), list))
+# R.16 rule crashes are COUNTED (not a silent all-clear) via rule_errors.
+_re = {}
+txn_monitor.evaluate_customer([{"customer": "X", "amount": "not-a-number", "date": "2026-06-01", "direction": "in", "method": "wire"}], None, _re)
+check("R.16 rule errors are counted so a crashing typology is visible",
+      isinstance(_re, dict) and "rule_errors" in txn_monitor.evaluate([]))
+# KYC: a PRESENT but unparseable expiry is a GAP, never silently treated as valid.
+_g = kyc.cdd_gaps({"id_number": "P1", "nationality": "AE", "dob": "1980-01-01",
+                   "proof_of_address": "yes", "passport_expiry": "not-a-date"})
+check("KYC unparseable expiry is flagged as a manual-review gap (not silently valid)",
+      any("unreadable" in g for g in _g))
 # A corrupt / truncated feed must NOT read as a quiet 'ACTIVE, 0 txns' day.
 import tempfile as _tf0
 _bad_feed = os.path.join(_tf0.mkdtemp(), "bad.json")

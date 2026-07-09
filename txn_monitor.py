@@ -198,8 +198,11 @@ def _alert(rule, severity, t, detail):
             "amount": _amt(t) if "amount" in t else None, "detail": detail}
 
 
-def evaluate_customer(txns, jurisdiction_table=None):
-    """Run all rules over ONE customer's transactions. Returns a list of alerts."""
+def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):
+    """Run all rules over ONE customer's transactions. Returns a list of alerts.
+    A crashing rule never blocks the others, but its failure is COUNTED (via the
+    optional rule_errors dict) so a rule that silently produces no alerts because
+    it crashes on every customer is visible, not a silent all-clear."""
     alerts = []
     for rule in _RULES:
         try:
@@ -208,20 +211,24 @@ def evaluate_customer(txns, jurisdiction_table=None):
             else:
                 alerts += rule(txns)
         except Exception:
+            if rule_errors is not None:
+                rule_errors[getattr(rule, "__name__", "rule")] = rule_errors.get(getattr(rule, "__name__", "rule"), 0) + 1
             continue  # a rule error never blocks the others
     return alerts
 
 
 def evaluate(transactions, jurisdiction_table=None):
     """Group by customer and evaluate. Returns {configured, n_txns, n_customers,
-    alerts:[...], by_severity:{...}}. With no feed: configured=False, alerts=[]."""
+    alerts:[...], by_severity:{...}, rule_errors:{...}}. With no feed:
+    configured=False, alerts=[]."""
     txns = transactions or []
     by_customer = defaultdict(list)
     for t in txns:
         by_customer[t.get("customer", "?")].append(t)
     alerts = []
+    rule_errors = {}
     for cust, ctx in by_customer.items():
-        alerts += evaluate_customer(ctx, jurisdiction_table)
+        alerts += evaluate_customer(ctx, jurisdiction_table, rule_errors)
     sev_rank = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
     alerts.sort(key=lambda a: sev_rank.get(a["severity"], 0), reverse=True)
     by_sev = defaultdict(int)
@@ -229,7 +236,7 @@ def evaluate(transactions, jurisdiction_table=None):
         by_sev[a["severity"]] += 1
     return {"configured": bool(transactions) or feed_configured(),
             "n_txns": len(txns), "n_customers": len(by_customer),
-            "alerts": alerts, "by_severity": dict(by_sev)}
+            "alerts": alerts, "by_severity": dict(by_sev), "rule_errors": rule_errors}
 
 
 def status_line():
@@ -240,8 +247,11 @@ def status_line():
                     "feed could not be parsed (corrupt or truncated JSON). No transactions "
                     "were screened this run; investigate the feed before relying on it.")
         res = evaluate(load_transactions())
+        errs = res.get("rule_errors") or {}
+        warn = (f"  ⚠ {sum(errs.values())} rule error(s) [{', '.join(sorted(errs))}] — "
+                "some typologies did not run this run" if errs else "")
         return (f"Transaction monitoring (R.16): ACTIVE — {res['n_txns']} txns / "
-                f"{res['n_customers']} customers → {len(res['alerts'])} alert(s).")
+                f"{res['n_customers']} customers → {len(res['alerts'])} alert(s).{warn}")
     return ("Transaction monitoring (R.16): engine ready & tested, INACTIVE — no "
             "transaction feed connected (set TXN_FEED_PATH). No transaction data is "
             "screened or reported until a real feed is configured.")
