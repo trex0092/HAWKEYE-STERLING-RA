@@ -181,6 +181,17 @@ const bFull = diffState(b1.nextState, [bClean], '2026-06-21', 0.85, ['OFAC SDN',
 check('a standing sanctions match clears on de-listing when all its lists were screened',
   bFull.cleared.length === 1 && !bFull.nextState.subjects.b);
 
+/* Every carry-forward must read as STILL ACTIVE (lastSeen = today): the case
+   planner (screening-cases.mjs planCaseActions) auto-clears + completes the
+   Asana case of any registry subject whose lastSeen is stale — with a false
+   "not flagged" audit comment — and a cleared case never re-opens. */
+check('carry-forward on a failed originating list marks the subject still-active (lastSeen bumped)',
+  bDegraded.nextState.subjects.b.lastSeen === '2026-06-20');
+check('carry-forward on incomplete enrichment marks the subject still-active (lastSeen bumped)',
+  p2.nextState.subjects.p.lastSeen === '2026-06-20');
+check('carry-forward on an errored subject marks it still-active with firstSeen intact',
+  d5.nextState.subjects.a.lastSeen === '2026-06-20' && d5.nextState.subjects.a.firstSeen === '2026-06-19');
+
 /* ── rendering ── */
 check('matchSummary names band, score and lists', matchSummary(d1.alerts[0]).includes('HIGH') && matchSummary(d1.alerts[0]).includes('OFAC SDN'));
 const report = buildScreenReport(d1.alerts, [], '2026-06-19', { screened: 42, degraded: true, errored: 1 });

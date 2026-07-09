@@ -66,6 +66,21 @@ const SEQ_KEY = 'hsra.seq';
 ══════════════════════════════════════════ */
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* Strict-mode shared token (netlify/functions/_auth.js): when the operator has
+   filled <meta name="hsra-app-token"> at deploy time, every function call must
+   carry it as X-App-Token or strict mode 401s the browser path. Empty → no-op. */
+function appToken(){
+  try{
+    const m = typeof document!=='undefined' && document.querySelector('meta[name="hsra-app-token"]');
+    return ((m && m.getAttribute('content')) || '').trim();
+  }catch(e){ return ''; }
+}
+function fnHeaders(){
+  const h = {'Content-Type':'application/json'};
+  const t = appToken();
+  if(t) h['X-App-Token'] = t;
+  return h;
+}
 
 /* ══════════════════════════════════════════
    DEVICE SECURITY — passphrase gate + encryption-at-rest (WebCrypto, no deps)
@@ -76,7 +91,11 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;
    scoring engine and its full test suite are unaffected. Closes the Identity &
    Access / Data Protection gaps for an on-device app (no backend to host them).
 ══════════════════════════════════════════ */
-const SECURE_KEYS = ['hsra.draft.v2','hsra.riskdata.v1','hsra.register.v1','hsra.asana.delivered.v1','hsra.asana.failed.v1','hsra.audit.v1'];
+/* hsra.asana.tokenised.v1 must be listed here: SS reads/writes go through the
+   in-memory mirror while unlocked, and _secActivate repopulates that mirror
+   from SECURE_KEYS only — an unlisted key silently reads as null after every
+   lock/unlock or reload, which reset the "tokenise (no PII)" opt-in. */
+const SECURE_KEYS = ['hsra.draft.v2','hsra.riskdata.v1','hsra.register.v1','hsra.asana.delivered.v1','hsra.asana.failed.v1','hsra.audit.v1','hsra.asana.tokenised.v1'];
 const SEC_META_KEY = 'hsra.sec.v1';        /* {v,salt,iter,iv,ct} passphrase verifier — never encrypted */
 const SEC_OPTOUT_KEY = 'hsra.sec.optout';  /* '1' when the officer chose to store unencrypted */
 const PBKDF2_ITER = 250000;
@@ -700,7 +719,12 @@ function defaultState(){
 }
 function freshState(){
   const s = defaultState();
-  s.meta.ref = newRef();
+  /* While the encryption gate is up, the draft is unreadable ciphertext, so
+     boot lands here even though a real draft exists behind the lock. Allocating
+     a reference now would burn one hsra.seq number on every locked page load
+     (unlock re-runs hydrateApp, restores the draft, and discards this state).
+     Leave the ref empty; the post-unlock hydrate allocates it properly. */
+  s.meta.ref = _encLocked() ? '' : newRef();
   s.meta.date = todayISO();
   return s;
 }
@@ -880,7 +904,7 @@ function scheduleRiskBackup(){
   rdBackupTimer = setTimeout(function(){
     fetch('/.netlify/functions/risk-backup', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: fnHeaders(),
       body: JSON.stringify({sheet: {app: 'Hawkeye Sterling — Entity Risk Assessment', version: APP_VERSION,
         riskDataVersion: RISK_DATA_VERSION, updatedAt: riskData.updatedAt, overrides: riskData.overrides}})
     }).catch(function(){});
@@ -1527,7 +1551,7 @@ function doSendToAsana(p, ref, isRetry){
   if(typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) return;
   fetch('/.netlify/functions/asana-task', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: fnHeaders(),
     body: JSON.stringify(p)
   }).then(r => r.json()).then(d => {
     if(d && d.ok && d.gid){
@@ -1907,12 +1931,16 @@ function regWrite(items){
 const ASANA_MIRROR_EP = '/.netlify/functions/asana-mirror';
 function mirrorPayload(){
   const items = regAll();
+  /* Honour the tokenised-delivery opt-in here too: when the officer chose
+     "tokenise (no PII)", customer identity must not reach Asana via the
+     register mirror either — only the non-identifying triage fields go. */
+  const tok = (typeof asanaTokenised==='function') && asanaTokenised();
   const register = Object.keys(items).map(ref=>{
     const it = items[ref]||{}, s = it.summary||{}, st = it.state||{};
-    return { ref, entity: s.entity||'', outcome: s.outcome||'', total: (s.total==null?'':s.total),
+    return { ref, entity: tok ? '' : (s.entity||''), outcome: s.outcome||'', total: (s.total==null?'':s.total),
       prohibited: !!s.prohibited, complete: !!s.complete, date: s.date||'',
-      nextReview: s.nextReview||'', jurisdiction: (st.entity&&st.entity.jurisdiction)||'',
-      activity: (st.profile&&st.profile.activity)||'', savedAt: it.savedAt||'' };
+      nextReview: s.nextReview||'', jurisdiction: tok ? '' : ((st.entity&&st.entity.jurisdiction)||''),
+      activity: tok ? '' : ((st.profile&&st.profile.activity)||''), savedAt: it.savedAt||'' };
   });
   return { action:'write', register, audit: (typeof auditAll==='function'?auditAll():[]).slice(-1000) };
 }
@@ -1927,7 +1955,7 @@ function mirrorPush(){
   try{
     const p = mirrorPayload();
     if(!p.register.length && !p.audit.length) return;
-    fetch(ASANA_MIRROR_EP, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(p)}).then(()=>{}).catch(()=>{});
+    fetch(ASANA_MIRROR_EP, {method:'POST', headers: fnHeaders(), body: JSON.stringify(p)}).then(()=>{}).catch(()=>{});
   }catch(e){}
 }
 function mirrorBeacon(){
@@ -1935,7 +1963,12 @@ function mirrorBeacon(){
   try{
     const p = mirrorPayload();
     if(!p.register.length && !p.audit.length) return;
-    if(navigator.sendBeacon) navigator.sendBeacon(ASANA_MIRROR_EP, new Blob([JSON.stringify(p)], {type:'application/json'}));
+    /* sendBeacon cannot set headers, so with a strict-mode token configured the
+       beacon would 401 — use keepalive fetch (survives unload) to carry it. */
+    if(appToken() && typeof fetch==='function'){
+      fetch(ASANA_MIRROR_EP, {method:'POST', headers: fnHeaders(), body: JSON.stringify(p), keepalive:true}).then(()=>{}).catch(()=>{});
+    }
+    else if(navigator.sendBeacon) navigator.sendBeacon(ASANA_MIRROR_EP, new Blob([JSON.stringify(p)], {type:'application/json'}));
     else mirrorPush();
   }catch(e){}
 }

@@ -380,7 +380,7 @@ function corsHeaders(event) {
   if (origin && originAllowed(event)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-App-Token';
     headers['Access-Control-Max-Age'] = '86400';
   }
   return headers;

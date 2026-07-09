@@ -164,6 +164,37 @@ def rule_high_risk_counterparty(txns, jurisdiction_table=None):
     return out
 
 
+def rule_cdd_trigger(txns):
+    """Occasional transaction at/above the CDD trigger (AED 15,000) — FATF R.10
+    requires CDD on occasional transactions above the designated threshold.
+    Below the DPMSR line, so LOW severity: a work item (perform/refresh CDD),
+    not a suspicion. Cash-threshold amounts are already alerted by THRESHOLD."""
+    out = []
+    for t in txns:
+        amt = _amt(t)
+        if CDD_TRIGGER_THRESHOLD <= amt < CASH_REPORT_THRESHOLD:
+            out.append(_alert("CDD_TRIGGER", "LOW", t,
+                f"{amt:,.0f} AED ≥ CDD trigger {CDD_TRIGGER_THRESHOLD:,.0f} — "
+                "verify CDD is on file for this customer"))
+    return out
+
+
+def rule_round_amount_cash(txns):
+    """Repeated exact-round cash amounts (multiples of AED 5,000, ≥ 10,000) —
+    round-figure cash is a classic laundering indicator for a DPMS, where
+    genuine trades price off a floating metal rate and rarely land on round
+    numbers. One alert per customer once the pattern repeats."""
+    round_cash = [t for t in txns
+                  if _norm(t.get("method")) == "cash"
+                  and _amt(t) >= 10000 and _amt(t) % 5000 == 0]
+    if len(round_cash) < 3:
+        return []
+    total = sum(_amt(t) for t in round_cash)
+    return [_alert("ROUND_AMOUNT", "MEDIUM", round_cash[0],
+        f"{len(round_cash)} exact-round cash txns (total {total:,.0f} AED) — "
+        "round-figure cash is atypical for metal-rate-priced trades")]
+
+
 def rule_rapid_passthrough(txns):
     """Funds in then out within ~2 days (≤72h, date-granular) for a similar amount
     — pass-through / layering. The window is intentionally generous (over-alert is
@@ -182,7 +213,8 @@ def rule_rapid_passthrough(txns):
 
 
 _RULES = [rule_threshold, rule_structuring, rule_velocity,
-          rule_high_risk_counterparty, rule_rapid_passthrough]
+          rule_high_risk_counterparty, rule_rapid_passthrough,
+          rule_cdd_trigger, rule_round_amount_cash]
 
 
 def _any_customer(txns):

@@ -139,7 +139,14 @@ async function main() {
     else {
       anyError = true;
       rec.errStreak = (Number(rec.errStreak) || 0) + 1;
-      if (rec.errStreak >= ERROR_STREAK_ALERT) persistentErrors.push({ name: s.name, id: s.id, url: s.url, streak: rec.errStreak });
+      /* Carry status/detail like reg-watch does: without them, watch-notify
+         counts this entry as "content changed" and the Asana card tells the
+         MLRO a designation list CHANGED when it is actually unmonitored/blind. */
+      if (rec.errStreak >= ERROR_STREAK_ALERT) persistentErrors.push({
+        name: s.name, id: s.id, url: s.url, streak: rec.errStreak,
+        status: 'unreachable', errorStreak: rec.errStreak,
+        detail: 'unreachable ' + rec.errStreak + ' consecutive runs — change-detection is blind'
+      });
     }
   }
 

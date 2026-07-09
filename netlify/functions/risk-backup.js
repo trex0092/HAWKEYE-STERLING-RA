@@ -93,7 +93,15 @@ const handle = async (event) => {
     if (gid) {
       const upd = await api(token, 'PUT', '/tasks/' + gid, { data: { notes } });
       if (upd.ok) { await fileInSection(gid); return resp(200, { ok: true, gid, updated: true }); }
-      /* mirror task deleted between lookup and update — fall through to create */
+      /* Only a genuine 404 means the mirror task was deleted — recreate it. A
+         transient (429/5xx) or auth failure must NOT fall through to a create,
+         or a still-existing mirror gets a duplicate and later runs update
+         whichever paginates first while the other goes stale (asana-task.js
+         fixed this same class of bug). */
+      if (upd.status !== 404) {
+        const msg = (upd.body && upd.body.errors && upd.body.errors[0] && upd.body.errors[0].message) || ('asana update failed (' + upd.status + ')');
+        return resp(upd.status || 502, { ok: false, error: msg });
+      }
     }
     const made = await api(token, 'POST', '/tasks', { data: { name: TASK_NAME, notes, projects: [project] } });
     if (!made.ok) {
@@ -188,7 +196,7 @@ function corsHeaders(event) {
   if (origin && originAllowed(event)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-App-Token';
     headers['Access-Control-Max-Age'] = '86400';
   }
   return headers;

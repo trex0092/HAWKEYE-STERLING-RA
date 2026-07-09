@@ -132,9 +132,12 @@ def qa_gate(possible_matches, adverse_findings, pep_findings, list_meta, stats):
                 issues.append(f"sanctions hit on '{m.get('name')}' missing matched-entry/score evidence")
                 break
 
-    # Every PEP must carry its Wikidata source.
+    # Every auto-screened PEP must carry its Wikidata source. Manual-review
+    # findings (non-Latin / too-short names) intentionally carry no id — they
+    # are a designed hand-off, not an integrity violation, and flagging them
+    # would fail the gate on every run for as long as such a customer exists.
     for p in pep_findings:
-        if not p.get("id"):
+        if not p.get("id") and not p.get("review"):
             issues.append(f"PEP '{p.get('subject_name')}' missing Wikidata source id")
 
     # PROMPT SECURITY: a flagged-injection item must NEVER have been model-classified.

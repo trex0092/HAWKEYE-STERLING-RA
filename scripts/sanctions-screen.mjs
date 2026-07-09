@@ -302,8 +302,17 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
   // behaviour unchanged.
   const screened = screenedLists ? new Set(Array.from(screenedLists)) : null;
 
+  /* Carry a standing match forward as STILL ACTIVE (lastSeen = today). The case
+     planner (screening-cases.mjs) treats a stale lastSeen as "no longer flagged"
+     and auto-clears + completes the Asana case with a false "not flagged" audit
+     comment — and a cleared case never re-opens. A carry-forward is precisely
+     the situation where we could NOT re-verify, so it must not read as cleared. */
+  const carryForward = (key) => {
+    if (prev[key]) nextSubjects[key] = { ...prev[key], lastSeen: today };
+  };
+
   for (const r of results) {
-    if (r.errored) continue;
+    if (r.errored) { carryForward(r.key); continue; }
     if (isMatch(r, threshold)) {
       matchCount++;
       const sig = matchSignature(r);
@@ -330,7 +339,8 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
       const priorEnrichmentOnly = Array.isArray(prior.lists) && prior.lists.length > 0
         && prior.lists.every(l => ENRICHMENT_LISTS.has(l));
       if (r.enrichmentIncomplete && priorEnrichmentOnly) {
-        continue;   // leave nextSubjects[r.key] (the copied prior) in place
+        carryForward(r.key);   // keep the prior standing, marked still-active
+        continue;
       }
       // Degrade-loudly: if a SANCTIONS list that produced this prior match failed
       // to load this run, we could not re-screen the subject against it — carry the
@@ -340,7 +350,8 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
         const priorSanctionsLists = (Array.isArray(prior.lists) ? prior.lists : [])
           .filter(l => !ENRICHMENT_LISTS.has(l));
         if (priorSanctionsLists.some(l => !screened.has(l))) {
-          continue;   // originating list not screened this run → keep the standing match
+          carryForward(r.key);   // originating list not screened this run → keep the standing match
+          continue;
         }
       }
       cleared.push({ key: r.key, name: r.name, prior });

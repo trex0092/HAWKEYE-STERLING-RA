@@ -154,9 +154,12 @@ _TRANSLIT_GROUPS = [
 ]
 
 def _ascii_fold(s: str) -> str:
-    s = unicodedata.normalize("NFD", str(s or ""))
+    # Uppercase BEFORE decomposing (mirrors screen.py normalize()): lowercase
+    # Turkish dotless ı (U+0131) has no NFD decomposition and would be deleted
+    # by the ASCII filter, fragmenting "Kılıç" into "k l c". Upper-casing maps
+    # ı→I first, so ı/i collapse together and ş/ç/İ fold as expected.
+    s = unicodedata.normalize("NFD", str(s or "").upper())
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    # Turkish dotless-i / special letters survive folding as expected (İ→I, ş→s …)
     return re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9 ]", " ", s)).strip().lower()
 
 def name_variants(name: str, cap: int = 12):
@@ -229,7 +232,12 @@ def triage_adverse(subject: str, article: dict):
     # PROMPT SECURITY: the headline/source are untrusted web text. If they contain
     # injection patterns, never send them to the model — classify deterministically
     # and flag for the audit trail.
-    inj = detect_injection(article.get("title", "")) + detect_injection(article.get("source", ""))
+    # The date is untrusted too — it is raw RSS pubDate text (screen.py stores it
+    # verbatim), so injected instructions there would otherwise reach the prompt
+    # unscreened and outside the <<UNTRUSTED>> wrapper the system prompt keys on.
+    inj = (detect_injection(article.get("title", ""))
+           + detect_injection(article.get("source", ""))
+           + detect_injection(article.get("date", "")))
     if inj:
         out["injection_suspected"] = sorted(set(inj))
         return out
@@ -243,7 +251,7 @@ def triage_adverse(subject: str, article: dict):
                   f"Subject: {_wrap_untrusted(subject)}\n"
                   f"Headline: {_wrap_untrusted(article.get('title',''))} "
                   f"(source {_wrap_untrusted(article.get('source','?'))}, "
-                  f"{_sanitize_untrusted(article.get('date','?'), 32)}).\n"
+                  f"{_wrap_untrusted(_sanitize_untrusted(article.get('date','?'), 32))}).\n"
                   "Return compact JSON only: "
                   '{"is_about_subject": true|false, "is_adverse": true|false, '
                   '"severity": "CRITICAL|HIGH|MEDIUM|LOW|NONE"}')

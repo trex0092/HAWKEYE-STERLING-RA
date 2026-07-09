@@ -231,14 +231,18 @@ export function contentChanges(changes) {
   return changes.filter(c => c.status === 'new' || c.status === 'changed');
 }
 
-/* True when anything other than checkedAt moved (hash, status, error,
-   errorStreak, provenance). Drives the workflow's state commit so error
+/* True when anything other than checkedAt/contentAsOf moved (hash, status,
+   error, errorStreak, provenance). Drives the workflow's state commit so error
    streaks persist across runs even when no content changed — without it a
-   source could fail every day and the streak would reset each run. */
+   source could fail every day and the streak would reset each run.
+   contentAsOf must be stripped too: an unchanged direct fetch advances it to
+   today on every run, so leaving it in would make EVERY run "materially
+   changed" and this function permanently true. A genuine content change still
+   registers via hash/changedAt. */
 export function stateMateriallyChanged(prevState, nextState) {
   const strip = st => JSON.stringify(Object.fromEntries(
     Object.entries((st && st.sources) || {}).map(([id, v]) => {
-      const { checkedAt: _checkedAt, ...rest } = v || {};
+      const { checkedAt: _checkedAt, contentAsOf: _contentAsOf, ...rest } = v || {};
       return [id, rest];
     })
   ));

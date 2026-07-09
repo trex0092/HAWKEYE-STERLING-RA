@@ -81,6 +81,7 @@ jobs:
             git checkout FETCH_HEAD -- data/screen-delta-state.json 2>/dev/null || true
             git checkout FETCH_HEAD -- data/adverse-media-evidence.json 2>/dev/null || true
             git checkout FETCH_HEAD -- data/run-metrics.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/source-coverage-state.json 2>/dev/null || true
             echo "delta-state overlaid from screen-delta-state"
           else
             echo "no screen-delta-state branch yet — using state from main"
@@ -124,10 +125,10 @@ jobs:
       - name: Commit delta-state (what has already been reported)
         if: always()
         run: |
-          if [ -n "$(git status --porcelain data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json 2>/dev/null)" ]; then
+          if [ -n "$(git status --porcelain data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json 2>/dev/null)" ]; then
             git config user.name "daily-screening"
             git config user.email "actions@github.com"
-            git add data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json
+            git add data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json
             git commit -m "chore(screen): update delta-state [skip ci]"
             # Persist on the screen-delta-state branch (main is protected):
             # rebuilt as <current main> + one data commit, force-updated.
