@@ -2,27 +2,30 @@
 
 /* Optional shared-secret gate — defence in depth, NOT user authentication.
  *
- * A static browser app cannot keep a secret (anyone can read app.js), so this
- * does not, and cannot, authenticate the browser. What it does:
+ * HONEST LIMITATION: the Origin header is set by browsers but is trivially
+ * forgeable by any non-browser client (`curl -H 'Origin: https://…'`). So the
+ * Origin allow-list is a hardening measure against casual cross-site abuse, not
+ * an authentication boundary — treat every function endpoint as effectively
+ * public. A static browser app also cannot keep a real secret (anyone can read
+ * the token out of the page), so even the token below cannot fully authenticate
+ * the browser; it only raises the bar from "zero-effort curl" to "must read the
+ * page/JS". Confidential data must not rely on these gates alone.
  *
- *   - APP_SHARED_TOKEN UNSET (default) → sharedTokenOk() always returns true. The
- *     live site and existing server-to-server callers are completely unaffected;
- *     this file is inert until an operator opts in.
- *   - APP_SHARED_TOKEN SET → a request that carries NO browser Origin header (the
- *     server-to-server / curl path that otherwise slips past the origin guard,
- *     because a missing Origin is treated as allowed) MUST present a matching
- *     `X-App-Token` header. The browser path is still gated by Origin, not the
- *     token. This closes the "omit Origin to bypass the only access control" hole
- *     for a hardened deployment without breaking browser same-origin POSTs.
- *
- * NOTE: if you set APP_SHARED_TOKEN, any server-side caller that POSTs to these
- * functions without an Origin must either send `-H "X-App-Token: <token>"` or
- * take the origin-guarded path by sending the site's own Origin header. The
- * repo's own callers (the verify curls in netlify-deploy.yml /
- * asana-delivery-diag.yml and the function-health.yml probes) use the Origin
- * path — they send `Origin: https://hawkeye-sterling-ra.netlify.app`, which the
- * origin guard allows — so they keep working whether or not the token gate is
- * armed, and no GitHub-side secret is needed for them.
+ * Three modes:
+ *   - APP_SHARED_TOKEN UNSET (default) → sharedTokenOk() always returns true.
+ *     The live site and server-to-server callers are unaffected; this file is
+ *     inert until an operator opts in.
+ *   - APP_SHARED_TOKEN SET, APP_STRICT_TOKEN unset (default token mode) → a
+ *     request with NO browser Origin (the curl / server-to-server path) MUST
+ *     present a matching `X-App-Token`; a request that carries a site Origin is
+ *     still allowed without the token. This closes the "omit Origin to bypass"
+ *     hole but, per the limitation above, does NOT stop an Origin-forging curl.
+ *   - APP_SHARED_TOKEN SET **and** APP_STRICT_TOKEN=1 (strict mode) → EVERY
+ *     request must present a matching `X-App-Token`, including browser requests.
+ *     This is the only mode that resists Origin forgery. The browser sends the
+ *     token via a same-origin <meta name="hsra-app-token"> tag the operator
+ *     fills in at deploy time (see index.html/console.html and the README); the
+ *     repo's own verify/health curls must add `-H "X-App-Token: <token>"`.
  */
 const crypto = require('crypto');
 
@@ -33,14 +36,20 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
+function strictMode() {
+  return /^(1|true|yes|on)$/i.test(String(process.env.APP_STRICT_TOKEN || ''));
+}
+
 function sharedTokenOk(event) {
   const required = process.env.APP_SHARED_TOKEN;
   if (!required) return true;                       // feature off → unchanged
   const h = (event && event.headers) || {};
-  const origin = h.origin || h.Origin;
-  if (origin) return true;                          // browser path (origin-guarded)
+  if (!strictMode()) {
+    const origin = h.origin || h.Origin;
+    if (origin) return true;                        // default mode: browser path (origin-guarded)
+  }
   const provided = h['x-app-token'] || h['X-App-Token'] || '';
-  return !!provided && safeEqual(provided, required);
+  return !!provided && safeEqual(provided, required);   // strict mode: token required on every path
 }
 
-module.exports = { sharedTokenOk };
+module.exports = { sharedTokenOk, strictMode };

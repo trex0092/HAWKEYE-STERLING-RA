@@ -387,6 +387,35 @@ check("mapped Arabic keyword buckets into the Money Laundering typology", "Money
 _m2 = screen.match_adverse_keywords("Firm X charged in money laundering probe")
 check("English keyword matching is unchanged by the Arabic extension", "money laundering" in _m2)
 check("clean headline matches nothing", screen.match_adverse_keywords("Local bakery wins pastry award") == [])
+# Arabic orthographic variants must not cause a silent false negative: the
+# indefinite (no ال) form, a diacritic, and an alef/hamza variant all still match.
+check("Arabic indefinite 'غسل أموال' (no article) still maps to money laundering",
+      "money laundering" in screen.match_adverse_keywords("قضية غسل أموال كبيرة في دبي"))
+check("Arabic diacritic + alef variant still maps to money laundering",
+      "money laundering" in screen.match_adverse_keywords("تحقيق في غسْل الاموال"))
+check("Arabic 'تمويل إرهاب' maps to terrorist financing",
+      "terrorist financing" in screen.match_adverse_keywords("اتهامات تمويل إرهاب"))
+check("a clean Arabic headline still matches nothing (no over-broad Arabic match)",
+      screen.match_adverse_keywords("افتتاح متجر مجوهرات جديد في دبي") == [])
+# Weaponised worldwide coverage: headlines in many scripts/languages are flagged,
+# and benign ones in those scripts are not.
+_ml = [
+    ("Εταιρεία σε υπόθεση ξέπλυμα χρήματος", "money laundering"),   # Greek
+    ("חברה נחשדת בהלבנת הון", "money laundering"),                    # Hebrew
+    ("บริษัทถูกกล่าวหาว่าฟอกเงิน", "money laundering"),                # Thai
+    ("Firma oskarżona o pranie pieniędzy", "money laundering"),      # Polish
+    ("Công ty bị cáo buộc rửa tiền", "money laundering"),            # Vietnamese
+    ("Фирма обвинена в изпиране на пари", "money laundering"),        # Bulgarian
+    ("நிறுவனம் பணமோசடி வழக்கில்", "money laundering"),                 # Tamil
+]
+_ml_ok = all(exp in screen.match_adverse_keywords(t) for t, exp in _ml)
+check("worldwide multilingual flagging across Greek/Hebrew/Thai/Polish/Vietnamese/Bulgarian/Tamil", _ml_ok)
+check("worldwide sweep covers many languages and locales",
+      screen.ADVERSE_LANG_COUNT >= 30 and len(screen.GNEWS_LOCALES) >= 60)
+check("ADVERSE_LOCALES accepts 'all' → full matrix",
+      screen._resolve_locale_count("all", len(screen.GNEWS_LOCALES)) == len(screen.GNEWS_LOCALES)
+      and screen._resolve_locale_count("5", 74) == 5 and screen._resolve_locale_count("bogus", 74) == 5)
+check("GDELT risk-term cluster is broad (global predicate coverage)", len(screen.GDELT_RISK_TERMS) >= 20)
 
 _gd = screen.parse_gdelt({"articles": [
     {"title": "X Trading fined for sanctions evasion", "domain": "example.com",

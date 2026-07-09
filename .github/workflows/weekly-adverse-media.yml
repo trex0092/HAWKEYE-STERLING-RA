@@ -91,6 +91,15 @@ jobs:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
           RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          # Weaponised global adverse-media sweep: query EVERY Google News locale in
+          # the worldwide matrix (all markets/languages), on top of GDELT's global
+          # index. Tunable without a code change via the repo variable ADVERSE_LOCALES
+          # (e.g. set a number to cap runtime on a very large customer base).
+          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || 'all' }}
+          # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
+          # its own assigned MLRO case subtask, not just the first 40. The full
+          # findings list is always in the daily task body regardless of this cap.
+          CASE_SUBTASK_CAP: ${{ vars.CASE_SUBTASK_CAP || '200' }}
           # AI layer: key enables GROUNDED triage only (classifies real headlines, cannot invent
           # facts). Generative report prose stays OFF unless REPORT_ALLOW_LLM=1 is also set.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
