@@ -10,7 +10,7 @@
    · backup-risk-data (commit the Asana risk-data mirror to the repo)
    · probe (diagnostic: print source, classified lists, name contexts).
 */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 /* Shared Asana client: bounded retry on 429/5xx + the re-run dedup guard. */
 import { asana, findRecentDuplicate, listProjectTasks as listTasksIn } from './asana-notify.mjs';
 
@@ -23,6 +23,7 @@ const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWK
 const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1213914392047129';
 /* "FATF list moves" section of that project, so list-change alerts file neatly. */
 const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1216203873114461';
+const FATF_SKIP_ALERT = Number(process.env.FATF_SKIP_ALERT) || 2; /* consecutive unreachable runs before a monitoring-gap alert */
 
 /* FATF naming → the app's baseline naming */
 const ALIASES = {
@@ -435,27 +436,58 @@ export async function main(mode) {
   const fetched = await fetchFatfSegments();
   if (!fetched) {
     /* No fresh authoritative capture this run (e.g. archive.org briefly down).
-       Skip cleanly: never diff against stale data, never fail red. The weekly
-       cadence retries; the saved state is unchanged. */
+       Skip cleanly: never diff against stale data, never fail red. BUT count
+       consecutive skips — a source that stays unreachable run after run means the
+       FATF list is going UNMONITORED, which must be surfaced, not silently green. */
     console.log('no fresh authoritative FATF capture reachable this run — skipping (state unchanged). Verify manually on ' + FATF_URL);
+    try {
+      /* read-and-catch (no existsSync pre-check) — avoids a TOCTOU race between
+         the check and the read; a missing/garbled file simply starts a fresh {}. */
+      let st = {};
+      try { st = JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch { st = {}; }
+      st.skipStreak = (Number(st.skipStreak) || 0) + 1;
+      st.lastSkip = new Date().toISOString().slice(0, 10);
+      mkdirSync('data', { recursive: true });
+      writeFileSync(STATE_FILE, JSON.stringify(st, null, 2) + '\n');
+      if (st.skipStreak >= FATF_SKIP_ALERT && REG_PROJECT_GID) {
+        const url = await createTask(
+          '⚠ FATF monitoring GAP — list source unreachable ' + st.skipStreak + ' consecutive run(s)',
+          'The FATF black/grey-list watchdog could not reach an authoritative capture (direct + archive) for '
+          + st.skipStreak + ' consecutive runs. FATF list moves may be UNDETECTED. Verify manually on ' + FATF_URL
+          + ' and check the source endpoints.', undefined, REG_PROJECT_GID, REG_FATF_SECTION_GID);
+        console.log('FATF monitoring-gap alert filed (skipStreak=' + st.skipStreak + '): ' + url);
+      }
+    } catch (e) { console.error('FATF skip-streak bookkeeping failed: ' + e.message); }
     return;
   }
   console.log('list source: ' + fetched.source);
   const source = fetched.source;
+  /* Source reachable again → clear any accumulated skip-streak so a later gap
+     alerts fresh. Read-and-catch (no existsSync pre-check — TOCTOU-safe): a
+     missing state file simply means there is no streak to clear. */
+  try {
+    const st = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+    if (st.skipStreak) { st.skipStreak = 0; writeFileSync(STATE_FILE, JSON.stringify(st, null, 2) + '\n'); }
+  } catch (e) { /* no state yet / unreadable — nothing to reset */ }
   const current = classifyCountries(fetched.html, baseline);
   /* Safety: an empty/tiny list, an implausibly large "black" list, or black/grey
      overlap all mean the source was parsed wrong — stop before alerting or persisting. */
   assertPlausible(current);
   console.log('FATF now — black:', current.black.join(', '), '| grey:', current.grey.length, 'countries');
 
-  if (mode === 'seed' || !existsSync(STATE_FILE)) {
+  /* Read-and-catch (no existsSync pre-check — TOCTOU-safe). Seed when there is
+     no usable PRIOR LIST STATE: missing/garbled file, or a file that carries only
+     skip-streak bookkeeping (written by an unreachable-source run before any
+     seed) — diffing against a list-less state would read as "everything added". */
+  let prev = null;
+  try { prev = JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch { prev = null; }
+  if (mode === 'seed' || !prev || !Array.isArray(prev.black)) {
     mkdirSync('data', { recursive: true }); /* git does not keep empty dirs */
     writeFileSync(STATE_FILE, JSON.stringify({ ...current, updated: new Date().toISOString().slice(0, 10) }, null, 2) + '\n');
     console.log('state seeded — no alert on the first run');
     return;
   }
 
-  const prev = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
   const diff = diffLists(prev, current);
   const changed = [...diff.blackAdded, ...diff.blackRemoved, ...diff.greyAdded, ...diff.greyRemoved];
   if (!changed.length) { console.log('no FATF list changes — staying silent'); return; }

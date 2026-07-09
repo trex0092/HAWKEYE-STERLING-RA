@@ -49,6 +49,7 @@ ASANA_ASSIGNEE_GID    = "1213645083721304"   # Luisa Fernanda
 THRESHOLD             = 85   # combined (full + core) similarity to flag a match
 CORE_THRESHOLD        = 82   # distinctive-token similarity required (false-positive guard)
 SHORT_ENTRY_THRESHOLD = 97   # near-exact gate for short (<6 char) designated names (HAMAS, IRISL …)
+TOKENSET_THRESHOLD    = 93   # strict additive gate: token-set (subset/patronymic) recall without FP blow-up
 EOCN_PDF_PATH         = "eocn_list.pdf"
 EOCN_JSON_PATH        = "data/eocn-local-terrorist-list.json"
 DELTA_STATE_PATH      = "data/screen-delta-state.json"  # what we've already reported (delta engine)
@@ -764,14 +765,17 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
         # Targeted Arabic pass — wrongdoing coverage in Arabic press that would
         # never match the English risk terms (AE:ar locale only).
         passes.append((f'"{name}" ({AR_RISK_QUERY})', GNEWS_URLS[4:5]))
+    attempts = failures = 0
     for q, locales in passes:
         query = requests.utils.quote(q)
         for url_template in locales:
             url = url_template.format(query=query)
+            attempts += 1
             try:
                 r = requests.get(url, timeout=15,
                                  headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
                 if r.status_code != 200:
+                    failures += 1
                     continue
                 root = ET.fromstring(r.content)
                 for item in root.findall(".//item")[:max_results]:
@@ -798,19 +802,28 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
                         "categories": typology_for(matched),
                     })
             except Exception:
+                failures += 1
                 continue
             time.sleep(0.4)  # polite delay between requests
 
     # Independent second source — GDELT. Its failure alone never fails the
     # subject (the Google News passes above already ran); it is logged so a quiet
     # feed outage is visible in the run log instead of silently narrowing recall.
+    gdelt_ok = False
     try:
         for a in search_gdelt(name, max_results):
             if a["title"] not in seen_titles:
                 seen_titles.add(a["title"])
                 articles.append(a)
+        gdelt_ok = True
     except Exception as e:
         log(f"  GDELT unavailable for this subject ({str(e)[:80]}) — Google News coverage stands")
+
+    # Degrade loudly: if EVERY Google-News fetch failed AND GDELT failed, we have
+    # ZERO coverage for this subject — raise so the caller records an am_error and
+    # the report degrades, rather than returning [] that reads as "no adverse media".
+    if attempts > 0 and failures >= attempts and not gdelt_ok:
+        raise RuntimeError(f"adverse-media: all {attempts} Google-News fetches + GDELT failed for '{name}'")
 
     articles = dedup_stories(articles)
     # Sort: flagged first, then most-recent first (recency ranking).
@@ -983,9 +996,20 @@ def _norm_lower(s):
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", s.lower())).strip()
 
 def check_pep(name):
-    """Returns {hit, id, label, description} | {hit:False} | {errored:True}."""
+    """Returns {hit, id, label, description} | {hit:False} | {errored:True} |
+    {hit, review:True} for a name that cannot be auto-screened."""
     key = _norm_lower(name)
     if not key or len(key) < 5:
+        # A name with content that the Latin normaliser collapses to <5 chars
+        # (recorded only in non-Latin script) cannot be auto-screened against the
+        # English Wikidata index. Returning {hit:False} would file it as "no PEP"
+        # — a silent false negative. Surface it for manual PEP review instead
+        # (mirrors the sanctions `_unscreenable` path), unless it is genuinely empty.
+        if name and str(name).strip():
+            return {"hit": True, "review": True, "id": "",
+                    "category": "MANUAL REVIEW — name not auto-screenable for PEP (non-Latin script / too short)",
+                    "label": str(name).strip(),
+                    "description": "screen this subject for PEP/RCA status manually against a domestic register"}
         return {"hit": False}
     if key in _PEP_CACHE:
         return _PEP_CACHE[key]
@@ -1051,6 +1075,25 @@ def parse_ofac(data):
     except Exception as e:
         log(f"  OFAC parse error: {e}")
     return names, "live", sha256_of(data)
+
+def parse_ofac_alt(data):
+    """OFAC a.k.a. list (alt.csv) → the set of alias names. The SDN publishes its
+    weak/strong a.k.a. names in a SEPARATE file; screening only the primary name
+    (parse_ofac) is a false-negative gap — a party operating under an SDN alias
+    would screen clear. Format: ent_num, alt_num, alt_type, alt_name, remarks →
+    the alias name is column index 3. Best-effort: a missing/garbled file yields
+    an empty set (the primary SDN list still screens), never an error."""
+    aliases = set()
+    if not data: return aliases
+    try:
+        reader = csv.reader(io.StringIO(data.decode("latin-1")))
+        for row in reader:
+            if len(row) > 3:
+                n = row[3].strip().strip('"')
+                if n and n != "-0-": aliases.add(n)
+    except Exception as e:
+        log(f"  OFAC alt parse error: {e}")
+    return aliases
 
 def parse_un(data):
     names = set()
@@ -1225,6 +1268,31 @@ def extract_individuals(notes):
         cleaned.append(n)
     return list(dict.fromkeys(cleaned))
 
+# Corporate owner / parent / shareholder lines in a KYC note. A customer owned
+# by a DESIGNATED ENTITY (not a natural person) must be screened too — the 50 % /
+# control rule applies to corporate owners, and extract_individuals only yields
+# natural persons, so this closes a false-negative gap.
+_ENTITY_OWNER_RE = re.compile(
+    r"(?:Parent(?:\s+Company)?|Shareholder|Ultimate\s+Beneficial\s+Owner|UBO|Holding(?:\s+Company)?|"
+    r"Owner|Owned\s+by|Beneficial\s+Owner)\s*(?:\([^)]*\))?\s*[:\-—]\s*([^\n]+)", re.IGNORECASE)
+# A name carrying a legal-form token is a corporate entity, not a natural person.
+_CORP_FORM_RE = re.compile(
+    r"\b(llc|l\.l\.c|fze|fzco|fzc|dmcc|dwc|pjsc|psc|plc|ltd|limited|inc|incorporated|corp|"
+    r"corporation|company|group|holdings?|gmbh|sarl|bv|nv|s\.a|ag|pte|sdn|bhd|establishment|"
+    r"industries|international|enterprises|trust|foundation|stiftung|waqf|anstalt)\b", re.IGNORECASE)
+def _looks_corporate(name):
+    return bool(_CORP_FORM_RE.search(name or "")) or kyc.is_arrangement_entity(name or "")
+def extract_entity_owners(notes):
+    if not notes: return []
+    out = []
+    for m in _ENTITY_OWNER_RE.finditer(notes):
+        cand = m.group(1).strip().strip(".,;").strip()
+        # Corporate owners only (carry a legal-form / arrangement token); natural
+        # persons are already captured by extract_individuals and screened there.
+        if cand and len(cand) >= 5 and _looks_corporate(cand):
+            out.append(cand)
+    return list(dict.fromkeys(out))
+
 def get_all_customers():
     customers = []
     params = {
@@ -1248,12 +1316,17 @@ def get_all_customers():
             kyc_data = kyc.parse_customer(notes)
             struct_inds = kyc_data.get("individuals", [])
             individuals = [i["name"] for i in struct_inds] or extract_individuals(notes)
+            # Corporate owners/parents named in the note that are NOT natural persons
+            # (already in `individuals`) — screened as ENTITY subjects (50%/control).
+            entity_owners = [e for e in extract_entity_owners(notes)
+                             if _norm_lower(e) not in {_norm_lower(i) for i in individuals}]
             customers.append({
                 "gid": t["gid"],
                 "name": t["name"],
                 "permalink": t.get("permalink_url",""),
                 "created_at": t.get("created_at",""),
                 "individuals": individuals,
+                "entity_owners": entity_owners,
                 "kyc": kyc_data,
                 "country": kyc_data.get("country", ""),
                 "has_assessment": len(notes.strip()) > 100,
@@ -1278,20 +1351,44 @@ def core_tokens(norm):
     """Distinctive tokens of a normalized name (boilerplate removed)."""
     return [t for t in norm.split() if t not in STOPWORD_TOKENS and len(t) > 1]
 
+def _token_set_ratio(a, b):
+    """rapidfuzz token_set_ratio when available (production), else 0 so the extra
+    recall gate is simply inert under a minimal offline stub — never an error."""
+    fn = getattr(fuzz, "token_set_ratio", None)
+    return fn(a, b) if fn else 0
+
+def _is_token_subset(short_norm, long_norm):
+    """True when EVERY distinctive token of the shorter name closely matches a
+    token in the longer name, and the longer name has strictly more tokens. This
+    is the patronymic / extra-middle-name case ("USAMA BIN LADIN" vs the full
+    listed chain) — a strong, low-false-positive subset signal. Requires ≥2
+    distinctive tokens so a single common token can't trigger it."""
+    ta, tb = core_tokens(short_norm), core_tokens(long_norm)
+    if len(ta) < 2 or len(tb) <= len(ta):
+        return False
+    return all(any(fuzz.token_sort_ratio(t, u) >= 88 for u in tb) for t in ta)
+
 def match_score(n_norm, e_norm):
-    """Returns (decisive_score, full_score, core_score).
+    """Returns (decisive_score, full_score, core_score, tset_score).
 
     decisive_score = min(full, core): a pair only scores high if BOTH the whole
     string AND its distinctive core agree. Two firms sharing only legal-form /
     sector boilerplate ("SANAYI VE TICARET ANONIM SIRKETI") score high on `full`
     but low on `core`, so the min collapses the false positive. When neither side
-    has a distinctive core (e.g. a pure person-name), we fall back to `full`."""
+    has a distinctive core (e.g. a pure person-name), we fall back to `full`.
+
+    tset_score = token_set_ratio: asymmetry-tolerant, it scores high when one
+    name's tokens are a SUBSET of the other's — a short KYC spelling vs a long
+    patronymic chain ("USAMA BIN LADEN" vs "USAMA BIN MUHAMMAD BIN AWAD BIN
+    LADIN"). Used ONLY as an additional positive signal under a strict gate in
+    screen_name; it never loosens the min()."""
     full = fuzz.token_sort_ratio(n_norm, e_norm)
+    tset = _token_set_ratio(n_norm, e_norm)
     cn, ce = core_tokens(n_norm), core_tokens(e_norm)
     if not cn or not ce:
-        return full, full, full
+        return full, full, full, tset
     core = fuzz.token_sort_ratio(" ".join(cn), " ".join(ce))
-    return min(full, core), full, core
+    return min(full, core), full, core, tset
 
 def confidence_tier(core):
     if core >= 92: return "STRONG"
@@ -1313,11 +1410,15 @@ def screen_name(name, all_lists):
     for list_name, entries in all_lists.items():
         for en, orig in entries:
             if len(en) < 2: continue
-            best = None
+            best = None; best_tset = 0; subset = False
             for cand in variants:
-                score, full, core = match_score(cand, en)
+                score, full, core, tset = match_score(cand, en)
                 if best is None or score > best[0]:
                     best = (score, full, core)
+                if tset > best_tset:
+                    best_tset = tset
+                if not subset and _is_token_subset(cand, en):
+                    subset = True
             score, full, core = best
             # Short designated names (HAMAS, IRISL, ISIL, ANO …) are real and must
             # never be dropped from screening — but fuzzy-matching a <6-char string
@@ -1330,9 +1431,16 @@ def screen_name(name, all_lists):
                                  "name_score": full, "core_score": core,
                                  "confidence": confidence_tier(core)})
                 continue
-            if score >= THRESHOLD and core >= CORE_THRESHOLD:
+            # Primary gate: whole-string AND distinctive-core agreement (min()).
+            # Additive recall gate: a true token-SUBSET (every distinctive token of
+            # the shorter name present in the longer designated entry) with a high
+            # token_set_ratio also flags — the patronymic-chain / extra-middle-name
+            # case the min() misses. Recorded at the conservative min-based score so
+            # it reads as a POSSIBLE match for MLRO disambiguation, never confirmed.
+            if (score >= THRESHOLD and core >= CORE_THRESHOLD) or \
+               (subset and best_tset >= TOKENSET_THRESHOLD):
                 hits.append({"list": list_name, "matched_entry": orig, "score": score,
-                             "name_score": full, "core_score": core,
+                             "name_score": full, "core_score": core, "set_score": best_tset,
                              "confidence": confidence_tier(core)})
     best = {}
     for h in hits:
@@ -1374,6 +1482,14 @@ def screen_customers(customers, all_lists):
                 # even though the company name itself did not match.
                 hits.append({"subject_type":"INDIVIDUAL","subject_name":ind,
                              "control_linkage": True, **h})
+        for ent in c.get("entity_owners", []):
+            if _unscreenable(ent):
+                hits.append(_manual_review_hit("ENTITY (owner)", ent, True))
+            for h in screen_name(ent, all_lists):
+                # A DESIGNATED corporate owner/parent flags the customer by the
+                # 50%/control rule just like a natural-person owner.
+                hits.append({"subject_type":"ENTITY (owner)","subject_name":ent,
+                             "control_linkage": True, **h})
         if hits:
             possible_matches.append({**c,"hits":hits})
         else:
@@ -1403,13 +1519,47 @@ def save_delta_state(state):
     except Exception as e:
         log(f"  delta state save error: {e}")
 
+DELTA_RESURFACE_GAP_DAYS = 7     # re-alert an item that reappears after this gap (de-list → re-list)
+DELTA_RETENTION_DAYS     = 400   # drop fingerprints unseen this long (bounds file growth)
+
+def _delta_days(a, b):
+    try:
+        da = datetime.datetime.strptime(str(a)[:10], "%Y-%m-%d").date()
+        db = datetime.datetime.strptime(str(b)[:10], "%Y-%m-%d").date()
+        return abs((db - da).days)
+    except Exception:
+        return 0
+
 def _delta_mark(state, key, today):
-    """Returns (is_new, first_seen). Records `today` as first_seen for new keys."""
-    first = state.get(key)
-    if first:
-        return False, first
-    state[key] = today
-    return True, today
+    """Returns (is_new, first_seen). Records first/last seen. An item that reappears
+    after a gap of > DELTA_RESURFACE_GAP_DAYS (i.e. it fell off the lists and was
+    re-listed, or coverage lapsed) is treated as NEW again, so a re-listing is not
+    silently deduped as 'standing'. Backward-compatible with legacy string values."""
+    rec = state.get(key)
+    if isinstance(rec, str):
+        first = last = rec                       # legacy: value was the first_seen date
+    elif isinstance(rec, dict):
+        first, last = rec.get("first"), rec.get("last") or rec.get("first")
+    else:
+        first = last = None
+    resurfaced = bool(last) and _delta_days(last, today) > DELTA_RESURFACE_GAP_DAYS
+    is_new = (first is None) or resurfaced
+    if is_new:
+        first = today
+    state[key] = {"first": first, "last": today}
+    return is_new, first
+
+def prune_delta_state(state, today, retention_days=DELTA_RETENTION_DAYS):
+    """Drop fingerprints not seen within the retention window so the state file
+    cannot grow without bound. Returns the number pruned."""
+    dropped = []
+    for key, rec in list(state.items()):
+        last = rec if isinstance(rec, str) else (rec.get("last") or rec.get("first") if isinstance(rec, dict) else None)
+        if last and _delta_days(last, today) > retention_days:
+            dropped.append(key)
+    for key in dropped:
+        del state[key]
+    return len(dropped)
 
 def classify_deltas(possible_matches, adverse_findings, pep_findings, state, today):
     """Annotate every hit/finding with is_new / first_seen. Returns new-counts."""
@@ -1869,10 +2019,12 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
 # ── UNIFIED DAILY REPORT (Sanctions + Adverse Media + PEP, ONE narrative) ─────
 def load_all_lists():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
+    ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
     uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
+    ofac_names |= parse_ofac_alt(ofac_alt_data)   # fold in SDN a.k.a. aliases (best-effort)
     un_names,   un_date,   un_hash   = parse_un(un_data)
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
@@ -1921,20 +2073,26 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     # a run that finds 1 PEP but had 200 Wikidata lookups time out is NOT a clean
     # PEP pass — the 200 unknowns are provisional, not "no PEP".
     pep_degraded = stats.get("pep_errors", 0) > 0
-    sanc_ok = any(list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu"))
+    # Sanctions coverage: DEGRADED if ANY core list failed to load (not just if all
+    # of them did) — a run missing 1 of 4 core lists is not a clean "OK".
+    core_loaded = [list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu")]
+    sanc_ok = all(core_loaded)
+    # Adverse-media coverage: DEGRADED when any subject's whole adverse sweep failed.
+    am_degraded = stats.get("am_errors", 0) > 0
     L = []; A = L.append
 
     delta = stats.get("delta", {})
     supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
-    sanc_status = "OK" if sanc_ok else "DEGRADED"
+    sanc_status = "OK" if sanc_ok else ("DEGRADED" if any(core_loaded) else "FAILED")
     pep_status = "DEGRADED" if pep_degraded else "OK"
+    am_status = "DEGRADED" if am_degraded else "OK"
 
     # ── Compact header — three result blocks (Sanctions · Adverse media · PEP)
     #    lead the report; everything here is a one-line snapshot. ──
     A(f"🛡️  DAILY SCREENING — {dt}")
     A(f"Subjects: {stats['subjects_total']}  ({stats['companies_screened']} companies + "
       f"{stats['individuals_screened']} owners / directors / UBOs)  ·  delivered by 09:00 UAE")
-    A(f"Modules:  Sanctions {sanc_status}  ·  Adverse media OK  ·  PEP {pep_status}")
+    A(f"Modules:  Sanctions {sanc_status}  ·  Adverse media {am_status}  ·  PEP {pep_status}")
     if delta:
         A(f"New since last run:  {delta.get('sanctions',0)} sanctions  ·  "
           f"{delta.get('adverse',0)} adverse  ·  {delta.get('pep',0)} PEP")
@@ -1994,21 +2152,29 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                   " apply OFAC/EU 50%/control aggregation; treat the entity as designated by extension pending review.")
             A("   MLRO Decision:  [ ] false positive   [ ] escalate / freeze   [ ] investigate")
             A("")
-        A("   Lists screened:")
-        A(_list_status_line(list_meta, "ofac", "OFAC SDN"))
-        A(_list_status_line(list_meta, "un",   "UN Consolidated"))
-        A(_list_status_line(list_meta, "eu",   "EU FSF"))
-        A(_list_status_line(list_meta, "uk",   "UK OFSI"))
-        A(_list_status_line(list_meta, "eocn", "UAE EOCN"))
-        if supp:
-            A("   Supplementary lists (best-effort — never affect core coverage):")
-            for k in supp:
-                m_ = supp[k]
-                label = {"canada": "Canada (SEMA)"}.get(k, k)
-                if m_.get("count", 0) > 0:
-                    A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
-                else:
-                    A(f"      {label}: not reached this run (supplementary — core lists unaffected)")
+    # ALWAYS render list provenance — including on a zero-match run, so a clean
+    # result can never hide that a core list was down (a "clear" against a list
+    # that never loaded is not clear). Any core list at 0 names is flagged.
+    A("   Lists screened:")
+    A(_list_status_line(list_meta, "ofac", "OFAC SDN"))
+    A(_list_status_line(list_meta, "un",   "UN Consolidated"))
+    A(_list_status_line(list_meta, "eu",   "EU FSF"))
+    A(_list_status_line(list_meta, "uk",   "UK OFSI"))
+    A(_list_status_line(list_meta, "eocn", "UAE EOCN"))
+    if not sanc_ok:
+        _down = [lbl for k, lbl in (("ofac","OFAC"),("un","UN"),("uk","UK OFSI"),("eu","EU FSF"))
+                 if list_meta.get(k, {}).get("count", 0) == 0]
+        A(f"   ⚠ SANCTIONS COVERAGE DEGRADED — core list(s) not loaded: {', '.join(_down)}. "
+          "Treat every 'clear' this run as PROVISIONAL and re-run.")
+    if supp:
+        A("   Supplementary lists (best-effort — never affect core coverage):")
+        for k in supp:
+            m_ = supp[k]
+            label = {"canada": "Canada (SEMA)"}.get(k, k)
+            if m_.get("count", 0) > 0:
+                A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
+            else:
+                A(f"      {label}: not reached this run (supplementary — core lists unaffected)")
     A("")
 
     A("━" * 70)
@@ -2430,6 +2596,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # failed (parent_gid is None), keep the prior state so today's new matches are
     # flagged new again on the next run instead of being silently suppressed.
     if parent_gid:
+        pruned = prune_delta_state(state, today)
+        if pruned:
+            log(f"  delta state: pruned {pruned} fingerprint(s) unseen > {DELTA_RETENTION_DAYS}d")
         save_delta_state(state)
     else:
         log("Delta-state NOT persisted: Asana delivery failed — new matches will re-alert next run.")
@@ -2500,11 +2669,13 @@ def main():
 
     # Download lists
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
+    ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
     uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
 
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
+    ofac_names |= parse_ofac_alt(ofac_alt_data)   # fold in SDN a.k.a. aliases (best-effort)
     un_names,   un_date,   un_hash   = parse_un(un_data)
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)

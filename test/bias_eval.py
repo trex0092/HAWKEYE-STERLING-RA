@@ -36,7 +36,12 @@ else:
     def _tsr(a, b):
         a = " ".join(sorted(a.split())); b = " ".join(sorted(b.split()))
         return difflib.SequenceMatcher(None, a, b).ratio() * 100
-    _rf = types.ModuleType("rapidfuzz"); _rf.fuzz = types.SimpleNamespace(token_sort_ratio=_tsr)
+    def _tset(a, b):
+        sa, sb = set(a.split()), set(b.split()); inter = sa & sb
+        if not inter: return _tsr(a, b)
+        i = " ".join(sorted(inter))
+        return max(_tsr(i, " ".join(sorted(sa))), _tsr(i, " ".join(sorted(sb))), _tsr(a, b))
+    _rf = types.ModuleType("rapidfuzz"); _rf.fuzz = types.SimpleNamespace(token_sort_ratio=_tsr, token_set_ratio=_tset)
     sys.modules["rapidfuzz"] = _rf
     _ENGINE = "difflib-stub"
 sys.modules.setdefault("pdfplumber", types.ModuleType("pdfplumber"))

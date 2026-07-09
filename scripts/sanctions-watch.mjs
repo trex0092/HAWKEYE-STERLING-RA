@@ -124,11 +124,39 @@ async function main() {
     counts[s.id] = { prev: prevCount, now };
   }
 
+  // Per-source consecutive-error streak. A permanently-dead list URL (e.g. OFAC
+  // moves sdn.csv → daily 404) must not decay silently inside a "no action" note
+  // forever: track the streak in state and, once it crosses the threshold, treat
+  // it as an actionable change (alert + commit). state_dirty ensures the streak is
+  // PERSISTED even on a no-list-change run (else it would reset every run).
+  const ERROR_STREAK_ALERT = Number(process.env.SANCTIONS_ERROR_STREAK) || 3;
+  const persistentErrors = [];
+  let anyError = false;
+  for (const s of sources) {
+    const f = fetched[s.id];
+    const rec = state.sources[s.id] || (state.sources[s.id] = {});
+    if (f && f.ok) { rec.errStreak = 0; }
+    else {
+      anyError = true;
+      rec.errStreak = (Number(rec.errStreak) || 0) + 1;
+      if (rec.errStreak >= ERROR_STREAK_ALERT) persistentErrors.push({ name: s.name, id: s.id, url: s.url, streak: rec.errStreak });
+    }
+  }
+
   const moved = contentChanges(changes);
-  const report = buildReport(changes, today, mode, counts);
-  const flagged = mode === 'seed' ? [] : moved;
+  let report = buildReport(changes, today, mode, counts);
+  if (persistentErrors.length) {
+    report += '\n\n⚠ PERSISTENT SOURCE FAILURES — a list has been unreachable for '
+      + ERROR_STREAK_ALERT + '+ consecutive runs (its change-detection is BLIND):\n'
+      + persistentErrors.map(e => '- ' + e.name + ' — unreachable ' + e.streak + ' run(s): ' + e.url).join('\n');
+  }
+  // Persistent errors are actionable (alert); any error/count change makes the
+  // state dirty (commit) so the streak accumulates run-to-run.
+  const flagged = mode === 'seed' ? [] : (persistentErrors.length ? [...moved, ...persistentErrors] : moved);
+  const stateDirty = mode === 'seed' || flagged.length > 0 || anyError
+    || Object.values(counts).some(c => typeof c.now === 'number' && c.now !== c.prev);
   const seeded = changes.filter(x => x.status !== 'error').length;
-  const count = mode === 'seed' ? seeded : moved.length;
+  const count = mode === 'seed' ? seeded : flagged.length;
   const prTitle = mode === 'seed'
     ? 'Sanctions Watch — baseline (' + seeded + ' list' + (seeded === 1 ? '' : 's') + ')'
     : 'Sanctions Watch — ' + count + ' list change' + (count === 1 ? '' : 's');
@@ -139,8 +167,11 @@ async function main() {
   writeFileSync(CHANGES_FILE, JSON.stringify({ date: today, mode, changes: flagged }, null, 2) + '\n');
 
   console.log(report);
-  console.log('\nmode=' + mode + '  list-changes=' + moved.length + '  errors=' + changes.filter(x => x.status === 'error').length);
+  console.log('\nmode=' + mode + '  list-changes=' + moved.length + '  persistent-errors=' + persistentErrors.length
+    + '  errors=' + changes.filter(x => x.status === 'error').length);
   setOutput('has_changes', flagged.length ? 'true' : 'false');
+  setOutput('state_dirty', stateDirty ? 'true' : 'false');
+  setOutput('persistent_errors', String(persistentErrors.length));
   setOutput('changed_count', String(count));
   setOutput('pr_title', prTitle);
 }

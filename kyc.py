@@ -188,11 +188,15 @@ def cdd_gaps(rec, today=None):
         gaps.append("date of birth not recorded")
     if not _present(rec.get("proof_of_address")):
         gaps.append("proof of address not obtained")
-    # Expiry checks (only when a date is parseable).
+    # Expiry checks. A PRESENT but unparseable expiry is a GAP, never silently
+    # treated as valid (module contract: "a field we cannot parse is a GAP").
     for fld, label in (("passport_expiry", "passport/ID"), ("eid_expiry", "Emirates ID")):
-        d = parse_date(rec.get(fld))
+        raw = rec.get(fld)
+        d = parse_date(raw)
         if d and d < today:
-            gaps.append(f"{label} document expired ({rec.get(fld)})")
+            gaps.append(f"{label} document expired ({raw})")
+        elif _present(raw) and d is None:
+            gaps.append(f"{label} expiry date unreadable ({raw}) — verify manually")
     return gaps
 
 
