@@ -165,6 +165,22 @@ const d6 = diffState(d1.nextState, [sIncomplete], '2026-06-22', 0.85);
 check('a prior sanctions hit (re-checked locally) still clears on de-listing despite incomplete enrichment',
   d6.cleared.length === 1 && !d6.nextState.subjects.a);
 
+/* Degrade-loudly: a standing SANCTIONS match must NOT be auto-cleared when the
+   list that produced it failed to load this run (coverage artefact, not a
+   de-listing). */
+const twoList = normalizeResult({ name: 'B Co', topScore: 95, band: 'high', recommendation: 'match',
+  lists: [{ list: 'UK OFSI' }, { list: 'EU FSF' }] }, { key: 'b', name: 'B Co' });
+const b1 = diffState({ updated: null, subjects: {} }, [twoList], '2026-06-19', 0.85, ['OFAC SDN', 'UK OFSI', 'EU FSF']);
+const bClean = normalizeResult({ name: 'B Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] }, { key: 'b', name: 'B Co' });
+// This run only OFAC loaded (UK OFSI + EU FSF failed) → subject no longer matches, but we did not re-verify it.
+const bDegraded = diffState(b1.nextState, [bClean], '2026-06-20', 0.85, ['OFAC SDN']);
+check('a standing sanctions match is carried forward when its originating list failed to load',
+  bDegraded.cleared.length === 0 && !!bDegraded.nextState.subjects.b);
+// Control: when every originating list DID load and the subject is clean, it clears normally.
+const bFull = diffState(b1.nextState, [bClean], '2026-06-21', 0.85, ['OFAC SDN', 'UK OFSI', 'EU FSF']);
+check('a standing sanctions match clears on de-listing when all its lists were screened',
+  bFull.cleared.length === 1 && !bFull.nextState.subjects.b);
+
 /* ── rendering ── */
 check('matchSummary names band, score and lists', matchSummary(d1.alerts[0]).includes('HIGH') && matchSummary(d1.alerts[0]).includes('OFAC SDN'));
 const report = buildScreenReport(d1.alerts, [], '2026-06-19', { screened: 42, degraded: true, errored: 1 });

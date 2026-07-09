@@ -288,12 +288,19 @@ export function matchSignature(r) {
    matches to alert on, the cleared matches (informational), and the next state.
    Subjects that errored this run carry their prior state forward untouched —
    never wiped, never silently cleared. */
-export function diffState(prevState, results, today, threshold) {
+export function diffState(prevState, results, today, threshold, screenedLists) {
   const prev = (prevState && prevState.subjects) || {};
   const nextSubjects = { ...prev };
   const alerts = [];
   const cleared = [];
   let matchCount = 0;
+  // Names of the SANCTIONS lists actually loaded/screened this run. A prior
+  // sanctions match whose originating list did NOT load this run must be carried
+  // forward, never cleared — we did not re-verify it, so "no longer matches" is a
+  // coverage artefact (a failed download / 0-name parse), not a de-listing.
+  // Omitted on the external-engine path and in unit tests → guard inactive,
+  // behaviour unchanged.
+  const screened = screenedLists ? new Set(Array.from(screenedLists)) : null;
 
   for (const r of results) {
     if (r.errored) continue;
@@ -324,6 +331,17 @@ export function diffState(prevState, results, today, threshold) {
         && prior.lists.every(l => ENRICHMENT_LISTS.has(l));
       if (r.enrichmentIncomplete && priorEnrichmentOnly) {
         continue;   // leave nextSubjects[r.key] (the copied prior) in place
+      }
+      // Degrade-loudly: if a SANCTIONS list that produced this prior match failed
+      // to load this run, we could not re-screen the subject against it — carry the
+      // match forward (no clear, no case auto-completion) rather than declaring an
+      // all-clear off the back of a fetch/parse failure.
+      if (screened) {
+        const priorSanctionsLists = (Array.isArray(prior.lists) ? prior.lists : [])
+          .filter(l => !ENRICHMENT_LISTS.has(l));
+        if (priorSanctionsLists.some(l => !screened.has(l))) {
+          continue;   // originating list not screened this run → keep the standing match
+        }
       }
       cleared.push({ key: r.key, name: r.name, prior });
       delete nextSubjects[r.key];
@@ -925,7 +943,8 @@ async function main() {
   if (!screen.anyOk) return bailUnscreened('no sanctions list could be loaded — ' + ((screen.notes || []).join('; ') || 'all sources failed'), today);
 
   const prevState = loadState();
-  const { alerts, cleared, matchCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold);
+  const screenedLists = ((screen.coverage && screen.coverage.lists) || []).map(L => L.name).filter(Boolean);
+  const { alerts, cleared, matchCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold, screenedLists);
   const meta = { screened: subjects.length, entities, individuals, degraded: screen.degraded, errored: screen.errored };
   const report = buildScreenReport(alerts, cleared, today, meta);
   const changes = buildChangesArtifact(alerts, today);

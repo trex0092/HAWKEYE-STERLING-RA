@@ -226,6 +226,20 @@ export function parseRss(xml) {
   return items;
 }
 
+/* Corporate/legal-form and generic trade boilerplate. A real headline almost
+   never carries the legal suffix ("Al Haramain General Trading LLC" is reported
+   as "Al Haramain …"), so requiring EVERY such token to appear in the headline
+   is a systematic false negative for exactly the UAE-corporate name shapes this
+   deployment screens. These are dropped from the name-match token set (with a
+   fallback to the full set when a name is nothing but boilerplate). */
+const CORP_STOP_MEDIA = new Set([
+  'llc','fze','fzc','fzco','fze','dmcc','dwc','pjsc','psc','pvt','ltd','limited',
+  'plc','inc','incorporated','corp','corporation','co','company','group','holding',
+  'holdings','international','intl','global','est','establishment','trading','trade',
+  'general','commercial','contracting','industries','industrial','enterprises',
+  'enterprise','services','service','investment','investments','sons','bros',
+  'brothers','partners','associates','and','the','for',
+]);
 /* Score adverse-media items for a subject. Requires the customer name to appear
    in the headline (Google News OR-matches loosely) AND a risk term to be present,
    so we don't flag an unrelated article that merely shares a surname. Returns
@@ -238,6 +252,10 @@ export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
   // subject is still matchable rather than silently never flagged.
   let nameTokens = nm.split(' ').filter(t => t.length >= 3);
   if (!nameTokens.length) nameTokens = nm.split(' ').filter(t => t.length >= 2);
+  // Drop corporate/legal boilerplate so a headline needn't carry "LLC / General
+  // Trading" to match; keep the full set only when the name is all boilerplate.
+  const sig = nameTokens.filter(t => !CORP_STOP_MEDIA.has(t));
+  if (sig.length) nameTokens = sig;
   const matched = [];
   for (const it of (items || [])) {
     const title = normalize(it.title);

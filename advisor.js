@@ -298,6 +298,9 @@ function ask(){
   $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
 
   const minDelay = new Promise(r => { reasoningTimer = setTimeout(r, 1000); });
+  /* fetch() does not reject on HTTP 4xx/5xx, and the backend returns
+     {ok:false, error:'…'} for those (503 no API key, 403 origin, 429 rate-limit).
+     Map any body lacking `text` to a visible error instead of a blank answer. */
   const brainFetch = fetch('/.netlify/functions/brain-soul', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -310,7 +313,7 @@ function ask(){
 
   Promise.all([brainFetch, minDelay])
   .then(([data]) => {
-    state.liveAnswer = data;
+    state.liveAnswer = answerFromResponse(data);
     try{ govRecord(data); }catch(e){}
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
@@ -323,6 +326,13 @@ function ask(){
     $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
     bindHero();
   });
+}
+/* Normalise a brain-soul response into a renderable answer. A successful reply
+   carries `text`; an error reply carries `{ok:false, error}` and no text — surface
+   that error rather than rendering an empty hero. */
+function answerFromResponse(data){
+  if(data && data.text) return data;
+  return {ok:false, text:(data && data.error) ? String(data.error) : 'The advisor is unavailable — please try again.'};
 }
 function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; state.liveAnswer=null; $('hero').innerHTML = heroHtml(); applyCssText($('hero')); }
 

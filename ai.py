@@ -251,10 +251,14 @@ def triage_adverse(subject: str, article: dict):
         if txt:
             try:
                 j = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
-                # Clamp the model's severity to the allowed set — a stray value like
-                # "SEVERE"/"N/A" must never reach the bare dict lookups downstream.
+                # Clamp the model's severity: (a) to the allowed set — a stray value
+                # like "SEVERE"/"N/A" must never reach the bare dict lookups
+                # downstream; (b) NEVER below the deterministic floor. The LLM may
+                # only SHARPEN (raise) severity, never downgrade — otherwise a
+                # misled or adversarial "NONE" would zero out a CRITICAL article's
+                # risk contribution, breaking the no-downgrade guarantee (MODEL_CARD).
                 sev = str(j.get("severity", severity)).upper()
-                if sev not in _SEV_RANK:
+                if sev not in _SEV_RANK or _SEV_RANK[sev] < _SEV_RANK[severity]:
                     sev = severity
                 out.update({
                     "severity": sev,

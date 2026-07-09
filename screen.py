@@ -48,6 +48,7 @@ ASANA_ASSIGNEE_GID    = "1213645083721304"   # Luisa Fernanda
 
 THRESHOLD             = 85   # combined (full + core) similarity to flag a match
 CORE_THRESHOLD        = 82   # distinctive-token similarity required (false-positive guard)
+SHORT_ENTRY_THRESHOLD = 97   # near-exact gate for short (<6 char) designated names (HAMAS, IRISL …)
 EOCN_PDF_PATH         = "eocn_list.pdf"
 EOCN_JSON_PATH        = "data/eocn-local-terrorist-list.json"
 DELTA_STATE_PATH      = "data/screen-delta-state.json"  # what we've already reported (delta engine)
@@ -625,6 +626,16 @@ def dedup_stories(articles, overlap=0.6):
                     k.setdefault("also_reported_by", [])
                     if a["source"] not in k["also_reported_by"] and a["source"] != k["source"]:
                         k["also_reported_by"].append(a["source"])
+                    # Merge risk signal into the survivor: a duplicate that was
+                    # flagged (or carries keywords/categories the kept copy lacks)
+                    # must not be silently dropped just because an unflagged copy of
+                    # the same story arrived first — OR the flag, union the evidence.
+                    if a.get("flagged") and not k.get("flagged"):
+                        k["flagged"] = True
+                    if a.get("keywords"):
+                        k["keywords"] = sorted(set(k.get("keywords") or []) | set(a.get("keywords") or []))
+                    if a.get("categories"):
+                        k["categories"] = sorted(set(k.get("categories") or []) | set(a.get("categories") or []))
                     dup = True
                     break
         if not dup:
@@ -1076,13 +1087,24 @@ def screen_name(name, all_lists):
     hits = []
     for list_name, entries in all_lists.items():
         for en, orig in entries:
-            if len(en) < 6: continue
+            if len(en) < 2: continue
             best = None
             for cand in variants:
                 score, full, core = match_score(cand, en)
                 if best is None or score > best[0]:
                     best = (score, full, core)
             score, full, core = best
+            # Short designated names (HAMAS, IRISL, ISIL, ANO …) are real and must
+            # never be dropped from screening — but fuzzy-matching a <6-char string
+            # invites false positives, so require a NEAR-EXACT match for short
+            # entries rather than the normal fuzzy gate. Long entries keep the
+            # combined full+core gate unchanged.
+            if len(en) < 6:
+                if score >= SHORT_ENTRY_THRESHOLD:
+                    hits.append({"list": list_name, "matched_entry": orig, "score": score,
+                                 "name_score": full, "core_score": core,
+                                 "confidence": confidence_tier(core)})
+                continue
             if score >= THRESHOLD and core >= CORE_THRESHOLD:
                 hits.append({"list": list_name, "matched_entry": orig, "score": score,
                              "name_score": full, "core_score": core,
@@ -1170,7 +1192,13 @@ def classify_deltas(possible_matches, adverse_findings, pep_findings, state, tod
     for m in possible_matches:
         m_new = False
         for h in m["hits"]:
-            key = f"SANC|{normalize(m['name'])}|{h['list']}|{normalize(h['matched_entry'])}"
+            # Include the SUBJECT (which owner/director/entity matched) in the key.
+            # Without it, a newly-added director matching the same list entry the
+            # entity already matched would dedupe to "standing" and never open an
+            # MLRO case. (One-time effect on upgrade: existing standing matches
+            # re-key and re-surface once for review — the conservative outcome.)
+            key = (f"SANC|{normalize(m['name'])}|{h.get('subject_type','')}|"
+                   f"{normalize(h.get('subject_name',''))}|{h['list']}|{normalize(h['matched_entry'])}")
             is_new, first = _delta_mark(state, key, today)
             h["is_new"], h["first_seen"] = is_new, first
             if is_new: n_s += 1; m_new = True
@@ -1664,7 +1692,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     dt = run_time.strftime("%d %b %Y")
     confirmed = [m for m in possible_matches if any(h["score"] >= 100 for h in m["hits"])]
     potential = [m for m in possible_matches if all(h["score"] < 100 for h in m["hits"])]
-    pep_degraded = stats.get("pep_errors", 0) > 0 and not pep_findings
+    # Degrade on ANY PEP lookup error, independent of whether some PEPs were found:
+    # a run that finds 1 PEP but had 200 Wikidata lookups time out is NOT a clean
+    # PEP pass — the 200 unknowns are provisional, not "no PEP".
+    pep_degraded = stats.get("pep_errors", 0) > 0
     sanc_ok = any(list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu"))
     L = []; A = L.append
 

@@ -132,6 +132,16 @@ async function sha256Hex(str){
 /* Secure-store facade: every sensitive key routes through this instead of
    localStorage directly. Synchronous reads after unlock come from the mirror;
    persistence is async-encrypted. */
+/* True only on an encrypted device that is currently LOCKED (passphrase gate up):
+   the passphrase verifier exists but the store has not been unlocked this session.
+   In that window we must never touch localStorage for a secure key — writing
+   plaintext would both leak PII at rest and clobber the ciphertext (which unlock
+   then migrates as "legacy plaintext", destroying every other filed record). */
+function _encLocked(){
+  if(_secActive) return false;
+  try{ return typeof localStorage !== 'undefined' && !!localStorage.getItem(SEC_META_KEY); }
+  catch(e){ return false; }
+}
 const SS = {
   getItem(k){
     if(_secActive) return Object.prototype.hasOwnProperty.call(_secMem,k) ? _secMem[k] : null;
@@ -139,11 +149,13 @@ const SS = {
   },
   setItem(k,v){
     v = String(v);
-    if(_secActive){ _secMem[k] = v; _secPersist(k, v); }
-    else localStorage.setItem(k, v);   /* may throw on quota — callers handle storageWarn */
+    if(_secActive){ _secMem[k] = v; _secPersist(k, v); return; }
+    if(_encLocked()) return;            /* locked encrypted device → drop; re-persisted (encrypted) on unlock */
+    localStorage.setItem(k, v);         /* may throw on quota — callers handle storageWarn */
   },
   removeItem(k){
-    if(_secActive) delete _secMem[k];
+    if(_secActive){ delete _secMem[k]; try{ localStorage.removeItem(k); }catch(e){} return; }
+    if(_encLocked()) return;            /* never mutate the encrypted store while locked */
     try{ localStorage.removeItem(k); }catch(e){}
   }
 };
@@ -258,6 +270,7 @@ function secLock(reason){
   try{ mirrorBeacon(); }catch(e){}   /* flush a last summary to Asana before the in-memory data is cleared */
   _secKey = null; _secActive = false;
   for(const k in _secMem) delete _secMem[k];
+  if(typeof saveTimer !== 'undefined' && saveTimer){ clearTimeout(saveTimer); saveTimer = null; }  /* no pending plaintext write can land after lock */
   if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer = null; }
   _sessClear();         /* destroy the 1-hour session so a reload cannot resume it */
   if($('btnLock')) $('btnLock').style.display = 'none';
@@ -421,7 +434,10 @@ function _auditRow(e){
     + '<span class="rd-name">'+esc(e.event)+(e.detail?' — '+esc(e.detail):'')+'</span>'
     + '<span class="rd-base">'+esc(e.who||'—')+(e.ref?' · '+esc(e.ref):'')+'</span></div>';
 }
-function fmtDateTime(iso){ try{ const d = new Date(iso); return fmtDate(d.toISOString().slice(0,10)) + ' ' + d.toTimeString().slice(0,5); }catch(e){ return esc(iso); } }
+/* Local date + local time. Pairing toISOString() (UTC date) with toTimeString()
+   (local time) mismatched the two east of UTC — an 02:00 UAE entry showed the
+   previous day's date. Derive both from the local calendar via toISO(). */
+function fmtDateTime(iso){ try{ const d = new Date(iso); return fmtDate(toISO(d)) + ' ' + d.toTimeString().slice(0,5); }catch(e){ return esc(iso); } }
 async function openAudit(){
   const log = auditAll();
   if($('auditRows')) $('auditRows').innerHTML = log.length

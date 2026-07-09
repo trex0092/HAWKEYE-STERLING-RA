@@ -160,11 +160,13 @@ jobs:
             git add data/sanctions-screen-state.json
             git add data/screening-cases-state.json 2>/dev/null || true
             git commit -m "$TITLE [skip ci]"
+            pushed=
             for attempt in 1 2 3 4 5; do
-              git push --force origin HEAD:refs/heads/screen-state && break
+              git push --force origin HEAD:refs/heads/screen-state && { pushed=1; break; }
               echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
+            [ -n "$pushed" ] || { echo "::error::state push to screen-state failed after 5 attempts — state NOT persisted"; exit 1; }
           else
             echo "state unchanged"
           fi
