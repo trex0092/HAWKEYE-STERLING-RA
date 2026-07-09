@@ -144,7 +144,11 @@ jobs:
         run: node scripts/screening-metrics.mjs
 
       - name: Persist screening + case state (screen-state branch)
-        if: steps.screen.outputs.screen_error != 'true'
+        # always() so state is persisted even if the CASES step failed AFTER
+        # creating cases in Asana — otherwise the new case GIDs written locally are
+        # lost and next run creates DUPLICATE cases. Only skip on a screen error
+        # (where no valid state was produced).
+        if: always() && steps.screen.outputs.screen_error != 'true'
         env:
           # Step output crosses into the shell via env (never inline ${{ }} in run:)
           # — the title can carry an upstream error message, so this is load-bearing.
@@ -172,7 +176,12 @@ jobs:
           fi
 
       - name: Open a GitHub issue if the screen could not run, or a hit was not delivered
-        if: steps.screen.outputs.screen_error == 'true' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true')
+        # In case-engine mode alerts are suppressed (asana_posted is always false)
+        # and the MLRO CASES are the delivery surface — so a new match is only
+        # "undelivered" when the cases step ALSO failed. Without the cases-outcome
+        # guard this opened a false "not delivered" issue on every real match, and
+        # (conversely) stayed silent when case delivery genuinely failed.
+        if: always() && (steps.screen.outputs.screen_error == 'true' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true' && steps.cases.outcome != 'success'))
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           TITLE: ${{ steps.screen.outputs.title }}

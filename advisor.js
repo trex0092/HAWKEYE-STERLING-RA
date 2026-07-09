@@ -120,7 +120,7 @@ function govFlagsHtml(la){
 function govStatsHtml(){
   const s = govStats();
   if(!s.calls) return '';
-  const item = (lbl,val)=>'<span data-csstext="display:inline-flex;flex-direction:column;line-height:1.3"><b data-csstext="color:#9FB0C8;font-size:12px">'+esc(val)+'</b><span data-csstext="font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#5A657A">'+esc(lbl)+'</span></span>';
+  const item = (lbl,val)=>'<span data-csstext="display:inline-flex;flex-direction:column;line-height:1.3"><b data-csstext="color:#9FB0C8;font-size:12px">'+esc(val)+'</b><span data-csstext="font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#8A94A8">'+esc(lbl)+'</span></span>';
   const health = s.lastErr && (!s.lastOk || s.lastErr > s.lastOk) ? '⚠ last call failed' : (s.lastOk ? 'healthy' : '—');
   return '<div class="sec-lbl" data-csstext="margin:18px 0 9px"><span>Advisor telemetry (on-device)</span><i></i></div>'
     + '<div data-csstext="display:flex;gap:18px;flex-wrap:wrap;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)">'
@@ -211,7 +211,7 @@ function heroAnswerHtml(){
       + '</div>'
       + '<div class="summary" data-csstext="white-space:pre-line">'+esc(la.text)+'</div>'
       + govFlagsHtml(la)
-      + (la.auditLine ? '<div data-csstext="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" data-csstext="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(la.auditLine)+'</div></div>' : '')
+      + (la.auditLine ? '<div data-csstext="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" data-csstext="font-size:9.5px;word-break:break-all;color:#8A94A8">'+esc(la.auditLine)+'</div></div>' : '')
       + '<button class="again" id="askAgain" data-csstext="margin-top:18px"><span>&#8634;</span> Ask another</button>'
       + '</div></div>';
   }
@@ -502,7 +502,7 @@ function renderToolResult(){
       +   (r.model ? '<span class="conf"><i></i>'+esc(r.model)+'</span>' : '')
       + '</div>'
       + '<div class="summary" data-csstext="white-space:pre-line">'+esc(r.text)+'</div>'
-      + (r.auditLine ? '<div data-csstext="margin-top:18px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" data-csstext="font-size:9.5px;word-break:break-all;color:#4A5468">'+esc(r.auditLine)+'</div></div>' : '')
+      + (r.auditLine ? '<div data-csstext="margin-top:18px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" data-csstext="font-size:9.5px;word-break:break-all;color:#8A94A8">'+esc(r.auditLine)+'</div></div>' : '')
       + '</div>';
   }
   const head = r.kind==='generic'

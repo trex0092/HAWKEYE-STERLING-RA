@@ -13,7 +13,7 @@
      • Netlify functions (/.netlify/) → always network, never cached.
    Bump CACHE to invalidate the old shell on the next visit. */
 
-const CACHE = 'hsra-shell-v2';
+const CACHE = 'hsra-shell-v3';
 const SHELL = [
   './',
   './index.html',
@@ -88,7 +88,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Other same-origin static GETs: stale-while-revalidate.
+  // App logic scripts: NETWORK-FIRST (coherent with the network-first HTML above).
+  // Stale-while-revalidate here served the NEW HTML with the OLD cached JS on the
+  // first visit after a deploy — a data-* / element-id mismatch until reload.
+  // Network-first keeps HTML and its scripts in lockstep; cache is the offline
+  // fallback only.
+  if (/\/(app|console|advisor|i18n|sw-register)\.js$/.test(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      try {
+        const fresh = await fetch(req);
+        if (fresh && fresh.ok) cache.put(req, fresh.clone()).catch(() => {});
+        return fresh;
+      } catch (_) {
+        return (await cache.match(req)) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Other same-origin static GETs (CSS, fonts, icons, reference data): stale-while-revalidate.
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req);

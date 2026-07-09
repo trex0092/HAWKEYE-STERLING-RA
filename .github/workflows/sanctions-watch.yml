@@ -94,7 +94,10 @@ jobs:
         run: node scripts/retain-state.mjs
 
       - name: Persist refreshed fingerprint state (sanctions-watch-state branch)
-        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        # Commit on state_dirty (any error / count change), not only on a list
+        # change — otherwise a per-source error streak resets every run and a dead
+        # URL can never reach the alert threshold.
+        if: steps.watch.outputs.state_dirty == 'true' || steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         env:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
         run: |

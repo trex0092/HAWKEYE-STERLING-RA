@@ -23,6 +23,7 @@ const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWK
 const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1213914392047129';
 /* "FATF list moves" section of that project, so list-change alerts file neatly. */
 const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1216203873114461';
+const FATF_SKIP_ALERT = Number(process.env.FATF_SKIP_ALERT) || 2; /* consecutive unreachable runs before a monitoring-gap alert */
 
 /* FATF naming → the app's baseline naming */
 const ALIASES = {
@@ -435,13 +436,38 @@ export async function main(mode) {
   const fetched = await fetchFatfSegments();
   if (!fetched) {
     /* No fresh authoritative capture this run (e.g. archive.org briefly down).
-       Skip cleanly: never diff against stale data, never fail red. The weekly
-       cadence retries; the saved state is unchanged. */
+       Skip cleanly: never diff against stale data, never fail red. BUT count
+       consecutive skips — a source that stays unreachable run after run means the
+       FATF list is going UNMONITORED, which must be surfaced, not silently green. */
     console.log('no fresh authoritative FATF capture reachable this run — skipping (state unchanged). Verify manually on ' + FATF_URL);
+    try {
+      const st = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, 'utf8')) : {};
+      st.skipStreak = (Number(st.skipStreak) || 0) + 1;
+      st.lastSkip = new Date().toISOString().slice(0, 10);
+      mkdirSync('data', { recursive: true });
+      writeFileSync(STATE_FILE, JSON.stringify(st, null, 2) + '\n');
+      if (st.skipStreak >= FATF_SKIP_ALERT && REG_PROJECT_GID) {
+        const url = await createTask(
+          '⚠ FATF monitoring GAP — list source unreachable ' + st.skipStreak + ' consecutive run(s)',
+          'The FATF black/grey-list watchdog could not reach an authoritative capture (direct + archive) for '
+          + st.skipStreak + ' consecutive runs. FATF list moves may be UNDETECTED. Verify manually on ' + FATF_URL
+          + ' and check the source endpoints.', undefined, REG_PROJECT_GID, REG_FATF_SECTION_GID);
+        console.log('FATF monitoring-gap alert filed (skipStreak=' + st.skipStreak + '): ' + url);
+      }
+    } catch (e) { console.error('FATF skip-streak bookkeeping failed: ' + e.message); }
     return;
   }
   console.log('list source: ' + fetched.source);
   const source = fetched.source;
+  /* Source reachable again → clear any accumulated skip-streak so a later gap
+     alerts fresh. Persisted below with the state write; if the run stays silent
+     (no list change) we still clear a lingering streak here. */
+  if (existsSync(STATE_FILE)) {
+    try {
+      const st = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+      if (st.skipStreak) { st.skipStreak = 0; writeFileSync(STATE_FILE, JSON.stringify(st, null, 2) + '\n'); }
+    } catch (e) { /* non-fatal */ }
+  }
   const current = classifyCountries(fetched.html, baseline);
   /* Safety: an empty/tiny list, an implausibly large "black" list, or black/grey
      overlap all mean the source was parsed wrong — stop before alerting or persisting. */

@@ -8,7 +8,7 @@
 html,body{background:#0A0E16}
 body{font-family:var(--sans);color:#EDEFF4;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh;position:relative;overflow-x:hidden}
 ::selection{background:rgba(255,92,168,0.30)}
-textarea::placeholder,input::placeholder{color:#4A5468}
+textarea::placeholder,input::placeholder{color:#8A94A8}
 button{font-family:inherit}
 @keyframes glowDrift{to{transform:translate(3.5%,-2.5%) scale(1.08)}}
 @keyframes ping{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.72)}}

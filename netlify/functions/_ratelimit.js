@@ -38,17 +38,16 @@ function sweep(now) {
 }
 
 /* Best client IP from the platform headers. Netlify sets
-   x-nf-client-connection-ip to the real peer; x-forwarded-for is a fallback
-   (take the FIRST hop — the left-most entry is the original client). */
+   x-nf-client-connection-ip to the REAL peer — the only value a client cannot
+   forge — so we key on it. x-forwarded-for / client-ip are client-controllable
+   (an attacker rotates the left-most hop to get a fresh bucket per request), so
+   they are NOT trusted for keying: if the platform header is absent we fail
+   CLOSED to a single shared bucket rather than handing out per-spoof buckets. */
 function clientIp(event) {
   const h = (event && event.headers) || {};
   const direct = h['x-nf-client-connection-ip'] || h['X-Nf-Client-Connection-Ip'];
   if (direct) return String(direct).trim();
-  const xff = h['x-forwarded-for'] || h['X-Forwarded-For'];
-  if (xff) return String(xff).split(',')[0].trim();
-  const ci = h['client-ip'] || h['Client-Ip'];
-  if (ci) return String(ci).trim();
-  return 'unknown';
+  return 'unknown-shared';   // fail closed — do not trust spoofable XFF for the limiter key
 }
 
 /* Returns null when the request is allowed, or a 429 response object when the
