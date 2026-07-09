@@ -7,7 +7,8 @@
       "jurisdiction": "Global",
       "url": "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv",
       "type": "csv",
-      "parser": "ofac"
+      "parser": "ofac",
+      "noHeader": true
     },
     {
       "id": "ofac-consolidated",

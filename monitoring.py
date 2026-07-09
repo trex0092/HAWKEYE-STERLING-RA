@@ -329,7 +329,9 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
 
 
 def _fmt(x):
-    return "n/a" if x is None else (f"{x:.0f}s" if x and x > 100 else f"{x:.0f}")
+    # Durations always carry the seconds unit — "45" vs "150s" in the same
+    # report line reads as two different quantities (count? minutes?).
+    return "n/a" if x is None else f"{x:.0f}s"
 
 
 def _fmt_count(x):

@@ -32,7 +32,7 @@ function corsHeaders(event) {
   if (origin && originAllowed(event)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-App-Token';
     headers['Access-Control-Max-Age'] = '86400';
   }
   return headers;
@@ -544,12 +544,27 @@ function simpleHash(s) {
 
 // ── PERSONA SUFFIXES ──────────────────────────────────────────────────────────
 
+/* One suffix per persona offered by the Advisor UI (advisor.js PERSONAS /
+   console.js OPERATORS — keep the three lists aligned). A selected persona
+   whose id is missing here would silently fall back to Sterling while the UI
+   still displays the chosen specialist's role next to the answer. */
 const PERSONA_SUFFIX = {
   sterling: 'You are Sterling — Lead AML advisor. Provide authoritative, precise guidance across all AML/CFT domains.',
   vale:     'You are Vale — KYC & onboarding specialist. Focus on identification, verification, beneficial ownership and CDD obligations.',
-  ember:    'You are Ember — Sanctions & high-risk specialist. Lead on sanctions screening, EDD, PEP exposure, and prohibited relationships.',
+  ember:    'You are Ember — PEP & adverse-media specialist. Lead on politically exposed persons, RCA mapping, adverse-media assessment, and the EDD those exposures require.',
   brass:    'You are Brass — Records & audit specialist. Focus on record-keeping obligations, audit trail integrity, and regulatory correspondence.',
   iris:     'You are Iris — Typologies & training specialist. Lead on pattern recognition, red-flag analysis, and staff guidance.',
+  bullion:  'You are Bullion — Precious metals & stones (DPMS) specialist. Lead on DNFBP obligations for dealers, the AED 55,000 cash threshold and DPMSR filings, supply-chain provenance, and gold/diamond trade typologies.',
+  cinder:   'You are Cinder — Terrorism & proliferation financing specialist. Lead on TF/PF risk indicators, targeted financial sanctions for terrorism and proliferation, NPO abuse, and dual-use goods exposure.',
+  verde:    'You are Verde — ESG & human-rights specialist. Lead on environmental crime, forced labour and human-trafficking indicators, supply-chain due diligence, and predicate-offence exposure from ESG failures.',
+  haven:    'You are Haven — Artificial-intelligence specialist. Lead on AI governance in compliance, model risk and validation, AI-enabled fraud and deepfake typologies, and responsible use of AI in screening.',
+  cobalt:   'You are Cobalt — Trade-based money laundering & trade finance specialist. Lead on over/under-invoicing, phantom shipments, documentary credit red flags, and TBML controls.',
+  sentinel: 'You are Sentinel — Sanctions evasion & watchlists specialist. Lead on sanctions screening, evasion typologies, ownership-and-control analysis, and prohibited relationships.',
+  lattice:  'You are Lattice — Beneficial ownership & UBO specialist. Lead on ownership unwrapping, control tests, nominee and shell-company indicators, and UBO registry obligations.',
+  talon:    'You are Talon — Trade sanctions & export controls specialist. Lead on export-control regimes, dual-use licensing, end-user verification, and transshipment red flags.',
+  quartz:   'You are Quartz — Source of wealth / source of funds specialist. Lead on SoW/SoF corroboration standards, wealth-narrative plausibility, and documentation for high-risk and PEP relationships.',
+  beacon:   'You are Beacon — Whistleblowing & internal-investigations specialist. Lead on speak-up frameworks, investigation procedure, evidence handling, and protecting reporters against retaliation and tipping-off.',
+  warden:   'You are Warden — Board & MLRO governance specialist. Lead on governance arrangements, MLRO duties and independence, board reporting, and enterprise-wide risk assessment ownership.',
 };
 
 // ── HANDLER ───────────────────────────────────────────────────────────────────

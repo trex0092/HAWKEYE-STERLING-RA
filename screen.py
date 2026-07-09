@@ -576,13 +576,26 @@ def _normalize_ar(s: str) -> str:
     s = s.replace("ة", "ه")                        # ة → ه
     return s
 
+def _latin_fold(s: str) -> str:
+    """Case-fold Latin text robustly across the Turkish dotted/dotless i and
+    diacritics: uppercase first (ı→I and i→I collapse together), strip combining
+    marks, then lowercase — so 'DOLANDIRICILIK' (all-caps headline) and
+    'dolandırıcılık' (dictionary term) both fold to 'dolandiricilik'."""
+    s = unicodedata.normalize("NFD", (s or "").upper())
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return s.lower()
+
 def match_adverse_keywords(title: str) -> list:
     """All adverse keywords found in one headline: the English set (word-boundary,
     case-insensitive) plus the 18-language multilingual set. Each non-English term
     maps to its English canonical so typology bucketing and reporting stay uniform.
-    Latin-script foreign terms match on \b word boundaries (lower-cased); Arabic
-    terms match on the Arabic-normalised headline; other non-Latin scripts match by
-    substring on the raw headline. Order preserved, no duplicates."""
+    Latin-script foreign terms match on \b word boundaries (lower-cased, with a
+    diacritic-folded fallback for all-caps Turkish-style headlines); Arabic terms
+    match on the Arabic-normalised headline; other non-Latin scripts match by
+    substring on the LOWER-CASED headline — Cyrillic and Greek are cased scripts,
+    and the dictionary terms are lowercase, so matching against the raw headline
+    would miss every capitalized or all-caps headline. Order preserved, no
+    duplicates."""
     raw = title or ""
     tl = raw.lower()
     raw_ar = _normalize_ar(raw)
@@ -593,9 +606,11 @@ def match_adverse_keywords(title: str) -> list:
         if _ARABIC_RE.search(term):
             hit = _normalize_ar(term) in raw_ar
         elif _NONLATIN_RE.search(term):
-            hit = term in raw
+            hit = term in tl
         else:
             hit = re.search(r"\b" + re.escape(term.lower()), tl) is not None
+            if not hit:
+                hit = re.search(r"\b" + re.escape(_latin_fold(term)), _latin_fold(raw)) is not None
         if hit:
             matched.append(canon)
     return matched
@@ -1135,7 +1150,8 @@ def parse_uk(data):
         # served with HTTP 200, blindly skipping row 0 would discard the real header
         # and parse EVERY row to blanks → a silently zeroed list. Detect the header.
         reader = csv.DictReader(io.StringIO("\n".join(lines[1:])))
-        if not (reader.fieldnames and "Name 6" in reader.fieldnames):
+        has_title_row = bool(reader.fieldnames and "Name 6" in reader.fieldnames)
+        if not has_title_row:
             reader = csv.DictReader(io.StringIO("\n".join(lines)))  # no title row
         if not (reader.fieldnames and "Name 6" in reader.fieldnames):
             log("  UK parse error: expected 'Name 6' column not found — list NOT parsed")
@@ -1148,7 +1164,13 @@ def parse_uk(data):
             if n6: names.add(n6)
             combined = " ".join(p for p in [n1,n2,n3] if p)
             if combined: names.add(combined)
-        date_str = lines[0].split(",")[-1].strip() if lines else "unknown"
+        # The list date lives on the TITLE row. With no title row, line 0 is the
+        # CSV header and its last cell is a column name (e.g. "Name 3") — showing
+        # that as the list date in the audit block would be nonsense. Also require
+        # a digit so a reshuffled title row can't smuggle prose in as a date.
+        if has_title_row and lines:
+            cand = lines[0].split(",")[-1].strip()
+            date_str = cand if any(ch.isdigit() for ch in cand) else "unknown"
     except Exception as e:
         log(f"  UK parse error: {e}")
     return names, date_str, sha256_of(data)
@@ -1530,6 +1552,20 @@ def _delta_days(a, b):
     except Exception:
         return 0
 
+def _name_sig(name: str) -> str:
+    """Stable, non-empty fingerprint component for a name/title. normalize()
+    strips non-Latin scripts to "" — used directly in a delta key, every
+    Arabic/Cyrillic/CJK subject would collapse to the SAME key, so the 2nd+
+    unscreenable customer is born 'standing' and never opens an MLRO case.
+    Fall back to a hash of the NFC form when the Latin normalization is empty."""
+    n = normalize(name)
+    if n:
+        return n
+    s = unicodedata.normalize("NFC", str(name or "")).strip()
+    if not s:
+        return ""
+    return "#" + hashlib.sha256(s.encode("utf-8")).hexdigest()[:16]
+
 def _delta_mark(state, key, today):
     """Returns (is_new, first_seen). Records first/last seen. An item that reappears
     after a gap of > DELTA_RESURFACE_GAP_DAYS (i.e. it fell off the lists and was
@@ -1572,8 +1608,8 @@ def classify_deltas(possible_matches, adverse_findings, pep_findings, state, tod
             # entity already matched would dedupe to "standing" and never open an
             # MLRO case. (One-time effect on upgrade: existing standing matches
             # re-key and re-surface once for review — the conservative outcome.)
-            key = (f"SANC|{normalize(m['name'])}|{h.get('subject_type','')}|"
-                   f"{normalize(h.get('subject_name',''))}|{h['list']}|{normalize(h['matched_entry'])}")
+            key = (f"SANC|{_name_sig(m['name'])}|{h.get('subject_type','')}|"
+                   f"{_name_sig(h.get('subject_name',''))}|{h['list']}|{normalize(h['matched_entry'])}")
             is_new, first = _delta_mark(state, key, today)
             h["is_new"], h["first_seen"] = is_new, first
             if is_new: n_s += 1; m_new = True
@@ -1584,8 +1620,8 @@ def classify_deltas(possible_matches, adverse_findings, pep_findings, state, tod
             # Key on the NORMALIZED TITLE, not the URL: Google News links carry
             # volatile tracking params that change every fetch, which would make the
             # same standing story re-appear as NEW forever. Title is stable.
-            sig = normalize(a.get("title", "")) or (a.get("url", "") or "")
-            key = f"AM|{normalize(f['subject_name'])}|{sig}"
+            sig = _name_sig(a.get("title", "")) or (a.get("url", "") or "")
+            key = f"AM|{_name_sig(f['subject_name'])}|{sig}"
             is_new, first = _delta_mark(state, key, today)
             a["is_new"], a["first_seen"] = is_new, first
             if is_new: n_a += 1; f_new = True
@@ -1594,7 +1630,7 @@ def classify_deltas(possible_matches, adverse_findings, pep_findings, state, tod
         # Fall back to description/label when the Wikidata id is empty, so two
         # different same-named PEP subjects don't collide to one blank key.
         pid = p.get("id") or normalize(p.get("description", ""))[:48] or normalize(p.get("label", ""))
-        key = f"PEP|{normalize(p['subject_name'])}|{pid}"
+        key = f"PEP|{_name_sig(p['subject_name'])}|{pid}"
         is_new, first = _delta_mark(state, key, today)
         p["is_new"], p["first_seen"] = is_new, first
         if is_new: n_p += 1
@@ -1674,8 +1710,16 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
 
             for subject_name, subject_type in subjects:
                 log(f"  Adverse media search: {subject_name}")
-                articles = search_adverse_media(subject_name)
-                lines.append(format_adverse_block(subject_name, articles, subject_type))
+                # Degrade loudly, never abort: search_adverse_media raises when
+                # every source fails, and an unguarded raise here would discard
+                # the already-computed sanctions results and post NO task at all
+                # (run_weekly_adverse and screen_subject_set both guard this).
+                try:
+                    articles = search_adverse_media(subject_name)
+                    lines.append(format_adverse_block(subject_name, articles, subject_type))
+                except Exception as e:
+                    log(f"  ! adverse media unavailable for {subject_name}: {e}")
+                    lines.append(f"   ⚠️  ADVERSE MEDIA UNAVAILABLE for {subject_name} — all sources failed this run; re-run or review manually.")
 
             lines.append("")
         potential_text = "\n".join(lines)
@@ -2431,6 +2475,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         subjects_all.append(("COMPANY", c["name"], None, c))
         for ind in c.get("individuals", []):
             subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
+        # Corporate owners/parents are sanctions-screened (50%/control rule) —
+        # sweep their adverse media too, or a designated parent's coverage is
+        # never seen. No PEP check: PEP status is a natural-person concept.
+        for ent in c.get("entity_owners", []):
+            subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
 
     def _enrich(subj):
         subj_type, subj_name, parent, c = subj
@@ -2457,8 +2506,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             if r["am_error"]:
                 am_errors += 1
             else:
-                if r["type"] == "COMPANY": companies += 1
-                else: individuals += 1
+                # Corporate owners count with companies — they are legal persons.
+                if r["type"] == "INDIVIDUAL": individuals += 1
+                else: companies += 1
                 if r["adverse"]:
                     adverse_findings.append({"subject_type": r["type"], "subject_name": r["name"],
                         "parent": r["parent"], "permalink": r["permalink"], "articles": r["adverse"]})
@@ -2467,9 +2517,12 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 if p.get("errored"):
                     pep_errors += 1
                 elif p.get("hit"):
+                    # Carry the review flag through: a manual-review PEP has no
+                    # Wikidata id BY DESIGN, and the QA gate must not report it
+                    # as a missing-source integrity violation on every run.
                     pep_findings.append({"subject_name": r["name"], "parent": r["parent"],
                         "permalink": r["permalink"], "id": p.get("id", ""),
-                        "category": p.get("category", ""),
+                        "category": p.get("category", ""), "review": bool(p.get("review")),
                         "label": p.get("label", ""), "description": p.get("description", "")})
             if done % 50 == 0 or done == total:
                 log(f"  enriched {done}/{total}")
@@ -2688,6 +2741,14 @@ def main():
         "eu":    {"count":len(eu_names),    "date":eu_date,    "hash":eu_hash},
         "eocn":  {"count":len(eocn_names),  "date":eocn_date,  "hash":eocn_hash},
     }
+
+    # Fail-safe (mirrors load_all_lists): if EVERY list failed to load, screening
+    # would clear every customer and post a green ✅ task — a total list-fetch
+    # failure must never masquerade as "all clear".
+    if sum(m["count"] for m in list_meta.values()) == 0:
+        raise RuntimeError(
+            "FATAL: no sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
+            "— refusing to screen or post an all-clear.")
 
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],

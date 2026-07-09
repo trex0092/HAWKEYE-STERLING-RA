@@ -12,6 +12,17 @@
 ══════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* Strict-mode shared token (netlify/functions/_auth.js): sends the deploy-time
+   <meta name="hsra-app-token"> value as X-App-Token when present. */
+function fnHeaders(){
+  const h = {'Content-Type':'application/json'};
+  try{
+    const m = document.querySelector('meta[name="hsra-app-token"]');
+    const t = ((m && m.getAttribute('content')) || '').trim();
+    if(t) h['X-App-Token'] = t;
+  }catch(e){}
+  return h;
+}
 
 const OPERATORS = [
   {id:'cypher',  img:'assets/persona-cypher.webp',  pos:'42% 30%', name:'Cypher',  role:'Transaction Monitoring Unit', ac:'255,92,168'},
@@ -80,7 +91,7 @@ function refreshFromAsana(btn){
   if(typeof fetch==='undefined') return;
   if(btn){ btn.disabled=true; btn.classList.add('spinning'); btn.setAttribute('title','Refreshing…'); }
   const done = t => { if(btn){ btn.disabled=false; btn.classList.remove('spinning'); btn.setAttribute('title', t); } };
-  fetch(ASANA_MIRROR_EP, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'read'})})
+  fetch(ASANA_MIRROR_EP, {method:'POST', headers: fnHeaders(), body: JSON.stringify({action:'read'})})
     .then(r=>r.json()).then(d=>{
       if(d && d.ok && Array.isArray(d.register)){
         _asanaFetched = d.register.map(r=>({ ref:String(r.ref||''), entity:String(r.entity||r.ref||''),

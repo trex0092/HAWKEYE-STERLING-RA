@@ -193,7 +193,9 @@ def cdd_gaps(rec, today=None):
     for fld, label in (("passport_expiry", "passport/ID"), ("eid_expiry", "Emirates ID")):
         raw = rec.get(fld)
         d = parse_date(raw)
-        if d and d < today:
+        # <= : a document expiring TODAY is no longer acceptable evidence — the
+        # relationship outlives the check, so flag it for renewal now.
+        if d and d <= today:
             gaps.append(f"{label} document expired ({raw})")
         elif _present(raw) and d is None:
             gaps.append(f"{label} expiry date unreadable ({raw}) — verify manually")

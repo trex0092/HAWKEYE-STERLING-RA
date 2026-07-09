@@ -7,6 +7,17 @@
 ══════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* Strict-mode shared token (netlify/functions/_auth.js): sends the deploy-time
+   <meta name="hsra-app-token"> value as X-App-Token when present. */
+function fnHeaders(){
+  const h = {'Content-Type':'application/json'};
+  try{
+    const m = document.querySelector('meta[name="hsra-app-token"]');
+    const t = ((m && m.getAttribute('content')) || '').trim();
+    if(t) h['X-App-Token'] = t;
+  }catch(e){}
+  return h;
+}
 
 const MODES = ['Quick','Speed','Balanced','Deep'];
 
@@ -58,6 +69,11 @@ const PERSONAS = [
 
 let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', liveAnswer:null, regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null, piiConfirmed:false};
 let reasoningTimer = null;
+/* Monotonic ask sequence — a response only renders if it belongs to the most
+   recent ask() (or nothing was reset in between). Without it, a slow Deep-mode
+   response can land after a newer question (or after "Ask another") and
+   overwrite the UI with a mismatched question/answer pair. */
+let askSeq = 0;
 
 /* AI Acceptable-Use Policy gate — the Advisor is blocked until the operator
    acknowledges the policy once on this device (recorded locally). */
@@ -74,7 +90,21 @@ function piiScan(t){ const s = String(t||''); return PII_RES.some(re=>re.test(s)
    data stays in this browser's localStorage — nothing is sent anywhere, in
    keeping with the suite's no-telemetry-by-design posture. */
 const GOV_KEY = 'hsra.advisor.telemetry.v1';
-function govLoad(){ try{ return JSON.parse(localStorage.getItem(GOV_KEY) || 'null') || {lat:[], usage:{}, flags:{}, lastOk:null, lastErr:null, calls:0}; }catch(e){ return {lat:[], usage:{}, flags:{}, lastOk:null, lastErr:null, calls:0}; } }
+/* Shape-validate, not just parse-validate: a stored value that is valid JSON
+   but not the expected object (e.g. `{"calls":3}` or `[]`) would make
+   govStats() throw inside renderAsk()'s innerHTML expression and leave the
+   Ask tab blank and listener-less until localStorage is cleared by hand. */
+function govDefault(){ return {lat:[], usage:{}, flags:{}, lastOk:null, lastErr:null, calls:0}; }
+function govLoad(){
+  try{
+    const g = JSON.parse(localStorage.getItem(GOV_KEY) || 'null');
+    if(!g || typeof g !== 'object' || Array.isArray(g)
+       || !Array.isArray(g.lat)
+       || !g.usage || typeof g.usage !== 'object' || Array.isArray(g.usage)
+       || !g.flags || typeof g.flags !== 'object' || Array.isArray(g.flags)) return govDefault();
+    return g;
+  }catch(e){ return govDefault(); }
+}
 function govSave(g){ try{ localStorage.setItem(GOV_KEY, JSON.stringify(g)); }catch(e){} }
 function govRecord(data){
   const g = govLoad();
@@ -301,6 +331,7 @@ function ask(){
     $('hero').innerHTML = heroHtml(); applyCssText($('hero')); bindHero(); return;
   }
   clearTimeout(reasoningTimer);
+  const myAsk = ++askSeq;
   state.askedQuestion = q; state.phase = 'reasoning'; state.liveAnswer = null;
   $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
 
@@ -310,16 +341,24 @@ function ask(){
      Map any body lacking `text` to a visible error instead of a blank answer. */
   const brainFetch = fetch('/.netlify/functions/brain-soul', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: fnHeaders(),
     body: JSON.stringify({
       question: q,
       mode: MODE_TO_REASONING[state.mode] || 'balanced',
       persona: state.personaId,
     }),
-  }).then(r => r.json());
+  }).then(r => r.json().catch(() => {
+    /* A non-JSON body means the platform killed the function (Netlify's
+       synchronous-function execution limit — most likely a long Deep-mode
+       call), not a missing API key. Say so instead of misdirecting ops. */
+    return {ok:false, error: r.status >= 500
+      ? 'The advisor timed out at the platform level (HTTP ' + r.status + '). Deep mode can exceed the function execution limit — try Balanced or Speed, or raise the Netlify function timeout.'
+      : 'The advisor returned an unreadable response (HTTP ' + r.status + ') — please try again.'};
+  }));
 
   Promise.all([brainFetch, minDelay])
   .then(([data]) => {
+    if(myAsk !== askSeq) return; // superseded by a newer ask() or reset()
     state.liveAnswer = answerFromResponse(data);
     try{ govRecord(data); }catch(e){}
     state.phase = 'answer';
@@ -327,6 +366,7 @@ function ask(){
     bindHero();
   })
   .catch(() => {
+    if(myAsk !== askSeq) return;
     state.liveAnswer = {ok: false, text: 'The brain is unavailable — ensure ANTHROPIC_API_KEY is set in Netlify environment variables and redeploy.'};
     try{ govRecord({ok:false}); }catch(e){}
     state.phase = 'answer';
@@ -341,7 +381,7 @@ function answerFromResponse(data){
   if(data && data.text) return data;
   return {ok:false, text:(data && data.error) ? String(data.error) : 'The advisor is unavailable — please try again.'};
 }
-function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; state.liveAnswer=null; $('hero').innerHTML = heroHtml(); applyCssText($('hero')); }
+function reset(){ clearTimeout(reasoningTimer); askSeq++; state.phase='idle'; state.liveAnswer=null; $('hero').innerHTML = heroHtml(); applyCssText($('hero')); }
 
 function regGroups(){ return (typeof window!=='undefined' && Array.isArray(window.REG_GROUPS)) ? window.REG_GROUPS : []; }
 function askQuestion(q){ state.tab='ask'; state.question=q; render(); }

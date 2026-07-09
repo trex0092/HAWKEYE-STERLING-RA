@@ -28,12 +28,14 @@ export const CHANGES_FILE = 'sanctions-watch-changes.json';
 /* Approximate record count for the report: count a per-record marker if the
    source defines one, else count CSV data rows (lines minus header). Returns
    null when the format gives no reliable count. */
-export function countEntries(body, type, marker) {
+export function countEntries(body, type, marker, noHeader) {
   if (typeof body !== 'string' || !body) return null;
   if (marker) return body.split(marker).length - 1;
   if (type === 'csv') {
     const lines = body.split(/\r?\n/).filter(l => l.trim().length);
-    return Math.max(0, lines.length - 1);
+    // Headerless CSVs (registry `noHeader: true`, e.g. OFAC sdn.csv) count every
+    // data row; subtracting a header that isn't there undercounts by one.
+    return Math.max(0, lines.length - (noHeader ? 0 : 1));
   }
   return null;
 }
@@ -93,6 +95,35 @@ function loadState() {
   if (!existsSync(STATE_FILE)) return { updated: null, sources: {} };
   try { return JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch (e) { console.warn('sanctions-watch: state file unreadable, starting fresh (' + e.message + ')'); return { updated: null, sources: {} }; }
 }
+/* Per-source consecutive-error streak. A permanently-dead list URL (e.g. OFAC
+   moves sdn.csv → daily 404) must not decay silently inside a "no action" note
+   forever: track the streak in state and, once it crosses the threshold, treat
+   it as an actionable change (alert + commit). state_dirty ensures the streak is
+   PERSISTED even on a no-list-change run (else it would reset every run).
+   Entries carry status/detail like reg-watch's: without them, watch-notify
+   counts the entry as "content changed" and the Asana card tells the MLRO a
+   designation list CHANGED when it is actually unmonitored/blind.
+   Mutates stateSources[id].errStreak; exported for unit tests. */
+export function trackErrorStreaks(sources, fetched, stateSources, threshold) {
+  const persistentErrors = [];
+  let anyError = false;
+  for (const s of sources) {
+    const f = fetched[s.id];
+    const rec = stateSources[s.id] || (stateSources[s.id] = {});
+    if (f && f.ok) { rec.errStreak = 0; }
+    else {
+      anyError = true;
+      rec.errStreak = (Number(rec.errStreak) || 0) + 1;
+      if (rec.errStreak >= threshold) persistentErrors.push({
+        name: s.name, id: s.id, url: s.url, streak: rec.errStreak,
+        status: 'unreachable', errorStreak: rec.errStreak,
+        detail: 'unreachable ' + rec.errStreak + ' consecutive runs — change-detection is blind'
+      });
+    }
+  }
+  return { persistentErrors, anyError };
+}
+
 function setOutput(key, val) {
   /* Sanitize before writing to GITHUB_OUTPUT: a CR/LF in the value (e.g. an upstream
      error message folded into a title) could inject additional output lines; cap the
@@ -117,31 +148,15 @@ async function main() {
   const counts = {};
   for (const s of sources) {
     const f = fetched[s.id];
-    const now = (f && f.ok && typeof f.body === 'string') ? countEntries(f.body, s.type, s.marker) : null;
+    const now = (f && f.ok && typeof f.body === 'string') ? countEntries(f.body, s.type, s.marker, s.noHeader) : null;
     const prevCount = prev[s.id] && typeof prev[s.id].count === 'number' ? prev[s.id].count : null;
     if (typeof now === 'number') state.sources[s.id].count = now;
     else if (typeof prevCount === 'number' && state.sources[s.id]) state.sources[s.id].count = prevCount;
     counts[s.id] = { prev: prevCount, now };
   }
 
-  // Per-source consecutive-error streak. A permanently-dead list URL (e.g. OFAC
-  // moves sdn.csv → daily 404) must not decay silently inside a "no action" note
-  // forever: track the streak in state and, once it crosses the threshold, treat
-  // it as an actionable change (alert + commit). state_dirty ensures the streak is
-  // PERSISTED even on a no-list-change run (else it would reset every run).
   const ERROR_STREAK_ALERT = Number(process.env.SANCTIONS_ERROR_STREAK) || 3;
-  const persistentErrors = [];
-  let anyError = false;
-  for (const s of sources) {
-    const f = fetched[s.id];
-    const rec = state.sources[s.id] || (state.sources[s.id] = {});
-    if (f && f.ok) { rec.errStreak = 0; }
-    else {
-      anyError = true;
-      rec.errStreak = (Number(rec.errStreak) || 0) + 1;
-      if (rec.errStreak >= ERROR_STREAK_ALERT) persistentErrors.push({ name: s.name, id: s.id, url: s.url, streak: rec.errStreak });
-    }
-  }
+  const { persistentErrors, anyError } = trackErrorStreaks(sources, fetched, state.sources, ERROR_STREAK_ALERT);
 
   const moved = contentChanges(changes);
   let report = buildReport(changes, today, mode, counts);

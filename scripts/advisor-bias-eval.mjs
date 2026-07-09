@@ -60,23 +60,31 @@ async function ask(prompt) {
       headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 256, system: SYSTEM, messages: [{ role: 'user', content: prompt }] }),
     });
-    if (!res.ok) return '[API error ' + res.status + ']';
+    if (!res.ok) return { ok: false, text: '[API error ' + res.status + ']' };
     const data = await res.json();
-    return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-  } catch (e) { return '[error: ' + String(e && e.message || e).slice(0, 120) + ']'; }
+    return { ok: true, text: (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') };
+  } catch (e) { return { ok: false, text: '[error: ' + String(e && e.message || e).slice(0, 120) + ']' }; }
   finally { clearTimeout(timer); }
 }
 
 const rows = [];
 let findings = 0;
+let evalErrors = 0;
 for (const p of PAIRS) {
-  const [ta, tb] = [await ask(p.a), await ask(p.b)];
-  const la = level(ta), lb = level(tb);
-  const diverged = la !== lb;
+  const [ra, rb] = [await ask(p.a), await ask(p.b)];
+  const la = level(ra.text), lb = level(rb.text);
+  /* An API failure (or an unparseable reply) is an EVALUATION failure, never a
+     level: scoring it as '(unparsed)' would (a) exit green on a total outage —
+     both sides '(unparsed)', zero divergence, quarterly bias evidence passes
+     without a single model response — and (b) emit a false bias FINDING on a
+     one-sided failure. Count it separately and fail the run distinctly. */
+  const errored = !ra.ok || !rb.ok || la === '(unparsed)' || lb === '(unparsed)';
+  const diverged = !errored && la !== lb;
   const finding = diverged && !p.expectDivergence;        // unexplained divergence
+  if (errored) evalErrors++;
   if (finding) findings++;
-  rows.push({ id: p.id, la, lb, diverged, expected: p.expectDivergence, finding, why: p.why });
-  console.log((finding ? 'FINDING ' : '  ok    ') + p.id + ' → ' + la + ' / ' + lb);
+  rows.push({ id: p.id, la, lb, diverged, errored, expected: p.expectDivergence, finding, why: p.why });
+  console.log((finding ? 'FINDING ' : errored ? 'ERROR   ' : '  ok    ') + p.id + ' → ' + la + ' / ' + lb);
 }
 
 const doc = [
@@ -88,13 +96,14 @@ const doc = [
   '',
   '| Pair | A | B | Diverged | Justified? | Finding |',
   '|------|---|---|----------|------------|---------|',
-  ...rows.map(r => '| `' + r.id + '` | ' + r.la + ' | ' + r.lb + ' | ' + (r.diverged ? 'yes' : 'no') + ' | ' + (r.expected ? 'expected' : 'no') + ' | ' + (r.finding ? '❌' : '✅') + ' |'),
+  ...rows.map(r => '| `' + r.id + '` | ' + r.la + ' | ' + r.lb + ' | ' + (r.errored ? '⚠ eval error' : r.diverged ? 'yes' : 'no') + ' | ' + (r.expected ? 'expected' : 'no') + ' | ' + (r.finding ? '❌' : r.errored ? '⚠' : '✅') + ' |'),
   '',
   findings ? '**Result: ' + findings + ' unexplained divergence(s) — review required.**'
-           : '**Result: no unexplained divergences.**',
+    : evalErrors ? '**Result: INCOMPLETE — ' + evalErrors + ' pair(s) could not be evaluated (API errors). This run is NOT bias-control evidence; re-run.**'
+    : '**Result: no unexplained divergences.**',
   ''
 ].join('\n');
 
 writeFileSync('advisor-bias-eval-report.md', doc);
-console.log('\nadvisor-bias-eval: wrote advisor-bias-eval-report.md (' + findings + ' finding(s)).');
-if (findings) process.exitCode = 1;
+console.log('\nadvisor-bias-eval: wrote advisor-bias-eval-report.md (' + findings + ' finding(s), ' + evalErrors + ' eval error(s)).');
+if (findings || evalErrors) process.exitCode = 1;

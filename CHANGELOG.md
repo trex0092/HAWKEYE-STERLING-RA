@@ -10,6 +10,111 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added / hardened (deep-test follow-up)
+
+- **Corporate owners now get the adverse-media sweep.** `screen.py` sanctions-
+  screened `entity_owners` (50%/control rule) but excluded them from the
+  enrichment loop, so a designated parent's media coverage was never seen; they
+  now join the sweep as `ENTITY (owner)` subjects (no PEP check — PEP status is
+  a natural-person concept).
+- **Deep-mode platform-timeout handling.** Netlify synchronous functions
+  default to a ~10 s execution cap that only Netlify support can raise;
+  Deep-mode Advisor calls can exceed it, and the resulting non-JSON 502 used to
+  render as a misleading "check ANTHROPIC_API_KEY" error. The Advisor now
+  detects the platform kill and says so (suggesting Balanced/Speed or the
+  timeout raise); the constraint is documented in `.env.example`.
+- **Cross-browser smoke now fails on `console.error` too**, not just uncaught
+  exceptions — broken-but-caught code paths (failed asset decode, bad JSON) no
+  longer ship silently. Service-worker registration noise on `file://` is
+  excluded.
+- **Sanctions Watch streak logic extracted and unit-tested.**
+  `trackErrorStreaks` is now an exported pure function with tests covering
+  threshold crossing, reset-on-success, the below-threshold case, and the
+  unreachable entry shape the notifier depends on — this was the one alerting
+  path with no test (and where the "dead list reported as changed" bug hid).
+- **Small hardenings:** the AM/PEP same-day dedup now matches the date with
+  boundaries ("9 Jul 2026" no longer matches inside "19 Jul 2026");
+  `parse_uk`'s no-title-row fallback can no longer show a CSV column header as
+  the list date; `countEntries` no longer subtracts a phantom header row for
+  the headerless OFAC `sdn.csv` (registry gains `noHeader: true`).
+
+### Fixed
+
+- **Deep-test sweep — 23 defects fixed across every layer** (five parallel
+  adversarial reviews of the app, engine, scripts and functions; every finding
+  reproduced before fixing):
+  - **Screening engine (`screen.py`)** — non-Latin adverse-media matching was
+    case-sensitive (capitalized/all-caps Cyrillic & Greek headlines never
+    matched; Turkish all-caps missed via dotless-ı casing) — now matched on the
+    lower-cased headline with a diacritic-folded fallback; delta keys collapsed
+    to one identical fingerprint for ALL unscreenable non-Latin subjects, so
+    the 2nd+ such customer was born "standing" and never opened an MLRO case —
+    empty normalizations now fall back to a hash of the NFC name; the daily
+    narrative aborted (discarding sanctions results, posting nothing) when one
+    subject's adverse-media sweep fully failed — now degrades loudly per
+    subject; the `full_batch` path could post a green ✅ all-clear with zero
+    loaded sanctions lists — the same FATAL fail-safe as `load_all_lists` now
+    applies.
+  - **R-09 coverage alarm was inert in production** — `data/source-coverage-state.json`
+    was never restored from or committed to the `screen-delta-state` branch, so
+    every run started with empty history and a silently-shrunk list could never
+    alarm. Both screening workflows now persist it.
+  - **QA gate false-failed forever on manual-review PEPs** — the designed
+    no-Wikidata-id hand-off for non-Latin names was reported as a missing-source
+    integrity violation on every run; the `review` flag now propagates and is
+    exempt.
+  - **Case lifecycle: carried-forward matches were auto-cleared** — a standing
+    match kept when it could NOT be re-verified (enrichment error, failed list
+    download, subject error) retained a stale `lastSeen`, so the case planner
+    completed its Asana case with a false "not flagged" comment (and a cleared
+    case never re-opens). Carry-forwards now read as still-active; regression
+    tests added.
+  - **Sanctions Watch reported a dead list as "content changed"** — persistent
+    failure entries lacked `status`/`detail`, so the Asana card told the MLRO
+    a designation list changed when it was actually unmonitored. Now rendered
+    as unreachable with the streak, like Regulatory Watch.
+  - **Regulatory Watch `state_dirty` was permanently true** — an unchanged
+    direct fetch advances `contentAsOf` daily and the materiality projection
+    didn't strip it; it does now (regression-tested).
+  - **Bias eval scored API failures as levels** — a total outage exited green
+    ("no unexplained divergences" without one model response) and a one-sided
+    failure emitted a false bias finding; evaluation errors now fail the run
+    distinctly as INCOMPLETE.
+  - **Tokenised-delivery privacy (app)** — the "🔒 Asana: tokenise (no PII)"
+    opt-in silently reset after every lock/unlock or reload on an encrypted
+    device (key missing from `SECURE_KEYS`), and the register mirror ignored
+    the opt-in entirely, shipping every entity's legal name/jurisdiction/
+    activity to Asana on autosave. Both paths now honour it.
+  - **RA reference burn** — every page load of a locked encrypted device
+    permanently consumed one `RA-YYYYMMDD-NNN` sequence number; allocation is
+    now skipped while the gate is up.
+  - **Advisor race** — a slow Deep-mode response could land after a newer
+    question (or after "Ask another") and render Q1's answer under Q2's
+    heading; requests are now sequenced and stale responses dropped. Corrupt
+    (valid-JSON-but-wrong-shape) telemetry in localStorage no longer leaves
+    the Ask tab blank and dead.
+  - **Persona routing** — 11 of 16 advisor personas silently fell back to the
+    generic Sterling system prompt while the UI displayed the chosen
+    specialist; all 16 now have server-side suffixes and Ember's suffix matches
+    its UI role (PEP & adverse media).
+  - **Asana functions** — a transient (429/5xx) failure updating the
+    auto-backup mirror tasks created duplicates (`risk-backup`, `asana-mirror`;
+    same bug class previously fixed in `asana-task`) — recreate now only on a
+    genuine 404; a malformed mirror payload (e.g. `[null]`) returned 502
+    "asana unreachable" instead of a 400.
+  - **Strict-token mode was unusable from the browser** — the documented
+    `<meta name="hsra-app-token">` mechanism didn't exist in any HTML/JS; the
+    meta tag now ships on all three screens, all function calls attach
+    `X-App-Token` when it is filled (the register mirror switches from
+    sendBeacon to keepalive fetch to carry it), and CORS allows the header.
+  - **Python modules** — `ai.py` prompt-injection screening skipped the RSS
+    `date` field (now screened + wrapped) and `_ascii_fold` fragmented Turkish
+    dotless-ı names ("Kılıç" → "k l c"; now folds to "kilic"); `txn_monitor.py`
+    gained the two documented-but-missing typologies (CDD-trigger ≥ AED 15,000
+    and repeated round-amount cash); `monitoring.py` runtime medians now always
+    carry the seconds unit; `kyc.py` flags a document expiring today as
+    expired.
+
 ### Security & hardening
 
 - **AML monitoring pipeline hardening (round 3).** The ten AML/CTF monitoring

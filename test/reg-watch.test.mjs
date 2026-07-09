@@ -163,6 +163,12 @@ const base2 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-02', ch
 const base3 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-02', changedAt: '2026-06-01', status: 403, error: 'HTTP 403', errorStreak: 1 } } };
 check('checkedAt-only refresh is not a material state change', !stateMateriallyChanged(base1, base2));
 check('an advancing error streak IS a material state change', stateMateriallyChanged(base2, base3));
+/* An unchanged direct fetch advances contentAsOf to today on every run — that
+   confirmation timestamp alone must not read as material, or state_dirty is
+   permanently true and the output is meaningless. */
+const asOf1 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-01', changedAt: '2026-06-01', contentAsOf: '2026-07-01', status: 200 } } };
+const asOf2 = { sources: { a: { hash: 'h', bytes: 5, checkedAt: '2026-07-02', changedAt: '2026-06-01', contentAsOf: '2026-07-02', status: 200 } } };
+check('a contentAsOf-only refresh (unchanged content, newer confirmation) is not material', !stateMateriallyChanged(asOf1, asOf2));
 
 /* ── Wayback fallback plumbing ── */
 check('rawSnapshotUrl adds the id_ flag and upgrades to https',

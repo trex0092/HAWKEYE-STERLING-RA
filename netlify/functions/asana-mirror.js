@@ -48,6 +48,10 @@ function normalizeRegister(reg){
   /* Cap the item count BEFORE the per-item coercion below, so a huge array can't
      pin CPU/memory (the output-size 413 fires only after this map runs). */
   if(items.length > MAX_REGISTER_ITEMS) items = items.slice(0, MAX_REGISTER_ITEMS);
+  /* Drop null/primitive elements BEFORE the per-field reads below — `r.ref` on a
+     null element throws inside the handler's try and the client would see a 502
+     "asana unreachable" for what is actually a malformed request body. */
+  items = items.filter(r => r && typeof r === 'object');
   return items.map(r => ({
     ref: fld(r.ref),
     entity: fld(r.entity),
@@ -146,6 +150,9 @@ const handle = async (event) => {
     /* An expired/revoked token is actionable — surface it distinctly so a read does
        not look like "no backups yet" and a write does not look like a generic outage. */
     if (e && e.status === 401) return resp(401, { ok: false, error: 'Asana token unauthorized — rotate ASANA_ACCESS_TOKEN' });
+    /* A concrete upstream HTTP status (429/5xx on update) is a real Asana answer,
+       not unreachability — pass it through so the client's retry logic sees it. */
+    if (e && e.status) return resp(e.status, { ok: false, error: 'asana responded ' + e.status });
     return resp(502, { ok: false, error: 'asana unreachable' });
   }
 };
@@ -179,6 +186,11 @@ async function upsertTask(token, project, name, notes, section) {
   if (found && found.gid) {
     const upd = await api(token, 'PUT', '/tasks/' + found.gid, { data: { notes } });
     if (upd.ok) { gid = found.gid; updated = true; }
+    /* Only a genuine 404 (task deleted between lookup and update) may fall
+       through to a create. A transient 429/5xx must NOT spawn a second
+       auto-backup task — findTask returns the first name match, so a duplicate
+       makes reads/writes silently target a stale mirror from then on. */
+    else if (upd.status !== 404) { const e = new Error('asana update failed'); e.status = upd.status; throw e; }
   }
   if (!gid) {
     const made = await api(token, 'POST', '/tasks', { data: { name, notes, projects: [project] } });
@@ -255,7 +267,7 @@ function corsHeaders(event) {
   if (origin && originAllowed(event)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-App-Token';
     headers['Access-Control-Max-Age'] = '86400';
   }
   return headers;
