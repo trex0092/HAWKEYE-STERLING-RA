@@ -105,11 +105,13 @@ jobs:
             git commit -m "$PR_TITLE [skip ci]"
             # Persist on the sanctions-watch-state branch (main is protected):
             # rebuilt as <current main> + one data commit, force-updated.
+            pushed=
             for attempt in 1 2 3 4 5; do
-              git push --force origin HEAD:refs/heads/sanctions-watch-state && break
+              git push --force origin HEAD:refs/heads/sanctions-watch-state && { pushed=1; break; }
               echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
+            [ -n "$pushed" ] || { echo "::error::state push to sanctions-watch-state failed after 5 attempts — state NOT persisted"; exit 1; }
           else
             echo "state unchanged"
           fi

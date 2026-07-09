@@ -39,10 +39,15 @@ const REG_KEY = 'hsra.register.v1';
 /* Register pulled from Asana via the Refresh button — display-only, never
    written to localStorage (avoids clashing with index.html's encrypted store). */
 let _asanaFetched = [];
+/* True when the local register exists but is encrypted-at-rest (index.html's
+   passphrase gate is enabled). The console cannot decrypt it, so it must say so
+   rather than render a false "nothing filed / all-clear" state. */
+let REG_ENCRYPTED = false;
 function readLocalRegister(){
   let raw=null;
   try{ raw = localStorage.getItem(REG_KEY); }catch(e){}
-  if(!raw || raw.indexOf('hsx1:')===0) return [];        /* none filed, or locked/encrypted */
+  REG_ENCRYPTED = !!(raw && raw.indexOf('hsx1:')===0);
+  if(!raw || REG_ENCRYPTED) return [];                   /* none filed, or locked/encrypted */
   let data; try{ data = JSON.parse(raw); }catch(e){ return []; }
   const items = (data && data.items && typeof data.items==='object') ? data.items : {};
   return Object.keys(items).map(ref=>{
@@ -166,7 +171,7 @@ function renderStats(){
     : a.overdue ? a.overdue+' review overdue'
     : a.drafts ? a.drafts+' in draft' : 'none open';
   const tiles=[
-    {label:'Entities Monitored', value:a.n,         color:'#4FD6A0', sub:a.n? a.complete+' complete' : 'no entities yet'},
+    {label:'Entities Monitored', value:a.n,         color:'#4FD6A0', sub:a.n? a.complete+' complete' : (REG_ENCRYPTED? 'register encrypted' : 'no entities yet')},
     {label:'Open Alerts',        value:a.openAlerts, color:'#FFAE57', sub:alertSub},
     {label:'Sanctions Hits',     value:a.prohibited, color:'#FF6B6B', sub:a.prohibited? 'do not onboard' : 'none flagged'},
     {label:'Cases Cleared',      value:a.complete,   color:'#7FB3E8', sub:a.complete? 'marked complete' : 'none yet'}
@@ -208,7 +213,12 @@ function renderJur(){
 }
 function renderAlerts(){
   const a=AGG;
-  if(!a.recent.length){ $('alertStream').innerHTML='<div class="empty-note">No assessments filed yet — file one in the Assessment tab to populate the console.</div>'; return; }
+  if(!a.recent.length){
+    $('alertStream').innerHTML = REG_ENCRYPTED
+      ? '<div class="empty-note">This device’s register is encrypted — unlock it on the Assessment page to populate the console. Encrypted records are not counted here.</div>'
+      : '<div class="empty-note">No assessments filed yet — file one in the Assessment tab to populate the console.</div>';
+    return;
+  }
   $('alertStream').innerHTML = a.recent.map((it,i)=>{
     const key = it.prohibited?'PROHIBITED':it.outcome;
     const t=bandTone(key);

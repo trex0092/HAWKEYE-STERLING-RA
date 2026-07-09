@@ -36,6 +36,17 @@ check('scoreAdverseMedia uses medium band for a non-strong risk term', weak.hit 
 
 check('ADVERSE_TERMS covers core AML predicates', ADVERSE_TERMS.includes('sanctions') && ADVERSE_TERMS.includes('terrorism'));
 
+/* Corporate boilerplate must not be required in the headline: a UAE-shaped legal
+   name still matches a headline that carries only its distinctive tokens. */
+const corpHit = scoreAdverseMedia('Al Haramain General Trading LLC',
+  [{ title: 'Al Haramain investigated for money laundering', link: '' }]);
+check('scoreAdverseMedia matches despite dropped "General Trading LLC" boilerplate',
+  corpHit.hit === true && corpHit.terms.includes('money laundering'));
+/* A pure surname must still require a risk term (no over-broad match). */
+const corpClean = scoreAdverseMedia('Al Haramain General Trading LLC',
+  [{ title: 'Al Haramain opens a new showroom', link: '' }]);
+check('boilerplate-stripped name still needs a risk term', corpClean.hit === false);
+
 /* ── GDELT (second English/global source) ──────────────────────────────────── */
 check('gdeltUrl targets the GDELT DOC 2.0 artlist JSON API with the quoted name',
   gdeltUrl('Acme Co').startsWith('https://api.gdeltproject.org/api/v2/doc/doc?query=') &&

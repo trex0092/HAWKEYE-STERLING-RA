@@ -144,10 +144,19 @@ function runScreen(file, bridge, seed){
   check('console(data): diligence mix renders percentages', /\d+%/.test(els.riskBars.innerHTML));
 })();
 
+/* ── 1c. AI Operations Console — ENCRYPTED register (must NOT read as all-clear) ── */
+(function(){
+  const { els } = runScreen('console.html', '{}', {'hsra.register.v1': 'hsx1:AAAA:BBBB'});
+  check('console(encrypted): alert stream says the register is encrypted, not "nothing filed"',
+    els.alertStream.innerHTML.includes('encrypted') && !els.alertStream.innerHTML.includes('No assessments filed yet'));
+  check('console(encrypted): entities tile sub flags the encrypted register',
+    els.statTiles.innerHTML.includes('register encrypted'));
+})();
+
 /* ── 2. Hawkeye Sterling Advisor ── */
 (function(){
   const { els, fetches, api } = runScreen('advisor.html',
-    '{ get state(){return state;}, render, renderAsk, renderQa, renderRegGroups, regGroups, askQuestion, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, heroHtml, aupAck, PERSONAS }');
+    '{ get state(){return state;}, render, renderAsk, renderQa, renderRegGroups, regGroups, askQuestion, renderTools, currentTool, renderResultOnly, escalationRun, genericRun, toolsList, ask, reset, persona, heroHtml, aupAck, answerFromResponse, heroAnswerHtml, PERSONAS }');
 
   check('advisor: boots on the Ask tab with all three tabs', els.tabs.innerHTML.includes('Ask the advisor')
     && els.tabs.innerHTML.includes('Regulatory Q&amp;A') && els.tabs.innerHTML.includes('Super Tools'));
@@ -182,6 +191,25 @@ function runScreen(file, bridge, seed){
   api.reset();
   check('advisor: Ask another returns to the idle hero', api.state.phase === 'idle'
     && els.hero.innerHTML.includes('Ask me anything'));
+
+  /* Asking with an empty composer prompts, rather than substituting a canned
+     question and dispatching a (billed) backend call. */
+  api.aupAck();
+  const fetchesBefore = fetches.length;
+  api.state.question = '   ';
+  api.ask();
+  check('advisor: an empty question prompts instead of substituting + sending',
+    api.state.phase === 'answer' && /enter a question/i.test(api.state.liveAnswer.text) && fetches.length === fetchesBefore);
+  api.reset();
+
+  /* Server-error responses ({ok:false, error} with no `text`) must surface the
+     message, not render a blank answer body. */
+  check('advisor: a backend error body is mapped to a visible message',
+    api.answerFromResponse({ok:false, error:'ANTHROPIC_API_KEY not configured'}).text === 'ANTHROPIC_API_KEY not configured');
+  check('advisor: an empty/garbled error body still yields a non-blank message',
+    (api.answerFromResponse({ok:false}).text || '').length > 0 && (api.answerFromResponse(null).text || '').length > 0);
+  check('advisor: a successful body passes through unchanged',
+    api.answerFromResponse({text:'ok', verdict:'CDD'}).verdict === 'CDD');
 
   /* Regulatory Q&A — full 60-group catalogue from window.REG_GROUPS */
   api.state.tab = 'qa'; api.render();
@@ -223,6 +251,11 @@ function runScreen(file, bridge, seed){
   api.state.toolInputs = {subject:'Crown Coin Exchange', risk:'20'};
   api.state.toolResult = api.escalationRun(api.state.toolInputs); api.renderResultOnly();
   check('advisor: clean low-risk signals resolve to CDD', api.state.toolResult.verdict.indexOf('CDD') === 0);
+  /* a free-text PEP tier of "none" must NOT force EDD */
+  api.state.toolInputs = {subject:'Crown Coin Exchange', pep:'none', risk:'20'};
+  api.state.toolResult = api.escalationRun(api.state.toolInputs);
+  check('advisor: PEP tier "none" does not force a mandatory-EDD escalation',
+    api.state.toolResult.verdict.indexOf('CDD') === 0);
   /* a non-escalation tool returns deterministic, cited guidance (no faked AI) */
   const genTool = api.toolsList().find(t => t.id !== 'escalation');
   api.state.toolResult = api.genericRun(genTool, 'a DPMS dealer taking structured cash deposits');

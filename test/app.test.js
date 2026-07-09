@@ -61,7 +61,7 @@ const script = appjs;
   addMonths, exportFileName, toggleComplete,
   rdSetOverride, rdClearOverride, rdResetAll, rdCount, mergeRiskData,
   saveRiskData, loadRiskData, rdExportSheet, rdRender,
-  setAnalystOverride, reassess, priorChanges, fmtDate, dmyToISO, dateFieldChanged,
+  setAnalystOverride, reassess, priorChanges, fmtDate, fmtDateTime, toISO, dmyToISO, dateFieldChanged,
   buildNarrative, insertNarrative, asanaPayload, sendToAsana, deliveredGid, rememberDelivered,
   scheduleRiskBackup,
   regAll, regUpsert, regDelete, regOpenEntry, regRender, regOpenIdx, regDeleteIdx,
@@ -896,6 +896,52 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     check('wrong passphrase cannot decrypt (AES-GCM auth fails)', rejected);
     let plainRejected = false; try{ await A.decryptStr(key, 'just-some-plaintext'); }catch(e){ plainRejected = true; }
     check('decryptStr rejects non-encrypted input', plainRejected);
+  })();
+
+  /* ── 27b. Locked-while-encrypted: writes must NOT overwrite the ciphertext ──
+     Regression for the plaintext-leak / register-wipe bug: on an encrypted device
+     that is locked (passphrase gate up, store not yet unlocked this session), any
+     autosave/register write must be dropped, never written as plaintext over the
+     encrypted blobs (which unlock would then migrate as "legacy plaintext",
+     destroying every other filed record). */
+  (function(){
+    const savedM = Object.assign({}, global.localStorage._m);
+    try{
+      global.localStorage._m = {};
+      const cipherDraft = 'hsx1:AAAAAAAAAAAAAAAA:BBBBBBBBBBBBBBBBBBBB';
+      global.localStorage.setItem('hsra.sec.v1', JSON.stringify({v:1, salt:'x', iter:250000, iv:'y', ct:'z'})); // encrypted device
+      global.localStorage.setItem('hsra.draft.v2', cipherDraft);                                                 // existing ciphertext
+      A.state = A.freshState(); A.state.entity.legalName = 'Locked Co';
+      A.saveDraft();  // fires while _secActive is false (locked)
+      check('locked encrypted device: autosave does NOT clobber the encrypted draft',
+        global.localStorage.getItem('hsra.draft.v2') === cipherDraft);
+      check('locked encrypted device: no plaintext register written',
+        global.localStorage.getItem('hsra.register.v1') == null);
+    } finally {
+      global.localStorage._m = savedM;
+    }
+    // Control: with no passphrase verifier present (unencrypted device), saveDraft persists normally.
+    const savedM2 = Object.assign({}, global.localStorage._m);
+    try{
+      global.localStorage._m = {};
+      A.state = A.freshState(); A.state.entity.legalName = 'Plain Co';
+      A.saveDraft();
+      const raw = global.localStorage.getItem('hsra.draft.v2');
+      check('unencrypted device: saveDraft persists the draft as before', !!raw && raw.indexOf('Plain Co') !== -1);
+    } finally {
+      global.localStorage._m = savedM2;
+    }
+  })();
+
+  /* ── 27c. fmtDateTime pairs the LOCAL date with the LOCAL time ──
+     Regression for the UTC-date/local-time mismatch that showed the previous
+     day's date for entries in the first hours of the day east of UTC. */
+  (function(){
+    const d = new Date('2026-07-09T22:00:00Z');   // 02:00 next-day local east of UTC → UTC date is a day behind
+    const expectDate = A.fmtDate(A.toISO(d));   // local calendar date
+    const hh = String(d.getHours()).padStart(2,'0'), mm = String(d.getMinutes()).padStart(2,'0');
+    const got = A.fmtDateTime(d.toISOString());
+    check('fmtDateTime uses the local date, not the UTC date', got === expectDate + ' ' + hh + ':' + mm);
   })();
 
   /* ── 28. Tamper-evident activity log (hash chain) ── */

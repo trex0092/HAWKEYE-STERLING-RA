@@ -260,7 +260,7 @@ function renderAsk(){
     + '</div></div>'
     + '<div>'
     +   '<div data-csstext="margin-bottom:16px"><div class="sec-lbl" data-csstext="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'
-    +   '<div id="hero">'+heroHtml()+'</div>'
+    +   '<div id="hero" role="status" aria-live="polite">'+heroHtml()+'</div>'
     +   govStatsHtml()
     + '</div>'
     + '</div>';
@@ -285,7 +285,14 @@ const MODE_TO_REASONING = {Quick:'speed', Speed:'speed', Balanced:'balanced', De
 function ask(){
   // AUP gate: must acknowledge the Acceptable-Use Policy before any send.
   if(!aupAcked()){ renderAsk(); return; }
-  const q = (state.question||'').trim() || 'What CDD is required for a UAE gold trader?';
+  const q = (state.question||'').trim();
+  // Don't substitute a canned question for an empty composer (that sends a
+  // question the user never asked, plus a billed call + telemetry). Prompt instead.
+  if(!q){
+    state.askedQuestion = ''; state.phase = 'answer';
+    state.liveAnswer = {ok:false, text:'Please enter a question for the advisor.'};
+    $('hero').innerHTML = heroHtml(); applyCssText($('hero')); bindHero(); return;
+  }
   // PII guard: warn (once) before identifiers leave the device.
   if(piiScan(q) && !state.piiConfirmed){
     state.piiConfirmed = true;
@@ -298,6 +305,9 @@ function ask(){
   $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
 
   const minDelay = new Promise(r => { reasoningTimer = setTimeout(r, 1000); });
+  /* fetch() does not reject on HTTP 4xx/5xx, and the backend returns
+     {ok:false, error:'…'} for those (503 no API key, 403 origin, 429 rate-limit).
+     Map any body lacking `text` to a visible error instead of a blank answer. */
   const brainFetch = fetch('/.netlify/functions/brain-soul', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -310,7 +320,7 @@ function ask(){
 
   Promise.all([brainFetch, minDelay])
   .then(([data]) => {
-    state.liveAnswer = data;
+    state.liveAnswer = answerFromResponse(data);
     try{ govRecord(data); }catch(e){}
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
@@ -324,6 +334,13 @@ function ask(){
     bindHero();
   });
 }
+/* Normalise a brain-soul response into a renderable answer. A successful reply
+   carries `text`; an error reply carries `{ok:false, error}` and no text — surface
+   that error rather than rendering an empty hero. */
+function answerFromResponse(data){
+  if(data && data.text) return data;
+  return {ok:false, text:(data && data.error) ? String(data.error) : 'The advisor is unavailable — please try again.'};
+}
 function reset(){ clearTimeout(reasoningTimer); state.phase='idle'; state.liveAnswer=null; $('hero').innerHTML = heroHtml(); applyCssText($('hero')); }
 
 function regGroups(){ return (typeof window!=='undefined' && Array.isArray(window.REG_GROUPS)) ? window.REG_GROUPS : []; }
@@ -333,7 +350,7 @@ function renderQa(){
     '<div class="qa-wrap">'
     + '<div class="sec-lbl"><span>Regulatory Q&amp;A</span><i></i></div>'
     + '<div class="qa-desc">Source-cited regulatory questions, grouped by topic and grounded in UAE Federal Decree-Law No. 10 of 2025, Cabinet Decision 134/2025 and FATF. Pick a question to read its cited answer.</div>'
-    + '<input class="qa-filter" id="qaFilter" placeholder="Filter questions…">'
+    + '<input class="qa-filter" id="qaFilter" aria-label="Filter questions" placeholder="Filter questions…">'
     + '<div class="reg-groups" id="regGroups"></div>'
     + '</div>';
   const f = $('qaFilter');
@@ -415,7 +432,10 @@ const ESC_FIELDS = [
 ];
 function escalationRun(v){
   const subject = (v.subject||'').trim() || 'the subject';
-  const sanctions = splitList(v.sanctions), pep = (v.pep||'').trim(), typ = splitList(v.typologies);
+  const sanctions = splitList(v.sanctions), typ = splitList(v.typologies);
+  // A free-text "PEP tier" of none/no/n/a/nil means NOT a PEP — don't force EDD on it.
+  const pepRaw = (v.pep||'').trim();
+  const pep = /^(no|none|n\/?a|nil|n|false|-)$/i.test(pepRaw) ? '' : pepRaw;
   const jur = splitList(v.jurisdictions).map(s=>s.toUpperCase());
   const score = parseInt(v.risk,10), cfa = jur.filter(j=>TOOL_CFA[j]);
   const triggers = [], rank = {CDD:0, SDD:1, EDD:2};

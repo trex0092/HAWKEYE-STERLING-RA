@@ -314,6 +314,16 @@ const event = (body) => ({ httpMethod: 'POST', headers: {}, body: JSON.stringify
     check('shared-token: SET + valid browser Origin (no token) → 200', (await post({ origin: ORIGIN }, 'Tok Browser · CDD 19')).statusCode === 200);
     check('shared-token: gate also applies to asana-mirror (no Origin, no token → 401)',
       (await asanaMirror.handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ action: 'read' }) })).statusCode === 401);
+    /* STRICT mode (APP_STRICT_TOKEN=1): the token is required on EVERY path,
+       including a browser Origin — the only mode that resists Origin forgery. */
+    process.env.APP_STRICT_TOKEN = '1';
+    check('strict-token: SET + valid Origin but NO token → 401 (origin no longer bypasses)',
+      (await post({ origin: ORIGIN }, 'Strict Origin NoTok · CDD 19')).statusCode === 401);
+    check('strict-token: SET + valid Origin + correct token → 200',
+      (await post({ origin: ORIGIN, 'x-app-token': 'sekret' }, 'Strict Origin Tok · CDD 19')).statusCode === 200);
+    check('strict-token: SET + no Origin + correct token → 200',
+      (await post({ 'x-app-token': 'sekret' }, 'Strict NoOrigin Tok · CDD 19')).statusCode === 200);
+    delete process.env.APP_STRICT_TOKEN;
     delete process.env.APP_SHARED_TOKEN;
     check('shared-token: UNSET → no-Origin request allowed again (backward compatible)', (await post({}, 'Tok Unset · CDD 19')).statusCode === 200);
   }

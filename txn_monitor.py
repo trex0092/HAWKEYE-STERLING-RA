@@ -40,6 +40,21 @@ def feed_configured():
     return bool(TXN_FEED_PATH and os.path.exists(TXN_FEED_PATH))
 
 
+def feed_parse_error(path=None):
+    """True if a feed file is configured and present but cannot be parsed as a
+    JSON list of records. A corrupt / truncated feed must NOT read as a quiet
+    'ACTIVE, 0 txns' day — that would silence every monitoring rule."""
+    p = path or TXN_FEED_PATH
+    if not p or not os.path.exists(p):
+        return False
+    try:
+        with open(p) as f:
+            data = json.load(f)
+        return not isinstance(data, list)
+    except Exception:
+        return True
+
+
 def load_transactions(path=None):
     """Return the transaction list from the configured feed, or [] if none.
     Never raises, never fabricates. [] means 'no feed' (degrade loudly)."""
@@ -220,6 +235,10 @@ def evaluate(transactions, jurisdiction_table=None):
 def status_line():
     """One line for the report / monitoring section. Honest about the feed."""
     if feed_configured():
+        if feed_parse_error():
+            return ("Transaction monitoring (R.16): DEGRADED — the configured transaction "
+                    "feed could not be parsed (corrupt or truncated JSON). No transactions "
+                    "were screened this run; investigate the feed before relying on it.")
         res = evaluate(load_transactions())
         return (f"Transaction monitoring (R.16): ACTIVE — {res['n_txns']} txns / "
                 f"{res['n_customers']} customers → {len(res['alerts'])} alert(s).")

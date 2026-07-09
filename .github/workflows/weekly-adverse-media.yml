@@ -91,6 +91,24 @@ jobs:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
           RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          # Weaponised WORLDWIDE adverse-media sweep. Two layers, always on:
+          #   1. GDELT global index — ONE request/subject, 65+ languages, worldwide
+          #      print/broadcast/web (the real "all news around the world" net), now
+          #      with a 26-term predicate cluster + 75 records.
+          #   2. Google News across the worldwide locale matrix, scored against the
+          #      36-language red-flag dictionaries.
+          # ADVERSE_LOCALES caps how many of the 74 Google-News locales are swept per
+          # subject so the daily job DELIVERS to Asana inside the 350-min cap (a full
+          # 74-locale sweep is ~10x the requests and would time out on a ~1000-subject
+          # book → nothing delivered). GDELT keeps global coverage regardless. Set the
+          # repo var ADVERSE_LOCALES=all for a manual/weekend deep sweep, and raise
+          # SCREEN_CONCURRENCY with it. Both are tunable without a code change.
+          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '14' }}
+          SCREEN_CONCURRENCY: ${{ vars.SCREEN_CONCURRENCY || '16' }}
+          # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
+          # its own assigned MLRO case subtask, not just the first 40. The full
+          # findings list is always in the daily task body regardless of this cap.
+          CASE_SUBTASK_CAP: ${{ vars.CASE_SUBTASK_CAP || '200' }}
           # AI layer: key enables GROUNDED triage only (classifies real headlines, cannot invent
           # facts). Generative report prose stays OFF unless REPORT_ALLOW_LLM=1 is also set.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -113,11 +131,13 @@ jobs:
             git commit -m "chore(screen): update delta-state [skip ci]"
             # Persist on the screen-delta-state branch (main is protected):
             # rebuilt as <current main> + one data commit, force-updated.
+            pushed=
             for attempt in 1 2 3 4 5; do
-              git push --force origin HEAD:refs/heads/screen-delta-state && break
+              git push --force origin HEAD:refs/heads/screen-delta-state && { pushed=1; break; }
               echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
+            [ -n "$pushed" ] || { echo "::error::state push to screen-delta-state failed after 5 attempts — state NOT persisted"; exit 1; }
           else
             echo "delta-state unchanged"
           fi

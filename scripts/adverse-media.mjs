@@ -74,7 +74,47 @@ export const LANG_TERMS = {
   uk: ['шахрайство', 'відмивання грошей', 'санкції', 'тероризм', 'фінансування тероризму',
     'хабарництво', 'корупція', 'розтрата', 'заарештований', 'засуджений', 'контрабанда'],
   nl: ['fraude', 'witwassen', 'sancties', 'terrorisme', 'terrorismefinanciering', 'omkoping',
-    'corruptie', 'verduistering', 'gearresteerd', 'veroordeeld', 'smokkel']
+    'corruptie', 'verduistering', 'gearresteerd', 'veroordeeld', 'smokkel'],
+  // ── Extended worldwide language coverage (weaponised global sweep) ──
+  pl: ['oszustwo', 'pranie pieniędzy', 'sankcje', 'terroryzm', 'finansowanie terroryzmu',
+    'łapówka', 'korupcja', 'sprzeniewierzenie', 'aresztowany', 'skazany', 'przemyt'],
+  sv: ['bedrägeri', 'penningtvätt', 'sanktioner', 'terrorism', 'terrorismfinansiering',
+    'muta', 'korruption', 'förskingring', 'gripen', 'dömd', 'smuggling'],
+  no: ['svindel', 'hvitvasking', 'sanksjoner', 'terrorisme', 'terrorfinansiering',
+    'bestikkelse', 'korrupsjon', 'underslag', 'arrestert', 'dømt', 'smugling'],
+  da: ['svindel', 'hvidvask', 'sanktioner', 'terrorisme', 'terrorfinansiering',
+    'bestikkelse', 'korruption', 'underslæb', 'anholdt', 'dømt', 'smugling'],
+  fi: ['petos', 'rahanpesu', 'pakotteet', 'terrorismi', 'terrorismin rahoitus',
+    'lahjonta', 'korruptio', 'kavallus', 'pidätetty', 'tuomittu', 'salakuljetus'],
+  ro: ['fraudă', 'spălare de bani', 'sancțiuni', 'terorism', 'finanțarea terorismului',
+    'mită', 'corupție', 'delapidare', 'arestat', 'condamnat', 'contrabandă'],
+  cs: ['podvod', 'praní špinavých peněz', 'sankce', 'terorismus', 'financování terorismu',
+    'úplatek', 'korupce', 'zpronevěra', 'zatčen', 'odsouzen', 'pašování'],
+  sk: ['podvod', 'pranie špinavých peňazí', 'sankcie', 'terorizmus', 'financovanie terorizmu',
+    'úplatok', 'korupcia', 'sprenevera', 'zatknutý', 'odsúdený', 'pašovanie'],
+  hu: ['csalás', 'pénzmosás', 'szankciók', 'terrorizmus', 'terrorizmus finanszírozása',
+    'megvesztegetés', 'korrupció', 'sikkasztás', 'letartóztatták', 'elítélték', 'csempészet'],
+  el: ['απάτη', 'ξέπλυμα χρήματος', 'κυρώσεις', 'τρομοκρατία', 'χρηματοδότηση τρομοκρατίας',
+    'δωροδοκία', 'διαφθορά', 'υπεξαίρεση', 'συνελήφθη', 'καταδικάστηκε', 'λαθρεμπόριο'],
+  bg: ['измама', 'изпиране на пари', 'санкции', 'тероризъм', 'финансиране на тероризъм',
+    'подкуп', 'корупция', 'присвояване', 'арестуван', 'осъден', 'контрабанда'],
+  sr: ['prevara', 'pranje novca', 'sankcije', 'terorizam', 'korupcija', 'mito', 'uhapšen',
+    'krijumčarenje', 'превара', 'прање новца', 'санкције', 'тероризам', 'корупција'],
+  he: ['הונאה', 'הלבנת הון', 'סנקציות', 'טרור', 'מימון טרור', 'שוחד', 'שחיתות', 'מעילה',
+    'נעצר', 'הורשע', 'הברחה'],
+  th: ['ฉ้อโกง', 'ฟอกเงิน', 'คว่ำบาตร', 'ก่อการร้าย', 'สนับสนุนการก่อการร้าย', 'สินบน',
+    'ทุจริต', 'ยักยอก', 'ถูกจับ', 'ลักลอบ'],
+  vi: ['gian lận', 'rửa tiền', 'trừng phạt', 'khủng bố', 'tài trợ khủng bố', 'hối lộ',
+    'tham nhũng', 'biển thủ', 'bị bắt', 'kết án', 'buôn lậu'],
+  ms: ['penipuan', 'pengubahan wang haram', 'sekatan', 'keganasan', 'pembiayaan keganasan',
+    'rasuah', 'salah guna dana', 'ditangkap', 'penyeludupan'],
+  tl: ['pandaraya', 'parusa', 'terorismo', 'pagpopondo sa terorismo', 'suhol', 'korupsiyon',
+    'malversasyon', 'inaresto', 'nahatulan'],
+  sw: ['ulaghai', 'utakatishaji fedha', 'vikwazo', 'ugaidi', 'ufadhili wa ugaidi', 'rushwa',
+    'ufisadi', 'ubadhirifu', 'amekamatwa', 'magendo'],
+  bn: ['জালিয়াতি', 'অর্থ পাচার', 'নিষেধাজ্ঞা', 'সন্ত্রাস', 'সন্ত্রাসে অর্থায়ন', 'ঘুষ', 'দুর্নীতি',
+    'আত্মসাৎ', 'গ্রেপ্তার', 'পাচার'],
+  ta: ['மோசடி', 'பணமோசடி', 'தடைகள்', 'பயங்கரவாதம்', 'லஞ்சம்', 'ஊழல்', 'கையாடல்', 'கைது', 'கடத்தல்']
 };
 
 /* Union of every language's terms — the term set used when scoring the merged,
@@ -155,7 +195,47 @@ export const LOCALES = [
   { id: 'id-ID', hl: 'id', gl: 'ID', ceid: 'ID:id', lang: 'id' },
   { id: 'fa-IR', hl: 'fa', gl: 'IR', ceid: 'IR:fa', lang: 'fa' },
   { id: 'ur-PK', hl: 'ur', gl: 'PK', ceid: 'PK:ur', lang: 'ur' },
-  { id: 'nl-NL', hl: 'nl', gl: 'NL', ceid: 'NL:nl', lang: 'nl' }
+  { id: 'nl-NL', hl: 'nl', gl: 'NL', ceid: 'NL:nl', lang: 'nl' },
+  // ── Extended worldwide coverage (weaponised global sweep) ──
+  // More MENA / Gulf
+  { id: 'ar-QA', hl: 'ar', gl: 'QA', ceid: 'QA:ar', lang: 'ar' },
+  { id: 'ar-KW', hl: 'ar', gl: 'KW', ceid: 'KW:ar', lang: 'ar' },
+  { id: 'ar-BH', hl: 'ar', gl: 'BH', ceid: 'BH:ar', lang: 'ar' },
+  { id: 'ar-OM', hl: 'ar', gl: 'OM', ceid: 'OM:ar', lang: 'ar' },
+  { id: 'ar-JO', hl: 'ar', gl: 'JO', ceid: 'JO:ar', lang: 'ar' },
+  { id: 'ar-LB', hl: 'ar', gl: 'LB', ceid: 'LB:ar', lang: 'ar' },
+  { id: 'ar-IQ', hl: 'ar', gl: 'IQ', ceid: 'IQ:ar', lang: 'ar' },
+  { id: 'ar-MA', hl: 'ar', gl: 'MA', ceid: 'MA:ar', lang: 'ar' },
+  { id: 'he-IL', hl: 'he', gl: 'IL', ceid: 'IL:he', lang: 'he' },
+  // More Asia
+  { id: 'th-TH', hl: 'th', gl: 'TH', ceid: 'TH:th', lang: 'th' },
+  { id: 'vi-VN', hl: 'vi', gl: 'VN', ceid: 'VN:vi', lang: 'vi' },
+  { id: 'ms-MY', hl: 'ms', gl: 'MY', ceid: 'MY:ms', lang: 'ms' },
+  { id: 'bn-BD', hl: 'bn', gl: 'BD', ceid: 'BD:bn', lang: 'bn' },
+  { id: 'ta-IN', hl: 'ta', gl: 'IN', ceid: 'IN:ta', lang: 'ta' },
+  { id: 'tl-PH', hl: 'tl', gl: 'PH', ceid: 'PH:tl', lang: 'tl' },
+  // More Europe
+  { id: 'pl-PL', hl: 'pl', gl: 'PL', ceid: 'PL:pl', lang: 'pl' },
+  { id: 'sv-SE', hl: 'sv', gl: 'SE', ceid: 'SE:sv', lang: 'sv' },
+  { id: 'no-NO', hl: 'no', gl: 'NO', ceid: 'NO:no', lang: 'no' },
+  { id: 'da-DK', hl: 'da', gl: 'DK', ceid: 'DK:da', lang: 'da' },
+  { id: 'fi-FI', hl: 'fi', gl: 'FI', ceid: 'FI:fi', lang: 'fi' },
+  { id: 'el-GR', hl: 'el', gl: 'GR', ceid: 'GR:el', lang: 'el' },
+  { id: 'ro-RO', hl: 'ro', gl: 'RO', ceid: 'RO:ro', lang: 'ro' },
+  { id: 'cs-CZ', hl: 'cs', gl: 'CZ', ceid: 'CZ:cs', lang: 'cs' },
+  { id: 'sk-SK', hl: 'sk', gl: 'SK', ceid: 'SK:sk', lang: 'sk' },
+  { id: 'hu-HU', hl: 'hu', gl: 'HU', ceid: 'HU:hu', lang: 'hu' },
+  { id: 'bg-BG', hl: 'bg', gl: 'BG', ceid: 'BG:bg', lang: 'bg' },
+  { id: 'sr-RS', hl: 'sr', gl: 'RS', ceid: 'RS:sr', lang: 'sr' },
+  // More Africa / South Asia English + Swahili
+  { id: 'en-KE', hl: 'en-KE', gl: 'KE', ceid: 'KE:en', lang: 'en' },
+  { id: 'en-GH', hl: 'en-GH', gl: 'GH', ceid: 'GH:en', lang: 'en' },
+  { id: 'sw-KE', hl: 'sw', gl: 'KE', ceid: 'KE:sw', lang: 'sw' },
+  { id: 'sw-TZ', hl: 'sw', gl: 'TZ', ceid: 'TZ:sw', lang: 'sw' },
+  // More Latin America
+  { id: 'es-CO', hl: 'es-419', gl: 'CO', ceid: 'CO:es-419', lang: 'es' },
+  { id: 'es-CL', hl: 'es-419', gl: 'CL', ceid: 'CL:es-419', lang: 'es' },
+  { id: 'es-PE', hl: 'es-419', gl: 'PE', ceid: 'PE:es-419', lang: 'es' }
 ];
 
 /* The locale set to sweep this run — all of LOCALES unless narrowed by the
@@ -226,6 +306,20 @@ export function parseRss(xml) {
   return items;
 }
 
+/* Corporate/legal-form and generic trade boilerplate. A real headline almost
+   never carries the legal suffix ("Al Haramain General Trading LLC" is reported
+   as "Al Haramain …"), so requiring EVERY such token to appear in the headline
+   is a systematic false negative for exactly the UAE-corporate name shapes this
+   deployment screens. These are dropped from the name-match token set (with a
+   fallback to the full set when a name is nothing but boilerplate). */
+const CORP_STOP_MEDIA = new Set([
+  'llc','fze','fzc','fzco','fze','dmcc','dwc','pjsc','psc','pvt','ltd','limited',
+  'plc','inc','incorporated','corp','corporation','co','company','group','holding',
+  'holdings','international','intl','global','est','establishment','trading','trade',
+  'general','commercial','contracting','industries','industrial','enterprises',
+  'enterprise','services','service','investment','investments','sons','bros',
+  'brothers','partners','associates','and','the','for',
+]);
 /* Score adverse-media items for a subject. Requires the customer name to appear
    in the headline (Google News OR-matches loosely) AND a risk term to be present,
    so we don't flag an unrelated article that merely shares a surname. Returns
@@ -238,6 +332,10 @@ export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
   // subject is still matchable rather than silently never flagged.
   let nameTokens = nm.split(' ').filter(t => t.length >= 3);
   if (!nameTokens.length) nameTokens = nm.split(' ').filter(t => t.length >= 2);
+  // Drop corporate/legal boilerplate so a headline needn't carry "LLC / General
+  // Trading" to match; keep the full set only when the name is all boilerplate.
+  const sig = nameTokens.filter(t => !CORP_STOP_MEDIA.has(t));
+  if (sig.length) nameTokens = sig;
   const matched = [];
   for (const it of (items || [])) {
     const title = normalize(it.title);
