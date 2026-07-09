@@ -10,6 +10,34 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added / hardened (deep-test follow-up)
+
+- **Corporate owners now get the adverse-media sweep.** `screen.py` sanctions-
+  screened `entity_owners` (50%/control rule) but excluded them from the
+  enrichment loop, so a designated parent's media coverage was never seen; they
+  now join the sweep as `ENTITY (owner)` subjects (no PEP check — PEP status is
+  a natural-person concept).
+- **Deep-mode platform-timeout handling.** Netlify synchronous functions
+  default to a ~10 s execution cap that only Netlify support can raise;
+  Deep-mode Advisor calls can exceed it, and the resulting non-JSON 502 used to
+  render as a misleading "check ANTHROPIC_API_KEY" error. The Advisor now
+  detects the platform kill and says so (suggesting Balanced/Speed or the
+  timeout raise); the constraint is documented in `.env.example`.
+- **Cross-browser smoke now fails on `console.error` too**, not just uncaught
+  exceptions — broken-but-caught code paths (failed asset decode, bad JSON) no
+  longer ship silently. Service-worker registration noise on `file://` is
+  excluded.
+- **Sanctions Watch streak logic extracted and unit-tested.**
+  `trackErrorStreaks` is now an exported pure function with tests covering
+  threshold crossing, reset-on-success, the below-threshold case, and the
+  unreachable entry shape the notifier depends on — this was the one alerting
+  path with no test (and where the "dead list reported as changed" bug hid).
+- **Small hardenings:** the AM/PEP same-day dedup now matches the date with
+  boundaries ("9 Jul 2026" no longer matches inside "19 Jul 2026");
+  `parse_uk`'s no-title-row fallback can no longer show a CSV column header as
+  the list date; `countEntries` no longer subtracts a phantom header row for
+  the headerless OFAC `sdn.csv` (registry gains `noHeader: true`).
+
 ### Fixed
 
 - **Deep-test sweep — 23 defects fixed across every layer** (five parallel

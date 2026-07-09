@@ -686,7 +686,10 @@ async function postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, t
       : 'Adverse Media & PEP — CLEAR — ' + dateStr;
 
     const names = await fetchTaskNames(projectGid, token);
-    const already = names.find(n => n.includes(dateStr) && (n.includes('Adverse Media') || n.includes('PEP')));
+    /* Boundary-guarded date match: "9 Jul 2026" is a substring of "19 Jul 2026",
+       so a bare includes() could dedupe against a different day's card. */
+    const dateRe = new RegExp('(^|[^0-9])' + dateStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^0-9])');
+    const already = names.find(n => dateRe.test(n) && (n.includes('Adverse Media') || n.includes('PEP')));
     if (already) { console.log('sanctions-screen: already posted: ' + already); return { posted: false, skipped: true, name: already }; }
 
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);

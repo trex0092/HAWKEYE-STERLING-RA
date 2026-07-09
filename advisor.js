@@ -347,7 +347,14 @@ function ask(){
       mode: MODE_TO_REASONING[state.mode] || 'balanced',
       persona: state.personaId,
     }),
-  }).then(r => r.json());
+  }).then(r => r.json().catch(() => {
+    /* A non-JSON body means the platform killed the function (Netlify's
+       synchronous-function execution limit — most likely a long Deep-mode
+       call), not a missing API key. Say so instead of misdirecting ops. */
+    return {ok:false, error: r.status >= 500
+      ? 'The advisor timed out at the platform level (HTTP ' + r.status + '). Deep mode can exceed the function execution limit — try Balanced or Speed, or raise the Netlify function timeout.'
+      : 'The advisor returned an unreadable response (HTTP ' + r.status + ') — please try again.'};
+  }));
 
   Promise.all([brainFetch, minDelay])
   .then(([data]) => {

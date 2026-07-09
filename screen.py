@@ -1150,7 +1150,8 @@ def parse_uk(data):
         # served with HTTP 200, blindly skipping row 0 would discard the real header
         # and parse EVERY row to blanks → a silently zeroed list. Detect the header.
         reader = csv.DictReader(io.StringIO("\n".join(lines[1:])))
-        if not (reader.fieldnames and "Name 6" in reader.fieldnames):
+        has_title_row = bool(reader.fieldnames and "Name 6" in reader.fieldnames)
+        if not has_title_row:
             reader = csv.DictReader(io.StringIO("\n".join(lines)))  # no title row
         if not (reader.fieldnames and "Name 6" in reader.fieldnames):
             log("  UK parse error: expected 'Name 6' column not found — list NOT parsed")
@@ -1163,7 +1164,13 @@ def parse_uk(data):
             if n6: names.add(n6)
             combined = " ".join(p for p in [n1,n2,n3] if p)
             if combined: names.add(combined)
-        date_str = lines[0].split(",")[-1].strip() if lines else "unknown"
+        # The list date lives on the TITLE row. With no title row, line 0 is the
+        # CSV header and its last cell is a column name (e.g. "Name 3") — showing
+        # that as the list date in the audit block would be nonsense. Also require
+        # a digit so a reshuffled title row can't smuggle prose in as a date.
+        if has_title_row and lines:
+            cand = lines[0].split(",")[-1].strip()
+            date_str = cand if any(ch.isdigit() for ch in cand) else "unknown"
     except Exception as e:
         log(f"  UK parse error: {e}")
     return names, date_str, sha256_of(data)
@@ -2468,6 +2475,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         subjects_all.append(("COMPANY", c["name"], None, c))
         for ind in c.get("individuals", []):
             subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
+        # Corporate owners/parents are sanctions-screened (50%/control rule) —
+        # sweep their adverse media too, or a designated parent's coverage is
+        # never seen. No PEP check: PEP status is a natural-person concept.
+        for ent in c.get("entity_owners", []):
+            subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
 
     def _enrich(subj):
         subj_type, subj_name, parent, c = subj
@@ -2494,8 +2506,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             if r["am_error"]:
                 am_errors += 1
             else:
-                if r["type"] == "COMPANY": companies += 1
-                else: individuals += 1
+                # Corporate owners count with companies — they are legal persons.
+                if r["type"] == "INDIVIDUAL": individuals += 1
+                else: companies += 1
                 if r["adverse"]:
                     adverse_findings.append({"subject_type": r["type"], "subject_name": r["name"],
                         "parent": r["parent"], "permalink": r["permalink"], "articles": r["adverse"]})

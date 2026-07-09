@@ -12,6 +12,17 @@ for (const file of ['index.html', 'console.html', 'advisor.html']) {
   test(`cross-browser smoke: ${file}`, async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
+    /* console.error is the quieter failure mode: a caught-but-broken code path
+       (failed asset decode, CSP report, bad JSON) logs instead of throwing, so
+       the pageerror hook alone lets it ship. Same allowance for file:// noise:
+       the SW cannot register off file://, which some engines log as an error. */
+    const consoleErrors = [];
+    page.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      const t = m.text();
+      if (/service.?worker|serviceworker/i.test(t)) return; // expected off file://
+      consoleErrors.push(t);
+    });
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load' });
@@ -26,5 +37,8 @@ for (const file of ['index.html', 'console.html', 'advisor.html']) {
 
     // No uncaught JS exception in any engine — the real cross-browser signal.
     expect(pageErrors, `uncaught errors in ${file}: ${pageErrors.join(' | ')}`).toEqual([]);
+
+    // …and no console.error either (broken-but-caught paths must not ship).
+    expect(consoleErrors, `console errors in ${file}: ${consoleErrors.join(' | ')}`).toEqual([]);
   });
 }

@@ -1,7 +1,7 @@
 /* Unit tests for the Sanctions Watch pure logic (no network).
    Usage: node test/sanctions-watch.test.mjs */
 import { readFileSync } from 'node:fs';
-import { countEntries, buildReport } from '../scripts/sanctions-watch.mjs';
+import { countEntries, buildReport, trackErrorStreaks } from '../scripts/sanctions-watch.mjs';
 import { loadSources, fingerprint, computeChanges, contentChanges } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -25,6 +25,8 @@ check('countEntries ignores blank trailing CSV lines',
 check('countEntries uses a record marker when given',
   countEntries('<DATAID>1</DATAID><DATAID>2</DATAID><DATAID>3</DATAID>', 'xml', '<DATAID>') === 3);
 check('countEntries returns null for markerless xml', countEntries('<x/>', 'xml') === null);
+check('countEntries counts every row of a headerless CSV (OFAC sdn.csv)',
+  countEntries('row1,a\nrow2,b\nrow3,c\n', 'csv', undefined, true) === 3);
 check('countEntries returns null for empty body', countEntries('', 'csv') === null);
 
 /* change detection via the shared engine */
@@ -60,6 +62,28 @@ check('seed report reads as a baseline',
   buildReport(changes, '2026-06-16', 'seed', counts).includes('baseline'));
 check('report is quiet when nothing moved',
   buildReport([{ id: 'x', name: 'X', status: 'unchanged' }], '2026-06-16', 'check', {}).includes('No designation-list changes detected'));
+
+/* ── persistent-failure streaks (trackErrorStreaks) ── */
+{
+  const srcs = [{ id: 'un', name: 'UN Consolidated', url: 'https://un.example/list' },
+                { id: 'eu', name: 'EU FSF', url: 'https://eu.example/list' }];
+  const st = { un: { errStreak: 2 }, eu: { errStreak: 2 } };
+  const r = trackErrorStreaks(srcs,
+    { un: { ok: false, status: 404 }, eu: { ok: true, status: 200, body: 'x' } }, st, 3);
+  check('a source failing its Nth consecutive run crosses the threshold with an unreachable entry',
+    r.anyError && r.persistentErrors.length === 1 && r.persistentErrors[0].id === 'un'
+    && st.un.errStreak === 3);
+  /* The entry must read as UNREACHABLE downstream — status/detail drive
+     watch-notify + the Asana card row; without them a dead list renders as
+     "content changed". */
+  const e = r.persistentErrors[0];
+  check('persistent-failure entry carries status/detail/errorStreak for the notifier',
+    e.status === 'unreachable' && e.errorStreak === 3 && /unreachable 3 consecutive runs/.test(e.detail));
+  check('a successful fetch resets the streak to zero', st.eu.errStreak === 0);
+  const r2 = trackErrorStreaks(srcs, { un: { ok: false }, eu: { ok: true, body: 'x' } }, { un: {}, eu: {} }, 3);
+  check('a first failure counts but does not alert below the threshold',
+    r2.anyError && r2.persistentErrors.length === 0);
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
