@@ -20,7 +20,7 @@ an auditable history:
 DESIGN: pure functions + JSON state in data/. No secrets, no PII (only names of
 lists and aggregate counts/timings). No third-party dependencies.
 """
-import os, json, time
+import os, json, time, datetime
 
 METRICS_STATE_PATH  = os.environ.get("METRICS_STATE_PATH", "data/run-metrics.json")
 COVERAGE_STATE_PATH = os.environ.get("COVERAGE_STATE_PATH", "data/source-coverage-state.json")
@@ -174,15 +174,44 @@ _ANOMALY_LABELS = {
     "error_rate": "elevated error rate",
     "subjects": "subject-coverage drop",
     "adverse_media": "adverse-media module degradation (recall narrowed)",
+    "stale_history": "screening pipeline appears STALE (no recent run — possible dead cron / auth failure)",
 }
 
+# A screening run is expected at least this often; if the newest snapshot is older
+# than this many days the pipeline is treated as stale (env-tunable).
+_STALE_MAX_AGE_DAYS = int(os.environ.get("METRICS_MAX_AGE_DAYS", "3"))
 
-def escalation(history=None, window=3, path=None):
+
+def _days_between(older, newer):
+    try:
+        do = datetime.datetime.strptime(str(older)[:10], "%Y-%m-%d").date()
+        dn = datetime.datetime.strptime(str(newer)[:10], "%Y-%m-%d").date()
+        return (dn - do).days
+    except Exception:
+        return None
+
+
+def escalation(history=None, window=3, path=None, today=None, max_age_days=None):
     """Decide whether sustained anomalies warrant raising an alert. Reads the
     persisted metrics history when `history` is not supplied. Safe: missing or
-    short history ⇒ {escalate: False}. Pure given its inputs."""
+    short history ⇒ {escalate: False} unless `today` is supplied (see below).
+
+    When `today` is given, ALSO run a staleness/heartbeat check: if screening has
+    stopped running entirely the content never changes, so the content-based
+    anomalies can never fire — the single most severe degradation (a dead
+    pipeline) would be invisible. Detect it by comparing the newest snapshot's
+    date to `today`. Pure given its inputs."""
     hist = history if history is not None else _load(path or METRICS_STATE_PATH, [])
-    types = sustained_anomalies(hist if isinstance(hist, list) else [], window)
+    hist = hist if isinstance(hist, list) else []
+    types = sustained_anomalies(hist, window)
+    if today:
+        limit = _STALE_MAX_AGE_DAYS if max_age_days is None else max_age_days
+        dates = [h.get("date") for h in hist if isinstance(h, dict) and h.get("date")]
+        newest = max(dates) if dates else None
+        age = _days_between(newest, today) if newest else None
+        if newest is None or (age is not None and age > limit):
+            if "stale_history" not in types:
+                types = list(types) + ["stale_history"]
     return {"escalate": bool(types), "types": types,
             "summary": "; ".join(_ANOMALY_LABELS.get(t, t) for t in types),
             "window": window}
@@ -318,7 +347,9 @@ if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "escalate"
     if mode == "escalate":
         state = sys.argv[2] if len(sys.argv) > 2 else None
-        print(json.dumps(escalation(path=state)))
+        # Pass today so a dead pipeline (stale history) escalates even though its
+        # content-based anomalies can never fire once runs stop.
+        print(json.dumps(escalation(path=state, today=datetime.date.today().isoformat())))
     else:
         sys.stderr.write(f"unknown mode: {mode}\n")
         sys.exit(2)

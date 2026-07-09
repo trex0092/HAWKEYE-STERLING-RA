@@ -287,6 +287,15 @@ check("R.16 detects high-risk-geo counterparty", any(a["rule"] == "HIGH_RISK_GEO
 check("R.16 returns nothing on an empty/no-feed input", txn_monitor.evaluate([])["alerts"] == [])
 check("R.16 is INACTIVE without a configured feed (honest status)", "INACTIVE" in txn_monitor.status_line() and txn_monitor.load_transactions("/nonexistent/path.json") == [])
 check("R.16 a single rule error never blocks the others", isinstance(txn_monitor.evaluate_customer([{"bad": "row"}]), list))
+# A corrupt / truncated feed must NOT read as a quiet 'ACTIVE, 0 txns' day.
+import tempfile as _tf0
+_bad_feed = os.path.join(_tf0.mkdtemp(), "bad.json")
+open(_bad_feed, "w").write('[{"customer":"A","amount":100  <<truncated')
+check("R.16 detects a corrupt feed (parse error), not silent empty",
+      txn_monitor.feed_parse_error(_bad_feed) is True and txn_monitor.load_transactions(_bad_feed) == [])
+_ok_feed = os.path.join(_tf0.mkdtemp(), "ok.json")
+open(_ok_feed, "w").write('[]')
+check("R.16 an empty-but-valid feed is not a parse error", txn_monitor.feed_parse_error(_ok_feed) is False)
 # Velocity baseline must EXCLUDE the spike day from its own mean, otherwise a large
 # single-day spike inflates the threshold and never fires (regression guard).
 _vel = txn_monitor.evaluate([
@@ -332,6 +341,19 @@ for _d in ("2026-07-01", "2026-07-02", "2026-07-03"):
     monitoring.monitor_run(_d, {"subjects": 500, "errors": 1}, {"total": 100}, {}, _sp2)
 _blip = monitoring.monitor_run("2026-07-04", {"subjects": 500, "errors": 150}, {"total": 100}, {}, _sp2)
 check("a single one-off anomalous run is not escalated as sustained", _blip["sustained"] == [] and not monitoring.escalation(path=_sp2)["escalate"])
+# Staleness / heartbeat: a dead pipeline (no recent run) escalates when `today`
+# is supplied, even though its content-based anomalies can never fire.
+_hb = [{"date": "2026-07-01", "counts": {"subjects": 500}, "error_rate": 0.0}]
+_stale = monitoring.escalation(history=_hb, today="2026-07-20", max_age_days=3)
+check("escalation flags a STALE pipeline when the newest run is too old",
+      _stale["escalate"] and "stale_history" in _stale["types"])
+_fresh = monitoring.escalation(history=_hb, today="2026-07-02", max_age_days=3)
+check("a recent run is not flagged stale", "stale_history" not in _fresh["types"])
+_empty = monitoring.escalation(history=[], today="2026-07-20")
+check("empty history with a today reference escalates as stale (never silently idle)",
+      _empty["escalate"] and "stale_history" in _empty["types"])
+check("without a today reference, staleness is inactive (backward compatible)",
+      not monitoring.escalation(history=_hb)["escalate"])
 # coverage + runtime anomalies feed the QA gate (degrade loudly)
 _qa_cov = agents.qa_gate(
     [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}], "risk": {"rating": "HIGH"}}], [], [],

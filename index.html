@@ -253,7 +253,7 @@
 
       <div class="sp-block">
         <div class="sp-label" data-i18n="fld.requiredDiligence">Required Diligence</div>
-        <div class="verdict-pill vp-cdd" id="verdictPill"><span id="verdictIcon">✓</span><span id="verdictText"></span></div>
+        <div class="verdict-pill vp-cdd" id="verdictPill" role="status" aria-live="polite" aria-label="Required diligence outcome"><span id="verdictIcon">✓</span><span id="verdictText"></span></div>
         <div class="sb-thresholds">
           <span class="thresh-chip tc-low" id="tc-low">CDD: 0–19</span>
           <span class="thresh-chip tc-med" id="tc-med">SDD: 20–22</span>
@@ -328,7 +328,7 @@
 
   <!-- Risk Data panel (reference scores: baseline + compliance overrides) -->
   <div class="rd-overlay" id="rdOverlay">
-    <div class="rd-panel">
+    <div class="rd-panel" role="dialog" aria-modal="true" aria-label="Risk Data — reference scores">
       <div class="rd-head">
         <span class="st" data-i18n="panel.riskdata">Risk Data — Reference Scores</span>
         <span class="rd-meta" id="rdMeta"></span>
@@ -357,7 +357,7 @@
 
   <!-- Assessment Register — every named assessment files itself here by reference -->
   <div class="rd-overlay" id="regOverlay">
-    <div class="rd-panel">
+    <div class="rd-panel" role="dialog" aria-modal="true" aria-label="Assessment register">
       <div class="rd-head">
         <span class="st" data-i18n="panel.register">Assessment Register</span>
         <span class="rd-meta" id="regMeta"></span>
@@ -386,7 +386,7 @@
 
   <!-- Batch Screening — triage many entities from a CSV through the same engine -->
   <div class="rd-overlay" id="batchOverlay">
-    <div class="rd-panel">
+    <div class="rd-panel" role="dialog" aria-modal="true" aria-label="Batch screening">
       <div class="rd-head">
         <span class="st" data-i18n="panel.batch">Batch Screening</span>
         <span class="rd-meta" id="batchMeta"></span>
@@ -412,7 +412,7 @@
 
   <!-- Activity Log — tamper-evident, hash-chained record of key actions on this device -->
   <div class="rd-overlay" id="auditOverlay">
-    <div class="rd-panel">
+    <div class="rd-panel" role="dialog" aria-modal="true" aria-label="Activity log">
       <div class="rd-head">
         <span class="st" data-i18n="panel.audit">Activity Log</span>
         <span class="rd-meta" id="auditMeta"></span>
@@ -485,7 +485,7 @@
 
 <input type="file" id="importFile" aria-label="Import assessment JSON file" accept=".json,application/json" class="hidden">
 <input type="file" id="rdImportFile" aria-label="Import risk data sheet JSON file" accept=".json,application/json" class="hidden">
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="storage-warn hidden" id="storageWarn" role="alert" aria-live="assertive">⚠ Autosave unavailable — your browser's local storage is blocked or full. Export your assessment to avoid losing work.</div>
 <div id="printReport"></div>
 

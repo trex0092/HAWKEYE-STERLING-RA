@@ -192,6 +192,16 @@ function runScreen(file, bridge, seed){
   check('advisor: Ask another returns to the idle hero', api.state.phase === 'idle'
     && els.hero.innerHTML.includes('Ask me anything'));
 
+  /* Asking with an empty composer prompts, rather than substituting a canned
+     question and dispatching a (billed) backend call. */
+  api.aupAck();
+  const fetchesBefore = fetches.length;
+  api.state.question = '   ';
+  api.ask();
+  check('advisor: an empty question prompts instead of substituting + sending',
+    api.state.phase === 'answer' && /enter a question/i.test(api.state.liveAnswer.text) && fetches.length === fetchesBefore);
+  api.reset();
+
   /* Server-error responses ({ok:false, error} with no `text`) must surface the
      message, not render a blank answer body. */
   check('advisor: a backend error body is mapped to a visible message',
@@ -241,6 +251,11 @@ function runScreen(file, bridge, seed){
   api.state.toolInputs = {subject:'Crown Coin Exchange', risk:'20'};
   api.state.toolResult = api.escalationRun(api.state.toolInputs); api.renderResultOnly();
   check('advisor: clean low-risk signals resolve to CDD', api.state.toolResult.verdict.indexOf('CDD') === 0);
+  /* a free-text PEP tier of "none" must NOT force EDD */
+  api.state.toolInputs = {subject:'Crown Coin Exchange', pep:'none', risk:'20'};
+  api.state.toolResult = api.escalationRun(api.state.toolInputs);
+  check('advisor: PEP tier "none" does not force a mandatory-EDD escalation',
+    api.state.toolResult.verdict.indexOf('CDD') === 0);
   /* a non-escalation tool returns deterministic, cited guidance (no faked AI) */
   const genTool = api.toolsList().find(t => t.id !== 'escalation');
   api.state.toolResult = api.genericRun(genTool, 'a DPMS dealer taking structured cash deposits');

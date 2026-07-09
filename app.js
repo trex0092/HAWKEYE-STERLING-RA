@@ -438,6 +438,19 @@ function _auditRow(e){
    (local time) mismatched the two east of UTC — an 02:00 UAE entry showed the
    previous day's date. Derive both from the local calendar via toISO(). */
 function fmtDateTime(iso){ try{ const d = new Date(iso); return fmtDate(toISO(d)) + ' ' + d.toTimeString().slice(0,5); }catch(e){ return esc(iso); } }
+/* Modal focus management (WCAG 2.4.3): remember what had focus, move focus into
+   the panel on open, restore it on close. Guarded so it is a no-op under the
+   test DOM stub (no querySelector / activeElement) and in older browsers. */
+let _lastModalFocus = null;
+function _focusDialog(overlayId){
+  const o = $(overlayId); if(!o) return;
+  try{ _lastModalFocus = (typeof document !== 'undefined' && document.activeElement) || null; }catch(e){ _lastModalFocus = null; }
+  try{ const btn = o.querySelector && o.querySelector('.rd-close'); if(btn && btn.focus) btn.focus(); }catch(e){}
+}
+function _restoreDialogFocus(){
+  try{ if(_lastModalFocus && _lastModalFocus.focus) _lastModalFocus.focus(); }catch(e){}
+  _lastModalFocus = null;
+}
 async function openAudit(){
   const log = auditAll();
   if($('auditRows')) $('auditRows').innerHTML = log.length
@@ -447,10 +460,11 @@ async function openAudit(){
   if($('auditMeta')) $('auditMeta').textContent = '';
   paintRole(); paintMfa();
   if($('auditOverlay')) $('auditOverlay').classList.add('open');
+  _focusDialog('auditOverlay');
   const ok = await auditVerify();
   if($('auditMeta')) $('auditMeta').textContent = log.length ? (ok ? '✓ chain intact' : '⚠ integrity check failed') : '';
 }
-function closeAudit(){ if($('auditOverlay')) $('auditOverlay').classList.remove('open'); }
+function closeAudit(){ if($('auditOverlay')) $('auditOverlay').classList.remove('open'); _restoreDialogFocus(); }
 async function exportAudit(){
   const out = {app:'Hawkeye Sterling — Activity Log', exportedAt:new Date().toISOString(), entries:auditAll()};
   out.integrity = await exportIntegrity(out.entries);   /* SHA-256 over JSON.stringify(export.entries); chain head also in each entry */
@@ -955,8 +969,8 @@ $('rdImportFile').addEventListener('change', function(e){
 
 /* ── Risk Data panel UI ── */
 let rdTab = 'countries', rdShowOvOnly = false, rdSearchTimer = null;
-function openRiskData(){ const o = $('rdOverlay'); if(o) o.classList.add('open'); rdRender(); }
-function closeRiskData(){ const o = $('rdOverlay'); if(o) o.classList.remove('open'); }
+function openRiskData(){ const o = $('rdOverlay'); if(o) o.classList.add('open'); rdRender(); _focusDialog('rdOverlay'); }
+function closeRiskData(){ const o = $('rdOverlay'); if(o) o.classList.remove('open'); _restoreDialogFocus(); }
 function rdSetTab(kind){ rdTab = kind; rdRender(); }
 function rdToggleOvOnly(){ rdShowOvOnly = !rdShowOvOnly; rdRender(); }
 /** Debounce keystrokes so the 380-row DOM rebuild doesn't fire on every character. */
@@ -1053,7 +1067,7 @@ function initRiskDataPanel(){
   });
   const ov = $('rdOverlay');
   if(ov) ov.addEventListener('click', function(e){ if(e.target===ov) closeRiskData(); });
-  if(document.addEventListener) document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeRiskData(); closeRegister(); closeAudit(); } });
+  if(document.addEventListener) document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeRiskData(); closeRegister(); closeAudit(); closeBatch(); } });
 }
 
 /* ══════════════════════════════════════════
@@ -2177,16 +2191,17 @@ function exportBatchResults(){
   if(!batchResults.length){ toast('Score a batch first'); return; }
   batchDownload('batch-results-' + todayISO().replace(/-/g,'') + '.csv', batchToCsv(batchResults), 'text/csv');
 }
-function openBatch(){ const o = $('batchOverlay'); if(o) o.classList.add('open'); }
-function closeBatch(){ const o = $('batchOverlay'); if(o) o.classList.remove('open'); }
+function openBatch(){ const o = $('batchOverlay'); if(o) o.classList.add('open'); _focusDialog('batchOverlay'); }
+function closeBatch(){ const o = $('batchOverlay'); if(o) o.classList.remove('open'); _restoreDialogFocus(); }
 
 function openRegister(){
   regUpsert(); /* show the current assessment as it stands right now */
   regRender();
   const o = $('regOverlay');
   if(o) o.classList.add('open');
+  _focusDialog('regOverlay');
 }
-function closeRegister(){ const o = $('regOverlay'); if(o) o.classList.remove('open'); }
+function closeRegister(){ const o = $('regOverlay'); if(o) o.classList.remove('open'); _restoreDialogFocus(); }
 function regOpenIdx(i){
   const ref = regView[i];
   if(ref==null) return;
