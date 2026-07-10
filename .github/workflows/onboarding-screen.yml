@@ -105,10 +105,17 @@ jobs:
       - name: Commit delta-state (what has already been reported)
         if: always()
         run: |
-          if [ -n "$(git status --porcelain data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json 2>/dev/null)" ]; then
+          # Stage only the state files that exist: an early-exit run (e.g. 0 new
+          # customers) doesn't write the optional ones, and a hard `git add` of
+          # a missing path fatals (exit 128) instead of persisting the rest.
+          state_files=()
+          for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
+            [ -f "$f" ] && state_files+=("$f")
+          done
+          if [ "${#state_files[@]}" -gt 0 ] && [ -n "$(git status --porcelain -- "${state_files[@]}")" ]; then
             git config user.name "onboarding-screen"
             git config user.email "actions@github.com"
-            git add data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json
+            git add -- "${state_files[@]}"
             git commit -m "chore(screen): update delta-state (onboarding) [skip ci]"
             # Persist on the screen-delta-state branch (main is protected — a plain
             # `git push` to main is rejected and, previously, swallowed). Rebuilt as
