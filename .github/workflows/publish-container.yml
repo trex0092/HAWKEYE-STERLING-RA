@@ -1,0 +1,82 @@
+name: Publish container image
+
+# Packages the command center as a self-hostable container on GHCR — an
+# immutable, digest-addressable distribution channel for air-gapped or on-prem
+# deployments (the Netlify site remains the reference deployment). Publishes on
+# every release so image versions track APP_VERSION exactly; workflow_dispatch
+# covers the first publish and manual re-publishes. The image is provenance-
+# attested (Sigstore keyless), same as the release tarball.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-container
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: read
+      packages: write # GHCR push; nothing else
+      id-token: write # Sigstore keyless identity for the attestation
+      attestations: write # provenance upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = GitHub (checkout/API), GHCR + its blob storage, and the
+        # Sigstore trio for keyless attestation. The base image is on GHCR,
+        # so no third-party registry is ever contacted.
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+            fulcio.sigstore.dev:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false # docker login uses the token directly
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Build and push the image
+        id: build
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${REPO,,}" # registry paths must be lowercase
+          # Same single source of truth as Auto Release: APP_VERSION in app.js
+          # (at release time it equals the tag; on dispatch it is current main).
+          version=$(grep -oE "APP_VERSION = '[0-9]+\.[0-9]+\.[0-9]+'" app.js | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          test -n "$version" || { echo "could not read APP_VERSION from app.js"; exit 1; }
+          docker build \
+            --label "org.opencontainers.image.version=$version" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            -t "$image:$version" -t "$image:latest" .
+          docker push "$image:$version"
+          docker push "$image:latest"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image:$version" | cut -d@ -f2)
+          test -n "$digest" || { echo "could not resolve pushed image digest"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Attest build provenance (image)
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ghcr.io/trex0092/hawkeye-sterling-ra
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

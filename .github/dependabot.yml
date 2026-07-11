@@ -27,6 +27,15 @@ updates:
         patterns:
           - "*"
 
+  # Keep the self-hosting image base (Dockerfile FROM, pinned by digest)
+  # patched — Dependabot refreshes the digest alongside the version tag.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+
   # Keep the committed npm dev toolchain (package.json + package-lock.json)
   # patched. All entries are devDependencies — the app ships zero runtime npm
   # dependencies.
