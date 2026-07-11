@@ -9,7 +9,7 @@ Two related deliverables for an AML/CFT Entity Risk Assessment tool used by Hawk
 ## About the Design Files
 The files in this bundle are **design references created in HTML** — working prototypes that show the intended look and behavior. They are NOT production code to copy directly. The task is to **recreate these designs in the target codebase's existing environment** (React, Vue, etc.) using its established patterns and libraries — or, if no app exists yet, pick an appropriate framework and implement them there.
 
-`assets/tweaks-panel.jsx` and `assets/fg-tweaks-dark.jsx` are design-tool scaffolding (an in-prototype settings panel) — ignore them for implementation.
+`assets/tweaks-panel.jsx` and `assets/hs-tweaks-dark.jsx` are design-tool scaffolding (an in-prototype settings panel) — ignore them for implementation.
 
 ## Fidelity
 **High-fidelity.** Colors, typography, spacing, and interactions are final as approved by the client. Recreate pixel-perfectly.
@@ -49,12 +49,12 @@ The files in this bundle are **design references created in HTML** — working p
 
 ## Interactions & Behavior
 - **Live scoring** (recalc on every change): total = jurisdiction score + activity score + 11 question scores + onboarding + operational-history + relationship-duration + up to 6 supplier scores. Verdict: total ≤19 → CDD, 20–22 → SDD, ≥23 → EDD. Gauge arc length = `min(total/30, 1)` of the 270° arc, animated (`stroke-dasharray` transition .5s cubic-bezier(0.4,0,0.2,1)). Pointer position = `total/30 * 100%`.
-- **Scoring rules**: yes/no questions score 3 (bad answer) / 1 (good answer); question 1 is inverted (Yes=1, No=3). Onboarding: In-Person=1, Remote=3. Years: 0→3, 1→2, ≥2→1. Jurisdiction: per-country score 1/2/3 (full country list with scores is in `assets/fg-app.js` `COUNTRIES`). Activities, recycled-material and mined-material source scores: see `ACTIVITIES`, `RECYCLED`, `MINED` arrays in the same file — **treat these arrays as the source of truth**.
+- **Scoring rules**: yes/no questions score 3 (bad answer) / 1 (good answer); question 1 is inverted (Yes=1, No=3). Onboarding: In-Person=1, Remote=3. Years: 0→3, 1→2, ≥2→1. Jurisdiction: per-country score 1/2/3 (full country list with scores is in `assets/hs-app.js` `COUNTRIES`). Activities, recycled-material and mined-material source scores: see `ACTIVITIES`, `RECYCLED`, `MINED` arrays in the same file — **treat these arrays as the source of truth**.
 - **Entrance animations** (dark form, gated on `prefers-reduced-motion: no-preference`): cards slide up + fade in staggered ~70ms apart (.65s cubic-bezier(.22,.7,.25,1)); sidebar blocks likewise; on load the gauge arc draws in from 0 over 1.1s while the score counts up 0→N (~1s, cubic ease-out); afterwards any score change pops the number (scale 1→1.18→1, .45s). Background: 3 faint radial glows drift slowly (26s ease-in-out alternate). Boundary warning fades/slides in when shown.
 - **Complete Assessment** toggles a DRAFT/COMPLETE status (internal state; status badge currently hidden in header).
 - **Print/Export** (form) saves state then navigates to the report page; report's Print button calls `window.print()`.
 - **Reset** restores all defaults (UK jurisdiction, Non-Manufactured Precious Metal Trading, all good answers, 2 years, default suppliers).
-- **Autosave**: every change persists to `localStorage` key `fg_ra_v2` (flat key/value map — see `saveLS()` in `fg-app.js`); the report reads the same key. In production, replace with real persistence/API but keep the same data shape conceptually.
+- **Autosave**: every change persists to `localStorage` key `hs_ra_v2` (flat key/value map — see `saveLS()` in `hs-app.js`); the report reads the same key. In production, replace with real persistence/API but keep the same data shape conceptually.
 
 ## State Management
 - Form state: ref, dates, assessor info, entity name, jurisdiction, activity, onboarding (Yes/No), entityYears, relYears, 11 question answers, 6 supplier selections, notes, 2 signature blocks, complete/draft flag.
@@ -85,9 +85,9 @@ No external images. The HS monogram is typeset text in a bordered box. Gauge is 
 
 ## Files
 - `Entity Risk Assessment - Hawkeye Sterling (dark).html` — form markup + gauge SVG
-- `assets/fg-dark.css` — all form styling, animations, print fallback
-- `assets/fg-app.js` — data arrays (countries/activities/materials/questions), scoring engine, recalc, autosave
-- `assets/fg-anim.js` — gauge draw-in, count-up, score pop
+- `assets/hs-dark.css` — all form styling, animations, print fallback
+- `assets/hs-app.js` — data arrays (countries/activities/materials/questions), scoring engine, recalc, autosave
+- `assets/hs-anim.js` — gauge draw-in, count-up, score pop
 - `Hawkeye Sterling - Risk Report.html` — report markup + styles (inline)
 - `assets/hs-report.js` — reads saved state and fills the report
-- `assets/tweaks-panel.jsx`, `assets/fg-tweaks-dark.jsx` — design-tool only; ignore
+- `assets/tweaks-panel.jsx`, `assets/hs-tweaks-dark.jsx` — design-tool only; ignore

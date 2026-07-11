@@ -16,7 +16,7 @@
   var RATING = ['No Risk', 'Low', 'Medium', 'High'];
 
   var d = {};
-  try { d = JSON.parse(localStorage.getItem('fg_ra_v2') || '{}'); } catch (e) {}
+  try { d = JSON.parse(localStorage.getItem('hs_ra_v2') || '{}'); } catch (e) {}
 
   function txt(id, val) { var el = document.getElementById(id); if (el) el.textContent = (val && String(val).trim()) ? val : '—'; }
   function chip(score) {

@@ -52,26 +52,26 @@
       <div class="card">
         <div class="section-hd"><span class="sn">01</span><span class="st" data-i18n="sec.01">Assessment Administration</span></div>
         <div class="field-row three">
-          <div class="fg">
+          <div class="hs">
             <label for="refInput" data-i18n="fld.ref">Reference Number</label>
             <input type="text" id="refInput" placeholder="RA-20260612-001" data-act="field" data-evt="input" data-a1="meta" data-a2="ref">
           </div>
-          <div class="fg">
+          <div class="hs">
             <label for="assessDate" data-i18n="fld.assessDate">Assessment Date</label>
             <input type="text" id="assessDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateField" data-evt="change" data-a1="meta" data-a2="date">
           </div>
-          <div class="fg">
+          <div class="hs">
             <label for="nextReview" data-i18n="fld.nextReview">Next Review Date</label>
             <input type="text" id="nextReview" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateSign" data-evt="change" data-a1="nextReview">
             <span class="review-hint" id="reviewHint"></span>
           </div>
         </div>
         <div class="field-row">
-          <div class="fg">
+          <div class="hs">
             <label for="assessorName" data-i18n="fld.assessedBy">Assessed By</label>
             <input type="text" id="assessorName" placeholder="Full name" data-act="field" data-evt="input" data-a1="meta" data-a2="assessor">
           </div>
-          <div class="fg">
+          <div class="hs">
             <label for="assessorRole" data-i18n="fld.role">Role / Department</label>
             <input type="text" id="assessorRole" placeholder="e.g. Compliance Officer" data-act="field" data-evt="input" data-a1="meta" data-a2="role">
           </div>
@@ -82,37 +82,37 @@
       <div class="card">
         <div class="section-hd"><span class="sn">02</span><span class="st" data-i18n="sec.02">Entity Identification</span></div>
         <div class="field-row">
-          <div class="fg">
+          <div class="hs">
             <label for="entityName" data-i18n="fld.legalName">Legal Entity Name</label>
             <input type="text" id="entityName" placeholder="Registered legal name" data-act="field" data-evt="input" data-a1="entity" data-a2="name">
           </div>
-          <div class="fg">
+          <div class="hs">
             <label for="jurisdictionSelect"><span data-i18n="fld.jurisdiction">Jurisdiction &amp; Incorporation</span> <span id="jurisdictionScore" class="score-tag st-1"></span></label>
             <select id="jurisdictionSelect" data-act="onJurisdiction" data-evt="change"></select>
           </div>
         </div>
         <div class="field-row">
-          <div class="fg">
+          <div class="hs">
             <label for="entityTrading" data-i18n="fld.trading">Trading Name (If Different)</label>
             <input type="text" id="entityTrading" placeholder="Optional" data-act="field" data-evt="input" data-a1="entity" data-a2="trading">
           </div>
-          <div class="fg">
+          <div class="hs">
             <label for="entityRegno" data-i18n="fld.regno">Registration / Licence No.</label>
             <input type="text" id="entityRegno" class="mask-field" placeholder="Company or trade licence number" data-act="field" data-evt="input" data-a1="entity" data-a2="regno">
           </div>
         </div>
         <div class="field-row">
-          <div class="fg">
+          <div class="hs">
             <label for="entityAddress" data-i18n="fld.address">Registered Address</label>
             <input type="text" id="entityAddress" class="mask-field" placeholder="Street, city, country" data-act="field" data-evt="input" data-a1="entity" data-a2="address">
           </div>
-          <div class="fg">
+          <div class="hs">
             <label for="entityContact" data-i18n="fld.contact">Website / Email</label>
             <input type="text" id="entityContact" class="mask-field" placeholder="Optional" data-act="field" data-evt="input" data-a1="entity" data-a2="contact">
           </div>
         </div>
         <div class="field-row single">
-          <div class="fg">
+          <div class="hs">
             <label for="entityPrincipals" data-i18n="fld.principals">Principals — Beneficial Owners / Controllers / Directors</label>
             <input type="text" id="entityPrincipals" class="mask-field" placeholder="e.g. John Smith, Jane Doe (comma-separated)" data-act="field" data-evt="input" data-a1="entity" data-a2="principals">
           </div>
@@ -124,11 +124,11 @@
       <div class="card">
         <div class="section-hd"><span class="sn">03</span><span class="st" data-i18n="sec.03">Business Profile</span></div>
         <div class="field-row">
-          <div class="fg">
+          <div class="hs">
             <label for="activitySelect"><span data-i18n="fld.activity">Business Activity</span> <span id="activityScore" class="score-tag st-3"></span></label>
             <select id="activitySelect" data-act="onActivity" data-evt="change"></select>
           </div>
-          <div class="fg">
+          <div class="hs">
             <label id="onboardLbl"><span data-i18n="fld.onboard">Onboarding Channel</span> <span id="onboard_score_tag" class="score-tag st-1"></span></label>
             <div class="toggle-group" role="group" aria-labelledby="onboardLbl">
               <button class="toggle-btn" id="btn_onboard_no" data-act="toggle" data-a1="onboard" data-a2="No">In-Person</button>
@@ -137,14 +137,14 @@
           </div>
         </div>
         <div class="field-row">
-          <div class="fg">
+          <div class="hs">
             <label for="entityYearsInput"><span data-i18n="fld.opHistory">Operational History — Entity</span> <span id="entityYearsScore" class="score-tag st-1"></span></label>
             <div class="fl-row">
               <input type="number" id="entityYearsInput" min="0" max="99" data-act="years" data-evt="input" data-a1="entity" class="w72">
               <span class="yr-unit">years in operation</span>
             </div>
           </div>
-          <div class="fg">
+          <div class="hs">
             <label for="relYearsInput"><span data-i18n="fld.relDuration">Relationship Duration</span> <span id="relYearsScore" class="score-tag st-1"></span></label>
             <div class="fl-row">
               <input type="number" id="relYearsInput" min="0" max="99" data-act="years" data-evt="input" data-a1="rel" class="w72">
@@ -160,19 +160,19 @@
         <div id="questions-oc"></div>
         <div class="sec-divider">Screening Evidence</div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_sanctions_system" data-i18n="fld.sanctionsScreening">Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" data-act="screening" data-evt="input" data-a1="sanctions" data-a2="system"></div>
-          <div class="fg"><label for="scr_sanctions_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_sanctions_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateScreening" data-evt="change" data-a1="sanctions" data-a2="date"></div>
-          <div class="fg"><label for="scr_sanctions_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" data-act="screening" data-evt="input" data-a1="sanctions" data-a2="ref"></div>
+          <div class="hs"><label for="scr_sanctions_system" data-i18n="fld.sanctionsScreening">Sanctions Screening — System / Provider</label><input type="text" id="scr_sanctions_system" placeholder="e.g. OpenSanctions, Dow Jones" data-act="screening" data-evt="input" data-a1="sanctions" data-a2="system"></div>
+          <div class="hs"><label for="scr_sanctions_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_sanctions_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateScreening" data-evt="change" data-a1="sanctions" data-a2="date"></div>
+          <div class="hs"><label for="scr_sanctions_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_sanctions_ref" placeholder="Search / case reference" data-act="screening" data-evt="input" data-a1="sanctions" data-a2="ref"></div>
         </div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_pep_system" data-i18n="fld.pepScreening">PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" data-act="screening" data-evt="input" data-a1="pep" data-a2="system"></div>
-          <div class="fg"><label for="scr_pep_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_pep_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateScreening" data-evt="change" data-a1="pep" data-a2="date"></div>
-          <div class="fg"><label for="scr_pep_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" data-act="screening" data-evt="input" data-a1="pep" data-a2="ref"></div>
+          <div class="hs"><label for="scr_pep_system" data-i18n="fld.pepScreening">PEP Screening — System / Provider</label><input type="text" id="scr_pep_system" placeholder="e.g. provider or database" data-act="screening" data-evt="input" data-a1="pep" data-a2="system"></div>
+          <div class="hs"><label for="scr_pep_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_pep_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateScreening" data-evt="change" data-a1="pep" data-a2="date"></div>
+          <div class="hs"><label for="scr_pep_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_pep_ref" placeholder="Search / case reference" data-act="screening" data-evt="input" data-a1="pep" data-a2="ref"></div>
         </div>
         <div class="field-row three">
-          <div class="fg"><label for="scr_adverse_system" data-i18n="fld.adverseScreening">Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" data-act="screening" data-evt="input" data-a1="adverse" data-a2="system"></div>
-          <div class="fg"><label for="scr_adverse_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_adverse_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateScreening" data-evt="change" data-a1="adverse" data-a2="date"></div>
-          <div class="fg"><label for="scr_adverse_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" data-act="screening" data-evt="input" data-a1="adverse" data-a2="ref"></div>
+          <div class="hs"><label for="scr_adverse_system" data-i18n="fld.adverseScreening">Adverse Media — System / Provider</label><input type="text" id="scr_adverse_system" placeholder="e.g. provider or search engine" data-act="screening" data-evt="input" data-a1="adverse" data-a2="system"></div>
+          <div class="hs"><label for="scr_adverse_date" data-i18n="fld.screenedOn">Screened On</label><input type="text" id="scr_adverse_date" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateScreening" data-evt="change" data-a1="adverse" data-a2="date"></div>
+          <div class="hs"><label for="scr_adverse_ref" data-i18n="fld.refId">Reference ID</label><input type="text" id="scr_adverse_ref" placeholder="Search / case reference" data-act="screening" data-evt="input" data-a1="adverse" data-a2="ref"></div>
         </div>
       </div>
 
@@ -192,20 +192,20 @@
         <div class="attest-grid">
           <div class="attest-block">
             <div class="attest-role">First-Line — Assessed By</div>
-            <div class="fg"><label for="completedBy" data-i18n="fld.fullName">Full Name</label><input type="text" id="completedBy" placeholder="Full name" data-act="sign" data-evt="input" data-a1="completedBy"></div>
-            <div class="fg mt10"><label for="completedTitle" data-i18n="fld.titleRole">Title / Role</label><input type="text" id="completedTitle" placeholder="e.g. Compliance Analyst" data-act="sign" data-evt="input" data-a1="completedTitle"></div>
-            <div class="fg mt10"><label for="completedDate" data-i18n="fld.date">Date</label><input type="text" id="completedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateSign" data-evt="change" data-a1="completedDate"></div>
+            <div class="hs"><label for="completedBy" data-i18n="fld.fullName">Full Name</label><input type="text" id="completedBy" placeholder="Full name" data-act="sign" data-evt="input" data-a1="completedBy"></div>
+            <div class="hs mt10"><label for="completedTitle" data-i18n="fld.titleRole">Title / Role</label><input type="text" id="completedTitle" placeholder="e.g. Compliance Analyst" data-act="sign" data-evt="input" data-a1="completedTitle"></div>
+            <div class="hs mt10"><label for="completedDate" data-i18n="fld.date">Date</label><input type="text" id="completedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateSign" data-evt="change" data-a1="completedDate"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
           <div class="attest-block">
             <div class="attest-role">Second-Line — Reviewed &amp; Approved By</div>
-            <div class="fg"><label for="approvedBy" data-i18n="fld.fullName">Full Name</label><input type="text" id="approvedBy" placeholder="Full name" data-act="sign" data-evt="input" data-a1="approvedBy"></div>
-            <div class="fg mt10"><label for="approvedTitle" data-i18n="fld.titleRole">Title / Role</label><input type="text" id="approvedTitle" placeholder="e.g. MLRO / Head of Compliance" data-act="sign" data-evt="input" data-a1="approvedTitle"></div>
-            <div class="fg mt10"><label for="approvedDate" data-i18n="fld.date">Date</label><input type="text" id="approvedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateSign" data-evt="change" data-a1="approvedDate"></div>
+            <div class="hs"><label for="approvedBy" data-i18n="fld.fullName">Full Name</label><input type="text" id="approvedBy" placeholder="Full name" data-act="sign" data-evt="input" data-a1="approvedBy"></div>
+            <div class="hs mt10"><label for="approvedTitle" data-i18n="fld.titleRole">Title / Role</label><input type="text" id="approvedTitle" placeholder="e.g. MLRO / Head of Compliance" data-act="sign" data-evt="input" data-a1="approvedTitle"></div>
+            <div class="hs mt10"><label for="approvedDate" data-i18n="fld.date">Date</label><input type="text" id="approvedDate" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" data-act="dateSign" data-evt="change" data-a1="approvedDate"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
         </div>
-        <div class="fg">
+        <div class="hs">
           <div class="notes-hd">
             <label class="neon-title" for="notesInput" data-i18n="fld.notes">Assessment Notes &amp; Risk Rationale</label>
             <button class="tmpl-btn no-print" type="button" data-act="insertNarrative" title="Generate a band-matching risk rationale narrative in line with the Company's AML/CFT Compliance Manual">✎ Narrative Template</button>

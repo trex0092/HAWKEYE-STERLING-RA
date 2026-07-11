@@ -40,6 +40,8 @@ jobs:
           node-version: 22
       - name: Run scoring-engine tests
         run: node test/app.test.js
+      - name: Run brand guardrail (former entity name must never reappear)
+        run: node test/brand-guard.test.mjs
       - name: Run scoring model-validation golden set
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
@@ -190,3 +192,29 @@ jobs:
             grep -q "$s" /tmp/dom-advisor.html || { echo "MISSING (advisor): $s"; exit 1; }
           done
           echo "advisor smoke ok — composer, persona picker and hero render"
+
+  # Property-based fuzzing runs in its own job: unlike the stub-based suites in
+  # the blocked-egress `test` job above, it imports the real engine, so it
+  # needs the hash-locked dependencies (incl. hypothesis) from PyPI — and it
+  # exercises the real rapidfuzz-backed matcher rather than the difflib stub.
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress audit)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+      - name: Install the hash-locked engine dependencies (incl. hypothesis)
+        run: python -m pip install --quiet --require-hashes -r ci/requirements.txt
+      - name: Run property-based fuzzing of the text-normalisation layer (hypothesis)
+        env:
+          ASANA_TOKEN: dummy   # screen.py requires it at import; never used by the properties
+        run: python test/fuzz_properties.py

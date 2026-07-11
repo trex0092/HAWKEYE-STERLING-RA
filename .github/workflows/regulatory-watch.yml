@@ -30,8 +30,7 @@ on:
         default: 'check'
 
 permissions:
-  contents: write
-  issues: write
+  contents: read
 
 concurrency:
   group: regulatory-watch
@@ -39,6 +38,10 @@ concurrency:
 
 jobs:
   watch:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 20 # bound external regulator-source fetches
     steps:

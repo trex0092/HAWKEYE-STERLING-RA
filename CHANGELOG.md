@@ -10,6 +10,41 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added / hardened (brand purge + supply-chain scoring) — v3.7.1
+
+- **Brand initialism fully purged.** The former entity's initialism is gone
+  from the tree: the production form-field class is now `.hs` (markup + CSS —
+  rendering unchanged, verified against the committed visual baselines), the
+  screening engine's User-Agent reads `HawkeyeSterlingCompliance/3.0`, design
+  handoff assets are renamed `hs-*` (storage keys `hs_ra_*`, consts `HS_DARK_*`),
+  and test labels no longer use the old shorthand. A new **brand guardrail**
+  (`test/brand-guard.test.mjs`, wired into ci.yml) fails CI if any spacing/
+  casing/concatenation variant of the former name ever reappears.
+- **OpenSSF Scorecard hardening.**
+  - *Token-Permissions*: all nine workflows that carried top-level
+    `contents: write` now declare top-level `contents: read` and elevate at
+    job level only (auto-release, branch-cleanup, fatf-watchdog,
+    onboarding-screen, regulatory-watch, release, sanctions-screen,
+    sanctions-watch, weekly-adverse-media).
+  - *Pinned-Dependencies*: the semgrep and zizmor CI tools are now installed
+    `--require-hashes` from `ci/semgrep-requirements.txt` /
+    `ci/zizmor-requirements.txt` (pip-compile hash locks).
+  - *Fuzzing*: new property-based suite `test/fuzz_properties.py`
+    (hypothesis, derandomized) fuzzes the text-normalisation layer that
+    fronts every sanctions/adverse-media match — normalize/_latin_fold/
+    _normalize_ar/match_adverse_keywords/sha256_of invariants over arbitrary
+    unicode; hypothesis is hash-locked into `ci/requirements.txt`.
+  - *Signed-Releases*: release workflows now attach the Sigstore provenance
+    bundle (`hawkeye-sterling-ra-<v>.sigstore`) beside the tarball + SBOM so
+    releases are self-contained and machine-verifiable.
+- **Security: `@playwright/test` 1.49.1 → 1.61.1** (dev-only toolchain;
+  supersedes the Dependabot security PR that grouped `playwright` +
+  `@playwright/test`). Visual baselines will be refreshed via the Visual
+  Regression workflow's baseline mode after merge; the compare job is
+  non-blocking by design.
+- **APP_VERSION 3.7.1** (package.json / pyproject.toml / CITATION.cff synced;
+  auto-release cuts `v3.7.1` with the new signed assets on merge).
+
 ### Added / changed (repo professionalization)
 
 - **Committed npm toolchain.** New root `package.json` + `package-lock.json`

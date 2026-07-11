@@ -249,13 +249,13 @@ function saveLS(){
       d['r'+i]=rs?rs.value:'N/A';d['r'+i+'_score']=rs?String((RECYCLED.find(o=>o.name===rs.value)||{score:0}).score):'0';
       d['m'+i]=ms?ms.value:'N/A';d['m'+i+'_score']=ms?String((MINED.find(o=>o.name===ms.value)||{score:0}).score):'0';
     }
-    localStorage.setItem('fg_ra_v2',JSON.stringify(d));
-    localStorage.setItem('fg_ra_v1',JSON.stringify({ref:d.ref,assessor:d.assessor,role:d.role,notes:d.notes,sAssessor:d.sAssessor,sTitle:d.sTitle,sReviewer:d.sReviewer,sRevTitle:d.sRevTitle}));
+    localStorage.setItem('hs_ra_v2',JSON.stringify(d));
+    localStorage.setItem('hs_ra_v1',JSON.stringify({ref:d.ref,assessor:d.assessor,role:d.role,notes:d.notes,sAssessor:d.sAssessor,sTitle:d.sTitle,sReviewer:d.sReviewer,sRevTitle:d.sRevTitle}));
   }catch(e){}
 }
 function loadLS(){
   try{
-    const raw=localStorage.getItem('fg_ra_v1');if(!raw)return;const d=JSON.parse(raw);
+    const raw=localStorage.getItem('hs_ra_v1');if(!raw)return;const d=JSON.parse(raw);
     if(d.ref){document.getElementById('refNumber').value=d.ref;onRefChange();}
     if(d.assessor)document.getElementById('assessorName').value=d.assessor;
     if(d.role)document.getElementById('assessorRole').value=d.role;
@@ -274,7 +274,7 @@ state.activity_score=3;state.onboard='No';state.onboard_score=1;
 state.entity_years=2;state.entity_years_score=1;state.rel_years=2;state.rel_years_score=1;
 
 // Set ref & dates
-const savedRef=localStorage.getItem('fg_ra_v1');
+const savedRef=localStorage.getItem('hs_ra_v1');
 if(!savedRef){const ref=generateRef();document.getElementById('refNumber').value=ref;onRefChange();}
 else{loadLS();}
 function fmtDMY(d){return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();}
