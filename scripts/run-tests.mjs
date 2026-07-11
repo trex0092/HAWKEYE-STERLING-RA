@@ -5,7 +5,11 @@
    enforces that ci.yml lists every one of these suites by hand.
    Usage: npm test   (or: node scripts/run-tests.mjs) */
 import { readdirSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+/* The one sanctioned process-spawning import in this repo: the runner's whole
+   job is to execute each suite as its own `node test/<file>` process, exactly
+   like ci.yml does — fixed executable (process.execPath), repo-controlled
+   argv, no shell. Nothing user-supplied ever reaches the spawn. */
+import { spawnSync } from 'node:child_process'; // nosemgrep: hawkeye-no-child-process
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
