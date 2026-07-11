@@ -82,5 +82,9 @@ jobs:
           TAG: ${{ inputs.tag }}
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
+          # Two names for the same Sigstore bundle: the .sigstore copy is the
+          # signature evidence, the .intoto.jsonl copy carries the SLSA
+          # provenance statement under its conventional suffix.
           cp "$BUNDLE" "hawkeye-sterling-ra-$TAG.sigstore"
-          gh release upload "$TAG" "hawkeye-sterling-ra-$TAG.sigstore" --clobber || echo "bundle upload skipped"
+          cp "$BUNDLE" "hawkeye-sterling-ra-$TAG.intoto.jsonl"
+          gh release upload "$TAG" "hawkeye-sterling-ra-$TAG.sigstore" "hawkeye-sterling-ra-$TAG.intoto.jsonl" --clobber || echo "bundle upload skipped"

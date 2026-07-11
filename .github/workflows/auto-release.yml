@@ -88,5 +88,9 @@ jobs:
           V: ${{ steps.rel.outputs.version }}
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
+          # Two names for the same Sigstore bundle: the .sigstore copy is the
+          # signature evidence, the .intoto.jsonl copy carries the SLSA
+          # provenance statement under its conventional suffix.
           cp "$BUNDLE" "hawkeye-sterling-ra-$V.sigstore"
-          gh release upload "v$V" "hawkeye-sterling-ra-$V.sigstore" --repo "$GITHUB_REPOSITORY" --clobber || echo "bundle upload skipped"
+          cp "$BUNDLE" "hawkeye-sterling-ra-$V.intoto.jsonl"
+          gh release upload "v$V" "hawkeye-sterling-ra-$V.sigstore" "hawkeye-sterling-ra-$V.intoto.jsonl" --repo "$GITHUB_REPOSITORY" --clobber || echo "bundle upload skipped"
