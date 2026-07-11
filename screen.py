@@ -1070,7 +1070,7 @@ def download(url, label):
     log(f"Downloading {label}...")
     try:
         r = requests.get(url, timeout=90,
-                         headers={"User-Agent": "FineGoldCompliance/3.0"})
+                         headers={"User-Agent": "HawkeyeSterlingCompliance/3.0"})
         r.raise_for_status()
         log(f"  {label}: {len(r.content):,} bytes")
         return r.content

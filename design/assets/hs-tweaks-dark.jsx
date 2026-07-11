@@ -1,11 +1,11 @@
 // Tweaks for the dark Hawkeye Sterling Entity Risk Assessment — accent, heading style, density.
-const FG_DARK_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+const HS_DARK_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "accentDark": "#D2A648",
   "headingsDark": "Serif",
   "densityDark": "Comfortable"
 }/*EDITMODE-END*/;
 
-const FG_DARK_ACCENTS = ['#D2A648', '#C9863B', '#8FB3DC'];
+const HS_DARK_ACCENTS = ['#D2A648', '#C9863B', '#8FB3DC'];
 
 function fgDarkHexToRgba(hex, a) {
   const n = parseInt(hex.slice(1), 16);
@@ -13,7 +13,7 @@ function fgDarkHexToRgba(hex, a) {
 }
 
 function FGDarkTweaksApp() {
-  const [t, setTweak] = useTweaks(FG_DARK_TWEAK_DEFAULTS);
+  const [t, setTweak] = useTweaks(HS_DARK_TWEAK_DEFAULTS);
 
   React.useEffect(() => {
     const root = document.documentElement;
@@ -27,7 +27,7 @@ function FGDarkTweaksApp() {
   return (
     <TweaksPanel>
       <TweakSection label="Brand" />
-      <TweakColor label="Accent" value={t.accentDark} options={FG_DARK_ACCENTS}
+      <TweakColor label="Accent" value={t.accentDark} options={HS_DARK_ACCENTS}
                   onChange={(v) => setTweak('accentDark', v)} />
       <TweakSection label="Typography" />
       <TweakRadio label="Headings" value={t.headingsDark} options={['Serif', 'Sans']}

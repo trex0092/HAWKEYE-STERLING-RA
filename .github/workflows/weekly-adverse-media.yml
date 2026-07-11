@@ -20,7 +20,7 @@ on:
 # only to commit the delta-state file (what has already been reported) so the
 # next run flags just what is NEW.
 permissions:
-  contents: write
+  contents: read
 
 # A multi-hour sweep must never have a manual run overlap the daily schedule.
 concurrency:
@@ -29,6 +29,9 @@ concurrency:
 
 jobs:
   adverse-media:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 350    # companies + ~2x individuals × 3 locales — daily full-coverage sweep needs headroom (GitHub job cap is 360)
 

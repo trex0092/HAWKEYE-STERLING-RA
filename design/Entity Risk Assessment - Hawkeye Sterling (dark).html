@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/fg-dark.css">
+<link rel="stylesheet" href="assets/hs-dark.css">
 </head>
 <body>
 
@@ -31,29 +31,29 @@
       <div class="card" data-screen-label="01 Assessment Administration">
         <div class="section-hd"><span class="sn">01</span><span class="st">Assessment Administration</span></div>
         <div class="field-row three">
-          <div class="fg"><label>Reference Number</label><input type="text" id="refNumber" placeholder="HS-2024-0001" oninput="onRefChange()"></div>
-          <div class="fg"><label>Assessment Date</label><input type="text" id="assessmentDate" placeholder="DD/MM/YYYY" maxlength="10" onchange="onDateChange()"></div>
-          <div class="fg"><label>Next Review Date</label><input type="text" id="nextReviewDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
+          <div class="hs"><label>Reference Number</label><input type="text" id="refNumber" placeholder="HS-2024-0001" oninput="onRefChange()"></div>
+          <div class="hs"><label>Assessment Date</label><input type="text" id="assessmentDate" placeholder="DD/MM/YYYY" maxlength="10" onchange="onDateChange()"></div>
+          <div class="hs"><label>Next Review Date</label><input type="text" id="nextReviewDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
         </div>
         <div class="field-row">
-          <div class="fg"><label>Assessed By</label><input type="text" id="assessorName" placeholder="Full name" oninput="saveLS()"></div>
-          <div class="fg"><label>Role / Department</label><input type="text" id="assessorRole" placeholder="e.g. Compliance Officer" oninput="saveLS()"></div>
+          <div class="hs"><label>Assessed By</label><input type="text" id="assessorName" placeholder="Full name" oninput="saveLS()"></div>
+          <div class="hs"><label>Role / Department</label><input type="text" id="assessorRole" placeholder="e.g. Compliance Officer" oninput="saveLS()"></div>
         </div>
       </div>
 
       <div class="card" data-screen-label="02 Entity Identification">
         <div class="section-hd"><span class="sn">02</span><span class="st">Entity Identification</span></div>
         <div class="field-row">
-          <div class="fg"><label>Legal Entity Name</label><input type="text" id="entityName" placeholder="e.g. Hawkeye Sterling LLC" value="XXXX"></div>
-          <div class="fg"><label>Jurisdiction &amp; Incorporation <span id="jurisdictionScore" class="score-tag st-1">1 · Low</span></label><select id="jurisdictionSelect" onchange="onJurisdiction()"></select></div>
+          <div class="hs"><label>Legal Entity Name</label><input type="text" id="entityName" placeholder="e.g. Hawkeye Sterling LLC" value="XXXX"></div>
+          <div class="hs"><label>Jurisdiction &amp; Incorporation <span id="jurisdictionScore" class="score-tag st-1">1 · Low</span></label><select id="jurisdictionSelect" onchange="onJurisdiction()"></select></div>
         </div>
       </div>
 
       <div class="card" data-screen-label="03 Business Profile">
         <div class="section-hd"><span class="sn">03</span><span class="st">Business Profile</span></div>
         <div class="field-row">
-          <div class="fg"><label>Business Activity <span id="activityScore" class="score-tag st-3">3 · High</span></label><select id="activitySelect" onchange="onActivity()"></select></div>
-          <div class="fg">
+          <div class="hs"><label>Business Activity <span id="activityScore" class="score-tag st-3">3 · High</span></label><select id="activitySelect" onchange="onActivity()"></select></div>
+          <div class="hs">
             <label>Onboarding Channel <span id="onboard_score_tag" class="score-tag st-1">1 · Low</span></label>
             <div class="toggle-group">
               <button class="toggle-btn active-no" id="btn_onboard_no" onclick="setToggle('onboard','No','onboard')">In-Person</button>
@@ -62,11 +62,11 @@
           </div>
         </div>
         <div class="field-row">
-          <div class="fg">
+          <div class="hs">
             <label>Operational History — Entity <span id="entityYearsScore" class="score-tag st-1">1 · Low</span></label>
             <div style="display:flex;align-items:center;gap:8px"><input type="number" id="entityYearsInput" min="0" max="99" value="2" oninput="onYears('entity')" style="width:72px"><span style="font-size:12px;color:var(--text3)">years in operation</span></div>
           </div>
-          <div class="fg">
+          <div class="hs">
             <label>Relationship Duration <span id="relYearsScore" class="score-tag st-1">1 · Low</span></label>
             <div style="display:flex;align-items:center;gap:8px"><input type="number" id="relYearsInput" min="0" max="99" value="2" oninput="onYears('rel')" style="width:72px"><span style="font-size:12px;color:var(--text3)">years with entity</span></div>
           </div>
@@ -92,20 +92,20 @@
         <div class="attest-grid">
           <div class="attest-block">
             <div class="attest-role">First-Line — Assessed By</div>
-            <div class="fg"><label>Full Name</label><input type="text" id="s_assessorName" placeholder="Full name" oninput="saveLS()"></div>
-            <div class="fg" style="margin-top:10px"><label>Title / Role</label><input type="text" id="s_assessorTitle" placeholder="e.g. Compliance Analyst" oninput="saveLS()"></div>
-            <div class="fg" style="margin-top:10px"><label>Date</label><input type="text" id="s_assessorDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
+            <div class="hs"><label>Full Name</label><input type="text" id="s_assessorName" placeholder="Full name" oninput="saveLS()"></div>
+            <div class="hs" style="margin-top:10px"><label>Title / Role</label><input type="text" id="s_assessorTitle" placeholder="e.g. Compliance Analyst" oninput="saveLS()"></div>
+            <div class="hs" style="margin-top:10px"><label>Date</label><input type="text" id="s_assessorDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
           <div class="attest-block">
             <div class="attest-role">Second-Line — Reviewed &amp; Approved By</div>
-            <div class="fg"><label>Full Name</label><input type="text" id="s_reviewerName" placeholder="Full name" oninput="saveLS()"></div>
-            <div class="fg" style="margin-top:10px"><label>Title / Role</label><input type="text" id="s_reviewerTitle" placeholder="e.g. MLRO / Head of Compliance" oninput="saveLS()"></div>
-            <div class="fg" style="margin-top:10px"><label>Date</label><input type="text" id="s_reviewerDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
+            <div class="hs"><label>Full Name</label><input type="text" id="s_reviewerName" placeholder="Full name" oninput="saveLS()"></div>
+            <div class="hs" style="margin-top:10px"><label>Title / Role</label><input type="text" id="s_reviewerTitle" placeholder="e.g. MLRO / Head of Compliance" oninput="saveLS()"></div>
+            <div class="hs" style="margin-top:10px"><label>Date</label><input type="text" id="s_reviewerDate" placeholder="DD/MM/YYYY" maxlength="10"></div>
             <div class="sig-line"></div><div class="sig-caption">Signature</div>
           </div>
         </div>
-        <div class="fg">
+        <div class="hs">
           <label class="neon-title">Assessment Notes &amp; Risk Rationale</label>
           <textarea id="assessmentNotes" placeholder="Document any overrides, mitigating factors, escalation rationale, or additional risk considerations..." oninput="saveLS()"></textarea>
         </div>
@@ -182,13 +182,13 @@
 
 <div id="tweaks-root" class="no-print"></div>
 
-<script src="assets/fg-app.js"></script>
-<script src="assets/fg-anim.js"></script>
+<script src="assets/hs-app.js"></script>
+<script src="assets/hs-anim.js"></script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <script type="text/babel" src="assets/tweaks-panel.jsx"></script>
-<script type="text/babel" src="assets/fg-tweaks-dark.jsx"></script>
+<script type="text/babel" src="assets/hs-tweaks-dark.jsx"></script>
 
 </body>
 </html>
