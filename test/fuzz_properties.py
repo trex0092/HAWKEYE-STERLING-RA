@@ -24,8 +24,10 @@ os.environ.setdefault("ASANA_TOKEN", "dummy")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# screen must be imported FIRST: importing it bootstraps ci/requirements.txt
-# (which now carries hypothesis) when dependencies are missing on the runner.
+# Runs in ci.yml's dedicated `fuzz` job, which installs the hash-locked
+# ci/requirements.txt (hypothesis included) — unlike the blocked-egress `test`
+# job, whose Python suites deliberately run against stubs. Importing the real
+# engine here means the properties exercise the real rapidfuzz-backed paths.
 import screen
 
 from hypothesis import given, settings, strategies as st
