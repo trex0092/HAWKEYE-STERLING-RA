@@ -47,10 +47,11 @@ jobs:
           node-version: 22
 
       - name: Install Playwright + Chromium
-        # Local install so the `import '@playwright/test'` in the config/spec
-        # resolves (the repo has no package.json). node_modules is gitignored.
+        # npm ci restores the lockfile-pinned toolchain (@playwright/test is a
+        # devDependency) so the `import '@playwright/test'` in the config/spec
+        # resolves. node_modules is gitignored.
         run: |
-          npm install @playwright/test@1.49.1
+          npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Compare against baseline
@@ -87,8 +88,9 @@ jobs:
           node-version: 22
 
       - name: Install Playwright + Chromium
+        # npm ci restores the lockfile-pinned toolchain (same as the compare job).
         run: |
-          npm install @playwright/test@1.49.1
+          npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Update baseline snapshots

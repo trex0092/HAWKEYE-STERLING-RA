@@ -23,8 +23,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden the runner (egress block)
-        # Egress = setup-node (nodejs.org) + npx fetching eslint/htmlhint from the
-        # npm registry. Nothing else leaves the runner.
+        # Egress = setup-node (nodejs.org) + npm ci restoring the lockfile-pinned
+        # dev toolchain from the npm registry. Nothing else leaves the runner.
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           disable-sudo: true
@@ -43,10 +43,17 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install the pinned dev toolchain
+        # npm ci restores the exact package-lock.json versions instead of the
+        # floating major-pinned npx installs used before. No `cache: npm` on
+        # setup-node — the Actions cache service endpoints are not in the
+        # egress allow-list.
+        run: npm ci --no-audit --no-fund
+
       - name: ESLint (app logic, scripts, tests, functions)
-        run: npx --yes eslint@9 app.js console.js advisor.js scripts test netlify
+        run: npm run lint
 
       - name: HTMLHint (screens) — report only
         continue-on-error: true
         run: |
-          npx --yes htmlhint@1 index.html console.html advisor.html | tee -a "$GITHUB_STEP_SUMMARY"
+          npm run --silent lint:html | tee -a "$GITHUB_STEP_SUMMARY"

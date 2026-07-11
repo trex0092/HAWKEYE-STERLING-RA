@@ -40,12 +40,16 @@ jobs:
 
       - name: Audit (WCAG 2.1 AA)
         id: a11y
+        # pa11y is intentionally NOT in package.json: its puppeteer dependency
+        # downloads Chrome at install time, which would break `npm ci` in the
+        # blocked-egress lint job and bloat every local/Netlify install. It is
+        # exact-pinned here instead (was `pa11y@8`, which floats within 8.x).
         run: |
           set -o pipefail
           fail=0
           for f in index.html console.html advisor.html; do
             echo "## $f" | tee -a "$GITHUB_STEP_SUMMARY"
-            npx --yes pa11y@8 --standard WCAG2AA --reporter cli \
+            npx --yes pa11y@8.0.0 --standard WCAG2AA --reporter cli \
               --config test/pa11y.config.json "file://$PWD/$f" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || fail=1
           done
           exit $fail
