@@ -6,6 +6,11 @@ name: Branch Cleanup (manual)
 # `git branch --merged` can never identify these — each branch below was
 # verified by mapping it to its PR's merged state via the API.
 #
+# Second sweep (2026-07-11): the trailing block adds the stale work branches
+# that still carry the pre-rebrand tree (former entity name + pre-redaction
+# data). Verified against the open-PR list — none is an open PR head; branch
+# content stays recoverable through the PR refs.
+#
 # Safety: manual-only (workflow_dispatch); does nothing unless the `confirm`
 # input is the literal string DELETE (any other value = dry-run listing);
 # protected branches cannot be deleted by the API regardless. Branches that no
@@ -19,7 +24,7 @@ on:
         default: 'dry-run'
 
 permissions:
-  contents: write # ref deletion; nothing else
+  contents: read
 
 concurrency:
   group: branch-cleanup
@@ -27,6 +32,9 @@ concurrency:
 
 jobs:
   cleanup:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write # ref deletion; nothing else
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -86,6 +94,26 @@ jobs:
           claude/workflows-failing-6txcgv
           regulatory-watch/update
           visual/baseline
+          claude/app-integration-status-8r6cf0
+          claude/asana-automation-ai-alignment-ahad6l
+          claude/enhancement-suggestions-ggzacm
+          claude/gifted-darwin-ql5ypf
+          claude/integration-status-gaps-j955n4
+          claude/ongoing-monitoring-expansion-qny9sl
+          claude/pending-tasks-blockers-kp8srl
+          claude/regulatory-qa-super-tools-pending-b5rmoj
+          claude/relaxed-feynman-eaowqp
+          claude/risk-assessment-format-el4r1s
+          claude/section-integration-approach-5amyw0
+          claude/source-watch-asana
+          claude/transaction-monitoring-plans-30yml2
+          claude/weekly-speedup
+          claude/what-happened-4h2y8w
+          claude/workflow-creation-vymbx6
+          claude/workflows-deep-review-fixes-jug06s
+          fix-export-json-refs
+          michroma-titles
+          sanctions-watch/update
           '
           deleted=0; missing=0; failed=0
           {

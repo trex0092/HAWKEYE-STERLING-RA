@@ -10,9 +10,7 @@ on:
         required: true
 
 permissions:
-  contents: write
-  id-token: write       # OIDC for Sigstore-keyless build-provenance attestation
-  attestations: write   # store the attestation in the repo's attestation log
+  contents: read
 
 # One release at a time — concurrent runs could race on the same tag/attestation.
 concurrency:
@@ -21,6 +19,11 @@ concurrency:
 
 jobs:
   release:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write
+      id-token: write       # OIDC for Sigstore-keyless build-provenance attestation
+      attestations: write   # store the attestation in the repo's attestation log
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -63,8 +66,21 @@ jobs:
       # attestation (OIDC, no long-lived keys). Verify with:
       #   gh attestation verify hawkeye-sterling-ra-<tag>.tar.gz --repo <owner>/<repo>
       - name: Attest build provenance for the release artifacts
+        id: attest
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: |
             hawkeye-sterling-ra-*.tar.gz
             sbom.cdx.json
+
+      - name: Attach the Sigstore bundle as a release asset
+        # The attestation lives in the repo attestation log either way; also
+        # shipping the bundle beside the artifacts makes the release
+        # self-contained and machine-verifiable (Scorecard: Signed-Releases).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" "hawkeye-sterling-ra-$TAG.sigstore"
+          gh release upload "$TAG" "hawkeye-sterling-ra-$TAG.sigstore" --clobber || echo "bundle upload skipped"

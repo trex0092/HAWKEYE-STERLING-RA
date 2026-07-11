@@ -16,7 +16,7 @@ on:
         default: 'check'
 
 permissions:
-  contents: write
+  contents: read
 
 # Serialize: this job commits + pushes list-state / risk-data. Overlapping
 # runs (manual dispatch vs the 06:00 schedule) would race the push.
@@ -26,6 +26,9 @@ concurrency:
 
 jobs:
   watch:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15 # bound external list fetches
     steps:

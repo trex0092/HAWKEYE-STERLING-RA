@@ -41,8 +41,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  issues: write
+  contents: read
 
 concurrency:
   group: sanctions-screen
@@ -50,6 +49,10 @@ concurrency:
 
 jobs:
   screen:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 20 # bound the daily re-screen; a hang must fail loudly, not stall the control
     steps:

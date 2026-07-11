@@ -37,8 +37,10 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install Semgrep
-        run: python -m pip install --quiet "semgrep>=1"
+      - name: Install Semgrep (hash-locked)
+        # Exact version + hashes (ci/semgrep-requirements.txt, pip-compile
+        # --generate-hashes) so the SAST gate itself is supply-chain pinned.
+        run: python -m pip install --quiet --require-hashes -r ci/semgrep-requirements.txt
 
       - name: Semgrep — app invariants (blocking)
         run: |

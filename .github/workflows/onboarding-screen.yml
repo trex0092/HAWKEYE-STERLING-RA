@@ -23,7 +23,7 @@ on:
 
 # contents:write only to commit the shared delta-state (what has been reported).
 permissions:
-  contents: write
+  contents: read
 
 # Never overlap the daily sweep's delta-state commit, and never overlap itself.
 concurrency:
@@ -32,6 +32,9 @@ concurrency:
 
 jobs:
   onboarding:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 60   # only the new-customer subset is enriched; the full DB is just listed
 
