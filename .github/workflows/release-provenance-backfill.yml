@@ -1,0 +1,63 @@
+name: Release provenance backfill (manual)
+
+# One-shot utility: releases cut BEFORE the .intoto.jsonl release asset existed
+# (v3.7.1) carry their Sigstore bundle only under the .sigstore name. This
+# copies each release's existing bundle to the conventional provenance suffix —
+# same bytes, second name — so every release in the window is self-contained
+# and machine-verifiable (Scorecard: Signed-Releases). Idempotent: releases
+# that already have a .intoto.jsonl asset are skipped; re-runs are safe.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-provenance-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    # Write scope lives at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write # release-asset upload; nothing else
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = the GitHub API + release-asset storage only.
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            uploads.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+      - name: Copy each release's Sigstore bundle to the .intoto.jsonl name
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          for tag in $(gh release list --repo "$REPO" --limit 10 --json tagName --jq '.[].tagName'); do
+            assets=$(gh release view "$tag" --repo "$REPO" --json assets --jq '.assets[].name')
+            if echo "$assets" | grep -q '\.intoto\.jsonl$'; then
+              echo "$tag: provenance asset already present — skipping"
+              continue
+            fi
+            sig=$(echo "$assets" | grep '\.sigstore$' | head -1 || true)
+            if [ -z "$sig" ]; then
+              echo "$tag: no .sigstore bundle to backfill from — skipping"
+              continue
+            fi
+            gh release download "$tag" --repo "$REPO" --pattern "$sig" --output bundle.tmp
+            target="${sig%.sigstore}.intoto.jsonl"
+            cp bundle.tmp "$target"
+            gh release upload "$tag" "$target" --repo "$REPO" --clobber
+            rm -f bundle.tmp "$target"
+            echo "$tag: uploaded $target"
+          done
