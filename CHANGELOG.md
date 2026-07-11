@@ -10,6 +10,18 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added (label taxonomy)
+
+- **Full label taxonomy.** `settings.yml` now declares 32 labels: the
+  issue-triage set the issue templates already referenced but that was never
+  defined (`bug`, `enhancement`, `triage`, `review` — template auto-labelling
+  silently failed without them — plus `question`, `duplicate`, `wontfix`) and
+  a domain set (`engine`, `screening`, `advisor`, `governance`, `a11y`,
+  `i18n`, `pwa`, `design`, `release`, `config`). `labeler.yml` grows matching
+  path rules (20 auto-applied labels, incl. `security` and a `compliance`
+  rule scoped to the firm-approved risk-baseline data files), and label-sync
+  reconciles everything on merge.
+
 ### Added / hardened (brand purge + supply-chain scoring) — v3.7.1
 
 - **Brand initialism fully purged.** The former entity's initialism is gone

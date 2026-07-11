@@ -96,6 +96,62 @@ labels:
   - name: dependencies
     color: "0366d6"
     description: Dependency / supply-chain update
+  # Issue-triage set — referenced by the .github/ISSUE_TEMPLATE forms
+  # (bug_report → bug+triage, feature_request → enhancement+triage,
+  # compliance_review → compliance+review). Template auto-labelling fails
+  # silently if these are missing, so they live in the source of truth.
+  - name: bug
+    color: "d73a4a"
+    description: Something broken in the app or automation
+  - name: enhancement
+    color: "a2eeef"
+    description: New capability or improvement request
+  - name: triage
+    color: "ededed"
+    description: Awaiting initial assessment
+  - name: review
+    color: "f9a825"
+    description: Under MLRO / maintainer review
+  - name: question
+    color: "d876e3"
+    description: Further information requested
+  - name: duplicate
+    color: "cfd3d7"
+    description: Already tracked elsewhere
+  - name: wontfix
+    color: "ffffff"
+    description: Considered and deliberately not planned
+  # Domain set — auto-applied by .github/labeler.yml path rules.
+  - name: engine
+    color: "306998"
+    description: Python screening engine (screen / ai / agents / kyc / txn / monitoring)
+  - name: screening
+    color: "c2185b"
+    description: Sanctions / PEP / adverse-media screening automations and data
+  - name: advisor
+    color: "e99695"
+    description: AI Advisor pages and the brain-soul function
+  - name: governance
+    color: "6f42c1"
+    description: AIMS, policies, DPIA, model cards, assessments
+  - name: a11y
+    color: "0052cc"
+    description: Accessibility (WCAG / axe / pa11y)
+  - name: i18n
+    color: "bfd4f2"
+    description: Localisation / Arabic UI
+  - name: pwa
+    color: "1f6feb"
+    description: Offline support — service worker, manifest, icons
+  - name: design
+    color: "c5def5"
+    description: Design handoff reference (design/)
+  - name: release
+    color: "2ea44f"
+    description: Release, changelog, versioning
+  - name: config
+    color: "37474f"
+    description: Toolchain / repository configuration
 
 # ── Branch protection ───────────────────────────────────────────────────────────
 # main is the deploy branch. No direct pushes: every change lands via a reviewed,

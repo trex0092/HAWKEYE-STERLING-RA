@@ -1,6 +1,10 @@
+# Path → label rules for actions/labeler (v5 syntax). Every label named here
+# must be declared in .github/settings.yml (the label source of truth, synced
+# by label-sync.yml) or the labeler silently skips it.
+
 app:
   - changed-files:
-      - any-glob-to-any-file: ['index.html', 'console.html', 'advisor.html', 'assets/**']
+      - any-glob-to-any-file: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'app.css', 'console.css', 'assets/**']
 
 data:
   - changed-files:
@@ -24,4 +28,58 @@ netlify:
 
 dependencies:
   - changed-files:
-      - any-glob-to-any-file: ['package.json', 'package-lock.json', 'pyproject.toml', 'ci/requirements*']
+      - any-glob-to-any-file: ['package.json', 'package-lock.json', 'pyproject.toml', 'ci/requirements*', 'ci/semgrep-requirements*', 'ci/zizmor-requirements*', '.github/dependabot.yml']
+
+engine:
+  - changed-files:
+      - any-glob-to-any-file: ['screen.py', 'ai.py', 'agents.py', 'kyc.py', 'txn_monitor.py', 'monitoring.py', 'test/engine_test.py', 'test/bias_eval.py', 'test/redteam_injection.py', 'test/fuzz_properties.py']
+
+screening:
+  - changed-files:
+      - any-glob-to-any-file: ['scripts/sanctions-*', 'scripts/screening-*', 'scripts/adverse-media*', 'scripts/pep-check*', 'scripts/interpol-check*', 'scripts/lei-check*', 'scripts/fatf-watchdog*', 'data/sanctions-*', 'data/screen-*', 'data/eocn-*', 'data/dfat-*', 'data/seco-*', 'data/fatf-*', '.github/workflows/sanctions-*', '.github/workflows/onboarding-screen.yml', '.github/workflows/weekly-adverse-media.yml', '.github/workflows/daily-sanctions-screen.yml', '.github/workflows/fatf-watchdog.yml']
+
+advisor:
+  - changed-files:
+      - any-glob-to-any-file: ['advisor.html', 'advisor.js', 'advisor.css', 'assets/super-data.js', 'netlify/functions/brain-soul.js', 'test/advisor-*']
+
+governance:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/governance/**', 'docs/aims/**', 'docs/models/**', 'docs/executive/**', 'docs/AI-GOVERNANCE.md']
+
+security:
+  - changed-files:
+      - any-glob-to-any-file: ['SECURITY.md', '.semgrep/**', '.gitleaks.toml', '.github/zizmor.yml', 'netlify/functions/_auth.js', 'netlify/functions/_ratelimit.js', 'docs/security/**', '.github/workflows/codeql.yml', '.github/workflows/semgrep.yml', '.github/workflows/gitleaks.yml', '.github/workflows/scorecard.yml', '.github/workflows/osv-scanner.yml', '.github/workflows/dast-zap.yml', '.github/workflows/workflow-lint.yml', '.github/workflows/dependency-review.yml']
+
+compliance:
+  - changed-files:
+      # The firm-approved risk baseline — the PR template's "Risk data /
+      # baseline change" category, which needs MLRO sign-off.
+      - any-glob-to-any-file: ['data/jurisdiction-risk.json', 'data/sanctions-extra.json', 'data/dfat-curated-list.json', 'data/seco-curated-list.json', 'data/eocn-local-terrorist-list.json']
+
+a11y:
+  - changed-files:
+      - any-glob-to-any-file: ['test/axe.spec.mjs', 'test/keyboard.spec.mjs', 'test/pa11y.config.json', '.github/workflows/a11y.yml']
+
+i18n:
+  - changed-files:
+      - any-glob-to-any-file: ['i18n.js']
+
+pwa:
+  - changed-files:
+      - any-glob-to-any-file: ['sw.js', 'sw-register.js', 'manifest.webmanifest', 'scripts/gen-icons*', 'test/sw.test.mjs']
+
+design:
+  - changed-files:
+      - any-glob-to-any-file: ['design/**']
+
+release:
+  - changed-files:
+      - any-glob-to-any-file: ['CHANGELOG.md', 'CITATION.cff', '.github/workflows/release.yml', '.github/workflows/auto-release.yml']
+
+visual-regression:
+  - changed-files:
+      - any-glob-to-any-file: ['test/__screenshots__/**', 'test/visual.spec.mjs', 'playwright.config.mjs']
+
+config:
+  - changed-files:
+      - any-glob-to-any-file: ['.editorconfig', '.gitattributes', '.nvmrc', 'eslint.config.mjs', '.htmlhintrc', 'playwright*.config.mjs', 'lighthouserc.json', '.github/labeler.yml', '.github/settings.yml', '.claude/**']
