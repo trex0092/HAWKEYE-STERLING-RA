@@ -7,9 +7,10 @@
    duplicate keys, unsafe negation) plus the highest-value injection sinks
    (eval and friends). Deep security taint analysis is provided by CodeQL
    (.github/workflows/codeql.yml); we deliberately avoid eslint-plugin-security
-   so the project keeps ZERO committed dependencies — every tool runs through
-   `npx --yes`, which keeps the supply-chain attack surface minimal (consistent
-   with the SHA-pinned, dependency-light posture of the rest of the repo). */
+   so the project keeps ZERO runtime dependencies — the dev/CI toolchain is
+   lockfile-pinned in package.json (exact versions, installed with npm ci),
+   which keeps the supply-chain attack surface minimal (consistent with the
+   SHA-pinned, dependency-light posture of the rest of the repo). */
 
 const browserGlobals = {
   window: 'readonly', document: 'readonly', console: 'readonly', fetch: 'readonly',

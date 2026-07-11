@@ -3,9 +3,10 @@ name: OSV-Scanner (toolchain CVEs)
 # Audits the project's dependency surface for known vulnerabilities (OSV.dev).
 # The app ships ZERO runtime npm dependencies, so GitHub Dependency Review (which
 # only fires on manifest changes) has little to chew on; what actually carries
-# risk is the dev/CI TOOLCHAIN (the pinned npx/pip/Actions versions). This scans
+# risk is the dev/CI TOOLCHAIN (the pinned npm/pip/Actions versions). This scans
 # the CycloneDX SBOM that scripts/gen-sbom.mjs already produces (the toolchain is
-# its main content) plus the lockfile-free tree, against the OSV database.
+# its main content) plus the committed package-lock.json and source tree, against
+# the OSV database.
 #
 # Scheduled + manual + on push to main — deliberately NOT a pull_request gate, so
 # a newly-published CVE in a transitive dev tool never blocks an unrelated PR; it
@@ -15,7 +16,7 @@ on:
     - cron: '17 6 * * 1'   # Mondays 06:17 UTC
   push:
     branches: [main]
-    paths: ['.github/workflows/**', 'scripts/gen-sbom.mjs']
+    paths: ['.github/workflows/**', 'scripts/gen-sbom.mjs', 'package.json', 'package-lock.json']
   workflow_dispatch:
 
 permissions:

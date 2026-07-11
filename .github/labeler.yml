@@ -21,3 +21,7 @@ docs:
 netlify:
   - changed-files:
       - any-glob-to-any-file: ['netlify/**', 'netlify.toml']
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ['package.json', 'package-lock.json', 'pyproject.toml', 'ci/requirements*']

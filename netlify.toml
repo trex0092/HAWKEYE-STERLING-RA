@@ -1,4 +1,8 @@
 # Static single-file app — publish the repo root, no build step.
+# package.json exists for the DEV/CI toolchain only (all devDependencies, no
+# install scripts): Netlify's dependency-install step is a fast no-op for the
+# deploy — the published site is the checked-in files, unchanged. Node version
+# for the build image is pinned by .nvmrc (22, same as CI).
 [build]
   publish = "."
 

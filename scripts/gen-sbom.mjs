@@ -3,9 +3,9 @@
    The app ships ZERO runtime npm dependencies, so the meaningful supply chain is:
      1. the application component (versioned by APP_VERSION),
      2. the self-hosted web fonts bundled under assets/fonts/ (OFL-1.1), and
-     3. the dev/CI toolchain, whose versions are read straight from the pinned
-        `npx --yes pkg@ver` / `npm install pkg@ver` invocations in the workflows
-        (single source of truth — no drift).
+     3. the dev/CI toolchain: package.json devDependencies (the lockfile-pinned
+        source of truth) plus any remaining exact `npx --yes pkg@ver` pins in
+        the workflows (pa11y — deliberately kept out of package.json).
 
    Usage:
      node scripts/gen-sbom.mjs            # writes sbom.cdx.json
@@ -29,11 +29,17 @@ function fontFamilies() {
   return [...set].sort();
 }
 
-/* Read pinned dev tools from the workflow files: `npx --yes pkg@ver`,
-   `npx pkg@ver`, and `npm install pkg@ver` (scoped names supported). */
+/* Pinned dev tools: package.json devDependencies first (the committed,
+   lockfile-pinned toolchain), then any exact `npx --yes pkg@ver` /
+   `npx pkg@ver` / `npm install pkg@ver` pins still living in the workflows
+   (pa11y — see a11y.yml for why it stays out of package.json). */
 function devTools() {
-  const dir = join(ROOT, '.github', 'workflows');
   const tools = new Map(); /* name -> version */
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  for (const [name, ver] of Object.entries(pkg.devDependencies || {})) {
+    tools.set(name, String(ver).replace(/^[~^=v]+/, ''));
+  }
+  const dir = join(ROOT, '.github', 'workflows');
   const rx = /(?:npx(?:\s+--yes)?|npm\s+install)\s+((?:@[\w.-]+\/)?[\w.-]+)@([\w.\-]+)/g;
   for (const f of readdirSync(dir).filter(n => n.endsWith('.yml') || n.endsWith('.yaml'))) {
     const txt = readFileSync(join(dir, f), 'utf8');

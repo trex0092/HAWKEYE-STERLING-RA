@@ -1,0 +1,31 @@
+{
+  "name": "hawkeye-sterling-ra",
+  "version": "3.7.0",
+  "private": true,
+  "description": "Hawkeye Sterling — AML/CFT entity risk assessment suite (DPMS): static command-center web app + Python screening engine. This manifest pins the dev/CI toolchain only; the app ships zero runtime npm dependencies.",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Hawkeye Sterling",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trex0092/HAWKEYE-STERLING-RA.git"
+  },
+  "homepage": "https://hawkeye-sterling-ra.netlify.app",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint app.js console.js advisor.js scripts test netlify",
+    "lint:html": "htmlhint index.html console.html advisor.html",
+    "test": "node scripts/run-tests.mjs",
+    "test:visual": "playwright test --config=playwright.config.mjs",
+    "test:e2e": "playwright test --config=playwright.cross-browser.config.mjs",
+    "sbom": "node scripts/gen-sbom.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
+    "@playwright/test": "1.49.1",
+    "axe-core": "4.12.1",
+    "eslint": "9.39.5",
+    "htmlhint": "1.9.2"
+  }
+}

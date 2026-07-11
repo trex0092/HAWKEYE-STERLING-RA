@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FINE GOLD LLC — RUNTIME MONITORING & DRIFT DETECTION  (monitoring.py)
+HAWKEYE STERLING — RUNTIME MONITORING & DRIFT DETECTION  (monitoring.py)
 Hawkeye Sterling V2 — operational observability for the screening control.
 ====================================================================
 Two complementary monitors, both deterministic and persisted to git so there is

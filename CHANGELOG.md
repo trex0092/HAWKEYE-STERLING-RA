@@ -10,6 +10,39 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added / changed (repo professionalization)
+
+- **Committed npm toolchain.** New root `package.json` + `package-lock.json`
+  pin the dev/CI tools exactly (`eslint 9.39.5`, `htmlhint 1.9.2`,
+  `@playwright/test 1.49.1`, `@axe-core/playwright` / `axe-core 4.12.1` — the
+  axe pair previously floated to latest in CI) and add npm scripts
+  (`npm test` / `lint` / `lint:html` / `test:visual` / `test:e2e` / `sbom`).
+  The app still ships **zero runtime npm dependencies**; lint/visual/
+  cross-browser workflows now restore the toolchain with `npm ci`, pa11y is
+  exact-pinned in `a11y.yml` (kept out of package.json so its puppeteer
+  Chrome download can't break the blocked-egress lint job), and the SBOM
+  generator reads package.json as its source of truth. New `npm`
+  dependabot ecosystem keeps the toolchain patched (Playwright held to
+  patch bumps to protect the committed visual baselines).
+- **Version-sync guard.** `test/changelog.test.mjs` now asserts
+  `package.json`, `pyproject.toml` and `CITATION.cff` carry the same version
+  as `APP_VERSION` in `app.js` (the release tag source).
+- **Contributor/editor hygiene.** New `.editorconfig`, `.gitattributes`
+  (binary marks + linguist-generated for the corpus, baselines, design
+  handoff and lockfile), `.nvmrc` (Node 22, same as CI) and a metadata-only
+  `pyproject.toml` (Python runtime pins stay hash-locked in
+  `ci/requirements.txt`).
+- **README: table of contents + screenshots** of the three screens
+  (`docs/screenshots/`), and npm-script instructions in README/CONTRIBUTING.
+- **Personal data removed from the committed tree.** The screening-state
+  seeds on `main` (`data/sanctions-screen-state.json`,
+  `data/screen-delta-state.json`) are reset to empty baselines — the live
+  state stays on the dedicated data branches the workflows already use — and
+  test fixtures/comments now use fictional subject names.
+- **Brand unification.** Internal legal-entity naming replaced with the
+  public **Hawkeye Sterling** brand across engine headers, workflows, docs
+  and test fixtures.
+
 ### Added / hardened (deep-test follow-up)
 
 - **Corporate owners now get the adverse-media sweep.** `screen.py` sanctions-

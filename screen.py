@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FINE GOLD LLC — DAILY SANCTIONS SCREENING + ADVERSE MEDIA
+HAWKEYE STERLING — DAILY SANCTIONS SCREENING + ADVERSE MEDIA
 Hawkeye Sterling V2 — screen.py v3.0
 ==========================================
 Modes:
@@ -44,7 +44,7 @@ RUN_MODE              = os.environ.get("RUN_MODE", "full_batch")  # full_batch |
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
 ASANA_ONGOING_MON_GID = "1213914392047129"
 ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
-ASANA_ASSIGNEE_GID    = "1213645083721304"   # Luisa Fernanda
+ASANA_ASSIGNEE_GID    = "1213645083721304"   # default case/OM assignee (MLRO)
 
 THRESHOLD             = 85   # combined (full + core) similarity to flag a match
 CORE_THRESHOLD        = 82   # distinctive-token similarity required (false-positive guard)

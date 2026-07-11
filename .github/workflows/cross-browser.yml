@@ -48,10 +48,11 @@ jobs:
           node-version: 22
 
       - name: Install Playwright + browsers
-        # Local install so `import '@playwright/test'` resolves (the repo has no
-        # package.json). node_modules is gitignored.
+        # npm ci restores the lockfile-pinned toolchain (@playwright/test,
+        # @axe-core/playwright, axe-core — the axe packages previously floated
+        # to latest here). node_modules is gitignored.
         run: |
-          npm install @playwright/test@1.49.1 @axe-core/playwright axe-core
+          npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium firefox webkit
 
       - name: Cross-browser smoke

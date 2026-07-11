@@ -20,5 +20,18 @@ const nextHeading = unrel.search(/\n##\s+/);
 const body = nextHeading === -1 ? unrel : unrel.slice(0, nextHeading);
 check('[Unreleased] has content (≥1 bullet)', /(^|\n)\s*[-*]\s+\S/.test(body));
 
+/* Version sync — package.json, pyproject.toml and CITATION.cff must carry the
+   APP_VERSION app.js declares (auto-release.yml cuts tags from app.js, so a
+   drifting manifest would ship releases with mismatched metadata). */
+const appVer = (readFileSync(new URL('../app.js', import.meta.url), 'utf8')
+  .match(/APP_VERSION\s*=\s*'([0-9.]+)'/) || [])[1];
+check('app.js declares APP_VERSION', !!appVer);
+check('package.json version matches APP_VERSION',
+  JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version === appVer);
+check('pyproject.toml version matches APP_VERSION',
+  (readFileSync(new URL('../pyproject.toml', import.meta.url), 'utf8').match(/^version = "([0-9.]+)"/m) || [])[1] === appVer);
+check('CITATION.cff version matches APP_VERSION',
+  (readFileSync(new URL('../CITATION.cff', import.meta.url), 'utf8').match(/^version: "([0-9.]+)"/m) || [])[1] === appVer);
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

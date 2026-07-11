@@ -1,4 +1,4 @@
-// Fine Gold RA — intro motion: gauge draw-in, score count-up, pop on change.
+// Hawkeye Sterling RA — intro motion: gauge draw-in, score count-up, pop on change.
 (function () {
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var scoreEl = document.getElementById('totalScore');

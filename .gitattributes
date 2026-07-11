@@ -1,0 +1,15 @@
+# Conservative attributes — the tracked tree is already 100% LF (verified with
+# `git ls-files --eol`), so `text=auto` renormalises nothing today; it only
+# guards future additions. No eol= override.
+* text=auto
+
+# Binary assets — never diff/merge/normalise as text.
+*.png binary
+*.webp binary
+*.woff2 binary
+
+# Keep PR diffs and GitHub language stats focused on the real sources.
+assets/super-data.js linguist-generated
+test/__screenshots__/** linguist-generated
+design/** linguist-generated
+package-lock.json linguist-generated

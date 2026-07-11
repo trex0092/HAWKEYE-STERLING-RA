@@ -1,0 +1,18 @@
+# Python project metadata for the screening engine (screen.py, ai.py, agents.py,
+# kyc.py, txn_monitor.py, monitoring.py — flat modules at the repo root, run as
+# scripts by the workflows). METADATA ONLY: the engine is never installed as a
+# package, and its runtime dependencies stay HASH-LOCKED in ci/requirements.txt
+# (pip install --require-hashes). No [build-system] — nothing is built or
+# published to an index.
+[project]
+name = "hawkeye-sterling-ra"
+version = "3.7.0"
+description = "AML/CFT entity risk assessment suite — Python screening engine (sanctions/watchlist screening, adverse media, PEP, KYC, transaction monitoring, AI advisory)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Hawkeye Sterling" }]
+
+[project.urls]
+Homepage = "https://hawkeye-sterling-ra.netlify.app"
+Repository = "https://github.com/trex0092/HAWKEYE-STERLING-RA"

@@ -52,13 +52,13 @@ check('diff finds additions and removals both ways',
   diff.blackRemoved.join() === 'Myanmar' && diff.greyAdded.join() === 'Nigeria'
   && diff.greyRemoved.join() === 'Monaco' && diff.blackAdded.length === 0);
 
-const notes = buildAlert(diff, baseline, ['RA-20260612-001 · FINE GOLD LLC · CDD 19 (Nigeria)'], '24/10/2026');
+const notes = buildAlert(diff, baseline, ['RA-20260612-001 · GOLDEN FALCON TRADING LLC · CDD 19 (Nigeria)'], '24/10/2026');
 check('alert names additions with app score', notes.includes('FATF added Nigeria to the grey list (increased monitoring) on 24/10/2026')
   && notes.includes('scores it 3 (High)') && notes.includes('Risk Data panel'));
 check('alert names removals both lists', notes.includes('FATF removed Myanmar from the BLACK list')
   && notes.includes('FATF removed Monaco from the grey list'));
 check('alert lists affected assessments and re-assess instruction',
-  notes.includes('FINE GOLD LLC') && notes.includes('Re-assess these entities'));
+  notes.includes('GOLDEN FALCON TRADING LLC') && notes.includes('Re-assess these entities'));
 check('alert with no affected says none', buildAlert(diff, baseline, [], '24/10/2026').includes('none found'));
 check('normalize strips accents and case', normalize('CÔTE  d’IvoirE'.replace('’', "'")) === "cote d'ivoire");
 

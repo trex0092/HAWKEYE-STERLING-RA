@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FINE GOLD LLC — TRANSACTION MONITORING ENGINE  (txn_monitor.py)
+HAWKEYE STERLING — TRANSACTION MONITORING ENGINE  (txn_monitor.py)
 Hawkeye Sterling V2 — FATF R.16 (wire transfers) + R.20 (STR triggers).
 ====================================================================
 A deterministic, explainable transaction-monitoring rules engine for a DPMS

@@ -26,3 +26,23 @@ updates:
       python:
         patterns:
           - "*"
+
+  # Keep the committed npm dev toolchain (package.json + package-lock.json)
+  # patched. All entries are devDependencies — the app ships zero runtime npm
+  # dependencies.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    groups:
+      npm-dev:
+        patterns:
+          - "*"
+    ignore:
+      # Playwright minor/major bumps change rendering and would invalidate the
+      # committed visual baselines (test/__screenshots__). Bump deliberately and
+      # refresh baselines via the Visual Regression workflow's baseline mode.
+      - dependency-name: "@playwright/test"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

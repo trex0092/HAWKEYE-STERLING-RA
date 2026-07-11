@@ -1,6 +1,6 @@
 # CBUAE AML/CFT Framework Update (April 2026) — Impact Assessment for a UAE DPMS
 
-Prepared: 07/07/2026. Audience: the compliance function of Fine Gold LLC (DPMS, UAE).
+Prepared: 07/07/2026. Audience: the compliance function of Hawkeye Sterling LLC (DPMS, UAE).
 
 **Provenance & verification status:** communicated to the compliance function via an
 industry summary (infographic) of the Central Bank of the UAE's April 2026 AML/CFT
