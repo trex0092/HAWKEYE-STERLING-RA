@@ -10,6 +10,21 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added (perfection pass)
+
+- **Meta descriptions on all three screens** — the one recurring sub-100
+  Lighthouse metric (SEO 90) was the missing `meta description`; index,
+  console and advisor now carry one (head-only, rendering unchanged).
+- **Release provenance backfill workflow**
+  (`release-provenance-backfill.yml`, manual-only, idempotent) — copies the
+  existing Sigstore bundle of pre-`.intoto.jsonl` releases (v3.7.1) to the
+  conventional provenance name, so every release in the Scorecard window is
+  self-contained (Signed-Releases → 10).
+- **OpenSSF Best Practices evidence pack**
+  (`docs/governance/openssf-best-practices.md`) — maps every passing-level
+  criterion to in-repo evidence so the owner's badge registration (the last
+  Scorecard point requiring a human) is a copy-through.
+
 ### Added (scorecard follow-through)
 
 - **Fuzzing the Scorecard detector actually sees.** New fast-check property
