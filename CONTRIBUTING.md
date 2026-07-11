@@ -34,7 +34,8 @@ python3 -m http.server 8000
 # → http://localhost:8000
 ```
 
-Node is only needed to run the test/automation scripts (Node 20+ recommended).
+Node is only needed to run the test/automation scripts (Node 22, pinned in
+`.nvmrc` — same version CI uses).
 
 ## Before you open a PR
 
@@ -42,10 +43,11 @@ Run the checks locally — CI (`.github/workflows/ci.yml`) runs the same ones pl
 two headless-Chrome smoke tests, and they must pass:
 
 ```bash
-node test/app.test.js         # scoring engine, register, report, Asana delivery & backup, edge cases
-node test/watchdog.test.mjs   # FATF list parsing, alerts, digest, backup extraction
-node test/reg-watch.test.mjs  # Regulatory Watch fingerprinting
-npx eslint .                  # lint (config in eslint.config.mjs)
+npm ci                        # dev toolchain (ESLint, HTMLHint, Playwright — no runtime deps)
+npm test                      # every unit suite CI runs (test/*.test.js + test/*.test.mjs)
+node test/app.test.js         # …or any single suite directly (dependency-free)
+npm run lint                  # ESLint (config in eslint.config.mjs)
+npm run lint:html             # HTMLHint on the three screens (report-only in CI)
 ```
 
 Other gates that run automatically on your PR:

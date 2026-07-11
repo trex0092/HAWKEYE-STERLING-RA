@@ -11,6 +11,24 @@ A static web application for **AML/CFT customer (entity) risk assessment**, buil
 
 The core application lives in [`index.html`](index.html) with its logic in the sibling [`app.js`](app.js) and styles in [`app.css`](app.css) — no build step, no backend, no bundler. Page logic and CSS were moved out of the HTML into same-origin external files (`app.js`/`console.js`/`advisor.js` and `app.css`/`console.css`/`advisor.css`, alongside `i18n.js` / `sw-register.js`) so the Content-Security-Policy is a **pure `'self'` policy** — no `'unsafe-inline'` in `script-src` or `style-src` and no third-party origins. Former inline `on*` handlers are wired through event delegation; former inline styles are applied via the CSSOM. It deploys to any static host and keeps all data on the user's device. (The dark-neon "command-center" redesign uses three self-hosted faces — Space Grotesk, JetBrains Mono, Manrope under [`assets/fonts/`](assets/fonts) via [`fonts.css`](fonts.css) — and falls back to the system stack if they fail to load.)
 
+## Contents
+
+- [The command-center suite](#the-command-center-suite)
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [Automated daily screening engine + AI layer](#automated-daily-screening-engine--ai-layer)
+- [Risk methodology](#risk-methodology)
+- [Data management & privacy](#data-management--privacy)
+- [Device security](#device-security)
+- [Setup](#setup)
+- [Tests](#tests)
+- [Accessibility](#accessibility)
+- [Project structure](#project-structure)
+- [Contributing & support](#contributing--support)
+- [Security](#security)
+- [License](#license)
+- [Disclaimer](#disclaimer)
+
 ## The command-center suite
 
 A dark neon, AI-persona "command center" spanning three sibling pages — pure HTML/CSS/JS, no framework, cross-linked from the header nav and sharing the six robot portraits in [`assets/`](assets):
@@ -22,6 +40,14 @@ A dark neon, AI-persona "command center" spanning three sibling pages — pure H
 | **Hawkeye Sterling Advisor** | [`advisor.html`](advisor.html) | A cited-answer AML Q&A — a question composer with a swappable AI persona that returns a verdict, cited legal basis, decision guide and recommended steps, plus a filterable regulatory Q&A. |
 
 The **AI Risk Advisor** in the assessment sidebar is a robot whose head and HUD colour follow the operative outcome — **Vale** (teal) for CDD, **Cypher** (amber) for SDD, **Ember** (red) for EDD / PROHIBITED — each with a one-line advisory note. The header carries a persona avatar, a live UTC clock and a lock toggle. Every animation (gauge draw-in, radar sweep, HUD spin, entrance) respects `prefers-reduced-motion`.
+
+## Screenshots
+
+Desktop captures of the three screens (Chromium, 1280×900 — sources in [`docs/screenshots/`](docs/screenshots)):
+
+| Entity Risk Assessment | AI Operations Console | Hawkeye Sterling Advisor |
+|---|---|---|
+| [![Entity Risk Assessment — live scoring, gauge and CDD verdict](docs/screenshots/index.png)](docs/screenshots/index.png) | [![AI Operations Console — analyst on duty, stat tiles and alert stream](docs/screenshots/console.png)](docs/screenshots/console.png) | [![Hawkeye Sterling Advisor — cited-answer AML Q&A composer](docs/screenshots/advisor.png)](docs/screenshots/advisor.png) |
 
 ## Features
 
@@ -218,6 +244,8 @@ node test/watchdog.test.mjs  # 20 checks — FATF list parsing, alerts, digest, 
 
 CI runs both suites plus two headless-Chrome smoke tests (one with `prefers-reduced-motion` for stability, one with motion enabled to exercise animation code paths) on every push and pull request (`.github/workflows/ci.yml`).
 
+With the dev toolchain installed (`npm ci` — lockfile-pinned, no runtime dependencies), the same suites run as npm scripts: `npm test` (every `test/*.test.js` / `test/*.test.mjs` — exactly the set CI runs), `npm run lint`, `npm run lint:html`, and `npm run test:visual` / `npm run test:e2e` (after `npx playwright install chromium`). The unit suites themselves remain dependency-free — any single one still runs directly with `node test/<file>`.
+
 ## Accessibility
 
 The application targets WCAG 2.1 Level AA for its core assessment workflow:
@@ -254,10 +282,13 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 ├── .claude/settings.json       # Pre-registers the cybersecurity-skills plugin marketplace
 ├── .github/workflows/          # CI, FATF watchdog, Regulatory Watch, site health, releases
 ├── scripts/asana-alert.mjs     # Asana alert task helper (used by site health)
+├── package.json / package-lock.json # Dev/CI toolchain, lockfile-pinned (zero runtime npm deps)
+├── pyproject.toml              # Python engine metadata (runtime pins stay in ci/requirements.txt)
 ├── netlify.toml                # Static publish config (repo root, no build)
 ├── netlify/functions/          # Serverless: Asana task delivery + risk-data mirror
 ├── docs/                       # README screenshots + governance/research notes
-│   └── governance/             # AI governance & security gap analysis
+│   ├── governance/             # AI governance & security gap analysis
+│   └── screenshots/            # README captures of the three screens
 ├── design/                     # Original design handoff (reference only, not served logic)
 └── README.md
 ```
