@@ -29,7 +29,7 @@ jobs:
     environment: release
     steps:
       - name: Harden the runner (egress audit)
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           disable-sudo: true
           egress-policy: audit
@@ -67,7 +67,7 @@ jobs:
       #   gh attestation verify hawkeye-sterling-ra-<v>.tar.gz --repo <owner>/<repo>
       - name: Attest build provenance for the release artifacts
         if: steps.rel.outputs.released == 'true'
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: |
             hawkeye-sterling-ra-*.tar.gz
