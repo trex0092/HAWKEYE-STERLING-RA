@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FINE GOLD LLC — AI LAYER  (ai.py)
+HAWKEYE STERLING — AI LAYER  (ai.py)
 Hawkeye Sterling V2 — AI augmentation for the AML/CFT screening engine.
 ====================================================================
 Adopted in line with the UAE National AI Strategy 2031 mandate to embed AI in
@@ -420,7 +420,7 @@ def draft_str(customer_name, permalink, sanctions_hits, pep, adverse_articles, r
     UAE FIU goAML portal. AI/automation drafts; a human always files."""
     L = ["SUSPICIOUS TRANSACTION REPORT — DRAFT (for MLRO review; file via goAML)",
          "=" * 64,
-         f"Reporting entity:   Fine Gold LLC",
+         f"Reporting entity:   Hawkeye Sterling LLC",
          f"Subject:            {customer_name}",
          f"Customer record:    {permalink}",
          f"Assessed risk:      {risk['rating']}",

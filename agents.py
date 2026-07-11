@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FINE GOLD LLC — AGENTIC OPERATING MODEL  (agents.py)
+HAWKEYE STERLING — AGENTIC OPERATING MODEL  (agents.py)
 Hawkeye Sterling V2 — UAE "Sovereign AI" operating model + governance gate.
 ====================================================================
 Implements the UAE Agentic-AI operating model — People → Agents → Workflows →

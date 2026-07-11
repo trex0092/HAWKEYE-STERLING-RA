@@ -12,7 +12,7 @@ table this assessment deepens) ·
 
 Regulation (EU) 2024/1689 binds providers **placing AI systems on the EU market**
 and providers/deployers **whose system's output is used in the EU** (Art. 2).
-Fine Gold LLC operates in the **UAE** for UAE AML/CFT obligations; the system is
+Hawkeye Sterling LLC operates in the **UAE** for UAE AML/CFT obligations; the system is
 not marketed in the EU and its outputs (risk assessments, screening dispositions,
 advisor answers) are used by UAE-based staff for UAE regulatory filings.
 
@@ -29,8 +29,8 @@ that would flip this conclusion.
 | Actor | AI Act role | Basis |
 |---|---|---|
 | **Anthropic** | Provider of the **general-purpose AI model** (Chapter V) behind the Advisor | The GPAI obligations (model documentation, copyright policy, systemic-risk duties) sit with Anthropic, relied on via the vendor terms tracked in [`../aims/third-party-register.md`](../aims/third-party-register.md) |
-| **Fine Gold LLC** | **Provider** of the Advisor *system* (it develops the system around the API and puts it into service under its own name, Art. 3(3)) and **deployer** of it (own-use) | Both roles' duties assessed below |
-| **Fine Gold staff** | Users subject to the deployer's oversight and literacy duties | [`../aims/competency-records.md`](../aims/competency-records.md) |
+| **Hawkeye Sterling LLC** | **Provider** of the Advisor *system* (it develops the system around the API and puts it into service under its own name, Art. 3(3)) and **deployer** of it (own-use) | Both roles' duties assessed below |
+| **Hawkeye Sterling staff** | Users subject to the deployer's oversight and literacy duties | [`../aims/competency-records.md`](../aims/competency-records.md) |
 
 The deterministic risk engine (`app.js` scoring) and the screening engine's
 rule-based matching are **not AI systems** under Art. 3(1) — fully deterministic,

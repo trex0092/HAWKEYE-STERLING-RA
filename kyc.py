@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FINE GOLD LLC — KYC / IDENTITY LAYER  (kyc.py)
+HAWKEYE STERLING — KYC / IDENTITY LAYER  (kyc.py)
 Hawkeye Sterling V2 — FATF R.10 (CDD / identity) + R.25 (legal arrangements).
 ====================================================================
 The customer base in Asana stores a STRUCTURED "COMPLIANCE ASSESSMENT" note per

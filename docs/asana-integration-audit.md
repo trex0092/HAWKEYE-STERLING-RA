@@ -151,8 +151,8 @@ For each register entry with a reference `R`:
 - **Duplicate** — **two or more** Asana tasks share the `"R · "` prefix. → pre-fix
   residue; keep the most-recently-updated, delete the rest.
 
-Output: a sorted, verified discrepancy list — the same format as the Fine Gold
-LLC RA and Customer Database audits.
+Output: a sorted, verified discrepancy list — the same format as the Hawkeye Sterling
+RA and Customer Database audits.
 
 ### Cadence
 

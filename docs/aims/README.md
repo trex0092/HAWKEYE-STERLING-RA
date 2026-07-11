@@ -1,6 +1,6 @@
 # AI Management System (AIMS) — Document Pack
 
-Fine Gold LLC — Hawkeye Sterling V2. ISO/IEC 42001:2023-aligned documentation for
+Hawkeye Sterling V2. ISO/IEC 42001:2023-aligned documentation for
 the AI used in the AML/CFT screening system (`screen.py`, `ai.py`, `agents.py`) and
 the entity risk-assessment web app.
 

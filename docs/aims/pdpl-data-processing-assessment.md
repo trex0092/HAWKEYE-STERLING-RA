@@ -12,7 +12,7 @@ point. Review: annually + on any change to data flows or to LLM provisioning.
 > restricted where they would prejudice an investigation.
 
 ## 1. Roles
-- **Controller:** Fine Gold LLC (determines purpose & means of screening).
+- **Controller:** Hawkeye Sterling LLC (determines purpose & means of screening).
 - **Processors:**
   - Asana (system of record for customer/KYC data and reports);
   - Anthropic (LLM provider) — **only if** an API key is provisioned (opt-in);

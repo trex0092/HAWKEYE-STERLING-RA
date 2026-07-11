@@ -1,4 +1,4 @@
-// Tweaks for the dark Fine Gold Entity Risk Assessment — accent, heading style, density.
+// Tweaks for the dark Hawkeye Sterling Entity Risk Assessment — accent, heading style, density.
 const FG_DARK_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "accentDark": "#D2A648",
   "headingsDark": "Serif",

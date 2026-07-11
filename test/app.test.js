@@ -195,13 +195,13 @@ check('back to suggested', A.state.signoff.nextReview === '2027-06-11' && A.stat
 
 // 11. Persistence round-trip
 reset();
-A.state.entity.name = 'Fine Gold LLC';
+A.state.entity.name = 'Golden Falcon Trading LLC';
 A.state.entity.regno = 'REG-123';
 A.state.meta.assessor = 'J. Smith';
 A.state.signoff.completedBy = 'J. Smith';
 A.recalc(); A.saveDraft();
 const restored = A.loadDraft();
-check('draft restores entity name', restored && restored.state.entity.name === 'Fine Gold LLC');
+check('draft restores entity name', restored && restored.state.entity.name === 'Golden Falcon Trading LLC');
 check('mergeState round-trip stable', JSON.stringify(A.mergeState(JSON.parse(JSON.stringify(A.state)))) === JSON.stringify(A.state));
 check('mergeState sanitises bad values',
   A.mergeState({questions:{tf:'MAYBE'}}).questions.tf === 'No'
@@ -382,14 +382,14 @@ check('mergeState whitelists override band', A.mergeState({override:{band:'CDD',
 
 /* ── 20. Periodic re-assessment flow ── */
 reset();
-A.state.entity.name = 'Fine Gold LLC';
+A.state.entity.name = 'Golden Falcon Trading LLC';
 A.state.notes = 'old rationale';
 A.state.signoff.completedBy = 'J. Smith';
 A.state.complete = true;
 const oldRef = A.state.meta.ref;
 A.reassess();
 check('re-assess issues a new ref and keeps the facts', A.state.meta.ref !== oldRef
-  && A.state.entity.name === 'Fine Gold LLC' && A.state.prior && A.state.prior.ref === oldRef);
+  && A.state.entity.name === 'Golden Falcon Trading LLC' && A.state.prior && A.state.prior.ref === oldRef);
 check('re-assess clears rationale, sign-off, status', A.state.notes === ''
   && A.state.signoff.completedBy === '' && A.state.complete === false);
 check('prior snapshot records result + factors', A.state.prior.total === 19
@@ -442,9 +442,9 @@ check('low narrative cites policies by full name', nar.includes('low risk band')
 check('narrative contains no manual codes', nar.indexOf('FG/') === -1);
 check('narrative uses placeholder when entity unnamed', nar.includes('[Entity Legal Name]'));
 check('narrative contains no em-dash', nar.indexOf('—') === -1);
-A.state.entity.name = 'Fine Gold LLC';
+A.state.entity.name = 'Golden Falcon Trading LLC';
 nar = A.buildNarrative();
-check('narrative auto-fills entity, date, and score', nar.includes('We assessed Fine Gold LLC on ')
+check('narrative auto-fills entity, date, and score', nar.includes('We assessed Golden Falcon Trading LLC on ')
   && nar.includes('19 / 30+'));
 A.setToggle('criminal','Yes');                                  // 21 → SDD
 nar = A.buildNarrative();
@@ -475,11 +475,11 @@ check('narrative prints in the report notes', els.printReport._inner.includes('l
 
 /* ── 24. Asana delivery payload + Netlify function ── */
 reset();
-A.state.entity.name = 'Fine Gold LLC';
+A.state.entity.name = 'Golden Falcon Trading LLC';
 A.recalc();
 let ap = A.asanaPayload();
 check('asana task name carries ref, entity, band, score',
-  /^RA-\d{8}-\d{3} · Fine Gold LLC · CDD 19$/.test(ap.name));
+  /^RA-\d{8}-\d{3} · Golden Falcon Trading LLC · CDD 19$/.test(ap.name));
 check('asana notes fall back to the generated narrative', ap.notes.includes('low risk band')
   && ap.notes.includes('Ref: ' + A.state.meta.ref) && ap.notes.includes('Result: 19 / 30+ (CDD)'));
 A.state.notes = 'Officer-written rationale.';
@@ -514,14 +514,14 @@ check('asana payload carries the numeric score for the Score custom field', A.as
 // B2: tokenised delivery keeps customer/staff PII on device.
 A.setAsanaTokenised(true);
 const tp = A.asanaPayload();
-check('tokenised: task title drops the entity name', !tp.name.includes('Fine Gold LLC')
+check('tokenised: task title drops the entity name', !tp.name.includes('Golden Falcon Trading LLC')
   && /· CDD 19$/.test(tp.name) && tp.name.startsWith(A.state.meta.ref));
-check('tokenised: notes withhold entity / assessor / MLRO PII', !tp.notes.includes('Fine Gold LLC')
+check('tokenised: notes withhold entity / assessor / MLRO PII', !tp.notes.includes('Golden Falcon Trading LLC')
   && !tp.notes.includes('J. Smith') && !tp.notes.includes('A. Jones')
   && tp.notes.includes('Tokenised delivery') && tp.notes.includes('Result: 19 / 30+ (CDD)'));
 check('tokenised: band + score still delivered for triage/sectioning', tp.band === 'CDD' && tp.score === 19);
 A.setAsanaTokenised(false);
-check('untokenised: full detail restored', A.asanaPayload().notes.includes('Entity: Fine Gold LLC'));
+check('untokenised: full detail restored', A.asanaPayload().notes.includes('Entity: Golden Falcon Trading LLC'));
 
 // A5: register delivery-status chip reflects delivered / failed / pending / none.
 check('asana status: a delivered ref shows the delivered chip', (A.asanaStatus(A.state.meta.ref, true)||{}).cls === 'reg-st-done');
@@ -886,10 +886,10 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
   await (async function(){
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const key = await A._deriveKey('correct horse battery staple', salt, 1000);
-    const plain = 'sensitive client data — Fine Gold LLC, REG-123';
+    const plain = 'sensitive client data — Golden Falcon Trading LLC, REG-123';
     const blob = await A.encryptStr(key, plain);
     check('encryptStr produces tagged ciphertext, not plaintext',
-      blob.startsWith('hsx1:') && !blob.includes('Fine Gold') && !blob.includes('REG-123'));
+      blob.startsWith('hsx1:') && !blob.includes('Golden Falcon') && !blob.includes('REG-123'));
     check('decryptStr round-trips to the original plaintext', (await A.decryptStr(key, blob)) === plain);
     const wrong = await A._deriveKey('wrong passphrase', salt, 1000);
     let rejected = false; try{ await A.decryptStr(wrong, blob); }catch(e){ rejected = true; }

@@ -1,4 +1,4 @@
-# AI Governance — Fine Gold LLC AML/CFT Screening (Hawkeye Sterling V2)
+# AI Governance — Hawkeye Sterling AML/CFT Screening (V2)
 
 Adopted in line with the **UAE National AI Strategy 2031** mandate to embed AI in
 operations, and the **UAE AI Ethics Principles** (fairness, accountability,
