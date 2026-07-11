@@ -1,6 +1,6 @@
 {
   "name": "hawkeye-sterling-ra",
-  "version": "3.7.1",
+  "version": "3.7.2",
   "private": true,
   "description": "Hawkeye Sterling — AML/CFT entity risk assessment suite (DPMS): static command-center web app + Python screening engine. This manifest pins the dev/CI toolchain only; the app ships zero runtime npm dependencies.",
   "license": "SEE LICENSE IN LICENSE",
@@ -27,5 +27,8 @@
     "axe-core": "4.12.1",
     "eslint": "10.7.0",
     "htmlhint": "1.9.2"
+  },
+  "dependencies": {
+    "fast-check": "4.9.0"
   }
 }

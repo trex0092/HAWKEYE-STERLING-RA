@@ -10,6 +10,34 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added (scorecard follow-through)
+
+- **Fuzzing the Scorecard detector actually sees.** New fast-check property
+  suite `test/property-fuzz.test.js` (in ci.yml's `fuzz` job) fuzzes the two
+  CommonJS security primitives behind every function call: the per-IP rate
+  limiter (exact quota per window, per-IP isolation, spoofable-header
+  fail-closed bucket, well-formed 429s) and the shared-token gate (off ⇒
+  open, token mode gates the no-Origin path by exact match, strict mode
+  ignores Origin). fast-check joins the lockfile-pinned toolchain; the
+  hypothesis suite stays (Scorecard's Python detector only counts atheris,
+  but the properties are valuable regardless).
+- **Release provenance under its conventional name.** Both release workflows
+  now also attach the Sigstore bundle as
+  `hawkeye-sterling-ra-<v>.intoto.jsonl` (Scorecard's Signed-Releases
+  provenance suffix) beside the `.sigstore` signature copy.
+
+### Added (label taxonomy)
+
+- **Full label taxonomy.** `settings.yml` now declares 32 labels: the
+  issue-triage set the issue templates already referenced but that was never
+  defined (`bug`, `enhancement`, `triage`, `review` — template auto-labelling
+  silently failed without them — plus `question`, `duplicate`, `wontfix`) and
+  a domain set (`engine`, `screening`, `advisor`, `governance`, `a11y`,
+  `i18n`, `pwa`, `design`, `release`, `config`). `labeler.yml` grows matching
+  path rules (20 auto-applied labels, incl. `security` and a `compliance`
+  rule scoped to the firm-approved risk-baseline data files), and label-sync
+  reconciles everything on merge.
+
 ### Added / hardened (brand purge + supply-chain scoring) — v3.7.1
 
 - **Brand initialism fully purged.** The former entity's initialism is gone

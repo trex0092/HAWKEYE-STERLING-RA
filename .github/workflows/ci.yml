@@ -218,3 +218,10 @@ jobs:
         env:
           ASANA_TOKEN: dummy   # screen.py requires it at import; never used by the properties
         run: python test/fuzz_properties.py
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+      - name: Install the lockfile-pinned npm toolchain (fast-check)
+        run: npm ci --no-audit --no-fund
+      - name: Run property-based fuzzing of the function security primitives (fast-check)
+        run: node test/property-fuzz.test.js
