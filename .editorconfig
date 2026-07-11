@@ -1,0 +1,19 @@
+# EditorConfig — https://editorconfig.org
+# Matches the committed conventions: LF everywhere (the tracked tree is 100% LF),
+# 2-space indent in JS/CSS/HTML/YAML/JSON, 4-space in Python.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[*.md]
+# A trailing double-space is a hard line break in Markdown — don't strip it.
+trim_trailing_whitespace = false
