@@ -136,7 +136,7 @@ check('PEP Yes → outcome EDD over numeric SDD', a.outcome === 'EDD' && a.numer
 check('PEP escalation reason cites FATF R.12', a.escalations.some(e=>e.level==='edd' && e.reason.includes('PEP') && e.reason.includes('FATF R.12')));
 check('banner says EDD mandatory', txt(els.critBanner).includes('Enhanced Due Diligence mandatory'));
 A.state.meta.date = '2026-06-11'; A.recalc();
-check('PEP review +3mo (EDD cadence, FG/KYC)', A.state.signoff.nextReview === '2026-09-11');
+check('PEP review +3mo (EDD cadence, KYC policy)', A.state.signoff.nextReview === '2026-09-11');
 
 // 6. FATF call-for-action jurisdictions = mandatory EDD floor
 for(const c of ['Islamic Republic of Iran','North Korea','Myanmar']){
@@ -186,7 +186,7 @@ check('2 years → back to 19', A.computeAssessment().total === 19);
 // 10. Review suggestion follows outcome; manual override respected
 reset();
 A.state.meta.date = '2026-06-11'; A.recalc();
-check('CDD review +12mo (FG/KYC)', A.state.signoff.nextReview === '2027-06-11');
+check('CDD review +12mo (KYC policy)', A.state.signoff.nextReview === '2027-06-11');
 A.onSign('nextReview','2026-12-31');
 check('manual review kept', A.state.signoff.nextReview === '2026-12-31' && A.state.signoff.reviewManual === true);
 check('hint offers "use suggested"', els.reviewHint._inner.includes('use suggested'));

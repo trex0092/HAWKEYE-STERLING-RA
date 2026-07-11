@@ -29,7 +29,7 @@ pages) and `test/` (fixtures/assertions whose "findings" are the test inputs):
 | # | Rule | Location |
 |---|---|---|
 | 2, 3 | `js/xss-through-dom` | `design/assets/hs-report.js` |
-| 4 | `js/xss-through-dom` | `design/assets/fg-app.js` |
+| 4 | `js/xss-through-dom` | `design/assets/hs-app.js` |
 | 7 | `js/missing-origin-check` | `design/assets/tweaks-panel.jsx` |
 | 16 | `js/incomplete-url-substring-sanitization` | `test/link-check.test.mjs:68` (assertion on a fixture URL) |
 | 84 | `js/incomplete-url-substring-sanitization` | `test/sanctions-screen.test.mjs:207` (assertion on a fixture URL) |

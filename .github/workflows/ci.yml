@@ -40,6 +40,8 @@ jobs:
           node-version: 22
       - name: Run scoring-engine tests
         run: node test/app.test.js
+      - name: Run brand guardrail (former entity name must never reappear)
+        run: node test/brand-guard.test.mjs
       - name: Run scoring model-validation golden set
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
@@ -139,6 +141,8 @@ jobs:
         run: python test/bias_eval.py
       - name: Run prompt-injection red-team (R-02 — detection + non-execution)
         run: python test/redteam_injection.py
+      - name: Run property-based fuzzing of the text-normalisation layer (hypothesis)
+        run: python test/fuzz_properties.py
       - name: Browser smoke test (reduced motion — stable)
         run: |
           # Reduced motion skips the gauge draw-in animation, whose mid-flight
