@@ -10,6 +10,16 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added (security ops)
+
+- **History scrub runbook** (`docs/security/history-scrub-runbook.md`) —
+  owner-executable `git filter-repo` procedure that removes the
+  pre-redaction data (screening-subject records, former firm name) from git
+  history. Written so the document itself never contains a removed string:
+  the scrub list is generated from the old history at execution time. Also
+  records what a rewrite cannot fix (live state branches, old deploy
+  permalinks, GitHub object cache) and the private-repo alternative.
+
 ### Added (container distribution)
 
 - **Self-hosting container image** — `Dockerfile` (static-web-server base,
