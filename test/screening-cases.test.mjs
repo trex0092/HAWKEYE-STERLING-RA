@@ -10,8 +10,10 @@ function check(name, cond) {
 }
 
 const TODAY = '2026-07-08';
+/* Fixture subjects use fictional names (John Doe / Jane Roe); the GIDs are
+   inert numeric identifiers kept stable for the CASE-number assertions. */
 const subj = (over = {}) => ({
-  name: 'Abdul Aziz Sultan', jurisdiction: 'Dominica', band: 'high', topScore: 87,
+  name: 'John Doe', jurisdiction: 'Dominica', band: 'high', topScore: 87,
   recommendation: 'sanctions-match', lists: ['UK OFSI'], firstSeen: '2026-06-27', lastSeen: TODAY, ...over
 });
 
@@ -19,11 +21,11 @@ const subj = (over = {}) => ({
 check('addDays computes the SLA due date', addDays('2026-06-27', 5) === '2026-07-02' && addDays('junk', 5) === null);
 check('ageInDays counts whole days, defensive on garbage', ageInDays('2026-06-27', TODAY) === 11 && ageInDays(null, TODAY) === 0);
 check('caseTitle is stable and carries the customer GID tail',
-  caseTitle('abdul aziz sultan|ubo|1214107985842154', subj()) === '🧾 CASE-842154 — Abdul Aziz Sultan — sanctions-match');
+  caseTitle('john doe|ubo|1214107985842154', subj()) === '🧾 CASE-842154 — John Doe — sanctions-match');
 check('the four lifecycle sections are defined', Object.keys(CASE_SECTIONS).length === 4 && CASE_SLA_DAYS === 5);
 
 /* ── planner ── */
-const KEY = 'abdul aziz sultan|ubo|1214107985842154';
+const KEY = 'john doe|ubo|1214107985842154';
 
 check('new flag with no case → create, due = firstSeen + SLA', (() => {
   const a = planCaseActions({ [KEY]: subj() }, {}, TODAY);
@@ -68,9 +70,9 @@ check('a re-flagged subject after clearance opens a NEW case', (() => {
 })());
 
 check('mixed registry plans each subject independently', (() => {
-  const k2 = 'dinesh kumar|ubo|1214107921925846';
+  const k2 = 'jane roe|ubo|1214107921925846';
   const a = planCaseActions(
-    { [KEY]: subj(), [k2]: subj({ name: 'Dinesh Kumar', recommendation: 'review', lastSeen: '2026-07-01' }) },
+    { [KEY]: subj(), [k2]: subj({ name: 'Jane Roe', recommendation: 'review', lastSeen: '2026-07-01' }) },
     { [k2]: { taskGid: 't2', createdAt: '2026-06-27', cleared: false } },
     TODAY);
   const types = a.map(x => x.type).sort().join();
@@ -93,7 +95,7 @@ const RESULTS = {
   lists: [{ name: 'UK OFSI', count: 19761 }, { name: 'France DGT', count: 18644 }],
   failures: ['UN consolidated could not be loaded (fetch failed) — coverage degraded'],
   enrichment: { amErrors: 100, pepErrors: 0, skipped: 644 },
-  alerts: [{ key: KEY, name: 'Abdul Aziz Sultan', jurisdiction: 'Dominica', band: 'high', topScore: 87, recommendation: 'sanctions-match', lists: ['UK OFSI'] }],
+  alerts: [{ key: KEY, name: 'John Doe', jurisdiction: 'Dominica', band: 'high', topScore: 87, recommendation: 'sanctions-match', lists: ['UK OFSI'] }],
   cleared: ['Old Match Ltd', 'Another One']
 };
 const digest = buildResultsDigestHtml(RESULTS, a => (a.key === KEY ? 'case-gid-1' : null));

@@ -35,8 +35,8 @@ const fixture = {
     'eu-fsf': { error: 'HTTP 500' }
   } },
   screen: { subjects: {
-    'a|ubo|1': { name: 'Abdul Aziz Sultan', jurisdiction: 'Dominica', recommendation: 'sanctions-match', lists: ['UK OFSI'], lastSeen: '2026-07-03' },
-    'b|ubo|2': { name: 'Dinesh Kumar', jurisdiction: 'India', recommendation: 'review', lists: ['Adverse media'], lastSeen: '2026-06-30' }
+    'a|ubo|1': { name: 'John Doe', jurisdiction: 'Dominica', recommendation: 'sanctions-match', lists: ['UK OFSI'], lastSeen: '2026-07-03' },
+    'b|ubo|2': { name: 'Jane Roe', jurisdiction: 'India', recommendation: 'review', lists: ['Adverse media'], lastSeen: '2026-06-30' }
   } },
   regDocs: ['REG-UPDATE-2026-07-08.md'],
   pipelines: [
@@ -65,7 +65,7 @@ check('sanctions list movement is per-list: moved, quiet and error all render',
   && html.includes('✅ <strong>un-consolidated</strong> — no change this week')
   && html.includes('❌ <strong>eu-fsf</strong> — HTTP 500'));
 check('screening flags render with recommendation icons',
-  html.includes('⛔ <strong>Abdul Aziz Sultan</strong>') && html.includes('⚠️ <strong>Dinesh Kumar</strong>'));
+  html.includes('⛔ <strong>John Doe</strong>') && html.includes('⚠️ <strong>Jane Roe</strong>'));
 check('plain summary carries the headline counts for the fallback issue',
   plain.includes('Pipelines: 1/2 green') && plain.includes('Sources healthy: 3/4') && plain.includes('Open screening flags: 2'));
 

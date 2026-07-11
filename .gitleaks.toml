@@ -37,9 +37,10 @@ regexes = [
   '''1216229252787647''',  # section: AI & Platform Governance (weekly summary default)
   '''1213645083721304''',  # user GID: default case/OM assignee (public object identifier)
   # Customer-record task GIDs used as offline test fixtures in
-  # test/screening-cases.test.mjs (public object identifiers, not credentials).
-  '''1214107985842154''',  # customer record: Abdul Aziz Sultan (test fixture)
-  '''1214107921925846''',  # customer record: Dinesh Kumar (test fixture)
+  # test/screening-cases.test.mjs (public object identifiers, not credentials;
+  # fixture subject names are fictional).
+  '''1214107985842154''',  # customer-record test fixture GID
+  '''1214107921925846''',  # customer-record test fixture GID
   # Former Reg/Gov/Sanctions section GIDs (kept so history still scans clean).
   '''1215844241216116''',  # former section: Regulatory changes
   '''1215857714525481''',  # former section: Sanctions updates
