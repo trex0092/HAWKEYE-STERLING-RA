@@ -10,6 +10,22 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added (container distribution)
+
+- **Self-hosting container image** — `Dockerfile` (static-web-server base,
+  pinned by multi-arch index digest) packages the client runtime set only;
+  `publish-container.yml` builds, pushes to GHCR and provenance-attests the
+  image on every release (blocked egress, GitHub-only endpoints, job-scoped
+  write). Documented under *Setup → Self-host (container)* in `README.md`.
+  Scorecard: the Packaging check now counts instead of being excluded.
+
+### Changed (container distribution)
+
+- **OpenSSF Best Practices evidence pack corrected** — `floss_license` is a
+  passing-level MUST, so a proprietary project holds an *in-progress* entry
+  (2/10 on CII-Best-Practices), not *passing*; the doc previously overstated
+  this. Licensing decision recorded: proprietary stays (2026-07-11).
+
 ### Added (perfection pass)
 
 - **Meta descriptions on all three screens** — the one recurring sub-100

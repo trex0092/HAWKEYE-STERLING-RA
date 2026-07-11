@@ -231,6 +231,15 @@ python3 -m http.server 8000
 # → http://localhost:8000
 ```
 
+**Self-host (container)** — every release publishes a provenance-attested image to GHCR ([`publish-container.yml`](.github/workflows/publish-container.yml)); versions track `APP_VERSION`:
+
+```bash
+docker run -p 8080:80 ghcr.io/trex0092/hawkeye-sterling-ra:latest
+# → http://localhost:8080
+```
+
+The image serves the same static tree as the live site; the Netlify functions (Asana relay, AI brain, encrypted backup) are absent and the app degrades gracefully — all assessment data stays on-device either way.
+
 **Deploy** — the Netlify project [`hawkeye-sterling-ra`](https://app.netlify.com/projects/hawkeye-sterling-ra) publishes the repo root as-is (`netlify.toml`, no build step). Link the repository to the project in the Netlify UI for continuous deploys, or deploy any other static host — the app is `index.html` plus its same-origin `app.js` (and the `console.html`/`advisor.html` pages with their `*.js`).
 
 ## Tests
@@ -284,6 +293,7 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 ├── scripts/asana-alert.mjs     # Asana alert task helper (used by site health)
 ├── package.json / package-lock.json # Dev/CI toolchain, lockfile-pinned (zero runtime npm deps)
 ├── pyproject.toml              # Python engine metadata (runtime pins stay in ci/requirements.txt)
+├── Dockerfile                  # Self-hosting image (GHCR, digest-pinned base, published per release)
 ├── netlify.toml                # Static publish config (repo root, no build)
 ├── netlify/functions/          # Serverless: Asana task delivery + risk-data mirror
 ├── docs/                       # README screenshots + governance/research notes
