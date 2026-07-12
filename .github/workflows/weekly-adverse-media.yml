@@ -46,6 +46,10 @@ jobs:
           # screen.py contacts, Asana, Anthropic (LLM triage, when enabled), and the
           # GitHub/PyPI infra for checkout + pip. A missed host fails LOUD (the
           # empty-list guard reds the job; adverse/PEP degrade, never a silent clear).
+          # OFAC and UN serve their files via 302 to presigned storage URLs, so their
+          # storage backends (S3 / Azure blob) are allowlisted next to the primaries —
+          # without them both core lists are refused at connect time and screening
+          # silently runs DEGRADED (as it did 09–12 Jul).
           egress-policy: block
           allowed-endpoints: >
             github.com:443
@@ -57,7 +61,9 @@ jobs:
             app.asana.com:443
             api.anthropic.com:443
             sanctionslistservice.ofac.treas.gov:443
+            wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
             scsanctions.un.org:443
+            unsolprodfiles.blob.core.windows.net:443
             ofsistorage.blob.core.windows.net:443
             data.opensanctions.org:443
             www.international.gc.ca:443
@@ -102,13 +108,16 @@ jobs:
           #   2. Google News across the worldwide locale matrix, scored against the
           #      36-language red-flag dictionaries.
           # ADVERSE_LOCALES caps how many of the 74 Google-News locales are swept per
-          # subject so the daily job DELIVERS to Asana inside the 350-min cap (a full
-          # 74-locale sweep is ~10x the requests and would time out on a ~1000-subject
-          # book → nothing delivered). GDELT keeps global coverage regardless. Set the
-          # repo var ADVERSE_LOCALES=all for a manual/weekend deep sweep, and raise
-          # SCREEN_CONCURRENCY with it. Both are tunable without a code change.
-          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '14' }}
-          SCREEN_CONCURRENCY: ${{ vars.SCREEN_CONCURRENCY || '16' }}
+          # subject. The defaults are the EMPIRICAL per-IP ceiling for Google News
+          # from a GitHub runner: at 14 locales × 16 workers (10–12 Jul) the limiter
+          # tripped and 805/838 subjects got ZERO adverse-media coverage (raised as
+          # am_errors and a sustained anomaly); at 5 × 8 the full book swept clean.
+          # GDELT keeps worldwide coverage regardless. Raising the repo vars for a
+          # manual deep sweep risks re-tripping the limiter — the engine now
+          # early-exits throttled subjects and degrades LOUDLY, but the recall loss
+          # is real, so raise them only for supervised off-schedule runs.
+          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '5' }}
+          SCREEN_CONCURRENCY: ${{ vars.SCREEN_CONCURRENCY || '8' }}
           # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
           # its own assigned MLRO case subtask, not just the first 40. The full
           # findings list is always in the daily task body regardless of this cap.

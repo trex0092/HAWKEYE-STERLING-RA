@@ -49,6 +49,8 @@ jobs:
           # screen.py contacts, Asana, Anthropic (LLM triage, when enabled), and the
           # GitHub/PyPI infra for checkout + pip. A missed host fails LOUD (the
           # empty-list guard reds the job; adverse/PEP degrade, never a silent clear).
+          # OFAC and UN serve their files via 302 to presigned storage URLs, so their
+          # storage backends (S3 / Azure blob) are allowlisted next to the primaries.
           egress-policy: block
           allowed-endpoints: >
             github.com:443
@@ -60,7 +62,9 @@ jobs:
             app.asana.com:443
             api.anthropic.com:443
             sanctionslistservice.ofac.treas.gov:443
+            wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
             scsanctions.un.org:443
+            unsolprodfiles.blob.core.windows.net:443
             ofsistorage.blob.core.windows.net:443
             data.opensanctions.org:443
             www.international.gc.ca:443
