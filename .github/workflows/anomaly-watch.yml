@@ -4,8 +4,10 @@ name: Anomaly Watch
 # across consecutive screening runs (per monitoring.sustained_anomalies), as
 # opposed to a single-run blip — to a GitHub issue for the MLRO. Detection lives
 # in monitoring.py and is unit-tested; this workflow only ROUTES the verdict.
-# It reads the committed metrics history (data/run-metrics.json); until the
-# engine commits that state the run is a clean, green no-op.
+# It reads the committed metrics history (data/run-metrics.json) from the
+# screen-delta-state branch, where the engine persists it (main is push-
+# protected); until the engine commits that state the run is a clean, green
+# no-op.
 
 on:
   schedule:
@@ -44,6 +46,24 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
+      - name: Overlay latest metrics history (lives on the screen-delta-state branch)
+        run: |
+          # The screening engine persists data/run-metrics.json on the
+          # screen-delta-state branch (main is push-protected — GH006), so the
+          # copy on main freezes at whatever the last direct-to-main commit was.
+          # Reading main's copy here made the staleness heartbeat report a false
+          # "dead pipeline" while the daily sweep was green (issue #222). A
+          # MISSING branch is the pre-bootstrap case (fall back to main's copy);
+          # a FAILED fetch must red this job — silently reverting to the stale
+          # copy would re-create the false escalation. Anonymous fetch is fine:
+          # the repo is public and checkout kept persist-credentials: false.
+          if [ -n "$(git ls-remote --heads origin screen-delta-state)" ]; then
+            git fetch origin screen-delta-state --depth=1
+            git checkout FETCH_HEAD -- data/run-metrics.json
+            echo "run-metrics overlaid from screen-delta-state"
+          else
+            echo "no screen-delta-state branch yet — using state from main"
+          fi
       - name: Detect sustained anomalies
         id: detect
         run: |

@@ -720,6 +720,17 @@ GDELT_RISK_TERMS = [
     "arrested", "investigation", "raid", "seized", '"asset freeze"', "blacklisted",
 ]
 
+# GDELT circuit breaker. GDELT throttles busy shared IPs (GitHub runners) at the
+# CONNECTION level — no HTTP response, just a hang until the 20s timeout — and
+# once it does it stays down for the whole run (12 Jul: all 838 subjects burned a
+# 20-second timeout each, ~4.6 h of worker time). After this many CONSECUTIVE
+# hard failures the feed is declared down for the REST OF THE RUN with one loud
+# log line; each subject's coverage then stands on the Google News passes (and
+# still degrades loudly if those fail too). A success resets the count; the
+# breaker re-arms fresh on the next run.
+GDELT_BREAKER_AFTER = int(os.environ.get("GDELT_BREAKER_AFTER", "5"))
+_GDELT_STATE = {"consecutive_failures": 0, "open": False}
+
 def parse_gdelt(payload, max_results: int = 8) -> list:
     """GDELT artlist JSON → the same article shape the Google News pass emits.
     Pure (no network) so it is unit-testable offline."""
@@ -768,6 +779,10 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
       Pass 3 — targeted Arabic risk-term pass on the AE:ar edition.
     Headlines are flagged against an 18-language multilingual red-flag set,
     bucketed by typology, deduplicated across outlets, and ranked recent-first.
+    Self-throttling: every request is paced (success or failure), a subject
+    whose first 4 fetches all fail transport-level stops hammering the feed,
+    and a hard-down GDELT trips a run-level circuit breaker — so a rate-limited
+    feed degrades LOUDLY (am_error) instead of spiralling into a retry storm.
     Returns list of dicts: {title, source, date, ts, url, flagged, keywords, categories}.
     """
     seen_titles = set()
@@ -781,58 +796,87 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
         # never match the English risk terms (AE:ar locale only).
         passes.append((f'"{name}" ({AR_RISK_QUERY})', GNEWS_URLS[4:5]))
     attempts = failures = 0
+    throttled = False
     for q, locales in passes:
+        if throttled:
+            break
         query = requests.utils.quote(q)
         for url_template in locales:
             url = url_template.format(query=query)
             attempts += 1
+            ok = False
             try:
                 r = requests.get(url, timeout=15,
                                  headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
-                if r.status_code != 200:
-                    failures += 1
-                    continue
-                root = ET.fromstring(r.content)
-                for item in root.findall(".//item")[:max_results]:
-                    title_el = item.find("title")
-                    source_el = item.find("source")
-                    pubdate_el = item.find("pubDate")
-                    link_el = item.find("link")
-                    if title_el is None: continue
-                    title = (title_el.text or "").strip()
-                    if title in seen_titles: continue
-                    seen_titles.add(title)
-                    source = (source_el.text if source_el is not None else "Unknown")
-                    pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
-                    link = (link_el.text or "") if link_el is not None else ""
-                    matched = match_adverse_keywords(title)
-                    articles.append({
-                        "title": title,
-                        "source": source,
-                        "date": pub_date,
-                        "ts": _parse_rss_date(pubdate_el.text if pubdate_el is not None else ""),
-                        "url": link,
-                        "flagged": bool(matched),
-                        "keywords": matched,
-                        "categories": typology_for(matched),
-                    })
+                if r.status_code == 200:
+                    root = ET.fromstring(r.content)
+                    for item in root.findall(".//item")[:max_results]:
+                        title_el = item.find("title")
+                        source_el = item.find("source")
+                        pubdate_el = item.find("pubDate")
+                        link_el = item.find("link")
+                        if title_el is None: continue
+                        title = (title_el.text or "").strip()
+                        if title in seen_titles: continue
+                        seen_titles.add(title)
+                        source = (source_el.text if source_el is not None else "Unknown")
+                        pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
+                        link = (link_el.text or "") if link_el is not None else ""
+                        matched = match_adverse_keywords(title)
+                        articles.append({
+                            "title": title,
+                            "source": source,
+                            "date": pub_date,
+                            "ts": _parse_rss_date(pubdate_el.text if pubdate_el is not None else ""),
+                            "url": link,
+                            "flagged": bool(matched),
+                            "keywords": matched,
+                            "categories": typology_for(matched),
+                        })
+                    ok = True
             except Exception:
+                ok = False
+            if not ok:
                 failures += 1
-                continue
+            # Pace EVERY request, not just successes. Sleeping only on the
+            # success path meant a throttled feed was hammered back-to-back
+            # with zero delay — the retry storm kept the limiter tripped for
+            # the entire run (10–12 Jul: 805/838 subjects at zero coverage).
             time.sleep(0.4)  # polite delay between requests
+            # Transport-level early exit: the FIRST 4 fetches for this subject
+            # all failed ⇒ the feed is refusing this runner right now (per-IP
+            # rate limit / egress refusal). Every remaining locale hits the
+            # same host and fails the same way; skipping them sheds the load
+            # that keeps the limiter tripped. Never triggers once any fetch
+            # succeeded, and the subject still degrades loudly below unless
+            # GDELT covered it.
+            if failures == attempts and attempts >= 4:
+                throttled = True
+                break
 
     # Independent second source — GDELT. Its failure alone never fails the
     # subject (the Google News passes above already ran); it is logged so a quiet
     # feed outage is visible in the run log instead of silently narrowing recall.
+    # The run-level breaker (see GDELT_BREAKER_AFTER) stops a hard-down feed from
+    # costing every remaining subject a 20-second connect timeout.
     gdelt_ok = False
-    try:
-        for a in search_gdelt(name, max_results):
-            if a["title"] not in seen_titles:
-                seen_titles.add(a["title"])
-                articles.append(a)
-        gdelt_ok = True
-    except Exception as e:
-        log(f"  GDELT unavailable for this subject ({str(e)[:80]}) — Google News coverage stands")
+    if not _GDELT_STATE["open"]:
+        try:
+            for a in search_gdelt(name, max_results):
+                if a["title"] not in seen_titles:
+                    seen_titles.add(a["title"])
+                    articles.append(a)
+            gdelt_ok = True
+            _GDELT_STATE["consecutive_failures"] = 0
+        except Exception as e:
+            _GDELT_STATE["consecutive_failures"] += 1
+            if _GDELT_STATE["consecutive_failures"] >= GDELT_BREAKER_AFTER:
+                if not _GDELT_STATE["open"]:
+                    _GDELT_STATE["open"] = True
+                    log(f"  GDELT down ({GDELT_BREAKER_AFTER} subjects in a row) — circuit OPEN, "
+                        "skipping GDELT for the rest of the run; Google News coverage stands")
+            else:
+                log(f"  GDELT unavailable for this subject ({str(e)[:80]}) — Google News coverage stands")
 
     # Degrade loudly: if EVERY Google-News fetch failed AND GDELT failed, we have
     # ZERO coverage for this subject — raise so the caller records an am_error and
@@ -1175,9 +1219,15 @@ def parse_uk(data):
         log(f"  UK parse error: {e}")
     return names, date_str, sha256_of(data)
 
-def parse_eu(data):
+def parse_simple_csv(data, label="list"):
+    """OpenSanctions targets.simple.csv → set of names (primary + ;-separated
+    aliases). One format serves several lists: EU FSF is fetched this way as the
+    primary source, and OFAC SDN / UN Consolidated fall back to their
+    OpenSanctions mirrors in this format when the official endpoint is
+    unreachable (both serve files via 302 to presigned storage URLs, which an
+    egress-blocked runner refuses unless the storage host is allowlisted)."""
     names = set()
-    if not data: return names, "unknown", ""
+    if not data: return names
     try:
         reader = csv.DictReader(io.StringIO(data.decode("utf-8")))
         for row in reader:
@@ -1190,7 +1240,12 @@ def parse_eu(data):
             except Exception:
                 continue  # one malformed row never zeroes the whole list
     except Exception as e:
-        log(f"  EU parse error: {e}")
+        log(f"  {label} parse error: {e}")
+    return names
+
+def parse_eu(data):
+    names = parse_simple_csv(data, "EU")
+    if not data: return names, "unknown", ""
     return names, "live", sha256_of(data)
 
 def parse_canada(data):
@@ -2061,6 +2116,24 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
         log(f"✅ Comment on {customer_gid}")
 
 # ── UNIFIED DAILY REPORT (Sanctions + Adverse Media + PEP, ONE narrative) ─────
+def _mirror_fallback(names, dataset, label):
+    """When an official core-list endpoint yields nothing (unreachable, refused
+    redirect, garbled payload), fall back to its OpenSanctions mirror — same
+    host that already serves EU FSF, so it is reachable wherever screening runs.
+    The mirror's simple format carries primary names + designated aliases. The
+    provenance is kept honest: the list's 'date' field says MIRROR so the report
+    and audit trail show which source actually screened. Returns (names, date,
+    hash) — unchanged inputs when the primary already loaded."""
+    if names:
+        return None
+    data = download(f"https://data.opensanctions.org/datasets/latest/{dataset}/targets.simple.csv",
+                    f"{label} (OpenSanctions mirror)")
+    mirror_names = parse_simple_csv(data, label)
+    if not mirror_names:
+        return None
+    log(f"  {label}: official endpoint unavailable — screened via OpenSanctions mirror")
+    return mirror_names, "live (OpenSanctions mirror)", sha256_of(data)
+
 def load_all_lists():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
@@ -2070,6 +2143,10 @@ def load_all_lists():
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
     ofac_names |= parse_ofac_alt(ofac_alt_data)   # fold in SDN a.k.a. aliases (best-effort)
     un_names,   un_date,   un_hash   = parse_un(un_data)
+    fb = _mirror_fallback(ofac_names, "us_ofac_sdn", "OFAC SDN")
+    if fb: ofac_names, ofac_date, ofac_hash = fb
+    fb = _mirror_fallback(un_names, "un_sc_sanctions", "UN Consolidated")
+    if fb: un_names, un_date, un_hash = fb
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)

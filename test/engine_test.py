@@ -525,6 +525,98 @@ check("legacy history without am_errors stays silent (backward compatible)",
           [{"date": "2026-06-01", "total_seconds": 100, "error_rate": 0.0,
             "counts": {"subjects": 100}}] * 3, window=3))
 
+# ── screen.py: adverse-media resilience + core-list mirror fallback ───────────
+# Regressions from the 10–12 Jul incident: a rate-limited Google News turned
+# into a zero-delay retry storm (805/838 subjects at zero coverage), a hard-down
+# GDELT cost every subject a 20s timeout, and OFAC/UN silently screened empty
+# when their presigned-storage redirects were refused.
+print("screen.py — adverse-media resilience + list mirror fallback")
+
+class _Resp:
+    def __init__(self, status=200, content=b""):
+        self.status_code = status; self.content = content
+
+_RSS_OK = b"<rss><channel><item><title>Acme probe</title></item></channel></rss>"
+_calls = {"gnews": 0, "sleeps": 0, "gdelt": 0}
+_orig_get, _orig_sleep, _orig_gdelt = screen.requests.get, screen.time.sleep, screen.search_gdelt
+screen.time.sleep = lambda *_a, **_k: _calls.__setitem__("sleeps", _calls["sleeps"] + 1)
+
+def _reset_breaker():
+    screen._GDELT_STATE["consecutive_failures"] = 0
+    screen._GDELT_STATE["open"] = False
+
+def _gnews_refused(*_a, **_k):
+    _calls["gnews"] += 1
+    raise OSError("connection refused")
+
+def _gdelt_down(*_a, **_k):
+    _calls["gdelt"] += 1
+    raise RuntimeError("GDELT HTTP 429")
+
+# Total outage: stop after the first 4 transport failures, pace every attempt,
+# and still degrade loudly (the caller records an am_error).
+_reset_breaker(); screen.requests.get = _gnews_refused; screen.search_gdelt = _gdelt_down
+_raised = ""
+try:
+    screen.search_adverse_media("Total Outage LLC")
+except RuntimeError as e:
+    _raised = str(e)
+check("throttled subject early-exits after 4 fetches (not the full sweep)", _calls["gnews"] == 4)
+check("total outage still degrades loudly (am_error raise)", "all 4" in _raised)
+check("failed fetches are paced too (no zero-delay retry storm)", _calls["sleeps"] == 4)
+
+# Any success disarms the early exit — a healthy-but-flaky sweep still covers
+# every locale and keeps the coverage it found.
+_reset_breaker(); _calls["gnews"] = 0
+def _gnews_first_ok(*_a, **_k):
+    _calls["gnews"] += 1
+    if _calls["gnews"] == 1: return _Resp(200, _RSS_OK)
+    raise OSError("connection refused")
+screen.requests.get = _gnews_first_ok
+_arts = screen.search_adverse_media("Partly Cloudy DMCC")
+check("a subject with any success sweeps all locales (no early exit)", _calls["gnews"] == 7)
+check("partial coverage is kept, not raised away", len(_arts) == 1)
+
+# GDELT circuit breaker: N consecutive hard failures open the circuit for the
+# rest of the run; a success resets the streak.
+_reset_breaker(); _calls["gdelt"] = 0
+screen.requests.get = lambda *_a, **_k: _Resp(200, _RSS_OK)
+screen.search_gdelt = _gdelt_down
+for _ in range(screen.GDELT_BREAKER_AFTER + 3):
+    screen.search_adverse_media("Acme")
+check("GDELT circuit opens after N consecutive failures", screen._GDELT_STATE["open"])
+check("GDELT is not called once the circuit is open", _calls["gdelt"] == screen.GDELT_BREAKER_AFTER)
+_reset_breaker()
+screen.search_gdelt = lambda *_a, **_k: []
+screen.search_adverse_media("Acme")
+check("a GDELT success keeps the circuit closed and the streak at zero",
+      screen._GDELT_STATE["consecutive_failures"] == 0 and not screen._GDELT_STATE["open"])
+
+# OFAC / UN mirror fallback: primary yielded nothing → screen via the
+# OpenSanctions mirror with MIRROR provenance; primary loaded → no mirror fetch;
+# mirror also down → None (the existing degrade paths take over).
+_SIMPLE = b"id,schema,name,aliases\n1,Person,BAD GUY,ALIAS ONE;ALIAS TWO\n"
+_dl_urls = []
+_orig_download = screen.download
+screen.download = lambda url, label: (_dl_urls.append(url) or _SIMPLE)
+_fb = screen._mirror_fallback(set(), "us_ofac_sdn", "OFAC SDN")
+check("mirror fallback loads names when the primary yielded nothing",
+      bool(_fb) and _fb[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
+check("mirror provenance is explicit in the list date (audit trail)",
+      bool(_fb) and "mirror" in _fb[1].lower())
+check("mirror URL targets the expected OpenSanctions dataset",
+      bool(_dl_urls) and "us_ofac_sdn/targets.simple.csv" in _dl_urls[0])
+check("no mirror fetch when the primary loaded",
+      screen._mirror_fallback({"LOADED"}, "us_ofac_sdn", "OFAC SDN") is None and len(_dl_urls) == 1)
+screen.download = lambda url, label: None
+check("mirror also down → no fallback (existing degrade-loudly paths handle it)",
+      screen._mirror_fallback(set(), "un_sc_sanctions", "UN Consolidated") is None)
+screen.download = _orig_download
+check("parse_eu still parses via the shared simple-csv parser",
+      screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
+
+screen.requests.get, screen.time.sleep, screen.search_gdelt = _orig_get, _orig_sleep, _orig_gdelt
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

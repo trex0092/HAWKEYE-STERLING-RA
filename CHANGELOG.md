@@ -10,6 +10,43 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Fixed (screening ops — issue #222 disposition)
+
+- **Anomaly-watch read a frozen metrics copy** — the runtime monitor read
+  `data/run-metrics.json` from `main`, but the engine has persisted it on the
+  `screen-delta-state` branch since `main` became push-protected; the copy on
+  `main` froze at 2026-07-05 and the staleness heartbeat escalated a false
+  "dead pipeline / dead cron" (issue #222) while the daily sweep was green.
+  `anomaly-watch.yml` now overlays the state branch before detecting (missing
+  branch = clean bootstrap fallback; failed fetch reds the job rather than
+  silently regressing to stale data).
+- **OFAC SDN and UN Consolidated silently screened empty** — both endpoints
+  serve their files via 302 to presigned storage URLs
+  (`wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com` /
+  `unsolprodfiles.blob.core.windows.net`); the egress-blocked screening jobs
+  refused the redirect at connect time, so both core lists loaded ZERO names
+  and every run reported *Sanctions DEGRADED*. The storage hosts are now
+  allowlisted in `weekly-adverse-media.yml`, `onboarding-screen.yml` and
+  `sanctions-screen.yml` (matching `sanctions-watch.yml`), and `screen.py`
+  falls back to the OpenSanctions mirrors (`us_ofac_sdn` / `un_sc_sanctions`,
+  same host that already serves EU FSF) with explicit MIRROR provenance when
+  a primary yields nothing.
+- **Adverse-media recall collapse under rate-limiting** — the 14-locale ×
+  16-worker worldwide sweep tripped Google News' per-IP limiter (10–12 Jul:
+  805/838 subjects at zero coverage, raised as `am_errors`), and a throttled
+  feed was retried with zero delay (the polite pacing only ran on successes),
+  keeping the limiter tripped all run; GDELT, connection-throttled from
+  runner IPs, cost every subject a 20-second timeout. Defaults return to the
+  proven 5 locales × 8 workers; every fetch is paced (success or failure); a
+  subject whose first 4 fetches all fail transport-level stops hammering the
+  feed (still degrading loudly unless GDELT covered it); and a run-level
+  GDELT circuit breaker (`GDELT_BREAKER_AFTER`, default 5 consecutive hard
+  failures) skips the feed for the rest of the run with one loud log line.
+- **Drift guard** (`test/screening-state.test.mjs`) — asserts the state
+  readers/writers all point at `screen-delta-state` and that every workflow
+  allowlisting an OFAC/UN primary also allowlists its presigned storage
+  host, so neither failure class can silently return.
+
 ### Added (security ops)
 
 - **History scrub runbook** (`docs/security/history-scrub-runbook.md`) —
