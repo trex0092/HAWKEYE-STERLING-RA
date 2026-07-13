@@ -9,6 +9,7 @@ Modes:
 """
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
+import threading
 import xml.etree.ElementTree as ET
 import concurrent.futures
 
@@ -731,6 +732,89 @@ GDELT_RISK_TERMS = [
 GDELT_BREAKER_AFTER = int(os.environ.get("GDELT_BREAKER_AFTER", "5"))
 _GDELT_STATE = {"consecutive_failures": 0, "open": False}
 
+
+# ── Cross-worker feed pacing ──────────────────────────────────────────────────
+# The per-worker 0.4s sleep paced each THREAD, but SCREEN_CONCURRENCY workers
+# still hit the same feed concurrently — bursts of ~16 req/s against per-IP
+# limiters that meter in seconds. Once Google News tripped (9 Jul), that burst
+# rate never let it cool (13 Jul, post-pacing-fix: still 743/838 subjects at
+# zero coverage), and 8 workers slamming GDELT simultaneously 429'd it inside
+# the first minute. A gate serialises requests to one feed ACROSS ALL WORKERS
+# and adapts: failures back the shared interval off multiplicatively (a tripped
+# limiter gets quiet time to cool), successes decay it back toward base (a
+# healthy feed keeps full throughput).
+class _RateGate:
+    """Thread-safe request pacing for one external feed.
+
+    wait()     — blocks until this caller's reserved send slot; slots are handed
+                 out at least `interval` seconds apart across all threads.
+    penalize() — multiply the shared interval by `factor` (capped at `cap`);
+                 fires `on_cap` once per run when the cap is first reached.
+    reward()   — decay the interval by `decay` back toward `base`.
+    """
+    def __init__(self, base, cap, factor=1.6, decay=0.85, on_cap=None):
+        self.base, self.cap = float(base), float(cap)
+        self.factor, self.decay = float(factor), float(decay)
+        self.interval = self.base
+        self.on_cap = on_cap
+        self._lock = threading.Lock()
+        self._next = 0.0          # monotonic time of the next free send slot
+        self._cap_announced = False
+
+    def wait(self):
+        with self._lock:
+            now = time.monotonic()
+            delay = max(0.0, self._next - now)
+            self._next = max(now, self._next) + self.interval
+        if delay > 0:
+            time.sleep(delay)
+
+    def penalize(self):
+        announce = False
+        with self._lock:
+            self.interval = min(self.cap, self.interval * self.factor)
+            if self.interval >= self.cap and not self._cap_announced:
+                self._cap_announced = announce = True
+        if announce and self.on_cap:
+            self.on_cap()
+
+    def reward(self):
+        with self._lock:
+            self.interval = max(self.base, self.interval * self.decay)
+
+    @property
+    def at_cap(self):
+        return self.interval >= self.cap
+
+    def reset(self):
+        with self._lock:
+            self.interval = self.base
+            self._next = 0.0
+            self._cap_announced = False
+
+
+# Google News pacing: base = the proven polite delay (now global instead of
+# per-worker, so aggregate rate drops ~SCREEN_CONCURRENCY-fold); cap = the
+# quiet interval a tripped limiter needs to cool. Both env-tunable.
+GNEWS_MIN_INTERVAL = float(os.environ.get("GNEWS_MIN_INTERVAL", "0.4"))
+GNEWS_BACKOFF_CAP = float(os.environ.get("GNEWS_BACKOFF_CAP", "10.0"))
+# Run-level Google News breaker (mirror of GDELT's): after this many CONSECUTIVE
+# subjects with zero Google-News coverage WHILE the gate is already at max
+# backoff, the feed is refusing everything at maximum politeness — stop paying
+# its cost for the rest of the run. Any single success resets the streak, so a
+# merely-flaky feed never trips it. Subjects still degrade loudly (am_error)
+# unless GDELT covers them.
+GNEWS_BREAKER_AFTER = int(os.environ.get("GNEWS_BREAKER_AFTER", "30"))
+_GNEWS_STATE = {"consecutive_zero": 0, "open": False}
+_GNEWS_GATE = _RateGate(
+    GNEWS_MIN_INTERVAL, GNEWS_BACKOFF_CAP,
+    on_cap=lambda: log(f"  Google News rate-limited — pacing backed off to cap "
+                       f"({GNEWS_BACKOFF_CAP:g}s between fetches; recovers on success)"))
+# GDELT asks for ≤ 1 request per 5 seconds per IP; a fixed-interval gate
+# (base == cap) enforces exactly that across all workers.
+GDELT_MIN_INTERVAL = float(os.environ.get("GDELT_MIN_INTERVAL", "5.0"))
+_GDELT_GATE = _RateGate(GDELT_MIN_INTERVAL, GDELT_MIN_INTERVAL)
+
 def parse_gdelt(payload, max_results: int = 8) -> list:
     """GDELT artlist JSON → the same article shape the Google News pass emits.
     Pure (no network) so it is unit-testable offline."""
@@ -761,7 +845,11 @@ def parse_gdelt(payload, max_results: int = 8) -> list:
 
 def search_gdelt(name: str, max_results: int = 8) -> list:
     """Query GDELT for a subject + risk-term cluster. Raises on HTTP failure so
-    the caller can log it (the Google News passes still stand on their own)."""
+    the caller can log it (the Google News passes still stand on their own).
+    Paced by the run-global GDELT gate: 8 workers used to fire their first
+    GDELT requests simultaneously, which 429'd the feed inside the first minute
+    of the 13 Jul run and opened the circuit for all 838 subjects."""
+    _GDELT_GATE.wait()
     q = requests.utils.quote(f'"{name}" ({" OR ".join(GDELT_RISK_TERMS)})')
     r = requests.get(GDELT_URL.format(query=q), timeout=20,
                      headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
@@ -779,10 +867,14 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
       Pass 3 — targeted Arabic risk-term pass on the AE:ar edition.
     Headlines are flagged against an 18-language multilingual red-flag set,
     bucketed by typology, deduplicated across outlets, and ranked recent-first.
-    Self-throttling: every request is paced (success or failure), a subject
-    whose first 4 fetches all fail transport-level stops hammering the feed,
-    and a hard-down GDELT trips a run-level circuit breaker — so a rate-limited
-    feed degrades LOUDLY (am_error) instead of spiralling into a retry storm.
+    Self-throttling: every request waits for the run-global Google News gate
+    (one shared send slot across ALL workers; failures back the shared interval
+    off toward GNEWS_BACKOFF_CAP so a tripped per-IP limiter gets quiet time to
+    cool, successes decay it back to base), a subject whose first 4 fetches all
+    fail transport-level stops hammering the feed, and a feed refusing
+    GNEWS_BREAKER_AFTER consecutive subjects at max backoff — like a hard-down
+    GDELT — trips a run-level circuit breaker. A rate-limited feed degrades
+    LOUDLY (am_error) instead of spiralling into a retry storm.
     Returns list of dicts: {title, source, date, ts, url, flagged, keywords, categories}.
     """
     seen_titles = set()
@@ -797,6 +889,10 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
         passes.append((f'"{name}" ({AR_RISK_QUERY})', GNEWS_URLS[4:5]))
     attempts = failures = 0
     throttled = False
+    if _GNEWS_STATE["open"]:
+        passes = []   # run-level breaker open — Google News refused everything
+                      # at max backoff; the GDELT pass below still stands, and a
+                      # subject neither feed covers degrades loudly regardless.
     for q, locales in passes:
         if throttled:
             break
@@ -805,6 +901,7 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
             url = url_template.format(query=query)
             attempts += 1
             ok = False
+            _GNEWS_GATE.wait()
             try:
                 r = requests.get(url, timeout=15,
                                  headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
@@ -836,13 +933,17 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
                     ok = True
             except Exception:
                 ok = False
-            if not ok:
+            # Feed the adaptive gate: a failure widens the SHARED interval
+            # (multiplicative, toward the cap) so the whole worker pool goes
+            # quiet enough for a tripped limiter to cool; a success decays it
+            # back toward base. Per-worker sleeps couldn't do this — 8 workers
+            # each sleeping 0.4s still burst ~16 req/s at the feed (13 Jul:
+            # 743/838 subjects at zero coverage even WITH failure pacing).
+            if ok:
+                _GNEWS_GATE.reward()
+            else:
                 failures += 1
-            # Pace EVERY request, not just successes. Sleeping only on the
-            # success path meant a throttled feed was hammered back-to-back
-            # with zero delay — the retry storm kept the limiter tripped for
-            # the entire run (10–12 Jul: 805/838 subjects at zero coverage).
-            time.sleep(0.4)  # polite delay between requests
+                _GNEWS_GATE.penalize()
             # Transport-level early exit: the FIRST 4 fetches for this subject
             # all failed ⇒ the feed is refusing this runner right now (per-IP
             # rate limit / egress refusal). Every remaining locale hits the
@@ -853,6 +954,22 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
             if failures == attempts and attempts >= 4:
                 throttled = True
                 break
+
+    # Run-level Google News breaker: count CONSECUTIVE subjects with zero
+    # Google-News coverage while the gate is already at max backoff — i.e. the
+    # feed keeps refusing everything at maximum politeness. One success (any
+    # subject, any locale) resets the streak, so partial throttling — where
+    # patience still buys coverage — never trips it.
+    if attempts and not _GNEWS_STATE["open"]:
+        if failures >= attempts and _GNEWS_GATE.at_cap:
+            _GNEWS_STATE["consecutive_zero"] += 1
+            if _GNEWS_STATE["consecutive_zero"] >= GNEWS_BREAKER_AFTER:
+                _GNEWS_STATE["open"] = True
+                log(f"  Google News refusing all fetches ({GNEWS_BREAKER_AFTER} subjects in a row "
+                    "at max backoff) — circuit OPEN, skipping Google News for the rest of the run; "
+                    "GDELT coverage stands (uncovered subjects still degrade loudly)")
+        elif failures < attempts:
+            _GNEWS_STATE["consecutive_zero"] = 0
 
     # Independent second source — GDELT. Its failure alone never fails the
     # subject (the Google News passes above already ran); it is logged so a quiet
@@ -878,11 +995,14 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
             else:
                 log(f"  GDELT unavailable for this subject ({str(e)[:80]}) — Google News coverage stands")
 
-    # Degrade loudly: if EVERY Google-News fetch failed AND GDELT failed, we have
-    # ZERO coverage for this subject — raise so the caller records an am_error and
-    # the report degrades, rather than returning [] that reads as "no adverse media".
+    # Degrade loudly: if EVERY Google-News fetch failed (or its breaker skipped
+    # the feed entirely) AND GDELT failed, we have ZERO coverage for this
+    # subject — raise so the caller records an am_error and the report degrades,
+    # rather than returning [] that reads as "no adverse media".
     if attempts > 0 and failures >= attempts and not gdelt_ok:
         raise RuntimeError(f"adverse-media: all {attempts} Google-News fetches + GDELT failed for '{name}'")
+    if _GNEWS_STATE["open"] and attempts == 0 and not gdelt_ok:
+        raise RuntimeError(f"adverse-media: Google News circuit open + GDELT failed for '{name}'")
 
     articles = dedup_stories(articles)
     # Sort: flagged first, then most-recent first (recency ranking).
