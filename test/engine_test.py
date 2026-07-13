@@ -5,7 +5,7 @@ Self-contained: stubs the runtime-only deps (rapidfuzz/pdfplumber/requests) so t
 pure logic can be exercised offline in CI. Run: `python test/engine_test.py`
 Exits non-zero on first failure (CI-friendly).
 """
-import sys, os, types, difflib, importlib.util
+import sys, os, types, difflib, importlib.util, json
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -535,15 +535,25 @@ print("screen.py — adverse-media resilience + list mirror fallback")
 class _Resp:
     def __init__(self, status=200, content=b""):
         self.status_code = status; self.content = content
+    def json(self):
+        return json.loads(self.content or b"{}")
 
 _RSS_OK = b"<rss><channel><item><title>Acme probe</title></item></channel></rss>"
 _calls = {"gnews": 0, "sleeps": 0, "gdelt": 0}
 _orig_get, _orig_sleep, _orig_gdelt = screen.requests.get, screen.time.sleep, screen.search_gdelt
+_orig_mono = screen.time.monotonic
 screen.time.sleep = lambda *_a, **_k: _calls.__setitem__("sleeps", _calls["sleeps"] + 1)
+# Pin the clock: the rate gate schedules send slots on time.monotonic, and a
+# frozen "now" makes every computed delay (hence every sleep) deterministic.
+screen.time.monotonic = lambda: 1000.0
 
 def _reset_breaker():
     screen._GDELT_STATE["consecutive_failures"] = 0
     screen._GDELT_STATE["open"] = False
+    screen._GNEWS_STATE["consecutive_zero"] = 0
+    screen._GNEWS_STATE["open"] = False
+    screen._GNEWS_GATE.reset()
+    screen._GDELT_GATE.reset()
 
 def _gnews_refused(*_a, **_k):
     _calls["gnews"] += 1
@@ -563,7 +573,12 @@ except RuntimeError as e:
     _raised = str(e)
 check("throttled subject early-exits after 4 fetches (not the full sweep)", _calls["gnews"] == 4)
 check("total outage still degrades loudly (am_error raise)", "all 4" in _raised)
-check("failed fetches are paced too (no zero-delay retry storm)", _calls["sleeps"] == 4)
+# Pace-before-send through the run-global gate: the first slot of a fresh run
+# is immediate, every later fetch waits its turn — so 4 fetches = 3 gate waits,
+# and failures widen the shared interval instead of retrying back-to-back.
+check("failed fetches are paced too (no zero-delay retry storm)", _calls["sleeps"] == 3)
+check("failures back the shared gate off multiplicatively",
+      screen._GNEWS_GATE.interval > screen.GNEWS_MIN_INTERVAL)
 
 # Any success disarms the early exit — a healthy-but-flaky sweep still covers
 # every locale and keeps the coverage it found.
@@ -592,6 +607,77 @@ screen.search_adverse_media("Acme")
 check("a GDELT success keeps the circuit closed and the streak at zero",
       screen._GDELT_STATE["consecutive_failures"] == 0 and not screen._GDELT_STATE["open"])
 
+# ── run-global rate gate + Google News circuit breaker (13 Jul regression) ────
+# Per-worker pacing was not enough: 8 workers each sleeping 0.4s still burst
+# ~16 req/s at Google News, so the limiter tripped on 9 Jul never cooled
+# (13 Jul: 743/838 subjects at zero coverage), and 8 simultaneous first hits
+# 429'd GDELT inside the first minute. The gate serialises sends ACROSS workers
+# and adapts to the feed; sustained refusal at max backoff opens a run-level
+# breaker like GDELT's.
+print("screen.py — cross-worker rate gate + Google News breaker")
+
+_cap_fired = {"n": 0}
+_gate = screen._RateGate(0.4, 10.0, on_cap=lambda: _cap_fired.__setitem__("n", _cap_fired["n"] + 1))
+for _ in range(12):
+    _gate.penalize()
+check("gate backoff is multiplicative and capped", _gate.interval == 10.0 and _gate.at_cap)
+check("cap announcement fires exactly once", _cap_fired["n"] == 1)
+for _ in range(40):
+    _gate.reward()
+check("successes decay the interval back to base (never below)", _gate.interval == 0.4)
+
+_slots = []
+screen.time.sleep = lambda s: _slots.append(round(float(s), 3))
+_g2 = screen._RateGate(1.0, 8.0)
+_g2.wait(); _g2.wait(); _g2.wait()
+check("gate serialises callers ≥ interval apart (cross-worker, not per-worker)",
+      _slots == [1.0, 2.0])
+screen.time.sleep = lambda *_a, **_k: _calls.__setitem__("sleeps", _calls["sleeps"] + 1)
+
+# Breaker path: consecutive zero-coverage subjects at max backoff open the
+# circuit; the sweep stops paying Google News' cost for the rest of the run.
+_reset_breaker(); _calls["gnews"] = 0
+screen.requests.get = _gnews_refused
+screen.search_gdelt = lambda *_a, **_k: []          # GDELT healthy — no am_error
+for _ in range(screen.GNEWS_BREAKER_AFTER + 5):
+    screen.search_adverse_media("Refused Forever LLC")
+check("Google News circuit opens after N consecutive zero-coverage subjects at max backoff",
+      screen._GNEWS_STATE["open"])
+_calls["gnews"] = 0
+screen.search_adverse_media("After Breaker DMCC")
+check("Google News is not fetched once its circuit is open", _calls["gnews"] == 0)
+screen.search_gdelt = _gdelt_down
+screen._GDELT_STATE["open"] = True                   # both feeds down
+_raised = ""
+try:
+    screen.search_adverse_media("No Coverage At All Ltd")
+except RuntimeError as e:
+    _raised = str(e)
+check("breaker-open subjects still degrade loudly when GDELT is down too (no silent clear)",
+      "circuit open" in _raised)
+
+# Partial throttling never trips the breaker: one success resets the streak.
+_reset_breaker(); _calls["gnews"] = 0
+screen._GNEWS_STATE["consecutive_zero"] = screen.GNEWS_BREAKER_AFTER - 1
+screen._GNEWS_GATE.interval = screen._GNEWS_GATE.cap   # pinned at max backoff
+screen.requests.get = _gnews_first_ok                   # fetch 1 OK, rest refused
+screen.search_gdelt = lambda *_a, **_k: []
+screen.search_adverse_media("One Good Fetch LLC")
+check("a single Google News success resets the breaker streak",
+      screen._GNEWS_STATE["consecutive_zero"] == 0 and not screen._GNEWS_STATE["open"])
+
+# GDELT is paced by its own fixed-interval gate (≤ 1 request / 5s per IP,
+# shared across all workers — 8 simultaneous first hits is how it 429'd).
+_reset_breaker(); _slots = []
+screen.time.sleep = lambda s: _slots.append(round(float(s), 3))
+screen.requests.get = lambda *_a, **_k: _Resp(200, b'{"articles": []}')
+screen.search_gdelt = _orig_gdelt
+screen.search_gdelt("Paced Subject One")
+screen.search_gdelt("Paced Subject Two")
+check("GDELT fetches are paced by the run-global gate (one per GDELT_MIN_INTERVAL)",
+      _slots == [round(screen.GDELT_MIN_INTERVAL, 3)])
+screen.time.sleep = lambda *_a, **_k: _calls.__setitem__("sleeps", _calls["sleeps"] + 1)
+
 # OFAC / UN mirror fallback: primary yielded nothing → screen via the
 # OpenSanctions mirror with MIRROR provenance; primary loaded → no mirror fetch;
 # mirror also down → None (the existing degrade paths take over).
@@ -616,6 +702,8 @@ check("parse_eu still parses via the shared simple-csv parser",
       screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
 
 screen.requests.get, screen.time.sleep, screen.search_gdelt = _orig_get, _orig_sleep, _orig_gdelt
+screen.time.monotonic = _orig_mono
+_reset_breaker()   # leave the run-global gates/breakers pristine for later suites
 
 print()
 if _fail:
