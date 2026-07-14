@@ -61,6 +61,9 @@ def _save(path, data):
             if os.path.exists(tmp):
                 os.remove(tmp)
         except Exception:
+            # Best-effort temp cleanup only: the original file was never touched
+            # (os.replace is atomic and did not run), so a stray .tmp is harmless
+            # and there is nothing to recover or re-raise.
             pass
         return False
 
