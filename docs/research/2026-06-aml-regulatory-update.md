@@ -79,11 +79,11 @@ e) The 03/2026 MoET Supplemental Guidance for DPMS (single source). [19]
 17. AML Intelligence, final plenary under the Mexican presidency: https://www.amlintelligence.com/2026/06/fatf-last-plenary-under-mexican-presidency/
 18. FATF, incoming presidency of Giles Thomson: https://www.fatf-gafi.org/en/the-fatf/fatf-presidency/giles-thomson.html
 19. AML UAE, MoET supplemental guidance for DPMS: https://amluae.com/moet-supplemental-guidance-for-dealers-in-precious-metals-stones/
-20. Ministry of Economy and Tourism, H1 2025 inspection results: https://www.moet.gov.ae/en/-/ministry-of-economy-and-tourism-announces-h1-2025-inspection-results-on-private-sector-compliance-with-anti-money-laundering-laws
+20. Ministry of Economy and Tourism, H1 2025 inspection results: https://www.moet.gov.ae/en/-/ministry-of-economy-and-tourism-announces-h1-2025-inspection-results-on-private-sector-compliance-with-anti-money-laundering-laws (ministry site blocks datacenter/CI probes — verified in a browser; see the link-check host allowlist)
 21. The National, UAE imposes $11.4m in fines in H1 2025: https://www.thenationalnews.com/business/2025/07/24/uae-imposes-114m-in-fines-during-first-half-of-2025-on-money-laundering-offenders/
 22. UAE MOFA, NAMLCFTC replaces the Executive Office: https://www.mofa.gov.ae/en/mediahub/news/2024/9/23/23-9-2024-uae-national-anti-money-laundering2
 23. CBUAE Rulebook, Federal Decree-Law No. (7) of 2024: https://rulebook.centralbank.ae/en/rulebook/federal-law-decree-no-7-2024-amending-certain-provisions-federal-law-law-no-20-2018-anti
-24. MoET, registering companies in goAML: https://www.moet.gov.ae/en/registering-companies-in-goaml
+24. MoET, registering companies in goAML: https://www.moet.gov.ae/en/registering-companies-in-goaml (ministry site blocks datacenter/CI probes — verified in a browser; see the link-check host allowlist)
 25. AML UAE, goAML registration guide: https://amluae.com/goaml-registration-guide/
 26. UAE FIU, DPMS guidance (October 2022): https://www.uaefiu.gov.ae/media/igjeqjap/dealers-in-precious-metals-and-stones-october-2022.pdf
 27. AML UAE, DPMSR: https://amluae.com/dealers-in-precious-metals-and-stones-report-dpmsr/

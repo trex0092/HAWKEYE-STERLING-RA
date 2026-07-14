@@ -26,8 +26,12 @@ permissions:
   contents: read
 
 # Never overlap the daily sweep's delta-state commit, and never overlap itself.
+# Single-writer group SHARED with weekly-adverse-media.yml (see the comment
+# there): both force-push screen-delta-state, so the writers must serialise.
+# A queued onboarding cycle superseded during a very long daily sweep is
+# covered by the 26h onboarding look-back window and the next 6h cycle.
 concurrency:
-  group: onboarding-screen
+  group: screen-state
   cancel-in-progress: false
 
 jobs:

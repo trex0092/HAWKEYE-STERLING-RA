@@ -23,8 +23,13 @@ permissions:
   contents: read
 
 # A multi-hour sweep must never have a manual run overlap the daily schedule.
+# Single-writer group SHARED with onboarding-screen.yml: both workflows
+# force-push the screen-delta-state branch (rebuilt as <main> + one data
+# commit), so two concurrent runs could drop each other's just-persisted
+# run-metrics/delta files — the exact inputs anomaly-watch reads. Concurrency
+# groups are repo-wide across workflows; sharing one serialises the writers.
 concurrency:
-  group: daily-adverse-media
+  group: screen-state
   cancel-in-progress: false
 
 jobs:

@@ -108,3 +108,29 @@ jobs:
               const created = await github.rest.issues.create({ owner, repo, title: 'Sustained screening anomaly detected', body, labels: [label] });
               core.info(`opened escalation issue #${created.data.number}`);
             }
+      # Close-the-loop: when the sustained window is clean again, say so and
+      # close the escalation issue instead of leaving it open forever (the
+      # anomaly-watch label is deliberately NOT stale-exempt, but waiting 67
+      # days for actions/stale is not "cleared"). Safe by construction: the
+      # detect step always emits escalate, and a missing/stale history reads
+      # escalate=true via stale_history — so this can never fire on a dead
+      # pipeline, only on a genuinely healthy last-3-runs window.
+      - name: Clear and close the escalation issue when the anomaly is gone
+        if: steps.detect.outputs.escalate == 'false'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const label = 'anomaly-watch';
+            const today = new Date().toISOString().slice(0, 10);
+            const open = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: label });
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+                body: `Cleared as of ${today}: no sustained anomaly across the last-3-run window ` +
+                      '(per `monitoring.sustained_anomalies` on the live metrics history). ' +
+                      'Auto-closing — this re-opens as a new escalation if it recurs.' });
+              await github.rest.issues.update({ owner, repo, issue_number: issue.number,
+                state: 'closed', state_reason: 'completed' });
+              core.info(`cleared and closed escalation issue #${issue.number}`);
+            }
+            if (!open.data.length) core.info('no open escalation issue — nothing to clear');

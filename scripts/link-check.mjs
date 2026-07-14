@@ -30,6 +30,27 @@ export const ALLOWLIST = new Set([
   'https://www.un.org/securitycouncil/content/un-sc-consolidated-list', // UN SC Consolidated List landing page — live but heavy/slow, the probe times out (abort) on this canonical un.org page
 ]);
 
+/* Hosts that block ALL datacenter/CI connections outright (connection failure,
+   status null — indistinguishable from a dead host to the probe) but are the
+   canonical, verified-in-a-browser citations. The UAE Ministry of Economy
+   domains do this (verified 2026-07, issue #225): both the legacy moec.gov.ae
+   pages cited in the research notes and the current moet.gov.ae watched source.
+   Regulatory Watch monitors the moet.gov.ae source via its Internet Archive
+   fallback — see the `uae-moe` narrative in data/reg-sources.json. These are
+   skipped at probe time (a guaranteed 2×20s timeout buys no information) and
+   never counted dead. */
+export const ALLOWLIST_HOSTS = new Set([
+  'www.moec.gov.ae', 'moec.gov.ae',
+  'www.moet.gov.ae', 'moet.gov.ae',
+]);
+
+/* True when the URL's host is on the datacenter-blocked allowlist. Unparseable
+   URLs are not allowlisted (they are also not probeable — see isProbeable). */
+export function allowlistedHost(url) {
+  try { return ALLOWLIST_HOSTS.has(new URL(url).hostname.toLowerCase()); }
+  catch { return false; }
+}
+
 /* Gather unique URLs from the JSON registries + markdown docs. Accepts an
    object map of { path: text } so tests can supply fixtures without fs. */
 export function collectUrls(files) {
@@ -90,7 +111,7 @@ export function isDead(result) {
 }
 
 export function summarize(results) {
-  const dead = results.filter(r => isDead(r) && !ALLOWLIST.has(r.url));
+  const dead = results.filter(r => isDead(r) && !ALLOWLIST.has(r.url) && !allowlistedHost(r.url));
   return { total: results.length, dead: dead.length, ok: results.length - dead.length, deadList: dead };
 }
 
@@ -161,10 +182,12 @@ async function main() {
   const today = new Date().toISOString().slice(0, 10);
   const all = collectUrls(readFiles());
   /* Skip loopback / reserved-example URLs (README quick-start localhost, etc.):
-     they are intentionally non-resolvable and would be false "dead" links. */
-  const urls = all.filter(u => isProbeable(u.url));
+     they are intentionally non-resolvable and would be false "dead" links.
+     Also skip the datacenter-blocked allowlisted hosts — each would burn a
+     guaranteed 2×20s timeout to learn nothing (the block is unconditional). */
+  const urls = all.filter(u => isProbeable(u.url) && !allowlistedHost(u.url));
   const skipped = all.length - urls.length;
-  if (skipped) console.log('(skipped ' + skipped + ' non-probeable URL(s): localhost/example placeholders)');
+  if (skipped) console.log('(skipped ' + skipped + ' non-probeable/allowlisted URL(s): localhost/example placeholders + datacenter-blocked hosts — see ALLOWLIST_HOSTS)');
   const results = [];
   /* small concurrency pool to be polite */
   const pool = 6;

@@ -1103,6 +1103,12 @@ def update_adverse_evidence(adverse_findings, today_iso, path=None):
     for f_ in adverse_findings or []:
         subj = f_.get("subject_name") or ""
         for a in f_.get("articles", []):
+            # Watchlist findings are STANDING list presence, not distinct news
+            # stories — logging them daily would trip the ≥3-stories/90d repeat
+            # pattern for every listed subject. They carry their own evidence
+            # trail (the OpenSanctions entity URL in the report).
+            if a.get("watchlist"):
+                continue
             key = (subj, a.get("title"))
             if not subj or not a.get("title") or key in seen:
                 continue
@@ -1169,6 +1175,37 @@ PEP_RCA_HINTS = ["son of","daughter of","wife of","husband of","brother of","sis
                  "business partner of","advisor to","aide to"]
 _PEP_CACHE = {}
 
+# Wikidata pacing + circuit breaker (mirror of the Google News / GDELT guards).
+# SCREEN_CONCURRENCY workers with NO pacing burst ~8 req/s at the API; Wikimedia
+# meters anonymous clients per IP, and a shared GitHub-runner IP gets refused
+# for the whole run (14 Jul: 436 PEP lookups errored, PEP count fell 4 → 0 with
+# no gate to cool the limiter and no breaker to stop paying per-lookup latency).
+# One run-global gate serialises lookups across all workers; failures back the
+# shared interval off multiplicatively, successes decay it back toward base.
+PEP_MIN_INTERVAL = float(os.environ.get("PEP_MIN_INTERVAL", "0.5"))
+PEP_BACKOFF_CAP = float(os.environ.get("PEP_BACKOFF_CAP", "8.0"))
+# After this many CONSECUTIVE failed lookups the API is refusing this runner —
+# declare the feed down for the REST OF THE RUN with one loud log line. The
+# affected individuals are then re-covered in bulk by the OpenSanctions PEP
+# mirror (see load_pep_mirror) instead of finishing the run as "PEP unknown".
+PEP_BREAKER_AFTER = int(os.environ.get("PEP_BREAKER_AFTER", "10"))
+_PEP_STATE = {"consecutive_failures": 0, "open": False}
+_PEP_GATE = _RateGate(
+    PEP_MIN_INTERVAL, PEP_BACKOFF_CAP,
+    on_cap=lambda: log(f"  Wikidata rate-limited — PEP pacing backed off to cap "
+                       f"({PEP_BACKOFF_CAP:g}s between lookups; recovers on success)"))
+
+def _pep_failure():
+    """Shared bookkeeping for one failed Wikidata lookup: back off the gate and
+    advance the run-level breaker. A later success resets both (see check_pep)."""
+    _PEP_GATE.penalize()
+    _PEP_STATE["consecutive_failures"] += 1
+    if _PEP_STATE["consecutive_failures"] >= PEP_BREAKER_AFTER and not _PEP_STATE["open"]:
+        _PEP_STATE["open"] = True
+        log(f"  Wikidata refusing lookups ({PEP_BREAKER_AFTER} in a row) — PEP circuit OPEN, "
+            "skipping live lookups for the rest of the run; affected individuals fall back "
+            "to the OpenSanctions PEP mirror (provisional, loud)")
+
 def _norm_lower(s):
     s = unicodedata.normalize("NFD", str(s or ""))
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
@@ -1192,17 +1229,29 @@ def check_pep(name):
         return {"hit": False}
     if key in _PEP_CACHE:
         return _PEP_CACHE[key]
+    # Run-level breaker: once Wikidata refuses this runner, stop paying the
+    # per-lookup latency — the caller's bulk mirror pass covers these instead.
+    # Errored results are deliberately NOT cached: the next run retries live.
+    if _PEP_STATE["open"]:
+        return {"errored": True, "error": "wikidata circuit open"}
     url = ("https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json"
            "&language=en&uselang=en&type=item&limit=7&search="
            + requests.utils.quote(str(name).strip()))
     try:
+        _PEP_GATE.wait()   # one shared send slot across all workers
         r = requests.get(url, timeout=20, headers={
-            "User-Agent": "HawkeyeSterling-PEP/1.0 (compliance screening)",
+            # Wikimedia UA policy: identify the tool AND a contact point.
+            "User-Agent": "HawkeyeSterlingCompliance/3.0 "
+                          "(https://github.com/trex0092/HAWKEYE-STERLING-RA) PEP-screen",
             "Accept": "application/json"})
         if r.status_code != 200:
+            _pep_failure()
             return {"errored": True, "error": f"HTTP {r.status_code}"}
         results = (r.json() or {}).get("search", []) or []
+        _PEP_GATE.reward()
+        _PEP_STATE["consecutive_failures"] = 0
     except Exception as e:
+        _pep_failure()
         return {"errored": True, "error": str(e)[:200]}
     want = [t for t in key.split(" ") if len(t) >= 3]
     out = {"hit": False}
@@ -1227,6 +1276,162 @@ def check_pep(name):
                    "label": res.get("label", ""), "description": raw_desc}
             break
     _PEP_CACHE[key] = out
+    return out
+
+# ── OPENSANCTIONS BULK LAYER (PEP mirror fallback + adverse-exposure watchlist)
+# data.opensanctions.org already serves EU FSF and the OFAC/UN mirrors, so it is
+# reachable wherever screening runs and — being one bulk file per run — immune to
+# the per-IP request limiters that take out the live feeds from shared runner IPs.
+# LICENSING: OpenSanctions bulk data is CC-BY-NC 4.0 (commercial deployments need
+# their licence) — registered, with kill-switches and provenance rules, in
+# docs/aims/third-party-register.md. Wikidata (CC0) stays the PRIMARY PEP source;
+# the bulk PEP file is a FALLBACK for individuals the live lookup could not screen.
+PEP_MIRROR_FALLBACK = os.environ.get("PEP_MIRROR_FALLBACK", "1") == "1"
+PEP_MIRROR_URL = "https://data.opensanctions.org/datasets/latest/peps/targets.simple.csv"
+
+def parse_pep_index(data):
+    """targets.simple.csv → {normalized name/alias: {"id","label"}}, plus a
+    token-sorted secondary key per name so word-order variants still hit.
+    Exact-normalized index (NOT the fuzzy sanctions matcher): this is a
+    resilience net whose hits mean "listed — verify", so precision beats recall.
+    Tolerant per-row — one malformed row never zeroes the index."""
+    index = {}
+    if not data:
+        return index
+    try:
+        reader = csv.DictReader(io.StringIO(data.decode("utf-8")))
+        for row in reader:
+            try:
+                pid = (row.get("id") or "").strip()
+                primary = (row.get("name") or "").strip()
+                names = [primary] + [a.strip() for a in (row.get("aliases") or "").split(";")]
+                for n in names:
+                    if not n:
+                        continue
+                    k = _norm_lower(n)
+                    if len(k) < 5:   # same auto-screenability floor as check_pep
+                        continue
+                    entry = {"id": pid, "label": primary or n}
+                    index.setdefault(k, entry)
+                    index.setdefault(" ".join(sorted(k.split())), entry)
+            except Exception:
+                continue  # one malformed row never zeroes the whole index
+    except Exception as e:
+        log(f"  PEP mirror parse error: {e}")
+    return index
+
+def load_pep_mirror():
+    """One bulk download per run — called only when live lookups errored. Returns
+    the name index, or None when disabled/unavailable; callers leave the affected
+    individuals errored (loud, provisional) in that case."""
+    if not PEP_MIRROR_FALLBACK:
+        log("  PEP mirror fallback disabled (PEP_MIRROR_FALLBACK=0) — errored lookups stay errored")
+        return None
+    data = download(PEP_MIRROR_URL, "OpenSanctions PEPs (mirror fallback)")
+    index = parse_pep_index(data)
+    if not index:
+        return None
+    log(f"  PEP mirror: {len(index):,} name keys loaded — re-covering individuals "
+        "the live lookup could not screen")
+    return index
+
+def pep_mirror_lookup(index, name):
+    """Exact-normalized (+ token-sorted) lookup against the bulk PEP index.
+    Hit ⇒ 'listed in the consolidated PEP dataset — verify' (provenance-marked
+    mirror). Miss ⇒ screened-by-mirror, no listing found (still provisional —
+    the mirror is a net, not the primary)."""
+    key = _norm_lower(name)
+    if not key:
+        return {"hit": False, "via_mirror": True}
+    entry = index.get(key) or index.get(" ".join(sorted(key.split())))
+    if not entry:
+        return {"hit": False, "via_mirror": True}
+    return {"hit": True, "id": entry["id"], "label": entry["label"],
+            "category": "PEP (OpenSanctions peps watchlist — mirror)",
+            "description": "listed in the OpenSanctions consolidated PEP dataset "
+                           "(mirror fallback — Wikidata unavailable this run)",
+            "source_url": (f"https://www.opensanctions.org/entities/{entry['id']}/"
+                           if entry["id"] else ""),
+            "via_mirror": True}
+
+# ── ADVERSE-EXPOSURE WATCHLIST (OpenSanctions crime dataset, bulk) ────────────
+# Deterministic THIRD adverse net: consolidated criminal watchlists (national
+# wanted lists, enforcement actions, court records). One bulk download + one
+# local matching pass per run, so a news blackout (Google News AND GDELT
+# refusing the runner — 10-14 Jul) can no longer mean ZERO adverse coverage.
+# The news feeds stay on for recall (fresh stories); this list is standing
+# exposure, not headlines — its findings are excluded from the repeat-pattern
+# evidence counter. LICENSING: CC-BY-NC 4.0 — see docs/aims/third-party-register.md.
+ADVERSE_WATCHLIST = os.environ.get("ADVERSE_WATCHLIST", "1") == "1"
+WATCHLIST_URL = "https://data.opensanctions.org/datasets/latest/crime/targets.simple.csv"
+WATCHLIST_LABEL = "OpenSanctions crime watchlist"
+
+def parse_watchlist(data):
+    """targets.simple.csv → (entries, ids): entries = [(normalized, original)]
+    in the exact shape the sanctions matcher consumes; ids = {original: entity id}
+    so a hit can cite its OpenSanctions entity page as evidence."""
+    entries, ids = [], {}
+    if not data:
+        return entries, ids
+    try:
+        reader = csv.DictReader(io.StringIO(data.decode("utf-8")))
+        for row in reader:
+            try:
+                pid = (row.get("id") or "").strip()
+                names = [(row.get("name") or "").strip()]
+                names += [a.strip() for a in (row.get("aliases") or "").split(";")]
+                for n in names:
+                    if not n:
+                        continue
+                    entries.append((normalize(n), n))
+                    if pid and n not in ids:
+                        ids[n] = pid
+            except Exception:
+                continue  # one malformed row never zeroes the whole list
+    except Exception as e:
+        log(f"  {WATCHLIST_LABEL} parse error: {e}")
+    return entries, ids
+
+def load_adverse_watchlist():
+    """Returns (entries, ids, meta). meta feeds source-coverage drift tracking as
+    a SUPPLEMENTARY list (a fetch miss is a soft note, never a degraded core
+    control). Failure is loud: (None, {}, count 0) — the tally then records
+    news-dead subjects as am_blackout instead of watchlist-covered."""
+    if not ADVERSE_WATCHLIST:
+        log("  adverse-exposure watchlist disabled (ADVERSE_WATCHLIST=0)")
+        return None, {}, {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+    data = download(WATCHLIST_URL, WATCHLIST_LABEL)
+    entries, ids = parse_watchlist(data)
+    if not entries:
+        log(f"  {WATCHLIST_LABEL}: UNAVAILABLE this run — the news feeds are the only adverse nets today")
+        return None, {}, {"count": 0, "date": "unavailable", "hash": "", "tier": "supplementary"}
+    return entries, ids, {"count": len(entries), "date": "live (OpenSanctions mirror)",
+                          "hash": sha256_of(data), "tier": "supplementary"}
+
+def screen_watchlist(subjects_all, entries, ids, today_iso):
+    """One local pass of every DISTINCT subject name against the crime watchlist,
+    using the same matcher + thresholds as sanctions screening. Returns
+    {subject_name: [article, ...]} in the article shape the news path emits.
+    Titles are deterministic so delta fingerprints stay stable: a listing reads
+    NEW once, then STANDING on every later run."""
+    if not entries:
+        return {}
+    wl = {WATCHLIST_LABEL: entries}
+    out = {}
+    for name in sorted({s[1] for s in subjects_all}):
+        arts = []
+        for h in screen_name(name, wl):
+            ent = h["matched_entry"]
+            url = (f"https://www.opensanctions.org/entities/{ids[ent]}/" if ids.get(ent)
+                   else "https://www.opensanctions.org/datasets/crime/")
+            arts.append({
+                "title": f"Adverse-exposure watchlist: {ent} — OpenSanctions crime dataset",
+                "source": "OpenSanctions crime dataset (watchlist)", "url": url,
+                "date": str(today_iso)[:10], "ts": None, "flagged": True,
+                "keywords": ["watchlist"], "categories": ["Adverse exposure (watchlist)"],
+                "watchlist": True, "score": h["score"]})
+        if arts:
+            out[name] = arts
     return out
 
 # ── LIST DOWNLOADS ────────────────────────────────────────────────────────────
@@ -2311,22 +2516,32 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     confirmed = [m for m in possible_matches if any(h["score"] >= 100 for h in m["hits"])]
     potential = [m for m in possible_matches if all(h["score"] < 100 for h in m["hits"])]
     # Degrade on ANY PEP lookup error, independent of whether some PEPs were found:
-    # a run that finds 1 PEP but had 200 Wikidata lookups time out is NOT a clean
-    # PEP pass — the 200 unknowns are provisional, not "no PEP".
+    # a run that finds 1 PEP but had 200 lookups fail on BOTH sources is NOT a
+    # clean PEP pass — the 200 unknowns are provisional, not "no PEP". Individuals
+    # the OpenSanctions mirror re-covered are screened (not errors), but the run
+    # is labelled mirror-assisted so the MLRO knows the primary source was down.
     pep_degraded = stats.get("pep_errors", 0) > 0
+    pep_mirror = stats.get("pep_mirror", 0)
     # Sanctions coverage: DEGRADED if ANY core list failed to load (not just if all
     # of them did) — a run missing 1 of 4 core lists is not a clean "OK".
     core_loaded = [list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu")]
     sanc_ok = all(core_loaded)
-    # Adverse-media coverage: DEGRADED when any subject's whole adverse sweep failed.
-    am_degraded = stats.get("am_errors", 0) > 0
+    # Adverse-media coverage, three-state: DEGRADED only when subjects had ZERO
+    # adverse coverage from ANY net (news dead AND no watchlist); DEGRADED (news)
+    # when the news sweep was lost but the watchlist stood — recall narrowed,
+    # never silent; OK when every net ran.
+    am_errors_n = stats.get("am_errors", 0)
+    am_blackout = stats.get("am_blackout", 0)
+    am_degraded = am_errors_n > 0
     L = []; A = L.append
 
     delta = stats.get("delta", {})
     supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
     sanc_status = "OK" if sanc_ok else ("DEGRADED" if any(core_loaded) else "FAILED")
-    pep_status = "DEGRADED" if pep_degraded else "OK"
-    am_status = "DEGRADED" if am_degraded else "OK"
+    pep_status = ("DEGRADED" if pep_degraded
+                  else ("OK (mirror-assisted)" if pep_mirror else "OK"))
+    am_status = ("DEGRADED" if am_blackout
+                 else ("DEGRADED (news)" if am_errors_n else "OK"))
 
     # ── Compact header — three result blocks (Sanctions · Adverse media · PEP)
     #    lead the report; everything here is a one-line snapshot. ──
@@ -2425,6 +2640,13 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("   never conclusive. Source reliability: news = real-time but false-positive-prone;")
     A("   court/enforcement corroboration is strongest but can lag clearances — always")
     A("   confirm CURRENT status before an adverse decision.")
+    if am_blackout:
+        A(f"   Status: DEGRADED this run — {am_blackout} subject(s) had ZERO adverse coverage "
+          "(news feeds AND watchlist unavailable). Treat their 'no adverse media' as provisional; re-run.")
+    elif am_errors_n:
+        A(f"   Status: news sweep lost for {am_errors_n} subject(s) (feed rate-limited the runner) — "
+          "the adverse-exposure WATCHLIST still screened every subject; fresh-news recall is narrowed, "
+          "standing exposure is covered.")
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
@@ -2460,6 +2682,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A( "         EDD review required + assess STR grounds (tipping-off rules apply).")
             A("")
         A(f"   Source: Google News RSS ({ADVERSE_LOCALES}/{len(GNEWS_LOCALES)} worldwide locales) + GDELT global index (65+ languages) · {len(ADVERSE_KEYWORDS)} EN + {len(FOREIGN_KEYWORDS)} multilingual ({ADVERSE_LANG_COUNT}-language) red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
+        if stats.get("watchlist_loaded"):
+            A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
+              f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
     A("")
 
     A("━" * 70)
@@ -2467,13 +2692,18 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("━" * 70)
     A("   Source: Wikidata (free) — politicians, ministers, MPs, judges, military / SOE chiefs,")
     A("           state-owned-enterprise heads + their relatives & close associates (RCA).")
+    A("           Fallback: OpenSanctions consolidated PEP dataset (bulk mirror) covers any")
+    A("           individual the live lookup could not screen — hits are provenance-marked.")
     A(f"   Scope:  {stats['individuals_screened']} individuals auto-screened across the full database "
       f"(companies are not natural persons → not PEP-screened, but ARE sanctions + adverse-media screened).")
     A("   Action class (R.12): PEP status is PERMISSIBLE WITH CONTROLS — a confirmed PEP/RCA")
     A("   requires EDD, senior-management approval, source-of-funds/wealth establishment and")
     A("   enhanced ongoing monitoring; it is not, by itself, grounds to decline.")
     if pep_degraded:
-        A(f"   Status: DEGRADED this run ({stats.get('pep_errors',0)} lookups failed) — treat 'no PEP' as provisional; re-run.")
+        A(f"   Status: DEGRADED this run ({stats.get('pep_errors',0)} individual(s) unscreened on BOTH sources) — treat 'no PEP' as provisional; re-run.")
+    elif pep_mirror:
+        A(f"   Status: mirror-assisted this run — {pep_mirror} individual(s) screened via the OpenSanctions")
+        A("   PEP mirror because Wikidata was unavailable; a mirror hit means VERIFY, a miss is still provisional.")
     if not pep_findings:
         A("   No PEP matches identified." + ("  (provisional — see status above)" if pep_degraded else ""))
     else:
@@ -2487,7 +2717,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             A(f"   Class: {p.get('category','PEP (political / public office)')}")
             A(f"   {p.get('description','(position recorded on Wikidata)')}")
             if p.get("id"):
-                A(f"   Source: https://www.wikidata.org/wiki/{p['id']}")
+                A(f"   Source: {p.get('source_url') or 'https://www.wikidata.org/wiki/' + p['id']}")
             if p.get("permalink"):
                 A(f"   Customer record: {p['permalink']}")
             A("   MLRO Decision:  [ ] not a PEP   [ ] confirmed PEP — EDD + senior-mgmt approval   [ ] investigate")
@@ -2541,8 +2771,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("   Reviewed by: ____________________   Date: __________")
     A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
     A("")
-    A(f"Engine: screen.py · one pass: name-match vs live designation lists, Google News adverse")
-    A(f"media, Wikidata PEP, AI risk-rating & triage · {github_run_url()}")
+    A(f"Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT")
+    A(f"adverse media + OpenSanctions crime watchlist, Wikidata PEP (OpenSanctions mirror fallback),")
+    A(f"AI risk-rating & triage · {github_run_url()}")
     A("> " + ai.governance_footer())
     A("> Decision-support only; a 'no match' is never a clearance when a module is degraded (shown, never hidden).")
     A("> Detection is automatic; no freeze / decline / report before MLRO + four-eyes review.")
@@ -2642,15 +2873,124 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         log(f"  MLRO cases created: {created}")
     return created
 
+def _ai_mode_label():
+    """Honest AI-mode label. An ANTHROPIC key merely being present (LLM
+    *available*) is not the same as LLM triage being ON (LLM_TRIAGE=1, the
+    PDPL gate): 14 Jul the report claimed mode=LLM with 0 LLM calls attempted.
+    The broker/attestation contract keys off `!= "deterministic"`, so any
+    key-present state must stay distinct from plain "deterministic" (the
+    credential is issuable and the PDPL line must say the key is present)."""
+    if not ai.llm_available():
+        return "deterministic"
+    return "AI-assisted triage" if ai.LLM_TRIAGE else "deterministic (LLM standby — triage off)"
+
+def tally_enrichment(results, wl_hits, wl_loaded):
+    """Pure tally of the enrichment pass → (counts, adverse_findings, pep_findings).
+
+    Honest denominators (the 14 Jul incident): counts["subjects"] counts EVERY
+    subject the pass attempted — including errored ones — so error ratios are
+    true fractions of the book (795 news-dead subjects of 837 reads 95%, not the
+    1893% that the old survivors-only denominator produced). A subject counts at
+    most ONCE in counts["errors"] however many modules failed for it (the old
+    am+pep sum reached 1231 errors for 837 subjects).
+      am_errors    — subjects whose whole news sweep failed (GN + GDELT); same
+                     meaning as the committed metrics history, kept comparable
+      am_blackout  — of those, subjects with ZERO adverse coverage from ANY
+                     source (the watchlist was missing too) — the original alarm
+      pep_errors   — individuals with no PEP coverage from either source
+      pep_mirror   — individuals screened via the OpenSanctions mirror fallback
+      watchlist    — subjects with ≥1 adverse-exposure watchlist finding
+    """
+    companies = individuals = 0
+    am_errors = am_blackout = pep_errors = pep_mirror = subject_errors = 0
+    adverse_findings, pep_findings = [], []
+    for r in results:
+        if r["type"] == "INDIVIDUAL":
+            individuals += 1
+        else:
+            companies += 1   # corporate owners count with companies — legal persons
+        subj_err = False
+        if r["am_error"]:
+            am_errors += 1
+            subj_err = True
+            if not wl_loaded:
+                am_blackout += 1
+        # Adverse findings merge both nets: flagged news articles (when the sweep
+        # ran) + watchlist listings (always, including for news-dead subjects —
+        # that is the whole point of the third net).
+        arts = list(r["adverse"] or [])
+        seen_titles = {a.get("title") for a in arts}
+        for a in wl_hits.get(r["name"], []):
+            if a.get("title") not in seen_titles:
+                arts.append(a)
+        if arts:
+            adverse_findings.append({"subject_type": r["type"], "subject_name": r["name"],
+                "parent": r["parent"], "permalink": r["permalink"], "articles": arts})
+        p = r.get("pep")
+        if r["type"] == "INDIVIDUAL" and p is not None:
+            if p.get("errored"):
+                pep_errors += 1
+                subj_err = True
+            elif p.get("hit"):
+                if p.get("via_mirror"):
+                    pep_mirror += 1
+                # Carry the review flag through: a manual-review PEP has no
+                # Wikidata id BY DESIGN, and the QA gate must not report it
+                # as a missing-source integrity violation on every run.
+                pep_findings.append({"subject_name": r["name"], "parent": r["parent"],
+                    "permalink": r["permalink"], "id": p.get("id", ""),
+                    "category": p.get("category", ""), "review": bool(p.get("review")),
+                    "label": p.get("label", ""), "description": p.get("description", ""),
+                    "source_url": p.get("source_url", "")})
+            elif p.get("via_mirror"):
+                pep_mirror += 1   # mirror screened it, found no listing
+        if subj_err:
+            subject_errors += 1
+    counts = {"subjects": companies + individuals, "companies": companies,
+              "individuals": individuals, "errors": subject_errors,
+              "am_errors": am_errors, "am_blackout": am_blackout,
+              "pep_errors": pep_errors, "pep_mirror": pep_mirror,
+              "watchlist": sum(1 for f in adverse_findings
+                               if any(a.get("watchlist") for a in f["articles"]))}
+    return counts, adverse_findings, pep_findings
+
 def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     """Shared core: sanctions + adverse media + PEP over a set of customers, with
     delta classification, one Asana report and MLRO case subtasks. mode controls
     the task title only ('daily' vs 'onboarding')."""
     _t_start = time.time()
+    today = run_time.strftime("%Y-%m-%d")
+
+    # Subject set first — the watchlist pass below screens it before the
+    # network-bound enrichment starts.
+    subjects_all = []
+    for c in customers:
+        subjects_all.append(("COMPANY", c["name"], None, c))
+        for ind in c.get("individuals", []):
+            subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
+        # Corporate owners/parents are sanctions-screened (50%/control rule) —
+        # sweep their adverse media too, or a designated parent's coverage is
+        # never seen. No PEP check: PEP status is a natural-person concept.
+        for ent in c.get("entity_owners", []):
+            subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
+
+    # ADVERSE-EXPOSURE WATCHLIST (bulk, deterministic) — download + match BEFORE
+    # the enrichment pool, so adverse coverage exists even if both news feeds
+    # refuse the runner for the whole run (10–14 Jul).
+    wl_entries, wl_ids, wl_meta = load_adverse_watchlist()
+    wl_hits = screen_watchlist(subjects_all, wl_entries, wl_ids, today) if wl_entries else {}
+    if wl_entries:
+        log(f"  {WATCHLIST_LABEL}: {wl_meta['count']:,} names · "
+            f"{len(wl_hits)} subject name(s) matched")
+    _t_watchlist = time.time()
+
     # SOURCE-COVERAGE DRIFT (R-09): a list that silently shrank is the most
     # dangerous failure mode — it creates false negatives. Check before screening.
+    # The watchlist joins as a SUPPLEMENTARY source (drift is a soft note, never
+    # a degraded core control); list_meta itself stays pure — it feeds the QA
+    # gate's core-list checks and the attestation.
     coverage_result = monitoring.check_source_coverage(
-        list_meta, run_time.strftime("%Y-%m-%d"))
+        {**list_meta, "adverse_watchlist": wl_meta}, today)
     for a in coverage_result.get("alarms", []):
         log(f"COVERAGE ALARM: {a}")
 
@@ -2665,18 +3005,6 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual — run the
     # network-bound sweep in PARALLEL (bounded pool) so a full book screens in
     # minutes, not hours. Each worker still paces its own requests for politeness.
-    adverse_findings, pep_findings = [], []
-    companies = individuals = am_errors = pep_errors = 0
-    subjects_all = []
-    for c in customers:
-        subjects_all.append(("COMPANY", c["name"], None, c))
-        for ind in c.get("individuals", []):
-            subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
-        # Corporate owners/parents are sanctions-screened (50%/control rule) —
-        # sweep their adverse media too, or a designated parent's coverage is
-        # never seen. No PEP check: PEP status is a natural-person concept.
-        for ent in c.get("entity_owners", []):
-            subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
 
     def _enrich(subj):
         subj_type, subj_name, parent, c = subj
@@ -2697,36 +3025,34 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     total = len(subjects_all)
     log(f"Enriching {total} subjects with {SCREEN_CONCURRENCY} parallel workers...")
     done = 0
+    results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY) as ex:
         for r in ex.map(_enrich, subjects_all):
             done += 1
-            if r["am_error"]:
-                am_errors += 1
-            else:
-                # Corporate owners count with companies — they are legal persons.
-                if r["type"] == "INDIVIDUAL": individuals += 1
-                else: companies += 1
-                if r["adverse"]:
-                    adverse_findings.append({"subject_type": r["type"], "subject_name": r["name"],
-                        "parent": r["parent"], "permalink": r["permalink"], "articles": r["adverse"]})
-            p = r.get("pep")
-            if r["type"] == "INDIVIDUAL" and p is not None:
-                if p.get("errored"):
-                    pep_errors += 1
-                elif p.get("hit"):
-                    # Carry the review flag through: a manual-review PEP has no
-                    # Wikidata id BY DESIGN, and the QA gate must not report it
-                    # as a missing-source integrity violation on every run.
-                    pep_findings.append({"subject_name": r["name"], "parent": r["parent"],
-                        "permalink": r["permalink"], "id": p.get("id", ""),
-                        "category": p.get("category", ""), "review": bool(p.get("review")),
-                        "label": p.get("label", ""), "description": p.get("description", "")})
+            results.append(r)
             if done % 50 == 0 or done == total:
                 log(f"  enriched {done}/{total}")
+
+    # PEP MIRROR FALLBACK — individuals whose live lookup errored get one bulk
+    # second chance (loud, provisional) instead of finishing as "PEP unknown".
+    pep_unresolved = [r for r in results
+                      if r["type"] == "INDIVIDUAL" and (r.get("pep") or {}).get("errored")]
+    if pep_unresolved:
+        log(f"  PEP: {len(pep_unresolved)} live lookup(s) failed — trying the OpenSanctions mirror")
+        pep_index = load_pep_mirror()
+        if pep_index is not None:
+            for r in pep_unresolved:
+                r["pep"] = pep_mirror_lookup(pep_index, r["name"])
+
+    # Pure tally — honest denominators (every subject counts, errors once per
+    # subject) + findings merged across the news and watchlist nets.
+    counts, adverse_findings, pep_findings = tally_enrichment(
+        results, wl_hits, wl_entries is not None)
+    companies, individuals = counts["companies"], counts["individuals"]
+    am_errors, pep_errors = counts["am_errors"], counts["pep_errors"]
     _t_enrich = time.time()
 
     # DELTA — flag only what is new since the last run (state committed by workflow)
-    today = run_time.strftime("%Y-%m-%d")
     state = load_delta_state()
     delta = classify_deltas(possible_matches, adverse_findings, pep_findings, state, today)
     # NOTE: state is persisted only AFTER the report is successfully delivered to
@@ -2779,13 +3105,18 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             cdd_gaps=cdd_gap_count)
         m["ai_summary"] = ai.alert_summary(m["name"], m["risk"], m["hits"], m_pep, m_adverse)
     related = ai.related_parties(customers)
+    mode_lbl = ("LLM" if ai.llm_available() and ai.LLM_TRIAGE else
+                "LLM-standby (triage off)" if ai.llm_available() else "deterministic")
     log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
-        f"mode={'LLM' if ai.llm_available() else 'deterministic'}")
+        f"mode={mode_lbl}")
 
     _t_ai = time.time()
     # ── OPERATIONAL MONITORING (latency · usage · anomaly) ──
-    subjects_total = companies + individuals
-    errors_total = am_errors + pep_errors
+    # subjects = every subject the pass ATTEMPTED (incl. errored ones) and
+    # errors counts each subject at most once — see tally_enrichment. The old
+    # survivors-only denominator made ratios nonsensical (14 Jul: "795/42").
+    subjects_total = counts["subjects"]
+    errors_total = counts["errors"]
 
     # Evidence log (committed to git) + repeat-pattern signal: the same entity
     # flagged in ≥3 distinct stories inside 90 days is a PATTERN, not a headline.
@@ -2796,17 +3127,25 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             log(f"REPEAT ADVERSE PATTERN: {s_} — {n_} distinct stories in {REPEAT_WINDOW_DAYS}d — escalate to MLRO")
     except Exception as e:
         log(f"evidence log skipped ({e})")
-    timings = {"sanctions": round(_t_sanctions - _t_start, 2),
+    timings = {"watchlist": round(_t_watchlist - _t_start, 2),
+               "sanctions": round(_t_sanctions - _t_watchlist, 2),
                "enrichment": round(_t_enrich - _t_sanctions, 2),
                "ai_triage": round(_t_ai - _t_enrich, 2),
                "total": round(_t_ai - _t_start, 2)}
+    # Onboarding runs screen a handful of subjects — persisting their snapshots
+    # would REPLACE the same-date daily snapshot (persist_run dedups by date) and
+    # poison every baseline median (the committed history shows subjects=2 days).
+    # They still get the absolute checks; only the daily batch writes history.
     run_monitor = monitoring.monitor_run(
-        run_time.strftime("%Y-%m-%d"),
+        today,
         counts={"subjects": subjects_total, "errors": errors_total,
-                "am_errors": am_errors,
+                "am_errors": am_errors, "am_blackout": counts["am_blackout"],
+                "pep_errors": pep_errors, "pep_mirror": counts["pep_mirror"],
+                "watchlist": counts["watchlist"],
                 "flagged": len(possible_matches), "adverse": len(adverse_findings),
                 "pep": len(pep_findings)},
-        timings=timings, llm_calls=dict(ai.LLM_CALLS))
+        timings=timings, llm_calls=dict(ai.LLM_CALLS),
+        persist=(mode == "daily"))
     for a in run_monitor.get("anomalies", []):
         log(f"RUNTIME ANOMALY: {a}")
     for s in run_monitor.get("sustained", []):
@@ -2818,12 +3157,14 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     stats = {"customers_total": len(customers), "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": subjects_total,
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
+             "am_blackout": counts["am_blackout"], "pep_mirror": counts["pep_mirror"],
+             "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "adverse_repeat": repeat_patterns,
              "related_parties": related, "injection_blocked": injection_blocked,
              "monitoring": run_monitor, "coverage": coverage_result,
              "txn_status": txn_status, "cdd_gaps_total": cdd_gaps_total,
              "arrangements": arrangements,
-             "ai_mode": "AI-assisted triage" if ai.llm_available() else "deterministic"}
+             "ai_mode": _ai_mode_label()}
 
     # ── AGENTIC OPERATING MODEL: audit trail + QA / governance gate ──
     new_s = sum(1 for m in possible_matches if any(h.get("is_new") for h in m["hits"]))

@@ -10,6 +10,89 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Fixed (screening integrity — issue #222 root causes, 2026-07-14)
+
+- **Run metrics counted only surviving subjects** — `counts.subjects` was
+  incremented only for subjects whose adverse sweep did NOT error, so on the
+  14 Jul news-feed outage the denominator collapsed to 42 while the numerators
+  covered the near-full book, printing impossible ratios ("error rate 2931%",
+  "adverse-media errors 795/42 (1893%)"). The new pure `tally_enrichment`
+  counts **every attempted subject** in `subjects` and each subject **at most
+  once** in `errors` (a both-feeds failure is one degraded subject, not two
+  errors — the old sum reached 1231 errors for 837 subjects), so
+  `error_rate ≤ 100%` by construction and the anomaly thresholds compare true
+  fractions of the book. Report header and §⑤ now show the honest counts, and
+  new detail counters (`am_blackout`, `pep_errors`, `pep_mirror`, `watchlist`)
+  persist per run. Semantics documented in `docs/aims/runtime-monitoring.md`.
+- **PEP screening could silently zero out** — the live Wikidata lookup ran
+  with no pacing and no circuit breaker: 8 workers burst the API from one
+  shared runner IP, 436 lookups errored and the day's PEP count fell 4 → 0.
+  `check_pep` now paces through a run-global adaptive rate gate (mirror of the
+  Google News gate), opens a circuit after `PEP_BREAKER_AFTER` consecutive
+  failures, sends the Wikimedia-policy User-Agent (tool + repo contact), and
+  — when lookups still errored after the pool — the affected individuals are
+  re-covered in one bulk pass against the **OpenSanctions consolidated PEP
+  dataset** (`load_pep_mirror` / `pep_mirror_lookup`, exact-normalized index),
+  provenance-marked "mirror" with the OpenSanctions entity URL as evidence.
+  Kill-switch `PEP_MIRROR_FALLBACK=0`; licensing registered in
+  `docs/aims/third-party-register.md` (bulk data is CC-BY-NC 4.0).
+- **A news blackout meant ZERO adverse coverage** — when Google News and GDELT
+  both refused the runner (10–14 Jul), 795/837 subjects finished with no
+  adverse screening at all. The engine now runs a deterministic third net
+  BEFORE the news sweep: the **OpenSanctions crime watchlist** (national
+  wanted lists / enforcement actions), one bulk download matched locally with
+  the exact sanctions matcher and thresholds. Findings are article-shaped
+  with deterministic titles (delta-stable: NEW once, then STANDING), carry
+  the entity URL as evidence, are excluded from the ≥3-stories/90d
+  repeat-pattern counter (standing list presence is not a news story), and a
+  news outage now reads "news recall narrowed — watchlist stood" instead of
+  a blackout (`am_blackout` only counts subjects no net could screen).
+  Kill-switch `ADVERSE_WATCHLIST=0`.
+- **Onboarding snapshots poisoned the daily baselines** — `persist_run`
+  dedups history by date, so a 2-subject onboarding snapshot could REPLACE
+  the same day's full daily batch and drag `median_subjects` to 46.
+  `monitor_run` gained `persist=` and onboarding runs no longer write
+  history (they keep the absolute checks; sustained detection is the daily
+  batch's job).
+- **State-branch force-push race** — `weekly-adverse-media.yml` and
+  `onboarding-screen.yml` both rebuild `screen-delta-state` as `<main>` + one
+  data commit under DIFFERENT concurrency groups; an overlap could drop the
+  other's just-persisted `run-metrics.json` (the exact file anomaly-watch
+  reads). Both jobs now share one `screen-state` concurrency group
+  (repo-wide, cross-workflow) — guarded by a new drift check in
+  `test/screening-state.test.mjs`.
+- **Alerts that never clear** — `anomaly-watch.yml` now posts a "cleared"
+  comment and closes the escalation issue once the last-3-run window is
+  clean (a missing/stale history reads as escalate, so the close path can
+  never fire on a dead pipeline), and `link-check.yml` closes its tracking
+  issue when every link resolves (both also honour `workflow_dispatch`, so a
+  fix can be verified same-day). `mode=LLM` in the run log/report no longer
+  overstates AI usage when the key is present but triage is gated off —
+  the label now reads "LLM-standby (triage off)" (`_ai_mode_label`).
+
+### Fixed (dead citations — issue #225, 2026-07-14)
+
+- The five "dead" links split three ways, none a rotted citation: the UAE
+  Ministry of Economy hosts (`moec.gov.ae`, `moet.gov.ae`) **block all
+  datacenter/CI connections** — the canonical pages are live in a browser, so
+  `scripts/link-check.mjs` gained a documented `ALLOWLIST_HOSTS` (skipped at
+  probe time, never counted dead; `data/reg-sources.json` keeps `moet.gov.ae`
+  as the watched source via its Internet Archive fallback); the truncated
+  `www.moec.gov` in an older changelog entry is now written scheme-less so
+  the checker never re-probes the known-bad URL that entry documents; the two
+  deep `moet.gov.ae` research citations carry an explicit fetch note (no
+  verifiable Wayback capture was reachable from the fix environment).
+- `ci/osv-scanner.toml` (new): justified, documented suppression of
+  PYSEC-2026-2132 / CVE-2026-7246 (`click==8.1.8` in the semgrep CI venv) —
+  not remediable by upgrade (semgrep, incl. latest 1.169.0, pins
+  `click~=8.1.8`) and the vulnerable `click.edit()` interactive-editor path
+  is unreachable in the non-interactive CI job. Auto-heals via Dependabot
+  the moment semgrep unpins. Scorecard arithmetic + the honest path to ≥9.5
+  documented in `docs/governance/scorecard-9.5-path.md`;
+  `docs/governance/github-repository-hardening.md` §1 now matches the LIVE
+  single-maintainer branch-protection settings instead of claiming
+  approvals ≥ 1.
+
 ### Fixed (screening ops — issue #222 disposition)
 
 - **Anomaly-watch read a frozen metrics copy** — the runtime monitor read
@@ -707,8 +790,10 @@ bump merged to `main`.
   Branches if the Settings app is not installed.
 - **QA audit (2026-07-07):** Corrected a truncated citation URL in
   `docs/research/auto/REG-UPDATE-2026-06-30.md` — the UAE Ministry of Economy AML
-  page was cited as `https://www.moec.gov` (does not resolve). Restored the
-  canonical `https://www.moec.gov.ae/en/anti-money-laundering` already used in
+  page was cited with the truncated domain `www.moec.gov` (does not resolve;
+  written scheme-less here so the link checker never re-probes the known-bad
+  truncation this entry documents). Restored the canonical
+  `https://www.moec.gov.ae/en/anti-money-laundering` already used in
   `data/reg-sources.json` and every sibling reg-watch doc, clearing the sole dead
   link the citation-health gate reported.
 - **Deep bug hunt (2026-07-02):**

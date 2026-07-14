@@ -7,12 +7,35 @@ Implemented in `monitoring.py`; surfaced in every report (§⑤) and fed to the 
 ## What is monitored
 
 ### 1. Run metrics (latency · usage · anomaly)
-Per run we capture and persist (to `data/run-metrics.json`, rolling 30 runs):
-- **stage timings** — sanctions, enrichment, AI triage, and total wall-clock;
-- **counts** — subjects screened, errors, flagged / adverse / PEP findings;
+Per run we capture and persist (to `data/run-metrics.json`, rolling 30 runs;
+**daily batches only** — onboarding runs screen a handful of subjects and are
+excluded from history so they cannot poison the baseline medians):
+- **stage timings** — watchlist, sanctions, enrichment, AI triage, and total wall-clock;
+- **counts** — subjects screened, errors, flagged / adverse / PEP findings, plus
+  the degradation detail counters below;
 - **LLM usage** — calls attempted / ok / failed (from `ai.LLM_CALLS`; counts only,
   no prompt or response content retained);
 - **error rate** — errored subjects ÷ subjects screened.
+
+Counts definitions (semantics fixed 2026-07-14 — see the CHANGELOG entry; the
+previous engine counted only *surviving* subjects in the denominator and summed
+per-module failures in the numerator, which produced impossible ratios like
+"795/42 = 1893%" during the July news-feed outage):
+- **subjects** — every subject the enrichment pass *attempted*, including
+  errored ones (`tally_enrichment` in `screen.py`);
+- **errors** — subjects with ≥ 1 module failure; a subject counts **once** no
+  matter how many modules failed for it, so `errors ≤ subjects` always;
+- **am_errors** — subjects whose whole news sweep failed (Google News + GDELT);
+- **am_blackout** — of those, subjects with ZERO adverse coverage from ANY
+  source (the OpenSanctions crime watchlist was unavailable too);
+- **pep_errors** — individuals with no PEP coverage from either source
+  (Wikidata live + OpenSanctions PEP mirror);
+- **pep_mirror** — individuals screened via the OpenSanctions mirror fallback;
+- **watchlist** — subjects with ≥ 1 adverse-exposure watchlist finding.
+
+History spanning the 2026-07-14 semantics change stays valid: each run is
+judged against its own thresholds self-consistently, and pre-change snapshots
+age out of the rolling 30-run window naturally.
 
 Each run is compared to the **trailing baseline** and an anomaly is raised when:
 | Anomaly | Trigger |
@@ -20,6 +43,7 @@ Each run is compared to the **trailing baseline** and an anomaly is raised when:
 | Latency blow-out | total runtime ≥ 3× the trailing median |
 | Error-rate spike | > 10% of subjects errored |
 | Coverage cliff | subjects screened < 50% of the trailing median |
+| Adverse-media degradation | > 25% of subjects lost their news sweep |
 
 ### 2. Source-coverage drift
 The most dangerous screening failure is a sanctions list that **silently shrinks**
@@ -45,8 +69,11 @@ one of the last *N* runs (default 3). When that happens:
 - the report's §⑤ block prints a **`SUSTAINED ANOMALY — ESCALATE`** line, and
 - the scheduled **`anomaly-watch`** workflow (`python monitoring.py escalate`) opens —
   or updates — a single GitHub issue for the MLRO (idempotent: one open issue, not
-  a daily duplicate). It reads the committed metrics history and is a clean no-op
-  until that state exists, so it never fails red on its own.
+  a daily duplicate), and **closes it with a "cleared" comment** once the
+  last-3-run window is clean again (a missing/stale history reads as escalate,
+  so the close path can never fire on a dead pipeline). It reads the committed
+  metrics history and is a clean no-op until that state exists, so it never
+  fails red on its own.
 
 ## How it surfaces
 - **Report §⑤ Operational Monitoring** — runtime, subjects, errors, LLM usage,

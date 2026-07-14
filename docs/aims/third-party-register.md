@@ -9,6 +9,7 @@ basis/safeguard, and DPA status. Owner: MLRO / DPO. Review: annually + on change
 | **Anthropic** | LLM grounded triage (optional) | Subject **name + one public headline** only | Out | Vendor DPA + this DPIA — **DPA PENDING signature; egress GATED OFF** until executed | Key now wired, so triage is held off by `vars.LLM_TRIAGE` (default `0`). Set `=1` only after the DPA is signed and the transfer basis (below) is confirmed. |
 | **Google (News RSS)** | Adverse-media search | Subject name + risk terms (query) | Out | Public service; no account; no PII beyond the queried name | No customer record sent |
 | **Wikimedia (Wikidata)** | PEP detection | Individual name (query) | Out | Public CC0 API | No customer record sent |
+| **OpenSanctions** (`data.opensanctions.org`) | Bulk dataset downloads: EU FSF (primary), OFAC/UN mirror fallbacks, `peps` PEP-mirror fallback, `crime` adverse-exposure watchlist | **None** — pull-only bulk files; matching is on-runner; no name is ever sent | In | Bulk data is **CC-BY-NC 4.0** — a commercial production deployment needs an OpenSanctions licence before relying on the `peps`/`crime` layers beyond resilience. Kill-switches: `PEP_MIRROR_FALLBACK=0`, `ADVERSE_WATCHLIST=0`. | Every mirror/watchlist result is provenance-marked in the report ("OpenSanctions mirror" / "watchlist") so the audit trail shows which source actually screened. |
 | **GitHub (Actions)** | Compute runner, code, run history, secrets | Code + run logs (no customer record persisted in logs) | In + Out | GitHub DPA | harden-runner egress controls; secrets encrypted |
 | **GitHub (gov-list hosts)** | OFAC/UN/EU/UK/EOCN/Canada downloads | None (public lists fetched) | In | Public sources | — |
 
@@ -22,6 +23,7 @@ from the vendor against the firm's contracted plan and recorded here.
 | **Asana** | US (Asana default; EU data centre available on plan) | **Confirm** the workspace's contracted region |
 | **Google (News RSS)** | Global edge; query only (subject name) | No PII record stored; residency N/A |
 | **Wikimedia (Wikidata)** | Global; query only (name) | No PII record stored; residency N/A |
+| **OpenSanctions** | CDN download only — no query, no PII leaves the runner | Pull-only; residency N/A |
 | **GitHub (Actions)** | US-hosted runners | Confirm runner region if EU residency is required |
 
 ## Actions / gaps

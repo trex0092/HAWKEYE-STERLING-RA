@@ -62,4 +62,4 @@ jobs:
         run: |
           node scripts/asana-alert.mjs \
             "CONTROL STALE: a mandatory-daily compliance watcher did not run today" \
-            "The Freshness Check found that at least one mandatory-daily control (Sanctions Watch / Sanctions Screen / Daily Sanctions Screening / Regulatory Watch) has no successful run today. A daily ingestion/screening control that silently stops is a potential regulatory breach (e.g. UNSC / EOCN must run daily without delay). Review the schedules and the run log: $RUN_URL"
+            "The Freshness Check found that at least one mandatory-daily control (Sanctions Watch / Daily Screening (Sanctions + Adverse Media + PEP) / Sanctions Screen (case engine) / Regulatory Watch) has no successful run today. A daily ingestion/screening control that silently stops is a potential regulatory breach (e.g. UNSC / EOCN must run daily without delay). Review the schedules and the run log: $RUN_URL"
