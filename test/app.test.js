@@ -75,6 +75,10 @@ const script = appjs;
   currentRole, setRole, can, roleAtLeast, ROLES, ROLE_KEY, policyMissing,
   addRCA, exportAuditTokenized,
   mfaGenSecret, totpNow, totpVerify, _b32encode, _b32decode,
+  _sessSave, _sessRead, _sessRestore, _sessClear, _sessExpiredReason, _idbPut, _idbGet, _idbDel,
+  SESS_KEY, SEC_IDB_KEY,
+  get _secKey(){ return _secKey; }, set _secKey(v){ _secKey = v; },
+  get _sessExp(){ return _sessExp; }, set _sessExp(v){ _sessExp = v; },
   get riskData(){ return riskData; }
 };`);
 const A = globalThis.__app;
@@ -1119,6 +1123,100 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     check('applyLang back to English restores the عربي toggle label', document.getElementById('langToggle').textContent === 'عربي');
   }
 
+  /* ── 33. Session key at rest: non-extractable + IndexedDB (never raw in localStorage) ──
+     Regression for the raw-AES-key-in-localStorage exposure. The 1-hour cross-page
+     session must cache the key OBJECT in IndexedDB (non-extractable), keep only
+     {exp,seen} in localStorage, and FAIL CLOSED when IndexedDB is unavailable —
+     never falling back to writing the raw key. */
+  await (async function(){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await A._deriveKey('correct horse battery staple', salt, 1000);
+
+    // (a) The derived key is non-extractable — raw export is refused.
+    let exportRejected = false;
+    try{ await crypto.subtle.exportKey('raw', key); }catch(e){ exportRejected = true; }
+    check('session-key: _deriveKey yields a NON-extractable key (raw export refused)', exportRejected);
+
+    // (b) Fail closed with NO IndexedDB (Node has none): _sessSave caches nothing,
+    //     _sessRestore returns false — and the raw key is never in localStorage.
+    const saved = Object.assign({}, global.localStorage._m);
+    try{
+      global.localStorage._m = {};
+      global.localStorage.setItem('hsra.sec.v1', JSON.stringify({v:1, salt:'AAAA', iter:1000, iv:'AAAA', ct:'AAAA'}));
+      A._secKey = key; A._sessExp = Date.now() + 3600000;
+      await A._sessSave();
+      check('session-key: no IndexedDB → _sessSave caches no session blob (fail closed)',
+        global.localStorage.getItem('hsra.sess.v1') == null);
+      const restored = await A._sessRestore({ exp: A._sessExp, seen: Date.now() });
+      check('session-key: no IndexedDB → _sessRestore fails closed (false)', restored === false);
+
+      // (c) A legacy blob carrying a raw key (k) is refused by _sessRead.
+      global.localStorage.setItem('hsra.sess.v1', JSON.stringify({ k: 'AAAA', exp: Date.now() + 3600000, seen: Date.now() }));
+      check('session-key: a legacy blob carrying a raw key is refused by _sessRead', A._sessRead() === null);
+
+      // (d) With IndexedDB present: the key object goes to IDB; localStorage holds
+      //     only {exp,seen} (no k); the round-tripped key still decrypts; clear wipes both.
+      installFakeIDB();
+      global.localStorage._m = {};
+      global.localStorage.setItem('hsra.sec.v1', JSON.stringify({v:1, salt:'AAAA', iter:1000, iv:'AAAA', ct:'AAAA'}));
+      A._secKey = key; A._sessExp = Date.now() + 3600000;
+      await A._sessSave();
+      const blob = JSON.parse(global.localStorage.getItem('hsra.sess.v1') || 'null');
+      check('session-key: IDB present → localStorage holds {exp,seen} only, no raw key',
+        !!blob && !!blob.exp && !!blob.seen && !('k' in blob));
+      const gotKey = await A._idbGet(A.SEC_IDB_KEY);
+      check('session-key: the CryptoKey object is retrievable from IndexedDB',
+        !!gotKey && gotKey.type === 'secret');
+      const rt = await A.decryptStr(gotKey, await A.encryptStr(gotKey, 'sensitive'));
+      check('session-key: the IDB-cached key still encrypts/decrypts (usable)', rt === 'sensitive');
+      A._sessClear();
+      await new Promise(r => setTimeout(r, 10));   // let the async idbDel land
+      check('session-key: _sessClear wipes the localStorage metadata', global.localStorage.getItem('hsra.sess.v1') == null);
+      check('session-key: _sessClear wipes the cached key from IndexedDB', (await A._idbGet(A.SEC_IDB_KEY)) == null);
+    } finally {
+      delete global.indexedDB;
+      global.localStorage._m = saved;
+      A._secKey = null; A._sessExp = 0;
+    }
+  })();
+
   console.log('\n' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed ? 1 : 0);
 })();
+
+/* Minimal in-memory IndexedDB shim (browsers have the real thing; Node does not).
+   Enough of the surface for _idbOpen/_idbPut/_idbGet/_idbDel: async open with
+   onupgradeneeded→onsuccess, and a store with put/get/delete firing oncomplete. */
+function installFakeIDB(){
+  const dbs = {};
+  global.indexedDB = {
+    open(name){
+      const req = { onupgradeneeded: null, onsuccess: null, onerror: null, result: null, error: null };
+      setTimeout(function(){
+        const store = (dbs[name] = dbs[name] || {});
+        const db = {
+          createObjectStore(s){ store[s] = store[s] || new Map(); return {}; },
+          transaction(s){
+            const map = (store[s] = store[s] || new Map());
+            const tx = { oncomplete: null, onerror: null, onabort: null, error: null,
+              objectStore(){ return {
+                put(val, key){ const rq = { onsuccess: null, onerror: null, result: undefined };
+                  setTimeout(function(){ map.set(key, val); if(rq.onsuccess) rq.onsuccess(); if(tx.oncomplete) tx.oncomplete(); }, 0); return rq; },
+                get(key){ const rq = { onsuccess: null, onerror: null, result: undefined };
+                  setTimeout(function(){ rq.result = map.has(key) ? map.get(key) : undefined; if(rq.onsuccess) rq.onsuccess(); if(tx.oncomplete) tx.oncomplete(); }, 0); return rq; },
+                delete(key){ const rq = { onsuccess: null, onerror: null };
+                  setTimeout(function(){ map.delete(key); if(rq.onsuccess) rq.onsuccess(); if(tx.oncomplete) tx.oncomplete(); }, 0); return rq; }
+              }; }
+            };
+            return tx;
+          },
+          close(){}
+        };
+        req.result = db;
+        if(req.onupgradeneeded) req.onupgradeneeded({ target: req });
+        if(req.onsuccess) req.onsuccess();
+      }, 0);
+      return req;
+    }
+  };
+}

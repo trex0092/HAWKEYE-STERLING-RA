@@ -636,8 +636,10 @@ render();
     }catch(e){ return null; }
   }
   function touch(){
-    try{ var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if(!s) return;
-      var n = Date.now(); if(!s.seen || n - s.seen > 15000){ s.seen = n; localStorage.setItem(KEY, JSON.stringify(s)); }
+    try{ var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if(!s || !s.exp) return;
+      /* Write only {exp,seen} — never spread `s` — so a legacy blob's raw key is
+         never re-persisted by this read-only chip (the key now lives in IndexedDB). */
+      var n = Date.now(); if(!s.seen || n - s.seen > 15000){ localStorage.setItem(KEY, JSON.stringify({exp:s.exp, seen:n})); }
     }catch(e){}
   }
   function render(){
