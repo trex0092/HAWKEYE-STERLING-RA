@@ -850,9 +850,10 @@ _results = [
 _wl = {"News Dead Co": [dict(_wl_art)]}
 _c, _af, _pf = screen.tally_enrichment(_results, _wl, True)
 check("subjects counts EVERY attempted subject (not survivors)", _c["subjects"] == 6)
-check("errors count each subject once (both-feeds failure ≠ two errors)",
-      _c["errors"] == 2 and _c["errors"] <= _c["subjects"])
-check("am_errors keeps its historical meaning (news sweep lost)", _c["am_errors"] == 2)
+check("errors count ACTIONABLE failures once per subject (news-only loss is not an error while the watchlist stands)",
+      _c["errors"] == 1 and _c["errors"] <= _c["subjects"])
+check("am_errors keeps its historical meaning (news sweep lost — reported, not escalated)",
+      _c["am_errors"] == 2 and _c["am_errors"] > _c["errors"])
 check("no blackout while the watchlist stands", _c["am_blackout"] == 0)
 check("pep counters split errored vs mirror-screened",
       _c["pep_errors"] == 1 and _c["pep_mirror"] == 2)
@@ -863,6 +864,25 @@ check("mirror PEP hit lands in pep_findings with id + source_url",
 _c2, _af2, _pf2 = screen.tally_enrichment(_results, {}, False)
 check("with the watchlist down, news-dead subjects ARE blackout (loud)",
       _c2["am_blackout"] == 2 and _c2["watchlist"] == 0)
+check("blackout subjects DO count as errors (actionable: no net could screen)",
+      _c2["errors"] == 2)
+
+# Escalation keys on blackout, not news-recall narrowing: a throttled-news day
+# with the watchlist standing raises NO anomaly (compensating control), while a
+# true blackout day still escalates, and pre-watchlist history keeps its own
+# judgment via the am_errors fallback.
+_snap_news_only = {"date": "2026-07-15", "total_seconds": 2600, "error_rate": 0.006,
+                   "counts": {"subjects": 837, "errors": 5, "am_errors": 795, "am_blackout": 0}}
+check("news-only degradation does not raise the adverse_media anomaly",
+      "adverse_media" not in monitoring._anomaly_types(_snap_news_only, []))
+_snap_blackout = {"date": "2026-07-15", "total_seconds": 2600, "error_rate": 0.95,
+                  "counts": {"subjects": 837, "errors": 795, "am_errors": 795, "am_blackout": 795}}
+check("a true coverage blackout still raises the adverse_media anomaly",
+      "adverse_media" in monitoring._anomaly_types(_snap_blackout, []))
+_snap_legacy = {"date": "2026-07-12", "total_seconds": 7000, "error_rate": 24.58,
+                "counts": {"subjects": 33, "errors": 811, "am_errors": 805}}
+check("pre-watchlist snapshots fall back to am_errors (news-lost WAS blackout then)",
+      "adverse_media" in monitoring._anomaly_types(_snap_legacy, []))
 
 # error_rate can never exceed 100% again: 795 news-dead of 837 must read 95%.
 _big = [_res("COMPANY", f"C{i}", am_error=(i < 795)) for i in range(837)]

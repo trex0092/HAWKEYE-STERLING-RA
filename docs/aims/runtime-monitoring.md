@@ -23,8 +23,16 @@ per-module failures in the numerator, which produced impossible ratios like
 "795/42 = 1893%" during the July news-feed outage):
 - **subjects** — every subject the enrichment pass *attempted*, including
   errored ones (`tally_enrichment` in `screen.py`);
-- **errors** — subjects with ≥ 1 module failure; a subject counts **once** no
-  matter how many modules failed for it, so `errors ≤ subjects` always;
+- **errors** — subjects with ≥ 1 **actionable coverage failure** (adverse
+  blackout, or an individual unscreened for PEP on both sources); a subject
+  counts **once** no matter how many modules failed for it, so
+  `errors ≤ subjects` always. A news-only loss while the deterministic
+  watchlist stands is a *recall degradation*, not an error: it stays loud in
+  the report (module status `DEGRADED (news)`, §② status line) and in the
+  `am_errors` counter, but does not feed the error rate or the sustained
+  escalation — the watchlist is the compensating control, and an alarm that
+  can re-raise forever on a mitigated environmental condition (news feeds
+  throttling shared CI egress) is alert fatigue, not resilience;
 - **am_errors** — subjects whose whole news sweep failed (Google News + GDELT);
 - **am_blackout** — of those, subjects with ZERO adverse coverage from ANY
   source (the OpenSanctions crime watchlist was unavailable too);
@@ -41,9 +49,9 @@ Each run is compared to the **trailing baseline** and an anomaly is raised when:
 | Anomaly | Trigger |
 |---|---|
 | Latency blow-out | total runtime ≥ 3× the trailing median |
-| Error-rate spike | > 10% of subjects errored |
+| Error-rate spike | > 10% of subjects with an actionable coverage failure |
 | Coverage cliff | subjects screened < 50% of the trailing median |
-| Adverse-media degradation | > 25% of subjects lost their news sweep |
+| Adverse-media coverage loss | > 25% of subjects with **no adverse net at all** (`am_blackout`; pre-watchlist snapshots fall back to `am_errors`, the honest meaning of their era) |
 
 ### 2. Source-coverage drift
 The most dangerous screening failure is a sanctions list that **silently shrinks**
