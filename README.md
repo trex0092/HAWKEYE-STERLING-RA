@@ -88,8 +88,8 @@ by **09:00 UAE**:
 | # | Module | What it does |
 |---|---|---|
 | ① | **Sanctions / watchlists** | Fuzzy name-match against the live **OFAC SDN · UN · EU FSF · UK OFSI · UAE EOCN** lists (plus **Canada SEMA** as a best-effort supplementary list). Shows every candidate with the matched entry and score. |
-| ② | **Adverse media** | Google News RSS across **5 locales** (US/GB/AE/TR/AR) plus a targeted risk-term query; duplicate stories merged across outlets, bucketed by typology, ranked recent-first, every item carrying its **real article link**. |
-| ③ | **PEP** | Auto-detected against **Wikidata** (no list supplied by the firm) — politicians, judges, military/SOE heads **and their relatives & close associates (RCA)**. |
+| ② | **Adverse media** | Google News RSS across **5 locales** (US/GB/AE/TR/AR) plus a targeted risk-term query and the **GDELT** global index; duplicate stories merged across outlets, bucketed by typology, ranked recent-first, every item carrying its **real article link**. A deterministic third net — the **OpenSanctions crime watchlist** (bulk download, matched locally) — keeps adverse-exposure coverage alive even when the news feeds rate-limit the CI runner. |
+| ③ | **PEP** | Auto-detected against **Wikidata** (no list supplied by the firm) — politicians, judges, military/SOE heads **and their relatives & close associates (RCA)**. Rate-gated with a circuit breaker; when Wikidata is unreachable, the **OpenSanctions PEP mirror** (bulk) re-covers the affected individuals, provenance-marked. |
 
 **Screening intelligence**
 - **False-positive suppression** — a decisive second match on the distinctive name "core" after stripping corporate/legal boilerplate, so two firms sharing only suffixes don't match.

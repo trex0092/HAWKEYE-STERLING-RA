@@ -230,9 +230,18 @@ def persist_run(snapshot, path=None):
     return hist
 
 
-def monitor_run(today, counts, timings=None, llm_calls=None, path=None):
+def monitor_run(today, counts, timings=None, llm_calls=None, path=None, persist=True):
     """Convenience: build a snapshot from plain dicts, analyze vs history, persist.
-    Returns {snapshot, anomalies, baseline}."""
+    Returns {snapshot, anomalies, baseline}.
+
+    persist=False (onboarding runs): a handful-of-subjects run must not enter the
+    history — persist_run dedups BY DATE, so its snapshot would REPLACE the same
+    day's full daily batch and poison every baseline median (the committed
+    history carries subjects=2 days from exactly this). Such runs still get the
+    absolute checks (error rate, adverse-media rate) — judged against an empty
+    baseline so the daily batch's latency/subject medians don't misfire on a
+    deliberately tiny run — and never report sustained anomalies (that is the
+    daily batch's, and anomaly-watch's, job)."""
     snap = {"date": today, "total_seconds": float((timings or {}).get("total", 0.0)),
             "timings": dict(timings or {}),
             "counts": dict(counts or {}),
@@ -240,6 +249,10 @@ def monitor_run(today, counts, timings=None, llm_calls=None, path=None):
                           if counts.get("subjects") else 0.0,
             "llm_calls": dict(llm_calls or {})}
     p = path or METRICS_STATE_PATH
+    if not persist:
+        res = analyze_run(snap, [])
+        res["sustained"] = []
+        return {"snapshot": snap, **res}
     hist = _load(p, [])
     res = analyze_run(snap, hist if isinstance(hist, list) else [])
     updated = persist_run(snap, p)

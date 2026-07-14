@@ -1,0 +1,23 @@
+# OSV suppressions for the CI tool venvs pinned in this directory (hash-locked
+# pip lockfiles for the semgrep/zizmor toolchains). Read by osv-scanner
+# (.github/workflows/osv-scanner.yml, `scan --recursive .`) and by the OpenSSF
+# Scorecard Vulnerabilities check (which scans dependencies via the osv-scanner
+# library) — an osv-scanner.toml applies to manifests in the SAME directory.
+#
+# Rule for this file: an entry is only acceptable when the vulnerability is
+# (a) NOT remediable by a version bump (upstream pins the vulnerable range) AND
+# (b) NOT exploitable in how this repo uses the package, with the reasoning
+# written out. Remove the entry the moment the upstream unpins — Dependabot
+# (pip, /ci, weekly) will surface the fixed resolution automatically.
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2132"
+# click 8.1.8 — command injection in click.edit() (CVE-2026-7246 /
+# GHSA-47fr-3ffg-hgmw), fixed in click 8.3.3.
+reason = "Unfixable-by-upgrade and unreachable: semgrep — the only consumer of this venv — requires click~=8.1.8 (still true on the latest semgrep 1.169.0), so click 8.3.3 cannot resolve into ci/semgrep-requirements.txt. The vulnerable function, click.edit(), launches an interactive $EDITOR; the semgrep job runs strictly non-interactively (`semgrep --config .semgrep/hawkeye.yml --error`) on repo-local input in an egress-audited runner and has no code path into click.edit(). This is a CI-only SAST tool venv, never product code (the product is a static web app with no Python runtime). Revisit on every semgrep bump; delete this entry when semgrep accepts click >= 8.3.3."
+
+[[IgnoredVulns]]
+id = "GHSA-47fr-3ffg-hgmw"
+# Alias of PYSEC-2026-2132 above — listed separately in case the scanner
+# reports the advisory under its GHSA id rather than the PYSEC id.
+reason = "Alias of PYSEC-2026-2132 — see the entry above for the full justification (semgrep pins click~=8.1.8; click.edit() is unreachable in the non-interactive CI job)."

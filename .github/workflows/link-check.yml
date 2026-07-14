@@ -5,7 +5,8 @@ name: Link Check
 # CODE_OF_CONDUCT, SUPPORT, CHANGELOG), to protect the "every answer cited" promise
 # and keep README badges/links live. Loopback + reserved-example placeholders
 # (e.g. the README's localhost quick-start) are skipped, never probed.
-# Weekly: opens/updates a tracking issue when links are dead.
+# Weekly (or on dispatch): opens/updates a tracking issue when links are dead,
+# and closes it with a comment once every link resolves again (close-on-recovery).
 # Pull request: reports to the job summary, non-blocking (external links are flaky).
 
 on:
@@ -62,8 +63,11 @@ jobs:
             echo "link-check produced no report (the check step errored before writing it — see its log)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Open/refresh tracking issue (scheduled runs only)
-        if: github.event_name == 'schedule' && steps.lc.outputs.has_dead == 'true'
+      # Dispatch counts like schedule for the tracking issue, so a fix can be
+      # verified (and the issue opened OR closed) same-day instead of waiting
+      # for Monday. PR runs stay summary-only.
+      - name: Open/refresh tracking issue (scheduled/dispatch runs only)
+        if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && steps.lc.outputs.has_dead == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
@@ -77,3 +81,25 @@ jobs:
             } else {
               await github.rest.issues.create({ owner, repo, title, body, labels: ['link-check'] });
             }
+
+      # Close-on-recovery: the tracking issue used to stay open forever after
+      # the links were fixed (its label is stale-exempt, so not even
+      # actions/stale would close it). A clean run is the verification the
+      # issue asked for — record it and close.
+      - name: Close tracking issue when all links resolve (scheduled/dispatch runs only)
+        if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && steps.lc.outputs.has_dead == 'false'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const today = new Date().toISOString().slice(0, 10);
+            const open = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: 'link-check' });
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+                body: `All links resolved on the ${today} run — closing. ` +
+                      'The weekly check re-opens (or refreshes) this if citations rot again.' });
+              await github.rest.issues.update({ owner, repo, issue_number: issue.number,
+                state: 'closed', state_reason: 'completed' });
+              core.info(`closed link-check issue #${issue.number}`);
+            }
+            if (!open.data.length) core.info('no open link-check issue — nothing to close');

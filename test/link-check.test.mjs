@@ -1,6 +1,6 @@
 /* Unit tests for the Link / citation health pure logic (no network).
    Usage: node test/link-check.test.mjs */
-import { collectUrls, isDead, summarize, buildReport, ALLOWLIST, probe, isProbeable } from '../scripts/link-check.mjs';
+import { collectUrls, isDead, summarize, buildReport, ALLOWLIST, ALLOWLIST_HOSTS, allowlistedHost, probe, isProbeable } from '../scripts/link-check.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -64,6 +64,26 @@ const slowAllowUrl = 'https://www.un.org/securitycouncil/content/un-sc-consolida
 const sSlow = summarize([{ url: slowAllowUrl, sources: ['data/reg-sources.json'], ok: false, status: null, error: 'This operation was aborted' }]);
 check('ALLOWLIST source aborted/timed-out by the probe is not counted dead',
   ALLOWLIST.has(slowAllowUrl) && sSlow.dead === 0);
+/* ALLOWLIST_HOSTS: the UAE ministry domains block ALL datacenter/CI
+   connections (status null — indistinguishable from a dead host), but they are
+   the canonical, verified-in-a-browser citations (issue #225). Host-level
+   allowlisting keeps every deep page on those hosts out of the dead list;
+   everything else with a null status is still honestly dead. */
+check('datacenter-blocked ministry host is allowlisted (deep AML page)',
+  allowlistedHost('https://www.moec.gov.ae/en/anti-money-laundering') === true);
+check('the watched moet.gov.ae source is allowlisted', allowlistedHost('https://www.moet.gov.ae/') === true);
+check('host allowlisting is by hostname, not substring (evil lookalike is NOT allowlisted)',
+  allowlistedHost('https://www.moet.gov.ae.evil.example/') === false);
+check('unparseable url is never allowlisted', allowlistedHost('not a url') === false);
+const sMinistry = summarize([
+  { url: 'https://www.moec.gov.ae/en/anti-money-laundering', sources: ['CHANGELOG.md'], ok: false, status: null, error: 'fetch failed' },
+  { url: 'https://www.moet.gov.ae/en/registering-companies-in-goaml', sources: ['docs/research/2026-06-aml-regulatory-update.md'], ok: false, status: null, error: 'fetch failed' },
+  { url: 'https://gone.example/x', sources: ['docs/x.md'], ok: false, status: null, error: 'fetch failed' },
+]);
+check('allowlisted-host null-status probes are not counted dead; other null-status still is',
+  sMinistry.dead === 1 && sMinistry.deadList[0].url === 'https://gone.example/x');
+check('the four ministry hostnames are registered', ALLOWLIST_HOSTS.size === 4);
+
 const rep = buildReport(results, '2026-06-16');
 check('report lists dead urls with status + source file', rep.includes('https://dead.example')
   && rep.includes('404') && rep.includes('docs/x.md') && rep.includes('2 of 3'));

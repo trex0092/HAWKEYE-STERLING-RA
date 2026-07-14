@@ -554,6 +554,10 @@ def _reset_breaker():
     screen._GNEWS_STATE["open"] = False
     screen._GNEWS_GATE.reset()
     screen._GDELT_GATE.reset()
+    screen._PEP_STATE["consecutive_failures"] = 0
+    screen._PEP_STATE["open"] = False
+    screen._PEP_GATE.reset()
+    screen._PEP_CACHE.clear()
 
 def _gnews_refused(*_a, **_k):
     _calls["gnews"] += 1
@@ -700,6 +704,224 @@ check("mirror also down → no fallback (existing degrade-loudly paths handle it
 screen.download = _orig_download
 check("parse_eu still parses via the shared simple-csv parser",
       screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
+
+# ── PEP: run-global gate + circuit breaker + mirror fallback (14 Jul incident) ─
+# The live Wikidata lookup had NO gate and NO breaker: 8 workers burst the API,
+# 436 lookups errored and the PEP count fell 4 → 0 with nothing to catch it.
+print("screen.py — PEP gate / breaker / mirror fallback")
+
+_pep_kwargs = {}
+_pep_calls = {"n": 0}
+def _pep_refused(*_a, **_k):
+    _pep_calls["n"] += 1
+    _pep_kwargs.update(_k)
+    raise OSError("connection refused")
+
+_reset_breaker(); _calls["sleeps"] = 0
+screen.requests.get = _pep_refused
+_r1 = screen.check_pep("Errored Lookup Person")
+check("a refused PEP lookup returns errored (never a silent 'no PEP')", _r1.get("errored") is True)
+check("errored PEP lookups are NOT cached (next run retries live)",
+      screen._norm_lower("Errored Lookup Person") not in screen._PEP_CACHE)
+check("PEP lookups carry the Wikimedia-policy UA (tool + contact repo URL)",
+      "HAWKEYE-STERLING-RA" in (_pep_kwargs.get("headers") or {}).get("User-Agent", ""))
+check("failed PEP lookups back the shared gate off", screen._PEP_GATE.interval > screen.PEP_MIN_INTERVAL)
+
+_reset_breaker(); _pep_calls["n"] = 0
+for _i in range(screen.PEP_BREAKER_AFTER + 4):
+    screen.check_pep(f"Distinct Refused Person {_i:02d}")
+check("PEP circuit opens after N consecutive failed lookups", screen._PEP_STATE["open"])
+check("Wikidata is not called once the PEP circuit is open",
+      _pep_calls["n"] == screen.PEP_BREAKER_AFTER)
+check("breaker-open lookups still read errored (provisional, loud)",
+      screen.check_pep("After Pep Breaker Person").get("errored") is True)
+
+_reset_breaker()
+screen._PEP_STATE["consecutive_failures"] = screen.PEP_BREAKER_AFTER - 1
+screen.requests.get = lambda *_a, **_k: _Resp(200, b'{"search": []}')
+_r2 = screen.check_pep("Healthy Lookup Person")
+check("a successful lookup resets the PEP failure streak",
+      screen._PEP_STATE["consecutive_failures"] == 0 and not screen._PEP_STATE["open"])
+check("successful no-hit lookups ARE cached", screen._norm_lower("Healthy Lookup Person") in screen._PEP_CACHE)
+
+# Mirror fallback: bulk index parse + exact-normalized (and token-reordered)
+# lookup, provenance-marked; kill-switch honoured; miss stays provisional.
+_PEP_CSV = b"id,schema,name,aliases\nQ1234,Person,Sample Politician,Sample A Politician;S Politician\nos-77,Person,Watch Minister,\n"
+_idx = screen.parse_pep_index(_PEP_CSV)
+check("pep index carries primary + aliases (normalized keys)",
+      screen._norm_lower("Sample Politician") in _idx and screen._norm_lower("Sample A Politician") in _idx)
+_hit = screen.pep_mirror_lookup(_idx, "Politician Sample")   # word-order variant
+check("token-reordered names still hit the mirror index", _hit.get("hit") is True)
+check("mirror hits carry the OpenSanctions id + entity URL (QA-gate evidence)",
+      _hit.get("id") == "Q1234" and "opensanctions.org/entities/Q1234" in _hit.get("source_url", ""))
+check("mirror hits are provenance-marked as mirror", "mirror" in _hit.get("category", "").lower()
+      and _hit.get("via_mirror") is True)
+_miss = screen.pep_mirror_lookup(_idx, "Unlisted Individual Name")
+check("a mirror miss is via_mirror (screened) but not a hit", _miss == {"hit": False, "via_mirror": True})
+
+_dl_urls2 = []
+screen.download = lambda url, label: (_dl_urls2.append(url) or _PEP_CSV)
+check("load_pep_mirror downloads the peps dataset and builds the index",
+      bool(screen.load_pep_mirror()) and "peps/targets.simple.csv" in _dl_urls2[0])
+_orig_pep_flag = screen.PEP_MIRROR_FALLBACK
+screen.PEP_MIRROR_FALLBACK = False
+check("PEP_MIRROR_FALLBACK=0 kill-switch: no download, no index",
+      screen.load_pep_mirror() is None and len(_dl_urls2) == 1)
+screen.PEP_MIRROR_FALLBACK = _orig_pep_flag
+screen.download = lambda url, label: None
+check("mirror download failure → None (callers leave individuals errored, loudly)",
+      screen.load_pep_mirror() is None)
+screen.download = _orig_download
+
+# ── Adverse-exposure watchlist (bulk third net) ────────────────────────────────
+print("screen.py — adverse-exposure watchlist")
+_WL_CSV = b"id,schema,name,aliases\nos-crime-1,Person,PETROPARS INTERNATIONAL FZE,\nos-crime-2,Person,Unrelated Fugitive,\n"
+_wl_entries, _wl_ids = screen.parse_watchlist(_WL_CSV)
+check("watchlist parse keeps (normalized, original) pairs + entity ids",
+      ("petropars international fze" in dict(_wl_entries) or len(_wl_entries) == 2)
+      and _wl_ids.get("PETROPARS INTERNATIONAL FZE") == "os-crime-1")
+
+screen.download = lambda url, label: _WL_CSV
+_e, _i2, _m = screen.load_adverse_watchlist()
+check("watchlist loads with supplementary tier + mirror provenance",
+      _m["tier"] == "supplementary" and "mirror" in _m["date"].lower() and _m["count"] == 2)
+_orig_wl_flag = screen.ADVERSE_WATCHLIST
+screen.ADVERSE_WATCHLIST = False
+_e0, _i0, _m0 = screen.load_adverse_watchlist()
+check("ADVERSE_WATCHLIST=0 kill-switch: disabled, count 0", _e0 is None and _m0["count"] == 0)
+screen.ADVERSE_WATCHLIST = _orig_wl_flag
+screen.download = lambda url, label: None
+_e1, _i1, _m1 = screen.load_adverse_watchlist()
+check("watchlist download failure is loud: unavailable meta, no entries",
+      _e1 is None and _m1["date"] == "unavailable")
+screen.download = _orig_download
+
+_subjects = [("COMPANY", "PETROPARS INTERNATIONAL FZE", None, {}), ("INDIVIDUAL", "Clean Person", "PETROPARS INTERNATIONAL FZE", {})]
+_wl_hits = screen.screen_watchlist(_subjects, _e, _i2, "2026-07-14")
+_wl_art = (_wl_hits.get("PETROPARS INTERNATIONAL FZE") or [{}])[0]
+check("watchlist matching flags the listed subject only",
+      set(_wl_hits) == {"PETROPARS INTERNATIONAL FZE"})
+check("watchlist findings are article-shaped: flagged, marked, entity-URL evidence",
+      _wl_art.get("flagged") is True and _wl_art.get("watchlist") is True
+      and "opensanctions.org/entities/os-crime-1" in _wl_art.get("url", ""))
+check("watchlist titles are deterministic (stable delta fingerprints)",
+      _wl_art.get("title") == "Adverse-exposure watchlist: PETROPARS INTERNATIONAL FZE — OpenSanctions crime dataset")
+
+# Delta stability: NEW on first sight, STANDING (not re-alerted) the next day.
+_wl_finding = {"subject_type": "COMPANY", "subject_name": "PETROPARS INTERNATIONAL FZE",
+               "parent": None, "permalink": "", "articles": [dict(_wl_art)]}
+_state_wl = {}
+_d1 = screen.classify_deltas([], [_wl_finding], [], _state_wl, "2026-07-14")
+_wl_finding2 = {"subject_type": "COMPANY", "subject_name": "PETROPARS INTERNATIONAL FZE",
+                "parent": None, "permalink": "", "articles": [dict(_wl_art, date="2026-07-15")]}
+_d2 = screen.classify_deltas([], [_wl_finding2], [], _state_wl, "2026-07-15")
+check("watchlist finding deltas NEW once then STANDING", _d1["adverse"] == 1 and _d2["adverse"] == 0)
+
+# Evidence log: watchlist standing presence must not inflate the ≥3-stories/90d
+# repeat pattern (it is not a distinct news story).
+_ev_path = os.path.join(ROOT, "test", ".tmp-evidence.json")
+try:
+    _news_art = {"title": "Real Story", "source": "Paper", "url": "https://x", "keywords": [], "categories": []}
+    _mixed = [{"subject_type": "COMPANY", "subject_name": "Mixed Subject", "parent": "",
+               "articles": [dict(_wl_art), _news_art]}]
+    screen.update_adverse_evidence(_mixed, "2026-07-14", path=_ev_path)
+    _logged = json.load(open(_ev_path))
+    check("evidence log records news stories but skips watchlist entries",
+          [e["title"] for e in _logged] == ["Real Story"])
+finally:
+    if os.path.exists(_ev_path):
+        os.remove(_ev_path)
+
+# ── tally_enrichment: honest denominators (the 42-subjects incident) ──────────
+print("screen.py — tally_enrichment (honest metrics)")
+def _res(t, name, am_error=False, adverse=None, pep=None):
+    return {"type": t, "name": name, "parent": None, "permalink": "", "adverse": adverse,
+            "pep": pep, "am_error": am_error}
+_results = [
+    _res("COMPANY", "News Dead Co", am_error=True),                                    # news lost, watchlist covers
+    _res("COMPANY", "Healthy Co", adverse=[]),
+    _res("INDIVIDUAL", "Both Failed Person", am_error=True, pep={"errored": True}),    # counts ONCE in errors
+    _res("INDIVIDUAL", "Mirror Hit Person", pep={"hit": True, "id": "Q9", "via_mirror": True,
+                                                 "category": "PEP (OpenSanctions peps watchlist — mirror)",
+                                                 "source_url": "https://www.opensanctions.org/entities/Q9/"}),
+    _res("INDIVIDUAL", "Mirror Miss Person", pep={"hit": False, "via_mirror": True}),
+    _res("INDIVIDUAL", "Clean Person", pep={"hit": False}),
+]
+_wl = {"News Dead Co": [dict(_wl_art)]}
+_c, _af, _pf = screen.tally_enrichment(_results, _wl, True)
+check("subjects counts EVERY attempted subject (not survivors)", _c["subjects"] == 6)
+check("errors count each subject once (both-feeds failure ≠ two errors)",
+      _c["errors"] == 2 and _c["errors"] <= _c["subjects"])
+check("am_errors keeps its historical meaning (news sweep lost)", _c["am_errors"] == 2)
+check("no blackout while the watchlist stands", _c["am_blackout"] == 0)
+check("pep counters split errored vs mirror-screened",
+      _c["pep_errors"] == 1 and _c["pep_mirror"] == 2)
+check("news-dead subjects still get their watchlist findings",
+      any(f["subject_name"] == "News Dead Co" and f["articles"][0].get("watchlist") for f in _af))
+check("mirror PEP hit lands in pep_findings with id + source_url",
+      any(p["subject_name"] == "Mirror Hit Person" and p["id"] == "Q9" and p.get("source_url") for p in _pf))
+_c2, _af2, _pf2 = screen.tally_enrichment(_results, {}, False)
+check("with the watchlist down, news-dead subjects ARE blackout (loud)",
+      _c2["am_blackout"] == 2 and _c2["watchlist"] == 0)
+
+# error_rate can never exceed 100% again: 795 news-dead of 837 must read 95%.
+_big = [_res("COMPANY", f"C{i}", am_error=(i < 795)) for i in range(837)]
+_cb, _, _ = screen.tally_enrichment(_big, {}, False)
+check("the 14 Jul shape reads 795/837 (95%), not 795/42 (1893%)",
+      _cb["subjects"] == 837 and _cb["am_errors"] == 795
+      and 0.94 < _cb["am_errors"] / _cb["subjects"] < 0.96)
+
+# ── monitoring: onboarding runs stay out of history + semantics transition ────
+print("monitoring.py — persist flag + mixed-history transition")
+_mx_path = os.path.join(ROOT, "test", ".tmp-metrics.json")
+try:
+    if os.path.exists(_mx_path):
+        os.remove(_mx_path)
+    _ob = monitoring.monitor_run("2026-07-14", {"subjects": 2, "errors": 0, "am_errors": 0},
+                                 timings={"total": 30}, path=_mx_path, persist=False)
+    check("persist=False (onboarding) never writes the metrics history",
+          not os.path.exists(_mx_path))
+    check("persist=False never reports sustained anomalies (daily batch's job)",
+          _ob["sustained"] == [] and _ob["anomalies"] == [])
+    _dy = monitoring.monitor_run("2026-07-14", {"subjects": 837, "errors": 8, "am_errors": 8},
+                                 timings={"total": 2500}, path=_mx_path)
+    check("persist=True (daily) writes exactly one snapshot for the date",
+          len(json.load(open(_mx_path))) == 1)
+finally:
+    if os.path.exists(_mx_path):
+        os.remove(_mx_path)
+
+# Semantics transition: old-style snapshots (survivors-only denominators) and
+# new-style ones coexist in the 3-run window — each run is judged against its
+# own numbers, so the sustained intersection still clears on ONE healthy run.
+_old1 = {"date": "2026-07-12", "total_seconds": 7000,
+         "counts": {"subjects": 33, "errors": 811, "am_errors": 805}, "error_rate": 24.58}
+_old2 = {"date": "2026-07-13", "total_seconds": 3700,
+         "counts": {"subjects": 95, "errors": 785, "am_errors": 743}, "error_rate": 8.26}
+_new_bad = {"date": "2026-07-14", "total_seconds": 2500,
+            "counts": {"subjects": 837, "errors": 795, "am_errors": 795}, "error_rate": 0.95}
+_new_ok = {"date": "2026-07-15", "total_seconds": 2600,
+           "counts": {"subjects": 837, "errors": 8, "am_errors": 8}, "error_rate": 0.0096}
+_still = monitoring.sustained_anomalies([_old1, _old2, _new_bad])
+check("old+new bad snapshots still read sustained (error_rate + adverse_media)",
+      "error_rate" in _still and "adverse_media" in _still)
+check("one healthy honest run clears the sustained window",
+      monitoring.sustained_anomalies([_old1, _old2, _new_bad, _new_ok]) == [])
+
+# ── ai_mode label honesty ─────────────────────────────────────────────────────
+print("screen.py — ai_mode label")
+_orig_enabled, _orig_triage = screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE
+screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE = False, False
+check("no key → deterministic", screen._ai_mode_label() == "deterministic")
+screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE = True, False
+_standby = screen._ai_mode_label()
+check("key present but triage off → standby label (no more 'mode=LLM' with 0 calls)",
+      "standby" in _standby and "triage off" in _standby)
+check("standby label still issues the LLM credential (broker contract: != deterministic)",
+      _standby != "deterministic")
+screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE = True, True
+check("key present and triage on → AI-assisted triage", screen._ai_mode_label() == "AI-assisted triage")
+screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE = _orig_enabled, _orig_triage
 
 screen.requests.get, screen.time.sleep, screen.search_gdelt = _orig_get, _orig_sleep, _orig_gdelt
 screen.time.monotonic = _orig_mono

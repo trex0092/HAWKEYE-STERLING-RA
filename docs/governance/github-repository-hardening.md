@@ -34,9 +34,9 @@ Settings app, or manually at **Settings → Branches → Add branch ruleset / pr
 | Control | Required value | Why |
 |---|---|---|
 | Require a pull request before merging | **On** | No direct pushes to the deploy branch. |
-| Required approvals | **≥ 1** | Four-eyes on every change. |
-| Dismiss stale approvals on new commits | **On** | Re-review after the diff changes. |
-| Require review from Code Owners | **On** | Enforces [`.github/CODEOWNERS`](../../.github/CODEOWNERS). |
+| Required approvals | **0** (see note) | Single-maintainer reality: GitHub never counts the author's own approval, and the sole [code owner](../../.github/CODEOWNERS) *is* the author — any count > 0 made every owner-authored PR unmergeable with no admin bypass (`enforce_admins` is on). The binding controls are the required status checks below. **Raise to ≥ 1 when a second maintainer joins** (see the CHANGELOG entry "Unmergeable-by-design review rule on a single-maintainer repo" and the inline rationale in `.github/settings.yml`). |
+| Dismiss stale approvals on new commits | **On** | Re-review after the diff changes (binds any future approvals). |
+| Require review from Code Owners | **Off** (see note) | Same single-maintainer constraint as above — the only code owner is the PR author. **Turn back On together with required approvals ≥ 1** when a second maintainer joins. |
 | Require status checks to pass | **On** | No merging on red CI. |
 | Require branches up to date before merge | **On** (`strict`) | Tests run against the post-merge tree. |
 | Required checks | `test`, `lint`, `smoke`, `analyze` (CodeQL), `semgrep`, `gitleaks`, `size`, `Dependency Review` | The blocking gates that prove correctness, style, runtime-CSP/Trusted-Types safety, code scanning (CodeQL + Semgrep app-invariants), secret scanning, size, and dependency licensing/vulns. |

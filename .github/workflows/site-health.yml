@@ -1,6 +1,6 @@
 name: Site Health
 
-# Weekly check that the LIVE site is up and actually working: renders the
+# Daily check that the LIVE site is up and actually working: renders the
 # deployed app in headless Chrome and asserts the brand, the computed
 # verdict, and the gauge. On failure it opens an assigned alert task in the
 # HAWKEYE STERLING APP Asana project (plus GitHub's own failure email).

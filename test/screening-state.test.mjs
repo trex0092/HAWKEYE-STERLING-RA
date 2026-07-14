@@ -42,6 +42,30 @@ for (const producer of ['weekly-adverse-media.yml', 'onboarding-screen.yml']) {
     y.includes(`refs/heads/${STATE_BRANCH}`));
 }
 
+/* 1b. SINGLE WRITER — both state producers force-push the same branch (each
+   rebuilds it as <main> + one data commit), so they must share one concurrency
+   group or an overlap drops the other's just-persisted run-metrics/delta files
+   (the exact inputs anomaly-watch reads). */
+const groupOf = (y) => (y.match(/concurrency:\s*\n\s*group:\s*([^\s#]+)/) || [])[1];
+const gDaily = groupOf(wf('weekly-adverse-media.yml'));
+const gOnb = groupOf(wf('onboarding-screen.yml'));
+check('both screen-delta-state writers declare a concurrency group', Boolean(gDaily) && Boolean(gOnb));
+check('the two state writers share ONE concurrency group (serialised force-pushes)',
+  Boolean(gDaily) && gDaily === gOnb);
+
+/* 1c. CLOSE THE LOOP — the escalation issue must clear itself when the anomaly
+   is gone, and the link-check tracking issue when every link resolves; an
+   alert that never clears trains people to ignore it. */
+check('anomaly-watch has a clear path when escalate == false',
+  anomaly.includes("escalate == 'false'"));
+check('anomaly-watch closes the escalation issue on clear',
+  anomaly.includes("state: 'closed'"));
+const linkcheck = wf('link-check.yml');
+check('link-check has a close-on-recovery path when has_dead == false',
+  linkcheck.includes("has_dead == 'false'"));
+check('link-check closes the tracking issue on recovery',
+  linkcheck.includes("state: 'closed'"));
+
 /* 2. Primary list host ⇒ its redirect/storage host, in every allowlist. */
 const REDIRECT_PAIRS = [
   ['sanctionslistservice.ofac.treas.gov', 'wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443'],

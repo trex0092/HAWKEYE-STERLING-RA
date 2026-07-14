@@ -1,6 +1,6 @@
 name: Function Health
 
-# Weekly check that the live Netlify functions (asana-task, risk-backup,
+# Daily check that the live Netlify functions (asana-task, risk-backup,
 # brain-soul) are reachable, have their secrets configured, and return 400 for a
 # known-bad payload rather than 500/503 (missing secret) or a connection error
 # (function not deployed). On failure it creates an alert task in Asana
