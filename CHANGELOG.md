@@ -10,6 +10,25 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Changed (legal framework migrated to FDL 10/2025, 2026-07-14)
+
+- **New instrument register** `docs/research/uae-aml-legal-framework.md`: the
+  six federal AML/CFT/CPF instruments (FDL 10/2025; Cabinet Resolution
+  134/2025 Executive Regulations; Cabinet Decisions 109/2023 + 132/2023 on
+  beneficial ownership; Cabinet Decision 74/2020 TFS; Federal Law 7/2014)
+  with supersession notes, DPMS applicability, engine mapping and primary
+  sources — corroborated against the official legislation portal (entry 3314),
+  the CBUAE Rulebook and NAMLCFTC via the existing research trail.
+- **Engine citations migrated off the repealed law**: the attestation
+  (`agents.py`), STR/SAR regulatory-basis block (`ai.py`) and the report
+  regulatory-basis + retention notices (`screen.py`) cited FDL 26/2021 /
+  FDL 20/2018 / Cabinet 10/2019 — all repealed or superseded since
+  14/10/2025 by FDL 10/2025 and Cabinet Resolution 134/2025. Retention
+  notices now cite the current framework without asserting an unverified
+  article number (the pre-repeal citation, FDL 26/2021 Art. 23, is kept as
+  provenance). The Advisor web app already cited FDL 10/2025 — the engine
+  narratives now match it.
+
 ### Changed (alert hygiene — escalate on coverage loss, report recall narrowing, 2026-07-14)
 
 - **`counts.errors` and the `adverse_media` sustained anomaly now key on

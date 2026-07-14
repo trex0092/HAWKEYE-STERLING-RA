@@ -2118,9 +2118,9 @@ Reviewed By:         Compliance Department
 REGULATORY BASIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-— UAE Federal Decree-Law No. 26 of 2021 (AML/CFT Law)
+— UAE Federal Decree-Law No. 10 of 2025 (AML/CFT/CPF Law — repeals FDL 20/2018 as amended by FDL 26/2021)
+— UAE Cabinet Resolution No. 134 of 2025 (Executive Regulations of FDL 10/2025)
 — UAE Cabinet Resolution No. 74 of 2020 (TFS Obligations)
-— UAE Federal Decree-Law No. 10 of 2025 (AML/CFT Amendments)
 — FATF Recommendation 6 (Targeted Financial Sanctions)
 — FATF Recommendation 10 (Customer Due Diligence)
 — MoE Due Diligence Regulations — DPMS Sector
@@ -2216,9 +2216,10 @@ Overall Decision:       ☐ All Clear — No Action
 STR Reference (if any): ___________________________
 
 > RETENTION NOTICE: This record must be retained for
-> 10 years pursuant to UAE Federal Decree-Law No. 26
-> of 2021, Article 23, and Cabinet Resolution No. 74
-> of 2020."""
+> 10 years — UAE AML framework (Federal Decree-Law
+> No. 10 of 2025, repealing FDL 20/2018 as amended;
+> duty formerly FDL 26/2021 Art. 23) and Cabinet
+> Resolution No. 74 of 2020."""
     return narrative
 
 # ── NARRATIVE BUILDER — WEEKLY ADVERSE MEDIA ──────────────────────────────────
@@ -2333,7 +2334,7 @@ Overall Decision:       [ ] All Clear - No Action
                         [ ] Items Escalated (see findings)
                         [ ] STR / SAR Filed
 
-> RETENTION NOTICE: Retain 10 years per UAE FDL No. 26 of 2021, Article 23."""
+> RETENTION NOTICE: Retain 10 years — UAE AML framework (FDL No. 10 of 2025, repealing FDL 20/2018 as amended; duty formerly FDL 26/2021 Art. 23)."""
     return narrative
 
 # -- DAILY ADVERSE MEDIA SWEEP (companies + associated individuals) -------------
@@ -2776,7 +2777,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("> " + ai.governance_footer())
     A("> Decision-support only; a 'no match' is never a clearance when a module is degraded (shown, never hidden).")
     A("> Detection is automatic; no freeze / decline / report before MLRO + four-eyes review.")
-    A("> RETENTION: retain 10 years — UAE FDL No. 26 of 2021, Art. 23; Cabinet Decision 74/2020.")
+    A("> RETENTION: retain 10 years — UAE FDL No. 10 of 2025 (AML/CFT/CPF; duty formerly FDL 26/2021 Art. 23); Cabinet Decision 74/2020.")
     return "\n".join(L)
 
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily"):
