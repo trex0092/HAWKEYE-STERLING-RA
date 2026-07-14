@@ -2442,6 +2442,53 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
         log(f"✅ Comment on {customer_gid}")
 
 # ── UNIFIED DAILY REPORT (Sanctions + Adverse Media + PEP, ONE narrative) ─────
+# ── EOCN mirror cross-check (drift detector, TFS-critical direction only) ─────
+# The UAE Local Terrorist List is maintained as a curated in-repo JSON because
+# the EOCN distributes updates by notification, not a stable machine endpoint.
+# That design's failure mode is a STALE local file — a new designation the file
+# hasn't picked up would screen clear, a false negative on a FREEZE duty. This
+# cross-check downloads the OpenSanctions ae_local_terrorists dataset each run
+# and alarms LOUDLY on any mirror designation missing locally. The local file
+# stays authoritative (local-only names are informational — the mirror can lag
+# or transliterate differently); an unreachable mirror is a soft note, never a
+# degraded core control. Kill-switch: EOCN_MIRROR_CROSSCHECK=0.
+# LICENSING: CC-BY-NC 4.0 — see docs/aims/third-party-register.md.
+EOCN_MIRROR_CROSSCHECK = os.environ.get("EOCN_MIRROR_CROSSCHECK", "1") == "1"
+EOCN_MIRROR_URL = "https://data.opensanctions.org/datasets/latest/ae_local_terrorists/targets.simple.csv"
+
+def load_eocn_mirror():
+    """Returns (names, meta) for the OpenSanctions mirror of the UAE Local
+    Terrorist List — SUPPLEMENTARY tier (drift tracking; never core coverage)."""
+    if not EOCN_MIRROR_CROSSCHECK:
+        log("  EOCN mirror cross-check disabled (EOCN_MIRROR_CROSSCHECK=0)")
+        return set(), {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+    data = download(EOCN_MIRROR_URL, "EOCN mirror (OpenSanctions ae_local_terrorists)")
+    names = parse_simple_csv(data, "EOCN mirror")
+    if not names:
+        log("  EOCN mirror: unavailable this run — cross-check skipped (local list remains authoritative)")
+        return set(), {"count": 0, "date": "unavailable", "hash": "", "tier": "supplementary"}
+    return names, {"count": len(names), "date": "live (OpenSanctions mirror)",
+                   "hash": sha256_of(data), "tier": "supplementary"}
+
+def crosscheck_eocn(local_names, mirror_names):
+    """Designations present on the mirror but ABSENT from the curated local list
+    (normalized exact or token-sorted match) — the false-negative direction on
+    the TFS freeze duty. Returns a sorted list of the missing mirror names.
+    Local-only names are deliberately NOT flagged: the curated file is the
+    authority and the mirror may lag behind an EOCN de-listing."""
+    def _keys(n):
+        k = normalize(n)
+        return {k, " ".join(sorted(k.split()))} if k else set()
+    have = set()
+    for n in local_names or ():
+        have |= _keys(n)
+    missing = []
+    for n in mirror_names or ():
+        ks = _keys(n)
+        if ks and not (ks & have):
+            missing.append(n)
+    return sorted(missing)
+
 def _mirror_fallback(names, dataset, label):
     """When an official core-list endpoint yields nothing (unreachable, refused
     redirect, garbled payload), fall back to its OpenSanctions mirror — same
@@ -2483,6 +2530,19 @@ def load_all_lists():
         "eu":   {"count":len(eu_names),"date":eu_date,"hash":eu_hash,"tier":"core"},
         "eocn": {"count":len(eocn_names),"date":eocn_date,"hash":eocn_hash,"tier":"core"},
     }
+    # TFS drift detector: alarm if the OpenSanctions mirror carries a UAE Local
+    # Terrorist List designation the curated local file is missing. Nested under
+    # the eocn entry (not a top-level list) so the QA gate's core-list checks
+    # and the "screened vs N list names" audit line stay exact.
+    eocn_mirror_names, eocn_mirror_meta = load_eocn_mirror()
+    missing_locally = crosscheck_eocn(eocn_names, eocn_mirror_names)
+    list_meta["eocn"]["mirror"] = eocn_mirror_meta
+    list_meta["eocn"]["crosscheck_missing"] = missing_locally
+    if missing_locally:
+        shown = ", ".join(missing_locally[:5]) + (f" +{len(missing_locally)-5} more"
+                                                  if len(missing_locally) > 5 else "")
+        log(f"  EOCN CROSS-CHECK ALARM: {len(missing_locally)} mirror designation(s) "
+            f"not in the local list: {shown}")
     # Fail-safe: if EVERY core sanctions list failed to load, screening would clear
     # every customer for sanctions and post a green ✅. Abort instead — a total
     # list-fetch failure must never masquerade as "all clear".
@@ -3000,10 +3060,26 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # The watchlist joins as a SUPPLEMENTARY source (drift is a soft note, never
     # a degraded core control); list_meta itself stays pure — it feeds the QA
     # gate's core-list checks and the attestation.
-    coverage_result = monitoring.check_source_coverage(
-        {**list_meta, "adverse_watchlist": wl_meta}, today)
+    coverage_meta = {**list_meta, "adverse_watchlist": wl_meta}
+    if isinstance(list_meta.get("eocn", {}).get("mirror"), dict):
+        coverage_meta["eocn_mirror"] = list_meta["eocn"]["mirror"]
+    coverage_result = monitoring.check_source_coverage(coverage_meta, today)
     for a in coverage_result.get("alarms", []):
         log(f"COVERAGE ALARM: {a}")
+    # EOCN cross-check (TFS freeze duty): a mirror designation missing from the
+    # curated local list is a possible FALSE NEGATIVE — alarm into the same
+    # coverage path (QA gate + report §⑤ + MLRO attention), degrade loudly.
+    _eocn_missing = list_meta.get("eocn", {}).get("crosscheck_missing") or []
+    if _eocn_missing:
+        _shown = ", ".join(_eocn_missing[:5]) + (f" +{len(_eocn_missing)-5} more"
+                                                 if len(_eocn_missing) > 5 else "")
+        _msg = (f"EOCN local list may be STALE — {len(_eocn_missing)} designation(s) on the "
+                f"OpenSanctions ae_local_terrorists mirror not found locally ({_shown}); "
+                "update data/eocn-local-terrorist-list.json from the EOCN notification and re-run "
+                "— treat EOCN 'clear' results as PROVISIONAL until resolved")
+        coverage_result.setdefault("alarms", []).append(_msg)
+        coverage_result.setdefault("drops", []).append(_msg)
+        log(f"COVERAGE ALARM: {_msg}")
 
     # 1) SANCTIONS — entities + individuals, ALL matching candidates
     possible_matches, clear = screen_customers(customers, all_lists)

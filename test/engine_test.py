@@ -705,6 +705,44 @@ screen.download = _orig_download
 check("parse_eu still parses via the shared simple-csv parser",
       screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
 
+# ── EOCN mirror cross-check (TFS drift detector) ──────────────────────────────
+# The curated local UAE Local Terrorist List can go stale (EOCN updates arrive
+# by notification, not a machine endpoint) — a missed designation is a false
+# negative on a FREEZE duty. The cross-check alarms on mirror names missing
+# locally; local-only names are the curator's call and never alarmed.
+print("screen.py — EOCN mirror cross-check")
+_missing = screen.crosscheck_eocn(
+    ["ABDULLA MOHAMED AL TEST", "EXISTING PERSON"],
+    ["ABDULLA MOHAMED AL TEST", "AL TEST ABDULLA MOHAMED", "NEWLY DESIGNATED PARTY"])
+check("mirror designation missing locally is flagged (freeze-duty direction)",
+      _missing == ["NEWLY DESIGNATED PARTY"])
+check("token-reordered spellings of a local name do NOT false-alarm",
+      "AL TEST ABDULLA MOHAMED" not in _missing)
+check("local-only names are never flagged (curated file is authoritative)",
+      screen.crosscheck_eocn(["ONLY LOCAL PERSON"], []) == [])
+check("empty inputs are safe", screen.crosscheck_eocn([], []) == [])
+
+_dl_eocn = []
+screen.download = lambda url, label: (_dl_eocn.append(url) or _SIMPLE)
+_mn, _mm = screen.load_eocn_mirror()
+check("eocn mirror loads with supplementary tier + mirror provenance",
+      _mm["tier"] == "supplementary" and "mirror" in _mm["date"].lower()
+      and _mn == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"}
+      and "ae_local_terrorists/targets.simple.csv" in _dl_eocn[0])
+screen.download = lambda url, label: None
+_mn2, _mm2 = screen.load_eocn_mirror()
+check("unreachable eocn mirror is a soft note (no names, unavailable, never core-degrading)",
+      _mn2 == set() and _mm2["date"] == "unavailable" and _mm2["count"] == 0)
+_orig_eocn_flag = screen.EOCN_MIRROR_CROSSCHECK
+screen.EOCN_MIRROR_CROSSCHECK = False
+_dl_eocn2 = []
+screen.download = lambda url, label: (_dl_eocn2.append(url) or _SIMPLE)
+_mn3, _mm3 = screen.load_eocn_mirror()
+check("EOCN_MIRROR_CROSSCHECK=0 kill-switch: no download",
+      _mn3 == set() and _mm3["date"] == "disabled" and _dl_eocn2 == [])
+screen.EOCN_MIRROR_CROSSCHECK = _orig_eocn_flag
+screen.download = _orig_download
+
 # ── PEP: run-global gate + circuit breaker + mirror fallback (14 Jul incident) ─
 # The live Wikidata lookup had NO gate and NO breaker: 8 workers burst the API,
 # 436 lookups errored and the PEP count fell 4 → 0 with nothing to catch it.

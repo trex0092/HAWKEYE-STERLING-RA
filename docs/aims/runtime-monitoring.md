@@ -65,6 +65,14 @@ and compare each run to the trailing median:
 This complements the existing zero-count degrade-loudly guard: zero is caught by the
 module status; a *partial* collapse is caught here.
 
+The **UAE Local Terrorist List** additionally gets a TFS-specific drift detector:
+every run cross-checks the curated local file against the OpenSanctions
+`ae_local_terrorists` mirror and **alarms** (coverage alarm → QA gate → report)
+on any mirror designation missing locally — the false-negative direction on a
+freeze duty. Local-only names are never alarmed (the curated file is
+authoritative; the mirror may lag a de-listing). Kill-switch:
+`EOCN_MIRROR_CROSSCHECK=0`.
+
 ### 3. Transaction-monitoring status (R.16)
 The monitoring section also reports the honest state of the transaction-monitoring
 engine — **INACTIVE** until a real feed is connected (see `in-domain-aml-coverage.md`).
