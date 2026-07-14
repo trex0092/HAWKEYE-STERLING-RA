@@ -7,17 +7,16 @@ useDefault = true
 
 [allowlist]
 description = "Public, non-secret values: the EU consolidated-list access token (published by the EU), the URL-only data registries, and the env template."
+# NOTE: no whole-FILE exemptions for source files. screen.py and
+# daily-sanctions-screen.yml were previously exempted wholesale (they carry only
+# public Asana GIDs + the public EU FSF token, all covered by the regex allowlist
+# below); a whole-file exemption would also blind the scan to a REAL secret later
+# added to those files, so the specific public values are allow-listed by regex
+# instead and the files themselves are scanned normally.
 paths = [
   '''data/sanctions-sources\.json''',
   '''data/reg-sources\.json''',
   '''\.env\.example''',
-  # screen.py screening engine: holds only public Asana object GIDs and
-  # ${{ env }} secret references — no real secrets are inlined.
-  '''screen\.py''',
-  # Daily sanctions-screen workflow: contains only public Asana object GIDs (in a
-  # setup comment), the public EU FSF download token, and ${{ secrets.* }} refs —
-  # no real secrets are inlined.
-  '''\.github/workflows/daily-sanctions-screen\.yml''',
 ]
 regexes = [
   # EU FSF public access token embedded in the sanctions-list download URL
@@ -27,6 +26,8 @@ regexes = [
   # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
   '''1216203370612914''',  # HAWKEYE STERLING APP project (RA delivery target)
   '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log)
+  '''1213914392047131''',  # section: Daily Sanctions Screening (screen.py + daily-sanctions-screen.yml)
+  '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default)
   '''1215653768729951''',  # Risk Assessments - Madison LLC (former RA default)
   '''1215844297069727''',  # Regulations / Governance / Sanctions (merged into Ongoing Monitoring, then removed)
   # Section GIDs in the Ongoing Monitoring project (public identifiers), used by the
