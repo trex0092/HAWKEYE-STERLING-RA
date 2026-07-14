@@ -10,6 +10,25 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Changed (alert hygiene — escalate on coverage loss, report recall narrowing, 2026-07-14)
+
+- **`counts.errors` and the `adverse_media` sustained anomaly now key on
+  ACTIONABLE coverage failures** — a subject with zero adverse coverage from
+  any net (`am_blackout`: news dead AND watchlist missing) or an individual
+  unscreened for PEP on both sources. A news-only loss while the deterministic
+  OpenSanctions watchlist stands is a *recall degradation*: still loud in the
+  MLRO report (module status `DEGRADED (news)`, §② status line) and in the
+  persisted `am_errors` counter, but no longer an error or an escalation.
+  Rationale (supervisory alert-hygiene, cf. ECB/DORA operational-resilience
+  expectations): the watchlist is the compensating control, and an escalation
+  issue that can re-raise forever on a mitigated, environmental condition —
+  news feeds throttling shared CI egress — trains people to ignore the alarm
+  that matters. A true blackout (the compensating control ALSO missing) still
+  escalates, and pre-watchlist history keeps its own honest judgment via an
+  `am_errors` fallback in `monitoring._anomaly_types`/`analyze_run`.
+  Scorecard ≥ 9.0 runbook (from tracking issue #228) recorded in
+  `docs/governance/scorecard-9.5-path.md` so the issues tab can stay at zero.
+
 ### Fixed (screening integrity — issue #222 root causes, 2026-07-14)
 
 - **Run metrics counted only surviving subjects** — `counts.subjects` was

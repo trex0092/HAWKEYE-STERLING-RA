@@ -123,13 +123,22 @@ def analyze_run(snapshot, history):
     if med_subj and subj < 0.5 * med_subj:
         anomalies.append(
             f"subjects screened {subj} < 50% of median {med_subj:.0f} — coverage drop")
-    # Adverse-media module degradation (absolute): a large share of subjects lost
-    # their adverse-media pass — recall is silently narrowed even when the rest of
-    # the run is green. Sustained across runs ⇒ escalation (anomaly-watch).
-    am = snapshot["counts"].get("am_errors", 0)
+    # Adverse-media COVERAGE loss (absolute): a large share of subjects had no
+    # adverse screening from ANY net (news dead AND watchlist missing). Keyed on
+    # am_blackout, not am_errors: a news-only loss while the deterministic
+    # watchlist stands is a recall degradation — reported loudly in the run
+    # report and counters, but not an escalation-grade failure (the watchlist
+    # is the compensating control; feeds throttling shared CI egress is
+    # environmental and can recur forever). Old snapshots predate the watchlist
+    # and the am_blackout counter — for them news-lost WAS a blackout (no other
+    # net existed), so fall back to am_errors: their history stays judged by
+    # the reality of their own run. Sustained ⇒ escalation (anomaly-watch).
+    am = snapshot["counts"].get("am_blackout")
+    if am is None:
+        am = snapshot["counts"].get("am_errors", 0)
     if subj and am / subj > AM_ERROR_RATE_ALARM:
         anomalies.append(
-            f"adverse-media errors {am}/{subj} ({am/subj*100:.0f}%) > {AM_ERROR_RATE_ALARM*100:.0f}% — media recall degraded")
+            f"adverse-media coverage lost for {am}/{subj} ({am/subj*100:.0f}%) > {AM_ERROR_RATE_ALARM*100:.0f}% — no net could screen them")
     return {"anomalies": anomalies,
             "baseline": {"median_total_seconds": med_total, "median_subjects": med_subj,
                          "history_runs": len(prev)}}
@@ -150,7 +159,12 @@ def _anomaly_types(snapshot, prev):
     subj = snapshot.get("counts", {}).get("subjects", 0)
     if med_subj and subj < 0.5 * med_subj:
         t.add("subjects")
-    am = snapshot.get("counts", {}).get("am_errors", 0)
+    # Same blackout-first keying (with the pre-watchlist am_errors fallback)
+    # as analyze_run — the two must agree or a run could escalate on a
+    # category its own report never raised.
+    am = snapshot.get("counts", {}).get("am_blackout")
+    if am is None:
+        am = snapshot.get("counts", {}).get("am_errors", 0)
     if subj and am / subj > AM_ERROR_RATE_ALARM:
         t.add("adverse_media")
     return t
@@ -173,7 +187,7 @@ _ANOMALY_LABELS = {
     "latency": "runtime latency blow-out",
     "error_rate": "elevated error rate",
     "subjects": "subject-coverage drop",
-    "adverse_media": "adverse-media module degradation (recall narrowed)",
+    "adverse_media": "adverse-media coverage lost (no net could screen the affected subjects)",
     "stale_history": "screening pipeline appears STALE (no recent run — possible dead cron / auth failure)",
 }
 

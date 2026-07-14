@@ -2892,6 +2892,16 @@ def tally_enrichment(results, wl_hits, wl_loaded):
     1893% that the old survivors-only denominator produced). A subject counts at
     most ONCE in counts["errors"] however many modules failed for it (the old
     am+pep sum reached 1231 errors for 837 subjects).
+
+    counts["errors"] counts ACTIONABLE coverage failures only — a subject with
+    zero adverse coverage from any net (news dead AND watchlist missing), or an
+    individual unscreened for PEP on both sources. A news-only loss while the
+    deterministic watchlist stands is a RECALL DEGRADATION, not an error: it is
+    reported loudly (am_errors counter, "DEGRADED (news)" module status, §②
+    status line) but must not feed the error rate or the sustained escalation —
+    the watchlist is the compensating control, and an alarm that can re-raise
+    forever on a mitigated, environmental condition (news feeds throttling
+    shared CI egress) is alert fatigue, not resilience.
       am_errors    — subjects whose whole news sweep failed (GN + GDELT); same
                      meaning as the committed metrics history, kept comparable
       am_blackout  — of those, subjects with ZERO adverse coverage from ANY
@@ -2911,9 +2921,10 @@ def tally_enrichment(results, wl_hits, wl_loaded):
         subj_err = False
         if r["am_error"]:
             am_errors += 1
-            subj_err = True
             if not wl_loaded:
+                # No net could screen this subject — actionable failure.
                 am_blackout += 1
+                subj_err = True
         # Adverse findings merge both nets: flagged news articles (when the sweep
         # ran) + watchlist listings (always, including for news-dead subjects —
         # that is the whole point of the third net).

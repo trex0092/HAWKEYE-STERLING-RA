@@ -69,3 +69,30 @@ adding.
 scanners, more docs — every check those feed is already at 10. The remaining
 points are time (Maintained), a second human (Code-Review), and community
 breadth (Contributors). Any tooling that claims otherwise is gaming the badge.
+
+## Runbook to ≥ 9.0 (moved here from tracking issue #228 so the issues tab stays clear)
+
+- [ ] **Now (2 min, owner-only):** register at bestpractices.dev (evidence pack:
+  [`openssf-best-practices.md`](openssf-best-practices.md)) → CII "in progress" (+0.05).
+- [ ] **By mid-August (the lever):** add one trusted second maintainer; they
+  approve every PR before merge (Dependabot PRs count). The repo merges PRs
+  near-daily, so the last-30-changeset window refills in ~2–3 weeks of reviewed
+  merges. Then flip `required_approving_review_count: 1` + code-owner review ON
+  ([`github-repository-hardening.md`](github-repository-hardening.md) §1 and
+  `.github/settings.yml` are written ready-to-raise). A reviewer whose profile
+  belongs to a third organization who lands 5+ commits also lifts
+  **Contributors** 6→10.
+- [ ] **2026-09-09:** Maintained lifts automatically — nothing to do.
+- [ ] **On/after 2026-09-09 — verify the flip (~5 min):** open the latest
+  Scorecard workflow run log (per-check JSON in the "Run Scorecard analysis"
+  step) or `https://api.scorecard.dev/projects/github.com/trex0092/HAWKEYE-STERLING-RA`;
+  confirm Maintained ≈ 10 and the aggregate against the table below. Asking
+  Claude Code to "verify the scorecard runbook" on/after Sept 9 performs this
+  whole step.
+- [ ] **Keep NOT wiring** the Branch-Protection admin PAT (see above).
+
+| Scenario | Expected Sept 9 badge |
+|---|---|
+| No action | 8.8–8.9 |
+| + CII registration + ~6 reviewed changesets in the window | **9.0–9.1** |
+| + all merges reviewed from mid-August (+ Contributors) | **~9.5–9.6** |
