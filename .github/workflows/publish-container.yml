@@ -74,9 +74,13 @@ jobs:
           digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image:$version" | cut -d@ -f2)
           test -n "$digest" || { echo "could not resolve pushed image digest"; exit 1; }
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          # Export the image reference actually pushed so the attestation subject
+          # is derived from ${{ github.repository }} too — never a hardcoded owner
+          # that would drift from the pushed name on a fork/rename/org move.
+          echo "image=$image" >> "$GITHUB_OUTPUT"
       - name: Attest build provenance (image)
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-name: ghcr.io/trex0092/hawkeye-sterling-ra
+          subject-name: ${{ steps.build.outputs.image }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true

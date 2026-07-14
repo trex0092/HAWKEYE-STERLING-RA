@@ -10,6 +10,68 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Security & hardening (deep audit — 2026-07-14)
+
+A full three-surface deep audit (Python engine, frontend/Netlify, CI/supply-chain)
+found no new gaping hole in this already-hardened repo, but closed a coherent set
+of residual gaps. Every change ships with tests; settings-only findings are
+documented as maintainer actions.
+
+- **Confidential Netlify mirrors are token-gated.** `asana-mirror` (whose
+  `action:"read"` returns the **full assessment register + activity log**) and
+  `risk-backup` (the risk-data override sheet) previously fell under the default
+  auth mode, where a request with no `Origin` — or any browser `Origin` — passed
+  without a token, so on the public URL an unauthenticated `curl` could read
+  customer data (entity names, jurisdictions, outcomes). A new `dataTokenOk`
+  gate (`netlify/functions/_auth.js`) requires `X-App-Token` on **every** path
+  for these two endpoints whenever `APP_SHARED_TOKEN` is set (the forgeable-Origin
+  exemption still used by the task-write endpoint no longer applies to them).
+  No-token deployments are unchanged; `.env.example`, `README.md` and
+  `SECURITY.md` now state loudly that a deployment holding **real** customer data
+  must set `APP_SHARED_TOKEN` (ideally `APP_STRICT_TOKEN=1`) or use the on-device
+  *tokenise (no PII)* delivery option. (`test/asana-functions.test.js` +6 checks.)
+- **Session key no longer sits in localStorage in the clear.** The 1-hour
+  cross-page unlock used to `exportKey` the raw AES-256-GCM key and store it
+  base64 in `localStorage`, recoverable by any XSS or local read for the whole
+  unlocked window. The key is now derived **non-extractable** and its CryptoKey
+  object is cached in **IndexedDB**; only `{exp,seen}` metadata stays in
+  localStorage. If IndexedDB is unavailable the session **fails closed**
+  (passphrase re-prompt on navigation) — the key is never written to localStorage
+  as a fallback — and a legacy `hsra.sess.v1` blob carrying a raw key is refused
+  and scrubbed on boot. The read-only countdown chips in `console.js`/`advisor.js`
+  no longer re-persist the full blob. Prevents key *exfiltration*; an active-page
+  script during the unlocked window is unchanged (CSP + `esc()` remain the XSS
+  defence). (`test/app.test.js` +8 checks.)
+- **Hardened remote-XML parsing (billion-laughs / XXE).** The Google News RSS,
+  UN Consolidated and Canada SEMA feeds went through stdlib `xml.etree`, exposed
+  to entity-expansion and external-entity attacks in a malicious/MITM'd payload
+  (parser-side, so egress-block does not cover it). A dependency-free
+  `safe_xml_fromstring` (`screen.py`) refuses any DOCTYPE/ENTITY declaration and
+  caps input size before parsing; the list parsers degrade loudly (coverage drift)
+  on refusal. (`test/engine_test.py` +6 checks.)
+- **Atomic state writes + diagnosable degrade (engine).** The delta-state,
+  adverse-evidence and run-metrics/coverage writers now write via a temp file +
+  `os.replace` (`monitoring.py` also stops calling `os.makedirs("")` on a dir-less
+  path), so a crash mid-write cannot corrupt the baselines that gate the next
+  run's alerting. The Google-News fetch loop now logs **why** a fetch/parse failed
+  (bounded per kind) instead of swallowing it, and `kyc.load_jurisdiction_risk`
+  warns loudly when its file is present-but-unreadable (vs the silent, expected
+  absent-file no-op) so a risk input never vanishes without a trace.
+- **Supply-chain.** `publish-container.yml` derives the provenance
+  `subject-name` from `${{ github.repository }}` (the same value it builds/pushes)
+  instead of a hardcoded `ghcr.io/trex0092/…`, so a fork/rename can no longer
+  attest a name that isn't what was pushed. The gitleaks whole-file exemptions for
+  `screen.py` and `daily-sanctions-screen.yml` were narrowed to the specific
+  public Asana GIDs they contain (already covered by regex allowlist), restoring
+  secret-scan coverage of those files.
+- **Governance.** `docs/governance/github-repository-hardening.md` gains an
+  *apply-now priority* block for the still-unticked, code-unreachable controls
+  (Settings-app install so branch protection binds, `release`-environment
+  reviewer, secret-scanning push protection, `v*` tag protection). SSRF on the
+  config-supplied list fetch is documented as **accepted/contained** (harden-runner
+  egress-block + the redirect-host drift guard) in the code-scanning triage doc.
+  `SECURITY.md` fixes the stale `assets/brain-soul.js` path.
+
 ### Added (EOCN mirror cross-check — TFS drift detector, 2026-07-14)
 
 - The **UAE Local Terrorist List** is curated as an in-repo JSON (the EOCN

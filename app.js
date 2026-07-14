@@ -100,7 +100,7 @@ const SEC_META_KEY = 'hsra.sec.v1';        /* {v,salt,iter,iv,ct} passphrase ver
 const SEC_OPTOUT_KEY = 'hsra.sec.optout';  /* '1' when the officer chose to store unencrypted */
 const PBKDF2_ITER = 250000;
 const IDLE_LOCK_MS = 15 * 60 * 1000;       /* auto-lock after inactivity (zero-trust session) */
-const SESS_KEY = 'hsra.sess.v1';           /* {k,exp,seen}: 1-hour cross-page unlock session (officer-enabled) */
+const SESS_KEY = 'hsra.sess.v1';           /* {exp,seen}: 1-hour cross-page unlock metadata (the key object lives in IndexedDB, not here) */
 const SESS_MAX_MS = 60 * 60 * 1000;        /* hard 1-hour cap from unlock, regardless of activity */
 let _sessExp = 0;                          /* current session expiry (ms epoch); 0 = none */
 let _sessTimer = null;                     /* countdown interval handle */
@@ -127,10 +127,76 @@ const _b64 = u => {
 };
 const _ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
+/* ── Session-key store (IndexedDB) ──────────────────────────────────────────
+   The 1-hour cross-page unlock needs the derived AES key to survive a full page
+   navigation. The previous design exported the RAW key bytes into localStorage
+   (SESS_KEY.k), where any XSS or local read could recover them — defeating
+   encryption-at-rest for the whole unlocked window. Instead we now:
+     • derive the key NON-EXTRACTABLE (exportKey throws), and
+     • persist the CryptoKey OBJECT in IndexedDB (structured clone stores it,
+       and a non-extractable key can be used for encrypt/decrypt but never
+       serialised back to bytes by script), keeping only the non-sensitive
+       {exp,seen} metadata in localStorage for the synchronous cross-page checks.
+   If IndexedDB is unavailable the session is simply NOT cached — the officer
+   re-enters the passphrase on navigation (fail closed). The key is NEVER written
+   to localStorage as a fallback. */
+const SEC_IDB_DB = 'hsra-sec';
+const SEC_IDB_STORE = 'sess';
+const SEC_IDB_KEY = 'sessionKey';
+function _idbOpen(){
+  return new Promise((resolve, reject) => {
+    try{
+      if(typeof indexedDB === 'undefined' || !indexedDB) return reject(new Error('no-idb'));
+      const req = indexedDB.open(SEC_IDB_DB, 1);
+      req.onupgradeneeded = () => { try{ req.result.createObjectStore(SEC_IDB_STORE); }catch(e){} };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('idb-open'));
+    }catch(e){ reject(e); }
+  });
+}
+async function _idbPut(key, val){
+  const db = await _idbOpen();
+  try{
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(SEC_IDB_STORE, 'readwrite');
+      tx.objectStore(SEC_IDB_STORE).put(val, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error || new Error('idb-put'));
+      tx.onabort = () => reject(tx.error || new Error('idb-abort'));
+    });
+  }finally{ try{ db.close(); }catch(e){} }
+}
+async function _idbGet(key){
+  const db = await _idbOpen();
+  try{
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(SEC_IDB_STORE, 'readonly');
+      const rq = tx.objectStore(SEC_IDB_STORE).get(key);
+      rq.onsuccess = () => resolve(rq.result != null ? rq.result : null);
+      rq.onerror = () => reject(rq.error || new Error('idb-get'));
+    });
+  }finally{ try{ db.close(); }catch(e){} }
+}
+async function _idbDel(key){
+  const db = await _idbOpen();
+  try{
+    return await new Promise((resolve) => {
+      const tx = db.transaction(SEC_IDB_STORE, 'readwrite');
+      tx.objectStore(SEC_IDB_STORE).delete(key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
+    });
+  }finally{ try{ db.close(); }catch(e){} }
+}
+
 async function _deriveKey(pass, salt, iter){
   const base = await crypto.subtle.importKey('raw', _u8(pass), 'PBKDF2', false, ['deriveKey']);
+  /* NON-extractable: the 1-hour session caches the key OBJECT in IndexedDB, not
+     its raw bytes, so extractability is neither needed nor wanted (exportKey must
+     stay impossible for XSS/local-read). encrypt/decrypt work regardless. */
   return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'},
-    base, {name:'AES-GCM', length:256}, true, ['encrypt','decrypt']);  /* extractable: lets the 1-hour session cache the key (SESS_KEY) */
+    base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
 }
 async function encryptStr(key, str){
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -299,21 +365,27 @@ function secLock(reason){
 
 /* ── 1-hour unlock session (cross-page) ────────────────────────────────────
    Officer chose: cache the unlock so navigating between Assessment / Console /
-   Advisor (each a full page load) does not re-prompt, for up to one hour. We
-   persist the derived AES key + a hard expiry in localStorage; the passphrase
-   itself is never stored. Locking (idle / manual / expiry) destroys the session
-   so it cannot be resumed by reloading. */
+   Advisor (each a full page load) does not re-prompt, for up to one hour. The
+   key OBJECT is cached in IndexedDB (non-extractable — see the _idb helpers and
+   _deriveKey); only the {exp,seen} metadata lives in localStorage. The passphrase
+   and the raw key bytes are never stored. Locking (idle / manual / expiry)
+   destroys the session so it cannot be resumed by reloading. */
 async function _sessSave(){
   try{
     if(!_secKey || typeof localStorage === 'undefined') return;
-    const raw = await crypto.subtle.exportKey('raw', _secKey);
-    localStorage.setItem(SESS_KEY, JSON.stringify({k:_b64(raw), exp:_sessExp, seen:Date.now()}));
+    /* Cache the CryptoKey OBJECT in IndexedDB; fail CLOSED if IDB is unavailable
+       (store nothing — the officer re-enters the passphrase on the next page). */
+    let stored = false;
+    try{ stored = await _idbPut(SEC_IDB_KEY, _secKey); }catch(e){ stored = false; }
+    if(!stored){ try{ localStorage.removeItem(SESS_KEY); }catch(e){} return; }
+    localStorage.setItem(SESS_KEY, JSON.stringify({exp:_sessExp, seen:Date.now()}));
   }catch(e){}
 }
 function _sessRead(){
   try{
     const s = JSON.parse(localStorage.getItem(SESS_KEY) || 'null');
-    if(!s || !s.k || !s.exp) return null;
+    if(!s || !s.exp) return null;
+    if(s.k) return null;   /* legacy blob carried the raw key — refuse it (scrubbed on boot by _sessExpiredReason) so an exposed key is never used */
     const now = Date.now();
     if(now >= s.exp) return null;                              /* 1-hour cap reached */
     if(s.seen && (now - s.seen) >= IDLE_LOCK_MS) return null;  /* idle beyond the lock window */
@@ -335,6 +407,7 @@ function _sessExpiredReason(){   /* a session blob exists but is no longer valid
 }
 function _sessClear(){
   try{ if(typeof localStorage !== 'undefined') localStorage.removeItem(SESS_KEY); }catch(e){}
+  try{ _idbDel(SEC_IDB_KEY).catch(function(){}); }catch(e){}   /* best-effort: drop the cached key object (localStorage removal above is the authoritative gate) */
   _sessExp = 0;
   if(_sessTimer){ try{ clearInterval(_sessTimer); }catch(e){} _sessTimer = null; }
   _sessRenderChip();
@@ -342,16 +415,23 @@ function _sessClear(){
 function _sessTouch(){   /* throttled last-activity stamp so the idle window spans all three pages */
   try{
     const s = JSON.parse(localStorage.getItem(SESS_KEY) || 'null');
-    if(!s) return;
+    if(!s || !s.exp) return;
     const now = Date.now();
-    if(!s.seen || now - s.seen > 15000){ s.seen = now; localStorage.setItem(SESS_KEY, JSON.stringify(s)); }
+    /* Re-write ONLY {exp,seen} — never spread `s`, so a legacy `k` (raw key) can
+       never be resurrected into localStorage by an activity stamp. */
+    if(!s.seen || now - s.seen > 15000){ localStorage.setItem(SESS_KEY, JSON.stringify({exp:s.exp, seen:now})); }
   }catch(e){}
 }
-async function _sessRestore(s){   /* silent unlock from a stored session key — no passphrase prompt */
+async function _sessRestore(s){   /* silent unlock from the IndexedDB session key — no passphrase prompt */
   try{
     const meta = JSON.parse(localStorage.getItem(SEC_META_KEY) || 'null');
     if(!meta || !meta.salt) return false;
-    _secKey = await crypto.subtle.importKey('raw', _ub64(s.k), {name:'AES-GCM'}, true, ['encrypt','decrypt']);
+    /* Retrieve the cached CryptoKey OBJECT from IndexedDB. No key (or IDB gone)
+       ⇒ fail closed: clear the session and fall back to the passphrase prompt. */
+    let key = null;
+    try{ key = await _idbGet(SEC_IDB_KEY); }catch(e){ key = null; }
+    if(!key){ _sessClear(); return false; }
+    _secKey = key;
     const check = await crypto.subtle.decrypt({name:'AES-GCM', iv:_ub64(meta.iv)}, _secKey, _ub64(meta.ct));
     if(new TextDecoder().decode(check) !== 'hsra-verify') throw new Error('bad-session');
     _sessExp = s.exp;

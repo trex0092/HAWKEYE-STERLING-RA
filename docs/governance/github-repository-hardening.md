@@ -165,6 +165,30 @@ alongside the MLRO sign-off.
 | 9 | Code-scanning: 0 open alerts (Section 6) | ☐ |
 | 10 | Settings GitHub App installed (auto-applies Sections 1–2) | ☐ |
 
+### Apply-now priority (2026-07 deep-audit finding)
+
+The checklist above is entirely UI/app-configured, and the deep audit confirmed
+**every row is still un-ticked** — so the code-side hardening in this repo
+currently rests on one maintainer's discipline plus the CI gates. These four are
+the highest-impact and should be applied first; each closes a concrete exposure
+the audit called out, and none can be set from code in this repo:
+
+1. **Install the Settings GitHub App (#10)** — until it is installed,
+   `.github/settings.yml` (branch protection, required checks, linear history) is
+   *documentation only* and does **not** bind `main`. This is the keystone: it
+   makes rows 1–2 real.
+2. **`release` environment required reviewer (#7)** — today a push to `main` that
+   bumps `APP_VERSION` can auto-tag, Sigstore-attest, and (on release)
+   auto-publish the GHCR image with **zero human approval** (`auto-release.yml` →
+   `publish-container.yml`). Add a required reviewer so a release is a human
+   decision. `release.yml` has no `environment:` at all — consider adding one.
+3. **Secret scanning + push protection (#5)** — this is the backstop now that the
+   gitleaks whole-file exemptions for `screen.py` / `daily-sanctions-screen.yml`
+   have been narrowed (see `.gitleaks.toml`); with push protection off, a secret
+   pushed to those files relies on the periodic gitleaks job alone.
+4. **Tag protection `v*` (#8)** — prevents a forged/backdated release tag from
+   minting provenance for an artifact that never went through the release flow.
+
 ---
 
 ## Notes

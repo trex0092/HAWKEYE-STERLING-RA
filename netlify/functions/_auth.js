@@ -52,4 +52,26 @@ function sharedTokenOk(event) {
   return !!provided && safeEqual(provided, required);   // strict mode: token required on every path
 }
 
-module.exports = { sharedTokenOk, strictMode };
+/* Stricter gate for the endpoints that RETURN or HOLD confidential customer data
+ * (asana-mirror's register + activity-log read/write, risk-backup's risk-data
+ * sheet). These are NOT the "write a task a human reviews" path — a read returns
+ * entity names/jurisdictions/outcomes to the caller — so the default-mode Origin
+ * exemption (forgeable, per the note above) is deliberately NOT honoured here:
+ *   - APP_SHARED_TOKEN UNSET (default) → returns true, deployment unchanged. Such
+ *     a deployment is effectively public and MUST NOT hold real customer PII
+ *     (set APP_SHARED_TOKEN — ideally APP_STRICT_TOKEN=1 — before it does).
+ *   - APP_SHARED_TOKEN SET → a matching X-App-Token is required on EVERY path,
+ *     including the browser Origin path (like strict mode). The browser supplies
+ *     it from the same-origin <meta name="hsra-app-token"> the operator fills at
+ *     deploy time; a token-configured deployment therefore keeps working while an
+ *     Origin-forging curl no longer reads the register.
+ */
+function dataTokenOk(event) {
+  const required = process.env.APP_SHARED_TOKEN;
+  if (!required) return true;                       // feature off → unchanged
+  const h = (event && event.headers) || {};
+  const provided = h['x-app-token'] || h['X-App-Token'] || '';
+  return !!provided && safeEqual(provided, required);
+}
+
+module.exports = { sharedTokenOk, dataTokenOk, strictMode };

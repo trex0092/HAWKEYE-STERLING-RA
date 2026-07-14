@@ -83,6 +83,29 @@ Alerts (`js/file-access-to-http`): 17 (`sanctions-watch.mjs`), 14
 
 Alerts: 31 (`retain-state.mjs:95`), 6 (`fatf-watchdog.mjs:468`).
 
+### Config-supplied fetch URLs / redirect-following (SSRF) — reason: **"Accepted — contained by egress-block"**
+> `fetchListBody` (`scripts/sanctions-screen.mjs`) and the Python engine's
+> `download()` fetch sanctions-list URLs taken from the version-controlled
+> registries (`data/sanctions-sources.json`, `data/sanctions-extra.json`) and
+> follow HTTP redirects. Redirect-following is **load-bearing**: OFAC and the UN
+> serve their list files via a 302 to a presigned storage host (S3 / Azure blob),
+> so a hard host-allow-list on the fetch itself would break the primary lists.
+> The exposure is instead contained at two layers already in place:
+> 1. **Network egress-block** — the workflows that run these fetches
+>    (`sanctions-screen`, `weekly-adverse-media`, `onboarding-screen`,
+>    `sanctions-watch`, `fatf-watchdog`) run under `step-security/harden-runner`
+>    with `egress-policy: block` and an explicit host allow-list, so a request to
+>    any host not on that list — including a redirect target — fails at connect
+>    time. The redirect *destination* is therefore host-restricted at the network
+>    layer even though the application code does not enumerate it.
+> 2. **Drift guard** — `test/screening-state.test.mjs` fails CI if a list's
+>    primary host is allow-listed without its presigned-storage host, so the
+>    allow-list and the real redirect chain cannot silently diverge.
+> The application-layer scheme check (http/https only, no `file:`/`ftp:`) remains
+> in `fetchListBody`. Residual risk requires an attacker who can both edit the
+> in-repo source registry (a reviewed PR) **and** add the target host to the
+> egress allow-list (a second reviewed change) — no single-change SSRF path.
+
 ## 4 · Verification
 - Buckets 1+2 auto-close when CodeQL next analyses `main` (push-triggered).
 - Bucket 3 count trends to zero in the **daily AI Governance Report** once the

@@ -314,6 +314,28 @@ const event = (body) => ({ httpMethod: 'POST', headers: {}, body: JSON.stringify
     check('shared-token: SET + valid browser Origin (no token) → 200', (await post({ origin: ORIGIN }, 'Tok Browser · CDD 19')).statusCode === 200);
     check('shared-token: gate also applies to asana-mirror (no Origin, no token → 401)',
       (await asanaMirror.handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ action: 'read' }) })).statusCode === 401);
+
+    /* Data-bearing endpoints (asana-mirror read/write, risk-backup) require the
+       token on EVERY path once APP_SHARED_TOKEN is set — the browser-Origin
+       exemption that asana-task still honours (line above) does NOT apply, because
+       these endpoints return/hold confidential customer data (dataTokenOk). */
+    const mirror = (headers, body) => asanaMirror.handler({ httpMethod: 'POST', headers, body: JSON.stringify(body) });
+    const backup = (headers) => riskBackup.handler({ httpMethod: 'POST', headers, body: JSON.stringify({ sheet: { overrides: { 'Country|Hungary': 3 } } }) });
+    check('data-token: asana-mirror SET + valid Origin but NO token → 401 (origin does NOT bypass a data endpoint)',
+      (await mirror({ origin: ORIGIN }, { action: 'read' })).statusCode === 401);
+    check('data-token: asana-mirror SET + valid Origin + correct token → 200',
+      (await mirror({ origin: ORIGIN, 'x-app-token': 'sekret' }, { action: 'read' })).statusCode === 200);
+    check('data-token: asana-mirror write SET + valid Origin but NO token → 401',
+      (await mirror({ origin: ORIGIN }, { action: 'write', register: [], audit: [] })).statusCode === 401);
+    check('data-token: risk-backup SET + valid Origin but NO token → 401',
+      (await backup({ origin: ORIGIN })).statusCode === 401);
+    check('data-token: risk-backup SET + valid Origin + correct token → 200',
+      (await backup({ origin: ORIGIN, 'x-app-token': 'sekret' })).statusCode === 200);
+    /* Contrast: asana-task (writes a task a human reviews) keeps the default-mode
+       Origin bypass — a browser Origin without the token still posts. */
+    check('data-token: asana-task SET + valid Origin (no token) still 200 (task write is not a data endpoint)',
+      (await post({ origin: ORIGIN }, 'Task Origin NoTok · CDD 19')).statusCode === 200);
+
     /* STRICT mode (APP_STRICT_TOKEN=1): the token is required on EVERY path,
        including a browser Origin — the only mode that resists Origin forgery. */
     process.env.APP_STRICT_TOKEN = '1';
