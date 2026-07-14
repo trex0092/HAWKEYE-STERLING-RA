@@ -443,8 +443,9 @@ def draft_str(customer_name, permalink, sanctions_hits, pep, adverse_articles, r
         L.append(f"  • {f}")
     L += ["",
           "REGULATORY BASIS",
-          "  UAE Federal Decree-Law No. 20 of 2018 (AML/CFT); Cabinet Decision 10/2019;",
-          "  Cabinet Resolution 74/2020 (TFS). Report without tipping off the customer.",
+          "  UAE Federal Decree-Law No. 10 of 2025 (AML/CFT/CPF; repeals FDL 20/2018 as",
+          "  amended); Cabinet Resolution 134/2025 (Executive Regulations); Cabinet",
+          "  Resolution 74/2020 (TFS). Report without tipping off the customer.",
           "",
           "MLRO ACTION",
           "  [ ] File STR/SAR via goAML   [ ] Internal record only   [ ] Apply TFS freeze",

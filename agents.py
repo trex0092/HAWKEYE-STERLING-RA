@@ -212,7 +212,7 @@ def build_attestation(audit, ai_mode, injection_blocked, list_meta):
         ("GOVERNANCE · Risk Framework",       "per-subject risk rating (FATF R.10) + QA gate"),
         ("GOVERNANCE · Accountability",       "agent identities + least-privilege authorization; MLRO owns decisions"),
         ("GOVERNANCE · Decision Oversight",   "human-in-the-loop MLRO sign-off; degrade-loudly"),
-        ("COMPLIANCE · Regulations",          "UAE FDL 26/2021 · Cabinet 74/2020 · FATF R.6/10/12 · AI Strategy 2031"),
+        ("COMPLIANCE · Regulations",          "UAE FDL 10/2025 (AML/CFT/CPF) · Cabinet 134/2025 · Cabinet 74/2020 · FATF R.6/10/12 · AI Strategy 2031"),
         ("COMPLIANCE · Data Privacy",         privacy),
         ("COMPLIANCE · Security Controls",    f"prompt-injection defence ({injection_blocked} blocked) · credential scoping ({len(viol)} violations)"),
         ("COMPLIANCE · Audits",               f"agent audit trail + QA gate ({'PASS' if qa.get('passed') else 'ATTENTION'}) · 10-yr retention"),
