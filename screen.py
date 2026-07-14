@@ -2532,7 +2532,6 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     # never silent; OK when every net ran.
     am_errors_n = stats.get("am_errors", 0)
     am_blackout = stats.get("am_blackout", 0)
-    am_degraded = am_errors_n > 0
     L = []; A = L.append
 
     delta = stats.get("delta", {})
