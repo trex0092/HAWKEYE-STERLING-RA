@@ -10,6 +10,20 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added (ISO/IEC 42001 mandatory-documents crosswalk, 2026-07-14)
+
+- **`docs/aims/iso42001-mandatory-documents-index.md`** — one-page auditor
+  crosswalk mapping all 33 mandatory documented-information items of
+  ISO/IEC 42001:2023 (+ the 2026-focus additions: GenAI content management,
+  adversarial/prompt-security controls, DPIA) to their evidence in this repo.
+  Closes the three items that were enforced-but-unstated: measurable **AIMS
+  objectives** (the CI/monitoring gates, stated as objectives with targets),
+  the **communication process** (MLRO report → Asana, watcher issues with
+  close-on-clear, transparency notice, SECURITY.md channel), and the
+  **document-control procedure** (git + branch protection + CHANGELOG gate,
+  stated as the controlled-documents procedure). Linked from the AIMS pack
+  README as the audit entry point.
+
 ### Changed (legal framework migrated to FDL 10/2025, 2026-07-14)
 
 - **New instrument register** `docs/research/uae-aml-legal-framework.md`: the

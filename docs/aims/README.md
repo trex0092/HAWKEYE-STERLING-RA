@@ -8,6 +8,12 @@ These documents are decision-support and compliance evidence; they sit alongside
 technical controls (which are code- and CI-enforced) and the model card in
 [`../AI-GOVERNANCE.md`](../AI-GOVERNANCE.md).
 
+**Start here for audits:** the [ISO/IEC 42001 mandatory-documents crosswalk
+index](iso42001-mandatory-documents-index.md) maps all 33 required
+documented-information items (+ the 2026-focus additions) to their evidence in
+this repo, including the AIMS objectives, communication process and
+document-control procedure.
+
 | # | Document | ISO 42001 ref | File |
 |---|---|---|---|
 | 1 | AI System Inventory | A.4.2 | [ai-system-inventory.md](ai-system-inventory.md) |

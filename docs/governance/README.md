@@ -56,9 +56,11 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [ai-incident-runbook.md](ai-incident-runbook.md) | AI incident triggers, kill switch, response steps | ISO 42001 A.6; AI Act Art. 73-equivalent clocks in [eu-ai-act-assessment-2026.md §6](eu-ai-act-assessment-2026.md) |
 | [incident-postmortem-template.md](incident-postmortem-template.md) | Blameless post-incident review template | — |
 | [backup-recovery.md](backup-recovery.md) | Backup & disaster-recovery runbook | ISO 42001 A.6 |
-| [data-retention.md](data-retention.md) | Stores, retention, lineage, purge | UAE FDL 26/2021 Art. 23; PDPL |
+| [data-retention.md](data-retention.md) | Stores, retention, lineage, purge | UAE FDL 10/2025 (formerly FDL 26/2021 Art. 23); PDPL |
 | [pqc-readiness.md](pqc-readiness.md) | Post-quantum crypto exposure & agility | NIST PQC |
 | [github-repository-hardening.md](github-repository-hardening.md) | Required GitHub config (protection-as-code companion to `.github/settings.yml`) | Supply-chain |
+| [scorecard-9.5-path.md](scorecard-9.5-path.md) | OpenSSF Scorecard arithmetic + runbook to ≥ 9.0 (date-locked checks explained) | Supply-chain |
+| [openssf-best-practices.md](openssf-best-practices.md) | OpenSSF Best Practices badge criteria→evidence map | Supply-chain |
 
 **Owner:** MLRO / Compliance Engineering. **Review cadence:** annually and on any
 material change; navigability of this index is checked by the annual
