@@ -10,6 +10,26 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Added (EOCN mirror cross-check — TFS drift detector, 2026-07-14)
+
+- The **UAE Local Terrorist List** is curated as an in-repo JSON (the EOCN
+  distributes updates by notification, not a machine endpoint); its failure
+  mode is a STALE file — a new designation the file missed would screen
+  clear, a false negative on a **freeze duty**. Every run now cross-checks
+  the local list against the OpenSanctions `ae_local_terrorists` mirror and
+  **alarms loudly** (coverage alarm → QA gate integrity issue → report §⑤ +
+  run log) on any mirror designation missing locally, with the exact names
+  and the remediation ("update `data/eocn-local-terrorist-list.json` from
+  the EOCN notification; treat EOCN 'clear' as PROVISIONAL until resolved").
+  The curated file remains the screening source — local-only names are never
+  alarmed (the mirror may lag a de-listing), an unreachable mirror is a soft
+  note (never a degraded core control), and the audit line's "screened vs N
+  list names" count is unchanged (mirror names are not screened against).
+  Kill-switch `EOCN_MIRROR_CROSSCHECK=0`; licensing covered by the existing
+  OpenSanctions entry in `docs/aims/third-party-register.md`. 7 new offline
+  engine checks (missing-designation detection, token-reorder tolerance,
+  local-authority rule, soft-fail, kill-switch).
+
 ### Added (ISO/IEC 42001 mandatory-documents crosswalk, 2026-07-14)
 
 - **`docs/aims/iso42001-mandatory-documents-index.md`** — one-page auditor
