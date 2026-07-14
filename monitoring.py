@@ -41,12 +41,27 @@ def _load(path, default):
 
 
 def _save(path, data):
+    # Atomic write (temp + os.replace) so a crash mid-write cannot corrupt the
+    # metrics/coverage baseline the next run compares against. `makedirs` is
+    # guarded on a non-empty dirname: a bare filename (no directory) yields
+    # os.path.dirname("") == "" and os.makedirs("") would raise.
+    tmp = f"{path}.{os.getpid()}.tmp"
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
+        d = os.path.dirname(path)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(tmp, "w") as f:
             json.dump(data, f, indent=1, sort_keys=True)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
         return True
     except Exception:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
         return False
 
 

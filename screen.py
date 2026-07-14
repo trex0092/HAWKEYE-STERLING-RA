@@ -637,6 +637,61 @@ def _pct(score) -> str:
 def sha256_of(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
+# ── Hardened XML parsing ──────────────────────────────────────────────────────
+# The remote feeds parsed below (Google News RSS, UN Consolidated, Canada SEMA)
+# go through the stdlib ElementTree, which — per Python's own docs — is exposed
+# to entity-expansion ("billion laughs") and external-entity (XXE) attacks in a
+# malicious or MITM'd payload. None of these feeds legitimately declares a DTD,
+# so any document carrying a DOCTYPE/ENTITY declaration is refused, and the input
+# is size-capped, before parsing. A refusal raises ValueError, which the callers'
+# existing try/except turns into a loud coverage degrade — never a silent clear.
+# (defusedxml would do the same but is not in the hash-locked ci/requirements.txt;
+# this guard needs no new dependency.)
+XML_MAX_BYTES = int(os.environ.get("XML_MAX_BYTES", str(64 * 1024 * 1024)))
+
+def safe_xml_fromstring(data):
+    """Parse untrusted XML with stdlib ElementTree after refusing DTDs/entities
+    and oversize input. Returns the root Element; raises ValueError on rejection.
+    The ORIGINAL value is handed to ElementTree so str/bytes encoding semantics
+    are unchanged; only a bytes view is scanned for the DTD guard."""
+    if data is None or data == b"" or data == "":
+        raise ValueError("empty XML")
+    raw = data.encode("utf-8", "replace") if isinstance(data, str) else bytes(data)
+    if len(raw) > XML_MAX_BYTES:
+        raise ValueError(f"XML too large: {len(raw)} bytes > {XML_MAX_BYTES} cap")
+    # A DOCTYPE/ENTITY only ever appears in the (tiny) XML prolog of a well-formed
+    # feed; scan just the head so a large body is neither re-scanned nor able to
+    # false-positive on an incidental byte sequence deep in the document.
+    head = raw[:131072].upper()
+    if b"<!DOCTYPE" in head or b"<!ENTITY" in head:
+        raise ValueError("refused XML DTD/entity declaration (billion-laughs/XXE guard)")
+    return ET.fromstring(data)
+
+def _atomic_write_text(path, text):
+    """Write text to `path` atomically (temp file in the same dir + os.replace) so
+    a crash mid-write cannot leave a half-written state file that the next run
+    would read as corrupt. Returns True on success, False on failure (callers
+    keep their own degrade handling)."""
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        d = os.path.dirname(path)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(tmp, "w") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        return True
+    except Exception as e:
+        log(f"  WARN atomic write failed for {path}: {e}")
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+        return False
+
 def now_uae():
     utc = datetime.datetime.utcnow()
     return utc + datetime.timedelta(hours=UAE_TZ_OFFSET)
@@ -806,6 +861,11 @@ GNEWS_BACKOFF_CAP = float(os.environ.get("GNEWS_BACKOFF_CAP", "10.0"))
 # unless GDELT covers them.
 GNEWS_BREAKER_AFTER = int(os.environ.get("GNEWS_BREAKER_AFTER", "30"))
 _GNEWS_STATE = {"consecutive_zero": 0, "open": False}
+# Diagnosability: count fetch/parse failures by exception kind so a systematic
+# bug (every ElementTree parse raising, the DTD guard firing) is visible in the
+# log instead of being swallowed as an indistinguishable "no result" (see the
+# Google-News fetch loop). Bounded log lines per kind keep noise down.
+_GNEWS_FAIL_KINDS = {}
 _GNEWS_GATE = _RateGate(
     GNEWS_MIN_INTERVAL, GNEWS_BACKOFF_CAP,
     on_cap=lambda: log(f"  Google News rate-limited — pacing backed off to cap "
@@ -906,7 +966,7 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
                 r = requests.get(url, timeout=15,
                                  headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
                 if r.status_code == 200:
-                    root = ET.fromstring(r.content)
+                    root = safe_xml_fromstring(r.content)
                     for item in root.findall(".//item")[:max_results]:
                         title_el = item.find("title")
                         source_el = item.find("source")
@@ -931,8 +991,17 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
                             "categories": typology_for(matched),
                         })
                     ok = True
-            except Exception:
+            except Exception as e:
                 ok = False
+                # Diagnosable degrade: record WHY this fetch/parse failed so a
+                # systematic bug (every ET parse raising, or the DTD guard firing)
+                # is distinguishable from ordinary rate-limiting/network refusal
+                # rather than silently swallowed. The loud aggregate zero-coverage
+                # degrade downstream is unchanged.
+                _k = type(e).__name__
+                _GNEWS_FAIL_KINDS[_k] = _GNEWS_FAIL_KINDS.get(_k, 0) + 1
+                if _GNEWS_FAIL_KINDS[_k] <= 3:
+                    log(f"  google-news fetch/parse failed ({_k}): {str(e)[:160]}")
             # Feed the adaptive gate: a failure widens the SHARED interval
             # (multiplicative, toward the cap) so the whole worker pool goes
             # quiet enough for a tripped limiter to cool; a success decays it
@@ -1129,14 +1198,10 @@ def update_adverse_evidence(adverse_findings, today_iso, path=None):
         except Exception:
             return 10 ** 6
     entries = [e for e in entries if _age_days(e) <= EVIDENCE_RETENTION_DAYS]
-    try:
-        d = os.path.dirname(path)
-        if d:
-            os.makedirs(d, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(entries, f, ensure_ascii=False, indent=1)
-    except Exception as e:
-        log(f"  evidence log write failed ({e}) — screening output unaffected")
+    # Atomic write (temp + os.replace): a crash mid-write must never leave a
+    # half-written evidence file that the next run reads as corrupt.
+    if not _atomic_write_text(path, json.dumps(entries, ensure_ascii=False, indent=1)):
+        log("  evidence log write failed — screening output unaffected")
     counts = {}
     for e in entries:
         if _age_days(e) <= REPEAT_WINDOW_DAYS:
@@ -1484,7 +1549,7 @@ def parse_un(data):
     date_str = "unknown"
     if not data: return names, date_str, ""
     try:
-        root = ET.fromstring(data)
+        root = safe_xml_fromstring(data)
         date_str = root.get("dateGenerated", "unknown")[:10]
         for section in ["INDIVIDUALS", "ENTITIES"]:
             sec = root.find(section)
@@ -1579,7 +1644,7 @@ def parse_canada(data):
     names = set()
     if not data: return names, "unavailable", ""
     try:
-        root = ET.fromstring(data)
+        root = safe_xml_fromstring(data)
         for rec in root.iter():
             # Each record groups name parts as child elements; collect name-ish fields.
             entity = given = last = ""
@@ -1913,13 +1978,13 @@ def load_delta_state():
         return {}
 
 def save_delta_state(state):
-    try:
-        os.makedirs(os.path.dirname(DELTA_STATE_PATH), exist_ok=True)
-        with open(DELTA_STATE_PATH, "w") as f:
-            json.dump(state, f, indent=0, sort_keys=True)
+    # Atomic write: the delta state gates what the NEXT run reports as new vs
+    # standing; a half-written file would corrupt that judgement, so never write
+    # it in place.
+    if _atomic_write_text(DELTA_STATE_PATH, json.dumps(state, indent=0, sort_keys=True)):
         log(f"  delta state saved ({len(state)} fingerprints)")
-    except Exception as e:
-        log(f"  delta state save error: {e}")
+    else:
+        log("  delta state save error — next run may re-report standing items")
 
 DELTA_RESURFACE_GAP_DAYS = 7     # re-alert an item that reappears after this gap (de-list → re-list)
 DELTA_RETENTION_DAYS     = 400   # drop fingerprints unseen this long (bounds file growth)

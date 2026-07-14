@@ -27,7 +27,13 @@ DESIGN RULES (consistent with the rest of the system):
     value never leaves the record.
 No third-party dependencies.
 """
-import os, re, json, datetime
+import os, re, json, datetime, sys
+
+
+def _warn(msg):
+    """Surface a degrade on stderr so it lands in the run log. kyc.py is a
+    library (no dependency on screen.log); the workflows capture stderr."""
+    print(f"[kyc] WARN {msg}", file=sys.stderr, flush=True)
 
 # ── Legal-arrangement role / entity vocabulary (R.25) ─────────────────────────
 # A party holding one of these roles, OR an entity whose name carries one of these
@@ -54,8 +60,13 @@ JURISDICTION_RISK_PATH = os.environ.get(
 
 def load_jurisdiction_risk(path=None):
     """Return {country_lower: 'grey'|'high'} from the maintained file, or {} if
-    absent. Never raises."""
+    absent. Never raises. An ABSENT optional file degrades to neutral silently
+    (the expected no-op); a PRESENT-but-unreadable/corrupt file is a real loss of
+    a risk input and is warned LOUDLY (this module's DEGRADE-LOUDLY rule), so the
+    jurisdiction bump never vanishes without a trace."""
     p = path or JURISDICTION_RISK_PATH
+    if not os.path.exists(p):
+        return {}
     try:
         with open(p) as f:
             d = json.load(f)
@@ -63,8 +74,13 @@ def load_jurisdiction_risk(path=None):
         for tier in ("grey", "high"):
             for c in d.get(tier, []) or []:
                 out[_norm(c)] = tier
+        if not out:
+            _warn(f"jurisdiction-risk file '{p}' present but yielded 0 entries — "
+                  "jurisdiction risk bump is disabled this run")
         return out
-    except Exception:
+    except Exception as e:
+        _warn(f"jurisdiction-risk file '{p}' unreadable ({type(e).__name__}: {e}) — "
+              "jurisdiction risk bump is disabled this run")
         return {}
 
 

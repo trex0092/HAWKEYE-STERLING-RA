@@ -985,6 +985,88 @@ screen.requests.get, screen.time.sleep, screen.search_gdelt = _orig_get, _orig_s
 screen.time.monotonic = _orig_mono
 _reset_breaker()   # leave the run-global gates/breakers pristine for later suites
 
+# ── Hardening 2026-07: safe XML parse, atomic state writes, loud degrade ──────
+import io as _io, contextlib as _ctx, tempfile as _tmp
+
+print("hardening — safe XML parse (billion-laughs / XXE)")
+_ok_rss = b'<?xml version="1.0"?><rss><channel><item><title>Hi</title></item></channel></rss>'
+_root = screen.safe_xml_fromstring(_ok_rss)
+check("safe_xml: a benign feed parses",
+      _root.find(".//title") is not None and _root.find(".//title").text == "Hi")
+
+# Billion-laughs (internal entity expansion) — refused BEFORE any expansion runs.
+_laughs = b'<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;">]><lolz>&lol2;</lolz>'
+try:
+    screen.safe_xml_fromstring(_laughs); _rej_laughs = False
+except ValueError:
+    _rej_laughs = True
+check("safe_xml: a billion-laughs DOCTYPE/ENTITY payload is refused", _rej_laughs)
+
+# XXE (external entity) — carries a DOCTYPE, so it is refused too.
+_xxe = b'<?xml version="1.0"?><!DOCTYPE r [<!ENTITY x SYSTEM "file:///etc/passwd">]><r>&x;</r>'
+try:
+    screen.safe_xml_fromstring(_xxe); _rej_xxe = False
+except ValueError:
+    _rej_xxe = True
+check("safe_xml: an XXE external-entity payload is refused", _rej_xxe)
+
+# Oversize input is refused before parsing (secondary guard).
+_orig_cap = screen.XML_MAX_BYTES
+screen.XML_MAX_BYTES = 32
+try:
+    screen.safe_xml_fromstring(b'<a>' + b'x' * 100 + b'</a>'); _rej_big = False
+except ValueError:
+    _rej_big = True
+finally:
+    screen.XML_MAX_BYTES = _orig_cap
+check("safe_xml: oversize input is refused before parsing", _rej_big)
+
+# The list parsers degrade safely (no crash, no names) on a malicious DTD payload.
+_un_names, _un_date, _un_sig = screen.parse_un(_laughs)
+check("parse_un degrades safely on a DTD payload (no crash, no names)", _un_names == set())
+_ca_names, _ca_status, _ca_sig = screen.parse_canada(_xxe)
+check("parse_canada degrades safely on a DTD payload (no crash, no names)", _ca_names == set())
+
+print("hardening — atomic state writes")
+_hdir = _tmp.mkdtemp()
+_hcwd = os.getcwd(); os.chdir(_hdir)
+try:
+    # A bare filename (dir-less) used to make monitoring._save raise on makedirs("").
+    _ok_bare = monitoring._save("bare-metrics.json", {"a": 1})
+    check("monitoring._save handles a dir-less path (no makedirs('') crash)",
+          _ok_bare is True and os.path.exists(os.path.join(_hdir, "bare-metrics.json")))
+    # screen._atomic_write_text round-trips into a nested dir and leaves no .tmp.
+    _sp = os.path.join(_hdir, "sub", "state.json")
+    _ok_atomic = screen._atomic_write_text(_sp, '{"k":1}')
+    _tmps = [f for f in os.listdir(os.path.join(_hdir, "sub")) if f.endswith(".tmp")]
+    with open(_sp) as _f:
+        _round = _f.read()
+    check("atomic write creates the file and leaves no .tmp behind",
+          _ok_atomic is True and _round == '{"k":1}' and _tmps == [])
+finally:
+    os.chdir(_hcwd)
+
+print("hardening — kyc jurisdiction-risk loud degrade")
+# Absent optional file → silent {} (the expected no-op).
+check("kyc: an absent jurisdiction file degrades to {} silently",
+      kyc.load_jurisdiction_risk(os.path.join(_hdir, "nope.json")) == {})
+# Present-but-corrupt file → {} AND a loud stderr warning (a real risk-input loss).
+_bad = os.path.join(_hdir, "bad.json")
+with open(_bad, "w") as _f:
+    _f.write("{ not valid json")
+_err = _io.StringIO()
+with _ctx.redirect_stderr(_err):
+    _corrupt = kyc.load_jurisdiction_risk(_bad)
+check("kyc: a corrupt jurisdiction file degrades to {} AND warns loudly",
+      _corrupt == {} and "WARN" in _err.getvalue())
+# A valid file loads the grey/high tiers.
+_good = os.path.join(_hdir, "good.json")
+with open(_good, "w") as _f:
+    _f.write('{"grey":["Panama"],"high":["Iran"]}')
+_jr = kyc.load_jurisdiction_risk(_good)
+check("kyc: a valid jurisdiction file loads grey/high tiers",
+      _jr.get("panama") == "grey" and _jr.get("iran") == "high")
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
