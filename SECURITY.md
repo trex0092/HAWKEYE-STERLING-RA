@@ -76,8 +76,8 @@ In scope:
 
 - The on-device deterministic risk-scoring engine and UI (`index.html`,
   `console.html`, `advisor.html`).
-- The optional LLM-backed **Advisor** (`assets/brain-soul.js`) and its runtime
-  guardrails (PII flag, output-structure validator, budget flag, kill switch).
+- The optional LLM-backed **Advisor** (`netlify/functions/brain-soul.js`) and its
+  runtime guardrails (PII flag, output-structure validator, budget flag, kill switch).
 - The Netlify relay functions under `netlify/functions/` and the automation
   scripts under `scripts/`.
 - The CI/CD and watchdog workflows under `.github/workflows/`.
@@ -96,6 +96,21 @@ deterministic engine has no backend. Secrets (API tokens) are held server-side
 in Netlify/GitHub environment variables and never reach the browser. Secret
 hygiene is enforced in CI by **gitleaks** ([`.gitleaks.toml`](.gitleaks.toml))
 and dependency risk by **CodeQL** and **Dependency Review**.
+
+**Off-device mirrors are gated.** Two functions carry customer data off-device to
+Asana: `asana-mirror` (the assessment register + activity log, readable back via
+`action:"read"`) and `risk-backup` (the risk-data override sheet). Because a read
+returns entity names, jurisdictions and outcomes, these endpoints require a valid
+`X-App-Token` on **every** request path — including the browser — whenever
+`APP_SHARED_TOKEN` is configured (the forgeable-Origin exemption used by the
+task-write endpoint does not apply to them; see
+[`netlify/functions/_auth.js`](netlify/functions/_auth.js)). A deployment that
+files **real** customer data therefore **must** set `APP_SHARED_TOKEN` (ideally
+also `APP_STRICT_TOKEN=1`) and fill the matching `<meta name="hsra-app-token">`
+value; with the token unset these relays are effectively public, and the
+on-device **"tokenise (no PII)"** delivery option should be used instead. The
+Origin allow-list and per-IP rate limits remain hardening layers, not
+authentication.
 
 ## Evidence retention
 

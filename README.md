@@ -219,6 +219,8 @@ Copy `.env.example` to `.env` (never commit it) and fill in the values, then add
 | `ASANA_PROJECT_GID` | Recommended | GID of the RISK ASSESSMENTS Asana project (from the project URL). Defaults to the built-in value — set explicitly to avoid targeting the wrong project after a project rename or workspace change. |
 | `ASANA_ASSIGNEE` | No | Asana user to assign tasks to. Defaults to `me` (the token bearer). |
 | `ALLOWED_ORIGINS` | No | Comma-separated extra browser origins permitted to call the Netlify functions. Same-origin requests and header-less (server-to-server) calls are always allowed; cross-site browser origins are rejected with `403`. |
+| `APP_SHARED_TOKEN` | Recommended for real data | Shared-secret gate for the Netlify functions. **The `asana-mirror` (register + activity-log) and `risk-backup` (risk-data sheet) relays carry customer data off-device and a read returns it, so when this is set they require an `X-App-Token` on *every* path — including the browser** (the Origin header is forgeable). Leave blank and those relays are effectively public; a deployment that files **real** customer data should set this and fill the matching `<meta name="hsra-app-token">` value in the three HTML pages (or rely on the on-device *tokenise — no PII* delivery option). See [`netlify/functions/_auth.js`](netlify/functions/_auth.js). |
+| `APP_STRICT_TOKEN` | No | Set to `1` to require `X-App-Token` on **every** request to **every** function (including the task-write endpoint and the browser path) — the only mode that resists Origin forgery. Requires `APP_SHARED_TOKEN`. |
 
 ### Getting started
 
