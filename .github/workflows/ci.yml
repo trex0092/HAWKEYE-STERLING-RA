@@ -88,6 +88,8 @@ jobs:
         run: node test/sanctions-match-fuzz.test.mjs
       - name: Run GLEIF LEI-check unit tests
         run: node test/lei-check.test.mjs
+      - name: Run legal-citation guard (repealed instruments never cited as operative)
+        run: node test/legal-citations.test.mjs
       - name: Run threat-intel (STIX) unit tests
         run: node test/threat-intel.test.mjs
       - name: Run PWA icon-generator unit tests
@@ -128,6 +130,8 @@ jobs:
         run: node test/interpol-check.test.mjs
       - name: Run HTML asset-integrity test (every href/src/manifest/precache path resolves)
         run: node test/asset-integrity.test.mjs
+      - name: Run readiness-review currency guard (re-score addendum matches the live estate)
+        run: node test/readiness-review.test.mjs
       - name: Run CI coverage drift guard (every test file is wired into a workflow)
         run: node test/ci-coverage.test.mjs
       - name: Run branch-protection drift guard (required contexts match check names; no path-gated required checks)

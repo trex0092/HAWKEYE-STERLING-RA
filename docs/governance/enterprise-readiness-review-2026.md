@@ -298,3 +298,78 @@ outside this plan.)*
 *Prepared as an independent readiness review; observations verified against the repository at the
 date above. Recommendations align to ISO/IEC 42001, NIST AI RMF, EU AI Act, OECD AI Principles,
 COSO, ISO 31000, FATF RBA, Wolfsberg guidance, and GDPR/PDPL as cited inline.*
+
+---
+
+## 18 · Re-score addendum · 15 July 2026
+
+*Appended as an addendum: sections 1-17 above are the 2 July point-in-time record and are
+deliberately left unedited (same convention as the code-scanning triage record). Every claim below
+is [OBSERVED] against commit `8576ad61` unless marked otherwise.*
+
+Verified at HEAD: 46 workflows · 104 markdown documents under docs/ (87 excluding docs/research/auto).
+(The 2 July scope line said 37 workflows and 40+ governance documents; the estate has grown and the
+counts are now asserted by `test/readiness-review.test.mjs`, which fails CI when this line drifts
+from the repository.)
+
+### 18.1 Delivered since 2 July (the Critical/High items of §16)
+
+| §16 item | Status 15 Jul | Evidence |
+|---|---|---|
+| 1. Executive layer (4 docs) | **Delivered** | `docs/executive/` (executive-brief, business-value, regulatory-readiness, roadmap) |
+| 2. Model cards ×6 | **Delivered** | `docs/models/` (risk-scoring-engine, sanctions-name-matcher, adverse-media-classifier, pep-identifier, advisor-llm, ai-triage + README) |
+| 3. Demo pack + screenshots | **Delivered** (no walkthrough video yet) | `docs/demo/` (demo-script, scenarios, sample-data) + `docs/screenshots/` |
+| 4. Architecture diagram set | **Delivered** | `docs/architecture/diagrams.md` (7 Mermaid diagrams incl. trust boundaries) |
+| 5. KPI dashboard | **Partially delivered** | `docs/executive/kpi-dashboard.md` (catalogue + monthly log; KPI 10 still needs the in-app accept/override logging; no auto-rendered page yet) |
+| 6. Risk-register L×I format | **Delivered** | `docs/aims/ai-risk-register.md` (Likelihood/Impact scales, inherent vs residual) |
+| 7. COSO / ISO 31000 crosswalk | **Not delivered** | no COSO mapping in `ai-frameworks-crosswalk-2026.md` |
+| 8. Charter + Review-Committee ToR | **Not delivered** | committee remains unchartered (register item P2, Board) |
+| 9. User/Admin/API guides | **Delivered** | `docs/user-guides/` (3 guides) + `docs/api/functions.md` |
+| 10. AI-acceptance metric in app log | **Not delivered** | pending app change (feeds KPI 10) |
+
+Also delivered since 2 July, relevant to scoring: AI Policy v1.0, Stakeholder Impact Assessment and
+DPIA §6 residual-risk acceptance are **ratified 2026-07-02** (`ai-policy.md` §9, `stakeholder-impact-assessment-2026.md`
+sign-off, `dpia-2026.md` §6); ISO/IEC 42001 mandatory-documents index added; workflow-hardening pass
+(job-level tokens, egress blocks, non-root container with a PR-time container smoke test).
+
+### 18.2 Re-scored dimensions
+
+| Dimension | 2 Jul | 15 Jul | Basis for change |
+|---|---:|---:|---|
+| AI governance framework | 4.5 | 4.5 | unchanged |
+| Compliance documentation | 4.5 | 4.5 | unchanged |
+| Controls & assurance | 4.5 | 4.5 | unchanged |
+| Security engineering | 4.5 | 4.5 | unchanged (hardening continued; GitHub UI controls still open, see P23-P25) |
+| Risk management | 4.0 | 4.5 | L×I inherent/residual format delivered |
+| Repository organisation | 4.0 | 4.5 | audience-first docs tree of §7 delivered (executive/models/architecture/user-guides/api/demo) |
+| Architecture documentation | 3.5 | 4.5 | diagram set incl. trust boundaries delivered |
+| UX | 4.0 | 4.0 | unchanged (tour/empty states still proposed) |
+| Model documentation | 3.0 | 4.5 | all 6 model cards delivered |
+| Metrics & KPIs | 3.0 | 3.5 | dashboard spec + log delivered; rendering + KPI 10 outstanding |
+| Executive readiness | 2.5 | 4.0 | executive layer delivered |
+| Presentation/demo readiness | 2.5 | 4.0 | demo pack + screenshots delivered; video outstanding |
+| **Overall** | **3.9** | **4.3** | mean of the twelve dimensions |
+
+### 18.3 §17 checklist, refreshed
+
+- [x] Executive brief + business value + regulatory-readiness docs merged (`docs/executive/`)
+- [x] All 6 model cards present and dated
+- [x] Architecture + trust-boundary diagrams render on GitHub (`docs/architecture/diagrams.md`)
+- [ ] KPI dashboard shows current month with real numbers (log present; current-month row to complete)
+- [x] AI Policy v1.0 + Stakeholder Impact Assessment ratified (2026-07-02, signature rows filled)
+- [x] DPIA §6 residual-risk acceptance signed by MLRO (2026-07-02)
+- [ ] Anthropic DPA executed (still DRAFT: `docs/aims/anthropic-dpa-execution-pack.md`; state it on slide 1)
+- [ ] TEST-000 end-to-end evidence captured
+- [ ] Daily Compliance Brief + AI Governance Report from *this week* exportable as evidence
+- [ ] Assurance Coverage Matrix reviewed: every row's proof ran green in the last cycle
+- [x] Risk register: R-13 (transaction feed) status honestly current; key-person row present
+- [x] Latest release tag matches the released version line (v3.7.2 released 2026-07-11)
+- [ ] Demo script rehearsed once end-to-end on the live site
+- [ ] Known-gaps list rehearsed: every gap has an owner, date, and compensating control
+
+### 18.4 Outstanding to reach 4.5
+
+COSO/ISO 31000 crosswalk columns (§6-D) · charter + committee ToR (§8, register P2) · KPI 10
+app-log change + rendered dashboard (§12) · walkthrough video (§14) · executed Anthropic DPA
+(register P3) with the live bias cycle it unlocks (P6) · GitHub UI hardening checklist rows
+(register P23-P25). Re-score at least quarterly and on any figure drift (CI-enforced).
