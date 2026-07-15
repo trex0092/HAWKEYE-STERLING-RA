@@ -24,6 +24,11 @@ export const SOURCES_FILE = 'data/sanctions-sources.json';
 export const STATE_FILE   = 'data/sanctions-state.json';
 export const REPORT_FILE  = 'sanctions-watch-report.md';
 export const CHANGES_FILE = 'sanctions-watch-changes.json';
+export const TFS_LOG_FILE = 'data/tfs-update-log.json';
+/* The full-base screening workflows whose next successful run after a detected
+   list change IS the re-screen of the customer base against the new list. */
+export const SCREEN_WORKFLOWS = ['weekly-adverse-media.yml', 'sanctions-screen.yml'];
+export const TFS_LOG_CAP = 200;
 
 /* Approximate record count for the report: count a per-record marker if the
    source defines one, else count CSV data rows (lines minus header). Returns
@@ -124,6 +129,116 @@ export function trackErrorStreaks(sources, fetched, stateSources, threshold) {
   return { persistentErrors, anyError };
 }
 
+/* ── TFS timeline log: publication → ingestion → re-screen ──────────────────
+   TFS duties are timed: when a designation list changes, the firm must be able
+   to EVIDENCE how quickly it ingested the update and re-screened the customer
+   base against it. This log records one entry per detected list change:
+     publicationDate — the list's own machine-readable publish date when the
+                       format carries one (UN consolidated.xml dateGenerated);
+                       null otherwise (most feeds publish no date; the MLRO can
+                       complete it from the official notice)
+     detectedAt      — when this watcher ingested the change (fingerprint moved)
+     rescreen        — the first successful full-base screening run that STARTED
+                       after detection (resolved on a later watch run via the
+                       Actions API), with the latency in hours
+   The log lives beside the fingerprint state on the sanctions-watch-state
+   branch; entries are pure data (offline-tested), only the run lookup touches
+   the network. */
+
+/* Best-effort machine-readable publication date from a fetched list body.
+   Only the UN consolidated XML carries one (dateGenerated); others → null. */
+export function extractPublishedDate(body) {
+  if (typeof body !== 'string' || !body) return null;
+  const m = body.match(/dateGenerated="([^"]{10,})"/);
+  return m ? m[1].slice(0, 10) : null;
+}
+
+/* Build pending log entries for this run's content changes. */
+export function tfsNewEntries(moved, counts, fetched, nowIso) {
+  return (moved || []).map(mv => {
+    const c = (counts || {})[mv.id] || {};
+    const f = (fetched || {})[mv.id] || {};
+    return {
+      id: mv.id,
+      list: mv.name,
+      change: mv.status === 'new' ? 'first snapshot' : 'list changed',
+      publicationDate: f.ok ? extractPublishedDate(f.body) : null,
+      detectedAt: nowIso,
+      prevCount: typeof c.prev === 'number' ? c.prev : null,
+      newCount: typeof c.now === 'number' ? c.now : null,
+      rescreen: null,
+      status: 'pending-rescreen',
+    };
+  });
+}
+
+/* Resolve pending entries against successful screening runs: the re-screen is
+   the EARLIEST success that started at or after detection, across any of the
+   full-base screening workflows. runsByWorkflow: {file: [{id, startedAt}]}
+   (successful runs only). Mutates entries; returns how many were resolved. */
+export function resolveRescreens(entries, runsByWorkflow) {
+  let resolved = 0;
+  for (const e of entries || []) {
+    if (e.status !== 'pending-rescreen') continue;
+    const detected = Date.parse(e.detectedAt);
+    if (Number.isNaN(detected)) continue;
+    let best = null;
+    for (const [wf, runs] of Object.entries(runsByWorkflow || {})) {
+      for (const r of runs || []) {
+        const started = Date.parse(r.startedAt);
+        if (Number.isNaN(started) || started < detected) continue;
+        if (!best || started < best.started) best = { workflow: wf, runId: r.id, startedAt: r.startedAt, started };
+      }
+    }
+    if (best) {
+      e.rescreen = { workflow: best.workflow, runId: best.runId, startedAt: best.startedAt };
+      e.latencyHours = Math.round((best.started - detected) / 3600000 * 10) / 10;
+      e.status = 'complete';
+      resolved++;
+    }
+  }
+  return resolved;
+}
+
+/* Keep the newest `cap` entries (the log is an audit trail, not unbounded). */
+export function capTfsEntries(entries, cap = TFS_LOG_CAP) {
+  const a = entries || [];
+  return a.length > cap ? a.slice(a.length - cap) : a;
+}
+
+export function loadTfsLog() {
+  const empty = {
+    _README: 'TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest ' + TFS_LOG_CAP + '.',
+    entries: [],
+  };
+  if (!existsSync(TFS_LOG_FILE)) return empty;
+  try {
+    const parsed = JSON.parse(readFileSync(TFS_LOG_FILE, 'utf8'));
+    if (parsed && Array.isArray(parsed.entries)) return { _README: empty._README, entries: parsed.entries };
+    return empty;
+  } catch (e) {
+    console.warn('tfs-log: unreadable, starting fresh (' + e.message + ')');
+    return empty;
+  }
+}
+
+/* ── Network (runner only; not imported by tests) ── */
+async function fetchScreenRuns(repo, token, workflowId, perPage = 20) {
+  const url = 'https://api.github.com/repos/' + repo + '/actions/workflows/' + workflowId
+    + '/runs?status=success&per_page=' + perPage;
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'hawkeye-sanctions-watch',
+    },
+  });
+  if (!res.ok) throw new Error('GitHub API ' + res.status + ' for ' + workflowId);
+  const data = await res.json();
+  return (data.workflow_runs || []).map(r => ({ id: r.id, startedAt: r.run_started_at || r.created_at }));
+}
+
 function setOutput(key, val) {
   /* Sanitize before writing to GITHUB_OUTPUT: a CR/LF in the value (e.g. an upstream
      error message folded into a title) could inject additional output lines; cap the
@@ -181,11 +296,39 @@ async function main() {
   writeFileSync(REPORT_FILE, report + '\n');
   writeFileSync(CHANGES_FILE, JSON.stringify({ date: today, mode, changes: flagged }, null, 2) + '\n');
 
+  /* TFS timeline: append an entry per content change, then try to resolve any
+     pending re-screen linkages via the Actions API (needs GITHUB_TOKEN with
+     actions:read; skipped gracefully offline). Failures never break the watch:
+     the log is evidence, the alerting above is the control. */
+  let logChanged = false;
+  try {
+    const logObj = loadTfsLog();
+    const before = JSON.stringify(logObj.entries);
+    if (mode !== 'seed' && moved.length) {
+      logObj.entries.push(...tfsNewEntries(moved, counts, fetched, new Date().toISOString()));
+    }
+    const repo = process.env.GITHUB_REPOSITORY, token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    if (repo && token && logObj.entries.some(e => e.status === 'pending-rescreen')) {
+      const runsByWorkflow = {};
+      for (const wf of SCREEN_WORKFLOWS) {
+        try { runsByWorkflow[wf] = await fetchScreenRuns(repo, token, wf); }
+        catch (e) { console.warn('tfs-log: could not query ' + wf + ' runs — ' + e.message); }
+      }
+      const resolved = resolveRescreens(logObj.entries, runsByWorkflow);
+      if (resolved) console.log('tfs-log: resolved re-screen linkage for ' + resolved + ' entr' + (resolved === 1 ? 'y' : 'ies'));
+    }
+    logObj.entries = capTfsEntries(logObj.entries);
+    logChanged = JSON.stringify(logObj.entries) !== before || !existsSync(TFS_LOG_FILE);
+    writeFileSync(TFS_LOG_FILE, JSON.stringify(logObj, null, 2) + '\n');
+  } catch (e) {
+    console.warn('tfs-log: update skipped this run — ' + e.message);
+  }
+
   console.log(report);
   console.log('\nmode=' + mode + '  list-changes=' + moved.length + '  persistent-errors=' + persistentErrors.length
     + '  errors=' + changes.filter(x => x.status === 'error').length);
   setOutput('has_changes', flagged.length ? 'true' : 'false');
-  setOutput('state_dirty', stateDirty ? 'true' : 'false');
+  setOutput('state_dirty', (stateDirty || logChanged) ? 'true' : 'false');
   setOutput('persistent_errors', String(persistentErrors.length));
   setOutput('changed_count', String(count));
   setOutput('pr_title', prTitle);

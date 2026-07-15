@@ -46,8 +46,10 @@ mode. Then the §6 TEST-000 verification before real use.
   [`backup-recovery.md`](../governance/backup-recovery.md)).
 - **BCP drill** — periodically confirm a second person can rotate secrets and
   operate (closes risk R-17).
-- **Monitoring** — the 37 workflows run themselves; the daily AI Governance Report
-  flags any control that stops (STALE). Investigate Anomaly Watch issues.
+- **Monitoring** — the assurance workflows run themselves (live count in
+  [`data/board-figures.json`](../../data/board-figures.json), generated, never
+  hand-maintained); the daily AI Governance Report flags any control that stops
+  (STALE). Investigate Anomaly Watch issues.
 
 ## Reference
 API contracts → [`../api/functions.md`](../api/functions.md) · architecture →

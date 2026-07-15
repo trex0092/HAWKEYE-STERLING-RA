@@ -66,6 +66,8 @@ jobs:
         run: node test/daily-brief.test.mjs
       - name: Run governance-report unit tests
         run: node test/governance-report.test.mjs
+      - name: Run board-figure drift guard (committed figures match the live estate)
+        run: node test/board-figures.test.mjs
       - name: Run weekly-summary unit tests
         run: node test/weekly-summary.test.mjs
       - name: Run screening-cases unit tests
@@ -128,6 +130,8 @@ jobs:
         run: node test/interpol-check.test.mjs
       - name: Run HTML asset-integrity test (every href/src/manifest/precache path resolves)
         run: node test/asset-integrity.test.mjs
+      - name: Run readiness-review currency guard (re-score addendum matches the live estate)
+        run: node test/readiness-review.test.mjs
       - name: Run CI coverage drift guard (every test file is wired into a workflow)
         run: node test/ci-coverage.test.mjs
       - name: Run branch-protection drift guard (required contexts match check names; no path-gated required checks)

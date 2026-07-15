@@ -1,7 +1,8 @@
 /* Unit tests for the Sanctions Watch pure logic (no network).
    Usage: node test/sanctions-watch.test.mjs */
 import { readFileSync } from 'node:fs';
-import { countEntries, buildReport, trackErrorStreaks } from '../scripts/sanctions-watch.mjs';
+import { countEntries, buildReport, trackErrorStreaks, extractPublishedDate, tfsNewEntries,
+  resolveRescreens, capTfsEntries, SCREEN_WORKFLOWS, TFS_LOG_CAP } from '../scripts/sanctions-watch.mjs';
 import { loadSources, fingerprint, computeChanges, contentChanges } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -83,6 +84,66 @@ check('report is quiet when nothing moved',
   const r2 = trackErrorStreaks(srcs, { un: { ok: false }, eu: { ok: true, body: 'x' } }, { un: {}, eu: {} }, 3);
   check('a first failure counts but does not alert below the threshold',
     r2.anyError && r2.persistentErrors.length === 0);
+}
+
+/* ── TFS timeline log: publication → ingestion → re-screen ── */
+{
+  check('screening workflows for re-screen resolution are declared',
+    SCREEN_WORKFLOWS.includes('weekly-adverse-media.yml') && SCREEN_WORKFLOWS.includes('sanctions-screen.yml'));
+
+  // publication date: only the UN consolidated XML carries a machine-readable one
+  check('extractPublishedDate reads UN dateGenerated',
+    extractPublishedDate('<CONSOLIDATED_LIST dateGenerated="2026-06-16T09:00:00.000Z">') === '2026-06-16');
+  check('extractPublishedDate is null for CSV bodies', extractPublishedDate('name,alias\nrow1,a') === null);
+  check('extractPublishedDate is null for empty input', extractPublishedDate('') === null);
+
+  const moved = [
+    { id: 'un', name: 'UN Consolidated', status: 'changed' },
+    { id: 'ofac-sdn', name: 'US OFAC SDN', status: 'new' },
+  ];
+  const counts = { un: { prev: 1001, now: 1002 } };
+  const fetched = {
+    un: { ok: true, body: '<CONSOLIDATED_LIST dateGenerated="2026-06-16T00:00:00Z"></CONSOLIDATED_LIST>' },
+    'ofac-sdn': { ok: true, body: 'row1,a\nrow2,b\n' },
+  };
+  const entries = tfsNewEntries(moved, counts, fetched, '2026-06-16T05:07:00Z');
+  check('one pending entry per content change', entries.length === 2 && entries.every(e => e.status === 'pending-rescreen'));
+  check('entry records detection time + count delta',
+    entries[0].detectedAt === '2026-06-16T05:07:00Z' && entries[0].prevCount === 1001 && entries[0].newCount === 1002);
+  check('UN entry carries its machine-readable publication date', entries[0].publicationDate === '2026-06-16');
+  check('a feed without a publish date records null (MLRO completes from the notice)',
+    entries[1].publicationDate === null && entries[1].prevCount === null);
+
+  // re-screen resolution: earliest SUCCESS started at/after detection wins
+  const runs = {
+    'sanctions-screen.yml': [
+      { id: 101, startedAt: '2026-06-16T05:00:00Z' },   // before detection: ignored
+      { id: 102, startedAt: '2026-06-16T05:37:00Z' },   // first success after: the re-screen
+    ],
+    'weekly-adverse-media.yml': [
+      { id: 201, startedAt: '2026-06-17T00:07:00Z' },   // later: not chosen
+    ],
+  };
+  const resolved = resolveRescreens(entries, runs);
+  check('both pending entries resolve against the run history', resolved === 2);
+  check('the earliest post-detection success is chosen with its latency',
+    entries[0].status === 'complete' && entries[0].rescreen.runId === 102
+    && entries[0].rescreen.workflow === 'sanctions-screen.yml' && entries[0].latencyHours === 0.5);
+  const unresolved = [{ detectedAt: '2026-06-18T05:07:00Z', status: 'pending-rescreen' }];
+  check('an entry with no post-detection success stays pending',
+    resolveRescreens(unresolved, runs) === 0 && unresolved[0].status === 'pending-rescreen');
+  check('an already-complete entry is not re-resolved', resolveRescreens(entries, runs) === 0);
+
+  // audit-trail cap: newest entries win
+  const many = Array.from({ length: TFS_LOG_CAP + 5 }, (_, i) => ({ n: i }));
+  const capped = capTfsEntries(many);
+  check('the log caps at the newest ' + TFS_LOG_CAP + ' entries',
+    capped.length === TFS_LOG_CAP && capped[0].n === 5 && capped[capped.length - 1].n === TFS_LOG_CAP + 4);
+
+  // the committed seed file parses and has the documented shape
+  const seed = JSON.parse(readFileSync(new URL('../data/tfs-update-log.json', import.meta.url), 'utf8'));
+  check('data/tfs-update-log.json is seeded with a README and an entries array',
+    typeof seed._README === 'string' && Array.isArray(seed.entries));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
