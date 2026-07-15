@@ -1,11 +1,13 @@
 name: Freshness Check
 
-# Silent-failure alarm for the mandatory-daily controls. A scheduled compliance
-# watcher that simply stops running (bad cron, disabled workflow, runner outage)
-# produces no failure — just nothing — which GitHub never alerts on. This guard
-# runs after the watchers each day and asks the Actions API whether each
-# mandatory-daily control has a SUCCESSFUL run dated today (UTC); if any is
-# missing it fails loudly (red + Actions email) and opens an Asana alert.
+# Silent-failure alarm for the mandatory scheduled controls. A scheduled
+# compliance watcher that simply stops running (bad cron, disabled workflow,
+# runner outage) produces no failure — just nothing — which GitHub never alerts
+# on. This guard runs after the watchers each day and asks the Actions API
+# whether each mandatory control has a SUCCESSFUL run inside its cadence window
+# (daily: today UTC; weekly: 8 days; quarterly: 96 days — see
+# scripts/freshness-check.mjs CONTROLS); if any is missing it fails loudly
+# (red + Actions email) and opens an Asana alert.
 #
 # Needs the ASANA_ACCESS_TOKEN repository secret to route the alert to Asana.
 
@@ -48,7 +50,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Verify mandatory-daily controls ran today
+      - name: Verify mandatory controls ran inside their cadence window
         id: freshness
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -61,5 +63,5 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node scripts/asana-alert.mjs \
-            "CONTROL STALE: a mandatory-daily compliance watcher did not run today" \
-            "The Freshness Check found that at least one mandatory-daily control (Sanctions Watch / Daily Screening (Sanctions + Adverse Media + PEP) / Sanctions Screen (case engine) / Regulatory Watch) has no successful run today. A daily ingestion/screening control that silently stops is a potential regulatory breach (e.g. UNSC / EOCN must run daily without delay). Review the schedules and the run log: $RUN_URL"
+            "CONTROL STALE: a mandatory scheduled compliance control missed its cadence window" \
+            "The Freshness Check found that at least one mandatory control (daily: Sanctions Watch / Daily Screening / Sanctions Screen / Regulatory Watch / FATF Watchdog / Onboarding Screen; weekly: Advisor Guardrail Eval; quarterly: Advisor Bias Eval / Quarterly Screening Review) has no successful run inside its cadence window. A scheduled control that silently stops is a potential regulatory breach (e.g. UNSC / EOCN ingestion must run daily without delay; the evals evidence the AI assurance cadence). Review the schedules and the run log: $RUN_URL"
