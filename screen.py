@@ -1688,12 +1688,16 @@ def parse_eocn(pdf_path):
     # review-age gate silently disarmed and the run exited green.
     overdue, msg = eocn_review_check(None)
     EOCN_SOURCE_STATE["obtained"] = False
+    json_hash = ""
     # 1) Preferred: the maintained JSON list (zero-dependency, no PDF parsing).
     if os.path.exists(EOCN_JSON_PATH):
         try:
             with open(EOCN_JSON_PATH, "rb") as _f:
                 raw = _f.read()
             data = json.loads(raw)
+            # Hash here, where raw is provably bound; the names-return below
+            # sits outside this try and must not reference raw directly.
+            json_hash = sha256_of(raw)
             # Review currency is a property of the file's metadata, not of the
             # entry extraction: evaluate it as soon as the JSON parses so the
             # gate also arms on the empty-entries path.
@@ -1719,7 +1723,7 @@ def parse_eocn(pdf_path):
         date_label = "from maintained list (data/eocn-local-terrorist-list.json)"
         if overdue:
             date_label += " · REVIEW OVERDUE"
-        return names, date_label, sha256_of(raw)
+        return names, date_label, json_hash
     if os.path.exists(EOCN_JSON_PATH):
         log(f"  EOCN JSON present but yielded no names - manual update required")
     # 2) Fallback: a raw PDF uploaded to repo root.
