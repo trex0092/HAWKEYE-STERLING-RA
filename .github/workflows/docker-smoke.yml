@@ -65,7 +65,7 @@ jobs:
           up=
           for attempt in $(seq 1 30); do
             if curl -fsS -o /dev/null http://localhost:8080/health; then up=1; break; fi
-            sleep 1
+            echo "waiting for /health (attempt $attempt)"; sleep 1
           done
           [ -n "$up" ] || { echo "::error::/health never answered"; docker logs hsra; exit 1; }
 
