@@ -143,7 +143,10 @@ deliberately split:
   monitored; promote any to `block` once its audited egress is confirmed stable.
 
 The workflow security itself is gated by **zizmor (blocking)** in
-`workflow-lint.yml`; accepted-baseline suppressions live in `.github/zizmor.yml`.
+`workflow-lint.yml` with a **zero baseline** — `.github/zizmor.yml` was removed
+(2026-07-15) once the state-pushing workflows switched to ephemeral env-token
+pushes with `persist-credentials: false`; the only accepted finding is the
+documented inline `zizmor: ignore[dangerous-triggers]` in `labeler.yml`.
 
 ---
 

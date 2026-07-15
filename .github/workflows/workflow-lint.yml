@@ -5,10 +5,11 @@ name: Workflow lint (actionlint + zizmor)
 #                   embedded shellcheck pass. The run: blocks are clean, so no
 #                   shellcheck rules are suppressed — keep them clean.
 #   - zizmor      : CI/CD security audit (dangerous triggers, template injection,
-#                   over-broad permissions, unpinned actions). BLOCKING — the
-#                   accepted-baseline suppressions live in .github/zizmor.yml, so
-#                   any new finding (or any of these audits in an unlisted file)
-#                   fails the gate.
+#                   over-broad permissions, unpinned actions). BLOCKING with a
+#                   ZERO baseline — there is no .github/zizmor.yml; the only
+#                   accepted finding is the documented inline
+#                   `zizmor: ignore[dangerous-triggers]` in labeler.yml, so any
+#                   other finding fails the gate.
 on:
   pull_request:
     paths: ['.github/workflows/**']

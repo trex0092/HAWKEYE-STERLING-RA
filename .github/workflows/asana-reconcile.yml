@@ -40,6 +40,11 @@ jobs:
             nodejs.org:443
             app.asana.com:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          # Read-only job — nothing here uses git credentials (the reconcile
+          # script only reads the tree and talks to Asana), so keep the token
+          # off disk.
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22

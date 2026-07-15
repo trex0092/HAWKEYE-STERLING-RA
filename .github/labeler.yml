@@ -48,7 +48,7 @@ governance:
 
 security:
   - changed-files:
-      - any-glob-to-any-file: ['SECURITY.md', '.semgrep/**', '.gitleaks.toml', '.github/zizmor.yml', 'netlify/functions/_auth.js', 'netlify/functions/_ratelimit.js', 'docs/security/**', '.github/workflows/codeql.yml', '.github/workflows/semgrep.yml', '.github/workflows/gitleaks.yml', '.github/workflows/scorecard.yml', '.github/workflows/osv-scanner.yml', '.github/workflows/dast-zap.yml', '.github/workflows/workflow-lint.yml', '.github/workflows/dependency-review.yml']
+      - any-glob-to-any-file: ['SECURITY.md', '.semgrep/**', '.gitleaks.toml', 'netlify/functions/_auth.js', 'netlify/functions/_ratelimit.js', 'docs/security/**', '.github/workflows/codeql.yml', '.github/workflows/semgrep.yml', '.github/workflows/gitleaks.yml', '.github/workflows/scorecard.yml', '.github/workflows/osv-scanner.yml', '.github/workflows/dast-zap.yml', '.github/workflows/workflow-lint.yml', '.github/workflows/dependency-review.yml']
 
 compliance:
   - changed-files:

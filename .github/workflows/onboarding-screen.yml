@@ -77,6 +77,11 @@ jobs:
             www.wikidata.org:443
             query.wikidata.org:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # No credentials on disk (zizmor artipacked): the state push below
+          # authenticates with an ephemeral env token, and the overlay fetch
+          # is anonymous (public repo).
+          persist-credentials: false
 
       - name: Overlay latest delta-state (shared with the daily sweep, on screen-delta-state)
         run: |
@@ -115,6 +120,8 @@ jobs:
 
       - name: Commit delta-state (what has already been reported)
         if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           # Stage only the state files that exist: an early-exit run (e.g. 0 new
           # customers) doesn't write the optional ones, and a hard `git add` of
@@ -131,9 +138,11 @@ jobs:
             # Persist on the screen-delta-state branch (main is protected — a plain
             # `git push` to main is rejected and, previously, swallowed). Rebuilt as
             # <current main> + one data commit, force-updated, matching the sweep.
+            # Auth is the ephemeral env token in the push URL — the checkout
+            # persists no credentials, so nothing lands in .git/config.
             pushed=
             for attempt in 1 2 3 4 5; do
-              git push --force origin HEAD:refs/heads/screen-delta-state && { pushed=1; break; }
+              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/screen-delta-state && { pushed=1; break; }
               echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done

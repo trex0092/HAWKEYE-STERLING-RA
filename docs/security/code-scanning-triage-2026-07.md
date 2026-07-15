@@ -111,3 +111,16 @@ Alerts: 31 (`retain-state.mjs:95`), 6 (`fatf-watchdog.mjs:468`).
 - Bucket 3 count trends to zero in the **daily AI Governance Report** once the
   owner records the dismissals; the report's open-alert metric is the CA-13
   closure evidence.
+
+## 5 · Addendum (2026-07-15) — zizmor baseline retired
+
+The triage reasons above reference `.github/zizmor.yml` as the accepted-baseline
+record. That file was **removed on 2026-07-15**: the six state-pushing workflows
+now check out with `persist-credentials: false` and push their data branches
+with an ephemeral env-token URL, and `asana-reconcile.yml` (which never pushed —
+a stale suppression) was likewise switched to a credential-free checkout. The
+`artipacked` suppressions therefore have nothing left to suppress, and zizmor
+runs with a **zero baseline** (sole remaining accepted finding: the documented
+inline `zizmor: ignore[dangerous-triggers]` in `labeler.yml`). This section is
+an addendum rather than an edit because §3's dismissal texts are a point-in-time
+record of what the owner clicked.
