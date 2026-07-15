@@ -153,21 +153,29 @@ export function extractPublishedDate(body) {
   return m ? m[1].slice(0, 10) : null;
 }
 
-/* Build pending log entries for this run's content changes. */
+/* Build log entries for this run's content changes. A source's FIRST snapshot
+   is recorded as a terminal 'baseline' entry: it documents when monitoring of
+   that list began (and still alerts, like any content change), but it is not
+   a designation UPDATE, so it carries no pending-rescreen obligation and
+   never enters the re-screen latency evidence - an unresolved "pending"
+   baseline would read as an overdue TFS re-screen that never existed. A
+   change to an already-tracked list is the TFS event this log exists for:
+   'pending-rescreen' until a post-detection screening run is found. */
 export function tfsNewEntries(moved, counts, fetched, nowIso) {
   return (moved || []).map(mv => {
     const c = (counts || {})[mv.id] || {};
     const f = (fetched || {})[mv.id] || {};
+    const baseline = mv.status === 'new';
     return {
       id: mv.id,
       list: mv.name,
-      change: mv.status === 'new' ? 'first snapshot' : 'list changed',
+      change: baseline ? 'first snapshot' : 'list changed',
       publicationDate: f.ok ? extractPublishedDate(f.body) : null,
       detectedAt: nowIso,
       prevCount: typeof c.prev === 'number' ? c.prev : null,
       newCount: typeof c.now === 'number' ? c.now : null,
       rescreen: null,
-      status: 'pending-rescreen',
+      status: baseline ? 'baseline' : 'pending-rescreen',
     };
   });
 }
@@ -175,13 +183,24 @@ export function tfsNewEntries(moved, counts, fetched, nowIso) {
 /* Resolve pending entries against successful screening runs: the re-screen is
    the EARLIEST success that started at or after detection, across any of the
    full-base screening workflows. runsByWorkflow: {file: [{id, startedAt}]}
-   (successful runs only). Mutates entries; returns how many were resolved. */
-export function resolveRescreens(entries, runsByWorkflow) {
+   (successful runs only). coverage (optional): {file: {complete, oldestMs}}
+   describing how far back each workflow's fetched history reaches. An entry
+   resolves only when EVERY workflow's history covers its detection time
+   (complete history, or oldest fetched run at/before detectedAt); otherwise
+   the true earliest re-screen could sit in unfetched history and the recorded
+   latency would overstate - the entry just stays pending for a later run.
+   Omitting coverage means the caller vouches the runs are complete. Mutates
+   entries; returns how many were resolved. */
+export function resolveRescreens(entries, runsByWorkflow, coverage) {
   let resolved = 0;
   for (const e of entries || []) {
     if (e.status !== 'pending-rescreen') continue;
     const detected = Date.parse(e.detectedAt);
     if (Number.isNaN(detected)) continue;
+    if (coverage && Object.keys(runsByWorkflow || {}).some(wf => {
+      const cov = coverage[wf];
+      return cov && !cov.complete && !(cov.oldestMs <= detected);
+    })) continue;
     let best = null;
     for (const [wf, runs] of Object.entries(runsByWorkflow || {})) {
       for (const r of runs || []) {
@@ -208,7 +227,7 @@ export function capTfsEntries(entries, cap = TFS_LOG_CAP) {
 
 export function loadTfsLog() {
   const empty = {
-    _README: 'TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest ' + TFS_LOG_CAP + '.',
+    _README: 'TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). A first snapshot of a newly tracked source is recorded with status "baseline" (monitoring began; not a designation update, so no re-screen obligation or latency). Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest ' + TFS_LOG_CAP + '.',
     entries: [],
   };
   if (!existsSync(TFS_LOG_FILE)) return empty;
@@ -223,20 +242,34 @@ export function loadTfsLog() {
 }
 
 /* ── Network (runner only; not imported by tests) ── */
-async function fetchScreenRuns(repo, token, workflowId, perPage = 20) {
-  const url = 'https://api.github.com/repos/' + repo + '/actions/workflows/' + workflowId
-    + '/runs?status=success&per_page=' + perPage;
-  const res = await fetch(url, {
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'hawkeye-sanctions-watch',
-    },
-  });
-  if (!res.ok) throw new Error('GitHub API ' + res.status + ' for ' + workflowId);
-  const data = await res.json();
-  return (data.workflow_runs || []).map(r => ({ id: r.id, startedAt: r.run_started_at || r.created_at }));
+/* Successful runs newest-first, paging back until the fetched history reaches
+   oldestNeededMs (the oldest pending detection) or is exhausted, so the
+   EARLIEST post-detection run is provably inside the window - a single page
+   could silently hide it and overstate the recorded re-screen latency.
+   Returns {runs, complete}: complete=false means the page cap was hit before
+   the history covered the boundary (resolution is then withheld). */
+async function fetchScreenRuns(repo, token, workflowId, oldestNeededMs = 0, perPage = 50, maxPages = 5) {
+  const runs = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const url = 'https://api.github.com/repos/' + repo + '/actions/workflows/' + workflowId
+      + '/runs?status=success&per_page=' + perPage + '&page=' + page;
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'hawkeye-sanctions-watch',
+      },
+    });
+    if (!res.ok) throw new Error('GitHub API ' + res.status + ' for ' + workflowId);
+    const data = await res.json();
+    const batch = (data.workflow_runs || []).map(r => ({ id: r.id, startedAt: r.run_started_at || r.created_at }));
+    runs.push(...batch);
+    if (batch.length < perPage) return { runs, complete: true };       // history exhausted
+    const oldest = Date.parse(batch[batch.length - 1].startedAt);
+    if (!Number.isNaN(oldest) && oldest <= oldestNeededMs) return { runs, complete: true };
+  }
+  return { runs, complete: false };
 }
 
 function setOutput(key, val) {
@@ -308,13 +341,32 @@ async function main() {
       logObj.entries.push(...tfsNewEntries(moved, counts, fetched, new Date().toISOString()));
     }
     const repo = process.env.GITHUB_REPOSITORY, token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-    if (repo && token && logObj.entries.some(e => e.status === 'pending-rescreen')) {
-      const runsByWorkflow = {};
+    const pendingEntries = logObj.entries.filter(e => e.status === 'pending-rescreen');
+    if (repo && token && pendingEntries.length) {
+      // Page each workflow's run history back to the oldest pending detection
+      // so the chosen "earliest post-detection run" is provably the earliest.
+      const oldestNeededMs = pendingEntries.reduce((m, e) => {
+        const t = Date.parse(e.detectedAt);
+        return Number.isNaN(t) ? m : Math.min(m, t);
+      }, Infinity);
+      const runsByWorkflow = {}, coverage = {};
       for (const wf of SCREEN_WORKFLOWS) {
-        try { runsByWorkflow[wf] = await fetchScreenRuns(repo, token, wf); }
-        catch (e) { console.warn('tfs-log: could not query ' + wf + ' runs — ' + e.message); }
+        try {
+          const { runs, complete } = await fetchScreenRuns(repo, token, wf, oldestNeededMs);
+          const oldest = runs.length ? Date.parse(runs[runs.length - 1].startedAt) : NaN;
+          runsByWorkflow[wf] = runs;
+          coverage[wf] = { complete, oldestMs: Number.isNaN(oldest) ? Infinity : oldest };
+        } catch (e) {
+          console.warn('tfs-log: could not query ' + wf + ' runs - ' + e.message);
+          // Unknown history for this workflow: block resolution this run
+          // rather than recording a possibly-later run from the OTHER
+          // workflow as "the" re-screen. The entries stay pending and
+          // resolve on a later run when the API answers.
+          runsByWorkflow[wf] = [];
+          coverage[wf] = { complete: false, oldestMs: Infinity };
+        }
       }
-      const resolved = resolveRescreens(logObj.entries, runsByWorkflow);
+      const resolved = resolveRescreens(logObj.entries, runsByWorkflow, coverage);
       if (resolved) console.log('tfs-log: resolved re-screen linkage for ' + resolved + ' entr' + (resolved === 1 ? 'y' : 'ies'));
     }
     logObj.entries = capTfsEntries(logObj.entries);

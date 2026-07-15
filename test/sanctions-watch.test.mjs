@@ -107,7 +107,10 @@ check('report is quiet when nothing moved',
     'ofac-sdn': { ok: true, body: 'row1,a\nrow2,b\n' },
   };
   const entries = tfsNewEntries(moved, counts, fetched, '2026-06-16T05:07:00Z');
-  check('one pending entry per content change', entries.length === 2 && entries.every(e => e.status === 'pending-rescreen'));
+  check('a changed list is pending-rescreen; a first snapshot is a terminal baseline',
+    entries.length === 2 && entries[0].status === 'pending-rescreen'
+    && entries[1].status === 'baseline' && entries[1].change === 'first snapshot'
+    && entries[1].rescreen === null);
   check('entry records detection time + count delta',
     entries[0].detectedAt === '2026-06-16T05:07:00Z' && entries[0].prevCount === 1001 && entries[0].newCount === 1002);
   check('UN entry carries its machine-readable publication date', entries[0].publicationDate === '2026-06-16');
@@ -125,7 +128,8 @@ check('report is quiet when nothing moved',
     ],
   };
   const resolved = resolveRescreens(entries, runs);
-  check('both pending entries resolve against the run history', resolved === 2);
+  check('only the pending entry resolves; the baseline is never touched',
+    resolved === 1 && entries[1].status === 'baseline' && entries[1].rescreen === null);
   check('the earliest post-detection success is chosen with its latency',
     entries[0].status === 'complete' && entries[0].rescreen.runId === 102
     && entries[0].rescreen.workflow === 'sanctions-screen.yml' && entries[0].latencyHours === 0.5);
@@ -133,6 +137,24 @@ check('report is quiet when nothing moved',
   check('an entry with no post-detection success stays pending',
     resolveRescreens(unresolved, runs) === 0 && unresolved[0].status === 'pending-rescreen');
   check('an already-complete entry is not re-resolved', resolveRescreens(entries, runs) === 0);
+
+  // coverage gating: while any workflow's fetched history does not reach back
+  // to the detection time, the true earliest re-screen could be unfetched, so
+  // the entry stays pending instead of recording an overstated latency.
+  const pend2 = [{ detectedAt: '2026-06-16T05:07:00Z', status: 'pending-rescreen' }];
+  const covShort = {
+    'sanctions-screen.yml':     { complete: false, oldestMs: Date.parse('2026-06-17T00:00:00Z') },
+    'weekly-adverse-media.yml': { complete: true,  oldestMs: Date.parse('2026-06-17T00:07:00Z') },
+  };
+  check('incomplete run history blocks resolution (entry stays pending)',
+    resolveRescreens(pend2, runs, covShort) === 0 && pend2[0].status === 'pending-rescreen');
+  const covOk = {
+    'sanctions-screen.yml':     { complete: false, oldestMs: Date.parse('2026-06-16T05:00:00Z') },
+    'weekly-adverse-media.yml': { complete: true,  oldestMs: Date.parse('2026-06-17T00:07:00Z') },
+  };
+  check('history reaching the detection time allows resolution',
+    resolveRescreens(pend2, runs, covOk) === 1 && pend2[0].status === 'complete'
+    && pend2[0].rescreen.runId === 102);
 
   // audit-trail cap: newest entries win
   const many = Array.from({ length: TFS_LOG_CAP + 5 }, (_, i) => ({ n: i }));

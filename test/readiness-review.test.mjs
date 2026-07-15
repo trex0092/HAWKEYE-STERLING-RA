@@ -6,9 +6,10 @@
    workflow and docs counts, so any change to the estate forces a conscious
    re-verification (and, when warranted, a re-score) of the review.
    Usage: node test/readiness-review.test.mjs */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { countWorkflows, countDocs, countAutoDocs } from '../scripts/board-figures.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let passed = 0, failed = 0;
@@ -26,19 +27,14 @@ check('addendum carries a machine-readable "Verified at HEAD" line', !!m);
 if (m) {
   const [, wfClaim, docsClaim, curatedClaim] = m.map(Number);
 
-  const workflows = readdirSync(join(ROOT, '.github/workflows')).filter(f => /\.ya?ml$/.test(f)).length;
+  // Counted with the same functions that generate data/board-figures.json, so
+  // the addendum, the board figures and this guard can never disagree about
+  // what "a workflow" or "a doc" is.
+  const workflows = countWorkflows();
   check(`addendum workflow count matches disk (${wfClaim} vs ${workflows})`, wfClaim === workflows);
 
-  const mdUnder = (dir) => {
-    let n = 0;
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      if (e.isDirectory()) n += mdUnder(join(dir, e.name));
-      else if (e.name.endsWith('.md')) n++;
-    }
-    return n;
-  };
-  const docsTotal = mdUnder(join(ROOT, 'docs'));
-  const autoDocs = readdirSync(join(ROOT, 'docs/research/auto')).filter(f => f.endsWith('.md')).length;
+  const docsTotal = countDocs();
+  const autoDocs = countAutoDocs();
   check(`addendum docs count matches disk (${docsClaim} vs ${docsTotal})`, docsClaim === docsTotal);
   check(`addendum curated-docs count matches disk (${curatedClaim} vs ${docsTotal - autoDocs})`, curatedClaim === docsTotal - autoDocs);
 }

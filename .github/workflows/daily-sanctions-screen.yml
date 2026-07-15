@@ -93,37 +93,60 @@ jobs:
       # --------------------------------------------------------
       # STEP 3 — DOWNLOAD ALL SANCTIONS LISTS
       # --------------------------------------------------------
+      # Downloads use -f with a graceful else-branch: an HTTP failure must
+      # neither kill the job before any report can be delivered (bash -e used
+      # to die right here on a curl error) nor leave an HTTP error page on
+      # disk that gets hashed and "screened" as list data. A failed download
+      # leaves NO file; the screening step classifies a missing/empty source
+      # file as a SOURCE OUTAGE, screens DEGRADED without that list, says so
+      # in the report, and the floor gate fails the job after delivery.
       - name: Download OFAC SDN list
         run: |
-          curl -sL \
+          if curl -sfL \
             "https://www.treasury.gov/ofac/downloads/sdn.xml" \
-            -o /tmp/ofac_sdn.xml
-          echo "OFAC_HASH=$(sha256sum /tmp/ofac_sdn.xml | cut -d' ' -f1)" \
-            >> "$GITHUB_ENV"
+            -o /tmp/ofac_sdn.xml; then
+            echo "OFAC_HASH=$(sha256sum /tmp/ofac_sdn.xml | cut -d' ' -f1)" \
+              >> "$GITHUB_ENV"
+          else
+            echo "::warning::OFAC SDN download failed - this run screens DEGRADED without it"
+            rm -f /tmp/ofac_sdn.xml
+          fi
 
       - name: Download UN Consolidated list
         run: |
-          curl -sL \
+          if curl -sfL \
             "https://main.un.org/securitycouncil/content/un-sc-consolidated-list/en/consolidated.xml" \
-            -o /tmp/un_consolidated.xml
-          echo "UN_HASH=$(sha256sum /tmp/un_consolidated.xml | cut -d' ' -f1)" \
-            >> "$GITHUB_ENV"
+            -o /tmp/un_consolidated.xml; then
+            echo "UN_HASH=$(sha256sum /tmp/un_consolidated.xml | cut -d' ' -f1)" \
+              >> "$GITHUB_ENV"
+          else
+            echo "::warning::UN Consolidated download failed - this run screens DEGRADED without it"
+            rm -f /tmp/un_consolidated.xml
+          fi
 
       - name: Download EU Financial Sanctions list
         run: |
-          curl -sL \
+          if curl -sfL \
             "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content" \
-            -o /tmp/eu_sanctions.xml
-          echo "EU_HASH=$(sha256sum /tmp/eu_sanctions.xml | cut -d' ' -f1)" \
-            >> "$GITHUB_ENV"
+            -o /tmp/eu_sanctions.xml; then
+            echo "EU_HASH=$(sha256sum /tmp/eu_sanctions.xml | cut -d' ' -f1)" \
+              >> "$GITHUB_ENV"
+          else
+            echo "::warning::EU FSF download failed - this run screens DEGRADED without it"
+            rm -f /tmp/eu_sanctions.xml
+          fi
 
       - name: Download UK OFSI Consolidated list
         run: |
-          curl -sL \
+          if curl -sfL \
             "https://assets.publishing.service.gov.uk/media/uk-sanctions-consolidated-list.csv" \
-            -o /tmp/uk_ofsi.csv
-          echo "UK_HASH=$(sha256sum /tmp/uk_ofsi.csv | cut -d' ' -f1)" \
-            >> "$GITHUB_ENV"
+            -o /tmp/uk_ofsi.csv; then
+            echo "UK_HASH=$(sha256sum /tmp/uk_ofsi.csv | cut -d' ' -f1)" \
+              >> "$GITHUB_ENV"
+          else
+            echo "::warning::UK OFSI download failed - this run screens DEGRADED without it"
+            rm -f /tmp/uk_ofsi.csv
+          fi
 
       - name: Load UAE EOCN list (maintained in-repo)
         run: |
@@ -417,39 +440,95 @@ jobs:
                   _age = None
               _max_age = int(os.environ.get("EOCN_REVIEW_MAX_AGE_DAYS", "7"))
               if _age is None or _age > _max_age:
-                  print(f"WARNING: EOCN REVIEW OVERDUE - lastReviewed '{_lr or 'missing'}' (age {_age}d, max {_max_age}d)")
+                  # The age label carries its own unit ("26d" or "unknown") so
+                  # downstream consumers never render "Noned"/"unknownd".
+                  _age_label = f"{_age}d" if _age is not None else "unknown"
+                  print(f"WARNING: EOCN REVIEW OVERDUE - lastReviewed '{_lr or 'missing'}' (age {_age_label}, max {_max_age}d)")
                   with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as _ge:
                       _ge.write("UAE_LIST_STALE=true\n")
-                      _ge.write(f"UAE_LIST_REVIEW_AGE={_age if _age is not None else 'unknown'}\n")
+                      _ge.write(f"UAE_LIST_REVIEW_AGE={_age_label}\n")
+                      _ge.write(f"UAE_LIST_REVIEW_MAX={_max_age}\n")
           except Exception as e:
               print(f"UAE EOCN load error: {e}")
               os.environ["UAE_PDF_FAILED"] = "true"
 
-          # ---- guard: never screen against an empty list ----
-          # If every download/parse failed, `sanctioned` is empty and
-          # process.extract(..., []) returns [] for every customer → all "clear".
-          # That is a universal false negative; fail loudly instead.
-          if not sanctioned:
-              raise SystemExit("FATAL: no sanctions entries loaded from ANY list — refusing to screen (every customer would be reported 'clear'). Check the list downloads/parsers above.")
-
-          # ---- coverage floors: never screen against a PARTIALLY loaded core list ----
+          # ---- fail-safes: never trust an empty or partially loaded core list ----
           # One list at zero names (parse failure) or a fraction of its known
-          # size (truncated download) is the same false-negative class as the
-          # all-empty case above, per list. Floors here are deliberately
-          # conservative (well below normal sizes: this manual-dispatch path
-          # parses different file formats than the main engine) so they catch a
-          # collapse, never a routine de-listing. Kill-switch: LIST_FLOORS_ENFORCE=0.
+          # size (truncated download) is a silent false-negative machine; all
+          # lists empty would report every customer "clear". Floors here are
+          # deliberately conservative (well below normal sizes: this
+          # manual-dispatch path parses different file formats than the main
+          # engine) so they catch a collapse, never a routine de-listing.
+          # Kill-switch: LIST_FLOORS_ENFORCE=0.
+          #
+          # Two classes, so a source outage cannot silently kill the Asana
+          # delivery (the old SystemExit here skipped the report step, so a
+          # breach day produced NO task at all and the UAE_PDF_FAILED handling
+          # in the report step was unreachable):
+          #   outage - the source file was never obtained (absent/empty, the
+          #            download steps remove failed fetches): screen DEGRADED
+          #            without it, mark it in the report, fail AFTER delivery;
+          #   breach - the file is present but parsed below floor (corruption/
+          #            truncation): compute NO results, deliver a REFUSAL
+          #            notice instead of a report, fail AFTER delivery.
           _floors = {"OFAC SDN": 1000, "UN Consolidated": 200, "EU FSF": 500, "UK OFSI": 1000, "UAE EOCN": 100}
+          _srcfile = {"OFAC SDN": "/tmp/ofac_sdn.xml", "UN Consolidated": "/tmp/un_consolidated.xml",
+                      "EU FSF": "/tmp/eu_sanctions.xml", "UK OFSI": "/tmp/uk_ofsi.csv",
+                      "UAE EOCN": "data/eocn-local-terrorist-list.json"}
           _by_list = {}
           for _s in sanctioned:
               _by_list[_s["list"]] = _by_list.get(_s["list"], 0) + 1
-          _breaches = [f"{_l} loaded {_by_list.get(_l, 0)} name(s), below its floor of {_f}"
-                       for _l, _f in _floors.items() if _by_list.get(_l, 0) < _f]
-          if _breaches:
-              _bmsg = "COVERAGE FLOOR BREACH: " + "; ".join(_breaches)
-              if os.environ.get("LIST_FLOORS_ENFORCE", "1") == "1":
-                  raise SystemExit("FATAL: " + _bmsg + " - refusing to screen or post an all-clear (possible failed download / bad parse / truncated source).")
-              print("WARNING: " + _bmsg)
+          _obtained = {_l: os.path.exists(_p) and os.path.getsize(_p) > 0 for _l, _p in _srcfile.items()}
+          # The EOCN list is a LOCAL curated file with a documented honest-empty
+          # DEGRADED state; "obtained" for it means names were actually
+          # extracted, so an empty/corrupt/absent local file degrades (like the
+          # engine) instead of refusing the whole run.
+          _obtained["UAE EOCN"] = _by_list.get("UAE EOCN", 0) > 0
+          _enforce = os.environ.get("LIST_FLOORS_ENFORCE", "1") == "1"
+          _short = [_l for _l in _floors if _by_list.get(_l, 0) < _floors[_l]]
+          _outages = [_l for _l in _short if not _obtained[_l]]
+          _breaches = [f"{_l} loaded {_by_list.get(_l, 0)} name(s), below its floor of {_floors[_l]}"
+                       for _l in _short if _obtained[_l]]
+          _refusal = ""
+          if not sanctioned:
+              # Every list empty: screening would clear every customer (a
+              # universal false negative) - refused regardless of class or
+              # kill-switch, but still DELIVERED as a refusal notice below.
+              _refusal = ("no sanctions entries loaded from ANY list - refusing to screen "
+                          "(every customer would be reported 'clear'); check the list downloads above")
+          elif _breaches and _enforce:
+              _refusal = ("COVERAGE FLOOR BREACH: " + "; ".join(_breaches)
+                          + " - refusing to screen or post an all-clear "
+                          "(possible failed download / bad parse / truncated source)")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as _ge:
+              if _outages:
+                  print("WARNING: SOURCE OUTAGE - screening proceeds DEGRADED without: " + ", ".join(_outages))
+                  _ge.write("LIST_OUTAGES=" + ", ".join(_outages) + "\n")
+              if _breaches:
+                  print(("FATAL: " if _enforce else "WARNING: ")
+                        + "COVERAGE FLOOR BREACH: " + "; ".join(_breaches))
+              if _refusal:
+                  _ge.write("FLOOR_BREACH_MSG=" + _refusal.replace("\n", " ")[:500] + "\n")
+              if _refusal or ((_outages or _breaches) and _enforce):
+                  _ge.write("FLOOR_GATE=true\n")
+          if _refusal:
+              # Deliver the refusal instead of results: the report step posts a
+              # clearly marked refusal task (no all-clear wording), then the
+              # floor gate step turns the job red. Results from corrupt data
+              # are never computed.
+              results_data = {
+                  "total": len(customers),
+                  "entity_count": sum(1 for c in customers if c.get("kind") != "individual"),
+                  "individual_count": sum(1 for c in customers if c.get("kind") == "individual"),
+                  "confirmed": [], "potential": [], "clear_count": 0,
+                  "uae_pdf_failed": os.environ.get("UAE_PDF_FAILED", "false"),
+                  "refused": _refusal,
+                  "unavailable_lists": _outages,
+              }
+              with open("/tmp/results.json", "w") as f:
+                  json.dump(results_data, f, ensure_ascii=False, indent=2)
+              print("SCREENING REFUSED - refusal notice written for delivery; the floor gate fails the job after delivery.")
+              raise SystemExit(0)
 
           # ---- normalise all sanctioned names ----
           sanctioned_norm = [(normalise(s["name"]), s) for s in sanctioned]
@@ -516,7 +595,8 @@ jobs:
               "confirmed": confirmed_hits,
               "potential": potential_matches,
               "clear_count": len(clear),
-              "uae_pdf_failed": os.environ.get("UAE_PDF_FAILED","false")
+              "uae_pdf_failed": os.environ.get("UAE_PDF_FAILED","false"),
+              "unavailable_lists": _outages
           }
           with open("/tmp/results.json","w") as f:
               json.dump(results_data, f, ensure_ascii=False, indent=2)
@@ -556,6 +636,7 @@ jobs:
           UAE_PDF_FAILED: ${{ env.UAE_PDF_FAILED }}
           UAE_LIST_STALE: ${{ env.UAE_LIST_STALE }}
           UAE_LIST_REVIEW_AGE: ${{ env.UAE_LIST_REVIEW_AGE }}
+          UAE_LIST_REVIEW_MAX: ${{ env.UAE_LIST_REVIEW_MAX }}
           SCRIPT_VERSION: "daily-sanctions-screen.yml v1"
         run: |
           python3 << 'PYEOF'
@@ -581,9 +662,29 @@ jobs:
           confirmed   = results["confirmed"]
           potential   = results["potential"]
           clear_count = results["clear_count"]
+          refused     = results.get("refused") or ""
+          unavailable = results.get("unavailable_lists") or []
+
+          # ---- per-list status lines (refusal / outage aware) ----
+          # The old report hardcoded "SCREENED" for every list, so a run that
+          # proceeded DEGRADED (source outage) or was REFUSED (floor breach)
+          # would still read as fully screened - a false audit statement.
+          def _list_status(label, hashval):
+              if refused:
+                  return ("REFUSED - coverage floor breach, see banner above", "N/A")
+              if label in unavailable:
+                  return ("⚠️  UNAVAILABLE THIS RUN (source outage) - screening proceeded without this list", "N/A")
+              return ("SCREENED", hashval)
+          ofac_status, ofac_hash = _list_status("OFAC SDN", ofac_hash)
+          un_status,   un_hash   = _list_status("UN Consolidated", un_hash)
+          eu_status,   eu_hash   = _list_status("EU FSF", eu_hash)
+          uk_status,   uk_hash   = _list_status("UK OFSI", uk_hash)
 
           # ---- UAE EOCN status line ----
-          if uae_failed:
+          if refused:
+              uae_b_status = "REFUSED - coverage floor breach, see banner above"
+              uae_b_hash   = "N/A"
+          elif uae_failed or "UAE EOCN" in unavailable:
               uae_b_status = "⚠️  EOCN LIST UNAVAILABLE — manual check required"
               uae_b_hash   = "N/A"
           else:
@@ -601,12 +702,21 @@ jobs:
               eocn_last_reviewed = "?"
           # Review-age gate flag set by the screening step: mark the report line
           # so the MLRO sees the lapsed review where the reconciliation date is.
+          # UAE_LIST_REVIEW_AGE carries its own unit ("26d" or "unknown") and the
+          # window comes from the configured EOCN_REVIEW_MAX_AGE_DAYS, so this
+          # line never renders "unknownd" or a stale hardcoded "7d".
           if os.environ.get("UAE_LIST_STALE", "false") == "true":
               _rev_age = os.environ.get("UAE_LIST_REVIEW_AGE", "unknown")
-              eocn_last_reviewed = f"{eocn_last_reviewed}  ⚠️ REVIEW OVERDUE ({_rev_age}d old, max 7d): re-verify against the official EOCN publication"
+              _rev_max = os.environ.get("UAE_LIST_REVIEW_MAX", "7")
+              eocn_last_reviewed = f"{eocn_last_reviewed}  ⚠️ REVIEW OVERDUE (age {_rev_age}, max {_rev_max}d): re-verify against the official EOCN publication"
 
           # ---- confirmed hits section ----
-          if not confirmed:
+          if refused:
+              # Never render all-clear wording on a refused run: no results
+              # were computed, so "no matches" would be a false statement.
+              hits_text = ("SCREENING REFUSED - no match results were computed this run.\n"
+                           + refused)
+          elif not confirmed:
               hits_text = "No confirmed sanctions matches identified in this run.\nAll customers returned clear across all lists screened."
           else:
               lines = []
@@ -628,7 +738,9 @@ jobs:
               hits_text = "\n\n".join(lines)
 
           # ---- potential matches section ----
-          if not potential:
+          if refused:
+              potential_text = "SCREENING REFUSED - no match results were computed this run."
+          elif not potential:
               potential_text = "No potential matches requiring review in this run."
           else:
               lines = []
@@ -650,10 +762,25 @@ jobs:
                   )
               potential_text = "\n\n".join(lines)
 
+          # ---- integrity banner (refusal / degraded run) ----
+          if refused:
+              banner = ("\n          ⛔ SCREENING REFUSED - COVERAGE FLOOR BREACH\n"
+                        "          " + refused + "\n"
+                        "          No screening results below are valid; the workflow run is failed red\n"
+                        "          after this delivery. Fix the source data and re-run.\n")
+          elif unavailable:
+              banner = ("\n          ⚠️ DEGRADED RUN - SOURCE OUTAGE\n"
+                        "          These core list(s) could not be obtained and were NOT screened this\n"
+                        "          run: " + ", ".join(unavailable) + ".\n"
+                        "          All other lists screened normally. The workflow run is failed red\n"
+                        "          after this delivery so the outage is escalated, not routine.\n")
+          else:
+              banner = ""
+
           # ---- build full narrative ----
           narrative = f"""DAILY SANCTIONS SCREENING — AUTOMATED BATCH RUN
           ================================================
-
+          {banner}
           Date:                {date_disp}
           Screening Time:      {time_gst} GST (UTC+4)
           Triggered By:        Automated — GitHub Actions
@@ -683,27 +810,27 @@ jobs:
              Source:    https://ofac.treasury.gov/
              File:      sdn.xml (official government download)
              File Hash: {ofac_hash}
-             Status:    SCREENED
+             Status:    {ofac_status}
 
           ✅ UN Consolidated List — UN Security Council
              Source:    https://scsanctions.un.org/resources/xml/en/consolidated.xml
              File:      consolidated.xml (official UN download)
              File Hash: {un_hash}
-             Status:    SCREENED
+             Status:    {un_status}
 
           ✅ EU Financial Sanctions — European Commission
              Source:    https://webgate.ec.europa.eu/fsd/fsf/public/files/
                         xmlFullSanctionsList_1_1/content
              File:      export_sanctions_en.xml (official EU download)
              File Hash: {eu_hash}
-             Status:    SCREENED
+             Status:    {eu_status}
 
           ✅ UK OFSI Consolidated List — HM Treasury
              Source:    https://assets.publishing.service.gov.uk/
                         media/uk-sanctions-consolidated-list.csv
              File:      ConList.csv (official HM Treasury download)
              File Hash: {uk_hash}
-             Status:    SCREENED
+             Status:    {uk_status}
 
           ℹ️ Switzerland SECO — Consolidated sanctions ("Gesamtliste")
              Source:    State Secretariat for Economic Affairs (SECO)
@@ -839,7 +966,14 @@ jobs:
               "Content-Type": "application/json"
           }
 
-          task_name = f"🔍 {date_iso} — Daily Sanctions Screening"
+          # Refusal/degraded runs must be unmistakable in the Asana list view,
+          # not only inside the task body.
+          if refused:
+              task_name = f"⛔ {date_iso} — Daily Sanctions Screening - REFUSED (coverage floor)"
+          elif unavailable:
+              task_name = f"⚠️ {date_iso} — Daily Sanctions Screening - DEGRADED (source outage)"
+          else:
+              task_name = f"🔍 {date_iso} — Daily Sanctions Screening"
 
           payload = {
               "data": {
@@ -953,6 +1087,31 @@ jobs:
         if: always() && env.UAE_LIST_STALE == 'true'
         env:
           AGE: ${{ env.UAE_LIST_REVIEW_AGE }}
+          MAXD: ${{ env.UAE_LIST_REVIEW_MAX || '7' }}
         run: |
-          echo "::error::UAE EOCN local list review is overdue (age: ${AGE}d, max 7d). Screening ran and delivered, but the curated list's manual review has lapsed. Re-verify data/eocn-local-terrorist-list.json against the official EOCN publication and update lastReviewed."
+          # AGE carries its own unit ("26d" or "unknown"); MAXD is the
+          # configured EOCN_REVIEW_MAX_AGE_DAYS window, not a hardcoded 7.
+          echo "::error::UAE EOCN local list review is overdue (age: ${AGE}, max ${MAXD}d). Screening ran and delivered, but the curated list's manual review has lapsed. Re-verify data/eocn-local-terrorist-list.json against the official EOCN publication and update lastReviewed."
+          exit 1
+
+      # --------------------------------------------------------
+      # STEP 9 — COVERAGE FLOOR GATE (fails the run AFTER delivery)
+      # --------------------------------------------------------
+      # A floor breach (corrupt/truncated source: results withheld, refusal
+      # notice delivered) or a source outage (list not obtained: run screened
+      # DEGRADED, report delivered) must still turn this job red so failure
+      # alerting fires and the gap cannot become routine. FLOOR_GATE is set by
+      # the screening step, which already honors LIST_FLOORS_ENFORCE=0.
+      - name: Fail if a coverage floor was breached or a core list was unavailable
+        if: always() && env.FLOOR_GATE == 'true'
+        env:
+          BREACH: ${{ env.FLOOR_BREACH_MSG }}
+          OUTAGES: ${{ env.LIST_OUTAGES }}
+        run: |
+          if [ -n "$BREACH" ]; then
+            echo "::error::$BREACH (the refusal notice was delivered to Asana before this failure)"
+          fi
+          if [ -n "$OUTAGES" ]; then
+            echo "::error::Core list source outage: $OUTAGES. The run screened DEGRADED without them and the report was delivered before this failure."
+          fi
           exit 1

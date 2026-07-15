@@ -28,9 +28,10 @@ import { pathToFileURL } from 'node:url';
    accepts the file name as the workflow identifier); name = human label;
    cadence is documentation, maxAgeDays is the enforced window (0 = a success
    dated today). Every *scheduled* workflow in .github/workflows must appear
-   either here or in the justified exempt list in test/freshness-check.test.mjs
-   — the test fails otherwise, so a new scheduled control cannot silently sit
-   outside the alarm the way the weekly/quarterly evals once did. */
+   either here or in the justified EXEMPT list below;
+   test/freshness-check.test.mjs fails otherwise, so a new scheduled control
+   cannot silently sit outside the alarm the way the weekly/quarterly evals
+   once did. */
 export const CONTROLS = [
   { id: 'sanctions-watch.yml',      name: 'Sanctions Watch',                                       cadence: 'daily',     maxAgeDays: 0 },
   { id: 'weekly-adverse-media.yml', name: 'Daily Screening (Sanctions + Adverse Media + PEP)',     cadence: 'daily',     maxAgeDays: 0 },
@@ -43,8 +44,27 @@ export const CONTROLS = [
   { id: 'quarterly-review.yml',     name: 'Quarterly Screening Review',                            cadence: 'quarterly', maxAgeDays: 96 },
 ];
 
-/* Deprecated alias kept for one release so external references keep working. */
-export const MANDATORY = CONTROLS;
+/* Scheduled workflows deliberately NOT freshness-monitored, with the reason.
+   Lives beside CONTROLS so the classification of every scheduled workflow
+   reads in one place; test/freshness-check.test.mjs fails whenever a
+   scheduled workflow appears in neither set. */
+export const EXEMPT = {
+  'a11y.yml': 'accessibility scan; quality gate, not an ingestion/eval duty',
+  'anomaly-watch.yml': 'meta-monitor over run metrics; opens its own issues on anomaly',
+  'asana-reconcile.yml': 'mirror reconciliation; self-alerting on divergence',
+  'codeql.yml': 'security scanner; also gates every push/PR',
+  'daily-brief.yml': 'reporting digest; absence is recipient-noticed, no ingestion duty',
+  'dast-zap.yml': 'security scan of the deployed site',
+  'freshness-check.yml': 'this alarm itself',
+  'function-health.yml': 'site operations probe; self-alerting',
+  'governance-report.yml': 'reports ON control state; the controls it reads are monitored individually',
+  'link-check.yml': 'documentation hygiene',
+  'osv-scanner.yml': 'security scan',
+  'scorecard.yml': 'security posture scan',
+  'site-health.yml': 'site operations probe; self-alerting',
+  'stale.yml': 'repository housekeeping',
+  'weekly-summary.yml': 'MLRO digest; absence is recipient-noticed each Monday, no ingestion duty',
+};
 
 /* UTC calendar date (YYYY-MM-DD) of an ISO timestamp. */
 export function utcDay(iso) {
@@ -76,20 +96,36 @@ export function isStale(lastSuccessDay, today, maxAgeDays) {
    is for a control that did not FIRE inside its window (bad cron / disabled /
    runner outage), not one that is mid-run (the daily full-coverage screen
    legitimately takes ~45 min). Its own failure path alerts separately if that
-   run later fails, and the next check re-verifies.
-   statuses: [{ id, name, cadence, maxAgeDays, lastSuccessDay, pendingToday? }]. */
+   run later fails, and the next check re-verifies. A control whose API query
+   FAILED (queryError set) is excluded here: a failed query is not evidence
+   the control missed its window - unknownControls() reports those honestly.
+   statuses: [{ id, name, cadence, maxAgeDays, lastSuccessDay, pendingToday?,
+   queryError? }]. */
 export function staleControls(statuses, today) {
   return statuses
-    .filter(s => isStale(s.lastSuccessDay, today, s.maxAgeDays) && !s.pendingToday)
+    .filter(s => !s.queryError && isStale(s.lastSuccessDay, today, s.maxAgeDays) && !s.pendingToday)
     .map(s => ({ id: s.id, name: s.name, cadence: s.cadence || 'daily',
                  maxAgeDays: s.maxAgeDays || 0, lastSuccessDay: s.lastSuccessDay || null }));
 }
 
-export function buildReport(stale, today, total) {
+/* Controls whose status could NOT be verified because the last-success API
+   query failed. Kept apart from staleControls: reporting a failed query as
+   "never ran / STALE" (the old behavior, since a caught error left
+   lastSuccessDay null) put a false claim in a compliance report. Unknown
+   still fails the check - fail-closed - but under an honest label. */
+export function unknownControls(statuses) {
+  return (statuses || [])
+    .filter(s => s.queryError)
+    .map(s => ({ id: s.id, name: s.name, cadence: s.cadence || 'daily',
+                 error: String(s.queryError) }));
+}
+
+export function buildReport(stale, today, total, unknown = []) {
   const lines = [`# Freshness Check — ${today}`, ''];
-  if (!stale.length) {
+  if (!stale.length && !unknown.length) {
     lines.push(`All ${total} mandatory scheduled controls have a successful run inside their cadence window. ✅`);
-  } else {
+  }
+  if (stale.length) {
     lines.push(`**${stale.length} of ${total} mandatory scheduled control(s) have NO successful run inside their cadence window.**`, '');
     lines.push('| Control | Cadence | Window | Last successful run |', '| --- | --- | --- | --- |');
     for (const s of stale) {
@@ -97,6 +133,14 @@ export function buildReport(stale, today, total) {
       lines.push(`| ${s.name} | ${s.cadence} | ${window} | ${s.lastSuccessDay || 'never'} |`);
     }
     lines.push('', 'A mandatory control outside its cadence window is a potential regulatory breach (e.g. UNSC / EOCN ingestion must run daily without delay; the Advisor evals evidence the AI assurance cadence). Investigate the schedule, the workflow status, and the runner before relying on the affected control.');
+  }
+  if (unknown.length) {
+    lines.push('', `**${unknown.length} of ${total} control(s) could not be verified: the GitHub API query failed. Status UNKNOWN - a failed query is not evidence the control ran, and not evidence it missed its window.**`, '');
+    lines.push('| Control | Cadence | Query error |', '| --- | --- | --- |');
+    for (const u of unknown) {
+      lines.push(`| ${u.name} | ${u.cadence} | ${u.error} |`);
+    }
+    lines.push('', 'Re-run this check once the API is reachable; until then treat the affected controls as unverified, not as fresh.');
   }
   return lines.join('\n');
 }
@@ -151,25 +195,35 @@ async function main() {
     return;
   }
   const today = new Date().toISOString().slice(0, 10);
-  const statuses = [];
-  for (const c of CONTROLS) {
-    let day = null, pending = false;
+  // The controls are independent: query them concurrently (at most 2 calls
+  // each) instead of up to 18 sequential round-trips.
+  const statuses = await Promise.all(CONTROLS.map(async c => {
+    let day = null, pending = false, queryError = null;
     try { day = await lastSuccessDay(repo, token, c.id); }
-    catch (e) { console.error(`  warn: could not query ${c.id} — ${e.message}`); }
-    if (isStale(day, today, c.maxAgeDays)) {
+    catch (e) {
+      // A failed query means UNKNOWN, never "never ran": leaving day null
+      // here used to make the control indistinguishable from one that truly
+      // has no success on record. unknownControls() reports it separately.
+      queryError = e.message;
+      console.error(`  warn: could not query ${c.id}: ${e.message}`);
+    }
+    if (!queryError && isStale(day, today, c.maxAgeDays)) {
       // Only need the extra call when there's no success in-window — is it mid-run?
       try { pending = await pendingToday(repo, token, c.id, today); }
-      catch (e) { console.error(`  warn: could not query in-progress ${c.id} — ${e.message}`); }
+      catch (e) { console.error(`  warn: could not query in-progress ${c.id}: ${e.message}`); }
     }
-    statuses.push({ ...c, lastSuccessDay: day, pendingToday: pending });
-  }
+    return { ...c, lastSuccessDay: day, pendingToday: pending, queryError };
+  }));
   const stale = staleControls(statuses, today);
-  const report = buildReport(stale, today, CONTROLS.length);
+  const unknown = unknownControls(statuses);
+  const report = buildReport(stale, today, CONTROLS.length, unknown);
   console.log(report);
   if (process.env.GITHUB_STEP_SUMMARY) {
     try { (await import('node:fs')).appendFileSync(process.env.GITHUB_STEP_SUMMARY, report + '\n'); } catch { /* best effort */ }
   }
-  if (stale.length) process.exitCode = 1;
+  // Fail-closed on both: a verified-stale control AND an unverifiable one
+  // (the run can't attest freshness it never observed).
+  if (stale.length || unknown.length) process.exitCode = 1;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
