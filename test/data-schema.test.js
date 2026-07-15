@@ -71,5 +71,39 @@ try {
   check('screen-state: every subject has name/band/topScore/lists/firstSeen/lastSeen', allOk);
 } catch (e) { check('sanctions-screen-state.json schema (' + e.message + ')', false); }
 
+// ── data/eocn-local-terrorist-list.json (curated TFS list + its update SOP) ──
+// The curated list's currency depends on a manual procedure, so the file's
+// review metadata and the written SOP are controls in their own right: a
+// missing lastReviewed, a count that disagrees with the entries, or a deleted
+// SOP would silently unpick the maintenance regime.
+try {
+  const eocn = read('eocn-local-terrorist-list.json');
+  check('eocn list: lastReviewed is a YYYY-MM-DD date', isDate(eocn.lastReviewed));
+  check('eocn list: populated flag is a boolean', typeof eocn.populated === 'boolean');
+  check('eocn list: entries is an array', Array.isArray(eocn.entries));
+  if (eocn.populated) {
+    check('eocn list: populated list has entries', (eocn.entries || []).length > 0);
+    check('eocn list: count matches the number of entries (' + eocn.count + ' vs ' + (eocn.entries || []).length + ')',
+      eocn.count === (eocn.entries || []).length);
+  }
+  let entriesOk = true;
+  for (const e of eocn.entries || []) {
+    if (typeof e === 'string') { if (!e.trim()) entriesOk = false; }
+    else if (e && typeof e === 'object') { if (!isStr(e.name)) entriesOk = false; }
+    else entriesOk = false;
+  }
+  check('eocn list: every entry is a name string or {name, aliases}', entriesOk);
+
+  const sopPath = path.join(__dirname, '..', 'docs', 'aims', 'eocn-list-update-sop.md');
+  check('eocn list: the written update SOP exists (docs/aims/eocn-list-update-sop.md)', fs.existsSync(sopPath));
+  if (fs.existsSync(sopPath)) {
+    const sop = fs.readFileSync(sopPath, 'utf8');
+    for (const section of ['Update triggers', 'Update procedure', 'Full reconciliation procedure', 'Evidence log']) {
+      check('eocn SOP: has section "' + section + '"', sop.includes(section));
+    }
+    check('eocn SOP: references the data file it governs', sop.includes('eocn-local-terrorist-list.json'));
+  }
+} catch (e) { check('eocn-local-terrorist-list.json schema (' + e.message + ')', false); }
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
