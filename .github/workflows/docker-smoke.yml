@@ -1,0 +1,100 @@
+name: Container smoke test
+
+# Builds the self-hosting image and asserts the runtime security contract that
+# sws.toml + the Dockerfile promise: the app serves 200 on /, every edge
+# security header (CSP with Trusted Types, HSTS, XFO, COOP/COEP/CORP) is
+# present in-container, /health answers for orchestrator probes, sw.js is
+# no-cache, and the process runs as the non-root numeric user. This is the
+# only place the image is built before a release, so it gates Dockerfile and
+# header-parity regressions at PR time (netlify.toml is in the path filter
+# because sws.toml must mirror it — see test/security-headers.test.mjs).
+#
+# NOT a required status context on purpose: path-gated required checks
+# deadlock PRs that don't touch these files.
+
+on:
+  pull_request:
+    paths: ['Dockerfile', 'sws.toml', 'netlify.toml', '.github/workflows/docker-smoke.yml']
+  push:
+    branches: [main]
+    paths: ['Dockerfile', 'sws.toml', 'netlify.toml', '.github/workflows/docker-smoke.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = GitHub (checkout) + GHCR and its blob storage for the
+        # pinned base image. Nothing else — the build is COPY-only and the
+        # assertions run against localhost.
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Build the image
+        run: docker build -t hsra-smoke:ci .
+
+      - name: Run and probe the container
+        run: |
+          docker run -d --name hsra -p 8080:8080 hsra-smoke:ci
+
+          # The container must come up as the non-root numeric user.
+          user="$(docker inspect --format '{{.Config.User}}' hsra)"
+          [ "$user" = "65532:65532" ] || { echo "::error::container user is '$user', expected 65532:65532"; exit 1; }
+
+          # Wait for the health endpoint (SERVER_HEALTH=true).
+          up=
+          for attempt in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:8080/health; then up=1; break; fi
+            sleep 1
+          done
+          [ -n "$up" ] || { echo "::error::/health never answered"; docker logs hsra; exit 1; }
+
+          # The app itself serves.
+          curl -fsS http://localhost:8080/ | grep -q "HAWKEYE STERLING" || { echo "::error::/ did not serve the app shell"; exit 1; }
+
+          # Every edge security header must be present in-container (parity
+          # with netlify.toml — the exact values are locked by
+          # test/security-headers.test.mjs; this proves the server APPLIES them).
+          curl -fsS -D /tmp/headers.txt -o /dev/null http://localhost:8080/
+          for h in \
+            "content-security-policy: .*require-trusted-types-for 'script'" \
+            "strict-transport-security: max-age=63072000" \
+            "x-frame-options: DENY" \
+            "x-content-type-options: nosniff" \
+            "referrer-policy: no-referrer" \
+            "permissions-policy: .*browsing-topics=()" \
+            "cross-origin-opener-policy: same-origin" \
+            "cross-origin-embedder-policy: credentialless" \
+            "cross-origin-resource-policy: same-origin" \
+          ; do
+            grep -qi "$h" /tmp/headers.txt || { echo "::error::missing header: $h"; cat /tmp/headers.txt; exit 1; }
+          done
+
+          # The service worker must be revalidated on every visit.
+          curl -fsS -D - -o /dev/null http://localhost:8080/sw.js | grep -qi "cache-control: no-cache" || { echo "::error::sw.js is missing Cache-Control: no-cache"; exit 1; }
+
+          echo "container smoke: all assertions passed"
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs hsra || true
