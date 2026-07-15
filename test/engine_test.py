@@ -1099,6 +1099,75 @@ _jr = kyc.load_jurisdiction_risk(_good)
 check("kyc: a valid jurisdiction file loads grey/high tiers",
       _jr.get("panama") == "grey" and _jr.get("iran") == "high")
 
+print("screen — EOCN review-age gate (manual-review currency on the TFS list)")
+import datetime as _dt_rev
+_rev_today = _dt_rev.date(2026, 7, 15)
+check("eocn review age: days since lastReviewed computed",
+      screen.eocn_review_age_days("2026-06-19", _rev_today) == 26)
+check("eocn review age: missing date is None",
+      screen.eocn_review_age_days("", _rev_today) is None)
+check("eocn review age: garbage date is None",
+      screen.eocn_review_age_days("not-a-date", _rev_today) is None)
+_od, _odmsg = screen.eocn_review_check("2026-06-19", _rev_today, max_age_days=7)
+check("eocn review check: 26d > 7d is OVERDUE with an actionable message",
+      _od is True and "26" in _odmsg and "lastReviewed" in _odmsg)
+_cur, _curmsg = screen.eocn_review_check("2026-07-12", _rev_today, max_age_days=7)
+check("eocn review check: 3d <= 7d is current", _cur is False and _curmsg == "")
+_edge, _ = screen.eocn_review_check("2026-07-08", _rev_today, max_age_days=7)
+check("eocn review check: exactly 7d is still current (limit is exclusive)", _edge is False)
+_miss, _missmsg = screen.eocn_review_check(None, _rev_today, max_age_days=7)
+check("eocn review check: a missing lastReviewed counts as overdue",
+      _miss is True and "no parseable" in _missmsg)
+
+# parse_eocn wires the gate: a stale lastReviewed flags the run + marks the label.
+_prev_alert = dict(screen.EOCN_REVIEW_ALERT)
+_prev_json_path = screen.EOCN_JSON_PATH
+_revdir = _tmp.mkdtemp()
+_stale_file = os.path.join(_revdir, "eocn-stale.json")
+with open(_stale_file, "w") as _f:
+    json.dump({"lastReviewed": (_dt_rev.date.today() - _dt_rev.timedelta(days=30)).isoformat(),
+               "entries": ["TEST NAME ONE", "TEST NAME TWO"]}, _f)
+screen.EOCN_JSON_PATH = _stale_file
+_rn, _rlabel, _rhash = screen.parse_eocn(os.path.join(_revdir, "missing.pdf"))
+check("parse_eocn: a stale lastReviewed sets the overdue alert and marks the label",
+      screen.EOCN_REVIEW_ALERT["overdue"] is True and "REVIEW OVERDUE" in _rlabel and len(_rn) == 2)
+_fresh_file = os.path.join(_revdir, "eocn-fresh.json")
+with open(_fresh_file, "w") as _f:
+    json.dump({"lastReviewed": _dt_rev.date.today().isoformat(),
+               "entries": ["TEST NAME ONE"]}, _f)
+screen.EOCN_JSON_PATH = _fresh_file
+_rn2, _rlabel2, _rhash2 = screen.parse_eocn(os.path.join(_revdir, "missing.pdf"))
+check("parse_eocn: a current lastReviewed clears the alert and label",
+      screen.EOCN_REVIEW_ALERT["overdue"] is False and "REVIEW OVERDUE" not in _rlabel2)
+
+# The gate fails the run post-delivery only when overdue AND hard-fail is on.
+screen.EOCN_REVIEW_ALERT.update({"overdue": True, "message": "test overdue"})
+_prev_hard = screen.EOCN_REVIEW_HARD_FAIL
+screen.EOCN_REVIEW_HARD_FAIL = True
+_gate_exited = False
+try:
+    screen.enforce_eocn_review_gate()
+except SystemExit as _e:
+    _gate_exited = (_e.code == 3)
+check("review gate: overdue + hard-fail exits non-zero (code 3)", _gate_exited)
+screen.EOCN_REVIEW_HARD_FAIL = False
+_gate_soft = True
+try:
+    screen.enforce_eocn_review_gate()
+except SystemExit:
+    _gate_soft = False
+check("review gate: kill-switch EOCN_REVIEW_HARD_FAIL=0 alarms without exiting", _gate_soft)
+screen.EOCN_REVIEW_ALERT.update({"overdue": False, "message": ""})
+_gate_clean = True
+try:
+    screen.enforce_eocn_review_gate()
+except SystemExit:
+    _gate_clean = False
+check("review gate: a current review never exits", _gate_clean)
+screen.EOCN_REVIEW_HARD_FAIL = _prev_hard
+screen.EOCN_REVIEW_ALERT.update(_prev_alert)
+screen.EOCN_JSON_PATH = _prev_json_path
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

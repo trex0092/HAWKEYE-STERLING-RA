@@ -405,6 +405,22 @@ jobs:
                           uae_names.append(cand)
                           sanctioned.append({"name": cand, "list": "UAE EOCN", "programme": "UAE Local Terrorist List"})
               print(f"UAE EOCN: {len(uae_names)} names loaded from in-repo list")
+              # Review-age gate: the curated list is only as current as its own
+              # lastReviewed date. An overdue (or missing) review still screens
+              # with the file we have, but flags the run so the report marks it
+              # and a post-delivery step fails the job loudly.
+              import datetime as _dt_eocn
+              _lr = str(_eocn.get("lastReviewed", ""))[:10]
+              try:
+                  _age = (_dt_eocn.date.today() - _dt_eocn.datetime.strptime(_lr, "%Y-%m-%d").date()).days
+              except Exception:
+                  _age = None
+              _max_age = int(os.environ.get("EOCN_REVIEW_MAX_AGE_DAYS", "7"))
+              if _age is None or _age > _max_age:
+                  print(f"WARNING: EOCN REVIEW OVERDUE - lastReviewed '{_lr or 'missing'}' (age {_age}d, max {_max_age}d)")
+                  with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as _ge:
+                      _ge.write("UAE_LIST_STALE=true\n")
+                      _ge.write(f"UAE_LIST_REVIEW_AGE={_age if _age is not None else 'unknown'}\n")
           except Exception as e:
               print(f"UAE EOCN load error: {e}")
               os.environ["UAE_PDF_FAILED"] = "true"
@@ -538,6 +554,8 @@ jobs:
           UK_HASH: ${{ env.UK_HASH }}
           UAE_HASH: ${{ env.UAE_HASH }}
           UAE_PDF_FAILED: ${{ env.UAE_PDF_FAILED }}
+          UAE_LIST_STALE: ${{ env.UAE_LIST_STALE }}
+          UAE_LIST_REVIEW_AGE: ${{ env.UAE_LIST_REVIEW_AGE }}
           SCRIPT_VERSION: "daily-sanctions-screen.yml v1"
         run: |
           python3 << 'PYEOF'
@@ -581,6 +599,11 @@ jobs:
           except Exception:
               eocn_count = "?"
               eocn_last_reviewed = "?"
+          # Review-age gate flag set by the screening step: mark the report line
+          # so the MLRO sees the lapsed review where the reconciliation date is.
+          if os.environ.get("UAE_LIST_STALE", "false") == "true":
+              _rev_age = os.environ.get("UAE_LIST_REVIEW_AGE", "unknown")
+              eocn_last_reviewed = f"{eocn_last_reviewed}  ⚠️ REVIEW OVERDUE ({_rev_age}d old, max 7d): re-verify against the official EOCN publication"
 
           # ---- confirmed hits section ----
           if not confirmed:
@@ -919,3 +942,17 @@ jobs:
           print(f'Clear:             {r[\"clear_count\"]}')
           "
           fi
+
+      # --------------------------------------------------------
+      # STEP 8 — REVIEW-AGE GATE (fails the run AFTER delivery)
+      # --------------------------------------------------------
+      # Screening ran and the report was delivered above; a lapsed manual
+      # review of the curated local terrorist list must still turn this run
+      # red so it is escalated rather than quietly noted in the report body.
+      - name: Fail if the local terrorist list review is overdue
+        if: always() && env.UAE_LIST_STALE == 'true'
+        env:
+          AGE: ${{ env.UAE_LIST_REVIEW_AGE }}
+        run: |
+          echo "::error::UAE EOCN local list review is overdue (age: ${AGE}d, max 7d). Screening ran and delivered, but the curated list's manual review has lapsed. Re-verify data/eocn-local-terrorist-list.json against the official EOCN publication and update lastReviewed."
+          exit 1

@@ -1692,7 +1692,13 @@ def parse_eocn(pdf_path):
                         if a: names.add(a)
             if names:
                 log(f"  EOCN: {len(names)} names from {EOCN_JSON_PATH}")
-                return names, "from maintained list (data/eocn-local-terrorist-list.json)", sha256_of(raw)
+                overdue, msg = eocn_review_check(data.get("lastReviewed"))
+                EOCN_REVIEW_ALERT["overdue"], EOCN_REVIEW_ALERT["message"] = overdue, msg
+                date_label = "from maintained list (data/eocn-local-terrorist-list.json)"
+                if overdue:
+                    log(f"  ALARM: {msg}")
+                    date_label += " · REVIEW OVERDUE"
+                return names, date_label, sha256_of(raw)
             log(f"  EOCN JSON present but 'entries' is empty — manual update required")
         except Exception as e:
             log(f"  EOCN JSON parse error: {e}")
@@ -2524,6 +2530,55 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
 EOCN_MIRROR_CROSSCHECK = os.environ.get("EOCN_MIRROR_CROSSCHECK", "1") == "1"
 EOCN_MIRROR_URL = "https://data.opensanctions.org/datasets/latest/ae_local_terrorists/targets.simple.csv"
 
+# ── EOCN review-age gate (manual-review currency on the TFS list) ────────────
+# The mirror cross-check above detects DIVERGENCE; this gate detects a LAPSED
+# REVIEW: the curated local list is only as current as its own `lastReviewed`
+# date, and nothing previously read that field. If the review is older than
+# EOCN_REVIEW_MAX_AGE_DAYS the run still screens and delivers (screening with
+# the current file beats not screening), then exits non-zero AFTER delivery so
+# the workflow goes red and its failure alerting fires.
+# Kill-switch: EOCN_REVIEW_HARD_FAIL=0 keeps the alarm but not the exit.
+EOCN_REVIEW_MAX_AGE_DAYS = int(os.environ.get("EOCN_REVIEW_MAX_AGE_DAYS", "7"))
+EOCN_REVIEW_HARD_FAIL = os.environ.get("EOCN_REVIEW_HARD_FAIL", "1") == "1"
+EOCN_REVIEW_ALERT = {"overdue": False, "message": ""}
+
+def eocn_review_age_days(last_reviewed, today=None):
+    """Whole days since the list's lastReviewed date; None if missing/bad."""
+    if not last_reviewed:
+        return None
+    try:
+        reviewed = datetime.datetime.strptime(str(last_reviewed)[:10], "%Y-%m-%d").date()
+    except Exception:
+        return None
+    today = today or datetime.date.today()
+    return (today - reviewed).days
+
+def eocn_review_check(last_reviewed, today=None, max_age_days=None):
+    """(overdue, message) for the review-age gate. A missing or unparseable
+    lastReviewed counts as overdue: an unverifiable review date is not
+    evidence of currency."""
+    limit = EOCN_REVIEW_MAX_AGE_DAYS if max_age_days is None else max_age_days
+    age = eocn_review_age_days(last_reviewed, today)
+    if age is None:
+        return True, (f"EOCN REVIEW OVERDUE: data/eocn-local-terrorist-list.json has no parseable "
+                      f"lastReviewed date; review the list against the official EOCN publication "
+                      f"and set lastReviewed (max age {limit}d)")
+    if age > limit:
+        return True, (f"EOCN REVIEW OVERDUE: lastReviewed {str(last_reviewed)[:10]} is {age}d old "
+                      f"(max {limit}d); re-verify data/eocn-local-terrorist-list.json against the "
+                      f"official EOCN publication and update lastReviewed; treat EOCN 'clear' "
+                      f"results as PROVISIONAL until reviewed")
+    return False, ""
+
+def enforce_eocn_review_gate():
+    """Post-delivery hard fail: the run completed and delivered; a lapsed
+    manual review must still turn the run red so the workflow's failure
+    alerting fires (and the freshness check sees no success for the day)."""
+    if EOCN_REVIEW_ALERT["overdue"]:
+        log(f"EOCN REVIEW GATE: {EOCN_REVIEW_ALERT['message']}")
+        if EOCN_REVIEW_HARD_FAIL:
+            sys.exit(3)
+
 def load_eocn_mirror():
     """Returns (names, meta) for the OpenSanctions mirror of the UAE Local
     Terrorist List — SUPPLEMENTARY tier (drift tracking; never core coverage)."""
@@ -3203,6 +3258,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         coverage_result.setdefault("alarms", []).append(_msg)
         coverage_result.setdefault("drops", []).append(_msg)
         log(f"COVERAGE ALARM: {_msg}")
+    # EOCN review-age gate: a lapsed manual review of the curated local list
+    # surfaces in the same coverage path (QA gate + report §⑤); the run itself
+    # fails post-delivery via enforce_eocn_review_gate().
+    if EOCN_REVIEW_ALERT["overdue"]:
+        coverage_result.setdefault("alarms", []).append(EOCN_REVIEW_ALERT["message"])
+        coverage_result.setdefault("drops", []).append(EOCN_REVIEW_ALERT["message"])
+        log(f"COVERAGE ALARM: {EOCN_REVIEW_ALERT['message']}")
 
     # 1) SANCTIONS — entities + individuals, ALL matching candidates
     possible_matches, clear = screen_customers(customers, all_lists)
@@ -3411,6 +3473,7 @@ def run_unified(run_time):
     customers = get_all_customers()
     screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily")
     log("Unified run done.")
+    enforce_eocn_review_gate()
 
 def run_onboarding(run_time):
     """Screen only customers created within the last ONBOARDING_WINDOW_HOURS, so a
@@ -3437,6 +3500,7 @@ def run_onboarding(run_time):
     all_lists, list_meta = load_all_lists()
     screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
     log("Onboarding run done.")
+    enforce_eocn_review_gate()
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
@@ -3526,6 +3590,7 @@ def main():
     )
     post_daily_task(narrative, run_time, run_label, len(possible_matches))
     log("Done.")
+    enforce_eocn_review_gate()
 
 if __name__ == "__main__":
     main()
