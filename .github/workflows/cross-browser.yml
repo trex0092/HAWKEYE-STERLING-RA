@@ -53,7 +53,7 @@ jobs:
         # @axe-core/playwright, axe-core — the axe packages previously floated
         # to latest here). node_modules is gitignored.
         run: |
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npx playwright install --with-deps chromium firefox webkit
 
       - name: Cross-browser smoke

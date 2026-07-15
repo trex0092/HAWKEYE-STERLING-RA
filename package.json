@@ -13,6 +13,7 @@
   "engines": {
     "node": ">=22"
   },
+  "packageManager": "npm@10.9.7",
   "scripts": {
     "lint": "eslint app.js console.js advisor.js scripts test netlify",
     "lint:html": "htmlhint index.html console.html advisor.html",

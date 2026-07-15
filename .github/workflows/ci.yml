@@ -237,6 +237,6 @@ jobs:
         with:
           node-version: 22
       - name: Install the lockfile-pinned npm toolchain (fast-check)
-        run: npm ci --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run property-based fuzzing of the function security primitives (fast-check)
         run: node test/property-fuzz.test.js

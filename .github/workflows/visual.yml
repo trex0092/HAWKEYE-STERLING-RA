@@ -53,7 +53,7 @@ jobs:
         # devDependency) so the `import '@playwright/test'` in the config/spec
         # resolves. node_modules is gitignored.
         run: |
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Compare against baseline
@@ -94,7 +94,7 @@ jobs:
       - name: Install Playwright + Chromium
         # npm ci restores the lockfile-pinned toolchain (same as the compare job).
         run: |
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Update baseline snapshots
