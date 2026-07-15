@@ -6,7 +6,7 @@
 **Owner:** MLRO (accountable) · Compliance Engineering (operational)
 **Source of truth:** [`data/ai-assets.json`](../../data/ai-assets.json) (machine-readable; this page is the human view)
 **Review cadence:** Quarterly, and on any change to model id, provider, prompt charter, or data flow.
-**Last reviewed:** 2026-06-21
+**Last reviewed:** 2026-07-15
 
 > **Scope note.** The Hawkeye Sterling RA **scoring engine** (`index.html`), the operations console
 > (`console.html`), and every watcher (`fatf-watchdog`, `sanctions-watch`, `sanctions-screen`,
@@ -22,6 +22,7 @@
 |----|-------|-------------------|-----------|-----------------|-----------|--------|
 | `advisor` | **MLRO Advisor** (`netlify/functions/brain-soul.js` → `advisor.html`) | Anthropic — Claude (haiku/sonnet/opus by mode) | **MEDIUM** | Limited risk (transparency) | Human-in-the-loop | active |
 | `reg-draft` | **Regulatory-Watch AI Draft** (`scripts/reg-draft.mjs`) | Anthropic — Claude | **LOW** | Minimal risk | Human-on-the-loop | optional (off unless `ANTHROPIC_API_KEY` set) |
+| `ai-triage` | **Adverse-Media LLM Triage** (`ai.py`) | Anthropic — Claude (haiku, classification only) | **MEDIUM** | Minimal risk | Human-in-the-loop | dormant (fail-closed: `LLM_TRIAGE=0` until the Anthropic DPA is executed) |
 
 ---
 
@@ -29,7 +30,7 @@
 
 - **What it is:** An optional, on-request advisory assistant for the MLRO/Compliance Officer across
   AML/CFT, sanctions, operational and reporting questions. Served by `brain-soul.js` calling the
-  Anthropic API (key held server-side, never in the browser). 14 personas; three modes (speed/
+  Anthropic API (key held server-side, never in the browser). 16 personas; three modes (speed/
   balanced/deep) routing to Haiku/Sonnet/Opus respectively.
 - **Risk tier — MEDIUM.** It is **decision support only**: it never decides, files, freezes, or
   records. The worst-case failure is a misleading suggestion, mitigated by mandatory MLRO review and
@@ -52,6 +53,21 @@
 - **Risk tier — LOW.** Off by default; output is a reviewed draft committed for human ratification;
   **never auto-published** (detection is automatic, the wording change stays a reviewed decision).
 - **Oversight:** human-on-the-loop — every draft is ratified or discarded in a commit/PR.
+
+## 3. Adverse-Media LLM Triage (`ai-triage`)
+
+- **What it is:** Grounded relevance/severity classification of real, pre-existing adverse-media
+  headlines inside a screening run (`ai.py`). It judges provided text only; the raw headline and
+  link are always attached, and no generative prose ever enters a filed report
+  (`REPORT_ALLOW_LLM=0`).
+- **Risk tier — MEDIUM.** When enabled it sends a subject's **name + one public headline** to the
+  processor (a cross-border transfer of personal data), so it is **fail-closed OFF**
+  (`LLM_TRIAGE=0`) until the Anthropic DPA is executed — see
+  [`../aims/anthropic-dpa-execution-pack.md`](../aims/anthropic-dpa-execution-pack.md).
+- **Controls:** double gate (`ANTHROPIC_API_KEY` **and** `LLM_TRIAGE=1`), `GROUNDING_SYSTEM`
+  prompt-security contract, in-code data minimisation (name + single headline only), degrade-loudly
+  fallback to the deterministic path, mandatory MLRO review of every output.
+- **Oversight:** human-in-the-loop — labels are decision support attached to raw evidence.
 
 ---
 
