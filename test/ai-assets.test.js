@@ -39,5 +39,61 @@ reg.assets.forEach((a, i) => {
   seen.add(a.id);
 });
 
+/* ── Register ⇄ code cross-checks ─────────────────────────────────────────
+   These are the drift guards that were missing when the register said
+   "personas": 14 while brain-soul.js defined 16, and while ai.py (the LLM
+   adverse-media triage surface) was not registered at all. */
+
+// Every registered surface file must exist on disk.
+reg.assets.forEach(a => {
+  check('asset "' + a.id + '" surface_file exists on disk (' + a.surface_file + ')',
+    fs.existsSync(path.join(__dirname, '..', a.surface_file)));
+});
+
+// The advisor's persona count must equal the persona definitions in code:
+// brain-soul.js PERSONA_SUFFIX (server) and advisor.js PERSONAS (UI) — the
+// two lists the code itself says must stay aligned.
+const advisor = reg.assets.find(a => a.id === 'advisor');
+check('register contains the advisor asset', !!advisor);
+if (advisor) {
+  const soul = fs.readFileSync(path.join(__dirname, '..', 'netlify', 'functions', 'brain-soul.js'), 'utf8');
+  const suffixBlock = (soul.match(/const PERSONA_SUFFIX = \{([\s\S]*?)\n\};/) || [])[1] || '';
+  const suffixCount = (suffixBlock.match(/^  [a-z_]+:/gm) || []).length;
+  check('brain-soul.js PERSONA_SUFFIX parsed (found ' + suffixCount + ' personas)', suffixCount > 0);
+  check('register persona count matches brain-soul.js PERSONA_SUFFIX (' + advisor.personas + ' vs ' + suffixCount + ')',
+    advisor.personas === suffixCount);
+
+  const advisorSrc = fs.readFileSync(path.join(__dirname, '..', 'advisor.js'), 'utf8');
+  const personasBlock = (advisorSrc.match(/const PERSONAS = \[([\s\S]*?)\n\];/) || [])[1] || '';
+  const uiCount = (personasBlock.match(/\{id:'/g) || []).length;
+  check('advisor.js PERSONAS parsed (found ' + uiCount + ' personas)', uiCount > 0);
+  check('register persona count matches advisor.js PERSONAS (' + advisor.personas + ' vs ' + uiCount + ')',
+    advisor.personas === uiCount);
+}
+
+// Shadow-AI scan: every file that calls the model API endpoint must be a
+// registered surface, or an allowlisted eval harness (an assurance control
+// over a registered surface, documented in the advisor asset's controls).
+const EVAL_HARNESSES = new Set(['scripts/advisor-eval.mjs', 'scripts/advisor-bias-eval.mjs']);
+const SCAN_DIRS = ['', 'scripts', 'netlify/functions'];
+const apiCallers = [];
+for (const d of SCAN_DIRS) {
+  const abs = path.join(__dirname, '..', d);
+  for (const f of fs.readdirSync(abs)) {
+    if (!/\.(js|mjs|py)$/.test(f)) continue;
+    const rel = d ? d + '/' + f : f;
+    const full = path.join(abs, f);
+    if (!fs.statSync(full).isFile()) continue;
+    if (fs.readFileSync(full, 'utf8').includes('api.anthropic.com')) apiCallers.push(rel);
+  }
+}
+check('shadow-AI scan found the known model-API callers', apiCallers.length >= 3);
+const surfaces = new Set(reg.assets.map(a => a.surface_file));
+for (const f of apiCallers) {
+  check('model-API caller "' + f + '" is a registered surface or an allowlisted eval harness',
+    surfaces.has(f) || EVAL_HARNESSES.has(f));
+}
+check('the LLM triage surface (ai.py) is registered', surfaces.has('ai.py'));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
