@@ -27,7 +27,7 @@ const ANSWER = {
   basis:[
     {ref:'FATF Rec. 22 & 23', note:'Extends CDD, record-keeping and reporting duties to dealers in precious metals and stones.'},
     {ref:'FATF Rec. 10', note:'Standard customer due diligence and verification of beneficial ownership.'},
-    {ref:'UAE Cabinet Decision No. (10) of 2019', note:'Arts. 4–7 — identification, verification and ongoing monitoring obligations.'},
+    {ref:'UAE Cabinet Resolution No. (134) of 2025', note:'Executive Regulations of FDL 10/2025: identification, verification and ongoing monitoring obligations (supersedes Cabinet Decision No. (10) of 2019).'},
     {ref:'MoE DPMS Guidance', note:'Cash-transaction reporting (DPMSR) at or above AED 55,000, single or linked.'}
   ],
   guide:[

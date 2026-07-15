@@ -29,9 +29,13 @@ concurrency:
 jobs:
   watch:
     # Write scopes live at job level (top level is read-only — least privilege).
+    # actions:read lets the TFS timeline log resolve each detected list change
+    # to the first successful full-base screening run after it (re-screen
+    # evidence) via the Actions API — same read-only pattern as freshness-check.
     permissions:
       contents: write
       issues: write
+      actions: read
     runs-on: ubuntu-latest
     timeout-minutes: 20 # a hung list fetch must surface as a failure, not a silent hang on a mandatory-daily control
     steps:
@@ -72,6 +76,7 @@ jobs:
           if git fetch origin sanctions-watch-state --depth=1 2>/dev/null; then
             git checkout FETCH_HEAD -- data/sanctions-state.json 2>/dev/null || true
             git checkout FETCH_HEAD -- data/retention 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/tfs-update-log.json 2>/dev/null || true
             echo "state overlaid from sanctions-watch-state"
           else
             echo "no sanctions-watch-state branch yet — using state from main"
@@ -81,6 +86,9 @@ jobs:
         id: watch
         env:
           MODE: ${{ inputs.mode || 'check' }}
+          # Read-only: the TFS timeline log queries screening-run history
+          # (actions:read) to record publication → ingestion → re-screen timing.
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/sanctions-watch.mjs "$MODE"
 
       - name: Notify Asana — Ongoing Monitoring project
@@ -113,7 +121,7 @@ jobs:
           if [ -n "$(git status --porcelain data/ 2>/dev/null)" ]; then
             git config user.name "sanctions-watch"
             git config user.email "actions@github.com"
-            git add data/sanctions-state.json data/retention
+            git add data/sanctions-state.json data/retention data/tfs-update-log.json
             git commit -m "$PR_TITLE [skip ci]"
             # Persist on the sanctions-watch-state branch (main is protected):
             # rebuilt as <current main> + one data commit, force-updated.

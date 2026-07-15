@@ -1692,7 +1692,13 @@ def parse_eocn(pdf_path):
                         if a: names.add(a)
             if names:
                 log(f"  EOCN: {len(names)} names from {EOCN_JSON_PATH}")
-                return names, "from maintained list (data/eocn-local-terrorist-list.json)", sha256_of(raw)
+                overdue, msg = eocn_review_check(data.get("lastReviewed"))
+                EOCN_REVIEW_ALERT["overdue"], EOCN_REVIEW_ALERT["message"] = overdue, msg
+                date_label = "from maintained list (data/eocn-local-terrorist-list.json)"
+                if overdue:
+                    log(f"  ALARM: {msg}")
+                    date_label += " · REVIEW OVERDUE"
+                return names, date_label, sha256_of(raw)
             log(f"  EOCN JSON present but 'entries' is empty — manual update required")
         except Exception as e:
             log(f"  EOCN JSON parse error: {e}")
@@ -2369,7 +2375,8 @@ RESULTS SUMMARY
   Clean - no adverse hits:        {max(0, stats["subjects_total"] - len(findings))}
 
 REGULATORY BASIS
-  Ongoing CDD / continuous monitoring - UAE Cabinet Decision 10/2019 Art.7;
+  Ongoing CDD / continuous monitoring - UAE Cabinet Resolution 134/2025
+  (Executive Regulations of FDL 10/2025, superseding Cabinet Decision 10/2019);
   FATF Recommendation 10. Adverse media is a MONITORING signal; authoritative
   designation status is governed by the daily sanctions screen
   (OFAC / UN / EU / UK OFSI / UAE EOCN).
@@ -2524,6 +2531,55 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
 EOCN_MIRROR_CROSSCHECK = os.environ.get("EOCN_MIRROR_CROSSCHECK", "1") == "1"
 EOCN_MIRROR_URL = "https://data.opensanctions.org/datasets/latest/ae_local_terrorists/targets.simple.csv"
 
+# ── EOCN review-age gate (manual-review currency on the TFS list) ────────────
+# The mirror cross-check above detects DIVERGENCE; this gate detects a LAPSED
+# REVIEW: the curated local list is only as current as its own `lastReviewed`
+# date, and nothing previously read that field. If the review is older than
+# EOCN_REVIEW_MAX_AGE_DAYS the run still screens and delivers (screening with
+# the current file beats not screening), then exits non-zero AFTER delivery so
+# the workflow goes red and its failure alerting fires.
+# Kill-switch: EOCN_REVIEW_HARD_FAIL=0 keeps the alarm but not the exit.
+EOCN_REVIEW_MAX_AGE_DAYS = int(os.environ.get("EOCN_REVIEW_MAX_AGE_DAYS", "7"))
+EOCN_REVIEW_HARD_FAIL = os.environ.get("EOCN_REVIEW_HARD_FAIL", "1") == "1"
+EOCN_REVIEW_ALERT = {"overdue": False, "message": ""}
+
+def eocn_review_age_days(last_reviewed, today=None):
+    """Whole days since the list's lastReviewed date; None if missing/bad."""
+    if not last_reviewed:
+        return None
+    try:
+        reviewed = datetime.datetime.strptime(str(last_reviewed)[:10], "%Y-%m-%d").date()
+    except Exception:
+        return None
+    today = today or datetime.date.today()
+    return (today - reviewed).days
+
+def eocn_review_check(last_reviewed, today=None, max_age_days=None):
+    """(overdue, message) for the review-age gate. A missing or unparseable
+    lastReviewed counts as overdue: an unverifiable review date is not
+    evidence of currency."""
+    limit = EOCN_REVIEW_MAX_AGE_DAYS if max_age_days is None else max_age_days
+    age = eocn_review_age_days(last_reviewed, today)
+    if age is None:
+        return True, (f"EOCN REVIEW OVERDUE: data/eocn-local-terrorist-list.json has no parseable "
+                      f"lastReviewed date; review the list against the official EOCN publication "
+                      f"and set lastReviewed (max age {limit}d)")
+    if age > limit:
+        return True, (f"EOCN REVIEW OVERDUE: lastReviewed {str(last_reviewed)[:10]} is {age}d old "
+                      f"(max {limit}d); re-verify data/eocn-local-terrorist-list.json against the "
+                      f"official EOCN publication and update lastReviewed; treat EOCN 'clear' "
+                      f"results as PROVISIONAL until reviewed")
+    return False, ""
+
+def enforce_eocn_review_gate():
+    """Post-delivery hard fail: the run completed and delivered; a lapsed
+    manual review must still turn the run red so the workflow's failure
+    alerting fires (and the freshness check sees no success for the day)."""
+    if EOCN_REVIEW_ALERT["overdue"]:
+        log(f"EOCN REVIEW GATE: {EOCN_REVIEW_ALERT['message']}")
+        if EOCN_REVIEW_HARD_FAIL:
+            sys.exit(3)
+
 def load_eocn_mirror():
     """Returns (names, meta) for the OpenSanctions mirror of the UAE Local
     Terrorist List — SUPPLEMENTARY tier (drift tracking; never core coverage)."""
@@ -2575,6 +2631,58 @@ def _mirror_fallback(names, dataset, label):
     log(f"  {label}: official endpoint unavailable — screened via OpenSanctions mirror")
     return mirror_names, "live (OpenSanctions mirror)", sha256_of(data)
 
+# ── Core-list coverage floors (zero/partial-load hard-fail) ──────────────────
+# A core list that loads ZERO names (parse failure, the PR #128 bug class) or a
+# fraction of its known size (truncated download, format drift) used to degrade
+# to an UNAVAILABLE status line while screening continued - a silent
+# under-screen in the false-negative direction. Mirroring the existing
+# all-lists-empty fail-safe, a core list below its floor now REFUSES the run
+# loudly BEFORE any all-clear can be posted. Floors are ~50% of the verified
+# 2026-07-02 baseline counts (OFAC 19,129 / UN 1,002 / UK 19,762 / EU 42,347 /
+# EOCN 312): generous enough for real de-listings, tight enough to catch a
+# broken parse. The mirror fallbacks above absorb ordinary source outages
+# first, so a breach here means the data itself is wrong.
+# Per-list override: LIST_FLOOR_<KEY>=n. Kill-switch: LIST_FLOORS_ENFORCE=0.
+LIST_FLOORS_ENFORCE = os.environ.get("LIST_FLOORS_ENFORCE", "1") == "1"
+CORE_LIST_FLOORS = {
+    "ofac": int(os.environ.get("LIST_FLOOR_OFAC", "9000")),
+    "un":   int(os.environ.get("LIST_FLOOR_UN",   "500")),
+    "uk":   int(os.environ.get("LIST_FLOOR_UK",   "9000")),
+    "eu":   int(os.environ.get("LIST_FLOOR_EU",   "20000")),
+    "eocn": int(os.environ.get("LIST_FLOOR_EOCN", "150")),
+}
+
+def core_list_floor_breaches(list_meta, floors=None):
+    """Core lists whose loaded name count sits below the coverage floor
+    (zero included). Returns [message, ...]; empty when every floor holds.
+    Lists absent from the floors map (supplementary tier) are never floored."""
+    floors = CORE_LIST_FLOORS if floors is None else floors
+    breaches = []
+    for key, floor in floors.items():
+        meta = (list_meta or {}).get(key)
+        if meta is None:
+            continue
+        count = int(meta.get("count", 0) or 0)
+        if count < floor:
+            breaches.append(f"{key.upper()} loaded {count:,} name(s), below its coverage floor "
+                            f"of {floor:,} - possible failed download / bad parse / truncated source")
+    return breaches
+
+def enforce_core_list_floors(list_meta):
+    """Refuse to screen when a core list is below its floor: screening against
+    a partially loaded core list silently under-screens (false negatives), so
+    the run must fail BEFORE any all-clear can be posted. Kill-switch
+    LIST_FLOORS_ENFORCE=0 logs the breaches but lets the run continue.
+    Returns the breach list either way (for reports/tests)."""
+    breaches = core_list_floor_breaches(list_meta)
+    for b in breaches:
+        log(f"COVERAGE FLOOR BREACH: {b}")
+    if breaches and LIST_FLOORS_ENFORCE:
+        raise RuntimeError(
+            "FATAL: core sanctions list(s) below coverage floor - refusing to screen or post "
+            "an all-clear: " + "; ".join(breaches))
+    return breaches
+
 def load_all_lists():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
@@ -2618,6 +2726,9 @@ def load_all_lists():
         raise RuntimeError(
             "FATAL: no core sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
+    # Per-list coverage floors: a single core list at zero (or a fraction of its
+    # known size) is the same false-negative class as the all-empty case above.
+    enforce_core_list_floors(list_meta)
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
         "UN Consolidated": [(normalize(n),n) for n in un_names],
@@ -3148,6 +3259,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         coverage_result.setdefault("alarms", []).append(_msg)
         coverage_result.setdefault("drops", []).append(_msg)
         log(f"COVERAGE ALARM: {_msg}")
+    # EOCN review-age gate: a lapsed manual review of the curated local list
+    # surfaces in the same coverage path (QA gate + report §⑤); the run itself
+    # fails post-delivery via enforce_eocn_review_gate().
+    if EOCN_REVIEW_ALERT["overdue"]:
+        coverage_result.setdefault("alarms", []).append(EOCN_REVIEW_ALERT["message"])
+        coverage_result.setdefault("drops", []).append(EOCN_REVIEW_ALERT["message"])
+        log(f"COVERAGE ALARM: {EOCN_REVIEW_ALERT['message']}")
 
     # 1) SANCTIONS — entities + individuals, ALL matching candidates
     possible_matches, clear = screen_customers(customers, all_lists)
@@ -3356,6 +3474,7 @@ def run_unified(run_time):
     customers = get_all_customers()
     screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily")
     log("Unified run done.")
+    enforce_eocn_review_gate()
 
 def run_onboarding(run_time):
     """Screen only customers created within the last ONBOARDING_WINDOW_HOURS, so a
@@ -3382,6 +3501,7 @@ def run_onboarding(run_time):
     all_lists, list_meta = load_all_lists()
     screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
     log("Onboarding run done.")
+    enforce_eocn_review_gate()
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
@@ -3442,6 +3562,9 @@ def main():
         raise RuntimeError(
             "FATAL: no sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
+    # Per-list coverage floors: a single core list at zero (or a fraction of its
+    # known size) is the same false-negative class as the all-empty case above.
+    enforce_core_list_floors(list_meta)
 
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
@@ -3468,6 +3591,7 @@ def main():
     )
     post_daily_task(narrative, run_time, run_label, len(possible_matches))
     log("Done.")
+    enforce_eocn_review_gate()
 
 if __name__ == "__main__":
     main()

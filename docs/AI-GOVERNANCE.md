@@ -91,7 +91,8 @@ invent no facts. "Secure by design. Trust by default."
 
 ## 8. Regulatory basis
 UAE National AI Strategy 2031 · UAE AI Ethics Principles · UAE PDPL ·
-UAE Federal Decree-Law No. 20 of 2018 (AML/CFT) · Cabinet Decision 10/2019 ·
+UAE Federal Decree-Law No. 10 of 2025 (AML/CFT/CPF, repealing FDL 20/2018) ·
+Cabinet Resolution 134/2025 (Executive Regulations, superseding Cabinet Decision 10/2019) ·
 Cabinet Resolution 74/2020 (TFS) · FATF Recommendations 6, 10, 12.
 
 ## 8a. Governance ⇄ Compliance traceability matrix
