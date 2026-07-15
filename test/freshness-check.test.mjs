@@ -53,7 +53,8 @@ check('flags a daily control whose last success was an earlier day', r.length ==
 const weekly = CONTROLS.find(c => c.cadence === 'weekly');
 const quarterly = CONTROLS.find(c => c.cadence === 'quarterly');
 check('the control set includes a weekly eval control', !!weekly && weekly.id === 'advisor-eval.yml');
-check('the control set includes the quarterly bias eval', CONTROLS.some(c => c.id === 'advisor-bias-eval.yml'));
+check('the control set includes the quarterly bias eval',
+  !!quarterly && CONTROLS.some(c => c.id === 'advisor-bias-eval.yml'));
 const cadenceMix = CONTROLS.map(c => ({
   ...c,
   lastSuccessDay: c.cadence === 'weekly' ? '2026-06-20'      // 5 days ago: fresh
