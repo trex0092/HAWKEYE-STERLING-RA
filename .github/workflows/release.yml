@@ -26,6 +26,11 @@ jobs:
       attestations: write   # store the attestation in the repo's attestation log
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Protected environment: same gate as auto-release.yml, so the required
+    # reviewer configured on the `release` environment (repo settings) binds
+    # BOTH release paths. Until configured, GitHub auto-creates it unprotected
+    # (no-op gating) — see docs/governance/github-repository-hardening.md §4.
+    environment: release
     steps:
       - name: Harden the runner (egress audit)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
