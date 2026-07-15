@@ -109,5 +109,19 @@ for (const [wf, req] of wfRequiredJobs) {
   check(`${wf} pull_request trigger is NOT path-filtered (required checks must report on every PR)`, !pathFiltered);
 }
 
+/* 5. RELEASE GATING — every workflow that creates a GitHub release must run
+   inside the protected `release` environment, so the required-reviewer gate
+   (configured in Settings → Environments, hardening runbook §4) binds every
+   release path. auto-release.yml declared it; release.yml did not, leaving a
+   dispatch path that could mint a tag + release + provenance with no
+   environment gate at all. */
+for (const wf of workflows) {
+  const body = readFileSync(join(wfDir, wf), 'utf8');
+  if (body.includes('gh release create')) {
+    check(`${wf} creates releases inside the protected release environment`,
+      /^\s{4}environment:\s*release\s*$/m.test(body.split('\n').map(stripComment).join('\n')));
+  }
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
