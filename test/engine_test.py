@@ -1027,6 +1027,38 @@ check("parse_un degrades safely on a DTD payload (no crash, no names)", _un_name
 _ca_names, _ca_status, _ca_sig = screen.parse_canada(_xxe)
 check("parse_canada degrades safely on a DTD payload (no crash, no names)", _ca_names == set())
 
+print("screen — core-list coverage floors (zero/partial-load hard-fail)")
+_meta_ok = {"ofac": {"count": 19129}, "un": {"count": 1002}, "uk": {"count": 19762},
+            "eu": {"count": 42347}, "eocn": {"count": 312}}
+check("floors: healthy baseline counts pass", screen.core_list_floor_breaches(_meta_ok) == [])
+_meta_zero = {**_meta_ok, "eu": {"count": 0}}
+_bz = screen.core_list_floor_breaches(_meta_zero)
+check("floors: a zero-name core list breaches with an actionable message",
+      len(_bz) == 1 and "EU" in _bz[0] and "floor" in _bz[0])
+_meta_partial = {**_meta_ok, "ofac": {"count": 1200}}
+_bp = screen.core_list_floor_breaches(_meta_partial)
+check("floors: a partially loaded core list breaches (1,200 of 19,129)",
+      len(_bp) == 1 and "OFAC" in _bp[0])
+check("floors: custom floors are honored",
+      screen.core_list_floor_breaches({"ofac": {"count": 10}}, {"ofac": 5}) == [])
+check("floors: a list not in the floors map (supplementary tier) is never floored",
+      screen.core_list_floor_breaches({**_meta_ok, "canada": {"count": 0}}) == [])
+_prev_floors_enforce = screen.LIST_FLOORS_ENFORCE
+screen.LIST_FLOORS_ENFORCE = True
+_floor_raised = False
+try:
+    screen.enforce_core_list_floors(_meta_zero)
+except RuntimeError as _e:
+    _floor_raised = "refusing to screen" in str(_e)
+check("floors: enforcement refuses the run before any all-clear can post", _floor_raised)
+screen.LIST_FLOORS_ENFORCE = False
+_floor_soft = screen.enforce_core_list_floors(_meta_zero)
+check("floors: kill-switch LIST_FLOORS_ENFORCE=0 logs breaches without refusing",
+      len(_floor_soft) == 1)
+_floor_clean = screen.enforce_core_list_floors(_meta_ok)
+check("floors: a healthy load never refuses", _floor_clean == [])
+screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
+
 print("hardening — atomic state writes")
 _hdir = _tmp.mkdtemp()
 _hcwd = os.getcwd(); os.chdir(_hdir)

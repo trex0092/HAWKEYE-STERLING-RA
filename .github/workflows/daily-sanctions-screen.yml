@@ -432,6 +432,25 @@ jobs:
           if not sanctioned:
               raise SystemExit("FATAL: no sanctions entries loaded from ANY list — refusing to screen (every customer would be reported 'clear'). Check the list downloads/parsers above.")
 
+          # ---- coverage floors: never screen against a PARTIALLY loaded core list ----
+          # One list at zero names (parse failure) or a fraction of its known
+          # size (truncated download) is the same false-negative class as the
+          # all-empty case above, per list. Floors here are deliberately
+          # conservative (well below normal sizes: this manual-dispatch path
+          # parses different file formats than the main engine) so they catch a
+          # collapse, never a routine de-listing. Kill-switch: LIST_FLOORS_ENFORCE=0.
+          _floors = {"OFAC SDN": 1000, "UN Consolidated": 200, "EU FSF": 500, "UK OFSI": 1000, "UAE EOCN": 100}
+          _by_list = {}
+          for _s in sanctioned:
+              _by_list[_s["list"]] = _by_list.get(_s["list"], 0) + 1
+          _breaches = [f"{_l} loaded {_by_list.get(_l, 0)} name(s), below its floor of {_f}"
+                       for _l, _f in _floors.items() if _by_list.get(_l, 0) < _f]
+          if _breaches:
+              _bmsg = "COVERAGE FLOOR BREACH: " + "; ".join(_breaches)
+              if os.environ.get("LIST_FLOORS_ENFORCE", "1") == "1":
+                  raise SystemExit("FATAL: " + _bmsg + " - refusing to screen or post an all-clear (possible failed download / bad parse / truncated source).")
+              print("WARNING: " + _bmsg)
+
           # ---- normalise all sanctioned names ----
           sanctioned_norm = [(normalise(s["name"]), s) for s in sanctioned]
           norm_names_only = [x[0] for x in sanctioned_norm]
