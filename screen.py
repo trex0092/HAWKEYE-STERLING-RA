@@ -2575,6 +2575,58 @@ def _mirror_fallback(names, dataset, label):
     log(f"  {label}: official endpoint unavailable — screened via OpenSanctions mirror")
     return mirror_names, "live (OpenSanctions mirror)", sha256_of(data)
 
+# ── Core-list coverage floors (zero/partial-load hard-fail) ──────────────────
+# A core list that loads ZERO names (parse failure, the PR #128 bug class) or a
+# fraction of its known size (truncated download, format drift) used to degrade
+# to an UNAVAILABLE status line while screening continued - a silent
+# under-screen in the false-negative direction. Mirroring the existing
+# all-lists-empty fail-safe, a core list below its floor now REFUSES the run
+# loudly BEFORE any all-clear can be posted. Floors are ~50% of the verified
+# 2026-07-02 baseline counts (OFAC 19,129 / UN 1,002 / UK 19,762 / EU 42,347 /
+# EOCN 312): generous enough for real de-listings, tight enough to catch a
+# broken parse. The mirror fallbacks above absorb ordinary source outages
+# first, so a breach here means the data itself is wrong.
+# Per-list override: LIST_FLOOR_<KEY>=n. Kill-switch: LIST_FLOORS_ENFORCE=0.
+LIST_FLOORS_ENFORCE = os.environ.get("LIST_FLOORS_ENFORCE", "1") == "1"
+CORE_LIST_FLOORS = {
+    "ofac": int(os.environ.get("LIST_FLOOR_OFAC", "9000")),
+    "un":   int(os.environ.get("LIST_FLOOR_UN",   "500")),
+    "uk":   int(os.environ.get("LIST_FLOOR_UK",   "9000")),
+    "eu":   int(os.environ.get("LIST_FLOOR_EU",   "20000")),
+    "eocn": int(os.environ.get("LIST_FLOOR_EOCN", "150")),
+}
+
+def core_list_floor_breaches(list_meta, floors=None):
+    """Core lists whose loaded name count sits below the coverage floor
+    (zero included). Returns [message, ...]; empty when every floor holds.
+    Lists absent from the floors map (supplementary tier) are never floored."""
+    floors = CORE_LIST_FLOORS if floors is None else floors
+    breaches = []
+    for key, floor in floors.items():
+        meta = (list_meta or {}).get(key)
+        if meta is None:
+            continue
+        count = int(meta.get("count", 0) or 0)
+        if count < floor:
+            breaches.append(f"{key.upper()} loaded {count:,} name(s), below its coverage floor "
+                            f"of {floor:,} - possible failed download / bad parse / truncated source")
+    return breaches
+
+def enforce_core_list_floors(list_meta):
+    """Refuse to screen when a core list is below its floor: screening against
+    a partially loaded core list silently under-screens (false negatives), so
+    the run must fail BEFORE any all-clear can be posted. Kill-switch
+    LIST_FLOORS_ENFORCE=0 logs the breaches but lets the run continue.
+    Returns the breach list either way (for reports/tests)."""
+    breaches = core_list_floor_breaches(list_meta)
+    for b in breaches:
+        log(f"COVERAGE FLOOR BREACH: {b}")
+    if breaches and LIST_FLOORS_ENFORCE:
+        raise RuntimeError(
+            "FATAL: core sanctions list(s) below coverage floor - refusing to screen or post "
+            "an all-clear: " + "; ".join(breaches))
+    return breaches
+
 def load_all_lists():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
@@ -2618,6 +2670,9 @@ def load_all_lists():
         raise RuntimeError(
             "FATAL: no core sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
+    # Per-list coverage floors: a single core list at zero (or a fraction of its
+    # known size) is the same false-negative class as the all-empty case above.
+    enforce_core_list_floors(list_meta)
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
         "UN Consolidated": [(normalize(n),n) for n in un_names],
@@ -3442,6 +3497,9 @@ def main():
         raise RuntimeError(
             "FATAL: no sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
+    # Per-list coverage floors: a single core list at zero (or a fraction of its
+    # known size) is the same false-negative class as the all-empty case above.
+    enforce_core_list_floors(list_meta)
 
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
