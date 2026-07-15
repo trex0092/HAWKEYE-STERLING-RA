@@ -3,7 +3,7 @@
   "description": "Authoritative inventory of every AI/LLM surface in the Hawkeye Sterling suite. Layer 1 (AI Discovery & Inventory) of the 6 Layers of Agentic AI Governance. The deterministic RA scoring engine (index.html) is intentionally NOT an AI asset and is excluded by design.",
   "owner_role": "MLRO (accountable) / Compliance Engineering (operational)",
   "review_cadence": "Quarterly, and on any change to model id, provider, prompt charter, or data flow.",
-  "last_reviewed": "2026-06-21",
+  "last_reviewed": "2026-07-15",
   "assets": [
     {
       "id": "advisor",
@@ -19,7 +19,7 @@
         { "mode": "balanced", "model": "claude-sonnet-4-6", "max_tokens": 4096 },
         { "mode": "deep", "model": "claude-opus-4-8", "max_tokens": 8192 }
       ],
-      "personas": 14,
+      "personas": 16,
       "risk_tier": "MEDIUM",
       "risk_tier_rationale": "Decision-support only; never auto-decides, files, or freezes. Outputs are advisory and gated behind MLRO review. Failure mode is a misleading suggestion, mitigated by human sign-off and the SOUL_CHARTER guardrails.",
       "eu_ai_act_class": "Limited risk (transparency obligations). Not a high-risk system: it does not make or automate the compliance decision; the human MLRO does.",
@@ -69,7 +69,37 @@
       "human_oversight": "Human-on-the-loop. Reviewer ratifies or discards every draft.",
       "data_retention": "Draft committed to git (docs/research/auto) with full history. No customer data.",
       "status": "optional"
+    },
+    {
+      "id": "ai-triage",
+      "name": "Adverse-Media LLM Triage",
+      "classification": "Assistive grounded classification (relevance/severity of real headlines, human-reviewed)",
+      "agentic": false,
+      "autonomy": "Classifies text provided to it inside a screening run only; never generates report prose and never decides, files, or freezes.",
+      "surface_file": "ai.py",
+      "ui": "Screening run reports (labelled [AI] output with the raw headline and link always attached)",
+      "provider": "Anthropic (API, ANTHROPIC_API_KEY GitHub Actions secret; fail-closed without it)",
+      "models": [
+        { "mode": "grounded-classification", "model": "claude-haiku-4-5-20251001", "note": "AI_MODEL env default; classification calls only" }
+      ],
+      "personas": 0,
+      "risk_tier": "MEDIUM",
+      "risk_tier_rationale": "When enabled it sends a subject's name plus one public adverse-media headline to the processor, a cross-border transfer of personal data, so it is fail-closed OFF (LLM_TRIAGE=0) until the Anthropic DPA is executed. It judges provided text only, never invents facts, and every output is labelled and carries the raw evidence for mandatory human review.",
+      "eu_ai_act_class": "Minimal risk. Internal decision-support classification; the raw evidence is always shown and the human MLRO makes the decision.",
+      "inputs": ["Subject name + one public adverse-media headline (minimised payload; no full record, no ID numbers, no DOB, no contact or financial data)"],
+      "outputs": ["Relevance/severity label, marked as AI-generated, with the raw headline and link attached"],
+      "controls": [
+        "Fail-closed gate: requires LLM_TRIAGE=1 in addition to the API key; production workflows keep LLM_TRIAGE=0 until the Anthropic DPA is executed (ai.py)",
+        "REPORT_ALLOW_LLM=0: no generative prose is admitted into filed reports (hard anti-hallucination rule, ai.py)",
+        "GROUNDING_SYSTEM prompt-security contract: use only facts in the input; ignore instructions embedded in third-party text",
+        "Data minimisation enforced in code: name + single headline only (docs/aims/anthropic-dpa-execution-pack.md Schedule A)",
+        "Degrade loudly: an LLM error falls back to the deterministic path and the output is marked accordingly",
+        "Kill switch: remove ANTHROPIC_API_KEY (AI_ENABLED false) or unset LLM_TRIAGE"
+      ],
+      "human_oversight": "Human-in-the-loop. Labels are decision support attached to raw evidence; the MLRO reviews and records every screening decision.",
+      "data_retention": "Transient API inference; the surface persists nothing server-side. See docs/aims/anthropic-dpa-execution-pack.md Schedule A and docs/governance/data-retention.md.",
+      "status": "dormant (fail-closed: LLM_TRIAGE=0 until the Anthropic DPA is executed; see docs/aims/anthropic-dpa-execution-pack.md)"
     }
   ],
-  "shadow_ai_note": "No other AI surfaces exist in the suite. The RA scoring engine (index.html), the operations console (console.html), and all watcher scripts (fatf-watchdog, sanctions-watch/screen, regulatory-watch detection, daily-brief, expiry notifier) are deterministic and rules-based, not AI. Any new AI surface MUST be added to this register before deployment."
+  "shadow_ai_note": "No AI surfaces exist in the suite beyond the three registered above (advisor, reg-draft, ai-triage). The RA scoring engine (index.html), the operations console (console.html), and all watcher scripts (fatf-watchdog, sanctions-watch/screen, regulatory-watch detection, daily-brief, expiry notifier) are deterministic and rules-based, not AI. The eval harnesses (scripts/advisor-eval.mjs, scripts/advisor-bias-eval.mjs) call the model API as assurance controls over the advisor surface and are listed in its controls, not as separate surfaces. Any new AI surface MUST be added to this register before deployment; test/ai-assets.test.js scans the codebase for model-API callers and fails CI on an unregistered surface."
 }
