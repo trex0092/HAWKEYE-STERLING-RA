@@ -39,6 +39,7 @@ jobs:
           # sudo must stay enabled: `playwright install --with-deps` runs
           # `sudo apt-get` to install the browser system libraries (same as
           # the Visual Regression workflow). Disabling sudo breaks the install.
+          # Stays audit: Playwright fetches three browsers from variable CDNs.
           egress-policy: audit
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:

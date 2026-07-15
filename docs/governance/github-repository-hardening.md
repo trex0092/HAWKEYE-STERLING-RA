@@ -129,18 +129,22 @@ Every workflow runs `step-security/harden-runner`. The **egress** posture is
 deliberately split:
 
 - **`egress-policy: block`** (enforced, with a pinned allow-list) — the sensitive
-  or predictable-egress jobs: all token-handling AML/Asana workflows, plus the
-  high-frequency CI gates **`ci`, `lint`, `gitleaks`, `dependency-review`**, and
-  `netlify-deploy` / `asana-delivery-diag`. A compromised dependency here cannot
-  reach an unlisted host — the run fails loudly instead.
+  or predictable-egress jobs: all token-handling AML/Asana workflows, the
+  high-frequency CI gates **`ci` (both jobs), `lint`, `gitleaks`,
+  `dependency-review`**, `netlify-deploy` / `asana-delivery-diag`, and — promoted
+  2026-07-15 with allow-lists read from their own egress-audit logs —
+  **`scorecard`, `workflow-lint`, `semgrep`, `osv-scanner`** and ci's `fuzz` job.
+  A compromised dependency here cannot reach an unlisted host — the run fails
+  loudly instead.
 - **`egress-policy: audit`** (observe-only) — jobs whose egress is broad or
-  external and not safely enumerable without risking a **required** check:
-  `codeql` (downloads language packs incl. Python), `semgrep` (rule registry),
-  `scorecard` (many external scoring APIs), `osv-scanner` (reusable workflow),
-  and the site-fetching jobs `dast-zap`, `lighthouse`, `link-check`,
-  `site-health`, `cross-browser`, `visual`, `a11y`, plus the release jobs
-  (`release`, `auto-release`) whose Sigstore endpoints vary. These remain
-  monitored; promote any to `block` once its audited egress is confirmed stable.
+  external and not safely enumerable without risking a **required** check or a
+  release: `codeql` (bundle + query packs from variable hosts), the
+  browser-fetching jobs `cross-browser`, `visual`, `a11y`, `lighthouse`
+  (Playwright/Chrome CDNs vary; some also need sudo for apt libraries), the
+  site-fetching jobs `dast-zap`, `link-check`, `site-health` (external targets
+  by design), plus the release jobs (`release`, `auto-release`) whose asset
+  upload + Sigstore endpoints vary. Each carries an inline "stays audit"
+  comment; promote one to `block` only from its own observed egress log.
 
 The workflow security itself is gated by **zizmor (blocking)** in
 `workflow-lint.yml` with a **zero baseline** — `.github/zizmor.yml` was removed

@@ -31,11 +31,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
+        # Allowlist observed from the 2026-07-14 run's egress audit: GitHub
+        # (checkout), nodejs.org for setup-node on a toolchain-cache miss, the
+        # Go module proxy pair for `go install osv-scanner`
+        # (storage.googleapis.com is the module CDN behind the proxy), and the
+        # OSV/deps.dev APIs the scanner queries.
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           disable-sudo: true
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            proxy.golang.org:443
+            sum.golang.org:443
+            storage.googleapis.com:443
+            api.osv.dev:443
+            api.deps.dev:443
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:

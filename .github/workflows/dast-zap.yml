@@ -34,7 +34,10 @@ jobs:
       - name: Harden the runner (egress audit)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
-          egress-policy: audit   # ZAP needs outbound HTTP(S) to the target
+          # No sudo needed: docker pull/run and the report chmod are
+          # unprivileged on the hosted runner.
+          disable-sudo: true
+          egress-policy: audit   # ZAP needs outbound HTTP(S) to the target site it scans
 
       - name: Run ZAP baseline scan
         env:

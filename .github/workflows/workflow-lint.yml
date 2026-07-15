@@ -29,11 +29,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
+        # Allowlist observed from the 2026-07-14 run's egress audit: GitHub
+        # (checkout + zizmor's advisory queries), the Go module proxy pair for
+        # `go install actionlint` (storage.googleapis.com is the module CDN
+        # behind the proxy), and PyPI for the hash-locked zizmor install.
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           disable-sudo: true
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            proxy.golang.org:443
+            sum.golang.org:443
+            storage.googleapis.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
