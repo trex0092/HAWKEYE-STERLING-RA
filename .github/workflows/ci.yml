@@ -88,6 +88,8 @@ jobs:
         run: node test/sanctions-match-fuzz.test.mjs
       - name: Run GLEIF LEI-check unit tests
         run: node test/lei-check.test.mjs
+      - name: Run legal-citation guard (repealed instruments never cited as operative)
+        run: node test/legal-citations.test.mjs
       - name: Run threat-intel (STIX) unit tests
         run: node test/threat-intel.test.mjs
       - name: Run PWA icon-generator unit tests

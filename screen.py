@@ -2375,7 +2375,8 @@ RESULTS SUMMARY
   Clean - no adverse hits:        {max(0, stats["subjects_total"] - len(findings))}
 
 REGULATORY BASIS
-  Ongoing CDD / continuous monitoring - UAE Cabinet Decision 10/2019 Art.7;
+  Ongoing CDD / continuous monitoring - UAE Cabinet Resolution 134/2025
+  (Executive Regulations of FDL 10/2025, superseding Cabinet Decision 10/2019);
   FATF Recommendation 10. Adverse media is a MONITORING signal; authoritative
   designation status is governed by the daily sanctions screen
   (OFAC / UN / EU / UK OFSI / UAE EOCN).
