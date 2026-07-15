@@ -25,9 +25,9 @@ on:
       - 'CHANGELOG.md'
   workflow_dispatch:
 
+# Least privilege at the top level; the job declares its own write scope.
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
@@ -35,6 +35,9 @@ concurrency:
 
 jobs:
   links:
+    permissions:
+      contents: read
+      issues: write # broken-link reports are filed as issues
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

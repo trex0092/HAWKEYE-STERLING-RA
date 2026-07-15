@@ -14,9 +14,9 @@ on:
     - cron: '9 10 * * 1'   # 10:09 UTC every Monday (odd minute)
   workflow_dispatch:
 
+# Least privilege at the top level; the job declares its own write scope.
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: asana-reconcile
@@ -24,6 +24,9 @@ concurrency:
 
 jobs:
   reconcile:
+    permissions:
+      contents: read
+      issues: write # fallback issue when Asana is unreachable
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
