@@ -236,11 +236,11 @@ python3 -m http.server 8000
 **Self-host (container)** — every release publishes a provenance-attested image to GHCR ([`publish-container.yml`](.github/workflows/publish-container.yml)); versions track `APP_VERSION`:
 
 ```bash
-docker run -p 8080:80 ghcr.io/trex0092/hawkeye-sterling-ra:latest
+docker run -p 8080:8080 ghcr.io/trex0092/hawkeye-sterling-ra:latest
 # → http://localhost:8080
 ```
 
-The image serves the same static tree as the live site; the Netlify functions (Asana relay, AI brain, encrypted backup) are absent and the app degrades gracefully — all assessment data stays on-device either way.
+The image serves the same static tree as the live site — as a non-root process with the same security headers the Netlify edge sets (CSP, HSTS, COOP/COEP — see `sws.toml`) and a `/health` probe endpoint; the Netlify functions (Asana relay, AI brain, encrypted backup) are absent and the app degrades gracefully — all assessment data stays on-device either way.
 
 **Deploy** — the Netlify project [`hawkeye-sterling-ra`](https://app.netlify.com/projects/hawkeye-sterling-ra) publishes the repo root as-is (`netlify.toml`, no build step). Link the repository to the project in the Netlify UI for continuous deploys, or deploy any other static host — the app is `index.html` plus its same-origin `app.js` (and the `console.html`/`advisor.html` pages with their `*.js`).
 

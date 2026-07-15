@@ -1,0 +1,39 @@
+# static-web-server config for the self-hosting container (Dockerfile).
+#
+# Header parity with the edge: every security header below mirrors the
+# `[[headers]]` block in netlify.toml BYTE-FOR-BYTE — test/security-headers.test.mjs
+# asserts the two files never drift, so a hardening change at the edge must land
+# here too (and vice versa). The CSP's report-to/report-uri point at a Netlify
+# function that does not exist in the container; browsers ignore an unreachable
+# reporting endpoint (violations are still enforced), and keeping the string
+# identical is what makes exact-parity testing possible.
+#
+# Server basics (root, port, health endpoint) come from the Dockerfile ENV
+# (SERVER_ROOT, SERVER_PORT, SERVER_HEALTH); this file only adds what env vars
+# cannot express: per-route response headers.
+
+[advanced]
+
+# Security headers applied to every response (same set as the edge).
+[[advanced.headers]]
+source = "**"
+[advanced.headers.headers]
+Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; child-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; require-trusted-types-for 'script'; trusted-types default; report-to csp-endpoint; report-uri /.netlify/functions/csp-report"
+Reporting-Endpoints = "csp-endpoint=\"/.netlify/functions/csp-report\""
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+X-Permitted-Cross-Domain-Policies = "none"
+X-DNS-Prefetch-Control = "off"
+Referrer-Policy = "no-referrer"
+Permissions-Policy = "accelerometer=(), autoplay=(), bluetooth=(), browsing-topics=(), camera=(), display-capture=(), fullscreen=(), gamepad=(), geolocation=(), gyroscope=(), hid=(), idle-detection=(), interest-cohort=(), local-fonts=(), magnetometer=(), microphone=(), midi=(), payment=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()"
+Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+Cross-Origin-Opener-Policy = "same-origin"
+Cross-Origin-Embedder-Policy = "credentialless"
+Cross-Origin-Resource-Policy = "same-origin"
+
+# The service worker must be re-checked on every visit so a new image's shell
+# is picked up promptly (same rule as the edge).
+[[advanced.headers]]
+source = "/sw.js"
+[advanced.headers.headers]
+Cache-Control = "no-cache"

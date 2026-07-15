@@ -14,10 +14,11 @@ let pass = 0, fail = 0;
 const check = (name, cond) => { if (cond) { pass++; console.log('  ok  ' + name); } else { fail++; console.log('FAIL  ' + name); } };
 
 const toml = readFileSync(new URL('../netlify.toml', import.meta.url), 'utf8');
-const QUOTED = /"([^"]*)"/; // constant regex — extracts the quoted value on a header line
+const swsToml = readFileSync(new URL('../sws.toml', import.meta.url), 'utf8');
+const QUOTED = /"((?:[^"\\]|\\.)*)"/; // constant regex — extracts the (possibly escaped) quoted value on a header line
 /* Find `Header = "value"` by scanning lines (no regex built from `header`). */
-const val = (header) => {
-  for (const raw of toml.split('\n')) {
+const valIn = (content, header) => {
+  for (const raw of content.split('\n')) {
     const line = raw.trim();
     if (line.startsWith(header + ' =') || line.startsWith(header + '=')) {
       const m = line.match(QUOTED);
@@ -26,6 +27,7 @@ const val = (header) => {
   }
   return '';
 };
+const val = (header) => valIn(toml, header);
 
 /* Clickjacking + MIME + cross-domain-policy lockdown */
 check('X-Frame-Options is DENY', val('X-Frame-Options') === 'DENY');
@@ -61,6 +63,23 @@ const csp = val('Content-Security-Policy');
 check("CSP media-src is 'none'", csp.includes("media-src 'none'"));
 check("CSP frame-src is 'none'", csp.includes("frame-src 'none'"));
 check("CSP child-src is 'none'", csp.includes("child-src 'none'"));
+
+/* Container parity: sws.toml (served by the self-hosting image) must carry
+   byte-identical values for every security header the edge sets — a hardening
+   change in netlify.toml that skips sws.toml (or vice versa) fails here. */
+for (const header of [
+  'Content-Security-Policy', 'Reporting-Endpoints', 'X-Frame-Options',
+  'X-Content-Type-Options', 'X-Permitted-Cross-Domain-Policies',
+  'X-DNS-Prefetch-Control', 'Referrer-Policy', 'Permissions-Policy',
+  'Strict-Transport-Security', 'Cross-Origin-Opener-Policy',
+  'Cross-Origin-Embedder-Policy', 'Cross-Origin-Resource-Policy',
+  'Cache-Control',
+]) {
+  const edge = valIn(toml, header), container = valIn(swsToml, header);
+  check(`sws.toml mirrors ${header}`, edge !== '' && edge === container);
+}
+check('sws.toml applies the header set to every route (source "**")', swsToml.includes('source = "**"'));
+check('sws.toml keeps the sw.js no-cache route', swsToml.includes('source = "/sw.js"'));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
 if (fail) process.exit(1);
