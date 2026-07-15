@@ -15,9 +15,9 @@ on:
   workflow_dispatch:
 
 # Least privilege: read the repo, write an issue. No other scope.
+# Least privilege at the top level; the job declares its own write scope.
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: anomaly-watch
@@ -25,6 +25,9 @@ concurrency:
 
 jobs:
   watch:
+    permissions:
+      contents: read
+      issues: write # anomaly alerts are filed as issues
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

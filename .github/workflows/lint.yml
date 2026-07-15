@@ -48,7 +48,7 @@ jobs:
         # floating major-pinned npx installs used before. No `cache: npm` on
         # setup-node — the Actions cache service endpoints are not in the
         # egress allow-list.
-        run: npm ci --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: ESLint (app logic, scripts, tests, functions)
         run: npm run lint

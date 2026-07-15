@@ -24,9 +24,9 @@ on:
 
 # Least privilege: read the repo to load settings.yml, write issues to manage
 # labels. No other scopes are needed.
+# Least privilege at the top level; the job declares its own write scope.
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: label-sync
@@ -34,10 +34,13 @@ concurrency:
 
 jobs:
   sync:
+    permissions:
+      contents: read
+      issues: write # creates/updates the repo label taxonomy
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Harden the runner (egress audit)
+      - name: Harden the runner (egress block)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           disable-sudo: true

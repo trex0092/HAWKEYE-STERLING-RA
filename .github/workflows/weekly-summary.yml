@@ -12,10 +12,9 @@ on:
     - cron: '3 5 * * 1'   # Mondays 05:03 UTC = 09:03 UAE
   workflow_dispatch:
 
+# Least privilege at the top level; the job declares its own scopes.
 permissions:
   contents: read
-  actions: read
-  issues: write
 
 concurrency:
   group: weekly-summary
@@ -23,6 +22,10 @@ concurrency:
 
 jobs:
   summary:
+    permissions:
+      contents: read
+      actions: read # reads workflow-run history for the digest
+      issues: write # posts the weekly summary issue
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

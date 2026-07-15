@@ -38,6 +38,8 @@ jobs:
       - name: Harden the runner (egress audit)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
+          # Stays audit: Playwright fetches Chromium from a variable CDN, and
+          # `playwright install --with-deps` needs sudo for apt libraries.
           egress-policy: audit
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -51,7 +53,7 @@ jobs:
         # devDependency) so the `import '@playwright/test'` in the config/spec
         # resolves. node_modules is gitignored.
         run: |
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Compare against baseline
@@ -79,6 +81,8 @@ jobs:
       - name: Harden the runner (egress audit)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
+          # Stays audit: Playwright fetches Chromium from a variable CDN, and
+          # `playwright install --with-deps` needs sudo for apt libraries.
           egress-policy: audit
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -90,7 +94,7 @@ jobs:
       - name: Install Playwright + Chromium
         # npm ci restores the lockfile-pinned toolchain (same as the compare job).
         run: |
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Update baseline snapshots

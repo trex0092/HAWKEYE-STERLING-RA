@@ -55,6 +55,11 @@ jobs:
             ofsistorage.blob.core.windows.net:443
             app.asana.com:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          # No credentials on disk (zizmor artipacked): the state push below
+          # authenticates with an ephemeral env token, and the overlay fetch
+          # is anonymous (public repo).
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
@@ -103,6 +108,7 @@ jobs:
         if: steps.watch.outputs.state_dirty == 'true' || steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         env:
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -n "$(git status --porcelain data/ 2>/dev/null)" ]; then
             git config user.name "sanctions-watch"
@@ -111,9 +117,11 @@ jobs:
             git commit -m "$PR_TITLE [skip ci]"
             # Persist on the sanctions-watch-state branch (main is protected):
             # rebuilt as <current main> + one data commit, force-updated.
+            # Auth is the ephemeral env token in the push URL — the checkout
+            # persists no credentials, so nothing lands in .git/config.
             pushed=
             for attempt in 1 2 3 4 5; do
-              git push --force origin HEAD:refs/heads/sanctions-watch-state && { pushed=1; break; }
+              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/sanctions-watch-state && { pushed=1; break; }
               echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done

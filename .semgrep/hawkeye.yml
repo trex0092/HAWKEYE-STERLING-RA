@@ -7,8 +7,10 @@
 # advisory alongside them.
 #
 # Scope note: these run over app.js / console.js / advisor.js / scripts / netlify
-# (the executable surface). Run locally with:
-#   semgrep --config .semgrep/hawkeye.yml app.js console.js advisor.js scripts netlify
+# (the executable JS surface) plus the Python screening engine (screen.py ai.py
+# agents.py kyc.py txn_monitor.py monitoring.py). Run locally with:
+#   semgrep --config .semgrep/hawkeye.yml app.js console.js advisor.js scripts netlify \
+#     screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py
 
 rules:
   - id: hawkeye-no-string-to-code
@@ -73,3 +75,55 @@ rules:
         - console.js
         - advisor.js
     pattern: process.env.$ANYTHING
+
+  # ---- Python screening engine invariants (screen.py, ai.py, agents.py,
+  # kyc.py, txn_monitor.py, monitoring.py) ----
+
+  - id: hawkeye-py-no-string-to-code
+    languages: [python]
+    severity: ERROR
+    message: >
+      String-to-code execution (eval / exec) is forbidden in the screening
+      engine. The engine evaluates sanctions/adverse-media data — feeding any
+      of it through eval/exec turns hostile list content into code execution.
+      Express behaviour declaratively instead of compiling a string.
+    metadata:
+      category: security
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      confidence: HIGH
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+
+  - id: hawkeye-py-no-shell
+    languages: [python]
+    severity: ERROR
+    message: >
+      Shell-string execution is forbidden in the screening engine: os.system,
+      os.popen and subprocess with shell=True interpolate into a shell, so any
+      screened name or list value in the string becomes a command-injection
+      vector. Argv-list subprocess (no shell) is the only sanctioned form —
+      see the pip bootstrap in screen.py.
+    metadata:
+      category: security
+      cwe: "CWE-78: OS Command Injection"
+      confidence: HIGH
+    pattern-either:
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+      - pattern: subprocess.$FUNC(..., shell=True, ...)
+
+  - id: hawkeye-py-no-pickle
+    languages: [python]
+    severity: ERROR
+    message: >
+      pickle deserialization is forbidden in the screening engine — unpickling
+      attacker-influenced bytes is arbitrary code execution. All engine state
+      lives in JSON (data/*.json); use json.load(s) instead.
+    metadata:
+      category: security
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      confidence: HIGH
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)

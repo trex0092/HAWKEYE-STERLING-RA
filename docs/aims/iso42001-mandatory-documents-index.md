@@ -62,7 +62,7 @@ management review; failures surface via the monitoring/escalation path.
 | Error containment | `error_rate` (actionable failures) | ≤ 10% per run; sustained window empty | monitoring thresholds + escalation |
 | Advisor quality | weekly eval score; bias parity | eval gate passes; recall parity within tolerance | `advisor-eval.yml`, `bias_eval.py` (CI-blocking) |
 | Prompt-security | red-team suite | detection, non-execution, no-downgrade, no-echo all hold | `redteam_injection.py` (CI-blocking) |
-| Supply-chain posture | OpenSSF Scorecard | maintain configurable maximum (8.1 today; ≥9.0 from 2026-09 per runbook) | scorecard workflow + [`scorecard-9.5-path.md`](../governance/scorecard-9.5-path.md) |
+| Supply-chain posture | OpenSSF Scorecard | maintain configurable maximum (8.1 today; ≥8.5 milestone ~2026-09-09 via the Maintained lift — or earlier with reviewed merges — then ≥9.0 per runbook) | scorecard workflow + [`scorecard-9.5-path.md`](../governance/scorecard-9.5-path.md) |
 
 ## §Communication — internal & external AI communication process (closes item 12)
 

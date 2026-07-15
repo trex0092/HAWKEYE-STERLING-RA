@@ -10,6 +10,54 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Security & hardening — workflows, supply chain, container (2026-07-15)
+
+Every mechanical OpenSSF Scorecard check was already at 10 (aggregate 8.1),
+so this pass hardens what the score cannot see and protects the 10s the
+documented 8.5/9.5 milestones stand on
+([`scorecard-9.5-path.md`](docs/governance/scorecard-9.5-path.md) now records
+the explicit 8.5 routes: ~2026-09-09 automatic via the Maintained lift, or
+earlier via reviewed merges).
+
+- **zizmor now gates with a ZERO suppression baseline.** The six state-pushing
+  workflows (sanctions-watch, regulatory-watch, sanctions-screen,
+  onboarding-screen, weekly-adverse-media, fatf-watchdog) check out with
+  `persist-credentials: false` and push their data branches through an
+  ephemeral env-token URL — the `GITHUB_TOKEN` never touches `.git/config`.
+  `asana-reconcile` never pushed at all (stale suppression) and is now
+  credential-free too. `.github/zizmor.yml` is deleted; the only accepted
+  finding left is the documented inline `dangerous-triggers` ignore in
+  `labeler.yml`.
+- **Write scopes moved to job level in 9 single-job workflows** (stale,
+  pr-size, anomaly-watch, advisor-eval, advisor-bias-eval, asana-reconcile,
+  weekly-summary, link-check, label-sync): top level is `contents: read`,
+  each job declares exactly the `issues`/`pull-requests`/`actions` scopes it
+  uses.
+- **Egress block for the security tooling.** scorecard, workflow-lint,
+  semgrep, osv-scanner and ci's fuzz job move from harden-runner egress
+  `audit` to `block`, each allow-list read from its own egress-audit log;
+  scorecard and dast-zap gain `disable-sudo`. Workflows that must stay on
+  audit (browser CDNs, external targets, release-endpoint variance) now say
+  why inline.
+- **npm installs can no longer run dependency scripts**: all five `npm ci`
+  invocations pass `--ignore-scripts` (browsers come from explicit
+  `npx playwright install` steps), and `package.json` pins
+  `packageManager: npm@10.9.7` for Corepack-reproducible tooling.
+- **The self-host container now matches the edge.** BREAKING for
+  self-hosters: the server runs as non-root (`USER 65532:65532`) on port
+  **8080** — `docker run -p 8080:8080 …`. A new `sws.toml` serves the exact
+  netlify.toml security-header set in-container (CSP with Trusted Types,
+  HSTS, XFO, COOP/COEP/CORP; byte-parity locked by
+  `test/security-headers.test.mjs`), `GET /health` is enabled for
+  orchestrator probes, and a new path-filtered `docker-smoke` workflow
+  builds the image at PR time and asserts headers/health/non-root before a
+  regression can reach a release.
+- **The Python screening engine gained blocking SAST invariants**: three
+  ERROR-severity semgrep rules (no eval/exec, no shell-string execution —
+  os.system/os.popen/subprocess `shell=True` —, no pickle) now scan
+  screen/ai/agents/kyc/txn_monitor/monitoring in the semgrep gate, which
+  previously covered only the JavaScript surface.
+
 ### Security & hardening (deep audit — 2026-07-14)
 
 A full three-surface deep audit (Python engine, frontend/Netlify, CI/supply-chain)
