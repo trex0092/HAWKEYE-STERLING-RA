@@ -9,7 +9,8 @@
      • navigations  → network-first, fall back to cached page then index.html
                       (fresh when online, fully usable offline);
      • same-origin static GET → stale-while-revalidate;
-     • cross-origin (Google Fonts) and non-GET → passthrough (never cached);
+     • cross-origin and non-GET → passthrough (never cached; the app is
+       strictly same-origin — fonts are self-hosted under assets/fonts/);
      • Netlify functions (/.netlify/) → always network, never cached.
    Bump CACHE to invalidate the old shell on the next visit. */
 
@@ -64,7 +65,8 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  // Never cache serverless function calls or cross-origin requests (fonts/API).
+  // Never cache serverless function calls or cross-origin requests (the app
+  // is strictly same-origin; anything cross-origin is not ours to cache).
   if (url.origin !== self.location.origin) return;
   if (url.pathname.includes('/.netlify/')) return;
 

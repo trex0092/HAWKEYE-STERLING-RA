@@ -1,7 +1,8 @@
-# OpenSSF Scorecard — where the score comes from and the path to 9.5+
+# OpenSSF Scorecard — where the score comes from and the path to 8.5 / 9.5+
 
-_Last updated: 2026-07-14 · Scorecard v5.3.0 · live aggregate at the time of
-writing: **8.0** (README badge is served live by `api.scorecard.dev`)._
+_Last updated: 2026-07-15 · Scorecard v5.3.0 · live aggregate at the time of
+writing: **8.1** (verified in the 2026-07-14 run log; the README badge is
+served live by `api.scorecard.dev`)._
 
 This page records the exact arithmetic behind the repo's Scorecard aggregate,
 what was maximized, what is **structurally capped** and by what, and the
@@ -24,7 +25,7 @@ division** — exclusion is not a zero.
 | Binary-Artifacts, Token-Permissions, Signed-Releases, Dependency-Update-Tool | 10 | High | maxed |
 | Pinned-Dependencies, SAST, Security-Policy, Fuzzing, Packaging | 10 | Medium | maxed |
 | CI-Tests | 10 | Low | maxed |
-| Vulnerabilities | 9 | High | PYSEC-2026-2132 (`click==8.1.8`, semgrep's CI venv). **Not fixable by upgrade**: semgrep — including the latest 1.169.0 — pins `click~=8.1.8`, so the fixed 8.3.3 cannot resolve. Remediated with a justified, documented suppression in [`ci/osv-scanner.toml`](../../ci/osv-scanner.toml) (the vulnerable `click.edit()` is an interactive-editor path unreachable in the non-interactive CI job). If the scanner honors the suppression this check reads 10; either way it auto-heals the moment semgrep unpins click (Dependabot covers `/ci` weekly). |
+| Vulnerabilities | 10 | High | **Verified 10 in the 2026-07-14 run** ("0 existing vulnerabilities detected") — the justified suppression of PYSEC-2026-2132 (`click==8.1.8`, semgrep's CI venv) in [`ci/osv-scanner.toml`](../../ci/osv-scanner.toml) is honored. Background: semgrep — including the latest 1.169.0 — pins `click~=8.1.8`, so the fixed 8.3.3 cannot resolve; the vulnerable `click.edit()` is an interactive-editor path unreachable in the non-interactive CI job. Auto-heals fully the moment semgrep unpins click (Dependabot covers `/ci` weekly). |
 | **Maintained** | **0** | High | **Hard time gate** — the check returns 0 for any repo younger than 90 days regardless of activity. Created 2026-06-11 ⇒ the gate lifts ~**2026-09-09**, and with the repo's commit/issue cadence the check then scores ~10 with no action needed. |
 | **Code-Review** | **0** | High | **Structural** — single maintainer. GitHub does not count self-approval and the sole code owner is the author, so required-approvals is deliberately 0 (see [`github-repository-hardening.md`](github-repository-hardening.md) §1 and `.github/settings.yml`). The check looks at the last ~30 changesets; it only moves when a **second human** reviews and approves PRs. |
 | CII-Best-Practices | 0 | Low | Registration at bestpractices.dev is owner-only; the proprietary `LICENSE` fails the `floss_license` passing-level MUST, capping the entry at **in progress = 2/10** (≈ +0.05 aggregate). See [`openssf-best-practices.md`](openssf-best-practices.md). |
@@ -32,9 +33,9 @@ division** — exclusion is not a zero.
 | Contributors | 6 | Low | Needs contributors from ≥ 3 organizations with 5+ commits each — an organic-growth metric. |
 | Branch-Protection | −1 (excluded) | High | The default workflow token cannot read branch-protection rules, so the check errors and is excluded. **Deliberately left unwired** — see below. |
 
-**Arithmetic**: maxed checks contribute 675 over weight 67.5; adding
-Vulnerabilities 9×7.5, License 9×2.5, Contributors 6×2.5 and the three zeros
-gives **780 / 97.5 = 8.0** — exactly the badge.
+**Arithmetic**: maxed checks (now including Vulnerabilities) contribute 750
+over weight 75; adding License 9×2.5, Contributors 6×2.5 and the three zeros
+gives **787.5 / 97.5 = 8.08 → badge 8.1** — exactly the live value.
 
 ## Why NOT to "fix" Branch-Protection with an admin PAT
 
@@ -46,11 +47,35 @@ current exclusion simply removes the 7.5 weight. Leave it unwired until the
 repo has a second maintainer and approvals ≥ 1; then the same PAT is worth
 adding.
 
+## Reaching 8.5 — the explicit milestone
+
+The badge cannot print 8.5 today by any in-repo change: with Code-Review and
+Maintained both at 0, the ceiling of everything else combined is ~8.3 (even a
+license swap + CII + Contributors maxed). The two honest routes, either of
+which crosses 8.5:
+
+| Route | What happens | When | Expected badge |
+|---|---|---|---|
+| **A — automatic** | The Maintained 90-day age gate lifts (repo created 2026-06-11); with the normal commit/issue cadence the check jumps 0 → ~10 | **~2026-09-09**, no action | **~8.8** |
+| **B — fast (owner process)** | A second reviewer approves PRs before merge (Dependabot PRs count). At ~15 approved of the last 30 changesets, Code-Review reads 5 → 825/97.5 = 8.46 | ~2–3 weeks of reviewed merges at the current near-daily cadence | **8.5** |
+
+Optional garnish for margin: CII "in progress" registration (+0.05, owner-only,
+~2 min — evidence pack ready in
+[`openssf-best-practices.md`](openssf-best-practices.md)).
+
+What the 2026-07-15 hardening PR does for this: nothing mechanical was left to
+gain, so it **protects the twelve 10s** the routes above stand on — zizmor now
+gates with a zero suppression baseline (ephemeral-token state pushes), the
+security tooling runs egress-blocked with observed allowlists, npm installs
+ignore dependency scripts, and the container gained non-root + edge-header
+parity with a PR-time smoke gate. A regression in any 10 before September
+would cost more than either route gains.
+
 ## The path to ≥ 9.5 (in order of when each step can happen)
 
-1. **Now (this change)** — Vulnerabilities remediated (suppression or, later,
-   the upstream unpin): aggregate → **~8.08–8.1**. Everything mechanical is at
-   ceiling.
+1. **Done (verified 2026-07-14)** — Vulnerabilities remediated (the
+   `ci/osv-scanner.toml` suppression is honored; reads 10): aggregate →
+   **8.1**. Everything mechanical is at ceiling.
 2. **~2026-09-09 (automatic)** — Maintained gate lifts at 90 days of repo age:
    0 → ~10, aggregate → **~8.8–8.9**. No action required; keep the normal
    commit/issue cadence.
