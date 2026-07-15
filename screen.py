@@ -1672,14 +1672,36 @@ def parse_eocn(pdf_path):
     Primary source is the maintained in-repo JSON (data/eocn-local-terrorist-list.json),
     populated from the official EOCN publication — the EOCN site offers no free
     machine-readable feed and bot-gates its PDF/XLSX, so the list is kept here.
-    A raw PDF at repo root (eocn_list.pdf), if present, is still parsed as a fallback."""
+    A raw PDF at repo root (eocn_list.pdf), if present, is still parsed as a fallback.
+
+    Side effects, valid for THIS call whichever branch supplies the names:
+    EOCN_REVIEW_ALERT is re-armed from the JSON's lastReviewed (a parse error,
+    an empty entries array or an absent file counts as an unverifiable review,
+    so the alert arms), and EOCN_SOURCE_STATE records whether any source
+    material actually yielded names, which the coverage-floor classifier uses
+    to tell an outage (degrade, deliver, then fail) from corruption (refuse)."""
     names = set()
+    # Default: no verifiable review record. A parseable JSON below refines
+    # this; every other branch keeps the alarm armed. Previously only the
+    # successful JSON-with-names branch touched the alert, so a corrupt JSON,
+    # an empty entries array, or a run served by the PDF fallback left the
+    # review-age gate silently disarmed and the run exited green.
+    overdue, msg = eocn_review_check(None)
+    EOCN_SOURCE_STATE["obtained"] = False
+    json_hash = ""
     # 1) Preferred: the maintained JSON list (zero-dependency, no PDF parsing).
     if os.path.exists(EOCN_JSON_PATH):
         try:
             with open(EOCN_JSON_PATH, "rb") as _f:
                 raw = _f.read()
             data = json.loads(raw)
+            # Hash here, where raw is provably bound; the names-return below
+            # sits outside this try and must not reference raw directly.
+            json_hash = sha256_of(raw)
+            # Review currency is a property of the file's metadata, not of the
+            # entry extraction: evaluate it as soon as the JSON parses so the
+            # gate also arms on the empty-entries path.
+            overdue, msg = eocn_review_check(data.get("lastReviewed"))
             for e in data.get("entries", []):
                 if isinstance(e, str):
                     n = e.strip()
@@ -1690,18 +1712,20 @@ def parse_eocn(pdf_path):
                     for a in e.get("aliases", []) or []:
                         a = (a or "").strip()
                         if a: names.add(a)
-            if names:
-                log(f"  EOCN: {len(names)} names from {EOCN_JSON_PATH}")
-                overdue, msg = eocn_review_check(data.get("lastReviewed"))
-                EOCN_REVIEW_ALERT["overdue"], EOCN_REVIEW_ALERT["message"] = overdue, msg
-                date_label = "from maintained list (data/eocn-local-terrorist-list.json)"
-                if overdue:
-                    log(f"  ALARM: {msg}")
-                    date_label += " · REVIEW OVERDUE"
-                return names, date_label, sha256_of(raw)
-            log(f"  EOCN JSON present but 'entries' is empty — manual update required")
         except Exception as e:
             log(f"  EOCN JSON parse error: {e}")
+    EOCN_REVIEW_ALERT["overdue"], EOCN_REVIEW_ALERT["message"] = overdue, msg
+    if overdue:
+        log(f"  ALARM: {msg}")
+    if names:
+        EOCN_SOURCE_STATE["obtained"] = True
+        log(f"  EOCN: {len(names)} names from {EOCN_JSON_PATH}")
+        date_label = "from maintained list (data/eocn-local-terrorist-list.json)"
+        if overdue:
+            date_label += " · REVIEW OVERDUE"
+        return names, date_label, json_hash
+    if os.path.exists(EOCN_JSON_PATH):
+        log(f"  EOCN JSON present but yielded no names - manual update required")
     # 2) Fallback: a raw PDF uploaded to repo root.
     if not os.path.exists(pdf_path):
         log(f"  EOCN list not found — manual check required")
@@ -1718,6 +1742,7 @@ def parse_eocn(pdf_path):
                 if re.match(r"^[A-Z\s\-\'\.]+$", line) and len(line.split()) >= 2:
                     names.add(line)
         log(f"  EOCN: {len(names)} names extracted")
+        EOCN_SOURCE_STATE["obtained"] = bool(names)
         return names, "from uploaded PDF", pdf_hash
     except Exception as e:
         log(f"  EOCN parse error: {e}")
@@ -2635,13 +2660,24 @@ def _mirror_fallback(names, dataset, label):
 # A core list that loads ZERO names (parse failure, the PR #128 bug class) or a
 # fraction of its known size (truncated download, format drift) used to degrade
 # to an UNAVAILABLE status line while screening continued - a silent
-# under-screen in the false-negative direction. Mirroring the existing
-# all-lists-empty fail-safe, a core list below its floor now REFUSES the run
-# loudly BEFORE any all-clear can be posted. Floors are ~50% of the verified
-# 2026-07-02 baseline counts (OFAC 19,129 / UN 1,002 / UK 19,762 / EU 42,347 /
-# EOCN 312): generous enough for real de-listings, tight enough to catch a
-# broken parse. The mirror fallbacks above absorb ordinary source outages
-# first, so a breach here means the data itself is wrong.
+# under-screen in the false-negative direction. A core list below its floor is
+# now handled by WHY it is small:
+#   breach (source material obtained, parsed below floor) - corruption or
+#     truncation: REFUSE the run before screening, because results computed
+#     against corrupt data must never post as an all-clear;
+#   outage (no source material obtained: endpoint down, absent or honestly
+#     empty local file) - screening PROCEEDS without the list, the report
+#     shows it unavailable/DEGRADED, and enforce_list_outage_gate() fails the
+#     run AFTER delivery so the outage still goes red and cannot become
+#     routine. (Treating outages as breaches killed the whole run, report and
+#     Asana delivery included, on any transient source outage.)
+# Only OFAC and UN have OpenSanctions mirror fallbacks (EU is itself fetched
+# from that mirror; UK and the local EOCN file have no second source), and the
+# legacy daily path has none, so outages here are real single-list gaps the
+# mirrors did not absorb.
+# Floors are ~50% of the verified 2026-07-02 baseline counts (OFAC 19,129 /
+# UN 1,002 / UK 19,762 / EU 42,347 / EOCN 312): generous enough for real
+# de-listings, tight enough to catch a broken parse.
 # Per-list override: LIST_FLOOR_<KEY>=n. Kill-switch: LIST_FLOORS_ENFORCE=0.
 LIST_FLOORS_ENFORCE = os.environ.get("LIST_FLOORS_ENFORCE", "1") == "1"
 CORE_LIST_FLOORS = {
@@ -2652,36 +2688,76 @@ CORE_LIST_FLOORS = {
     "eocn": int(os.environ.get("LIST_FLOOR_EOCN", "150")),
 }
 
-def core_list_floor_breaches(list_meta, floors=None):
-    """Core lists whose loaded name count sits below the coverage floor
-    (zero included). Returns [message, ...]; empty when every floor holds.
-    Lists absent from the floors map (supplementary tier) are never floored."""
+# Set by enforce_core_list_floors(); read by enforce_list_outage_gate() after
+# the report has been delivered (same post-delivery pattern as EOCN_REVIEW_ALERT).
+LIST_OUTAGE_ALERT = {"outages": []}
+# Set by parse_eocn(): whether any EOCN source material (JSON entries or the
+# fallback PDF) actually yielded names this run. False makes the floor
+# classifier treat an EOCN shortfall as an outage (absent or honestly empty
+# local file: the documented DEGRADED state) rather than as corruption.
+EOCN_SOURCE_STATE = {"obtained": False}
+
+def core_list_floor_breaches(list_meta, floors=None, fetched=None):
+    """Classify core lists whose loaded name count sits below the coverage
+    floor (zero included). Returns (breaches, outages):
+      breaches - source material was obtained but parsed below floor: treat
+                 as corruption/truncation and refuse to screen;
+      outages  - no source material was obtained this run: screen DEGRADED,
+                 deliver, then fail post-delivery via the outage gate.
+    fetched maps list key -> whether source material was obtained; when
+    fetched is None, or a key is missing from it, a sub-floor list counts as
+    a breach (fail-closed, the original behavior). Lists absent from the
+    floors map (supplementary tier) are never floored."""
     floors = CORE_LIST_FLOORS if floors is None else floors
-    breaches = []
+    breaches, outages = [], []
     for key, floor in floors.items():
         meta = (list_meta or {}).get(key)
         if meta is None:
             continue
         count = int(meta.get("count", 0) or 0)
-        if count < floor:
+        if count >= floor:
+            continue
+        if fetched is not None and not fetched.get(key, True):
+            outages.append(f"{key.upper()} source unavailable this run ({count:,} name(s) loaded, "
+                           f"floor {floor:,}): screening proceeds DEGRADED without it")
+        else:
             breaches.append(f"{key.upper()} loaded {count:,} name(s), below its coverage floor "
                             f"of {floor:,} - possible failed download / bad parse / truncated source")
-    return breaches
+    return breaches, outages
 
-def enforce_core_list_floors(list_meta):
-    """Refuse to screen when a core list is below its floor: screening against
-    a partially loaded core list silently under-screens (false negatives), so
-    the run must fail BEFORE any all-clear can be posted. Kill-switch
-    LIST_FLOORS_ENFORCE=0 logs the breaches but lets the run continue.
-    Returns the breach list either way (for reports/tests)."""
-    breaches = core_list_floor_breaches(list_meta)
+def enforce_core_list_floors(list_meta, fetched=None):
+    """Refuse to screen when a core list was OBTAINED but parsed below its
+    floor: screening against a partially loaded core list silently
+    under-screens (false negatives), so the run must fail BEFORE any all-clear
+    can be posted. A sub-floor list with NO obtained source material is an
+    outage instead: it is recorded in LIST_OUTAGE_ALERT so the run screens
+    DEGRADED, delivers its report, and enforce_list_outage_gate() then turns
+    the run red. Kill-switch LIST_FLOORS_ENFORCE=0 logs both classes but
+    refuses nothing (and the outage gate does not exit).
+    Returns (breaches, outages) either way (for reports/tests)."""
+    breaches, outages = core_list_floor_breaches(list_meta, fetched=fetched)
     for b in breaches:
         log(f"COVERAGE FLOOR BREACH: {b}")
+    for o in outages:
+        log(f"CORE LIST OUTAGE: {o}")
+    LIST_OUTAGE_ALERT["outages"] = outages
     if breaches and LIST_FLOORS_ENFORCE:
         raise RuntimeError(
             "FATAL: core sanctions list(s) below coverage floor - refusing to screen or post "
             "an all-clear: " + "; ".join(breaches))
-    return breaches
+    return breaches, outages
+
+def enforce_list_outage_gate():
+    """Post-delivery hard fail for core-list outages: the run screened
+    DEGRADED without the unavailable list(s) and delivered its report; the
+    outage must still turn the run red (exit 4) so the workflow's failure
+    alerting fires and a recurring outage cannot quietly become the routine
+    state. Kill-switch: LIST_FLOORS_ENFORCE=0 (same switch as the floors)."""
+    if LIST_OUTAGE_ALERT["outages"]:
+        for o in LIST_OUTAGE_ALERT["outages"]:
+            log(f"CORE LIST OUTAGE GATE: {o}")
+        if LIST_FLOORS_ENFORCE:
+            sys.exit(4)
 
 def load_all_lists():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
@@ -2689,13 +2765,22 @@ def load_all_lists():
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
     uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
+    # Track whether SOURCE MATERIAL was obtained per list (primary bytes, or a
+    # mirror that answered): the floor check uses it to tell corruption (data
+    # present but tiny: refuse) from an outage (nothing obtained: degrade).
+    ofac_fetched = bool(ofac_data)
+    un_fetched   = bool(un_data)
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
     ofac_names |= parse_ofac_alt(ofac_alt_data)   # fold in SDN a.k.a. aliases (best-effort)
     un_names,   un_date,   un_hash   = parse_un(un_data)
     fb = _mirror_fallback(ofac_names, "us_ofac_sdn", "OFAC SDN")
-    if fb: ofac_names, ofac_date, ofac_hash = fb
+    if fb:
+        ofac_names, ofac_date, ofac_hash = fb
+        ofac_fetched = True
     fb = _mirror_fallback(un_names, "un_sc_sanctions", "UN Consolidated")
-    if fb: un_names, un_date, un_hash = fb
+    if fb:
+        un_names, un_date, un_hash = fb
+        un_fetched = True
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
@@ -2726,9 +2811,15 @@ def load_all_lists():
         raise RuntimeError(
             "FATAL: no core sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
-    # Per-list coverage floors: a single core list at zero (or a fraction of its
-    # known size) is the same false-negative class as the all-empty case above.
-    enforce_core_list_floors(list_meta)
+    # Per-list coverage floors: an OBTAINED core list at zero (or a fraction
+    # of its known size) is the same false-negative class as the all-empty
+    # case above and refuses the run; a list with no obtainable source this
+    # run degrades and turns the run red after delivery (outage gate).
+    enforce_core_list_floors(list_meta, fetched={
+        "ofac": ofac_fetched, "un": un_fetched,
+        "uk": bool(uk_data), "eu": bool(eu_data),
+        "eocn": EOCN_SOURCE_STATE["obtained"],
+    })
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
         "UN Consolidated": [(normalize(n),n) for n in un_names],
@@ -3474,6 +3565,7 @@ def run_unified(run_time):
     customers = get_all_customers()
     screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily")
     log("Unified run done.")
+    enforce_list_outage_gate()
     enforce_eocn_review_gate()
 
 def run_onboarding(run_time):
@@ -3501,6 +3593,7 @@ def run_onboarding(run_time):
     all_lists, list_meta = load_all_lists()
     screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
     log("Onboarding run done.")
+    enforce_list_outage_gate()
     enforce_eocn_review_gate()
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
@@ -3562,9 +3655,16 @@ def main():
         raise RuntimeError(
             "FATAL: no sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
-    # Per-list coverage floors: a single core list at zero (or a fraction of its
-    # known size) is the same false-negative class as the all-empty case above.
-    enforce_core_list_floors(list_meta)
+    # Per-list coverage floors: an OBTAINED core list at zero (or a fraction
+    # of its known size) is the same false-negative class as the all-empty
+    # case above and refuses the run; a list with no obtainable source this
+    # run degrades and turns the run red after delivery (outage gate). This
+    # legacy path has NO mirror fallbacks, so bool(data) is the whole story.
+    enforce_core_list_floors(list_meta, fetched={
+        "ofac": bool(ofac_data), "un": bool(un_data),
+        "uk": bool(uk_data), "eu": bool(eu_data),
+        "eocn": EOCN_SOURCE_STATE["obtained"],
+    })
 
     all_lists = {
         "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
@@ -3591,6 +3691,7 @@ def main():
     )
     post_daily_task(narrative, run_time, run_label, len(possible_matches))
     log("Done.")
+    enforce_list_outage_gate()
     enforce_eocn_review_gate()
 
 if __name__ == "__main__":

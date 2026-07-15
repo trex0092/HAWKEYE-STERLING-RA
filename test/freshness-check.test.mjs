@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { staleControls, isStale, daysBetween, utcDay, buildReport, CONTROLS } from '../scripts/freshness-check.mjs';
+import { staleControls, unknownControls, isStale, daysBetween, utcDay, buildReport, CONTROLS, EXEMPT } from '../scripts/freshness-check.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -77,40 +77,66 @@ check('an in-progress-today control is not flagged stale', staleControls(onePend
 const pendingElsewhere = allFresh.map((s, i) => i === 1 ? { ...s, lastSuccessDay: null, pendingToday: false } : s);
 check('a control neither successful nor running today is still stale', staleControls(pendingElsewhere, today).length === 1);
 
+// a failed API query is UNKNOWN, never "stale/never ran" - the old behavior
+// (caught error, lastSuccessDay left null) reported a transient GitHub API
+// error as a control with no successful run on record, a false claim.
+const oneErrored = allFresh.map((s, i) => i === 0
+  ? { ...s, lastSuccessDay: null, queryError: 'GitHub API 500 for ' + s.id } : s);
+check('a query error is not reported stale', staleControls(oneErrored, today).length === 0);
+const unk = unknownControls(oneErrored);
+check('a query error is reported unknown, carrying its error',
+  unk.length === 1 && unk[0].id === CONTROLS[0].id && /500/.test(unk[0].error));
+check('no unknowns when every query succeeded', unknownControls(allFresh).length === 0);
+
 // report content
 check('green report mentions all controls fresh', /successful run inside their cadence window/.test(buildReport([], today, CONTROLS.length)));
 const alarmReport = buildReport([{ id: 'sanctions-watch.yml', name: 'Sanctions Watch', cadence: 'daily', maxAgeDays: 0, lastSuccessDay: null }], today, CONTROLS.length);
 check('alarm report lists the stale control', /Sanctions Watch/.test(alarmReport));
 check('alarm report shows the cadence window', /daily/.test(alarmReport) && /today/.test(alarmReport));
+const unknownReport = buildReport([], today, CONTROLS.length, unk);
+check('unknown report says UNKNOWN and never claims "never ran"',
+  /could not be verified/.test(unknownReport) && /UNKNOWN/.test(unknownReport)
+  && !/never ran/.test(unknownReport) && !/\| never \|/.test(unknownReport));
+check('unknown report is not the green all-fresh report',
+  !/cadence window\. ✅/.test(unknownReport));
+check('a run with both stale and unknown reports both sections',
+  (r => /NO successful run/.test(r) && /could not be verified/.test(r))(
+    buildReport(staleControls(oneStale, today), today, CONTROLS.length, unk)));
 
 /* ── Coverage meta-test ─────────────────────────────────────────────────────
    Every workflow with a `schedule:` cron must be either a monitored control
-   (CONTROLS) or explicitly exempted here with a reason. This is the guard that
-   would have caught the original gap: advisor-eval.yml / advisor-bias-eval.yml
-   were scheduled compliance controls monitored by nothing. A new scheduled
+   (CONTROLS) or explicitly exempted (EXEMPT, exported beside CONTROLS so the
+   whole classification reads in one place). This is the guard that would have
+   caught the original gap: advisor-eval.yml / advisor-bias-eval.yml were
+   scheduled compliance controls monitored by nothing. A new scheduled
    workflow now forces a deliberate classification. */
-const EXEMPT = {
-  'a11y.yml': 'accessibility scan; quality gate, not an ingestion/eval duty',
-  'anomaly-watch.yml': 'meta-monitor over run metrics; opens its own issues on anomaly',
-  'asana-reconcile.yml': 'mirror reconciliation; self-alerting on divergence',
-  'codeql.yml': 'security scanner; also gates every push/PR',
-  'daily-brief.yml': 'reporting digest; absence is recipient-noticed, no ingestion duty',
-  'dast-zap.yml': 'security scan of the deployed site',
-  'freshness-check.yml': 'this alarm itself',
-  'function-health.yml': 'site operations probe; self-alerting',
-  'governance-report.yml': 'reports ON control state; the controls it reads are monitored individually',
-  'link-check.yml': 'documentation hygiene',
-  'osv-scanner.yml': 'security scan',
-  'scorecard.yml': 'security posture scan',
-  'site-health.yml': 'site operations probe; self-alerting',
-  'stale.yml': 'repository housekeeping',
-  'weekly-summary.yml': 'MLRO digest; absence is recipient-noticed each Monday, no ingestion duty',
-};
+check('EXEMPT is a justified map (every entry carries a reason)',
+  Object.keys(EXEMPT).length > 0
+  && Object.values(EXEMPT).every(v => typeof v === 'string' && v.length > 10));
+
+/* A workflow is "scheduled" if it declares a schedule trigger in any YAML
+   spelling: block style (schedule: alone on its line, optionally with a
+   trailing comment), a flow-style value (schedule: [...] / {...}), or a
+   flow-style on: mapping (on: { schedule: [...] }). The previous regex
+   required the colon to END the line, so a trailing comment or flow style
+   would have silently dropped a scheduled workflow out of this
+   classification. */
+const isScheduled = (text) =>
+  /^\s*schedule:\s*(#.*)?$/m.test(text)
+  || /^\s*schedule:\s*[\[{]/m.test(text)
+  || /^\s*on:\s*\{[^}]*\bschedule\b/m.test(text);
+check('detects block-style schedule', isScheduled('on:\n  schedule:\n    - cron: "0 1 * * *"'));
+check('detects schedule with a trailing comment', isScheduled('on:\n  schedule:  # daily\n    - cron: "0 1 * * *"'));
+check('detects a flow-style schedule value', isScheduled('on:\n  schedule: [{cron: "0 1 * * *"}]'));
+check('detects a flow-style on: mapping', isScheduled('on: { schedule: [ { cron: "0 1 * * *" } ] }'));
+check('ignores an unscheduled workflow', !isScheduled('on:\n  workflow_dispatch:\n'));
+check('ignores a commented-out schedule', !isScheduled('on:\n  workflow_dispatch:\n  # schedule:\n'));
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const wfDir = join(ROOT, '.github', 'workflows');
 const scheduled = readdirSync(wfDir)
   .filter(f => /\.ya?ml$/.test(f))
-  .filter(f => /^\s*schedule:\s*$/m.test(readFileSync(join(wfDir, f), 'utf8')));
+  .filter(f => isScheduled(readFileSync(join(wfDir, f), 'utf8')));
 check('found scheduled workflows to classify', scheduled.length > 0);
 const controlIds = new Set(CONTROLS.map(c => c.id));
 for (const f of scheduled) {
@@ -120,6 +146,34 @@ for (const f of scheduled) {
 // and every monitored control must actually exist and be scheduled
 for (const c of CONTROLS) {
   check(`monitored control ${c.id} exists and is scheduled`, scheduled.includes(c.id));
+}
+// no workflow may be BOTH monitored and exempt (one classification each)
+for (const f of Object.keys(EXEMPT)) {
+  check(`exempt workflow ${f} is not also a monitored control`, !controlIds.has(f));
+}
+
+/* ── Cadence pinning ────────────────────────────────────────────────────────
+   The maxAgeDays windows in CONTROLS assume each workflow's cron cadence.
+   Pin the exact cron lines so a cadence change (a daily control quietly
+   becoming monthly, say) fails here and forces a deliberate review of the
+   control's window, instead of the alarm silently tolerating stale runs. */
+const EXPECTED_CRONS = {
+  'sanctions-watch.yml':      ['7 5 * * *'],
+  'weekly-adverse-media.yml': ['7 0 * * *'],
+  'regulatory-watch.yml':     ['19 6 * * *'],
+  'sanctions-screen.yml':     ['37 5 * * *'],
+  'fatf-watchdog.yml':        ['7 6 * * *'],
+  'onboarding-screen.yml':    ['11 */6 * * *'],
+  'advisor-eval.yml':         ['9 8 * * 1'],
+  'advisor-bias-eval.yml':    ['9 9 1 */3 *'],
+  'quarterly-review.yml':     ['9 6 1 1,4,7,10 *'],
+};
+check('every monitored control has a pinned cron', CONTROLS.every(c => EXPECTED_CRONS[c.id]));
+for (const c of CONTROLS) {
+  const body = readFileSync(join(wfDir, c.id), 'utf8');
+  const crons = [...body.matchAll(/^\s*-\s*cron:\s*['"]([^'"]+)['"]/gm)].map(m => m[1]);
+  check(`control ${c.id} runs on its pinned cadence (${crons.join(' | ') || 'none'})`,
+    JSON.stringify(crons) === JSON.stringify(EXPECTED_CRONS[c.id]));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');

@@ -1030,19 +1030,32 @@ check("parse_canada degrades safely on a DTD payload (no crash, no names)", _ca_
 print("screen — core-list coverage floors (zero/partial-load hard-fail)")
 _meta_ok = {"ofac": {"count": 19129}, "un": {"count": 1002}, "uk": {"count": 19762},
             "eu": {"count": 42347}, "eocn": {"count": 312}}
-check("floors: healthy baseline counts pass", screen.core_list_floor_breaches(_meta_ok) == [])
+check("floors: healthy baseline counts pass", screen.core_list_floor_breaches(_meta_ok) == ([], []))
 _meta_zero = {**_meta_ok, "eu": {"count": 0}}
-_bz = screen.core_list_floor_breaches(_meta_zero)
+_bz, _oz = screen.core_list_floor_breaches(_meta_zero)
 check("floors: a zero-name core list breaches with an actionable message",
-      len(_bz) == 1 and "EU" in _bz[0] and "floor" in _bz[0])
+      len(_bz) == 1 and "EU" in _bz[0] and "floor" in _bz[0] and _oz == [])
 _meta_partial = {**_meta_ok, "ofac": {"count": 1200}}
-_bp = screen.core_list_floor_breaches(_meta_partial)
+_bp, _ = screen.core_list_floor_breaches(_meta_partial)
 check("floors: a partially loaded core list breaches (1,200 of 19,129)",
       len(_bp) == 1 and "OFAC" in _bp[0])
 check("floors: custom floors are honored",
-      screen.core_list_floor_breaches({"ofac": {"count": 10}}, {"ofac": 5}) == [])
+      screen.core_list_floor_breaches({"ofac": {"count": 10}}, {"ofac": 5}) == ([], []))
 check("floors: a list not in the floors map (supplementary tier) is never floored",
-      screen.core_list_floor_breaches({**_meta_ok, "canada": {"count": 0}}) == [])
+      screen.core_list_floor_breaches({**_meta_ok, "canada": {"count": 0}}) == ([], []))
+# Outage vs corruption: a sub-floor list whose source was NEVER OBTAINED is an
+# outage (screen DEGRADED, deliver, fail post-delivery), not a breach (refuse
+# pre-screen). A transient endpoint outage used to kill the whole run, report
+# and Asana delivery included, through the breach path.
+_b_out, _o_out = screen.core_list_floor_breaches(_meta_zero, fetched={"eu": False})
+check("floors: a sub-floor list with no obtained source classifies as an outage",
+      _b_out == [] and len(_o_out) == 1 and "EU" in _o_out[0] and "DEGRADED" in _o_out[0])
+_b_mix, _o_mix = screen.core_list_floor_breaches(
+    {**_meta_zero, "ofac": {"count": 3}}, fetched={"eu": False, "ofac": True})
+check("floors: obtained-but-tiny stays a breach while unobtained is an outage",
+      len(_b_mix) == 1 and "OFAC" in _b_mix[0] and len(_o_mix) == 1 and "EU" in _o_mix[0])
+check("floors: a key missing from the fetched map fails closed as a breach",
+      screen.core_list_floor_breaches(_meta_zero, fetched={})[0] != [])
 _prev_floors_enforce = screen.LIST_FLOORS_ENFORCE
 screen.LIST_FLOORS_ENFORCE = True
 _floor_raised = False
@@ -1051,13 +1064,39 @@ try:
 except RuntimeError as _e:
     _floor_raised = "refusing to screen" in str(_e)
 check("floors: enforcement refuses the run before any all-clear can post", _floor_raised)
+# Outage enforcement path: never refuses pre-screen; recorded for the gate.
+screen.LIST_OUTAGE_ALERT["outages"] = []
+_b_e, _o_e = screen.enforce_core_list_floors(_meta_zero, fetched={"eu": False})
+check("floors: an outage never refuses pre-screen and is recorded for the gate",
+      _b_e == [] and len(_o_e) == 1 and screen.LIST_OUTAGE_ALERT["outages"] == _o_e)
+_gate4 = False
+try:
+    screen.enforce_list_outage_gate()
+except SystemExit as _e:
+    _gate4 = (_e.code == 4)
+check("outage gate: post-delivery exit (code 4) when a core list was unavailable", _gate4)
 screen.LIST_FLOORS_ENFORCE = False
-_floor_soft = screen.enforce_core_list_floors(_meta_zero)
+_gate4_soft = True
+try:
+    screen.enforce_list_outage_gate()
+except SystemExit:
+    _gate4_soft = False
+check("outage gate: kill-switch LIST_FLOORS_ENFORCE=0 logs without exiting", _gate4_soft)
+_floor_soft_b, _floor_soft_o = screen.enforce_core_list_floors(_meta_zero)
 check("floors: kill-switch LIST_FLOORS_ENFORCE=0 logs breaches without refusing",
-      len(_floor_soft) == 1)
+      len(_floor_soft_b) == 1 and _floor_soft_o == [])
+screen.LIST_FLOORS_ENFORCE = True
+screen.LIST_OUTAGE_ALERT["outages"] = []
+_gate4_clean = True
+try:
+    screen.enforce_list_outage_gate()
+except SystemExit:
+    _gate4_clean = False
+check("outage gate: no recorded outages never exits", _gate4_clean)
 _floor_clean = screen.enforce_core_list_floors(_meta_ok)
-check("floors: a healthy load never refuses", _floor_clean == [])
+check("floors: a healthy load never refuses", _floor_clean == ([], []))
 screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
+screen.LIST_OUTAGE_ALERT["outages"] = []
 
 print("hardening — atomic state writes")
 _hdir = _tmp.mkdtemp()
@@ -1121,6 +1160,7 @@ check("eocn review check: a missing lastReviewed counts as overdue",
 
 # parse_eocn wires the gate: a stale lastReviewed flags the run + marks the label.
 _prev_alert = dict(screen.EOCN_REVIEW_ALERT)
+_prev_src_state = dict(screen.EOCN_SOURCE_STATE)
 _prev_json_path = screen.EOCN_JSON_PATH
 _revdir = _tmp.mkdtemp()
 _stale_file = os.path.join(_revdir, "eocn-stale.json")
@@ -1131,6 +1171,8 @@ screen.EOCN_JSON_PATH = _stale_file
 _rn, _rlabel, _rhash = screen.parse_eocn(os.path.join(_revdir, "missing.pdf"))
 check("parse_eocn: a stale lastReviewed sets the overdue alert and marks the label",
       screen.EOCN_REVIEW_ALERT["overdue"] is True and "REVIEW OVERDUE" in _rlabel and len(_rn) == 2)
+check("parse_eocn: a populated JSON reports source obtained for the floor classifier",
+      screen.EOCN_SOURCE_STATE["obtained"] is True)
 _fresh_file = os.path.join(_revdir, "eocn-fresh.json")
 with open(_fresh_file, "w") as _f:
     json.dump({"lastReviewed": _dt_rev.date.today().isoformat(),
@@ -1139,6 +1181,41 @@ screen.EOCN_JSON_PATH = _fresh_file
 _rn2, _rlabel2, _rhash2 = screen.parse_eocn(os.path.join(_revdir, "missing.pdf"))
 check("parse_eocn: a current lastReviewed clears the alert and label",
       screen.EOCN_REVIEW_ALERT["overdue"] is False and "REVIEW OVERDUE" not in _rlabel2)
+
+# The alert arms on EVERY parse_eocn path, not only a successful JSON parse:
+# a corrupt JSON, an empty entries array with a stale review, or an absent
+# file is an unverifiable/lapsed review and must arm the gate. Before this,
+# those paths left the previous alert value in place (silently disarmed), so
+# a PDF-fallback or broken-file run exited green.
+_corrupt_file = os.path.join(_revdir, "eocn-corrupt.json")
+with open(_corrupt_file, "w") as _f:
+    _f.write("{ not valid json")
+screen.EOCN_JSON_PATH = _corrupt_file
+_cn, _clabel, _chash = screen.parse_eocn(os.path.join(_revdir, "missing.pdf"))
+check("parse_eocn: a corrupt JSON arms the overdue alert and reports no source obtained",
+      screen.EOCN_REVIEW_ALERT["overdue"] is True and _cn == set()
+      and screen.EOCN_SOURCE_STATE["obtained"] is False)
+_empty_fresh = os.path.join(_revdir, "eocn-empty-fresh.json")
+with open(_empty_fresh, "w") as _f:
+    json.dump({"lastReviewed": _dt_rev.date.today().isoformat(),
+               "populated": False, "entries": []}, _f)
+screen.EOCN_JSON_PATH = _empty_fresh
+_en, _elabel, _ehash = screen.parse_eocn(os.path.join(_revdir, "missing.pdf"))
+check("parse_eocn: an honestly-empty JSON with a current review stays un-alarmed but is not 'obtained'",
+      screen.EOCN_REVIEW_ALERT["overdue"] is False and _en == set()
+      and screen.EOCN_SOURCE_STATE["obtained"] is False)
+_empty_stale = os.path.join(_revdir, "eocn-empty-stale.json")
+with open(_empty_stale, "w") as _f:
+    json.dump({"lastReviewed": "2020-01-01", "populated": False, "entries": []}, _f)
+screen.EOCN_JSON_PATH = _empty_stale
+screen.parse_eocn(os.path.join(_revdir, "missing.pdf"))
+check("parse_eocn: an empty JSON with a stale lastReviewed still arms the review alert",
+      screen.EOCN_REVIEW_ALERT["overdue"] is True)
+screen.EOCN_JSON_PATH = os.path.join(_revdir, "does-not-exist.json")
+screen.parse_eocn(os.path.join(_revdir, "missing.pdf"))
+check("parse_eocn: an absent JSON (and no PDF) arms the review alert and reports no source",
+      screen.EOCN_REVIEW_ALERT["overdue"] is True
+      and screen.EOCN_SOURCE_STATE["obtained"] is False)
 
 # The gate fails the run post-delivery only when overdue AND hard-fail is on.
 screen.EOCN_REVIEW_ALERT.update({"overdue": True, "message": "test overdue"})
@@ -1166,6 +1243,7 @@ except SystemExit:
 check("review gate: a current review never exits", _gate_clean)
 screen.EOCN_REVIEW_HARD_FAIL = _prev_hard
 screen.EOCN_REVIEW_ALERT.update(_prev_alert)
+screen.EOCN_SOURCE_STATE.update(_prev_src_state)
 screen.EOCN_JSON_PATH = _prev_json_path
 
 print()
