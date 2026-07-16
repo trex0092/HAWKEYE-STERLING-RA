@@ -383,6 +383,10 @@ async function main() {
   setOutput('state_dirty', (stateDirty || logChanged) ? 'true' : 'false');
   setOutput('persistent_errors', String(persistentErrors.length));
   setOutput('changed_count', String(count));
+  /* CONTENT changes only (new/changed lists), excluding persistent-error
+     alerts: the workflow's immediate-re-screen dispatch keys on this, and a
+     dead URL must alert without pointlessly re-screening unchanged data. */
+  setOutput('content_changes', String(moved.length));
   setOutput('pr_title', prTitle);
 }
 
