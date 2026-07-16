@@ -10,6 +10,33 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Daily-screening delivery made unloseable: worst-case rich-text sizing, shrink-and-retry, delivery gate (2026-07-16)
+
+Third and final round on the day's Asana delivery failures. After #269 (cap by
+bytes, not characters) and #270 (cap by html-escaped bytes), the 19:56 UTC
+verification run STILL got `400 Rich text value is too large` at ≤65,000
+escaped bytes — Asana's server-side conversion can also entity-encode
+non-ASCII code points (`→` → `&#8594;`), which `html.escape` accounting leaves
+at 3 UTF-8 bytes. Worse, the run stayed GREEN while delivering nothing (no
+task, no MLRO cases, delta-state not persisted), which blinds the Freshness
+Check — it keys on run conclusions.
+
+- **`_asana_notes_size` now budgets the worst case**: named-entity costs for
+  HTML specials plus numeric-entity form (`&#NNNN;`) for every non-ASCII code
+  point — a strict upper bound on the conversion (`≥` raw UTF-8 length,
+  proven in tests), so the first attempt should always fit.
+- **`post_unified_task` shrink-and-retries**: on a `400 … too large` it
+  rebuilds the notes with a 40%-smaller budget (65,000 → 39,000 → … floor
+  12,000) before conceding — delivery can no longer be lost to sizing, even if
+  Asana's accounting changes again.
+- **New delivery gate (exit 5)**: `run_unified`/`run_onboarding` now fail the
+  run when the unified task was never created, so the freshness alarm and the
+  Actions failure email fire instead of a silent green. Kill-switch
+  `DELIVERY_HARD_FAIL=0` (mirrors `EOCN_REVIEW_HARD_FAIL`).
+- `test/engine_test.py`: sizing unit checks (arrow=7, emoji=9, `&`=5,
+  never-under-counts property), arrow-heavy cap regression, explicit retry
+  budget, and both delivery-gate outcomes.
+
 ### Scorecard 7.7 explained + Branch-Protection raised to review-required (2026-07-16)
 
 The README badge fell 8.1 → 7.7 on 2026-07-16 — not a regression but a

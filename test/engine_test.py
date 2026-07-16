@@ -1362,6 +1362,52 @@ check("cap_notes still caps pure-ASCII narratives over the limit",
       screen._asana_notes_size(screen.cap_notes(_ascii_big)) <= screen.ASANA_NOTES_MAX
       and "TAIL-MARKER retain 10 years" in screen.cap_notes(_ascii_big))
 
+# ── screen.py: worst-case rich-text sizing + delivery gate ───────────────────
+# Regression for the THIRD 2026-07-16 delivery failure: capping the
+# html.escape'd size to 65,000 bytes STILL returned "Rich text value is too
+# large" — Asana's conversion can also entity-encode non-ASCII code points
+# (→ → &#8594;), which html.escape leaves as raw UTF-8. The sizing must be a
+# strict upper bound: numeric-entity form for every non-ASCII code point.
+check("notes sizing budgets ASCII at 1 byte", screen._asana_notes_size("abc") == 3)
+check("notes sizing budgets '&' at its &amp; form", screen._asana_notes_size("&") == 5)
+check("notes sizing budgets an arrow at its &#8594; numeric-entity form",
+      screen._asana_notes_size("→") == 7)
+check("notes sizing budgets an astral emoji at its numeric-entity form",
+      screen._asana_notes_size("\U0001f6e1") == 9)  # 🛡 → &#128737;
+check("notes sizing never under-counts the raw UTF-8 length",
+      screen._asana_notes_size(_big) >= len(_big.encode("utf-8")))
+_arrowy = ("Match 92% → escalate • review — pending\n" * 2000
+           + "TAIL-MARKER retain 10 years")
+check("cap_notes caps arrow/bullet-heavy narratives by worst-case entity size",
+      screen._asana_notes_size(screen.cap_notes(_arrowy)) <= screen.ASANA_NOTES_MAX
+      and "TAIL-MARKER retain 10 years" in screen.cap_notes(_arrowy))
+check("cap_notes honours an explicit retry budget",
+      screen._asana_notes_size(screen.cap_notes(_arrowy, 20000)) <= 20000
+      and "TAIL-MARKER retain 10 years" in screen.cap_notes(_arrowy, 20000))
+
+# The delivery gate: a run whose unified task was never created must go RED
+# (observed 2026-07-16: green runs with FAILed delivery blinded the freshness
+# alarm, which keys on run conclusions).
+screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+try:
+    screen.enforce_delivery_gate()
+    _gate_clean = True
+except SystemExit:
+    _gate_clean = False
+check("delivery gate passes when the unified task was delivered", _gate_clean)
+screen.UNIFIED_DELIVERY_FAILED["failed"] = True
+_gate_code = None
+_prev_hard_fail = screen.DELIVERY_HARD_FAIL
+screen.DELIVERY_HARD_FAIL = True
+try:
+    screen.enforce_delivery_gate()
+except SystemExit as e:
+    _gate_code = e.code
+finally:
+    screen.DELIVERY_HARD_FAIL = _prev_hard_fail
+    screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+check("delivery gate exits 5 when the unified task was never created", _gate_code == 5)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

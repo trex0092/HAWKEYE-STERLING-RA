@@ -9,7 +9,6 @@ Modes:
 """
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
-import html as html_mod
 import threading
 import xml.etree.ElementTree as ET
 import concurrent.futures
@@ -726,36 +725,52 @@ def asana_request(method, url, **kw):
         return last
     return last
 
-def _asana_notes_size(s):
-    """The size Asana actually enforces on `notes`. The API stores notes as rich
-    text: it HTML-escapes the plain text server-side (& → &amp;, < → &lt;, …) and
-    limits the ESCAPED representation to ~65,535 bytes. A URL-heavy report (news
-    links full of `&`) inflates 5× per ampersand on conversion, so measuring raw
-    characters — or even raw UTF-8 bytes — under-counts and the API still 400s
-    (2026-07-16: 65,000 chars = 68,709 raw bytes → "Value is too large"; capped
-    to 65,000 raw bytes → "Rich text value is too large"). html.escape with
-    quote=True escapes a superset of what Asana escapes, so this never
-    under-counts."""
-    return len(html_mod.escape(s, quote=True).encode("utf-8"))
+# Named-entity costs for the HTML specials; every other non-ASCII code point is
+# budgeted at its numeric-entity form ("&#8594;" for →), the largest encoding the
+# rich-text conversion can produce for it.
+_ASANA_ENTITY_COST = {"&": 5, "<": 4, ">": 4, '"': 6, "'": 6}
 
-def cap_notes(narrative):
+def _asana_notes_size(s):
+    """WORST-CASE size of what Asana's rich-text conversion can make of `notes`.
+    The API stores notes as rich text and limits the CONVERTED representation to
+    ~65,535 bytes; the conversion escapes HTML specials (& → &amp;, …) AND can
+    entity-encode non-ASCII code points (→ → &#8594;, 🛡 → &#128737;), so a
+    report heavy in arrows/bullets/emoji/Arabic inflates far beyond its UTF-8
+    byte count. Both under-counting bugs were hit live on 2026-07-16: capping by
+    characters, by raw UTF-8 bytes, and finally by html.escape'd bytes (65,000)
+    each still returned "Rich text value is too large". Numeric-entity
+    accounting is ≥ the UTF-8 length and ≥ every escape Asana applies, so this
+    measure never under-counts (post_unified_task retries with a smaller budget
+    as a final backstop should Asana's accounting ever grow again)."""
+    total = 0
+    for ch in s:
+        cost = _ASANA_ENTITY_COST.get(ch)
+        if cost is None:
+            cp = ord(ch)
+            cost = 1 if cp < 0x80 else 3 + len(str(cp))  # "&#" + digits + ";"
+        total += cost
+    return total
+
+def cap_notes(narrative, limit=None):
     """Cap a report to Asana's notes limit WITHOUT amputating the sign-off / retention
     footer at the end — truncate the body, keep the tail. Sizes are measured with
-    _asana_notes_size (escaped UTF-8 bytes — see above); the head cut lands on a
-    character boundary by construction."""
-    if _asana_notes_size(narrative) <= ASANA_NOTES_MAX:
+    _asana_notes_size (worst-case rich-text bytes — see above); the head cut lands
+    on a character boundary by construction. `limit` overrides ASANA_NOTES_MAX so
+    post_unified_task can retry with a smaller budget if Asana still refuses."""
+    limit = ASANA_NOTES_MAX if limit is None else limit
+    if _asana_notes_size(narrative) <= limit:
         return narrative
     tail = narrative[-1200:]
     marker = "\n…[body truncated — see workflow run log]…\n"
-    budget = ASANA_NOTES_MAX - _asana_notes_size(tail) - _asana_notes_size(marker)
+    budget = limit - _asana_notes_size(tail) - _asana_notes_size(marker)
     lo, hi = 0, len(narrative)
-    while lo < hi:  # longest head whose escaped size fits the budget
+    while lo < hi:  # longest head whose worst-case size fits the budget
         mid = (lo + hi + 1) // 2
         if _asana_notes_size(narrative[:mid]) <= budget:
             lo = mid
         else:
             hi = mid - 1
-    log(f"  notes truncated (rich-text {_asana_notes_size(narrative)} → ≤{ASANA_NOTES_MAX} bytes); "
+    log(f"  notes truncated (worst-case rich-text {_asana_notes_size(narrative)} → ≤{limit} bytes); "
         f"sign-off/retention preserved")
     return narrative[:lo] + marker + tail
 
@@ -2712,6 +2727,26 @@ def enforce_eocn_review_gate():
         if EOCN_REVIEW_HARD_FAIL:
             sys.exit(3)
 
+# Set by post_unified_task when every attempt (including the shrink-and-retry
+# budgets) failed; read by enforce_delivery_gate(). Kill-switch:
+# DELIVERY_HARD_FAIL=0 keeps the alarm but not the exit.
+UNIFIED_DELIVERY_FAILED = {"failed": False}
+DELIVERY_HARD_FAIL = os.environ.get("DELIVERY_HARD_FAIL", "1") == "1"
+
+def enforce_delivery_gate():
+    """A screening run whose report never reached the MLRO queue must be RED.
+    The freshness alarm and the Actions failure email key on the run
+    CONCLUSION — observed live 2026-07-16: Asana 400s on oversized notes left
+    the runs green while no task, no MLRO cases and no persisted delta-state
+    existed, so the alarm chain saw a healthy control that had delivered
+    nothing. Runs before the other gates: an undelivered run is the more
+    fundamental failure."""
+    if UNIFIED_DELIVERY_FAILED["failed"]:
+        log("DELIVERY GATE: the unified screening task was never created — "
+            "failing the run so the freshness alarm and Actions email fire")
+        if DELIVERY_HARD_FAIL:
+            sys.exit(5)
+
 def load_eocn_mirror():
     """Returns (names, meta) for the OpenSanctions mirror of the UAE Local
     Terrorist List — SUPPLEMENTARY tier (drift tracking; never core coverage)."""
@@ -3230,20 +3265,34 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
         task_name = f"🆕 {flag} Onboarding Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
     else:
         task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
-    payload = {"data": {
-        "name": task_name[:250],
-        "notes": cap_notes(narrative),
-        "due_on": run_time.strftime("%Y-%m-%d"),
-        "assignee": ASANA_ASSIGNEE_GID,
-        "projects": [ASANA_ONGOING_MON_GID],
-        "memberships": [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}],
-    }}
-    r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
-    if r is not None and r.status_code in (200, 201):
-        gid = r.json()["data"]["gid"]
-        log(f"OK Unified daily task created: {gid}")
-        return gid
-    log(f"FAIL unified task: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:300]}")
+    # Shrink-and-retry: the worst-case sizing in cap_notes should fit first try,
+    # but Asana's server-side rich-text accounting is not documented — if it
+    # still answers "too large", rebuild with a smaller budget rather than lose
+    # the day's delivery. Floor of 12,000 keeps the summary + sign-off intact.
+    budget, last = ASANA_NOTES_MAX, None
+    for _ in range(5):
+        payload = {"data": {
+            "name": task_name[:250],
+            "notes": cap_notes(narrative, budget),
+            "due_on": run_time.strftime("%Y-%m-%d"),
+            "assignee": ASANA_ASSIGNEE_GID,
+            "projects": [ASANA_ONGOING_MON_GID],
+            "memberships": [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}],
+        }}
+        r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+        if r is not None and r.status_code in (200, 201):
+            gid = r.json()["data"]["gid"]
+            log(f"OK Unified daily task created: {gid}")
+            return gid
+        last = r
+        body = (getattr(r, "text", "") or "").lower()
+        if r is not None and r.status_code == 400 and "too large" in body and budget > 12000:
+            budget = max(12000, int(budget * 0.6))
+            log(f"  Asana still rejects the notes as too large — retrying with a {budget}-byte budget")
+            continue
+        break
+    log(f"FAIL unified task: {getattr(last,'status_code','network')} - {getattr(last,'text','')[:300]}")
+    UNIFIED_DELIVERY_FAILED["failed"] = True
     return None
 
 def create_case_subtask(parent_gid, name, notes, due_on):
@@ -3679,6 +3728,7 @@ def run_unified(run_time):
     customers = get_all_customers()
     screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily")
     log("Unified run done.")
+    enforce_delivery_gate()
     enforce_list_outage_gate()
     enforce_eocn_review_gate()
 
@@ -3707,6 +3757,7 @@ def run_onboarding(run_time):
     all_lists, list_meta = load_all_lists()
     screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
     log("Onboarding run done.")
+    enforce_delivery_gate()
     enforce_list_outage_gate()
     enforce_eocn_review_gate()
 
