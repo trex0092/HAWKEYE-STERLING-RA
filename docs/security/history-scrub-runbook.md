@@ -27,13 +27,19 @@ hygiene rather than a necessity.
 
 ## What a rewrite cannot fix
 
-- **The state branches re-expose current data by design.** `screen-state`,
-  `screen-delta-state`, `sanctions-watch-state`, `reg-watch-state` and
-  `fatf-state` are force-rebuilt on every scheduled run from the live
-  screening of the customer base — the day after a scrub they will again
-  carry current subject data. A rewrite erases the *past*; the complete fix
-  for the *present* is Option A or moving state persistence to private
-  storage (a follow-up engineering task).
+- **The subject-data state branches re-expose current data by design.**
+  `screen-state` and `screen-delta-state` are force-rebuilt on every scheduled
+  run from the live screening of the customer base, so the day after a scrub
+  they would again carry current subject data in plaintext, UNLESS the
+  `STATE_ENCRYPTION_KEY` repository secret is set: with it, those two branches
+  commit only encrypted state (`scripts/state-crypto.mjs`, merged 2026-07-16)
+  and the plaintext re-exposure stops going forward. The other three state
+  branches (`sanctions-watch-state`, `reg-watch-state`, `fatf-state`) were
+  inspected on 2026-07-16 and carry list-fingerprint metadata, public
+  regulator page snapshots and country lists only, no subject or personal
+  data, so they need no handling beyond the rewrite itself. A rewrite erases
+  the *past*; the *present* is closed by setting the secret (Option A remains
+  the strongest single fix).
 - **Old Netlify deploy permalinks.** Pre-redaction deploys remain reachable
   at their `https://<deploy-id>--hawkeye-sterling-ra.netlify.app` URLs.
   Delete old deploys in the Netlify UI where offered (or via support). The
