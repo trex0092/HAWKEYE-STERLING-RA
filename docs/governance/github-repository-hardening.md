@@ -193,16 +193,23 @@ owner's act, after a UI glance wherever the evidence column says so.
 
 | # | Control | Automated verification (2026-07-16) | Applied (date / by) |
 |---|---|---|---|
-| 1 | Branch protection on `main` (Section 1) | PASS: branches API returns `protected: true`; all 8 required checks plus strict up-to-date enforced on every PR merged this day (#258, #259) | ☐ |
-| 2 | General settings: squash-only, auto-delete branches, features (Section 2) | PASS on API-visible parts: wiki/projects/downloads off, issues on; 13 consecutive squash merges in 24h, newest merge commit on `main` dates to 5 Jul (pre-rule); zero stray branches. Merge-commit/rebase disablement: owner UI glance | ☐ |
-| 3 | Description / topics / social preview (Section 2) | PASS for description, homepage and all 10 topics (exact match to Section 2). Social preview image: owner UI glance | ☐ |
-| 4 | Dependency graph + Dependabot alerts + security updates (Section 3) | PARTIAL: graph proven on (required Dependency Review check green on every PR, hard-fails without it); Dependabot version PRs merged (#214, #216). Alerts + security-updates toggles: owner UI glance | ☐ |
-| 5 | Secret scanning + push protection (Section 3) | No session read surface (api.github.com egress-blocked; no MCP settings endpoint). Compensating control verified: gitleaks required check green on every PR. Owner UI | ☐ |
-| 6 | Private vulnerability reporting (Section 3) | No session read surface. Owner UI | ☐ |
-| 7 | `release` environment with required reviewer (Section 4) | ACTIVE: four measured holds on 2026-07-16 (82s, 133s, 270s, 60s) across `auto-release.yml` and `release.yml`, incl. dispatch probe run 29484768299; the variable pattern matches a required reviewer approved by a human, not a fixed wait timer. Owner confirms rule type in the UI | ☐ |
-| 8 | Tag protection `v*` (Section 5) | No session read surface (session push path rejects all tag pushes at the transport layer, so probing proves nothing). Indirect: all 7 `v*` tags were created by the release automation; no stray tags | ☐ |
-| 9 | Code-scanning: 0 open alerts (Section 6) | PASS: alert-inventory run 29476614879 (2026-07-16) reports TOTAL_OPEN_ALERTS=0 | ☐ |
+| 1 | Branch protection on `main` (Section 1) | PASS: branches API returns `protected: true`; all 8 required checks plus strict up-to-date enforced on every PR merged this day (#258, #259) | 2026-07-16 / @trex0092 |
+| 2 | General settings: squash-only, auto-delete branches, features (Section 2) | PASS on API-visible parts: wiki/projects/downloads off, issues on; 13 consecutive squash merges in 24h, newest merge commit on `main` dates to 5 Jul (pre-rule); zero stray branches. Merge-commit/rebase disablement: owner UI glance | 2026-07-16 / @trex0092 |
+| 3 | Description / topics / social preview (Section 2) | PASS for description, homepage and all 10 topics (exact match to Section 2). Social preview image: owner UI glance | 2026-07-16 / @trex0092 |
+| 4 | Dependency graph + Dependabot alerts + security updates (Section 3) | PARTIAL: graph proven on (required Dependency Review check green on every PR, hard-fails without it); Dependabot version PRs merged (#214, #216). Alerts + security-updates toggles: owner UI glance | 2026-07-16 / @trex0092 |
+| 5 | Secret scanning + push protection (Section 3) | No session read surface (api.github.com egress-blocked; no MCP settings endpoint). Compensating control verified: gitleaks required check green on every PR. Owner UI | 2026-07-16 / @trex0092 |
+| 6 | Private vulnerability reporting (Section 3) | No session read surface. Owner UI | 2026-07-16 / @trex0092 |
+| 7 | `release` environment with required reviewer (Section 4) | ACTIVE: four measured holds on 2026-07-16 (82s, 133s, 270s, 60s) across `auto-release.yml` and `release.yml`, incl. dispatch probe run 29484768299; the variable pattern matches a required reviewer approved by a human, not a fixed wait timer. Owner confirms rule type in the UI | 2026-07-16 / @trex0092 |
+| 8 | Tag protection `v*` (Section 5) | No session read surface (session push path rejects all tag pushes at the transport layer, so probing proves nothing). Indirect: all 7 `v*` tags were created by the release automation; no stray tags | 2026-07-16 / @trex0092 |
+| 9 | Code-scanning: 0 open alerts (Section 6) | PASS: alert-inventory run 29476614879 (2026-07-16) reports TOTAL_OPEN_ALERTS=0 | 2026-07-16 / @trex0092 |
 | 10 | Settings GitHub App installed (auto-applies Sections 1–2) | No session read surface (app installations not readable). Indirect: live protection shape matches `.github/settings.yml` (8 contexts, strict). Owner UI glance | ☐ |
+
+> **Attestation basis, rows 1 to 9 (2026-07-16):** the repository owner
+> (@trex0092) confirmed completion of the corresponding Settings actions in
+> session on 2026-07-16 (confirmation recorded on Asana tasks P24 and P29), on
+> top of the automated evidence in the verification column. Row 10 remains open
+> pending the owner's confirmation that the Settings GitHub App is installed;
+> one word closes it.
 
 ### Apply-now priority (2026-07 deep-audit finding)
 
