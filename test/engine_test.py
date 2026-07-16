@@ -1292,6 +1292,40 @@ screen.EOCN_REVIEW_ALERT.update(_prev_alert)
 screen.EOCN_SOURCE_STATE.update(_prev_src_state)
 screen.EOCN_JSON_PATH = _prev_json_path
 
+print("str_dossier — goAML-aligned STR/SAR draft assembler (draft only, never files)")
+import str_dossier
+check("example case validates clean", str_dossier.validate_case(str_dossier.EXAMPLE_CASE) == [])
+_dossier = str_dossier.build_dossier(str_dossier.EXAMPLE_CASE, today="2026-07-16")
+check("dossier is stamped DRAFT and not a filing",
+      "NOT A FILING" in _dossier and "No automated filing" in _dossier)
+check("dossier maps the goAML field groups",
+      all(s in _dossier for s in ["Report header (goAML", "Reporting entity (goAML",
+                                  "Subject of the report (goAML", "Transactions / activity (goAML",
+                                  "Grounds for suspicion (goAML", "Report indicators"]))
+check("dossier embeds the same grounds narrative as the case card (ai.draft_str)",
+      "SUSPICIOUS TRANSACTION REPORT — DRAFT" in _dossier
+      and "UN Consolidated" in _dossier and "EXAMPLE PERSON" in _dossier)
+check("dossier renders the transaction table and subject particulars",
+      "| 2026-07-01 |" in _dossier and "1962-08-08" in _dossier and "Exampleland" in _dossier)
+check("dossier carries the tipping-off warning and the sign-off block",
+      "tip off" in _dossier and "MLRO sign-off" in _dossier and "goAML ref" in _dossier)
+_bad = {"customer": {"name": ""}, "risk": {"rating": "SEVERE"},
+        "transactions": [{"date": "2026-07-01"}]}
+_errs = str_dossier.validate_case(_bad)
+check("validation names every problem (missing hits, blank name, bad rating, short txn)",
+      any("hits" in e for e in _errs) and any("customer.name" in e for e in _errs)
+      and any("risk.rating" in e for e in _errs)
+      and any("transactions[0].type" in e for e in _errs))
+_raised = False
+try:
+    str_dossier.build_dossier(_bad)
+except ValueError:
+    _raised = True
+check("building an invalid case raises instead of producing a broken dossier", _raised)
+check("a case with no transactions renders the SAR fallback line",
+      "No transaction rows supplied" in str_dossier.build_dossier(
+          {**str_dossier.EXAMPLE_CASE, "transactions": []}, today="2026-07-16"))
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
