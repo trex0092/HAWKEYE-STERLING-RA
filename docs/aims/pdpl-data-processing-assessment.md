@@ -60,10 +60,12 @@ PDPL Art. 22–23; (c) log it in `third-party-register.md`. Until then the syste
 no-egress by design.
 
 ## 6. Residual risk & actions
-- **Open action:** execute the Anthropic DPA and record the transfer basis **before**
-  flipping the system to LLM-enabled in production (tracked in the third-party
-  register). Until done, keep `REPORT_ALLOW_LLM=0` and treat the key as not provisioned
-  for any path that would transmit personal data beyond name+headline.
+- **Open action, updated 2026-07-16:** the Anthropic DPA is recorded as executed per
+  the owner's attestation of 2026-07-16 (third-party register row), and the owner
+  reports `LLM_TRIAGE=1` enabled the same day. What remains open: counsel's written
+  confirmation of the transfer basis, to be recorded in the third-party register when
+  received (Asana P26). `REPORT_ALLOW_LLM` stays `0`: generative report prose remains
+  off; only grounded triage (name + one public headline) is enabled by this change.
 - Residual after controls: **Low** (no-egress default; minimisation; masking).
 
 ## Evidence
