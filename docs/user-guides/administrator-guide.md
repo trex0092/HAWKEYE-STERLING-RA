@@ -15,6 +15,7 @@ risk-data resets. You own the server-side configuration.
 | `ASANA_PROJECT_GID` → HAWKEYE STERLING APP | Netlify env + code default |
 | `ANTHROPIC_API_KEY` (optional, for Advisor/triage) | Netlify env + GitHub secret |
 | Monitoring secrets (`ASANA_ACCESS_TOKEN`) | GitHub Actions secrets |
+| `STATE_ENCRYPTION_KEY` (encrypts screening state branches, P30) | GitHub Actions secret, **pending: create it to switch state commits to encrypted** |
 | **4 Asana custom fields** → `ASANA_CF_*` | **pending — create then wire** |
 
 ## Per-device setup (each officer)

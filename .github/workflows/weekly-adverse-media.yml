@@ -91,16 +91,22 @@ jobs:
         run: pip install --quiet --require-hashes -r ci/requirements.txt
 
       - name: Overlay latest delta-state (lives on the screen-delta-state branch)
+        env:
+          STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
         run: |
           # Branch protection blocks direct pushes to main (GH006 — the old
           # main-push below failed silently since 7 Jul), so the delta-state
           # lives on a dedicated data branch. Without the overlay every run
-          # re-reports findings already delivered.
+          # re-reports findings already delivered. With STATE_ENCRYPTION_KEY
+          # set the branch carries <file>.enc instead of subject-data
+          # plaintext (P30): decrypt restores the working files; an .enc with
+          # no key fails loudly rather than running with amnesia.
           if git fetch origin screen-delta-state --depth=1 2>/dev/null; then
-            git checkout FETCH_HEAD -- data/screen-delta-state.json 2>/dev/null || true
-            git checkout FETCH_HEAD -- data/adverse-media-evidence.json 2>/dev/null || true
-            git checkout FETCH_HEAD -- data/run-metrics.json 2>/dev/null || true
-            git checkout FETCH_HEAD -- data/source-coverage-state.json 2>/dev/null || true
+            for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
+              git checkout FETCH_HEAD -- "$f" 2>/dev/null || true
+              git checkout FETCH_HEAD -- "$f.enc" 2>/dev/null || true
+            done
+            node scripts/state-crypto.mjs decrypt data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json
             echo "delta-state overlaid from screen-delta-state"
           else
             echo "no screen-delta-state branch yet — using state from main"
@@ -148,10 +154,15 @@ jobs:
         if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
         run: |
           # Stage only the state files that exist: a degraded/early-exit run
           # doesn't write the optional ones, and a hard `git add` of a missing
-          # path fatals (exit 128) instead of persisting the rest.
+          # path fatals (exit 128) instead of persisting the rest. With
+          # STATE_ENCRYPTION_KEY set, the commit carries only <file>.enc: the
+          # plaintext working files are restored to their main-branch content
+          # so CURRENT subject data never lands on the public branch (P30,
+          # encrypt-forward).
           state_files=()
           for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
             [ -f "$f" ] && state_files+=("$f")
@@ -159,7 +170,16 @@ jobs:
           if [ "${#state_files[@]}" -gt 0 ] && [ -n "$(git status --porcelain -- "${state_files[@]}")" ]; then
             git config user.name "daily-screening"
             git config user.email "actions@github.com"
-            git add -- "${state_files[@]}"
+            if [ -n "$STATE_ENCRYPTION_KEY" ]; then
+              node scripts/state-crypto.mjs encrypt "${state_files[@]}"
+              for f in "${state_files[@]}"; do
+                [ -f "$f.enc" ] && git add "$f.enc"
+                git checkout -- "$f" 2>/dev/null || true
+              done
+            else
+              echo "::warning::delta-state persisted in PLAINTEXT (subject data) - set the STATE_ENCRYPTION_KEY secret to encrypt state commits (P30)"
+              git add -- "${state_files[@]}"
+            fi
             git commit -m "chore(screen): update delta-state [skip ci]"
             # Persist on the screen-delta-state branch (main is protected):
             # rebuilt as <current main> + one data commit, force-updated.

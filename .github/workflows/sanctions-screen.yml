@@ -101,14 +101,22 @@ jobs:
           node-version: 22
 
       - name: Overlay latest screening + case state (lives on the screen-state branch)
+        env:
+          STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
         run: |
           # Branch protection blocks direct pushes to main, so per-subject
           # screening state and case-lifecycle state persist on a dedicated
           # data branch. Without the overlay every run would re-alert standing
-          # matches and re-create existing cases.
+          # matches and re-create existing cases. With STATE_ENCRYPTION_KEY
+          # set the branch carries <file>.enc instead of subject-data
+          # plaintext (P30): decrypt restores the working files; an .enc with
+          # no key fails loudly rather than running with amnesia.
           if git fetch origin screen-state --depth=1 2>/dev/null; then
-            git checkout FETCH_HEAD -- data/sanctions-screen-state.json 2>/dev/null || true
-            git checkout FETCH_HEAD -- data/screening-cases-state.json 2>/dev/null || true
+            for f in data/sanctions-screen-state.json data/screening-cases-state.json; do
+              git checkout FETCH_HEAD -- "$f" 2>/dev/null || true
+              git checkout FETCH_HEAD -- "$f.enc" 2>/dev/null || true
+            done
+            node scripts/state-crypto.mjs decrypt data/sanctions-screen-state.json data/screening-cases-state.json
             echo "state overlaid from screen-state"
           else
             echo "no screen-state branch yet — using state from main"
@@ -164,18 +172,31 @@ jobs:
           # — the title can carry an upstream error message, so this is load-bearing.
           TITLE: ${{ steps.screen.outputs.title }}
           GITHUB_TOKEN: ${{ github.token }}
+          STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
         run: |
           # Branch protection blocks direct pushes to main (GH006 — the old
           # main-push here failed silently since 7 Jul), so the state lives on
           # the screen-state branch: rebuilt as <current main> + one data
           # commit, force-updated each run. Auth is the ephemeral env token in
           # the push URL — the checkout persists no credentials, so nothing
-          # lands in .git/config.
+          # lands in .git/config. With STATE_ENCRYPTION_KEY set, the commit
+          # carries only <file>.enc: the plaintext working files are restored
+          # to their main-branch content so CURRENT subject data never lands
+          # on the public branch (P30, encrypt-forward).
           if [ -n "$(git status --porcelain data/sanctions-screen-state.json data/screening-cases-state.json 2>/dev/null)" ]; then
             git config user.name "sanctions-screen"
             git config user.email "actions@github.com"
-            git add data/sanctions-screen-state.json
-            git add data/screening-cases-state.json 2>/dev/null || true
+            if [ -n "$STATE_ENCRYPTION_KEY" ]; then
+              node scripts/state-crypto.mjs encrypt data/sanctions-screen-state.json data/screening-cases-state.json
+              for f in data/sanctions-screen-state.json data/screening-cases-state.json; do
+                [ -f "$f.enc" ] && git add "$f.enc"
+                git checkout -- "$f" 2>/dev/null || true
+              done
+            else
+              echo "::warning::screen-state persisted in PLAINTEXT (subject data) - set the STATE_ENCRYPTION_KEY secret to encrypt state commits (P30)"
+              git add data/sanctions-screen-state.json
+              git add data/screening-cases-state.json 2>/dev/null || true
+            fi
             git commit -m "$TITLE [skip ci]"
             pushed=
             for attempt in 1 2 3 4 5; do
