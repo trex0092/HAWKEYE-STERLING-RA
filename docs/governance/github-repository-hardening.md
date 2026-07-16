@@ -202,14 +202,14 @@ owner's act, after a UI glance wherever the evidence column says so.
 | 7 | `release` environment with required reviewer (Section 4) | ACTIVE: four measured holds on 2026-07-16 (82s, 133s, 270s, 60s) across `auto-release.yml` and `release.yml`, incl. dispatch probe run 29484768299; the variable pattern matches a required reviewer approved by a human, not a fixed wait timer. Owner confirms rule type in the UI | 2026-07-16 / @trex0092 |
 | 8 | Tag protection `v*` (Section 5) | No session read surface (session push path rejects all tag pushes at the transport layer, so probing proves nothing). Indirect: all 7 `v*` tags were created by the release automation; no stray tags | 2026-07-16 / @trex0092 |
 | 9 | Code-scanning: 0 open alerts (Section 6) | PASS: alert-inventory run 29476614879 (2026-07-16) reports TOTAL_OPEN_ALERTS=0 | 2026-07-16 / @trex0092 |
-| 10 | Settings GitHub App installed (auto-applies Sections 1–2) | No session read surface (app installations not readable). Indirect: live protection shape matches `.github/settings.yml` (8 contexts, strict). Owner UI glance | ☐ |
+| 10 | Settings GitHub App installed (auto-applies Sections 1–2) | No session read surface (app installations not readable). Indirect: live protection shape matches `.github/settings.yml` (8 contexts, strict). Owner confirmed installed, in session, 2026-07-16 | 2026-07-16 / @trex0092 |
 
-> **Attestation basis, rows 1 to 9 (2026-07-16):** the repository owner
+> **Attestation basis, rows 1 to 10 (2026-07-16):** the repository owner
 > (@trex0092) confirmed completion of the corresponding Settings actions in
 > session on 2026-07-16 (confirmation recorded on Asana tasks P24 and P29), on
-> top of the automated evidence in the verification column. Row 10 remains open
-> pending the owner's confirmation that the Settings GitHub App is installed;
-> one word closes it.
+> top of the automated evidence in the verification column. Row 10 was attested
+> the same day on the owner's follow-up in-session confirmation that the
+> Settings GitHub App is installed.
 
 ### Apply-now priority (2026-07 deep-audit finding)
 
