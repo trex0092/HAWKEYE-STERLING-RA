@@ -1515,15 +1515,64 @@ def download(url, label):
         log(f"  ERROR {label}: {e}")
         return None
 
+# ── List-entry attributes (DOB / nationality) for match adjudication ─────────
+# Name-only matching forces the MLRO to open the source list just to see
+# whether a candidate is even plausibly the same person. Where a list carries
+# machine-readable attributes (UN XML: structured DOB + nationality; OFAC SDN:
+# DOB/nationality inside the remarks column), they are captured here keyed by
+# normalized name (primary names AND designated aliases) and attached to every
+# hit as decision-support CONTEXT. Annotation only: attributes never change a
+# score and never suppress a hit, so screening recall is untouched.
+LIST_ENTRY_ATTRS = {}
+_OFAC_ENT_ATTRS = {}   # ent_num -> (dobs, nationalities), links alt.csv aliases
+
+def _note_entry_attrs(name, dobs=None, nationalities=None):
+    key = normalize(name or "")
+    if not key or not (dobs or nationalities):
+        return
+    slot = LIST_ENTRY_ATTRS.setdefault(key, {"dob": set(), "nationality": set()})
+    for d in dobs or ():
+        d = str(d).strip()
+        if d: slot["dob"].add(d)
+    for n in nationalities or ():
+        n = str(n).strip()
+        if n: slot["nationality"].add(n)
+
+def match_context_for(matched_entry):
+    """Human-readable list-side attributes for a matched entry ('' if none)."""
+    a = LIST_ENTRY_ATTRS.get(normalize(matched_entry or ""))
+    if not a:
+        return ""
+    bits = []
+    if a["dob"]:
+        bits.append("list DOB: " + " / ".join(sorted(a["dob"])[:3]))
+    if a["nationality"]:
+        bits.append("list nationality: " + ", ".join(sorted(a["nationality"])[:3]))
+    return "; ".join(bits)
+
 def parse_ofac(data):
     names = set()
+    _OFAC_ENT_ATTRS.clear()
     if not data: return names, "unavailable", ""
     try:
         reader = csv.reader(io.StringIO(data.decode("latin-1")))
         for row in reader:
             if len(row) > 1:
                 n = row[1].strip().strip('"')
-                if n and n != "-0-": names.add(n)
+                if n and n != "-0-":
+                    names.add(n)
+                    # The remarks column (index 11) carries adjudication
+                    # attributes as prose ("DOB 08 Aug 1962; POB ...;
+                    # nationality Iraq; alt. DOB 1955"). Best-effort capture;
+                    # a "-0-" placeholder simply matches nothing.
+                    if len(row) > 11:
+                        dobs = re.findall(r"DOB\s+([^;]+)", row[11])
+                        nats = re.findall(r"nationality\s+([^;]+)", row[11])
+                        if dobs or nats:
+                            _note_entry_attrs(n, dobs, nats)
+                            ent = row[0].strip()
+                            if ent.isdigit():
+                                _OFAC_ENT_ATTRS[ent] = (dobs, nats)
     except Exception as e:
         log(f"  OFAC parse error: {e}")
     return names, "live", sha256_of(data)
@@ -1542,7 +1591,14 @@ def parse_ofac_alt(data):
         for row in reader:
             if len(row) > 3:
                 n = row[3].strip().strip('"')
-                if n and n != "-0-": aliases.add(n)
+                if n and n != "-0-":
+                    aliases.add(n)
+                    # An alias designates the same party: inherit the primary
+                    # entry's DOB/nationality via the shared ent_num so an
+                    # alias match shows the same adjudication context.
+                    attrs = _OFAC_ENT_ATTRS.get(row[0].strip())
+                    if attrs:
+                        _note_entry_attrs(n, attrs[0], attrs[1])
     except Exception as e:
         log(f"  OFAC alt parse error: {e}")
     return aliases
@@ -1560,18 +1616,37 @@ def parse_un(data):
             tag = "INDIVIDUAL" if section == "INDIVIDUALS" else "ENTITY"
             alias_tag = "INDIVIDUAL_ALIAS" if section == "INDIVIDUALS" else "ENTITY_ALIAS"
             for entry in sec.findall(tag):
+                entry_names = []
                 parts = []
                 for field in ["FIRST_NAME","SECOND_NAME","THIRD_NAME","FOURTH_NAME","NAME"]:
                     el = entry.find(field)
                     if el is not None and el.text: parts.append(el.text.strip())
-                if parts: names.add(" ".join(parts))
+                if parts: entry_names.append(" ".join(parts))
                 # Designated a.k.a. names are real designations the party operates
                 # under — capture them too (EU/UK parsers already do). Missing these
                 # was a false-negative gap: a UN alias-only match would screen clear.
                 for alias in entry.findall(alias_tag):
                     an = alias.find("ALIAS_NAME")
                     if an is not None and an.text and an.text.strip():
-                        names.add(an.text.strip())
+                        entry_names.append(an.text.strip())
+                names.update(entry_names)
+                # Structured adjudication attributes (individuals carry them;
+                # entity entries simply have none): every name of the party,
+                # aliases included, gets the same DOB/nationality context.
+                dobs = []
+                for dob in entry.findall("INDIVIDUAL_DATE_OF_BIRTH"):
+                    for t in ("DATE", "YEAR", "FROM_YEAR", "TO_YEAR"):
+                        el = dob.find(t)
+                        if el is not None and el.text and el.text.strip():
+                            dobs.append(el.text.strip())
+                nats = []
+                for nat in entry.findall("NATIONALITY"):
+                    for el in nat.findall("VALUE"):
+                        if el.text and el.text.strip():
+                            nats.append(el.text.strip())
+                if dobs or nats:
+                    for n in entry_names:
+                        _note_entry_attrs(n, dobs, nats)
     except Exception as e:
         log(f"  UN parse error: {e}")
     return names, date_str, sha256_of(data)
@@ -1930,7 +2005,8 @@ def screen_name(name, all_lists):
                 if score >= SHORT_ENTRY_THRESHOLD:
                     hits.append({"list": list_name, "matched_entry": orig, "score": score,
                                  "name_score": full, "core_score": core,
-                                 "confidence": confidence_tier(core)})
+                                 "confidence": confidence_tier(core),
+                                 "match_context": match_context_for(orig)})
                 continue
             # Primary gate: whole-string AND distinctive-core agreement (min()).
             # Additive recall gate: a true token-SUBSET (every distinctive token of
@@ -1942,7 +2018,8 @@ def screen_name(name, all_lists):
                (subset and best_tset >= TOKENSET_THRESHOLD):
                 hits.append({"list": list_name, "matched_entry": orig, "score": score,
                              "name_score": full, "core_score": core, "set_score": best_tset,
-                             "confidence": confidence_tier(core)})
+                             "confidence": confidence_tier(core),
+                             "match_context": match_context_for(orig)})
     best = {}
     for h in hits:
         key = (h["list"], h["matched_entry"])
@@ -2150,6 +2227,8 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                     f"   Matched Entry:   {h['matched_entry']}",
                     f"   Score:           {_pct(h['score'])}",
                 ]
+                if h.get("match_context"):
+                    lines.append(f"   List Attributes: {h['match_context']}")
             lines += [
                 f"   Action:          IMMEDIATE ESCALATION TO MLRO",
                 f"                    Do not tip off customer.",
@@ -2176,6 +2255,8 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                     f"   Matched Entry:   {h['matched_entry']}",
                     f"   Score:           {_pct(h['score'])}",
                 ]
+                if h.get("match_context"):
+                    lines.append(f"   List Attributes: {h['match_context']}")
             lines += [
                 f"   MLRO Decision:   ☐ False Positive   ☐ Escalate   ☐ Investigate",
                 "",
@@ -2534,8 +2615,10 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
              "Do NOT tip off customer. CR 74/2020 applies.\n"]
     for h in hits:
         lines += [f"List:    {h.get('list','?')}",
-                  f"Matched: {h.get('matched_entry','?')}",
-                  f"Score:   {_pct(h.get('score',0))}\n"]
+                  f"Matched: {h.get('matched_entry','?')}"]
+        if h.get("match_context"):
+            lines.append(f"Context: {h['match_context']}")
+        lines.append(f"Score:   {_pct(h.get('score',0))}\n")
     r = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{customer_gid}/stories",
                       json={"data": {"text": "\n".join(lines)}})
     if r is not None and r.status_code in (200,201):
@@ -2760,6 +2843,7 @@ def enforce_list_outage_gate():
             sys.exit(4)
 
 def load_all_lists():
+    LIST_ENTRY_ATTRS.clear()   # adjudication attributes are per-load state
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
@@ -2926,6 +3010,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 link = " · owner/UBO → 50%/control rule" if h.get("control_linkage") else ""
                 A(f"   -> [{h['subject_type']}] {h['subject_name']}  —  {h['list']}: "
                   f"\"{h['matched_entry']}\"   {_pct(h['score'])}{conf}{nflag}{link}")
+                # List-side adjudication attributes (DOB/nationality where the
+                # source publishes them) so plausibility is judged from the card.
+                if h.get("match_context"):
+                    A(f"        Adjudication: {h['match_context']}")
                 # R.10 — identity dossier + open CDD gaps for the matched individual.
                 if h.get("identity"):
                     A(f"        Identity (R.10): {h['identity']}")
@@ -3163,6 +3251,8 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
             notes.append(f"- [{h['subject_type']}] {h['subject_name']} → {h['list']}: "
                          f"\"{h['matched_entry']}\"  {_pct(h['score'])} ({h.get('confidence','')})"
                          + ("  [owner/UBO → 50%/control rule]" if h.get("control_linkage") else ""))
+            if h.get("match_context"):
+                notes.append(f"    {h['match_context']}")
         notes += ["", "Disposition: [ ] false positive   [ ] escalate / freeze (TFS)   [ ] investigate",
                   "Do not tip off. UAE Cabinet Resolution 74/2020 applies."]
         # Attach an AI-assisted STR/SAR DRAFT for HIGH-risk / confirmed cases (human files).
@@ -3627,6 +3717,7 @@ def main():
     log(f"Starting: {run_label}")
 
     # Download lists
+    LIST_ENTRY_ATTRS.clear()   # adjudication attributes are per-load state
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
