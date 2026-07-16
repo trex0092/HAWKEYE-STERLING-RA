@@ -92,10 +92,9 @@ Run at least quarterly, and after any period where the review-age alarm fired:
 |---|---|---|---|---|---|---|---|
 | 2026-06-19 | MLRO | review (recorded retrospectively) | `lastReviewed` in the data file | 312 → 312 | n/a | baseline for this SOP | MLRO |
 | 2026-07 | MLRO | sample currency check (recorded in the compliance register, 2026-07-14) | register verification | 312 → 312 | 20 of 20 recent designations present; 17 of 17 delistings absent | none required; NOT a full reconciliation | MLRO |
-| _next_ | | **first full §4 reconciliation: to be performed and recorded here** | | | | | |
+| 2026-07-16 | MLRO (mechanical comparison executed by compliance automation from the official publication supplied by the MLRO; the merge of the recording PR is the MLRO sign-off) | full reconciliation (§4, both directions) | official EOCN Local Terrorist List publication dated 13 Jul 2026 | 312 → 312 | 288 publication decision rows parsed: 261 active listings, 27 de-listings (رفع الإدراج rows). Every active designation matched into the file (0 missing); no de-listed party present in the file (0 stale). One file-side alias spelling had no exact publication match and is retained per §5 (curated file is authoritative for aliases). | none required; `lastReviewed` refreshed to 2026-07-16 | MLRO (PR merge) |
 
 ---
 
-*The sample check above verified a sample, not the whole file: the first full
-line-by-line reconciliation under §4 remains an open MLRO action and this SOP
-is not fully operational until that row is completed.*
+*First full §4 reconciliation completed and recorded 2026-07-16. The next is
+due per the §1 triggers or the weekly review window, whichever comes first.*

@@ -2,7 +2,7 @@
   "_README": "UAE EOCN Local Terrorist List — maintained in-repo because the Executive Office for Control & Non-Proliferation publishes it ONLY as PDF/Excel behind bot protection (no free machine-readable feed) and this repo is zero-dependency (cannot parse PDF/XLSX). Populate `entries` from the official download at https://www.uaeiec.gov.ae (Local Terrorist List). Each entry is either a plain string or { \"name\": \"…\", \"aliases\": [\"…\"] }. While `entries` is empty the screen reports UAE EOCN coverage as DEGRADED (incomplete) — it is never treated as a clean result. scripts/sanctions-watch.mjs can fingerprint the EOCN page so a change prompts an update here. Update procedure, reconciliation and evidence log: docs/aims/eocn-list-update-sop.md.",
   "source": "https://www.uaeiec.gov.ae (EOCN Local Terrorist List, official PDF)",
   "list": "UAE Local Terrorist List (Cabinet / EOCN designations)",
-  "lastReviewed": "2026-06-19",
+  "lastReviewed": "2026-07-16",
   "populated": true,
   "entries": [
     "KHALIFA MOHD T AL SUBAEY",
