@@ -190,7 +190,7 @@ jobs:
               node scripts/state-crypto.mjs encrypt data/sanctions-screen-state.json data/screening-cases-state.json
               for f in data/sanctions-screen-state.json data/screening-cases-state.json; do
                 [ -f "$f.enc" ] && git add "$f.enc"
-                git checkout -- "$f" 2>/dev/null || true
+                git checkout HEAD -- "$f" 2>/dev/null || true
               done
             else
               echo "::warning::screen-state persisted in PLAINTEXT (subject data) - set the STATE_ENCRYPTION_KEY secret to encrypt state commits (P30)"
