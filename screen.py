@@ -9,6 +9,7 @@ Modes:
 """
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
+import html as html_mod
 import threading
 import xml.etree.ElementTree as ET
 import concurrent.futures
@@ -703,7 +704,7 @@ def log(msg):
     print(f"[{datetime.datetime.utcnow().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 # ── ASANA TRANSPORT (honours 429 rate-limit; retries transient errors) ────────
-ASANA_NOTES_MAX = 65000  # UTF-8 BYTES — Asana enforces ~65,400 bytes, not characters
+ASANA_NOTES_MAX = 65000  # budget for the ESCAPED rich-text bytes Asana enforces (~65,535) — see _asana_notes_size
 
 def asana_request(method, url, **kw):
     """Single Asana call path. Retries on 429 (respecting Retry-After) and 5xx so a
@@ -725,23 +726,38 @@ def asana_request(method, url, **kw):
         return last
     return last
 
+def _asana_notes_size(s):
+    """The size Asana actually enforces on `notes`. The API stores notes as rich
+    text: it HTML-escapes the plain text server-side (& → &amp;, < → &lt;, …) and
+    limits the ESCAPED representation to ~65,535 bytes. A URL-heavy report (news
+    links full of `&`) inflates 5× per ampersand on conversion, so measuring raw
+    characters — or even raw UTF-8 bytes — under-counts and the API still 400s
+    (2026-07-16: 65,000 chars = 68,709 raw bytes → "Value is too large"; capped
+    to 65,000 raw bytes → "Rich text value is too large"). html.escape with
+    quote=True escapes a superset of what Asana escapes, so this never
+    under-counts."""
+    return len(html_mod.escape(s, quote=True).encode("utf-8"))
+
 def cap_notes(narrative):
     """Cap a report to Asana's notes limit WITHOUT amputating the sign-off / retention
-    footer at the end — truncate the body, keep the tail. Asana measures the limit in
-    UTF-8 BYTES (~65,400), not characters: Arabic findings and typographic characters
-    encode as 2–4 bytes each, so a character-based cap can still overflow the API
-    (2026-07-16 run: 65,000 chars = 68,709 bytes → HTTP 400, and the MLRO task plus
-    delta-state persistence were lost). Cap by encoded size, cut on a character
-    boundary (a partial code point at the cut is dropped by errors="ignore")."""
-    raw = narrative.encode("utf-8")
-    if len(raw) <= ASANA_NOTES_MAX:
+    footer at the end — truncate the body, keep the tail. Sizes are measured with
+    _asana_notes_size (escaped UTF-8 bytes — see above); the head cut lands on a
+    character boundary by construction."""
+    if _asana_notes_size(narrative) <= ASANA_NOTES_MAX:
         return narrative
     tail = narrative[-1200:]
     marker = "\n…[body truncated — see workflow run log]…\n"
-    budget = ASANA_NOTES_MAX - len(tail.encode("utf-8")) - len(marker.encode("utf-8"))
-    head = raw[:budget].decode("utf-8", "ignore")
-    log(f"  notes truncated ({len(raw)} → ≤{ASANA_NOTES_MAX} bytes); sign-off/retention preserved")
-    return head + marker + tail
+    budget = ASANA_NOTES_MAX - _asana_notes_size(tail) - _asana_notes_size(marker)
+    lo, hi = 0, len(narrative)
+    while lo < hi:  # longest head whose escaped size fits the budget
+        mid = (lo + hi + 1) // 2
+        if _asana_notes_size(narrative[:mid]) <= budget:
+            lo = mid
+        else:
+            hi = mid - 1
+    log(f"  notes truncated (rich-text {_asana_notes_size(narrative)} → ≤{ASANA_NOTES_MAX} bytes); "
+        f"sign-off/retention preserved")
+    return narrative[:lo] + marker + tail
 
 # ── ADVERSE MEDIA ─────────────────────────────────────────────────────────────
 # How many Google News locales (from the worldwide GNEWS_LOCALES matrix) to sweep
