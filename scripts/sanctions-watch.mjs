@@ -17,6 +17,7 @@
    Modes: check (default) | seed (record baselines, flag nothing).
 */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { loadSources, computeChanges, contentChanges } from './reg-watch.mjs';
 
@@ -225,9 +226,97 @@ export function capTfsEntries(entries, cap = TFS_LOG_CAP) {
   return a.length > cap ? a.slice(a.length - cap) : a;
 }
 
+/* ── Tamper-evident chain over the TFS log ──────────────────────────────────
+   The log is audit evidence; a hash chain makes any after-the-fact edit,
+   deletion or reordering detectable. Two seals per entry, because entries are
+   append-only in their DETECTION but legitimately mutate once at RESOLUTION:
+     chainHash      - sha256 over chainPrev + the immutable detection fields,
+                      linked entry-to-entry (chainPrev = previous chainHash);
+     resolutionHash - sha256 over chainHash + the resolution fields, added
+                      when the entry reaches a terminal status.
+   Verification accepts the first entry's chainPrev as-is: capTfsEntries drops
+   the oldest entries, and the dated snapshots under data/retention witness the
+   dropped prefix. Everything after the first entry must link exactly. */
+export const TFS_CHAIN_FIELDS = ['id', 'list', 'change', 'publicationDate', 'detectedAt', 'prevCount', 'newCount'];
+export const TFS_RESOLUTION_FIELDS = ['status', 'rescreen', 'latencyHours'];
+
+function sha256Hex(s) {
+  return createHash('sha256').update(s).digest('hex');
+}
+
+/* Deterministic JSON: sorted keys, undefined-valued keys skipped (matching
+   JSON.stringify), so the same logical entry always hashes identically. */
+export function canonicalJson(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(x => canonicalJson(x === undefined ? null : x)).join(',') + ']';
+  return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort()
+    .map(k => JSON.stringify(k) + ':' + canonicalJson(v[k])).join(',') + '}';
+}
+
+function pickFields(entry, fields) {
+  const out = {};
+  for (const f of fields) { if (entry[f] !== undefined) out[f] = entry[f]; }
+  return out;
+}
+
+function chainHashOf(entry, prev) {
+  return sha256Hex((prev || '') + '\n' + canonicalJson(pickFields(entry, TFS_CHAIN_FIELDS)));
+}
+
+function resolutionHashOf(entry) {
+  return sha256Hex(entry.chainHash + '\n' + canonicalJson(pickFields(entry, TFS_RESOLUTION_FIELDS)));
+}
+
+/* Seal the log in place: chain every entry that has no chainHash yet (on the
+   first sealed run this migrates the whole pre-chain log), and add the
+   resolution seal to every terminal entry that lacks one. Idempotent; returns
+   how many entries were touched. Mutates entries. */
+export function sealTfsLog(entries) {
+  let touched = 0;
+  let prev = '';
+  for (const e of entries || []) {
+    let changed = false;
+    if (!e.chainHash) {
+      e.chainPrev = prev;
+      e.chainHash = chainHashOf(e, prev);
+      changed = true;
+    }
+    if (!e.resolutionHash && e.status !== 'pending-rescreen') {
+      e.resolutionHash = resolutionHashOf(e);
+      changed = true;
+    }
+    if (changed) touched++;
+    prev = e.chainHash;
+  }
+  return touched;
+}
+
+/* Walk the sealed log and prove nothing was edited, deleted or reordered.
+   Returns {ok, index, reason}: index is the first offending entry (-1 when
+   clean). Every entry must be sealed (sealTfsLog migrates legacy logs on the
+   first run after this shipped), linked to its predecessor, and terminal
+   entries must carry a matching resolution seal. */
+export function verifyTfsChain(entries) {
+  const list = entries || [];
+  let prev = null;
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i];
+    if (!e.chainHash) return { ok: false, index: i, reason: 'entry is not sealed' };
+    if (prev !== null && e.chainPrev !== prev) return { ok: false, index: i, reason: 'chain linkage broken (entry deleted, inserted or reordered)' };
+    if (e.chainHash !== chainHashOf(e, e.chainPrev)) return { ok: false, index: i, reason: 'detection fields do not match their seal' };
+    if (e.resolutionHash) {
+      if (e.resolutionHash !== resolutionHashOf(e)) return { ok: false, index: i, reason: 'resolution fields do not match their seal' };
+    } else if (e.status !== 'pending-rescreen') {
+      return { ok: false, index: i, reason: 'terminal entry missing its resolution seal' };
+    }
+    prev = e.chainHash;
+  }
+  return { ok: true, index: -1, reason: '' };
+}
+
 export function loadTfsLog() {
   const empty = {
-    _README: 'TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). A first snapshot of a newly tracked source is recorded with status "baseline" (monitoring began; not a designation update, so no re-screen obligation or latency). Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest ' + TFS_LOG_CAP + '.',
+    _README: 'TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). A first snapshot of a newly tracked source is recorded with status "baseline" (monitoring began; not a designation update, so no re-screen obligation or latency). Entries are tamper-evident: chainPrev/chainHash link each detection to its predecessor and resolutionHash seals the terminal outcome; `node scripts/sanctions-watch.mjs verify-log` proves the log unedited and the watch workflow runs that check daily. Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest ' + TFS_LOG_CAP + '.',
     entries: [],
   };
   if (!existsSync(TFS_LOG_FILE)) return empty;
@@ -282,6 +371,21 @@ function setOutput(key, val) {
 
 async function main() {
   const mode = process.argv[2] || 'check';
+  if (mode === 'verify-log') {
+    // Offline integrity check: prove the TFS evidence log was not edited,
+    // truncated or reordered since the watcher last sealed it. Run by the
+    // watch workflow before every check, and available to an auditor as a
+    // standalone command. Never fetches anything.
+    const { entries } = loadTfsLog();
+    const v = verifyTfsChain(entries);
+    if (!v.ok) {
+      console.error('TFS LOG INTEGRITY FAILURE at entry ' + v.index + ': ' + v.reason
+        + ' - treat data/tfs-update-log.json as tampered; recover the last good copy from data/retention snapshots.');
+      process.exit(1);
+    }
+    console.log('tfs-log: chain verified, ' + entries.length + ' entr' + (entries.length === 1 ? 'y' : 'ies') + ' intact');
+    return;
+  }
   const sources = loadSources(readFileSync(SOURCES_FILE, 'utf8'));
   const today = new Date().toISOString().slice(0, 10);
   const prevState = loadState();
@@ -369,6 +473,11 @@ async function main() {
       const resolved = resolveRescreens(logObj.entries, runsByWorkflow, coverage);
       if (resolved) console.log('tfs-log: resolved re-screen linkage for ' + resolved + ' entr' + (resolved === 1 ? 'y' : 'ies'));
     }
+    // Seal AFTER append+resolve so new detections join the chain and fresh
+    // resolutions get their terminal seal; the next run's verify-log step
+    // then proves nothing was edited in between.
+    const sealedNow = sealTfsLog(logObj.entries);
+    if (sealedNow) console.log('tfs-log: sealed ' + sealedNow + ' entr' + (sealedNow === 1 ? 'y' : 'ies') + ' into the tamper-evident chain');
     logObj.entries = capTfsEntries(logObj.entries);
     logChanged = JSON.stringify(logObj.entries) !== before || !existsSync(TFS_LOG_FILE);
     writeFileSync(TFS_LOG_FILE, JSON.stringify(logObj, null, 2) + '\n');
