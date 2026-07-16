@@ -10,7 +10,36 @@ bump merged to `main`.
 
 ## [Unreleased]
 
-### Security & hardening — workflows, supply chain, container (2026-07-15)
+### Scorecard 7.7 explained + Branch-Protection raised to review-required (2026-07-16)
+
+The README badge fell 8.1 → 7.7 on 2026-07-16 — not a regression but a
+visibility event: applying live branch protection (hardening rows 1/10) made
+the OpenSSF **Branch-Protection** check readable for the first time, so it
+stopped erroring out of the aggregate (−1, weight excluded) and priced the
+then-current single-maintainer config (0 required approvals, no code-owner
+review) at **3/10**: 810 / 105 = 7.71. Verified in the run SARIFs: the
+2026-07-15 18:23 UTC run has no Branch-Protection finding; every 2026-07-16
+run scores it 3. [`scorecard-9.5-path.md`](docs/governance/scorecard-9.5-path.md)
+had predicted the mechanism and now records the full event and updated path
+(9.0 is arithmetically unreachable before the Maintained age gate lifts
+~2026-09-09; ceiling today is 8.3).
+
+- **Branch protection now requires review** (`.github/settings.yml`, applied
+  automatically by the installed Settings app): `required_approving_review_count`
+  0 → **1**, `require_code_owner_reviews` → **true**. Expected to lift
+  Branch-Protection 3 → 6–8 (badge 7.9–8.1) on the next Scorecard run after
+  merge.
+- **`enforce_admins` → off, deliberately**: GitHub never counts the PR
+  author's own approval and the sole code owner is the author, so with admin
+  enforcement on, approvals ≥ 1 would make every owner-authored PR
+  unmergeable — including the revert of the rule itself (the Settings app
+  re-applies `settings.yml` on every push to `main`). The logged admin bypass
+  is the documented solo merge path; bot-authored PRs (Dependabot) are to be
+  **approved, not bypassed**, which also feeds the Code-Review check. Restore
+  admin enforcement when a second maintainer joins.
+- [`github-repository-hardening.md`](docs/governance/github-repository-hardening.md)
+  §1 amended to match (approvals 1, code owners On, include-administrators Off
+  with lockout rationale).
 
 Every mechanical OpenSSF Scorecard check was already at 10 (aggregate 8.1),
 so this pass hardens what the score cannot see and protects the 10s the

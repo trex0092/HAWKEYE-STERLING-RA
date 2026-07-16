@@ -155,26 +155,37 @@ labels:
 
 # ── Branch protection ───────────────────────────────────────────────────────────
 # main is the deploy branch. No direct pushes: every change lands via a reviewed,
-# CI-green, up-to-date PR with a linear history, and admins are included so the
-# rules actually bind.
+# CI-green, up-to-date PR with a linear history. Admin enforcement is OFF as the
+# deliberate single-maintainer merge path — see the notes inline below.
 branches:
   - name: main
     protection:
       required_pull_request_reviews:
-        # SINGLE-MAINTAINER REALITY: GitHub never counts the PR author's own
-        # approval, and this repo has exactly one human with write access — so
-        # any approval count > 0 (or a code-owner review, since the sole code
-        # owner is also the author) makes every owner-authored PR UNMERGEABLE,
-        # with enforce_admins removing even the admin bypass. The binding
-        # controls on this repo are the required status checks below (tests,
-        # SAST, secrets, CodeQL, smoke). RAISE the count back to 1 and restore
-        # require_code_owner_reviews the day a second maintainer joins.
+        # SINGLE-MAINTAINER OPERATING MODE (2026-07-16): reviews are REQUIRED
+        # (1 approval + code owners) and the admin bypass below (enforce_admins
+        # off) is the sole maintainer's merge path. GitHub never counts the PR
+        # author's own approval, so with enforce_admins ON any count > 0 would
+        # make every owner-authored PR unmergeable — including the PR reverting
+        # this file, a full lockout, because the installed Settings app
+        # re-applies this file on every push to main. Rules of the mode:
+        #   - Owner-authored PRs: merge via the logged admin bypass
+        #     ("Merge without waiting for requirements to be met").
+        #   - Bot-authored PRs (Dependabot): the owner CAN approve those —
+        #     approve, don't bypass. Each approval also counts toward the
+        #     Scorecard Code-Review check (last-30-changesets window).
+        #   - Second maintainer joins: keep count 1, turn enforce_admins back
+        #     ON, stop using the bypass.
+        # History: raised 0 → 1 on 2026-07-16. Live branch protection (checklist
+        # rows 1/10) made the Branch-Protection check readable for the first
+        # time; it priced the count-0 config at 3/10 and the badge fell
+        # 8.1 → 7.7. See docs/governance/scorecard-9.5-path.md for the math.
         # NOTE: if the Settings app is not installed, apply this by hand:
-        # Settings → Branches → main → uncheck "Require approvals" and
-        # "Require review from Code Owners".
-        required_approving_review_count: 0
+        # Settings → Branches → main → check "Require approvals" (1) and
+        # "Require review from Code Owners", and uncheck "Do not allow
+        # bypassing the above settings" (a.k.a. "Include administrators").
+        required_approving_review_count: 1
         dismiss_stale_reviews: true
-        require_code_owner_reviews: false
+        require_code_owner_reviews: true
       required_status_checks:
         strict: true        # branch must be up to date with main before merge
         contexts:
@@ -191,7 +202,12 @@ branches:
           - gitleaks
           - size
           - Dependency Review
-      enforce_admins: true              # rules apply to admins too
+      enforce_admins: false             # OFF by design: the admin bypass is the
+                                        # single maintainer's merge path now that
+                                        # approvals are required (see the
+                                        # required_pull_request_reviews note).
+                                        # Restore to true when a second
+                                        # maintainer joins.
       required_linear_history: true
       required_conversation_resolution: true
       allow_force_pushes: false
