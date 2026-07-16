@@ -62,6 +62,12 @@ for (const [wf, files] of [
     body.includes('STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}'));
   check(`${wf} warns loudly when persisting plaintext without the key`,
     /::warning::.*PLAINTEXT/.test(body));
+  // the plaintext restore must target HEAD: the overlay step stages the
+  // fetched branch copy into the index, so an index-relative restore
+  // (`git checkout -- $f`) would re-commit the pre-encryption plaintext
+  // blob alongside every .enc, forever
+  check(`${wf} restores plaintext from HEAD, not the overlay-polluted index`,
+    body.includes('git checkout HEAD -- "$f"') && !body.includes('git checkout -- "$f"'));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

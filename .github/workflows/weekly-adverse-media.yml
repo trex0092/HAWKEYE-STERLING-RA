@@ -174,7 +174,7 @@ jobs:
               node scripts/state-crypto.mjs encrypt "${state_files[@]}"
               for f in "${state_files[@]}"; do
                 [ -f "$f.enc" ] && git add "$f.enc"
-                git checkout -- "$f" 2>/dev/null || true
+                git checkout HEAD -- "$f" 2>/dev/null || true
               done
             else
               echo "::warning::delta-state persisted in PLAINTEXT (subject data) - set the STATE_ENCRYPTION_KEY secret to encrypt state commits (P30)"
