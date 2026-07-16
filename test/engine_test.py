@@ -1027,6 +1027,52 @@ check("parse_un degrades safely on a DTD payload (no crash, no names)", _un_name
 _ca_names, _ca_status, _ca_sig = screen.parse_canada(_xxe)
 check("parse_canada degrades safely on a DTD payload (no crash, no names)", _ca_names == set())
 
+print("screen — list-entry adjudication attributes (DOB/nationality context)")
+screen.LIST_ENTRY_ATTRS.clear()
+_un_attrs_xml = (b'<CONSOLIDATED_LIST dateGenerated="2026-07-01">'
+                 b'<INDIVIDUALS><INDIVIDUAL>'
+                 b'<FIRST_NAME>TESTPARTY</FIRST_NAME><SECOND_NAME>SUBJECT</SECOND_NAME>'
+                 b'<INDIVIDUAL_DATE_OF_BIRTH><TYPE_OF_DATE>EXACT</TYPE_OF_DATE>'
+                 b'<DATE>1962-08-08</DATE></INDIVIDUAL_DATE_OF_BIRTH>'
+                 b'<NATIONALITY><VALUE>Testland</VALUE></NATIONALITY>'
+                 b'<INDIVIDUAL_ALIAS><QUALITY>Good</QUALITY>'
+                 b'<ALIAS_NAME>TESTPARTY ALIASNAME</ALIAS_NAME></INDIVIDUAL_ALIAS>'
+                 b'</INDIVIDUAL></INDIVIDUALS><ENTITIES/></CONSOLIDATED_LIST>')
+_un_a_names, _, _ = screen.parse_un(_un_attrs_xml)
+check("un parser captures DOB + nationality for the primary name",
+      "1962-08-08" in screen.match_context_for("TESTPARTY SUBJECT")
+      and "Testland" in screen.match_context_for("TESTPARTY SUBJECT"))
+check("un alias names inherit the designated party's attributes",
+      "TESTPARTY ALIASNAME" in _un_a_names
+      and "1962-08-08" in screen.match_context_for("TESTPARTY ALIASNAME"))
+_ofac_attrs_csv = ('1234,"OFAC TESTPARTY",individual,PROG,-0-,-0-,-0-,-0-,-0-,-0-,-0-,'
+                   '"DOB 08 Aug 1962; POB Somewhere; nationality Testland; alt. DOB 1955"\n'
+                   '5678,"PLAIN TESTPARTY",individual,PROG,-0-,-0-,-0-,-0-,-0-,-0-,-0-,-0-\n'
+                   ).encode("latin-1")
+_ofac_a_names, _, _ = screen.parse_ofac(_ofac_attrs_csv)
+check("ofac remarks DOB, alternate DOB and nationality are captured",
+      "08 Aug 1962" in screen.match_context_for("OFAC TESTPARTY")
+      and "1955" in screen.match_context_for("OFAC TESTPARTY")
+      and "Testland" in screen.match_context_for("OFAC TESTPARTY"))
+check("a party without remarks attributes has an empty context",
+      "PLAIN TESTPARTY" in _ofac_a_names and screen.match_context_for("PLAIN TESTPARTY") == "")
+_ofac_alt_csv = b'1234,9,aka,"OFAC ALIASPARTY",-0-\n'
+_ofac_aliases = screen.parse_ofac_alt(_ofac_alt_csv)
+check("ofac alias inherits attributes through the ent_num linkage",
+      "OFAC ALIASPARTY" in _ofac_aliases
+      and "Testland" in screen.match_context_for("OFAC ALIASPARTY"))
+# hits carry the context as annotation only: score gates are untouched
+_attr_lists = {"UN Consolidated": [(screen.normalize("TESTPARTY SUBJECT"), "TESTPARTY SUBJECT")]}
+_attr_hits = screen.screen_name("TESTPARTY SUBJECT", _attr_lists)
+check("a hit carries match_context and the exact-match score is unaffected",
+      len(_attr_hits) == 1 and _attr_hits[0]["match_context"].startswith("list DOB")
+      and _attr_hits[0]["score"] >= 95)
+_plain_lists = {"UN Consolidated": [(screen.normalize("SOMEOTHER PARTYNAME"), "SOMEOTHER PARTYNAME")]}
+_plain_hits = screen.screen_name("SOMEOTHER PARTYNAME", _plain_lists)
+check("a hit with no known attributes carries an empty context",
+      len(_plain_hits) == 1 and _plain_hits[0]["match_context"] == "")
+screen.LIST_ENTRY_ATTRS.clear()
+
 print("screen — core-list coverage floors (zero/partial-load hard-fail)")
 _meta_ok = {"ofac": {"count": 19129}, "un": {"count": 1002}, "uk": {"count": 19762},
             "eu": {"count": 42347}, "eocn": {"count": 312}}
