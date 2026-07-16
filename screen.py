@@ -703,7 +703,7 @@ def log(msg):
     print(f"[{datetime.datetime.utcnow().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 # ── ASANA TRANSPORT (honours 429 rate-limit; retries transient errors) ────────
-ASANA_NOTES_MAX = 65000  # Asana notes hard limit is ~65,535; stay under
+ASANA_NOTES_MAX = 65000  # UTF-8 BYTES — Asana enforces ~65,400 bytes, not characters
 
 def asana_request(method, url, **kw):
     """Single Asana call path. Retries on 429 (respecting Retry-After) and 5xx so a
@@ -727,13 +727,21 @@ def asana_request(method, url, **kw):
 
 def cap_notes(narrative):
     """Cap a report to Asana's notes limit WITHOUT amputating the sign-off / retention
-    footer at the end — truncate the body, keep the tail."""
-    if len(narrative) <= ASANA_NOTES_MAX:
+    footer at the end — truncate the body, keep the tail. Asana measures the limit in
+    UTF-8 BYTES (~65,400), not characters: Arabic findings and typographic characters
+    encode as 2–4 bytes each, so a character-based cap can still overflow the API
+    (2026-07-16 run: 65,000 chars = 68,709 bytes → HTTP 400, and the MLRO task plus
+    delta-state persistence were lost). Cap by encoded size, cut on a character
+    boundary (a partial code point at the cut is dropped by errors="ignore")."""
+    raw = narrative.encode("utf-8")
+    if len(raw) <= ASANA_NOTES_MAX:
         return narrative
-    log(f"  notes truncated ({len(narrative)} → {ASANA_NOTES_MAX}); sign-off/retention preserved")
     tail = narrative[-1200:]
-    head = narrative[: ASANA_NOTES_MAX - len(tail) - 40]
-    return head + "\n…[body truncated — see workflow run log]…\n" + tail
+    marker = "\n…[body truncated — see workflow run log]…\n"
+    budget = ASANA_NOTES_MAX - len(tail.encode("utf-8")) - len(marker.encode("utf-8"))
+    head = raw[:budget].decode("utf-8", "ignore")
+    log(f"  notes truncated ({len(raw)} → ≤{ASANA_NOTES_MAX} bytes); sign-off/retention preserved")
+    return head + marker + tail
 
 # ── ADVERSE MEDIA ─────────────────────────────────────────────────────────────
 # How many Google News locales (from the worldwide GNEWS_LOCALES matrix) to sweep

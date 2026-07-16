@@ -1326,6 +1326,29 @@ check("a case with no transactions renders the SAR fallback line",
       "No transaction rows supplied" in str_dossier.build_dossier(
           {**str_dossier.EXAMPLE_CASE, "transactions": []}, today="2026-07-16"))
 
+# ── screen.py: Asana notes cap is measured in UTF-8 BYTES, not characters ────
+# Regression for the 2026-07-16 daily-screening failure: a 65,000-CHARACTER
+# narrative full of multi-byte characters (Arabic findings, '…', '—') encoded
+# to 68,709 bytes and Asana rejected it (limit ~65,400 bytes) — the MLRO task
+# and the delta-state persist were lost. cap_notes must budget encoded bytes.
+_short = "clean ascii report"
+check("cap_notes returns short narratives untouched", screen.cap_notes(_short) == _short)
+_ar_line = "تنبيه غسل الأموال — نتيجة سلبية · " * 40 + "\n"   # ~3 bytes/char average
+_big = _ar_line * 900 + "SIGN-OFF: MLRO review required\nRETENTION: retain 10 years"
+_capped = screen.cap_notes(_big)
+check("cap_notes output fits the Asana byte limit",
+      len(_capped.encode("utf-8")) <= screen.ASANA_NOTES_MAX)
+check("cap_notes keeps the sign-off / retention tail",
+      "RETENTION: retain 10 years" in _capped and "MLRO review required" in _capped)
+check("cap_notes marks the truncation for the reader",
+      "[body truncated" in _capped)
+check("cap_notes output is valid text with no mangled code points",
+      _capped.encode("utf-8").decode("utf-8") == _capped)
+_ascii_big = ("x" * 100 + "\n") * 800 + "TAIL-MARKER retain 10 years"
+check("cap_notes still caps pure-ASCII narratives over the limit",
+      len(screen.cap_notes(_ascii_big).encode("utf-8")) <= screen.ASANA_NOTES_MAX
+      and "TAIL-MARKER retain 10 years" in screen.cap_notes(_ascii_big))
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
