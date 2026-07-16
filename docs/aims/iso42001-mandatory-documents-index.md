@@ -85,9 +85,12 @@ management review; failures surface via the monitoring/escalation path.
 All AIMS documentation is **controlled in git** and inherits the code
 controls, which is stricter than a manual document register:
 
-- **Creation/update:** PR-only to `main` (branch protection, no direct pushes,
-  `enforce_admins` on); every change reviewed against the 8 required status
-  checks; CODEOWNERS routes ownership; squash merges keep linear history.
+- **Creation/update:** PR-only to `main` (branch protection, no direct pushes;
+  required approvals ≥ 1 with a logged admin bypass as the documented
+  single-maintainer merge path — see
+  [`github-repository-hardening.md`](../governance/github-repository-hardening.md) §1);
+  every change gated by the 8 required status checks; CODEOWNERS routes
+  ownership; squash merges keep linear history.
 - **Versioning & traceability:** every revision is a commit with author, date,
   rationale; notable changes logged in `CHANGELOG.md` (format CI-enforced by
   `test/changelog.test.mjs`).

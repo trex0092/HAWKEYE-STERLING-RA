@@ -34,15 +34,15 @@ Settings app, or manually at **Settings → Branches → Add branch ruleset / pr
 | Control | Required value | Why |
 |---|---|---|
 | Require a pull request before merging | **On** | No direct pushes to the deploy branch. |
-| Required approvals | **0** (see note) | Single-maintainer reality: GitHub never counts the author's own approval, and the sole [code owner](../../.github/CODEOWNERS) *is* the author — any count > 0 made every owner-authored PR unmergeable with no admin bypass (`enforce_admins` is on). The binding controls are the required status checks below. **Raise to ≥ 1 when a second maintainer joins** (see the CHANGELOG entry "Unmergeable-by-design review rule on a single-maintainer repo" and the inline rationale in `.github/settings.yml`). |
+| Required approvals | **1** (amended 2026-07-16, see note) | Reviews are required as a hardened repo should have them. GitHub never counts the author's own approval and the sole [code owner](../../.github/CODEOWNERS) *is* the author, so on this single-maintainer repo the owner merges own-authored PRs via the **logged admin bypass** (`enforce_admins` off, below) — and **approves bot-authored PRs (Dependabot) normally** instead of bypassing. History: this was 0 from repo creation to 2026-07-16; the day live protection made the OpenSSF Branch-Protection check readable, the count-0 config scored 3/10 and the badge fell 8.1 → 7.7 (see [`scorecard-9.5-path.md`](scorecard-9.5-path.md)). |
 | Dismiss stale approvals on new commits | **On** | Re-review after the diff changes (binds any future approvals). |
-| Require review from Code Owners | **Off** (see note) | Same single-maintainer constraint as above — the only code owner is the PR author. **Turn back On together with required approvals ≥ 1** when a second maintainer joins. |
+| Require review from Code Owners | **On** (amended 2026-07-16) | Raised together with required approvals; the owner's merge path for own-authored PRs is the admin bypass, not a weakened rule. |
 | Require status checks to pass | **On** | No merging on red CI. |
 | Require branches up to date before merge | **On** (`strict`) | Tests run against the post-merge tree. |
 | Required checks | `test`, `lint`, `smoke`, `analyze` (CodeQL), `semgrep`, `gitleaks`, `size`, `Dependency Review` | The blocking gates that prove correctness, style, runtime-CSP/Trusted-Types safety, code scanning (CodeQL + Semgrep app-invariants), secret scanning, size, and dependency licensing/vulns. |
 | Require conversation resolution | **On** | No unresolved review threads at merge. |
 | Require linear history | **On** | Matches squash-only merging. |
-| Include administrators | **On** (`enforce_admins`) | The rules bind everyone, including admins. |
+| Include administrators | **Off** (`enforce_admins`, amended 2026-07-16) | Deliberately off while the repo has one maintainer: with approvals ≥ 1 required and self-approval impossible, admin enforcement would make every owner-authored PR unmergeable — including the PR needed to undo the rule (the Settings app re-applies `settings.yml` on every push to `main`, so a lockout would be self-sustaining). The bypass is visible and logged on each merge. **Turn back On when a second maintainer joins.** |
 | Allow force pushes | **Off** | History is immutable. |
 | Allow deletions | **Off** | `main` cannot be deleted. |
 
