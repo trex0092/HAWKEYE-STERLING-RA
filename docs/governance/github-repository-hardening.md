@@ -2,7 +2,7 @@
 
 **Status:** authoritative configuration record
 **Owner:** @trex0092 (MLRO / repository admin)
-**Last reviewed:** 2026-06-30
+**Last reviewed:** 2026-07-16
 **Companion config-as-code:** [`.github/settings.yml`](../../.github/settings.yml)
 
 This repository ships a production AML/CFT system, so its GitHub controls are
@@ -101,6 +101,24 @@ configure in the UI:
 - [ ] (Optional) Gate any state-mutating watcher workflow that writes back to the
   repo behind the same or a dedicated environment.
 
+> **Verification record, 2026-07-16 (Compliance Eng):** wiring is live on `main`:
+> both `release.yml` (line 33) and `auto-release.yml` (line 32) declare
+> `environment: release`. Live behaviour measured the same day: the last
+> push-triggered Auto Release run before the gate (run 29479225499, started
+> 07:13:56Z) began immediately and completed in 77 seconds with no hold, while a
+> `workflow_dispatch` probe (run 29483261607, dispatched 08:23:01Z) entered the
+> `waiting` state, its job held 82 seconds between queue (08:23:05Z) and start
+> (08:24:27Z), then completed as a safe no-op because v3.7.2 was already
+> released. Deployment protection on the `release` environment was therefore
+> armed between 07:15 and 08:23 UTC on 2026-07-16 and now intercepts every
+> release-path run. Not visible from outside the UI: whether the configured rule
+> is a required reviewer (what this runbook requires) or only a wait timer, and
+> who approved the probe. The owner confirms the rule type under Settings,
+> Environments, release before ticking row 7 of Section 7. Operational
+> consequence: every push to `main` queues an Auto Release run that holds until
+> approved; on commits that do not bump `APP_VERSION` the approved run is a safe
+> no-op.
+
 ---
 
 ## 5. Tag protection  *(UI-only — Settings → Tags)*
@@ -184,11 +202,13 @@ the audit called out, and none can be set from code in this repo:
    `.github/settings.yml` (branch protection, required checks, linear history) is
    *documentation only* and does **not** bind `main`. This is the keystone: it
    makes rows 1–2 real.
-2. **`release` environment required reviewer (#7)** — today a push to `main` that
-   bumps `APP_VERSION` can auto-tag, Sigstore-attest, and (on release)
-   auto-publish the GHCR image with **zero human approval** (`auto-release.yml` →
-   `publish-container.yml`). Add a required reviewer so a release is a human
-   decision. `release.yml` has no `environment:` at all — consider adding one.
+2. **`release` environment required reviewer (#7)**: partially closed. Both
+   release paths now carry `environment: release` in the workflow file
+   (`release.yml` line 33, `auto-release.yml` line 32), and deployment
+   protection on that environment was observed intercepting release-path runs
+   on 2026-07-16 (verification record in Section 4). Remaining for this row:
+   the owner confirms in the UI that the configured rule is a **required
+   reviewer**, not only a wait timer, then ticks row 7 with the date.
 3. **Secret scanning + push protection (#5)** — this is the backstop now that the
    gitleaks whole-file exemptions for `screen.py` / `daily-sanctions-screen.yml`
    have been narrowed (see `.gitleaks.toml`); with push protection off, a secret
