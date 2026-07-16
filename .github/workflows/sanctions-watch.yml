@@ -29,13 +29,14 @@ concurrency:
 jobs:
   watch:
     # Write scopes live at job level (top level is read-only — least privilege).
-    # actions:read lets the TFS timeline log resolve each detected list change
-    # to the first successful full-base screening run after it (re-screen
-    # evidence) via the Actions API — same read-only pattern as freshness-check.
+    # actions:write serves two duties: the TFS timeline log READS screening-run
+    # history to resolve each detected list change to its re-screen evidence,
+    # and on a content change the watch DISPATCHES the case-engine screen
+    # immediately (TFS without-delay duty) instead of waiting for its cron.
     permissions:
       contents: write
       issues: write
-      actions: read
+      actions: write
     runs-on: ubuntu-latest
     timeout-minutes: 20 # a hung list fetch must surface as a failure, not a silent hang on a mandatory-daily control
     steps:
@@ -90,6 +91,28 @@ jobs:
           # (actions:read) to record publication → ingestion → re-screen timing.
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/sanctions-watch.mjs "$MODE"
+
+      - name: Trigger an immediate re-screen (TFS without-delay duty)
+        # A designation-list CONTENT change re-screens the live customer base
+        # NOW instead of waiting for the case engine's 05:37 cron. The
+        # dispatched run is a normal sanctions-screen.yml run, so the TFS
+        # timeline log resolves it as the re-screen evidence automatically on
+        # the next watch run, with the shortened latency on the record.
+        # content_changes counts new/changed lists only: persistent-error
+        # alerts never dispatch (a dead URL has no new data to screen), and
+        # seed mode never dispatches (the baseline is not a designation event).
+        # continue-on-error: the scheduled screen is the backstop; a failed
+        # dispatch surfaces in the TFS latency evidence, not as a dead watch.
+        continue-on-error: true
+        if: steps.watch.outputs.content_changes != '' && steps.watch.outputs.content_changes != '0' && (inputs.mode || 'check') != 'seed'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.actions.createWorkflowDispatch({
+              owner, repo, workflow_id: 'sanctions-screen.yml', ref: 'main',
+            });
+            core.notice('Dispatched sanctions-screen.yml: immediate re-screen after a designation-list content change.');
 
       - name: Notify Asana — Ongoing Monitoring project
         id: asana
