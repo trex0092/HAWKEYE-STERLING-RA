@@ -2,7 +2,8 @@
    Usage: node test/sanctions-watch.test.mjs */
 import { readFileSync } from 'node:fs';
 import { countEntries, buildReport, trackErrorStreaks, extractPublishedDate, tfsNewEntries,
-  resolveRescreens, capTfsEntries, SCREEN_WORKFLOWS, TFS_LOG_CAP } from '../scripts/sanctions-watch.mjs';
+  resolveRescreens, capTfsEntries, sealTfsLog, verifyTfsChain, canonicalJson,
+  SCREEN_WORKFLOWS, TFS_LOG_CAP } from '../scripts/sanctions-watch.mjs';
 import { loadSources, fingerprint, computeChanges, contentChanges } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -166,6 +167,59 @@ check('report is quiet when nothing moved',
   const seed = JSON.parse(readFileSync(new URL('../data/tfs-update-log.json', import.meta.url), 'utf8'));
   check('data/tfs-update-log.json is seeded with a README and an entries array',
     typeof seed._README === 'string' && Array.isArray(seed.entries));
+}
+
+/* ── tamper-evident chain over the TFS log (sealTfsLog / verifyTfsChain) ── */
+{
+  check('canonicalJson is key-order independent',
+    canonicalJson({ b: 1, a: [2, null] }) === canonicalJson({ a: [2, null], b: 1 }));
+
+  const mk = (i, status) => ({ id: 'l' + i, list: 'List ' + i, change: 'list changed',
+    publicationDate: null, detectedAt: '2026-06-1' + i + 'T05:00:00Z',
+    prevCount: i * 10, newCount: i * 10 + 1, rescreen: null,
+    status: status || 'pending-rescreen' });
+  const log = [mk(1, 'complete'), mk(2), mk(3, 'baseline')];
+  log[0].rescreen = { workflow: 'sanctions-screen.yml', runId: 9, startedAt: '2026-06-11T06:00:00Z' };
+  log[0].latencyHours = 1;
+
+  const sealed = sealTfsLog(log);
+  check('sealing chains every unsealed entry (pre-chain logs migrate in one pass)',
+    sealed === 3 && log.every(e => e.chainHash) && log[1].chainPrev === log[0].chainHash
+    && log[2].chainPrev === log[1].chainHash && log[0].chainPrev === '');
+  check('terminal entries carry a resolution seal; pending entries do not',
+    !!log[0].resolutionHash && !log[1].resolutionHash && !!log[2].resolutionHash);
+  check('a freshly sealed log verifies clean', verifyTfsChain(log).ok === true);
+  check('sealing is idempotent', sealTfsLog(log) === 0 && verifyTfsChain(log).ok === true);
+  check('an empty log verifies clean', verifyTfsChain([]).ok === true);
+
+  const t1 = JSON.parse(JSON.stringify(log)); t1[1].detectedAt = '2026-06-12T05:01:00Z';
+  const v1 = verifyTfsChain(t1);
+  check('editing a detection field breaks the chain at that entry', v1.ok === false && v1.index === 1);
+
+  const t2 = JSON.parse(JSON.stringify(log)); t2[0].latencyHours = 0.1;
+  const v2 = verifyTfsChain(t2);
+  check('editing a resolution field breaks its seal', v2.ok === false && v2.index === 0);
+
+  const t3 = [log[0], log[2]];
+  check('deleting a mid-log entry breaks the linkage', verifyTfsChain(t3).ok === false);
+
+  const t4 = JSON.parse(JSON.stringify(log)); delete t4[2].resolutionHash;
+  check('stripping a terminal seal is itself a failure', verifyTfsChain(t4).ok === false);
+
+  check('a capped log (oldest entries dropped) still verifies', verifyTfsChain(log.slice(1)).ok === true);
+
+  // a later resolution re-seals cleanly: pending entry resolves, then seals
+  const runs2 = { 'sanctions-screen.yml': [{ id: 77, startedAt: '2026-06-13T09:00:00Z' }] };
+  const r2 = resolveRescreens(log, runs2);
+  const resealed = sealTfsLog(log);
+  check('a post-seal resolution re-seals and verifies',
+    r2 === 1 && resealed === 1 && !!log[1].resolutionHash && verifyTfsChain(log).ok === true);
+
+  // and the workflow actually runs the verifier daily, before the watch
+  const wyml = readFileSync(new URL('../.github/workflows/sanctions-watch.yml', import.meta.url), 'utf8');
+  check('the watch workflow verifies log integrity before each run',
+    wyml.indexOf('sanctions-watch.mjs verify-log') !== -1
+    && wyml.indexOf('verify-log') < wyml.indexOf('Run sanctions watch'));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

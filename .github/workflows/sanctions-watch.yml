@@ -83,6 +83,13 @@ jobs:
             echo "no sanctions-watch-state branch yet — using state from main"
           fi
 
+      - name: Verify TFS evidence-log integrity (tamper-evident chain)
+        # Proves data/tfs-update-log.json was not edited, truncated or
+        # reordered since the watcher last sealed it. Runs BEFORE the watch so
+        # a tampered evidence log turns the mandatory-daily control red and
+        # nothing new is stacked on top of it. Offline; no fetches.
+        run: node scripts/sanctions-watch.mjs verify-log
+
       - name: Run sanctions watch
         id: watch
         env:
