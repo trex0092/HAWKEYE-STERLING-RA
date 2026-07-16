@@ -49,6 +49,7 @@ check('an empty secret is rejected on encrypt and decrypt',
 for (const [wf, files] of [
   ['sanctions-screen.yml', ['data/sanctions-screen-state.json']],
   ['weekly-adverse-media.yml', ['data/screen-delta-state.json']],
+  ['onboarding-screen.yml', ['data/screen-delta-state.json']],
 ]) {
   const body = readFileSync(join(ROOT, '.github/workflows', wf), 'utf8');
   check(`${wf} decrypts state on overlay (fetches the .enc variants too)`,
