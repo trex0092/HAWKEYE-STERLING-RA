@@ -118,6 +118,17 @@ configure in the UI:
 > consequence: every push to `main` queues an Auto Release run that holds until
 > approved; on commits that do not bump `APP_VERSION` the approved run is a safe
 > no-op.
+>
+> **Same-day follow-up (second probe):** a `workflow_dispatch` of `release.yml`
+> itself (run 29484768299, deliberately invalid tag input so nothing could be
+> created even if approved) was held 60 seconds between queue (08:48:13Z) and
+> job start (08:49:13Z), then the tag-shape validation refused the input, red
+> run, zero side effects. Together with the two post-merge Auto Release holds
+> (133s and 270s), the four holds measured this day range from 60 to 270
+> seconds. A fixed wait timer releases at a constant interval, so this variable
+> pattern is consistent with a **required reviewer approved by a human** and
+> not with a wait timer. The remaining owner act is the one-glance confirmation
+> in the UI, recorded when ticking row 7 of Section 7.
 
 ---
 
@@ -175,20 +186,23 @@ documented inline `zizmor: ignore[dangerous-triggers]` in `labeler.yml`.
 ## 7. Audit checklist
 
 Tick with date + initials when verified in the live repo. Re-review quarterly
-alongside the MLRO sign-off.
+alongside the MLRO sign-off. The "Automated verification" column is evidence
+recorded by Compliance Engineering from live probes and API reads; it does not
+tick a row. "Applied" attestation (date + initials) remains the repository
+owner's act, after a UI glance wherever the evidence column says so.
 
-| # | Control | Applied (date / by) |
-|---|---|---|
-| 1 | Branch protection on `main` (Section 1) | ☐ |
-| 2 | General settings: squash-only, auto-delete branches, features (Section 2) | ☐ |
-| 3 | Description / topics / social preview (Section 2) | ☐ |
-| 4 | Dependency graph + Dependabot alerts + security updates (Section 3) | ☐ |
-| 5 | Secret scanning + push protection (Section 3) | ☐ |
-| 6 | Private vulnerability reporting (Section 3) | ☐ |
-| 7 | `release` environment with required reviewer (Section 4) | ☐ |
-| 8 | Tag protection `v*` (Section 5) | ☐ |
-| 9 | Code-scanning: 0 open alerts (Section 6) | ☐ |
-| 10 | Settings GitHub App installed (auto-applies Sections 1–2) | ☐ |
+| # | Control | Automated verification (2026-07-16) | Applied (date / by) |
+|---|---|---|---|
+| 1 | Branch protection on `main` (Section 1) | PASS: branches API returns `protected: true`; all 8 required checks plus strict up-to-date enforced on every PR merged this day (#258, #259) | ☐ |
+| 2 | General settings: squash-only, auto-delete branches, features (Section 2) | PASS on API-visible parts: wiki/projects/downloads off, issues on; 13 consecutive squash merges in 24h, newest merge commit on `main` dates to 5 Jul (pre-rule); zero stray branches. Merge-commit/rebase disablement: owner UI glance | ☐ |
+| 3 | Description / topics / social preview (Section 2) | PASS for description, homepage and all 10 topics (exact match to Section 2). Social preview image: owner UI glance | ☐ |
+| 4 | Dependency graph + Dependabot alerts + security updates (Section 3) | PARTIAL: graph proven on (required Dependency Review check green on every PR, hard-fails without it); Dependabot version PRs merged (#214, #216). Alerts + security-updates toggles: owner UI glance | ☐ |
+| 5 | Secret scanning + push protection (Section 3) | No session read surface (api.github.com egress-blocked; no MCP settings endpoint). Compensating control verified: gitleaks required check green on every PR. Owner UI | ☐ |
+| 6 | Private vulnerability reporting (Section 3) | No session read surface. Owner UI | ☐ |
+| 7 | `release` environment with required reviewer (Section 4) | ACTIVE: four measured holds on 2026-07-16 (82s, 133s, 270s, 60s) across `auto-release.yml` and `release.yml`, incl. dispatch probe run 29484768299; the variable pattern matches a required reviewer approved by a human, not a fixed wait timer. Owner confirms rule type in the UI | ☐ |
+| 8 | Tag protection `v*` (Section 5) | No session read surface (session push path rejects all tag pushes at the transport layer, so probing proves nothing). Indirect: all 7 `v*` tags were created by the release automation; no stray tags | ☐ |
+| 9 | Code-scanning: 0 open alerts (Section 6) | PASS: alert-inventory run 29476614879 (2026-07-16) reports TOTAL_OPEN_ALERTS=0 | ☐ |
+| 10 | Settings GitHub App installed (auto-applies Sections 1–2) | No session read surface (app installations not readable). Indirect: live protection shape matches `.github/settings.yml` (8 contexts, strict). Owner UI glance | ☐ |
 
 ### Apply-now priority (2026-07 deep-audit finding)
 
