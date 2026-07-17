@@ -10,6 +10,21 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Asana notes budget is now learned, not guessed (2026-07-17)
+
+Both of today's deliveries needed a retry: even a 65,000-byte NUMERIC-ENTITY
+WORST CASE was rejected by Asana's undocumented server-side accounting before
+succeeding at 39,000. The budget that actually delivered is now remembered in
+the delta-state (reserved key `__meta_asana_notes_budget__`, persisted only on
+delivered runs, clamped on load) and reused as the next run's opening bid —
+steady state becomes one API call with no rejection. A deterministic weekly
+probe (+5%, capped at the documented max) re-tests headroom so detail lost to
+a transient never becomes permanent, and a rejected probe falls straight back
+to the known-good value; the 0.6× shrink chain down to the 12,000-byte floor
+remains the universal safety net beneath everything (`notes_budget_plan`).
+Ten new engine checks cover the plan, the clamp, and prune-safety of the
+reserved key.
+
 ### README badges: live control signals added (2026-07-17)
 
 Four live badges join CI / CodeQL / Scorecard / license in the README header,
