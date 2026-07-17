@@ -144,13 +144,16 @@ breadth (Contributors). Any tooling that claims otherwise is gaming the badge.
   `enforce_admins: true` and retire the bypass. A reviewer whose profile
   belongs to a third organization who lands 5+ commits also lifts
   **Contributors** 6→10.
-- [ ] **2026-09-09:** Maintained lifts automatically — nothing to do.
+- [ ] **2026-09-09:** Maintained lifts automatically — nothing to do. The
+  verification task below **auto-files in Asana that morning**
+  (`.github/workflows/scorecard-milestone.yml`, 10:17 UTC, idempotent; delete
+  the workflow after sign-off).
 - [ ] **On/after 2026-09-09 — verify the flip (~5 min):** open the latest
   Scorecard workflow run log (per-check JSON in the "Run Scorecard analysis"
   step) or `https://api.scorecard.dev/projects/github.com/trex0092/HAWKEYE-STERLING-RA`;
   confirm Maintained ≈ 10 and the aggregate against the table below. Asking
   Claude Code to "verify the scorecard runbook" on/after Sept 9 performs this
-  whole step.
+  whole step (the auto-filed Asana task carries the same checklist).
 - Note: the old "keep the Branch-Protection admin PAT unwired" advice is
   retired — the check reads the live rules by itself since 2026-07-16; no PAT
   is needed or useful either way.
