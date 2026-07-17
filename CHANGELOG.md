@@ -10,6 +10,16 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### README badges: live control signals added (2026-07-17)
+
+Four live badges join CI / CodeQL / Scorecard / license in the README header,
+each backed by a real, verifiable signal — no vanity chips: **daily screening**
+(shields.io workflow-status on `weekly-adverse-media.yml@main` — the core
+compliance control, green only when the last run delivered), **controls
+freshness** (`freshness-check.yml@main` — the silent-failure alarm itself),
+**latest release** (shields.io GitHub release), and **Netlify deploy status**
+(official badge for the production site).
+
 ### The 9.0 milestone made self-enforcing: auto-filed verification on 2026-09-09 (2026-07-17)
 
 9.0 cannot print before the Maintained age gate lifts on 2026-09-09 (repo
