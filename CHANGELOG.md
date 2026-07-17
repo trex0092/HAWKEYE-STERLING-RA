@@ -10,6 +10,23 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Vulnerabilities check restored to 10: justified suppression of the semgrep-venv `mcp` trio (2026-07-17)
+
+Three GHSA advisories against `mcp` (the MCP Python SDK) landed in OSV on
+2026-07-16 evening and read the Scorecard Vulnerabilities check at 7
+(badge 8.1 → 7.9). All three are MCP **server-transport** flaws (tasks-feature
+authorization, SSE/HTTP session hijack, WebSocket Host/Origin validation),
+fixed in mcp 1.27.2/1.28.1 — but `mcp==1.23.3` sits in
+`ci/semgrep-requirements.txt` only because **semgrep 1.169.0 hard-pins
+`mcp==1.23.3`** (exact pin, verified from the wheel metadata; pip-compile
+resolution with `mcp>=1.28.1` is impossible). The semgrep CI job is a one-shot
+non-interactive scan in an egress-blocked runner that never starts an MCP
+server, so the vulnerable code is unreachable — suppressed in
+[`ci/osv-scanner.toml`](ci/osv-scanner.toml) under this file's standing rule
+(unfixable-by-upgrade AND unreachable, reasoning written out), mirroring the
+click precedent. Deleted the moment semgrep re-pins; Dependabot (`/ci`,
+weekly) surfaces that automatically.
+
 ### Daily-screening delivery made unloseable: worst-case rich-text sizing, shrink-and-retry, delivery gate (2026-07-16)
 
 Third and final round on the day's Asana delivery failures. After #269 (cap by
