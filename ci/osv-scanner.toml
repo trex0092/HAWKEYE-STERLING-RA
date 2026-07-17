@@ -21,3 +21,34 @@ id = "GHSA-47fr-3ffg-hgmw"
 # Alias of PYSEC-2026-2132 above — listed separately in case the scanner
 # reports the advisory under its GHSA id rather than the PYSEC id.
 reason = "Alias of PYSEC-2026-2132 — see the entry above for the full justification (semgrep pins click~=8.1.8; click.edit() is unreachable in the non-interactive CI job)."
+
+# ── mcp 1.23.3 (semgrep venv) — three server-transport advisories, 2026-07-16 ──
+# All three are in the MCP Python SDK's SERVER transports; fixed in mcp 1.27.2 /
+# 1.28.1. semgrep 1.169.0 (latest) declares the exact pin `mcp==1.23.3`
+# (Requires-Dist verified from the wheel metadata), so no fixed version can
+# resolve into ci/semgrep-requirements.txt until semgrep re-pins. The semgrep CI
+# job (semgrep.yml) only ever runs `semgrep scan` as a one-shot, non-interactive
+# static analyzer inside a harden-runner egress-blocked job: it never starts an
+# MCP server, never opens an SSE/Streamable-HTTP/WebSocket listener, and accepts
+# no inbound connections — the vulnerable code is unreachable in this venv.
+# CI-only tool venv, never product code. Revisit on every semgrep bump; delete
+# these entries the moment semgrep accepts mcp >= 1.28.1 (Dependabot pip/ci
+# weekly will surface it).
+
+[[IgnoredVulns]]
+id = "GHSA-hvrp-rf83-w775"
+# CVE-2026-52870 — experimental tasks feature: missing per-client authorization
+# in default task handlers (mcp 1.23.0–1.27.1, fixed 1.27.2).
+reason = "Unfixable-by-upgrade and unreachable: semgrep==1.169.0 hard-pins mcp==1.23.3; the vulnerable code is the MCP SERVER tasks feature on a multi-client server, and the semgrep CI job never starts an MCP server (one-shot non-interactive scan, egress-blocked runner, no inbound connections). See block comment above."
+
+[[IgnoredVulns]]
+id = "GHSA-jpw9-pfvf-9f58"
+# CVE-2026-52869 — SSE / Streamable HTTP server transports: session hijack via
+# session id without principal verification (mcp <= 1.27.1, fixed 1.27.2).
+reason = "Unfixable-by-upgrade and unreachable: semgrep==1.169.0 hard-pins mcp==1.23.3; the vulnerable code is the MCP SERVER HTTP/SSE transport, and the semgrep CI job never opens an HTTP/SSE listener (one-shot non-interactive scan, egress-blocked runner, no inbound connections). See block comment above."
+
+[[IgnoredVulns]]
+id = "GHSA-vj7q-gjh5-988w"
+# Deprecated WebSocket server transport: missing Host/Origin validation on the
+# handshake (mcp < 1.28.1, fixed 1.28.1).
+reason = "Unfixable-by-upgrade and unreachable: semgrep==1.169.0 hard-pins mcp==1.23.3; the vulnerable code is the deprecated MCP WebSocket SERVER transport, and the semgrep CI job never starts a WebSocket server (one-shot non-interactive scan, egress-blocked runner, no inbound connections). See block comment above."
