@@ -1,0 +1,52 @@
+name: Scorecard 9.0 milestone reminder
+
+# Files ONE Asana task on 2026-09-09 — the day the repo turns 90 days old and
+# the OpenSSF Scorecard "Maintained" age gate lifts — carrying the 9.0
+# verification checklist from docs/governance/scorecard-9.5-path.md, so the
+# milestone is verified the day it becomes reachable instead of relying on
+# memory. Idempotent: a hard date guard plus an exact-title check in the
+# script (the yearly cron re-fire finds the task and skips). Needs the
+# ASANA_ACCESS_TOKEN secret.
+#
+# DELETE this workflow (and scripts/scorecard-milestone.mjs) once the
+# September 2026 verification task is signed off — it fires once by design.
+on:
+  schedule:
+    - cron: '17 10 9 9 *' # 10:17 UTC on 9 Sep (odd minute) — after the ~07:56 UTC gate lift
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scorecard-milestone
+  cancel-in-progress: false
+
+jobs:
+  file-reminder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: File the milestone verification task
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+        run: node scripts/scorecard-milestone.mjs

@@ -10,6 +10,27 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The 9.0 milestone made self-enforcing: auto-filed verification on 2026-09-09 (2026-07-17)
+
+9.0 cannot print before the Maintained age gate lifts on 2026-09-09 (repo
+created 2026-06-11; the check hard-zeros any repo younger than 90 days), so
+the milestone now enforces itself instead of relying on memory — the same
+pattern as the quarterly methodology review:
+
+- **`.github/workflows/scorecard-milestone.yml`** (cron 10:17 UTC, 9 Sep) +
+  **`scripts/scorecard-milestone.mjs`**: files ONE Asana task carrying the
+  9.0 verification checklist from
+  [`scorecard-9.5-path.md`](docs/governance/scorecard-9.5-path.md) — confirm
+  Maintained ≈ 10 / Branch-Protection 8 / Vulnerabilities 10 in the run
+  SARIF, count reviewed changesets in the last-30 window, check the badge
+  against the expected table (~8.8 with no reviews; **9.0–9.1 at ~9–10
+  reviewed changesets**; 9.5–9.6 fully reviewed). Hard date guard (never
+  files early, even via manual dispatch) + exact-title dedup (the yearly
+  cron re-fire skips). Self-destruct note: delete the workflow after
+  sign-off.
+- `test/scorecard-milestone.test.mjs`: 11 offline checks on the date guard,
+  dedup key, and checklist content.
+
 ### Vulnerabilities check restored to 10: justified suppression of the semgrep-venv `mcp` trio (2026-07-17)
 
 Three GHSA advisories against `mcp` (the MCP Python SDK) landed in OSV on

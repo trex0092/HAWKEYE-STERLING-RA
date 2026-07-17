@@ -76,6 +76,8 @@ jobs:
         run: node test/asana-notify.test.mjs
       - name: Run quarterly-review unit tests
         run: node test/quarterly-review.test.mjs
+      - name: Run scorecard-milestone unit tests
+        run: node test/scorecard-milestone.test.mjs
       - name: Run regulatory-watch unit tests
         run: node test/reg-watch.test.mjs
       - name: Run sanctions-watch unit tests
