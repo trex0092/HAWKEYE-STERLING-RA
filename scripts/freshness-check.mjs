@@ -61,6 +61,7 @@ export const EXEMPT = {
   'link-check.yml': 'documentation hygiene',
   'osv-scanner.yml': 'security scan',
   'scorecard.yml': 'security posture scan',
+  'scorecard-milestone.yml': 'one-shot dated reminder (files the 2026-09-09 Scorecard 9.0 verification task); date-guarded and title-deduped, deleted after sign-off — no recurring ingestion/eval duty',
   'site-health.yml': 'site operations probe; self-alerting',
   'stale.yml': 'repository housekeeping',
   'weekly-summary.yml': 'MLRO digest; absence is recipient-noticed each Monday, no ingestion duty',
