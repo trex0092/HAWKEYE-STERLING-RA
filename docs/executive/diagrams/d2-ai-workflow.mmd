@@ -1,0 +1,32 @@
+%%{init: {"theme": "base", "themeVariables": {
+  "fontFamily": "Segoe UI, Arial, sans-serif",
+  "fontSize": "15px",
+  "primaryColor": "#F4F6FA",
+  "primaryBorderColor": "#22304A",
+  "primaryTextColor": "#101828",
+  "lineColor": "#44506B",
+  "clusterBkg": "#FFFFFF",
+  "clusterBorder": "#9AA4B8"
+}}}%%
+flowchart TB
+  S1["<b>1 · USER INPUT</b><br/>Customer Database (Asana) ·<br/>analyst form entries · Advisor questions"]
+  S2["<b>2 · DATA COLLECTION</b><br/>OFAC SDN · UN · EU FSF · UK OFSI · UAE EOCN · Canada SEMA<br/>Google News (5 locales) · GDELT · OpenSanctions · Wikidata"]
+  S3["<b>3 · PREPROCESSING</b><br/>Unicode fold &amp; normalise · transliteration variants (AR/TR)<br/>sanitise untrusted web text · prompt-injection screen"]
+  S4["<b>4 · AI PROCESSING</b><br/>Fuzzy match + name-core check · 50% ownership rule<br/>severity/relevance triage · related-party graph<br/><i>optional LLM sharpen (never downgrade)</i>"]
+  S5["<b>5 · DECISION SUPPORT</b><br/>Explainable risk rating (factors shown)<br/>'why flagged / what to check' notes · delta vs last run"]
+  S6["<b>6 · COMPLIANCE RECOMMENDATION</b><br/>EDD cadence · next checks · goAML STR/SAR draft<br/><i>proposals only — nothing is decided</i>"]
+  S7{{"<b>7 · HUMAN REVIEW</b><br/>MLRO case subtasks · disposition per hit<br/>four-eyes review · analyst override (ratchet-up only)"}}
+  S8["<b>8 · AUDIT TRAIL</b><br/>Agent action log · QA governance gate · audit lines<br/>hash-chained device log · 10-year retention"]
+  S9["<b>9 · CONTINUOUS ADAPTATION</b><br/>Delta state between runs · learned delivery budget<br/>weekly evals · monthly watchdogs · <i>no model retraining</i>"]
+
+  S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9
+  S9 -. "state feeds next run" .-> S2
+
+  classDef stage fill:#F4F6FA,stroke:#22304A,color:#101828;
+  classDef aiStage fill:#FDE7F0,stroke:#BE185D,color:#4A0D28;
+  classDef human fill:#F1E8FD,stroke:#6D28D9,color:#2A1052;
+  classDef audit fill:#E7F6EC,stroke:#047857,color:#052E1C;
+  class S1,S2,S3 stage;
+  class S4,S5,S6 aiStage;
+  class S7 human;
+  class S8,S9 audit;

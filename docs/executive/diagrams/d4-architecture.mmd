@@ -1,0 +1,64 @@
+%%{init: {"theme": "base", "themeVariables": {
+  "fontFamily": "Segoe UI, Arial, sans-serif",
+  "fontSize": "14px",
+  "primaryColor": "#F4F6FA",
+  "primaryBorderColor": "#22304A",
+  "primaryTextColor": "#101828",
+  "lineColor": "#44506B",
+  "clusterBkg": "#FFFFFF",
+  "clusterBorder": "#9AA4B8"
+}}}%%
+flowchart TB
+  subgraph BROWSER["USER DEVICE — browser (all assessment data stays here)"]
+    UI["3-page suite<br/>index · console · advisor"]
+    ENGINE["Deterministic risk engine<br/>0–30 score · hard outcomes"]
+    STORE[("Encrypted localStorage<br/>AES-256-GCM · PBKDF2<br/>idle auto-lock")]
+    LOG["Hash-chained activity log<br/>SHA-256 · tamper-evident"]
+  end
+
+  subgraph NETLIFY["NETLIFY EDGE + FUNCTIONS — pure-self CSP · HSTS · rate limits · X-App-Token"]
+    FN1["asana-task / asana-mirror /<br/>risk-backup relays"]
+    FN2["brain-soul.js<br/>LLM Advisor core + 7 guards"]
+  end
+
+  subgraph GHA["GITHUB ACTIONS — 47 scheduled/CI workflows"]
+    UNIFIED["Daily unified screen<br/>screen.py + ai.py + agents.py"]
+    WATCH["Watchdogs: FATF · sanctions lists ·<br/>regulatory sources · site health · freshness"]
+    CIQ["CI quality gates: 63 test files ·<br/>CodeQL · Semgrep · gitleaks · SBOM"]
+  end
+
+  subgraph EXTDATA["EXTERNAL DATA SOURCES (fetched, treated as untrusted)"]
+    LISTS[("Sanctions lists<br/>OFAC · UN · EU · OFSI ·<br/>UAE EOCN · SEMA")]
+    MEDIA[("Adverse media<br/>Google News · GDELT ·<br/>OpenSanctions")]
+    WIKI[("PEP reference<br/>Wikidata + mirror")]
+  end
+
+  ANTHROPIC(["Anthropic Claude API<br/>opt-in per surface · key-gated"])
+  ASANA[["Asana workspace<br/>cases · registers · alerts<br/>MLRO subtasks"]]
+  GOAML[["UAE FIU goAML<br/>STR filed by MLRO only"]]
+  MLRO{{"MLRO / Compliance team"}}
+
+  UI --> ENGINE --> STORE
+  ENGINE --> LOG
+  UI -- "complete assessment" --> FN1 --> ASANA
+  UI -- "advisor question" --> FN2
+  FN2 -. "ADVISOR_ENABLED + key" .-> ANTHROPIC
+  UNIFIED --> LISTS
+  UNIFIED --> MEDIA
+  UNIFIED --> WIKI
+  UNIFIED -. "LLM_TRIAGE opt-in" .-> ANTHROPIC
+  UNIFIED -- "daily MLRO report + case subtasks" --> ASANA
+  WATCH --> ASANA
+  ASANA --> MLRO
+  MLRO --> GOAML
+
+  classDef device fill:#E8F0FE,stroke:#1D4ED8,color:#0F1D40;
+  classDef edge fill:#FDE7F0,stroke:#BE185D,color:#4A0D28;
+  classDef ci fill:#E7F6EC,stroke:#047857,color:#052E1C;
+  classDef ext fill:#FFF4E0,stroke:#B45309,color:#4A2A05;
+  classDef human fill:#F1E8FD,stroke:#6D28D9,color:#2A1052;
+  class UI,ENGINE,STORE,LOG device;
+  class FN1,FN2 edge;
+  class UNIFIED,WATCH,CIQ ci;
+  class LISTS,MEDIA,WIKI,ANTHROPIC ext;
+  class ASANA,GOAML,MLRO human;
