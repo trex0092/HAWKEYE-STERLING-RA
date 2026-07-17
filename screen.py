@@ -703,7 +703,47 @@ def log(msg):
     print(f"[{datetime.datetime.utcnow().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 # ── ASANA TRANSPORT (honours 429 rate-limit; retries transient errors) ────────
-ASANA_NOTES_MAX = 65000  # budget for the ESCAPED rich-text bytes Asana enforces (~65,535) — see _asana_notes_size
+ASANA_NOTES_MAX = 65000    # opening budget in worst-case rich-text bytes — see _asana_notes_size
+ASANA_NOTES_FLOOR = 12000  # shrink-chain floor: keeps the summary + sign-off intact
+
+# Asana's server-side size accounting is a black box (2026-07-16: it rejected
+# notes capped to a 65,000-byte NUMERIC-ENTITY WORST CASE, i.e. stricter than
+# every estimate derivable from the text), so the only reliable budget is the
+# one that actually delivered. It is remembered in the delta-state under a
+# reserved key and reused as the next run's opening bid: steady state is one
+# API call with no rejection. A weekly probe bids 5% above the remembered
+# value so headroom lost to a transient never becomes permanent; the shrink
+# chain below the remembered value remains the universal safety net.
+NOTES_BUDGET_KEY = "__meta_asana_notes_budget__"  # reserved — never a fingerprint
+NOTES_BUDGET = {"stored": None, "learned": None}  # loaded from / saved to delta-state
+
+def _clamp_notes_budget(v):
+    """A budget read from state is advisory — clamp garbage into the sane range."""
+    try:
+        v = int(v)
+    except (TypeError, ValueError):
+        return None
+    return min(ASANA_NOTES_MAX, max(ASANA_NOTES_FLOOR, v))
+
+def notes_budget_plan(stored, probe=False):
+    """Ordered notes-size budgets for the delivery attempts. Without a stored
+    known-good budget: open at ASANA_NOTES_MAX and shrink 0.6× per rejection.
+    With one: open exactly there (no rejection in steady state); on a probe
+    run, bid ~5% above it first and fall straight back to the known-good value
+    before the shrink chain, so a failed probe costs one call, not detail."""
+    plan = []
+    if stored is None:
+        plan.append(ASANA_NOTES_MAX)
+    else:
+        if probe and stored < ASANA_NOTES_MAX:
+            plan.append(min(ASANA_NOTES_MAX, int(stored * 1.05) + 1))
+        if not plan or plan[-1] != stored:
+            plan.append(stored)
+    b = plan[-1]
+    while b > ASANA_NOTES_FLOOR and len(plan) < 6:
+        b = max(ASANA_NOTES_FLOOR, int(b * 0.6))
+        plan.append(b)
+    return plan
 
 def asana_request(method, url, **kw):
     """Single Asana call path. Retries on 429 (respecting Retry-After) and 5xx so a
@@ -3265,12 +3305,13 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
         task_name = f"🆕 {flag} Onboarding Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
     else:
         task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
-    # Shrink-and-retry: the worst-case sizing in cap_notes should fit first try,
-    # but Asana's server-side rich-text accounting is not documented — if it
-    # still answers "too large", rebuild with a smaller budget rather than lose
-    # the day's delivery. Floor of 12,000 keeps the summary + sign-off intact.
-    budget, last = ASANA_NOTES_MAX, None
-    for _ in range(5):
+    # Adaptive budget: open at the budget that delivered last run (learned via
+    # delta-state; weekly probe re-tests headroom), shrink on rejection. See
+    # notes_budget_plan for the strategy; the plan always ends in the classic
+    # 0.6× shrink chain down to ASANA_NOTES_FLOOR as the universal safety net.
+    probe = run_time.toordinal() % 7 == 0  # deterministic weekly headroom re-test
+    plan, last = notes_budget_plan(NOTES_BUDGET["stored"], probe), None
+    for i, budget in enumerate(plan):
         payload = {"data": {
             "name": task_name[:250],
             "notes": cap_notes(narrative, budget),
@@ -3282,13 +3323,13 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
         r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
         if r is not None and r.status_code in (200, 201):
             gid = r.json()["data"]["gid"]
+            NOTES_BUDGET["learned"] = budget  # persisted with the delta-state on delivery
             log(f"OK Unified daily task created: {gid}")
             return gid
         last = r
         body = (getattr(r, "text", "") or "").lower()
-        if r is not None and r.status_code == 400 and "too large" in body and budget > 12000:
-            budget = max(12000, int(budget * 0.6))
-            log(f"  Asana still rejects the notes as too large — retrying with a {budget}-byte budget")
+        if r is not None and r.status_code == 400 and "too large" in body and i + 1 < len(plan):
+            log(f"  Asana rejects the notes at a {budget}-byte budget — retrying at {plan[i + 1]}")
             continue
         break
     log(f"FAIL unified task: {getattr(last,'status_code','network')} - {getattr(last,'text','')[:300]}")
@@ -3581,6 +3622,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 
     # DELTA — flag only what is new since the last run (state committed by workflow)
     state = load_delta_state()
+    NOTES_BUDGET["stored"] = _clamp_notes_budget(state.get(NOTES_BUDGET_KEY))
+    NOTES_BUDGET["learned"] = None
     delta = classify_deltas(possible_matches, adverse_findings, pep_findings, state, today)
     # NOTE: state is persisted only AFTER the report is successfully delivered to
     # Asana (see end of function). Saving it here would let a failed post — which
@@ -3717,6 +3760,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         pruned = prune_delta_state(state, today)
         if pruned:
             log(f"  delta state: pruned {pruned} fingerprint(s) unseen > {DELTA_RETENTION_DAYS}d")
+        if NOTES_BUDGET["learned"]:
+            state[NOTES_BUDGET_KEY] = NOTES_BUDGET["learned"]
         save_delta_state(state)
     else:
         log("Delta-state NOT persisted: Asana delivery failed — new matches will re-alert next run.")

@@ -1408,6 +1408,46 @@ finally:
     screen.UNIFIED_DELIVERY_FAILED["failed"] = False
 check("delivery gate exits 5 when the unified task was never created", _gate_code == 5)
 
+# ── screen.py: adaptive notes budget (learned across runs via delta-state) ───
+# 2026-07-17: even the numeric-entity worst case at 65,000 bytes was rejected
+# by Asana, so the only reliable budget is the one that actually delivered.
+# The plan must: open at the stored known-good budget in steady state (one
+# call, no rejection), probe +5% at most weekly and fall back to known-good
+# before shrinking, and always end in the 0.6× chain down to the floor.
+_p = screen.notes_budget_plan(None)
+check("no stored budget: opens at the documented max and shrinks to the floor",
+      _p[0] == screen.ASANA_NOTES_MAX and _p[-1] == screen.ASANA_NOTES_FLOOR
+      and all(_p[i] > _p[i + 1] for i in range(len(_p) - 1)))
+_p = screen.notes_budget_plan(39000, probe=False)
+check("steady state: opens exactly at the stored known-good budget",
+      _p[0] == 39000 and all(b <= 39000 for b in _p) and _p[-1] == screen.ASANA_NOTES_FLOOR)
+_p = screen.notes_budget_plan(39000, probe=True)
+check("probe run: bids ~5% above known-good, then falls back to known-good before shrinking",
+      _p[0] == int(39000 * 1.05) + 1 and _p[1] == 39000 and _p[2] < 39000)
+check("probe never exceeds the documented max",
+      screen.notes_budget_plan(64000, probe=True)[0] == screen.ASANA_NOTES_MAX)
+check("a stored budget at the max never probes above it",
+      screen.notes_budget_plan(screen.ASANA_NOTES_MAX, probe=True)[0] == screen.ASANA_NOTES_MAX)
+check("every plan stays within [floor, max] and is bounded",
+      all(screen.ASANA_NOTES_FLOOR <= b <= screen.ASANA_NOTES_MAX
+          for s in (None, 12000, 39000, 65000) for b in screen.notes_budget_plan(s, probe=True))
+      and all(len(screen.notes_budget_plan(s, probe=p)) <= 6
+              for s in (None, 12000, 39000, 64999, 65000) for p in (False, True)))
+check("stored-budget clamp: garbage → None, tiny → floor, huge → max",
+      screen._clamp_notes_budget("junk") is None
+      and screen._clamp_notes_budget(None) is None
+      and screen._clamp_notes_budget(5) == screen.ASANA_NOTES_FLOOR
+      and screen._clamp_notes_budget(10**9) == screen.ASANA_NOTES_MAX
+      and screen._clamp_notes_budget(39000) == 39000)
+check("the delta-state key for the budget can never collide with a fingerprint",
+      screen.NOTES_BUDGET_KEY.startswith("__meta_"))
+# The reserved key must survive pruning (it carries no last-seen date).
+import datetime as _dt_budget
+_state = {"somefingerprint": "2020-01-01", screen.NOTES_BUDGET_KEY: 39000}
+screen.prune_delta_state(_state, _dt_budget.date(2026, 7, 17))
+check("prune drops stale fingerprints but keeps the reserved budget key",
+      "somefingerprint" not in _state and _state.get(screen.NOTES_BUDGET_KEY) == 39000)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
