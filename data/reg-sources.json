@@ -78,8 +78,8 @@
       "name": "Wolfsberg Group",
       "jurisdiction": "Global",
       "category": "Industry standard",
-      "narrative": "Association of thirteen global banks setting de-facto industry standards for financial-crime risk management. Publishes the Correspondent Banking Due Diligence Questionnaire (CBDDQ), the Wolfsberg Principles, payment-transparency and sanctions-screening guidance, and periodic FAQs. A change usually means an updated CBDDQ version or new due-diligence expectations that counterparties will start requesting. Feeds: correspondent-banking and CDD answers, and questionnaire-handling tools.",
-      "url": "https://www.wolfsberg-principles.com/",
+      "narrative": "Association of thirteen global banks setting de-facto industry standards for financial-crime risk management. Publishes the Correspondent Banking Due Diligence Questionnaire (CBDDQ), the Wolfsberg Principles, payment-transparency and sanctions-screening guidance, and periodic FAQs. A change usually means an updated CBDDQ version or new due-diligence expectations that counterparties will start requesting. Feeds: correspondent-banking and CDD answers, and questionnaire-handling tools. Fetch note: watched at the Group's current wolfsberg-group.org home — the former www.wolfsberg-principles.com domain stopped resolving in July 2026 (link-check timeouts, 2026-07-20 report).",
+      "url": "https://wolfsberg-group.org/",
       "type": "html"
     },
     {

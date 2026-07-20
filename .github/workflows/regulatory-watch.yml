@@ -58,10 +58,13 @@ jobs:
           # The list must include every REDIRECT TARGET too, not just the
           # registry hostnames: www.moec.gov.ae → www.moet.gov.ae,
           # www.uaefiu.gov.ae → uaefiu.gov.ae, www.namlcftc.gov.ae →
-          # namlcftc.gov.ae, www.dmcc.ae → dmcc.ae, www.wolfsberg-principles.com
-          # → wolfsberg-group.org, www.un.org → main.un.org (all verified from
-          # the 2026-07-01 audit-mode egress log). Blocking a redirect hop
-          # starves that source of every snapshot while the run stays green.
+          # namlcftc.gov.ae, www.dmcc.ae → dmcc.ae, www.un.org → main.un.org
+          # (all verified from the 2026-07-01 audit-mode egress log). Blocking a
+          # redirect hop starves that source of every snapshot while the run
+          # stays green. (The Wolfsberg source is watched at wolfsberg-group.org
+          # directly since 2026-07-20 — its former www.wolfsberg-principles.com
+          # domain stopped resolving and was dropped from the registry and from
+          # this list; both wolfsberg-group.org forms stay allowlisted.)
           # archive.org + web.archive.org serve the Wayback fallback for
           # sources whose bot protection 403/418s the runner directly.
           allowed-endpoints: >
@@ -94,7 +97,6 @@ jobs:
             dmcc.ae:443
             www.fatf-gafi.org:443
             fatf-gafi.org:443
-            www.wolfsberg-principles.com:443
             wolfsberg-group.org:443
             www.wolfsberg-group.org:443
             www.responsiblemineralsinitiative.org:443

@@ -72,17 +72,21 @@ check('ALLOWLIST source aborted/timed-out by the probe is not counted dead',
 check('datacenter-blocked ministry host is allowlisted (deep AML page)',
   allowlistedHost('https://www.moec.gov.ae/en/anti-money-laundering') === true);
 check('the watched moet.gov.ae source is allowlisted', allowlistedHost('https://www.moet.gov.ae/') === true);
+check('datacenter-blocked amluae.com research citations are allowlisted (2026-07-20 report)',
+  allowlistedHost('https://amluae.com/goaml-registration-guide/') === true
+  && allowlistedHost('https://www.amluae.com/') === true);
 check('host allowlisting is by hostname, not substring (evil lookalike is NOT allowlisted)',
   allowlistedHost('https://www.moet.gov.ae.evil.example/') === false);
 check('unparseable url is never allowlisted', allowlistedHost('not a url') === false);
 const sMinistry = summarize([
   { url: 'https://www.moec.gov.ae/en/anti-money-laundering', sources: ['CHANGELOG.md'], ok: false, status: null, error: 'fetch failed' },
   { url: 'https://www.moet.gov.ae/en/registering-companies-in-goaml', sources: ['docs/research/2026-06-aml-regulatory-update.md'], ok: false, status: null, error: 'fetch failed' },
+  { url: 'https://amluae.com/confirmed-name-match-report-cnmr/', sources: ['docs/research/2026-06-aml-regulatory-update.md'], ok: false, status: null, error: 'fetch failed' },
   { url: 'https://gone.example/x', sources: ['docs/x.md'], ok: false, status: null, error: 'fetch failed' },
 ]);
 check('allowlisted-host null-status probes are not counted dead; other null-status still is',
   sMinistry.dead === 1 && sMinistry.deadList[0].url === 'https://gone.example/x');
-check('the four ministry hostnames are registered', ALLOWLIST_HOSTS.size === 4);
+check('the six datacenter-blocked hostnames are registered', ALLOWLIST_HOSTS.size === 6);
 
 const rep = buildReport(results, '2026-06-16');
 check('report lists dead urls with status + source file', rep.includes('https://dead.example')
