@@ -61,7 +61,7 @@ check('a cleared case never re-acts', (() => {
   return a.length === 0;
 })());
 
-check('a re-flagged subject after clearance opens a NEW case', (() => {
+check('a re-flagged subject after clearance stays with the closed case (manual reopen by design)', (() => {
   /* cleared case + subject flagged again today → planner treats it as active
      with an existing (cleared) case: current design keeps the old case closed
      and creates nothing — verify no clear/age fires on a cleared case. */

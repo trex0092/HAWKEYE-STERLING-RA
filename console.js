@@ -104,7 +104,11 @@ function refreshFromAsana(btn){
     }).catch(()=> done('Refresh failed — try again'));
 }
 function aggregate(items){
-  const today=new Date().toISOString().slice(0,10);
+  // Local calendar date, matching app.js toISO(): nextReview is stored as a
+  // LOCAL date, so comparing it against toISOString()'s UTC date mis-flags
+  // overdue reviews for the first hours after local midnight (UTC+4 here).
+  const d=new Date();
+  const today=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fold=o=> o==='PROHIBITED'?'EDD':o;
   const counts={CDD:0,SDD:0,EDD:0};
   let prohibited=0, complete=0, overdue=0, drafts=0;

@@ -164,8 +164,9 @@ function runScreen(file, bridge, seed){
     && els.main.innerHTML.includes('Ask me anything about AML compliance.'));
   check('advisor: persona picker offers sixteen advisors, Sterling default', countOcc(els.main.innerHTML, 'class="p-btn"') === 16
     && els.main.innerHTML.includes('<b>Sterling</b>'));
-  check('advisor: mode toggle offers four depths, no fake "directives" claim',
-    els.main.innerHTML.includes('data-mode="Quick"') && els.main.innerHTML.includes('data-mode="Deep"')
+  check('advisor: mode toggle offers the three backend reasoning depths, no fake "directives" claim',
+    els.main.innerHTML.includes('data-mode="Speed"') && els.main.innerHTML.includes('data-mode="Balanced"')
+    && els.main.innerHTML.includes('data-mode="Deep"') && !els.main.innerHTML.includes('data-mode="Quick"')
     && !els.main.innerHTML.includes('directives'));
 
   /* Switch persona → header avatar + picker update */
