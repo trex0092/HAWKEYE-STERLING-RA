@@ -147,11 +147,15 @@ def build_dossier(case, today=None):
     if txns:
         A("  | Date | Type | Amount | Currency | Counterparty | Notes |")
         A("  | --- | --- | --- | --- | --- | --- |")
+        # Escape literal pipes in the cell values — a trade description or
+        # counterparty string containing "|" would otherwise split its row into
+        # extra columns and garble the table the MLRO reviews.
+        cell = lambda v: str(v).replace("|", "\\|")
         for t in txns:
-            A("  | " + " | ".join([str(t.get("date", "")), str(t.get("type", "")),
-                                   str(t.get("amount", "")), str(t.get("currency", "")),
-                                   str(t.get("counterparty", "") or ""),
-                                   str(t.get("notes", "") or "")]) + " |")
+            A("  | " + " | ".join([cell(t.get("date", "")), cell(t.get("type", "")),
+                                   cell(t.get("amount", "")), cell(t.get("currency", "")),
+                                   cell(t.get("counterparty", "") or ""),
+                                   cell(t.get("notes", "") or "")]) + " |")
     else:
         A("  No transaction rows supplied: activity-based report (SAR) or MLRO")
         A("  to attach the transaction extract from the customer file.")
