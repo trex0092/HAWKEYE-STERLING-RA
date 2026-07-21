@@ -10,7 +10,30 @@ bump merged to `main`.
 
 ## [Unreleased]
 
-### Asana notes budget is now learned, not guessed (2026-07-17)
+### GitHub Actions expansion: post-publication CVE watch, provenance re-verification, Dependabot auto-merge, compliance calendar (2026-07-21)
+
+Four workflows close the estate's remaining coverage gaps. **Container Scan
+(Trivy)** re-scans the published `ghcr.io` image weekly (plus on-demand
+dispatch after a publish), failing on fixable HIGH/CRITICAL CVEs and filing
+SARIF into code scanning — an image is at its most vulnerable months after
+the build, and nothing re-checked it. **Attestation Verify** re-runs `gh attestation verify`
+against `:latest` weekly, so the Sigstore provenance chain the publish
+workflow creates is actually exercised end-to-end instead of trusted on
+faith. **Dependabot Auto-Merge** arms GitHub auto-merge (squash) on
+patch/minor/digest bumps — the owner's approval remains the trigger
+(protection requires it, and each approval still feeds the Scorecard
+Code-Review window); majors stay manual. Requires the new `allow_auto_merge`
+repository setting (`.github/settings.yml`). **Compliance Calendar** turns
+dated programme duties (annual governance-pack review, AI-awareness training
+refresh, FATF plenary pre-briefs) into lead-time, due-dated Asana tasks from
+the new MLRO-editable registry `data/compliance-calendar.json` — list CONTENT
+was watched continuously, but calendar deadlines lived in document footers
+nobody re-reads. Occurrence logic (month-end-clamped recurrence, lead window,
+7-day grace tail, exact-title dedup) is pure and covered by 31 new offline
+checks wired into CI; all three scheduled workflows are classified in the
+freshness alarm's EXEMPT set with reasons, every new job is egress-blocked,
+and the board figures / readiness-review counts are refreshed (47 → 51
+workflows).
 
 Both of today's deliveries needed a retry: even a 65,000-byte NUMERIC-ENTITY
 WORST CASE was rejected by Asana's undocumented server-side accounting before

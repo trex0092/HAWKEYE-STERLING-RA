@@ -1,0 +1,84 @@
+name: Container Scan (Trivy)
+
+# CVE watch over the PUBLISHED container image (ghcr.io/<repo>:latest) — the
+# self-hosting distribution channel. publish-container.yml builds and attests
+# the image and docker-smoke.yml proves it serves, but nothing re-checked the
+# image's OS packages as new CVEs were disclosed AFTER publication — an image
+# is at its most vulnerable months after the build, when nothing rebuilds it.
+# This closes that gap: a weekly re-scan of :latest (dispatch it after a
+# publish for an immediate read), failing on FIXABLE HIGH/CRITICAL findings
+# (the red badge is the alarm — the fix is a Dependabot base-image bump +
+# republish) and uploading SARIF so findings land in code scanning beside
+# CodeQL. No workflow_run chaining off the publish: that trigger is on
+# zizmor's dangerous list and the workflow-lint gate holds a zero baseline —
+# the weekly cadence matches the weekly Dependabot digest bump anyway.
+
+on:
+  schedule:
+    - cron: '41 6 * * 1' # Mondays 06:41 UTC (odd minute — avoids the :00 thundering herd)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    permissions:
+      contents: read
+      security-events: write # SARIF upload to code scanning; nothing else
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = GitHub (checkout, the trivy binary from GitHub releases,
+        # SARIF upload) and GHCR + its blob storage — the image AND the trivy
+        # vulnerability DB are both OCI artifacts on ghcr.io, and the DB pull
+        # is authenticated (TRIVY_USERNAME/PASSWORD below) so the anonymous
+        # rate-limit fallback to third-party mirrors is never taken.
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Resolve the published image reference
+        id: ref
+        env:
+          REPO: ${{ github.repository }}
+        # Derived from ${{ github.repository }} (lowercased — registry paths
+        # must be lowercase), never a hardcoded owner that would drift from
+        # the pushed name on a fork/rename/org move (same rule as
+        # publish-container.yml).
+        run: echo "image=ghcr.io/${REPO,,}:latest" >> "$GITHUB_OUTPUT"
+      - name: Scan the published image (gate = fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ref.outputs.image }}
+          format: sarif
+          output: trivy.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true # unfixable CVEs alarm nobody into action; the gate is "a patch exists and we have not shipped it"
+          exit-code: '1'
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ github.token }}
+      - name: Upload SARIF to code scanning
+        # Findings must land in the code-scanning inventory even when the
+        # severity gate fails the job — the alarm and the record are separate.
+        if: always()
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+        with:
+          sarif_file: trivy.sarif
+          category: container-scan
