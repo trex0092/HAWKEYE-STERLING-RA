@@ -1,0 +1,55 @@
+name: Compliance Calendar
+
+# Files lead-time Asana reminder tasks for DATED compliance-programme duties —
+# the annual governance-pack review, the AI-awareness training refresh, FATF
+# plenary pre-briefs — from the data/compliance-calendar.json registry. The
+# estate watches list CONTENT continuously (sanctions-watch, fatf-watchdog,
+# regulatory-watch), but nothing carried the CALENDAR duties whose deadline
+# arrives whether or not anything changes; those lived in document footers
+# ("reviewed annually") that nobody re-reads. Weekly Monday cron; each
+# occurrence is filed ONCE — the task title embeds the occurrence date and an
+# exact-title check across the project dedups re-fires (same forever-dedup as
+# scorecard-milestone.yml). The registry is the MLRO-editable surface: move a
+# provisional date or add duties (EWRA refresh, goAML renewal anniversary)
+# by editing the JSON, not this workflow. Needs the ASANA_ACCESS_TOKEN secret.
+
+on:
+  schedule:
+    - cron: '7 6 * * 1' # Mondays 06:07 UTC (odd minute — house style)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compliance-calendar
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: File due calendar reminders
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+        run: node scripts/compliance-calendar.mjs

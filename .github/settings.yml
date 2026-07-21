@@ -32,6 +32,10 @@ repository:
   allow_merge_commit: false
   allow_rebase_merge: false
   delete_branch_on_merge: true
+  # Auto-merge lets an APPROVED, CI-green PR land itself. Used by
+  # dependabot-automerge.yml for patch/minor bumps — protection still requires
+  # the owner's approval first, so nothing merges un-reviewed.
+  allow_auto_merge: true
   allow_update_branch: true
 
   # Security: forbid force-push/deletion of any history via the API surface too.

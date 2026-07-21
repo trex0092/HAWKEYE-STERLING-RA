@@ -1,0 +1,60 @@
+name: Dependabot Auto-Merge
+
+# Arms GitHub auto-merge (squash) on Dependabot patch/minor/digest PRs so an
+# APPROVED, CI-green bump lands itself instead of needing a second visit.
+# The owner's approval stays the trigger: branch protection requires 1
+# approval + code owners, and the Scorecard Code-Review strategy counts each
+# owner-approved Dependabot PR (docs/governance/scorecard-9.5-path.md) — so
+# this workflow NEVER approves anything, it only removes the return trip
+# after the human approval. Majors are left unarmed for a deliberate manual
+# merge (they can carry breaking changes, e.g. the pinned-by-design
+# @playwright/test line in .github/dependabot.yml). Requires the repository
+# allow_auto_merge setting (.github/settings.yml).
+
+on: pull_request
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  arm:
+    # PR author (not actor) — the trust decision is about who wrote the
+    # change, not who re-ran the workflow.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      contents: write # gh pr merge --auto (the merge itself still waits on protection: approval + green checks)
+      pull-requests: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = the GitHub API only (fetch-metadata reads the PR, gh arms
+        # auto-merge). No checkout — nothing here needs the tree.
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+      - name: Read the update type
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ github.token }}
+      - name: Arm auto-merge (patch / minor / digest only)
+        # Grouped PRs report the HIGHEST bump in the group, so one major in a
+        # group correctly leaves the whole PR unarmed. Docker digest-only
+        # bumps report no semver type and are patch-equivalent — armed.
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
+      - name: Leave majors for a deliberate manual merge
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        run: echo "major version bump — not armed; review the changelog and merge manually"

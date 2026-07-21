@@ -78,6 +78,8 @@ jobs:
         run: node test/quarterly-review.test.mjs
       - name: Run scorecard-milestone unit tests
         run: node test/scorecard-milestone.test.mjs
+      - name: Run compliance-calendar unit tests
+        run: node test/compliance-calendar.test.mjs
       - name: Run regulatory-watch unit tests
         run: node test/reg-watch.test.mjs
       - name: Run sanctions-watch unit tests

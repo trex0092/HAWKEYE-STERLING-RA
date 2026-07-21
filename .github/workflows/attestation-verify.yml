@@ -1,0 +1,60 @@
+name: Attestation Verify
+
+# Closes the provenance loop. publish-container.yml ATTESTS what it ships
+# (Sigstore keyless build provenance, pushed to the registry) — but an
+# attestation nobody ever verifies is decoration, and the verification path
+# itself can rot (expired trust roots, a registry migration, a renamed repo)
+# without any run going red. This weekly job re-verifies that the published
+# :latest image still carries valid SLSA build provenance traceable to this
+# repository, exactly the check a consumer of the image would run. Red badge
+# = the provenance chain is broken; investigate before trusting the image.
+
+on:
+  schedule:
+    - cron: '53 6 * * 1' # Mondays 06:53 UTC (odd minute — house style)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: attestation-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = the GitHub attestations API, GHCR + its blob storage (the
+        # image manifest/digest being verified), and the Sigstore TUF trust
+        # root the verifier refreshes. No checkout — gh needs no workspace.
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+            tuf-repo-cdn.sigstore.dev:443
+      - name: Verify the published image provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Lowercased from ${{ github.repository }} — same no-hardcoded-owner
+          # rule as publish-container.yml.
+          image="oci://ghcr.io/${REPO,,}:latest"
+          echo "Verifying SLSA build provenance for $image against $REPO"
+          gh attestation verify "$image" \
+            --repo "$REPO" \
+            --predicate-type https://slsa.dev/provenance/v1
+          {
+            echo "## Attestation Verify — $(date -u +%F)"
+            echo ""
+            echo "\`$image\` carries valid SLSA build provenance from \`$REPO\`. ✅"
+          } >> "$GITHUB_STEP_SUMMARY"

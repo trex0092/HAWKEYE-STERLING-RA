@@ -307,7 +307,14 @@ COSO, ISO 31000, FATF RBA, Wolfsberg guidance, and GDPR/PDPL as cited inline.*
 deliberately left unedited (same convention as the code-scanning triage record). Every claim below
 is [OBSERVED] against commit `8576ad61` unless marked otherwise.*
 
-Verified at HEAD: 47 workflows · 110 markdown documents under docs/ (93 excluding docs/research/auto).
+*Estate re-verification · 21 July 2026 — the GitHub Actions expansion added four workflows
+(container-scan, attestation-verify, dependabot-automerge, compliance-calendar; every new job
+egress-blocked). Coverage additions only — no scored control changed; scores stand as re-scored
+on 15 July.*
+
+Verified at HEAD: 51 workflows · 110 markdown documents under docs/ (93 excluding docs/research/auto).
+
+Verified at HEAD on 15 July: 47 workflows · 110 markdown documents under docs/ (93 excluding docs/research/auto).
 (Refreshed with this cycle's curated-list update SOP, which added one governance document.)
 (The 2 July scope line said 37 workflows and 40+ governance documents; the estate has grown and the
 counts are now asserted by `test/readiness-review.test.mjs`, which fails CI when this line drifts

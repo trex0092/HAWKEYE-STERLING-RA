@@ -1,0 +1,70 @@
+{
+  "_README": "Dated compliance-programme duties, filed as lead-time Asana reminder tasks by scripts/compliance-calendar.mjs (weekly Compliance Calendar workflow). Two shapes: one-off { id, title, date, leadDays } and recurring { id, title, anchor, everyMonths, leadDays } — recurring occurrences are computed from the anchor, month-end clamped. Optional on both: graceDays (default 7 — a weekly cron straddling the date still files, late but loudly), provisional: true (an external body sets the date; the task tells the owner to confirm it), owner, notes[]. A duty is due inside [occurrence − leadDays, occurrence + graceDays]; each occurrence is filed once, deduped by exact task title (which embeds the occurrence date). EDIT THIS FILE to move a provisional date or add duties the repository cannot know (EWRA refresh anniversary, goAML registration renewal, licence renewals) — never the workflow.",
+  "events": [
+    {
+      "id": "fatf-plenary-2026-10",
+      "title": "FATF Plenary (October 2026) — MLRO pre-brief",
+      "date": "2026-10-23",
+      "leadDays": 14,
+      "provisional": true,
+      "owner": "MLRO",
+      "notes": [
+        "Confirm the plenary dates on fatf-gafi.org (provisional: 21–23 October 2026) and correct this entry if they moved.",
+        "Expect list movements (high-risk / increased-monitoring jurisdictions): fatf-watchdog.yml ingests the OUTPUTS automatically — this brief is the human look-ahead.",
+        "Note likely UAE-relevant agenda items and any jurisdictions in the current customer base for the MLRO brief."
+      ]
+    },
+    {
+      "id": "fatf-plenary-2027-02",
+      "title": "FATF Plenary (February 2027) — MLRO pre-brief",
+      "date": "2027-02-26",
+      "leadDays": 14,
+      "provisional": true,
+      "owner": "MLRO",
+      "notes": [
+        "Confirm the plenary dates on fatf-gafi.org (provisional: late February 2027) and correct this entry if they moved.",
+        "Expect list movements (high-risk / increased-monitoring jurisdictions): fatf-watchdog.yml ingests the OUTPUTS automatically — this brief is the human look-ahead.",
+        "Note likely UAE-relevant agenda items and any jurisdictions in the current customer base for the MLRO brief."
+      ]
+    },
+    {
+      "id": "fatf-plenary-2027-06",
+      "title": "FATF Plenary (June 2027) — MLRO pre-brief",
+      "date": "2027-06-25",
+      "leadDays": 14,
+      "provisional": true,
+      "owner": "MLRO",
+      "notes": [
+        "Confirm the plenary dates on fatf-gafi.org (provisional: late June 2027) and correct this entry if they moved.",
+        "Expect list movements (high-risk / increased-monitoring jurisdictions): fatf-watchdog.yml ingests the OUTPUTS automatically — this brief is the human look-ahead.",
+        "Note likely UAE-relevant agenda items and any jurisdictions in the current customer base for the MLRO brief."
+      ]
+    },
+    {
+      "id": "governance-pack-annual-review",
+      "title": "AI governance pack — annual review & re-approval",
+      "anchor": "2027-07-15",
+      "everyMonths": 12,
+      "leadDays": 30,
+      "owner": "AI Governance Committee / MLRO",
+      "notes": [
+        "Review and re-approve each instrument that states an annual cadence: docs/governance/ai-policy.md, ai-acceptable-use-policy.md, ai-governance-committee-charter.md, stakeholder-impact-assessment-2026.md, dpia-2026.md, eu-ai-act-assessment-2026.md.",
+        "Record the outcome and next-review date in each document's own review table — the anchor here mirrors the July 2026 approval cycle.",
+        "If any instrument changed materially mid-year, its footer review trigger already applied; this task is the backstop, not the only path."
+      ]
+    },
+    {
+      "id": "ai-awareness-training-annual",
+      "title": "AI-awareness training refresh — all users of AI output",
+      "anchor": "2027-07-01",
+      "everyMonths": 12,
+      "leadDays": 45,
+      "owner": "MLRO",
+      "notes": [
+        "Refresh the annual training defined in docs/governance/eu-ai-act-assessment-2026.md (§ training): the four AI-awareness essentials plus LLM limits and known failure modes, for every user of AI output; the MLRO/reviewer module adds eval-output reading and the suspension triggers in ai-incident-runbook.md.",
+        "Log completion per person in docs/aims/competency-records.md.",
+        "45-day lead: training needs scheduling around operations, not a same-week scramble."
+      ]
+    }
+  ]
+}

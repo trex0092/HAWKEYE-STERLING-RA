@@ -20,6 +20,8 @@
 [![Cross-browser](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/cross-browser.yml?branch=main&label=cross-browser)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/cross-browser.yml)
 [![Visual Regression](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/visual.yml?branch=main&label=visual)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/visual.yml)
 [![Docker Smoke](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/docker-smoke.yml?branch=main&label=docker%20smoke)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/docker-smoke.yml)
+[![Container Scan](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/container-scan.yml?branch=main&label=container%20scan)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/container-scan.yml)
+[![Attestation Verify](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/attestation-verify.yml?branch=main&label=attestation%20verify)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/attestation-verify.yml)
 
 <!-- Live compliance controls (scheduled watchers — a red badge IS the alarm) -->
 [![Regulatory Watch](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/regulatory-watch.yml?branch=main&label=regulatory%20watch)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/regulatory-watch.yml)
@@ -37,6 +39,7 @@
 [![Governance Report](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/governance-report.yml?branch=main&label=governance%20report)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/governance-report.yml)
 [![Quarterly Review](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/quarterly-review.yml?branch=main&label=quarterly%20review)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/quarterly-review.yml)
 [![Onboarding Screen](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/onboarding-screen.yml?branch=main&label=onboarding%20screen)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/onboarding-screen.yml)
+[![Compliance Calendar](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/compliance-calendar.yml?branch=main&label=compliance%20calendar)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/compliance-calendar.yml)
 [![Asana Reconcile](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/asana-reconcile.yml?branch=main&label=asana%20reconcile)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/asana-reconcile.yml)
 [![Advisor Eval](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/advisor-eval.yml?branch=main&label=advisor%20eval)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/advisor-eval.yml)
 [![Advisor Bias Eval](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/advisor-bias-eval.yml?branch=main&label=advisor%20bias%20eval)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/advisor-bias-eval.yml)
