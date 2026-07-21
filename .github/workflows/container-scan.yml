@@ -34,11 +34,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden the runner (egress block)
-        # Egress = GitHub (checkout, the trivy binary from GitHub releases,
-        # SARIF upload) and GHCR + its blob storage — the image AND the trivy
-        # vulnerability DB are both OCI artifacts on ghcr.io, and the DB pull
-        # is authenticated (TRIVY_USERNAME/PASSWORD below) so the anonymous
-        # rate-limit fallback to third-party mirrors is never taken.
+        # Egress = GitHub (checkout, SARIF upload), get.trivy.dev (the trivy
+        # binary installer endpoint used by trivy-action's setup step —
+        # observed blocked in run 1's egress audit), and GHCR + its blob
+        # storage — the image AND the trivy vulnerability DB are both OCI
+        # artifacts on ghcr.io, and the DB pull is authenticated
+        # (TRIVY_USERNAME/PASSWORD below) so the anonymous rate-limit
+        # fallback to third-party mirrors is never taken.
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           disable-sudo: true
@@ -48,6 +50,7 @@ jobs:
             api.github.com:443
             codeload.github.com:443
             objects.githubusercontent.com:443
+            get.trivy.dev:443
             ghcr.io:443
             pkg-containers.githubusercontent.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
