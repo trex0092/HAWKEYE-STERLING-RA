@@ -57,13 +57,44 @@ _ARRANGEMENT_ENTITY_TOKENS = {
 JURISDICTION_RISK_PATH = os.environ.get(
     "JURISDICTION_RISK_PATH", "data/jurisdiction-risk.json")
 
+# Common short/variant spellings for entries the maintained list stores under
+# the app baseline's FORMAL names ({alias: listed name}, both in _norm form).
+# The Country:/Nationality: fields this table nudges are hand-typed in the KYC
+# notes, so "Iran" or "Laos" must hit the same entry as "Islamic Republic of
+# Iran" — an unmatched spelling silently DROPS a call-for-action risk bump (a
+# false negative, against this module's degrade-loudly rule). An alias resolves
+# ONLY while its listed name is present, so a jurisdiction FATF de-lists never
+# survives through its alias.
+_JURISDICTION_ALIASES = {
+    "iran": "islamic republic of iran",
+    "laos": "lao people's democratic republic",
+    "lao pdr": "lao people's democratic republic",
+    "ivory coast": "cote d'ivoire",
+    "côte d'ivoire": "cote d'ivoire",
+    "democratic republic of congo": "the democratic republic of congo",
+    "democratic republic of the congo": "the democratic republic of congo",
+    "dr congo": "the democratic republic of congo",
+    "drc": "the democratic republic of congo",
+    "burma": "myanmar",
+    "dprk": "north korea",
+    "democratic people's republic of korea": "north korea",
+    "viet nam": "vietnam",
+    "bosnia and herzegovina": "bosnia-herzegovina",
+    "syrian arab republic": "syria",
+    "virgin islands (uk)": "british virgin islands",
+    "bvi": "british virgin islands",
+    "bolivarian republic of venezuela": "venezuela",
+    "plurinational state of bolivia": "bolivia",
+}
+
 
 def load_jurisdiction_risk(path=None):
     """Return {country_lower: 'grey'|'high'} from the maintained file, or {} if
     absent. Never raises. An ABSENT optional file degrades to neutral silently
     (the expected no-op); a PRESENT-but-unreadable/corrupt file is a real loss of
     a risk input and is warned LOUDLY (this module's DEGRADE-LOUDLY rule), so the
-    jurisdiction bump never vanishes without a trace."""
+    jurisdiction bump never vanishes without a trace. Well-known short/variant
+    spellings (_JURISDICTION_ALIASES) resolve to their listed entry's tier."""
     p = path or JURISDICTION_RISK_PATH
     if not os.path.exists(p):
         return {}
@@ -74,6 +105,9 @@ def load_jurisdiction_risk(path=None):
         for tier in ("grey", "high"):
             for c in d.get(tier, []) or []:
                 out[_norm(c)] = tier
+        for alias, target in _JURISDICTION_ALIASES.items():
+            if target in out and alias not in out:
+                out[alias] = out[target]
         if not out:
             _warn(f"jurisdiction-risk file '{p}' present but yielded 0 entries — "
                   "jurisdiction risk bump is disabled this run")
@@ -122,12 +156,16 @@ def _clean(s):
 
 def _present(s):
     """True iff a field is meaningfully filled (not blank / NA / Pending)."""
-    return bool(_clean(s)) and _clean(s).upper() not in ("NA", "N/A", "PENDING", "-", "—")
+    return bool(_clean(s)) and _clean(s).upper() not in ("NA", "N/A", "PENDING", "-", "—", "–")
 
 
-# Individual block header, e.g. "Individual 1 — Shareholder & Director"
+# Individual block header, e.g. "Individual 1 — Shareholder & Director".
+# The dash class must cover the en-dash (–) too, not only the em-dash/hyphen:
+# word processors auto-convert " - " to " – ", and mask_id already treats the
+# en-dash as an expected data marker — a header the splitter can't parse drops
+# that party's whole KYC block silently.
 _INDIV_HDR = re.compile(
-    r"Individual\s+\d+\s*[—\-:]\s*(.+)", re.IGNORECASE)
+    r"Individual\s+\d+\s*[—–\-:]\s*(.+)", re.IGNORECASE)
 
 # Field labels inside an individual block.
 _FIELDS = {
@@ -170,7 +208,7 @@ def _split_individual_blocks(notes):
     m = re.search(r"SECTION\s*4\b.*?(?=SECTION\s*5\b|$)", notes, re.IGNORECASE | re.DOTALL)
     if m:
         sec = m.group(0)
-    parts = re.split(r"(Individual\s+\d+\s*[—\-:][^\n]*)", sec)
+    parts = re.split(r"(Individual\s+\d+\s*[—–\-:][^\n]*)", sec)
     # parts: [pre, hdr1, body1, hdr2, body2, ...]
     for i in range(1, len(parts) - 1, 2):
         hdr = parts[i]

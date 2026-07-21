@@ -339,7 +339,6 @@ async function _secActivate(){
 }
 function _secFinish(msg){
   _secHide();
-  if($('btnLock')) $('btnLock').style.display = '';
   _syncHeaderLock(false);
   hydrateApp();
   toast(msg);
@@ -358,7 +357,6 @@ function secLock(reason){
   if(typeof saveTimer !== 'undefined' && saveTimer){ clearTimeout(saveTimer); saveTimer = null; }  /* no pending plaintext write can land after lock */
   if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer = null; }
   _sessClear();         /* destroy the 1-hour session so a reload cannot resume it */
-  if($('btnLock')) $('btnLock').style.display = 'none';
   _syncHeaderLock(true);
   _secShow('unlock', reason);   /* opaque overlay hides the on-screen data until re-unlocked */
 }
@@ -437,7 +435,6 @@ async function _sessRestore(s){   /* silent unlock from the IndexedDB session ke
     _sessExp = s.exp;
     await _secActivate();          /* load the encrypted register/draft into the mirror + arm idle */
     _secHide();
-    if($('btnLock')) $('btnLock').style.display = '';
     _syncHeaderLock(false);
     hydrateApp();
     return true;
@@ -769,6 +766,10 @@ function addMonths(iso, m){
   const lastDay = new Date(y, mo+1, 0).getDate(); /* clamp: 29 Feb + 12mo → 28 Feb, not 1 Mar */
   return toISO(new Date(y, mo, Math.min(day, lastDay)));
 }
+function addDays(iso, n){
+  const p = (iso || todayISO()).split('-').map(Number);
+  return toISO(new Date(p[0], (p[1]||1)-1, (p[2]||1)+n));
+}
 function newRef(){
   const d = new Date();
   const ymd = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
@@ -884,7 +885,10 @@ function mergeState(src){
     }
   }
   if(!COUNTRIES.some(c=>c.name===out.entity.jurisdiction)) out.entity.jurisdiction = 'United Kingdom';
-  if(!ACTIVITIES.some(a=>a.name===out.profile.activity)) out.profile.activity = ACTIVITIES[0].name;
+  /* Unknown activity falls back to the state DEFAULT (score 3), mirroring the
+     jurisdiction guard above — never to ACTIVITIES[0], the lowest-scoring
+     entry, which would silently downgrade a re-imported assessment's risk. */
+  if(!ACTIVITIES.some(a=>a.name===out.profile.activity)) out.profile.activity = 'Non-Manufactured Precious Metal Trading';
   out.profile.onboard = out.profile.onboard==='Yes' ? 'Yes' : 'No';
   out.profile.entityYears = Math.max(0, Math.min(99, parseInt(out.profile.entityYears)||0));
   out.profile.relYears = Math.max(0, Math.min(99, parseInt(out.profile.relYears)||0));
@@ -2118,7 +2122,9 @@ function regRender(){
   const fv = (($('regReviewFilter') && $('regReviewFilter').value) || 'all');
   const refs = Object.keys(items).sort((x,y)=>String(items[y].savedAt||'').localeCompare(String(items[x].savedAt||'')));
   regView = [];
-  const today = todayISO(), soon = addMonths(today, 1);
+  /* A true 30-day window — the filter and summary are labelled "30 days", and
+     a calendar month here drifted 28–31 days with the month. */
+  const today = todayISO(), soon = addDays(today, 30);
   const html = refs.map(ref => {
     const it = items[ref] || {}, sm = it.summary || {};
     if(q && (ref+' '+(sm.entity||'')).toLowerCase().indexOf(q)===-1) return '';

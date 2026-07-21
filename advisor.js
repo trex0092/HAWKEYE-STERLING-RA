@@ -19,7 +19,10 @@ function fnHeaders(){
   return h;
 }
 
-const MODES = ['Quick','Speed','Balanced','Deep'];
+/* One button per backend reasoning tier (brain-soul selectModel: speed /
+   balanced / deep). A fourth "Quick" label used to alias Speed byte-for-byte —
+   two visually distinct choices produced identical requests. */
+const MODES = ['Speed','Balanced','Deep'];
 
 const ANSWER = {
   verdict:'Enhanced Due Diligence', tone:'high', confidence:'High confidence',
@@ -67,7 +70,7 @@ const PERSONAS = [
   {id:'warden',   name:'Warden',   role:'Board & MLRO Governance',              img:'assets/persona-warden.webp',   accent:'210,80,200',  pos:'52% 18%'}
 ];
 
-let state = {tab:'ask', mode:'Quick', question:'', askedQuestion:'', phase:'idle', liveAnswer:null, regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null, piiConfirmed:false};
+let state = {tab:'ask', mode:'Speed', question:'', askedQuestion:'', phase:'idle', liveAnswer:null, regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null, piiConfirmed:false};
 let reasoningTimer = null;
 /* Monotonic ask sequence — a response only renders if it belongs to the most
    recent ask() (or nothing was reset in between). Without it, a slow Deep-mode
@@ -310,7 +313,7 @@ function bindPersona(){
 }
 function bindHero(){ const aa=$('askAgain'); if(aa) aa.addEventListener('click', reset); }
 
-const MODE_TO_REASONING = {Quick:'speed', Speed:'speed', Balanced:'balanced', Deep:'deep'};
+const MODE_TO_REASONING = {Speed:'speed', Balanced:'balanced', Deep:'deep'};
 
 function ask(){
   // AUP gate: must acknowledge the Acceptable-Use Policy before any send.
