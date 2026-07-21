@@ -33,7 +33,11 @@ nobody re-reads. Occurrence logic (month-end-clamped recurrence, lead window,
 checks wired into CI; all three scheduled workflows are classified in the
 freshness alarm's EXEMPT set with reasons, every new job is egress-blocked,
 and the board figures / readiness-review counts are refreshed (47 → 51
-workflows).
+workflows). First-run egress audits then tightened the allowlists the honest
+way — observed-then-admitted: `get.trivy.dev` (trivy's binary installer) for
+the container scan, and GitHub's own Sigstore TUF trust domain
+(`tuf-repo.github.com` + its `tmaproduction` blob backend) for the
+attestation verifier.
 
 Both of today's deliveries needed a retry: even a 65,000-byte NUMERIC-ENTITY
 WORST CASE was rejected by Asana's undocumented server-side accounting before

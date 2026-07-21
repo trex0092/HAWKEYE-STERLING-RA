@@ -28,8 +28,12 @@ jobs:
     steps:
       - name: Harden the runner (egress block)
         # Egress = the GitHub attestations API, GHCR + its blob storage (the
-        # image manifest/digest being verified), and the Sigstore TUF trust
-        # root the verifier refreshes. No checkout — gh needs no workspace.
+        # image manifest/digest being verified), and BOTH Sigstore TUF trust
+        # roots the verifier refreshes: the public-good instance
+        # (tuf-repo-cdn.sigstore.dev) and GitHub's own trust domain —
+        # tuf-repo.github.com plus its tmaproduction blob backend, observed
+        # blocked in run 1's egress audit. No checkout — gh needs no
+        # workspace.
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           disable-sudo: true
@@ -40,6 +44,8 @@ jobs:
             ghcr.io:443
             pkg-containers.githubusercontent.com:443
             tuf-repo-cdn.sigstore.dev:443
+            tuf-repo.github.com:443
+            tmaproduction.blob.core.windows.net:443
       - name: Verify the published image provenance
         env:
           GH_TOKEN: ${{ github.token }}
