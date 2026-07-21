@@ -51,9 +51,13 @@ export function level(text) {
   const tt = t.replace(/\b(?:EDD|SDD|CDD)\b[^.;]*?\bNOT\b[^.;]*/g, ' ')
               .replace(/\bNOT\b[^.;]*?\b(?:EDD|SDD|CDD)\b/g, ' ');
   // Prefer an explicitly phrased recommendation ("recommend EDD", "apply CDD",
-  // "diligence level: SDD") over the most-severe token mentioned.
+  // "diligence level: SDD") over the most-severe token mentioned. Return the
+  // canonical literal, not the regex capture: the capture is a slice of the
+  // fetched model reply, and routing it through this map keeps the report file
+  // free of network-derived strings (CodeQL js/http-to-file-access).
+  const CANON = { EDD: 'EDD', SDD: 'SDD', CDD: 'CDD' };
   const explicit = tt.match(/\b(?:RECOMMEND(?:ED|ATION)?|APPL(?:Y|IES|IED)|REQUIRE[SD]?|LEVEL\s*[:=])\b[^.]*?\b(EDD|SDD|CDD)\b/);
-  if (explicit) return explicit[1];
+  if (explicit) return CANON[explicit[1]];
   // Otherwise take the FIRST level mentioned (position-ordered), not the most
   // severe — closer to the model's leading recommendation.
   const idx = { EDD: tt.indexOf('EDD'), SDD: tt.indexOf('SDD'), CDD: tt.indexOf('CDD') };
