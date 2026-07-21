@@ -69,7 +69,15 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
           ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1216203873114460' }}
-        run: node scripts/watch-notify.mjs "Advisor guardrail regression detected" advisor-eval-report.md
+        # Title must not claim a regression when the eval could not run (e.g. the
+        # API returned 400s on a billing lapse) — the report's Result line is the
+        # discriminator, written by scripts/advisor-eval.mjs.
+        run: |
+          TITLE="Advisor guardrail regression detected"
+          if grep -q '^\*\*Result: INCOMPLETE' advisor-eval-report.md; then
+            TITLE="Advisor eval incomplete — API errors (no regression evidence)"
+          fi
+          node scripts/watch-notify.mjs "$TITLE" advisor-eval-report.md
 
       - name: Fallback to a GitHub issue if Asana delivery failed
         if: steps.eval.outcome == 'failure' && steps.asana.outcome == 'failure'
@@ -79,16 +87,19 @@ jobs:
             const fs = require('fs');
             let report = 'Advisor eval reported a guardrail regression. See the workflow run.';
             try { report = fs.readFileSync('advisor-eval-report.md', 'utf8'); } catch (e) {}
+            const incomplete = report.includes('**Result: INCOMPLETE');
             const { owner, repo } = context.repo;
             await github.rest.issues.create({
               owner, repo,
-              title: 'Advisor guardrail regression detected',
+              title: incomplete
+                ? 'Advisor eval incomplete — API errors (no regression evidence)'
+                : 'Advisor guardrail regression detected',
               body: report + '\n\n---\n> Filed because the Asana delivery was unavailable. Set the `ASANA_ACCESS_TOKEN` secret to route future regressions to Asana.',
               labels: ['advisor-eval'],
             });
 
-      - name: Fail the job if a guardrail regressed
+      - name: Fail the job if a guardrail regressed or the eval could not run
         if: steps.eval.outcome == 'failure'
         run: |
-          echo "Advisor eval reported a guardrail regression — see advisor-eval-report.md and the alert above."
+          echo "Advisor eval reported a guardrail regression or could not complete — see advisor-eval-report.md and the alert above."
           exit 1

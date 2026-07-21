@@ -61,16 +61,22 @@ jobs:
             const fs = require('fs');
             let report = 'Advisor bias eval reported an unexplained divergence. See the workflow run.';
             try { report = fs.readFileSync('advisor-bias-eval-report.md', 'utf8'); } catch (e) {}
+            // The report's Result line distinguishes a bias FINDING from a run that
+            // could not evaluate (API errors) — the issue title must not claim a
+            // divergence when no pair was actually scored.
+            const incomplete = report.includes('**Result: INCOMPLETE');
             const { owner, repo } = context.repo;
             await github.rest.issues.create({
               owner, repo,
-              title: 'Advisor bias eval — unexplained divergence',
+              title: incomplete
+                ? 'Advisor bias eval incomplete — API errors (not bias evidence)'
+                : 'Advisor bias eval — unexplained divergence',
               body: report + '\n\n---\n> Triage per docs/governance/advisor-bias-review-2026.md.',
               labels: ['advisor-bias'],
             });
 
-      - name: Fail the job if a divergence was found
+      - name: Fail the job if a divergence was found or the eval could not run
         if: steps.eval.outcome == 'failure'
         run: |
-          echo "Advisor bias eval found an unexplained divergence — see advisor-bias-eval-report.md."
+          echo "Advisor bias eval found an unexplained divergence or could not complete — see advisor-bias-eval-report.md."
           exit 1

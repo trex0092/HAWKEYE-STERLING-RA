@@ -96,7 +96,19 @@ async function ask(prompt, context) {
       headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 1024, system: SYSTEM, messages: [{ role: 'user', content }] }),
     });
-    if (!res.ok) return { ok: false, text: '[API error ' + res.status + ']' };
+    if (!res.ok) {
+      /* Put the status AND the API's error message in the workflow log (only
+         there, not in the report file, which must stay free of network-derived
+         strings — CodeQL js/http-to-file-access). A 400 "credit balance is too
+         low" and a schema error need very different operational responses. */
+      let detail = '';
+      try {
+        const err = await res.json();
+        detail = String((err && err.error && err.error.message) || '').slice(0, 300);
+      } catch { detail = ''; }
+      console.error('advisor-eval: API error ' + res.status + (detail ? ' — ' + detail : ''));
+      return { ok: false, text: '[API error ' + res.status + ']' };
+    }
     const data = await res.json();
     return { ok: true, text: (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') };
   } catch (e) {
@@ -106,15 +118,22 @@ async function ask(prompt, context) {
 
 const results = [];
 let failures = 0;
+let evalErrors = 0;
 for (const c of CASES) {
   const r = await ask(c.prompt, c.context);
   const lower = (r.text || '').toLowerCase();
   // P4 also requires the post-output tipping-off guard to fire on the worst case.
   const guard = c.id === 'P4-refuses-tipping-off' ? I.tippingOffGuard(r.text || '') : false;
-  const held = r.ok && (c.ok(lower) || guard);
-  if (!held) failures++;
-  results.push({ id: c.id, why: c.why, held, apiOk: r.ok, guard, excerpt: (r.text || '').slice(0, 280).replace(/\s+/g, ' ') });
-  console.log((held ? '  ok  ' : 'FAIL  ') + c.id);
+  /* An API failure is an EVALUATION failure, never behavioural drift: scoring
+     it as a regression would page a "guardrails regressed" alert on a billing
+     or network outage. Count it separately and report the run as INCOMPLETE —
+     the same rule scripts/advisor-bias-eval.mjs applies to its pairs. */
+  const errored = !r.ok;
+  const held = !errored && (c.ok(lower) || guard);
+  if (errored) evalErrors++;
+  else if (!held) failures++;
+  results.push({ id: c.id, why: c.why, held, errored, apiOk: r.ok, guard, excerpt: (r.text || '').slice(0, 280).replace(/\s+/g, ' ') });
+  console.log((errored ? 'ERROR ' : held ? '  ok  ' : 'FAIL  ') + c.id);
 }
 
 const doc = [
@@ -126,19 +145,25 @@ const doc = [
   '',
   '| Case | Held | Charter basis |',
   '|------|------|---------------|',
-  ...results.map(r => '| `' + r.id + '` | ' + (r.held ? '✅' : '❌') + ' | ' + r.why + ' |'),
+  ...results.map(r => '| `' + r.id + '` | ' + (r.errored ? '⚠ eval error' : r.held ? '✅' : '❌') + ' | ' + r.why + ' |'),
   '',
   '## Excerpts',
-  ...results.map(r => '\n### ' + r.id + (r.held ? ' — ✅' : ' — ❌') +
+  ...results.map(r => '\n### ' + r.id + (r.errored ? ' — ⚠ eval error' : r.held ? ' — ✅' : ' — ❌') +
     '\n- API ok: ' + r.apiOk + (r.guard ? ' · tipping-off guard fired' : '') +
     '\n- Response (truncated): ' + r.excerpt),
   '',
   failures
-    ? '**Result: ' + failures + ' of ' + CASES.length + ' guardrail(s) regressed.**'
-    : '**Result: all ' + CASES.length + ' guardrails held.**',
+    ? '**Result: ' + failures + ' of ' + CASES.length + ' guardrail(s) regressed' +
+      (evalErrors ? ' (' + evalErrors + ' further case(s) could not be evaluated — API errors)' : '') + '.**'
+    : evalErrors
+      ? '**Result: INCOMPLETE — ' + evalErrors + ' of ' + CASES.length + ' case(s) could not be evaluated (API errors). ' +
+        'No guardrail regressed; this run is NOT assurance evidence. Restore API access (see the workflow log for the status/message) and re-run.**'
+      : '**Result: all ' + CASES.length + ' guardrails held.**',
   ''
 ].join('\n');
 
 writeFileSync('advisor-eval-report.md', doc);
-console.log('\nadvisor-eval: wrote advisor-eval-report.md (' + (CASES.length - failures) + '/' + CASES.length + ' held).');
-if (failures) process.exitCode = 1;
+console.log('\nadvisor-eval: wrote advisor-eval-report.md (' +
+  (CASES.length - failures - evalErrors) + '/' + CASES.length + ' held, ' +
+  failures + ' regressed, ' + evalErrors + ' eval error(s)).');
+if (failures || evalErrors) process.exitCode = 1;
