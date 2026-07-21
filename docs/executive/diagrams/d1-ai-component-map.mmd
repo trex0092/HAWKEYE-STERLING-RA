@@ -1,0 +1,53 @@
+%%{init: {"theme": "base", "themeVariables": {
+  "fontFamily": "Segoe UI, Arial, sans-serif",
+  "fontSize": "15px",
+  "primaryColor": "#F4F6FA",
+  "primaryBorderColor": "#22304A",
+  "primaryTextColor": "#101828",
+  "lineColor": "#44506B",
+  "clusterBkg": "#FFFFFF",
+  "clusterBorder": "#9AA4B8"
+}}}%%
+flowchart TB
+  subgraph DEVICE["PLANE 1 · ON-DEVICE APPLICATION (browser, zero backend)"]
+    RA["Entity Risk Assessment<br/><i>index.html / app.js</i><br/>Deterministic 0–30 scoring · hard outcomes"]
+    PERSONA["AI Risk Advisor personas<br/><i>Vale · Cypher · Ember</i><br/>Rule-driven advisory UX"]
+    CONSOLE["AI Operations Console<br/><i>console.html / console.js</i>"]
+  end
+
+  subgraph EDGE["PLANE 2 · SERVERLESS AI (Netlify Functions)"]
+    BRAIN["Advisor Intelligence Core<br/><i>netlify/functions/brain-soul.js</i><br/>LLM Q&amp;A · Soul Charter P1–P10<br/>7 runtime guards · audit line"]
+    ADV["Hawkeye Sterling Advisor<br/><i>advisor.html / advisor.js</i><br/>Cited Q&amp;A · 17 personas · AUP gate"]
+  end
+
+  subgraph CI["PLANE 3 · AUTOMATED SCREENING &amp; AI LAYER (GitHub Actions)"]
+    SCREEN["Daily screening engine<br/><i>screen.py</i><br/>Sanctions · adverse media · PEP"]
+    AI["AI layer<br/><i>ai.py</i><br/>Risk rating · triage · STR draft<br/>Prompt-injection defence"]
+    AGENTS["Agentic operating model<br/><i>agents.py</i><br/>Least-privilege agents · QA gate"]
+    REGDRAFT["Regulatory Watch AI drafter<br/><i>scripts/reg-draft.mjs</i><br/>PR-gated update proposals"]
+  end
+
+  LLM(["Anthropic Claude API<br/><b>opt-in, key-gated</b>"])
+  MLRO{{"MLRO / Compliance Officer<br/><b>every decision is human</b>"}}
+
+  ADV --> BRAIN
+  BRAIN -. "when enabled" .-> LLM
+  AI -. "opt-in triage" .-> LLM
+  REGDRAFT -. "if key present" .-> LLM
+  SCREEN --> AI --> AGENTS
+  RA --> MLRO
+  PERSONA --> RA
+  CONSOLE --> MLRO
+  BRAIN --> MLRO
+  AGENTS --> MLRO
+
+  classDef device fill:#E8F0FE,stroke:#1D4ED8,color:#0F1D40;
+  classDef edge fill:#FDE7F0,stroke:#BE185D,color:#4A0D28;
+  classDef ci fill:#E7F6EC,stroke:#047857,color:#052E1C;
+  classDef ext fill:#FFF4E0,stroke:#B45309,color:#4A2A05;
+  classDef human fill:#F1E8FD,stroke:#6D28D9,color:#2A1052;
+  class RA,PERSONA,CONSOLE device;
+  class BRAIN,ADV edge;
+  class SCREEN,AI,AGENTS,REGDRAFT ci;
+  class LLM ext;
+  class MLRO human;

@@ -1,0 +1,47 @@
+%%{init: {"theme": "base", "themeVariables": {
+  "fontFamily": "Segoe UI, Arial, sans-serif",
+  "fontSize": "15px",
+  "primaryColor": "#F4F6FA",
+  "primaryBorderColor": "#22304A",
+  "primaryTextColor": "#101828",
+  "lineColor": "#44506B",
+  "clusterBkg": "#FFFFFF",
+  "clusterBorder": "#9AA4B8"
+}}}%%
+flowchart LR
+  subgraph AIZONE["AI PROPOSES — decision support only"]
+    A1["Screen &amp; match<br/><i>every hit carries its<br/>source evidence</i>"]
+    A2["Rate &amp; triage<br/><i>explainable factors,<br/>labelled AI outputs</i>"]
+    A3["Draft &amp; summarise<br/><i>STR draft, alert notes,<br/>review digests</i>"]
+  end
+
+  subgraph GATE["GOVERNANCE GATE — deterministic"]
+    Q["QA gate: source on every finding ·<br/>no injected item reaches the model ·<br/>degrade-loudly verified"]
+  end
+
+  subgraph HUMANZONE["HUMAN DECIDES — accountable officer"]
+    H1{{"MLRO reviews case subtask<br/>sets disposition"}}
+    H2{{"Four-eyes / dual attestation<br/>on operative actions"}}
+    H3{{"Files STR via goAML ·<br/>applies TFS freeze ·<br/>onboards or declines"}}
+  end
+
+  subgraph AUDITZONE["EVERYTHING RECORDED"]
+    R["Agent action audit trail · audit lines<br/>hash-chained activity log · Asana + Actions<br/>retained 10 years"]
+  end
+
+  A1 --> A2 --> A3 --> Q --> H1 --> H2 --> H3
+  A1 -.-> R
+  A2 -.-> R
+  A3 -.-> R
+  Q -.-> R
+  H1 -.-> R
+  H3 -.-> R
+
+  classDef ai fill:#FDE7F0,stroke:#BE185D,color:#4A0D28;
+  classDef gate fill:#FFF4E0,stroke:#B45309,color:#4A2A05;
+  classDef human fill:#F1E8FD,stroke:#6D28D9,color:#2A1052;
+  classDef audit fill:#E7F6EC,stroke:#047857,color:#052E1C;
+  class A1,A2,A3 ai;
+  class Q gate;
+  class H1,H2,H3 human;
+  class R audit;
