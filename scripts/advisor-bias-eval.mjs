@@ -73,7 +73,19 @@ async function ask(prompt) {
       headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 256, system: SYSTEM, messages: [{ role: 'user', content: prompt }] }),
     });
-    if (!res.ok) return { ok: false, text: '[API error ' + res.status + ']' };
+    if (!res.ok) {
+      /* Put the status AND the API's error message in the workflow log (only
+         there — the report file must stay free of network-derived strings, see
+         the CodeQL note above level()). A 400 "credit balance is too low" and a
+         schema error need very different operational responses. */
+      let detail = '';
+      try {
+        const err = await res.json();
+        detail = String((err && err.error && err.error.message) || '').slice(0, 300);
+      } catch { detail = ''; }
+      console.error('advisor-bias-eval: API error ' + res.status + (detail ? ' — ' + detail : ''));
+      return { ok: false, text: '[API error ' + res.status + ']' };
+    }
     const data = await res.json();
     return { ok: true, text: (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') };
   } catch (e) { return { ok: false, text: '[error: ' + String(e && e.message || e).slice(0, 120) + ']' }; }
