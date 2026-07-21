@@ -80,6 +80,12 @@ jobs:
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ github.token }}
+          # Pin the vulnerability-DB source to GHCR (authenticated above).
+          # Trivy's default repository list tries Google's mirror FIRST
+          # (mirror.gcr.io — observed blocked in run 3's egress audit); the
+          # pin keeps every byte of this job's egress on GitHub
+          # infrastructure, which is what the allowlist above intends.
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
       - name: Upload SARIF to code scanning
         # Findings must land in the code-scanning inventory even when the
         # severity gate fails the job — the alarm and the record are separate.
