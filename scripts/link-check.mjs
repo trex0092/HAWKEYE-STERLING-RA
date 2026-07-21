@@ -36,12 +36,16 @@ export const ALLOWLIST = new Set([
    domains do this (verified 2026-07, issue #225): both the legacy moec.gov.ae
    pages cited in the research notes and the current moet.gov.ae watched source.
    Regulatory Watch monitors the moet.gov.ae source via its Internet Archive
-   fallback — see the `uae-moe` narrative in data/reg-sources.json. These are
-   skipped at probe time (a guaranteed 2×20s timeout buys no information) and
-   never counted dead. */
+   fallback — see the `uae-moe` narrative in data/reg-sources.json. amluae.com
+   (the AML UAE research citations in docs/research/) does the same (verified
+   2026-07-20: pages live in a browser and freshly search-indexed, while every
+   CI probe dies at connection level — the 2026-07-20 link-check report).
+   These are skipped at probe time (a guaranteed 2×20s timeout buys no
+   information) and never counted dead. */
 export const ALLOWLIST_HOSTS = new Set([
   'www.moec.gov.ae', 'moec.gov.ae',
   'www.moet.gov.ae', 'moet.gov.ae',
+  'www.amluae.com', 'amluae.com',
 ]);
 
 /* True when the URL's host is on the datacenter-blocked allowlist. Unparseable

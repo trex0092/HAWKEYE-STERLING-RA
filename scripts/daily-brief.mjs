@@ -37,7 +37,10 @@ export function categorize(tasks) {
     const n = String(t.name || '');
     if (/^Daily Compliance Brief/i.test(n)) continue;       /* never count our own briefs */
     if (/^RISK DATA SHEET/i.test(n)) continue;              /* the auto-backup mirror task */
-    if (/^FATF/i.test(n)) b.fatf.push(t);
+    /* Unanchored like every sibling branch: the watchdog's monitoring-gap
+       alert is titled "⚠ FATF monitoring GAP — …", which a ^-anchored match
+       misfiled under "Other monitoring". */
+    if (/FATF/i.test(n)) b.fatf.push(t);
     else if (/Sanctions Screen/i.test(n)) b.screen.push(t);
     else if (/Sanctions Watch/i.test(n)) b.watch.push(t);
     else if (isHealthAlert(n)) b.health.push(t);

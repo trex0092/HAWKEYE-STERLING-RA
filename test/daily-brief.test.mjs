@@ -24,6 +24,11 @@ const b = categorize(tasks);
 check('categorize routes each watcher by name prefix',
   b.fatf.length === 1 && b.screen.length === 1 && b.watch.length === 1
   && b.regulatory.length === 1 && b.health.length === 1 && b.other.length === 1);
+/* The watchdog's monitoring-gap alert carries a ⚠ prefix — it must still file
+   under FATF, not "Other monitoring" (regression: ^-anchored match missed it). */
+const bGap = categorize([{ name: '⚠ FATF monitoring GAP — list source unreachable 3 consecutive run(s)', permalink_url: 'g1' }]);
+check('emoji-prefixed FATF monitoring-gap alert files under FATF',
+  bGap.fatf.length === 1 && bGap.other.length === 0);
 check('categorize ignores the brief itself and the risk-data backup',
   !JSON.stringify(b).includes('u6') && !JSON.stringify(b).includes('u7'));
 check('totalItems counts everything except the ignored tasks', totalItems(b) === 6);

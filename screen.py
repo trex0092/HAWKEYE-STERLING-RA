@@ -609,9 +609,14 @@ def match_adverse_keywords(title: str) -> list:
         elif _NONLATIN_RE.search(term):
             hit = term in tl
         else:
-            hit = re.search(r"\b" + re.escape(term.lower()), tl) is not None
+            # Both edges anchored: unlike the English entries (deliberate stems —
+            # 'launder', 'smuggl' — that need open-ended prefix matching), the
+            # foreign terms are whole words, and a bare prefix collides with
+            # unrelated English ('mito'chondria → Serbian 'mito' bribery,
+            # 'preso'rted → Portuguese 'preso' arrest).
+            hit = re.search(r"\b" + re.escape(term.lower()) + r"\b", tl) is not None
             if not hit:
-                hit = re.search(r"\b" + re.escape(_latin_fold(term)), _latin_fold(raw)) is not None
+                hit = re.search(r"\b" + re.escape(_latin_fold(term)) + r"\b", _latin_fold(raw)) is not None
         if hit:
             matched.append(canon)
     return matched
@@ -2012,13 +2017,20 @@ def _token_set_ratio(a, b):
     fn = getattr(fuzz, "token_set_ratio", None)
     return fn(a, b) if fn else 0
 
-def _is_token_subset(short_norm, long_norm):
-    """True when EVERY distinctive token of the shorter name closely matches a
-    token in the longer name, and the longer name has strictly more tokens. This
-    is the patronymic / extra-middle-name case ("USAMA BIN LADIN" vs the full
-    listed chain) — a strong, low-false-positive subset signal. Requires ≥2
-    distinctive tokens so a single common token can't trigger it."""
-    ta, tb = core_tokens(short_norm), core_tokens(long_norm)
+def _is_token_subset(a_norm, b_norm):
+    """True when EVERY distinctive token of the SHORTER of the two names closely
+    matches a token in the longer one, and the longer has strictly more tokens.
+    This is the patronymic / extra-middle-name case ("USAMA BIN LADIN" vs the
+    full listed chain) — a strong, low-false-positive subset signal. Requires ≥2
+    distinctive tokens so a single common token can't trigger it. SYMMETRIC by
+    ordering on token count: the KYC name may sit on either side — a customer
+    recorded as "Islamic Revolutionary Guard Corps Quds Force" must flag the
+    designated entry "QUDS FORCE" exactly as the short spelling flags the long
+    chain; fixing the argument order to customer-first silently screened the
+    superset direction clear (a sanctions false negative)."""
+    ta, tb = core_tokens(a_norm), core_tokens(b_norm)
+    if len(tb) < len(ta):
+        ta, tb = tb, ta
     if len(ta) < 2 or len(tb) <= len(ta):
         return False
     return all(any(fuzz.token_sort_ratio(t, u) >= 88 for u in tb) for t in ta)

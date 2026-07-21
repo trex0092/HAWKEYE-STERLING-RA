@@ -75,6 +75,17 @@ check("patronymic short form matches the full designated chain (subset recall)",
       len(screen.screen_name("Usama bin Ladin", _chain)) == 1)
 check("an unrelated multi-token name is not subset-matched to the chain",
       screen.screen_name("Ahmed Al Rashid Trading", _chain) == [])
+# The subset gate must be SYMMETRIC: a customer name that EXTENDS a designated
+# entry (extra descriptor/middle tokens) is the same subset relation in the
+# other direction — fixing the argument order to customer-first screened these
+# clear (regression: sanctions false negative).
+_short_entry = {"OFAC SDN": [(screen.normalize("QUDS FORCE"), "QUDS FORCE"),
+                             (screen.normalize("ABU BAKR AL BAGHDADI"), "ABU BAKR AL BAGHDADI")]}
+check("customer name extending a designated entry still hits (superset direction)",
+      len(screen.screen_name("Islamic Revolutionary Guard Corps Quds Force", _short_entry)) == 1
+      and len(screen.screen_name("Abu Bakr Muhammad Al Rashid Al Baghdadi", _short_entry)) == 1)
+check("a generic long name is still not subset-matched to a short entry",
+      screen.screen_name("Gulf Star Metals Trading LLC", _short_entry) == [])
 # Corporate owner/parent extraction (50%/control): a designated ENTITY owner is
 # screened even though only natural persons are in `individuals`.
 _owners = screen.extract_entity_owners("Ultimate Beneficial Owner: Rosneft Holding LLC\nParent Company: Acme Group FZE\nDirector: John Smith")
@@ -325,10 +336,28 @@ check("R.10 CDD gaps surfaced for incomplete party", any("identification" in g f
 check("R.10 complete party with proof-of-address has no doc gap", not any("proof of address" in g for g in _k["individuals"][0]["cdd_gaps"]))
 check("ID number is masked (presence + last 3 only, no full value)", kyc.mask_id("18397269566") == ("•" * 8) + "566")
 check("mask_id hides N/A and blanks", kyc.mask_id("N/A") == "" and kyc.mask_id("") == "")
+# Word processors auto-convert " - " to an en-dash; the header splitter must
+# accept every dash form mask_id already treats as a marker, or the whole
+# party silently loses its KYC block (regression: en-dash dropped parties).
+_k_en = kyc.parse_customer(_NOTE.replace("Individual 1 —", "Individual 1 –").replace("Individual 2 —", "Individual 2 –"),
+                           today=_dt.date(2026, 6, 29))
+check("en-dash individual headers parse identically to em-dash",
+      len(_k_en["individuals"]) == 2 and _k_en["individuals"][0]["name"] == "Huseyin Kursat Yamac"
+      and _k_en["individuals"][1]["role"].lower() == "trustee")
+check("an en-dash placeholder field is not treated as filled", not kyc._present("–"))
 _jt = {"iran": "high", "syria": "grey"}
 check("jurisdiction risk picks worst of country+nationalities", kyc.jurisdiction_risk_for("Turkey", ["Turkey", "Iran"], _jt)[0] == "high")
 check("jurisdiction risk neutral when no table", kyc.jurisdiction_risk_for("Turkey", ["Turkey"], {})[0] is None)
 check("maintained jurisdiction list excludes de-listed home jurisdictions", "turkey" not in kyc.load_jurisdiction_risk() and "united arab emirates" not in kyc.load_jurisdiction_risk())
+# Hand-typed notes say "Iran"/"Laos", the maintained list stores the app
+# baseline's formal names — the alias layer must bridge them, or a
+# call-for-action nationality silently loses its risk bump (regression).
+_jfull = kyc.load_jurisdiction_risk()
+check("short-form spellings resolve to the listed formal entries",
+      _jfull.get("iran") == "high" and _jfull.get("laos") == "grey"
+      and _jfull.get("burma") == "high" and _jfull.get("ivory coast") == "grey")
+check("jurisdiction_risk_for bumps a hand-typed 'Iran' nationality",
+      kyc.jurisdiction_risk_for("United Arab Emirates", ["Iran"], _jfull)[0] == "high")
 # risk model wires R.10 jurisdiction + CDD gaps
 _rj = ai.compute_risk_rating(sanctions_hits=[], is_control=False, pep=False, adverse_articles=[], jurisdiction_high_risk=True)
 check("high-risk jurisdiction raises risk + factor", any("call-for-action" in f for f in _rj["factors"]))
@@ -480,6 +509,13 @@ _ml = [
 ]
 _ml_ok = all(exp in screen.match_adverse_keywords(t) for t, exp in _ml)
 check("worldwide multilingual flagging across Greek/Hebrew/Thai/Polish/Vietnamese/Bulgarian/Tamil", _ml_ok)
+# Foreign Latin terms are whole words, so both edges are anchored — a bare
+# prefix collided with unrelated English (regression: 'mito'chondria flagged
+# bribery via Serbian 'mito', 'preso'rted flagged arrest via Portuguese 'preso').
+check("foreign whole-word terms never match on an English prefix",
+      screen.match_adverse_keywords("Mitochondria under the microscope") == []
+      and screen.match_adverse_keywords("Presorted mail rates rise") == []
+      and screen.match_adverse_keywords("Suape port expansion announced") == [])
 check("worldwide sweep covers many languages and locales",
       screen.ADVERSE_LANG_COUNT >= 30 and len(screen.GNEWS_LOCALES) >= 60)
 check("ADVERSE_LOCALES accepts 'all' → full matrix",
@@ -1183,6 +1219,8 @@ with open(_good, "w") as _f:
 _jr = kyc.load_jurisdiction_risk(_good)
 check("kyc: a valid jurisdiction file loads grey/high tiers",
       _jr.get("panama") == "grey" and _jr.get("iran") == "high")
+check("kyc: an alias never resurrects a jurisdiction the file no longer lists",
+      "burma" not in _jr and "islamic republic of iran" not in _jr)
 
 print("screen — EOCN review-age gate (manual-review currency on the TFS list)")
 import datetime as _dt_rev
@@ -1325,6 +1363,16 @@ check("building an invalid case raises instead of producing a broken dossier", _
 check("a case with no transactions renders the SAR fallback line",
       "No transaction rows supplied" in str_dossier.build_dossier(
           {**str_dossier.EXAMPLE_CASE, "transactions": []}, today="2026-07-16"))
+# A literal '|' in a trade description / counterparty must not split its row
+# into extra markdown columns (regression: unescaped pipes garbled the table).
+_pipe_case = {**str_dossier.EXAMPLE_CASE,
+              "transactions": [{**str_dossier.EXAMPLE_CASE["transactions"][0],
+                                "type": "cash | gold bar", "notes": "a|b"}]}
+_pipe_row = [ln for ln in str_dossier.build_dossier(_pipe_case, today="2026-07-16").splitlines()
+             if "gold bar" in ln][0]
+check("transaction cells escape literal pipes (row keeps its 6 columns)",
+      "cash \\| gold bar" in _pipe_row and "a\\|b" in _pipe_row
+      and _pipe_row.count(" | ") == 6)  # leading "  | " + 5 separators; escaped \| never pads to " | "
 
 # ── screen.py: Asana notes cap budgets the ESCAPED rich-text bytes ───────────
 # Regression for the two 2026-07-16 daily-screening delivery failures: (1) a
