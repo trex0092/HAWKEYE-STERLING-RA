@@ -25,7 +25,10 @@ Completion requires your identity in the sign-off field.
 ## Decisions the system will never make for you
 Sanctions freeze / decline / STR filing are **your** decisions with dual
 attestation (UAE Federal Decree-Law 10/2025 Art.16/18; FATF R.26). The engine
-detects and evidences; you decide and file.
+detects and evidences; you decide and file. The
+[alert-investigation decision tree](alert-investigation-decision-tree.md) is the
+disposition path that lands cases on your desk — escalations arrive at step 4,
+the STR call is step 5.
 
 ## Adverse-media, PEP & repeat patterns
 - Review the daily **Adverse Media & PEP** task and any **⚠ REPEAT ADVERSE-MEDIA
