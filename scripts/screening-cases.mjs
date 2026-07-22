@@ -178,7 +178,7 @@ function readJson(path) {
 
 async function main() {
   const today = new Date().toISOString().slice(0, 10);
-  const projectGid = process.env.ASANA_CASES_PROJECT_GID || '1213914392047129';
+  const projectGid = process.env.ASANA_CASES_PROJECT_GID || '1216203370612914';
   const assignee = process.env.ASANA_CASE_ASSIGNEE_GID || '1213645083721304';
 
   if (!asanaEnabled()) {
@@ -281,7 +281,7 @@ async function main() {
   if (results && results.date === today) {
     try {
       const html = buildResultsDigestHtml(results, a => (casesState[a.key] || {}).taskGid || null);
-      const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203873114462';
+      const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203370612916';
       const url = await notifyAsana(resultsDigestTitle(results), '', { project: projectGid, section: sectionGid, html, assignee: assignee });
       console.log('screening-cases: daily results digest posted to Asana' + (url ? ' — ' + url : ''));
     } catch (e) {

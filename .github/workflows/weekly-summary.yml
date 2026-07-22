@@ -79,7 +79,7 @@ jobs:
         id: summary
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           # "AI & Platform Governance" section of the Ongoing Monitoring project
           ASANA_WEEKLY_SECTION_GID: ${{ vars.ASANA_WEEKLY_SECTION_GID || '1216229252787647' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

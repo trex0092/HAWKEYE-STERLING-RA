@@ -58,7 +58,7 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID }}
-          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
         run: node scripts/asana-reconcile.mjs
 
       - name: Fallback to a GitHub issue if the reconciliation could not reach Asana

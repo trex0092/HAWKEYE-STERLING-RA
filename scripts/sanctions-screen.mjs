@@ -69,7 +69,7 @@ export const COVERAGE = 'OFAC SDN/non-SDN · UN · EU · UK OFSI · UAE EOCN Loc
    Adverse Media & PEP record here so there is always evidence monitoring actually
    executed. The section is resolved by name at runtime (created if missing), so no
    manual Asana setup is required; ASANA_OM_AM_PEP_SECTION_GID is an optional override. */
-export const OM_PROJECT_GID = process.env.ASANA_OM_PROJECT_GID || '1213914392047129';
+export const OM_PROJECT_GID = process.env.ASANA_OM_PROJECT_GID || '1216203370612914';
 export const OM_SECTION_AM_PEP = 'Adverse Media & PEP Monitoring';
 /* Audit tasks are assigned to the token bearer by default; override with a user GID. */
 const OM_ASSIGNEE = process.env.ASANA_OM_ASSIGNEE_GID || 'me';

@@ -7,8 +7,8 @@
 #   ASANA_PAT         — Your Asana Personal Access Token
 #
 # REQUIRED REPO VARIABLES (Settings → Variables → Actions):
-#   ASANA_PROJECT_GID     = 1213914392047129
-#   ASANA_SECTION_GID     = 1213914392047131
+#   ASANA_PROJECT_GID     = 1216203370612914 (HAWKEYE STERLING APP)
+#   ASANA_SECTION_GID     = 1216203370612916 (Assessment Report)
 #   ASANA_ASSIGNEE_GID    = 1213645083721304
 #   ASANA_CUSTOMER_DB_GID = 1214107620220121
 #
@@ -622,8 +622,8 @@ jobs:
           # must be in project"). Defaults are the verified-correct pair:
           # project "Sanctions/Media/PEP - Monitoring" / section "Screening
           # Daily Report".
-          ASANA_PROJECT_GID: ${{ vars.ASANA_SCREEN_PROJECT_GID || '1213914392047129' }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_SCREEN_SECTION_GID || '1213914392047131' }}
+          ASANA_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
           ASANA_ASSIGNEE_GID: ${{ vars.ASANA_ASSIGNEE_GID || '1213645083721304' }}
           DATE_ISO: ${{ steps.date.outputs.DATE_ISO }}
           DATE_DISPLAY: ${{ steps.date.outputs.DATE_DISPLAY }}
@@ -1005,7 +1005,7 @@ jobs:
               print("⚠️ SECTION CONFIG DRIFT — section "
                     f"{section_gid} is not in project {project_gid}; "
                     "creating the task without a section. Fix the "
-                    "ASANA_SCREEN_SECTION_GID / ASANA_SCREEN_PROJECT_GID pair.")
+                    "ASANA_DELIVERY_SECTION_GID / ASANA_DELIVERY_PROJECT_GID pair.")
               del payload["data"]["memberships"]
               r = requests.post(
                   "https://app.asana.com/api/1.0/tasks",

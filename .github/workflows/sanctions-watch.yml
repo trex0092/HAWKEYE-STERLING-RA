@@ -127,9 +127,9 @@ jobs:
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           # "Sanctions updates" section of the Ongoing Monitoring project
-          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1216203873114462' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
           # Step output crosses into the shell via env (never inline ${{ }} in run:),
           # so a hostile character in a generated title can never become shell syntax.
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
