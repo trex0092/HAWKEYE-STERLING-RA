@@ -67,8 +67,8 @@ jobs:
         if: steps.eval.outcome == 'failure'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1216203873114460' }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
         # Title must not claim a regression when the eval could not run (e.g. the
         # API returned 400s on a billing lapse) — the report's Result line is the
         # discriminator, written by scripts/advisor-eval.mjs.

@@ -21,7 +21,7 @@
 import { asana } from './asana-notify.mjs';
 
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
-export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1213914392047129';
+export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
 /* Section resolved BY NAME at runtime (created if missing); GID overrides it. */
 export const GOV_SECTION_NAME = 'AI & Platform Governance';
 const GOV_SECTION_GID = process.env.ASANA_GOV_SECTION_GID || '';

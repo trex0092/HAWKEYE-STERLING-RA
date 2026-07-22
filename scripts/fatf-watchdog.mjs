@@ -20,9 +20,9 @@ const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWK
 /* Regulatory/sanctions changes (FATF list moves) go to the dedicated
    "Ongoing Monitoring" project so all monitoring alerts stay
    together; the client-assessment digest/backup stay in HAWKEYE STERLING APP. */
-const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1213914392047129';
+const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
 /* "FATF list moves" section of that project, so list-change alerts file neatly. */
-const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1216203873114461';
+const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1216203370612916';
 const FATF_SKIP_ALERT = Number(process.env.FATF_SKIP_ALERT) || 2; /* consecutive unreachable runs before a monitoring-gap alert */
 
 /* FATF naming → the app's baseline naming */

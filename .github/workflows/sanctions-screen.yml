@@ -19,14 +19,14 @@ name: Sanctions Screen
 #
 # Secrets / vars:
 #   ASANA_ACCESS_TOKEN  (secret)  read the Customer Database + post the alert
-#   ASANA_REG_PROJECT_GID         alert destination project (default in script)
+#   ASANA_REG_PROJECT_GID         alert destination project (vars.ASANA_DELIVERY_PROJECT_GID -> HAWKEYE STERLING APP)
 #   ASANA_CUSTOMER_PROJECT_GID    screening subject project (default in script)
 #   ASANA_SANCTIONS_SECTION_GID   section to file alerts under
 #   SCREEN_MATCH_THRESHOLD        material-match score 0-1 (default 0.85)
 #   SCREEN_ADVERSE_MEDIA          '0' to disable Google News adverse-media (default on)
 #   SCREEN_PEP                    '0' to disable the Wikidata PEP signal (default on)
 #   SCREEN_INTERPOL               '1' to ENABLE the Interpol Red Notice per-subject signal (default OFF; public subset only, supplementary — verify the public API on the runner before turning on)
-#   ASANA_OM_PROJECT_GID          "Ongoing Monitoring" project for the daily audit task
+#   ASANA_OM_PROJECT_GID          daily audit task project (vars.ASANA_DELIVERY_PROJECT_GID -> HAWKEYE STERLING APP)
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
 on:
@@ -126,17 +126,17 @@ jobs:
         id: screen
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_REG_PROJECT_GID }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
           # "Sanctions updates" section of the Ongoing Monitoring project
-          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1216203873114462' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           SCREEN_PEP: ${{ vars.SCREEN_PEP }}
           SCREEN_INTERPOL: ${{ vars.SCREEN_INTERPOL }}
           # Ongoing Monitoring audit trail — the section is found/created by name
           # at runtime, so the section GID var is an optional override.
-          ASANA_OM_PROJECT_GID: ${{ vars.ASANA_OM_PROJECT_GID || '1213914392047129' }}
+          ASANA_OM_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_OM_AM_PEP_SECTION_GID: ${{ vars.ASANA_OM_AM_PEP_SECTION_GID }}
           # Case-engine mode: the lifecycle cases below ARE the alert surface;
           # the flat alert card + daily audit task would duplicate the unified
@@ -150,10 +150,10 @@ jobs:
         if: steps.screen.outputs.screen_error != 'true'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_CASES_PROJECT_GID: ${{ vars.ASANA_CASES_PROJECT_GID || '1213914392047129' }}
+          ASANA_CASES_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
           # "Sanctions updates" section — the run's RESULTS surface (Asana, not GitHub)
-          ASANA_SCREEN_RESULTS_SECTION_GID: ${{ vars.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203873114462' }}
+          ASANA_SCREEN_RESULTS_SECTION_GID: ${{ vars.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203370612916' }}
         run: node scripts/screening-cases.mjs
 
       - name: Screening metrics (non-blocking observability)

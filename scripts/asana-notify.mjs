@@ -13,7 +13,7 @@
 
 // "Ongoing Monitoring" (merged target; workspace: Compliance Tasks)
 export const REG_PROJECT_GID =
-  process.env.ASANA_REG_PROJECT_GID || '1213914392047129';
+  process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
 
 export function asanaEnabled() {
   return !!process.env.ASANA_ACCESS_TOKEN;
