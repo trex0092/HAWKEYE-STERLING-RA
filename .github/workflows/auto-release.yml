@@ -5,6 +5,15 @@ name: Auto Release
 # to main that changes the version is tagged automatically with generated
 # notes (the PR titles since the previous release). Pushes that do not
 # change APP_VERSION are a green no-op.
+#
+# Two-stage design: `check` (no environment) decides whether the current
+# APP_VERSION still needs a release; `release` (protected `release`
+# environment) only runs when it does. The gate used to sit on the whole
+# workflow, which made every ordinary push wait for reviewer approval as a
+# no-op deployment — queued runs then cancelled each other under the
+# concurrency group and the workflow badge went red without a single real
+# failure. Gating only the publish step keeps required-reviewer control over
+# anything that actually ships while ordinary pushes stay a green no-op.
 on:
   push:
     branches: [main]
@@ -13,12 +22,50 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: "${{ github.workflow }}-${{ github.ref }}"
-  cancel-in-progress: false
-
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      needs_release: ${{ steps.decide.outputs.needs_release }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Decide whether APP_VERSION needs a release
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(grep -oE "APP_VERSION = '[0-9]+\.[0-9]+\.[0-9]+'" app.js | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          test -n "$V" || { echo "could not read APP_VERSION from app.js"; exit 1; }
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "v$V already released — nothing to do"
+            echo "needs_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "v$V is not released yet — handing over to the gated release job"
+            echo "needs_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.needs_release == 'true'
+    # Serialize actual publishes only; no-op runs never enter this group.
+    concurrency:
+      group: auto-release-publish
+      cancel-in-progress: false
     # Write scopes live at job level (top level is read-only — least privilege).
     permissions:
       contents: write
@@ -48,6 +95,8 @@ jobs:
         run: |
           V=$(grep -oE "APP_VERSION = '[0-9]+\.[0-9]+\.[0-9]+'" app.js | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
           test -n "$V" || { echo "could not read APP_VERSION from app.js"; exit 1; }
+          # Re-check at publish time: the approval can land long after `check`
+          # ran, and a parallel run may have released this version meanwhile.
           if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "v$V already released — nothing to do"
             echo "released=false" >> "$GITHUB_OUTPUT"

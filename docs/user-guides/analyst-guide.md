@@ -26,6 +26,10 @@ do is audit-logged.
 - Assessor name is set in the header (completion is blocked without it).
 
 ## Good practice
+- Work screening alerts through the
+  [alert-investigation decision tree](alert-investigation-decision-tree.md) —
+  false positive? → enough information? → escalate? → suspicion? — and document
+  every disposition.
 - Treat every AI/advisor note as **decision-support, not a decision**.
 - Use the **Advisor** page for "how do I treat this?" questions — it gives cited
   guidance, never a ruling on a specific customer's sanctions status.
