@@ -312,7 +312,13 @@ is [OBSERVED] against commit `8576ad61` unless marked otherwise.*
 egress-blocked). Coverage additions only — no scored control changed; scores stand as re-scored
 on 15 July.*
 
-Verified at HEAD: 51 workflows · 110 markdown documents under docs/ (93 excluding docs/research/auto).
+*Estate re-verification · 22 July 2026 — badge remediation + governance additions (#302): two curated
+documents added (GRC↔cybersecurity model, alert-investigation decision tree) and the auto-release
+two-stage split added one egress-blocked check job. Coverage additions only — no scored control changed.*
+
+Verified at HEAD: 51 workflows · 112 markdown documents under docs/ (95 excluding docs/research/auto).
+
+Verified at HEAD on 21 July: 51 workflows · 110 markdown documents under docs/ (93 excluding docs/research/auto).
 
 Verified at HEAD on 15 July: 47 workflows · 110 markdown documents under docs/ (93 excluding docs/research/auto).
 (Refreshed with this cycle's curated-list update SOP, which added one governance document.)
