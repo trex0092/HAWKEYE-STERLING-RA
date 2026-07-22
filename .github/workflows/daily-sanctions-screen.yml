@@ -56,9 +56,10 @@ jobs:
             www.treasury.gov:443
             sanctionslistservice.ofac.treas.gov:443
             wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
-            main.un.org:443
+            scsanctions.un.org:443
+            unsolprodfiles.blob.core.windows.net:443
             webgate.ec.europa.eu:443
-            assets.publishing.service.gov.uk:443
+            ofsistorage.blob.core.windows.net:443
             app.asana.com:443
 
       # Check out the repo so the maintained UAE EOCN list
@@ -115,7 +116,7 @@ jobs:
       - name: Download UN Consolidated list
         run: |
           if curl -sfL \
-            "https://main.un.org/securitycouncil/content/un-sc-consolidated-list/en/consolidated.xml" \
+            "https://scsanctions.un.org/resources/xml/en/consolidated.xml" \
             -o /tmp/un_consolidated.xml; then
             echo "UN_HASH=$(sha256sum /tmp/un_consolidated.xml | cut -d' ' -f1)" \
               >> "$GITHUB_ENV"
@@ -127,7 +128,7 @@ jobs:
       - name: Download EU Financial Sanctions list
         run: |
           if curl -sfL \
-            "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content" \
+            "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw" \
             -o /tmp/eu_sanctions.xml; then
             echo "EU_HASH=$(sha256sum /tmp/eu_sanctions.xml | cut -d' ' -f1)" \
               >> "$GITHUB_ENV"
@@ -139,7 +140,7 @@ jobs:
       - name: Download UK OFSI Consolidated list
         run: |
           if curl -sfL \
-            "https://assets.publishing.service.gov.uk/media/uk-sanctions-consolidated-list.csv" \
+            "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv" \
             -o /tmp/uk_ofsi.csv; then
             echo "UK_HASH=$(sha256sum /tmp/uk_ofsi.csv | cut -d' ' -f1)" \
               >> "$GITHUB_ENV"
@@ -826,8 +827,8 @@ jobs:
              Status:    {eu_status}
 
           ✅ UK OFSI Consolidated List — HM Treasury
-             Source:    https://assets.publishing.service.gov.uk/
-                        media/uk-sanctions-consolidated-list.csv
+             Source:    https://ofsistorage.blob.core.windows.net/
+                        publishlive/2022format/ConList.csv
              File:      ConList.csv (official HM Treasury download)
              File Hash: {uk_hash}
              Status:    {uk_status}
