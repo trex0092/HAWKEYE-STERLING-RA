@@ -395,18 +395,39 @@ jobs:
           # UK OFSI
           try:
               import csv
+              import re as _re
               before = len(sanctioned)
+              # ConList.csv (OFSI 2022format) carries meta rows before the header,
+              # so DictReader on row 1 reads garbage keys and yields 0 names (a
+              # coverage-floor breach). Mirror scripts/sanctions-match.mjs
+              # parseOfsiCsv instead: find the header row by its distinctive
+              # cells, then join the "Name N" columns per row ("0" is OFSI's
+              # empty-part placeholder).
               with open("/tmp/uk_ofsi.csv", encoding="utf-8-sig", errors="replace") as f:
-                  reader = csv.DictReader(f)
-                  for row in reader:
-                      # Use only the known OFSI name columns. The old bare
-                      # `... or list(row.values())[0] if row else ""` both mis-parsed
-                      # (precedence made `else ""` dead) and, when name columns were
-                      # empty, injected the first column's value (e.g. "Group Type")
-                      # as a sanctioned "name".
-                      name = (row.get("Name 6") or row.get("Name") or row.get("LastName") or row.get("name") or "")
-                      if name and name.strip():
-                          sanctioned.append({"name": name.strip(), "list": "UK OFSI", "programme": row.get("Regime","UK Sanctions")})
+                  _rows = list(csv.reader(f))
+              _h = -1
+              for _i, _r in enumerate(_rows):
+                  _cells = [c.strip().lower() for c in _r]
+                  if "name 6" in _cells or "name 1" in _cells or "group id" in _cells:
+                      _h = _i
+                      break
+              if _h < 0:
+                  raise ValueError("ConList.csv header row not found")
+              _name_cols = sorted(
+                  [(idx, int(m.group(1))) for idx, c in enumerate(_rows[_h])
+                   for m in [_re.match(r"^name\s*(\d+)$", c.strip(), _re.I)] if m],
+                  key=lambda t: t[1])
+              _regime_idx = next((idx for idx, c in enumerate(_rows[_h])
+                                  if c.strip().lower() == "regime"), None)
+              for _r in _rows[_h + 1:]:
+                  _parts = [(_r[idx] if idx < len(_r) else "").strip() for idx, _n in _name_cols]
+                  _name = " ".join(p for p in _parts if p and p != "0")
+                  _name = " ".join(_name.split())
+                  if _name:
+                      _prog = (_r[_regime_idx].strip() if _regime_idx is not None
+                               and _regime_idx < len(_r) and _r[_regime_idx].strip()
+                               else "UK Sanctions")
+                      sanctioned.append({"name": _name, "list": "UK OFSI", "programme": _prog})
               print(f"UK OFSI: {len(sanctioned)-before} entries")
           except Exception as e:
               print(f"UK parse error: {e}")
