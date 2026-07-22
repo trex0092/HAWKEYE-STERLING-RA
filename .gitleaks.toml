@@ -25,6 +25,7 @@ regexes = [
   # not secrets. The default asana-client-id rule false-positives on any 16-digit
   # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
   '''1216203370612914''',  # HAWKEYE STERLING APP project (RA delivery target)
+  '''1216203370612916''',  # section: Assessment Report (pipeline report delivery target)
   '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log)
   '''1213914392047131''',  # section: Daily Sanctions Screening (screen.py + daily-sanctions-screen.yml)
   '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default)
