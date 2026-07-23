@@ -311,22 +311,42 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
     if (prev[key]) nextSubjects[key] = { ...prev[key], lastSeen: today };
   };
 
+  const BAND_RANK = { critical: 3, high: 2, medium: 1, low: 0 };
   for (const r of results) {
     if (r.errored) { carryForward(r.key); continue; }
     if (isMatch(r, threshold)) {
       matchCount++;
-      const sig = matchSignature(r);
       const prior = prev[r.key];
+      /* Coverage-stable signature: a prior hit on a sanctions list that did NOT
+         load this run was not re-verified. Rebuilding the signature from this
+         run's reduced coverage would (a) fire a spurious "changed match" alert
+         and (b) silently drop the unverified hit (and any band downgrade it
+         caused) from the recorded state. Carry those hits — and the stronger
+         prior band they supported — forward until the list loads again. */
+      let lists = r.lists || [];
+      let band = r.band, recommendation = r.recommendation;
+      if (screened && prior && Array.isArray(prior.lists)) {
+        const unscreened = prior.lists.filter(l => !ENRICHMENT_LISTS.has(l) && !screened.has(l));
+        if (unscreened.length) {
+          const have = new Set(lists.map(h => h.list).filter(Boolean));
+          for (const l of unscreened) if (!have.has(l)) { lists = lists.concat([{ list: l, carriedForward: true }]); have.add(l); }
+          if ((BAND_RANK[prior.band] || 0) > (BAND_RANK[band] || 0)) {
+            band = prior.band;
+            recommendation = prior.recommendation || recommendation;
+          }
+        }
+      }
+      const sig = matchSignature({ band, recommendation, lists });
       const firstSeen = (prior && prior.firstSeen) || today;
       nextSubjects[r.key] = {
-        name: r.name, jurisdiction: r.jurisdiction, band: r.band, topScore: r.topScore,
-        recommendation: r.recommendation, lists: (r.lists || []).map(h => h.list).filter(Boolean),
+        name: r.name, jurisdiction: r.jurisdiction, band, topScore: r.topScore,
+        recommendation, lists: lists.map(h => h.list).filter(Boolean),
         signature: sig, firstSeen, lastSeen: today
       };
       if (!prior || prior.signature !== sig) {
         alerts.push({ key: r.key, name: r.name, jurisdiction: r.jurisdiction, gid: r.gid,
           entityType: r.entityType, parent: r.parent, role: r.role,
-          band: r.band, topScore: r.topScore, recommendation: r.recommendation, lists: r.lists || [], isNew: !prior });
+          band, topScore: r.topScore, recommendation, lists, isNew: !prior });
       }
     } else if (prev[r.key]) {
       const prior = prev[r.key];
@@ -474,10 +494,24 @@ function pepHitLine(r) {
   const h = (r.lists || []).find(x => x.list && x.list.includes('PEP')) || {};
   return '  ' + r.name + ' | Wikidata | ' + String(h.hitName || '').slice(0, 120) + (h.score != null ? ' | score ' + h.score : '');
 }
+/* Subject-level NEW/STANDING tag for a hit line, from the diff's new-match keys
+   (alerts with isNew — subject first flagged this run). Blank when the caller
+   could not supply that info. */
+function hitStatusTag(r, newKeys) {
+  if (!newKeys) return '';
+  return newKeys.has(r.key) ? ' | NEW' : ' | STANDING (previously reported)';
+}
+/* " (N new, M standing)" breakdown for a hit-count line; '' without diff info. */
+function hitStatusCounts(hits, newKeys) {
+  if (!newKeys || !hits.length) return '';
+  const fresh = hits.filter(r => newKeys.has(r.key)).length;
+  return ' (' + fresh + ' new, ' + (hits.length - fresh) + ' standing)';
+}
 
 /* PART B — Adverse Media & PEP monitoring task body (CLEAR or HIT variant). */
-export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], pepHits = [], regUrl = '', amKeywordCount = AM_KEYWORD_COUNT } = {}) {
+export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], pepHits = [], newMatchKeys = null, regUrl = '', amKeywordCount = AM_KEYWORD_COUNT } = {}) {
   const hasHits = amHits.length > 0 || pepHits.length > 0;
+  const newKeys = newMatchKeys ? new Set(newMatchKeys) : null;
   const L = [];
   L.push('ADVERSE MEDIA & PEP MONITORING REPORT');
   L.push('Date: ' + today + ' | Run: ' + (run || 'local'));
@@ -516,10 +550,10 @@ export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], p
     L.push('PEP status changes:           NONE');
     L.push('False positives cleared:      NONE');
   } else {
-    L.push('New adverse media hits:       ' + amHits.length);
-    for (const r of amHits) L.push(amHitLine(r));
-    L.push('New PEP identifications:      ' + pepHits.length);
-    for (const r of pepHits) L.push(pepHitLine(r));
+    L.push('Adverse media hits:           ' + amHits.length + hitStatusCounts(amHits, newKeys));
+    for (const r of amHits) L.push(amHitLine(r) + hitStatusTag(r, newKeys));
+    L.push('PEP identifications:          ' + pepHits.length + hitStatusCounts(pepHits, newKeys));
+    for (const r of pepHits) L.push(pepHitLine(r) + hitStatusTag(r, newKeys));
     L.push('False positives cleared:      [to be reviewed by MLRO]');
   }
   L.push('');
@@ -541,7 +575,7 @@ export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], p
     L.push('Detection automatic. Action requires MLRO review.');
     L.push('Next run: ' + (tomorrow || ''));
   } else {
-    L.push('STATUS: ⚠ REVIEW REQUIRED — see alert card in Regulations project');
+    L.push('STATUS: ⚠ REVIEW REQUIRED' + (regUrl ? ' — see alert card in Regulations project' : ''));
     L.push(RULE);
     if (regUrl) L.push('Link to the Regulations alert: ' + regUrl);
     L.push('Detection automatic. Action requires MLRO review.');
@@ -693,7 +727,8 @@ async function postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, t
     if (already) { console.log('sanctions-screen: already posted: ' + already); return { posted: false, skipped: true, name: already }; }
 
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-    const notes = buildAmPepNotes({ today, tomorrow, run: runUrl(), subjects: subjects.length, amHits, pepHits, regUrl });
+    const notes = buildAmPepNotes({ today, tomorrow, run: runUrl(), subjects: subjects.length, amHits, pepHits,
+      newMatchKeys: alerts.filter(a => a.isNew).map(a => a.key), regUrl });
     const url = await createOmTask({ name, notes, projectGid, sectionGid }, token);
     console.log('sanctions-screen: AM/PEP task created — ' + name + (url ? ' — ' + url : ''));
     return { posted: true, url, name };

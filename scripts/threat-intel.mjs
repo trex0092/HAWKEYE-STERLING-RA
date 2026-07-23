@@ -17,8 +17,10 @@
        an auto-decision.
    Authoritative sanction status still comes from the consolidated lists.
 
-   Default OFF (enable with SCREEN_THREAT_INTEL=1 and a bundle source). The pure
-   parse/score helpers are unit-tested offline; only loadStixBundle /
+   NOT yet wired into the daily screen: no code reads a SCREEN_THREAT_INTEL
+   flag today, so setting one is a no-op. Use checkThreatIntel()/screenStix()
+   directly (ad-hoc investigation, a custom step) until a wiring lands. The
+   pure parse/score helpers are unit-tested offline; only loadStixBundle /
    checkThreatIntel touch the network or filesystem. */
 
 import { readFile } from 'node:fs/promises';
@@ -76,13 +78,17 @@ export function screenStix(name, bundle, { threshold = 85 } = {}) {
   const hits = [];
   let best = 0;
   for (const e of entries) {
+    // One hit per SDO, on its BEST alias — stopping at the first alias over
+    // threshold would understate the score (and could band 'medium' when a
+    // later alias scores 'high').
+    let bestCand = null, bestSc = 0;
     for (const candidate of [e.name, ...e.aliases]) {
       const sc = similarity(subj, normalizeName(candidate));
       if (sc > best) best = sc;
-      if (sc >= threshold) {
-        hits.push({ name: e.name, type: e.type, id: e.id, matchedOn: candidate, score: Math.round(sc) });
-        break; // one hit per SDO (best alias)
-      }
+      if (sc > bestSc) { bestSc = sc; bestCand = candidate; }
+    }
+    if (bestSc >= threshold) {
+      hits.push({ name: e.name, type: e.type, id: e.id, matchedOn: bestCand, score: Math.round(bestSc) });
     }
   }
   if (!hits.length) return { hit: false, score: Math.round(best), band: 'low', match: null, count: 0 };

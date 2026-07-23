@@ -71,6 +71,7 @@ jobs:
       contents: write
       id-token: write       # OIDC for Sigstore-keyless build-provenance attestation
       attestations: write   # store the attestation in the repo's attestation log
+      actions: write        # dispatch publish-container.yml (GITHUB_TOKEN events cannot chain)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Protected environment: configure required reviewers on the `release`
@@ -145,3 +146,16 @@ jobs:
           cp "$BUNDLE" "hawkeye-sterling-ra-$V.sigstore"
           cp "$BUNDLE" "hawkeye-sterling-ra-$V.intoto.jsonl"
           gh release upload "v$V" "hawkeye-sterling-ra-$V.sigstore" "hawkeye-sterling-ra-$V.intoto.jsonl" --repo "$GITHUB_REPOSITORY" --clobber || echo "bundle upload skipped"
+
+      - name: Dispatch the container publish
+        # The release above was created with GITHUB_TOKEN, whose events never
+        # trigger other workflows — publish-container.yml's release trigger
+        # cannot fire for it. workflow_dispatch is GitHub's documented
+        # exception to that rule, so invoke it explicitly at the freshly
+        # minted tag (the workflow-lint zizmor gate keeps workflow_run
+        # chaining off the table — see container-scan.yml).
+        if: steps.rel.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.rel.outputs.version }}
+        run: gh workflow run publish-container.yml --repo "$GITHUB_REPOSITORY" --ref "v$V"

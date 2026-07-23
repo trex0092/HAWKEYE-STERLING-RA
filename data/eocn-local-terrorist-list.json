@@ -112,7 +112,7 @@
     "Ali Nasser Alaseeri",
     "FADHL SALEH SALEM ALTAYABI",
     "Ashur Omar Ashur OBAIDOON",
-    "HAZEM MOHSEN FARHAN + HAZEM MOHSEN AL FARHAN",
+    { "name": "HAZEM MOHSEN FARHAN", "aliases": ["HAZEM MOHSEN AL FARHAN"] },
     "MEHDI AZIZOLLAH KIASATI",
     "FARSHAD JAFAR HAKEMZADEH",
     "SEYYED REZA MOHMMAD GHASEMI",
@@ -125,7 +125,7 @@
     "MUHAMMED IBRAHIM ISA",
     "IBRAHIM ALI ALHASSAN",
     "SURAJO ABUBAKAR MUHAMMAD",
-    "Alaa khanfurah - Alaa abdulrazzaq ali khanfurah - Alaa Alkhanfurah",
+    { "name": "Alaa khanfurah", "aliases": ["Alaa abdulrazzaq ali khanfurah", "Alaa Alkhanfurah"] },
     "FADI SAID KAMAR",
     "WALID KAMEL AWAD",
     "KHALED WALID AWAD",
@@ -187,8 +187,7 @@
     "ISLAMIC GROUB IN EGYPT",
     "ANSAR BAIT AL-MAQDIS (WILAYAT SINAI- PROVINCE OR STATE IN THE SINAI)",
     "AJNAD MISR",
-    "MAJLIS SHURA AL-MUJAHIDEEN FI AKNAF BAYT AL-MAQDIS (THE MUJAHEDEEN SHURA COUNCIL IN THE",
-    "ENVIRONS OF JERUSALEM",
+    "MAJLIS SHURA AL-MUJAHIDEEN FI AKNAF BAYT AL-MAQDIS (THE MUJAHEDEEN SHURA COUNCIL IN THE ENVIRONS OF JERUSALEM)",
     "THE HOUTHI MOVEMENT IN YEMEN",
     "HEZBOLLAH AL-HIJAZ IN SAUDI ARABIA",
     "HEZBOLLAH IN THE GULF COOPERATION COUNCIL",
@@ -319,5 +318,5 @@
     "AL-Khobara For Accounting, Auditing, and studies"
   ],
   "note": "Extracted from the official EOCN Local Terrorist List PDF. Includes the LISTED individuals, organizations and entities only; the DELISTED (removed) sections of the PDF are intentionally excluded. Refresh when EOCN amends the list. Arabic-script aliases are omitted (the current matcher normalises to Latin characters).",
-  "count": 312
+  "count": 311
 }

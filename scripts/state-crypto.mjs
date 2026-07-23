@@ -49,7 +49,8 @@ export function decryptText(payload, secret) {
   const salt = Buffer.from(parts[1], 'base64');
   const nonce = Buffer.from(parts[2], 'base64');
   const blob = Buffer.from(parts[3], 'base64');
-  if (blob.length < 17) throw new Error('payload too short');
+  // ct may be empty (encrypting '' is valid): blob = ct + 16-byte GCM tag.
+  if (blob.length < 16) throw new Error('payload too short');
   const ct = blob.subarray(0, blob.length - 16);
   const tag = blob.subarray(blob.length - 16);
   const decipher = createDecipheriv('aes-256-gcm', deriveKey(secret, salt), nonce);

@@ -8,6 +8,13 @@ name: Publish container image
 # attested (Sigstore keyless), same as the release tarball.
 
 on:
+  # Both in-repo release paths (auto-release.yml / release.yml) create the
+  # release with GITHUB_TOKEN, whose events never trigger other workflows —
+  # so each of them dispatches this workflow explicitly after publishing
+  # (workflow_dispatch is GitHub's documented exception to that rule; the
+  # workflow-lint zizmor gate keeps workflow_run chaining off the table —
+  # see container-scan.yml). The release trigger stays for a release
+  # published by hand in the UI, which DOES fire it.
   release:
     types: [published]
   workflow_dispatch:

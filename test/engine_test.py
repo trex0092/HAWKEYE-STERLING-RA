@@ -264,6 +264,16 @@ print("regression — deep-audit fixes")
 uk_no_title = b"Name 6,Name 1,Name 2,Name 3\nAL-SOMEONE,,,\nOTHER NAME,First,,\n"
 uknames, ukstatus, _ = screen.parse_uk(uk_no_title)
 check("parse_uk handles a missing title row (no silent zero)", "AL-SOMEONE" in uknames and len(uknames) >= 1)
+# parse_uk must assemble the FULL name from Name 1..5 + Name 6 (surname last)
+# and strip OFSI's literal "0" empty-part placeholders — surname-only or
+# given-names-only entries under-score against full customer names.
+uk_split = b"Name 6,Name 1,Name 2,Name 3,Name 4,Name 5\nSURNAME,First,Middle,0,0,0\nACME ENTITY,,,,,\n"
+uksplit_names, _, _ = screen.parse_uk(uk_split)
+check("parse_uk assembles the full individual name (given names + surname)",
+      "First Middle SURNAME" in uksplit_names)
+check("parse_uk strips the '0' placeholder from name parts",
+      not any("0" in n for n in uksplit_names))
+check("parse_uk keeps entity rows (Name 6 only) intact", "ACME ENTITY" in uksplit_names)
 uk_html = b"<html><body>Service unavailable</body></html>"
 _, uk_html_status, _ = screen.parse_uk(uk_html)
 check("parse_uk flags an unexpected (HTML) body instead of 0 silent names", "PARSE ERROR" in uk_html_status)

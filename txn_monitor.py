@@ -172,10 +172,16 @@ def rule_cdd_trigger(txns):
     out = []
     for t in txns:
         amt = _amt(t)
-        if CDD_TRIGGER_THRESHOLD <= amt < CASH_REPORT_THRESHOLD:
-            out.append(_alert("CDD_TRIGGER", "LOW", t,
-                f"{amt:,.0f} AED ≥ CDD trigger {CDD_TRIGGER_THRESHOLD:,.0f} — "
-                "verify CDD is on file for this customer"))
+        if amt < CDD_TRIGGER_THRESHOLD:
+            continue
+        # THRESHOLD already alerts CASH at/above the DPMSR line — but only cash.
+        # A wire/gold transaction of any size still needs CDD on file, so the
+        # upper carve-out must not exempt non-cash methods.
+        if _norm(t.get("method")) == "cash" and amt >= CASH_REPORT_THRESHOLD:
+            continue
+        out.append(_alert("CDD_TRIGGER", "LOW", t,
+            f"{amt:,.0f} AED ≥ CDD trigger {CDD_TRIGGER_THRESHOLD:,.0f} — "
+            "verify CDD is on file for this customer"))
     return out
 
 

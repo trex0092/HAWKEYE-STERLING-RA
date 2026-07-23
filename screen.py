@@ -1063,7 +1063,7 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
                         title = (title_el.text or "").strip()
                         if title in seen_titles: continue
                         seen_titles.add(title)
-                        source = (source_el.text if source_el is not None else "Unknown")
+                        source = ((source_el.text or "").strip() if source_el is not None else "") or "Unknown"
                         pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
                         link = (link_el.text or "") if link_el is not None else ""
                         matched = match_adverse_keywords(title)
@@ -1753,13 +1753,20 @@ def parse_uk(data):
             log("  UK parse error: expected 'Name 6' column not found — list NOT parsed")
             return names, "PARSE ERROR — unexpected format", sha256_of(data)
         for row in reader:
-            n6 = (row.get("Name 6") or "").strip()
-            n1 = (row.get("Name 1") or "").strip()
-            n2 = (row.get("Name 2") or "").strip()
-            n3 = (row.get("Name 3") or "").strip()
-            if n6: names.add(n6)
-            combined = " ".join(p for p in [n1,n2,n3] if p)
-            if combined: names.add(combined)
+            # OFSI splits a name across "Name 1".."Name 5" (given names) with
+            # the surname / entity name in "Name 6", and pads empty parts with
+            # a literal "0". Screening must see the ASSEMBLED full name — the
+            # surname alone or the given names alone score too low against a
+            # customer's full name and produce false negatives. Entities carry
+            # only "Name 6", so the join degrades to that naturally (this
+            # mirrors parseOfsiCsv in scripts/sanctions-match.mjs).
+            parts = []
+            for i in (1, 2, 3, 4, 5, 6):
+                part = (row.get(f"Name {i}") or "").strip()
+                if part and part != "0":
+                    parts.append(part)
+            if parts:
+                names.add(" ".join(parts))
         # The list date lives on the TITLE row. With no title row, line 0 is the
         # CSV header and its last cell is a column name (e.g. "Name 3") — showing
         # that as the list date in the audit block would be nonsense. Also require
@@ -2966,12 +2973,16 @@ def load_all_lists():
     ofac_fetched = bool(ofac_data)
     un_fetched   = bool(un_data)
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
-    ofac_names |= parse_ofac_alt(ofac_alt_data)   # fold in SDN a.k.a. aliases (best-effort)
     un_names,   un_date,   un_hash   = parse_un(un_data)
+    # Fallback check BEFORE folding alt.csv aliases: if the primary sdn.csv
+    # failed but alt.csv loaded, the alias fold would leave ofac_names non-empty
+    # and defeat the mirror — screening aliases-only OFAC coverage silently.
     fb = _mirror_fallback(ofac_names, "us_ofac_sdn", "OFAC SDN")
     if fb:
-        ofac_names, ofac_date, ofac_hash = fb
+        ofac_names, ofac_date, ofac_hash = fb   # mirror already carries aliases
         ofac_fetched = True
+    else:
+        ofac_names |= parse_ofac_alt(ofac_alt_data)   # fold in SDN a.k.a. aliases (best-effort)
     fb = _mirror_fallback(un_names, "un_sc_sanctions", "UN Consolidated")
     if fb:
         un_names, un_date, un_hash = fb
@@ -3049,8 +3060,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     pep_degraded = stats.get("pep_errors", 0) > 0
     pep_mirror = stats.get("pep_mirror", 0)
     # Sanctions coverage: DEGRADED if ANY core list failed to load (not just if all
-    # of them did) — a run missing 1 of 4 core lists is not a clean "OK".
-    core_loaded = [list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu")]
+    # of them did) — a run missing 1 of 5 core lists is not a clean "OK". EOCN is
+    # tier "core" in list_meta and must count here too: a dead local-terrorist
+    # list parse is a coverage loss, not an OK run.
+    core_loaded = [list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu","eocn")]
     sanc_ok = all(core_loaded)
     # Adverse-media coverage, three-state: DEGRADED only when subjects had ZERO
     # adverse coverage from ANY net (news dead AND no watchlist); DEGRADED (news)
@@ -3390,8 +3403,13 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
     for p in pep_findings:
         if not p.get("is_new"): continue
         nm = f"🟠 PEP case: {p['subject_name']} — {p.get('category','PEP')}"
+        # Only Wikidata-sourced findings carry a Q-id; mirror/manual findings
+        # must not get a fabricated wikidata.org link to a non-existent page.
+        pid = str(p.get('id') or '')
+        source_line = (f"Wikidata: https://www.wikidata.org/wiki/{pid}" if pid.startswith("Q")
+                       else (f"Source ref: {pid}" if pid else "Source: mirror / manual review"))
         notes = [f"Subject: {p['subject_name']}" + (f"  (owner/director — {p['parent']})" if p.get("parent") else ""),
-                 f"Wikidata: https://www.wikidata.org/wiki/{p.get('id','')}",
+                 source_line,
                  f"Description: {p.get('description','')}", f"Record: {p.get('permalink','')}",
                  "", "Disposition: [ ] not a PEP   [ ] confirmed PEP — apply EDD   [ ] investigate"]
         queue.append((1, nm, "\n".join(notes)))

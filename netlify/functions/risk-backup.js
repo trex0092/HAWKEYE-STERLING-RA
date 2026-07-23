@@ -72,12 +72,13 @@ const handle = async (event) => {
 
   try {
     let gid = null;
+    let lookupFailed = null;
     let path = '/projects/' + project + '/tasks?limit=100&opt_fields=name';
     let iterations = 0;
     while (path && !gid && iterations < 50) { /* guard against malformed pagination loops */
       iterations++;
       const page = await api(token, 'GET', path);
-      if (!page.ok) break;
+      if (!page.ok) { lookupFailed = page; break; }
       const hit = (page.body.data || []).find(t => String(t.name || '') === TASK_NAME);
       if (hit) gid = hit.gid;
       path = (page.body.next_page && page.body.next_page.offset)
@@ -105,6 +106,15 @@ const handle = async (event) => {
         const msg = (upd.body && upd.body.errors && upd.body.errors[0] && upd.body.errors[0].message) || ('asana update failed (' + upd.status + ')');
         return resp(upd.status || 502, { ok: false, error: msg });
       }
+    }
+    /* Same duplicate-task class of bug on the LOOKUP side: a transient (429/5xx)
+       failure while paging the project must not read as "mirror task absent" —
+       falling through to create would duplicate a still-existing mirror.
+       Surface the real upstream status, as the update path does. */
+    if (!gid && lookupFailed) {
+      const msg = (lookupFailed.body && lookupFailed.body.errors && lookupFailed.body.errors[0] && lookupFailed.body.errors[0].message)
+        || ('asana lookup failed (' + lookupFailed.status + ') — not creating a possible duplicate; retry later');
+      return resp(lookupFailed.status || 502, { ok: false, error: msg });
     }
     const made = await api(token, 'POST', '/tasks', { data: { name: TASK_NAME, notes, projects: [project] } });
     if (!made.ok) {

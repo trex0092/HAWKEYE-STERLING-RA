@@ -85,7 +85,11 @@ function aupAcked(){ try{ return !!localStorage.getItem(AUP_KEY); }catch(e){ ret
 function aupAck(){ try{ localStorage.setItem(AUP_KEY, JSON.stringify({at:new Date().toISOString(), version:1})); }catch(e){} }
 
 /* Client PII guard — warns before identifiers leave the device (DPIA risk #1). */
-const PII_RES = [/\b784-?\d{4}-?\d{7}-?\d\b/, /\b[A-Z]{1,2}\d{6,9}\b/, /\b\d{12,}\b/];
+/* Mirrors the server guard's patterns (brain-soul.js): Emirates ID, passport,
+   long account numbers, and IBAN — the warning text promises IBAN detection,
+   so the client must actually detect one (an unspaced UAE IBAN escapes both
+   the passport and long-number patterns). */
+const PII_RES = [/\b784-?\d{4}-?\d{7}-?\d\b/, /\b[A-Z]{1,2}\d{6,9}\b/, /\b\d{12,}\b/, /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/];
 function piiScan(t){ const s = String(t||''); return PII_RES.some(re=>re.test(s)); }
 
 /* ── AI governance telemetry (on-device, privacy-preserving) ──────────────────
@@ -109,12 +113,16 @@ function govLoad(){
   }catch(e){ return govDefault(); }
 }
 function govSave(g){ try{ localStorage.setItem(GOV_KEY, JSON.stringify(g)); }catch(e){} }
+/* LOCAL calendar date, not toISOString()'s UTC date: in UAE (UTC+4) the UTC
+   day lags until 04:00, mis-bucketing the first 4 hours of usage into
+   yesterday (same class app.js toISO() fixed for review dates). */
+function govDay(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function govRecord(data){
   const g = govLoad();
   const ok = data && data.ok !== false;
   g.calls = (g.calls||0) + 1;
   if(typeof data.elapsedMs === 'number'){ g.lat.push(data.elapsedMs); if(g.lat.length > 200) g.lat = g.lat.slice(-200); }
-  const day = new Date().toISOString().slice(0,10);
+  const day = govDay(new Date());
   g.usage[day] = g.usage[day] || {n:0, modes:{}, personas:{}};
   g.usage[day].n++;
   g.usage[day].modes[state.mode] = (g.usage[day].modes[state.mode]||0) + 1;
@@ -130,7 +138,7 @@ function govRecord(data){
 function pct(arr, p){ if(!arr.length) return null; const s = arr.slice().sort((a,b)=>a-b); return s[Math.min(s.length-1, Math.floor((p/100)*s.length))]; }
 function govStats(){
   const g = govLoad();
-  const today = new Date().toISOString().slice(0,10);
+  const today = govDay(new Date());
   return { calls:g.calls||0, today:(g.usage[today]&&g.usage[today].n)||0,
     p50:pct(g.lat,50), p95:pct(g.lat,95), lastOk:g.lastOk, lastErr:g.lastErr, flags:g.flags||{} };
 }
@@ -322,12 +330,14 @@ function ask(){
   // Don't substitute a canned question for an empty composer (that sends a
   // question the user never asked, plus a billed call + telemetry). Prompt instead.
   if(!q){
+    askSeq++;   // invalidate any in-flight ask so a late answer can't overwrite this prompt
     state.askedQuestion = ''; state.phase = 'answer';
     state.liveAnswer = {ok:false, text:'Please enter a question for the advisor.'};
     $('hero').innerHTML = heroHtml(); applyCssText($('hero')); bindHero(); return;
   }
   // PII guard: warn (once) before identifiers leave the device.
   if(piiScan(q) && !state.piiConfirmed){
+    askSeq++;   // same invalidation: the warning must not be replaced by a stale answer
     state.piiConfirmed = true;
     state.askedQuestion = q; state.phase = 'answer';
     state.liveAnswer = {ok:false, text:'⚠ Possible personal identifiers detected in your question (e.g. Emirates ID, passport, or a long account/IBAN number). Sending will transfer them off-device to Anthropic for processing. Click "Ask the advisor" again to confirm, or edit your question to remove them.'};
@@ -475,10 +485,13 @@ const ESC_FIELDS = [
 ];
 function escalationRun(v){
   const subject = (v.subject||'').trim() || 'the subject';
-  const sanctions = splitList(v.sanctions), typ = splitList(v.typologies);
+  // Free-text negations (none/no/n/a/nil…) mean NO hit — in the sanctions field
+  // they must not read as a designated-party match and return PROHIBITED.
+  const NEGATION = /^(no|none|n\/?a|nil|n|false|-)$/i;
+  const sanctions = splitList(v.sanctions).filter(s=>!NEGATION.test(s)), typ = splitList(v.typologies);
   // A free-text "PEP tier" of none/no/n/a/nil means NOT a PEP — don't force EDD on it.
   const pepRaw = (v.pep||'').trim();
-  const pep = /^(no|none|n\/?a|nil|n|false|-)$/i.test(pepRaw) ? '' : pepRaw;
+  const pep = NEGATION.test(pepRaw) ? '' : pepRaw;
   const jur = splitList(v.jurisdictions).map(s=>s.toUpperCase());
   const score = parseInt(v.risk,10), cfa = jur.filter(j=>TOOL_CFA[j]);
   const triggers = [], rank = {CDD:0, SDD:1, EDD:2};

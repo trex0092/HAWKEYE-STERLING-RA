@@ -16,13 +16,16 @@
 
 import { inflateRawSync } from 'node:zlib';
 
-/* Fold a name to a stable comparison key: strip diacritics, lower-case, collapse
-   non-alphanumerics. Turkish/Arabic/Cyrillic trade names compare cleanly. The
-   single source of truth — sanctions-screen.mjs re-exports this. */
+/* Fold a name to a stable comparison key: strip combining marks (Latin
+   diacritics AND Arabic harakat), lower-case, collapse everything that is not
+   a letter or digit IN ANY SCRIPT. Keeping \p{L} (not just a-z) matters: an
+   Arabic- or Cyrillic-script subject must keep its letters, or it folds to the
+   empty key and silently screens clear. The single source of truth —
+   sanctions-screen.mjs re-exports this. */
 export function normalizeName(s) {
   return String(s == null ? '' : s)
-    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    .normalize('NFKD').replace(/\p{M}+/gu, '')
+    .toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
 /* Corporate suffixes / very common words that carry no identifying signal — kept

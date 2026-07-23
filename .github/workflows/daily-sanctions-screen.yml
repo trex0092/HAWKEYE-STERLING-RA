@@ -278,10 +278,16 @@ jobs:
 
           # ---- helpers ----
           def normalise(name):
-              """Lowercase, remove punctuation, normalise unicode."""
-              name = unicodedata.normalize("NFKD", name)
-              name = name.encode("ascii", "ignore").decode("ascii")
-              name = re.sub(r"[^\w\s]", " ", name.lower())
+              """Fold to a stable comparison key — same semantics as
+              normalizeName in scripts/sanctions-match.mjs (the single source
+              of truth): NFKD, strip combining marks (Latin diacritics AND
+              Arabic harakat), lower-case, collapse anything that is not a
+              letter or digit IN ANY SCRIPT. The old ASCII-only fold emptied
+              non-Latin-script names, so they either 100%-matched every other
+              emptied name or silently screened Clear."""
+              name = unicodedata.normalize("NFKD", str(name or ""))
+              name = "".join(c for c in name if unicodedata.category(c)[0] != "M")
+              name = "".join(c if unicodedata.category(c)[0] in ("L", "N") else " " for c in name.lower())
               return re.sub(r"\s+", " ", name).strip()
 
           THRESHOLD = 85

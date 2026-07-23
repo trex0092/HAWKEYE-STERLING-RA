@@ -31,12 +31,25 @@ export function isHealthAlert(name) { return /\b(SITE|FUNCTION) DOWN\b|health ch
 /* Sort the day's new tasks into the categories the brief reports on. The brief's
    own tasks and the risk-data backup task are never counted. Categorisation is
    by the stable name prefixes the individual watchers use. */
+/* Routine scheduled output that shares the REG project with real alerts. These
+   are reports and reminders the pipeline files on a fixed cadence — counting
+   them as "new monitoring items" makes the ✅ ALL CLEAR headline unreachable on
+   any day a sibling report runs, and dresses routine paperwork up as signal. */
+const ROUTINE_TASKS = [
+  /^📅 Weekly Compliance Summary/i,          /* weekly-summary.mjs */
+  /^Adverse-media methodology review/i,      /* quarterly-review.mjs */
+  /^AI Governance & Platform Report/i,       /* governance-report.mjs */
+  /^\[TEST\] /,                              /* connectivity self-tests */
+  / — due \d{4}-\d{2}-\d{2}$/               /* compliance-calendar.mjs reminders */
+];
+
 export function categorize(tasks) {
   const b = { fatf: [], screen: [], watch: [], regulatory: [], health: [], other: [] };
   for (const t of tasks) {
     const n = String(t.name || '');
     if (/^Daily Compliance Brief/i.test(n)) continue;       /* never count our own briefs */
     if (/^RISK DATA SHEET/i.test(n)) continue;              /* the auto-backup mirror task */
+    if (ROUTINE_TASKS.some(re => re.test(n))) continue;     /* scheduled reports, not alerts */
     /* Unanchored like every sibling branch: the watchdog's monitoring-gap
        alert is titled "⚠ FATF monitoring GAP — …", which a ^-anchored match
        misfiled under "Other monitoring". */
