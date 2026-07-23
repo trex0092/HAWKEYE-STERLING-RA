@@ -1,8 +1,26 @@
 # OpenSSF Scorecard — where the score comes from and the path to 9.0 / 9.5+
 
-_Last updated: 2026-07-16 · Scorecard v5.3.0 · live aggregate at the time of
-writing: **7.7** (verified in the 2026-07-16 run SARIF; the README badge is
-served live by `api.scorecard.dev`)._
+_Last updated: 2026-07-23 · Scorecard v5.3.0 · live aggregate at the time of
+writing: **8.1** (verified in the 2026-07-23 run results JSON; the README badge
+is served live by `api.scorecard.dev`)._
+
+## 2026-07-23: the Branch-Protection fix landed exactly as predicted — 7.7 → 8.1
+
+The Settings app applied the merged `settings.yml` (approvals 1 + code-owner
+review) and the next runs priced **Branch-Protection at 8** — the top of the
+predicted 6–8 band. The only remaining warn is *"required approving review
+count is 1"*: the check's maximal tier wants **2**, which this repo deliberately
+does not set — with a single maintainer, GitHub never counts the author's own
+approval, so count 2 would (a) leave Dependabot auto-merge permanently unarmed
+(the owner's one approval could never satisfy protection, defeating the
+approve-don't-bypass strategy that feeds Code-Review) and (b) make every PR a
+three-person ceremony once a second maintainer joins. Branch-Protection 8 **is**
+the documented single-maintainer maximum; see `.github/settings.yml`.
+
+Two aggregates printed on the way: **8.0** on 2026-07-22 while SAST read 9
+(a direct-to-main state commit put 29/30 SAST-checked commits in the rolling
+window), then **8.1** on 2026-07-23 when the window refilled to 30/30 and SAST
+returned to 10 — the arithmetic below (847.5 / 105 = 8.07) verified live.
 
 This page records the exact arithmetic behind the repo's Scorecard aggregate,
 what was maximized, what is **structurally capped** and by what, and the
@@ -44,7 +62,7 @@ The aggregate is a weighted average over the checks that ran: each check scores
 Low = 2.5. A check that errors (score −1) is **excluded from both sides of the
 division** — exclusion is not a zero.
 
-## Current per-check state (verified from the Scorecard run SARIF, 2026-07-16)
+## Current per-check state (verified from the Scorecard run results, 2026-07-23)
 
 | Check | Score | Weight | State |
 |---|---|---|---|
@@ -58,13 +76,12 @@ division** — exclusion is not a zero.
 | CII-Best-Practices | 0 | Low | Registration at bestpractices.dev is owner-only; the proprietary `LICENSE` fails the `floss_license` passing-level MUST, capping the entry at **in progress = 2/10** (≈ +0.05 aggregate). See [`openssf-best-practices.md`](openssf-best-practices.md). |
 | License | 9 | Low | 9 is the max while the license is proprietary (not FSF/OSI). Deliberate. |
 | Contributors | 6 | Low | Needs contributors from ≥ 3 organizations with 5+ commits each — an organic-growth metric. |
-| Branch-Protection | **3** (included since 2026-07-16) | High | Live rules became readable on 2026-07-16 (see the event section above) and the then-current approvals-0 config scored 3. **Fix in flight**: `settings.yml` now requires 1 approval + code-owner review (admin bypass = the solo merge path); expected **6–8** once the Settings app applies the merged change and Scorecard re-runs. |
+| Branch-Protection | **8** (verified 2026-07-23) | High | The 2026-07-16 `settings.yml` fix applied: approvals 1 + code-owner review + strict status checks priced at 8 — the **single-maintainer maximum** (see the 2026-07-23 event section: the last warn wants approvals 2, which would break Dependabot auto-merge and the approve-don't-bypass strategy). Reaching 9–10 is a second-maintainer decision, not a config tweak. |
 
 **Arithmetic**: maxed checks contribute 750 over weight 75; adding License
-9×2.5, Contributors 6×2.5, Branch-Protection 3×7.5 and the three zeros gives
-**810 / 105 = 7.71 → badge 7.7** — exactly the live value. After the
-Branch-Protection fix applies: 6 → 832.5/105 = 7.93 (badge 7.9); 8 →
-847.5/105 = **8.07 (badge 8.1)**.
+9×2.5, Contributors 6×2.5, Branch-Protection 8×7.5 and the three zeros gives
+**847.5 / 105 = 8.07 → badge 8.1** — exactly the live value since 2026-07-23.
+(The 2026-07-16 pre-fix state was 810 / 105 = 7.71 → 7.7.)
 
 ## The hard truth about "make it 9 now"
 
@@ -127,10 +144,10 @@ breadth (Contributors). Any tooling that claims otherwise is gaming the badge.
 
 ## Runbook to ≥ 9.0 (moved here from tracking issue #228 so the issues tab stays clear)
 
-- [x] **2026-07-16 — raise Branch-Protection at the source** (this PR):
+- [x] **2026-07-16 — raise Branch-Protection at the source** (merged):
   approvals 1 + code-owner review in `settings.yml`, admin bypass documented.
-  After merge, confirm the next Scorecard run reads Branch-Protection 6–8 and
-  the badge 7.9–8.1.
+  **Confirmed 2026-07-23**: Branch-Protection reads **8** and the badge **8.1**
+  (top of the predicted band; per-check verification in the run results JSON).
 - [ ] **Now (2 min, owner-only):** register at bestpractices.dev (evidence pack:
   [`openssf-best-practices.md`](openssf-best-practices.md)) → CII "in progress" (+0.05).
 - [ ] **Habit, from today (owner):** approve every Dependabot PR before
