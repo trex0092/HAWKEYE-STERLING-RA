@@ -6,7 +6,7 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-07-16. Items are numbered by who moves next, not by
+> **Last updated:** 2026-07-23. Items are numbered by who moves next, not by
 > importance.
 
 | # | Action | Owner | What closes it | Asana |
@@ -21,6 +21,9 @@
 | 8 | First Internal Audit thematic review per [`../aims/internal-audit.md`](../aims/internal-audit.md); findings into the Section 6 log and CAPA. | Internal Audit | Audit log row completed with findings and status | P9 |
 | 9 | Extend the AI register enterprise-wide. Blocked by item 4: this belongs to the Committee once chartered. | AI Governance Committee | Enterprise rows added to the register | P11 |
 | 10 | ISO/IEC 42001 path decision (resolution R6 of the minute template): readiness assessment, certification, or continued self-assessment. | Board | Decision minuted | P12 |
+| 11 | Confirm whether the UAE→US transfers (Anthropic, Asana) additionally require a Data Office transfer approval beyond the DPIA's assessed processor-terms basis — [`uae-ai-data-laws-2026.md`](uae-ai-data-laws-2026.md) row 3. Related to item 5's PDPL confirmation. | MLRO / counsel | Written position (approval obtained, or a documented not-required determination) filed with the DPIA cross-border row | P39 |
+| 12 | Pin the UAE Data Office breach-notification clock in [`ai-incident-runbook.md`](ai-incident-runbook.md) alongside the existing FIU/regulator paths — [`uae-ai-data-laws-2026.md`](uae-ai-data-laws-2026.md) row 9. | MLRO | Runbook revision naming the notification window and trigger merged | P40 |
+| 13 | Determine and minute whether the deploying entity must formally designate a DPO — [`uae-ai-data-laws-2026.md`](uae-ai-data-laws-2026.md) row 10. Fits the item-4 board sitting. | MLRO / Board | Determination minuted; if required, the appointment recorded in the [committee charter](ai-governance-committee-charter.md) roles | P41 |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
