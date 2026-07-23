@@ -316,7 +316,13 @@ on 15 July.*
 documents added (GRC↔cybersecurity model, alert-investigation decision tree) and the auto-release
 two-stage split added one egress-blocked check job. Coverage additions only — no scored control changed.*
 
-Verified at HEAD: 51 workflows · 112 markdown documents under docs/ (95 excluding docs/research/auto).
+*Estate re-verification · 23 July 2026 — regulatory-applicability additions: two curated documents
+added (UAE AI & data laws 2026 posture map, seven-stage operational governance lifecycle).
+Coverage additions only — no scored control changed.*
+
+Verified at HEAD: 51 workflows · 114 markdown documents under docs/ (97 excluding docs/research/auto).
+
+Verified at HEAD on 22 July: 51 workflows · 112 markdown documents under docs/ (95 excluding docs/research/auto).
 
 Verified at HEAD on 21 July: 51 workflows · 110 markdown documents under docs/ (93 excluding docs/research/auto).
 

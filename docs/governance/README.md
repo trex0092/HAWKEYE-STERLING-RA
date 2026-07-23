@@ -28,11 +28,13 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [nist-ai-rmf-mapping-2026.md](nist-ai-rmf-mapping-2026.md) | GOVERN/MAP/MEASURE/MANAGE crosswalk | NIST AI RMF 1.0 |
 | [eu-ai-act-assessment-2026.md](eu-ai-act-assessment-2026.md) | Applicability, role & risk classification, Art. 4 literacy, Art. 73-equivalent clocks | EU AI Act (voluntary) |
 | [uae-ai-charter-mapping-2026.md](uae-ai-charter-mapping-2026.md) | 12-principle mapping | UAE AI Charter |
+| [uae-ai-data-laws-2026.md](uae-ai-data-laws-2026.md) | 2026 UAE AI/data-law applicability + Data Office top-10 violation posture map | UAE PDPL; FDL 34/2021; Data Office |
 | [ai-frameworks-crosswalk-2026.md](ai-frameworks-crosswalk-2026.md) | FAST/SUM values + responsible-AI lifecycle orientation | Turing FAST/SUM; EU AI Act |
 | [agentic-ai-governance-6layers-2026.md](agentic-ai-governance-6layers-2026.md) | Six-layer agentic-AI governance scorecard (incl. Layer 5 human oversight) | Practitioner framework |
 | [ai-governance-gap-analysis-2026.md](ai-governance-gap-analysis-2026.md) | Tile-by-tile gap analysis vs the AI Governance & Security periodic table | Practitioner framework |
 | [enterprise-readiness-review-2026.md](enterprise-readiness-review-2026.md) | Maturity scoring + recommendations | — |
 | [pbg-lifecycle-map-2026.md](pbg-lifecycle-map-2026.md) | 11-stage lifecycle map (design → retire), owners + evidence | ISO 42001 A.6 |
+| [operational-ai-governance-lifecycle.md](operational-ai-governance-lifecycle.md) | Seven-stage operating loop + the three executive questions, mapped to evidence | Practitioner framework |
 
 ## Risk & impact assessments
 
