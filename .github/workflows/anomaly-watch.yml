@@ -50,19 +50,30 @@ jobs:
         with:
           python-version: '3.11'
       - name: Overlay latest metrics history (lives on the screen-delta-state branch)
+        env:
+          STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
         run: |
           # The screening engine persists data/run-metrics.json on the
           # screen-delta-state branch (main is push-protected — GH006), so the
           # copy on main freezes at whatever the last direct-to-main commit was.
           # Reading main's copy here made the staleness heartbeat report a false
-          # "dead pipeline" while the daily sweep was green (issue #222). A
-          # MISSING branch is the pre-bootstrap case (fall back to main's copy);
-          # a FAILED fetch must red this job — silently reverting to the stale
-          # copy would re-create the false escalation. Anonymous fetch is fine:
-          # the repo is public and checkout kept persist-credentials: false.
+          # "dead pipeline" while the daily sweep was green (issue #222). The
+          # P30 encrypt-forward hardening recreated that bug one level deeper:
+          # the branch's PLAINTEXT file is deliberately restored to main's
+          # (frozen) content and the real history rides in run-metrics.json.enc
+          # — overlaying only the plaintext graded a fossil and re-raised the
+          # false "dead pipeline" as issue #304. Overlay BOTH and decrypt, like
+          # every other consumer of this branch. A MISSING branch is the
+          # pre-bootstrap case (fall back to main's copy); a FAILED fetch or a
+          # present .enc with no key must red this job — silently reverting to
+          # the stale copy would re-create the false escalation (state-crypto
+          # exits 1 exactly for that case). Anonymous fetch is fine: the repo
+          # is public and checkout kept persist-credentials: false.
           if [ -n "$(git ls-remote --heads origin screen-delta-state)" ]; then
             git fetch origin screen-delta-state --depth=1
             git checkout FETCH_HEAD -- data/run-metrics.json
+            git checkout FETCH_HEAD -- data/run-metrics.json.enc 2>/dev/null || true
+            node scripts/state-crypto.mjs decrypt data/run-metrics.json
             echo "run-metrics overlaid from screen-delta-state"
           else
             echo "no screen-delta-state branch yet — using state from main"
