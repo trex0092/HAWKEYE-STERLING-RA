@@ -52,8 +52,13 @@ const ALIASES = {
 };
 
 export function normalize(s) {
-  /* hyphens fold to spaces so "Guinea-Bissau" can never half-match as "Guinea" */
-  return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[‐-—-]/g, ' ').replace(/\s+/g, ' ').trim();
+  /* hyphens fold to spaces so "Guinea-Bissau" can never half-match as "Guinea";
+     typographic apostrophes (and their HTML entities) fold to ASCII ' so
+     "Lao People’s…" / "Côte d’Ivoire" / DPRK variants match dictionary keys */
+  return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/&(#8217|#x2019|rsquo|apos);/g, "'")
+    .replace(/[’‘ʼ]/g, "'")
+    .replace(/[‐-—-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /* Multi-word names must match across any whitespace run (newlines in HTML). */

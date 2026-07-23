@@ -241,8 +241,11 @@
             <circle class="gh-ring gh-ring-b" cx="120" cy="120" r="93" fill="none" stroke-width="1.5" stroke-dasharray="20 9 3 9"></circle>
             <circle cx="120" cy="120" r="84" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="9" stroke-dasharray="396 132" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
             <circle id="gaugeArc" cx="120" cy="120" r="84" fill="none" stroke="url(#gaugeGrad)" stroke-width="9" stroke-dasharray="0 600" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
-            <circle cx="120" cy="120" r="93" fill="none" stroke="rgba(255,148,52,0.6)" stroke-width="2" stroke-dasharray="2 600" stroke-dashoffset="-264" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
-            <circle cx="120" cy="120" r="93" fill="none" stroke="rgba(255,87,87,0.6)" stroke-width="2" stroke-dasharray="2 600" stroke-dashoffset="-304" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
+            <!-- Threshold ticks ride the r=93 ring, so each offset must be a fraction of ITS
+                 circumference: score/30 of the 270° sweep = score/30 × 2π×93×0.75 (≈438).
+                 SDD at 20 → 292; EDD at 23 → 336. -->
+            <circle cx="120" cy="120" r="93" fill="none" stroke="rgba(255,148,52,0.6)" stroke-width="2" stroke-dasharray="2 600" stroke-dashoffset="-292" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
+            <circle cx="120" cy="120" r="93" fill="none" stroke="rgba(255,87,87,0.6)" stroke-width="2" stroke-dasharray="2 600" stroke-dashoffset="-336" stroke-linecap="round" transform="rotate(135,120,120)"></circle>
           </svg>
           <div class="gr-hud" id="gaugeRobot" aria-hidden="true">
             <div class="gr-glow" id="grGlow"></div>

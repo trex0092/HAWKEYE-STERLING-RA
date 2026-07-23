@@ -208,5 +208,20 @@ check('screenName flags a fuzzy/partial name match', fuzzy.hitCount >= 1 && fuzz
 const clean = screenName('Helga Andersen Bakery', index, 85);
 check('screenName clears an unrelated subject', clean.hitCount === 0 && clean.recommendation === 'clear' && clean.band === 'low');
 
+/* ── non-Latin scripts (regression: [^a-z0-9] erased Arabic/Cyrillic names,
+   folding them to the empty key — zero tokens, zero candidates, silent clear) ── */
+check('normalizeName keeps Arabic letters (harakat stripped)',
+  normalizeName('مُحَمَّد صَالِح') === normalizeName('محمد صالح') && normalizeName('محمد صالح').length > 0);
+check('normalizeName keeps Cyrillic letters',
+  normalizeName('Владимир Путин') === 'владимир путин');
+const arIndex = buildIndex([{ id: 'un', name: 'UN Consolidated', names: ['محمد صالح الحوثي'] }]);
+const arHit = screenName('محمد صالح الحوثي', arIndex, 85);
+check('Arabic-script subject matches an Arabic-script designation (not a silent clear)',
+  arHit.hitCount === 1 && arHit.topScore === 100);
+const cyIndex = buildIndex([{ id: 'ofac', name: 'OFAC SDN', names: ['Владимир Владимирович Путин'] }]);
+const cyHit = screenName('Владимир Путин', cyIndex, 85);
+check('Cyrillic-script subject fuzzy-matches a Cyrillic designation',
+  cyHit.hitCount >= 1 && cyHit.topScore >= 85);
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

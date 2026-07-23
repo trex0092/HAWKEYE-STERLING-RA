@@ -226,12 +226,21 @@ const amResults = [
 const amHit = buildAmPepNotes({ today: '2026-06-24', tomorrow: '2026-06-25', subjects: 325,
   amHits: amResults.filter(r => r.lists.some(h => h.list.includes('Adverse media'))),
   pepHits: amResults.filter(r => r.lists.some(h => h.list.includes('PEP'))),
+  newMatchKeys: ['a'],
   regUrl: 'https://app.asana.com/0/1/2' });
 check('AM/PEP HIT note flags review, counts hits and lists each subject',
-  amHit.includes('STATUS: ⚠ REVIEW REQUIRED') && amHit.includes('New adverse media hits:       1') &&
-  amHit.includes('New PEP identifications:      1') && amHit.includes('Acme DMCC') && amHit.includes('Beta FZE'));
+  amHit.includes('STATUS: ⚠ REVIEW REQUIRED') && amHit.includes('Adverse media hits:           1 (1 new, 0 standing)') &&
+  amHit.includes('PEP identifications:          1 (0 new, 1 standing)') && amHit.includes('Acme DMCC') && amHit.includes('Beta FZE'));
+check('AM/PEP HIT note tags each hit NEW or STANDING at subject level',
+  /Acme DMCC.*\| NEW/.test(amHit) && /Beta FZE.*\| STANDING \(previously reported\)/.test(amHit));
 check('AM/PEP HIT note links the Regulations alert when provided',
-  amHit.includes('https://app.asana.com/0/1/2'));
+  amHit.includes('https://app.asana.com/0/1/2') && amHit.includes('see alert card in Regulations project'));
+const amHitNoReg = buildAmPepNotes({ today: '2026-06-24', tomorrow: '2026-06-25', subjects: 325,
+  amHits: amResults.slice(0, 1), pepHits: [] });
+check('AM/PEP HIT note without a posted alert card claims neither the card nor a link',
+  amHitNoReg.includes('STATUS: ⚠ REVIEW REQUIRED') && !amHitNoReg.includes('Regulations'));
+check('AM/PEP HIT note without diff info counts hits without claiming they are new',
+  !amHitNoReg.includes('New adverse media hits') && amHitNoReg.includes('Adverse media hits:           1') && !amHitNoReg.includes('| NEW'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

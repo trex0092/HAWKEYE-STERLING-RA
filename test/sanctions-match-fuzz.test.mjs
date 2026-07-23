@@ -54,8 +54,11 @@ for (let i = 0; i < 4000; i++) {
   catch { check('normalizeName never throws on input #' + i, false); continue; }
   check('normalizeName returns a string', typeof n1 === 'string');
   check('normalizeName is idempotent', n1 === n2);
-  check('normalizeName emits only [a-z0-9 ] and is trimmed',
-    /^[a-z0-9 ]*$/.test(n1) && n1 === n1.trim() && !/\s\s/.test(n1));
+  /* Letters/digits in ANY script (non-Latin names must survive folding — the
+     old [a-z0-9]-only contract was the Arabic/Cyrillic silent-clear bug),
+     no combining marks, no uppercase, single-spaced, trimmed. */
+  check('normalizeName emits only letters/digits/spaces (any script), mark-free and trimmed',
+    /^[\p{L}\p{N} ]*$/u.test(n1) && !/[\p{M}\p{Lu}]/u.test(n1) && n1 === n1.trim() && !/\s\s/.test(n1));
 }
 
 /* ── sigTokens: every token significant (len>=3, not pure-digit) ── */

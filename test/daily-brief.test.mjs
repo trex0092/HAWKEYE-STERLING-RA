@@ -52,5 +52,24 @@ check('quiet day reads ALL CLEAR and marks each category no change',
   && notesClear.includes('FATF list moves: no change')
   && notesClear.includes('Regulatory changes: no change'));
 
+/* Routine scheduled reports share the REG project — they must not count as
+   monitoring items (regression: they made ALL CLEAR unreachable on any day a
+   sibling report ran). */
+const routine = categorize([
+  { name: '📅 Weekly Compliance Summary — 2026-07-20 (past 7 days)' },
+  { name: 'Adverse-media methodology review — Q3 2026' },
+  { name: 'AI Governance & Platform Report — 2026-07 — ✅ all green' },
+  { name: '[TEST] FATF Watchdog connectivity check' },
+  { name: 'EWRA annual refresh — due 2026-08-01' }
+]);
+check('routine scheduled reports and calendar reminders are not monitoring items',
+  totalItems(routine) === 0);
+const mixed = categorize([
+  { name: '📅 Weekly Compliance Summary — 2026-07-20 (past 7 days)' },
+  { name: '⚠ Sanctions Screen — 1 customer match' }
+]);
+check('a real alert still counts on a day a routine report also ran',
+  totalItems(mixed) === 1 && mixed.screen.length === 1);
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

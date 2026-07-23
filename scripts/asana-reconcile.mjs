@@ -166,7 +166,7 @@ async function main() {
     const link = runUrl();
     const html = '<body><h2>Asana ↔ RA reconciliation — ' + diff.total + ' discrepancy(ies)</h2>'
       + '<strong>' + esc(report.split('\n')[0]) + '</strong>'
-      + '<pre>' + esc(report) + '</pre>'
+      + '<code>' + esc(report) + '</code>'  /* Asana html_notes has no <pre>; an unsupported tag 400s the card exactly when drift is found */
       + (link ? '<a href="' + esc(link) + '">View the run</a>' : '') + '</body>';
     await notifyAsana('RA ↔ Asana reconciliation — ' + diff.total + ' discrepancy(ies)', report, { html });
   }

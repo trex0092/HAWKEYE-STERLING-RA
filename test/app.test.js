@@ -269,6 +269,19 @@ check('import: scalar coerced to string', hard.entity.name === '123');
 check('import: unknown keys dropped', !('evil' in hard.entity));
 check('import: reviewManual normalised to boolean', hard.signoff.reviewManual === true);
 
+// mergeState accepts only ISO (YYYY-MM-DD) dates — a garbage date must fall back
+// to the default instead of flowing into addMonths and poisoning nextReview
+const badDates = A.mergeState({meta:{date:'12/06/2026'}, signoff:{completedDate:'garbage', approvedDate:'2026-6-1', nextReview:'soon'}, screening:{sanctions:{date:'not-a-date'}}});
+check('import: non-ISO dates fall back to the default', badDates.meta.date === ''
+  && badDates.signoff.completedDate === '' && badDates.signoff.approvedDate === ''
+  && badDates.signoff.nextReview === '' && badDates.screening.sanctions.date === '');
+check('import: ISO dates still cross the boundary', A.mergeState({meta:{date:'2026-06-12'}, screening:{pep:{date:'2026-01-01'}}}).meta.date === '2026-06-12'
+  && A.mergeState({screening:{pep:{date:'2026-01-01'}}}).screening.pep.date === '2026-01-01');
+A.state = A.mergeState({meta:{date:'June 12, 2026'}, entity:{name:'DateGuard Ltd'}});
+A.recalc();
+check('import: garbage meta.date cannot poison nextReview (no NaN-NaN-NaN)',
+  !/NaN/.test(String(A.state.signoff.nextReview)) && /^\d{4}-\d{2}-\d{2}$/.test(String(A.state.signoff.nextReview)));
+
 // export filename is sanitised
 reset();
 A.state.meta.ref = 'RA/2026:te*st?"x"<y>|z';
@@ -1095,6 +1108,15 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     const outLines = out.split('\n');
     check('batchToCsv emits a header + one row per result', outLines.length===3 && /Prohibited/i.test(outLines[0]));
     check('batchToCsv quotes fields containing commas', /"Smith, John Co"/.test(out));
+    // CSV injection: cells starting with = + - @ or tab must be apostrophe-prefixed
+    // so they never execute as formulas in Excel/Sheets, while the app's own
+    // numeric Score column stays a plain number.
+    const injRow = A.batchToCsv([{name:'=2+5', jurisdiction:'+SUM(A1)', activity:'@cmd', total:19, outcome:'CDD',
+      prohibited:false, escalations:['-2+3'], notes:['\tping']}]).split('\n')[1];
+    check('batchToCsv neutralises formula prefixes (= + - @ tab)',
+      injRow.includes("'=2+5") && injRow.includes("'+SUM(A1)") && injRow.includes("'@cmd")
+      && injRow.includes("'-2+3") && injRow.includes("'\tping") && !/(^|,)=2\+5/.test(injRow));
+    check('batchToCsv leaves the numeric Score column untouched', injRow.split(',')[3] === '19');
     // batch must NOT consume real RA reference numbers (defaultState, not freshState)
     const seqBefore = global.localStorage.getItem('hsra.seq');
     A.scoreBatch('name,jurisdiction,activity\nA,United Kingdom,Non-Manufactured Precious Metal Trading\nB,United Kingdom,Non-Manufactured Precious Metal Trading\n');

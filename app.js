@@ -822,12 +822,19 @@ function mergeState(src){
     profile:['activity','onboard','entityYears','relYears'],
     signoff:['completedBy','completedTitle','completedDate','approvedBy','approvedTitle','approvedDate','nextReview','reviewManual']
   };
+  /* Date fields feed addMonths() and the review scheduler, where a non-ISO
+     value becomes 'NaN-NaN-NaN' in nextReview and silently drops the
+     assessment from review tracking — only YYYY-MM-DD may cross; anything
+     else keeps the clean default. */
+  const DATE_FIELDS = {meta:['date'], signoff:['completedDate','approvedDate','nextReview']};
+  const isoDay = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
   Object.keys(SCALARS).forEach(k => {
     if(!src[k] || typeof src[k]!=='object') return;
     SCALARS[k].forEach(f => {
       const v = src[k][f];
       if(v==null || typeof v==='object' || typeof v==='function') return;
       if(f==='reviewManual') out.signoff.reviewManual = (v===true || v==='true');
+      else if((DATE_FIELDS[k]||[]).indexOf(f)!==-1){ if(isoDay(v)) out[k][f] = String(v); }
       else out[k][f] = String(v);
     });
   });
@@ -854,6 +861,7 @@ function mergeState(src){
       ['system','date','ref'].forEach(f => {
         const v = m[f];
         if(v==null || typeof v==='object' || typeof v==='function') return;
+        if(f==='date' && !isoDay(v)) return; /* non-ISO dates never enter the record */
         out.screening[g][f] = String(v);
       });
     });
@@ -1450,14 +1458,24 @@ function buildNarrative(){
   } else if(a.outcome==='CDD'){
     t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the low risk band. The customer operates from ' + jurWord + ', and its licensed activity is within the sectors accepted by our ' + POLICIES.RAS + '. Screening for sanctions, PEP and adverse media was completed and cleared before onboarding under our ' + POLICIES.TFS + '. We found no concerns under our ' + POLICIES.SOFW + ', and the declared material sources fall within our ' + POLICIES.RS + '. Standard due diligence applies. We will review the file at least every twelve months, re-screen the customer annually, and bring the review forward if anything changes, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the low risk cycle. The relationship is within our risk appetite and is approved. This note is kept as the record of our decision.';
   } else if(a.outcome==='SDD'){
-    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the medium risk band. Some factors raise the profile, such as the jurisdiction, the business activity, the material sources or the length of trading history. Screening was completed and cleared under our ' + POLICIES.TFS + ', the source of funds is verifiable under our ' + POLICIES.SOFW + ', and the activity remains within the sectors accepted by our ' + POLICIES.RAS + '.'
+    /* SDD can be reached numerically (20-22) or by an analyst override from CDD
+       (score 19 or below) — the band sentence must state the band the numbers
+       actually support, and the override path must appear in the record. */
+    t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the ' + (a.numericBand==='CDD' ? 'low' : 'medium') + ' risk band.'
+      + (a.analystOv ? ' The outcome was raised from ' + a.analystOv.from + ' by an analyst override: ' + a.analystOv.reason + '.' : '')
+      + ' Some factors raise the profile, such as the jurisdiction, the business activity, the material sources or the length of trading history. Screening was completed and cleared under our ' + POLICIES.TFS + ', the source of funds is verifiable under our ' + POLICIES.SOFW + ', and the activity remains within the sectors accepted by our ' + POLICIES.RAS + '.'
       + (a.total===22 ? ' The score is one point below the high risk threshold, so a change in a single factor will raise the required diligence.' : '')
       + ' Simplified due diligence applies, with closer monitoring where needed. We will review the file every six months, or sooner if a trigger event occurs, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the medium risk cycle. We continue the relationship on a conditional basis under our ' + POLICIES.RCP + '. This note is kept as the record of our decision.';
   } else {
     t = 'We assessed ' + name + ' on ' + when + ' using the Company\'s Risk Assessment methodology. The total score is ' + score + ', which places the customer in the high risk band.'
       + (a.escalations.length ? ' This includes a mandatory escalation: ' + a.escalations.map(e=>e.reason).join('; ') + '.' : '')
       + (a.analystOv ? ' The outcome was raised from ' + a.analystOv.from + ' by an analyst override: ' + a.analystOv.reason + '.' : '')
-      + ' The main concerns come from factors such as the jurisdiction, the material sources, the delivery channel or the ownership structure. The customer is not based in a FATF blacklisted country, screening returned no matches on the UN, EU, OFAC or UAE lists under our ' + POLICIES.TFS + ', and the source of funds can be verified, so we may continue under enhanced controls within our ' + POLICIES.RAS + '. Enhanced due diligence applies and senior management approval is recorded. We verify the owners and controllers under our ' + POLICIES.UBO + ', obtain documents that support the source of funds and wealth, and carry out enhanced checks under our ' + POLICIES.RS + '. We will review the file at least every three months, or immediately if a trigger event occurs, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the high risk cycle. Approved by [MLRO name] on [DD/MM/YYYY]. This note is kept as the record of our decision.';
+      /* The FATF sentence must match the jurisdiction's actual status: for a
+         call-for-action jurisdiction the "not blacklisted" claim would
+         contradict the escalation recorded above. */
+      + ' The main concerns come from factors such as the jurisdiction, the material sources, the delivery channel or the ownership structure. The customer is '
+      + ((jC && jC.cfa) ? 'based in a FATF call-for-action (blacklisted) jurisdiction, which drives the escalation above' : 'not based in a FATF blacklisted country')
+      + ', screening returned no matches on the UN, EU, OFAC or UAE lists under our ' + POLICIES.TFS + ', and the source of funds can be verified, so we may continue under enhanced controls within our ' + POLICIES.RAS + '. Enhanced due diligence applies and senior management approval is recorded. We verify the owners and controllers under our ' + POLICIES.UBO + ', obtain documents that support the source of funds and wealth, and carry out enhanced checks under our ' + POLICIES.RS + '. We will review the file at least every three months, or immediately if a trigger event occurs, in line with our ' + POLICIES.KYC + '. Transaction monitoring follows the high risk cycle. Approved by [MLRO name] on [DD/MM/YYYY]. This note is kept as the record of our decision.';
   }
   return t.replace(/—/g, '-'); /* narrative stays em-dash free per client style */
 }
@@ -2246,7 +2264,14 @@ function scoreBatchRow(m){
   } finally { state = saved; }
 }
 function scoreBatch(text){ return batchParseCsv(text).rows.map(o => scoreBatchRow(mapBatchRow(o))); }
-function batchCsvCell(v){ v = String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+function batchCsvCell(v){
+  v = String(v==null?'':v);
+  /* A leading = + - @ tab or CR executes as a formula when the export is opened
+     in Excel/Sheets (CSV injection) — neutralised with a literal apostrophe.
+     The app's own numeric cells (Score) are non-negative, so they never match. */
+  if(/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+  return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+}
 function batchToCsv(results){
   const head = ['Name','Jurisdiction','Activity','Score','Outcome','Prohibited','Escalations','Notes'];
   const lines = [head.join(',')];
@@ -2875,6 +2900,10 @@ function hydrateApp(){
   const draft = loadDraft();
   state = draft ? draft.state : freshState();
   syncUI();
+  /* The tokenise opt-in lives in the encrypted store: while locked it reads as
+     ciphertext (never '1'), so the boot-time paint can show the inverse of the
+     real setting — repaint once the decrypted value is readable. */
+  paintTokeniseBtn();
   return draft;
 }
 

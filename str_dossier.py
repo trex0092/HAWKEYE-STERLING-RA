@@ -81,6 +81,9 @@ def validate_case(case):
             errors.append("customer.name is required")
     elif "customer" in case:
         errors.append("customer must be an object")
+    subj = case.get("subject")
+    if subj is not None and not isinstance(subj, dict):
+        errors.append("subject must be an object")
     risk = case.get("risk")
     if isinstance(risk, dict):
         if risk.get("rating") not in ("LOW", "MEDIUM", "HIGH"):
@@ -89,9 +92,24 @@ def validate_case(case):
             errors.append("risk.factors must be a list")
     elif "risk" in case:
         errors.append("risk must be an object")
-    if "hits" in case and not isinstance(case.get("hits"), list):
-        errors.append("hits must be a list")
-    for i, t in enumerate(case.get("transactions") or []):
+    if "hits" in case:
+        hits = case.get("hits")
+        if not isinstance(hits, list):
+            errors.append("hits must be a list")
+        else:
+            for i, h in enumerate(hits):
+                if not isinstance(h, dict):
+                    errors.append(f"hits[{i}] must be an object")
+    txns = case.get("transactions") or []
+    if not isinstance(txns, list):
+        errors.append("transactions must be a list")
+        txns = []
+    for i, t in enumerate(txns):
+        # A non-dict row must surface as a validation error, not an
+        # AttributeError out of the validator itself.
+        if not isinstance(t, dict):
+            errors.append(f"transactions[{i}] must be an object")
+            continue
         for f in ("date", "type", "amount", "currency"):
             if not (str(t.get(f, "")).strip()):
                 errors.append(f"transactions[{i}].{f} is required")

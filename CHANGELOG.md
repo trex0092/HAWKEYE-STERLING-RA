@@ -10,6 +10,49 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Deep-audit fixes: screening correctness, alert integrity, workflow plumbing (2026-07-23)
+
+A 13-area adversarially-verified audit of the whole estate. Screening
+correctness: **non-Latin names no longer silently screen clear** —
+`normalizeName` (and the workflow-embedded matcher's port of it) now folds to
+letters/digits in any script instead of erasing Arabic/Cyrillic to an empty
+key; **UK OFSI names are assembled in full** (Name 1–5 + surname, `"0"`
+placeholders stripped) instead of screening the surname and given names as
+separate fragments; the **OFAC mirror fallback** is checked before alt.csv
+aliases fold in, so an sdn.csv outage with a live alt.csv can no longer defeat
+the mirror; **EOCN counts toward the DEGRADED coverage status** like the core
+list it is; two malformed EOCN entries (concatenated variants, a PDF line-wrap
+split) were reshaped so their primary names actually match; the DFAT/SECO
+curated fallbacks gained the `sanctions-extra.json` activation switch their
+READMEs pointed at.
+
+Alert integrity: `diffState` keeps a **coverage-stable match signature** — a
+list that failed to load no longer fires a spurious "changed match" alert or
+silently drops the unverified hit; the daily brief **skips routine scheduled
+reports**, making ✅ ALL CLEAR reachable again; the AM/PEP daily task
+distinguishes **new vs standing** hits and only claims the Regulations card
+when one was actually filed; the reconcile drift card swaps `<pre>` (which
+Asana's html_notes rejects) for `<code>`; `risk-backup` no longer creates a
+duplicate mirror task after a transient lookup failure, and a malformed audit
+row no longer 502s a whole backup.
+
+Engine/app: non-cash transactions ≥ AED 55,000 get their **CDD-trigger alert**
+(the cash-only THRESHOLD carve-out no longer exempts wires); the escalation
+tool treats "none"/"n/a" in the sanctions field as no hit instead of returning
+PROHIBITED; the client PII guard detects IBANs as its warning promises; advisor
+telemetry buckets by local (UTC+4) day; FATF country matching folds
+typographic apostrophes (Lao PDR, Côte d'Ivoire, DPRK variants); empty-payload
+state decryption fixed (off-by-one); `str_dossier` reports malformed rows as
+validation errors instead of crashing; Google News items with an empty
+`<source/>` no longer crash the narrative builder; PEP cases only link
+Wikidata for real Q-ids.
+
+Workflows: the container publish is **dispatched explicitly from both release
+workflows** (GITHUB_TOKEN release events never chain, so the `release:` trigger
+alone could never fire); a failed `ls-remote` in anomaly-watch goes red instead
+of silently grading frozen metrics; the function-health cron runs after
+site-health as documented.
+
 ### GitHub Actions expansion: post-publication CVE watch, provenance re-verification, Dependabot auto-merge, compliance calendar (2026-07-21)
 
 Four workflows close the estate's remaining coverage gaps. **Container Scan

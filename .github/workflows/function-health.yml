@@ -16,7 +16,7 @@ name: Function Health
 
 on:
   schedule:
-    - cron: '15 5 * * *'   # 05:15 UTC daily (just after site-health)
+    - cron: '23 5 * * *'   # 05:23 UTC daily (just after site-health at 05:19; odd minute)
   workflow_dispatch:
 
 # Read-only probe: checks out the repo and curls live functions. The Asana

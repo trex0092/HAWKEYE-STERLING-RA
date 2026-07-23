@@ -52,7 +52,7 @@ function normalizeRegister(reg){
      null element throws inside the handler's try and the client would see a 502
      "asana unreachable" for what is actually a malformed request body. */
   items = items.filter(r => r && typeof r === 'object');
-  return items.map(r => ({
+  return items.filter(r => r && typeof r === 'object').map(r => ({
     ref: fld(r.ref),
     entity: fld(r.entity),
     outcome: fld(r.outcome),
@@ -69,7 +69,9 @@ function normalizeRegister(reg){
 }
 function normalizeAudit(audit){
   if(!Array.isArray(audit)) return [];
-  return audit.slice(-1000).map(e => ({
+  /* Drop null/primitive rows instead of throwing — a single bad element must
+     not turn a normalisable backup into a 502 and lose the whole mirror. */
+  return audit.slice(-1000).filter(e => e && typeof e === 'object').map(e => ({
     ts: String(e.ts || ''), who: String(e.who || ''), ref: String(e.ref || ''),
     event: String(e.event || ''), detail: String(e.detail || ''), hash: String(e.hash || '')
   }));
