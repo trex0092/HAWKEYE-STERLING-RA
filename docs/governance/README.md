@@ -19,6 +19,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [ai-acceptable-use-policy.md](ai-acceptable-use-policy.md) | Operator AUP — permitted/prohibited use, acknowledgment | ISO 42001 A.9.2 |
 | [explainability-statement-2026.md](explainability-statement-2026.md) | How outputs are interpretable; stated limits | NIST AI RMF MAP; AI Act Art. 13-style |
 | [grc-cybersecurity-model.md](grc-cybersecurity-model.md) | How the GRC layer and the security controls form one loop | NIST CSF GOVERN; ISO 42001 |
+| [adr-001-deterministic-vs-learned.md](adr-001-deterministic-vs-learned.md) | Why the operative core is deterministic; revisit triggers + governed path to a first learned model | ADR; SR 11-7 |
 
 ## Framework mappings & assessments
 
@@ -51,12 +52,18 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [ai-asset-register.md](ai-asset-register.md) | Inventory of AI surfaces + onboarding process | ISO 42001 A.4.2 |
 | [assurance-coverage-matrix.md](assurance-coverage-matrix.md) | Control → automated proof → evidence map; known gaps | ISO 42001 9.1 |
 | [model-validation-2026.md](model-validation-2026.md) | Model validation + change control + quarterly MLRO sign-off | SR 11-7-style |
+| [model-risk-management-2026.md](model-risk-management-2026.md) | MRM framework: inventory, tiering, pillar map | CBUAE MMS 2022; SR 11-7 |
+| [backtesting-protocol-2026.md](backtesting-protocol-2026.md) | Outcomes analysis: metrics, small-N guards, cycle ledger | SR 11-7 outcomes analysis |
+| [champion-challenger-thresholds.md](champion-challenger-thresholds.md) | Shadow-mode threshold challenge + decision log | SR 11-7 effective challenge |
+| [eval-scorecard.md](eval-scorecard.md) | Longitudinal eval results ledger (backfilled from run history) | ISO 42001 9.1 |
+| [citation-accuracy-metric.md](citation-accuracy-metric.md) | Advisor grounding metric: definition, target, exemption state | NIST AI RMF MEASURE |
 
 ## Operations & resilience runbooks
 
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-incident-runbook.md](ai-incident-runbook.md) | AI incident triggers, kill switch, response steps | ISO 42001 A.6; AI Act Art. 73-equivalent clocks in [eu-ai-act-assessment-2026.md §6](eu-ai-act-assessment-2026.md) |
+| [operating-model.md](operating-model.md) | Squad shape, RACI, MLRO delegation matrix, scaling triggers | ISO 42001 5.3/7.2 |
 | [incident-postmortem-template.md](incident-postmortem-template.md) | Blameless post-incident review template | — |
 | [backup-recovery.md](backup-recovery.md) | Backup & disaster-recovery runbook | ISO 42001 A.6 |
 | [data-retention.md](data-retention.md) | Stores, retention, lineage, purge | UAE FDL 10/2025 (formerly FDL 26/2021 Art. 23); PDPL |

@@ -98,7 +98,15 @@ override and its reason.
 - **Reproducibility:** the model is deterministic and dependency-free; the same
   inputs always yield the same output, on any browser, offline.
 - **Independence:** validation logic (the golden set) is authored and reviewed
-  separately from the engine; both sit under `@trex0092` review via CODEOWNERS.
+  separately from the engine, and CI-frozen — a change to any frozen value
+  fails the build, so the validation evidence cannot drift silently with the
+  code it checks. **Stated limitation:** in today's single-maintainer estate,
+  build and validation both sit under `@trex0092` (CODEOWNERS); with the
+  mechanical safeguards that is *self-validation with guards*, not independent
+  validation in the SR 11-7 / CBUAE MMS sense. Independent review is therefore
+  routed to the Internal Audit thematic review (open-actions item 8), scoped
+  per the [MRM framework](model-risk-management-2026.md) §3
+  "Independent validation" row; its findings land in the §5 log below.
 
 ### 3.1 Reference examples (frozen)
 
@@ -140,6 +148,11 @@ override and its reason.
 
 ## 6. Governance alignment
 
+- **MRM:** this pack is the Tier-1 validation record under the firm's
+  [Model Risk Management framework](model-risk-management-2026.md) (CBUAE MMS
+  / SR 11-7 crosswalk); outcomes analysis is delegated to the
+  [backtesting protocol](backtesting-protocol-2026.md) and threshold challenge
+  to the [champion/challenger protocol](champion-challenger-thresholds.md).
 - **FATF:** R.1 (risk-based approach), R.10/R.12 (CDD/PEP), R.11 (records), R.26
   (supervision via the daily screening engine).
 - **NIST AI RMF / ISO 42001:** the deterministic model complements the AI
