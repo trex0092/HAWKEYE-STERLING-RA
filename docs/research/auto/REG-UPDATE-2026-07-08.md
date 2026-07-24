@@ -5,24 +5,26 @@
 ### UAE Financial Intelligence Unit (FIU) — goAML
 
 - **What appears to have changed**:
-  - The extracted content shows no substantive regulatory or reporting-process change; the page still reflects a "website last updated: 9 February 2024" date and "about us last updated on 9 February 2024."
-  - The only forward-dated marker is a footer copyright of "© 2026," which appears to be routine template/site churn rather than a content update.
-  - Latest listed publications ("What's New") remain unchanged (2019–2022 items), indicating no new guidance, typology report, or STR/goAML process update in this extract.
+  - The only delta is the visitor counter incrementing (2085066 → 2085074/2085075).
+  - No substantive change to content, guidance, laws/decisions, or reporting processes.
+  - This is routine site churn (dynamic visitor metric), not a regulatory update.
 
 - **Likely app impact**:
-  - No changes warranted. Existing Regulatory Q&A topics referencing the FIU (goAML registration, STR/SAR filing process, reporting entity obligations) remain accurate.
-  - No Super Tools citation updates needed in `assets/super-data.js` for FIU/goAML references.
-  - No country/risk data changes in `index.html` triggered by this diff.
+  - None. No Regulatory Q&A topics, Super Tools citations in `assets/super-data.js`, or country/risk data in `index.html` require updating based on this delta.
 
 - **Suggested citation**:
-  - None required. If a citation refresh is ever needed for general FIU references, cite: "UAE Financial Intelligence Unit (FIU) — goAML," https://www.uaefiu.gov.ae/en/ (page last updated 9 February 2024). Do not cite the "© 2026" footer as a substantive update.
+  - No update warranted. If a citation to the source is nonetheless retained, cite: "UAE Financial Intelligence Unit (FIU) — goAML," https://www.uaefiu.gov.ae/en/ (page last updated 9 February 2024).
 
-### UAE Executive Office for Control & Non-Proliferation (EOCN)
+### Responsible Jewellery Council (RJC)
+- **What appears to have changed**:
+  - The ADDED and REMOVED segments are identical text strings within the "find a member" country directory (member counts by country).
+  - No visible change in country names or counts in the delta; this appears to be routine site churn (dynamic member-directory re-rendering).
+  - No change detected to standards, policies, or certification content.
 
-- **What appears to have changed**: The source could not be fetched due to a connection timeout (`UND_ERR_CONNECT_TIMEOUT`); no page content was retrieved. This is a fetch/availability failure, not a confirmed content change. No substantive change can be verified from this result.
+- **Likely app impact**:
+  - Minimal to none. This is a membership directory listing, not a regulatory or standards update.
+  - No changes warranted to Regulatory Q&A topics on RJC certification, Code of Practices (CoP), Chain of Custody (CoC), or LGMS standards.
+  - No changes to Super Tools citations in `assets/super-data.js` or to country/risk data in `index.html` — the member-count directory is not a risk indicator.
 
-- **Likely app impact**: None confirmed at this time. No updates to Regulatory Q&A topics/answers, Super Tools citations in `assets/super-data.js`, or country/risk data in `index.html` are warranted based on a failed fetch alone. Any EOCN-related content (e.g., targeted financial sanctions, proliferation financing, UN/local sanctions list obligations) remains unverified against the live source.
-
-- **Suggested citation**: None proposed. Recommend re-fetching the source and, if a genuine change is confirmed, citing the specific EOCN instrument/guidance by its visible title at that time. Do not cite pending successful retrieval.
-
-**Reviewer note**: Recommend a re-crawl to distinguish a transient network/availability issue from an actual site change or takedown. Escalate only if the timeout persists across multiple attempts.
+- **Suggested citation**:
+  - No update warranted. If future substantive RJC content is cited, reference the RJC standards suite by name (e.g., "RJC Code of Practices") and homepage: https://www.responsiblejewellery.com/. No article/circular numbers are visible in the text.
