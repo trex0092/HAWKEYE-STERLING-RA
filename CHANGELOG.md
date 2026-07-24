@@ -10,6 +10,33 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance closures: breach-notification clock pinned; three sign-ready drafts (2026-07-24)
+
+Register item 12 closed: the incident runbook now names the UAE Data Office
+breach-notification clock (immediately; 72h internal ceiling pending the PDPL
+Executive Regulations' final timeline; individuals without undue delay) beside
+the FIU/goAML and EOCN/TFS paths, and the UAE-laws map row 9 flips to
+addressed. Three decisions converted from write-from-scratch to sign-and-file:
+a cross-border transfer position for counsel (register item 11), a DPO
+determination paper with a minute block for the board sitting (item 13), and a
+manual transaction-feed compensating control ready for MLRO adoption (item 6).
+Register rows updated to point at the drafts; drift-guard figures trued
+(127 docs / 110 curated).
+
+### EOCN local list: 4 designations reconciled from the mirror; review evidence recorded (2026-07-24)
+
+The daily run's cross-check (run 30064680613) alarmed on 4 OpenSanctions
+`ae_local_terrorists` designations missing from
+`data/eocn-local-terrorist-list.json` — a false-negative exposure on the TFS
+freeze duty. All 4 added (Alaa Abdulrazzaq Ali Khanfurah; Bayt Al-Mal AL
+Muslimeen; Hazem Mohsen Farhan; Coalition of 14 February (Bahrain)), each
+keeping the exact mirror rendering as an alias so the cross-check resolves
+deterministically; count 311 → 315. `lastReviewed` set to 2026-07-24 with a
+`lastReviewedEvidence` note stating plainly that this reconciliation is
+mirror-derived pending MLRO confirmation against the official EOCN
+publication (the portal is PDF-only behind bot protection). Clears the
+EOCN REVIEW OVERDUE exit-3 gate that failed the 24 Jul daily runs.
+
 ### Bank-grade model-risk & evaluation governance pack (2026-07-24)
 
 Ten additions closing the gap between "governed AI estate" and a bank's

@@ -16,9 +16,18 @@
 2. **Notify.** Inform the MLRO within 24h; if customer PII or a tipping-off risk is involved, treat as
    a potential data/compliance incident under the firm's IR policy. **External clocks:** classify the
    event against [`eu-ai-act-assessment-2026.md §6`](eu-ai-act-assessment-2026.md) — a breach of a
-   legal duty is assessed ≤ 48h and routed to the UAE notification duties (goAML/EOCN; PDPL breach
-   notification where personal data is affected); a serious malfunction without legal breach is
-   triaged ≤ 5 business days.
+   legal duty is assessed ≤ 48h and routed to the UAE notification duties; a serious malfunction
+   without legal breach is triaged ≤ 5 business days. The UAE paths, each with its own clock:
+   - **FIU / goAML** (suspicion of ML/TF): STR/SAR assessment per the MLRO's standing procedure —
+     without delay once suspicion is formed.
+   - **EOCN / TFS** (designated-party touchpoint): freeze first, then report per the TFS procedure —
+     immediately.
+   - **UAE Data Office — personal-data breach (PDPL, FDL 45/2021 Art. 9):** where a breach threatens
+     privacy, confidentiality or security of personal data, notify the Data Office **immediately; the
+     firm's internal ceiling is 72 hours from becoming aware**, adopted as the conservative SLA while
+     the PDPL Executive Regulations' final notification timeline is pending — revisit this line when
+     they issue. Notify **affected individuals without undue delay** where the breach threatens their
+     rights. Record both notification times in the incident log below.
 3. **Preserve evidence.** Export the tamper-evident activity log; save `advisor-eval-report.md` and the
    workflow run; capture the offending prompt/response.
 4. **Root-cause.** Diagnose from the eval report + audit line (model, mode, hash, timestamp).
