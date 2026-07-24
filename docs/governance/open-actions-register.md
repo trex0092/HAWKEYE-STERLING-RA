@@ -6,7 +6,7 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-07-23. Items are numbered by who moves next, not by
+> **Last updated:** 2026-07-24. Items are numbered by who moves next, not by
 > importance.
 
 | # | Action | Owner | What closes it | Asana |
@@ -24,6 +24,9 @@
 | 11 | Confirm whether the UAE→US transfers (Anthropic, Asana) additionally require a Data Office transfer approval beyond the DPIA's assessed processor-terms basis — [`uae-ai-data-laws-2026.md`](uae-ai-data-laws-2026.md) row 3. Related to item 5's PDPL confirmation. | MLRO / counsel | Written position (approval obtained, or a documented not-required determination) filed with the DPIA cross-border row | P39 |
 | 12 | Pin the UAE Data Office breach-notification clock in [`ai-incident-runbook.md`](ai-incident-runbook.md) alongside the existing FIU/regulator paths — [`uae-ai-data-laws-2026.md`](uae-ai-data-laws-2026.md) row 9. | MLRO | Runbook revision naming the notification window and trigger merged | P40 |
 | 13 | Determine and minute whether the deploying entity must formally designate a DPO — [`uae-ai-data-laws-2026.md`](uae-ai-data-laws-2026.md) row 10. Fits the item-4 board sitting. | MLRO / Board | Determination minuted; if required, the appointment recorded in the [committee charter](ai-governance-committee-charter.md) roles | P41 |
+| 14 | Run the first backtesting cycle per [`backtesting-protocol-2026.md`](backtesting-protocol-2026.md) — blocked until ≥25 disposed cases accumulate (18 open / 0 disposed at creation), so disposition of the open screening cases is the path to unblocking it. | MLRO | Cycle-1 ledger row completed and signed; findings fed to the §5 validation sign-off | to open |
+| 15 | Execute the first manual red-team campaign round per [`../aims/red-team-log.md`](../aims/red-team-log.md) §3 (2026 Q3, with the quarterly review): non-lexical obfuscations + in-the-wild sweep. | MLRO / maintainer | Round-1 row completed; any corpus/detector change merged | to open |
+| 16 | Ratify the MRM framework — model tiering, PSI thresholds and the backtesting protocol — at the item-4 board sitting. | Board | Ratification minuted; the governance-pillar row in [`model-risk-management-2026.md`](model-risk-management-2026.md) §3 flips to ✅ | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
