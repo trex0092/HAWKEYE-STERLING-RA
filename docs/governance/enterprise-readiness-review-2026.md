@@ -320,7 +320,13 @@ two-stage split added one egress-blocked check job. Coverage additions only — 
 added (UAE AI & data laws 2026 posture map, seven-stage operational governance lifecycle).
 Coverage additions only — no scored control changed.*
 
-Verified at HEAD: 51 workflows · 124 markdown documents under docs/ (107 excluding docs/research/auto).
+*Estate re-verification · 24 July 2026 — state-branch sync: fifteen auto-generated
+regulatory-watch digests (docs/research/auto/) folded into main from the reg-watch-state
+branch. Auto docs only — the curated set and all scored controls are unchanged.*
+
+Verified at HEAD: 51 workflows · 139 markdown documents under docs/ (107 excluding docs/research/auto).
+
+Verified at HEAD on 23 July: 51 workflows · 124 markdown documents under docs/ (107 excluding docs/research/auto).
 
 Verified at HEAD on 22 July: 51 workflows · 112 markdown documents under docs/ (95 excluding docs/research/auto).
 
