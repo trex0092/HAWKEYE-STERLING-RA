@@ -10,6 +10,20 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### EOCN local list: 4 designations reconciled from the mirror; review evidence recorded (2026-07-24)
+
+The daily run's cross-check (run 30064680613) alarmed on 4 OpenSanctions
+`ae_local_terrorists` designations missing from
+`data/eocn-local-terrorist-list.json` — a false-negative exposure on the TFS
+freeze duty. All 4 added (Alaa Abdulrazzaq Ali Khanfurah; Bayt Al-Mal AL
+Muslimeen; Hazem Mohsen Farhan; Coalition of 14 February (Bahrain)), each
+keeping the exact mirror rendering as an alias so the cross-check resolves
+deterministically; count 311 → 315. `lastReviewed` set to 2026-07-24 with a
+`lastReviewedEvidence` note stating plainly that this reconciliation is
+mirror-derived pending MLRO confirmation against the official EOCN
+publication (the portal is PDF-only behind bot protection). Clears the
+EOCN REVIEW OVERDUE exit-3 gate that failed the 24 Jul daily runs.
+
 ### Bank-grade model-risk & evaluation governance pack (2026-07-24)
 
 Ten additions closing the gap between "governed AI estate" and a bank's
