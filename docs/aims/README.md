@@ -39,6 +39,7 @@ document-control procedure.
 | 21 | Decommissioning & Retirement | A.6 | [decommissioning.md](decommissioning.md) |
 | 22 | Population-Stability Monitoring (PSI) | 9.1 / A.6.2 | [population-stability-monitoring.md](population-stability-monitoring.md) |
 | 23 | Red-Team Log (campaigns & corpus growth) | A.5.5 | [red-team-log.md](red-team-log.md) |
+| 24 | Transaction-Feed Compensating Control (interim, DRAFT) | A.6 | [transaction-feed-compensating-control.md](transaction-feed-compensating-control.md) |
 
 **Owner:** MLRO / Compliance. **Review cadence:** at least annually and on any
 material change to the AI system. **Retention:** 10 years (UAE FDL No. 26 of 2021,

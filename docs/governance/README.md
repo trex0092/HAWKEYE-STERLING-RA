@@ -44,6 +44,8 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [dpia-2026.md](dpia-2026.md) | Data Protection Impact Assessment | UAE PDPL; GDPR-style |
 | [stakeholder-impact-assessment-2026.md](stakeholder-impact-assessment-2026.md) | Stakeholder harms & mitigations (ratified 2026-07-02) | ISO 42001 A.5 |
 | [advisor-bias-review-2026.md](advisor-bias-review-2026.md) | Paired-prompt bias review method + log | ISO 42001 A.5.4 |
+| [cross-border-transfer-position-2026.md](cross-border-transfer-position-2026.md) | UAE→US transfer position (DRAFT for counsel; closes register item 11 on signature) | UAE PDPL transfers |
+| [dpo-determination-2026.md](dpo-determination-2026.md) | DPO requirement assessment + minute block (DRAFT for the board sitting) | UAE PDPL Art. 10 |
 
 ## Registers & assurance evidence
 
