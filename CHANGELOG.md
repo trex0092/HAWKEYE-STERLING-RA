@@ -10,6 +10,31 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Bank-grade model-risk & evaluation governance pack (2026-07-24)
+
+Ten additions closing the gap between "governed AI estate" and a bank's
+model-risk bar, each honest about what is live vs pending data or a human act:
+an **MRM framework** with model tiering and a CBUAE MMS (2022) / SR 11-7
+pillar map (`docs/governance/model-risk-management-2026.md`); a **backtesting
+& outcomes-analysis protocol** with small-N guards — first cycle explicitly
+blocked until ≥25 disposed cases (`backtesting-protocol-2026.md`); a one-way
+**champion/challenger protocol** for the matcher threshold
+(`champion-challenger-thresholds.md`); **ADR-001** recording why the operative
+core is deterministic and the governed path to a first learned model
+(`adr-001-deterministic-vs-learned.md`); **population-stability (PSI)
+monitoring** with frozen-baseline discipline
+(`docs/aims/population-stability-monitoring.md`); a **longitudinal eval
+scorecard** backfilled from the real workflow-run history
+(`eval-scorecard.md`); a **red-team campaign log** on top of the standing
+CI corpus (`docs/aims/red-team-log.md`); the **citation-accuracy metric**
+with its current exemption stated (`citation-accuracy-metric.md`); an
+**operating model** (squads, RACI, MLRO delegation matrix,
+`operating-model.md`); and a **cross-division use-case map**
+(`docs/executive/cross-division-use-case-map.md`). The validation pack's
+independence bullet now states the single-maintainer limitation plainly and
+routes independent review to the Internal Audit thematic review; both README
+indexes updated.
+
 ### Deep-audit fixes: screening correctness, alert integrity, workflow plumbing (2026-07-23)
 
 A 13-area adversarially-verified audit of the whole estate. Screening
