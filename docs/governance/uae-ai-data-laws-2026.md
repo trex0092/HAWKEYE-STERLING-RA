@@ -32,7 +32,7 @@ Status: ✅ addressed · 🟡 partial / to confirm · ⚪ conditional on deploym
 | 6 | Inadequate data security (≤100k) | CSP/Trusted Types/isolation headers, secret masking, egress-blocked CI, encrypted state branches (P30), scanner fleet — see the [GRC↔cyber map](grc-cybersecurity-model.md) | ✅ |
 | 7 | Excessive collection (≤100k) | Minimisation by design: only name+headline ever reach the LLM; assessment fields are the regulated minimum | ✅ |
 | 8 | Retention failures (≤100k) | [Data-retention schedule](data-retention.md) with per-store rules | ✅ |
-| 9 | Breach-reporting failures (≤1M) | [AI incident runbook](ai-incident-runbook.md) + anomaly escalation cover detect/respond; the runbook's next review should pin the **Data Office notification clock** alongside the existing FIU/regulator paths | 🟡 |
+| 9 | Breach-reporting failures (≤1M) | [AI incident runbook](ai-incident-runbook.md) + anomaly escalation cover detect/respond; the runbook now pins the **Data Office notification clock** (immediately; 72h internal ceiling pending the Executive Regulations' final timeline) alongside the FIU/EOCN paths | ✅ |
 | 10 | No DPO where required (≤50k) | Roles sit in the [governance committee charter](ai-governance-committee-charter.md); whether the deploying entity must formally designate a DPO depends on its processing profile — decide and minute it | ⚪ |
 
 ## The 2026 must-do checklist, located in this repo
@@ -44,7 +44,7 @@ Status: ✅ addressed · 🟡 partial / to confirm · ⚪ conditional on deploym
 - Security & access controls → hardening stack ✅
 - Retention & deletion policies → [data-retention.md](data-retention.md) ✅
 - DPO appointment (if required) → ⚪ row 10 above
-- Breach detection & response → runbook + monitors ✅; notification clock 🟡 row 9
+- Breach detection & response → runbook + monitors ✅; notification clock pinned ✅ row 9
 - Cross-border approval → 🟡 row 3 above
 - Team training & culture → competency records + [training pack](../aims/competency-records.md)
 
@@ -55,6 +55,8 @@ explainability statement · Accountable → HITL, MLRO sign-off, dual attestatio
 Safe & secure → security stack + guardrail evals · Privacy-respecting → minimisation,
 tokenised delivery, PDPL assessment.
 
-*The two 🟡 rows and the ⚪ row are the actionable residue: confirm the transfer-approval
-position, pin the Data Office breach-notification clock in the runbook's next revision,
-and minute the DPO determination. Route via the [open-actions register](open-actions-register.md).*
+*The remaining residue is row 3 🟡 and row 10 ⚪: confirm the transfer-approval position
+(draft: [cross-border-transfer-position-2026.md](cross-border-transfer-position-2026.md))
+and minute the DPO determination (draft:
+[dpo-determination-2026.md](dpo-determination-2026.md)). Row 9's clock was pinned in the
+runbook on 2026-07-24. Route via the [open-actions register](open-actions-register.md).*

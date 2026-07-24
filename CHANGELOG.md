@@ -10,6 +10,19 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance closures: breach-notification clock pinned; three sign-ready drafts (2026-07-24)
+
+Register item 12 closed: the incident runbook now names the UAE Data Office
+breach-notification clock (immediately; 72h internal ceiling pending the PDPL
+Executive Regulations' final timeline; individuals without undue delay) beside
+the FIU/goAML and EOCN/TFS paths, and the UAE-laws map row 9 flips to
+addressed. Three decisions converted from write-from-scratch to sign-and-file:
+a cross-border transfer position for counsel (register item 11), a DPO
+determination paper with a minute block for the board sitting (item 13), and a
+manual transaction-feed compensating control ready for MLRO adoption (item 6).
+Register rows updated to point at the drafts; drift-guard figures trued
+(127 docs / 110 curated).
+
 ### EOCN local list: 4 designations reconciled from the mirror; review evidence recorded (2026-07-24)
 
 The daily run's cross-check (run 30064680613) alarmed on 4 OpenSanctions
