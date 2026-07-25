@@ -10,6 +10,21 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Adverse media: Bing News RSS as an independent third news feed (2026-07-25)
+
+Google News and GDELT meter shared runner IPs independently, and 10–14 Jul
+showed both can refuse the same run — the crime watchlist kept deterministic
+coverage, but fresh-story recall went to zero. `screen.py` now queries **Bing
+News RSS** (free, no key, a third rate-limit pool) once per subject with the
+English risk-term cluster, through the same contract as GDELT: run-global
+adaptive pacing, a run-level circuit breaker (`BING_BREAKER_AFTER`, default
+5), loud per-subject degradation, the shared multilingual keyword flagger,
+cross-outlet dedupe, and the hardened XML parse. A subject covered only by
+Bing now counts covered (no false `am_error`); zero-coverage alarms now
+require all three news feeds to fail. Kill-switch `BING_NEWS=0`. Egress
+allowlists for both screening workflows gain `www.bing.com:443`; engine tests
+cover the parser, breaker, kill-switch, and third-net coverage semantics.
+
 ### EOCN review preparer, self-sufficient Netlify CD trigger, secret-rotation calendar (2026-07-25)
 
 **EOCN Reconcile** (`eocn-reconcile.yml`, Mon & Thu 04:37 UTC): does the
