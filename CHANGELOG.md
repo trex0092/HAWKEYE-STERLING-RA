@@ -10,6 +10,24 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Matcher: exact C-side prefilter — ~6× faster screening pass, bit-identical results (2026-07-25)
+
+The sweep scored every (subject, entry) pair in a Python loop — ~870
+subjects × ~290k crime-watchlist names alone is ~250M pair evaluations
+dominated by Python call overhead, a silent ~33-minute CPU grind that is
+exactly the window the 24–25 Jul runner-VM deaths landed in. `screen_name`
+now pre-filters each list with `rapidfuzz.process.extract` in C under two
+cutoffs that the hit gates make *necessary conditions* (`token_sort_ratio ≥
+THRESHOLD` for the primary and short-entry gates; `token_set_ratio ≥
+TOKENSET_THRESHOLD` for the subset branch), then scores only the survivors
+in the original order — so skipped pairs are exactly the pairs that could
+never hit, and output is bit-identical with blocking on or off. Proven
+three ways: adversarial fixtures in the engine suite, a hypothesis
+equivalence property under the real rapidfuzz stack
+(`test/fuzz_properties.py`), and a 100k-entry benchmark (5.8× on 2 cores,
+identical hits). Degrades to the plain loop when `rapidfuzz.process` is
+unavailable (the offline test stub); kill-switch `MATCH_BLOCKING=0`.
+
 ### Adverse media: Bing News RSS as an independent third news feed (2026-07-25)
 
 Google News and GDELT meter shared runner IPs independently, and 10–14 Jul

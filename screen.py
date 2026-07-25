@@ -2191,6 +2191,59 @@ def confidence_tier(core):
     if core >= 85: return "MODERATE"
     return "WEAK"
 
+# ── Exact match blocking (C-side prefilter, bit-identical results) ───────────
+# The full sweep scores every (subject, entry) pair in a Python loop — ~870
+# subjects × ~290k crime-watchlist names alone is ~250M pair evaluations whose
+# cost is dominated by Python call overhead, a silent ~33-minute CPU grind
+# that is exactly the window the 24-25 Jul runner-VM deaths landed in.
+# rapidfuzz.process.extract runs that loop in multithreaded C with a
+# score_cutoff, and the hit gates make two cutoffs a NECESSARY condition:
+#   - the primary gate needs min(full, core) ≥ THRESHOLD, so full
+#     (token_sort_ratio) ≥ THRESHOLD — and the short-entry gate needs
+#     score ≥ SHORT_ENTRY_THRESHOLD ≥ THRESHOLD, so the same cutoff covers it;
+#   - the additive subset gate is ANDed with best_tset ≥ TOKENSET_THRESHOLD
+#     (token_set_ratio).
+# An entry surviving NEITHER cutoff for ANY variant can never append a hit
+# (non-hits leave no other trace), so only survivors are scored in Python and
+# the output is bit-identical with blocking on or off —
+# test/engine_test.py asserts that equivalence on adversarial fixtures.
+# Survivors are re-iterated in ascending entry order, preserving the exact
+# insertion order (and therefore identical tie-breaks) of the unblocked loop.
+# Falls back to the plain loop when rapidfuzz.process is unavailable (the
+# offline test stub). Kill-switch: MATCH_BLOCKING=0.
+MATCH_BLOCKING = os.environ.get("MATCH_BLOCKING", "1") == "1"
+try:
+    from rapidfuzz import process as _rf_process
+except Exception:
+    _rf_process = None
+_NORMS_CACHE = {}   # id(entries) -> (entries, [norm, ...]) — strong ref pins the id
+
+def _entry_norms(entries):
+    key = id(entries)
+    cached = _NORMS_CACHE.get(key)
+    if cached is None or cached[0] is not entries:
+        cached = (entries, [e[0] for e in entries])
+        _NORMS_CACHE[key] = cached
+    return cached[1]
+
+def _survivor_indices(variants, entries):
+    """Indices of entries that could possibly hit for ANY variant, via two
+    C-side cutoff passes (full ≥ THRESHOLD, token-set ≥ TOKENSET_THRESHOLD).
+    None ⇒ prefilter unavailable; caller scores every entry (identical
+    results, original speed)."""
+    if not (MATCH_BLOCKING and _rf_process is not None
+            and getattr(fuzz, "token_set_ratio", None)):
+        return None
+    norms = _entry_norms(entries)
+    survivors = set()
+    for cand in variants:
+        for scorer, cutoff in ((fuzz.token_sort_ratio, THRESHOLD),
+                               (fuzz.token_set_ratio, TOKENSET_THRESHOLD)):
+            for _choice, _score, idx in _rf_process.extract(
+                    cand, norms, scorer=scorer, score_cutoff=cutoff, limit=None):
+                survivors.add(idx)
+    return sorted(survivors)
+
 def screen_name(name, all_lists):
     n = normalize(name)
     if len(n) < 4: return []
@@ -2204,7 +2257,8 @@ def screen_name(name, all_lists):
             variants.add(nv)
     hits = []
     for list_name, entries in all_lists.items():
-        for en, orig in entries:
+        surv = _survivor_indices(variants, entries)
+        for en, orig in (entries if surv is None else (entries[i] for i in surv)):
             if len(en) < 2: continue
             best = None; best_tset = 0; subset = False
             for cand in variants:
