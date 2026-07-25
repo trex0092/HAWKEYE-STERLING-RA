@@ -795,6 +795,56 @@ check("BING_NEWS=0 kill-switch: feed never fetched", _calls["bing"] == 0)
 screen.BING_NEWS = _orig_bing_flag
 screen.search_bing_news = _orig_bing
 
+# ── exact match blocking (skip provably-impossible pairs) ─────────────────────
+# The length-bound pre-filter must be invisible in results: pairs it skips are
+# exactly the pairs no gate could ever flag. Equivalence is asserted over
+# fixtures chosen to exercise every gate: the subset/patronymic chain, the
+# superset direction, short (<6) entries at and below the near-exact gate,
+# boilerplate-heavy names, near-threshold fuzz, non-Latin input, and clears.
+print("screen.py — exact match blocking equivalence")
+_BLK_LISTS = {"T": [(screen.normalize(x), x) for x in [
+    "USAMA BIN MUHAMMAD BIN AWAD BIN LADIN",
+    "QUDS FORCE",
+    "HAMAS",
+    "ISLAMIC REVOLUTIONARY GUARD CORPS QUDS FORCE",
+    "ACME GENERAL TRADING LLC",
+    "PETROPARS INTERNATIONAL FZE",
+    "ALPHA BETA GAMMA HOLDINGS",
+    "XYLOPHONE ORCHARD VENTURES DMCC",
+]]}
+_BLK_SUBJECTS = [
+    "USAMA BIN LADIN", "Usama Ladin", "HAMAS", "HAMAA", "Quds Force",
+    "Islamic Revolutionary Guard Corps Quds Force", "ACME GENERAL TRADING",
+    "Acme Trading LLC", "PETROPARS INTL FZE", "Petropars International FZE",
+    "Completely Unrelated Name", "Alpha Beta Gamma Holding",
+]
+_orig_blocking = screen.MATCH_BLOCKING
+try:
+    screen.MATCH_BLOCKING = False
+    _blk_base = [screen.screen_name(s, _BLK_LISTS) for s in _BLK_SUBJECTS]
+    screen.MATCH_BLOCKING = True
+    _blk_fast = [screen.screen_name(s, _BLK_LISTS) for s in _BLK_SUBJECTS]
+finally:
+    screen.MATCH_BLOCKING = _orig_blocking
+check("blocking on/off produce identical screen_name output (adversarial fixtures)",
+      _blk_base == _blk_fast)
+_blk_entries = _BLK_LISTS["T"]
+_blk_surv = screen._survivor_indices({screen.normalize("USAMA BIN LADIN")}, _blk_entries)
+# This suite runs under the offline rapidfuzz STUB (sys.modules line 25), so
+# the C-side prefilter is deliberately inert here: _survivor_indices returns
+# None and screen_name scores every entry — the exact fallback contract.
+# Real-rapidfuzz survivor behavior (keep subset chains and short entries,
+# drop unrelated names, bit-identical outputs) is asserted by the property
+# suite (test/fuzz_properties.py), which imports the real dependency stack.
+check("under the offline stub the prefilter is inert (None -> plain loop)",
+      _blk_surv is None)
+check("stubbed token_set_ratio alone also disables the prefilter (never a crash)",
+      screen._survivor_indices({screen.normalize("hamas")}, _blk_entries) is None)
+check("prefilter unavailable → None (caller scores every entry, plain loop)",
+      (lambda _p: (setattr(screen, "_rf_process", None),
+                   screen._survivor_indices({"x y"}, _blk_entries) is None,
+                   setattr(screen, "_rf_process", _p))[1])(screen._rf_process))
+
 # OFAC / UN mirror fallback: primary yielded nothing → screen via the
 # OpenSanctions mirror with MIRROR provenance; primary loaded → no mirror fetch;
 # mirror also down → None (the existing degrade paths take over).

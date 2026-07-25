@@ -119,6 +119,43 @@ def prop_sha256_shape(data):
     assert out == screen.sha256_of(data)
 
 
+
+# ── match-blocking equivalence (real rapidfuzz C prefilter) ──────────────────
+# screen_name's C-side prefilter (rapidfuzz.process.extract with the THRESHOLD
+# and TOKENSET_THRESHOLD cutoffs) may only ever SKIP pairs that could never
+# hit; results must be bit-identical with blocking on or off. The engine unit
+# suite runs under the offline rapidfuzz stub where the prefilter is inert, so
+# THIS suite — importing the real dependency stack — is where the equivalence
+# is proven. The token pool is built for collisions: shared given names and
+# transliteration variants (subset/patronymic chains), legal-form boilerplate
+# (core-vs-full divergence), and short designated names (near-exact gate).
+_NAME_TOKEN = st.sampled_from([
+    "mohammed", "muhammad", "mohamed", "abdul", "abdel", "bin", "ibn", "al",
+    "rashid", "hussain", "usama", "ladin", "awad", "karim", "trading",
+    "general", "llc", "dmcc", "fze", "holdings", "international", "quds",
+    "force", "hamas", "ano", "irisl", "x", "petro", "pars",
+])
+_NAME = st.lists(_NAME_TOKEN, min_size=1, max_size=6).map(" ".join)
+
+
+@PROP
+@given(st.lists(_NAME, min_size=1, max_size=12), st.lists(_NAME, min_size=1, max_size=6))
+def prop_blocking_equivalence(entry_names, subject_names):
+    lists = {"P": [(screen.normalize(e), e) for e in entry_names]}
+    orig = screen.MATCH_BLOCKING
+    try:
+        screen.MATCH_BLOCKING = False
+        base = [screen.screen_name(s, lists) for s in subject_names]
+        screen.MATCH_BLOCKING = True
+        fast = [screen.screen_name(s, lists) for s in subject_names]
+    finally:
+        screen.MATCH_BLOCKING = orig
+    assert base == fast
+
+
+
+
+
 check("normalize is idempotent on arbitrary unicode", prop_normalize_idempotent)
 check("normalize output is closed over [A-Z0-9 ], trimmed, single-spaced", prop_normalize_alphabet)
 check("normalize is casing-insensitive", prop_normalize_case_insensitive)
@@ -128,6 +165,7 @@ check("_normalize_ar is an NFC no-op on ASCII", prop_normalize_ar_ascii_noop)
 check("match_adverse_keywords is total, deterministic and duplicate-free", prop_match_keywords_total_and_stable)
 check("match_adverse_keywords always finds a planted English keyword", prop_match_keywords_finds_planted_term)
 check("sha256_of yields stable 64-char lowercase hex", prop_sha256_shape)
+check("match blocking on/off is result-identical under real rapidfuzz", prop_blocking_equivalence)
 
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
