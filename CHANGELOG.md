@@ -10,6 +10,25 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### EOCN review preparer, self-sufficient Netlify CD trigger, secret-rotation calendar (2026-07-25)
+
+**EOCN Reconcile** (`eocn-reconcile.yml`, Mon & Thu 04:37 UTC): does the
+mechanical half of the weekly EOCN review — downloads the OpenSanctions
+`ae_local_terrorists` mirror, runs the daily screen's own
+`crosscheck_eocn`, folds any missing designations in (exact mirror
+rendering kept as an alias, the #315 pattern), stamps `lastReviewed` plus a
+mirror-derived evidence note, and pushes the result to the rolling
+`eocn-reconcile` branch with an Asana task linking the compare view. The
+human act of opening and merging that PR records the MLRO sign-off; the
+7-day review-age gate on the daily screening is deliberately untouched and
+keeps enforcing if the branch is ignored. **Netlify deploy**: the
+build-hook workflow gains a path-filtered `push`-to-main trigger — inert
+(warn + green) until `NETLIFY_BUILD_HOOK_URL` exists, then production
+re-publishes on every app-file merge independently of Netlify's broken Git
+integration. **Compliance calendar**: quarterly rotation duties for
+`ASANA_ACCESS_TOKEN` and `ANTHROPIC_API_KEY` (each with an end-to-end
+verify step before revoking the old credential).
+
 ### Resilience hardening: repo-wide control self-healing + production-currency watchdog (2026-07-25)
 
 Generalises the morning's screening-specific fix to the whole control estate.

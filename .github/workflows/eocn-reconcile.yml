@@ -1,0 +1,159 @@
+name: EOCN Reconcile (prepare weekly review)
+
+# Converts the EOCN weekly review from a from-scratch chore into a one-click
+# sign-off, WITHOUT weakening the control. Background: the daily screening
+# hard-fails (exit 3) whenever data/eocn-local-terrorist-list.json's
+# lastReviewed is older than 7 days — by design, a human must re-verify the
+# curated TFS list weekly, and on 24 Jul the lapse redded the mandatory daily
+# control. This workflow does the mechanical part on Mon & Thu: it downloads
+# the OpenSanctions ae_local_terrorists mirror, runs the SAME cross-check the
+# daily screen uses (screen.crosscheck_eocn), folds any missing designations
+# into the list (exact mirror rendering kept as an alias — the 24 Jul #315
+# reconcile pattern), stamps lastReviewed + a mirror-derived evidence note,
+# and pushes the result to an `eocn-reconcile` branch with an Asana task
+# linking the compare view.
+#
+# The human act of OPENING AND MERGING that PR *is* the review sign-off —
+# nothing lands on main and the review-age gate keeps enforcing until the
+# MLRO does so. If the branch is ignored for 7 days the daily control goes
+# red exactly as before: this prepares the review, it can never replace it.
+# (The branch push uses GITHUB_TOKEN, which deliberately does not trigger
+# workflows — CI runs when the human opens the PR from the compare link.)
+
+on:
+  schedule:
+    - cron: '37 4 * * 1,4'   # Mon & Thu 04:37 UTC — twice weekly keeps the review age well inside the 7-day gate when merged promptly
+  workflow_dispatch:
+
+permissions:
+  contents: write   # push the prepared eocn-reconcile branch (main stays protected)
+
+concurrency:
+  group: eocn-reconcile
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+            data.opensanctions.org:443
+            app.asana.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --quiet --require-hashes -r ci/requirements.txt
+
+      - name: Reconcile the local list against the OpenSanctions mirror
+        id: reconcile
+        run: |
+          python3 << 'PYEOF'
+          import datetime, json, os, sys
+          import screen
+
+          PATH = "data/eocn-local-terrorist-list.json"
+          with open(PATH, encoding="utf-8") as f:
+              doc = json.load(f)
+
+          def entry_names(e):
+              if isinstance(e, str):
+                  return [e]
+              if isinstance(e, dict):
+                  return [e.get("name", "")] + list(e.get("aliases", []) or [])
+              return []
+
+          local_names = [n for e in doc.get("entries", []) for n in entry_names(e) if n]
+
+          mirror_names, meta = screen.load_eocn_mirror()
+          if not mirror_names:
+              # The reconciler's one job needs the mirror; a red run here is a
+              # signal to look at the source, and the daily screen's review-age
+              # gate remains the enforcement either way.
+              print("::error::EOCN mirror unavailable — reconciliation cannot be prepared this run")
+              sys.exit(1)
+
+          missing = screen.crosscheck_eocn(local_names, mirror_names)
+          today = datetime.date.today().isoformat()
+
+          for name in missing:
+              doc["entries"].append({"name": name, "aliases": [name]})
+          doc["count"] = len(doc["entries"])
+          doc["lastReviewed"] = today
+          doc["lastReviewedEvidence"] = (
+              f"{today} reconciliation prepared by eocn-reconcile.yml (run "
+              f"{os.environ.get('GITHUB_RUN_ID','?')}): cross-checked against the OpenSanctions "
+              f"ae_local_terrorists mirror ({meta.get('count','?')} designations, sha256 "
+              f"{str(meta.get('hash',''))[:16]}…). "
+              + (f"{len(missing)} mirror designation(s) folded in with the exact mirror rendering "
+                 f"kept as an alias: " + "; ".join(missing) + ". " if missing else
+                 "No divergence — the local list already covers every mirror designation. ")
+              + "Mirror-derived, pending MLRO confirmation against the official EOCN publication "
+                "(https://www.uaeiec.gov.ae): merging this branch to main records that review."
+          )
+
+          # The same gate the daily screen runs must resolve on the updated list.
+          updated_names = [n for e in doc["entries"] for n in entry_names(e) if n]
+          leftover = screen.crosscheck_eocn(updated_names, mirror_names)
+          if leftover:
+              print(f"::error::post-update cross-check still missing {len(leftover)} designation(s): {leftover[:5]}")
+              sys.exit(1)
+
+          with open(PATH, "w", encoding="utf-8") as f:
+              json.dump(doc, f, ensure_ascii=False, indent=2)
+              f.write("\n")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"added={len(missing)}\n")
+              out.write(f"count={doc['count']}\n")
+          print(f"prepared: {len(missing)} added, count {doc['count']}, lastReviewed {today}")
+          PYEOF
+
+      - name: Push the prepared review branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          git config user.name "eocn-reconcile"
+          git config user.email "actions@github.com"
+          git add data/eocn-local-terrorist-list.json
+          git commit -m "eocn: prepared weekly review — merge records MLRO sign-off"
+          # Single rolling branch (rebuilt as <main> + one commit each run) so
+          # stale preparations never pile up; auth is the ephemeral env token in
+          # the push URL — the checkout persists no credentials.
+          pushed=
+          for attempt in 1 2 3 4 5; do
+            git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/eocn-reconcile && { pushed=1; break; }
+            echo "push failed (attempt $attempt) — retrying"
+            sleep $((attempt * 3))
+          done
+          [ -n "$pushed" ] || { echo "::error::push of the prepared eocn-reconcile branch failed"; exit 1; }
+
+      - name: File the review task in Asana
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ADDED: ${{ steps.reconcile.outputs.added }}
+          COUNT: ${{ steps.reconcile.outputs.count }}
+          COMPARE_URL: ${{ github.server_url }}/${{ github.repository }}/compare/main...eocn-reconcile
+        run: |
+          node scripts/asana-alert.mjs \
+            "EOCN weekly review prepared — one click to sign off (${ADDED} designation(s) folded in, count ${COUNT})" \
+            "The eocn-reconcile workflow cross-checked data/eocn-local-terrorist-list.json against the OpenSanctions ae_local_terrorists mirror and pushed the prepared review to the eocn-reconcile branch. ACTION: open ${COMPARE_URL} , create the pull request, verify the evidence note (mirror-derived, pending confirmation against the official EOCN publication at uaeiec.gov.ae), and MERGE — the merge records the MLRO review and resets the 7-day review-age gate on the daily screening. If this is not merged within 7 days of the stamped lastReviewed date the daily control goes red by design."

@@ -21,13 +21,28 @@ name: Netlify Production Deploy (build hook)
 
 on:
   workflow_dispatch:
-  # Branch-scoped push trigger: a dispatch-only workflow absent from the
-  # default branch is not registered, so the dispatch API 404s. On push
-  # events a missing secret is a soft no-op (setup not done yet), so
-  # registering this way never reds the branch.
+  # Self-sufficient CD: once the NETLIFY_BUILD_HOOK_URL secret exists, every
+  # merge to main that touches the SERVED app re-publishes production even if
+  # Netlify's own Git integration stays broken (it has been since 27 Jun).
+  # Path-filtered so the many daily state-sync/docs/workflow merges don't
+  # burn Netlify build minutes; while the secret is still missing a push
+  # firing is a soft no-op (warning, green), so this trigger is safe to
+  # carry before setup completes. Site Currency (08:07 UTC) independently
+  # alarms if production ever drifts behind main again.
   push:
     branches:
-      - claude/test-failure-investigation-tphsu1
+      - main
+    paths:
+      - 'index.html'
+      - 'console.html'
+      - 'advisor.html'
+      - '*.js'
+      - '*.css'
+      - 'assets/**'
+      - 'netlify/**'
+      - 'netlify.toml'
+      - 'manifest.webmanifest'
+      - 'fonts.css'
 
 permissions:
   contents: read
