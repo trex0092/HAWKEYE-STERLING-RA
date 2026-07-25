@@ -585,8 +585,9 @@ class _Resp:
         return json.loads(self.content or b"{}")
 
 _RSS_OK = b"<rss><channel><item><title>Acme probe</title></item></channel></rss>"
-_calls = {"gnews": 0, "sleeps": 0, "gdelt": 0}
+_calls = {"gnews": 0, "sleeps": 0, "gdelt": 0, "bing": 0}
 _orig_get, _orig_sleep, _orig_gdelt = screen.requests.get, screen.time.sleep, screen.search_gdelt
+_orig_bing = screen.search_bing_news
 _orig_mono = screen.time.monotonic
 screen.time.sleep = lambda *_a, **_k: _calls.__setitem__("sleeps", _calls["sleeps"] + 1)
 # Pin the clock: the rate gate schedules send slots on time.monotonic, and a
@@ -598,8 +599,11 @@ def _reset_breaker():
     screen._GDELT_STATE["open"] = False
     screen._GNEWS_STATE["consecutive_zero"] = 0
     screen._GNEWS_STATE["open"] = False
+    screen._BING_STATE["consecutive_failures"] = 0
+    screen._BING_STATE["open"] = False
     screen._GNEWS_GATE.reset()
     screen._GDELT_GATE.reset()
+    screen._BING_GATE.reset()
     screen._PEP_STATE["consecutive_failures"] = 0
     screen._PEP_STATE["open"] = False
     screen._PEP_GATE.reset()
@@ -613,9 +617,16 @@ def _gdelt_down(*_a, **_k):
     _calls["gdelt"] += 1
     raise RuntimeError("GDELT HTTP 429")
 
+def _bing_down(*_a, **_k):
+    _calls["bing"] += 1
+    raise RuntimeError("Bing News HTTP 429")
+
 # Total outage: stop after the first 4 transport failures, pace every attempt,
-# and still degrade loudly (the caller records an am_error).
+# and still degrade loudly (the caller records an am_error). Bing (the third
+# net) is stubbed down alongside GDELT so the Google-News fetch counter and
+# the pacing assertions keep measuring Google News alone.
 _reset_breaker(); screen.requests.get = _gnews_refused; screen.search_gdelt = _gdelt_down
+screen.search_bing_news = _bing_down
 _raised = ""
 try:
     screen.search_adverse_media("Total Outage LLC")
@@ -727,6 +738,62 @@ screen.search_gdelt("Paced Subject Two")
 check("GDELT fetches are paced by the run-global gate (one per GDELT_MIN_INTERVAL)",
       _slots == [round(screen.GDELT_MIN_INTERVAL, 3)])
 screen.time.sleep = lambda *_a, **_k: _calls.__setitem__("sleeps", _calls["sleeps"] + 1)
+
+# ── Bing News third feed (independent rate-limit pool) ────────────────────────
+# 10-14 Jul showed Google News AND GDELT can refuse the same run; the crime
+# watchlist kept deterministic coverage but fresh-story recall went to zero.
+# Bing News RSS is the third pool: same article shape, same flagger, breaker
+# and pacing mirroring GDELT's, its failure alone never fails a subject, and a
+# subject covered ONLY by Bing is covered (no am_error false alarm).
+print("screen.py — Bing News third feed")
+
+_BING_RSS = (b'<rss xmlns:News="https://www.bing.com/news/search"><channel>'
+             b'<item><title>Acme Trading fined for money laundering</title>'
+             b'<link>https://ex/1</link><pubDate>Tue, 30 Jun 2026 06:00:00 GMT</pubDate>'
+             b'<News:Source>Example Wire</News:Source></item>'
+             b'<item><title></title><link>https://ex/2</link></item>'
+             b'<item><title>Acme Trading opens flagship store</title>'
+             b'<link>https://ex/3</link></item>'
+             b'</channel></rss>')
+_bg = screen.parse_bing_news(_BING_RSS)
+check("bing parse emits the standard shape, flags risk, skips blank titles",
+      len(_bg) == 2 and _bg[0]["flagged"] and not _bg[1]["flagged"]
+      and _bg[0]["source"] == "Example Wire" and _bg[0]["ts"]
+      and _bg[0]["date"] == "2026-06-30" and _bg[0]["url"] == "https://ex/1")
+check("bing parse is safe on empty payloads", screen.parse_bing_news(b"") == [])
+
+# Third-net coverage semantics: Google News refused + GDELT down + Bing alive
+# ⇒ the subject IS covered — no am_error raise, Bing's articles are kept.
+_reset_breaker()
+screen.requests.get = _gnews_refused
+screen.search_gdelt = _gdelt_down
+screen.search_bing_news = lambda *_a, **_k: [{
+    "title": "Acme fraud probe", "source": "Example Wire", "date": "2026-06-30",
+    "ts": 1, "url": "https://ex/1", "flagged": True, "keywords": ["fraud"],
+    "categories": ["Fraud / Financial Crime"]}]
+_arts_bing = screen.search_adverse_media("Bing Only Coverage LLC")
+check("a subject covered only by Bing is covered (no false am_error)",
+      len(_arts_bing) == 1 and _arts_bing[0]["flagged"])
+
+# Breaker: N consecutive Bing failures open its circuit for the rest of the
+# run; the other feeds are untouched.
+_reset_breaker(); _calls["bing"] = 0
+screen.requests.get = lambda *_a, **_k: _Resp(200, _RSS_OK)
+screen.search_gdelt = lambda *_a, **_k: []
+screen.search_bing_news = _bing_down
+for _ in range(screen.BING_BREAKER_AFTER + 3):
+    screen.search_adverse_media("Acme")
+check("bing circuit opens after N consecutive failures", screen._BING_STATE["open"])
+check("bing is not called once the circuit is open", _calls["bing"] == screen.BING_BREAKER_AFTER)
+
+# Kill-switch: BING_NEWS=0 skips the feed entirely.
+_reset_breaker(); _calls["bing"] = 0
+_orig_bing_flag = screen.BING_NEWS
+screen.BING_NEWS = False
+screen.search_adverse_media("Acme")
+check("BING_NEWS=0 kill-switch: feed never fetched", _calls["bing"] == 0)
+screen.BING_NEWS = _orig_bing_flag
+screen.search_bing_news = _orig_bing
 
 # OFAC / UN mirror fallback: primary yielded nothing → screen via the
 # OpenSanctions mirror with MIRROR provenance; primary loaded → no mirror fetch;

@@ -1004,6 +1004,82 @@ def search_gdelt(name: str, max_results: int = 8) -> list:
         raise RuntimeError(f"GDELT HTTP {r.status_code}")
     return parse_gdelt(r.json() if r.content else {}, max_results)
 
+# ── Bing News RSS — independent THIRD news feed ──────────────────────────────
+# Google News and GDELT meter shared runner IPs independently, and 10-14 Jul
+# showed both can refuse the same run (the crime watchlist kept deterministic
+# coverage, but fresh-story recall went to zero). Bing News serves a free,
+# no-key RSS endpoint on a THIRD rate-limit pool, so headline recall now needs
+# three simultaneous refusals to go dark. Same integration contract as GDELT:
+# one paced, breaker-guarded query per subject; its failure alone never fails
+# the subject; articles land in the same shape and flow through the same
+# multilingual keyword flagger and dedupe. Kill-switch: BING_NEWS=0.
+BING_NEWS = os.environ.get("BING_NEWS", "1") == "1"
+BING_NEWS_URL = "https://www.bing.com/news/search?q={query}&format=rss"
+BING_BREAKER_AFTER = int(os.environ.get("BING_BREAKER_AFTER", "5"))
+_BING_STATE = {"consecutive_failures": 0, "open": False}
+# Bing tolerates polite RSS polling; pace like Google News (shared slot across
+# all workers, multiplicative backoff on failure, decay on success).
+BING_MIN_INTERVAL = float(os.environ.get("BING_MIN_INTERVAL", "0.5"))
+BING_BACKOFF_CAP = float(os.environ.get("BING_BACKOFF_CAP", "10.0"))
+_BING_GATE = _RateGate(
+    BING_MIN_INTERVAL, BING_BACKOFF_CAP,
+    on_cap=lambda: log(f"  Bing News rate-limited — pacing backed off to cap "
+                       f"({BING_BACKOFF_CAP:g}s between fetches; recovers on success)"))
+
+def parse_bing_news(data, max_results: int = 8) -> list:
+    """Bing News RSS bytes → the same article shape the other feeds emit.
+    Pure apart from the shared XML-hardening guard, so it is unit-testable
+    offline. Defensive per-item parsing: one malformed item never zeroes the
+    feed's whole result."""
+    arts = []
+    if not data:
+        return arts
+    root = safe_xml_fromstring(data)
+    for item in root.iter("item"):
+        try:
+            title = (item.findtext("title") or "").strip()
+            if not title:
+                continue
+            source = ""
+            for el in item.iter():
+                if el.tag.split("}")[-1] == "Source" and (el.text or "").strip():
+                    source = el.text.strip()
+                    break
+            matched = match_adverse_keywords(title)
+            pub = item.findtext("pubDate") or ""
+            ts = _parse_rss_date(pub)
+            dm = re.search(r"(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})", pub)
+            date = ""
+            if dm and dm.group(2).lower() in _MONTHS:
+                date = f"{dm.group(3)}-{_MONTHS[dm.group(2).lower()]:02d}-{int(dm.group(1)):02d}"
+            arts.append({
+                "title": title,
+                "source": source or "Bing News",
+                "date": date,
+                "ts": ts,
+                "url": (item.findtext("link") or "").strip(),
+                "flagged": bool(matched),
+                "keywords": matched,
+                "categories": typology_for(matched),
+            })
+            if len(arts) >= max_results * 3:
+                break
+        except Exception:
+            continue
+    return arts
+
+def search_bing_news(name: str, max_results: int = 8) -> list:
+    """Query Bing News RSS for a subject + the English risk-term cluster.
+    Raises on HTTP/parse failure so the caller can log it and count the
+    breaker; paced by the run-global Bing gate."""
+    _BING_GATE.wait()
+    q = requests.utils.quote(f'"{name}" ({RISK_QUERY})')
+    r = requests.get(BING_NEWS_URL.format(query=q), timeout=20,
+                     headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
+    if r.status_code != 200:
+        raise RuntimeError(f"Bing News HTTP {r.status_code}")
+    return parse_bing_news(r.content, max_results)
+
 def search_adverse_media(name: str, max_results: int = 8) -> list:
     """
     Deep adverse-media search via Google News RSS.
@@ -1151,14 +1227,41 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
             else:
                 log(f"  GDELT unavailable for this subject ({str(e)[:80]}) — Google News coverage stands")
 
+    # Independent THIRD source — Bing News RSS (separate rate-limit pool from
+    # both Google News and GDELT). Same contract as the GDELT block above: its
+    # failure alone never fails the subject, outages are logged not swallowed,
+    # and a hard-down feed trips a run-level breaker instead of costing every
+    # remaining subject a timeout.
+    bing_ok = False
+    if BING_NEWS and not _BING_STATE["open"]:
+        try:
+            for a in search_bing_news(name, max_results):
+                if a["title"] not in seen_titles:
+                    seen_titles.add(a["title"])
+                    articles.append(a)
+            bing_ok = True
+            _BING_STATE["consecutive_failures"] = 0
+            _BING_GATE.reward()
+        except Exception as e:
+            _BING_STATE["consecutive_failures"] += 1
+            _BING_GATE.penalize()
+            if _BING_STATE["consecutive_failures"] >= BING_BREAKER_AFTER:
+                if not _BING_STATE["open"]:
+                    _BING_STATE["open"] = True
+                    log(f"  Bing News down ({BING_BREAKER_AFTER} subjects in a row) — circuit OPEN, "
+                        "skipping Bing News for the rest of the run; Google News/GDELT coverage stands")
+            else:
+                log(f"  Bing News unavailable for this subject ({str(e)[:80]}) — other feeds stand")
+
     # Degrade loudly: if EVERY Google-News fetch failed (or its breaker skipped
-    # the feed entirely) AND GDELT failed, we have ZERO coverage for this
-    # subject — raise so the caller records an am_error and the report degrades,
-    # rather than returning [] that reads as "no adverse media".
-    if attempts > 0 and failures >= attempts and not gdelt_ok:
-        raise RuntimeError(f"adverse-media: all {attempts} Google-News fetches + GDELT failed for '{name}'")
-    if _GNEWS_STATE["open"] and attempts == 0 and not gdelt_ok:
-        raise RuntimeError(f"adverse-media: Google News circuit open + GDELT failed for '{name}'")
+    # the feed entirely) AND GDELT failed AND Bing News failed, we have ZERO
+    # fresh-story coverage for this subject — raise so the caller records an
+    # am_error and the report degrades, rather than returning [] that reads as
+    # "no adverse media".
+    if attempts > 0 and failures >= attempts and not gdelt_ok and not bing_ok:
+        raise RuntimeError(f"adverse-media: all {attempts} Google-News fetches + GDELT + Bing News failed for '{name}'")
+    if _GNEWS_STATE["open"] and attempts == 0 and not gdelt_ok and not bing_ok:
+        raise RuntimeError(f"adverse-media: Google News circuit open + GDELT + Bing News failed for '{name}'")
 
     articles = dedup_stories(articles)
     # Sort: flagged first, then most-recent first (recency ranking).
@@ -3332,7 +3435,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("   Reviewed by: ____________________   Date: __________")
     A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
     A("")
-    A(f"Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT")
+    A(f"Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT + Bing News")
     A(f"adverse media + OpenSanctions crime watchlist, Wikidata PEP (OpenSanctions mirror fallback),")
     A(f"AI risk-rating & triage · {github_run_url()}")
     A("> " + ai.governance_footer())

@@ -10,6 +10,40 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Adverse media: Bing News RSS as an independent third news feed (2026-07-25)
+
+Google News and GDELT meter shared runner IPs independently, and 10–14 Jul
+showed both can refuse the same run — the crime watchlist kept deterministic
+coverage, but fresh-story recall went to zero. `screen.py` now queries **Bing
+News RSS** (free, no key, a third rate-limit pool) once per subject with the
+English risk-term cluster, through the same contract as GDELT: run-global
+adaptive pacing, a run-level circuit breaker (`BING_BREAKER_AFTER`, default
+5), loud per-subject degradation, the shared multilingual keyword flagger,
+cross-outlet dedupe, and the hardened XML parse. A subject covered only by
+Bing now counts covered (no false `am_error`); zero-coverage alarms now
+require all three news feeds to fail. Kill-switch `BING_NEWS=0`. Egress
+allowlists for both screening workflows gain `www.bing.com:443`; engine tests
+cover the parser, breaker, kill-switch, and third-net coverage semantics.
+
+### EOCN review preparer, self-sufficient Netlify CD trigger, secret-rotation calendar (2026-07-25)
+
+**EOCN Reconcile** (`eocn-reconcile.yml`, Mon & Thu 04:37 UTC): does the
+mechanical half of the weekly EOCN review — downloads the OpenSanctions
+`ae_local_terrorists` mirror, runs the daily screen's own
+`crosscheck_eocn`, folds any missing designations in (exact mirror
+rendering kept as an alias, the #315 pattern), stamps `lastReviewed` plus a
+mirror-derived evidence note, and pushes the result to the rolling
+`eocn-reconcile` branch with an Asana task linking the compare view. The
+human act of opening and merging that PR records the MLRO sign-off; the
+7-day review-age gate on the daily screening is deliberately untouched and
+keeps enforcing if the branch is ignored. **Netlify deploy**: the
+build-hook workflow gains a path-filtered `push`-to-main trigger — inert
+(warn + green) until `NETLIFY_BUILD_HOOK_URL` exists, then production
+re-publishes on every app-file merge independently of Netlify's broken Git
+integration. **Compliance calendar**: quarterly rotation duties for
+`ASANA_ACCESS_TOKEN` and `ANTHROPIC_API_KEY` (each with an end-to-end
+verify step before revoking the old credential).
+
 ### Resilience hardening: repo-wide control self-healing + production-currency watchdog (2026-07-25)
 
 Generalises the morning's screening-specific fix to the whole control estate.

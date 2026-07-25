@@ -58,6 +58,7 @@ export const EXEMPT = {
   'container-scan.yml': 'security scan of the published image (post-publication CVE watch); red badge is the alarm',
   'control-retry.yml': 'self-healing dispatcher over the daily controls above; the controls themselves are what this alarm monitors, and a dead dispatcher just means a missing control stays missing — which this alarm then catches',
   'daily-brief.yml': 'reporting digest; absence is recipient-noticed, no ingestion duty',
+  'eocn-reconcile.yml': 'prepares the weekly EOCN review branch + files the sign-off task; the review duty itself is enforced by the daily screening review-age gate (exit 3 past 7 days), which is what this alarm monitors',
   'dast-zap.yml': 'security scan of the deployed site',
   'freshness-check.yml': 'this alarm itself',
   'function-health.yml': 'site operations probe; self-alerting',

@@ -326,7 +326,14 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 55 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
+Verified at HEAD: 56 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
+*(25 July, third pass: the EOCN Reconcile preparer — twice-weekly mirror cross-check pushed to a
+review branch whose human merge records the MLRO sign-off; the review-age gate itself is
+unchanged. Netlify deploy gains a path-filtered push trigger (inert until its secret exists);
+quarterly secret-rotation duties added to the compliance calendar. Tooling only — no scored
+control changed.)*
+
+Verified at HEAD on 25 July (second pass): 55 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
 *(25 July, second pass — resilience hardening: the Control Retry self-healing dispatcher
 (re-fires any daily control missing its day's success, two passes before the freshness alarm)
 and the Site Currency probe (live APP_VERSION vs main, self-arming, Asana-alerting — closes the
