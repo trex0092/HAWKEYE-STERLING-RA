@@ -14,6 +14,7 @@ name: Daily Screening (Sanctions + Adverse Media + PEP)
 on:
   schedule:
     - cron: '7 0 * * *'    # 00:07 UTC = 04:07 UAE, daily (odd minute) — early start lets the DEEPER ~4-4.5h sweep (5 locales + targeted query) still deliver by ~08:30 UAE, same UTC day (keeps freshness-check valid)
+    - cron: '7 3 * * *'    # 03:07 UTC self-healing retry — the 24 & 25 Jul 00:07 runs died to runner-VM shutdowns mid-sweep and stayed red until someone manually re-ran hours later. This firing is a NO-OP (preflight skips the sweep) whenever today already has a successful run; it only screens when the mandatory daily control would otherwise be missing, and still delivers by ~08:30 UAE.
   workflow_dispatch:        # Manual trigger
 
 # Results are posted to Asana via the screen's own token. contents:write is used
@@ -33,7 +34,55 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Self-healing gate: the retry firing (03:07 UTC) must not double-screen or
+  # double-post to Asana on days when the 00:07 run succeeded. On schedule
+  # events this asks the Actions API whether today (UTC) already has a
+  # successful run of this workflow and skips the sweep if so; manual
+  # dispatches always screen. Skipped-job days still conclude "success", so
+  # the badge and freshness-check semantics are unchanged.
+  preflight:
+    permissions:
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+      - name: Skip if today's screening already succeeded
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -u
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "manual dispatch — always screens"
+            exit 0
+          fi
+          today="$(date -u +%Y-%m-%d)"
+          n=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/actions/workflows/weekly-adverse-media.yml/runs?status=success&created=%3E%3D${today}&per_page=1" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("total_count", 0))')
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "today (UTC $today) already has $n successful screening run(s) — retry firing is a no-op"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "no successful screening run yet today (UTC $today) — proceeding with the sweep"
+          fi
+
   adverse-media:
+    needs: preflight
+    if: needs.preflight.outputs.run == 'true'
     # Write scopes live at job level (top level is read-only — least privilege).
     permissions:
       contents: write

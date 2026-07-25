@@ -326,7 +326,13 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 51 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
+Verified at HEAD: 53 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
+*(25 July: two operations workflows added by the badge-failure investigation — the Netlify
+production-deploy lever (build hook) and the read-only Netlify probe — plus the daily screening's
+self-healing 03:07 UTC retry firing inside the existing workflow. Tooling only — no scored control
+changed.)*
+
+Verified at HEAD on 24 July: 51 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
 (Evening sync of the same day added the 24 July regulatory-watch digest — one auto doc.)
 
 Verified at HEAD on 23 July: 51 workflows · 124 markdown documents under docs/ (107 excluding docs/research/auto).

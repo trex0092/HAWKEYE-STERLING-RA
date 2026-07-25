@@ -1,0 +1,96 @@
+name: Netlify Production Deploy (build hook)
+
+# Production deploys stopped publishing after 27 Jun 2026: pushes to main no
+# longer trigger a Netlify production build (no Netlify status/check appears
+# on main commits — verified 25 Jul), while PR deploy previews still build.
+# The live site therefore serves the 27 Jun bundle (pre app.js split) and the
+# deploy badge shows the last failed production attempt. The July workaround
+# (netlify-deploy.yml, since repurposed) prescribed a Netlify BUILD HOOK but
+# its secret was never created.
+#
+# ONE-TIME SETUP (Netlify UI, ~1 minute):
+#   Netlify -> Site configuration -> Build & deploy -> Build hooks ->
+#   "Add build hook" (branch: main) -> copy the URL, then GitHub repo ->
+#   Settings -> Secrets and variables -> Actions -> New repository secret:
+#     NETLIFY_BUILD_HOOK_URL = <that URL>
+# (Re-linking the repository under Build & deploy -> Continuous deployment
+#  fixes push-triggered production builds permanently and is the better fix;
+#  this workflow is the GitHub-native lever until/alongside that.)
+#
+# NOTE: a Netlify build consumes the team's build minutes/credits.
+
+on:
+  workflow_dispatch:
+  # Branch-scoped push trigger: a dispatch-only workflow absent from the
+  # default branch is not registered, so the dispatch API 404s. On push
+  # events a missing secret is a soft no-op (setup not done yet), so
+  # registering this way never reds the branch.
+  push:
+    branches:
+      - claude/test-failure-investigation-tphsu1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: netlify-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          # Build hooks live on api.netlify.com; the publish check reads the
+          # live site. Nothing else is contacted.
+          egress-policy: block
+          allowed-endpoints: >
+            api.netlify.com:443
+            hawkeye-sterling-ra.netlify.app:443
+
+      - name: Trigger Netlify production build via build hook
+        id: kick
+        env:
+          HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -u
+          if [ -z "${HOOK_URL:-}" ]; then
+            if [ "$EVENT" = "push" ]; then
+              echo "::warning::NETLIFY_BUILD_HOOK_URL secret not set — skipping (registration push). Create a Netlify build hook for branch main and add it as that repo secret, then dispatch this workflow."
+              echo "kicked=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::NETLIFY_BUILD_HOOK_URL secret not set. Netlify -> Site configuration -> Build & deploy -> Build hooks -> Add build hook (branch: main); save the URL as the NETLIFY_BUILD_HOOK_URL repository secret."
+            exit 1
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOOK_URL")
+          echo "Netlify build hook POST -> HTTP $code"
+          if [ "$code" != "200" ] && [ "$code" != "201" ] && [ "$code" != "204" ]; then
+            echo "::error::Build hook POST failed (HTTP $code) — the hook may have been deleted; recreate it in the Netlify UI."
+            exit 1
+          fi
+          echo "kicked=true" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the publish to reach the live site
+        if: steps.kick.outputs.kicked == 'true'
+        run: |
+          set -u
+          # The 27 Jun bundle predates the app.js split, so the first modern
+          # publish is unambiguous: /app.js starts serving an APP_VERSION.
+          # Poll up to 10 minutes (a no-build static publish takes ~1-2).
+          for i in $(seq 1 30); do
+            live=$(curl -sSL "https://hawkeye-sterling-ra.netlify.app/app.js" | grep -oE "APP_VERSION = '[0-9.]+'" | head -1 || true)
+            if [ -n "$live" ]; then
+              echo "PUBLISHED: live site now serves $live"
+              exit 0
+            fi
+            echo "  not published yet (check $i/30) — waiting 20s"
+            sleep 20
+          done
+          echo "::error::Build was triggered but the live site still serves the pre-split bundle after 10 minutes — check the deploy log in the Netlify UI (app.netlify.com/projects/hawkeye-sterling-ra/deploys)."
+          exit 1

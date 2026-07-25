@@ -1,0 +1,63 @@
+name: Netlify Probe (diagnostic, manual)
+
+# Read-only diagnostic for the production-deploy outage: production deploys
+# stopped publishing after 27 Jun (the badge shows "failed", the published
+# deploy is a month old) while PR deploy previews keep succeeding. The
+# container running the investigation has no egress to Netlify hosts, so this
+# probe runs where egress is open — a GitHub runner — and answers three
+# questions with zero credentials beyond the read-only GITHUB_TOKEN:
+#   1. Does Netlify post commit statuses / check runs for pushes to main
+#      (i.e. do production builds trigger at all, and with what result)?
+#   2. What state does the public deploy badge report right now?
+#   3. Which APP_VERSION is the live site actually serving vs the repo?
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: read
+  checks: read
+
+concurrency:
+  group: netlify-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Commit statuses + check runs on recent main commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          for sha in $(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/commits?sha=main&per_page=8" \
+              | python3 -c 'import json,sys; [print(c["sha"]) for c in json.load(sys.stdin)]'); do
+            echo "=== $sha ==="
+            curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/commits/$sha/status" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print("combined:", d["state"], "| statuses:", [(s["context"], s["state"], s.get("target_url","")) for s in d["statuses"]])'
+            curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/commits/$sha/check-runs" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print("check-runs:", [(c["name"], c["conclusion"], (c.get("details_url") or "")) for c in d.get("check_runs",[]) if "netlify" in (c["app"]["slug"] or "").lower() or "netlify" in c["name"].lower()])'
+          done
+
+      - name: Public deploy badge state
+        run: |
+          set -u
+          svg=$(curl -sSL "https://api.netlify.com/api/v1/badges/475b8e6f-bfe0-40fd-99bc-4a9282853475/deploy-status")
+          echo "badge says: $(echo "$svg" | grep -oiE 'success|failed|failing|building|canceled|locked|never' | head -1)"
+
+      - name: Live site APP_VERSION vs repo
+        run: |
+          set -u
+          live=$(curl -sSL "https://hawkeye-sterling-ra.netlify.app/app.js" | grep -oE "APP_VERSION = '[0-9.]+'" | head -1 || true)
+          echo "live site:  ${live:-<not found>}"
+          echo "repo main:  APP_VERSION = '3.7.2' (at time of writing)"
+          # Functions probe: a stale deploy may also mean stale function env.
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/csp-report" -X POST -H 'Content-Type: application/csp-report' --data '{}' || true)
+          echo "csp-report function POST -> HTTP $code"
