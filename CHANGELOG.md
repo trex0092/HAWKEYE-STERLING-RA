@@ -10,6 +10,25 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Resilience hardening: repo-wide control self-healing + production-currency watchdog (2026-07-25)
+
+Generalises the morning's screening-specific fix to the whole control estate.
+**Control Retry** (`control-retry.yml`, 07:37 & 10:07 UTC): for each mandatory
+daily control with no successful run today and nothing queued or running, it
+fires one `workflow_dispatch` — so a transient runner death on ANY daily
+control heals the same morning, before the freshness alarm. Deliberately
+narrow: deterministic failures (e.g. the EOCN review-age gate) fail again on
+re-dispatch and the day stays honestly red; mid-run controls are left alone;
+one dispatch per control per pass. **Site Currency** (`site-currency.yml`,
+08:07 UTC): compares the APP_VERSION the live site serves against HEAD of
+main daily — the check whose absence let production deploys sit silently
+stale from 27 Jun. Self-arming (warns-but-green while the known pre-split
+outage persists), then red + Asana alert on any future drift beyond a 24h
+grace. **Freshness Check** gains a second daily firing (12:09 UTC) so the
+alarm re-verifies after the healing passes and its own badge recovers from a
+transient same-day. License badge recolored red → steel blue (informational
+label, not a status).
+
 ### Daily screening self-heals after runner deaths; Netlify production deploy path restored (2026-07-25)
 
 The 24 and 25 Jul 00:07 UTC screening runs both died to runner-VM shutdowns
