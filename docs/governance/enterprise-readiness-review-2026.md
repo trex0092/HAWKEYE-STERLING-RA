@@ -326,7 +326,14 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 53 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
+Verified at HEAD: 55 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
+*(25 July, second pass — resilience hardening: the Control Retry self-healing dispatcher
+(re-fires any daily control missing its day's success, two passes before the freshness alarm)
+and the Site Currency probe (live APP_VERSION vs main, self-arming, Asana-alerting — closes the
+gap that let production deploys sit silently stale from 27 Jun). Freshness Check gains a second
+daily firing. Tooling only — no scored control changed.)*
+
+Verified at HEAD on 25 July (earlier): 53 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
 *(25 July: two operations workflows added by the badge-failure investigation — the Netlify
 production-deploy lever (build hook) and the read-only Netlify probe — plus the daily screening's
 self-healing 03:07 UTC retry firing inside the existing workflow. Tooling only — no scored control

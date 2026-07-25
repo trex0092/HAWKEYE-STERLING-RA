@@ -14,6 +14,7 @@ name: Freshness Check
 on:
   schedule:
     - cron: '9 9 * * *' # 09:09 UTC daily — after sanctions-watch (05:07), the screening runs and regulatory-watch (06:19)
+    - cron: '9 12 * * *' # second firing — re-verifies after the Control Retry dispatcher's healing passes (07:37/10:07), and heals this alarm's own badge if the first firing died transiently. Idempotent read-only check; a still-stale control simply alerts twice, which is the point.
   workflow_dispatch:
 
 # Least privilege: read the repo + read Actions run history. The Asana alert on
