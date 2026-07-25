@@ -13,12 +13,6 @@ name: Netlify Probe (diagnostic, manual)
 
 on:
   workflow_dispatch:
-  # Push trigger scoped to the investigation branch: a dispatch-only workflow
-  # that has never run and is absent from the default branch is not registered,
-  # so the dispatch API 404s. The push run both registers and executes it.
-  push:
-    branches:
-      - claude/test-failure-investigation-tphsu1
 
 permissions:
   contents: read

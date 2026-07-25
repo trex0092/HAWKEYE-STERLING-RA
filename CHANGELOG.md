@@ -10,6 +10,31 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Daily screening self-heals after runner deaths; Netlify production deploy path restored (2026-07-25)
+
+The 24 and 25 Jul 00:07 UTC screening runs both died to runner-VM shutdowns
+("The runner has received a shutdown signal") mid-way through the
+OpenSanctions crime-watchlist pass and stayed red until manual re-runs hours
+later — which also cascaded the 24 Jul Freshness Check red. The workflow now
+fires a second, self-healing schedule at 03:07 UTC gated by a `preflight` job:
+a no-op on days where a successful run already exists, a full sweep only when
+the mandatory daily control would otherwise be missing (manual dispatches
+always screen). The watchlist stage itself now streams the ~68 MB CSV through
+a `TextIOWrapper` instead of decoding two extra full copies, and logs a
+heartbeat every 100 subjects so the formerly-silent ~33-minute matching window
+shows liveness (and any future death point) in the Actions log.
+
+Separately: Netlify production deploys have not published since 27 Jun (no
+production build triggers on main pushes; PR previews unaffected; the live
+site still serves the pre-`app.js`-split bundle). The July workaround's
+build-hook secret was never created. `netlify-production-deploy.yml` restores
+that lever — POST the `NETLIFY_BUILD_HOOK_URL` build hook and verify the
+publish reached the live site — plus `netlify-probe.yml`, a read-only
+diagnostic of Netlify's commit statuses, the badge, and the served bundle.
+One-time setup (Netlify UI): create a build hook for `main` and save its URL
+as the `NETLIFY_BUILD_HOOK_URL` repository secret; re-linking the repository
+in Build & deploy fixes push-triggered production builds permanently.
+
 ### Governance closures: breach-notification clock pinned; three sign-ready drafts (2026-07-24)
 
 Register item 12 closed: the incident runbook now names the UAE Data Office

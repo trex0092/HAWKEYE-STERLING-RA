@@ -1521,12 +1521,20 @@ WATCHLIST_LABEL = "OpenSanctions crime watchlist"
 def parse_watchlist(data):
     """targets.simple.csv → (entries, ids): entries = [(normalized, original)]
     in the exact shape the sanctions matcher consumes; ids = {original: entity id}
-    so a hit can cite its OpenSanctions entity page as evidence."""
+    so a hit can cite its OpenSanctions entity page as evidence.
+
+    The bulk file is the largest download of the run (~68 MB, ~290k names) and
+    this stage executes with every core list already resident, on the shared
+    7 GB runner where the 24-25 Jul night runs died mid-stage to VM shutdowns.
+    Decoding to one giant str and copying it again into StringIO tripled the
+    transient footprint, so the reader streams through a TextIOWrapper instead
+    — same rows, same output, two ~68 MB copies fewer."""
     entries, ids = [], {}
     if not data:
         return entries, ids
     try:
-        reader = csv.DictReader(io.StringIO(data.decode("utf-8")))
+        reader = csv.DictReader(io.TextIOWrapper(
+            io.BytesIO(data), encoding="utf-8", errors="replace"))
         for row in reader:
             try:
                 pid = (row.get("id") or "").strip()
@@ -1570,7 +1578,18 @@ def screen_watchlist(subjects_all, entries, ids, today_iso):
         return {}
     wl = {WATCHLIST_LABEL: entries}
     out = {}
-    for name in sorted({s[1] for s in subjects_all}):
+    names = sorted({s[1] for s in subjects_all})
+    # Heartbeat: this pass fuzzy-matches every distinct subject against ~290k
+    # watchlist names and ran 33 minutes on 24 Jul with zero output — exactly
+    # the window in which the 24-25 Jul night runners died, unattributably.
+    # A progress line every 100 subjects makes the stage's liveness (and any
+    # future death point) visible in the Actions log; stdout only, so the
+    # Asana report body is untouched.
+    _wl_t0 = time.time()
+    for _wl_done, name in enumerate(names):
+        if _wl_done and _wl_done % 100 == 0:
+            log(f"  watchlist pass: {_wl_done}/{len(names)} subjects "
+                f"({time.time() - _wl_t0:.0f}s elapsed)")
         arts = []
         for h in screen_name(name, wl):
             ent = h["matched_entry"]
