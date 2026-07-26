@@ -72,15 +72,28 @@ jobs:
         env:
           HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
           EVENT: ${{ github.event_name }}
+          # Self-diagnosis for the missing-secret path (4 identical failures,
+          # 25-26 Jul): print the NAMES of what actually exists so a typo, a
+          # save under the adjacent Variables tab, or an environment-scoped
+          # secret is visible in the log instead of another blind retry.
+          # Names only — key listings; secret VALUES are never printed (and
+          # registered values are log-masked anyway).
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+          VARS_JSON: ${{ toJSON(vars) }}
         run: |
           set -u
           if [ -z "${HOOK_URL:-}" ]; then
+            echo "Repository/organization SECRET names visible to this run:"
+            echo "$SECRETS_JSON" | python3 -c 'import json,sys; [print("  -", k) for k in sorted(json.load(sys.stdin))]' || true
+            echo "Repository/organization VARIABLE names visible to this run:"
+            echo "$VARS_JSON" | python3 -c 'import json,sys; [print("  -", k) for k in sorted(json.load(sys.stdin) or {})]' || true
+            echo "NETLIFY_BUILD_HOOK_URL is NOT among the secrets above. If it appears under VARIABLES, re-save it on the Secrets tab; if it appears under an ENVIRONMENT, re-save it as a Repository secret; if the spelling differs, rename it."
             if [ "$EVENT" = "push" ]; then
-              echo "::warning::NETLIFY_BUILD_HOOK_URL secret not set — skipping (registration push). Create a Netlify build hook for branch main and add it as that repo secret, then dispatch this workflow."
+              echo "::warning::NETLIFY_BUILD_HOOK_URL secret not set — skipping (push firing). See the name listing above."
               echo "kicked=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "::error::NETLIFY_BUILD_HOOK_URL secret not set. Netlify -> Site configuration -> Build & deploy -> Build hooks -> Add build hook (branch: main); save the URL as the NETLIFY_BUILD_HOOK_URL repository secret."
+            echo "::error::NETLIFY_BUILD_HOOK_URL secret not set — see the secret/variable name listing above for what this run could actually see. Netlify -> Site configuration -> Build & deploy -> Build hooks -> Add build hook (branch: main); save the URL as a REPOSITORY SECRET named NETLIFY_BUILD_HOOK_URL (Settings -> Secrets and variables -> Actions -> Secrets tab)."
             exit 1
           fi
           code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOOK_URL")
