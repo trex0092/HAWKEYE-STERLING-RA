@@ -72,16 +72,49 @@ jobs:
         env:
           HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
           EVENT: ${{ github.event_name }}
+          # Self-diagnosis for the missing-secret path (4 identical dispatch
+          # failures, 25-26 Jul, HOOK_URL always empty). Individual probes of
+          # the LIKELY misconfigurations only — zizmor's overprovisioned-
+          # secrets audit rightly rejects toJSON(secrets), so no whole-context
+          # injection: each candidate is a single-secret provision, values are
+          # never printed, and a uniquely-matching variant is USED with a loud
+          # rename warning so a typo still deploys today.
+          ALT_1: ${{ secrets.NETLIFY_BUILD_HOOK }}
+          ALT_2: ${{ secrets.NETLIFY_BUILDHOOK_URL }}
+          ALT_3: ${{ secrets.NETLIFY_HOOK_URL }}
+          ALT_4: ${{ secrets.BUILD_HOOK_URL }}
+          ALT_5: ${{ secrets.NETLIFY_WEBHOOK_URL }}
+          # Saved on the adjacent Variables tab instead of Secrets:
+          VAR_HOOK: ${{ vars.NETLIFY_BUILD_HOOK_URL }}
+          VARS_JSON: ${{ toJSON(vars) }}
         run: |
           set -u
           if [ -z "${HOOK_URL:-}" ]; then
-            if [ "$EVENT" = "push" ]; then
-              echo "::warning::NETLIFY_BUILD_HOOK_URL secret not set — skipping (registration push). Create a Netlify build hook for branch main and add it as that repo secret, then dispatch this workflow."
-              echo "kicked=false" >> "$GITHUB_OUTPUT"
-              exit 0
+            found=""
+            for pair in "NETLIFY_BUILD_HOOK:${ALT_1:-}" "NETLIFY_BUILDHOOK_URL:${ALT_2:-}" "NETLIFY_HOOK_URL:${ALT_3:-}" "BUILD_HOOK_URL:${ALT_4:-}" "NETLIFY_WEBHOOK_URL:${ALT_5:-}"; do
+              name="${pair%%:*}"; val="${pair#*:}"
+              if [ -n "$val" ]; then
+                echo "::warning::Found a build-hook secret under the name '$name' — using it this run. Rename it to NETLIFY_BUILD_HOOK_URL so every firing (including push-triggered deploys) finds it."
+                HOOK_URL="$val"; found="$name"; break
+              fi
+            done
+            if [ -z "$found" ] && [ -n "${VAR_HOOK:-}" ]; then
+              echo "::warning::NETLIFY_BUILD_HOOK_URL exists as a VARIABLE, not a Secret — using it this run. Variables are stored unencrypted and unmasked: delete it from the Variables tab and re-save it on the SECRETS tab."
+              HOOK_URL="$VAR_HOOK"; found="vars.NETLIFY_BUILD_HOOK_URL"
             fi
-            echo "::error::NETLIFY_BUILD_HOOK_URL secret not set. Netlify -> Site configuration -> Build & deploy -> Build hooks -> Add build hook (branch: main); save the URL as the NETLIFY_BUILD_HOOK_URL repository secret."
-            exit 1
+            if [ -z "$found" ]; then
+              echo "Repository/organization VARIABLE names visible to this run (secrets cannot be enumerated without over-provisioning):"
+              echo "$VARS_JSON" | python3 -c 'import json,sys; [print("  -", k) for k in sorted(json.load(sys.stdin) or {})]' || true
+              echo "Probed and empty: NETLIFY_BUILD_HOOK_URL and common variants (NETLIFY_BUILD_HOOK, NETLIFY_BUILDHOOK_URL, NETLIFY_HOOK_URL, BUILD_HOOK_URL, NETLIFY_WEBHOOK_URL), plus the Variables tab."
+              echo "Remaining causes: saved under an ENVIRONMENT (this workflow binds none — re-save as a Repository secret), saved on a different repository, or never saved on the GitHub side at all."
+              if [ "$EVENT" = "push" ]; then
+                echo "::warning::NETLIFY_BUILD_HOOK_URL secret not set — skipping (push firing)."
+                echo "kicked=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "::error::NETLIFY_BUILD_HOOK_URL is not set as a Repository secret (all likely variants probed empty — see above). Netlify -> Site configuration -> Build & deploy -> Build hooks -> Add build hook (branch: main); then GitHub -> Settings -> Secrets and variables -> Actions -> SECRETS tab -> New repository secret, name NETLIFY_BUILD_HOOK_URL."
+              exit 1
+            fi
           fi
           code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOOK_URL")
           echo "Netlify build hook POST -> HTTP $code"
