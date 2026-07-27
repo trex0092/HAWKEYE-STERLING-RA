@@ -10,6 +10,51 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening engine: six silent-false-negative extraction/loading gaps closed (2026-07-27)
+
+The full-screening correctness audit's pipeline pass found the engine's
+matcher sound but its NAME EXTRACTION and one list-loading edge able to
+clear subjects silently. All fixed, each with a regression test that fails
+against the prior code:
+
+- **Mixed-script names** — `"محمد صالح TRADING LLC"` normalizes to its Latin
+  residue (`"TRADING LLC"`), which passed the old ≥4-char screenability test
+  and fuzzy-matched boilerplate only, clearing the customer while the
+  all-Latin transliteration of the same name hits. Any name whose letters
+  are partly LOST by `normalize()` now also surfaces a MANUAL REVIEW hit
+  (`_lost_script_letters`), for sanctions and for PEP (`check_pep`).
+  Diacritic Latin (Müller/İnönü) folds cleanly and is not flagged.
+- **Extractor either/or** — one recognised SECTION-4 block suppressed the
+  regex `Name:` extractor entirely (`struct or regex`), so a `Name:` line in
+  SECTION 5 or under a drifted header was never screened. Now a UNION of
+  structured parse + regex extractor + owner-line individuals, deduped
+  case/diacritic-insensitively (`_individuals_union`).
+- **Owner lines naming non-corporate parties** — `"UBO: John Smith"` (no
+  separate `Name:` line) or an unincorporated designated org
+  (`"UBO: Islamic Revolutionary Guard Corps Quds Force"`) was dropped by
+  BOTH extractors. New `extract_owner_individuals` screens them with
+  control linkage.
+- **En-dash separator** — `"UBO – Acme Holdings LLC"` (U+2013, the
+  word-processor auto-conversion kyc.py already handles for its own
+  headers) extracted nothing; the owner separator class now carries it.
+- **Latin-only `Name:` pattern** — non-Latin `Name:` lines matched nothing,
+  so those subjects bypassed extraction AND the manual-review net. The
+  capture is now script-agnostic (guards unchanged), and inline commas no
+  longer lose the whole line.
+- **SKIP_TOKENS substring filter** — `"LLC" in "WILLCOX"` silently dropped
+  real people; skip tokens now match on token boundaries only.
+- **OFAC alias-only coverage** — with `sdn.csv` AND its mirror both down,
+  folding `alt.csv` anyway left ~17k alias-only names — above the 9,000
+  coverage floor, so the run read "OFAC SDN: OK" while every primary SDN
+  name went unscreened. Aliases now fold into a LOADED primary only
+  (`_fold_ofac_aliases`); an unloaded primary stays empty for the floor
+  machinery to classify honestly (both load paths).
+- **Legacy delivery gates** — manual-dispatch `full_batch` /
+  `weekly_adverse` runs logged a failed Asana post and exited 0 (green,
+  nothing delivered — the 2026-07-16 class the unified path already gates).
+  Their posters now arm the same delivery gate (exit 5), and a failed
+  confirmed-hit comment logs loudly instead of vanishing.
+
 ### Matcher: stale-norms guard on the prefilter cache (2026-07-27)
 
 A full-screening correctness audit re-verified the C-side prefilter's

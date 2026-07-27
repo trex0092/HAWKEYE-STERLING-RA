@@ -97,6 +97,85 @@ _pm_e, _clr_e = screen.screen_customers(
     [{"name": "Clean Trading DMCC", "individuals": [], "entity_owners": ["Rosneft Holding LLC"], "permalink": "x"}], _ec)
 check("a designated corporate owner flags the customer by control linkage",
       len(_pm_e) == 1 and any(h["subject_type"].startswith("ENTITY (owner)") and h["control_linkage"] for h in _pm_e[0]["hits"]))
+
+# ── full-screening audit regressions: extraction & the unscreenable net ───────
+print("screen.py — extraction & unscreenable-net regressions")
+# Mixed-script subject: normalize() strips the Arabic letters, leaving only the
+# Latin boilerplate residue — which previously screened (and cleared) alone,
+# while the all-Latin transliteration of the same name hits. A manual-review
+# hit must now ride alongside whatever the residue matches.
+_mix_lists = {"UN Consolidated": [(screen.normalize("MOHAMED SALAH AL ZAWARI TRADING LLC"),
+                                   "MOHAMED SALAH AL ZAWARI TRADING LLC")]}
+_pm_mix, _ = screen.screen_customers(
+    [{"name": "محمد صالح الزواري TRADING LLC", "individuals": [], "entity_owners": [], "permalink": "x"}],
+    _mix_lists)
+check("mixed-script customer name surfaces MANUAL REVIEW, never a silent clear",
+      len(_pm_mix) == 1 and any(h.get("unscreenable") for h in _pm_mix[0]["hits"]))
+check("Arabic-script letters count as lost by the normalizer",
+      screen._lost_script_letters("محمد صالح TRADING LLC"))
+check("diacritic Latin (Müller/İnönü) folds cleanly — NOT flagged for review",
+      not screen._lost_script_letters("Müller İnönü Trading LLC"))
+check("pure ASCII names are NOT flagged for script review",
+      not screen._lost_script_letters("Acme General Trading LLC"))
+check("mixed-script names also route to manual PEP review (not silent 'no PEP')",
+      screen.check_pep("محمد صالح TRADING LLC").get("review") is True)
+# Union of extractors: a recognised structured block must not hide Name: lines
+# elsewhere in the note (the old `structured or regex` either/or did).
+_union_notes = ("SECTION 4 — IDENTIFICATION\n"
+                "Individual 1 — Shareholder\nName: Jane Rivera\nNationality: US\n"
+                "SECTION 5 — OTHER PARTIES\nName: Viktor Bout\nNationality: RU\n"
+                + "x" * 80)
+_union = screen._individuals_union(["Jane Rivera"], _union_notes)
+check("extractor union keeps structured AND stray Name: lines (Viktor Bout screened)",
+      "Jane Rivera" in _union and any("Viktor Bout" in n for n in _union))
+check("extractor union dedupes case/diacritic-insensitively",
+      sum(1 for n in _union if screen._norm_lower(n) == "jane rivera") == 1)
+# Owner-line separator drift: the en-dash (U+2013, word-processor auto-convert)
+# must extract like colon/hyphen/em-dash.
+check("en-dash owner separator extracts the corporate owner",
+      screen.extract_entity_owners("Ultimate Beneficial Owner – Al Qaeda Holdings LLC")
+      == ["Al Qaeda Holdings LLC"])
+# Owner lines naming a party WITHOUT a corporate token were dropped by BOTH
+# extractors (extract_individuals only reads Name: lines) — never screened.
+check("owner-line natural person is extracted for screening",
+      screen.extract_owner_individuals("UBO: John Smith\nParent Company: Acme Group FZE")
+      == ["John Smith"])
+check("owner-line unincorporated designated org is extracted for screening",
+      screen.extract_owner_individuals("UBO: Islamic Revolutionary Guard Corps Quds Force")
+      == ["Islamic Revolutionary Guard Corps Quds Force"])
+check("owner-line placeholders (N/A, pending, dashes) are not subjects",
+      screen.extract_owner_individuals("UBO: N/A\nShareholder: pending\nOwner: ———")
+      == [])
+check("owner-line share percentages are stripped, not name-corrupting",
+      screen.extract_owner_individuals("Shareholder (60%): John Smith (60%)")
+      == ["John Smith"])
+# SKIP_TOKENS must match on token boundaries: 'LLC' skips 'ACME LLC' but not
+# the surname 'WILLCOX' (the old substring test silently dropped the person).
+_willcox_notes = "Name: John Willcox\nNationality: GB\nName: Acme L.L.C\n" + "x" * 80
+_wx = screen.extract_individuals(_willcox_notes)
+check("surname embedding a legal-form fragment is still screened (Willcox)",
+      "John Willcox" in _wx)
+check("a real legal-form token still skips the corporate line",
+      not any("L.L.C" in n for n in _wx))
+# Non-Latin Name: lines must be EXTRACTED so they reach the manual-review net
+# (the old Latin-only char class matched nothing, bypassing the net entirely).
+_ar_notes = "SECTION X\nName: محمد صالح الزواري\nNationality: TN\n" + "x" * 80
+check("non-Latin Name: line is extracted (feeds the manual-review net)",
+      any("محمد" in n for n in screen.extract_individuals(_ar_notes)))
+# Inline commas no longer lose the whole line (the old class could not span
+# them and extracted NOTHING for "Name: John Smith, Director").
+check("a Name: line with an inline comma still extracts",
+      any("John Smith" in n for n in screen.extract_individuals(
+          "Name: John Smith, Director\nNationality: GB\n" + "x" * 80)))
+# OFAC alias fold: aliases broaden a LOADED primary only. Alias-only coverage
+# (primary + mirror both down) previously passed the 9,000 floor and read
+# "OFAC SDN: OK" while every primary SDN name went unscreened.
+_alt_bytes = b'101,1,aka,"ACME LAUNDERING LLC",strong\n'
+check("aliases never masquerade as OFAC coverage when the primary failed",
+      screen._fold_ofac_aliases(set(), _alt_bytes) == set())
+check("aliases still fold into a loaded primary",
+      screen._fold_ofac_aliases({"REAL PRIMARY NAME"}, _alt_bytes)
+      == {"REAL PRIMARY NAME", "ACME LAUNDERING LLC"})
 # PEP: a non-Latin-only name is surfaced for manual review, never a silent "no PEP".
 _pep_nl = screen.check_pep("محمد عبدالله")
 check("non-Latin PEP name is surfaced for manual review (not silently cleared)",
@@ -1594,6 +1673,21 @@ finally:
     screen.DELIVERY_HARD_FAIL = _prev_hard_fail
     screen.UNIFIED_DELIVERY_FAILED["failed"] = False
 check("delivery gate exits 5 when the unified task was never created", _gate_code == 5)
+# The LEGACY posters must arm the same gate: full_batch / weekly_adverse runs
+# previously logged a failed Asana post and exited 0 — a green run that
+# delivered nothing (the exact 2026-07-16 class, on the manual-dispatch paths).
+import datetime as _dt
+_orig_asana_request = screen.asana_request
+screen.asana_request = lambda *a, **k: None      # every post fails
+try:
+    screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+    screen.post_daily_task("narrative", _dt.datetime(2026, 7, 27, 9, 0), "Manual Run", 0)
+    _armed_daily = screen.UNIFIED_DELIVERY_FAILED["failed"]
+finally:
+    screen.asana_request = _orig_asana_request
+    screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+check("legacy daily post failure arms the delivery gate (no more green no-delivery)",
+      _armed_daily)
 
 # ── screen.py: adaptive notes budget (learned across runs via delta-state) ───
 # 2026-07-17: even the numeric-entity worst case at 65,000 bytes was rejected
