@@ -1280,6 +1280,27 @@ _un_names, _un_date, _un_sig = screen.parse_un(_laughs)
 check("parse_un degrades safely on a DTD payload (no crash, no names)", _un_names == set())
 _ca_names, _ca_status, _ca_sig = screen.parse_canada(_xxe)
 check("parse_canada degrades safely on a DTD payload (no crash, no names)", _ca_names == set())
+# SEMA aliases (regression: never captured — an alias-only match screened clear
+# against this supplementary list). Both published shapes must parse.
+_ca_alias_xml = (b"<?xml version='1.0'?><data-set>"
+                 b"<record><Entity>ACME SHIPPING LLC</Entity>"
+                 b"<Aliases>ACME MARITIME; AL-ACME LINES</Aliases></record>"
+                 b"<record><GivenName>Ivan</GivenName><LastName>Petrov</LastName>"
+                 b"<Aliases><Alias>Ivan the Wolf</Alias><Alias>I. Petroff</Alias></Aliases></record>"
+                 b"<record><Aliases>ORPHAN ALIAS</Aliases></record>"
+                 b"<record><Entity>PLACEHOLDER CO</Entity><Aliases>n/a</Aliases></record>"
+                 b"</data-set>")
+_ca_n, _ca_s, _ = screen.parse_canada(_ca_alias_xml)
+check("SEMA semicolon-form aliases are screened",
+      {"ACME MARITIME", "AL-ACME LINES"} <= _ca_n)
+check("SEMA nested <Alias> elements are screened",
+      {"Ivan the Wolf", "I. Petroff"} <= _ca_n)
+check("SEMA primary entity/person names still parse alongside aliases",
+      "ACME SHIPPING LLC" in _ca_n and "Ivan Petrov" in _ca_n and _ca_s == "live")
+check("an alias block with no primary record name cannot inject names",
+      "ORPHAN ALIAS" not in _ca_n)
+check("placeholder alias values (n/a) are not screened as names",
+      "n/a" not in _ca_n and not any(x.lower() == "n/a" for x in _ca_n))
 
 print("screen — list-entry adjudication attributes (DOB/nationality context)")
 screen.LIST_ENTRY_ATTRS.clear()
@@ -1728,6 +1749,81 @@ _state = {"somefingerprint": "2020-01-01", screen.NOTES_BUDGET_KEY: 39000}
 screen.prune_delta_state(_state, _dt_budget.date(2026, 7, 17))
 check("prune drops stale fingerprints but keeps the reserved budget key",
       "somefingerprint" not in _state and _state.get(screen.NOTES_BUDGET_KEY) == 39000)
+
+# ── MLRO case backlog: overflow/failed items are cased LATER, not never ──────
+print("screen.py — case-cap overflow backlog")
+check("the backlog delta-state key can never collide with a fingerprint",
+      screen.CASE_BACKLOG_KEY.startswith("__meta_"))
+_state_bl = {"somefingerprint": "2020-01-01",
+             screen.CASE_BACKLOG_KEY: [{"p": 0, "name": "x", "notes": "y", "queued": "2026-07-20"}]}
+screen.prune_delta_state(_state_bl, _dt_budget.date(2026, 7, 17))
+check("prune keeps the reserved backlog key",
+      isinstance(_state_bl.get(screen.CASE_BACKLOG_KEY), list))
+check("malformed backlog state degrades to empty, never a crash",
+      screen.load_case_backlog({screen.CASE_BACKLOG_KEY: "garbage"}) == []
+      and screen.load_case_backlog({screen.CASE_BACKLOG_KEY: [{"notes": 1}, None]}) == []
+      and screen.load_case_backlog({}) == [])
+
+def _bl_match(name, score=90):
+    return {"name": name, "permalink": "", "hits": [
+        {"is_new": True, "score": score, "list": "OFAC SDN", "subject_type": "ENTITY",
+         "subject_name": name, "matched_entry": "ENTRY", "confidence": "STRONG"}]}
+
+_bl_created = []
+_orig_create_case = screen.create_case_subtask
+screen.create_case_subtask = lambda parent, nm, notes, due: (_bl_created.append((nm, notes)), True)[1]
+_orig_cap = screen.CASE_SUBTASK_CAP
+screen.CASE_SUBTASK_CAP = 2
+_bl_run_time = _dt_budget.datetime(2026, 7, 27, 9, 0)
+try:
+    # Run 1: four new items, cap 2 → two cased, two carried in state.
+    _st = {}
+    _n = screen.open_mlro_cases("parent-gid", [_bl_match(f"Firm {i}") for i in range(4)],
+                                [], [], _bl_run_time, state=_st)
+    _carried = screen.load_case_backlog(_st)
+    check("cap overflow lands in the reserved backlog, not the void",
+          _n == 2 and len(_bl_created) == 2 and len(_carried) == 2
+          and all(e["queued"] == "2026-07-27" for e in _carried))
+    # Run 2 (next day): no new items → the backlog drains, with provenance.
+    _bl_created.clear()
+    _n2 = screen.open_mlro_cases("parent-gid", [], [], [],
+                                 _dt_budget.datetime(2026, 7, 28, 9, 0), state=_st)
+    check("a later run with free capacity drains the backlog (cased later, not never)",
+          _n2 == 2 and len(_bl_created) == 2
+          and all("backlogged since the 2026-07-27 run" in notes for _, notes in _bl_created)
+          and screen.load_case_backlog(_st) == [])
+    # Priority: a carried sanctions case (older queued date) beats today's new one.
+    _st2 = {screen.CASE_BACKLOG_KEY: [{"p": 0, "name": "🔴 SANCTIONS case: Old Carried — OFAC SDN 90%",
+                                       "notes": "old", "queued": "2026-07-20"}]}
+    _bl_created.clear()
+    screen.open_mlro_cases("parent-gid", [_bl_match("Today New")], [], [], _bl_run_time, state=_st2)
+    check("backlogged sanctions items outrank today's within the cap (oldest first)",
+          len(_bl_created) == 2 and "Old Carried" in _bl_created[0][0]
+          and "Today New" in _bl_created[1][0])
+    # A failed create with a live parent is retried from the backlog next run.
+    screen.create_case_subtask = lambda parent, nm, notes, due: False
+    _st3 = {}
+    _n3 = screen.open_mlro_cases("parent-gid", [_bl_match("Flaky Create")], [], [], _bl_run_time, state=_st3)
+    check("a failed subtask create is carried to the backlog for retry",
+          _n3 == 0 and len(screen.load_case_backlog(_st3)) == 1)
+    # No parent (delivery failed): nothing cased, and the state must NOT gain a
+    # backlog — the run's items re-alert as new next run anyway.
+    _st4 = {}
+    screen.open_mlro_cases(None, [_bl_match("No Parent")], [], [], _bl_run_time, state=_st4)
+    check("no delivery → no backlog write (items re-alert as new next run)",
+          screen.CASE_BACKLOG_KEY not in _st4)
+    # Same-name dedup: an item re-listed today never duplicates its carried copy.
+    screen.create_case_subtask = lambda parent, nm, notes, due: (_bl_created.append((nm, notes)), True)[1]
+    _bl_created.clear()
+    _dup_name = "🔴 SANCTIONS case: Firm 0 — OFAC SDN 90%"
+    _st5 = {screen.CASE_BACKLOG_KEY: [{"p": 0, "name": _dup_name, "notes": "old", "queued": "2026-07-20"}]}
+    screen.open_mlro_cases("parent-gid", [_bl_match("Firm 0")], [], [], _bl_run_time, state=_st5)
+    check("a re-listed item dedupes against its carried backlog copy (one case, not two)",
+          sum(1 for nm, _ in _bl_created if nm == _dup_name) == 1
+          and screen.load_case_backlog(_st5) == [])
+finally:
+    screen.create_case_subtask = _orig_create_case
+    screen.CASE_SUBTASK_CAP = _orig_cap
 
 print()
 if _fail:

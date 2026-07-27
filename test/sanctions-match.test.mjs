@@ -4,7 +4,7 @@ import {
   normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseOfacAltCsv, parseOfacXml, parseUnXml, parseOfsiCsv,
   parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName, nameVariants, indelRatio, tokenSetRatio, isTokenSubset,
-  MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters,
+  MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters, trigramsOf, fuzzyTokenMatches,
   unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList
 } from '../scripts/sanctions-match.mjs';
 import { deflateRawSync } from 'node:zlib';
@@ -267,6 +267,43 @@ check('subset gate flags the patronymic-chain case at its conservative score',
   usama.hitCount === 1 && usama.topScore < 85 && usama.recommendation === 'sanctions-match');
 check('a single shared token can never subset-flag (Sberbank stays clear)',
   screenName('Sberbank', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['SBERBANK OF RUSSIA'] }]), 85).hitCount === 0);
+
+/* ── fuzzy candidate blocking (regression: a subject whose EVERY significant
+   token carries an out-of-transliteration-group typo shared no exact token
+   with its designated entry — no candidates, silent clear at topScore 0, even
+   though the pair scores ≥85 once actually compared) ── */
+check('trigramsOf pads the token edges and is unique + deterministic',
+  trigramsOf('putin').join('|') === '^pu|put|uti|tin|in$' && trigramsOf('aaaa').join('|') === '^aa|aaa|aa$');
+const fbIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['VLADIMIR PUTIN', 'MUHAMMAD HUSSEIN', 'ABDULLAH KADYROV'] }]);
+check('fuzzyTokenMatches admits single-edit tokens via the prefix+length key (putyn → putin)',
+  fuzzyTokenMatches('putyn', fbIdx).join() === 'putin' && fuzzyTokenMatches('vladimyr', fbIdx).join() === 'vladimir');
+check('fuzzyTokenMatches admits a first-letter typo via the trigram path (wladimir → vladimir)',
+  fuzzyTokenMatches('wladimir', fbIdx).join() === 'vladimir');
+check('fuzzyTokenMatches returns nothing for unrelated or exact tokens',
+  fuzzyTokenMatches('zzz', fbIdx).length === 0 && fuzzyTokenMatches('putin', fbIdx).length === 0);
+const vp = screenName('Vladimyr Putyn', fbIdx, 85);
+check('1-char-typo-in-every-token subject now flags (was a silent clear at 0)',
+  vp.hitCount === 1 && vp.topScore >= 85 && vp.recommendation === 'sanctions-match');
+const ak = screenName('Abdulah Kadirov', fbIdx, 85);
+check('a second every-token-typo subject flags through the same path',
+  ak.hitCount === 1 && ak.topScore >= 85);
+/* Candidates alone never lower the score bar: a 2+-edit-per-token pair scores
+   68.8 on the unchanged scorers and MUST stay clear (blocking is candidate
+   recall only, precision comes from the same ≥85 gate as before). */
+check('a multi-edit pair below the threshold stays clear (blocking never over-flags)',
+  screenName('Muhamet Huseinn', fbIdx, 85).hitCount === 0);
+check('unrelated names still clear with the blocking index present',
+  screenName('Helga Andersen Bakery', fbIdx, 85).hitCount === 0
+  && screenName('Helga Andersen Bakery', fbIdx, 85).recommendation === 'clear');
+/* Over-cap (very common) fuzzy buckets are a LAST resort: still reachable when
+   the subject has no other candidate path, so a typo'd very common name is not
+   silently cleared by the common-token cap. */
+const commonNames = ['MOHAMMED'];
+for (let i = 0; i < 2501; i++) commonNames.push('MOHAMMED FILLER' + i);
+const commonIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: commonNames }]);
+const mx = screenName('Mohammex', commonIdx, 85);
+check('a typo\'d very common token still finds its entries via the last-resort fallback',
+  mx.hitCount >= 1 && mx.topScore >= 85);
 
 /* ── manual-review routing (screen.py _unscreenable parity; regression: a name
    with no distinctive tokens had no candidate path and silently cleared) ── */

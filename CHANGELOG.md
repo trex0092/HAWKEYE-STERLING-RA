@@ -10,6 +10,64 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### JS engine follow-up: cleared-case reopen, fuzzy candidate blocking, empty-key dedupe (2026-07-27)
+
+- **Cleared cases reopen on a re-flag** (owner-authorized design change — the
+  old "manual reopen by design" pin is superseded): a subject re-flagged after
+  its case was cleared now gets a FRESH case with an SLA restarting from the
+  re-flag day, a "⚠ RE-FLAGGED AFTER CLEARANCE" banner linking the prior case
+  and its cleared date, and state replaced wholesale (`reopenedFrom`/
+  `reopenedAt` provenance) so aging restarts cleanly and a second clearance +
+  third re-flag works identically. The daily digest resolves the subject to
+  the NEW open case, not the old completed one. Rationale: the shipped config
+  suppresses alerts, so the case board is the only delivery surface — a
+  re-listed customer with no open case was a dropped-review risk.
+- **Fuzzy candidate blocking** — the matcher's exact-token candidate index is
+  now backed by trigram and prefix+length posting lists: a subject token with
+  NO exact bucket admits near-tokens verified at `levenshtein ≤ 1` or
+  InDel ≥ 88 ("Vladimyr Putyn" → flags at 86; "Wladimir Putin" → 93; both
+  silently cleared before). Hot path unchanged within +0.8% (measured, 89k
+  entries); recall-monotone; over-cap buckets used only as a last resort.
+  Honest bound, pinned as a negative test: a name ≥2 edits off in every
+  token still scores under the 85 gate and clears — recorded on the model
+  card.
+- **Empty-key dedupe** — two distinct symbol-only/unscreenable customers
+  previously shared the empty normalization key and the second was dropped
+  before screening; empty-normalization subjects now key on their raw name
+  (collision-proof `raw:` prefix) and each surfaces its own MANUAL REVIEW row.
+
+### Screening follow-up: case backlog, SEMA aliases, fallback matcher parity (2026-07-27)
+
+Round two of the full-screening correctness audit — the items deferred for an
+owner decision, now authorized:
+
+- **MLRO case backlog** — items past `CASE_SUBTASK_CAP` (40/run), and items
+  whose Asana subtask create failed, used to get a log line and nothing else:
+  the delta engine marked them standing, so they never re-entered the case
+  queue — reported once, cased never. They now ride a reserved backlog key in
+  the delta state (`__meta_case_backlog__`, same pattern as the notes-budget
+  key: survives pruning, persisted only on delivery) and drain on later runs
+  whenever the day's NEW items leave capacity free — sanctions first, oldest
+  first, with "(backlogged since …)" provenance on the case, same-name dedup
+  against re-listed items, and a LOUD bound at 400 carried items.
+- **Canada SEMA aliases** — `parse_canada` captured no `<Aliases>` content, so
+  a party operating under a SEMA-listed a.k.a. screened clear against this
+  supplementary list. Both published shapes now parse (nested `<Alias>`
+  elements and flat semicolon-separated text), gated on the record carrying a
+  primary name and filtered for placeholders.
+- **Retired fallback workflow uses the real matcher** — the manual-dispatch
+  `daily-sanctions-screen.yml` carried its own inline matcher (token_sort
+  top-3, break on first hit, no core/subset/short-entry gates, no
+  transliteration variants): a fallback that could clear names the daily
+  engine flags, on exactly the days it would be dispatched. Its screening
+  step now imports the engine and screens through `screen_name` (same gates,
+  same C prefilter, placeholder `ASANA_TOKEN` at import — the step never
+  calls Asana), keeps the results-file schema, surfaces unscreenable names as
+  MANUAL REVIEW rows, and reserves "confirmed" for genuine exact (≥100)
+  matches. Verified end-to-end offline against the in-repo EOCN list
+  (exact → confirmed 100, transliteration variant → potential 96,
+  Arabic-only → MANUAL REVIEW, unrelated → clear, outage degrade intact).
+
 ### JS sanctions engine: four silent-clear classes closed, unscreened days go red (2026-07-27)
 
 The full-screening correctness audit's JS pass found the daily case engine

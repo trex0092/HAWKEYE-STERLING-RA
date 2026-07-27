@@ -56,7 +56,14 @@ export function caseTitle(key, s) {
 }
 
 /* Pure planner: decide every case action from plain data.
-     create — subject flagged today, no case yet
+     create — subject flagged today, no case yet; OR re-flagged after its case
+              was cleared (owner-authorized design change: in the shipped
+              case-engine config alerts are suppressed, so the case board is
+              the ONLY delivery surface — a re-listed customer must get a
+              fresh OPEN case, not a digest line pointing at a completed one).
+              A re-flag create carries priorCase {taskGid, clearedAt} so the
+              new case references the history ("re-flagged after clearance"
+              is investigation-relevant).
      age    — case open past the SLA, aging comment not yet posted
      clear  — subject no longer flagged today (or gone from the registry)
    Nothing is planned for under-review/escalated moves — those are human. */
@@ -69,6 +76,13 @@ export function planCaseActions(subjects, casesState, today) {
     const active = s.lastSeen === today;
     if (active && !cs) {
       actions.push({ type: 'create', key, subject: s, dueOn: addDays(s.firstSeen || today, CASE_SLA_DAYS) });
+    } else if (active && cs && cs.cleared) {
+      /* RE-FLAGGED after clearance → a fresh case. SLA restarts from the
+         re-flag day (today), and the executor REPLACES the cleared state
+         entry (newCaseStateEntry) so aging restarts cleanly and a later
+         clearance + third re-flag runs through this same branch again. */
+      actions.push({ type: 'create', key, subject: s, dueOn: addDays(today, CASE_SLA_DAYS),
+        priorCase: { taskGid: cs.taskGid || null, clearedAt: cs.clearedAt || null } });
     } else if (active && cs && !cs.cleared) {
       const age = ageInDays(s.firstSeen || cs.createdAt, today);
       if (!cs.agingAlerted && age > CASE_SLA_DAYS) {
@@ -84,7 +98,17 @@ export function planCaseActions(subjects, casesState, today) {
   return actions;
 }
 
-export function caseHtml(key, s, runLink) {
+/* The state entry recorded for a just-created case. A re-flag create REPLACES
+   the cleared entry wholesale — carrying reopenedFrom/reopenedAt — so the SLA
+   and the one-shot aging alert restart cleanly, and the digest's caseGidFor
+   resolves the subject to the NEW open case, never the old completed one. */
+export function newCaseStateEntry(gid, today, priorCase) {
+  const entry = { taskGid: gid, createdAt: today, agingAlerted: false, cleared: false };
+  if (priorCase && priorCase.taskGid) { entry.reopenedFrom = priorCase.taskGid; entry.reopenedAt = today; }
+  return entry;
+}
+
+export function caseHtml(key, s, runLink, priorCase) {
   const customerGid = String(key).split('|')[2] || '';
   const h = ['<body>'];
   h.push('<h1>Screening case — ' + esc(s.name || 'unknown') + '</h1>');
@@ -95,6 +119,14 @@ export function caseHtml(key, s, runLink) {
   h.push('<li><strong>Matched on:</strong> ' + esc((s.lists || []).join(', ') || 'see screening record') + '</li>');
   h.push('<li><strong>First flagged:</strong> ' + esc(s.firstSeen || '?') + ' — SLA: review within ' + CASE_SLA_DAYS + ' days</li>');
   if (customerGid) h.push('<li><strong>Customer record:</strong> <a data-asana-gid="' + esc(customerGid) + '"/></li>');
+  /* Re-flag provenance: a subject returning to the lists after a clearance is
+     investigation-relevant — the MLRO must see the prior case and when it was
+     cleared, not treat this as a first-time flag. */
+  if (priorCase && priorCase.taskGid) {
+    h.push('<li><strong>⚠ RE-FLAGGED AFTER CLEARANCE:</strong> prior case <a data-asana-gid="' + esc(priorCase.taskGid) + '"/>'
+      + (priorCase.clearedAt ? ' (cleared ' + esc(priorCase.clearedAt) + ')' : '')
+      + ' — review the prior disposition before clearing again.</li>');
+  }
   h.push('</ul>');
   h.push('<h2>Lifecycle</h2>');
   h.push('<ol><li>Move to <strong>Under Review</strong> when work starts (manual).</li>'
@@ -221,7 +253,7 @@ async function main() {
           method: 'POST',
           body: JSON.stringify({ data: {
             name: caseTitle(a.key, a.subject).slice(0, 250),
-            html_notes: caseHtml(a.key, a.subject, link),
+            html_notes: caseHtml(a.key, a.subject, link, a.priorCase),
             due_on: a.dueOn || addDays(today, CASE_SLA_DAYS),
             assignee,
             projects: [projectGid],
@@ -229,8 +261,11 @@ async function main() {
           } })
         });
         const gid = d.data && d.data.gid;
-        casesState[a.key] = { taskGid: gid, createdAt: today, agingAlerted: false, cleared: false };
-        console.log('  created case ' + caseTitle(a.key, a.subject) + (d.data && d.data.permalink_url ? ' — ' + d.data.permalink_url : ''));
+        /* REPLACES a cleared entry on a re-flag, so the digest's caseGidFor
+           resolves to this new open case and the SLA/aging restart cleanly. */
+        casesState[a.key] = newCaseStateEntry(gid, today, a.priorCase);
+        console.log('  ' + (a.priorCase ? 're-opened (fresh case after clearance — prior ' + a.priorCase.taskGid + ') ' : 'created case ')
+          + caseTitle(a.key, a.subject) + (d.data && d.data.permalink_url ? ' — ' + d.data.permalink_url : ''));
       } else if (a.type === 'age') {
         await asana('/tasks/' + a.caseGid + '/stories', {
           method: 'POST',

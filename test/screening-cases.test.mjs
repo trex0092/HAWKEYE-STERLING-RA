@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, CASE_SECTIONS, buildResultsDigestHtml, resultsDigestTitle } from '../scripts/screening-cases.mjs';
+import { planCaseActions, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, CASE_SECTIONS, buildResultsDigestHtml, resultsDigestTitle } from '../scripts/screening-cases.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -61,12 +61,62 @@ check('a cleared case never re-acts', (() => {
   return a.length === 0;
 })());
 
-check('a re-flagged subject after clearance stays with the closed case (manual reopen by design)', (() => {
-  /* cleared case + subject flagged again today → planner treats it as active
-     with an existing (cleared) case: current design keeps the old case closed
-     and creates nothing — verify no clear/age fires on a cleared case. */
-  const a = planCaseActions({ [KEY]: subj() }, { [KEY]: { taskGid: 't1', cleared: true } }, TODAY);
-  return a.length === 0; /* documented: manual reopen if the same standing match returns */
+check('a re-flagged subject after clearance gets a FRESH case referencing the prior one', (() => {
+  /* DESIGN CHANGE (owner-authorized): this used to pin "stays with the closed
+     case (manual reopen by design)". In the shipped case-engine config alerts
+     are suppressed, so the case board is the ONLY delivery surface — the old
+     behavior left a re-listed customer with just a digest line pointing at a
+     COMPLETED case (no open case, no SLA, no assignee). Now the planner
+     creates a fresh case, due today+SLA, carrying priorCase {taskGid,
+     clearedAt} so the new card references the history. */
+  const a = planCaseActions({ [KEY]: subj() }, { [KEY]: { taskGid: 't1', cleared: true, clearedAt: '2026-07-01' } }, TODAY);
+  return a.length === 1 && a[0].type === 'create' && a[0].dueOn === addDays(TODAY, CASE_SLA_DAYS)
+    && a[0].priorCase && a[0].priorCase.taskGid === 't1' && a[0].priorCase.clearedAt === '2026-07-01';
+})());
+
+check('re-flag create REPLACES the cleared state entry — SLA/aging restart, digest resolves the NEW case', (() => {
+  /* Simulate the executor: the plan's create lands as a fresh open entry via
+     newCaseStateEntry, so caseGidFor (casesState[key].taskGid) now yields the
+     NEW case gid — the audit found the digest linking the old completed one. */
+  const cases = { [KEY]: { taskGid: 't1', cleared: true, clearedAt: '2026-07-01', agingAlerted: true } };
+  const a = planCaseActions({ [KEY]: subj() }, cases, TODAY)[0];
+  cases[a.key] = newCaseStateEntry('t2', TODAY, a.priorCase);
+  const caseGidFor = k => (cases[k] || {}).taskGid || null;
+  return caseGidFor(KEY) === 't2' && cases[KEY].cleared === false && cases[KEY].agingAlerted === false
+    && cases[KEY].createdAt === TODAY && cases[KEY].reopenedFrom === 't1' && cases[KEY].reopenedAt === TODAY;
+})());
+
+check('second clearance then THIRD re-flag runs the same reopen path against the second case', (() => {
+  const cases = { [KEY]: { taskGid: 't1', cleared: true, clearedAt: '2026-06-30' } };
+  /* re-flag #1 → fresh case t2 replaces t1's cleared entry */
+  const a1 = planCaseActions({ [KEY]: subj() }, cases, TODAY)[0];
+  cases[a1.key] = newCaseStateEntry('t2', TODAY, a1.priorCase);
+  /* subject drops off again → auto-clear t2 (simulated as the executor does) */
+  const a2 = planCaseActions({ [KEY]: subj({ lastSeen: TODAY }) }, cases, '2026-07-10');
+  if (!(a2.length === 1 && a2[0].type === 'clear' && a2[0].caseGid === 't2')) return false;
+  cases[KEY] = { ...cases[KEY], cleared: true, clearedAt: '2026-07-10' };
+  /* re-flag #2 → a third fresh case referencing t2, not t1 */
+  const a3 = planCaseActions({ [KEY]: subj({ lastSeen: '2026-07-15' }) }, cases, '2026-07-15');
+  return a3.length === 1 && a3[0].type === 'create'
+    && a3[0].priorCase.taskGid === 't2' && a3[0].priorCase.clearedAt === '2026-07-10';
+})());
+
+check('a still-OPEN case is never duplicated by the reopen path', (() => {
+  const fresh = subj({ firstSeen: '2026-07-05' });
+  const a = planCaseActions({ [KEY]: fresh }, { [KEY]: { taskGid: 't1', createdAt: '2026-07-05', agingAlerted: false, cleared: false } }, TODAY);
+  return a.length === 0;
+})());
+
+check('a subject clear on both runs (inactive + cleared case) stays no-action', (() => {
+  const gone = subj({ lastSeen: '2026-07-05' });
+  const a = planCaseActions({ [KEY]: gone }, { [KEY]: { taskGid: 't1', cleared: true, clearedAt: '2026-07-06' } }, TODAY);
+  return a.length === 0;
+})());
+
+check('newCaseStateEntry without a prior case is a plain open entry (no reopen fields)', (() => {
+  const e = newCaseStateEntry('t9', TODAY, undefined);
+  return e.taskGid === 't9' && e.cleared === false && e.agingAlerted === false
+    && !('reopenedFrom' in e) && !('reopenedAt' in e);
 })());
 
 check('mixed registry plans each subject independently', (() => {
@@ -87,6 +137,12 @@ check('case body: single <body> root, escalation banner for sanctions-match, SLA
 check('case body links the customer record by GID', html.includes('data-asana-gid="1214107985842154"'));
 check('case body: a plain review flag gets the softer banner',
   caseHtml(KEY, subj({ recommendation: 'review' })).includes('Screening flag — review required'));
+const reflagHtml = caseHtml(KEY, subj(), 'https://example/run', { taskGid: 't1', clearedAt: '2026-07-01' });
+check('re-flag case body references the prior case gid and its cleared date',
+  reflagHtml.includes('RE-FLAGGED AFTER CLEARANCE') && reflagHtml.includes('data-asana-gid="t1"')
+  && reflagHtml.includes('cleared 2026-07-01') && /^<body>[\s\S]*<\/body>$/.test(reflagHtml));
+check('a first-time case body carries no re-flag banner',
+  !caseHtml(KEY, subj(), 'https://example/run').includes('RE-FLAGGED'));
 
 /* ── daily results digest (the Asana results surface) ── */
 const RESULTS = {
