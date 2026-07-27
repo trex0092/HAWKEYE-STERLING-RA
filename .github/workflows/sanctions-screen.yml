@@ -14,8 +14,11 @@ name: Sanctions Screen
 # changed. Runs AFTER the Sanctions Watch (05:00) so it screens against fresh lists.
 #
 # A run that could not screen (no Asana token, every list failed to load, empty
-# database) NEVER reports all-clear — it opens a GitHub issue instead. Reduced
-# coverage (a list failed, or UAE EOCN unpopulated) is flagged as degraded.
+# database) NEVER reports all-clear — the screen step exits non-zero so the run
+# concludes RED (control-retry re-dispatches it and the freshness check sees no
+# success for the day), and the issue step below still opens a GitHub issue
+# (always()-guarded; the bail writes its outputs before setting the exit code).
+# Reduced coverage (a list failed, or UAE EOCN unpopulated) is flagged as degraded.
 #
 # Secrets / vars:
 #   ASANA_ACCESS_TOKEN  (secret)  read the Customer Database + post the alert
@@ -215,6 +218,9 @@ jobs:
         # "undelivered" when the cases step ALSO failed. Without the cases-outcome
         # guard this opened a false "not delivered" issue on every real match, and
         # (conversely) stayed silent when case delivery genuinely failed.
+        # always() is load-bearing twice over: an unscreened bail now FAILS the
+        # screen step (red run — so control-retry re-dispatches), and this step
+        # must still run afterwards to file the issue from the bail's outputs.
         if: always() && (steps.screen.outputs.screen_error == 'true' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true' && steps.cases.outcome != 'success'))
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:

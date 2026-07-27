@@ -1,9 +1,10 @@
 /* Unit tests for the in-repo sanctions matcher (no network).
    Usage: node test/sanctions-match.test.mjs */
 import {
-  normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseOfacXml, parseUnXml, parseOfsiCsv,
+  normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseOfacAltCsv, parseOfacXml, parseUnXml, parseOfsiCsv,
   parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
-  buildIndex, screenName,
+  buildIndex, screenName, nameVariants, indelRatio, tokenSetRatio, isTokenSubset,
+  MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters,
   unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList
 } from '../scripts/sanctions-match.mjs';
 import { deflateRawSync } from 'node:zlib';
@@ -30,6 +31,15 @@ check('parseDelimited supports a semicolon delimiter',
 /* ── OFAC (no header, name in col 2, -0- empties) ── */
 const ofac = parseOfacCsv('1,"AEROCARIBBEAN AIRLINES",entity,CUBA,-0-\n2,"DOE, JOHN",individual,SDGT,-0-\n');
 check('parseOfacCsv pulls col-2 names', ofac.length === 2 && ofac[0] === 'AEROCARIBBEAN AIRLINES' && ofac[1] === 'DOE, JOHN');
+
+/* ── OFAC alt.csv (SDN a.k.a. names — headerless, alias in col 4, -0- empties).
+   Regression: screening only sdn.csv's primary names left every SDN alias
+   unscreened (a party operating under an a.k.a. silently cleared). ── */
+const ofacAlt = parseOfacAltCsv('36,12,"aka","AL QAIDA",-0-\n36,13,"aka","-0-",note\n37,14,"fka","THE BASE",-0-\n38,15,"aka","",x\n');
+check('parseOfacAltCsv pulls col-4 alias names, skips -0- and blanks',
+  ofacAlt.join('|') === 'AL QAIDA|THE BASE');
+check('parseList routes parser=ofacalt to the alt.csv parser (before the generic ofac→CSV rule)',
+  parseList({ id: 'ofac-sdn-alt', parser: 'ofacalt' }, '1,2,aka,USAMA BIN LADEN,-0-').join() === 'USAMA BIN LADEN');
 
 /* ── OFAC XML (CONSOLIDATED.XML / SDN.XML: sdnEntry, individual first+last,
    entity full name in lastName, akaList aliases) ── */
@@ -208,6 +218,69 @@ check('screenName flags a fuzzy/partial name match', fuzzy.hitCount >= 1 && fuzz
 const clean = screenName('Helga Andersen Bakery', index, 85);
 check('screenName clears an unrelated subject', clean.hitCount === 0 && clean.recommendation === 'clear' && clean.band === 'low');
 
+/* ── transliteration variants (regression: the exact-token candidate index was
+   blind to a subject spelled "Mohammed …" against a listed "MUHAMMAD …" — no
+   shared token, no candidates, silent clear at topScore 0) ── */
+const nv = nameVariants('mohammed husein trading llc');
+check('nameVariants keeps the base spelling and adds whole-word group swaps',
+  nv.has('mohammed husein trading llc') && nv.has('muhammad husein trading llc') && nv.has('mohammed hussein trading llc'));
+check('nameVariants swaps whole words only (no corruption inside "salah")',
+  [...nameVariants('salah co')].join('|') === 'salah co');
+check('nameVariants is deterministically capped with the base always retained',
+  nameVariants('mohammed bin abdul al ahmed yousef hussein sheikh ismail').size <= 13
+  && nameVariants('mohammed bin abdul al ahmed yousef hussein sheikh ismail').has('mohammed bin abdul al ahmed yousef hussein sheikh ismail'));
+check('nameVariants of an empty fold is empty', nameVariants('').size === 0);
+const vIdx = buildIndex([{ id: 'ofac', name: 'OFAC SDN', names: ['MUHAMMAD HUSSEIN'] }]);
+const vHit = screenName('Mohammed Husein Trading LLC', vIdx, 85);
+check('variant spelling reaches the candidate index and flags (was a silent clear)',
+  vHit.hitCount === 1 && vHit.topScore >= 85 && vHit.recommendation === 'sanctions-match');
+check('a variant equal to a designated name is an exact 100 hit',
+  screenName('Usama Ibn Laden', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['USAMA BIN LADEN'] }]), 85).topScore === 100);
+/* Core-vs-core scoring: corp boilerplate must not hide a one-letter typo. */
+check('similarity scores the stopword-stripped cores too (typo behind a corp suffix)',
+  similarity(normalizeName('Muhamad Hussein Trading LLC'), normalizeName('MUHAMMAD HUSSEIN')) >= 85);
+check('similarity is still low on unrelated names with distinct cores',
+  similarity(normalizeName('Falcon Star Metals LLC'), normalizeName('Northern Route Logistics')) < 60);
+
+/* ── subset / patronymic recall gate (screen.py _is_token_subset parity;
+   regression: "Quds Force" scored 73 vs the full IRGC chain and "Usama Bin
+   Ladin" 84 vs the full listed chain — both silently cleared at 85) ── */
+check('indelRatio matches rapidfuzz ratio semantics (hussein/husein ≥ 88, ladin/laden < 88)',
+  indelRatio('hussein', 'husein') >= 88 && indelRatio('ladin', 'laden') < 88 && indelRatio('a', 'a') === 100);
+check('tokenSetRatio is 100 for a token subset and low for unrelated names',
+  tokenSetRatio('quds force', 'islamic revolutionary guard corps quds force') === 100
+  && tokenSetRatio('acme trading', 'global widgets') < TOKENSET_THRESHOLD);
+check('isTokenSubset is symmetric by token count and needs ≥2 distinctive tokens',
+  isTokenSubset('quds force', 'islamic revolutionary guard corps quds force')
+  && isTokenSubset('islamic revolutionary guard corps quds force', 'quds force')
+  && !isTokenSubset('sberbank', 'sberbank of russia'));
+const irgcIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['ISLAMIC REVOLUTIONARY GUARD CORPS QUDS FORCE'] }]);
+const quds = screenName('Quds Force', irgcIdx, 85);
+check('subset gate flags the short spelling of a long designated chain (was a silent clear)',
+  quds.hitCount === 1 && quds.recommendation === 'sanctions-match');
+const qudsSup = screenName('Islamic Revolutionary Guard Corps Quds Force',
+  buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['QUDS FORCE'] }]), 85);
+check('subset gate flags the superset direction too (KYC name on either side)',
+  qudsSup.hitCount === 1 && qudsSup.recommendation === 'sanctions-match');
+const usama = screenName('Usama Bin Ladin', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['USAMA BIN MUHAMMAD BIN AWAD BIN LADIN'] }]), 85);
+check('subset gate flags the patronymic-chain case at its conservative score',
+  usama.hitCount === 1 && usama.topScore < 85 && usama.recommendation === 'sanctions-match');
+check('a single shared token can never subset-flag (Sberbank stays clear)',
+  screenName('Sberbank', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['SBERBANK OF RUSSIA'] }]), 85).hitCount === 0);
+
+/* ── manual-review routing (screen.py _unscreenable parity; regression: a name
+   with no distinctive tokens had no candidate path and silently cleared) ── */
+const mrIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['SOME ENTITY LLC'] }]);
+const yuLi = screenName('Yu Li', mrIdx, 85);
+check('all-short-token name routes to MANUAL REVIEW, never a silent clear',
+  yuLi.recommendation === 'review' && yuLi.hitCount === 1 && yuLi.lists[0].list === MANUAL_REVIEW_LIST && yuLi.topScore === 0);
+check('symbols-only name routes to MANUAL REVIEW',
+  screenName('☠ ☠', mrIdx, 85).recommendation === 'review');
+check('an exact designated-name match beats the manual-review routing',
+  screenName('Yu Li', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['YU LI'] }]), 85).topScore === 100);
+check('an empty subject name stays clear (nothing to review)',
+  screenName('', mrIdx, 85).recommendation === 'clear');
+
 /* ── non-Latin scripts (regression: [^a-z0-9] erased Arabic/Cyrillic names,
    folding them to the empty key — zero tokens, zero candidates, silent clear) ── */
 check('normalizeName keeps Arabic letters (harakat stripped)',
@@ -222,6 +295,26 @@ const cyIndex = buildIndex([{ id: 'ofac', name: 'OFAC SDN', names: ['Влади�
 const cyHit = screenName('Владимир Путин', cyIndex, 85);
 check('Cyrillic-script subject fuzzy-matches a Cyrillic designation',
   cyHit.hitCount >= 1 && cyHit.topScore >= 85);
+
+/* ── lost-script routing (screen.py _lost_script_letters parity; regression:
+   a non-Latin-script subject vs the LATIN-published lists kept its any-script
+   tokens, found no bucket, and silently cleared at 0 — the exact class the
+   engine audit named, and the shipped lists ARE Latin) ── */
+check('Arabic letters count as lost by the Latin fold', lostScriptLetters('محمد صالح TRADING LLC'));
+check('diacritic Latin folds cleanly — not flagged', !lostScriptLetters('Müller İnönü Trading'));
+check('Turkish dotless ı folds cleanly — not flagged', !lostScriptLetters('yatırım holding'));
+check('pure ASCII is not flagged', !lostScriptLetters('Acme General Trading LLC'));
+const latinIdx = buildIndex([{ id: 'un', name: 'UN Consolidated', names: ['MOHAMED SALAH AL ZAWARI'] }]);
+const arVsLatin = screenName('محمد صالح الزواري', latinIdx, 85);
+check('Arabic-script subject vs Latin-published lists routes to MANUAL REVIEW, never a silent clear',
+  arVsLatin.recommendation === 'review' && arVsLatin.lists[0].list === MANUAL_REVIEW_LIST);
+const mixVsLatin = screenName('محمد صالح TRADING LLC', latinIdx, 85);
+check('mixed-script subject with only boilerplate residue also routes to MANUAL REVIEW',
+  mixVsLatin.recommendation === 'review');
+check('same-script curated match still beats the lost-script routing',
+  screenName('محمد صالح الحوثي', arIndex, 85).recommendation === 'sanctions-match');
+check('a Latin subject that clears is untouched by the lost-script routing',
+  screenName('Totally Unrelated Firm', latinIdx, 85).recommendation === 'clear');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

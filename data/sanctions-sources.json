@@ -11,6 +11,17 @@
       "noHeader": true
     },
     {
+      "id": "ofac-sdn-alt",
+      "name": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "jurisdiction": "Global",
+      "url": "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv",
+      "type": "csv",
+      "parser": "ofacalt",
+      "noHeader": true,
+      "mergeInto": "ofac-sdn",
+      "_note": "The SDN's weak/strong a.k.a. names live in this SEPARATE headerless file (ent_num, alt_num, alt_type, alt_name, remarks). The screen folds them into the primary OFAC SDN list (mergeInto) so an alias hit reads as the SDN designation it is — screening sdn.csv's primary names alone is a false-negative gap (a party operating under an SDN alias would screen clear; mirrors screen.py parse_ofac_alt). If this file fails to load, the primary SDN list still screens but is flagged partial: alias coverage missing, standing SDN matches carried forward, never cleared off reduced coverage."
+    },
+    {
       "id": "ofac-consolidated",
       "name": "US OFAC — Consolidated (non-SDN) list (XML)",
       "jurisdiction": "Global",

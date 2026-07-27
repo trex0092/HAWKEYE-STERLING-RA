@@ -1470,12 +1470,15 @@ def check_pep(name):
     """Returns {hit, id, label, description} | {hit:False} | {errored:True} |
     {hit, review:True} for a name that cannot be auto-screened."""
     key = _norm_lower(name)
-    if not key or len(key) < 5:
+    if not key or len(key) < 5 or _lost_script_letters(name):
         # A name with content that the Latin normaliser collapses to <5 chars
         # (recorded only in non-Latin script) cannot be auto-screened against the
         # English Wikidata index. Returning {hit:False} would file it as "no PEP"
         # — a silent false negative. Surface it for manual PEP review instead
         # (mirrors the sanctions `_unscreenable` path), unless it is genuinely empty.
+        # MIXED-script names are the same gap: their non-Latin letters are lost
+        # by the fold, so the lookup would search only the Latin residue
+        # ("TRADING LLC") and file a confident-looking "no PEP".
         if name and str(name).strip():
             return {"hit": True, "review": True, "id": "",
                     "category": "MANUAL REVIEW — name not auto-screenable for PEP (non-Latin script / too short)",
@@ -1809,6 +1812,18 @@ def parse_ofac_alt(data):
         log(f"  OFAC alt parse error: {e}")
     return aliases
 
+def _fold_ofac_aliases(primary_names, alt_data):
+    """Fold alt.csv aliases into a LOADED primary SDN set only. When the
+    primary (and, in the unified path, its mirror) failed, folding aliases
+    anyway left ofac_names at ~17k alias-only entries — above the 9,000
+    coverage floor, so the floor check read the list as OK and the run
+    proceeded with every primary SDN name unscreened, reported as full OFAC
+    coverage. An unloaded primary must stay EMPTY so the floor machinery
+    classifies it honestly (outage: degrade + red; obtained-but-tiny: refuse)."""
+    if primary_names:
+        primary_names |= parse_ofac_alt(alt_data)
+    return primary_names
+
 def parse_un(data):
     names = set()
     date_str = "unknown"
@@ -2044,15 +2059,32 @@ SKIP_TOKENS = [
     "ANONIM SIRKETI","ANONİM ŞİRKETİ","KIYMETLI MADENLER",
 ]
 
+def _skip_token_hit(n):
+    """A SKIP_TOKENS entry only counts on token boundaries: 'LLC' must skip
+    'ACME LLC' but not the surname 'WILLCOX' — the old bare-substring test
+    silently dropped real people whose names embed a legal-form fragment."""
+    up = n.upper()
+    return any(re.search(r"(?<![A-Z0-9])" + re.escape(s) + r"(?![A-Z0-9])", up)
+               for s in SKIP_TOKENS)
+
 def extract_individuals(notes):
     if not notes or len(notes.strip()) < 100: return []
-    pattern = r"Name:\s*([A-Za-zÀ-ÿ\s\.\-\']+?)(?:\n|Shares|Nationality|Passport|Date of|Gender|Emirates|Proof|PEP|$)"
+    # Script-agnostic capture (was a Latin-only char class): a "Name: محمد صالح"
+    # line must still be EXTRACTED so the subject reaches the _unscreenable
+    # manual-review net — the old pattern matched nothing for non-Latin names,
+    # so they bypassed extraction AND the net, screening silently clear. The
+    # broader capture also keeps names the old class truncated at the first
+    # foreign char or lost entirely at an inline comma ("Name: John Smith,
+    # Director" previously extracted NOTHING — the class could not span ","
+    # and no alternation matched there).
+    pattern = r"Name:[ \t]*([^\n]+?)(?:\n|Shares|Nationality|Passport|Date of|Gender|Emirates|Proof|PEP|$)"
     found = re.findall(pattern, notes)
     cleaned = []
     for n in found:
-        n = n.strip()
+        n = re.sub(r"\([^)]*\)", " ", n)          # share %, role notes
+        n = re.sub(r"\s+", " ", n).strip().strip(".,;:-–—").strip()
         if len(n) < 5: continue
-        if any(s.upper() in n.upper() for s in SKIP_TOKENS): continue
+        if _skip_token_hit(n): continue
         if re.search(r"\d", n): continue
         cleaned.append(n)
     return list(dict.fromkeys(cleaned))
@@ -2063,24 +2095,61 @@ def extract_individuals(notes):
 # natural persons, so this closes a false-negative gap.
 _ENTITY_OWNER_RE = re.compile(
     r"(?:Parent(?:\s+Company)?|Shareholder|Ultimate\s+Beneficial\s+Owner|UBO|Holding(?:\s+Company)?|"
-    r"Owner|Owned\s+by|Beneficial\s+Owner)\s*(?:\([^)]*\))?\s*[:\-—]\s*([^\n]+)", re.IGNORECASE)
+    # Separator class carries the EN-dash (U+2013) as well as hyphen/em-dash:
+    # word processors auto-convert " - " to " – ", and an owner recorded as
+    # "UBO – Al Qaeda Holdings LLC" previously extracted nothing (the same
+    # typing-drift class kyc.py fixed for its own header regex).
+    r"Owner|Owned\s+by|Beneficial\s+Owner)\s*(?:\([^)]*\))?\s*[:\-–—]\s*([^\n]+)", re.IGNORECASE)
 # A name carrying a legal-form token is a corporate entity, not a natural person.
 _CORP_FORM_RE = re.compile(
     r"\b(llc|l\.l\.c|fze|fzco|fzc|dmcc|dwc|pjsc|psc|plc|ltd|limited|inc|incorporated|corp|"
     r"corporation|company|group|holdings?|gmbh|sarl|bv|nv|s\.a|ag|pte|sdn|bhd|establishment|"
     r"industries|international|enterprises|trust|foundation|stiftung|waqf|anstalt)\b", re.IGNORECASE)
+# Owner-line values that are placeholders, not names.
+_OWNER_JUNK_RE = re.compile(r"^(?:n/?a|none|nil|not\s+applicable|pending|tbc|tbd|unknown|[-–—_]+)$",
+                            re.IGNORECASE)
 def _looks_corporate(name):
     return bool(_CORP_FORM_RE.search(name or "")) or kyc.is_arrangement_entity(name or "")
+def _owner_candidates(notes):
+    """Cleaned party names from Parent/Shareholder/UBO/Owner lines."""
+    for m in _ENTITY_OWNER_RE.finditer(notes or ""):
+        cand = re.sub(r"\([^)]*\)", " ", m.group(1))   # share %, role notes
+        cand = re.sub(r"\s+", " ", cand).strip().strip(".,;").strip()
+        if cand and len(cand) >= 5 and not _OWNER_JUNK_RE.match(cand):
+            yield cand
 def extract_entity_owners(notes):
     if not notes: return []
-    out = []
-    for m in _ENTITY_OWNER_RE.finditer(notes):
-        cand = m.group(1).strip().strip(".,;").strip()
-        # Corporate owners only (carry a legal-form / arrangement token); natural
-        # persons are already captured by extract_individuals and screened there.
-        if cand and len(cand) >= 5 and _looks_corporate(cand):
-            out.append(cand)
-    return list(dict.fromkeys(out))
+    # Corporate owners (carry a legal-form / arrangement token) — screened as
+    # ENTITY subjects under the 50%/control rule.
+    return list(dict.fromkeys(c for c in _owner_candidates(notes) if _looks_corporate(c)))
+def extract_owner_individuals(notes):
+    """Owner/UBO/shareholder lines naming a party WITHOUT a corporate token — a
+    natural person, or an unincorporated designated organisation ("UBO: Islamic
+    Revolutionary Guard Corps Quds Force"). extract_individuals only reads
+    "Name:" lines, so a party recorded ONLY on an owner line was previously
+    dropped by BOTH extractors and never screened at all — the comment that
+    "natural persons are already captured by extract_individuals" assumed a
+    Name: line that need not exist."""
+    if not notes: return []
+    return list(dict.fromkeys(c for c in _owner_candidates(notes) if not _looks_corporate(c)))
+
+def _individuals_union(struct_names, notes):
+    """UNION of the structured KYC parse, the regex Name: extractor and the
+    owner-line individuals — deduped case/diacritic-insensitively. The old
+    `structured or regex` either/or meant one recognised SECTION-4 block hid
+    every other Name: line in the note (SECTION 5, drifted headers like
+    "Individual 2, Shareholder") — those people were silently never screened.
+    _norm_lower is empty for a fully non-Latin name — fall back to the
+    NFC-folded string so such names are deduped, never dropped (they must
+    reach the _unscreenable manual-review net)."""
+    out, seen = [], set()
+    for nm in (list(struct_names) + extract_individuals(notes)
+               + extract_owner_individuals(notes)):
+        k = _norm_lower(nm) or unicodedata.normalize("NFC", str(nm)).strip().lower()
+        if k and k not in seen:
+            seen.add(k)
+            out.append(nm)
+    return out
 
 def get_all_customers():
     customers = []
@@ -2104,7 +2173,10 @@ def get_all_customers():
             # extractor if the note isn't in the structured format.
             kyc_data = kyc.parse_customer(notes)
             struct_inds = kyc_data.get("individuals", [])
-            individuals = [i["name"] for i in struct_inds] or extract_individuals(notes)
+            # UNION of every extractor (see _individuals_union) — a recognised
+            # SECTION-4 block must not hide Name: lines elsewhere in the note,
+            # and parties recorded ONLY on a UBO/Owner line must be screened.
+            individuals = _individuals_union([i["name"] for i in struct_inds], notes)
             # Corporate owners/parents named in the note that are NOT natural persons
             # (already in `individuals`) — screened as ENTITY subjects (50%/control).
             entity_owners = [e for e in extract_entity_owners(notes)
@@ -2219,9 +2291,16 @@ except Exception:
 _NORMS_CACHE = {}   # id(entries) -> (entries, [norm, ...]) — strong ref pins the id
 
 def _entry_norms(entries):
+    # Rebuild on length change as well as identity change: an entries list
+    # mutated in place after first being screened would otherwise serve stale
+    # norms, and the prefilter would silently never survey the added names — a
+    # sanctions false negative. No production path mutates a list today (every
+    # loader builds its list once), but this invariant is what the whole
+    # "bit-identical with blocking on/off" claim rests on, so it is guarded
+    # here rather than assumed of every future caller.
     key = id(entries)
     cached = _NORMS_CACHE.get(key)
-    if cached is None or cached[0] is not entries:
+    if cached is None or cached[0] is not entries or len(cached[1]) != len(entries):
         cached = (entries, [e[0] for e in entries])
         _NORMS_CACHE[key] = cached
     return cached[1]
@@ -2301,13 +2380,31 @@ def screen_name(name, all_lists):
             best[key] = h
     return sorted(best.values(), key=lambda x: -x["score"])
 
+def _lost_script_letters(name):
+    """True when the name carries LETTERS that normalize() strips entirely —
+    Arabic/Cyrillic/CJK/Greek script, or unfoldable Latin like Ł/Æ. Their
+    content vanishes from the match key, so the fuzzy pass compares only the
+    Latin/digit residue. Diacritic Latin (Müller, İnönü) folds to A-Z and is
+    NOT flagged. NFD after upper() mirrors normalize()'s own pipeline."""
+    up = unicodedata.normalize("NFD", str(name or "").upper())
+    return any(unicodedata.category(c).startswith("L") and not ("A" <= c <= "Z")
+               for c in up)
+
 def _unscreenable(name):
     # A name that carries content but collapses to fewer than 4 matchable chars
     # after normalize() (e.g. recorded only in Arabic/Cyrillic/CJK script, which
     # the Latin normaliser strips to empty) cannot be auto-screened. Returning no
     # hits would file it as "clear" — a silent sanctions false negative — so these
     # are surfaced for manual screening instead.
-    return bool(name and str(name).strip()) and len(normalize(name)) < 4
+    # A MIXED-script name is the same gap in disguise: "محمد صالح TRADING LLC"
+    # leaves an ≥4-char Latin residue ("TRADING LLC"), so the old length test
+    # passed it to the fuzzy pass — which then screened boilerplate only and
+    # cleared the customer while the all-Latin transliteration of the same name
+    # hits. Any name whose letters are partly lost by normalize() therefore
+    # ALSO surfaces for manual screening (its Latin residue is still fuzzy-
+    # screened as before; the manual-review hit rides alongside).
+    return bool(name and str(name).strip()) and (
+        len(normalize(name)) < 4 or _lost_script_letters(name))
 
 def _manual_review_hit(subject_type, subject_name, control_linkage):
     return {"subject_type": subject_type, "subject_name": subject_name,
@@ -2858,6 +2955,9 @@ def run_weekly_adverse(customers, run_time):
         log(f"OK Daily adverse media task created: {r.json()['data']['gid']}")
     else:
         log(f"FAIL task: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:300]}")
+        # Arm the delivery gate: a run whose report never reached the MLRO queue
+        # must exit red, not green — this mode previously logged and exited 0.
+        UNIFIED_DELIVERY_FAILED["failed"] = True
 
 # -- ASANA - POST DAILY TASK ---------------------------------------------------
 def post_daily_task(narrative, run_time, run_label, n_matches):
@@ -2881,6 +2981,9 @@ def post_daily_task(narrative, run_time, run_label, n_matches):
         log(f"✅ Daily task created: {r.json()['data']['gid']}")
     else:
         log(f"❌ Task failed: {getattr(r,'status_code','network')} — {getattr(r,'text','')[:300]}")
+        # Arm the delivery gate: a run whose report never reached the MLRO queue
+        # must exit red, not green — this mode previously logged and exited 0.
+        UNIFIED_DELIVERY_FAILED["failed"] = True
 
 def post_confirmed_hit_comment(customer_gid, hits, run_time):
     dt = run_time.strftime("%d %b %Y %H:%M GST")
@@ -2897,6 +3000,11 @@ def post_confirmed_hit_comment(customer_gid, hits, run_time):
                       json={"data": {"text": "\n".join(lines)}})
     if r is not None and r.status_code in (200,201):
         log(f"✅ Comment on {customer_gid}")
+    else:
+        # Secondary channel (the report still carries the hit) — but a failed
+        # confirmed-hit comment must leave a trace, not vanish silently.
+        log(f"❌ Confirmed-hit comment FAILED on {customer_gid}: "
+            f"{getattr(r,'status_code','network')} — {getattr(r,'text','')[:200]}")
 
 # ── UNIFIED DAILY REPORT (Sanctions + Adverse Media + PEP, ONE narrative) ─────
 # ── EOCN mirror cross-check (drift detector, TFS-critical direction only) ─────
@@ -3158,7 +3266,10 @@ def load_all_lists():
         ofac_names, ofac_date, ofac_hash = fb   # mirror already carries aliases
         ofac_fetched = True
     else:
-        ofac_names |= parse_ofac_alt(ofac_alt_data)   # fold in SDN a.k.a. aliases (best-effort)
+        # Aliases broaden a LOADED primary only: with primary AND mirror both
+        # down, alias-only coverage (~17k names) would pass the 9,000 floor
+        # and read as "OFAC SDN: OK" — see _fold_ofac_aliases.
+        ofac_names = _fold_ofac_aliases(ofac_names, ofac_alt_data)
     fb = _mirror_fallback(un_names, "un_sc_sanctions", "UN Consolidated")
     if fb:
         un_names, un_date, un_hash = fb
@@ -4030,6 +4141,7 @@ def main():
         log(f"Starting: {run_label}")
         customers = get_all_customers()
         run_weekly_adverse(customers, run_time)
+        enforce_delivery_gate()   # an undelivered report must exit red, not green
         return
 
     # Daily sanctions run
@@ -4051,7 +4163,9 @@ def main():
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
 
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
-    ofac_names |= parse_ofac_alt(ofac_alt_data)   # fold in SDN a.k.a. aliases (best-effort)
+    # Aliases broaden a LOADED primary only (no mirror on this legacy path —
+    # a single sdn.csv outage with alt.csv up would otherwise read as OK).
+    ofac_names = _fold_ofac_aliases(ofac_names, ofac_alt_data)
     un_names,   un_date,   un_hash   = parse_un(un_data)
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
@@ -4108,6 +4222,7 @@ def main():
     )
     post_daily_task(narrative, run_time, run_label, len(possible_matches))
     log("Done.")
+    enforce_delivery_gate()   # an undelivered report is the more fundamental failure
     enforce_list_outage_gate()
     enforce_eocn_review_gate()
 

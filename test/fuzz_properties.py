@@ -153,6 +153,28 @@ def prop_blocking_equivalence(entry_names, subject_names):
     assert base == fast
 
 
+@PROP
+@given(st.lists(_NAME, min_size=1, max_size=8), _NAME)
+def prop_blocking_survives_inplace_list_growth(entry_names, late_entry):
+    # An entries list that GROWS in place after already being screened must
+    # still screen bit-identically with blocking on or off. Pre-guard, the
+    # norms cache (keyed by list identity) served the stale norms, so the
+    # prefilter never surveyed the appended designation — the blocked path
+    # silently cleared a name the plain loop flags.
+    lists = {"P": [(screen.normalize(e), e) for e in entry_names]}
+    orig = screen.MATCH_BLOCKING
+    try:
+        screen.MATCH_BLOCKING = True
+        screen.screen_name("warm cache subject", lists)   # populate _NORMS_CACHE
+        lists["P"].append((screen.normalize(late_entry), late_entry))
+        fast = screen.screen_name(late_entry, lists)
+        screen.MATCH_BLOCKING = False
+        base = screen.screen_name(late_entry, lists)
+    finally:
+        screen.MATCH_BLOCKING = orig
+    assert base == fast
+
+
 
 
 
@@ -166,6 +188,7 @@ check("match_adverse_keywords is total, deterministic and duplicate-free", prop_
 check("match_adverse_keywords always finds a planted English keyword", prop_match_keywords_finds_planted_term)
 check("sha256_of yields stable 64-char lowercase hex", prop_sha256_shape)
 check("match blocking on/off is result-identical under real rapidfuzz", prop_blocking_equivalence)
+check("match blocking stays result-identical after in-place list growth", prop_blocking_survives_inplace_list_growth)
 
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

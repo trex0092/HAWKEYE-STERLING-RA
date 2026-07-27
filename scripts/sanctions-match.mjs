@@ -43,15 +43,25 @@ const CORP_STOP = new Set([
 ]);
 
 /* Significant tokens of a normalized name (drop corp/common words, very short
-   tokens and pure digits). Used both for candidate lookup and token scoring. */
+   tokens and pure digits). Used both for candidate lookup and token scoring.
+   HOT PATH: similarity()/isTokenSubset() recompute an entry's tokens for every
+   (variant × candidate) pair, so results are memoized by the normalized string
+   (bounded, and frozen — treat the returned array as read-only). */
+const SIG_CACHE = new Map();
+const SIG_CACHE_MAX = 300000;   // comfortably above the consolidated corpus; bounds adversarial callers
 export function sigTokens(norm) {
+  const key = String(norm);
+  const hit = SIG_CACHE.get(key);
+  if (hit) return hit;
   const out = [];
-  for (const t of String(norm).split(' ')) {
+  for (const t of key.split(' ')) {
     if (t.length < 3) continue;
     if (/^\d+$/.test(t)) continue;
     if (CORP_STOP.has(t)) continue;
     out.push(t);
   }
+  Object.freeze(out);
+  if (SIG_CACHE.size < SIG_CACHE_MAX) SIG_CACHE.set(key, out);
   return out;
 }
 
@@ -88,6 +98,22 @@ export function parseOfacCsv(body) {
   const names = [];
   for (const r of parseDelimited(body, ',')) {
     const name = (r[1] || '').trim();
+    if (name && name !== '-0-') names.push(name);
+  }
+  return names;
+}
+
+/* OFAC a.k.a. list (alt.csv): headerless CSV — ent_num, alt_num, alt_type,
+   alt_name, remarks; "-0-" marks an empty field. The SDN publishes its
+   weak/strong a.k.a. names in this SEPARATE file, so screening only sdn.csv's
+   primary names is a false-negative gap — a party operating under an SDN alias
+   would screen clear (mirrors screen.py parse_ofac_alt). The screen runner
+   folds these names into the primary OFAC SDN list (source.mergeInto), so an
+   alias hit reads as the SDN designation it is. */
+export function parseOfacAltCsv(body) {
+  const names = [];
+  for (const r of parseDelimited(body, ',')) {
+    const name = (r[3] || '').trim();
     if (name && name !== '-0-') names.push(name);
   }
   return names;
@@ -452,6 +478,7 @@ export function parseList(source, body) {
   const id = (source.id || '').toLowerCase();
   const p = (source.parser || '').toLowerCase();
   if (p === 'ofacxml') return parseOfacXml(body);                 // OFAC SDN/CONSOLIDATED .XML (before the generic ofac→CSV rule)
+  if (p === 'ofacalt') return parseOfacAltCsv(body);              // OFAC alt.csv a.k.a. names (before the generic ofac→CSV rule)
   if (p === 'ofac' || /^ofac/.test(id)) return parseOfacCsv(body);
   if (p === 'un' || /^un[-_]/.test(id)) return parseUnXml(body);
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);
@@ -491,14 +518,20 @@ export function levenshtein(a, b) {
 }
 
 /* Similarity of two normalized names, 0-100. Max of an edit-distance ratio over
-   the full strings (catches typos) and a token-set score (catches reordered /
-   partial names like "Putin Vladimir" vs "Vladimir Vladimirovich Putin"). */
+   the full strings (catches typos), the same ratio over the boilerplate-stripped
+   cores (catches a typo hidden behind corp suffixes: "Muhamad Hussein Trading
+   LLC" vs "MUHAMMAD HUSSEIN" — the full-string distance is dominated by the
+   suffix, the core distance is not), and a token-set score (catches reordered /
+   partial names like "Putin Vladimir" vs "Vladimir Vladimirovich Putin").
+   Strictly recall-monotone vs the pre-core version: a max() over a superset of
+   score paths can only rise, never lower an existing score. */
 export function similarity(a, b) {
   if (!a || !b) return 0;
   if (a === b) return 100;
   const dist = levenshtein(a, b);
   const lev = (1 - dist / Math.max(a.length, b.length)) * 100;
-  const A = new Set(sigTokens(a)), B = new Set(sigTokens(b));
+  const ta = sigTokens(a), tb = sigTokens(b);
+  const A = new Set(ta), B = new Set(tb);
   let token = 0;
   if (A.size && B.size) {
     let inter = 0;
@@ -508,7 +541,129 @@ export function similarity(a, b) {
     const cover = inter / Math.min(A.size, B.size);
     token = (0.4 * jac + 0.6 * cover) * 100;
   }
-  return Math.max(lev, token);
+  /* Core-vs-core: the edit-distance ratio over the stopword-stripped cores when
+     BOTH sides have one (equivalent to scoring similarity(core, core) — the
+     token component is computed from the same sig-token sets either way). */
+  let core = 0;
+  const ca = ta.join(' '), cb = tb.join(' ');
+  if (ca && cb && (ca !== a || cb !== b)) {
+    core = ca === cb ? 100 : (1 - levenshtein(ca, cb) / Math.max(ca.length, cb.length)) * 100;
+  }
+  return Math.max(lev, core, token);
+}
+
+/* ── Subset (patronymic / extra-middle-name) recall gate — screen.py parity ──
+   The similarity() token score caps a perfect token SUBSET at 60 + 40·jaccard,
+   so "QUDS FORCE" inside "ISLAMIC REVOLUTIONARY GUARD CORPS QUDS FORCE" scores
+   73 and "USAMA BIN LADIN" against the full listed chain scores 84 — both
+   silently cleared at the 85 threshold. screen.py flags exactly these via its
+   _is_token_subset + TOKENSET_THRESHOLD gate; this ports that gate (same 88
+   per-token and 93 token-set cutoffs, same InDel ratio semantics rapidfuzz
+   uses, same strict shorter-inside-longer shape) so the two engines agree. */
+export const TOKENSET_THRESHOLD = 93;   // token-set score an ANDed subset hit must clear (mirrors screen.py)
+const SUBSET_TOKEN_SIM = 88;            // per-token similarity for "closely matches" (mirrors screen.py)
+
+/* Normalized InDel similarity, 0-100 — rapidfuzz `ratio` semantics (a
+   substitution costs 2, i.e. delete+insert), so the 88/93 cutoffs above mean
+   the same thing they mean in screen.py's rapidfuzz gates. */
+export function indelRatio(a, b) {
+  const A = String(a == null ? '' : a), B = String(b == null ? '' : b);
+  if (!A && !B) return 100;
+  if (!A || !B) return 0;
+  if (A === B) return 100;
+  const m = A.length, n = B.length;
+  let prev = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let cur = i, diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = prev[j];
+      const cost = A[i - 1] === B[j - 1] ? 0 : 2;
+      cur = Math.min(prev[j] + 1, cur + 1, diag + cost);
+      prev[j] = cur;
+      diag = tmp;
+    }
+  }
+  return (1 - prev[n] / (m + n)) * 100;
+}
+
+/* token_set_ratio over two normalized names: sorted-intersection vs
+   intersection+each-side's-remainder (classic token-set construction) — 100
+   whenever one name's tokens are a subset of the other's, tolerant of extra
+   middle names / patronymic chains on either side. */
+export function tokenSetRatio(a, b) {
+  const ta = new Set(String(a == null ? '' : a).split(' ').filter(Boolean));
+  const tb = new Set(String(b == null ? '' : b).split(' ').filter(Boolean));
+  if (!ta.size || !tb.size) return 0;
+  const inter = [...ta].filter(t => tb.has(t)).sort();
+  const diffA = [...ta].filter(t => !tb.has(t)).sort();
+  const diffB = [...tb].filter(t => !ta.has(t)).sort();
+  const s0 = inter.join(' ');
+  const s1 = [...inter, ...diffA].join(' ');
+  const s2 = [...inter, ...diffB].join(' ');
+  return Math.max(indelRatio(s0, s1), indelRatio(s0, s2), indelRatio(s1, s2));
+}
+
+/* True when EVERY distinctive token of the SHORTER of the two names closely
+   matches a token in the longer one, and the longer has strictly more tokens —
+   the patronymic / extra-middle-name shape. Requires ≥2 distinctive tokens so
+   a single shared token ("Sberbank" vs "SBERBANK OF RUSSIA") can never
+   trigger it. SYMMETRIC by ordering on token count: the KYC name may sit on
+   either side (mirrors screen.py _is_token_subset, including its warning that
+   fixing the argument order silently screened the superset direction clear). */
+export function isTokenSubset(aNorm, bNorm) {
+  let ta = sigTokens(aNorm), tb = sigTokens(bNorm);
+  if (tb.length < ta.length) { const t = ta; ta = tb; tb = t; }
+  if (ta.length < 2 || tb.length <= ta.length) return false;
+  return ta.every(t => tb.some(u => indelRatio(t, u) >= SUBSET_TOKEN_SIM));
+}
+
+/* ── Transliteration variants (Arabic/Turkish spelling equivalents) ─────────
+   Ported from ai.py's _TRANSLIT_GROUPS / name_variants (keep the group list in
+   step with ai.py — it is the shared source of truth for which spellings are
+   treated as equivalent). Without variants the exact-token candidate index is
+   blind to a subject spelled "Mohammed …" against a list entry spelled
+   "Muhammad …": no shared token, no candidates, silent clear. Conservative:
+   only well-established particle / name swaps, whole-word only. */
+const TRANSLIT_GROUPS = [
+  ['mohammed', 'muhammad', 'mohamed', 'mohammad', 'muhammed', 'mohd'],
+  ['abdul', 'abdel', 'abd al', 'abdal', 'abd el'],
+  ['bin', 'ibn', 'ben'],
+  ['al', 'el'],
+  ['ahmed', 'ahmad'],
+  ['yousef', 'yusuf', 'yousuf', 'youssef'],
+  ['hussein', 'husain', 'hussain', 'husein'],
+  ['sheikh', 'shaikh', 'shaykh'],
+  ['abdulrahman', 'abdul rahman', 'abdelrahman'],
+  ['ismail', 'ismael', 'esmail'],
+];
+
+const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/* Variant spellings of a NORMALIZED name (including itself). Whole-word/phrase
+   swaps only — a bare replace would rewrite the particle inside unrelated
+   tokens ("al" inside "salah") and waste the cap on corrupted spellings.
+   Deterministic cap: sorted before truncating (never set-iteration order), and
+   the base spelling is always retained — same semantics as ai.py. */
+export function nameVariants(norm, cap = 12) {
+  const base = String(norm == null ? '' : norm);
+  if (!base) return new Set();
+  const variants = new Set([base]);
+  for (const grp of TRANSLIT_GROUPS) {
+    for (const canonical of grp) {
+      const rx = new RegExp('\\b' + escapeRe(canonical) + '\\b', 'g');
+      if (rx.test(base)) {
+        rx.lastIndex = 0;
+        for (const alt of grp) {
+          if (alt !== canonical) variants.add(base.replace(rx, alt));
+        }
+      }
+    }
+  }
+  const out = new Set([...variants].sort().slice(0, cap));
+  out.add(base);
+  return out;
 }
 
 /* Build a name index over the parsed lists for fast candidate lookup.
@@ -541,12 +696,34 @@ export function buildIndex(lists) {
    other significant token. Bounds work on common-name subjects. */
 const COMMON_TOKEN_CAP = 2500;
 
+/* Pseudo-list name for a subject the matcher cannot auto-screen (mirrors
+   screen.py's MANUAL REVIEW routing) — consumed by the screen runner, which
+   must surface it as a reviewable finding, never a clear. */
+export const MANUAL_REVIEW_LIST = 'MANUAL REVIEW';
+
+/* True when the name carries LETTERS that the Latin A-Z fold loses entirely —
+   Arabic/Cyrillic/CJK/Greek script, or unfoldable Latin like Ł/Æ. Mirrors
+   screen.py's _lost_script_letters exactly (uppercase → NFD → drop combining
+   marks → any remaining letter outside A-Z is lost): diacritic Latin (Müller)
+   and Turkish dotless ı fold cleanly and are NOT flagged. Used to keep a
+   non-Latin-script subject from silently clearing against Latin-indexed lists. */
+export function lostScriptLetters(name) {
+  const up = String(name == null ? '' : name).toUpperCase().normalize('NFD');
+  for (const c of up) {
+    if (/\p{M}/u.test(c)) continue;
+    if (/\p{L}/u.test(c) && (c < 'A' || c > 'Z')) return true;
+  }
+  return false;
+}
+
 /* Screen one subject name against the index. Returns a raw engine-shaped row
-   { name, topScore, band, recommendation, hitCount, lists[] }. */
+   { name, topScore, band, recommendation, hitCount, lists[] }; recommendation
+   is 'sanctions-match' (hits), 'review' (not auto-screenable) or 'clear'. */
 export function screenName(name, index, threshold = 85) {
+  const rawName = String(name == null ? '' : name).trim();
   const norm = normalizeName(name);
   const empty = { name, topScore: 0, band: 'low', recommendation: 'clear', hitCount: 0, lists: [] };
-  if (!norm || !index || !index.entries.length) return empty;
+  if (!rawName || !index || !index.entries.length) return empty;
 
   const byNorm = new Map();   // matched designated norm -> { list, hitName, score }
   const addHit = (list, hitName, score, key) => {
@@ -554,28 +731,84 @@ export function screenName(name, index, threshold = 85) {
     if (!prev || score > prev.score) byNorm.set(key, { list, hitName, score: Math.round(score) });
   };
 
-  /* exact designated-name match → 100 */
-  const ex = index.exact.get(norm);
-  if (ex) for (const h of ex) addHit(h.list, h.hitName, 100, h.hitName + '|' + h.list);
+  /* Transliteration-aware recall (screen.py parity): also screen the subject's
+     spelling variants (Mohammed/Muhammad, bin/ibn …). Usually just the base;
+     a handful only when a name carries a known particle, so cost stays bounded. */
+  const variants = nameVariants(norm);
 
-  /* fuzzy over candidates that share a significant token */
+  /* exact designated-name match → 100 (a variant equal to a designated name IS
+     that designation under an equivalent spelling) */
+  let exactAny = false;
+  for (const v of variants) {
+    const ex = index.exact.get(v);
+    if (ex) { exactAny = true; for (const h of ex) addHit(h.list, h.hitName, 100, h.hitName + '|' + h.list); }
+  }
+
+  /* A name that folds to nothing, or to no significant token (all tokens
+     short/stopword/numeric — e.g. "Yu Li", or a symbols-only record), has no
+     candidate path: returning "clear" would be a silent sanctions false
+     negative. Route it to MANUAL REVIEW instead (screen.py _unscreenable /
+     _manual_review_hit parity). An exact designated-name match still wins. */
   const toks = sigTokens(norm);
-  const rare = toks.filter(t => (index.token.get(t) || []).length <= COMMON_TOKEN_CAP);
-  const useToks = rare.length ? rare : toks;
-  const seen = new Set();
-  let best = ex ? 100 : 0;
-  for (const t of useToks) {
-    for (const i of (index.token.get(t) || [])) {
-      if (seen.has(i)) continue;
-      seen.add(i);
-      const e = index.entries[i];
-      const sc = similarity(norm, e.norm);
-      if (sc > best) best = sc;
-      if (sc >= threshold) addHit(e.list, e.hitName, sc, e.hitName + '|' + e.list);
+  if (!exactAny && (!norm || !toks.length)) {
+    return {
+      name, topScore: 0, band: 'medium', recommendation: 'review', hitCount: 1,
+      lists: [{ list: MANUAL_REVIEW_LIST, score: 0,
+        hitName: 'name not auto-screenable (no distinctive name tokens after normalization) — screen this subject manually against all lists' }]
+    };
+  }
+
+  /* fuzzy over candidates that share a significant token with ANY variant */
+  const candIdx = new Set();
+  for (const v of variants) {
+    const vToks = sigTokens(v);
+    const rare = vToks.filter(t => (index.token.get(t) || []).length <= COMMON_TOKEN_CAP);
+    for (const t of (rare.length ? rare : vToks)) {
+      for (const i of (index.token.get(t) || [])) candIdx.add(i);
     }
+  }
+  let best = exactAny ? 100 : 0;
+  for (const i of candIdx) {
+    const e = index.entries[i];
+    /* Best score across variants; the subset gate (screen.py parity) is only
+       probed while the pair is still below both bars — it can only ADD hits. */
+    let sc = 0, subset = false, tset = 0;
+    for (const v of variants) {
+      const s = similarity(v, e.norm);
+      if (s > sc) sc = s;
+      if (sc === 100) break;   // cannot improve; skip the remaining variants
+      if (sc < threshold && !(subset && tset >= TOKENSET_THRESHOLD)) {
+        if (isTokenSubset(v, e.norm)) {
+          subset = true;
+          const r = tokenSetRatio(v, e.norm);
+          if (r > tset) tset = r;
+        }
+      }
+    }
+    if (sc > best) best = sc;
+    if (sc >= threshold) addHit(e.list, e.hitName, sc, e.hitName + '|' + e.list);
+    /* Additive recall gate: a true token SUBSET (patronymic chain / extra
+       middle names) with a high token-set score flags too — recorded at the
+       conservative similarity score so it reads as a POSSIBLE match for MLRO
+       disambiguation, never confirmed (mirrors screen.py's ANDed gate). */
+    else if (subset && tset >= TOKENSET_THRESHOLD) addHit(e.list, e.hitName, sc, e.hitName + '|' + e.list);
   }
 
   const lists = [...byNorm.values()].sort((a, b) => b.score - a.score).slice(0, 12);
+  /* A subject carrying letters OUTSIDE the Latin A-Z fold (Arabic/Cyrillic/CJK
+     script — normalizeName keeps them, but the published lists are indexed in
+     Latin, so those tokens can never bucket-match anything) must not silently
+     clear at 0: mirror screen.py's _unscreenable and route it to MANUAL
+     REVIEW. Only when NOTHING hit — an exact match against a curated
+     same-script entry, a Latin-residue fuzzy hit or a subset hit still wins
+     (this branch is strictly recall-monotone). */
+  if (!lists.length && lostScriptLetters(rawName)) {
+    return {
+      name, topScore: 0, band: 'medium', recommendation: 'review', hitCount: 1,
+      lists: [{ list: MANUAL_REVIEW_LIST, score: 0,
+        hitName: 'name not auto-screenable (non-Latin script — its letters cannot be matched against the Latin-published lists) — screen this subject manually against all lists' }]
+    };
+  }
   if (!lists.length) return { name, topScore: Math.round(best), band: 'low', recommendation: 'clear', hitCount: 0, lists: [] };
   const topScore = lists[0].score;
   const band = topScore >= 98 ? 'critical' : 'high';

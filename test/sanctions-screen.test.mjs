@@ -5,9 +5,14 @@
 import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
-  GOVERNANCE_NOTE, DEFAULT_THRESHOLD,
+  GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT
 } from '../scripts/sanctions-screen.mjs';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -241,6 +246,88 @@ check('AM/PEP HIT note without a posted alert card claims neither the card nor a
   amHitNoReg.includes('STATUS: ⚠ REVIEW REQUIRED') && !amHitNoReg.includes('Regulations'));
 check('AM/PEP HIT note without diff info counts hits without claiming they are new',
   !amHitNoReg.includes('New adverse media hits') && amHitNoReg.includes('Adverse media hits:           1') && !amHitNoReg.includes('| NEW'));
+
+/* ── threshold clamp (regression: SCREEN_MATCH_THRESHOLD=85 — screen.py's
+   0-100 convention — became an effective cutoff of 8500 and silently cleared
+   every fuzzy match; out-of-range values must fall back loudly) ── */
+check('resolveThreshold accepts a valid fraction', resolveThreshold('0.9') === 0.9 && resolveThreshold(0.5) === 0.5 && resolveThreshold('1') === 1);
+check('resolveThreshold defaults when unset/blank', resolveThreshold(undefined) === DEFAULT_THRESHOLD && resolveThreshold('') === DEFAULT_THRESHOLD);
+check('resolveThreshold rejects the 0-100 scale (85 → default, never 8500)', resolveThreshold('85') === DEFAULT_THRESHOLD);
+check('resolveThreshold rejects zero, negatives and garbage', resolveThreshold('0') === DEFAULT_THRESHOLD && resolveThreshold('-1') === DEFAULT_THRESHOLD && resolveThreshold('abc') === DEFAULT_THRESHOLD);
+
+/* ── OFAC alias fold (regression: sdn.csv carries only primary names; the aka
+   file alt.csv was never fetched, so every SDN alias was unscreened) ── */
+check('foldAliasSources merges alias names into the primary list under ITS name', (() => {
+  const lists = [{ id: 'ofac-sdn', name: 'OFAC SDN', names: ['A CO'] }, { id: 'ofac-sdn-alt', name: 'OFAC aka', names: ['B CO', 'A CO'] }];
+  const r = foldAliasSources(lists, [{ id: 'ofac-sdn-alt', name: 'OFAC aka', mergeInto: 'ofac-sdn' }]);
+  return lists.length === 1 && lists[0].name === 'OFAC SDN' && lists[0].names.join('|') === 'A CO|B CO'
+    && r.folded.length === 1 && r.notes.length === 0 && !lists[0].partial;
+})());
+check('foldAliasSources marks the primary PARTIAL when the alias file failed (alias coverage missing, noted)', (() => {
+  const lists = [{ id: 'ofac-sdn', name: 'OFAC SDN', names: ['A CO'] }];
+  const r = foldAliasSources(lists, [{ id: 'ofac-sdn-alt', name: 'OFAC aka', mergeInto: 'ofac-sdn' }]);
+  return lists[0].partial === true && r.notes.length === 1 && /alias coverage degraded/.test(r.notes[0]);
+})());
+check('foldAliasSources never screens aliases ALONE when the primary list failed', (() => {
+  const lists = [{ id: 'ofac-sdn-alt', name: 'OFAC aka', names: ['B CO'] }];
+  const r = foldAliasSources(lists, [{ id: 'ofac-sdn-alt', name: 'OFAC aka', mergeInto: 'ofac-sdn' }]);
+  return lists.length === 0 && r.notes.length === 1 && /NOT screened alone/.test(r.notes[0]);
+})());
+check('the shipped sources config wires alt.csv into the primary SDN list', (() => {
+  const cfg = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-sources.json'), 'utf8'));
+  const alt = (cfg.sources || []).find(s => s.id === 'ofac-sdn-alt');
+  return !!alt && alt.parser === 'ofacalt' && alt.mergeInto === 'ofac-sdn' && /alt\.csv/.test(alt.url);
+})());
+
+/* ── MANUAL REVIEW flow through the diff (screen.py parity: an unscreenable
+   subject is a reviewable finding, never a clear — and never a permanently
+   stuck one: the marker clears once the subject screens cleanly) ── */
+const mrRow = normalizeResult({ name: 'Yu Li', topScore: 0, band: 'medium', recommendation: 'review',
+  lists: [{ list: 'MANUAL REVIEW', score: 0 }] }, { key: 'y', name: 'Yu Li' });
+check('a MANUAL REVIEW row is material (isMatch) — surfaced, not cleared', isMatch(mrRow) === true);
+const mr1 = diffState({ updated: null, subjects: {} }, [mrRow], '2026-07-25', 0.85, ['OFAC SDN']);
+check('MANUAL REVIEW alerts once and is recorded standing', mr1.alerts.length === 1 && mr1.nextState.subjects.y.lists.join() === 'MANUAL REVIEW');
+check('a standing MANUAL REVIEW is not re-alerted daily', diffState(mr1.nextState, [mrRow], '2026-07-26', 0.85, ['OFAC SDN']).alerts.length === 0);
+const mrClean = normalizeResult({ name: 'Yu Li', topScore: 10, band: 'low', recommendation: 'clear', lists: [] }, { key: 'y', name: 'Yu Li' });
+const mr2 = diffState(mr1.nextState, [mrClean], '2026-07-27', 0.85, ['OFAC SDN']);
+check('MANUAL REVIEW clears once the subject screens cleanly (a local marker is no "unloaded list")',
+  mr2.cleared.length === 1 && !mr2.nextState.subjects.y);
+
+/* ── enrichment evidence carried through a lookup failure (regression: a
+   sanctions+PEP standing match whose PEP lookup errored lost the PEP evidence
+   from state AND fired a spurious "changed match" alert) ── */
+const mixedPrior = normalizeResult({ name: 'M Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+  lists: [{ list: 'OFAC SDN', matchScore: 96 }, { list: 'PEP (Wikidata)', matchScore: 80 }] }, { key: 'm', name: 'M Co' });
+const mx1 = diffState({ updated: null, subjects: {} }, [mixedPrior], '2026-07-25', 0.85, ['OFAC SDN']);
+const sanctionsOnly = normalizeResult({ name: 'M Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+  lists: [{ list: 'OFAC SDN', matchScore: 96 }] }, { key: 'm', name: 'M Co' });
+sanctionsOnly.enrichmentIncomplete = true;
+const mx2 = diffState(mx1.nextState, [sanctionsOnly], '2026-07-26', 0.85, ['OFAC SDN']);
+check('an errored enrichment lookup neither drops the PEP evidence nor fires a spurious changed-alert',
+  mx2.alerts.length === 0 && mx2.nextState.subjects.m.lists.sort().join() === 'OFAC SDN,PEP (Wikidata)');
+const sanctionsOnlyOk = normalizeResult({ name: 'M Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+  lists: [{ list: 'OFAC SDN', matchScore: 96 }] }, { key: 'm', name: 'M Co' });
+const mx3 = diffState(mx1.nextState, [sanctionsOnlyOk], '2026-07-26', 0.85, ['OFAC SDN']);
+check('once enrichment completes and the PEP hit is gone, the record updates (one changed-alert)',
+  mx3.alerts.length === 1 && mx3.nextState.subjects.m.lists.join() === 'OFAC SDN');
+
+/* ── wiring pins: red unscreened bail + retry/liveness contract ── */
+const screenSrc = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+const screenYml = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');
+const retryYml = readFileSync(join(ROOT, '.github/workflows/control-retry.yml'), 'utf8');
+const bailBlock = screenSrc.match(/function bailUnscreened[\s\S]*?\n\}/);
+check('bailUnscreened turns the run RED via process.exitCode (green bail suppressed control-retry + freshness)',
+  !!bailBlock && /process\.exitCode = 1/.test(bailBlock[0]) && !/process\.exit\(/.test(bailBlock[0]));
+check('the issue step is always()-guarded so it still fires after the red bail',
+  /if: always\(\) && \(steps\.screen\.outputs\.screen_error == 'true'/.test(screenYml));
+check('control-retry heals on missing SUCCESS (a red bail is now re-dispatched)',
+  /conclusion.*success/.test(retryYml) && /sanctions-screen\.yml/.test(retryYml));
+
+/* ── wiring pin: the EOCN reconcile step can actually `import screen` ── */
+const eocnYml = readFileSync(join(ROOT, '.github/workflows/eocn-reconcile.yml'), 'utf8');
+const reconcileStep = eocnYml.match(/- name: Reconcile the local list[\s\S]*?(?=\n {6}- name: )/);
+check('eocn-reconcile provides ASANA_TOKEN to the import (screen.py reads it unconditionally at module load)',
+  !!reconcileStep && /ASANA_TOKEN:/.test(reconcileStep[0]));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
