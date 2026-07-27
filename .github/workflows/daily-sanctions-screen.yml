@@ -20,7 +20,11 @@ on:
   # RETIRED (schedule removed): superseded by the single unified "Daily Screening
   # (Sanctions + Adverse Media + PEP)" workflow (weekly-adverse-media.yml,
   # RUN_MODE=unified), delivered daily by 09:00 UAE. Kept as manual-only so it can
-  # still be re-run on demand; no longer posts a duplicate daily task.
+  # still be re-run on demand; no longer posts a duplicate daily task. Its
+  # screening step now runs through the REAL engine matcher (screen.py
+  # screen_name) — the weak inline top-3 token_sort matcher it used to carry
+  # could clear names the daily engine flags, making the fallback a
+  # false-confidence trap on exactly the days it would be dispatched.
   workflow_dispatch:
 
 # Least privilege: the screen reads the repo and posts results to Asana via
@@ -273,24 +277,19 @@ jobs:
           python3 << 'PYEOF'
           import json, os, re, hashlib
           import xml.etree.ElementTree as ET
-          from rapidfuzz import fuzz, process
-          import unicodedata
 
-          # ---- helpers ----
-          def normalise(name):
-              """Fold to a stable comparison key — same semantics as
-              normalizeName in scripts/sanctions-match.mjs (the single source
-              of truth): NFKD, strip combining marks (Latin diacritics AND
-              Arabic harakat), lower-case, collapse anything that is not a
-              letter or digit IN ANY SCRIPT. The old ASCII-only fold emptied
-              non-Latin-script names, so they either 100%-matched every other
-              emptied name or silently screened Clear."""
-              name = unicodedata.normalize("NFKD", str(name or ""))
-              name = "".join(c for c in name if unicodedata.category(c)[0] != "M")
-              name = "".join(c if unicodedata.category(c)[0] in ("L", "N") else " " for c in name.lower())
-              return re.sub(r"\s+", " ", name).strip()
-
-          THRESHOLD = 85
+          # The weak inline matcher this step used to carry (token_sort top-3,
+          # break on first hit, no core/subset/short-entry gates, no
+          # transliteration variants) is GONE: this fallback now screens through
+          # the REAL engine matcher (screen.py screen_name — the audited one the
+          # daily unified run uses), so a manual dispatch of this workflow can
+          # never clear a name the daily engine would flag. screen.py reads
+          # ASANA_TOKEN at import (config only); this step never calls Asana, so
+          # a placeholder satisfies the import without handing a credential to
+          # a step that parses external downloads (same pattern as
+          # eocn-reconcile.yml — least privilege).
+          os.environ.setdefault("ASANA_TOKEN", "import-only-placeholder")
+          import screen as engine
 
           # ---- load customers ----
           with open("/tmp/customers.json") as f:
@@ -558,61 +557,52 @@ jobs:
               print("SCREENING REFUSED - refusal notice written for delivery; the floor gate fails the job after delivery.")
               raise SystemExit(0)
 
-          # ---- normalise all sanctioned names ----
-          sanctioned_norm = [(normalise(s["name"]), s) for s in sanctioned]
-          norm_names_only = [x[0] for x in sanctioned_norm]
+          # ---- screen through the engine matcher (parity with the daily run) ----
+          # Same normalize/variants/core/subset/short-entry gates, same C-side
+          # prefilter, same thresholds. Every hit the engine finds is recorded;
+          # "confirmed" only at a genuine exact match (score >= 100 — the
+          # engine's confirmed-hit gate; fuzzy 95-99 reads POTENTIAL).
+          all_lists = {}
+          programme = {}
+          for s in sanctioned:
+              all_lists.setdefault(s["list"], []).append((engine.normalize(s["name"]), s["name"]))
+              programme.setdefault((s["list"], s["name"]), s.get("programme", ""))
 
-          # ---- screen each customer ----
           confirmed_hits = []
           potential_matches = []
           clear = []
 
           for customer in customers:
               cname = customer["name"]
-              cnorm = normalise(cname)
-
-              # rapidfuzz batch match — top 3
-              results = process.extract(
-                  cnorm,
-                  norm_names_only,
-                  scorer=fuzz.token_sort_ratio,
-                  limit=3
-              )
-
-              hit = False
-              for match_name, score, idx in results:
-                  if score >= 95:
-                      confirmed_hits.append({
-                          "customer": cname,
-                          "customer_gid": customer["gid"],
-                          "customer_url": customer["url"],
-                          "kind": customer.get("kind","entity"),
-                          "parent": customer.get("parent",""),
-                          "role": customer.get("role",""),
-                          "matched_name": sanctioned_norm[idx][1]["name"],
-                          "matched_list": sanctioned_norm[idx][1]["list"],
-                          "programme": sanctioned_norm[idx][1]["programme"],
-                          "score": score
-                      })
-                      hit = True
-                      break
-                  elif score >= THRESHOLD:
-                      potential_matches.append({
-                          "customer": cname,
-                          "customer_gid": customer["gid"],
-                          "customer_url": customer["url"],
-                          "kind": customer.get("kind","entity"),
-                          "parent": customer.get("parent",""),
-                          "role": customer.get("role",""),
-                          "matched_name": sanctioned_norm[idx][1]["name"],
-                          "matched_list": sanctioned_norm[idx][1]["list"],
-                          "programme": sanctioned_norm[idx][1]["programme"],
-                          "score": score
-                      })
-                      hit = True
-                      break
-
-              if not hit:
+              row = {
+                  "customer": cname,
+                  "customer_gid": customer["gid"],
+                  "customer_url": customer["url"],
+                  "kind": customer.get("kind", "entity"),
+                  "parent": customer.get("parent", ""),
+                  "role": customer.get("role", ""),
+              }
+              hits = engine.screen_name(cname, all_lists)
+              if hits:
+                  top = hits[0]   # engine-sorted, best score first
+                  row.update({
+                      "matched_name": top["matched_entry"],
+                      "matched_list": top["list"],
+                      "programme": programme.get((top["list"], top["matched_entry"]), ""),
+                      "score": round(top["score"]),
+                  })
+                  (confirmed_hits if top["score"] >= 100 else potential_matches).append(row)
+              elif engine._unscreenable(cname):
+                  # Non-Latin-script / too-short names cannot be auto-screened —
+                  # a silent "clear" would be a false negative (engine parity:
+                  # surfaced as a reviewable POTENTIAL row, never dropped).
+                  row.update({
+                      "matched_name": ("name not auto-screenable (non-Latin script or too short) "
+                                       "— screen this customer manually against all lists"),
+                      "matched_list": "MANUAL REVIEW", "programme": "", "score": 0,
+                  })
+                  potential_matches.append(row)
+              else:
                   clear.append(cname)
 
           # ---- save results ----

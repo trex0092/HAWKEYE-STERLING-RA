@@ -722,6 +722,27 @@ ASANA_NOTES_FLOOR = 12000  # shrink-chain floor: keeps the summary + sign-off in
 NOTES_BUDGET_KEY = "__meta_asana_notes_budget__"  # reserved — never a fingerprint
 NOTES_BUDGET = {"stored": None, "learned": None}  # loaded from / saved to delta-state
 
+# ── MLRO case backlog (reserved delta-state key) ─────────────────────────────
+# Items past CASE_SUBTASK_CAP (or whose subtask create failed) used to get a
+# log line and nothing else: the delta engine marked them standing, so they
+# never re-entered the case queue on any later run — reported once, cased
+# never. They are now carried in a reserved backlog inside the delta state and
+# drained on later runs whenever the day's NEW items leave capacity free
+# (sanctions first, oldest first). Bounded LOUDLY, never silently.
+CASE_BACKLOG_KEY = "__meta_case_backlog__"        # reserved — never a fingerprint
+CASE_BACKLOG_MAX = 400                            # hard bound on carried items (log names the overflow)
+
+def load_case_backlog(state):
+    """Backlog entries from the delta state: [{p, name, notes, queued}] —
+    malformed/legacy content degrades to an empty backlog, never a crash."""
+    out = []
+    for e in (state.get(CASE_BACKLOG_KEY) or []) if isinstance(state, dict) else []:
+        if (isinstance(e, dict) and isinstance(e.get("name"), str) and e["name"]
+                and isinstance(e.get("notes"), str)):
+            out.append({"p": int(e.get("p", 0) or 0), "name": e["name"],
+                        "notes": e["notes"], "queued": str(e.get("queued", ""))[:10]})
+    return out
+
 def _clamp_notes_budget(v):
     """A budget read from state is advisory — clamp garbage into the sane range."""
     try:
@@ -1954,8 +1975,23 @@ def parse_canada(data):
         for rec in root.iter():
             # Each record groups name parts as child elements; collect name-ish fields.
             entity = given = last = ""
+            aliases = []
             for ch in list(rec):
                 tag = ch.tag.split("}")[-1].lower()
+                if "alias" in tag or tag == "aka":
+                    # Aliases were previously never captured — a party operating
+                    # under a SEMA-listed a.k.a. screened clear against this
+                    # (supplementary) list. Tolerant of both shapes: nested
+                    # <Aliases><Alias>A</Alias>…> (one alias per child element)
+                    # and flat <Aliases>A; B</Aliases> (semicolon-separated).
+                    kids = list(ch)
+                    chunks = ([" ".join(" ".join(k.itertext()).split()) for k in kids]
+                              if kids else re.split(r"[;\n]", ch.text or ""))
+                    for a in chunks:
+                        a = a.strip().strip('"').strip()
+                        if len(a) >= 2 and not _OWNER_JUNK_RE.match(a):
+                            aliases.append(a)
+                    continue
                 val = (ch.text or "").strip()
                 if not val: continue
                 if "entity" in tag or tag == "name": entity = entity or val
@@ -1964,6 +2000,11 @@ def parse_canada(data):
             if entity: names.add(entity)
             person = " ".join(p for p in [given, last] if p)
             if person and len(person) > 3: names.add(person)
+            # An alias designates the SAME party — screened like a primary name.
+            # Gated on the record carrying a primary, so a stray alias-shaped
+            # element outside a real record cannot inject names.
+            if entity or (person and len(person) > 3):
+                names.update(aliases)
     except Exception as e:
         log(f"  Canada SEMA parse error: {e}")
     if not names: return names, "unavailable", ""
@@ -3661,9 +3702,13 @@ def create_case_subtask(parent_gid, name, notes, due_on):
     log(f"  case subtask failed: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
     return False
 
-def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time):
+def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
+                    state=None):
     """Create an assigned subtask for each NEW item (sanctions, PEP, adverse),
-    capped at CASE_SUBTASK_CAP; any overflow is logged, never silently dropped."""
+    capped at CASE_SUBTASK_CAP per run. Overflow and failed creates go to the
+    reserved backlog in `state` (persisted with the delta state on delivery)
+    and are drained on later runs — sanctions first, oldest first — so an item
+    past the cap is cased LATER, not never."""
     due_on = run_time.strftime("%Y-%m-%d")
     queue = []  # (priority, name, notes)
     for m in possible_matches:
@@ -3712,14 +3757,48 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         notes += ["", "Disposition: [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR"]
         queue.append((2, nm, "\n".join(notes)))
 
-    queue.sort(key=lambda x: x[0])  # sanctions first, then PEP, then adverse
+    # Merge today's NEW items with the carried backlog. Sort key (priority,
+    # queued-date, arrival order): a backlogged sanctions case beats today's
+    # adverse case, and within a priority the longest-waiting item goes first.
+    today_iso = due_on
+    entries = [{"p": p, "name": nm, "notes": notes, "queued": today_iso}
+               for p, nm, notes in sorted(queue, key=lambda x: x[0])]
+    today_names = {e["name"] for e in entries}
+    backlog = [e for e in load_case_backlog(state) if e["name"] not in today_names]
+    if backlog:
+        log(f"  case backlog: {len(backlog)} carried item(s) eligible this run")
+    combined = sorted(entries + backlog,
+                      key=lambda e: (e["p"], e["queued"] or today_iso))
     created = 0
-    for _, nm, notes in queue[:CASE_SUBTASK_CAP]:
-        if create_case_subtask(parent_gid, nm, notes, due_on):
+    leftover = []
+    for i, e in enumerate(combined):
+        if i >= CASE_SUBTASK_CAP or not create_case_subtask(
+                parent_gid, e["name"],
+                (e["notes"] + (f"\n\n(backlogged since the {e['queued']} run — "
+                               f"case capacity or a create failure deferred it)"
+                               if e["queued"] and e["queued"] != today_iso else "")),
+                due_on):
+            leftover.append(e)
+        else:
             created += 1
-    if len(queue) > CASE_SUBTASK_CAP:
-        log(f"  case cap: created {created}, {len(queue) - CASE_SUBTASK_CAP} additional NEW item(s) "
-            f"not turned into subtasks (see report body)")
+    if state is not None:
+        # A failed create with a live parent is retried from the backlog next
+        # run; with NO parent (delivery failed) the state is never persisted and
+        # everything re-alerts as new, so skip the pointless carry.
+        if parent_gid:
+            if len(leftover) > CASE_BACKLOG_MAX:
+                log(f"  case backlog OVER CAP: dropping {len(leftover) - CASE_BACKLOG_MAX} "
+                    f"oldest-priority-last item(s) beyond {CASE_BACKLOG_MAX} — raise "
+                    f"CASE_SUBTASK_CAP or clear the queue (items remain in the report body)")
+                leftover = leftover[:CASE_BACKLOG_MAX]
+            if leftover:
+                log(f"  case backlog: {len(leftover)} item(s) carried to the next run")
+            state[CASE_BACKLOG_KEY] = [
+                {"p": e["p"], "name": e["name"][:250], "notes": e["notes"][:8000],
+                 "queued": e["queued"] or today_iso} for e in leftover]
+    if len(combined) > CASE_SUBTASK_CAP:
+        log(f"  case cap: created {created}, {len(combined) - CASE_SUBTASK_CAP} additional NEW item(s) "
+            f"deferred to the case backlog (all remain in the report body)")
     else:
         log(f"  MLRO cases created: {created}")
     return created
@@ -4068,8 +4147,10 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                         pep_findings, list_meta, stats, run_time)
     parent_gid = post_unified_task(narrative, run_time, possible_matches,
                                    adverse_findings, pep_findings, mode=mode)
-    # MLRO case subtasks for the NEW items only (keeps the case list actionable)
-    open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time)
+    # MLRO case subtasks for the NEW items only (keeps the case list actionable);
+    # overflow/failed items ride the reserved backlog inside `state`.
+    open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
+                    state=state)
     # Persist the delta-state ONLY once the report was delivered. If the post
     # failed (parent_gid is None), keep the prior state so today's new matches are
     # flagged new again on the next run instead of being silently suppressed.
