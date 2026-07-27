@@ -2219,9 +2219,16 @@ except Exception:
 _NORMS_CACHE = {}   # id(entries) -> (entries, [norm, ...]) — strong ref pins the id
 
 def _entry_norms(entries):
+    # Rebuild on length change as well as identity change: an entries list
+    # mutated in place after first being screened would otherwise serve stale
+    # norms, and the prefilter would silently never survey the added names — a
+    # sanctions false negative. No production path mutates a list today (every
+    # loader builds its list once), but this invariant is what the whole
+    # "bit-identical with blocking on/off" claim rests on, so it is guarded
+    # here rather than assumed of every future caller.
     key = id(entries)
     cached = _NORMS_CACHE.get(key)
-    if cached is None or cached[0] is not entries:
+    if cached is None or cached[0] is not entries or len(cached[1]) != len(entries):
         cached = (entries, [e[0] for e in entries])
         _NORMS_CACHE[key] = cached
     return cached[1]

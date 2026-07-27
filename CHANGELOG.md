@@ -10,6 +10,22 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Matcher: stale-norms guard on the prefilter cache (2026-07-27)
+
+A full-screening correctness audit re-verified the C-side prefilter's
+bit-identical claim with a 3,558-subject adversarial differential (blocking
+on/off: 0 mismatches, 0 necessity violations) and found one latent defect:
+`_entry_norms` caches a list's normalized names by object identity, so an
+entries list mutated IN PLACE after first being screened would serve stale
+norms — the prefilter would silently never survey the appended designation,
+a sanctions false negative in blocked mode (probe: 0 hits blocked vs 1
+unblocked). No production loader mutates a list today (every load path
+builds its lists once), so no live run was affected; the cache now also
+rebuilds on length change, with regression tests in the engine suite
+(`_entry_norms` re-norm check) and the real-rapidfuzz property suite
+(equivalence must survive in-place list growth — verified to fail against
+the unguarded code).
+
 ### Matcher: exact C-side prefilter — ~6× faster screening pass, bit-identical results (2026-07-25)
 
 The sweep scored every (subject, entry) pair in a Python loop — ~870

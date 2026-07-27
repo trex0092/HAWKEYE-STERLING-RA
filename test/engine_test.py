@@ -844,6 +844,18 @@ check("prefilter unavailable → None (caller scores every entry, plain loop)",
       (lambda _p: (setattr(screen, "_rf_process", None),
                    screen._survivor_indices({"x y"}, _blk_entries) is None,
                    setattr(screen, "_rf_process", _p))[1])(screen._rf_process))
+# Stale-cache guard: _entry_norms is keyed by list identity, so an entries list
+# mutated IN PLACE after first being screened must be re-normed — serving the
+# cached norms would mean the prefilter never surveys the appended designation
+# (a silent sanctions false negative in blocked mode). No loader mutates a list
+# today; this pins the invariant against any future caller that does.
+_mut_entries = [(screen.normalize("ZORRO HOLDINGS LLC"), "ZORRO HOLDINGS LLC")]
+_norms_before = list(screen._entry_norms(_mut_entries))
+_mut_entries.append((screen.normalize("PETROPARS INTERNATIONAL FZE"), "PETROPARS INTERNATIONAL FZE"))
+_norms_after = screen._entry_norms(_mut_entries)
+check("_entry_norms re-norms after in-place list growth (stale-cache guard)",
+      len(_norms_before) == 1 and len(_norms_after) == 2
+      and _norms_after[1] == screen.normalize("PETROPARS INTERNATIONAL FZE"))
 
 # OFAC / UN mirror fallback: primary yielded nothing → screen via the
 # OpenSanctions mirror with MIRROR provenance; primary loaded → no mirror fetch;
