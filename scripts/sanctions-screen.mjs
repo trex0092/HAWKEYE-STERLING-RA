@@ -34,7 +34,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
-import { normalizeName, parseList, buildIndex, screenName } from './sanctions-match.mjs';
+import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
 import { checkAdverseMedia, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
@@ -86,8 +86,26 @@ export function formatHumanDate(iso) {
 }
 
 /* A score at/above this fraction (engine scores are 0-100) is treated as a match
-   even absent an explicit recommendation. Override with SCREEN_MATCH_THRESHOLD. */
-export const DEFAULT_THRESHOLD = Number(process.env.SCREEN_MATCH_THRESHOLD) || 0.85;
+   even absent an explicit recommendation. Override with SCREEN_MATCH_THRESHOLD
+   (validated through resolveThreshold below). */
+export const DEFAULT_THRESHOLD = 0.85;
+
+/* Parse SCREEN_MATCH_THRESHOLD — a FRACTION in (0, 1]. The Python engine's
+   THRESHOLD uses the 0-100 scale, so an operator copying its `85` here would
+   silently raise the effective cutoff to 8500 and clear every fuzzy match (a
+   config-typo false-negative machine). Out-of-range / non-numeric values are
+   rejected LOUDLY and the default kept — matching is never silently disabled. */
+export function resolveThreshold(raw) {
+  if (raw == null || String(raw).trim() === '') return DEFAULT_THRESHOLD;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > 1) {
+    console.error('sanctions-screen: SCREEN_MATCH_THRESHOLD=' + JSON.stringify(String(raw))
+      + ' is not a fraction in (0,1] (did you use screen.py\'s 0-100 scale?) — using the default '
+      + DEFAULT_THRESHOLD + ' so fuzzy matching is never silently disabled.');
+    return DEFAULT_THRESHOLD;
+  }
+  return n;
+}
 
 /* Recommendations / bands that mean "no action". Anything else the engine returns
    is treated as a positive signal (conservative — errs toward flagging). */
@@ -97,6 +115,11 @@ const HIGH_BANDS = new Set(['critical', 'high', 'severe', 'elevated', 'red', 'am
    sanctions match. A standing match derived solely from these must NOT be cleared
    on a run where the lookup errored or was time-budget-skipped (see diffState). */
 const ENRICHMENT_LISTS = new Set(['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice']);
+/* Locally-derived pseudo-lists (no external list behind them, re-evaluated on
+   every run): they must be exempt from the "originating list did not load this
+   run" carry-forward, or a MANUAL REVIEW flag could never clear even after the
+   subject's record is fixed and screens clean. */
+const LOCAL_MARKER_LISTS = new Set([MANUAL_REVIEW_LIST]);
 
 /* ── Pure helpers (no network; unit-tested) ───────────────────────────────── */
 
@@ -326,7 +349,7 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
       let lists = r.lists || [];
       let band = r.band, recommendation = r.recommendation;
       if (screened && prior && Array.isArray(prior.lists)) {
-        const unscreened = prior.lists.filter(l => !ENRICHMENT_LISTS.has(l) && !screened.has(l));
+        const unscreened = prior.lists.filter(l => !ENRICHMENT_LISTS.has(l) && !LOCAL_MARKER_LISTS.has(l) && !screened.has(l));
         if (unscreened.length) {
           const have = new Set(lists.map(h => h.list).filter(Boolean));
           for (const l of unscreened) if (!have.has(l)) { lists = lists.concat([{ list: l, carriedForward: true }]); have.add(l); }
@@ -334,6 +357,18 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
             band = prior.band;
             recommendation = prior.recommendation || recommendation;
           }
+        }
+      }
+      /* Enrichment evidence (PEP / adverse media / Interpol) on a prior match is
+         NOT re-verified on a run whose lookup errored or was budget-skipped.
+         Rebuilding the signature without it would (a) fire a spurious "changed
+         match" alert and (b) silently rewrite the standing record, dropping the
+         PEP/media evidence over a mere lookup failure. Carry it forward; a later
+         run with working enrichment updates it legitimately. */
+      if (r.enrichmentIncomplete && prior && Array.isArray(prior.lists)) {
+        const have = new Set(lists.map(h => h.list).filter(Boolean));
+        for (const l of prior.lists) {
+          if (ENRICHMENT_LISTS.has(l) && !have.has(l)) { lists = lists.concat([{ list: l, carriedForward: true }]); have.add(l); }
         }
       }
       const sig = matchSignature({ band, recommendation, lists });
@@ -367,8 +402,11 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
       // match forward (no clear, no case auto-completion) rather than declaring an
       // all-clear off the back of a fetch/parse failure.
       if (screened) {
+        /* Local markers (MANUAL REVIEW) have no originating list — they are
+           re-derived every run, so a prior marker never blocks a genuine clear
+           once the subject screens cleanly. */
         const priorSanctionsLists = (Array.isArray(prior.lists) ? prior.lists : [])
-          .filter(l => !ENRICHMENT_LISTS.has(l));
+          .filter(l => !ENRICHMENT_LISTS.has(l) && !LOCAL_MARKER_LISTS.has(l));
         if (priorSanctionsLists.some(l => !screened.has(l))) {
           carryForward(r.key);   // originating list not screened this run → keep the standing match
           continue;
@@ -764,6 +802,42 @@ async function fetchListBody(source, timeoutMs = 60000) {
   }, timeoutMs);
 }
 
+/* Fold alias-only sources (source.mergeInto = <primary source id> — e.g. the
+   OFAC SDN a.k.a. file alt.csv) into their primary list, so an alias hit
+   carries the PRIMARY list's name: a party operating under an SDN alias IS an
+   SDN match. Mutates `lists` in place; returns { folded, notes }:
+     both loaded    → primary gains the alias names (deduped); alias row removed
+     alias missing  → primary kept + marked `partial` — alias coverage is
+                      MISSING, so the diff must not treat the primary list as
+                      fully re-verified (standing matches carried, not cleared)
+     primary missing→ alias row dropped: aliases are never screened ALONE as the
+                      primary's coverage (mirrors screen.py's aliases-only guard)
+   Pure (no I/O) so test/sanctions-screen.test.mjs pins it offline. */
+export function foldAliasSources(lists, sources) {
+  const folded = [], notes = [];
+  const byId = new Map((lists || []).map(L => [L.id, L]));
+  for (const s of (sources || [])) {
+    if (!s || !s.mergeInto) continue;
+    const alias = byId.get(s.id);
+    const target = byId.get(s.mergeInto);
+    if (alias && target) {
+      const before = target.names.length;
+      target.names = [...new Set([...target.names, ...alias.names])];
+      lists.splice(lists.indexOf(alias), 1);
+      byId.delete(s.id);
+      folded.push('folded ' + (target.names.length - before) + ' a.k.a. name(s) from ' + s.name + ' into ' + target.name);
+    } else if (alias && !target) {
+      lists.splice(lists.indexOf(alias), 1);
+      byId.delete(s.id);
+      notes.push(s.name + ' loaded but its primary list did not — a.k.a. names NOT screened alone; coverage degraded');
+    } else if (!alias && target) {
+      target.partial = true;   // alias file failed: primary screens, but was not FULLY re-verified
+      notes.push(target.name + ' screened WITHOUT its a.k.a. names (' + s.name + ' failed) — alias coverage degraded; standing matches on this list are carried forward, not cleared');
+    }
+  }
+  return { folded, notes };
+}
+
 /* Fetch + parse every enabled source into [{ id, name, names[] }]. A source that
    fails to fetch or yields zero names degrades coverage (reported, never a silent
    all-clear); a curated list with no entries degrades too. */
@@ -799,6 +873,12 @@ async function loadSanctionsLists(cfg) {
       console.error('sanctions-screen: ' + s.id + ' failed — ' + (e && e.message || e));
     }
   }));
+  /* Alias-only sources (OFAC alt.csv) fold into their primary list so alias
+     hits carry the primary designation; a missing alias file soft-degrades
+     that list (partial) — reported, never a hard fail of the primary load. */
+  const fold = foldAliasSources(lists, sources);
+  for (const f of fold.folded) console.log('sanctions-screen: ' + f);
+  for (const n of fold.notes) { notes.push(n); console.error('sanctions-screen: ' + n); }
   return { lists, degraded: fetched < sources.length, fetched, total: sources.length, notes };
 }
 
@@ -898,7 +978,11 @@ async function screenLocally(subjects, cfg) {
       }
     }
 
-    const hasSanctions = raw.lists.length > 0;
+    /* screenName's recommendation distinguishes real designation hits
+       ('sanctions-match') from a not-auto-screenable subject ('review', with
+       the MANUAL REVIEW pseudo-list) — the latter must surface as a reviewable
+       finding, never be promoted to a sanctions match nor demoted to clear. */
+    const hasSanctions = raw.recommendation === 'sanctions-match';
     const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
     const merged = {
       name: s.name,
@@ -955,6 +1039,13 @@ function bailUnscreened(reason, today) {
   setOutput('screen_error', 'true');
   setOutput('asana_posted', 'false');
   setOutput('title', 'Sanctions Screen — could not run (' + reason + ')');
+  /* An unscreened day must be a RED run, not a green one with an issue: the
+     control-retry dispatcher only re-fires a control with no SUCCESSFUL run
+     today, and the freshness check reads a green conclusion as evidence the
+     daily screen happened. Exit code (never process.exit) so the sync writes
+     above land and the workflow's always()-guarded steps still see the
+     outputs; the issue step fires either way. */
+  process.exitCode = 1;
 }
 
 async function main() {
@@ -962,7 +1053,7 @@ async function main() {
   const cfg = {
     sourcesFile: SANCTIONS_SOURCES_FILE,
     extraFile: process.env.SANCTIONS_EXTRA_FILE || 'data/sanctions-extra.json',
-    threshold: Number(process.env.SCREEN_MATCH_THRESHOLD) || DEFAULT_THRESHOLD,
+    threshold: resolveThreshold(process.env.SCREEN_MATCH_THRESHOLD),
     adverseMedia: process.env.SCREEN_ADVERSE_MEDIA !== '0',   // default on
     pep: process.env.SCREEN_PEP !== '0',                      // default on
     interpol: process.env.SCREEN_INTERPOL === '1',            // default OFF (opt-in; verify the public API on the runner before enabling)
@@ -992,7 +1083,12 @@ async function main() {
   if (!screen.anyOk) return bailUnscreened('no sanctions list could be loaded — ' + ((screen.notes || []).join('; ') || 'all sources failed'), today);
 
   const prevState = loadState();
-  const screenedLists = ((screen.coverage && screen.coverage.lists) || []).map(L => L.name).filter(Boolean);
+  /* Lists fully re-verified this run. A `partial` list (its a.k.a. file failed
+     to load — e.g. OFAC SDN without alt.csv) screened only part of its
+     designations, so it is EXCLUDED here: diffState then carries its standing
+     matches forward instead of clearing them off reduced coverage. */
+  const screenedLists = ((screen.coverage && screen.coverage.lists) || [])
+    .filter(L => !L.partial).map(L => L.name).filter(Boolean);
   const { alerts, cleared, matchCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold, screenedLists);
   const meta = { screened: subjects.length, entities, individuals, degraded: screen.degraded, errored: screen.errored };
   const report = buildScreenReport(alerts, cleared, today, meta);

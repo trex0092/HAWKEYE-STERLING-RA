@@ -108,9 +108,20 @@ for (let i = 0; i < 2000; i++) {
   check('screenName returns a well-formed row',
     typeof r.topScore === 'number' && r.topScore >= 0 && r.topScore <= 100 &&
     Array.isArray(r.lists) && r.hitCount === r.lists.length &&
-    (r.recommendation === 'clear' || r.recommendation === 'sanctions-match'));
+    (r.recommendation === 'clear' || r.recommendation === 'sanctions-match' || r.recommendation === 'review'));
   check('screenName: a clear result carries no hits and low band',
-    r.recommendation === 'sanctions-match' || (r.hitCount === 0 && r.band === 'low'));
+    r.recommendation !== 'clear' || (r.hitCount === 0 && r.band === 'low'));
+  check('screenName: a review result is exactly the MANUAL REVIEW marker (score 0, one pseudo-hit)',
+    r.recommendation !== 'review' || (r.hitCount === 1 && r.topScore === 0 && r.lists[0].list === 'MANUAL REVIEW'));
+  /* Unscreenable ⇒ never a silent clear: a non-empty raw name that folds to no
+     significant token has no candidate path — it must route to MANUAL REVIEW
+     (or be an exact designated-name hit), the property behind the "Yu Li" /
+     symbols-only silent-clear regression. */
+  const norm = normalizeName(subj);
+  if (subj.trim() && sigTokens(norm).length === 0) {
+    check('screenName never silently clears an unscreenable name',
+      r.recommendation === 'review' || (r.recommendation === 'sanctions-match' && r.topScore === 100));
+  }
 }
 
 /* Recall guarantee: any designated name screened against its own index must be

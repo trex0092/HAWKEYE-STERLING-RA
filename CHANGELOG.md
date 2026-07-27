@@ -10,6 +10,56 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### JS sanctions engine: four silent-clear classes closed, unscreened days go red (2026-07-27)
+
+The full-screening correctness audit's JS pass found the daily case engine
+(`scripts/sanctions-screen.mjs` + `scripts/sanctions-match.mjs` — also the
+TFS immediate-re-screen target) silently clearing four classes of subject
+the Python engine flags, and passing an unscreened day as green. All fixed,
+with regression tests verified to fail against the pre-fix code:
+
+- **OFAC SDN aliases** — the JS engine loaded only `sdn.csv` primary names;
+  a party operating under an SDN a.k.a. cleared. New `ofac-sdn-alt` source
+  (`alt.csv`, `parseOfacAltCsv`) folds aliases into the primary list
+  (`foldAliasSources`); alias-file failure marks the list `partial` — its
+  standing matches are carried forward, never cleared off reduced coverage,
+  and aliases are never screened alone when the primary failed.
+- **Candidate blindness** — fuzzy candidates required an exact shared
+  token, so routine transliteration drift ("Muhamad Husein" vs "MUHAMMAD
+  HUSSEIN", similarity 87.5) was never even scored. `nameVariants` ports
+  `ai.py`'s transliteration groups (shared source of truth) into
+  candidate generation and scoring; `similarity()` gains a
+  boilerplate-stripped core-vs-core arm ("Muhamad Hussein Trading LLC" vs
+  "MUHAMMAD HUSSEIN": 46 → 94). Strictly recall-monotone. Residual,
+  stated honestly: a typo outside the groups in EVERY significant token
+  still finds no candidate (Python's cutoff prefilter has no such
+  blindness) — recorded on the model card.
+- **Token-subset names** — "Quds Force" vs the full IRGC chain (73) and
+  "Usama Bin Ladin" vs the full patronymic chain (84) cleared at the 85
+  bar. The Python subset gate is ported (`isTokenSubset` +
+  `tokenSetRatio ≥ 93`, rapidfuzz InDel semantics via `indelRatio`),
+  symmetric in both directions, recorded at the conservative score.
+- **Unscreenable names** — a name folding to no distinctive tokens
+  ("Yu Li", symbols-only) or carrying non-Latin-script letters the
+  Latin-published lists can never match (`lostScriptLetters`, mirroring
+  `screen.py:_lost_script_letters`) now routes to a **MANUAL REVIEW**
+  finding instead of silently clearing; an exact or same-script curated
+  match still wins. The marker alerts once, stands without re-alert spam,
+  and clears the day the subject screens cleanly (`LOCAL_MARKER_LISTS`).
+- **Red unscreened days** — `bailUnscreened` (Asana unreadable, no lists)
+  wrote its report and exited 0: a green run the self-healing dispatcher
+  would never retry and the freshness check counted as done. It now sets
+  `process.exitCode = 1` after writing outputs; the issue step still fires
+  (`always()`-guarded) and `control-retry` re-dispatches the day.
+- **Hardening** — `SCREEN_MATCH_THRESHOLD` is validated as a fraction in
+  (0,1] (copying screen.py's `85` would have set the cutoff to 8500 and
+  cleared every fuzzy match — rejected loudly, default kept);
+  `eocn-reconcile.yml`'s import-only step gets a placeholder
+  `ASANA_TOKEN` (it never calls Asana; every prior run died on import);
+  a standing sanctions match no longer loses its PEP/adverse-media
+  evidence (nor fires a spurious CHANGED alert) when the enrichment
+  lookup merely errored — prior evidence is carried forward.
+
 ### Screening engine: six silent-false-negative extraction/loading gaps closed (2026-07-27)
 
 The full-screening correctness audit's pipeline pass found the engine's
