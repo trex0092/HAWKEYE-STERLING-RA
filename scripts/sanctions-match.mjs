@@ -688,7 +688,74 @@ export function buildIndex(lists) {
       }
     }
   }
-  return { exact, token, entries, size: entries.length };
+  /* ── Fuzzy-blocking keys over the UNIQUE significant tokens ────────────────
+     The exact-token candidate index above is blind to a subject whose every
+     token carries an out-of-transliteration-group typo ("Vladimyr Putyn" vs
+     VLADIMIR PUTIN shares no exact token → no candidates → silent clear).
+     Two cheap, complementary posting-list indexes close that: padded character
+     TRIGRAMS (robust to a typo anywhere but the first chars) and a PREFIX +
+     length key (robust to a typo the trigram share-count misses in short
+     tokens). Built once per index over unique tokens — bounded memory, and the
+     no-typo query path never touches them (see fuzzyTokenMatches). */
+  const tokens = [...token.keys()];               // unique sig tokens, id = position (deterministic)
+  const gram = new Map();                         // trigram -> tokenId[]
+  const pfx = new Map();                          // first2 + '|' + length -> tokenId[]
+  for (let id = 0; id < tokens.length; id++) {
+    const t = tokens[id];
+    for (const g of trigramsOf(t)) {
+      let arr = gram.get(g);
+      if (!arr) gram.set(g, arr = []);
+      arr.push(id);
+    }
+    const k = t.slice(0, 2) + '|' + t.length;
+    let arr = pfx.get(k);
+    if (!arr) pfx.set(k, arr = []);
+    arr.push(id);
+  }
+  return { exact, token, entries, tokens, gram, pfx, size: entries.length };
+}
+
+/* Unique padded character trigrams of a token ('^' and '$' mark the edges so
+   boundary typos still share most grams). Deterministic order. */
+export function trigramsOf(token) {
+  const s = '^' + String(token == null ? '' : token) + '$';
+  const out = new Set();
+  for (let i = 0; i + 3 <= s.length; i++) out.add(s.slice(i, i + 3));
+  return [...out];
+}
+
+/* Fuzzy-blocking lookup: index tokens plausibly one typo away from `token`.
+   Candidate token ids come from (a) sharing at least half of the token's
+   trigrams and (b) the prefix+length keys at length−1/len/len+1; each is then
+   VERIFIED with an edit-distance gate before being returned. The gate is
+   `levenshtein ≤ 1 OR indelRatio ≥ 88`: the indelRatio-only rule the subset
+   gate uses would reject the very class this exists for (one SUBSTITUTION
+   costs 2 under InDel, so putyn/putin scores 80 and vladimyr/vladimir 87.5 —
+   both under 88); the lev≤1 arm admits exactly the single-edit tokens, the
+   indel arm keeps longer near-matches. Deterministic (sorted); returns [] on
+   an index without blocking keys (defensive). */
+export function fuzzyTokenMatches(token, index) {
+  const t = String(token == null ? '' : token);
+  if (t.length < 3 || !index || !index.gram || !index.pfx || !index.tokens) return [];
+  const grams = trigramsOf(t);
+  const tally = new Map();                        // tokenId -> shared trigram count
+  for (const g of grams) {
+    for (const id of (index.gram.get(g) || [])) tally.set(id, (tally.get(id) || 0) + 1);
+  }
+  const need = Math.ceil(grams.length / 2);
+  const candIds = new Set();
+  for (const [id, n] of tally) if (n >= need) candIds.add(id);
+  const p = t.slice(0, 2);
+  for (const L of [t.length - 1, t.length, t.length + 1]) {
+    for (const id of (index.pfx.get(p + '|' + L) || [])) candIds.add(id);
+  }
+  const out = [];
+  for (const id of candIds) {
+    const u = index.tokens[id];
+    if (u === t) continue;                        // exact tokens go through the main bucket path
+    if (levenshtein(t, u) <= 1 || indelRatio(t, u) >= 88) out.push(u);
+  }
+  return out.sort();
 }
 
 /* Tokens shared by huge numbers of entries (very common given names) are poor
@@ -766,6 +833,30 @@ export function screenName(name, index, threshold = 85) {
     for (const t of (rare.length ? rare : vToks)) {
       for (const i of (index.token.get(t) || [])) candIdx.add(i);
     }
+  }
+  /* Fuzzy-blocking fallback — ONLY for a BASE token with NO exact bucket at
+     all (an out-of-group typo: "vladimyr", "putyn"): the no-typo hot path
+     never probes, and variant-generated spellings are deliberately excluded —
+     probing a swapped spelling that is simply absent from the corpus would
+     re-import the very common-token buckets the rare-preference above skipped
+     (measured +25% on the no-typo path) without adding recall the base
+     spelling's own bucket does not already provide. Admitted near-tokens
+     contribute their buckets; over-cap (very common) buckets are held back
+     and used only when the subject otherwise has NO candidates at all — the
+     same "rarer evidence first, common only as a last resort" rule the exact
+     path applies. Candidates then score through the normal path, so this is
+     recall-monotone: it can only ADD candidates, never lower a score. */
+  const fuzzyCommon = new Set();
+  for (const t of new Set(toks)) {
+    if (index.token.has(t)) continue;
+    for (const u of fuzzyTokenMatches(t, index)) {
+      const bucket = index.token.get(u) || [];
+      if (bucket.length <= COMMON_TOKEN_CAP) for (const i of bucket) candIdx.add(i);
+      else fuzzyCommon.add(u);
+    }
+  }
+  if (!candIdx.size) {
+    for (const u of fuzzyCommon) for (const i of (index.token.get(u) || [])) candIdx.add(i);
   }
   let best = exactAny ? 100 : 0;
   for (const i of candIdx) {

@@ -136,8 +136,14 @@ export function parseSubject(task) {
   const notes = String((task && task.notes) || '');
   const jurisdiction = matchField(notes, /(?:Jurisdiction|Country of Incorporation|Country of Registration|Country)\s*[:\-]\s*([^\n]+)/i);
   const idNumber = matchField(notes, /(?:Trade Licence|Trade License|Licen[cs]e No\.?|Registration(?: No\.?| Number)?|Commercial Register(?:ation)?(?: No\.?)?)\s*[:\-]\s*([^\n]+)/i);
+  /* A name that folds to nothing (symbols-only / unscreenable record) must
+     still get a DISTINCT stable key: on the shared empty key '', the second
+     such customer was deduped away before screening and never even reached
+     MANUAL REVIEW. The raw-string fallback cannot collide with a normalized
+     key (normalizeName output never contains ':'). */
+  const key = normalizeName(name) || (name ? 'raw:' + name : '');
   return {
-    key: normalizeName(name),
+    key,
     name,
     entityType: 'organisation',
     jurisdiction: jurisdiction || undefined,

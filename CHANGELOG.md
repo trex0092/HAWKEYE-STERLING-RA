@@ -10,6 +10,32 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### JS engine follow-up: cleared-case reopen, fuzzy candidate blocking, empty-key dedupe (2026-07-27)
+
+- **Cleared cases reopen on a re-flag** (owner-authorized design change — the
+  old "manual reopen by design" pin is superseded): a subject re-flagged after
+  its case was cleared now gets a FRESH case with an SLA restarting from the
+  re-flag day, a "⚠ RE-FLAGGED AFTER CLEARANCE" banner linking the prior case
+  and its cleared date, and state replaced wholesale (`reopenedFrom`/
+  `reopenedAt` provenance) so aging restarts cleanly and a second clearance +
+  third re-flag works identically. The daily digest resolves the subject to
+  the NEW open case, not the old completed one. Rationale: the shipped config
+  suppresses alerts, so the case board is the only delivery surface — a
+  re-listed customer with no open case was a dropped-review risk.
+- **Fuzzy candidate blocking** — the matcher's exact-token candidate index is
+  now backed by trigram and prefix+length posting lists: a subject token with
+  NO exact bucket admits near-tokens verified at `levenshtein ≤ 1` or
+  InDel ≥ 88 ("Vladimyr Putyn" → flags at 86; "Wladimir Putin" → 93; both
+  silently cleared before). Hot path unchanged within +0.8% (measured, 89k
+  entries); recall-monotone; over-cap buckets used only as a last resort.
+  Honest bound, pinned as a negative test: a name ≥2 edits off in every
+  token still scores under the 85 gate and clears — recorded on the model
+  card.
+- **Empty-key dedupe** — two distinct symbol-only/unscreenable customers
+  previously shared the empty normalization key and the second was dropped
+  before screening; empty-normalization subjects now key on their raw name
+  (collision-proof `raw:` prefix) and each surfaces its own MANUAL REVIEW row.
+
 ### Screening follow-up: case backlog, SEMA aliases, fallback matcher parity (2026-07-27)
 
 Round two of the full-screening correctness audit — the items deferred for an

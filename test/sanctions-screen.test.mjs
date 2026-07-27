@@ -8,6 +8,7 @@ import {
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT
 } from '../scripts/sanctions-screen.mjs';
+import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -81,6 +82,25 @@ const dupSubs = parseSubjects([dupA, dupB]);
 check('duplicate-named customers: entity deduped but BOTH customers’ principals are screened',
   dupSubs.filter(x => x.entityType === 'organisation').length === 1 &&
   dupSubs.some(x => x.name === 'Alpha Person') && dupSubs.some(x => x.name === 'Bravo Person'));
+
+/* Empty-normalization customers (symbols-only / unscreenable records) used to
+   COLLIDE on the shared key '': the second was deduped away before screening
+   and never even reached MANUAL REVIEW. Each now gets a distinct raw-string
+   key; only a true duplicate of the SAME raw name dedupes. */
+const symbolSubs = parseSubjects([
+  { gid: 'S1', name: '☠☠', completed: false, notes: '' },
+  { gid: 'S2', name: '♛♛♛', completed: false, notes: '' },
+  { gid: 'S3', name: '☠☠', completed: false, notes: '' },   // true duplicate name → deduped
+]);
+check('two distinct symbol-only customers BOTH survive parsing with distinct stable keys',
+  symbolSubs.length === 2 && new Set(symbolSubs.map(x => x.key)).size === 2
+  && symbolSubs.every(x => x.key && x.key.startsWith('raw:')));
+const symbolIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['SOME ENTITY LLC'] }]);
+check('both symbol-only customers produce MANUAL REVIEW rows (neither silently dropped)',
+  symbolSubs.every(x => {
+    const r = normalizeResult(screenName(x.name, symbolIdx, 85), x);
+    return r.key === x.key && r.recommendation === 'review' && r.lists[0].list === 'MANUAL REVIEW';
+  }));
 
 /* a principal whose name collides with a legal entity (or a same-named principal
    of another customer) must NOT be dropped — every recorded person is screened */
