@@ -90,6 +90,43 @@
         "Used by the daily screening's LLM triage and the deployed advisor functions.",
         "Create the replacement key in the Anthropic console, update the GitHub repository secret and the Netlify environment variable, then confirm the next daily screening run stays green (AI: risk-rated line present in its log) before revoking the old key."
       ]
+    },
+    {
+      "id": "tfs-training-refresh-annual",
+      "title": "TFS & sanctions-evasion training refresh — role-based, record in competency-records",
+      "anchor": "2026-09-15",
+      "everyMonths": 12,
+      "leadDays": 21,
+      "owner": "MLRO",
+      "notes": [
+        "Role-based refresh on the TFS name-match procedure (suspend without delay; PNMR/CNMR/FFR via goAML; tipping-off discipline) plus current sanctions-evasion typologies — checklist items G1/J3 in docs/governance/sanctions-screening-gap-checklist-2026.md.",
+        "Also run after any material screening-system or list-regime change, not only on the anniversary.",
+        "Log completion per person in docs/aims/competency-records.md."
+      ]
+    },
+    {
+      "id": "tfs-procedure-annual-review",
+      "title": "TFS name-match procedure — annual review + tabletop walk-through",
+      "anchor": "2026-09-15",
+      "everyMonths": 12,
+      "leadDays": 21,
+      "owner": "MLRO",
+      "notes": [
+        "Review docs/aims/tfs-name-match-procedure.md against current EOCN guidance and goAML form set; walk one simulated potential match end-to-end (suspend → verify → PNMR → release-on-feedback) and record it in the procedure's §4 event log.",
+        "Confirm the §4 log carries every real TFS event since the last review."
+      ]
+    },
+    {
+      "id": "internal-watchlist-annual-review",
+      "title": "Internal firm watchlist — annual review (entries still justified; lastReviewed bumped)",
+      "anchor": "2026-09-15",
+      "everyMonths": 12,
+      "leadDays": 14,
+      "owner": "MLRO",
+      "notes": [
+        "Review data/internal-watchlist.json per docs/aims/eocn-list-update-sop.md §8: every entry still justified (or removed), count equals entries, lastReviewed updated even when nothing changed.",
+        "An empty list is a valid outcome — record the review anyway; the review is the control."
+      ]
     }
   ]
 }

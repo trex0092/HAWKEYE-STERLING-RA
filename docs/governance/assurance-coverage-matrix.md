@@ -49,6 +49,8 @@ material change, and at the quarterly management review._
 | Matching quality (fuzzy, transliteration, Arabic) with fairness bound | `test/sanctions-match.test.mjs`, `test/sanctions-match-fuzz.test.mjs`, `test/engine_test.py` (recall-gap check) | Every push/PR | CI run log |
 | Screening engine unit coverage | `test/sanctions-screen.test.mjs` (50 checks) | Every push/PR | CI run log |
 | Mandatory-daily controls actually ran today | `freshness-check.yml` → `scripts/freshness-check.mjs` | Daily 09:00 UTC | Asana alert on staleness |
+| Internal firm watchlist screened alongside official lists (optional — empty never degrades, populated always screens) | `test/data-schema.test.js` (shape + `optional` wiring); supplementary-tier load in `screen.py` / optional source in `sanctions-screen.mjs` | Every push/PR + per screen run | Screening report "Internal — Firm Watchlist" line |
+| Sanctions/EOCN hit → TFS path (suspend, PNMR/CNMR/FFR, freeze) — procedure + routing | — (manual procedure; §4 below) | Per event + annual tabletop | [`tfs-name-match-procedure.md`](../aims/tfs-name-match-procedure.md) §4 event log; decision-tree gate 1a |
 | Screening observability metrics | `scripts/screening-metrics.mjs` (in `sanctions-screen.yml`) | Per screen run | Run log (§3 KPIs) |
 
 ### 1.4 Regulatory & list watch
@@ -170,6 +172,7 @@ workflow has a loud failure path (red run, GitHub-issue fallback, or Asana alert
 | **Manual penetration test** of the live app + functions (beyond the automated ZAP baseline): authenticated-flow abuse, business-logic, rate-limit bypass, CORS/origin edge cases | Firm (external tester recommended) | **Annual** | Report filed in `docs/governance/`; findings → [`corrective-actions.md`](../aims/corrective-actions.md) |
 | Review of deferred architectural decisions (function auth / Netlify Identity, distributed rate limiting, WebAuthn) | Firm | Annual or on risk change | This doc + [`ai-governance-gap-analysis-2026.md`](ai-governance-gap-analysis-2026.md) |
 | Asana token custody: scoped service account + rotation on personnel change | Firm (Asana admin) | On change / annual | [`third-party-register.md`](../aims/third-party-register.md) |
+| TFS name-match procedure review + tabletop walk-through (suspend → verify → PNMR/CNMR+FFR → release) | MLRO | Annual (calendar duty) + after every real TFS event | [`tfs-name-match-procedure.md`](../aims/tfs-name-match-procedure.md) §4 event log |
 
 ## 5 · Known gaps (stated, not hidden)
 
