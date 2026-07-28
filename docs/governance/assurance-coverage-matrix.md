@@ -56,7 +56,7 @@ material change, and at the quarterly management review._
 | Control | Automated proof | Frequency | Evidence |
 |---|---|---|---|
 | Consolidated sanction-list changes detected (OFAC/UN/EU/UK) | `sanctions-watch.yml` (+ `test/sanctions-watch.test.mjs`) | Daily 05:00 UTC | Card in *Ongoing Monitoring* → Sanctions updates; issue fallback |
-| Regulator source changes detected (20 UAE/global sources) | `regulatory-watch.yml` (+ `test/reg-watch.test.mjs`) | Daily 06:00 UTC | Card → Regulatory changes; issue fallback |
+| Regulator source changes detected (22 UAE/global sources, incl. the EU AI Act page) | `regulatory-watch.yml` (+ `test/reg-watch.test.mjs`) | Daily 06:00 UTC | Card → Regulatory changes; issue fallback |
 | FATF black/grey list moves + affected-assessment digest | `fatf-watchdog.yml` (+ `test/watchdog.test.mjs`) | Daily 06:00 UTC (digest monthly) | Card → FATF list moves; review task |
 | Daily compliance brief composed from the monitoring projects | `daily-brief.yml` (+ `test/daily-brief.test.mjs`) | Daily 07:00 UTC | Brief card in *Ongoing Monitoring* |
 | Anomaly watch over watcher outputs | `anomaly-watch.yml` | Daily | Run log / alert |

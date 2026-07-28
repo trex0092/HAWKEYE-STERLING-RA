@@ -63,7 +63,7 @@ register gate is the control, and CI enforces it.
 | AI activity monitoring | ✅ | Runtime guards in `brain-soul.js` (`piiFlagged` / `structureFlagged` / `budgetFlagged`); Advisor audit line on every exchange; daily `function-health` probe |
 | Permission analysis | ✅ | The Advisor holds **no tool permissions at all** (advisory chat only; server-held key); automation permissions are least-privilege per workflow, lint-enforced (actionlint + zizmor) with egress-blocked runners — see [`github-repository-hardening.md`](github-repository-hardening.md) |
 | Conversation monitoring | N-A | Deliberate non-control — exchanges are ephemeral by design (data-minimisation; retention would create a PDPL liability with no proportionate benefit). See the non-controls section |
-| Knowledge-source analysis | ✅ | Sources pinned and watched: [`data/sanctions-sources.json`](../../data/sanctions-sources.json), 20 regulatory sources under regulatory-watch; staleness caught daily (`freshness-check`); Advisor egress is data-minimised |
+| Knowledge-source analysis | ✅ | Sources pinned and watched: [`data/sanctions-sources.json`](../../data/sanctions-sources.json), 22 regulatory sources under regulatory-watch (incl. the EU AI Act page); staleness caught daily (`freshness-check`); Advisor egress is data-minimised |
 | Risk alerts | ✅ | Every failure path alerts loudly — Asana card, red run, or GitHub-issue fallback; *silence is never success* ([coverage matrix §2](assurance-coverage-matrix.md)) |
 
 **Verdict:** ✅ for everything the estate actually runs; the one absent tile is absent on purpose,

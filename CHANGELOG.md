@@ -10,6 +10,31 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### EU AI Act — Digital Omnibus amendment intake: assessment updated, EU watch source added (2026-07-28)
+
+The Digital Omnibus AI amendments are now adopted law (Parliament 16 Jun 2026,
+Council 29 Jun, final act signed 8 Jul; pending OJ publication) — one day after
+the EU AI Act assessment was written against the original Regulation. Its §7.5
+"Act evolution" re-assessment trigger fired; headline conclusions survive (not
+territorially bound, not high-risk, Art. 50 disclosure implemented and
+CI-asserted).
+
+- **Assessment updated** (`docs/governance/eu-ai-act-assessment-2026.md`):
+  Art. 5 sweep extended to the new ninth prohibition (NCII/CSAM generation —
+  not present, text-only system); Art. 4 literacy note records the legal floor
+  softening to "support the development" while **deliberately keeping the
+  stricter original standard**; Art. 50(2) machine-readable-marking timing
+  (2 Dec 2026, legacy) noted with the internal-use position; AI Office
+  exclusive-competence note (same-provider GPAI systems — the opposite of this
+  architecture); postponed high-risk dates recorded as runway in §7; dated
+  assessment-log row added.
+- **Watch gap closed** (`data/reg-sources.json`): §7.5 claimed Act evolution was
+  watched via the regulatory-watch pipeline, but the source list contained no
+  EU AI-regulation source — the Omnibus arrived via manual intake. A dedicated
+  `eu-ai-act` source (Commission AI regulatory-framework page) is now
+  fingerprinted daily like every other source; count references trued up
+  (20 → 22 across the coverage matrix §1.4 and the stack scorecard).
+
 ### Operational AI Governance Stack — crosswalk §C, Level-4 evidence index, GovernanceScore + register review currency (2026-07-28)
 
 Adopts the five-level *Operational AI Governance Stack* (visibility → monitoring
