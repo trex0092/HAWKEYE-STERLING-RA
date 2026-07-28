@@ -9,7 +9,10 @@ Asana automation layer (GitHub Actions watchers + assessment delivery).
 
 > **Companion docs:** the AI inventory lives in [`ai-asset-register.md`](ai-asset-register.md) (L1),
 > retention in [`data-retention.md`](data-retention.md) (L2), and the tile-level security posture in
-> [`ai-governance-gap-analysis-2026.md`](ai-governance-gap-analysis-2026.md).
+> [`ai-governance-gap-analysis-2026.md`](ai-governance-gap-analysis-2026.md). The five-*level*
+> operational-stack view of the same territory (visibility → monitoring → controls → evidence →
+> continuous governance) is scored separately in
+> [`operational-ai-governance-stack-2026.md`](operational-ai-governance-stack-2026.md).
 
 ---
 
