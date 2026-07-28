@@ -1,5 +1,8 @@
 # App Setup Runbook — Day 0 (before first use)
 
+**Owner:** Compliance Engineering (operational) · MLRO (accountable)
+**Review cadence:** annually, and on any change to the setup steps or the deployment.
+
 Ordered setup for **hawkeye-sterling-ra.netlify.app** before the first real
 assessment. The app is on-device: every officer's browser holds its own
 encrypted state, so **§2–§5 are per device**; §1 is already done centrally.

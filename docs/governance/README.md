@@ -55,6 +55,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-asset-register.md](ai-asset-register.md) | Inventory of AI surfaces + onboarding process | ISO 42001 A.4.2 |
+| [policy-register.md](policy-register.md) | Every governing instrument with owner, approval record and next review; anti-shadow-policy sweep in CI | ISO 42001 7.5 / A.2.2; NIST AI RMF GOVERN 1.2 |
 | [obligation-register.md](obligation-register.md) | Every obligation → instrument, owner, control, evidence, watch source; status honest about what waits on a human | FATF R.1; ISO 42001 4.2 |
 | [grc-metrics.md](grc-metrics.md) | Six GRC management ratios computed from the estate, with a CI freshness check | ISO 42001 9.1; NIST AI RMF MEASURE |
 | [prompt-lifecycle-register.md](prompt-lifecycle-register.md) | PromptOps: every governed prompt, fingerprinted and version-controlled — an edit fails CI until the row is re-approved | ISO 42001 A.6.2.4; NIST AI RMF MANAGE 2.2 |

@@ -19,7 +19,7 @@
 
 | Metric | Value | Basis |
 |---|---|---|
-| **Control Effectiveness Rate** | **100%** (60/60) | Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof |
+| **Control Effectiveness Rate** | **100%** (61/61) | Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof |
 | **Compliance Completion Rate** | **37.5%** (6/16) | Obligations at *met* ÷ regulatory obligations. 8 partial, 2 pending |
 | **KRI Breach Rate** | **12.5%** (1/8) | Instrumented KRIs in breach ÷ instrumented KRIs |
 | **Overdue Issue Rate** | *not instrumented* | Open items carry an owner and a closing condition but no target date |

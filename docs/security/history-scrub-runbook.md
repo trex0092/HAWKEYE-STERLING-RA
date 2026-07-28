@@ -1,5 +1,8 @@
 # History scrub runbook — removing pre-redaction data from git history
 
+**Owner:** Repo owner (the rewrite and the force-push are owner-only acts)
+**Review cadence:** annually until executed; the execution itself is open-actions item 1.
+
 PR #213 redacted the screening-subject records from `main` and PR #217
 completed the rebrand — but **git history still serves the pre-redaction
 blobs** (any commit before 2026-07-11 can be checked out, and the old file

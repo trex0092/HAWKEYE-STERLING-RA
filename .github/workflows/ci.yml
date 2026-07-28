@@ -140,6 +140,8 @@ jobs:
         run: node test/obligations.test.mjs
       - name: Run GRC metrics test (metric bases + KRI wiring + appetite vs code)
         run: node test/grc-metrics.test.mjs
+      - name: Run policy register test (ownership, approval record, shadow-policy sweep)
+        run: node test/policies.test.mjs
       - name: Run data/*.json integrity test
         run: node test/data-json.test.js
       - name: Run data/*.json schema test (sanctions sources + state shape)

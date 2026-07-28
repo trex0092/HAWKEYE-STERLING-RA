@@ -326,6 +326,15 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 153 markdown documents under docs/ (120 excluding docs/research/auto).
+*(28 July, third pass — policy register (`data/policies.json` + `policy-register.md`): thirteen
+governing instruments with owner, type, status, approval record and next review, eleven in force and
+two draft pending the same board sitting. CI now requires each instrument to declare its owner in its
+own header — five documents had none until the register asked — an approval date to be evidenced by
+the document itself, a draft to assert no review date, and every policy/procedure/charter/runbook/SOP
+under docs/ to be registered or excluded with a reason. One curated document added; no scored control
+changed.)*
+
 Verified at HEAD: 56 workflows · 152 markdown documents under docs/ (119 excluding docs/research/auto).
 *(28 July, second pass — GRC framework completion: Risk Appetite Statement (DRAFT, board R7), obligation
 register and the GRC metrics layer, with `data/risk-appetite.json`, `data/obligations.json` and a

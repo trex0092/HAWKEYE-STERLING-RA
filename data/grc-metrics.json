@@ -4,8 +4,8 @@
   "metrics": {
     "controlEffectivenessRate": {
       "value": 100,
-      "numerator": 60,
-      "denominator": 60,
+      "numerator": 61,
+      "denominator": 61,
       "basis": "Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof. Manual rows (§4) are excluded by design."
     },
     "complianceCompletionRate": {

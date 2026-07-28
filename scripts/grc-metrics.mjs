@@ -114,6 +114,14 @@ export function findingClosure(root = ROOT) {
    with test/tool-register.test.mjs and test/prompt-register.test.mjs. */
 export const SCANNERS = new Set(['scripts/grc-metrics.mjs']);
 
+/* Source-text scan, NOT URL validation: the question is whether a FILE mentions
+   the model endpoint at all, so there is no URL value to parse and compare a
+   hostname against. Written as an anchored regex rather than a substring
+   `includes()` so the intent is explicit and the code does not take the shape
+   of an incomplete URL check (CodeQL js/incomplete-url-substring-sanitization,
+   which fires on that shape regardless of whether a URL is involved). */
+const MODEL_ENDPOINT = /(^|[^\w.])api\.anthropic\.com([^\w.]|$)/;
+
 /* Any model call declaring tools would put a model one step from a connector. */
 export function modelToolDeclarations(root = ROOT) {
   const dirs = ['', 'scripts', 'netlify/functions'];
@@ -124,7 +132,7 @@ export function modelToolDeclarations(root = ROOT) {
       const rel = d ? d + '/' + f : f;
       if (SCANNERS.has(rel)) continue;
       const src = read(root, rel);
-      if (!src.includes('api.anthropic.com')) continue;
+      if (!MODEL_ENDPOINT.test(src)) continue;
       if (/["']tools["']\s*:/.test(src) || /tool_choice/.test(src)) count++;
     }
   }

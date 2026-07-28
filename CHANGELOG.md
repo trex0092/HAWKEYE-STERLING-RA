@@ -10,6 +10,41 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — policy register: ownership and approval records for every instrument (2026-07-28)
+
+The last repo-side gap from the GRC map (core component 4, policy management).
+The policies existed and were indexed; what nothing recorded was which had been
+**approved**, by whom, when they fall due, and — for five of them — who owned
+them at all.
+
+- **Policy register** — [`data/policies.json`](data/policies.json)
+  + [`docs/governance/policy-register.md`](docs/governance/policy-register.md)
+  + `test/policies.test.mjs`. Thirteen governing instruments (policies,
+  standards, procedures, runbooks, charters) with owner, approver, type,
+  status, version, approval record and next review; eleven in force, two draft
+  pending the same board sitting.
+- **Ownership is now declared in the document, not only in the register.** CI
+  requires an `**Owner:**` line in each instrument's own header, so ownership
+  survives someone reading the document without the register. Five documents —
+  the committee charter, backup & recovery, the app setup runbook, the
+  red-team procedure and the history scrub runbook — had no declared owner
+  until this register asked for one; headers were added in the same change.
+- **Approval honesty.** A row may not claim a ratification the document itself
+  does not record (checked in ISO and long-form date), a draft may not assert a
+  next-review date (review clocks start at approval), and a draft must name the
+  open-actions item that approves it.
+- **Anti-shadow-policy sweep.** Every `docs/**` file whose name carries
+  *policy*, *procedure*, *charter*, *runbook* or *sop* must be registered or
+  excluded with a written reason — three external framework artefacts are
+  excluded with theirs.
+
+Also: the model-endpoint scan in `scripts/grc-metrics.mjs` is now an anchored
+regex rather than a substring `includes()`. It reads source text, not URLs, so
+there is no hostname to parse — but the substring shape is what CodeQL's
+incomplete-URL-sanitization query fires on, and the intent is clearer stated as
+a pattern match (`test/` is already excluded from CodeQL for exactly this class
+of alert, per the CA-13 triage record).
+
 ### Governance — risk appetite, obligation register and a measured GRC layer (2026-07-28)
 
 Closed the three gaps a modern-GRC self-check surfaced: no stated risk

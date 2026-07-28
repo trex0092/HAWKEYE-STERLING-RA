@@ -114,6 +114,7 @@ material change, and at the quarterly management review._
 | No model call may declare tools / `tool_choice` (no model→connector path) | `test/tool-register.test.mjs` (scan of every model-API caller) | Every push/PR | CI run log |
 | Obligation register: instruments current, controls reachable, watch source per obligation, partial rows tied to a live open action | `test/obligations.test.mjs` | Every push/PR | CI run log; [`obligation-register`](obligation-register.md) |
 | Stated risk appetite matches the appetite the code enforces (zero-tolerance list + band cutoffs) | `test/grc-metrics.test.mjs` (parses `netlify/functions/brain-soul.js` and `app.js`) | Every push/PR | CI run log; [`risk-appetite-statement-2026`](risk-appetite-statement-2026.md) |
+| Policy register: every instrument owned in its own header, approval dates evidenced, no unregistered policy/procedure/runbook | `test/policies.test.mjs` | Every push/PR | CI run log; [`policy-register`](policy-register.md) |
 | GRC metrics snapshot cannot go stale in a board pack | `grc-metrics.mjs` `--check` (CI step + `npm test` drift check) | Every push/PR | CI run log; [`grc-metrics`](grc-metrics.md) |
 
 ### 1.9 Quality & accessibility
