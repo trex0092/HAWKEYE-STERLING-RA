@@ -57,5 +57,24 @@ for (const f of specFiles) {
   check(`a playwright config testMatch covers ${f}`, matchers.some((re) => re.test(f)));
 }
 
+/* 4. Generated-artefact drift checks → the local runner and ci.yml must agree.
+   These are ci.yml steps that are NOT test files (a script with a --check mode
+   comparing a committed artefact against its regenerated form), so they were
+   invisible to `npm test` until scripts/run-tests.mjs picked them up. A stale
+   docs/regulatory-watch.md reached main that way on 2026-07-28. This guard
+   keeps the two lists tied together in BOTH directions: a check the runner
+   claims must really be a CI step, and a `--check` step in ci.yml must really
+   be run locally — otherwise one side silently stops enforcing. */
+const runner = read('scripts/run-tests.mjs');
+const runnerChecks = [...runner.matchAll(/script:\s*'([^']+)'/g)].map((m) => m[1]).sort();
+check('run-tests.mjs declares drift checks', runnerChecks.length > 0);
+for (const s of runnerChecks) {
+  check(`ci.yml also runs ${s} --check`, ci.includes(`node ${s} --check`));
+}
+const ciDriftChecks = [...ci.matchAll(/node (scripts\/[\w.-]+\.mjs) --check/g)].map((m) => m[1]).sort();
+for (const s of new Set(ciDriftChecks)) {
+  check(`scripts/run-tests.mjs also runs ${s} --check locally`, runnerChecks.includes(s));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
