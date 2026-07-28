@@ -20,7 +20,7 @@
 | Metric | Value | Basis |
 |---|---|---|
 | **Control Effectiveness Rate** | **100%** (61/61) | Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof |
-| **Compliance Completion Rate** | **37.5%** (6/16) | Obligations at *met* ÷ regulatory obligations. 8 partial, 2 pending |
+| **Compliance Completion Rate** | **33.3%** (6/18) | Obligations at *met* ÷ regulatory obligations. 10 partial, 2 pending |
 | **KRI Breach Rate** | **12.5%** (1/8) | Instrumented KRIs in breach ÷ instrumented KRIs |
 | **Overdue Issue Rate** | *not instrumented* | Open items carry an owner and a closing condition but no target date |
 | **Third-Party Assessment Coverage** | **71.4%** (5/7) | Vendors with a settled safeguard/DPA position ÷ vendors in the register |
@@ -36,9 +36,9 @@ node scripts/grc-metrics.mjs --write   # refresh the snapshot
 
 ## 2. How to read the two low numbers
 
-**Compliance completion at 37.5% is not a control failure.** *Met* is reserved
-for obligations that are built, operating and evidenced end to end. Eight of the
-sixteen regulatory obligations sit at *partial*: the control exists and is
+**Compliance completion at 33.3% is not a control failure.** *Met* is reserved
+for obligations that are built, operating and evidenced end to end. Ten of the
+eighteen regulatory obligations sit at *partial*: the control exists and is
 evidenced, and a human act — a board sitting, a counsel confirmation, a training
 delivery, an audit round — is outstanding. Each names the
 [open-actions](open-actions-register.md) item that closes it. The metric tracks

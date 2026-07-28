@@ -326,6 +326,17 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 171 markdown documents under docs/ (138 excluding docs/research/auto).
+*(28 July, fourth pass — the AML/CFT/CPF **policy pack**: seventeen governing instruments drafted under
+`docs/policies/` (master policy, CDD/SDD/EDD, sanctions & TFS, CPF, transaction monitoring & reporting,
+goAML filing procedure, EWRA methodology, responsible sourcing, record-keeping, training, governance
+charter, whistleblowing, data privacy, information security, outsourcing, independent audit, regulatory
+change management). Registered as **draft** pending approval (open-actions item 18) — the estate had the
+controls and the registers, but not the instruments that say how the controls are applied. Two obligations
+added: OB-20 proliferation financing as a standalone pillar, OB-21 wire-transfer data at AED 3,500.
+Eighteen curated documents added; no workflow added; no scored control changed. Compliance completion
+moves 37.5% → 33.3% because the denominator grew by two — an honest dilution, not a regression.)*
+
 Verified at HEAD: 56 workflows · 153 markdown documents under docs/ (120 excluding docs/research/auto).
 *(28 July, third pass — policy register (`data/policies.json` + `policy-register.md`): thirteen
 governing instruments with owner, type, status, approval record and next review, eleven in force and

@@ -37,6 +37,8 @@
 | OB-14 | PDPL: lawful basis, minimisation, cross-border transfer | FDL 45/2021 | MLRO / DPO | 🟡 partial — item 11 |
 | OB-15 | Designation-list currency and change detection | CR 74/2020 | Compliance Eng. | ✅ met |
 | OB-16 | Supervisor and goAML registration currency | FDL 10/2025 | MLRO / firm | 🔴 pending — firm-side |
+| OB-20 | Assess and control **proliferation financing** as a standalone risk | FDL 10/2025, Art. 3(3) · CR 134/2025 | MLRO | 🟡 partial — item 18 |
+| OB-21 | Wire-transfer originator/beneficiary data at or above AED 3,500 | CR 134/2025 | MLRO | 🟡 partial — item 6 |
 
 ## 2. Voluntary standards and monitored regimes
 
@@ -57,9 +59,11 @@
   applicability is detected rather than assumed.
 
 Read alongside the [open-actions register](open-actions-register.md), the shape
-is consistent: the engineering is done, the human acts are not. Six obligations
-are fully met, eight are built-but-waiting on a sitting, a filing, a delivery or
-a signature, and two are firm-side.
+is consistent: the engineering is done, the human acts are not. Six obligations are fully met, ten are built-but-waiting on a sitting, a filing,
+a delivery or a signature, and two are firm-side. Every obligation now names the
+governing instrument in [`../policies/`](../policies/README.md) that discharges
+it — which is what changed on 2026-07-28: the controls existed, the policies
+saying how they are applied did not.
 
 ## 4. Change detection
 
