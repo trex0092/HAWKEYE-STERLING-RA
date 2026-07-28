@@ -10,6 +10,36 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Operational AI Governance Stack — crosswalk §C, Level-4 evidence index, GovernanceScore + register review currency (2026-07-28)
+
+Adopts the five-level *Operational AI Governance Stack* (visibility → monitoring
+→ controls → evidence → continuous governance) as a third external crosswalk and
+closes the two small gaps the mapping surfaced.
+
+- **Crosswalk §C** (`docs/governance/ai-frameworks-crosswalk-2026.md`):
+  level-by-level mapping, with the deliberate non-controls stated in the open
+  (conversation monitoring — ephemeral by design, PDPL/data-minimisation;
+  discovery/permission tooling — N/A while the estate is fully enumerated) and
+  their re-trigger condition (adoption of platform-built agents).
+- **Governance-evidence index**
+  (`docs/governance/assurance-coverage-matrix.md` §1.10): the six Level-4
+  evidence types (decision ledger, runtime evidence, override records,
+  authorization chain, independent audit evidence, decision provenance) each
+  mapped to the existing artefact and automated proof that satisfies it —
+  monitoring says what happened; evidence proves who authorised it.
+- **GovernanceScore** (`scripts/governance-report.mjs`): composite 0–100 health
+  of the scored controls (pass=1, attention=0.5, fail=0; info rows excluded) in
+  the daily card's title and body, with Δ against the previous report parsed
+  from the task titles the idempotency listing already fetched (zero extra API
+  calls). New KPI row in the coverage matrix §3.
+- **Register review currency** (same script): `data/ai-assets.json` declares a
+  quarterly review cadence but nothing enforced it — the daily card now carries
+  a register-review row (pass / REVIEW OVERDUE past the 100-day window / fail on
+  a missing or unreadable date), so an unreviewed inventory can only rot loudly.
+  The schema test additionally requires a declared cadence and a parseable
+  `last_reviewed` (shape only in CI — currency stays with the daily report, so
+  no time-bomb tests).
+
 ### Screening accuracy hardening — measured 95% floors: benchmark corpus, shared transliteration, phonetic fold, one-way thresholds, adverse-media tiers (2026-07-28)
 
 Six-phase programme raising the sanctions + adverse-media screening estate to

@@ -11,7 +11,7 @@ GitHub Actions workflow). *Frequency* = when it runs. *Evidence* = where the
 result is recorded. All referenced workflows live in `.github/workflows/`; tests
 in `test/`.
 
-_Last reviewed: 2026-07-02 · Owner: Compliance Engineering · Review: with each
+_Last reviewed: 2026-07-28 · Owner: Compliance Engineering · Review: with each
 material change, and at the quarterly management review._
 
 ---
@@ -106,6 +106,7 @@ material change, and at the quarterly management review._
 | Bias eval (deterministic dimension; live-LLM pairs gated on DPA) | `advisor-bias-eval.yml` + `test/bias_eval.py` | Quarterly | [`advisor-bias-review-2026.md`](advisor-bias-review-2026.md) |
 | Prompt-injection red team | `test/redteam_injection.py` | Every push/PR | CI run log; [`red-team-procedure`](../aims/red-team-procedure.md) |
 | LLM egress gated until DPA executed (`LLM_TRIAGE=0`) | Env gate in `onboarding-screen.yml` / `weekly-adverse-media.yml` | Every run | Workflow env; [`third-party-register`](../aims/third-party-register.md) |
+| AI asset register: schema + shadow-AI scan; quarterly review currency | `test/ai-assets.test.js` (shape, CI); register-review row in `governance-report.yml` (currency — REVIEW OVERDUE past 100 days) | Every push/PR + daily | CI run log; daily governance card |
 
 ### 1.9 Quality & accessibility
 
@@ -116,6 +117,24 @@ material change, and at the quarterly management review._
 | Performance/SEO budgets | `lighthouse.yml` | Path-triggered | LHCI artifact |
 | Visual regression vs committed baseline | `visual.yml` (read-only compare; write scopes only on baseline dispatch) | Path-triggered | Playwright report artifact |
 | Documentation link integrity + changelog format | `link-check.yml`, `test/changelog.test.mjs` | Weekly + push | CI run log |
+
+### 1.10 Governance-evidence index (Level-4 evidence types)
+
+Monitoring shows *what happened*; evidence proves *who authorised it, why, and
+that it is independently verifiable*. This index maps each evidence type of the
+five-level Operational AI Governance Stack
+([crosswalk §C](ai-frameworks-crosswalk-2026.md)) to the artefact that
+satisfies it — everything below already exists elsewhere in this matrix; this
+names it as evidence an examiner can demand.
+
+| Evidence type | Artefact | Automated proof | Where an examiner finds it |
+|---|---|---|---|
+| Governance decision ledger | [`open-actions-register.md`](open-actions-register.md) + minuted decisions ([board minute template](board-minute-template-2026-07.md)) + [ADR-001](adr-001-deterministic-vs-learned.md) | — (manual, §4 cadence) | `docs/governance/` |
+| Runtime evidence | Tamper-evident hash-chained activity log; workflow run logs; daily governance card | `test/app.test.js` (chain verify); `governance-report.yml` | In-app log (tokenised export); Asana *AI & Platform Governance* section |
+| Human override records | One-way analyst override with mandatory justification, written to the activity log | `test/app.test.js` (override cases) | In-app activity log |
+| Authorization chain | MLRO sign-off + dual attestation; CODEOWNERS-gated change control; policy ratification signatures | `test/app.test.js` (RBAC paths); branch protection | [`ai-policy.md`](ai-policy.md) §9; [`model-validation-2026.md`](model-validation-2026.md) |
+| Independent audit evidence | Tokenised exports verifiable off-app; Sigstore release attestations + SBOM; SARIF artefacts | `test/export-integrity.test.js`; `release.yml` (+ `test/sbom.test.mjs`) | GitHub releases / security tab |
+| Decision provenance | Contributing factors behind every score; versioned risk data (`RISK_DATA_VERSION`); Advisor audit line ("decision support, not a decision") | `test/scoring-golden.test.js`; `test/advisor-assurance.test.js` | On-screen + activity log |
 
 ---
 
@@ -139,6 +158,7 @@ workflow has a loud failure path (red run, GitHub-issue fallback, or Asana alert
 | Watcher change volume (reg/sanctions/FATF cards) | *Ongoing Monitoring* sections | Daily |
 | CI health (suite pass rate, 45 test files) | GitHub Actions | Per push |
 | Supply-chain score | OpenSSF Scorecard | Weekly |
+| GovernanceScore — composite control-suite health (0–100; pass=1, attention=0.5, fail=0) | Daily governance report (title + body, with Δ vs previous) | Daily |
 | Advisor eval outcomes (guardrail regressions, bias divergence) | Eval workflow runs / review docs | Weekly / quarterly |
 
 ## 4 · Manual assurance cadence (no automated proof — by design)
