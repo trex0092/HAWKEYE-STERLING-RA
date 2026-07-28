@@ -2,7 +2,7 @@
    Usage: node test/adverse-media.test.mjs */
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
-  canonicalLink, sourceTierFor, WEAK_TERMS } from '../scripts/adverse-media.mjs';
+  canonicalLink, sourceTierFor } from '../scripts/adverse-media.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
