@@ -10,6 +10,7 @@ Modes:
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
 import threading
+import functools
 import xml.etree.ElementTree as ET
 import concurrent.futures
 
@@ -47,10 +48,60 @@ ASANA_ONGOING_MON_GID = "1213914392047129"
 ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
 ASANA_ASSIGNEE_GID    = "1213645083721304"   # default case/OM assignee (MLRO)
 
-THRESHOLD             = 85   # combined (full + core) similarity to flag a match
-CORE_THRESHOLD        = 82   # distinctive-token similarity required (false-positive guard)
-SHORT_ENTRY_THRESHOLD = 97   # near-exact gate for short (<6 char) designated names (HAMAS, IRISL …)
-TOKENSET_THRESHOLD    = 93   # strict additive gate: token-set (subset/patronymic) recall without FP blow-up
+# ── Match thresholds — env-tunable, ONE-WAY (challenger runs more sensitive
+# only, per docs/governance/champion-challenger-thresholds.md). A value ABOVE
+# the champion default would weaken screening, so it is rejected loudly unless
+# MATCH_THRESHOLD_ALLOW_RAISE=1 is set as an explicit, separate decision.
+# Invalid values never silently change matching — loud reject, default kept
+# (mirrors scripts/sanctions-screen.mjs resolveThreshold).
+def _resolve_match_threshold(env_name, default, lo=70, hi=100):
+    raw = os.environ.get(env_name, "")
+    if not str(raw).strip():
+        return default
+    try:
+        v = float(raw)
+    except ValueError:
+        v = None
+    if v is None or not (lo <= v <= hi):
+        print(f"{env_name}={raw!r} is not a number in [{lo},{hi}] — using the champion "
+              f"default {default} so matching is never silently weakened", flush=True)
+        return default
+    if v > default and os.environ.get("MATCH_THRESHOLD_ALLOW_RAISE", "0") != "1":
+        print(f"{env_name}={raw!r} would RAISE the cutoff above the champion default "
+              f"{default} (less sensitive screening). One-way rule: raises require "
+              f"MATCH_THRESHOLD_ALLOW_RAISE=1 — using the default", flush=True)
+        return default
+    return v
+
+THRESHOLD             = _resolve_match_threshold("MATCH_THRESHOLD", 85)              # combined (full + core) similarity to flag a match
+CORE_THRESHOLD        = _resolve_match_threshold("MATCH_CORE_THRESHOLD", 82)         # distinctive-token similarity required (false-positive guard)
+SHORT_ENTRY_THRESHOLD = _resolve_match_threshold("MATCH_SHORT_ENTRY_THRESHOLD", 97)  # near-exact gate for short (<6 char) designated names (HAMAS, IRISL …)
+TOKENSET_THRESHOLD    = _resolve_match_threshold("MATCH_TOKENSET_THRESHOLD", 93)     # strict additive gate: token-set (subset/patronymic) recall without FP blow-up
+
+# ── Shadow challenger (docs/governance/champion-challenger-thresholds.md §3) ──
+# SHADOW_THRESHOLD (0-100, must sit below MATCH_THRESHOLD) turns on a LOG-ONLY
+# challenger band: a (subject, entry) pair whose min(full, core) lands in
+# [shadow, THRESHOLD) and fails every champion gate is counted and logged —
+# never a hit, never a case, never in the delta state. This is the evidence
+# feed the champion/challenger decision log needs before any live threshold
+# change. Off unless explicitly set; invalid values reject loudly to off.
+def _resolve_shadow_threshold():
+    raw = os.environ.get("SHADOW_THRESHOLD", "")
+    if not str(raw).strip():
+        return None
+    try:
+        v = float(raw)
+    except ValueError:
+        v = None
+    if v is None or not (70 <= v < THRESHOLD):
+        print(f"SHADOW_THRESHOLD={raw!r} is not a number in [70, {THRESHOLD}) — shadow "
+              f"challenger disabled (it never changes live matching either way)", flush=True)
+        return None
+    return v
+
+SHADOW_THRESHOLD_VALUE = _resolve_shadow_threshold()
+_SHADOW_CHALLENGER = {"count": 0, "examples": []}   # run-level tally (log-only evidence)
+_SHADOW_LOG_CAP = 25                                 # bounded example log lines per run
 EOCN_PDF_PATH         = "eocn_list.pdf"
 EOCN_JSON_PATH        = "data/eocn-local-terrorist-list.json"
 DELTA_STATE_PATH      = "data/screen-delta-state.json"  # what we've already reported (delta engine)
@@ -621,6 +672,149 @@ def match_adverse_keywords(title: str) -> list:
             matched.append(canon)
     return matched
 
+_RSS_TAG_RE = re.compile(r"<[^>]+>")
+def _strip_rss_description(text):
+    """RSS <description> → plain text: HTML tags stripped, common entities
+    decoded, whitespace collapsed, bounded (feeds embed whole link farms)."""
+    s = _RSS_TAG_RE.sub(" ", str(text or ""))
+    s = (s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+          .replace("&quot;", '"').replace("&#39;", "'").replace("&nbsp;", " "))
+    return re.sub(r"\s+", " ", s).strip()[:1000]
+
+# ── Keyword tiers + description scanning + counter eligibility ───────────────
+# WEAK keywords are the high-noise generics: they legitimately flag a headline
+# for the record (an analyst may still care), but a "political rally" or a
+# commercial "lawsuit" headline must not carry the same escalation weight as
+# "money laundering". Tiering NEVER unflags an article — it only gates the
+# ≥3-stories/90-days repeat counter (see adverse_actionable), where weak-only
+# stories need a second independent outlet to count.
+KEYWORD_TIER_WEAK = {
+    "politic", "illegal", "unlawful", "breach", "regulatory breach", "lawsuit",
+    "court case", "litigate", "verdict", "fined", "esg", "pollution",
+    "toxic waste", "environmental violation", "greenwashing", "deforestation",
+    "land grabbing", "indigenous rights", "nuclear", "dual-use", "exploitation",
+    "conflict of interest", "human rights", "due diligence failure",
+}
+
+def keyword_tier(keywords):
+    """'strong' when ANY matched keyword is outside the weak set; 'weak' when
+    every matched keyword is a generic; None for an unflagged article."""
+    if not keywords:
+        return None
+    return "weak" if all(kw in KEYWORD_TIER_WEAK for kw in keywords) else "strong"
+
+def adverse_keywords_for(title, description=""):
+    """Adverse keywords across the headline AND the feed's description/snippet.
+    Headline-only scanning missed every story whose risk terms sit below the
+    fold ("X steps back from board duties" / "…follows his arrest last week…")
+    — the single largest measured adverse-media recall loss. Union preserves
+    title-keyword order first (report display is title-led), then adds
+    description-only finds. Strictly additive: a title-flagged article can
+    never lose a keyword by also scanning its description."""
+    matched = list(match_adverse_keywords(title))
+    if description:
+        for kw in match_adverse_keywords(description):
+            if kw not in matched:
+                matched.append(kw)
+    return matched
+
+def _counter_relevance(subject, title):
+    """Name-relevance for repeat-counter gating: HIGH/MEDIUM/LOW from
+    ai._name_relevance, plus UNSCORABLE when the headline's script shares no
+    Latin letters with the folded subject (Arabic/Cyrillic/CJK press) — a
+    Latin-token overlap test is meaningless there, and gating on it would
+    silently exclude exactly the non-English coverage this deployment exists
+    to catch. UNSCORABLE therefore passes the relevance gate (recall-monotone:
+    cross-script evidence is never dropped by a scorer that cannot read it)."""
+    folded = ai._ascii_fold(title)
+    if not re.search(r"[a-z]", folded):
+        return "UNSCORABLE"
+    return ai._name_relevance(subject, title)
+
+def adverse_actionable(subject, article):
+    """True when one flagged article is eligible for the ≥3-stories/90-days
+    repeat-escalation counter. Flag status, evidence retention and report
+    display are NEVER touched by this predicate — it only decides escalation
+    weight: (a) the story must plausibly be about the subject (relevance HIGH/
+    MEDIUM, or UNSCORABLE cross-script); (b) a weak-tier (generic-keyword)
+    story must be corroborated by a second independent outlet before it
+    counts."""
+    kws = article.get("keywords") or []
+    if not (article.get("flagged") or kws):
+        return False
+    if _counter_relevance(subject, article.get("title", "")) == "LOW":
+        return False
+    tier = article.get("tier") or keyword_tier(kws)
+    if tier == "weak":
+        domains = article.get("domains")
+        if domains is None:
+            domains = [article.get("source", "")] + list(article.get("also_reported_by") or [])
+        return len({d for d in domains if d}) >= 2
+    return True
+
+# ── Source-credibility tiers (annotation + ordering ONLY, never a gate) ──────
+# data/source-credibility.json maps known outlets to tier 1 (wire services /
+# regulators / established Gulf dailies) or tier 2 (mainstream regional);
+# everything else is tier 3. Used to rank what survives the per-subject cap —
+# a missing/invalid file degrades to everything-tier-3, loudly, because
+# ranking is quality-of-life, not a screening control.
+def _load_source_tiers():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "data", "source-credibility.json")
+    tiers = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        for tier, key in ((1, "tier1"), (2, "tier2")):
+            for dom in data.get(key, []):
+                tiers[str(dom).lower()] = tier
+    except Exception as e:
+        print(f"source-credibility tiers unavailable ({type(e).__name__}) — "
+              f"all sources rank tier 3 (ordering only; screening unaffected)", flush=True)
+    return tiers
+
+_SOURCE_TIERS = _load_source_tiers()
+
+def source_tier_for(article):
+    """Credibility tier (1 best … 3 default) for one article, from its URL host
+    or, failing that, its outlet display name folded against domain labels."""
+    m = re.match(r"https?://([^/?#]+)", str(article.get("url") or ""), re.I)
+    if m:
+        host = m.group(1).lower()
+        host = host[4:] if host.startswith("www.") else host
+        while host:
+            if host in _SOURCE_TIERS:
+                return _SOURCE_TIERS[host]
+            dot = host.find(".")
+            if dot < 0:
+                break
+            host = host[dot + 1:]
+    name = re.sub(r"[^a-z0-9]", "", str(article.get("source") or "").lower())
+    if name:
+        for dom, tier in _SOURCE_TIERS.items():
+            if dom.split(".")[0] == name:
+                return tier
+    return 3
+
+# Aggregator hosts whose links are opaque redirectors with per-fetch tracking
+# params — a URL there never identifies the underlying article, so the
+# fingerprint falls back to the title signature (same rationale as the
+# delta-state key: titles are stable, aggregator URLs are not).
+_AGGREGATOR_HOSTS = {"news.google.com", "www.bing.com", "bing.com"}
+
+def _canonical_fingerprint(url, title):
+    """Stable identity of one story for repeat counting: lowercase host minus
+    www. + path, query/fragment stripped — so the same article re-served under
+    rotating utm/tracking params counts ONCE across days. Aggregator or
+    missing URLs fall back to the normalized-title signature."""
+    m = re.match(r"https?://([^/?#]+)([^?#]*)", str(url or "").strip(), re.I)
+    if m:
+        host = m.group(1).lower().lstrip(".")
+        host = host[4:] if host.startswith("www.") else host
+        if host and host not in _AGGREGATOR_HOSTS:
+            return f"u:{host}{m.group(2).rstrip('/')}"
+    return "t:" + _name_sig(title)
+
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def normalize(name):
     if not name: return ""
@@ -855,7 +1049,24 @@ def _resolve_locale_count(raw, total):
         return max(1, min(total, int(s)))
     except (TypeError, ValueError):
         return min(5, total)
-ADVERSE_LOCALES = _resolve_locale_count(os.environ.get("ADVERSE_LOCALES", "5"), len(GNEWS_LOCALES))
+ADVERSE_LOCALES = _resolve_locale_count(os.environ.get("ADVERSE_LOCALES", "8"), len(GNEWS_LOCALES))
+
+# Articles kept per subject after dedup/ranking. The old hard-coded 5 truncated
+# real coverage for any subject whose flagged bucket alone exceeded it; 8 is
+# the new default with the ceiling env-tunable (validated 1-20, loud reject).
+def _resolve_adverse_max(raw):
+    s = str(raw or "").strip()
+    if not s:
+        return 8
+    try:
+        v = int(s)
+        if 1 <= v <= 20:
+            return v
+    except ValueError:
+        pass
+    print(f"ADVERSE_MAX_RESULTS={raw!r} is not an integer in [1,20] — using default 8", flush=True)
+    return 8
+ADVERSE_MAX_RESULTS = _resolve_adverse_max(os.environ.get("ADVERSE_MAX_RESULTS", "8"))
 # A targeted second pass: the name AND a cluster of material risk terms, so adverse
 # coverage surfaces even when it isn't in the subject's top general-news headlines.
 RISK_QUERY = ("fraud OR sanctions OR \"money laundering\" OR arrest OR investigation OR "
@@ -1066,7 +1277,8 @@ def parse_bing_news(data, max_results: int = 8) -> list:
                 if el.tag.split("}")[-1] == "Source" and (el.text or "").strip():
                     source = el.text.strip()
                     break
-            matched = match_adverse_keywords(title)
+            desc = _strip_rss_description(item.findtext("description") or "")
+            matched = adverse_keywords_for(title, desc)
             pub = item.findtext("pubDate") or ""
             ts = _parse_rss_date(pub)
             dm = re.search(r"(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})", pub)
@@ -1079,8 +1291,10 @@ def parse_bing_news(data, max_results: int = 8) -> list:
                 "date": date,
                 "ts": ts,
                 "url": (item.findtext("link") or "").strip(),
+                "snippet": desc[:300],
                 "flagged": bool(matched),
                 "keywords": matched,
+                "tier": keyword_tier(matched),
                 "categories": typology_for(matched),
             })
             if len(arts) >= max_results * 3:
@@ -1101,7 +1315,7 @@ def search_bing_news(name: str, max_results: int = 8) -> list:
         raise RuntimeError(f"Bing News HTTP {r.status_code}")
     return parse_bing_news(r.content, max_results)
 
-def search_adverse_media(name: str, max_results: int = 8) -> list:
+def search_adverse_media(name: str, max_results: int = None) -> list:
     """
     Deep adverse-media search via Google News RSS.
       Pass 1 — exact name across the first ADVERSE_LOCALES worldwide locales
@@ -1121,6 +1335,8 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
     LOUDLY (am_error) instead of spiralling into a retry storm.
     Returns list of dicts: {title, source, date, ts, url, flagged, keywords, categories}.
     """
+    if max_results is None:
+        max_results = ADVERSE_MAX_RESULTS
     seen_titles = set()
     articles = []
     passes = [
@@ -1163,15 +1379,21 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
                         source = ((source_el.text or "").strip() if source_el is not None else "") or "Unknown"
                         pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
                         link = (link_el.text or "") if link_el is not None else ""
-                        matched = match_adverse_keywords(title)
+                        # The RSS description carries the article's first lines
+                        # (HTML-wrapped) — scan it too: risk terms often sit
+                        # below a neutral headline. Tags stripped, bounded.
+                        desc = _strip_rss_description(item.findtext("description") or "")
+                        matched = adverse_keywords_for(title, desc)
                         articles.append({
                             "title": title,
                             "source": source,
                             "date": pub_date,
                             "ts": _parse_rss_date(pubdate_el.text if pubdate_el is not None else ""),
                             "url": link,
+                            "snippet": desc[:300],
                             "flagged": bool(matched),
                             "keywords": matched,
+                            "tier": keyword_tier(matched),
                             "categories": typology_for(matched),
                         })
                     ok = True
@@ -1286,7 +1508,12 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
 
     articles = dedup_stories(articles)
     # Sort: flagged first, then most-recent first (recency ranking).
-    articles.sort(key=lambda x: (not x["flagged"], -(x.get("ts") or 0)))
+    # Ranking: flagged first, then source credibility (tier 1 wire services /
+    # regulators before unknown outlets), then recency — so when the cap
+    # truncates, what survives is the flagged, best-sourced, freshest coverage.
+    for a in articles:
+        a["source_tier"] = source_tier_for(a)
+    articles.sort(key=lambda x: (not x["flagged"], x.get("source_tier", 3), -(x.get("ts") or 0)))
     return articles[:max_results]
 
 # RFC-822 dates from Google News RSS -> epoch seconds for recency ranking.
@@ -1393,12 +1620,21 @@ def update_adverse_evidence(adverse_findings, today_iso, path=None):
             if not subj or not a.get("title") or key in seen:
                 continue
             seen.add(key)
+            domains = sorted({d for d in
+                              [a.get("source", "")] + list(a.get("also_reported_by") or []) if d})
             entries.append({
                 "date": str(today_iso)[:10], "subject": subj,
                 "subject_type": f_.get("subject_type", ""), "parent": f_.get("parent") or "",
                 "title": a.get("title", ""), "source": a.get("source", ""),
                 "url": a.get("url", ""), "keywords": a.get("keywords", []),
                 "categories": a.get("categories", []),
+                # Counter-gating evidence (28 Jul 2026 hardening): keyword tier,
+                # name-relevance at log time, corroborating outlets, and the
+                # canonical story fingerprint. Display/retention unchanged.
+                "tier": a.get("tier") or keyword_tier(a.get("keywords", [])),
+                "relevance": _counter_relevance(subj, a.get("title", "")),
+                "domains": domains,
+                "fingerprint": _canonical_fingerprint(a.get("url", ""), a.get("title", "")),
             })
 
     def _age_days(e):
@@ -1413,11 +1649,33 @@ def update_adverse_evidence(adverse_findings, today_iso, path=None):
     # half-written evidence file that the next run reads as corrupt.
     if not _atomic_write_text(path, json.dumps(entries, ensure_ascii=False, indent=1)):
         log("  evidence log write failed — screening output unaffected")
-    counts = {}
+    # Repeat-pattern signal, hardened: count DISTINCT story fingerprints (the
+    # same article re-served across days under rotating tracking params counts
+    # once) among COUNTER-ELIGIBLE entries — relevance HIGH/MEDIUM/UNSCORABLE
+    # (never LOW: a same-surname story about someone else must not manufacture
+    # an escalation) and strong keyword tier, or weak tier corroborated by a
+    # second independent outlet. Every entry stays in the log and the report
+    # regardless — only its ESCALATION weight is gated. Entries written before
+    # this hardening carry none of the gating fields and stay counter-eligible
+    # (no retroactive suppression of standing evidence), on their title
+    # fingerprint.
+    counts, excluded = {}, 0
     for e in entries:
-        if _age_days(e) <= REPEAT_WINDOW_DAYS:
-            counts[e["subject"]] = counts.get(e["subject"], 0) + 1
-    return {subj: n for subj, n in counts.items() if n >= REPEAT_THRESHOLD}
+        if _age_days(e) > REPEAT_WINDOW_DAYS:
+            continue
+        legacy = "fingerprint" not in e
+        eligible = legacy or (
+            e.get("relevance") != "LOW"
+            and (e.get("tier") != "weak" or len(e.get("domains") or []) >= 2))
+        if not eligible:
+            excluded += 1
+            continue
+        fp = e.get("fingerprint") or ("t:" + _name_sig(e.get("title", "")))
+        counts.setdefault(e["subject"], set()).add(fp)
+    if excluded:
+        log(f"  adverse evidence: {excluded} in-window item(s) logged but excluded from the "
+            f"repeat counter (low relevance / uncorroborated weak tier) — display unaffected")
+    return {subj: len(fps) for subj, fps in counts.items() if len(fps) >= REPEAT_THRESHOLD}
 
 # ── PEP — POLITICALLY EXPOSED PERSONS (free, Wikidata, individuals only) ──────
 # No genuinely free commercial-use PEP *list* exists (OpenSanctions etc. are
@@ -2304,6 +2562,116 @@ def confidence_tier(core):
     if core >= 85: return "MODERATE"
     return "WEAK"
 
+# ── PHONETIC FOLD (romanization-drift recall) ────────────────────────────────
+# A name whose EVERY significant token sits ≥2 edits off the listed spelling
+# ("Muhamet Huseinn" vs "MUHAMMAD HUSSEIN" ≈ 69) scores below every fuzzy gate
+# and used to clear BY DESIGN — the model card pinned it as a residual. This
+# layer closes it: each token folds to a romanization-robust consonantal key,
+# and a pair whose token key-lists agree exactly (or form the strict
+# patronymic-subset shape) flags as a WEAK phonetic-only possible match at its
+# real (conservative) fuzzy score — never confirmed, never suppressing or
+# lowering any existing hit. The fold is tuned for Arabic AND Cyrillic
+# romanization drift: digraphs collapse BEFORE run-collapse (else "kayoom"
+# loses its oo→u), the first vowel is kept but only up to the Arabic-real
+# distinctions ({e,i} and {o,u} merge; a stays apart — hassan/hussein must NOT
+# collide), and a trailing vowel is preserved so gender/nisba suffixes
+# (hana/hani, qassem/qasemi) stay distinct. Keys are computed on
+# transliteration-CANONICAL tokens (data/translit-groups.json), so khalid/
+# khaled or omar/umar share a key by group membership rather than luck, and
+# the particles abu/abd merge into their following token ("Abou Bakr" ≡
+# "Aboubakr"). Pure string ops — identical under the offline difflib stub.
+_PHON_DIGRAPHS = (("shch", "s"), ("sch", "s"), ("sh", "s"), ("ch", "c"),
+                  ("zh", "j"), ("kh", "k"), ("gh", "k"), ("ph", "f"),
+                  ("th", "t"), ("dh", "d"), ("dj", "j"), ("ck", "k"),
+                  ("ts", "c"), ("tz", "c"), ("x", "ks"), ("oo", "u"),
+                  ("ou", "u"), ("ee", "i"), ("ei", "i"), ("ey", "i"))
+_PHON_VOWEL_CLASS = {"a": "a", "e": "i", "i": "i", "o": "u", "u": "u"}
+_PHON_CHAR_MAP = str.maketrans({"q": "k", "c": "k", "g": "k", "w": "v",
+                                "p": "b", "d": "t", "z": "s"})
+_PHON_PARTICLES = {"abu", "abou", "abo", "abd"}
+
+@functools.lru_cache(maxsize=1 << 18)
+def phonetic_key(token):
+    """Romanization-robust key of one lowercase token (identity below 3 chars)."""
+    t = token
+    if len(t) < 3:
+        return t
+    for pat, rep in _PHON_DIGRAPHS:          # digraphs FIRST (before run-collapse)
+        t = t.replace(pat, rep)
+    t = re.sub(r"(.)\1+", r"\1", t)          # collapse doubled letters
+    t = t.replace("y", "i")
+    t = t.translate(_PHON_CHAR_MAP)
+    if len(t) > 3 and t.endswith("e"):       # French/Latin silent trailing e
+        t = t[:-1]
+    first = t[0]
+    fv = next((c for c in t[1:] if c in "aeiou"), "")
+    fv = _PHON_VOWEL_CLASS.get(fv, fv)
+    rest = "".join(c for c in t[1:] if c not in "aeiou" and c != "h")
+    tail = _PHON_VOWEL_CLASS[t[-1]] if len(t) > 1 and t[-1] in "aeiou" else ""
+    return re.sub(r"(.)\1+", r"\1", first + fv + rest + tail)
+
+def phonetic_tokens(norm):
+    """Distinctive tokens of a normalized name, particle-merged and folded to
+    their transliteration-canonical spellings — the token stream the phonetic
+    keys are computed over."""
+    toks = [t.lower() for t in core_tokens(norm)]
+    merged, i = [], 0
+    while i < len(toks):
+        if toks[i] in _PHON_PARTICLES and i + 1 < len(toks):
+            merged.append(toks[i] + toks[i + 1]); i += 2
+        else:
+            merged.append(toks[i]); i += 1
+    return [ai.translit_canon_token(t) for t in merged]
+
+@functools.lru_cache(maxsize=1 << 18)
+def _phonetic_profile(norm):
+    """Sorted (key, token-length) pairs, or None when the name has fewer than
+    two significant tokens — a single common token must never carry a
+    phonetic-only hit. Cached by normalized string, so list entries are folded
+    once per process however many subjects screen against them."""
+    toks = phonetic_tokens(norm)
+    if len(toks) < 2:
+        return None
+    return tuple(sorted((phonetic_key(t), len(t)) for t in toks))
+
+def _phonetic_pair_match(a_profile, b_profile):
+    """'equal' when both names' sorted key-lists agree exactly and every paired
+    token's raw lengths differ by ≤3 (a same-key token pair 4+ letters apart is
+    a different name wearing the same consonant skeleton); 'subset' when the
+    SHORTER side (≥2 tokens, each ≥4 chars) is wholly contained in the strictly
+    longer side's key multiset — the patronymic / extra-middle-name shape the
+    fuzzy subset gate misses when spellings drift beyond its 88 per-token bar.
+    None otherwise. Strictly additive: callers only ever ADD a hit on a match."""
+    if a_profile is None or b_profile is None:
+        return None
+    if len(a_profile) == len(b_profile):
+        if [p[0] for p in a_profile] == [p[0] for p in b_profile] and \
+           all(abs(p[1] - q[1]) <= 3 for p, q in zip(a_profile, b_profile)):
+            return "equal"
+        return None
+    short, long_ = (a_profile, b_profile) if len(a_profile) < len(b_profile) else (b_profile, a_profile)
+    if len(short) < 2 or sum(1 for p in short if p[1] >= 4) < 2:
+        return None
+    pool = [p[0] for p in long_]
+    for k, _len in short:
+        if k in pool:
+            pool.remove(k)
+        else:
+            return None
+    return "subset"
+
+def _phonetic_mode():
+    """MATCH_PHONETIC ∈ 1 (live, default) | shadow (count + log, no hits) | 0
+    (off). Read at call time so tests and operators can toggle per run; an
+    unknown value is rejected LOUDLY and the default kept."""
+    v = os.environ.get("MATCH_PHONETIC", "1").strip().lower()
+    if v in ("1", "shadow", "0"):
+        return v
+    log(f"MATCH_PHONETIC={v!r} is not one of 1|shadow|0 — using default 1")
+    return "1"
+
+_PHONETIC_SHADOW = {"count": 0}   # shadow-mode tally (read by tests/operators)
+
 # ── Exact match blocking (C-side prefilter, bit-identical results) ───────────
 # The full sweep scores every (subject, entry) pair in a Python loop — ~870
 # subjects × ~290k crime-watchlist names alone is ~250M pair evaluations whose
@@ -2356,13 +2724,61 @@ def _survivor_indices(variants, entries):
         return None
     norms = _entry_norms(entries)
     survivors = set()
+    # With the shadow challenger on, the full-string cutoff drops to the shadow
+    # band's floor so shadow-band pairs survive the prefilter too — the shadow
+    # tally must be identical with blocking on or off (score ≥ shadow ⇒ full ≥
+    # shadow keeps the cutoff a necessary condition, same argument as the hit
+    # gates). Costs more survivors only while a challenger is being evidenced.
+    full_cutoff = THRESHOLD if SHADOW_THRESHOLD_VALUE is None else min(THRESHOLD, SHADOW_THRESHOLD_VALUE)
     for cand in variants:
-        for scorer, cutoff in ((fuzz.token_sort_ratio, THRESHOLD),
+        for scorer, cutoff in ((fuzz.token_sort_ratio, full_cutoff),
                                (fuzz.token_set_ratio, TOKENSET_THRESHOLD)):
             for _choice, _score, idx in _rf_process.extract(
                     cand, norms, scorer=scorer, score_cutoff=cutoff, limit=None):
                 survivors.add(idx)
     return sorted(survivors)
+
+# ── Phonetic candidate index (keeps the C-side prefilter recall-complete) ────
+# The two rapidfuzz cutoffs above are necessary conditions of the FUZZY gates
+# only: a phonetic-only pair ("Muhamet Huseinn" ≈ 69) survives neither, so in
+# blocked mode the phonetic branch would be silently unreachable — the exact
+# defect class the blocking-equivalence property exists to catch. This index
+# restores completeness: a posting list per phonetic key, and a candidate is
+# any entry sharing ≥2 of a variant's distinct keys (or all of them when the
+# variant has fewer than 2 distinct keys). That count rule covers all three
+# hit shapes — equal key-lists share every key; a subset's shorter side (≥2
+# tokens by gate) appears in one posting per token; the reverse direction
+# contributes its ≥2 keys — so blocked and unblocked stay bit-identical.
+# Cache carries the same identity + length-rebuild invariants as _NORMS_CACHE.
+_PHON_IDX_CACHE = {}   # id(entries) -> (entries, postings, entry_count)
+
+def _phonetic_postings(entries):
+    key = id(entries)
+    cached = _PHON_IDX_CACHE.get(key)
+    if cached is None or cached[0] is not entries or cached[2] != len(entries):
+        postings = {}
+        for i, (en, _orig) in enumerate(entries):
+            prof = _phonetic_profile(en)
+            if prof is None:
+                continue
+            for k in {p[0] for p in prof}:
+                postings.setdefault(k, []).append(i)
+        cached = (entries, postings, len(entries))
+        _PHON_IDX_CACHE[key] = cached
+    return cached[1]
+
+def _phonetic_candidates(variant_profiles, entries):
+    postings = _phonetic_postings(entries)
+    cand = set()
+    for prof in variant_profiles:
+        keys = {p[0] for p in prof}
+        need = min(2, len(keys))
+        counts = {}
+        for k in keys:
+            for i in postings.get(k, ()):
+                counts[i] = counts.get(i, 0) + 1
+        cand.update(i for i, c in counts.items() if c >= need)
+    return cand
 
 def screen_name(name, all_lists):
     n = normalize(name)
@@ -2376,8 +2792,20 @@ def screen_name(name, all_lists):
         if len(nv) >= 4:
             variants.add(nv)
     hits = []
+    # Phonetic layer state for this subject: profiles of every variant, or an
+    # empty list when the subject has <2 significant tokens (layer inert).
+    phon_mode = _phonetic_mode()
+    variant_profiles = []
+    if phon_mode != "0":
+        variant_profiles = [p for p in (_phonetic_profile(v) for v in variants)
+                            if p is not None]
     for list_name, entries in all_lists.items():
         surv = _survivor_indices(variants, entries)
+        if surv is not None and variant_profiles:
+            # Union the phonetic candidates in so the C-side prefilter stays
+            # recall-complete for the phonetic branch (bit-identical results
+            # with blocking on or off — asserted by the equivalence property).
+            surv = sorted(set(surv) | _phonetic_candidates(variant_profiles, entries))
         for en, orig in (entries if surv is None else (entries[i] for i in surv)):
             if len(en) < 2: continue
             best = None; best_tset = 0; subset = False
@@ -2414,6 +2842,42 @@ def screen_name(name, all_lists):
                              "name_score": full, "core_score": core, "set_score": best_tset,
                              "confidence": confidence_tier(core),
                              "match_context": match_context_for(orig)})
+            else:
+                # Phonetic-only branch: strictly additive (behind the fuzzy
+                # gates — it can never replace, lower or suppress a fuzzy
+                # hit). Recorded at the conservative min-based score so it
+                # always reads as a POSSIBLE match for MLRO disambiguation,
+                # never confirmed.
+                pm = None
+                if variant_profiles:
+                    e_prof = _phonetic_profile(en)
+                    if e_prof is not None:
+                        for vp in variant_profiles:
+                            pm = _phonetic_pair_match(vp, e_prof)
+                            if pm:
+                                break
+                if pm:
+                    if phon_mode == "shadow":
+                        _PHONETIC_SHADOW["count"] += 1
+                        log(f'  PHONETIC-SHADOW: "{name}" ~ "{orig}" [{list_name}] '
+                            f"{pm} key match, fuzzy score {score} — no hit emitted (shadow mode)")
+                    else:
+                        hits.append({"list": list_name, "matched_entry": orig, "score": score,
+                                     "name_score": full, "core_score": core, "set_score": best_tset,
+                                     "phonetic": True, "phonetic_shape": pm,
+                                     "confidence": "WEAK (phonetic-only)",
+                                     "match_context": match_context_for(orig)})
+                elif SHADOW_THRESHOLD_VALUE is not None and score >= SHADOW_THRESHOLD_VALUE:
+                    # Shadow challenger band [shadow, THRESHOLD): counted and
+                    # logged as decision-log evidence — NEVER a hit, a case or
+                    # a delta-state entry.
+                    _SHADOW_CHALLENGER["count"] += 1
+                    if len(_SHADOW_CHALLENGER["examples"]) < _SHADOW_LOG_CAP:
+                        _SHADOW_CHALLENGER["examples"].append(
+                            {"subject": name, "entry": orig, "list": list_name,
+                             "score": round(score, 1)})
+                        log(f'  SHADOW-CHALLENGER: "{name}" ~ "{orig}" [{list_name}] '
+                            f"score {score:.1f} in [{SHADOW_THRESHOLD_VALUE:g}, {THRESHOLD:g}) — log-only, no hit")
     best = {}
     for h in hits:
         key = (h["list"], h["matched_entry"])
@@ -2944,7 +3408,7 @@ def run_weekly_adverse(customers, run_time):
             subjects.append(("INDIVIDUAL", ind, c["name"]))
         for subj_type, subj_name, parent in subjects:
             try:
-                articles = search_adverse_media(subj_name, max_results=5)
+                articles = search_adverse_media(subj_name, max_results=ADVERSE_MAX_RESULTS)
                 if subj_type == "COMPANY":
                     companies_screened += 1
                 else:
@@ -3975,7 +4439,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         r = {"type": subj_type, "name": subj_name, "parent": parent,
              "permalink": c.get("permalink", ""), "adverse": None, "pep": None, "am_error": False}
         try:
-            articles = search_adverse_media(subj_name, max_results=5)
+            articles = search_adverse_media(subj_name, max_results=ADVERSE_MAX_RESULTS)
             r["adverse"] = [a for a in articles if a["flagged"]]
         except Exception as e:
             r["am_error"] = True; r["am_msg"] = str(e)[:120]

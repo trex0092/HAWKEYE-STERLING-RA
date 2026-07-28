@@ -41,7 +41,7 @@ challenger).
 
 | Challenger | Hypothesis | Status |
 |---|---|---|
-| Threshold 0.80 shadow | The 0.85 line leaves too little headroom for short/transliterated names | Proposed — activate on the first backtesting near-miss finding, or on MLRO instruction |
+| Threshold 0.80 shadow | The 0.85 line leaves too little headroom for short/transliterated names | **Implemented (log-only wiring live, 28 Jul 2026)** — activation is now a config action: set `SHADOW_THRESHOLD=80` (Python engine, 0-100 scale) and/or `SCREEN_SHADOW_THRESHOLD=0.80` (JS engine, fraction). Pairs in the [shadow, champion) band are counted and logged (Python: run log + `_SHADOW_CHALLENGER` tally; JS: run log + the results file's `shadow[]` array) and NEVER become hits, cases or delta-state entries. Both engines also enforce the one-way rule in config: raising a live threshold above the champion default is rejected unless the explicit `MATCH_THRESHOLD_ALLOW_RAISE=1` / `SCREEN_MATCH_THRESHOLD_ALLOW_RAISE=1` override is set. Activate on the first backtesting near-miss finding, or on MLRO instruction. |
 
 ## 4. Decision log
 

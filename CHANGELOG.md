@@ -10,6 +10,86 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening accuracy hardening — measured 95% floors: benchmark corpus, shared transliteration, phonetic fold, one-way thresholds, adverse-media tiers (2026-07-28)
+
+Six-phase programme raising the sanctions + adverse-media screening estate to
+CI-enforced 95% accuracy floors, measured on a new labelled benchmark run
+through **both real engines** — measurement landed first, so every phase is
+falsifiable against a frozen pre-hardening baseline. All hardening is
+**recall-monotone**: no change unflags, drops or suppresses anything; precision
+comes from tiering and escalation weighting. Headline movement (identical on
+py_rapidfuzz / py_difflib / js): sanctions recall **57.0%/62.0% → 97.5%**,
+adverse-media classification **57.9%/77.3% → 100%**, repeat-signal accuracy
+**50% → 100%**, hard negatives held (100% Python / 96.5% JS, documented).
+
+- **Benchmark + frozen baseline** (`test/fixtures/screening-benchmark/`,
+  `scripts/screening-benchmark.mjs`, `test/benchmark_eval.py`,
+  `test/screening-benchmark.test.mjs`): 121 labelled true-equivalent pairs
+  (per script group and catching mechanism), 85 hard negatives (one budgeted
+  canary, n030), 114 labelled adverse headlines across 8 languages incl.
+  description-only and wrong-subject cases, 6 multi-day repeat scenarios.
+  Per-backend floors in `floors.json` ratchet only upward (MLRO sign-off to
+  lower); the rapidfuzz backend gates in the fuzz job (real deps), the difflib
+  stub in the bare test job. Governance:
+  `docs/governance/screening-accuracy-benchmark.md`.
+- **Shared transliteration source of truth** (`data/translit-groups.json`,
+  89 disjoint groups / 267 members, loaded fail-loud by BOTH engines,
+  schema-guarded by `test/translit-data.test.mjs`): closes the khaled/khalid
+  class and every Cyrillic/Ukrainian romanization pair the duplicated 10-group
+  in-code tables missed. Deliberate firewalls: salah≠saleh, sayed≠said,
+  selim≠salim stay ungrouped. Variant cap 12→32 (`TRANSLIT_VARIANT_CAP`).
+  Fail-before: khaled→khalid produced no variant pre-change.
+- **Phonetic fold layer** (`phonetic_key`/`phoneticKey`, identical spec both
+  engines, zero new dependencies): the model card's pinned "clears by design"
+  residual — every significant token ≥2 edits off ("Muhamet Huseinn" ≈ 69) —
+  now flags as a **WEAK (phonetic-only)** possible match at its real
+  conservative score, never confirmed-looking. Strictly additive (property-
+  tested: the layer never removes or re-scores a fuzzy hit); dedicated
+  phonetic posting indexes keep blocked/unblocked screening bit-identical
+  (hypothesis property extended over a multi-edit drift pool);
+  `MATCH_PHONETIC` = 1 | shadow | 0. The negative-test pin is FLIPPED, with
+  the kill-switch restoring the historical clear as the regression guard.
+  Also: the JS engine now folds Turkish dotless ı (Kılıç ≡ Kilic — found by
+  the corpus, screen.py parity).
+- **One-way env-tunable thresholds + shadow challenger**: the four match
+  cutoffs (85/82/97/93) are env-tunable, range-validated, and ONE-WAY —
+  raising above the champion default needs the explicit `…ALLOW_RAISE=1`
+  override; the champion/challenger doc's proposed 0.80 shadow run is now
+  wired LOG-ONLY in both engines (`SHADOW_THRESHOLD` /
+  `SCREEN_SHADOW_THRESHOLD`) — counted and logged, never a hit, case or
+  delta entry.
+- **Adverse media — precision without suppression**: feed descriptions
+  captured and scanned alongside headlines (the largest measured recall
+  loss); strong/weak keyword tiers (generic "political"/"lawsuit"/"ESG"
+  headlines stay flagged for the record but need a second independent outlet
+  to count toward escalation); the ≥3-stories/90-days repeat counter now
+  counts DISTINCT canonical-URL fingerprints among counter-eligible entries —
+  wrong-subject same-surname stories (relevance LOW) never count,
+  cross-script (Arabic/Russian/Chinese) headlines are UNSCORABLE and always
+  pass the relevance gate, one article re-served under rotating tracking
+  params counts once, and legacy evidence entries stay eligible (no
+  retroactive suppression). JS gains the stem terms its exact-word list
+  missed ("sanctioned", "launder", "kickback", "guilty", "contraband" …).
+  `ADVERSE_MAX_RESULTS` env (default 8, was hard-coded 5),
+  `ADVERSE_LOCALES` default 5→8, source-credibility ranking tiers
+  (`data/source-credibility.json` — annotation/ordering only).
+- **Floors ratcheted** (`floors.json` v2): recall ≥95% with the miss budget
+  capped at the 3 documented residuals per engine (triple-token drift with a
+  phonetically ambiguous g/j pair; Turkish legal-form abbreviation on the
+  Python min(full,core) side; two JS-only plain-Levenshtein prefix-cluster
+  gaps); adverse/repeat at the achieved 100%. `test/bias_eval.py` floors
+  70%→90% per group, gap 30%→10%, with new Cyrillic-expanded, CJK and
+  Phonetic groups — 100% recall in all six groups under both backends, zero
+  false positives.
+- **One-time re-surface note**: standing subjects that now gain a phonetic or
+  transliteration hit will alert once as new/changed (the conservative
+  outcome, same as the audit-round precedent), bounded by the per-run case
+  cap and backlog drain.
+- Model cards revised (`sanctions-name-matcher.md` — residual flipped;
+  `adverse-media-classifier.md` — also corrects the stale two-feed/5-locale
+  description to the actual three feeds + watchlist net), `.env.example`
+  knobs documented, README gains the benchmark section.
+
 ### JS engine follow-up: cleared-case reopen, fuzzy candidate blocking, empty-key dedupe (2026-07-27)
 
 - **Cleared cases reopen on a re-flag** (owner-authorized design change — the

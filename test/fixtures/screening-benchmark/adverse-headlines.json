@@ -1,0 +1,1919 @@
+{
+ "version": 1,
+ "description": "Labelled adverse-media corpus. items[]: single-headline classification cases — label 'adverse' = genuinely adverse, must be ACTIONABLE (flagged + eligible for the repeat-escalation counter); 'noise' = weak/generic-keyword headline that must stay flagged-for-the-record but NOT actionable; 'wrong-subject' = adverse story about a different party (low name-token overlap), logged but not actionable; 'clean' = must not flag at all. keywords_in records where the risk terms sit (title/description) — description-only adverse items are the pre-hardening recall gap. engines limits which engine a case scores against (non-Latin headlines are Python-pass cases by design: the JS engine deliberately requires the subject name in the headline). Cross-script relevance rule: a title whose script shares no letters with the subject's script is UNSCORABLE for name-relevance and must be treated as pass-through (counted when its keyword tier passes) — relevance gating must never exclude non-Latin press. repeat_scenarios[]: multi-day evidence-counter simulations against the >=3-stories/90-days signal; day_offset is relative to the runner's fixed reference date.",
+ "reference_date": "2026-07-01",
+ "items": [
+  {
+   "id": "a001",
+   "subject": "Khalid Mansour Al Otaibi",
+   "title": "Khalid Mansour Al Otaibi arrested in Dubai money laundering investigation",
+   "description": "Police detained the trader following a two-year probe into cross-border transfers.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "reuters.com",
+   "url": "https://www.reuters.com/world/khalid-otaibi-laundering-arrest"
+  },
+  {
+   "id": "a002",
+   "subject": "Marmara Gold Trading",
+   "title": "Marmara Gold Trading fined over sanctions evasion scheme",
+   "description": "Regulators said the firm routed payments for a designated entity.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Sanctions / Proliferation",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "ft.com",
+   "url": "https://www.ft.com/content/marmara-sanctions-evasion"
+  },
+  {
+   "id": "a003",
+   "subject": "Sergei Volkov",
+   "title": "Sergei Volkov indicted for wire fraud in bullion scheme",
+   "description": "Prosecutors allege fabricated invoices covering unallocated gold sales.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "apnews.com",
+   "url": "https://apnews.com/article/volkov-wire-fraud-indictment"
+  },
+  {
+   "id": "a004",
+   "subject": "Faisal Jassim Al Thani",
+   "title": "Court convicts Faisal Jassim Al Thani of bribery in refinery contract case",
+   "description": "The verdict follows testimony from two former procurement officials.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "gulfnews.com",
+   "url": "https://gulfnews.com/uae/faisal-thani-bribery-conviction"
+  },
+  {
+   "id": "a005",
+   "subject": "Caspian Metals Holding",
+   "title": "Caspian Metals Holding under investigation for smuggling gold through free zone",
+   "description": "Customs officers seized consignments mis-declared as scrap.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "thenationalnews.com",
+   "url": "https://www.thenationalnews.com/business/caspian-gold-smuggling"
+  },
+  {
+   "id": "a006",
+   "subject": "Omar Suleiman Haddad",
+   "title": "Omar Suleiman Haddad charged with terrorist financing offences",
+   "description": "Investigators traced hawala transfers to a proscribed group.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Terrorism / CFT",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "bbc.co.uk",
+   "url": "https://www.bbc.co.uk/news/haddad-terror-financing-charges"
+  },
+  {
+   "id": "a007",
+   "subject": "Anadolu Kiymetli Madenler Ticaret",
+   "title": "Anadolu Kiymetli Madenler Ticaret executives arrested in tax evasion sweep",
+   "description": "Ankara prosecutors sealed company records in dawn raids.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Tax",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "hurriyetdailynews.com",
+   "url": "https://www.hurriyetdailynews.com/anadolu-tax-evasion-arrests"
+  },
+  {
+   "id": "a008",
+   "subject": "Levant Exchange House",
+   "title": "Levant Exchange House license suspended over money laundering controls",
+   "description": "The central bank cited systematic failures in transaction monitoring.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "zawya.com",
+   "url": "https://www.zawya.com/en/business/levant-exchange-suspension"
+  },
+  {
+   "id": "a009",
+   "subject": "Viktor Bout",
+   "title": "Viktor Bout linked to new arms trafficking network, investigators say",
+   "description": "Flight records show cargo routes through three continents.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Sanctions / Proliferation",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "reuters.com",
+   "url": "https://www.reuters.com/world/bout-arms-trafficking-network"
+  },
+  {
+   "id": "a010",
+   "subject": "Mahmoud Nasser Qassem",
+   "title": "Mahmoud Nasser Qassem convicted of fraud over fake gold certificates",
+   "description": "Victims lost an estimated AED 40 million in the scheme.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "khaleejtimes.com",
+   "url": "https://www.khaleejtimes.com/uae/qassem-fraud-conviction"
+  },
+  {
+   "id": "a011",
+   "subject": "Black Sea Refining Corporation",
+   "title": "Black Sea Refining Corporation accused of corruption in port concession",
+   "description": "Leaked documents show payments routed to officials via shell firms.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "occrp.org",
+   "url": "https://www.occrp.org/en/investigations/black-sea-refining-corruption"
+  },
+  {
+   "id": "a012",
+   "subject": "Tarek Sharif",
+   "title": "Tarek Sharif detained as police probe human trafficking ring",
+   "description": "Authorities rescued fourteen workers held in debt bondage.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "apnews.com",
+   "url": "https://apnews.com/article/sharif-trafficking-detained"
+  },
+  {
+   "id": "a013",
+   "subject": "Gulf Falcon Precious Metals",
+   "title": "Gulf Falcon Precious Metals sanctioned by OFAC over Iran gold sales",
+   "description": "Treasury said the firm moved bullion for a designated network.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Sanctions / Proliferation",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "treasury.gov",
+   "url": "https://home.treasury.gov/news/press-releases/gulf-falcon-designation"
+  },
+  {
+   "id": "a014",
+   "subject": "Yevgeniy Prigozhin",
+   "title": "Yevgeniy Prigozhin network accused of sanctions evasion through shell companies",
+   "description": "Investigators mapped forty entities across three jurisdictions.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Sanctions / Proliferation",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "bloomberg.com",
+   "url": "https://www.bloomberg.com/news/prigozhin-sanctions-evasion"
+  },
+  {
+   "id": "a015",
+   "subject": "Hossam Din Farag",
+   "title": "Hossam Din Farag arrested over embezzlement at exchange house",
+   "description": "Auditors flagged unexplained shortfalls across teller accounts.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "arabianbusiness.com",
+   "url": "https://www.arabianbusiness.com/farag-embezzlement-arrest"
+  },
+  {
+   "id": "a016",
+   "subject": "Ural Mining Investment Company",
+   "title": "Ural Mining Investment Company blacklisted for conflict gold purchases",
+   "description": "Assay records tied shipments to mines controlled by armed groups.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "ESG / Human Rights / Minerals",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "reuters.com",
+   "url": "https://www.reuters.com/business/ural-mining-conflict-gold"
+  },
+  {
+   "id": "a017",
+   "subject": "Rashid Omar Al Marri",
+   "title": "Rashid Omar Al Marri guilty of insider trading, court rules",
+   "description": "The ruling caps a three-year market abuse investigation.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "ft.com",
+   "url": "https://www.ft.com/content/almarri-insider-trading"
+  },
+  {
+   "id": "a018",
+   "subject": "Horizon Star General Trading",
+   "title": "Horizon Star General Trading owner indicted in ponzi scheme collapse",
+   "description": "Investors were promised fixed returns on gold-backed notes.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "wsj.com",
+   "url": "https://www.wsj.com/articles/horizon-star-ponzi-indictment"
+  },
+  {
+   "id": "a019",
+   "subject": "Aleksandr Petrov",
+   "title": "Aleksandr Petrov arrested at border with undeclared bullion, smuggling charges filed",
+   "description": "Officers found kilobars concealed in vehicle panels.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "apnews.com",
+   "url": "https://apnews.com/article/petrov-bullion-smuggling"
+  },
+  {
+   "id": "a020",
+   "subject": "Noor Al Deen Atef",
+   "title": "Noor Al Deen Atef convicted of forgery in trade documents case",
+   "description": "Falsified certificates of origin covered re-exported goods.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "gulfnews.com",
+   "url": "https://gulfnews.com/uae/courts/atef-forgery-conviction"
+  },
+  {
+   "id": "a021",
+   "subject": "Emirates Golden Bullion",
+   "title": "Emirates Golden Bullion probed over VAT fraud carousel",
+   "description": "Tax authority alleges circular trades inflated refund claims.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Tax",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "thenationalnews.com",
+   "url": "https://www.thenationalnews.com/business/egb-vat-fraud-probe"
+  },
+  {
+   "id": "a022",
+   "subject": "Mikhail Kuznetsov",
+   "title": "Mikhail Kuznetsov charged with bribery of customs officials",
+   "description": "Wiretaps recorded negotiations over inspection waivers.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "reuters.com",
+   "url": "https://www.reuters.com/world/kuznetsov-bribery-charges"
+  },
+  {
+   "id": "a023",
+   "subject": "Qassem Suleiman Gold Trading",
+   "title": "Qassem Suleiman Gold Trading tied to terrorist financing probe, sources say",
+   "description": "Investigators examined courier cash movements to high-risk corridors.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Terrorism / CFT",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "bloomberg.com",
+   "url": "https://www.bloomberg.com/news/qassem-suleiman-cft-probe"
+  },
+  {
+   "id": "a024",
+   "subject": "Halil Serdar Koc",
+   "title": "Halil Serdar Koc sentenced to prison for organized crime links",
+   "description": "The court found he coordinated cross-border cash couriers.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "hurriyetdailynews.com",
+   "url": "https://www.hurriyetdailynews.com/koc-organized-crime-sentence"
+  },
+  {
+   "id": "a025",
+   "subject": "Pearl Commodities",
+   "title": "Pearl Commodities directors face counterfeit hallmark charges",
+   "description": "Assay office flagged non-conforming stamps on retail bars.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "khaleejtimes.com",
+   "url": "https://www.khaleejtimes.com/business/pearl-counterfeit-hallmarks"
+  },
+  {
+   "id": "a026",
+   "subject": "Waleed Nasser",
+   "title": "Waleed Nasser extradited over narcotics proceeds laundered through gold",
+   "description": "Prosecutors say street cash was converted to scrap purchases.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "apnews.com",
+   "url": "https://apnews.com/article/nasser-extradition-laundering"
+  },
+  {
+   "id": "a027",
+   "subject": "Atlas Holding Group",
+   "title": "Atlas Holding Group fined for regulatory breach after failed audit, accounting fraud alleged",
+   "description": "The regulator cited fictitious inventory entries.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "ft.com",
+   "url": "https://www.ft.com/content/atlas-accounting-fraud"
+  },
+  {
+   "id": "a028",
+   "subject": "Ibrahim Tatlises Yildiz",
+   "title": "Ibrahim Tatlises Yildiz detained in kickback investigation at state tender",
+   "description": "Auditors traced consultancy fees to shell entities.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "reuters.com",
+   "url": "https://www.reuters.com/world/yildiz-kickback-detained"
+  },
+  {
+   "id": "a029",
+   "subject": "Hassan Nasrallah",
+   "title": "Hassan Nasrallah named in terror funding indictment unsealed Tuesday",
+   "description": "The filing details front charities and cash couriers.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Terrorism / CFT",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "apnews.com",
+   "url": "https://apnews.com/article/nasrallah-terror-funding"
+  },
+  {
+   "id": "a030",
+   "subject": "Nile Capital Investment Services",
+   "title": "Nile Capital Investment Services shut down over market manipulation",
+   "description": "Spoofing orders distorted regional bullion benchmarks.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "bloomberg.com",
+   "url": "https://www.bloomberg.com/news/nile-capital-manipulation"
+  },
+  {
+   "id": "a031",
+   "subject": "Saleh Hamid",
+   "title": "Saleh Hamid steps back from board duties at family firm",
+   "description": "The move follows his arrest last week in the money laundering case, his lawyer confirmed.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "gulfnews.com",
+   "url": "https://gulfnews.com/business/hamid-board-changes"
+  },
+  {
+   "id": "a032",
+   "subject": "Grigori Vasilyev",
+   "title": "Grigori Vasilyev resigns from metals exchange committee",
+   "description": "Sources said the resignation came as prosecutors prepared fraud charges against him.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "reuters.com",
+   "url": "https://www.reuters.com/business/vasilyev-resigns-committee"
+  },
+  {
+   "id": "a033",
+   "subject": "Delta Enterprises",
+   "title": "Delta Enterprises restructures Gulf operations",
+   "description": "The shake-up follows reports that regulators froze accounts amid a sanctions evasion inquiry.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Sanctions / Proliferation",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "zawya.com",
+   "url": "https://www.zawya.com/en/business/delta-restructure"
+  },
+  {
+   "id": "a034",
+   "subject": "Emad Fouad Bashir",
+   "title": "Emad Fouad Bashir absent from industry summit",
+   "description": "Organisers removed his keynote after he was indicted for bribery in Cairo.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "arabianbusiness.com",
+   "url": "https://www.arabianbusiness.com/bashir-summit-absence"
+  },
+  {
+   "id": "a035",
+   "subject": "Summit Overseas Enterprises",
+   "title": "Summit Overseas Enterprises changes auditors for third time",
+   "description": "A whistleblower complaint alleging accounting fraud triggered the latest switch.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "ft.com",
+   "url": "https://www.ft.com/content/summit-auditor-change"
+  },
+  {
+   "id": "a036",
+   "subject": "Mustapha Ozdemir",
+   "title": "Mustapha Ozdemir sells stake in logistics venture",
+   "description": "The sale comes weeks after his conviction for smuggling was upheld on appeal.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "hurriyetdailynews.com",
+   "url": "https://www.hurriyetdailynews.com/ozdemir-stake-sale"
+  },
+  {
+   "id": "a037",
+   "subject": "Crescent Global Investments",
+   "title": "Crescent Global Investments delays annual results",
+   "description": "The delay follows a police probe into embezzlement by two senior managers.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "thenationalnews.com",
+   "url": "https://www.thenationalnews.com/business/crescent-results-delay"
+  },
+  {
+   "id": "a038",
+   "subject": "Anwar Kamal Adnan",
+   "title": "Anwar Kamal Adnan withdraws from charity gala circuit",
+   "description": "His foundation is under investigation for terrorist financing, two officials said.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Terrorism / CFT",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "bbc.co.uk",
+   "url": "https://www.bbc.co.uk/news/adnan-foundation-inquiry"
+  },
+  {
+   "id": "a039",
+   "subject": "Golden Gate General Trading",
+   "title": "Golden Gate General Trading loses banking relationships",
+   "description": "Three lenders exited after the firm was blacklisted for tax fraud in two markets.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Tax",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "bloomberg.com",
+   "url": "https://www.bloomberg.com/news/golden-gate-derisking"
+  },
+  {
+   "id": "a040",
+   "subject": "Semen Stepanovich Kravets",
+   "title": "Semen Stepanovich Kravets exits shipping joint venture",
+   "description": "Partners cut ties after customs opened a contraband investigation into his cargo firm.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "reuters.com",
+   "url": "https://www.reuters.com/business/kravets-jv-exit"
+  },
+  {
+   "id": "a041",
+   "subject": "Munir Latif Shakir",
+   "title": "Munir Latif Shakir property portfolio put up for sale",
+   "description": "Agents began marketing the assets after courts ordered confiscation in his corruption case.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "gulfnews.com",
+   "url": "https://gulfnews.com/business/property/shakir-portfolio-sale"
+  },
+  {
+   "id": "a042",
+   "subject": "Oleh Ihor Danylenko",
+   "title": "Oleh Ihor Danylenko misses arbitration hearing",
+   "description": "His counsel cited travel limits imposed since he was arrested for wire fraud in March.",
+   "lang": "en",
+   "label": "adverse",
+   "keywords_in": "description",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "kyivindependent.com",
+   "url": "https://kyivindependent.com/danylenko-arbitration"
+  },
+  {
+   "id": "a043",
+   "subject": "Khalid Mansour Al Otaibi",
+   "title": "توقيف خالد منصور العتيبي في قضية غسل الأموال",
+   "description": "أوقفت السلطات التاجر بعد تحقيق استمر عامين في تحويلات عبر الحدود.",
+   "lang": "ar",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "aljazeera.net",
+   "url": "https://www.aljazeera.net/news/otaibi-laundering"
+  },
+  {
+   "id": "a044",
+   "subject": "Levant Exchange House",
+   "title": "اعتقال مسؤولين في دار الصرافة بتهمة احتيال",
+   "description": "وجهت النيابة تهم الاحتيال إلى اثنين من كبار الموظفين.",
+   "lang": "ar",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "alarabiya.net",
+   "url": "https://www.alarabiya.net/aswaq/levant-fraud"
+  },
+  {
+   "id": "a045",
+   "subject": "Omar Suleiman Haddad",
+   "title": "تهم تمويل الإرهاب تلاحق رجل أعمال خليجي",
+   "description": "تتبع المحققون تحويلات حوالة إلى جماعة محظورة.",
+   "lang": "ar",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Terrorism / CFT",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "aawsat.com",
+   "url": "https://aawsat.com/home/article/haddad-cft"
+  },
+  {
+   "id": "a046",
+   "subject": "Qassem Suleiman Gold Trading",
+   "title": "تهريب ذهب: توقيف شحنة مرتبطة بشركة تجارة ذهب",
+   "description": "صادرت الجمارك سبائك أخفيت في شحنة خردة.",
+   "lang": "ar",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "emaratalyoum.com",
+   "url": "https://www.emaratalyoum.com/local-section/qassem-gold"
+  },
+  {
+   "id": "a047",
+   "subject": "Munir Latif Shakir",
+   "title": "إدانة تاجر بتهمة رشوة مسؤولين في مناقصة حكومية",
+   "description": "قضت المحكمة بمصادرة عوائد الجريمة.",
+   "lang": "ar",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "albayan.ae",
+   "url": "https://www.albayan.ae/across-the-uae/shakir-bribery"
+  },
+  {
+   "id": "a048",
+   "subject": "Nile Capital Investment Services",
+   "title": "تحقيق في شبهات فساد داخل شركة استثمار إقليمية",
+   "description": "فتحت هيئة الرقابة تحقيقا في مدفوعات مشبوهة.",
+   "lang": "ar",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "skynewsarabia.com",
+   "url": "https://www.skynewsarabia.com/business/nile-corruption"
+  },
+  {
+   "id": "a049",
+   "subject": "Halil Serdar Koc",
+   "title": "Halil Serdar Koc kara para aklama soruşturmasında tutuklandı",
+   "description": "Savcılık, kuyumculuk hesapları üzerinden yapılan transferleri inceliyor.",
+   "lang": "tr",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "hurriyet.com.tr",
+   "url": "https://www.hurriyet.com.tr/gundem/koc-kara-para"
+  },
+  {
+   "id": "a050",
+   "subject": "Anadolu Kiymetli Madenler Ticaret",
+   "title": "Anadolu Kiymetli Madenler Ticaret yöneticilerine rüşvet suçlaması",
+   "description": "İhale dosyalarında usulsüzlük tespit edildi.",
+   "lang": "tr",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "sabah.com.tr",
+   "url": "https://www.sabah.com.tr/ekonomi/anadolu-rusvet"
+  },
+  {
+   "id": "a051",
+   "subject": "Mehmet Akif Turker",
+   "title": "Mehmet Akif Turker dolandırıcılık davasında mahkûm oldu",
+   "description": "Mahkeme, sahte fatura düzenlendiğine hükmetti.",
+   "lang": "tr",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "cumhuriyet.com.tr",
+   "url": "https://www.cumhuriyet.com.tr/turkiye/turker-dava"
+  },
+  {
+   "id": "a052",
+   "subject": "Emre Kilic",
+   "title": "Emre Kilic altın kaçakçılık şebekesi soruşturmasında gözaltında",
+   "description": "Gümrük muhafaza ekipleri üç ilde operasyon düzenledi.",
+   "lang": "tr",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "ntv.com.tr",
+   "url": "https://www.ntv.com.tr/turkiye/kilic-kacakcilik"
+  },
+  {
+   "id": "a053",
+   "subject": "Sergei Volkov",
+   "title": "Сергей Волков арестован по делу об отмывании денег",
+   "description": "Следствие изучает операции с драгоценными металлами.",
+   "lang": "ru",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "kommersant.ru",
+   "url": "https://www.kommersant.ru/doc/volkov-arest"
+  },
+  {
+   "id": "a054",
+   "subject": "Ural Mining Investment Company",
+   "title": "Компания попала под санкции за поставки золота",
+   "description": "Минфин США внес структуру в санкционный список.",
+   "lang": "ru",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Sanctions / Proliferation",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "rbc.ru",
+   "url": "https://www.rbc.ru/business/ural-sanctions"
+  },
+  {
+   "id": "a055",
+   "subject": "Mikhail Kuznetsov",
+   "title": "Михаил Кузнецов осуждён за взяточничество",
+   "description": "Суд назначил семь лет колонии и конфискацию активов.",
+   "lang": "ru",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "interfax.ru",
+   "url": "https://www.interfax.ru/russia/kuznetsov-vzyatka"
+  },
+  {
+   "id": "a056",
+   "subject": "Aleksandr Petrov",
+   "title": "Александр Петров арестован за контрабанду золота",
+   "description": "Слитки были спрятаны в панелях автомобиля.",
+   "lang": "ru",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "tass.ru",
+   "url": "https://tass.ru/proisshestviya/petrov-kontrabanda"
+  },
+  {
+   "id": "a057",
+   "subject": "Jonathan Reyes Ortega",
+   "title": "Jonathan Reyes Ortega detenido por lavado de dinero en operación aduanera",
+   "description": "La fiscalía investiga compras de oro con efectivo no declarado.",
+   "lang": "es",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "elpais.com",
+   "url": "https://elpais.com/economia/reyes-ortega-lavado"
+  },
+  {
+   "id": "a058",
+   "subject": "Marcus Devereaux",
+   "title": "Marcus Devereaux condamné pour blanchiment d'argent",
+   "description": "Le tribunal a ordonné la confiscation de ses avoirs.",
+   "lang": "fr",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "lemonde.fr",
+   "url": "https://www.lemonde.fr/economie/devereaux-blanchiment"
+  },
+  {
+   "id": "a059",
+   "subject": "Chen Wei Ming",
+   "title": "陈伟明因洗钱罪被捕",
+   "description": "警方冻结了其名下多个账户。",
+   "lang": "zh",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "scmp.com",
+   "url": "https://www.scmp.com/news/china/chen-laundering"
+  },
+  {
+   "id": "a060",
+   "subject": "Kang Min Ho",
+   "title": "강민호 자금세탁 혐의로 체포",
+   "description": "검찰은 귀금속 거래 내역을 조사 중이다.",
+   "lang": "ko",
+   "label": "adverse",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "yonhapnews.co.kr",
+   "url": "https://www.yonhapnews.co.kr/kang-arrest"
+  },
+  {
+   "id": "a061",
+   "subject": "Robert James Anderson",
+   "title": "Robert James Anderson weighs political run in county election",
+   "description": "The businessman addressed supporters at a rally on Saturday.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "localtimes.example.com",
+   "url": "https://localtimes.example.com/anderson-political-run"
+  },
+  {
+   "id": "a062",
+   "subject": "Stanford Marsh",
+   "title": "Stanford Marsh faces lawsuit over delayed office fit-out",
+   "description": "The contractor disputes the completion timeline in filings.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "constructionnews.example.com",
+   "url": "https://constructionnews.example.com/marsh-lawsuit"
+  },
+  {
+   "id": "a063",
+   "subject": "Pearl Commodities",
+   "title": "Pearl Commodities publishes ESG roadmap for 2027",
+   "description": "The plan targets recycled feedstock and audited supply chains.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "zawya.com",
+   "url": "https://www.zawya.com/en/business/pearl-esg-roadmap"
+  },
+  {
+   "id": "a064",
+   "subject": "Atlas Holding Group",
+   "title": "Atlas Holding Group in contract breach dispute with landlord",
+   "description": "Both sides seek mediation over escalation clauses.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "gulfnews.com",
+   "url": "https://gulfnews.com/business/atlas-lease-dispute"
+  },
+  {
+   "id": "a065",
+   "subject": "Helena Van Der Berg",
+   "title": "Helena Van Der Berg joins panel on nuclear energy financing",
+   "description": "The forum discussed small modular reactor investment models.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "energyweekly.example.com",
+   "url": "https://energyweekly.example.com/vandenberg-panel"
+  },
+  {
+   "id": "a066",
+   "subject": "Crescent Global Investments",
+   "title": "Crescent Global Investments sponsors pollution clean-up drive",
+   "description": "Volunteers collected six tonnes of coastal waste.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "khaleejtimes.com",
+   "url": "https://www.khaleejtimes.com/uae/crescent-cleanup"
+  },
+  {
+   "id": "a067",
+   "subject": "Peter Halloway",
+   "title": "Peter Halloway comments on political developments in trade policy",
+   "description": "He urged faster customs digitisation at the chamber meeting.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "tradejournal.example.com",
+   "url": "https://tradejournal.example.com/halloway-policy"
+  },
+  {
+   "id": "a068",
+   "subject": "Falcon International Trading",
+   "title": "Falcon International Trading settles employment lawsuit",
+   "description": "Terms of the settlement were not disclosed.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "gulfbusiness.com",
+   "url": "https://gulfbusiness.com/falcon-settlement"
+  },
+  {
+   "id": "a069",
+   "subject": "Edward Callaghan",
+   "title": "Edward Callaghan criticises illegal parking near souk",
+   "description": "Traders say congestion deters weekend footfall.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "citydesk.example.com",
+   "url": "https://citydesk.example.com/callaghan-parking"
+  },
+  {
+   "id": "a070",
+   "subject": "Summit Overseas Enterprises",
+   "title": "Summit Overseas Enterprises wins verdict in patent dispute",
+   "description": "The court upheld its design registration claims.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "iplawreview.example.com",
+   "url": "https://iplawreview.example.com/summit-verdict"
+  },
+  {
+   "id": "a071",
+   "subject": "Antonio Bellucci",
+   "title": "Antonio Bellucci gallery show explores exploitation of colour",
+   "description": "Critics praised the retrospective's bold palette.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "artsdaily.example.com",
+   "url": "https://artsdaily.example.com/bellucci-show"
+  },
+  {
+   "id": "a072",
+   "subject": "Golden Gate General Trading",
+   "title": "Golden Gate General Trading warns of greenwashing in recycled gold claims",
+   "description": "The firm called for tighter chain-of-custody standards.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "thenationalnews.com",
+   "url": "https://www.thenationalnews.com/business/goldengate-greenwashing"
+  },
+  {
+   "id": "a073",
+   "subject": "Frederick Aldous Grant",
+   "title": "Frederick Aldous Grant discusses conflict of interest rules for advisers",
+   "description": "His whitepaper proposes standard disclosure templates.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "complianceweek.example.com",
+   "url": "https://complianceweek.example.com/grant-coi-rules"
+  },
+  {
+   "id": "a074",
+   "subject": "Delta Enterprises",
+   "title": "Delta Enterprises flags dual-use export rules in earnings call",
+   "description": "Management said licensing timelines lengthened this quarter.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "reuters.com",
+   "url": "https://www.reuters.com/business/delta-earnings-exports"
+  },
+  {
+   "id": "a075",
+   "subject": "Huseyin Yamac",
+   "title": "Huseyin Yamac addresses seminar on regulatory breach prevention",
+   "description": "The workshop covered internal control frameworks.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "complianceweek.example.com",
+   "url": "https://complianceweek.example.com/yamac-seminar"
+  },
+  {
+   "id": "a076",
+   "subject": "Nile Capital Investment Services",
+   "title": "Nile Capital Investment Services report cites deforestation risk in commodity portfolios",
+   "description": "The study maps exposure across soft-commodity supply chains.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "ft.com",
+   "url": "https://www.ft.com/content/nile-deforestation-report"
+  },
+  {
+   "id": "a077",
+   "subject": "Marcus Devereaux",
+   "title": "Marcus Devereaux launches litigation funding venture",
+   "description": "The fund targets commercial arbitration claims.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "lawgazette.example.com",
+   "url": "https://lawgazette.example.com/devereaux-litigation-fund"
+  },
+  {
+   "id": "a078",
+   "subject": "Ozgur Anik",
+   "title": "Ozgur Anik elected to chamber post after political campaign",
+   "description": "He pledged export support for small refiners.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "dailysabah.com",
+   "url": "https://www.dailysabah.com/business/anik-chamber"
+  },
+  {
+   "id": "a079",
+   "subject": "Viktor Bout",
+   "title": "Viktor Bout biography tops non-fiction charts",
+   "description": "The paperback edition adds two new chapters.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "booksdesk.example.com",
+   "url": "https://booksdesk.example.com/bout-biography"
+  },
+  {
+   "id": "a080",
+   "subject": "Emirates Golden Bullion",
+   "title": "Emirates Golden Bullion sponsors court case moot for law students",
+   "description": "Finalists argued a mock commodities dispute.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "educationdesk.example.com",
+   "url": "https://educationdesk.example.com/egb-moot"
+  },
+  {
+   "id": "a081",
+   "subject": "Zoe Precious Metals",
+   "title": "Zoe Precious Metals debates pollution levy at industry forum",
+   "description": "Members split over refining emissions charges.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "metalsweekly.example.com",
+   "url": "https://metalsweekly.example.com/zoe-levy-debate"
+  },
+  {
+   "id": "a082",
+   "subject": "Christopher Mallory Boone",
+   "title": "Christopher Mallory Boone unveils ESG scorecard for family offices",
+   "description": "The framework grades governance and stewardship metrics.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "wealthbrief.example.com",
+   "url": "https://wealthbrief.example.com/boone-esg-scorecard"
+  },
+  {
+   "id": "a083",
+   "subject": "Jamil Antar",
+   "title": "Jamil Antar warns of unlawful subletting in trade zones",
+   "description": "He urged landlords to audit occupancy registers.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "propertydesk.example.com",
+   "url": "https://propertydesk.example.com/antar-subletting"
+  },
+  {
+   "id": "a084",
+   "subject": "Sapphire Commodities",
+   "title": "Sapphire Commodities joins anti-pollution pact for refineries",
+   "description": "Signatories commit to emissions reporting by 2028.",
+   "lang": "en",
+   "label": "noise",
+   "keywords_in": "title",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "metalsweekly.example.com",
+   "url": "https://metalsweekly.example.com/sapphire-pact"
+  },
+  {
+   "id": "a085",
+   "subject": "Khalid Nasser Al Qasimi",
+   "title": "Nasser detained in Cairo fraud probe",
+   "description": "The Egyptian midfielder faces questions over ticket resales.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "sportswire.example.com",
+   "url": "https://sportswire.example.com/nasser-cairo-probe"
+  },
+  {
+   "id": "a086",
+   "subject": "Mariam Yousef Al Hashimi",
+   "title": "Yousef arrested after market brawl",
+   "description": "Police detained the vendor following a dispute over stall fees.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Enforcement / Legal",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "citydesk.example.com",
+   "url": "https://citydesk.example.com/yousef-market-brawl"
+  },
+  {
+   "id": "a087",
+   "subject": "Hamdan Saeed Al Shamsi",
+   "title": "Saeed convicted in insurance fraud trial",
+   "description": "The taxi operator staged collisions for claims, court found.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "localtimes.example.com",
+   "url": "https://localtimes.example.com/saeed-insurance-fraud"
+  },
+  {
+   "id": "a088",
+   "subject": "Bassam Khoury Trading",
+   "title": "Khoury indicted for bribery in municipal contract",
+   "description": "The paving contractor allegedly paid inspectors for approvals.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Bribery / Corruption",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "regionalpost.example.com",
+   "url": "https://regionalpost.example.com/khoury-bribery"
+  },
+  {
+   "id": "a089",
+   "subject": "Adel Ibrahim Mansour",
+   "title": "Ibrahim held over smuggling attempt at land border",
+   "description": "Officers found cigarettes concealed in freight.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "bordernews.example.com",
+   "url": "https://bordernews.example.com/ibrahim-cigarettes"
+  },
+  {
+   "id": "a090",
+   "subject": "Rami Sabbagh Jewellery",
+   "title": "Sabbagh sentenced for tax evasion in bakery chain case",
+   "description": "The court imposed a suspended term and fines.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Tax",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "regionalpost.example.com",
+   "url": "https://regionalpost.example.com/sabbagh-tax"
+  },
+  {
+   "id": "a091",
+   "subject": "Ziad Mansour Barghouti",
+   "title": "Mansour faces money laundering charges in casino probe",
+   "description": "Regulators traced chips purchased with unexplained cash.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "gamingwire.example.com",
+   "url": "https://gamingwire.example.com/mansour-casino"
+  },
+  {
+   "id": "a092",
+   "subject": "Lina Haddad Interiors",
+   "title": "Haddad arrested in antiquities trafficking sting",
+   "description": "The dealer allegedly sold looted artefacts to collectors.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "heritagedesk.example.com",
+   "url": "https://heritagedesk.example.com/haddad-antiquities"
+  },
+  {
+   "id": "a093",
+   "subject": "Boris Orlov Logistics",
+   "title": "Orlov charged with sanctions evasion over machine tool exports",
+   "description": "Prosecutors say end-user certificates were falsified.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Sanctions / Proliferation",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "tradecompliance.example.com",
+   "url": "https://tradecompliance.example.com/orlov-exports"
+  },
+  {
+   "id": "a094",
+   "subject": "Ivan Petrov Consulting",
+   "title": "Petrov convicted of embezzlement at regional utility",
+   "description": "Auditors found diverted maintenance budgets.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "utilitynews.example.com",
+   "url": "https://utilitynews.example.com/petrov-embezzlement"
+  },
+  {
+   "id": "a095",
+   "subject": "Wang Jianguo Metals",
+   "title": "Jianguo network accused of wildlife trafficking",
+   "description": "Investigators seized ivory shipments across two ports.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Organised Crime / Trafficking",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "conservationwire.example.com",
+   "url": "https://conservationwire.example.com/jianguo-ivory"
+  },
+  {
+   "id": "a096",
+   "subject": "Salem Rashid Al Nuaimi",
+   "title": "Rashid guilty of forgery in visa racket",
+   "description": "The agency stamped counterfeit entry permits.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "localtimes.example.com",
+   "url": "https://localtimes.example.com/rashid-visa-racket"
+  },
+  {
+   "id": "a097",
+   "subject": "Tanaka Hiroshi Holdings",
+   "title": "Hiroshi indicted over kickback scheme at shipping line",
+   "description": "Rebates were routed through a Singapore intermediary.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Money Laundering",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "maritimewire.example.com",
+   "url": "https://maritimewire.example.com/hiroshi-kickbacks"
+  },
+  {
+   "id": "a098",
+   "subject": "Roman Lebedev Capital",
+   "title": "Lebedev banned for market manipulation in energy futures",
+   "description": "The tribunal cited layering across venues.",
+   "lang": "en",
+   "label": "wrong-subject",
+   "keywords_in": "title",
+   "expected_typology": "Fraud / Financial Crime",
+   "engines": [
+    "py"
+   ],
+   "source_domain": "energymarketsdaily.example.com",
+   "url": "https://energymarketsdaily.example.com/lebedev-ban"
+  },
+  {
+   "id": "a099",
+   "subject": "Robert James Anderson",
+   "title": "Robert James Anderson opens second showroom in Deira",
+   "description": "The expansion adds a certified assay counter.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "gulfbusiness.com",
+   "url": "https://gulfbusiness.com/anderson-showroom"
+  },
+  {
+   "id": "a100",
+   "subject": "Marmara Gold Trading",
+   "title": "Marmara Gold Trading reports record quarterly refining volumes",
+   "description": "Throughput rose on strong regional demand.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "metalsweekly.example.com",
+   "url": "https://metalsweekly.example.com/marmara-volumes"
+  },
+  {
+   "id": "a101",
+   "subject": "Huseyin Yamac",
+   "title": "Huseyin Yamac wins exporter of the year award",
+   "description": "The jury cited growth in certified refined output.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "dailysabah.com",
+   "url": "https://www.dailysabah.com/business/yamac-award"
+  },
+  {
+   "id": "a102",
+   "subject": "Pearl Commodities",
+   "title": "Pearl Commodities partners with logistics platform for insured delivery",
+   "description": "The tie-up covers same-day vault transfers.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "zawya.com",
+   "url": "https://www.zawya.com/en/business/pearl-logistics"
+  },
+  {
+   "id": "a103",
+   "subject": "Sergei Volkov",
+   "title": "Sergei Volkov to keynote metals conference in Astana",
+   "description": "His session covers refining capacity trends.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "metalsweekly.example.com",
+   "url": "https://metalsweekly.example.com/volkov-keynote"
+  },
+  {
+   "id": "a104",
+   "subject": "Fatima Zahra Hamdan",
+   "title": "Fatima Zahra Hamdan named to fintech advisory board",
+   "description": "She will chair the payments working group.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "wamda.example.com",
+   "url": "https://wamda.example.com/hamdan-board"
+  },
+  {
+   "id": "a105",
+   "subject": "Atlas Holding Group",
+   "title": "Atlas Holding Group completes headquarters relocation",
+   "description": "Staff moved to the new tower over the weekend.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "gulfnews.com",
+   "url": "https://gulfnews.com/business/atlas-relocation"
+  },
+  {
+   "id": "a106",
+   "subject": "Emre Kilic",
+   "title": "Emre Kilic launches apprenticeship scheme for goldsmiths",
+   "description": "Twenty trainees join the first cohort.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "dailysabah.com",
+   "url": "https://www.dailysabah.com/business/kilic-apprentices"
+  },
+  {
+   "id": "a107",
+   "subject": "Nguyen Van An",
+   "title": "Nguyen Van An expands jewellery export line to Europe",
+   "description": "New collections debut at the autumn fair.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "vietnamtradedesk.example.com",
+   "url": "https://vietnamtradedesk.example.com/an-exports"
+  },
+  {
+   "id": "a108",
+   "subject": "Crescent Global Investments",
+   "title": "Crescent Global Investments raises stake in refining venture",
+   "description": "The deal lifts its holding to forty per cent.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "bloomberg.com",
+   "url": "https://www.bloomberg.com/news/crescent-stake"
+  },
+  {
+   "id": "a109",
+   "subject": "Mikhail Kuznetsov",
+   "title": "Mikhail Kuznetsov donates assay equipment to technical college",
+   "description": "The lab opens to students next term.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "educationdesk.example.com",
+   "url": "https://educationdesk.example.com/kuznetsov-donation"
+  },
+  {
+   "id": "a110",
+   "subject": "Golden Gate General Trading",
+   "title": "Golden Gate General Trading certified for responsible sourcing audit",
+   "description": "The certificate covers refining and chain of custody.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "thenationalnews.com",
+   "url": "https://www.thenationalnews.com/business/goldengate-certified"
+  },
+  {
+   "id": "a111",
+   "subject": "Khalid Mansour Al Otaibi",
+   "title": "Khalid Mansour Al Otaibi hosts iftar for trade partners",
+   "description": "Guests included regional refiners and vault operators.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "khaleejtimes.com",
+   "url": "https://www.khaleejtimes.com/uae/otaibi-iftar"
+  },
+  {
+   "id": "a112",
+   "subject": "Stanford Marsh",
+   "title": "Stanford Marsh completes solar rooftop installation",
+   "description": "The array covers sixty per cent of site demand.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "energyweekly.example.com",
+   "url": "https://energyweekly.example.com/marsh-solar"
+  },
+  {
+   "id": "a113",
+   "subject": "Levant Exchange House",
+   "title": "Levant Exchange House opens flagship branch at financial centre",
+   "description": "The branch offers extended weekend hours.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "zawya.com",
+   "url": "https://www.zawya.com/en/business/levant-branch"
+  },
+  {
+   "id": "a114",
+   "subject": "Ozgur Anik",
+   "title": "Ozgur Anik joins mentoring programme for young exporters",
+   "description": "The scheme pairs founders with senior traders.",
+   "lang": "en",
+   "label": "clean",
+   "engines": [
+    "py",
+    "js"
+   ],
+   "source_domain": "tradejournal.example.com",
+   "url": "https://tradejournal.example.com/anik-mentoring"
+  }
+ ],
+ "repeat_scenarios": [
+  {
+   "id": "s01",
+   "subject": "Khalid Mansour Al Otaibi",
+   "expected_repeat": true,
+   "note": "genuine pattern: three distinct strong stories, three outlets, spread across the window",
+   "stories": [
+    {
+     "day_offset": -40,
+     "title": "Khalid Mansour Al Otaibi arrested in Dubai money laundering investigation",
+     "source": "reuters.com",
+     "url": "https://www.reuters.com/world/khalid-otaibi-laundering-arrest"
+    },
+    {
+     "day_offset": -20,
+     "title": "Prosecutors widen fraud case against Khalid Mansour Al Otaibi",
+     "source": "thenationalnews.com",
+     "url": "https://www.thenationalnews.com/business/otaibi-fraud-widens"
+    },
+    {
+     "day_offset": -5,
+     "title": "Khalid Mansour Al Otaibi assets frozen in bribery inquiry",
+     "source": "gulfnews.com",
+     "url": "https://gulfnews.com/uae/otaibi-assets-frozen"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "subject": "Sergei Volkov",
+   "expected_repeat": false,
+   "note": "same article re-surfaced across days: identical canonical URL behind rotating tracking params, reworded headline",
+   "stories": [
+    {
+     "day_offset": -15,
+     "title": "Sergei Volkov indicted for wire fraud in bullion scheme",
+     "source": "apnews.com",
+     "url": "https://apnews.com/article/volkov-wire-fraud-indictment?utm_source=rss&utm_campaign=feed"
+    },
+    {
+     "day_offset": -10,
+     "title": "Wire fraud indictment names Sergei Volkov in bullion scheme",
+     "source": "apnews.com",
+     "url": "https://apnews.com/article/volkov-wire-fraud-indictment?utm_source=newsletter&ref=daily"
+    },
+    {
+     "day_offset": -3,
+     "title": "Bullion scheme case: Sergei Volkov indicted for wire fraud",
+     "source": "apnews.com",
+     "url": "https://apnews.com/article/volkov-wire-fraud-indictment?ncid=twitter&utm_medium=social"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "subject": "Hamdan Saeed Al Shamsi",
+   "expected_repeat": false,
+   "note": "low-relevance flood: three adverse stories about different same-surname parties; headline never carries the subject's name",
+   "stories": [
+    {
+     "day_offset": -30,
+     "title": "Saeed convicted in insurance fraud trial",
+     "source": "localtimes.example.com",
+     "url": "https://localtimes.example.com/saeed-insurance-fraud"
+    },
+    {
+     "day_offset": -18,
+     "title": "Hamdan questioned in procurement bribery case",
+     "source": "regionalpost.example.com",
+     "url": "https://regionalpost.example.com/hamdan-procurement"
+    },
+    {
+     "day_offset": -6,
+     "title": "Saeed detained over cheque fraud complaints",
+     "source": "citydesk.example.com",
+     "url": "https://citydesk.example.com/saeed-cheque-fraud"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "subject": "Atlas Holding Group",
+   "expected_repeat": false,
+   "note": "weak-tier uncorroborated: three generic litigation/politics headlines, single outlet each, no second source",
+   "stories": [
+    {
+     "day_offset": -35,
+     "title": "Atlas Holding Group in contract breach dispute with landlord",
+     "source": "gulfnews.com",
+     "url": "https://gulfnews.com/business/atlas-lease-dispute"
+    },
+    {
+     "day_offset": -22,
+     "title": "Atlas Holding Group faces lawsuit over delayed handover",
+     "source": "constructionnews.example.com",
+     "url": "https://constructionnews.example.com/atlas-handover-lawsuit"
+    },
+    {
+     "day_offset": -9,
+     "title": "Atlas Holding Group chairman weighs political appointment",
+     "source": "localtimes.example.com",
+     "url": "https://localtimes.example.com/atlas-chairman-politics"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "subject": "Levant Exchange House",
+   "expected_repeat": true,
+   "note": "weak-tier corroborated: generic headlines but each story carried by a second independent outlet the same day",
+   "stories": [
+    {
+     "day_offset": -28,
+     "title": "Levant Exchange House named in breach of contract claim",
+     "source": "gulfbusiness.com",
+     "url": "https://gulfbusiness.com/levant-breach-claim"
+    },
+    {
+     "day_offset": -28,
+     "title": "Breach of contract claim names Levant Exchange House",
+     "source": "zawya.com",
+     "url": "https://www.zawya.com/en/business/levant-breach-claim-report"
+    },
+    {
+     "day_offset": -16,
+     "title": "Levant Exchange House lawsuit heads to arbitration",
+     "source": "gulfbusiness.com",
+     "url": "https://gulfbusiness.com/levant-arbitration"
+    },
+    {
+     "day_offset": -16,
+     "title": "Levant Exchange House lawsuit moves to arbitration panel",
+     "source": "thenationalnews.com",
+     "url": "https://www.thenationalnews.com/business/levant-arbitration-panel"
+    },
+    {
+     "day_offset": -4,
+     "title": "Levant Exchange House disputes unlawful termination finding",
+     "source": "gulfbusiness.com",
+     "url": "https://gulfbusiness.com/levant-termination"
+    },
+    {
+     "day_offset": -4,
+     "title": "Unlawful termination finding disputed by Levant Exchange House",
+     "source": "khaleejtimes.com",
+     "url": "https://www.khaleejtimes.com/business/levant-termination-dispute"
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "subject": "Gulf Falcon Precious Metals",
+   "expected_repeat": false,
+   "note": "two distinct strong stories only — below the three-story threshold; must not fire under any engine version",
+   "stories": [
+    {
+     "day_offset": -25,
+     "title": "Gulf Falcon Precious Metals sanctioned by OFAC over Iran gold sales",
+     "source": "treasury.gov",
+     "url": "https://home.treasury.gov/news/press-releases/gulf-falcon-designation"
+    },
+    {
+     "day_offset": -8,
+     "title": "Banks cut ties with Gulf Falcon Precious Metals after money laundering fine",
+     "source": "reuters.com",
+     "url": "https://www.reuters.com/business/gulf-falcon-derisking"
+    }
+   ]
+  }
+ ]
+}

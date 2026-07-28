@@ -1,0 +1,22 @@
+{
+ "version": 1,
+ "description": "Source-credibility tiers for adverse-media ranking — ANNOTATION AND ORDERING ONLY, never a flag/suppress gate. Tier 1: wire services, global financial press, regulators and established Gulf dailies. Tier 2: mainstream regional/national outlets. Everything else defaults to tier 3. Matched against the article URL's host (minus www.) or, failing that, the outlet display name folded against each domain's first label. Loaded by screen.py (source_tier_for) and scripts/adverse-media.mjs (sourceTierFor).",
+ "tier1": [
+  "reuters.com", "apnews.com", "afp.com", "bloomberg.com", "ft.com", "wsj.com",
+  "bbc.com", "bbc.co.uk", "economist.com", "nytimes.com", "theguardian.com",
+  "treasury.gov", "ofac.treasury.gov", "justice.gov", "fatf-gafi.org",
+  "un.org", "europa.eu", "gov.uk", "occrp.org", "icij.org",
+  "thenationalnews.com", "gulfnews.com", "khaleejtimes.com", "wam.ae",
+  "zawya.com", "arabianbusiness.com", "aljazeera.com", "aljazeera.net",
+  "alarabiya.net", "aawsat.com", "scmp.com", "lemonde.fr", "elpais.com"
+ ],
+ "tier2": [
+  "cnn.com", "cnbc.com", "forbes.com", "businessinsider.com", "politico.com",
+  "politico.eu", "hurriyetdailynews.com", "dailysabah.com", "hurriyet.com.tr",
+  "sabah.com.tr", "cumhuriyet.com.tr", "ntv.com.tr", "emaratalyoum.com",
+  "albayan.ae", "skynewsarabia.com", "gulfbusiness.com", "kommersant.ru",
+  "rbc.ru", "interfax.ru", "tass.ru", "kyivindependent.com", "yonhapnews.co.kr",
+  "straitstimes.com", "channelnewsasia.com", "timesofindia.com",
+  "hindustantimes.com", "dawn.com", "arabnews.com", "middleeasteye.net"
+ ]
+}

@@ -5,7 +5,7 @@
 import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
-  GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, foldAliasSources,
+  GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
@@ -270,10 +270,37 @@ check('AM/PEP HIT note without diff info counts hits without claiming they are n
 /* ── threshold clamp (regression: SCREEN_MATCH_THRESHOLD=85 — screen.py's
    0-100 convention — became an effective cutoff of 8500 and silently cleared
    every fuzzy match; out-of-range values must fall back loudly) ── */
-check('resolveThreshold accepts a valid fraction', resolveThreshold('0.9') === 0.9 && resolveThreshold(0.5) === 0.5 && resolveThreshold('1') === 1);
+check('resolveThreshold accepts a valid MORE-SENSITIVE fraction', resolveThreshold(0.5) === 0.5 && resolveThreshold('0.8') === 0.8 && resolveThreshold(String(DEFAULT_THRESHOLD)) === DEFAULT_THRESHOLD);
 check('resolveThreshold defaults when unset/blank', resolveThreshold(undefined) === DEFAULT_THRESHOLD && resolveThreshold('') === DEFAULT_THRESHOLD);
 check('resolveThreshold rejects the 0-100 scale (85 → default, never 8500)', resolveThreshold('85') === DEFAULT_THRESHOLD);
 check('resolveThreshold rejects zero, negatives and garbage', resolveThreshold('0') === DEFAULT_THRESHOLD && resolveThreshold('-1') === DEFAULT_THRESHOLD && resolveThreshold('abc') === DEFAULT_THRESHOLD);
+/* ONE-WAY rule (champion/challenger): raising above the champion default needs
+   the explicit override flag — a bare raise is rejected loudly to the default. */
+{
+  const orig = process.env.SCREEN_MATCH_THRESHOLD_ALLOW_RAISE;
+  delete process.env.SCREEN_MATCH_THRESHOLD_ALLOW_RAISE;
+  check('resolveThreshold rejects a bare raise above the champion default (one-way rule)',
+    resolveThreshold('0.9') === DEFAULT_THRESHOLD && resolveThreshold('0.95') === DEFAULT_THRESHOLD);
+  process.env.SCREEN_MATCH_THRESHOLD_ALLOW_RAISE = '1';
+  check('resolveThreshold accepts a raise only with SCREEN_MATCH_THRESHOLD_ALLOW_RAISE=1',
+    resolveThreshold('0.9') === 0.9);
+  if (orig === undefined) delete process.env.SCREEN_MATCH_THRESHOLD_ALLOW_RAISE;
+  else process.env.SCREEN_MATCH_THRESHOLD_ALLOW_RAISE = orig;
+}
+/* Shadow challenger resolver + band row: log-only evidence, never an alert. */
+check('resolveShadowThreshold off when unset; validates the (0, threshold) range',
+  resolveShadowThreshold(undefined, 0.85) === null
+  && resolveShadowThreshold('0.80', 0.85) === 0.80
+  && resolveShadowThreshold('0.85', 0.85) === null
+  && resolveShadowThreshold('0.9', 0.85) === null
+  && resolveShadowThreshold('80', 0.85) === null
+  && resolveShadowThreshold('abc', 0.85) === null);
+check('shadowBandRow captures a clear result inside the band and nothing else',
+  shadowBandRow({ name: 'X', recommendation: 'clear', topScore: 82 }, 0.80, 0.85) !== null
+  && shadowBandRow({ name: 'X', recommendation: 'clear', topScore: 79 }, 0.80, 0.85) === null
+  && shadowBandRow({ name: 'X', recommendation: 'clear', topScore: 86 }, 0.80, 0.85) === null
+  && shadowBandRow({ name: 'X', recommendation: 'sanctions-match', topScore: 82 }, 0.80, 0.85) === null
+  && shadowBandRow({ name: 'X', recommendation: 'clear', topScore: 82 }, null, 0.85) === null);
 
 /* ── OFAC alias fold (regression: sdn.csv carries only primary names; the aka
    file alt.csv was never fetched, so every SDN alias was unscreened) ── */
