@@ -60,8 +60,13 @@ ai = _load("ai"); agents = _load("agents"); kyc = _load("kyc")
 txn_monitor = _load("txn_monitor"); monitoring = _load("monitoring")
 screen = _load("screen")
 
-MIN_GROUP_RECALL = float(os.environ.get("BIAS_MIN_GROUP_RECALL", "0.70"))
-MAX_RECALL_GAP   = float(os.environ.get("BIAS_MAX_RECALL_GAP", "0.30"))
+# Floors ratcheted 28 Jul 2026 with the accuracy-hardening programme (shared
+# translit groups + phonetic fold): every group must now reach 90% recall with
+# a 10% cross-script gap — up from the 70%/30% pre-hardening guards. Raising
+# them further, or lowering them at all, goes through model-validation change
+# control (docs/governance/screening-accuracy-benchmark.md ratchet rule).
+MIN_GROUP_RECALL = float(os.environ.get("BIAS_MIN_GROUP_RECALL", "0.90"))
+MAX_RECALL_GAP   = float(os.environ.get("BIAS_MAX_RECALL_GAP", "0.10"))
 
 # ── Labelled equivalence set: pairs a fair matcher SHOULD link ────────────────
 # (customer spelling on file, designation spelling on the list) — true equivalents.
@@ -71,6 +76,8 @@ EQUIV = {
         ("Marmara Gold Trading", "Marmara Gold Trading"),
         ("Stanford Marsh Limited", "Stanford Marsh Ltd"),
         ("Robert James Anderson", "Robert James Anderson"),
+        ("Marcus Devereaux", "Marcus Devereux"),
+        ("Frederick Aldous Grant", "Frederik Aldous Grant"),
     ],
     "Arabic": [
         ("Mohammed Al Hussein", "Muhammad Al Husain"),
@@ -78,22 +85,36 @@ EQUIV = {
         ("Yousef El Sayed", "Yusuf Al Sayed"),
         ("Ahmed Abdullah", "Ahmad Abdullah"),
         ("Sheikh Mahmoud Ismail", "Shaikh Mahmoud Ismael"),
+        # Post-hardening classes: shared-data translit groups beyond the
+        # original ten (khaled/khalid, omar/umar+suleiman/sulayman,
+        # mahmoud/mahmud+nasser/naser+qassem/kassem, soliman/sulayman).
+        ("Khaled Mansour Al Otaibi", "Khalid Mansour Al Otaibi"),
+        ("Omar Suleiman Haddad", "Umar Sulayman Haddad"),
+        ("Mahmoud Nasser Qassem", "Mahmud Naser Kassem"),
+        ("Soliman Kassem", "Sulayman Qassim"),
     ],
     "Turkish": [
         ("Huseyin Yamac", "Huseyin Yamac"),
         ("Mehmet Akif Turker", "Mehmet Akif Turker"),
         ("Ozgur Anik", "Ozgur Anik"),
         ("Mustafa Kardaslar", "Mustafa Kardaslar"),
+        ("Mustapha Ozdemir", "Mustafa Ozdemir"),
+        ("Cemal Aydin Demir", "Jamal Aydin Demir"),
     ],
     # Cyrillic-origin (Slavic) names reach the lists in Latin transliteration;
     # customer files carry the common spelling variant (Sergei/Sergey, Yuri/Yuriy,
-    # Aleksandr/Alexander). A fair matcher should still link them.
+    # Aleksandr/Alexander) — plus Ukrainian/Russian cross-forms
+    # (Volodymyr/Vladimir, Mykola/Nikolai) and -off/-ov ending drift.
     "Cyrillic": [
         ("Sergei Ivanov", "Sergey Ivanov"),
         ("Aleksandr Volkov", "Alexander Volkov"),
         ("Dmitri Sokolov", "Dmitry Sokolov"),
         ("Yuriy Popov", "Yuri Popov"),
         ("Mikhail Kuznetsov", "Mikhail Kuznetsov"),
+        ("Volodymyr Melnyk", "Vladimir Melnik"),
+        ("Mykola Shevchenko", "Nikolai Shevchenko"),
+        ("Piotr Fedorov", "Pyotr Fyodorov"),
+        ("Andrey Smirnoff", "Andrei Smirnov"),
     ],
     # CJK / SE-Asian romanisation: the same name appears with different spacing
     # or hyphenation of the syllables (Wei Ming / Wei-ming). True equivalents.
@@ -103,6 +124,17 @@ EQUIV = {
         ("Lee Jong Su", "Lee Jong-su"),
         ("Zhang Wei Jun", "Zhang Wei-jun"),
         ("Nguyen Van An", "Nguyen Van An"),
+    ],
+    # Multi-edit romanization drift — every significant token ≥2 edits off.
+    # These cleared BY DESIGN before the phonetic fold layer (the model card
+    # pinned "Muhamet Huseinn" as its accepted residual); a fair matcher now
+    # links them as WEAK phonetic-only possible matches.
+    "Phonetic": [
+        ("Muhamet Huseinn", "Muhammad Hussein"),
+        ("Vladimyr Putyn", "Vladimir Putin"),
+        ("Moamer Gadafi", "Muammar Qadhafi"),
+        ("Abdool Kayoom", "Abdul Qayyum"),
+        ("Zulfiqhar Bhoutto", "Zulfikar Bhutto"),
     ],
 }
 
@@ -114,6 +146,12 @@ NON_EQUIV = [
     ("Zoe Precious Metals FZE", "Acme General Trading LLC"),
     ("Sergei Ivanov", "Aleksandr Volkov"),       # two distinct Slavic names
     ("Chen Wei Ming", "Zhang Wei Jun"),           # two distinct CJK-romanised names
+    # Phonetic-adjacent distinct persons: the fold layer must never link these
+    # (first-vowel and trailing-vowel guards; consonant-skeleton discipline).
+    ("Ali Hassan", "Ali Hussein"),
+    ("Hana Qassem", "Hani Qasemi"),
+    ("Imad Khatib", "Ahmad Khatri"),
+    ("Rami Sabbagh", "Ramzi Dabbagh"),
 ]
 
 

@@ -118,3 +118,4 @@ changes must keep that mix and be reviewed like code.
 | Date | Change | Authority |
 |---|---|---|
 | 2026-07-28 | Corpus authored (121 + 85 + 114 + 6); baseline frozen for js / py_rapidfuzz / py_difflib; Phase-0 no-regression floors committed | Model owner (this hardening programme) |
+| 2026-07-28 | Floors ratcheted to v2 (the 95% programme targets) after phases 1-4 landed. Achieved, all three backends: sanctions recall **97.5%** (118/121; the 3 misses are the documented residuals), hard negatives **100%** unnoted (py; js keeps its 3 pre-baseline boilerplate FPs at 96.5%), adverse classification **100%**, repeat-signal **100%**. Floors: recall ≥0.95 with fn cap 3, adverse/repeat ≥1.0, negatives ≥1.0 (py) / ≥0.964 (js). bias_eval floors raised 70→90%/group, gap 30→10%, + Cyrillic/CJK/Phonetic groups at 100% under both backends | Model owner (this hardening programme) |
