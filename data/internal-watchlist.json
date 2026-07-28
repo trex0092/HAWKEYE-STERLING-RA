@@ -1,0 +1,8 @@
+{
+  "_README": "Firm-internal watchlist (checklist A4) — names the firm designates internally (declined customers, known fraud counterparties, court/police notices, exited relationships) screened IN ADDITION to the official sanctions lists by BOTH engines: screen.py (parse_internal_watchlist, supplementary tier) and scripts/sanctions-screen.mjs (optional curated source in data/sanctions-extra.json). OPTIONAL by design: empty `entries` is a VALID state meaning 'no internal designations' and never degrades coverage — unlike the official curated lists, where empty means DEGRADED. Each entry is a plain string or { \"name\": \"…\", \"aliases\": [\"…\"] }. A hit on this list is an internal control outcome, NOT a TFS designation: it routes through the ordinary alert decision tree, never the TFS name-match procedure. Update via the same four-eyes PR procedure as the EOCN list: docs/aims/eocn-list-update-sop.md §8. Keep `count` equal to the number of entries and bump `lastReviewed` on every review, changes or none.",
+  "list": "Internal — Firm Watchlist",
+  "populated": false,
+  "count": 0,
+  "lastReviewed": "2026-07-28",
+  "entries": []
+}

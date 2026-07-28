@@ -10,6 +10,106 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Sanctions screening — TFS gap checklist intake: name-match procedure (PNMR/CNMR/FFR), internal watchlist, training cadence (2026-07-28)
+
+Self-assessed the screening estate against a 36-item UAE TFS practitioner
+checklist (Cabinet Decision 74/2020 context) — ~30 items pass with citable
+evidence (`docs/governance/sanctions-screening-gap-checklist-2026.md`) — and
+closed the three gaps it surfaced in the same change:
+
+- **TFS name-match procedure** (`docs/aims/tfs-name-match-procedure.md`) — the
+  material gap (checklist D3): a sanctions name match carries duties an
+  ordinary alert does not, and the alert decision tree previously ended at
+  "file STR/SAR" while the incident runbook cited a "TFS procedure" that did
+  not exist. New procedure: suspend dealings **without delay** → same-day
+  identifier verification → **PNMR** (potential) or **freeze + CNMR + FFR**
+  (confirmed) via goAML → release only on written EOCN/FIU basis, with a §4
+  TFS event log, tipping-off discipline, and the STR assessed in parallel —
+  never instead. Wired in: TFS gate **1a** in the decision tree (list hits
+  branch before the STR question), runbook link fixed, MLRO competency row +
+  training-record topic, annual review/tabletop + training-refresh duties in
+  the compliance calendar.
+- **Internal firm watchlist** (checklist A4) — `data/internal-watchlist.json`
+  screened by BOTH engines in addition to the official lists: supplementary
+  tier in `screen.py` (added after the all-empty guard and floors so internal
+  names can never satisfy a core-coverage fail-safe) and an `optional: true`
+  curated source in `data/sanctions-extra.json` (JS engine). Empty is a valid
+  state ("no internal designations") reported informationally — official
+  lists keep the opposite fail-safe (empty = DEGRADED). Both daily narratives
+  render the list's line; shape + wiring pinned by 10 new checks in
+  `test/data-schema.test.js`; maintained under the EOCN SOP's new §8; hits
+  route through the ordinary tree, never the TFS path.
+- **Training cadence** (G1/J3) — sanctions-evasion typologies + TFS handling
+  added to the competency baseline, with an annual refresh duty (also after
+  material screening changes) and an internal-watchlist annual review in
+  `data/compliance-calendar.json` (3 new duties).
+
+Stated, not hidden: transaction screening stays the known R-13 feed gap;
+input-side data quality accepted at current base size. Coverage matrix gains
+the internal-watchlist control row and the TFS manual-assurance row.
+
+### EU AI Act — Digital Omnibus amendment intake: assessment updated, EU watch source added (2026-07-28)
+
+The Digital Omnibus AI amendments are now adopted law (Parliament 16 Jun 2026,
+Council 29 Jun, final act signed 8 Jul; pending OJ publication) — one day after
+the EU AI Act assessment was written against the original Regulation. Its §7.5
+"Act evolution" re-assessment trigger fired; headline conclusions survive (not
+territorially bound, not high-risk, Art. 50 disclosure implemented and
+CI-asserted).
+
+- **Assessment updated** (`docs/governance/eu-ai-act-assessment-2026.md`):
+  Art. 5 sweep extended to the new ninth prohibition (NCII/CSAM generation —
+  not present, text-only system); Art. 4 literacy note records the legal floor
+  softening to "support the development" while **deliberately keeping the
+  stricter original standard**; Art. 50(2) machine-readable-marking timing
+  (2 Dec 2026, legacy) noted with the internal-use position; AI Office
+  exclusive-competence note (same-provider GPAI systems — the opposite of this
+  architecture); postponed high-risk dates recorded as runway in §7; dated
+  assessment-log row added.
+- **Watch gap closed** (`data/reg-sources.json`): §7.5 claimed Act evolution was
+  watched via the regulatory-watch pipeline, but the source list contained no
+  EU AI-regulation source — the Omnibus arrived via manual intake. A dedicated
+  `eu-ai-act` source (Commission AI regulatory-framework page) is now
+  fingerprinted daily like every other source; count references trued up
+  (20 → 22 across the coverage matrix §1.4 and the stack scorecard).
+
+### Operational AI Governance Stack — crosswalk §C, Level-4 evidence index, GovernanceScore + register review currency (2026-07-28)
+
+Adopts the five-level *Operational AI Governance Stack* (visibility → monitoring
+→ controls → evidence → continuous governance) as a third external crosswalk and
+closes the two small gaps the mapping surfaced.
+
+- **Crosswalk §C** (`docs/governance/ai-frameworks-crosswalk-2026.md`):
+  level-by-level mapping, with the deliberate non-controls stated in the open
+  (conversation monitoring — ephemeral by design, PDPL/data-minimisation;
+  discovery/permission tooling — N/A while the estate is fully enumerated) and
+  their re-trigger condition (adoption of platform-built agents).
+- **Governance-evidence index**
+  (`docs/governance/assurance-coverage-matrix.md` §1.10): the six Level-4
+  evidence types (decision ledger, runtime evidence, override records,
+  authorization chain, independent audit evidence, decision provenance) each
+  mapped to the existing artefact and automated proof that satisfies it —
+  monitoring says what happened; evidence proves who authorised it.
+- **GovernanceScore** (`scripts/governance-report.mjs`): composite 0–100 health
+  of the scored controls (pass=1, attention=0.5, fail=0; info rows excluded) in
+  the daily card's title and body, with Δ against the previous report parsed
+  from the task titles the idempotency listing already fetched (zero extra API
+  calls). New KPI row in the coverage matrix §3.
+- **Register review currency** (same script): `data/ai-assets.json` declares a
+  quarterly review cadence but nothing enforced it — the daily card now carries
+  a register-review row (pass / REVIEW OVERDUE past the 100-day window / fail on
+  a missing or unreadable date), so an unreviewed inventory can only rot loudly.
+  The schema test additionally requires a declared cadence and a parseable
+  `last_reviewed` (shape only in CI — currency stays with the daily report, so
+  no time-bomb tests).
+- **Full five-level scorecard**
+  (`docs/governance/operational-ai-governance-stack-2026.md`): tile-by-tile
+  assessment in the house format of the 6-layer doc — all five levels ✅, the
+  two absent tiles documented as deliberate non-controls with named re-trigger
+  conditions (platform-built agents, tool/action permissions, a second
+  operator). Cross-linked from the 6-layer doc, crosswalk §C and the
+  governance-pack index.
+
 ### Screening accuracy hardening — measured 95% floors: benchmark corpus, shared transliteration, phonetic fold, one-way thresholds, adverse-media tiers (2026-07-28)
 
 Six-phase programme raising the sanctions + adverse-media screening estate to

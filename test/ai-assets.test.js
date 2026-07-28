@@ -23,6 +23,11 @@ catch (e) { console.log('FAIL  data/ai-assets.json parses (' + e.message + ')');
 check('register parses and has an assets array', Array.isArray(reg.assets) && reg.assets.length > 0);
 check('register declares an owner role', !!reg.owner_role);
 check('register has a shadow-AI note (the anti-shadow-AI control)', !!reg.shadow_ai_note);
+check('register declares a review cadence', !!reg.review_cadence);
+// Shape only — currency (quarterly, 100-day window) is enforced daily by the
+// governance report's register-review row, never by CI (no time-bomb tests).
+check('register last_reviewed is a parseable date',
+  Number.isFinite(Date.parse(reg.last_reviewed || '')));
 
 const TIERS = ['LOW', 'MEDIUM', 'HIGH'];
 const REQUIRED = ['id', 'name', 'classification', 'surface_file', 'provider',

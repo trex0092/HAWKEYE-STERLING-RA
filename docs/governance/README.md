@@ -32,6 +32,8 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [uae-ai-data-laws-2026.md](uae-ai-data-laws-2026.md) | 2026 UAE AI/data-law applicability + Data Office top-10 violation posture map | UAE PDPL; FDL 34/2021; Data Office |
 | [ai-frameworks-crosswalk-2026.md](ai-frameworks-crosswalk-2026.md) | FAST/SUM values + responsible-AI lifecycle orientation | Turing FAST/SUM; EU AI Act |
 | [agentic-ai-governance-6layers-2026.md](agentic-ai-governance-6layers-2026.md) | Six-layer agentic-AI governance scorecard (incl. Layer 5 human oversight) | Practitioner framework |
+| [operational-ai-governance-stack-2026.md](operational-ai-governance-stack-2026.md) | Five-level operational-stack scorecard (visibility → monitoring → controls → evidence → continuous governance), incl. deliberate non-controls with re-triggers | Practitioner framework |
+| [sanctions-screening-gap-checklist-2026.md](sanctions-screening-gap-checklist-2026.md) | 36-item sanctions-screening gap self-assessment (lists, matching, TFS reporting, testing, evidence) — gaps closed in-change: TFS name-match procedure, internal watchlist, training cadence | UAE TFS practitioner checklist; Cabinet Decision 74/2020 |
 | [ai-governance-gap-analysis-2026.md](ai-governance-gap-analysis-2026.md) | Tile-by-tile gap analysis vs the AI Governance & Security periodic table | Practitioner framework |
 | [enterprise-readiness-review-2026.md](enterprise-readiness-review-2026.md) | Maturity scoring + recommendations | — |
 | [pbg-lifecycle-map-2026.md](pbg-lifecycle-map-2026.md) | 11-stage lifecycle map (design → retire), owners + evidence | ISO 42001 A.6 |

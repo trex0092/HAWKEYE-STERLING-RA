@@ -20,8 +20,9 @@
    without legal breach is triaged ≤ 5 business days. The UAE paths, each with its own clock:
    - **FIU / goAML** (suspicion of ML/TF): STR/SAR assessment per the MLRO's standing procedure —
      without delay once suspicion is formed.
-   - **EOCN / TFS** (designated-party touchpoint): freeze first, then report per the TFS procedure —
-     immediately.
+   - **EOCN / TFS** (designated-party touchpoint): freeze first, then report per the
+     [TFS name-match procedure](../aims/tfs-name-match-procedure.md) (PNMR / CNMR + FFR via
+     goAML) — immediately.
    - **UAE Data Office — personal-data breach (PDPL, FDL 45/2021 Art. 9):** where a breach threatens
      privacy, confidentiality or security of personal data, notify the Data Office **immediately; the
      firm's internal ceiling is 72 hours from becoming aware**, adopted as the conservative SLA while
