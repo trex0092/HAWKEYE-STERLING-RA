@@ -94,6 +94,27 @@ Run at least quarterly, and after any period where the review-age alarm fired:
 | 2026-07 | MLRO | sample currency check (recorded in the compliance register, 2026-07-14) | register verification | 312 → 312 | 20 of 20 recent designations present; 17 of 17 delistings absent | none required; NOT a full reconciliation | MLRO |
 | 2026-07-16 | MLRO (mechanical comparison executed by compliance automation from the official publication supplied by the MLRO; the merge of the recording PR is the MLRO sign-off) | full reconciliation (§4, both directions) | official EOCN Local Terrorist List publication dated 13 Jul 2026 | 312 → 312 | 288 publication decision rows parsed: 261 active listings, 27 de-listings (رفع الإدراج rows). Every active designation matched into the file (0 missing); no de-listed party present in the file (0 stale). One file-side alias spelling had no exact publication match and is retained per §5 (curated file is authoritative for aliases). | none required; `lastReviewed` refreshed to 2026-07-16 | MLRO (PR merge) |
 
+## 8. Internal firm watchlist (same procedure, different list)
+
+[`data/internal-watchlist.json`](../../data/internal-watchlist.json) — names the
+firm designates **internally** (declined customers, known fraud counterparties,
+court/police notices, exited relationships) — is maintained under **this same
+SOP**: every change lands via a four-eyes PR, `count` must equal the entries,
+and `lastReviewed` is bumped on every review. Differences from the official
+curated lists:
+
+- **Optional by design.** Empty `entries` is a valid state ("no internal
+  designations") and never degrades coverage — both engines report it
+  informationally (`optional: true` in `data/sanctions-extra.json`;
+  supplementary tier in `screen.py`). Official curated lists keep the opposite
+  fail-safe: empty = DEGRADED.
+- **Not a TFS list.** A hit is an internal control outcome routed through the
+  ordinary [alert decision tree](../user-guides/alert-investigation-decision-tree.md)
+  — never the [TFS name-match procedure](tfs-name-match-procedure.md), and it
+  triggers no freeze duty by itself.
+- **Review cadence:** with the annual internal-watchlist review duty in
+  `data/compliance-calendar.json`, and on any addition/removal event.
+
 ---
 
 *First full §4 reconciliation completed and recorded 2026-07-16. The next is

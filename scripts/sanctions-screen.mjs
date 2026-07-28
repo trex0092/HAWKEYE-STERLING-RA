@@ -933,7 +933,15 @@ async function loadSanctionsLists(cfg) {
          full-list XML on request and blows the flat 60s budget). */
       const body = await fetchListBody(s, Number(s.timeoutMs) || cfg.listTimeoutMs);
       const names = parseList(s, body);
-      if (!names.length) { notes.push(s.name + ' parsed 0 names — coverage degraded'); console.error('sanctions-screen: ' + s.id + ' parsed 0 names'); return; }
+      if (!names.length) {
+        /* An OPTIONAL source (source.optional — the firm-internal watchlist)
+           may legitimately be empty: "no internal designations" is a valid
+           state, reported informationally and counted as fetched so it never
+           degrades coverage. Official lists keep the fail-safe: empty means
+           DEGRADED, never a silent all-clear. */
+        if (s.optional) { fetched++; notes.push(s.name + ' has no entries — optional internal list, coverage unaffected'); console.log('sanctions-screen: ' + s.id + ' empty (optional) — screened set unchanged'); return; }
+        notes.push(s.name + ' parsed 0 names — coverage degraded'); console.error('sanctions-screen: ' + s.id + ' parsed 0 names'); return;
+      }
       lists.push({ id: s.id, name: s.name, names });
       fetched++;
       console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');

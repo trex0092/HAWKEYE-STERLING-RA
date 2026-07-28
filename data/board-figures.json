@@ -2,8 +2,8 @@
   "_README": "Canonical board/report figures generated from the repository by scripts/board-figures.mjs. Never hand-edit: run `node scripts/board-figures.mjs --write` to refresh. test/board-figures.test.mjs fails CI whenever the committed figures drift from the live estate, so any figure quoted in board material traces to a commit instead of a hand count.",
   "figures": {
     "workflows": 56,
-    "docsTotal": 145,
-    "docsCurated": 112,
+    "docsTotal": 147,
+    "docsCurated": 114,
     "egressBlock": 49,
     "egressAudit": 11
   },

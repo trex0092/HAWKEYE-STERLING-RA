@@ -12,6 +12,17 @@
       "_note": "EOCN publishes this only as PDF/Excel behind bot protection — no free machine-readable feed. Maintain the names in data/eocn-local-terrorist-list.json from the official EOCN download (https://www.uaeiec.gov.ae). While unpopulated it flags 'coverage incomplete', never a clean result."
     },
     {
+      "id": "internal-watchlist",
+      "name": "Internal — Firm Watchlist",
+      "jurisdiction": "United Arab Emirates",
+      "file": "data/internal-watchlist.json",
+      "type": "curated",
+      "parser": "curated",
+      "enabled": true,
+      "optional": true,
+      "_note": "Firm-internal designations screened IN ADDITION to the official lists (checklist A4). `optional: true` — unlike official curated lists, EMPTY entries is a valid state ('no internal designations'): reported informationally, never degrades coverage. Maintain via the four-eyes SOP: docs/aims/eocn-list-update-sop.md §8."
+    },
+    {
       "id": "ca-sema",
       "name": "Canada — Consolidated Autonomous Sanctions (SEMA, XML)",
       "jurisdiction": "Global",

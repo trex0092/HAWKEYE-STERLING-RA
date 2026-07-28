@@ -10,6 +10,44 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Sanctions screening — TFS gap checklist intake: name-match procedure (PNMR/CNMR/FFR), internal watchlist, training cadence (2026-07-28)
+
+Self-assessed the screening estate against a 36-item UAE TFS practitioner
+checklist (Cabinet Decision 74/2020 context) — ~30 items pass with citable
+evidence (`docs/governance/sanctions-screening-gap-checklist-2026.md`) — and
+closed the three gaps it surfaced in the same change:
+
+- **TFS name-match procedure** (`docs/aims/tfs-name-match-procedure.md`) — the
+  material gap (checklist D3): a sanctions name match carries duties an
+  ordinary alert does not, and the alert decision tree previously ended at
+  "file STR/SAR" while the incident runbook cited a "TFS procedure" that did
+  not exist. New procedure: suspend dealings **without delay** → same-day
+  identifier verification → **PNMR** (potential) or **freeze + CNMR + FFR**
+  (confirmed) via goAML → release only on written EOCN/FIU basis, with a §4
+  TFS event log, tipping-off discipline, and the STR assessed in parallel —
+  never instead. Wired in: TFS gate **1a** in the decision tree (list hits
+  branch before the STR question), runbook link fixed, MLRO competency row +
+  training-record topic, annual review/tabletop + training-refresh duties in
+  the compliance calendar.
+- **Internal firm watchlist** (checklist A4) — `data/internal-watchlist.json`
+  screened by BOTH engines in addition to the official lists: supplementary
+  tier in `screen.py` (added after the all-empty guard and floors so internal
+  names can never satisfy a core-coverage fail-safe) and an `optional: true`
+  curated source in `data/sanctions-extra.json` (JS engine). Empty is a valid
+  state ("no internal designations") reported informationally — official
+  lists keep the opposite fail-safe (empty = DEGRADED). Both daily narratives
+  render the list's line; shape + wiring pinned by 10 new checks in
+  `test/data-schema.test.js`; maintained under the EOCN SOP's new §8; hits
+  route through the ordinary tree, never the TFS path.
+- **Training cadence** (G1/J3) — sanctions-evasion typologies + TFS handling
+  added to the competency baseline, with an annual refresh duty (also after
+  material screening changes) and an internal-watchlist annual review in
+  `data/compliance-calendar.json` (3 new duties).
+
+Stated, not hidden: transaction screening stays the known R-13 feed gap;
+input-side data quality accepted at current base size. Coverage matrix gains
+the internal-watchlist control row and the TFS manual-assurance row.
+
 ### EU AI Act — Digital Omnibus amendment intake: assessment updated, EU watch source added (2026-07-28)
 
 The Digital Omnibus AI amendments are now adopted law (Parliament 16 Jun 2026,
