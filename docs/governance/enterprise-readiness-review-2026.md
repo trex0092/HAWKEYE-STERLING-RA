@@ -326,7 +326,15 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 56 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
+Verified at HEAD: 56 workflows · 145 markdown documents under docs/ (112 excluding docs/research/auto).
+*(28 July — screening accuracy hardening programme: labelled benchmark corpus with per-backend
+CI floors (recall 57→97.5%, adverse 58→100%, repeat 50→100%), shared transliteration data,
+phonetic fold layer, one-way threshold config + log-only shadow challenger, adverse-media
+description scanning / keyword tiers / gated repeat counter. One curated governance document
+added (screening-accuracy-benchmark.md). Detection controls STRENGTHENED — no scored control
+weakened; bias floors raised 70→90%/group.)*
+
+Verified at HEAD on 25 July (third pass): 56 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
 *(25 July, third pass: the EOCN Reconcile preparer — twice-weekly mirror cross-check pushed to a
 review branch whose human merge records the MLRO sign-off; the review-age gate itself is
 unchanged. Netlify deploy gains a path-filtered push trigger (inert until its secret exists);

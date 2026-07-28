@@ -33,14 +33,24 @@ For each group we run the real engine matcher (`screen.screen_name`, which appli
 - the **fairness gap** = max-group recall − min-group recall.
 
 ## Pass criteria (CI-enforced — the build fails otherwise)
-- every group recall ≥ **70%** (`BIAS_MIN_GROUP_RECALL`)
-- fairness gap ≤ **30%** (`BIAS_MAX_RECALL_GAP`)
-- **zero** false positives on the non-equivalence set
+- every group recall ≥ **90%** (`BIAS_MIN_GROUP_RECALL` — raised from 70% on
+  28 Jul 2026 with the accuracy-hardening programme: shared transliteration
+  groups, 10 → 89, plus the phonetic fold layer)
+- fairness gap ≤ **10%** (`BIAS_MAX_RECALL_GAP` — tightened from 30%)
+- **zero** false positives on the non-equivalence set (now including
+  phonetic-adjacent distinct persons: ali hassan/ali hussein,
+  hana qassem/hani qasemi)
 
 ## Result (current)
-Latin / Arabic / Turkish recall at **parity**, fairness gap **0%**, zero false
-positives. The misses that do occur (e.g. heavy abbreviation like `John A Smith`)
-are script-independent and logged, not concentrated on any one group.
+Six groups — Latin / Arabic / Turkish / Cyrillic / CJK / **Phonetic**
+(multi-edit romanization drift, the class that cleared by design before the
+phonetic fold) — all at **100% recall under both the rapidfuzz and the offline
+difflib backends**, fairness gap **0%**, zero false positives. The equivalence
+set was expanded alongside the hardening (khaled/khalid-class groups,
+Ukrainian/Russian cross-forms, -off/-ov drift, Muhamet Huseinn-class phonetic
+pairs); the full labelled corpus behind these floors lives in
+`test/fixtures/screening-benchmark/` (see
+`docs/governance/screening-accuracy-benchmark.md`).
 
 ## Limitations & forward work
 - The labelled set is small and hand-curated; it is a regression guard, not a

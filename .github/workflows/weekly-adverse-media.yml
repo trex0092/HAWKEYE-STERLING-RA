@@ -182,7 +182,7 @@ jobs:
           # manual deep sweep risks re-tripping the limiter — the engine now
           # early-exits throttled subjects and degrades LOUDLY, but the recall loss
           # is real, so raise them only for supervised off-schedule runs.
-          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '5' }}
+          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
           SCREEN_CONCURRENCY: ${{ vars.SCREEN_CONCURRENCY || '8' }}
           # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
           # its own assigned MLRO case subtask, not just the first 40. The full

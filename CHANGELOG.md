@@ -10,6 +10,148 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### EU AI Act — Digital Omnibus amendment intake: assessment updated, EU watch source added (2026-07-28)
+
+The Digital Omnibus AI amendments are now adopted law (Parliament 16 Jun 2026,
+Council 29 Jun, final act signed 8 Jul; pending OJ publication) — one day after
+the EU AI Act assessment was written against the original Regulation. Its §7.5
+"Act evolution" re-assessment trigger fired; headline conclusions survive (not
+territorially bound, not high-risk, Art. 50 disclosure implemented and
+CI-asserted).
+
+- **Assessment updated** (`docs/governance/eu-ai-act-assessment-2026.md`):
+  Art. 5 sweep extended to the new ninth prohibition (NCII/CSAM generation —
+  not present, text-only system); Art. 4 literacy note records the legal floor
+  softening to "support the development" while **deliberately keeping the
+  stricter original standard**; Art. 50(2) machine-readable-marking timing
+  (2 Dec 2026, legacy) noted with the internal-use position; AI Office
+  exclusive-competence note (same-provider GPAI systems — the opposite of this
+  architecture); postponed high-risk dates recorded as runway in §7; dated
+  assessment-log row added.
+- **Watch gap closed** (`data/reg-sources.json`): §7.5 claimed Act evolution was
+  watched via the regulatory-watch pipeline, but the source list contained no
+  EU AI-regulation source — the Omnibus arrived via manual intake. A dedicated
+  `eu-ai-act` source (Commission AI regulatory-framework page) is now
+  fingerprinted daily like every other source; count references trued up
+  (20 → 22 across the coverage matrix §1.4 and the stack scorecard).
+
+### Operational AI Governance Stack — crosswalk §C, Level-4 evidence index, GovernanceScore + register review currency (2026-07-28)
+
+Adopts the five-level *Operational AI Governance Stack* (visibility → monitoring
+→ controls → evidence → continuous governance) as a third external crosswalk and
+closes the two small gaps the mapping surfaced.
+
+- **Crosswalk §C** (`docs/governance/ai-frameworks-crosswalk-2026.md`):
+  level-by-level mapping, with the deliberate non-controls stated in the open
+  (conversation monitoring — ephemeral by design, PDPL/data-minimisation;
+  discovery/permission tooling — N/A while the estate is fully enumerated) and
+  their re-trigger condition (adoption of platform-built agents).
+- **Governance-evidence index**
+  (`docs/governance/assurance-coverage-matrix.md` §1.10): the six Level-4
+  evidence types (decision ledger, runtime evidence, override records,
+  authorization chain, independent audit evidence, decision provenance) each
+  mapped to the existing artefact and automated proof that satisfies it —
+  monitoring says what happened; evidence proves who authorised it.
+- **GovernanceScore** (`scripts/governance-report.mjs`): composite 0–100 health
+  of the scored controls (pass=1, attention=0.5, fail=0; info rows excluded) in
+  the daily card's title and body, with Δ against the previous report parsed
+  from the task titles the idempotency listing already fetched (zero extra API
+  calls). New KPI row in the coverage matrix §3.
+- **Register review currency** (same script): `data/ai-assets.json` declares a
+  quarterly review cadence but nothing enforced it — the daily card now carries
+  a register-review row (pass / REVIEW OVERDUE past the 100-day window / fail on
+  a missing or unreadable date), so an unreviewed inventory can only rot loudly.
+  The schema test additionally requires a declared cadence and a parseable
+  `last_reviewed` (shape only in CI — currency stays with the daily report, so
+  no time-bomb tests).
+- **Full five-level scorecard**
+  (`docs/governance/operational-ai-governance-stack-2026.md`): tile-by-tile
+  assessment in the house format of the 6-layer doc — all five levels ✅, the
+  two absent tiles documented as deliberate non-controls with named re-trigger
+  conditions (platform-built agents, tool/action permissions, a second
+  operator). Cross-linked from the 6-layer doc, crosswalk §C and the
+  governance-pack index.
+
+### Screening accuracy hardening — measured 95% floors: benchmark corpus, shared transliteration, phonetic fold, one-way thresholds, adverse-media tiers (2026-07-28)
+
+Six-phase programme raising the sanctions + adverse-media screening estate to
+CI-enforced 95% accuracy floors, measured on a new labelled benchmark run
+through **both real engines** — measurement landed first, so every phase is
+falsifiable against a frozen pre-hardening baseline. All hardening is
+**recall-monotone**: no change unflags, drops or suppresses anything; precision
+comes from tiering and escalation weighting. Headline movement (identical on
+py_rapidfuzz / py_difflib / js): sanctions recall **57.0%/62.0% → 97.5%**,
+adverse-media classification **57.9%/77.3% → 100%**, repeat-signal accuracy
+**50% → 100%**, hard negatives held (100% Python / 96.5% JS, documented).
+
+- **Benchmark + frozen baseline** (`test/fixtures/screening-benchmark/`,
+  `scripts/screening-benchmark.mjs`, `test/benchmark_eval.py`,
+  `test/screening-benchmark.test.mjs`): 121 labelled true-equivalent pairs
+  (per script group and catching mechanism), 85 hard negatives (one budgeted
+  canary, n030), 114 labelled adverse headlines across 8 languages incl.
+  description-only and wrong-subject cases, 6 multi-day repeat scenarios.
+  Per-backend floors in `floors.json` ratchet only upward (MLRO sign-off to
+  lower); the rapidfuzz backend gates in the fuzz job (real deps), the difflib
+  stub in the bare test job. Governance:
+  `docs/governance/screening-accuracy-benchmark.md`.
+- **Shared transliteration source of truth** (`data/translit-groups.json`,
+  89 disjoint groups / 267 members, loaded fail-loud by BOTH engines,
+  schema-guarded by `test/translit-data.test.mjs`): closes the khaled/khalid
+  class and every Cyrillic/Ukrainian romanization pair the duplicated 10-group
+  in-code tables missed. Deliberate firewalls: salah≠saleh, sayed≠said,
+  selim≠salim stay ungrouped. Variant cap 12→32 (`TRANSLIT_VARIANT_CAP`).
+  Fail-before: khaled→khalid produced no variant pre-change.
+- **Phonetic fold layer** (`phonetic_key`/`phoneticKey`, identical spec both
+  engines, zero new dependencies): the model card's pinned "clears by design"
+  residual — every significant token ≥2 edits off ("Muhamet Huseinn" ≈ 69) —
+  now flags as a **WEAK (phonetic-only)** possible match at its real
+  conservative score, never confirmed-looking. Strictly additive (property-
+  tested: the layer never removes or re-scores a fuzzy hit); dedicated
+  phonetic posting indexes keep blocked/unblocked screening bit-identical
+  (hypothesis property extended over a multi-edit drift pool);
+  `MATCH_PHONETIC` = 1 | shadow | 0. The negative-test pin is FLIPPED, with
+  the kill-switch restoring the historical clear as the regression guard.
+  Also: the JS engine now folds Turkish dotless ı (Kılıç ≡ Kilic — found by
+  the corpus, screen.py parity).
+- **One-way env-tunable thresholds + shadow challenger**: the four match
+  cutoffs (85/82/97/93) are env-tunable, range-validated, and ONE-WAY —
+  raising above the champion default needs the explicit `…ALLOW_RAISE=1`
+  override; the champion/challenger doc's proposed 0.80 shadow run is now
+  wired LOG-ONLY in both engines (`SHADOW_THRESHOLD` /
+  `SCREEN_SHADOW_THRESHOLD`) — counted and logged, never a hit, case or
+  delta entry.
+- **Adverse media — precision without suppression**: feed descriptions
+  captured and scanned alongside headlines (the largest measured recall
+  loss); strong/weak keyword tiers (generic "political"/"lawsuit"/"ESG"
+  headlines stay flagged for the record but need a second independent outlet
+  to count toward escalation); the ≥3-stories/90-days repeat counter now
+  counts DISTINCT canonical-URL fingerprints among counter-eligible entries —
+  wrong-subject same-surname stories (relevance LOW) never count,
+  cross-script (Arabic/Russian/Chinese) headlines are UNSCORABLE and always
+  pass the relevance gate, one article re-served under rotating tracking
+  params counts once, and legacy evidence entries stay eligible (no
+  retroactive suppression). JS gains the stem terms its exact-word list
+  missed ("sanctioned", "launder", "kickback", "guilty", "contraband" …).
+  `ADVERSE_MAX_RESULTS` env (default 8, was hard-coded 5),
+  `ADVERSE_LOCALES` default 5→8, source-credibility ranking tiers
+  (`data/source-credibility.json` — annotation/ordering only).
+- **Floors ratcheted** (`floors.json` v2): recall ≥95% with the miss budget
+  capped at the 3 documented residuals per engine (triple-token drift with a
+  phonetically ambiguous g/j pair; Turkish legal-form abbreviation on the
+  Python min(full,core) side; two JS-only plain-Levenshtein prefix-cluster
+  gaps); adverse/repeat at the achieved 100%. `test/bias_eval.py` floors
+  70%→90% per group, gap 30%→10%, with new Cyrillic-expanded, CJK and
+  Phonetic groups — 100% recall in all six groups under both backends, zero
+  false positives.
+- **One-time re-surface note**: standing subjects that now gain a phonetic or
+  transliteration hit will alert once as new/changed (the conservative
+  outcome, same as the audit-round precedent), bounded by the per-run case
+  cap and backlog drain.
+- Model cards revised (`sanctions-name-matcher.md` — residual flipped;
+  `adverse-media-classifier.md` — also corrects the stale two-feed/5-locale
+  description to the actual three feeds + watchlist net), `.env.example`
+  knobs documented, README gains the benchmark section.
+
 ### JS engine follow-up: cleared-case reopen, fuzzy candidate blocking, empty-key dedupe (2026-07-27)
 
 - **Cleared cases reopen on a re-flag** (owner-authorized design change — the

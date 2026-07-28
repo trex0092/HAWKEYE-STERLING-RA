@@ -1,0 +1,853 @@
+{
+ "version": 1,
+ "description": "Labelled sanctions-matcher recall corpus: true-equivalent (subject, listed) pairs a competent screening matcher SHOULD link. 'mechanism' records the engine mechanism expected to catch the pair post-hardening (exact/fuzzy/subset = pre-hardening anchors; translit/phonetic/phonetic-subset = hardening targets; residual = documented known miss, counted against the recall budget). Composition and ratchet rules: docs/governance/screening-accuracy-benchmark.md.",
+ "pairs": [
+  {
+   "id": "r001",
+   "group": "latin",
+   "subject": "Robert James Anderson",
+   "listed": "Robert James Anderson",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r002",
+   "group": "latin",
+   "subject": "Stanford Marsh Limited",
+   "listed": "Stanford Marsh Ltd",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r003",
+   "group": "latin",
+   "subject": "Peter Halloway",
+   "listed": "Peter Haloway",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r004",
+   "group": "latin",
+   "subject": "Viktor Bout",
+   "listed": "Viktor Bout",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r005",
+   "group": "latin",
+   "subject": "Jonathan Reyes Ortega",
+   "listed": "Jonathan Reyes-Ortega",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r006",
+   "group": "latin",
+   "subject": "Marcus Devereaux",
+   "listed": "Marcus Devereux",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r007",
+   "group": "latin",
+   "subject": "Helena Van Der Berg",
+   "listed": "Helena van der Berg",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r008",
+   "group": "latin",
+   "subject": "Christopher Mallory Boone",
+   "listed": "Christopher M Boone",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r009",
+   "group": "latin",
+   "subject": "Frederick Aldous Grant",
+   "listed": "Frederik Aldous Grant",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r010",
+   "group": "latin",
+   "subject": "Antonio Bellucci",
+   "listed": "Antonio Belucci",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r011",
+   "group": "latin",
+   "subject": "Edward Callaghan",
+   "listed": "Edward Calaghan",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r012",
+   "group": "arabic",
+   "subject": "Mohammed Al Hussein",
+   "listed": "Muhammad Al Husain",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r013",
+   "group": "arabic",
+   "subject": "Abdul Rahman Bin Saleh",
+   "listed": "Abdel Rahman Ibn Saleh",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r014",
+   "group": "arabic",
+   "subject": "Yousef El Sayed",
+   "listed": "Yusuf Al Sayed",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r015",
+   "group": "arabic",
+   "subject": "Ahmed Abdullah",
+   "listed": "Ahmad Abdullah",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r016",
+   "group": "arabic",
+   "subject": "Sheikh Mahmoud Ismail",
+   "listed": "Shaikh Mahmoud Ismael",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r017",
+   "group": "arabic",
+   "subject": "Mohd Rashid Al Falasi",
+   "listed": "Mohammed Rashid Al Falasi",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r018",
+   "group": "arabic",
+   "subject": "Khaled Mansour Al Otaibi",
+   "listed": "Khalid Mansour Al Otaibi",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r019",
+   "group": "arabic",
+   "subject": "Faisal Jassim Al Thani",
+   "listed": "Faysal Jassim Al Thani",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r020",
+   "group": "arabic",
+   "subject": "Omar Suleiman Haddad",
+   "listed": "Umar Sulayman Haddad",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r021",
+   "group": "arabic",
+   "subject": "Mahmoud Nasser Qassem",
+   "listed": "Mahmud Naser Kassem",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r022",
+   "group": "arabic",
+   "subject": "Mostafa Waleed Sharif",
+   "listed": "Moustafa Walid Shareef",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r023",
+   "group": "arabic",
+   "subject": "Tarek Aziz Hamid",
+   "listed": "Tariq Azeez Hameed",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r024",
+   "group": "arabic",
+   "subject": "Rachid Karim Habib",
+   "listed": "Rasheed Kareem Habeeb",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r025",
+   "group": "arabic",
+   "subject": "Usman Zaid Al Ghamdi",
+   "listed": "Othman Zayed Al Ghamdi",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r026",
+   "group": "arabic",
+   "subject": "Soliman Kassem",
+   "listed": "Sulayman Qassim",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r027",
+   "group": "arabic",
+   "subject": "Ebrahim Yehia Khaleel",
+   "listed": "Ibrahim Yahya Khalil",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r028",
+   "group": "arabic",
+   "subject": "Gamal Sherif",
+   "listed": "Jamal Sharif",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r029",
+   "group": "arabic",
+   "subject": "Saeed Hakeem Al Balushi",
+   "listed": "Said Hakim Al Balushi",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r030",
+   "group": "arabic",
+   "subject": "Abdulla Majed Al Suwaidi",
+   "listed": "Abdallah Majid Al Suwaidi",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r031",
+   "group": "arabic",
+   "subject": "Hasan Zakariya Salih",
+   "listed": "Hassan Zakaria Saleh",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r032",
+   "group": "arabic",
+   "subject": "Abd Al-Rahman Bin Umayr Al-Nuaymi",
+   "listed": "ABD AL-RAHMAN BIN 'UMAYR AL-NU'AYMI",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r033",
+   "group": "arabic",
+   "subject": "Khalifa Mohd Al Subaey",
+   "listed": "KHALIFA MOHD T AL SUBAEY",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r034",
+   "group": "arabic",
+   "subject": "Jabir Habeeb Al Amiri",
+   "listed": "Jaber Habib Al Amiri",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r035",
+   "group": "turkish",
+   "subject": "Huseyin Yamac",
+   "listed": "Huseyin Yamac",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r036",
+   "group": "turkish",
+   "subject": "Mehmet Akif Turker",
+   "listed": "Mehmet Akif Turker",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r037",
+   "group": "turkish",
+   "subject": "Ozgur Anik",
+   "listed": "Ozgur Anik",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r038",
+   "group": "turkish",
+   "subject": "Emre Kilic",
+   "listed": "Emre Kılıç",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r039",
+   "group": "turkish",
+   "subject": "Cemal Aydin Demir",
+   "listed": "Jamal Aydin Demir",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r040",
+   "group": "turkish",
+   "subject": "Mustapha Ozdemir",
+   "listed": "Mustafa Ozdemir",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r041",
+   "group": "turkish",
+   "subject": "Ibrahim Tatlises Yildiz",
+   "listed": "Ibrahim Tatlıses Yıldız",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r042",
+   "group": "turkish",
+   "subject": "Halil Serdar Koc",
+   "listed": "Halil Serdar Koç",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r043",
+   "group": "cyrillic",
+   "subject": "Sergei Ivanov",
+   "listed": "Sergey Ivanov",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r044",
+   "group": "cyrillic",
+   "subject": "Aleksandr Volkov",
+   "listed": "Alexander Volkov",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r045",
+   "group": "cyrillic",
+   "subject": "Dmitri Sokolov",
+   "listed": "Dmitry Sokolov",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r046",
+   "group": "cyrillic",
+   "subject": "Yuriy Popov",
+   "listed": "Yuri Popov",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r047",
+   "group": "cyrillic",
+   "subject": "Mikhail Kuznetsov",
+   "listed": "Mikhail Kuznetsov",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r048",
+   "group": "cyrillic",
+   "subject": "Yevgeniy Prigozhin",
+   "listed": "Yevgeny Prigozhin",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r049",
+   "group": "cyrillic",
+   "subject": "Wladimir Petrov",
+   "listed": "Vladimir Petrov",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r050",
+   "group": "cyrillic",
+   "subject": "Evgeni Morozov",
+   "listed": "Yevgeniy Morozov",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r051",
+   "group": "cyrillic",
+   "subject": "Piotr Fedorov",
+   "listed": "Pyotr Fyodorov",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r052",
+   "group": "cyrillic",
+   "subject": "Grigori Vasilyev",
+   "listed": "Grigoriy Vasilev",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r053",
+   "group": "cyrillic",
+   "subject": "Volodymyr Melnyk",
+   "listed": "Vladimir Melnik",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r054",
+   "group": "cyrillic",
+   "subject": "Oleksandr Kovalenko",
+   "listed": "Aleksandr Kovalenko",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r055",
+   "group": "cyrillic",
+   "subject": "Mykola Shevchenko",
+   "listed": "Nikolai Shevchenko",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r056",
+   "group": "cyrillic",
+   "subject": "Andrey Smirnoff",
+   "listed": "Andrei Smirnov",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r057",
+   "group": "cyrillic",
+   "subject": "Iurii Bondarenko",
+   "listed": "Yuri Bondarenko",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r058",
+   "group": "cyrillic",
+   "subject": "Ekaterina Vinogradova",
+   "listed": "Yekaterina Vinogradova",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r059",
+   "group": "cyrillic",
+   "subject": "Nataliya Fedotova",
+   "listed": "Natalia Fedotova",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r060",
+   "group": "cyrillic",
+   "subject": "Gennadiy Karpov",
+   "listed": "Gennady Karpov",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r061",
+   "group": "mixed",
+   "subject": "Muhamad Hussein Trading LLC",
+   "listed": "MUHAMMAD HUSSEIN",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r062",
+   "group": "mixed",
+   "subject": "Khalid Mahmoud General Trading FZE",
+   "listed": "KHALED MAHMUD",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r063",
+   "group": "mixed",
+   "subject": "Nasser Qassem Commodities DMCC",
+   "listed": "NASER KASSEM",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r064",
+   "group": "mixed",
+   "subject": "Omar Haddad International Group",
+   "listed": "UMAR HADDAD",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r065",
+   "group": "mixed",
+   "subject": "Tarek Sharif Investments Limited",
+   "listed": "TARIQ SHARIF",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r066",
+   "group": "mixed",
+   "subject": "Faisal Al Thani Holdings",
+   "listed": "FAYSAL AL THANI",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r067",
+   "group": "mixed",
+   "subject": "Ibrahim Khalil Enterprises",
+   "listed": "EBRAHIM KHALEEL",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r068",
+   "group": "mixed",
+   "subject": "Saleh Hamid Trading Est",
+   "listed": "SALIH HAMEED",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r069",
+   "group": "mixed",
+   "subject": "Mahmoud Rashid Global Services",
+   "listed": "MAHMUD RASHEED",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r070",
+   "group": "mixed",
+   "subject": "Sergei Volkov Capital Investment",
+   "listed": "SERGEY VOLKOV",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r071",
+   "group": "patronymic",
+   "subject": "Usama Bin Ladin",
+   "listed": "USAMA BIN MUHAMMAD BIN AWAD BIN LADIN",
+   "mechanism": "subset"
+  },
+  {
+   "id": "r072",
+   "group": "patronymic",
+   "subject": "Islamic Revolutionary Guard Corps Quds Force",
+   "listed": "QUDS FORCE",
+   "mechanism": "subset"
+  },
+  {
+   "id": "r073",
+   "group": "patronymic",
+   "subject": "Abu Musab Al Zarqawi",
+   "listed": "AHMAD FADIL NAZAL AL-KHALAYLAH ABU MUSAB AL ZARQAWI",
+   "mechanism": "subset"
+  },
+  {
+   "id": "r074",
+   "group": "patronymic",
+   "subject": "Hassan Nasrallah",
+   "listed": "HASSAN ABBAS NASRALLAH",
+   "mechanism": "subset"
+  },
+  {
+   "id": "r075",
+   "group": "patronymic",
+   "subject": "Rashid Omar Al Marri",
+   "listed": "RASHID OMAR HASSAN AL MARRI",
+   "mechanism": "subset"
+  },
+  {
+   "id": "r076",
+   "group": "patronymic",
+   "subject": "Mohammed Salim Al Ketbi",
+   "listed": "MOHAMMED SALIM ABDULLA HUMAID AL KETBI",
+   "mechanism": "subset"
+  },
+  {
+   "id": "r077",
+   "group": "patronymic",
+   "subject": "Aleksandr Sergeevich Volkov",
+   "listed": "ALEKSANDR VOLKOV",
+   "mechanism": "subset"
+  },
+  {
+   "id": "r078",
+   "group": "patronymic",
+   "subject": "Khalifa Al Subaey",
+   "listed": "KHALIFA MUHAMMAD TURKI AL-SUBAIY",
+   "mechanism": "phonetic-subset"
+  },
+  {
+   "id": "r079",
+   "group": "corporate",
+   "subject": "Marmara Gold Trading",
+   "listed": "Marmara Gold Trading",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r080",
+   "group": "corporate",
+   "subject": "Petropars International FZE",
+   "listed": "Petropars International FZE",
+   "mechanism": "exact"
+  },
+  {
+   "id": "r081",
+   "group": "corporate",
+   "subject": "Tumad Madencilik Sanayi Ve Ticaret Anonim Sirketi",
+   "listed": "TUMAD MADENCILIK SANAYI VE TICARET A.S.",
+   "mechanism": "residual"
+  },
+  {
+   "id": "r082",
+   "group": "corporate",
+   "subject": "Al Baraka Jewellery LLC",
+   "listed": "AL BARAKA JEWELLERY L.L.C.",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r083",
+   "group": "corporate",
+   "subject": "Caspian Metals Holding",
+   "listed": "CASPIAN METALS HOLDINGS",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r084",
+   "group": "corporate",
+   "subject": "Emirates Golden Bullion DMCC",
+   "listed": "EMIRATES GOLDEN BULLION",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r085",
+   "group": "corporate",
+   "subject": "Anadolu Kiymetli Madenler Ticaret",
+   "listed": "ANADOLU KIYMETLI MADENLER TICARET AS",
+   "mechanism": "residual"
+  },
+  {
+   "id": "r086",
+   "group": "corporate",
+   "subject": "Black Sea Refining Corporation",
+   "listed": "BLACK SEA REFINING CORP",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r087",
+   "group": "corporate",
+   "subject": "Gulf Falcon Precious Metals FZCO",
+   "listed": "GULF FALCON PRECIOUS METALS",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r088",
+   "group": "corporate",
+   "subject": "Ural Mining Investment Company",
+   "listed": "URAL MINING INVESTMENTS CO",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r089",
+   "group": "corporate",
+   "subject": "Levant Exchange House WLL",
+   "listed": "LEVANT EXCHANGE HOUSE",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r090",
+   "group": "corporate",
+   "subject": "Horizon Star General Trading",
+   "listed": "HORIZON STAR GENERAL TRADING LLC",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r091",
+   "group": "phonetic",
+   "subject": "Muhamet Huseinn",
+   "listed": "MUHAMMAD HUSSEIN",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r092",
+   "group": "phonetic",
+   "subject": "Vladimyr Putyn",
+   "listed": "VLADIMIR PUTIN",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r093",
+   "group": "phonetic",
+   "subject": "Moamer Gadafi",
+   "listed": "MUAMMAR QADHAFI",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r094",
+   "group": "phonetic",
+   "subject": "Ghassan Shaheen",
+   "listed": "Gasan Shahin",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r095",
+   "group": "phonetic",
+   "subject": "Mouhamad Kaddoura",
+   "listed": "Muhammad Qaddura",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r096",
+   "group": "phonetic",
+   "subject": "Abdool Kayoom",
+   "listed": "Abdul Qayyum",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r097",
+   "group": "phonetic",
+   "subject": "Sheereen Aboubakr",
+   "listed": "Shirin Abu Bakr",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r098",
+   "group": "phonetic",
+   "subject": "Zulfiqhar Bhoutto",
+   "listed": "Zulfikar Bhutto",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r099",
+   "group": "phonetic",
+   "subject": "Tchaikovski Andrei",
+   "listed": "Chaykovskiy Andrey",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r100",
+   "group": "phonetic",
+   "subject": "Khoudair Ghazwan",
+   "listed": "Kudair Gazvan",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r101",
+   "group": "phonetic",
+   "subject": "Fedot Scherbakov",
+   "listed": "Fedott Shcherbakov",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r102",
+   "group": "phonetic",
+   "subject": "Yousri Dahmane",
+   "listed": "Yusree Dahman",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r103",
+   "group": "phonetic",
+   "subject": "Ridha Boukhari",
+   "listed": "Reda Bukhari",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r104",
+   "group": "phonetic",
+   "subject": "Wissam Tahhan",
+   "listed": "Vissam Tahan",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r105",
+   "group": "mixed",
+   "subject": "Waleed Nasser Jewellery LLC",
+   "listed": "WALID NASER",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r106",
+   "group": "mixed",
+   "subject": "Qassem Suleiman Gold Trading DMCC",
+   "listed": "KASSEM SOLIMAN",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r107",
+   "group": "mixed",
+   "subject": "Aleksandr Petrov Trading FZE",
+   "listed": "ALEXANDER PETROV",
+   "mechanism": "phonetic"
+  },
+  {
+   "id": "r108",
+   "group": "mixed",
+   "subject": "Osama Ghanem Precious Metals LLC",
+   "listed": "OUSSAMA GHANEM",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r109",
+   "group": "arabic",
+   "subject": "Noor Al Deen Atef",
+   "listed": "Nur Al Din Atif",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r110",
+   "group": "arabic",
+   "subject": "Hossam Din Farag",
+   "listed": "Husam Deen Faraj",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r111",
+   "group": "arabic",
+   "subject": "Emad Fouad Bashir",
+   "listed": "Imad Fuad Basheer",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r112",
+   "group": "arabic",
+   "subject": "Munir Latif Shakir",
+   "listed": "Mounir Lateef Shaker",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r113",
+   "group": "arabic",
+   "subject": "Anwar Kamal Adnan",
+   "listed": "Anouar Kemal Adnane",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r114",
+   "group": "arabic",
+   "subject": "Marwan Raed Sayed",
+   "listed": "Merwan Raid Sayyid",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r115",
+   "group": "cyrillic",
+   "subject": "Anatoli Valeriy Kramarenko",
+   "listed": "Anatoly Valery Kramarenko",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r116",
+   "group": "cyrillic",
+   "subject": "Oleh Ihor Danylenko",
+   "listed": "Oleg Igor Danilenko",
+   "mechanism": "translit"
+  },
+  {
+   "id": "r117",
+   "group": "cyrillic",
+   "subject": "Semen Stepanovich Kravets",
+   "listed": "Semyon Stepanovych Kravets",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r118",
+   "group": "cyrillic",
+   "subject": "Borys Pavlo Zinchenko",
+   "listed": "Boris Pavel Zinchenko",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r119",
+   "group": "phonetic",
+   "subject": "Kazbek Dudaev",
+   "listed": "Kasbek Dudayev",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r120",
+   "group": "phonetic",
+   "subject": "Achraf Ganouchi",
+   "listed": "Ashraf Ghannouchi",
+   "mechanism": "fuzzy"
+  },
+  {
+   "id": "r121",
+   "group": "phonetic",
+   "subject": "Djaffar Boumedienne",
+   "listed": "Jaafar Bumedien",
+   "mechanism": "phonetic"
+  }
+ ]
+}

@@ -1,0 +1,517 @@
+{
+ "version": 1,
+ "description": "Labelled hard-negative corpus: (subject, listed) pairs that must NOT link — distinct real-world parties whose names share boilerplate, a single token, or surface similarity. Any hit here is a false positive against the precision floor. Entries carrying a 'note' are accepted budgeted exceptions.",
+ "pairs": [
+  {
+   "id": "n001",
+   "reason": "boilerplate-only",
+   "subject": "Tumad Madencilik Sanayi Ve Ticaret Anonim Sirketi",
+   "listed": "Dal Enerji Madencilik Turizm Sanayi Ve Ticaret Anonim Sirketi"
+  },
+  {
+   "id": "n002",
+   "reason": "boilerplate-only",
+   "subject": "Yildiz Altin Kiymetli Madenler Ticaret Anonim Sirketi",
+   "listed": "Bosphorus Kiymetli Madenler Ticaret Anonim Sirketi"
+  },
+  {
+   "id": "n003",
+   "reason": "boilerplate-only",
+   "subject": "Zoe Precious Metals FZE",
+   "listed": "Acme General Trading LLC"
+  },
+  {
+   "id": "n004",
+   "reason": "boilerplate-only",
+   "subject": "Falcon International Trading LLC",
+   "listed": "Oasis International Trading LLC"
+  },
+  {
+   "id": "n005",
+   "reason": "boilerplate-only",
+   "subject": "Crescent Global Investments Limited",
+   "listed": "Meridian Global Investments Limited"
+  },
+  {
+   "id": "n006",
+   "reason": "boilerplate-only",
+   "subject": "Pearl Commodities DMCC",
+   "listed": "Sapphire Commodities DMCC"
+  },
+  {
+   "id": "n007",
+   "reason": "boilerplate-only",
+   "subject": "Atlas Holding Group",
+   "listed": "Vertex Holding Group"
+  },
+  {
+   "id": "n008",
+   "reason": "boilerplate-only",
+   "subject": "Delta Enterprises FZCO",
+   "listed": "Quantum Enterprises FZCO"
+  },
+  {
+   "id": "n009",
+   "reason": "boilerplate-only",
+   "subject": "Anka Insaat Sanayi Ve Ticaret Limited Sirketi",
+   "listed": "Toros Insaat Sanayi Ve Ticaret Limited Sirketi"
+  },
+  {
+   "id": "n010",
+   "reason": "boilerplate-only",
+   "subject": "Golden Gate General Trading",
+   "listed": "Silver Gate General Trading"
+  },
+  {
+   "id": "n011",
+   "reason": "boilerplate-only",
+   "subject": "Nile Capital Investment Services",
+   "listed": "Volga Capital Investment Services"
+  },
+  {
+   "id": "n012",
+   "reason": "boilerplate-only",
+   "subject": "Summit Overseas Enterprises",
+   "listed": "Zenith Overseas Enterprises"
+  },
+  {
+   "id": "n013",
+   "reason": "single-token-subset",
+   "subject": "Sberbank",
+   "listed": "SBERBANK OF RUSSIA"
+  },
+  {
+   "id": "n014",
+   "reason": "single-token-subset",
+   "subject": "Aeroflot Catering",
+   "listed": "AEROFLOT RUSSIAN AIRLINES"
+  },
+  {
+   "id": "n015",
+   "reason": "single-token-subset",
+   "subject": "Hamas Trading",
+   "listed": "HARAKAT HAMAS FILASTIN"
+  },
+  {
+   "id": "n016",
+   "reason": "single-token-subset",
+   "subject": "Wagner Consulting",
+   "listed": "WAGNER GROUP PMC"
+  },
+  {
+   "id": "n017",
+   "reason": "single-token-subset",
+   "subject": "Nordstream Cafe",
+   "listed": "NORD STREAM 2 AG"
+  },
+  {
+   "id": "n018",
+   "reason": "single-token-subset",
+   "subject": "Basij Motors",
+   "listed": "BASIJ RESISTANCE FORCE"
+  },
+  {
+   "id": "n019",
+   "reason": "single-token-subset",
+   "subject": "Salam Bakery",
+   "listed": "SALAM AIR CHARTER SERVICES"
+  },
+  {
+   "id": "n020",
+   "reason": "single-token-subset",
+   "subject": "Aurora Foods",
+   "listed": "AURORA SHIPPING AND LOGISTICS GMBH"
+  },
+  {
+   "id": "n021",
+   "reason": "distinct-arabic",
+   "subject": "Ahmed Hassan",
+   "listed": "Mohammed Khalil"
+  },
+  {
+   "id": "n022",
+   "reason": "distinct-arabic",
+   "subject": "Ali Hassan Khouri",
+   "listed": "Alia Hussein Mansour"
+  },
+  {
+   "id": "n023",
+   "reason": "distinct-arabic",
+   "subject": "Fatima Zahra Hamdan",
+   "listed": "Fathi Zahran Hamawi"
+  },
+  {
+   "id": "n024",
+   "reason": "distinct-arabic",
+   "subject": "Khalid Nasser Al Qasimi",
+   "listed": "Walid Mansour Al Qasimi"
+  },
+  {
+   "id": "n025",
+   "reason": "distinct-arabic",
+   "subject": "Salem Rashid Al Nuaimi",
+   "listed": "Saif Rashed Al Neyadi"
+  },
+  {
+   "id": "n026",
+   "reason": "distinct-arabic",
+   "subject": "Hamdan Saeed Al Shamsi",
+   "listed": "Hamad Suhail Al Shamsi"
+  },
+  {
+   "id": "n027",
+   "reason": "distinct-arabic",
+   "subject": "Mariam Yousef Al Hashimi",
+   "listed": "Maryam Youssef Al Hammadi"
+  },
+  {
+   "id": "n028",
+   "reason": "distinct-arabic",
+   "subject": "Adel Ibrahim Mansour",
+   "listed": "Aqeel Ismail Mansouri"
+  },
+  {
+   "id": "n029",
+   "reason": "distinct-arabic",
+   "subject": "Sami Fadel Barakat",
+   "listed": "Samih Fawzi Barghouti"
+  },
+  {
+   "id": "n030",
+   "reason": "distinct-arabic",
+   "subject": "Nasser Ahmadi",
+   "listed": "Nasrin Ahmadi",
+   "note": "accepted-canary: the naser spelling variant sits within fuzzy range of nasrin; a WEAK possible-match after translit expansion is an accepted, budgeted false positive"
+  },
+  {
+   "id": "n031",
+   "reason": "distinct-arabic",
+   "subject": "Bassam Khoury",
+   "listed": "Bassel Khouri"
+  },
+  {
+   "id": "n032",
+   "reason": "distinct-arabic",
+   "subject": "Rami Sabbagh",
+   "listed": "Ramzi Dabbagh"
+  },
+  {
+   "id": "n033",
+   "reason": "distinct-arabic",
+   "subject": "Jamil Antar",
+   "listed": "Kamil Akhtar"
+  },
+  {
+   "id": "n034",
+   "reason": "distinct-arabic",
+   "subject": "Ziad Mansour Barghouti",
+   "listed": "Iyad Maasour Barghash"
+  },
+  {
+   "id": "n035",
+   "reason": "distinct-arabic",
+   "subject": "Lina Haddad",
+   "listed": "Luna Haddadin"
+  },
+  {
+   "id": "n036",
+   "reason": "distinct-slavic",
+   "subject": "Sergei Ivanov",
+   "listed": "Aleksandr Volkov"
+  },
+  {
+   "id": "n037",
+   "reason": "distinct-slavic",
+   "subject": "Dmitri Sokolov",
+   "listed": "Danila Sokolik"
+  },
+  {
+   "id": "n038",
+   "reason": "distinct-slavic",
+   "subject": "Boris Orlov",
+   "listed": "Bogdan Orlik"
+  },
+  {
+   "id": "n039",
+   "reason": "distinct-slavic",
+   "subject": "Ivan Petrov",
+   "listed": "Igor Popov"
+  },
+  {
+   "id": "n040",
+   "reason": "distinct-slavic",
+   "subject": "Roman Lebedev",
+   "listed": "Ruslan Lebedinsky"
+  },
+  {
+   "id": "n041",
+   "reason": "distinct-slavic",
+   "subject": "Maksim Kozlov",
+   "listed": "Matvei Kozlovsky"
+  },
+  {
+   "id": "n042",
+   "reason": "distinct-slavic",
+   "subject": "Anton Belov",
+   "listed": "Artem Belyaev"
+  },
+  {
+   "id": "n043",
+   "reason": "distinct-slavic",
+   "subject": "Oleg Titov",
+   "listed": "Timur Titarenko"
+  },
+  {
+   "id": "n044",
+   "reason": "distinct-slavic",
+   "subject": "Pavel Zhukov",
+   "listed": "Petr Zhuravlev"
+  },
+  {
+   "id": "n045",
+   "reason": "distinct-slavic",
+   "subject": "Vadim Orekhov",
+   "listed": "Viktor Onishchenko"
+  },
+  {
+   "id": "n046",
+   "reason": "distinct-cjk",
+   "subject": "Chen Wei Ming",
+   "listed": "Zhang Wei Jun"
+  },
+  {
+   "id": "n047",
+   "reason": "distinct-cjk",
+   "subject": "Kang Min Ho",
+   "listed": "Kim Jong Nam"
+  },
+  {
+   "id": "n048",
+   "reason": "distinct-cjk",
+   "subject": "Li Xiaoping",
+   "listed": "Liu Xiaobo"
+  },
+  {
+   "id": "n049",
+   "reason": "distinct-cjk",
+   "subject": "Wang Jianguo",
+   "listed": "Wu Jianmin"
+  },
+  {
+   "id": "n050",
+   "reason": "distinct-cjk",
+   "subject": "Park Sung Ho",
+   "listed": "Baek Seung Hee"
+  },
+  {
+   "id": "n051",
+   "reason": "distinct-cjk",
+   "subject": "Nguyen Van An",
+   "listed": "Ngo Van Anh"
+  },
+  {
+   "id": "n052",
+   "reason": "distinct-cjk",
+   "subject": "Tanaka Hiroshi",
+   "listed": "Takeda Hitoshi"
+  },
+  {
+   "id": "n053",
+   "reason": "distinct-cjk",
+   "subject": "Zhao Liang",
+   "listed": "Zhou Lin"
+  },
+  {
+   "id": "n054",
+   "reason": "similar-corporate",
+   "subject": "Aeroflex Industries",
+   "listed": "AEROFLOT LEASING"
+  },
+  {
+   "id": "n055",
+   "reason": "similar-corporate",
+   "subject": "Rosneft Catering Supplies",
+   "listed": "ROSTELECOM SERVICES"
+  },
+  {
+   "id": "n056",
+   "reason": "similar-corporate",
+   "subject": "Novatek Software House",
+   "listed": "NOVATOR DESIGN BUREAU"
+  },
+  {
+   "id": "n057",
+   "reason": "similar-corporate",
+   "subject": "Alrosa Flowers",
+   "listed": "ALROSTA TEXTILES"
+  },
+  {
+   "id": "n058",
+   "reason": "similar-corporate",
+   "subject": "Sinara Consulting",
+   "listed": "SINOPEC ENGINEERING"
+  },
+  {
+   "id": "n059",
+   "reason": "similar-corporate",
+   "subject": "Polyus Bakery",
+   "listed": "POLYMETAL RECYCLING"
+  },
+  {
+   "id": "n060",
+   "reason": "similar-corporate",
+   "subject": "Emirates Sky Cargo",
+   "listed": "EMPEROR SKY LOGISTICS"
+  },
+  {
+   "id": "n061",
+   "reason": "similar-corporate",
+   "subject": "Gulf Star Motors",
+   "listed": "GULF SUN MARINE"
+  },
+  {
+   "id": "n062",
+   "reason": "similar-corporate",
+   "subject": "Lukoil Uniform Supplies",
+   "listed": "LUKMAN OILFIELD SERVICES"
+  },
+  {
+   "id": "n063",
+   "reason": "similar-corporate",
+   "subject": "Severstal Coffee Roasters",
+   "listed": "SEVERNAYA VERF SHIPYARD"
+  },
+  {
+   "id": "n064",
+   "reason": "similar-corporate",
+   "subject": "Bosphorus Jewellers",
+   "listed": "BOSNIA FERROALLOYS"
+  },
+  {
+   "id": "n065",
+   "reason": "similar-corporate",
+   "subject": "Antalya Fresh Produce",
+   "listed": "ANTONOV AIRLINES"
+  },
+  {
+   "id": "n066",
+   "reason": "phonetic-adjacent",
+   "subject": "Ali Hassan",
+   "listed": "Ali Hussein"
+  },
+  {
+   "id": "n067",
+   "reason": "phonetic-adjacent",
+   "subject": "Omar Farouk",
+   "listed": "Amir Faraj"
+  },
+  {
+   "id": "n068",
+   "reason": "phonetic-adjacent",
+   "subject": "Samir Aziz",
+   "listed": "Sahira Azzam"
+  },
+  {
+   "id": "n069",
+   "reason": "phonetic-adjacent",
+   "subject": "Karim Mansour",
+   "listed": "Kamran Mansuri"
+  },
+  {
+   "id": "n070",
+   "reason": "phonetic-adjacent",
+   "subject": "Bilal Sharara",
+   "listed": "Belal Shurafa"
+  },
+  {
+   "id": "n071",
+   "reason": "phonetic-adjacent",
+   "subject": "Hana Qassem",
+   "listed": "Hani Qasemi"
+  },
+  {
+   "id": "n072",
+   "reason": "phonetic-adjacent",
+   "subject": "Yasser Hamdan",
+   "listed": "Yusra Hamdani"
+  },
+  {
+   "id": "n073",
+   "reason": "phonetic-adjacent",
+   "subject": "Nadia Suleiman",
+   "listed": "Nader Salman"
+  },
+  {
+   "id": "n074",
+   "reason": "phonetic-adjacent",
+   "subject": "Firas Najjar",
+   "listed": "Fares Najem"
+  },
+  {
+   "id": "n075",
+   "reason": "phonetic-adjacent",
+   "subject": "Imad Khatib",
+   "listed": "Ahmad Khatri"
+  },
+  {
+   "id": "n076",
+   "reason": "phonetic-adjacent",
+   "subject": "Petro Melnichenko",
+   "listed": "Pedro Menendez"
+  },
+  {
+   "id": "n077",
+   "reason": "phonetic-adjacent",
+   "subject": "Dana Almheiri",
+   "listed": "Tina Almazrouei"
+  },
+  {
+   "id": "n078",
+   "reason": "cross",
+   "subject": "Zoe Precious Metals FZE",
+   "listed": "Mohammed Khalil"
+  },
+  {
+   "id": "n079",
+   "reason": "cross",
+   "subject": "Huseyin Yamac",
+   "listed": "BLACK SEA REFINING CORP"
+  },
+  {
+   "id": "n080",
+   "reason": "cross",
+   "subject": "Robert James Anderson",
+   "listed": "QUDS FORCE"
+  },
+  {
+   "id": "n081",
+   "reason": "cross",
+   "subject": "Chen Wei Ming",
+   "listed": "Sergei Ivanov"
+  },
+  {
+   "id": "n082",
+   "reason": "cross",
+   "subject": "Marmara Gold Trading",
+   "listed": "URAL MINING INVESTMENTS CO"
+  },
+  {
+   "id": "n083",
+   "reason": "distinct-arabic",
+   "subject": "Fatima Zahra Hamdan",
+   "listed": "Fathi Zahran Hamawi"
+  },
+  {
+   "id": "n084",
+   "reason": "cross",
+   "subject": "Emirates Golden Bullion DMCC",
+   "listed": "HASSAN ABBAS NASRALLAH"
+  },
+  {
+   "id": "n085",
+   "reason": "cross",
+   "subject": "Ozgur Anik",
+   "listed": "Wagner Group PMC"
+  }
+ ]
+}

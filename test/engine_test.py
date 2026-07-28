@@ -199,6 +199,231 @@ print("ai.py — transliteration")
 v = ai.name_variants("Mohammed Al Hussein")
 check("transliteration yields variants", any("muhammad" in x for x in v) and any("mohamed" in x for x in v))
 check("name_variants always includes the base", any("mohammed al hussein" == x for x in v))
+# Shared-data groups (data/translit-groups.json): spellings the old in-code
+# table lacked must now swap — each was a silent-clear class before the file.
+check("name_variants swaps khaled/khalid (new shared-data group)",
+      "khalid mansour" in ai.name_variants("Khaled Mansour"))
+check("name_variants swaps sergei/sergey (Cyrillic romanization group)",
+      "sergey ivanov" in ai.name_variants("Sergei Ivanov"))
+check("name_variants swaps volodymyr/vladimir (cross-language forms)",
+      "vladimir melnyk" in ai.name_variants("Volodymyr Melnyk"))
+check("salah is NOT a saleh variant — different underlying names",
+      not any("saleh" in x for x in ai.name_variants("Salah Mansour")))
+check("translit groups load from the shared data file and stay disjoint",
+      len(ai._TRANSLIT_GROUPS) >= 80 and
+      len({m for g in ai._TRANSLIT_GROUPS for m in g}) == sum(len(g) for g in ai._TRANSLIT_GROUPS))
+check("translit_canon_token folds group members to one representative",
+      ai.translit_canon_token("khalid") == ai.translit_canon_token("khaled") and
+      ai.translit_canon_token("umar") == ai.translit_canon_token("omar") and
+      ai.translit_canon_token("zzz-ungrouped") == "zzz-ungrouped")
+
+# ── phonetic fold layer ──────────────────────────────────────────────────────
+print("screen.py — phonetic fold layer")
+check("phonetic_key folds romanization drift to one key",
+      screen.phonetic_key("muhamet") == screen.phonetic_key("muhammad") and
+      screen.phonetic_key("huseinn") == screen.phonetic_key("hussein") and
+      screen.phonetic_key("putyn") == screen.phonetic_key("putin") and
+      screen.phonetic_key("gadafi") == screen.phonetic_key("qadhafi") and
+      screen.phonetic_key("kayoom") == screen.phonetic_key("qayyum"))
+check("phonetic_key keeps the Arabic-real vowel distinctions (hassan≠hussein)",
+      screen.phonetic_key("hassan") != screen.phonetic_key("hussein") and
+      screen.phonetic_key("salim") != screen.phonetic_key("selim"))
+check("phonetic_key preserves a trailing vowel (gender/nisba suffixes distinct)",
+      screen.phonetic_key("hana") != screen.phonetic_key("hani") and
+      screen.phonetic_key("qassem") != screen.phonetic_key("qasemi"))
+check("phonetic_tokens merges abu/abd particles and folds to canonical spellings",
+      screen.phonetic_tokens(screen.normalize("Abou Bakr Trading LLC")) == ["aboubakr"] and
+      screen.phonetic_tokens(screen.normalize("Khaled Mansour")) ==
+      screen.phonetic_tokens(screen.normalize("Khalid Mansour")))
+check("single-token names never build a phonetic profile",
+      screen._phonetic_profile(screen.normalize("HAMAS")) is None)
+
+_PH_LIST = {"L": [(screen.normalize(x), x) for x in [
+    "MUHAMMAD HUSSEIN", "KHALIFA MUHAMMAD TURKI AL-SUBAIY", "ALI HUSSEIN"]]}
+_ph_hits = screen.screen_name("Muhamet Huseinn", _PH_LIST)
+check("the pinned multi-edit residual now flags as a phonetic-only WEAK hit",
+      len(_ph_hits) == 1 and _ph_hits[0].get("phonetic") is True and
+      _ph_hits[0]["confidence"] == "WEAK (phonetic-only)" and _ph_hits[0]["score"] < 85)
+check("phonetic subset shape catches the drifted patronymic chain",
+      any(h.get("phonetic") and h.get("phonetic_shape") == "subset"
+          for h in screen.screen_name("Khalifa Al Subaey", _PH_LIST)))
+check("phonetic-adjacent distinct names stay clear (ali hassan ≠ ali hussein)",
+      screen.screen_name("Ali Hassan", _PH_LIST) == [])
+_ph_env = os.environ.get("MATCH_PHONETIC")
+try:
+    os.environ["MATCH_PHONETIC"] = "0"
+    check("MATCH_PHONETIC=0 restores the historical clear (fuzzy gates untouched)",
+          screen.screen_name("Muhamet Huseinn", _PH_LIST) == [])
+    os.environ["MATCH_PHONETIC"] = "shadow"
+    _shadow_before = screen._PHONETIC_SHADOW["count"]
+    check("shadow mode emits no hit but counts the would-be phonetic match",
+          screen.screen_name("Muhamet Huseinn", _PH_LIST) == [] and
+          screen._PHONETIC_SHADOW["count"] == _shadow_before + 1)
+    os.environ["MATCH_PHONETIC"] = "banana"
+    check("an unknown MATCH_PHONETIC value is rejected loudly and defaults to live",
+          len(screen.screen_name("Muhamet Huseinn", _PH_LIST)) == 1)
+finally:
+    if _ph_env is None:
+        os.environ.pop("MATCH_PHONETIC", None)
+    else:
+        os.environ["MATCH_PHONETIC"] = _ph_env
+# Additivity: every layer-off hit survives the layer turning on, same score.
+_ADD_SUBJECTS = ["Muhamad Hussein Trading LLC", "Ali Hussein", "Sberbank",
+                 "Muhamet Huseinn", "Completely Unrelated Name"]
+try:
+    os.environ["MATCH_PHONETIC"] = "0"
+    _add_off = [screen.screen_name(s, _PH_LIST) for s in _ADD_SUBJECTS]
+    os.environ["MATCH_PHONETIC"] = "1"
+    _add_on = [screen.screen_name(s, _PH_LIST) for s in _ADD_SUBJECTS]
+finally:
+    if _ph_env is None:
+        os.environ.pop("MATCH_PHONETIC", None)
+    else:
+        os.environ["MATCH_PHONETIC"] = _ph_env
+_additive = True
+for _off_hits, _on_hits in zip(_add_off, _add_on):
+    _on_scores = {(h["list"], h["matched_entry"]): h["score"] for h in _on_hits}
+    for h in _off_hits:
+        if _on_scores.get((h["list"], h["matched_entry"])) != h["score"]:
+            _additive = False
+check("phonetic layer is strictly additive (no fuzzy hit removed or re-scored)", _additive)
+
+# ── adverse media: tiers, description scanning, counter eligibility ──────────
+print("screen.py — adverse media hardening")
+check("adverse_keywords_for finds risk terms the headline hides in the description",
+      screen.match_adverse_keywords("Trader steps back from board duties") == [] and
+      "arrest" in screen.adverse_keywords_for(
+          "Trader steps back from board duties",
+          "The move follows his arrest last week in the money laundering case."))
+check("keyword_tier: generics are weak, real crime terms are strong",
+      screen.keyword_tier(["politic", "lawsuit"]) == "weak" and
+      screen.keyword_tier(["lawsuit", "money laundering"]) == "strong" and
+      screen.keyword_tier([]) is None)
+_aa = screen.adverse_actionable
+check("actionable: strong keyword + name in headline",
+      _aa("Khalid Otaibi", {"flagged": True, "title": "Khalid Otaibi arrested in fraud case",
+                            "keywords": ["arrest", "fraud"], "source": "reuters.com"}))
+check("not actionable: weak-only tier without a second outlet",
+      not _aa("Atlas Group", {"flagged": True, "title": "Atlas Group faces lawsuit",
+                              "keywords": ["lawsuit"], "source": "a.example.com"}))
+check("actionable: weak tier corroborated by a second independent outlet",
+      _aa("Atlas Group", {"flagged": True, "title": "Atlas Group faces lawsuit",
+                          "keywords": ["lawsuit"], "source": "a.example.com",
+                          "also_reported_by": ["b.example.com"]}))
+check("not actionable: wrong-subject story (low name relevance)",
+      not _aa("Khalid Nasser Al Qasimi", {"flagged": True, "title": "Nasser detained in Cairo fraud probe",
+                                          "keywords": ["fraud"], "source": "x.example.com"}))
+check("actionable: cross-script (Arabic) headline is UNSCORABLE, never excluded",
+      _aa("Khalid Otaibi", {"flagged": True, "title": "توقيف تاجر في قضية غسل الأموال",
+                            "keywords": ["money laundering"], "source": "aljazeera.net"}))
+check("canonical fingerprint strips tracking params and falls back on aggregators",
+      screen._canonical_fingerprint("https://www.apnews.com/article/x?utm_source=rss", "T") ==
+      screen._canonical_fingerprint("https://apnews.com/article/x?ncid=tw", "T") and
+      screen._canonical_fingerprint("https://news.google.com/rss/articles/abc", "Same Story")
+      .startswith("t:"))
+# Counter: the same article re-served across days under rotating params counts
+# ONCE (no manufactured escalation); three distinct strong stories still fire.
+import tempfile as _tf
+with _tf.TemporaryDirectory() as _td:
+    _ev = os.path.join(_td, "ev.json")
+    for day, params in (("2026-06-20", "?utm_source=rss"), ("2026-06-25", "?ncid=tw"),
+                        ("2026-06-30", "?ref=daily")):
+        screen.update_adverse_evidence([{
+            "subject_name": "Resurfaced Story LLC", "subject_type": "COMPANY", "parent": "",
+            "articles": [{"title": f"Fraud probe report {params}", "source": "apnews.com",
+                          "url": "https://apnews.com/article/fraud-probe" + params,
+                          "keywords": ["fraud"], "categories": [], "flagged": True}],
+        }], day, path=_ev)
+    _rep = screen.update_adverse_evidence([], "2026-07-01", path=_ev)
+    check("repeat counter: one article under rotating params never fires the pattern",
+          "Resurfaced Story LLC" not in _rep)
+with _tf.TemporaryDirectory() as _td:
+    _ev = os.path.join(_td, "ev.json")
+    for day, t in (("2026-06-20", "Acme Corp arrested in fraud case"),
+                   ("2026-06-25", "Acme Corp faces money laundering charges"),
+                   ("2026-06-30", "Acme Corp assets frozen in bribery inquiry")):
+        screen.update_adverse_evidence([{
+            "subject_name": "Acme Corp", "subject_type": "COMPANY", "parent": "",
+            "articles": [{"title": t, "source": "reuters.com",
+                          "url": "https://reuters.com/" + t.replace(" ", "-").lower(),
+                          "keywords": screen.match_adverse_keywords(t),
+                          "categories": [], "flagged": True}],
+        }], day, path=_ev)
+    _rep = screen.update_adverse_evidence([], "2026-07-01", path=_ev)
+    check("repeat counter: three distinct strong stories still fire the pattern",
+          _rep.get("Acme Corp") == 3)
+check("source_tier_for ranks known wires tier 1 and unknowns tier 3",
+      screen.source_tier_for({"url": "https://www.reuters.com/world/x", "source": ""}) == 1 and
+      screen.source_tier_for({"url": "", "source": "Reuters"}) == 1 and
+      screen.source_tier_for({"url": "https://blog.example.xyz/p", "source": "Some Blog"}) == 3)
+check("ADVERSE_MAX_RESULTS default is 8 and validates loudly",
+      screen.ADVERSE_MAX_RESULTS == 8 and screen._resolve_adverse_max("99") == 8 and
+      screen._resolve_adverse_max("12") == 12)
+
+# ── threshold env-tunability (one-way) + shadow challenger ───────────────────
+print("screen.py — threshold resolver / shadow challenger")
+_thr_env = {k: os.environ.get(k) for k in
+            ("MATCH_THRESHOLD", "MATCH_THRESHOLD_ALLOW_RAISE", "SHADOW_THRESHOLD")}
+try:
+    os.environ.pop("MATCH_THRESHOLD_ALLOW_RAISE", None)
+    os.environ.pop("MATCH_THRESHOLD", None)
+    check("threshold resolver: unset env keeps the champion default",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 85)
+    os.environ["MATCH_THRESHOLD"] = "80"
+    check("threshold resolver: lowering (more sensitive) is a plain config",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 80)
+    os.environ["MATCH_THRESHOLD"] = "90"
+    check("threshold resolver: a bare raise is rejected to the default (one-way rule)",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 85)
+    os.environ["MATCH_THRESHOLD_ALLOW_RAISE"] = "1"
+    check("threshold resolver: a raise passes only with MATCH_THRESHOLD_ALLOW_RAISE=1",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 90)
+    os.environ.pop("MATCH_THRESHOLD_ALLOW_RAISE", None)
+    for bad in ("0.85", "abc", "40", "101", ""):
+        os.environ["MATCH_THRESHOLD"] = bad
+        if screen._resolve_match_threshold("MATCH_THRESHOLD", 85) != 85:
+            check(f"threshold resolver rejects {bad!r}", False)
+            break
+    else:
+        check("threshold resolver rejects fractions, garbage and out-of-range values", True)
+    # Shadow resolver: range [70, THRESHOLD), off when unset/invalid.
+    os.environ.pop("SHADOW_THRESHOLD", None)
+    check("shadow resolver: off when unset", screen._resolve_shadow_threshold() is None)
+    os.environ["SHADOW_THRESHOLD"] = "80"
+    check("shadow resolver: accepts a value inside [70, THRESHOLD)",
+          screen._resolve_shadow_threshold() == 80)
+    os.environ["SHADOW_THRESHOLD"] = str(screen.THRESHOLD)
+    check("shadow resolver: rejects a value at/above the live threshold",
+          screen._resolve_shadow_threshold() is None)
+finally:
+    for k, v in _thr_env.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+# Shadow band behaviour inside screen_name: "Marvin Ostrowski" vs "MERVIN
+# OSTRAVSKI" scores 81.2 under this suite's difflib stub — inside [80, 85),
+# failing every champion gate AND the phonetic gate (marvin/mervin first-vowel
+# a≠i·e, ostrowski/ostravski first-vowel u≠a) — a clean challenger-band
+# specimen with no transliteration-group involvement.
+_SHW_LIST = {"L": [(screen.normalize("MERVIN OSTRAVSKI"), "MERVIN OSTRAVSKI")]}
+_shw_orig = screen.SHADOW_THRESHOLD_VALUE
+try:
+    screen.SHADOW_THRESHOLD_VALUE = 80
+    _shw_count = screen._SHADOW_CHALLENGER["count"]
+    _shw_hits = screen.screen_name("Marvin Ostrowski", _SHW_LIST)
+    check("shadow band counts a [shadow, THRESHOLD) pair without emitting a hit",
+          _shw_hits == [] and screen._SHADOW_CHALLENGER["count"] == _shw_count + 1)
+    check("shadow example log records the pair",
+          any(e["entry"] == "MERVIN OSTRAVSKI" for e in screen._SHADOW_CHALLENGER["examples"]))
+    screen.SHADOW_THRESHOLD_VALUE = None
+    _shw_count2 = screen._SHADOW_CHALLENGER["count"]
+    screen.screen_name("Marvin Ostrowski", _SHW_LIST)
+    check("shadow off: the same pair leaves no tally and no hit",
+          screen._SHADOW_CHALLENGER["count"] == _shw_count2)
+finally:
+    screen.SHADOW_THRESHOLD_VALUE = _shw_orig
 
 # ── typology / dedup / delta ─────────────────────────────────────────────────
 print("screen.py — typology / dedup / delta")
@@ -729,7 +954,10 @@ def _gnews_first_ok(*_a, **_k):
     raise OSError("connection refused")
 screen.requests.get = _gnews_first_ok
 _arts = screen.search_adverse_media("Partly Cloudy DMCC")
-check("a subject with any success sweeps all locales (no early exit)", _calls["gnews"] == 7)
+# Full sweep = ADVERSE_LOCALES broad fetches + the en-US risk-term pass + the
+# AE:ar Arabic pass (locale-derived, so the default bump 5 -> 8 is covered).
+check("a subject with any success sweeps all locales (no early exit)",
+      _calls["gnews"] == screen.ADVERSE_LOCALES + 2)
 check("partial coverage is kept, not raised away", len(_arts) == 1)
 
 # GDELT circuit breaker: N consecutive hard failures open the circuit for the

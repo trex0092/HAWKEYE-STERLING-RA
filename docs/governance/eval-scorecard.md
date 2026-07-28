@@ -13,7 +13,8 @@ Engineering · appended per scheduled eval run and per release.**
 |---|---|---|---|
 | Advisor behavioural eval (`advisor-eval.yml`) | Weekly (Mon 08:09 UTC) + dispatch | Advisor answer quality/regressions; findings filed as issues | Regression issue ⇒ fix before next release |
 | Advisor bias eval (`advisor-bias-eval.yml`) | Quarterly (1st, 09:09 UTC) + dispatch | Paired-prompt bias review per [advisor-bias-review-2026.md](advisor-bias-review-2026.md) | Finding ⇒ CAPA |
-| Cross-script recall parity (`test/bias_eval.py`) | Every push/PR | Matcher recall gap Latin↔Arabic↔Turkish within bound | Hard CI gate |
+| Cross-script recall parity (`test/bias_eval.py`) | Every push/PR | Matcher recall ≥90%/group across Latin↔Arabic↔Turkish↔Cyrillic↔CJK↔Phonetic, gap ≤10% | Hard CI gate |
+| Screening accuracy benchmark (`test/benchmark_eval.py` + `test/screening-benchmark.test.mjs`) | Every push/PR (both engines; rapidfuzz backend in the fuzz job) | Labelled-corpus floors: sanctions recall ≥95% (fn cap 3), hard-negative clear, adverse classification, repeat-signal | Hard CI gate |
 | Prompt-injection red-team (`test/redteam_injection.py`) | Every push/PR | 100% detection / non-execution / no-downgrade, ≤1 benign FP | Hard CI gate — campaign history in the [red-team log](../aims/red-team-log.md) |
 | Scoring golden set (`test/scoring-golden.test.js`) | Every push/PR | Engine reproduces approved methodology (35 frozen checks) | Hard CI gate |
 | Citation accuracy | Every push/PR (guard) | Advisor citations resolve to the approved corpus — see [citation-accuracy-metric.md](citation-accuracy-metric.md) | Hard gate once the §160-row exemption closes |
@@ -48,9 +49,10 @@ never missed.
 
 ### Per-push CI gates (state, not series)
 
-| Gate | Standing result as of 2026-07-24 |
+| Gate | Standing result as of 2026-07-28 |
 |---|---|
-| Cross-script recall parity | ✅ within bound (gate green on `main`) |
+| Cross-script recall parity | ✅ 100%/group across all six script groups (incl. Phonetic), gap 0%, zero FPs — at the raised 90%/10% floors, both backends |
+| Screening accuracy benchmark | ✅ sanctions recall 97.5% (floor 95%, fn cap 3), hard-negative clear 100% unnoted (py) / 96.5% (js, documented), adverse classification 100%, repeat-signal 100% — all three backends |
 | Red-team corpus | ✅ 15/15 payloads: detected, non-executed, no-downgrade |
 | Scoring golden set | ✅ 35/35 (2026 Q2 sign-off) |
 

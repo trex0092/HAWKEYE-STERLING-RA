@@ -1,0 +1,465 @@
+{
+ "version": 1,
+ "description": "Frozen pre-hardening benchmark baseline, per backend. Written once by the runners' --freeze mode; CI compares against it and never rewrites it. Re-freezing is a governance action (docs/governance/screening-accuracy-benchmark.md).",
+ "backends": {
+  "py_rapidfuzz": {
+   "sanctions": {
+    "recall": {
+     "total": 121,
+     "hits": 69,
+     "rate": 0.5702479338842975,
+     "by_mechanism": {
+      "exact": {
+       "total": 13,
+       "hits": 13
+      },
+      "fuzzy": {
+       "total": 49,
+       "hits": 49
+      },
+      "translit": {
+       "total": 29,
+       "hits": 0
+      },
+      "phonetic": {
+       "total": 20,
+       "hits": 0
+      },
+      "subset": {
+       "total": 7,
+       "hits": 7
+      },
+      "phonetic-subset": {
+       "total": 1,
+       "hits": 0
+      },
+      "residual": {
+       "total": 2,
+       "hits": 0
+      }
+     },
+     "fn_ids": [
+      "r020",
+      "r021",
+      "r022",
+      "r023",
+      "r024",
+      "r025",
+      "r026",
+      "r027",
+      "r028",
+      "r029",
+      "r039",
+      "r050",
+      "r051",
+      "r053",
+      "r054",
+      "r056",
+      "r058",
+      "r061",
+      "r062",
+      "r063",
+      "r064",
+      "r065",
+      "r066",
+      "r067",
+      "r068",
+      "r069",
+      "r070",
+      "r078",
+      "r081",
+      "r085",
+      "r091",
+      "r093",
+      "r094",
+      "r095",
+      "r096",
+      "r097",
+      "r099",
+      "r100",
+      "r102",
+      "r103",
+      "r105",
+      "r106",
+      "r107",
+      "r108",
+      "r109",
+      "r110",
+      "r111",
+      "r112",
+      "r113",
+      "r114",
+      "r116",
+      "r121"
+     ]
+    },
+    "negatives": {
+     "total": 85,
+     "clear": 85,
+     "clear_rate": 1,
+     "fp_ids": []
+    }
+   },
+   "adverse": {
+    "classification": {
+     "total": 114,
+     "correct": 66,
+     "accuracy": 0.5789473684210527,
+     "wrong_ids": [
+      "a031",
+      "a032",
+      "a033",
+      "a034",
+      "a035",
+      "a036",
+      "a037",
+      "a038",
+      "a039",
+      "a040",
+      "a041",
+      "a042",
+      "a061",
+      "a062",
+      "a063",
+      "a064",
+      "a065",
+      "a066",
+      "a067",
+      "a068",
+      "a069",
+      "a070",
+      "a071",
+      "a072",
+      "a073",
+      "a074",
+      "a075",
+      "a076",
+      "a078",
+      "a080",
+      "a081",
+      "a082",
+      "a083",
+      "a084",
+      "a085",
+      "a086",
+      "a087",
+      "a088",
+      "a089",
+      "a090",
+      "a091",
+      "a092",
+      "a093",
+      "a094",
+      "a095",
+      "a096",
+      "a097",
+      "a098"
+     ]
+    },
+    "repeat": {
+     "total": 6,
+     "correct": 3,
+     "accuracy": 0.5,
+     "wrong_ids": [
+      "s02",
+      "s03",
+      "s04"
+     ]
+    }
+   }
+  },
+  "py_difflib": {
+   "sanctions": {
+    "recall": {
+     "total": 121,
+     "hits": 69,
+     "rate": 0.5702479338842975,
+     "by_mechanism": {
+      "exact": {
+       "total": 13,
+       "hits": 13
+      },
+      "fuzzy": {
+       "total": 49,
+       "hits": 49
+      },
+      "translit": {
+       "total": 29,
+       "hits": 0
+      },
+      "phonetic": {
+       "total": 20,
+       "hits": 0
+      },
+      "subset": {
+       "total": 7,
+       "hits": 7
+      },
+      "phonetic-subset": {
+       "total": 1,
+       "hits": 0
+      },
+      "residual": {
+       "total": 2,
+       "hits": 0
+      }
+     },
+     "fn_ids": [
+      "r020",
+      "r021",
+      "r022",
+      "r023",
+      "r024",
+      "r025",
+      "r026",
+      "r027",
+      "r028",
+      "r029",
+      "r039",
+      "r050",
+      "r051",
+      "r053",
+      "r054",
+      "r056",
+      "r058",
+      "r061",
+      "r062",
+      "r063",
+      "r064",
+      "r065",
+      "r066",
+      "r067",
+      "r068",
+      "r069",
+      "r070",
+      "r078",
+      "r081",
+      "r085",
+      "r091",
+      "r093",
+      "r094",
+      "r095",
+      "r096",
+      "r097",
+      "r099",
+      "r100",
+      "r102",
+      "r103",
+      "r105",
+      "r106",
+      "r107",
+      "r108",
+      "r109",
+      "r110",
+      "r111",
+      "r112",
+      "r113",
+      "r114",
+      "r116",
+      "r121"
+     ]
+    },
+    "negatives": {
+     "total": 85,
+     "clear": 85,
+     "clear_rate": 1,
+     "fp_ids": []
+    }
+   },
+   "adverse": {
+    "classification": {
+     "total": 114,
+     "correct": 66,
+     "accuracy": 0.5789473684210527,
+     "wrong_ids": [
+      "a031",
+      "a032",
+      "a033",
+      "a034",
+      "a035",
+      "a036",
+      "a037",
+      "a038",
+      "a039",
+      "a040",
+      "a041",
+      "a042",
+      "a061",
+      "a062",
+      "a063",
+      "a064",
+      "a065",
+      "a066",
+      "a067",
+      "a068",
+      "a069",
+      "a070",
+      "a071",
+      "a072",
+      "a073",
+      "a074",
+      "a075",
+      "a076",
+      "a078",
+      "a080",
+      "a081",
+      "a082",
+      "a083",
+      "a084",
+      "a085",
+      "a086",
+      "a087",
+      "a088",
+      "a089",
+      "a090",
+      "a091",
+      "a092",
+      "a093",
+      "a094",
+      "a095",
+      "a096",
+      "a097",
+      "a098"
+     ]
+    },
+    "repeat": {
+     "total": 6,
+     "correct": 3,
+     "accuracy": 0.5,
+     "wrong_ids": [
+      "s02",
+      "s03",
+      "s04"
+     ]
+    }
+   }
+  },
+  "js": {
+   "sanctions": {
+    "recall": {
+     "total": 121,
+     "hits": 75,
+     "rate": 0.6198347107438017,
+     "by_mechanism": {
+      "exact": {
+       "total": 13,
+       "hits": 12
+      },
+      "fuzzy": {
+       "total": 49,
+       "hits": 44
+      },
+      "translit": {
+       "total": 29,
+       "hits": 7
+      },
+      "phonetic": {
+       "total": 20,
+       "hits": 3
+      },
+      "subset": {
+       "total": 7,
+       "hits": 7
+      },
+      "phonetic-subset": {
+       "total": 1,
+       "hits": 0
+      },
+      "residual": {
+       "total": 2,
+       "hits": 2
+      }
+     },
+     "fn_ids": [
+      "r022",
+      "r023",
+      "r024",
+      "r025",
+      "r026",
+      "r027",
+      "r028",
+      "r029",
+      "r038",
+      "r044",
+      "r051",
+      "r053",
+      "r055",
+      "r056",
+      "r063",
+      "r065",
+      "r067",
+      "r068",
+      "r069",
+      "r070",
+      "r078",
+      "r091",
+      "r093",
+      "r094",
+      "r095",
+      "r096",
+      "r097",
+      "r098",
+      "r099",
+      "r100",
+      "r102",
+      "r103",
+      "r104",
+      "r105",
+      "r106",
+      "r107",
+      "r108",
+      "r109",
+      "r110",
+      "r111",
+      "r112",
+      "r113",
+      "r114",
+      "r116",
+      "r120",
+      "r121"
+     ]
+    },
+    "negatives": {
+     "total": 85,
+     "clear": 82,
+     "clear_rate": 0.9647058823529412,
+     "fp_ids": [
+      "n009",
+      "n010",
+      "n011"
+     ]
+    }
+   },
+   "adverse": {
+    "classification": {
+     "total": 88,
+     "correct": 68,
+     "accuracy": 0.7727272727272727,
+     "wrong_ids": [
+      "a013",
+      "a016",
+      "a017",
+      "a025",
+      "a026",
+      "a028",
+      "a029",
+      "a030",
+      "a031",
+      "a032",
+      "a033",
+      "a034",
+      "a035",
+      "a036",
+      "a037",
+      "a038",
+      "a039",
+      "a040",
+      "a041",
+      "a042"
+     ]
+    },
+    "syndication_dedup_count": 3
+   }
+  }
+ }
+}

@@ -18,6 +18,7 @@
 
    Pure helpers (query building + RSS parsing + scoring) are unit-tested offline;
    the fetch wrapper is the only network part. */
+import { readFileSync } from 'node:fs';
 
 /* ── English risk terms (default) ─────────────────────────────────────────────
    Appended to the customer name. A hit on a "strong" term (see STRONG_LIST)
@@ -26,8 +27,30 @@ export const ADVERSE_TERMS = [
   'fraud', 'money laundering', 'sanctions', 'sanctions evasion', 'terrorism',
   'terrorist financing', 'bribery', 'corruption', 'embezzlement', 'arrested',
   'indicted', 'convicted', 'trafficking', 'smuggling', 'tax evasion',
-  'organized crime', 'wire fraud', 'ponzi scheme'
+  'organized crime', 'wire fraud', 'ponzi scheme',
+  /* Stem forms (matching is substring): the exact-word list above missed
+     "sanctioned by OFAC", "laundered", "kickback scheme", "terror funding" and
+     "guilty" headlines outright — measured recall losses on the benchmark
+     corpus. Strictly additive. */
+  'sanctioned', 'blacklisted', 'guilty', 'insider trading', 'counterfeit',
+  'launder', 'kickback', 'terror funding', 'market manipulation', 'embezzle',
+  'indict', 'convict', 'arrest', 'smuggl', 'traffick', 'extort', 'forgery',
+  'narcotics', 'organised crime', 'conflict gold', 'ponzi', 'illegal mining',
+  'contraband'
 ];
+
+/* WEAK (generic, high-noise) terms: they flag a story FOR THE RECORD but a
+   weak-only match scores tier 'weak' (75/medium) so downstream consumers can
+   keep it out of escalation weight — a "political rally" or a commercial
+   "lawsuit" headline must never carry money-laundering weight. Adding these
+   is recall-monotone: pre-hardening they matched nothing at all. */
+export const WEAK_TERMS = new Set([
+  'political', 'politician', 'lawsuit', 'litigation', 'breach', 'unlawful',
+  'illegal', 'esg', 'pollution', 'greenwashing', 'court case',
+  'verdict', 'fined', 'nuclear', 'exploitation', 'conflict of interest',
+  'deforestation'
+]);
+for (const t of WEAK_TERMS) ADVERSE_TERMS.push(t);
 
 /* Arabic-language risk terms — for a UAE deployment, adverse media often breaks
    in Arabic press first. Querying these (against Arabic Google News) closes a
@@ -292,7 +315,11 @@ function decode(x) {
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => cp(parseInt(h, 16)));
 }
 
-/* Parse a Google News RSS feed → [{ title, link, source, date }]. */
+/* Parse a Google News RSS feed → [{ title, link, source, date, description }].
+   The description carries the article's first lines (HTML-wrapped): risk terms
+   often sit below a neutral headline ("X steps back from board duties" …
+   "follows his arrest last week"), so it is captured, tag-stripped and bounded
+   for scoring alongside the title. */
 export function parseRss(xml) {
   const items = [], re = /<item>([\s\S]*?)<\/item>/g;
   let m;
@@ -301,7 +328,9 @@ export function parseRss(xml) {
     const tag = n => { const t = new RegExp('<' + n + '\\b[^>]*>([\\s\\S]*?)<\\/' + n + '>').exec(b); return t ? decode(t[1]).trim() : ''; };
     const title = tag('title');
     if (!title) continue;
-    items.push({ title, link: tag('link'), source: tag('source'), date: tag('pubDate') });
+    const description = tag('description')
+      .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1000);
+    items.push({ title, link: tag('link'), source: tag('source'), date: tag('pubDate'), description });
   }
   return items;
 }
@@ -338,23 +367,33 @@ export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
   if (sig.length) nameTokens = sig;
   const matched = [];
   for (const it of (items || [])) {
+    /* Scan the headline AND the description snippet: risk terms (and often
+       the full subject name) sit below a neutral headline. Widening the
+       haystack is strictly recall-monotone — a title-only match still holds. */
     const title = normalize(it.title);
-    const hasName = nameTokens.length > 0 && nameTokens.every(t => title.includes(t));
+    const desc = normalize(it.description || '');
+    const hay = desc ? title + ' ' + desc : title;
+    const hasName = nameTokens.length > 0 && nameTokens.every(t => hay.includes(t));
     if (!hasName) continue;
-    const hitTerms = terms.filter(t => title.includes(normalize(t)));
+    const hitTerms = terms.filter(t => hay.includes(normalize(t)));
     if (!hitTerms.length) continue;
     matched.push({ ...it, terms: hitTerms });
   }
-  if (!matched.length) return { hit: false, score: 0, band: 'low', top: null, count: 0, terms: [] };
+  if (!matched.length) return { hit: false, score: 0, band: 'low', top: null, count: 0, terms: [], tier: null };
   const strong = matched.some(a => a.terms.some(t => STRONG_TERMS.has(t)));
+  /* weak-only: every matched term across every matched item is a generic —
+     still a hit (flagged for the record), but tier 'weak' at 75/medium so
+     consumers keep it out of escalation weight until corroborated. */
+  const weakOnly = !strong && matched.every(a => a.terms.every(t => WEAK_TERMS.has(t)));
   const allTerms = [...new Set(matched.flatMap(a => a.terms))];
   return {
     hit: true,
-    score: strong ? 90 : 80,
+    score: strong ? 90 : (weakOnly ? 75 : 80),
     band: strong ? 'high' : 'medium',
     top: matched[0],
     count: matched.length,
-    terms: allTerms
+    terms: allTerms,
+    tier: strong ? 'strong' : (weakOnly ? 'weak' : 'normal')
   };
 }
 
@@ -386,16 +425,63 @@ export function parseGdelt(body) {
   })).filter(x => x.title);
 }
 
-/* De-duplicate merged items across locales/sources by link (fallback: normalized
-   title), so the same wire story surfaced in many editions is counted once. */
+/* Canonical identity of one article link: lowercase host minus www., path
+   only — query/fragment stripped, so the SAME article re-served under rotating
+   utm/tracking params ("?utm_source=rss" today, "?ncid=twitter" tomorrow)
+   dedupes to one item instead of inflating counts. Empty for unparseable
+   links (caller falls back to the normalized title). */
+export function canonicalLink(link) {
+  const m = /^https?:\/\/([^/?#]+)([^?#]*)/i.exec(String(link == null ? '' : link).trim());
+  if (!m) return '';
+  let host = m[1].toLowerCase();
+  if (host.startsWith('www.')) host = host.slice(4);
+  return host + m[2].replace(/\/+$/, '');
+}
+
+/* De-duplicate merged items across locales/sources by CANONICAL link
+   (fallback: normalized title), so the same wire story surfaced in many
+   editions — or the same URL under fresh tracking params — is counted once. */
 export function dedupItems(items) {
   const seen = new Set(), out = [];
   for (const it of (items || [])) {
-    const key = (it && it.link && String(it.link).trim()) || normalize(it && it.title);
+    const key = canonicalLink(it && it.link) || normalize(it && it.title);
     if (!key || seen.has(key)) continue;
     seen.add(key); out.push(it);
   }
   return out;
+}
+
+/* Source-credibility tier (1 best … 3 default) from data/source-credibility.json —
+   ANNOTATION/ORDERING only, never a gate. Degrades quietly to all-tier-3 when
+   the file is unavailable (ranking is quality-of-life, not a control). */
+let SOURCE_TIERS = new Map();
+try {
+  const tiersData = JSON.parse(readFileSync(new URL('../data/source-credibility.json', import.meta.url), 'utf8'));
+  for (const [tier, key] of [[1, 'tier1'], [2, 'tier2']]) {
+    for (const dom of (tiersData[key] || [])) SOURCE_TIERS.set(String(dom).toLowerCase(), tier);
+  }
+} catch { /* ordering-only feature — engines run unaffected */ }
+
+export function sourceTierFor(item) {
+  const m = /^https?:\/\/([^/?#]+)/i.exec(String((item && (item.link || item.url)) || ''));
+  if (m) {
+    let host = m[1].toLowerCase();
+    if (host.startsWith('www.')) host = host.slice(4);
+    while (host) {
+      const t = SOURCE_TIERS.get(host);
+      if (t) return t;
+      const dot = host.indexOf('.');
+      if (dot < 0) break;
+      host = host.slice(dot + 1);
+    }
+  }
+  const name = String((item && item.source) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (name) {
+    for (const [dom, tier] of SOURCE_TIERS) {
+      if (dom.split('.')[0] === name) return tier;
+    }
+  }
+  return 3;
 }
 
 /* Fetch one source with a per-request timeout. Returns the parsed item array,

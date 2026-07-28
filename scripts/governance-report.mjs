@@ -13,11 +13,19 @@
    STALE, so "no news" can never masquerade as "all good" (same fail-safe
    philosophy as the screening engine).
 
+   The card also carries a composite GovernanceScore (0-100; pass=1,
+   attention=0.5, fail=0, info rows excluded) in its title and body — the
+   "governance metrics" tile of the Operational AI Governance Stack (crosswalk
+   §C) — plus an AI-asset-register review-currency row, so the register's
+   declared quarterly review (data/ai-assets.json last_reviewed) is enforced
+   here instead of rotting silently.
+
    Runs in GitHub Actions (.github/workflows/governance-report.yml).
    Needs ASANA_ACCESS_TOKEN (secret) + the runner's GITHUB_TOKEN (actions:read). */
 
 /* Shared Asana client: bounded retry on 429/5xx so a transient blip never
    drops the day's report (idempotency is by title-prefix check in main). */
+import { readFileSync } from 'node:fs';
 import { asana } from './asana-notify.mjs';
 
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
@@ -122,6 +130,31 @@ export function classifyRun(wf, run, nowMs) {
   }
 }
 
+/* The AI asset register (Layer 1) declares a quarterly review cadence; until
+   now nothing enforced it. Same fail-safe as the workflow rows: an overdue
+   review is flagged, a missing/unparseable date is a straight failure. */
+export const REGISTER_REVIEW = { label: 'AI Asset Register review (data/ai-assets.json)', cadence: 'quarterly' };
+export function classifyRegisterReview(register, nowMs) {
+  const when = Date.parse((register && register.last_reviewed) || '');
+  if (!Number.isFinite(when)) {
+    return { ...REGISTER_REVIEW, icon: '❌', state: 'fail', detail: 'NO REVIEW DATE — last_reviewed missing or unparseable' };
+  }
+  const age = Math.floor((nowMs - when) / 86400000);
+  if (age > STALE_DAYS.quarterly) {
+    return { ...REGISTER_REVIEW, icon: '⚠', state: 'attention', detail: 'REVIEW OVERDUE — last reviewed ' + register.last_reviewed + ' (' + age + 'd ago, quarterly cadence)' };
+  }
+  return { ...REGISTER_REVIEW, icon: '✅', state: 'pass', detail: 'reviewed ' + register.last_reviewed + ' (' + age + 'd ago)' };
+}
+
+/* One-line verdict from the counters — shared by summarise and addRow. */
+export function verdictFor(out) {
+  return out.fail
+    ? '❌ ' + out.fail + ' CONTROL' + (out.fail === 1 ? '' : 'S') + ' FAILING — investigate today'
+    : out.attention
+      ? '⚠ ' + out.attention + ' CONTROL' + (out.attention === 1 ? '' : 'S') + ' NEED' + (out.attention === 1 ? 'S' : '') + ' ATTENTION'
+      : '✅ ALL CONTROLS GREEN (' + out.pass + ' passing / ' + out.total + ' controls)';
+}
+
 /* Roll the whole suite up: rows per group + counters + one-line verdict. */
 export function summarise(latestByFile, nowMs, groups = CONTROL_GROUPS) {
   const out = { groups: [], pass: 0, fail: 0, attention: 0, info: 0, total: 0 };
@@ -133,23 +166,55 @@ export function summarise(latestByFile, nowMs, groups = CONTROL_GROUPS) {
     });
     out.groups.push({ title: g.title, rows });
   }
-  out.verdict = out.fail
-    ? '❌ ' + out.fail + ' CONTROL' + (out.fail === 1 ? '' : 'S') + ' FAILING — investigate today'
-    : out.attention
-      ? '⚠ ' + out.attention + ' CONTROL' + (out.attention === 1 ? '' : 'S') + ' NEED' + (out.attention === 1 ? 'S' : '') + ' ATTENTION'
-      : '✅ ALL CONTROLS GREEN (' + out.pass + ' passing / ' + out.total + ' controls)';
+  out.verdict = verdictFor(out);
   return out;
+}
+
+/* Fold a non-workflow control row (e.g. the register review) into a group,
+   the counters and the verdict. */
+export function addRow(summary, groupTitle, row) {
+  const g = summary.groups.find(x => x.title === groupTitle) || summary.groups[0];
+  g.rows.push(row);
+  summary[row.state]++; summary.total++;
+  summary.verdict = verdictFor(summary);
+  return summary;
+}
+
+/* Composite 0-100 health of the scored controls: pass=1, attention=0.5,
+   fail=0. Info rows (event-driven with no trigger yet, in-progress, skipped)
+   carry no evidence either way and are excluded. null when nothing scores. */
+export function governanceScore(summary) {
+  const scored = summary.pass + summary.fail + summary.attention;
+  if (!scored) return null;
+  return Math.round(100 * (summary.pass + 0.5 * summary.attention) / scored);
+}
+
+/* Most recent prior report's score, parsed from the task titles the project
+   listing already returned (zero extra API calls). Ignores today's report;
+   pre-score-era titles simply never match. */
+export function previousScore(names, todayLabel) {
+  let best = null;
+  for (const n of names) {
+    const m = /^AI Governance & Platform Report — (\d{1,2} [A-Za-z]{3} \d{4}) — .* score (\d{1,3})$/.exec(String(n || ''));
+    if (!m || m[1] === todayLabel) continue;
+    const ms = Date.parse(m[1]);
+    if (!Number.isFinite(ms)) continue;
+    if (!best || ms > best.ms) best = { label: m[1], ms, score: Number(m[2]) };
+  }
+  return best;
 }
 
 export function buildTaskName(label, summary) {
   const flag = summary.fail ? '❌ ' + summary.fail + ' failing'
     : summary.attention ? '⚠ ' + summary.attention + ' attention'
       : '✅ all green';
-  return 'AI Governance & Platform Report — ' + label + ' — ' + flag;
+  const score = governanceScore(summary);
+  return 'AI Governance & Platform Report — ' + label + ' — ' + flag
+    + (score == null ? '' : ' · score ' + score);
 }
 
 /* Plain-text task body, same monospace-ledger style as the other audit tasks. */
-export function buildReportNotes({ label, summary, alerts = {}, runLink }) {
+export function buildReportNotes({ label, summary, alerts = {}, runLink, prev }) {
   const L = [];
   L.push('AI GOVERNANCE & PLATFORM COMPLIANCE — DAILY REPORT');
   L.push('Date: ' + label);
@@ -158,6 +223,12 @@ export function buildReportNotes({ label, summary, alerts = {}, runLink }) {
   L.push('OVERALL: ' + summary.verdict);
   L.push('Controls: ' + summary.pass + ' pass · ' + summary.fail + ' fail · '
     + summary.attention + ' attention · ' + summary.info + ' info — ' + summary.total + ' total');
+  const score = governanceScore(summary);
+  if (score != null) {
+    const d = prev ? score - prev.score : null;
+    L.push('GovernanceScore: ' + score + '/100 (pass=1 · attention=0.5 · fail=0; info excluded)'
+      + (prev ? ' · previous ' + prev.score + ' on ' + prev.label + ' (Δ ' + (d > 0 ? '+' : '') + d + ')' : ''));
+  }
   for (const g of summary.groups) {
     L.push('');
     L.push(g.title);
@@ -274,13 +345,22 @@ async function main() {
 
   const latest = await fetchLatestRuns(repo, ghToken);
   const summary = summarise(latest, now.getTime());
+  /* Register review-currency row: the register can only rot loudly. An
+     unreadable register is itself a failure, never a silent omission. */
+  let regRow;
+  try {
+    regRow = classifyRegisterReview(JSON.parse(readFileSync(new URL('../data/ai-assets.json', import.meta.url), 'utf8')), now.getTime());
+  } catch (e) {
+    regRow = { ...REGISTER_REVIEW, icon: '❌', state: 'fail', detail: 'register unreadable — ' + ((e && e.message) || e) };
+  }
+  addRow(summary, '🤖 AI / ADVISOR GOVERNANCE', regRow);
   const alerts = {
     codeScanning: await countAlerts(repo, ghToken, 'code-scanning'),
     dependabot: await countAlerts(repo, ghToken, 'dependabot')
   };
 
   const title = buildTaskName(label, summary);
-  const notes = buildReportNotes({ label, summary, alerts, runLink: runUrl() });
+  const notes = buildReportNotes({ label, summary, alerts, runLink: runUrl(), prev: previousScore(names, label) });
   const today = now.toISOString().slice(0, 10);
   const made = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name: title, notes, projects: [REG_PROJECT_GID], due_on: today, assignee: 'me' } }) });
   const gid = made.data && made.data.gid;
