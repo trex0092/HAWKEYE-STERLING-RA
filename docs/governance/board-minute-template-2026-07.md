@@ -55,6 +55,16 @@ defers the decision to a stated date. No recommendation is embedded here; the
 Statement of Applicability and the internal-audit programme are the decision
 inputs.
 
+**R7. Risk Appetite Statement (open-actions item 17).** The Board ratifies the
+[Risk Appetite Statement](risk-appetite-statement-2026.md) — eight positions,
+the CDD/SDD/EDD acceptance scale, and the nine key risk indicators that measure
+them. The statement describes the appetite the estate already enforces in code
+(CI fails if the two diverge), so ratification adopts a description of the
+operating reality rather than a new tolerance. The Board also decides whether to
+set **target dates** on the open-actions register: that is the single missing
+input that leaves the overdue-issue metric uninstrumented
+([`grc-metrics.md`](grc-metrics.md) §3).
+
 ## Decisions taken
 
 | Resolution | Adopted / amended / rejected | Notes |

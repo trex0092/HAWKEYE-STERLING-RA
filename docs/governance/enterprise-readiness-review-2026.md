@@ -326,6 +326,16 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 152 markdown documents under docs/ (119 excluding docs/research/auto).
+*(28 July, second pass — GRC framework completion: Risk Appetite Statement (DRAFT, board R7), obligation
+register and the GRC metrics layer, with `data/risk-appetite.json`, `data/obligations.json` and a
+generated `data/grc-metrics.json` behind them. Three curated governance documents added; no workflow
+added. New enforced invariants: the stated appetite must match the zero-tolerance list and band cutoffs
+the code applies, every obligation must reach a live control and a watch source, and the metrics
+snapshot fails CI when stale. Scored controls unchanged — but the estate is now measured: control
+effectiveness 100%, compliance completion 37.5%, third-party coverage 71.4%, finding closure 95.2%,
+one KRI in breach (vendor assessments, already open-actions items 2 and 5).)*
+
 Verified at HEAD: 56 workflows · 149 markdown documents under docs/ (116 excluding docs/research/auto).
 *(28 July — AI-governance register completion: the prompt lifecycle register (PromptOps) and the
 tool & connector register, each with a machine-readable source of truth (`data/prompt-assets.json`,

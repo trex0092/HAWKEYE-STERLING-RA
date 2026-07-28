@@ -80,6 +80,12 @@ if (advisor) {
 // registered surface, or an allowlisted eval harness (an assurance control
 // over a registered surface, documented in the advisor asset's controls).
 const EVAL_HARNESSES = new Set(['scripts/advisor-eval.mjs', 'scripts/advisor-bias-eval.mjs']);
+/* Files whose job is to SCAN for model-API callers necessarily contain the host
+   string they look for, and call nothing. Kept in step with the exported
+   SCANNERS set in scripts/grc-metrics.mjs — this suite is CommonJS and cannot
+   import that ESM module synchronously, so test/grc-metrics.test.mjs asserts
+   the two lists are identical. */
+const SCANNERS = new Set(['scripts/grc-metrics.mjs']);
 const SCAN_DIRS = ['', 'scripts', 'netlify/functions'];
 const apiCallers = [];
 for (const d of SCAN_DIRS) {
@@ -87,6 +93,7 @@ for (const d of SCAN_DIRS) {
   for (const f of fs.readdirSync(abs)) {
     if (!/\.(js|mjs|py)$/.test(f)) continue;
     const rel = d ? d + '/' + f : f;
+    if (SCANNERS.has(rel)) continue;
     const full = path.join(abs, f);
     if (!fs.statSync(full).isFile()) continue;
     if (fs.readFileSync(full, 'utf8').includes('api.anthropic.com')) apiCallers.push(rel);

@@ -18,6 +18,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
+import { SCANNERS } from '../scripts/grc-metrics.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let passed = 0, failed = 0;
@@ -112,6 +113,7 @@ for (const d of SCAN_DIRS) {
   for (const f of readdirSync(d ? join(ROOT, d) : ROOT)) {
     if (!/\.(js|mjs|py)$/.test(f)) continue;
     const rel = d ? d + '/' + f : f;
+    if (SCANNERS.has(rel)) continue;   // scans for the host string; never calls it
     if (!existsSync(join(ROOT, rel))) continue;
     const src = read(rel);
     if (src.includes('api.anthropic.com')) callers.push({ rel, src });

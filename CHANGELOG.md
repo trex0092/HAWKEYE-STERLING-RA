@@ -10,6 +10,53 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — risk appetite, obligation register and a measured GRC layer (2026-07-28)
+
+Closed the three gaps a modern-GRC self-check surfaced: no stated risk
+appetite, no obligation inventory, and no management metrics. Same pattern as
+the registers above — JSON source of truth, human view, CI guard.
+
+- **Risk Appetite Statement** — [`data/risk-appetite.json`](data/risk-appetite.json)
+  + [`docs/governance/risk-appetite-statement-2026.md`](docs/governance/risk-appetite-statement-2026.md).
+  Eight positions (sanctions/TFS, customer acceptance, AI in decisions, personal
+  data, prompt/agent change control, resilience, supply chain, remediation), the
+  CDD ≤ 19 / SDD ≤ 22 / EDD acceptance scale with its hard rules, and nine KRIs.
+  The statement describes the appetite the estate **already enforces**, and CI
+  keeps it that way: `test/grc-metrics.test.mjs` parses `ZERO_TOLERANCE` out of
+  `netlify/functions/brain-soul.js` and the band cutoffs out of `app.js` and
+  fails if either diverges from the published text, in both directions. DRAFT
+  until board resolution **R7** (new open-actions item 17, new R7 block in the
+  minute template).
+- **Obligation register** — [`data/obligations.json`](data/obligations.json)
+  + [`docs/governance/obligation-register.md`](docs/governance/obligation-register.md).
+  Nineteen obligations (16 regulatory, 3 voluntary/monitored) mapped to
+  instrument, owner, controls, evidence, the Regulatory Watch source that would
+  detect a change, and the compliance-calendar duty that files the reminder.
+  `test/obligations.test.mjs` verifies every control and evidence path exists,
+  every watch source and calendar duty id is real, each of the three UAE
+  supervisors carries at least one obligation, every *partial* row names a live
+  open-actions item, and — reusing the legal-citation guard's rule — that no
+  obligation cites a repealed instrument (FDL 20/2018, CD 10/2019) as its basis.
+- **GRC metrics** — [`scripts/grc-metrics.mjs`](scripts/grc-metrics.mjs),
+  generated [`data/grc-metrics.json`](data/grc-metrics.json)
+  + [`docs/governance/grc-metrics.md`](docs/governance/grc-metrics.md).
+  Five of the six management ratios computed from committed artefacts — control
+  effectiveness **100%** (60/60), compliance completion **37.5%** (6/16 met, 8
+  partial waiting on a human act, 2 firm-side), KRI breach **12.5%** (1/8),
+  third-party coverage **71.4%** (the two outstanding vendor confirmations),
+  finding closure **95.2%** (HA-08, the transaction feed) — plus the counters
+  the KRIs key on. The sixth, overdue-issue rate, reports **null with its
+  reason** (open items carry owners and closing conditions but no target dates)
+  and its KRI stays marked *not instrumented*, excluded from the breach
+  denominator rather than scored as passing; instrumenting it is part of R7.
+  Freshness is enforced by `node scripts/grc-metrics.mjs --check`, wired into
+  both `ci.yml` and `scripts/run-tests.mjs` so a stale board figure fails the
+  build instead of reaching a board pack.
+
+Also: an explicit `SCANNERS` allowlist shared by the three scanning suites — a
+file whose job is to detect model-API callers necessarily contains the patterns
+it looks for, and must not be mistaken for one.
+
 ### Governance — prompt lifecycle and tool/connector registers, both CI-enforced (2026-07-28)
 
 Closed the two coverage gaps left by the 10-concept AI-governance self-check:
