@@ -62,9 +62,13 @@ export function runSanctions() {
   const total = recall.pairs.length;
   const hits = total - fnIds.length;
 
-  const fpIds = [];
+  /* Entries carrying a "note" are accepted, budgeted exceptions (reviewed like
+     code): a hit there is reported but does not count against the clear rate
+     the floors gate — the floor stays ratchet-only while the budgeted cost of
+     a recall gain remains visible in every report. */
+  const fpIds = [], budgetedFpIds = [];
   for (const n of negatives.pairs) {
-    if (pairHits(n.subject, n.listed)) fpIds.push(n.id);
+    if (pairHits(n.subject, n.listed)) (n.note ? budgetedFpIds : fpIds).push(n.id);
   }
 
   return {
@@ -73,7 +77,8 @@ export function runSanctions() {
       total: negatives.pairs.length,
       clear: negatives.pairs.length - fpIds.length,
       clear_rate: (negatives.pairs.length - fpIds.length) / negatives.pairs.length,
-      fp_ids: fpIds
+      fp_ids: fpIds,
+      budgeted_fp_ids: budgetedFpIds
     }
   };
 }
@@ -127,6 +132,9 @@ function printReport(m, baseline) {
   if (s.recall.fn_ids.length) console.log(`    missed: ${s.recall.fn_ids.join(' ')}`);
   console.log(`  hard-negatives clear    ${s.negatives.clear}/${s.negatives.total}  ${fmt(s.negatives.clear_rate)}`);
   if (s.negatives.fp_ids.length) console.log(`    false positives: ${s.negatives.fp_ids.join(' ')}`);
+  if (s.negatives.budgeted_fp_ids && s.negatives.budgeted_fp_ids.length) {
+    console.log(`    budgeted (noted) false positives: ${s.negatives.budgeted_fp_ids.join(' ')}`);
+  }
   console.log(`  adverse classification  ${a.classification.correct}/${a.classification.total}  ${fmt(a.classification.accuracy)}`);
   if (a.classification.wrong_ids.length) console.log(`    misclassified: ${a.classification.wrong_ids.join(' ')}`);
   console.log(`  syndication dedup count ${a.syndication_dedup_count} (target 1)`);

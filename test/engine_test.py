@@ -199,6 +199,23 @@ print("ai.py — transliteration")
 v = ai.name_variants("Mohammed Al Hussein")
 check("transliteration yields variants", any("muhammad" in x for x in v) and any("mohamed" in x for x in v))
 check("name_variants always includes the base", any("mohammed al hussein" == x for x in v))
+# Shared-data groups (data/translit-groups.json): spellings the old in-code
+# table lacked must now swap — each was a silent-clear class before the file.
+check("name_variants swaps khaled/khalid (new shared-data group)",
+      "khalid mansour" in ai.name_variants("Khaled Mansour"))
+check("name_variants swaps sergei/sergey (Cyrillic romanization group)",
+      "sergey ivanov" in ai.name_variants("Sergei Ivanov"))
+check("name_variants swaps volodymyr/vladimir (cross-language forms)",
+      "vladimir melnyk" in ai.name_variants("Volodymyr Melnyk"))
+check("salah is NOT a saleh variant — different underlying names",
+      not any("saleh" in x for x in ai.name_variants("Salah Mansour")))
+check("translit groups load from the shared data file and stay disjoint",
+      len(ai._TRANSLIT_GROUPS) >= 80 and
+      len({m for g in ai._TRANSLIT_GROUPS for m in g}) == sum(len(g) for g in ai._TRANSLIT_GROUPS))
+check("translit_canon_token folds group members to one representative",
+      ai.translit_canon_token("khalid") == ai.translit_canon_token("khaled") and
+      ai.translit_canon_token("umar") == ai.translit_canon_token("omar") and
+      ai.translit_canon_token("zzz-ungrouped") == "zzz-ungrouped")
 
 # ── typology / dedup / delta ─────────────────────────────────────────────────
 print("screen.py — typology / dedup / delta")

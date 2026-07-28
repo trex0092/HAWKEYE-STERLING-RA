@@ -3,7 +3,7 @@
 import {
   normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseOfacAltCsv, parseOfacXml, parseUnXml, parseOfsiCsv,
   parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
-  buildIndex, screenName, nameVariants, indelRatio, tokenSetRatio, isTokenSubset,
+  buildIndex, screenName, nameVariants, translitCanonToken, indelRatio, tokenSetRatio, isTokenSubset,
   MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters, trigramsOf, fuzzyTokenMatches,
   unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList
 } from '../scripts/sanctions-match.mjs';
@@ -227,9 +227,24 @@ check('nameVariants keeps the base spelling and adds whole-word group swaps',
 check('nameVariants swaps whole words only (no corruption inside "salah")',
   [...nameVariants('salah co')].join('|') === 'salah co');
 check('nameVariants is deterministically capped with the base always retained',
-  nameVariants('mohammed bin abdul al ahmed yousef hussein sheikh ismail').size <= 13
+  nameVariants('mohammed bin abdul al ahmed yousef hussein sheikh ismail').size <= 33
   && nameVariants('mohammed bin abdul al ahmed yousef hussein sheikh ismail').has('mohammed bin abdul al ahmed yousef hussein sheikh ismail'));
 check('nameVariants of an empty fold is empty', nameVariants('').size === 0);
+/* Shared-data groups (data/translit-groups.json): spellings the old in-code
+   table lacked must now swap — khaled/khalid, sergei/sergey and the Ukrainian/
+   Russian forms were silent-clear classes before the shared file. */
+check('nameVariants swaps khaled/khalid (new shared-data group)',
+  nameVariants('khaled mansour').has('khalid mansour'));
+check('nameVariants swaps sergei/sergey (Cyrillic romanization group)',
+  nameVariants('sergei ivanov').has('sergey ivanov'));
+check('nameVariants swaps volodymyr/vladimir (cross-language forms)',
+  nameVariants('volodymyr melnyk').has('vladimir melnyk'));
+check('salah stays ungrouped — a DIFFERENT name from saleh, never swapped',
+  ![...nameVariants('salah mansour')].some(v => v.includes('saleh')));
+check('translitCanonToken folds group members to one representative',
+  translitCanonToken('khalid') === translitCanonToken('khaled')
+  && translitCanonToken('umar') === translitCanonToken('omar')
+  && translitCanonToken('zzz-ungrouped') === 'zzz-ungrouped');
 const vIdx = buildIndex([{ id: 'ofac', name: 'OFAC SDN', names: ['MUHAMMAD HUSSEIN'] }]);
 const vHit = screenName('Mohammed Husein Trading LLC', vIdx, 85);
 check('variant spelling reaches the candidate index and flags (was a silent clear)',

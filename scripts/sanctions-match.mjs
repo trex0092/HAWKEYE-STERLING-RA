@@ -15,6 +15,7 @@
    so the existing normalise/diff/alert pipeline consumes it unchanged. */
 
 import { inflateRawSync } from 'node:zlib';
+import { readFileSync } from 'node:fs';
 
 /* Fold a name to a stable comparison key: strip combining marks (Latin
    diacritics AND Arabic harakat), lower-case, collapse everything that is not
@@ -619,25 +620,40 @@ export function isTokenSubset(aNorm, bNorm) {
   return ta.every(t => tb.some(u => indelRatio(t, u) >= SUBSET_TOKEN_SIM));
 }
 
-/* ── Transliteration variants (Arabic/Turkish spelling equivalents) ─────────
-   Ported from ai.py's _TRANSLIT_GROUPS / name_variants (keep the group list in
-   step with ai.py — it is the shared source of truth for which spellings are
-   treated as equivalent). Without variants the exact-token candidate index is
-   blind to a subject spelled "Mohammed …" against a list entry spelled
-   "Muhammad …": no shared token, no candidates, silent clear. Conservative:
-   only well-established particle / name swaps, whole-word only. */
-const TRANSLIT_GROUPS = [
-  ['mohammed', 'muhammad', 'mohamed', 'mohammad', 'muhammed', 'mohd'],
-  ['abdul', 'abdel', 'abd al', 'abdal', 'abd el'],
-  ['bin', 'ibn', 'ben'],
-  ['al', 'el'],
-  ['ahmed', 'ahmad'],
-  ['yousef', 'yusuf', 'yousuf', 'youssef'],
-  ['hussein', 'husain', 'hussain', 'husein'],
-  ['sheikh', 'shaikh', 'shaykh'],
-  ['abdulrahman', 'abdul rahman', 'abdelrahman'],
-  ['ismail', 'ismael', 'esmail'],
-];
+/* ── Transliteration variants (Arabic/Cyrillic/Turkish spelling equivalents) ─
+   Loaded from data/translit-groups.json — the single source of truth BOTH
+   engines read (ai.py loads the same file), replacing the duplicated in-code
+   tables that had already drifted once. Without variants the exact-token
+   candidate index is blind to a subject spelled "Mohammed …" against a list
+   entry spelled "Muhammad …": no shared token, no candidates, silent clear.
+   FAIL LOUD on a missing/invalid file: a silently-empty group list would be a
+   quiet recall degrade — better no run than an unknowingly weaker one. */
+function loadTranslitGroups() {
+  const path = new URL('../data/translit-groups.json', import.meta.url);
+  const data = JSON.parse(readFileSync(path, 'utf8'));
+  const groups = data && Array.isArray(data.groups) ? data.groups : [];
+  if (!groups.length) throw new Error('translit groups file contains no groups: ' + path);
+  for (const g of groups) {
+    if (!Array.isArray(g) || g.length < 2 || g.some(m => !m || m !== String(m).toLowerCase())) {
+      throw new Error('malformed translit group: ' + JSON.stringify(g));
+    }
+  }
+  return groups;
+}
+const TRANSLIT_GROUPS = loadTranslitGroups();
+
+/* Canonical representative per single-word member (first single-word member of
+   the group in sorted order — same rule as ai.py translit_canon_token), so the
+   phonetic layer keys "khalid"/"khaled" or "omar"/"umar" to one token. Multi-
+   word members ("abd al") are swap-only and never canonicalise a token. */
+const TRANSLIT_CANON = new Map();
+for (const g of TRANSLIT_GROUPS) {
+  const singles = g.filter(m => !m.includes(' ')).sort();
+  if (singles.length) for (const m of singles) TRANSLIT_CANON.set(m, singles[0]);
+}
+export function translitCanonToken(tok) {
+  return TRANSLIT_CANON.get(tok) || tok;
+}
 
 const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -646,7 +662,7 @@ const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
    tokens ("al" inside "salah") and waste the cap on corrupted spellings.
    Deterministic cap: sorted before truncating (never set-iteration order), and
    the base spelling is always retained — same semantics as ai.py. */
-export function nameVariants(norm, cap = 12) {
+export function nameVariants(norm, cap = 32) {
   const base = String(norm == null ? '' : norm);
   if (!base) return new Set();
   const variants = new Set([base]);

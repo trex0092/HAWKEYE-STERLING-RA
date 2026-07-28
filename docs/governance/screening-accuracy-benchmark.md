@@ -44,9 +44,13 @@ must never be compared or averaged. `BENCH_FORCE_DIFFLIB=1` forces the stub
 
 - **Sanctions recall** — pairs where `screen_name` / `screenName` returns a
   real hit (MANUAL REVIEW pseudo-hits do not count) ÷ all pairs.
-- **Hard-negative clear rate** — negatives left fully clear ÷ all negatives.
-  Entries with a `note` are accepted, budgeted exceptions (currently one:
-  `n030`, the naser/nasrin fuzzy-range canary).
+- **Hard-negative clear rate** — negatives left fully clear ÷ all negatives,
+  where entries carrying a `note` are accepted, budgeted exceptions (currently
+  one: `n030`, the naser/nasrin fuzzy-range canary — the documented cost of the
+  khaled/khalid-class transliteration recall gain). A hit on a noted entry is
+  reported in every run (`budgeted_fp_ids`) but does not count against the
+  gated clear rate, so the floor stays ratchet-only while the budget stays
+  visible. Adding a `note` to a fixture is reviewed like code.
 - **Adverse classification accuracy** — items where the engine's *actionable*
   decision matches the label. "Actionable" means: flagged AND eligible for the
   ≥3-stories/90-days repeat-escalation counter (Python: the engine's

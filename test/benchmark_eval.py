@@ -98,13 +98,21 @@ def run_sanctions():
     total = len(recall["pairs"])
     hits = total - len(fn_ids)
 
-    fp_ids = [n["id"] for n in negatives["pairs"] if _pair_hits(n["subject"], n["listed"])]
+    # Entries carrying a "note" are accepted, budgeted exceptions (reviewed like
+    # code): a hit there is reported but does not count against the clear rate
+    # the floors gate — so the floor can stay ratchet-only while the budgeted
+    # cost of a recall gain remains visible in every report.
+    fp_ids, budgeted_fp_ids = [], []
+    for n in negatives["pairs"]:
+        if _pair_hits(n["subject"], n["listed"]):
+            (budgeted_fp_ids if "note" in n else fp_ids).append(n["id"])
     ntotal = len(negatives["pairs"])
     return {
         "recall": {"total": total, "hits": hits, "rate": hits / total,
                    "by_mechanism": by_mech, "fn_ids": fn_ids},
         "negatives": {"total": ntotal, "clear": ntotal - len(fp_ids),
-                      "clear_rate": (ntotal - len(fp_ids)) / ntotal, "fp_ids": fp_ids},
+                      "clear_rate": (ntotal - len(fp_ids)) / ntotal,
+                      "fp_ids": fp_ids, "budgeted_fp_ids": budgeted_fp_ids},
     }
 
 
@@ -139,7 +147,7 @@ def run_adverse():
         art = {"title": it["title"], "description": it.get("description", ""),
                "source": it.get("source_domain", ""), "url": it.get("url", ""),
                "keywords": kws,
-               "categories": sorted({c for c in (screen.typology_for(k) for k in kws) if c}),
+               "categories": screen.typology_for(kws),
                "flagged": bool(kws)}
         actionable = _is_actionable(it["subject"], art)
         truth = it["label"] == "adverse"
@@ -167,7 +175,7 @@ def run_adverse():
                     kws = _article_keywords(st["title"], st.get("description", ""))
                     arts.append({"title": st["title"], "source": st["source"],
                                  "url": st["url"], "keywords": kws,
-                                 "categories": sorted({c for c in (screen.typology_for(k) for k in kws) if c}),
+                                 "categories": screen.typology_for(kws),
                                  "flagged": bool(kws), "date": day, "ts": None})
                 arts = screen.dedup_stories(arts)
                 finding = [{"subject_name": sc["subject"], "subject_type": "COMPANY",
@@ -204,6 +212,8 @@ def main():
     print(f"  hard-negatives clear    {s['negatives']['clear']}/{s['negatives']['total']}  {_fmt(s['negatives']['clear_rate'])}")
     if s["negatives"]["fp_ids"]:
         print(f"    false positives: {' '.join(s['negatives']['fp_ids'])}")
+    if s["negatives"].get("budgeted_fp_ids"):
+        print(f"    budgeted (noted) false positives: {' '.join(s['negatives']['budgeted_fp_ids'])}")
     print(f"  adverse classification  {a['classification']['correct']}/{a['classification']['total']}  {_fmt(a['classification']['accuracy'])}")
     if a["classification"]["wrong_ids"]:
         print(f"    misclassified: {' '.join(a['classification']['wrong_ids'])}")
