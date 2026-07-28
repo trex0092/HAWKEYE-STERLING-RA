@@ -326,6 +326,15 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 149 markdown documents under docs/ (116 excluding docs/research/auto).
+*(28 July — AI-governance register completion: the prompt lifecycle register (PromptOps) and the
+tool & connector register, each with a machine-readable source of truth (`data/prompt-assets.json`,
+`data/tool-surfaces.json`), a human view, and a CI drift guard (`test/prompt-register.test.mjs`,
+`test/tool-register.test.mjs`). Two curated governance documents added; no workflow added. Control
+coverage ADDED — prompt change control and the agent-capability inventory were previously
+ungoverned — and one new enforced invariant: a model call declaring `tools`/`tool_choice` now fails
+CI. No scored control weakened.)*
+
 Verified at HEAD: 56 workflows · 147 markdown documents under docs/ (114 excluding docs/research/auto).
 *(28 July — screening accuracy hardening programme: labelled benchmark corpus with per-backend
 CI floors (recall 57→97.5%, adverse 58→100%, repeat 50→100%), shared transliteration data,

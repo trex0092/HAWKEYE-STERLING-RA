@@ -5,6 +5,7 @@
 
 **Owner:** MLRO (accountable) · Compliance Engineering (operational)
 **Source of truth:** [`data/ai-assets.json`](../../data/ai-assets.json) (machine-readable; this page is the human view)
+**Sibling registers:** [`prompt-lifecycle-register.md`](prompt-lifecycle-register.md) — what each surface is *told* to do (fingerprinted, version-controlled) · [`tool-connector-register.md`](tool-connector-register.md) — what may be *invoked*, by whom, with which credential
 **Review cadence:** Quarterly, and on any change to model id, provider, prompt charter, or data flow.
 **Last reviewed:** 2026-07-15
 

@@ -130,6 +130,10 @@ jobs:
         run: node test/advisor-bias-eval.test.mjs
       - name: Run AI asset register schema test
         run: node test/ai-assets.test.js
+      - name: Run prompt register test (prompt fingerprints + change control)
+        run: node test/prompt-register.test.mjs
+      - name: Run tool & connector register test (agent authz + no model tool-calling)
+        run: node test/tool-register.test.mjs
       - name: Run data/*.json integrity test
         run: node test/data-json.test.js
       - name: Run data/*.json schema test (sanctions sources + state shape)

@@ -10,6 +10,47 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — prompt lifecycle and tool/connector registers, both CI-enforced (2026-07-28)
+
+Closed the two coverage gaps left by the 10-concept AI-governance self-check:
+prompt management (PromptOps) and MCP-class integration surfaces. Both follow
+the established register pattern — machine-readable JSON as the source of
+truth, a human view under `docs/governance/`, and a CI guard that fails on
+drift rather than a page that quietly rots.
+
+- **Prompt lifecycle register** — [`data/prompt-assets.json`](data/prompt-assets.json)
+  + [`docs/governance/prompt-lifecycle-register.md`](docs/governance/prompt-lifecycle-register.md).
+  Seven governed prompt artefacts across the three registered AI surfaces
+  (`SOUL_CHARTER`, the knowledge-context template, the 16 persona suffixes,
+  `GROUNDING_SYSTEM`, both `ai.py` user templates, and the reg-draft template),
+  each pinned to a **SHA-256 of its exact source region** with a purpose, the
+  risk if changed unreviewed, its runtime guards, its assurance controls, a
+  version and an approval record. Editing a prompt now fails
+  `test/prompt-register.test.mjs` until the change is reviewed and re-pinned
+  (`node scripts/prompt-register.mjs --update`), so an instruction set cannot
+  reach production without a recorded decision — the gap between
+  `test/advisor-assurance.test.js` (which checks that phrases are *present*)
+  and change control (which asks *who approved this wording*). The suite also
+  runs an anti-shadow-prompt scan: any file calling the model API without a
+  registered prompt is a red build, in both directions against
+  `data/ai-assets.json`.
+- **Tool & connector register** — [`data/tool-surfaces.json`](data/tool-surfaces.json)
+  + [`docs/governance/tool-connector-register.md`](docs/governance/tool-connector-register.md).
+  The capability view that sat between the asset register (which surfaces
+  exist) and the third-party register (which processors we contract with):
+  all ten agent actions with their credentials and holders, the nine connector
+  surfaces with hosts, what leaves and kill switches, and the MCP posture —
+  no server exposed, no client shipped, no repository secret ever handed to
+  operator-side MCP tooling. `test/tool-register.test.mjs` cross-checks the
+  action table, the agent roster and `ACTION_CREDENTIAL` against `agents.py`
+  in **both** directions, re-verifies the runtime invariants
+  (`asana.write` is DeliveryAgent's alone; no agent may file), confirms every
+  declared credential is a real secret and every declared host appears in a
+  declared caller, and — the load-bearing one — **fails if any model call ever
+  declares `tools`/`tool_choice`** while the register says tool-calling is off.
+  Re-opening the path from model output to a live connector is now a reviewed
+  code change, not a configuration flip.
+
 ### Sanctions screening — TFS gap checklist intake: name-match procedure (PNMR/CNMR/FFR), internal watchlist, training cadence (2026-07-28)
 
 Self-assessed the screening estate against a 36-item UAE TFS practitioner

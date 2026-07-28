@@ -54,6 +54,8 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-asset-register.md](ai-asset-register.md) | Inventory of AI surfaces + onboarding process | ISO 42001 A.4.2 |
+| [prompt-lifecycle-register.md](prompt-lifecycle-register.md) | PromptOps: every governed prompt, fingerprinted and version-controlled — an edit fails CI until the row is re-approved | ISO 42001 A.6.2.4; NIST AI RMF MANAGE 2.2 |
+| [tool-connector-register.md](tool-connector-register.md) | Capability view: what may be invoked, by whom, with which credential; MCP posture and connector onboarding rule | ISO 42001 A.4.2/A.10.2; UAE Securing Agentic AI |
 | [assurance-coverage-matrix.md](assurance-coverage-matrix.md) | Control → automated proof → evidence map; known gaps | ISO 42001 9.1 |
 | [model-validation-2026.md](model-validation-2026.md) | Model validation + change control + quarterly MLRO sign-off | SR 11-7-style |
 | [model-risk-management-2026.md](model-risk-management-2026.md) | MRM framework: inventory, tiering, pillar map | CBUAE MMS 2022; SR 11-7 |

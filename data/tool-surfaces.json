@@ -1,0 +1,150 @@
+{
+  "schema": "hawkeye-sterling.tool-connector-register/v1",
+  "description": "Authoritative capability view of the suite: every action an agent may take, the credential that action requires, and every external service the automated pipeline may reach. data/ai-assets.json inventories the AI surfaces and docs/aims/third-party-register.md governs the vendor relationship (DPA, residency, data shared); THIS register governs what may be invoked, by whom, with which secret, and how it is revoked. The human view is docs/governance/tool-connector-register.md.",
+  "owner_role": "MLRO (accountable) / Compliance Engineering (operational)",
+  "review_cadence": "Quarterly with the AI asset register, and on any new action, credential, or egress host.",
+  "last_reviewed": "2026-07-28",
+
+  "model_tool_calling": {
+    "enabled": false,
+    "statement": "No model call in this suite declares tools, tool_choice, or any function-calling parameter. Every model call is text-in / text-out: the model classifies, drafts, or advises, and deterministic code decides what happens next. There is therefore no path by which model output can invoke an action — the MCP-class risk of a model reaching a connector directly does not exist here, and re-opening it is a reviewable code change, not a configuration flip.",
+    "enforced_by": "test/tool-register.test.mjs scans every model-API caller for tool-calling parameters and fails CI if one appears while this flag is false."
+  },
+
+  "mcp_posture": {
+    "server_exposed": false,
+    "client_shipped": false,
+    "statement": "The suite exposes no Model Context Protocol server and ships no MCP client. Maintainers may reconcile the Asana workspace through MCP tooling in their own assistant (see docs/asana-integration-audit.md); that acts as the human, under the human's own Asana credential, and is reconciled by scripts/asana-reconcile.mjs like any other manual edit. No repository secret is ever handed to an MCP client.",
+    "onboarding_rule": "Adding an MCP server, a tool definition, or any new connector requires: a row in this register (action + credential + egress host + kill switch), a line in docs/aims/third-party-register.md if a new processor is involved, a DPIA delta if personal data crosses a new boundary, and MLRO approval recorded in the change. CI fails on an unregistered action or credential before the question of approval arises."
+  },
+
+  "actions": [
+    { "id": "asana.read",   "effect": "read",  "credential": "ASANA_TOKEN",       "connector": "asana",     "held_by": ["IngestAgent"],       "purpose": "Load the live customer base from the system of record." },
+    { "id": "asana.write",  "effect": "write", "credential": "ASANA_TOKEN",       "connector": "asana",     "held_by": ["DeliveryAgent"],     "purpose": "Post the finished screening report. Carries no decision authority." },
+    { "id": "llm.classify", "effect": "egress","credential": "ANTHROPIC_API_KEY", "connector": "anthropic", "held_by": ["AdverseMediaAgent"], "purpose": "Grounded relevance/severity classification of a real headline. Dormant while LLM_TRIAGE=0." },
+    { "id": "state.commit", "effect": "write", "credential": "GITHUB_TOKEN",      "connector": "github",    "held_by": [],                    "purpose": "Persist run state to the repository. Declared in the credential map but held by NO agent today — the map is deliberately wider than the allow-list so granting it is an explicit, reviewable edit rather than an omission." },
+    { "id": "lists.read",   "effect": "read",  "credential": null, "connector": "sanctions-lists",   "held_by": ["SanctionsAgent"],                  "purpose": "Download designation lists. Public sources, no credential, no name sent." },
+    { "id": "web.read",     "effect": "read",  "credential": null, "connector": "adverse-media,pep-reference", "held_by": ["AdverseMediaAgent", "PepAgent"], "purpose": "Query public adverse-media and PEP sources. The subject name is the query; no customer record leaves the runner." },
+    { "id": "match",        "effect": "compute", "credential": null, "connector": null, "held_by": ["SanctionsAgent"],              "purpose": "On-runner name matching against the downloaded lists." },
+    { "id": "compute",      "effect": "compute", "credential": null, "connector": null, "held_by": ["RiskAgent", "NetworkAgent"],   "purpose": "Deterministic risk scoring and related-party detection." },
+    { "id": "propose",      "effect": "draft",   "credential": null, "connector": null, "held_by": ["CaseAgent"],                   "purpose": "Draft MLRO cases and STR content. PROPOSE only — the split from filing is the human-in-the-loop boundary." },
+    { "id": "audit",        "effect": "read",    "credential": null, "connector": null, "held_by": ["QAAgent"],                     "purpose": "Pre-publish integrity gate over the assembled report." }
+  ],
+
+  "agents": [
+    { "name": "IngestAgent",       "role": "Load the live customer base",                   "authz": ["asana.read"] },
+    { "name": "SanctionsAgent",    "role": "Screen names vs designation lists",             "authz": ["lists.read", "match"] },
+    { "name": "AdverseMediaAgent", "role": "Fetch news + grounded triage (prompt-secured)", "authz": ["web.read", "llm.classify"] },
+    { "name": "PepAgent",          "role": "Detect PEP / RCA / SOE vs Wikidata",            "authz": ["web.read"] },
+    { "name": "RiskAgent",         "role": "Compute explainable risk rating",               "authz": ["compute"] },
+    { "name": "NetworkAgent",      "role": "Related-party / network detection",             "authz": ["compute"] },
+    { "name": "CaseAgent",         "role": "Draft MLRO cases + STR (PROPOSE only)",         "authz": ["propose"] },
+    { "name": "QAAgent",           "role": "Integrity / governance gate before publish",    "authz": ["audit"] },
+    { "name": "DeliveryAgent",     "role": "Post the report to Asana (no decisions)",       "authz": ["asana.write"] }
+  ],
+
+  "invariants": [
+    "asana.write is held by DeliveryAgent alone — enforced at runtime by preflight_credentials() in agents.py, not only by this register.",
+    "state.commit is held by no agent; preflight_credentials() rejects it for anyone but DeliveryAgent should it ever be granted.",
+    "CaseAgent may propose but never file: no agent holds a filing action, because filing is an MLRO act.",
+    "The credential broker is the single authority that hands a secret to an agent, and only for an action that agent is authorized to take; every grant and denial is logged, the secret value never is.",
+    "An action outside an agent's allow-list is denied AND recorded — a denial is evidence, not a silent no-op."
+  ],
+
+  "connectors": [
+    {
+      "id": "anthropic",
+      "vendor": "Anthropic",
+      "purpose": "Model inference for the three registered AI surfaces.",
+      "hosts": ["api.anthropic.com"],
+      "credentials": ["ANTHROPIC_API_KEY"],
+      "callers": ["netlify/functions/brain-soul.js", "ai.py", "scripts/reg-draft.mjs", "scripts/advisor-eval.mjs", "scripts/advisor-bias-eval.mjs"],
+      "data_out": "Advisor: officer question + optional pasted context. Triage: subject name + one public headline only. Reg-draft: public regulatory text. No customer record, ever.",
+      "kill_switches": ["unset ANTHROPIC_API_KEY (all callers fail closed)", "LLM_TRIAGE=0 (triage stays dormant even with the key present)", "ADVISOR_ENABLED=false (Advisor returns 503)", "REPORT_ALLOW_LLM=0 (no generative prose in filed reports)"]
+    },
+    {
+      "id": "asana",
+      "vendor": "Asana",
+      "purpose": "Customer system of record (read) and report/case delivery (write).",
+      "hosts": ["app.asana.com"],
+      "credentials": ["ASANA_TOKEN", "ASANA_ACCESS_TOKEN"],
+      "credential_note": "Two names by runtime, one workspace: the Python engine reads ASANA_TOKEN (screen.py requires it at import — the engine refuses to start rather than degrade silently), while the Node scripts and Netlify functions read ASANA_ACCESS_TOKEN. .github/workflows/netlify-deploy.yml bridges them (ASANA_TOKEN: secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN). Both are repository/site secrets; neither ever reaches the browser.",
+      "callers": ["screen.py", "str_dossier.py", "scripts/asana-notify.mjs", "scripts/asana-alert.mjs", "scripts/asana-reconcile.mjs", "netlify/functions/asana-task.js", "netlify/functions/asana-mirror.js", "netlify/functions/risk-backup.js"],
+      "data_out": "Customer records, UBOs, screening results — the system of record holds them by design.",
+      "kill_switches": ["unset the token (Python engine refuses to start; Node paths degrade loudly to a GitHub issue)", "revoke the PAT in Asana"]
+    },
+    {
+      "id": "github",
+      "vendor": "GitHub",
+      "purpose": "Run history, issue routing for degraded deliveries, state persistence.",
+      "hosts": ["api.github.com", "github.com"],
+      "credentials": ["GITHUB_TOKEN"],
+      "callers": ["scripts/governance-report.mjs", "scripts/weekly-summary.mjs", "scripts/sanctions-watch.mjs", "scripts/freshness-check.mjs"],
+      "data_out": "Run metadata and alert text. No customer record is written to a public artefact.",
+      "kill_switches": ["workflow permissions are least-privilege per job; harden-runner egress allow-lists constrain every run"]
+    },
+    {
+      "id": "sanctions-lists",
+      "vendor": "Government / OpenSanctions",
+      "purpose": "Designation-list downloads for on-runner matching.",
+      "hosts": ["sanctionslistservice.ofac.treas.gov", "scsanctions.un.org", "ofsistorage.blob.core.windows.net", "data.opensanctions.org", "www.international.gc.ca"],
+      "credentials": [],
+      "callers": ["screen.py", "scripts/sanctions-screen.mjs", "scripts/sanctions-watch.mjs"],
+      "data_out": "None — pull-only. No name is sent; matching happens on the runner.",
+      "kill_switches": ["PEP_MIRROR_FALLBACK=0", "ADVERSE_WATCHLIST=0", "EOCN_MIRROR_CROSSCHECK=0", "core lists empty = DEGRADED fail-safe, never a silent clear"]
+    },
+    {
+      "id": "adverse-media",
+      "vendor": "Google / GDELT / Bing",
+      "purpose": "Adverse-media search over public news.",
+      "hosts": ["news.google.com", "api.gdeltproject.org", "www.bing.com"],
+      "credentials": [],
+      "callers": ["screen.py", "scripts/adverse-media.mjs"],
+      "data_out": "Subject name plus risk terms as a query string. No customer record.",
+      "kill_switches": ["SCREEN_ADVERSE_MEDIA=0"]
+    },
+    {
+      "id": "pep-reference",
+      "vendor": "Wikimedia",
+      "purpose": "PEP / RCA / SOE detection against Wikidata.",
+      "hosts": ["www.wikidata.org"],
+      "credentials": [],
+      "callers": ["screen.py", "scripts/pep-check.mjs"],
+      "data_out": "Individual name as a query. No customer record.",
+      "kill_switches": ["SCREEN_PEP=0"]
+    },
+    {
+      "id": "regulatory-watch",
+      "vendor": "FATF / watched regulators / Internet Archive",
+      "purpose": "Change detection on public regulatory sources, with an Internet Archive fallback for hosts that block CI runners.",
+      "hosts": ["www.fatf-gafi.org", "web.archive.org"],
+      "credentials": [],
+      "callers": ["scripts/reg-watch.mjs", "scripts/fatf-watchdog.mjs"],
+      "data_out": "None — public pages are fetched by URL. The watched source list itself is governed in data/reg-sources.json, so adding a source is a reviewed data change.",
+      "kill_switches": ["disable the regulatory-watch / fatf-watchdog workflows", "remove the source from data/reg-sources.json"]
+    },
+    {
+      "id": "own-site",
+      "vendor": "Netlify (own deployment)",
+      "purpose": "Self-monitoring: currency, health and function probes against the firm's own published site.",
+      "hosts": ["hawkeye-sterling-ra.netlify.app"],
+      "credentials": [],
+      "callers": ["scripts/fatf-watchdog.mjs", "netlify/functions/brain-soul.js"],
+      "data_out": "None beyond the probe request itself; brain-soul.js uses the origin only for its CORS allow-list.",
+      "kill_switches": ["disable the site-health / site-currency workflows", "PRIMARY_ORIGIN / ALLOWED_ORIGINS bound which origins the functions answer"]
+    },
+    {
+      "id": "entity-reference",
+      "vendor": "GLEIF / INTERPOL",
+      "purpose": "LEI entity reference data and INTERPOL notice checks.",
+      "hosts": ["api.gleif.org", "ws-public.interpol.int"],
+      "credentials": [],
+      "callers": ["scripts/lei-check.mjs", "scripts/interpol-check.mjs"],
+      "data_out": "Entity/individual name as a query. No customer record.",
+      "kill_switches": ["the checks are separate scripts/workflows and can be disabled independently"]
+    }
+  ],
+
+  "advisor_note": "The MLRO Advisor is deliberately absent from the action table: it holds no action, no credential beyond the server-held model key, and no write path. It answers and stops. That is what makes it non-agentic in data/ai-assets.json, and any change to it belongs in this register first.",
+  "shadow_connector_note": "No egress surface exists outside this register. test/tool-register.test.mjs cross-checks the action table and the agent roster against agents.py in both directions, verifies every declared credential is a real secret or environment variable, and fails CI if a model call ever declares tools while model_tool_calling.enabled is false."
+}
