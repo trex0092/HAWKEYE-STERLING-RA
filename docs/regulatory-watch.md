@@ -72,5 +72,11 @@ Worldwide, UAE-weighted. The narrative is what each source is, why it is watched
 | **EU — High-Risk Third Countries (AML/CFT)** | The European Commission's list of third countries with strategic AML/CFT deficiencies (Delegated Regulation under the 4th/5th AMLD, aligned with but not identical to FATF's grey list), which triggers mandatory enhanced due diligence for EU-obliged entities on any listed-country nexus. A change usually means additions/removals with direct EDD consequences. Feeds: high-risk-jurisdiction EDD answers and the EWRA country-risk weighting — additions/removals must be mirrored the same week. |
 | **Responsible Jewellery Council (RJC)** | The jewellery and watch industry's standards and certification body: the Code of Practices (COP — full-scope responsible business including AML/KYC provisions), the Chain of Custody (CoC) standard, and the Laboratory Grown Material Standard (LGMS), each with assessment manuals and accredited-auditor requirements. Publishes standards revisions, audit/certification-requirement changes (e.g. Standards & Audit Changes information packs), governance announcements and progress reports. A change usually means revised certification requirements members must meet at next audit. Feeds: gold/jewellery sector answers, responsible-sourcing tools, and RJC-certification citations. |
 
+### EU
+
+| Source | Narrative |
+| --- | --- |
+| **European Commission — EU AI Act regulatory framework (incl. Digital Omnibus amendments)** | The Commission's canonical AI Act policy page: entry-into-force and application dates, amendments (e.g. the 2026 Digital Omnibus package), guidance and delegated acts. Watched because docs/governance/eu-ai-act-assessment-2026.md commits (§7.5) to re-assess on Act evolution — this feed is what fires that trigger; the Digital Omnibus itself arrived via manual intake on 2026-07-28, which exposed the missing source. |
+
 <!-- END:reg-sources -->
 
