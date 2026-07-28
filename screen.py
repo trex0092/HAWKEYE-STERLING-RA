@@ -104,6 +104,7 @@ _SHADOW_CHALLENGER = {"count": 0, "examples": []}   # run-level tally (log-only 
 _SHADOW_LOG_CAP = 25                                 # bounded example log lines per run
 EOCN_PDF_PATH         = "eocn_list.pdf"
 EOCN_JSON_PATH        = "data/eocn-local-terrorist-list.json"
+INTERNAL_WATCHLIST_PATH = "data/internal-watchlist.json"
 DELTA_STATE_PATH      = "data/screen-delta-state.json"  # what we've already reported (delta engine)
 UAE_TZ_OFFSET         = 4
 ONBOARDING_WINDOW_HOURS = int(os.environ.get("ONBOARDING_WINDOW_HOURS", "26"))  # "new customer" window
@@ -2350,6 +2351,41 @@ def parse_eocn(pdf_path):
         log(f"  EOCN parse error: {e}")
         return names, "PARSE ERROR", ""
 
+def parse_internal_watchlist(path=None):
+    """Optional firm-internal watchlist (data/internal-watchlist.json): names
+    the firm designates internally — declined customers, known fraud
+    counterparties, court/police notices — screened IN ADDITION to the
+    official lists. Supplementary tier: never floored, never core coverage,
+    and EMPTY `entries` is a VALID state ("no internal designations"),
+    reported informationally — unlike the official curated lists, where empty
+    means DEGRADED coverage. Same entry shapes as the EOCN curated file
+    (plain string, or {name, aliases})."""
+    path = path or INTERNAL_WATCHLIST_PATH
+    names = set()
+    if not os.path.exists(path):
+        return names, "not configured", ""
+    try:
+        with open(path, "rb") as _f:
+            raw = _f.read()
+        data = json.loads(raw)
+        for e in data.get("entries", []):
+            if isinstance(e, str):
+                n = e.strip()
+                if n: names.add(n)
+            elif isinstance(e, dict):
+                n = (e.get("name") or "").strip()
+                if n: names.add(n)
+                for a in e.get("aliases", []) or []:
+                    a = (a or "").strip()
+                    if a: names.add(a)
+        if names:
+            log(f"  INTERNAL: {len(names)} firm-designated name(s) from {path}")
+            return names, f"from maintained list ({path})", sha256_of(raw)
+        return names, "none designated (empty list is a valid state)", sha256_of(raw)
+    except Exception as e:
+        log(f"  INTERNAL watchlist parse error: {e} — fix {path}")
+        return names, "PARSE ERROR — fix data/internal-watchlist.json", ""
+
 # ── CUSTOMER LOADING ──────────────────────────────────────────────────────────
 SKIP_TOKENS = [
     "S.R.L","S.P.A","L.L.C","LLC","FZE","FZCO","DMCC","LTD","N/A",
@@ -3068,6 +3104,22 @@ def classify_deltas(possible_matches, adverse_findings, pep_findings, state, tod
         if is_new: n_p += 1
     return {"sanctions": n_s, "adverse": n_a, "pep": n_p}
 
+def _internal_watchlist_block(list_meta):
+    """Report block for the optional firm-internal watchlist. Zero entries is
+    a valid state ("no internal designations") — rendered informationally,
+    never as UNAVAILABLE, so an intentionally empty optional list can't read
+    as an outage."""
+    m = list_meta.get("internal", {})
+    n = int(m.get("count", 0) or 0)
+    head = ("✅ Internal — Firm Watchlist (optional, screened in addition to official lists)"
+            if n else
+            "▫ Internal — Firm Watchlist (optional — none designated; empty is a valid state)")
+    return (f"{head}\n"
+            f"   Source:    Maintained in-repo — data/internal-watchlist.json\n"
+            f"   Entries:   {n:,}\n"
+            f"   List Date: {m.get('date','unknown')}\n"
+            f"   File Hash: {m.get('hash') or 'N/A'}")
+
 # ── NARRATIVE BUILDER — DAILY ─────────────────────────────────────────────────
 def build_daily_narrative(customers, possible_matches, clear, list_meta,
                            run_time, run_label):
@@ -3200,6 +3252,8 @@ LISTS SCREENED
 
 {list_line("eocn","UAE EOCN — Local Terrorist List",
            "Maintained in-repo — data/eocn-local-terrorist-list.json")}
+
+{_internal_watchlist_block(list_meta)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCOPE
@@ -3832,6 +3886,14 @@ def load_all_lists():
     list_meta["canada"] = {"count":len(ca_names),"date":ca_date,"hash":ca_hash,"tier":"supplementary"}
     if ca_names:
         all_lists["Canada (SEMA)"] = [(normalize(n),n) for n in ca_names]
+    # Internal firm watchlist (optional, checklist A4): screened IN ADDITION to
+    # the official lists. Supplementary tier so firm-internal names can never
+    # satisfy a core-coverage fail-safe (floors sum core keys only), and empty
+    # is a valid state.
+    iw_names, iw_date, iw_hash = parse_internal_watchlist()
+    list_meta["internal"] = {"count":len(iw_names),"date":iw_date,"hash":iw_hash,"tier":"supplementary"}
+    if iw_names:
+        all_lists["Internal Watchlist"] = [(normalize(n),n) for n in iw_names]
     return all_lists, list_meta
 
 def _list_status_line(list_meta, key, label):
@@ -3960,9 +4022,13 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("   Supplementary lists (best-effort — never affect core coverage):")
         for k in supp:
             m_ = supp[k]
-            label = {"canada": "Canada (SEMA)"}.get(k, k)
+            label = {"canada": "Canada (SEMA)", "internal": "Internal Watchlist"}.get(k, k)
             if m_.get("count", 0) > 0:
                 A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
+            elif k == "internal":
+                # Optional firm list: empty means "no internal designations",
+                # a valid state — not an unreached source.
+                A(f"      {label}: no internal designations (empty list is a valid state)")
             else:
                 A(f"      {label}: not reached this run (supplementary — core lists unaffected)")
     A("")
@@ -4749,6 +4815,13 @@ def main():
         "EU FSF":          [(normalize(n),n) for n in eu_names],
         "UAE EOCN":        [(normalize(n),n) for n in eocn_names],
     }
+    # Internal firm watchlist (optional): added AFTER the all-empty guard and
+    # the floors so firm-internal names can never satisfy a core-coverage
+    # fail-safe on this path either; empty is a valid state.
+    iw_names, iw_date, iw_hash = parse_internal_watchlist()
+    list_meta["internal"] = {"count":len(iw_names),"date":iw_date,"hash":iw_hash,"tier":"supplementary"}
+    if iw_names:
+        all_lists["Internal Watchlist"] = [(normalize(n),n) for n in iw_names]
 
     log("Fetching customers...")
     customers = get_all_customers()
