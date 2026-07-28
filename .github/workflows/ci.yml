@@ -94,6 +94,8 @@ jobs:
         run: node test/sanctions-match.test.mjs
       - name: Run sanctions matcher property/fuzz tests
         run: node test/sanctions-match-fuzz.test.mjs
+      - name: Run screening accuracy benchmark — JS backend (labelled corpus, CI floors)
+        run: node test/screening-benchmark.test.mjs
       - name: Run GLEIF LEI-check unit tests
         run: node test/lei-check.test.mjs
       - name: Run legal-citation guard (repealed instruments never cited as operative)
@@ -157,6 +159,11 @@ jobs:
         run: python test/engine_test.py
       - name: Run formal bias / fairness evaluation (R-05 — cross-script recall parity)
         run: python test/bias_eval.py
+      - name: Run screening accuracy benchmark — Python difflib backend (labelled corpus, CI floors)
+        # No rapidfuzz in this job's image: the harness records backend=py_difflib
+        # and enforces that backend's own floors. The authoritative rapidfuzz gate
+        # runs in the fuzz job below, which installs the real engine deps.
+        run: python test/benchmark_eval.py
       - name: Run prompt-injection red-team (R-02 — detection + non-execution)
         run: python test/redteam_injection.py
       - name: Browser smoke test (reduced motion — stable)
@@ -249,6 +256,10 @@ jobs:
         env:
           ASANA_TOKEN: dummy   # screen.py requires it at import; never used by the properties
         run: python test/fuzz_properties.py
+      - name: Run screening accuracy benchmark — Python rapidfuzz backend (authoritative floors)
+        env:
+          ASANA_TOKEN: dummy   # screen.py requires it at import; never used by the benchmark
+        run: python test/benchmark_eval.py
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22

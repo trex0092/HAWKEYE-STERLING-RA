@@ -1,0 +1,26 @@
+{
+ "version": 1,
+ "description": "CI-enforced accuracy floors, per backend. Phase-0 floors equal the frozen pre-hardening baseline (pure no-regression gates); they ratchet UP as hardening phases land, to the 95% targets. Floors may only rise \u2014 lowering one requires MLRO sign-off through model-validation change control (docs/governance/screening-accuracy-benchmark.md).",
+ "backends": {
+  "py_rapidfuzz": {
+   "recall_min": 0.57,
+   "negative_clear_min": 1.0,
+   "adverse_accuracy_min": 0.578,
+   "fn_count_max": 52,
+   "repeat_accuracy_min": 0.5
+  },
+  "py_difflib": {
+   "recall_min": 0.57,
+   "negative_clear_min": 1.0,
+   "adverse_accuracy_min": 0.578,
+   "fn_count_max": 52,
+   "repeat_accuracy_min": 0.5
+  },
+  "js": {
+   "recall_min": 0.619,
+   "negative_clear_min": 0.964,
+   "adverse_accuracy_min": 0.772,
+   "fn_count_max": 46
+  }
+ }
+}
