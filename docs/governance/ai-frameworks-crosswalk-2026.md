@@ -61,7 +61,8 @@ are where AI-agent-governance platforms (e.g. CloudFuze) position themselves;
 Levels 3–5 must be the organisation's own architecture. The stack's key
 distinction: monitoring shows *what happened*; **governance evidence** (Level 4)
 proves *why, who authorised it, whether a human intervened, and that this is
-independently verifiable*.
+independently verifiable*. Scored tile-by-tile in
+[`operational-ai-governance-stack-2026.md`](operational-ai-governance-stack-2026.md).
 
 | Level | Tiles | How this system aligns |
 |---|---|---|

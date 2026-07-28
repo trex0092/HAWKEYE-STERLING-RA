@@ -39,6 +39,13 @@ closes the two small gaps the mapping surfaced.
   The schema test additionally requires a declared cadence and a parseable
   `last_reviewed` (shape only in CI — currency stays with the daily report, so
   no time-bomb tests).
+- **Full five-level scorecard**
+  (`docs/governance/operational-ai-governance-stack-2026.md`): tile-by-tile
+  assessment in the house format of the 6-layer doc — all five levels ✅, the
+  two absent tiles documented as deliberate non-controls with named re-trigger
+  conditions (platform-built agents, tool/action permissions, a second
+  operator). Cross-linked from the 6-layer doc, crosswalk §C and the
+  governance-pack index.
 
 ### Screening accuracy hardening — measured 95% floors: benchmark corpus, shared transliteration, phonetic fold, one-way thresholds, adverse-media tiers (2026-07-28)
 
