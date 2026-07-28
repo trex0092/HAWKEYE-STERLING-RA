@@ -288,6 +288,78 @@ for _off_hits, _on_hits in zip(_add_off, _add_on):
             _additive = False
 check("phonetic layer is strictly additive (no fuzzy hit removed or re-scored)", _additive)
 
+# ── adverse media: tiers, description scanning, counter eligibility ──────────
+print("screen.py — adverse media hardening")
+check("adverse_keywords_for finds risk terms the headline hides in the description",
+      screen.match_adverse_keywords("Trader steps back from board duties") == [] and
+      "arrest" in screen.adverse_keywords_for(
+          "Trader steps back from board duties",
+          "The move follows his arrest last week in the money laundering case."))
+check("keyword_tier: generics are weak, real crime terms are strong",
+      screen.keyword_tier(["politic", "lawsuit"]) == "weak" and
+      screen.keyword_tier(["lawsuit", "money laundering"]) == "strong" and
+      screen.keyword_tier([]) is None)
+_aa = screen.adverse_actionable
+check("actionable: strong keyword + name in headline",
+      _aa("Khalid Otaibi", {"flagged": True, "title": "Khalid Otaibi arrested in fraud case",
+                            "keywords": ["arrest", "fraud"], "source": "reuters.com"}))
+check("not actionable: weak-only tier without a second outlet",
+      not _aa("Atlas Group", {"flagged": True, "title": "Atlas Group faces lawsuit",
+                              "keywords": ["lawsuit"], "source": "a.example.com"}))
+check("actionable: weak tier corroborated by a second independent outlet",
+      _aa("Atlas Group", {"flagged": True, "title": "Atlas Group faces lawsuit",
+                          "keywords": ["lawsuit"], "source": "a.example.com",
+                          "also_reported_by": ["b.example.com"]}))
+check("not actionable: wrong-subject story (low name relevance)",
+      not _aa("Khalid Nasser Al Qasimi", {"flagged": True, "title": "Nasser detained in Cairo fraud probe",
+                                          "keywords": ["fraud"], "source": "x.example.com"}))
+check("actionable: cross-script (Arabic) headline is UNSCORABLE, never excluded",
+      _aa("Khalid Otaibi", {"flagged": True, "title": "توقيف تاجر في قضية غسل الأموال",
+                            "keywords": ["money laundering"], "source": "aljazeera.net"}))
+check("canonical fingerprint strips tracking params and falls back on aggregators",
+      screen._canonical_fingerprint("https://www.apnews.com/article/x?utm_source=rss", "T") ==
+      screen._canonical_fingerprint("https://apnews.com/article/x?ncid=tw", "T") and
+      screen._canonical_fingerprint("https://news.google.com/rss/articles/abc", "Same Story")
+      .startswith("t:"))
+# Counter: the same article re-served across days under rotating params counts
+# ONCE (no manufactured escalation); three distinct strong stories still fire.
+import tempfile as _tf
+with _tf.TemporaryDirectory() as _td:
+    _ev = os.path.join(_td, "ev.json")
+    for day, params in (("2026-06-20", "?utm_source=rss"), ("2026-06-25", "?ncid=tw"),
+                        ("2026-06-30", "?ref=daily")):
+        screen.update_adverse_evidence([{
+            "subject_name": "Resurfaced Story LLC", "subject_type": "COMPANY", "parent": "",
+            "articles": [{"title": f"Fraud probe report {params}", "source": "apnews.com",
+                          "url": "https://apnews.com/article/fraud-probe" + params,
+                          "keywords": ["fraud"], "categories": [], "flagged": True}],
+        }], day, path=_ev)
+    _rep = screen.update_adverse_evidence([], "2026-07-01", path=_ev)
+    check("repeat counter: one article under rotating params never fires the pattern",
+          "Resurfaced Story LLC" not in _rep)
+with _tf.TemporaryDirectory() as _td:
+    _ev = os.path.join(_td, "ev.json")
+    for day, t in (("2026-06-20", "Acme Corp arrested in fraud case"),
+                   ("2026-06-25", "Acme Corp faces money laundering charges"),
+                   ("2026-06-30", "Acme Corp assets frozen in bribery inquiry")):
+        screen.update_adverse_evidence([{
+            "subject_name": "Acme Corp", "subject_type": "COMPANY", "parent": "",
+            "articles": [{"title": t, "source": "reuters.com",
+                          "url": "https://reuters.com/" + t.replace(" ", "-").lower(),
+                          "keywords": screen.match_adverse_keywords(t),
+                          "categories": [], "flagged": True}],
+        }], day, path=_ev)
+    _rep = screen.update_adverse_evidence([], "2026-07-01", path=_ev)
+    check("repeat counter: three distinct strong stories still fire the pattern",
+          _rep.get("Acme Corp") == 3)
+check("source_tier_for ranks known wires tier 1 and unknowns tier 3",
+      screen.source_tier_for({"url": "https://www.reuters.com/world/x", "source": ""}) == 1 and
+      screen.source_tier_for({"url": "", "source": "Reuters"}) == 1 and
+      screen.source_tier_for({"url": "https://blog.example.xyz/p", "source": "Some Blog"}) == 3)
+check("ADVERSE_MAX_RESULTS default is 8 and validates loudly",
+      screen.ADVERSE_MAX_RESULTS == 8 and screen._resolve_adverse_max("99") == 8 and
+      screen._resolve_adverse_max("12") == 12)
+
 # ── threshold env-tunability (one-way) + shadow challenger ───────────────────
 print("screen.py — threshold resolver / shadow challenger")
 _thr_env = {k: os.environ.get(k) for k in
@@ -882,7 +954,10 @@ def _gnews_first_ok(*_a, **_k):
     raise OSError("connection refused")
 screen.requests.get = _gnews_first_ok
 _arts = screen.search_adverse_media("Partly Cloudy DMCC")
-check("a subject with any success sweeps all locales (no early exit)", _calls["gnews"] == 7)
+# Full sweep = ADVERSE_LOCALES broad fetches + the en-US risk-term pass + the
+# AE:ar Arabic pass (locale-derived, so the default bump 5 -> 8 is covered).
+check("a subject with any success sweeps all locales (no early exit)",
+      _calls["gnews"] == screen.ADVERSE_LOCALES + 2)
 check("partial coverage is kept, not raised away", len(_arts) == 1)
 
 # GDELT circuit breaker: N consecutive hard failures open the circuit for the
