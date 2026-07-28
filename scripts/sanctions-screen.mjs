@@ -104,7 +104,47 @@ export function resolveThreshold(raw) {
       + DEFAULT_THRESHOLD + ' so fuzzy matching is never silently disabled.');
     return DEFAULT_THRESHOLD;
   }
+  /* ONE-WAY rule (docs/governance/champion-challenger-thresholds.md): a value
+     ABOVE the champion default weakens screening, so it needs the explicit
+     override flag as a separate decision — mirrored in screen.py's
+     _resolve_match_threshold. Lowering (more sensitive) stays a plain config. */
+  if (n > DEFAULT_THRESHOLD && String(process.env.SCREEN_MATCH_THRESHOLD_ALLOW_RAISE || '') !== '1') {
+    console.error('sanctions-screen: SCREEN_MATCH_THRESHOLD=' + JSON.stringify(String(raw))
+      + ' would RAISE the cutoff above the champion default ' + DEFAULT_THRESHOLD
+      + ' (less sensitive screening). One-way rule: raises require'
+      + ' SCREEN_MATCH_THRESHOLD_ALLOW_RAISE=1 — using the default.');
+    return DEFAULT_THRESHOLD;
+  }
   return n;
+}
+
+/* Parse SCREEN_SHADOW_THRESHOLD — a log-only challenger band (fraction, must
+   sit BELOW the live threshold). A clear subject whose best score lands in
+   [shadow, threshold) is logged and written to the results file's shadow[]
+   array — never an alert, never a case, never in the delta state. Off unless
+   set; invalid values reject loudly to off (it never changes live matching). */
+export function resolveShadowThreshold(raw, threshold) {
+  if (raw == null || String(raw).trim() === '') return null;
+  const n = Number(raw);
+  const thr = typeof threshold === 'number' ? threshold : DEFAULT_THRESHOLD;
+  if (!Number.isFinite(n) || n <= 0 || n >= thr) {
+    console.error('sanctions-screen: SCREEN_SHADOW_THRESHOLD=' + JSON.stringify(String(raw))
+      + ' is not a fraction in (0, ' + thr + ') — shadow challenger disabled.');
+    return null;
+  }
+  return n;
+}
+
+/* The shadow-band row for one raw engine result, or null. Pure — unit-tested;
+   only CLEAR results are eligible (anything the engine flags is already an
+   alert and needs no shadow evidence). */
+export function shadowBandRow(raw, shadowThr, thr) {
+  if (shadowThr == null || !raw || raw.recommendation !== 'clear') return null;
+  const score = typeof raw.topScore === 'number' ? raw.topScore : 0;
+  if (score >= shadowThr * 100 && score < (thr == null ? DEFAULT_THRESHOLD : thr) * 100) {
+    return { name: raw.name, topScore: score };
+  }
+  return null;
 }
 
 /* Parse MATCH_PHONETIC — the phonetic-fold layer mode shared with screen.py:
@@ -938,7 +978,10 @@ async function screenLocally(subjects, cfg) {
   const index = buildIndex(loaded.lists);
   const thr = cfg.threshold * 100;
   const phonMode = resolvePhoneticMode(process.env.MATCH_PHONETIC);
-  console.log('sanctions-screen: indexed ' + index.size + ' designated names from ' + loaded.lists.length + ' list(s); matching ' + subjects.length + ' subjects (threshold ' + thr + ', phonetic ' + phonMode + ')');
+  const shadowThr = resolveShadowThreshold(process.env.SCREEN_SHADOW_THRESHOLD, cfg.threshold);
+  const shadow = [];
+  console.log('sanctions-screen: indexed ' + index.size + ' designated names from ' + loaded.lists.length + ' list(s); matching ' + subjects.length + ' subjects (threshold ' + thr + ', phonetic ' + phonMode
+    + (shadowThr != null ? ', shadow ' + shadowThr * 100 : '') + ')');
 
   /* `degraded` reflects SANCTIONS coverage only (a list failed to load / parsed
      0 names). Adverse-media and PEP are best-effort enrichment signals — when
@@ -972,6 +1015,12 @@ async function screenLocally(subjects, cfg) {
   };
   const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr, phonMode);   // { name, topScore, band, recommendation, hitCount, lists[] }
+    const sbRow = shadowBandRow(raw, shadowThr, cfg.threshold);
+    if (sbRow) {
+      shadow.push(sbRow);
+      console.log('sanctions-screen: SHADOW-CHALLENGER "' + sbRow.name + '" best score '
+        + sbRow.topScore + ' in [' + shadowThr * 100 + ', ' + thr + ') — log-only, no alert');
+    }
     if (raw.phoneticShadow && raw.phoneticShadow.length) {
       for (const ps of raw.phoneticShadow) {
         console.log('sanctions-screen: PHONETIC-SHADOW "' + s.name + '" ~ "' + ps.hitName
@@ -1038,7 +1087,7 @@ async function screenLocally(subjects, cfg) {
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -1142,6 +1191,9 @@ async function main() {
     lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({ name: L.name, count: (L.names || []).length })),
     failures: screen.notes || [],
     enrichment: { amErrors: screen.amErrors || 0, pepErrors: screen.pepErrors || 0, skipped: screen.enrichSkipped || 0 },
+    /* Log-only challenger evidence (SCREEN_SHADOW_THRESHOLD) — kept OUT of
+       alerts/matchCount/state; feeds the champion-challenger decision log. */
+    shadow: screen.shadow || [],
     alerts: alerts.map(a => ({
       key: a.key, name: a.name, jurisdiction: a.jurisdiction || '', band: a.band,
       topScore: a.topScore, recommendation: a.recommendation,

@@ -48,10 +48,60 @@ ASANA_ONGOING_MON_GID = "1213914392047129"
 ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
 ASANA_ASSIGNEE_GID    = "1213645083721304"   # default case/OM assignee (MLRO)
 
-THRESHOLD             = 85   # combined (full + core) similarity to flag a match
-CORE_THRESHOLD        = 82   # distinctive-token similarity required (false-positive guard)
-SHORT_ENTRY_THRESHOLD = 97   # near-exact gate for short (<6 char) designated names (HAMAS, IRISL …)
-TOKENSET_THRESHOLD    = 93   # strict additive gate: token-set (subset/patronymic) recall without FP blow-up
+# ── Match thresholds — env-tunable, ONE-WAY (challenger runs more sensitive
+# only, per docs/governance/champion-challenger-thresholds.md). A value ABOVE
+# the champion default would weaken screening, so it is rejected loudly unless
+# MATCH_THRESHOLD_ALLOW_RAISE=1 is set as an explicit, separate decision.
+# Invalid values never silently change matching — loud reject, default kept
+# (mirrors scripts/sanctions-screen.mjs resolveThreshold).
+def _resolve_match_threshold(env_name, default, lo=70, hi=100):
+    raw = os.environ.get(env_name, "")
+    if not str(raw).strip():
+        return default
+    try:
+        v = float(raw)
+    except ValueError:
+        v = None
+    if v is None or not (lo <= v <= hi):
+        print(f"{env_name}={raw!r} is not a number in [{lo},{hi}] — using the champion "
+              f"default {default} so matching is never silently weakened", flush=True)
+        return default
+    if v > default and os.environ.get("MATCH_THRESHOLD_ALLOW_RAISE", "0") != "1":
+        print(f"{env_name}={raw!r} would RAISE the cutoff above the champion default "
+              f"{default} (less sensitive screening). One-way rule: raises require "
+              f"MATCH_THRESHOLD_ALLOW_RAISE=1 — using the default", flush=True)
+        return default
+    return v
+
+THRESHOLD             = _resolve_match_threshold("MATCH_THRESHOLD", 85)              # combined (full + core) similarity to flag a match
+CORE_THRESHOLD        = _resolve_match_threshold("MATCH_CORE_THRESHOLD", 82)         # distinctive-token similarity required (false-positive guard)
+SHORT_ENTRY_THRESHOLD = _resolve_match_threshold("MATCH_SHORT_ENTRY_THRESHOLD", 97)  # near-exact gate for short (<6 char) designated names (HAMAS, IRISL …)
+TOKENSET_THRESHOLD    = _resolve_match_threshold("MATCH_TOKENSET_THRESHOLD", 93)     # strict additive gate: token-set (subset/patronymic) recall without FP blow-up
+
+# ── Shadow challenger (docs/governance/champion-challenger-thresholds.md §3) ──
+# SHADOW_THRESHOLD (0-100, must sit below MATCH_THRESHOLD) turns on a LOG-ONLY
+# challenger band: a (subject, entry) pair whose min(full, core) lands in
+# [shadow, THRESHOLD) and fails every champion gate is counted and logged —
+# never a hit, never a case, never in the delta state. This is the evidence
+# feed the champion/challenger decision log needs before any live threshold
+# change. Off unless explicitly set; invalid values reject loudly to off.
+def _resolve_shadow_threshold():
+    raw = os.environ.get("SHADOW_THRESHOLD", "")
+    if not str(raw).strip():
+        return None
+    try:
+        v = float(raw)
+    except ValueError:
+        v = None
+    if v is None or not (70 <= v < THRESHOLD):
+        print(f"SHADOW_THRESHOLD={raw!r} is not a number in [70, {THRESHOLD}) — shadow "
+              f"challenger disabled (it never changes live matching either way)", flush=True)
+        return None
+    return v
+
+SHADOW_THRESHOLD_VALUE = _resolve_shadow_threshold()
+_SHADOW_CHALLENGER = {"count": 0, "examples": []}   # run-level tally (log-only evidence)
+_SHADOW_LOG_CAP = 25                                 # bounded example log lines per run
 EOCN_PDF_PATH         = "eocn_list.pdf"
 EOCN_JSON_PATH        = "data/eocn-local-terrorist-list.json"
 DELTA_STATE_PATH      = "data/screen-delta-state.json"  # what we've already reported (delta engine)
@@ -2467,8 +2517,14 @@ def _survivor_indices(variants, entries):
         return None
     norms = _entry_norms(entries)
     survivors = set()
+    # With the shadow challenger on, the full-string cutoff drops to the shadow
+    # band's floor so shadow-band pairs survive the prefilter too — the shadow
+    # tally must be identical with blocking on or off (score ≥ shadow ⇒ full ≥
+    # shadow keeps the cutoff a necessary condition, same argument as the hit
+    # gates). Costs more survivors only while a challenger is being evidenced.
+    full_cutoff = THRESHOLD if SHADOW_THRESHOLD_VALUE is None else min(THRESHOLD, SHADOW_THRESHOLD_VALUE)
     for cand in variants:
-        for scorer, cutoff in ((fuzz.token_sort_ratio, THRESHOLD),
+        for scorer, cutoff in ((fuzz.token_sort_ratio, full_cutoff),
                                (fuzz.token_set_ratio, TOKENSET_THRESHOLD)):
             for _choice, _score, idx in _rf_process.extract(
                     cand, norms, scorer=scorer, score_cutoff=cutoff, limit=None):
@@ -2579,18 +2635,20 @@ def screen_name(name, all_lists):
                              "name_score": full, "core_score": core, "set_score": best_tset,
                              "confidence": confidence_tier(core),
                              "match_context": match_context_for(orig)})
-            elif variant_profiles:
-                # Phonetic-only branch: strictly additive (an elif — it can
-                # never replace, lower or suppress a fuzzy hit). Recorded at
-                # the conservative min-based score so it always reads as a
-                # POSSIBLE match for MLRO disambiguation, never confirmed.
-                e_prof = _phonetic_profile(en)
+            else:
+                # Phonetic-only branch: strictly additive (behind the fuzzy
+                # gates — it can never replace, lower or suppress a fuzzy
+                # hit). Recorded at the conservative min-based score so it
+                # always reads as a POSSIBLE match for MLRO disambiguation,
+                # never confirmed.
                 pm = None
-                if e_prof is not None:
-                    for vp in variant_profiles:
-                        pm = _phonetic_pair_match(vp, e_prof)
-                        if pm:
-                            break
+                if variant_profiles:
+                    e_prof = _phonetic_profile(en)
+                    if e_prof is not None:
+                        for vp in variant_profiles:
+                            pm = _phonetic_pair_match(vp, e_prof)
+                            if pm:
+                                break
                 if pm:
                     if phon_mode == "shadow":
                         _PHONETIC_SHADOW["count"] += 1
@@ -2602,6 +2660,17 @@ def screen_name(name, all_lists):
                                      "phonetic": True, "phonetic_shape": pm,
                                      "confidence": "WEAK (phonetic-only)",
                                      "match_context": match_context_for(orig)})
+                elif SHADOW_THRESHOLD_VALUE is not None and score >= SHADOW_THRESHOLD_VALUE:
+                    # Shadow challenger band [shadow, THRESHOLD): counted and
+                    # logged as decision-log evidence — NEVER a hit, a case or
+                    # a delta-state entry.
+                    _SHADOW_CHALLENGER["count"] += 1
+                    if len(_SHADOW_CHALLENGER["examples"]) < _SHADOW_LOG_CAP:
+                        _SHADOW_CHALLENGER["examples"].append(
+                            {"subject": name, "entry": orig, "list": list_name,
+                             "score": round(score, 1)})
+                        log(f'  SHADOW-CHALLENGER: "{name}" ~ "{orig}" [{list_name}] '
+                            f"score {score:.1f} in [{SHADOW_THRESHOLD_VALUE:g}, {THRESHOLD:g}) — log-only, no hit")
     best = {}
     for h in hits:
         key = (h["list"], h["matched_entry"])

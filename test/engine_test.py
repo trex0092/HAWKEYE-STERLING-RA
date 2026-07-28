@@ -288,6 +288,71 @@ for _off_hits, _on_hits in zip(_add_off, _add_on):
             _additive = False
 check("phonetic layer is strictly additive (no fuzzy hit removed or re-scored)", _additive)
 
+# ── threshold env-tunability (one-way) + shadow challenger ───────────────────
+print("screen.py — threshold resolver / shadow challenger")
+_thr_env = {k: os.environ.get(k) for k in
+            ("MATCH_THRESHOLD", "MATCH_THRESHOLD_ALLOW_RAISE", "SHADOW_THRESHOLD")}
+try:
+    os.environ.pop("MATCH_THRESHOLD_ALLOW_RAISE", None)
+    os.environ.pop("MATCH_THRESHOLD", None)
+    check("threshold resolver: unset env keeps the champion default",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 85)
+    os.environ["MATCH_THRESHOLD"] = "80"
+    check("threshold resolver: lowering (more sensitive) is a plain config",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 80)
+    os.environ["MATCH_THRESHOLD"] = "90"
+    check("threshold resolver: a bare raise is rejected to the default (one-way rule)",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 85)
+    os.environ["MATCH_THRESHOLD_ALLOW_RAISE"] = "1"
+    check("threshold resolver: a raise passes only with MATCH_THRESHOLD_ALLOW_RAISE=1",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 90)
+    os.environ.pop("MATCH_THRESHOLD_ALLOW_RAISE", None)
+    for bad in ("0.85", "abc", "40", "101", ""):
+        os.environ["MATCH_THRESHOLD"] = bad
+        if screen._resolve_match_threshold("MATCH_THRESHOLD", 85) != 85:
+            check(f"threshold resolver rejects {bad!r}", False)
+            break
+    else:
+        check("threshold resolver rejects fractions, garbage and out-of-range values", True)
+    # Shadow resolver: range [70, THRESHOLD), off when unset/invalid.
+    os.environ.pop("SHADOW_THRESHOLD", None)
+    check("shadow resolver: off when unset", screen._resolve_shadow_threshold() is None)
+    os.environ["SHADOW_THRESHOLD"] = "80"
+    check("shadow resolver: accepts a value inside [70, THRESHOLD)",
+          screen._resolve_shadow_threshold() == 80)
+    os.environ["SHADOW_THRESHOLD"] = str(screen.THRESHOLD)
+    check("shadow resolver: rejects a value at/above the live threshold",
+          screen._resolve_shadow_threshold() is None)
+finally:
+    for k, v in _thr_env.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+# Shadow band behaviour inside screen_name: "Marvin Ostrowski" vs "MERVIN
+# OSTRAVSKI" scores 81.2 under this suite's difflib stub — inside [80, 85),
+# failing every champion gate AND the phonetic gate (marvin/mervin first-vowel
+# a≠i·e, ostrowski/ostravski first-vowel u≠a) — a clean challenger-band
+# specimen with no transliteration-group involvement.
+_SHW_LIST = {"L": [(screen.normalize("MERVIN OSTRAVSKI"), "MERVIN OSTRAVSKI")]}
+_shw_orig = screen.SHADOW_THRESHOLD_VALUE
+try:
+    screen.SHADOW_THRESHOLD_VALUE = 80
+    _shw_count = screen._SHADOW_CHALLENGER["count"]
+    _shw_hits = screen.screen_name("Marvin Ostrowski", _SHW_LIST)
+    check("shadow band counts a [shadow, THRESHOLD) pair without emitting a hit",
+          _shw_hits == [] and screen._SHADOW_CHALLENGER["count"] == _shw_count + 1)
+    check("shadow example log records the pair",
+          any(e["entry"] == "MERVIN OSTRAVSKI" for e in screen._SHADOW_CHALLENGER["examples"]))
+    screen.SHADOW_THRESHOLD_VALUE = None
+    _shw_count2 = screen._SHADOW_CHALLENGER["count"]
+    screen.screen_name("Marvin Ostrowski", _SHW_LIST)
+    check("shadow off: the same pair leaves no tally and no hit",
+          screen._SHADOW_CHALLENGER["count"] == _shw_count2)
+finally:
+    screen.SHADOW_THRESHOLD_VALUE = _shw_orig
+
 # ── typology / dedup / delta ─────────────────────────────────────────────────
 print("screen.py — typology / dedup / delta")
 check("typology buckets fraud", "Fraud / Financial Crime" in screen.typology_for(["fraud"]))
