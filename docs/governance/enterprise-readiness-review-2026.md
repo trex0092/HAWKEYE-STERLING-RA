@@ -326,6 +326,34 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 153 markdown documents under docs/ (120 excluding docs/research/auto).
+*(28 July, third pass — policy register (`data/policies.json` + `policy-register.md`): thirteen
+governing instruments with owner, type, status, approval record and next review, eleven in force and
+two draft pending the same board sitting. CI now requires each instrument to declare its owner in its
+own header — five documents had none until the register asked — an approval date to be evidenced by
+the document itself, a draft to assert no review date, and every policy/procedure/charter/runbook/SOP
+under docs/ to be registered or excluded with a reason. One curated document added; no scored control
+changed.)*
+
+Verified at HEAD: 56 workflows · 152 markdown documents under docs/ (119 excluding docs/research/auto).
+*(28 July, second pass — GRC framework completion: Risk Appetite Statement (DRAFT, board R7), obligation
+register and the GRC metrics layer, with `data/risk-appetite.json`, `data/obligations.json` and a
+generated `data/grc-metrics.json` behind them. Three curated governance documents added; no workflow
+added. New enforced invariants: the stated appetite must match the zero-tolerance list and band cutoffs
+the code applies, every obligation must reach a live control and a watch source, and the metrics
+snapshot fails CI when stale. Scored controls unchanged — but the estate is now measured: control
+effectiveness 100%, compliance completion 37.5%, third-party coverage 71.4%, finding closure 95.2%,
+one KRI in breach (vendor assessments, already open-actions items 2 and 5).)*
+
+Verified at HEAD: 56 workflows · 149 markdown documents under docs/ (116 excluding docs/research/auto).
+*(28 July — AI-governance register completion: the prompt lifecycle register (PromptOps) and the
+tool & connector register, each with a machine-readable source of truth (`data/prompt-assets.json`,
+`data/tool-surfaces.json`), a human view, and a CI drift guard (`test/prompt-register.test.mjs`,
+`test/tool-register.test.mjs`). Two curated governance documents added; no workflow added. Control
+coverage ADDED — prompt change control and the agent-capability inventory were previously
+ungoverned — and one new enforced invariant: a model call declaring `tools`/`tool_choice` now fails
+CI. No scored control weakened.)*
+
 Verified at HEAD: 56 workflows · 147 markdown documents under docs/ (114 excluding docs/research/auto).
 *(28 July — screening accuracy hardening programme: labelled benchmark corpus with per-backend
 CI floors (recall 57→97.5%, adverse 58→100%, repeat 50→100%), shared transliteration data,

@@ -10,6 +10,129 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — policy register: ownership and approval records for every instrument (2026-07-28)
+
+The last repo-side gap from the GRC map (core component 4, policy management).
+The policies existed and were indexed; what nothing recorded was which had been
+**approved**, by whom, when they fall due, and — for five of them — who owned
+them at all.
+
+- **Policy register** — [`data/policies.json`](data/policies.json)
+  + [`docs/governance/policy-register.md`](docs/governance/policy-register.md)
+  + `test/policies.test.mjs`. Thirteen governing instruments (policies,
+  standards, procedures, runbooks, charters) with owner, approver, type,
+  status, version, approval record and next review; eleven in force, two draft
+  pending the same board sitting.
+- **Ownership is now declared in the document, not only in the register.** CI
+  requires an `**Owner:**` line in each instrument's own header, so ownership
+  survives someone reading the document without the register. Five documents —
+  the committee charter, backup & recovery, the app setup runbook, the
+  red-team procedure and the history scrub runbook — had no declared owner
+  until this register asked for one; headers were added in the same change.
+- **Approval honesty.** A row may not claim a ratification the document itself
+  does not record (checked in ISO and long-form date), a draft may not assert a
+  next-review date (review clocks start at approval), and a draft must name the
+  open-actions item that approves it.
+- **Anti-shadow-policy sweep.** Every `docs/**` file whose name carries
+  *policy*, *procedure*, *charter*, *runbook* or *sop* must be registered or
+  excluded with a written reason — three external framework artefacts are
+  excluded with theirs.
+
+Also: the model-endpoint scan in `scripts/grc-metrics.mjs` is now an anchored
+regex rather than a substring `includes()`. It reads source text, not URLs, so
+there is no hostname to parse — but the substring shape is what CodeQL's
+incomplete-URL-sanitization query fires on, and the intent is clearer stated as
+a pattern match (`test/` is already excluded from CodeQL for exactly this class
+of alert, per the CA-13 triage record).
+
+### Governance — risk appetite, obligation register and a measured GRC layer (2026-07-28)
+
+Closed the three gaps a modern-GRC self-check surfaced: no stated risk
+appetite, no obligation inventory, and no management metrics. Same pattern as
+the registers above — JSON source of truth, human view, CI guard.
+
+- **Risk Appetite Statement** — [`data/risk-appetite.json`](data/risk-appetite.json)
+  + [`docs/governance/risk-appetite-statement-2026.md`](docs/governance/risk-appetite-statement-2026.md).
+  Eight positions (sanctions/TFS, customer acceptance, AI in decisions, personal
+  data, prompt/agent change control, resilience, supply chain, remediation), the
+  CDD ≤ 19 / SDD ≤ 22 / EDD acceptance scale with its hard rules, and nine KRIs.
+  The statement describes the appetite the estate **already enforces**, and CI
+  keeps it that way: `test/grc-metrics.test.mjs` parses `ZERO_TOLERANCE` out of
+  `netlify/functions/brain-soul.js` and the band cutoffs out of `app.js` and
+  fails if either diverges from the published text, in both directions. DRAFT
+  until board resolution **R7** (new open-actions item 17, new R7 block in the
+  minute template).
+- **Obligation register** — [`data/obligations.json`](data/obligations.json)
+  + [`docs/governance/obligation-register.md`](docs/governance/obligation-register.md).
+  Nineteen obligations (16 regulatory, 3 voluntary/monitored) mapped to
+  instrument, owner, controls, evidence, the Regulatory Watch source that would
+  detect a change, and the compliance-calendar duty that files the reminder.
+  `test/obligations.test.mjs` verifies every control and evidence path exists,
+  every watch source and calendar duty id is real, each of the three UAE
+  supervisors carries at least one obligation, every *partial* row names a live
+  open-actions item, and — reusing the legal-citation guard's rule — that no
+  obligation cites a repealed instrument (FDL 20/2018, CD 10/2019) as its basis.
+- **GRC metrics** — [`scripts/grc-metrics.mjs`](scripts/grc-metrics.mjs),
+  generated [`data/grc-metrics.json`](data/grc-metrics.json)
+  + [`docs/governance/grc-metrics.md`](docs/governance/grc-metrics.md).
+  Five of the six management ratios computed from committed artefacts — control
+  effectiveness **100%** (60/60), compliance completion **37.5%** (6/16 met, 8
+  partial waiting on a human act, 2 firm-side), KRI breach **12.5%** (1/8),
+  third-party coverage **71.4%** (the two outstanding vendor confirmations),
+  finding closure **95.2%** (HA-08, the transaction feed) — plus the counters
+  the KRIs key on. The sixth, overdue-issue rate, reports **null with its
+  reason** (open items carry owners and closing conditions but no target dates)
+  and its KRI stays marked *not instrumented*, excluded from the breach
+  denominator rather than scored as passing; instrumenting it is part of R7.
+  Freshness is enforced by `node scripts/grc-metrics.mjs --check`, wired into
+  both `ci.yml` and `scripts/run-tests.mjs` so a stale board figure fails the
+  build instead of reaching a board pack.
+
+Also: an explicit `SCANNERS` allowlist shared by the three scanning suites — a
+file whose job is to detect model-API callers necessarily contains the patterns
+it looks for, and must not be mistaken for one.
+
+### Governance — prompt lifecycle and tool/connector registers, both CI-enforced (2026-07-28)
+
+Closed the two coverage gaps left by the 10-concept AI-governance self-check:
+prompt management (PromptOps) and MCP-class integration surfaces. Both follow
+the established register pattern — machine-readable JSON as the source of
+truth, a human view under `docs/governance/`, and a CI guard that fails on
+drift rather than a page that quietly rots.
+
+- **Prompt lifecycle register** — [`data/prompt-assets.json`](data/prompt-assets.json)
+  + [`docs/governance/prompt-lifecycle-register.md`](docs/governance/prompt-lifecycle-register.md).
+  Seven governed prompt artefacts across the three registered AI surfaces
+  (`SOUL_CHARTER`, the knowledge-context template, the 16 persona suffixes,
+  `GROUNDING_SYSTEM`, both `ai.py` user templates, and the reg-draft template),
+  each pinned to a **SHA-256 of its exact source region** with a purpose, the
+  risk if changed unreviewed, its runtime guards, its assurance controls, a
+  version and an approval record. Editing a prompt now fails
+  `test/prompt-register.test.mjs` until the change is reviewed and re-pinned
+  (`node scripts/prompt-register.mjs --update`), so an instruction set cannot
+  reach production without a recorded decision — the gap between
+  `test/advisor-assurance.test.js` (which checks that phrases are *present*)
+  and change control (which asks *who approved this wording*). The suite also
+  runs an anti-shadow-prompt scan: any file calling the model API without a
+  registered prompt is a red build, in both directions against
+  `data/ai-assets.json`.
+- **Tool & connector register** — [`data/tool-surfaces.json`](data/tool-surfaces.json)
+  + [`docs/governance/tool-connector-register.md`](docs/governance/tool-connector-register.md).
+  The capability view that sat between the asset register (which surfaces
+  exist) and the third-party register (which processors we contract with):
+  all ten agent actions with their credentials and holders, the nine connector
+  surfaces with hosts, what leaves and kill switches, and the MCP posture —
+  no server exposed, no client shipped, no repository secret ever handed to
+  operator-side MCP tooling. `test/tool-register.test.mjs` cross-checks the
+  action table, the agent roster and `ACTION_CREDENTIAL` against `agents.py`
+  in **both** directions, re-verifies the runtime invariants
+  (`asana.write` is DeliveryAgent's alone; no agent may file), confirms every
+  declared credential is a real secret and every declared host appears in a
+  declared caller, and — the load-bearing one — **fails if any model call ever
+  declares `tools`/`tool_choice`** while the register says tool-calling is off.
+  Re-opening the path from model output to a live connector is now a reviewed
+  code change, not a configuration flip.
+
 ### Sanctions screening — TFS gap checklist intake: name-match procedure (PNMR/CNMR/FFR), internal watchlist, training cadence (2026-07-28)
 
 Self-assessed the screening estate against a 36-item UAE TFS practitioner

@@ -1,5 +1,8 @@
 # Backup, Recovery & Export Integrity
 
+**Owner:** Compliance Engineering (operational) · MLRO (accountable)
+**Review cadence:** annually, and on any change to the stores or the export format.
+
 This runbook covers how Hawkeye Sterling RA data is backed up, how to restore it,
 and how to independently verify the integrity of an exported record. It
 complements the data-retention controls in

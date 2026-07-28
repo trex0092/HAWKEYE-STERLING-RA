@@ -1,0 +1,197 @@
+{
+  "schema": "hawkeye-sterling.risk-appetite/v1",
+  "description": "The firm's stated risk appetite for the AML/CFT and AI estate, expressed as positions that are enforced in code and measured by key risk indicators. Step 2 of the GRC framework. Every position names the control that enforces it and the KRI that measures it, so appetite is a live constraint rather than a paragraph. The human view is docs/governance/risk-appetite-statement-2026.md.",
+  "owner_role": "Board (accountable for appetite) / MLRO (operational custodian)",
+  "review_cadence": "Annually, and on any material change to the methodology, the estate or the regulatory perimeter.",
+  "last_reviewed": "2026-07-28",
+  "approval": {
+    "status": "DRAFT — prepared for ratification",
+    "resolution": "R7",
+    "route": "docs/governance/board-minute-template-2026-07.md",
+    "open_action": 17,
+    "note": "Appetite is a board act. Until R7 is minuted this document states the appetite the estate ALREADY enforces in code — it does not invent a new one. Nothing here grants tolerance the controls do not already give."
+  },
+
+  "scale": {
+    "name": "DPMS customer risk score (0-30)",
+    "bands": [
+      { "band": "CDD", "max": 19, "meaning": "Customer due diligence — within appetite on the numeric score alone" },
+      { "band": "SDD", "max": 22, "meaning": "Simplified/standard handling per the methodology" },
+      { "band": "EDD", "max": 30, "meaning": "Enhanced due diligence mandatory" }
+    ],
+    "hard_rules": "A prohibit-flagged answer forces PROHIBITED regardless of score; any EDD trigger forces EDD regardless of score. The analyst override is a one-way ratchet: it may only RAISE the required diligence, requires a written justification, and never applies to a prohibited relationship.",
+    "enforced_in": "app.js"
+  },
+
+  "appetite": [
+    {
+      "id": "RA-01",
+      "domain": "Sanctions & targeted financial sanctions",
+      "position": "ZERO",
+      "statement": "No dealing with a designated party, and no silent clear. A confirmed match stops the relationship and starts the TFS procedure; a screening run that cannot load a core list must read DEGRADED rather than pass.",
+      "enforced_by": ["screen.py", "docs/aims/tfs-name-match-procedure.md", "data/eocn-local-terrorist-list.json"],
+      "obligations": ["OB-04", "OB-05", "OB-15"],
+      "kris": ["KRI-01"]
+    },
+    {
+      "id": "RA-02",
+      "domain": "Customer acceptance",
+      "position": "BANDED",
+      "statement": "Risk is accepted by band, not by exception: CDD to 19, SDD to 22, EDD above. A prohibited outcome is never onboarded, and diligence may only ever be raised — never lowered — by a human, and only with a written reason.",
+      "enforced_by": ["app.js", "index.html", "data/jurisdiction-risk.json"],
+      "obligations": ["OB-01", "OB-02"],
+      "kris": ["KRI-02"]
+    },
+    {
+      "id": "RA-03",
+      "domain": "AI in compliance decisions",
+      "position": "ZERO",
+      "statement": "No AI system decides, files, freezes or records. Models classify, draft and advise; humans decide. No model call may declare tools, and no generative prose may enter a filed report.",
+      "enforced_by": ["data/tool-surfaces.json", "data/ai-assets.json", "ai.py"],
+      "obligations": ["OB-07"],
+      "kris": ["KRI-03"]
+    },
+    {
+      "id": "RA-04",
+      "domain": "Personal data & cross-border transfer",
+      "position": "ZERO",
+      "statement": "No personal data reaches a processor without an executed DPA and a confirmed transfer basis. Where the basis is unconfirmed the path is gated OFF, not merely documented as a risk.",
+      "enforced_by": ["docs/governance/dpia-2026.md", "docs/aims/third-party-register.md", "ai.py"],
+      "obligations": ["OB-14"],
+      "kris": ["KRI-04"]
+    },
+    {
+      "id": "RA-05",
+      "domain": "Prompt & agent change control",
+      "position": "ZERO",
+      "statement": "No instruction set reaches production unreviewed, and no agent holds an action that is not registered with a credential and a kill switch.",
+      "enforced_by": ["data/prompt-assets.json", "data/tool-surfaces.json", "agents.py"],
+      "obligations": ["OB-07"],
+      "kris": ["KRI-05"]
+    },
+    {
+      "id": "RA-06",
+      "domain": "Operational resilience",
+      "position": "MEASURED",
+      "statement": "Degradation is tolerated; silent degradation is not. A failed source, a dead run or a stale list is acceptable for as long as it is visible, alarmed and attributed — never absorbed into a clean-looking result.",
+      "enforced_by": [".github/workflows/freshness-check.yml", "docs/governance/backup-recovery.md", "docs/governance/ai-incident-runbook.md"],
+      "obligations": ["OB-15"],
+      "kris": ["KRI-06"]
+    },
+    {
+      "id": "RA-07",
+      "domain": "Supply chain, secrets & code security",
+      "position": "ZERO",
+      "statement": "No secret in git history, no known-vulnerable dependency without a recorded justification, no unreviewed third-party action in a workflow.",
+      "enforced_by": [".github/workflows/gitleaks.yml", ".github/workflows/osv-scanner.yml", "ci/osv-scanner.toml"],
+      "obligations": [],
+      "kris": ["KRI-07"]
+    },
+    {
+      "id": "RA-08",
+      "domain": "Remediation & audit findings",
+      "position": "LOW",
+      "statement": "Findings are accepted as a normal output of assurance; carrying them is not. Every finding gets a root cause, a corrective action and a verification, and CRITICAL/HIGH findings carry a regression test.",
+      "enforced_by": ["docs/aims/corrective-actions.md", "docs/aims/internal-audit.md"],
+      "obligations": ["OB-12"],
+      "kris": ["KRI-08"]
+    }
+  ],
+
+  "advisor_zero_tolerance": [
+    "Confirmed sanctions hit count",
+    "CAHRA refinery inputs without OECD docs",
+    "Direct mixer-sourced inbound transactions",
+    "Four-eyes / SoD violations",
+    "FFR filing SLA breaches",
+    "Transactions with no identifiable originator/beneficiary",
+    "High-risk customer EDD reviews overdue >30 days",
+    "Unregulated/unlicensed VASP transactions"
+  ],
+  "advisor_zero_tolerance_note": "Mirrored from ZERO_TOLERANCE in netlify/functions/brain-soul.js — the appetite thresholds the Advisor is told to treat as blocking. test/risk-appetite.test.mjs fails if the two lists diverge, so the stated appetite and the appetite the Advisor applies cannot drift apart.",
+
+  "kris": [
+    {
+      "id": "KRI-01",
+      "label": "Control effectiveness",
+      "appetite_ref": "RA-01",
+      "metric": "controlEffectivenessRate",
+      "threshold": { "operator": ">=", "value": 100 },
+      "instrumented": true,
+      "rationale": "Every control in the assurance matrix must still point at a proof artefact that exists. Anything less means a claimed control is unevidenced."
+    },
+    {
+      "id": "KRI-02",
+      "label": "Regulatory obligations without an owner",
+      "appetite_ref": "RA-02",
+      "metric": "obligationsWithoutOwner",
+      "threshold": { "operator": "<=", "value": 0 },
+      "instrumented": true,
+      "rationale": "An obligation nobody owns is the failure mode behind 'weak ownership of key controls'."
+    },
+    {
+      "id": "KRI-03",
+      "label": "Model tool-calling declarations",
+      "appetite_ref": "RA-03",
+      "metric": "modelToolDeclarations",
+      "threshold": { "operator": "<=", "value": 0 },
+      "instrumented": true,
+      "rationale": "The moment a model call declares tools, the model can reach a connector directly and RA-03 no longer holds."
+    },
+    {
+      "id": "KRI-04",
+      "label": "Vendor assessment coverage",
+      "appetite_ref": "RA-04",
+      "metric": "thirdPartyAssessmentCoverage",
+      "threshold": { "operator": ">=", "value": 100 },
+      "instrumented": true,
+      "rationale": "A processor whose safeguard is unconfirmed is a transfer the firm cannot evidence a basis for."
+    },
+    {
+      "id": "KRI-05",
+      "label": "Unapproved prompt or agent-capability drift",
+      "appetite_ref": "RA-05",
+      "metric": "governanceDriftCount",
+      "threshold": { "operator": "<=", "value": 0 },
+      "instrumented": true,
+      "rationale": "Sums prompt fingerprint mismatches and agent-register mismatches: either means production behaviour changed without a recorded decision."
+    },
+    {
+      "id": "KRI-06",
+      "label": "Obligations with no change-detection source",
+      "appetite_ref": "RA-06",
+      "metric": "obligationsWithoutWatchSource",
+      "threshold": { "operator": "<=", "value": 1 },
+      "instrumented": true,
+      "rationale": "An obligation with no watched source changes without anyone noticing. One is tolerated (ISO/IEC 42001, a standards-body publication rather than a supervisor feed); a second means a real blind spot."
+    },
+    {
+      "id": "KRI-07",
+      "label": "Suppressed vulnerabilities without a recorded justification",
+      "appetite_ref": "RA-07",
+      "metric": "unjustifiedSuppressions",
+      "threshold": { "operator": "<=", "value": 0 },
+      "instrumented": true,
+      "rationale": "Suppression is acceptable; silent suppression is not. Every entry in ci/osv-scanner.toml must carry a reason."
+    },
+    {
+      "id": "KRI-08",
+      "label": "Audit finding closure",
+      "appetite_ref": "RA-08",
+      "metric": "auditFindingClosureRate",
+      "threshold": { "operator": ">=", "value": 90 },
+      "instrumented": true,
+      "rationale": "Findings may be open; a backlog of them may not."
+    },
+    {
+      "id": "KRI-09",
+      "label": "Overdue issue rate",
+      "appetite_ref": "RA-08",
+      "metric": "overdueIssueRate",
+      "threshold": { "operator": "<=", "value": 10 },
+      "instrumented": false,
+      "not_instrumented_reason": "Open items carry an owner and a closing condition but no target date, so nothing can be aged against a deadline. Instrumenting this means the board setting target dates on the open-actions register — recorded as the reason the metric reports null rather than zero.",
+      "rationale": "Kept in the register unmeasured rather than dropped: an appetite you cannot measure is a gap to state, not a line to delete."
+    }
+  ]
+}

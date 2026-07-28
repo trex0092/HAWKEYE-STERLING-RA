@@ -36,7 +36,8 @@ if (suites.length === 0) { console.error('no unit suites found under test/'); pr
    their drift guard is a real test file (test/board-figures.test.mjs) and so
    already runs above. */
 const DRIFT_CHECKS = [
-  { script: 'scripts/reg-sources-doc.mjs', label: 'Regulatory Watch docs in sync with data/reg-sources.json', fix: 'node scripts/reg-sources-doc.mjs' }
+  { script: 'scripts/reg-sources-doc.mjs', label: 'Regulatory Watch docs in sync with data/reg-sources.json', fix: 'node scripts/reg-sources-doc.mjs' },
+  { script: 'scripts/grc-metrics.mjs', label: 'GRC metrics snapshot in sync with the assurance matrix, obligation register, third-party register and CAPA log', fix: 'node scripts/grc-metrics.mjs --write' }
 ];
 
 const failures = [];

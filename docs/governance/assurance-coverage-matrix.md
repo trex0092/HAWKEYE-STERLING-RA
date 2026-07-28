@@ -109,6 +109,13 @@ material change, and at the quarterly management review._
 | Prompt-injection red team | `test/redteam_injection.py` | Every push/PR | CI run log; [`red-team-procedure`](../aims/red-team-procedure.md) |
 | LLM egress gated until DPA executed (`LLM_TRIAGE=0`) | Env gate in `onboarding-screen.yml` / `weekly-adverse-media.yml` | Every run | Workflow env; [`third-party-register`](../aims/third-party-register.md) |
 | AI asset register: schema + shadow-AI scan; quarterly review currency | `test/ai-assets.test.js` (shape, CI); register-review row in `governance-report.yml` (currency — REVIEW OVERDUE past 100 days) | Every push/PR + daily | CI run log; daily governance card |
+| Prompt change control: every governed prompt matches its approved fingerprint; anti-shadow-prompt scan | `test/prompt-register.test.mjs` (SHA-256 per prompt region; re-pin via `scripts/prompt-register.mjs --update`) | Every push/PR | CI run log; [`prompt-lifecycle-register`](prompt-lifecycle-register.md) + `data/prompt-assets.json` history |
+| Agent capability inventory: action/authz/credential table matches `agents.py` both ways; runtime invariants intact | `test/tool-register.test.mjs` | Every push/PR | CI run log; [`tool-connector-register`](tool-connector-register.md) |
+| No model call may declare tools / `tool_choice` (no model→connector path) | `test/tool-register.test.mjs` (scan of every model-API caller) | Every push/PR | CI run log |
+| Obligation register: instruments current, controls reachable, watch source per obligation, partial rows tied to a live open action | `test/obligations.test.mjs` | Every push/PR | CI run log; [`obligation-register`](obligation-register.md) |
+| Stated risk appetite matches the appetite the code enforces (zero-tolerance list + band cutoffs) | `test/grc-metrics.test.mjs` (parses `netlify/functions/brain-soul.js` and `app.js`) | Every push/PR | CI run log; [`risk-appetite-statement-2026`](risk-appetite-statement-2026.md) |
+| Policy register: every instrument owned in its own header, approval dates evidenced, no unregistered policy/procedure/runbook | `test/policies.test.mjs` | Every push/PR | CI run log; [`policy-register`](policy-register.md) |
+| GRC metrics snapshot cannot go stale in a board pack | `grc-metrics.mjs` `--check` (CI step + `npm test` drift check) | Every push/PR | CI run log; [`grc-metrics`](grc-metrics.md) |
 
 ### 1.9 Quality & accessibility
 

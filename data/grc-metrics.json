@@ -1,0 +1,165 @@
+{
+  "schema": "hawkeye-sterling.grc-metrics/v1",
+  "generated_by": "scripts/grc-metrics.mjs --write (never hand-edited; test/grc-metrics.test.mjs and the CI drift check compare this snapshot to the live repository)",
+  "metrics": {
+    "controlEffectivenessRate": {
+      "value": 100,
+      "numerator": 61,
+      "denominator": 61,
+      "basis": "Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof. Manual rows (§4) are excluded by design."
+    },
+    "complianceCompletionRate": {
+      "value": 37.5,
+      "numerator": 6,
+      "denominator": 16,
+      "basis": "Obligations at status \"met\" ÷ regulatory obligations. \"partial\" means the control is built and evidenced but a human act is outstanding — see the open-actions item on each row.",
+      "partial": 8,
+      "pending": 2
+    },
+    "kriBreachRate": {
+      "value": 12.5,
+      "numerator": 1,
+      "denominator": 8,
+      "basis": "Instrumented KRIs in breach ÷ instrumented KRIs. Uninstrumented KRIs are listed with their reason and excluded from the denominator rather than scored as passing."
+    },
+    "overdueIssueRate": {
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "basis": "Not instrumented: open items carry an owner and a closing condition but no target date, so nothing can be aged. See KRI-09 in data/risk-appetite.json."
+    },
+    "thirdPartyAssessmentCoverage": {
+      "value": 71.4,
+      "numerator": 5,
+      "denominator": 7,
+      "basis": "Vendors whose safeguard/DPA position is settled ÷ vendors in the third-party register. A cell still asking for a confirmation counts as outstanding.",
+      "outstanding": [
+        "Asana",
+        "Anthropic"
+      ]
+    },
+    "auditFindingClosureRate": {
+      "value": 95.2,
+      "numerator": 20,
+      "denominator": 21,
+      "basis": "CAPA rows (CA-nn corrective + HA-nn hardening) at status Closed ÷ all CAPA rows.",
+      "open": [
+        "HA-08"
+      ]
+    }
+  },
+  "counters": {
+    "modelToolDeclarations": 0,
+    "governanceDriftCount": 0,
+    "unjustifiedSuppressions": 0,
+    "obligationsWithoutOwner": 0,
+    "obligationsWithoutWatchSource": 1
+  },
+  "kris": [
+    {
+      "id": "KRI-01",
+      "label": "Control effectiveness",
+      "metric": "controlEffectivenessRate",
+      "value": 100,
+      "threshold": {
+        "operator": ">=",
+        "value": 100
+      },
+      "instrumented": true,
+      "breached": false
+    },
+    {
+      "id": "KRI-02",
+      "label": "Regulatory obligations without an owner",
+      "metric": "obligationsWithoutOwner",
+      "value": 0,
+      "threshold": {
+        "operator": "<=",
+        "value": 0
+      },
+      "instrumented": true,
+      "breached": false
+    },
+    {
+      "id": "KRI-03",
+      "label": "Model tool-calling declarations",
+      "metric": "modelToolDeclarations",
+      "value": 0,
+      "threshold": {
+        "operator": "<=",
+        "value": 0
+      },
+      "instrumented": true,
+      "breached": false
+    },
+    {
+      "id": "KRI-04",
+      "label": "Vendor assessment coverage",
+      "metric": "thirdPartyAssessmentCoverage",
+      "value": 71.4,
+      "threshold": {
+        "operator": ">=",
+        "value": 100
+      },
+      "instrumented": true,
+      "breached": true
+    },
+    {
+      "id": "KRI-05",
+      "label": "Unapproved prompt or agent-capability drift",
+      "metric": "governanceDriftCount",
+      "value": 0,
+      "threshold": {
+        "operator": "<=",
+        "value": 0
+      },
+      "instrumented": true,
+      "breached": false
+    },
+    {
+      "id": "KRI-06",
+      "label": "Obligations with no change-detection source",
+      "metric": "obligationsWithoutWatchSource",
+      "value": 1,
+      "threshold": {
+        "operator": "<=",
+        "value": 1
+      },
+      "instrumented": true,
+      "breached": false
+    },
+    {
+      "id": "KRI-07",
+      "label": "Suppressed vulnerabilities without a recorded justification",
+      "metric": "unjustifiedSuppressions",
+      "value": 0,
+      "threshold": {
+        "operator": "<=",
+        "value": 0
+      },
+      "instrumented": true,
+      "breached": false
+    },
+    {
+      "id": "KRI-08",
+      "label": "Audit finding closure",
+      "metric": "auditFindingClosureRate",
+      "value": 95.2,
+      "threshold": {
+        "operator": ">=",
+        "value": 90
+      },
+      "instrumented": true,
+      "breached": false
+    },
+    {
+      "id": "KRI-09",
+      "label": "Overdue issue rate",
+      "metric": "overdueIssueRate",
+      "value": null,
+      "instrumented": false,
+      "breached": null
+    }
+  ],
+  "control_gaps": []
+}

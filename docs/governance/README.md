@@ -16,6 +16,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-policy.md](ai-policy.md) | Top-level standalone AI Policy (ratified 2026-07-02) | ISO 42001 A.2.2 |
+| [risk-appetite-statement-2026.md](risk-appetite-statement-2026.md) | Eight appetite positions + the acceptance scale + nine KRIs; CI pins the stated appetite to the appetite the code enforces (DRAFT — board R7) | ISO 31000 5.4.3; NIST AI RMF GOVERN 1.3 |
 | [ai-acceptable-use-policy.md](ai-acceptable-use-policy.md) | Operator AUP — permitted/prohibited use, acknowledgment | ISO 42001 A.9.2 |
 | [explainability-statement-2026.md](explainability-statement-2026.md) | How outputs are interpretable; stated limits | NIST AI RMF MAP; AI Act Art. 13-style |
 | [grc-cybersecurity-model.md](grc-cybersecurity-model.md) | How the GRC layer and the security controls form one loop | NIST CSF GOVERN; ISO 42001 |
@@ -54,6 +55,11 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-asset-register.md](ai-asset-register.md) | Inventory of AI surfaces + onboarding process | ISO 42001 A.4.2 |
+| [policy-register.md](policy-register.md) | Every governing instrument with owner, approval record and next review; anti-shadow-policy sweep in CI | ISO 42001 7.5 / A.2.2; NIST AI RMF GOVERN 1.2 |
+| [obligation-register.md](obligation-register.md) | Every obligation → instrument, owner, control, evidence, watch source; status honest about what waits on a human | FATF R.1; ISO 42001 4.2 |
+| [grc-metrics.md](grc-metrics.md) | Six GRC management ratios computed from the estate, with a CI freshness check | ISO 42001 9.1; NIST AI RMF MEASURE |
+| [prompt-lifecycle-register.md](prompt-lifecycle-register.md) | PromptOps: every governed prompt, fingerprinted and version-controlled — an edit fails CI until the row is re-approved | ISO 42001 A.6.2.4; NIST AI RMF MANAGE 2.2 |
+| [tool-connector-register.md](tool-connector-register.md) | Capability view: what may be invoked, by whom, with which credential; MCP posture and connector onboarding rule | ISO 42001 A.4.2/A.10.2; UAE Securing Agentic AI |
 | [assurance-coverage-matrix.md](assurance-coverage-matrix.md) | Control → automated proof → evidence map; known gaps | ISO 42001 9.1 |
 | [model-validation-2026.md](model-validation-2026.md) | Model validation + change control + quarterly MLRO sign-off | SR 11-7-style |
 | [model-risk-management-2026.md](model-risk-management-2026.md) | MRM framework: inventory, tiering, pillar map | CBUAE MMS 2022; SR 11-7 |
