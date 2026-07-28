@@ -134,6 +134,13 @@ _NAME_TOKEN = st.sampled_from([
     "rashid", "hussain", "usama", "ladin", "awad", "karim", "trading",
     "general", "llc", "dmcc", "fze", "holdings", "international", "quds",
     "force", "hamas", "ano", "irisl", "x", "petro", "pars",
+    # phonetic-fold drift pool: multi-edit romanization variants that only the
+    # phonetic branch can link — with these in the pool, the blocking
+    # equivalence property below also proves the phonetic candidate index is
+    # recall-complete (a phonetic-only pair missed in blocked mode would
+    # diverge from the unblocked loop and fail the property).
+    "muhamet", "huseinn", "hussein", "putin", "putyn", "vladimyr", "vladimir",
+    "khalifa", "subaey", "subaiy", "turki", "gadafi", "qadhafi", "abou", "bakr",
 ])
 _NAME = st.lists(_NAME_TOKEN, min_size=1, max_size=6).map(" ".join)
 
@@ -151,6 +158,33 @@ def prop_blocking_equivalence(entry_names, subject_names):
     finally:
         screen.MATCH_BLOCKING = orig
     assert base == fast
+
+
+@PROP
+@given(st.lists(_NAME, min_size=1, max_size=10), st.lists(_NAME, min_size=1, max_size=5))
+def prop_phonetic_additivity(entry_names, subject_names):
+    # The phonetic branch is an elif behind the fuzzy gates: turning the layer
+    # ON may only ADD hits — every layer-off hit must survive with an identical
+    # score. A violation would mean the layer replaced or re-scored a fuzzy
+    # hit, i.e. a recall-monotonicity break.
+    lists = {"P": [(screen.normalize(e), e) for e in entry_names]}
+    orig = os.environ.get("MATCH_PHONETIC")
+    try:
+        os.environ["MATCH_PHONETIC"] = "0"
+        off = [screen.screen_name(s, lists) for s in subject_names]
+        os.environ["MATCH_PHONETIC"] = "1"
+        on = [screen.screen_name(s, lists) for s in subject_names]
+    finally:
+        if orig is None:
+            os.environ.pop("MATCH_PHONETIC", None)
+        else:
+            os.environ["MATCH_PHONETIC"] = orig
+    for base, wide in zip(off, on):
+        got = {(h["list"], h["matched_entry"]): h["score"] for h in wide}
+        for h in base:
+            key = (h["list"], h["matched_entry"])
+            assert key in got and got[key] == h["score"], (
+                f"phonetic layer changed a fuzzy hit: {key} {h['score']} -> {got.get(key)}")
 
 
 @PROP

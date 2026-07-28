@@ -26,7 +26,15 @@ import { readFileSync } from 'node:fs';
 export function normalizeName(s) {
   return String(s == null ? '' : s)
     .normalize('NFKD').replace(/\p{M}+/gu, '')
-    .toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    .toLowerCase()
+    /* Turkish dotless ı has no NFKD decomposition and is NOT folded by
+       lowercasing, so "Kılıç" and "Kilic" normalized to different strings and
+       an ı-spelled subject could sit a phantom 2 edits from its own name —
+       measured as a silent miss on the benchmark corpus (screen.py folds it
+       via its uppercase-first ASCII path; this restores parity). Fold is
+       strictly widening: ı-vs-ı pairs matched before and still do. */
+    .replace(/ı/g, 'i')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
 /* Corporate suffixes / very common words that carry no identifying signal — kept
@@ -655,6 +663,118 @@ export function translitCanonToken(tok) {
   return TRANSLIT_CANON.get(tok) || tok;
 }
 
+/* ── Phonetic fold (romanization-drift recall) — screen.py parity ───────────
+   A name whose EVERY significant token sits ≥2 edits off the listed spelling
+   ("Muhamet Huseinn" vs "MUHAMMAD HUSSEIN" ≈ 69) scores below every gate and
+   used to clear BY DESIGN (the model card pinned it as a residual). Each token
+   folds to a romanization-robust consonantal key; a pair whose token key-lists
+   agree exactly — or form the strict patronymic-subset shape — flags as a WEAK
+   phonetic-only possible match at its real (conservative) similarity score.
+   Spec notes (identical in screen.py phonetic_key): digraphs fold BEFORE
+   run-collapse (else "kayoom" loses oo→u); the first vowel is kept but only up
+   to the Arabic-real distinctions ({e,i} and {o,u} merge, a stays apart so
+   hassan/hussein never collide); a trailing vowel is preserved so gender/nisba
+   suffixes (hana/hani, qassem/qasemi) stay distinct; keys are computed on
+   transliteration-CANONICAL tokens with abu/abd merged into their successor. */
+const PHON_DIGRAPHS = [['shch', 's'], ['sch', 's'], ['sh', 's'], ['ch', 'c'],
+  ['zh', 'j'], ['kh', 'k'], ['gh', 'k'], ['ph', 'f'], ['th', 't'], ['dh', 'd'],
+  ['dj', 'j'], ['ck', 'k'], ['ts', 'c'], ['tz', 'c'], ['x', 'ks'], ['oo', 'u'],
+  ['ou', 'u'], ['ee', 'i'], ['ei', 'i'], ['ey', 'i']];
+const PHON_VOWEL_CLASS = { a: 'a', e: 'i', i: 'i', o: 'u', u: 'u' };
+const PHON_CHAR_MAP = { q: 'k', c: 'k', g: 'k', w: 'v', p: 'b', d: 't', z: 's' };
+const PHON_PARTICLES = new Set(['abu', 'abou', 'abo', 'abd']);
+const PHON_KEY_CACHE = new Map();
+const PHON_KEY_CACHE_MAX = 300000;
+
+export function phoneticKey(token) {
+  const raw = String(token == null ? '' : token);
+  if (raw.length < 3) return raw;
+  const hit = PHON_KEY_CACHE.get(raw);
+  if (hit !== undefined) return hit;
+  let t = raw;
+  for (const [pat, rep] of PHON_DIGRAPHS) t = t.split(pat).join(rep);
+  t = t.replace(/(.)\1+/g, '$1');
+  t = t.replace(/y/g, 'i');
+  t = t.replace(/[qcgwpdz]/g, ch => PHON_CHAR_MAP[ch]);
+  if (t.length > 3 && t.endsWith('e')) t = t.slice(0, -1);
+  const first = t[0];
+  let fv = '';
+  for (let i = 1; i < t.length; i++) {
+    if ('aeiou'.includes(t[i])) { fv = PHON_VOWEL_CLASS[t[i]]; break; }
+  }
+  let rest = '';
+  for (let i = 1; i < t.length; i++) {
+    const c = t[i];
+    if (!'aeiou'.includes(c) && c !== 'h') rest += c;
+  }
+  const last = t[t.length - 1];
+  const tail = t.length > 1 && 'aeiou'.includes(last) ? PHON_VOWEL_CLASS[last] : '';
+  const key = (first + fv + rest + tail).replace(/(.)\1+/g, '$1');
+  if (PHON_KEY_CACHE.size < PHON_KEY_CACHE_MAX) PHON_KEY_CACHE.set(raw, key);
+  return key;
+}
+
+/* Significant tokens, particle-merged, folded to canonical spellings — the
+   token stream the phonetic keys are computed over. */
+export function phonTokens(norm) {
+  const toks = sigTokens(norm);
+  const merged = [];
+  for (let i = 0; i < toks.length; i++) {
+    if (PHON_PARTICLES.has(toks[i]) && i + 1 < toks.length) {
+      merged.push(toks[i] + toks[i + 1]); i++;
+    } else {
+      merged.push(toks[i]);
+    }
+  }
+  return merged.map(translitCanonToken);
+}
+
+/* Sorted [key, tokenLength] pairs, or null when the name has fewer than two
+   significant tokens — a single common token must never carry a phonetic-only
+   hit. Memoized by normalized string (list entries fold once per process). */
+const PHON_PROFILE_CACHE = new Map();
+export function phoneticProfile(norm) {
+  const key = String(norm == null ? '' : norm);
+  if (PHON_PROFILE_CACHE.has(key)) return PHON_PROFILE_CACHE.get(key);
+  const toks = phonTokens(key);
+  let prof = null;
+  if (toks.length >= 2) {
+    prof = toks.map(t => [phoneticKey(t), t.length])
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
+    Object.freeze(prof);
+  }
+  if (PHON_PROFILE_CACHE.size < PHON_KEY_CACHE_MAX) PHON_PROFILE_CACHE.set(key, prof);
+  return prof;
+}
+
+/* 'equal' when both sorted key-lists agree exactly and every paired token's
+   raw lengths differ by ≤3 (same key but 4+ letters apart is a different name
+   wearing the same consonant skeleton); 'subset' when the SHORTER side (≥2
+   tokens, each ≥4 chars) is wholly contained in the strictly longer side's
+   key multiset — the patronymic shape the 88-per-token fuzzy subset gate
+   misses once spellings drift. null otherwise. Strictly additive. */
+export function phoneticPairMatch(aProf, bProf) {
+  if (!aProf || !bProf) return null;
+  if (aProf.length === bProf.length) {
+    for (let i = 0; i < aProf.length; i++) {
+      if (aProf[i][0] !== bProf[i][0] || Math.abs(aProf[i][1] - bProf[i][1]) > 3) return null;
+    }
+    return 'equal';
+  }
+  const [short, long] = aProf.length < bProf.length ? [aProf, bProf] : [bProf, aProf];
+  if (short.length < 2) return null;
+  let big = 0;
+  for (const p of short) if (p[1] >= 4) big++;
+  if (big < 2) return null;
+  const pool = long.map(p => p[0]);
+  for (const [k] of short) {
+    const at = pool.indexOf(k);
+    if (at < 0) return null;
+    pool.splice(at, 1);
+  }
+  return 'subset';
+}
+
 const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /* Variant spellings of a NORMALIZED name (including itself). Whole-word/phrase
@@ -728,7 +848,26 @@ export function buildIndex(lists) {
     if (!arr) pfx.set(k, arr = []);
     arr.push(id);
   }
-  return { exact, token, entries, tokens, gram, pfx, size: entries.length };
+  /* ── Phonetic posting lists — keeps candidate generation recall-complete for
+     the phonetic branch. The trigram/prefix blocking above verifies near-
+     tokens at lev ≤ 1 / InDel ≥ 88, so a phonetic-only pair (every token ≥2
+     edits off) would never even be scored: index each entry under its distinct
+     phonetic keys instead. Candidates need ≥2 shared keys (or all, when the
+     subject has fewer than 2 distinct keys), which covers the equal shape and
+     both subset directions. */
+  const phon = new Map();                         // phonetic key -> entryIdx[]
+  const phonProfiles = new Array(entries.length).fill(null);
+  for (let i = 0; i < entries.length; i++) {
+    const prof = phoneticProfile(entries[i].norm);
+    if (!prof) continue;
+    phonProfiles[i] = prof;
+    for (const k of new Set(prof.map(p => p[0]))) {
+      let arr = phon.get(k);
+      if (!arr) phon.set(k, arr = []);
+      arr.push(i);
+    }
+  }
+  return { exact, token, entries, tokens, gram, pfx, phon, phonProfiles, size: entries.length };
 }
 
 /* Unique padded character trigrams of a token ('^' and '$' mark the edges so
@@ -802,17 +941,23 @@ export function lostScriptLetters(name) {
 /* Screen one subject name against the index. Returns a raw engine-shaped row
    { name, topScore, band, recommendation, hitCount, lists[] }; recommendation
    is 'sanctions-match' (hits), 'review' (not auto-screenable) or 'clear'. */
-export function screenName(name, index, threshold = 85) {
+export function screenName(name, index, threshold = 85, phonetic = '1') {
   const rawName = String(name == null ? '' : name).trim();
   const norm = normalizeName(name);
   const empty = { name, topScore: 0, band: 'low', recommendation: 'clear', hitCount: 0, lists: [] };
   if (!rawName || !index || !index.entries.length) return empty;
 
   const byNorm = new Map();   // matched designated norm -> { list, hitName, score }
-  const addHit = (list, hitName, score, key) => {
+  const addHit = (list, hitName, score, key, phoneticShape) => {
     const prev = byNorm.get(key);
-    if (!prev || score > prev.score) byNorm.set(key, { list, hitName, score: Math.round(score) });
+    if (!prev || score > prev.score) {
+      const h = { list, hitName, score: Math.round(score) };
+      if (phoneticShape) { h.phonetic = true; h.phoneticShape = phoneticShape; }
+      byNorm.set(key, h);
+    }
   };
+  const phonMode = phonetic === '0' || phonetic === 'shadow' ? phonetic : '1';
+  const phoneticShadow = [];   // shadow-mode would-be hits (never real hits)
 
   /* Transliteration-aware recall (screen.py parity): also screen the subject's
      spelling variants (Mohammed/Muhammad, bin/ibn …). Usually just the base;
@@ -874,6 +1019,25 @@ export function screenName(name, index, threshold = 85) {
   if (!candIdx.size) {
     for (const u of fuzzyCommon) for (const i of (index.token.get(u) || [])) candIdx.add(i);
   }
+  /* Phonetic candidates: entries sharing ≥2 of a variant's distinct phonetic
+     keys (or all of them for a low-key-count variant). Unioned in BEFORE
+     scoring so the phonetic branch below sees every entry it could flag —
+     without this the trigram blocking's lev≤1/InDel≥88 verification would
+     leave the branch silently unreachable (the exact defect class the
+     blocking-equivalence tests exist to catch). */
+  const subjProfiles = phonMode !== '0'
+    ? [...variants].map(phoneticProfile).filter(Boolean) : [];
+  if (subjProfiles.length && index.phon) {
+    for (const prof of subjProfiles) {
+      const keys = new Set(prof.map(p => p[0]));
+      const need = Math.min(2, keys.size);
+      const counts = new Map();
+      for (const k of keys) {
+        for (const i of (index.phon.get(k) || [])) counts.set(i, (counts.get(i) || 0) + 1);
+      }
+      for (const [i, c] of counts) if (c >= need) candIdx.add(i);
+    }
+  }
   let best = exactAny ? 100 : 0;
   for (const i of candIdx) {
     const e = index.entries[i];
@@ -899,6 +1063,26 @@ export function screenName(name, index, threshold = 85) {
        conservative similarity score so it reads as a POSSIBLE match for MLRO
        disambiguation, never confirmed (mirrors screen.py's ANDed gate). */
     else if (subset && tset >= TOKENSET_THRESHOLD) addHit(e.list, e.hitName, sc, e.hitName + '|' + e.list);
+    /* Phonetic-only branch (screen.py parity): strictly additive — an elif
+       that can never replace, lower or suppress a fuzzy or subset hit.
+       Recorded at the conservative similarity score, tier WEAK. */
+    else if (subjProfiles.length) {
+      const eProf = index.phonProfiles ? index.phonProfiles[i] : phoneticProfile(e.norm);
+      if (eProf) {
+        let pm = null;
+        for (const prof of subjProfiles) {
+          pm = phoneticPairMatch(prof, eProf);
+          if (pm) break;
+        }
+        if (pm) {
+          if (phonMode === 'shadow') {
+            phoneticShadow.push({ list: e.list, hitName: e.hitName, score: Math.round(sc), shape: pm });
+          } else {
+            addHit(e.list, e.hitName, sc, e.hitName + '|' + e.list, pm);
+          }
+        }
+      }
+    }
   }
 
   const lists = [...byNorm.values()].sort((a, b) => b.score - a.score).slice(0, 12);
@@ -916,10 +1100,16 @@ export function screenName(name, index, threshold = 85) {
         hitName: 'name not auto-screenable (non-Latin script — its letters cannot be matched against the Latin-published lists) — screen this subject manually against all lists' }]
     };
   }
-  if (!lists.length) return { name, topScore: Math.round(best), band: 'low', recommendation: 'clear', hitCount: 0, lists: [] };
+  if (!lists.length) {
+    const out = { name, topScore: Math.round(best), band: 'low', recommendation: 'clear', hitCount: 0, lists: [] };
+    if (phoneticShadow.length) out.phoneticShadow = phoneticShadow;
+    return out;
+  }
   const topScore = lists[0].score;
   const band = topScore >= 98 ? 'critical' : 'high';
-  return { name, topScore, band, recommendation: 'sanctions-match', hitCount: lists.length, lists };
+  const out = { name, topScore, band, recommendation: 'sanctions-match', hitCount: lists.length, lists };
+  if (phoneticShadow.length) out.phoneticShadow = phoneticShadow;
+  return out;
 }
 
 /* Screen a batch of subjects → raw engine-shaped rows (one per subject), keyed

@@ -5,7 +5,8 @@ import {
   parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName, nameVariants, translitCanonToken, indelRatio, tokenSetRatio, isTokenSubset,
   MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters, trigramsOf, fuzzyTokenMatches,
-  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList
+  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList,
+  phoneticKey, phonTokens, phoneticProfile, phoneticPairMatch
 } from '../scripts/sanctions-match.mjs';
 import { deflateRawSync } from 'node:zlib';
 
@@ -302,11 +303,75 @@ check('1-char-typo-in-every-token subject now flags (was a silent clear at 0)',
 const ak = screenName('Abdulah Kadirov', fbIdx, 85);
 check('a second every-token-typo subject flags through the same path',
   ak.hitCount === 1 && ak.topScore >= 85);
-/* Candidates alone never lower the score bar: a 2+-edit-per-token pair scores
-   68.8 on the unchanged scorers and MUST stay clear (blocking is candidate
-   recall only, precision comes from the same ≥85 gate as before). */
-check('a multi-edit pair below the threshold stays clear (blocking never over-flags)',
-  screenName('Muhamet Huseinn', fbIdx, 85).hitCount === 0);
+/* FLIPPED PIN (was: "a multi-edit pair below the threshold stays clear").
+   "Muhamet Huseinn" ≈ 69 was the model card's documented residual — every
+   significant token ≥2 edits off, cleared BY DESIGN. The phonetic fold closes
+   exactly this class: it must now flag as a WEAK phonetic-only possible match
+   at its real conservative score (below 85 — never a confirmed-looking hit),
+   and the fuzzy scorers themselves are untouched (kill-switch check below). */
+const mh = screenName('Muhamet Huseinn', fbIdx, 85);
+check('the pinned multi-edit residual now flags as a phonetic-only WEAK hit',
+  mh.hitCount === 1 && mh.recommendation === 'sanctions-match'
+  && mh.lists[0].phonetic === true && mh.lists[0].score < 85);
+check('MATCH_PHONETIC=0 restores the historical clear (fuzzy gates unchanged)',
+  screenName('Muhamet Huseinn', fbIdx, 85, '0').hitCount === 0);
+const mhShadow = screenName('Muhamet Huseinn', fbIdx, 85, 'shadow');
+check('shadow mode emits no hit but records the would-be phonetic match',
+  mhShadow.hitCount === 0 && mhShadow.recommendation === 'clear'
+  && mhShadow.phoneticShadow.length === 1 && mhShadow.phoneticShadow[0].shape === 'equal');
+
+/* ── Phonetic fold unit vectors (screen.py parity — same spec, same outputs) ── */
+check('phoneticKey folds romanization drift to one key (muhamet/muhammad, huseinn/hussein)',
+  phoneticKey('muhamet') === phoneticKey('muhammad')
+  && phoneticKey('huseinn') === phoneticKey('hussein')
+  && phoneticKey('putyn') === phoneticKey('putin')
+  && phoneticKey('gadafi') === phoneticKey('qadhafi')
+  && phoneticKey('kayoom') === phoneticKey('qayyum'));
+check('phoneticKey keeps the Arabic-real vowel distinctions (hassan≠hussein, salim≠selim… via first vowel)',
+  phoneticKey('hassan') !== phoneticKey('hussein')
+  && phoneticKey('salim') !== phoneticKey('selim'));
+check('phoneticKey preserves a trailing vowel (gender/nisba suffixes stay distinct)',
+  phoneticKey('hana') !== phoneticKey('hani')
+  && phoneticKey('qassem') !== phoneticKey('qasemi'));
+check('phonTokens merges abu/abd particles and folds to canonical spellings',
+  phonTokens('abou bakr trading llc').join('|') === 'aboubakr'
+  && phonTokens('khaled mansour').join('|') === phonTokens('khalid mansour').join('|'));
+check('phoneticProfile needs two significant tokens (single tokens never phonetic-match)',
+  phoneticProfile('hamas') === null && phoneticProfile('muhamet huseinn') !== null);
+check('phoneticPairMatch equal shape needs every key AND a bounded per-token length delta',
+  phoneticPairMatch(phoneticProfile('muhamet huseinn'), phoneticProfile('muhammad hussein')) === 'equal'
+  && phoneticPairMatch(phoneticProfile('ali hassan'), phoneticProfile('ali hussein')) === null);
+check('phoneticPairMatch subset shape: shorter (≥2 tokens ≥4 chars) inside a strictly longer chain',
+  phoneticPairMatch(phoneticProfile('khalifa al subaey'),
+    phoneticProfile('khalifa muhammad turki al subaiy')) === 'subset');
+/* Additivity: with the phonetic layer on, every hit the layer-off engine finds
+   is still found with an equal-or-better score — the branch is an elif that
+   can only ADD. */
+{
+  const addIdx = buildIndex([{ id: 'o', name: 'OFAC SDN',
+    names: ['VLADIMIR PUTIN', 'MUHAMMAD HUSSEIN', 'SBERBANK OF RUSSIA', 'MARMARA GOLD TRADING'] }]);
+  const subjects = ['Vladimyr Putyn', 'Muhamet Huseinn', 'Sberbank', 'Marmara Gold Trading', 'Helga Andersen'];
+  let additive = true;
+  for (const s of subjects) {
+    const off = screenName(s, addIdx, 85, '0');
+    const on = screenName(s, addIdx, 85, '1');
+    const onKeys = new Map(on.lists.map(h => [h.list + '|' + h.hitName, h.score]));
+    for (const h of off.lists) {
+      const got = onKeys.get(h.list + '|' + h.hitName);
+      if (got == null || got < h.score) additive = false;
+    }
+  }
+  check('phonetic layer is strictly additive (never removes or lowers a layer-off hit)', additive);
+}
+/* Turkish dotless-ı fold: "Kılıç" and "Kilic" must normalize identically —
+   pre-fix they sat a phantom 2 edits apart and ı-spelled entries could clear. */
+check('normalizeName folds Turkish dotless ı to i (Kılıç ≡ Kilic)',
+  normalizeName('Emre Kılıç') === normalizeName('Emre Kilic'));
+{
+  const trIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['Emre Kılıç'] }]);
+  check('an ı-spelled designation is an exact hit for its plain-i spelling',
+    screenName('Emre Kilic', trIdx, 85).topScore === 100);
+}
 check('unrelated names still clear with the blocking index present',
   screenName('Helga Andersen Bakery', fbIdx, 85).hitCount === 0
   && screenName('Helga Andersen Bakery', fbIdx, 85).recommendation === 'clear');

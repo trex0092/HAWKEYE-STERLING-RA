@@ -10,6 +10,7 @@ Modes:
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
 import threading
+import functools
 import xml.etree.ElementTree as ET
 import concurrent.futures
 
@@ -2304,6 +2305,116 @@ def confidence_tier(core):
     if core >= 85: return "MODERATE"
     return "WEAK"
 
+# ── PHONETIC FOLD (romanization-drift recall) ────────────────────────────────
+# A name whose EVERY significant token sits ≥2 edits off the listed spelling
+# ("Muhamet Huseinn" vs "MUHAMMAD HUSSEIN" ≈ 69) scores below every fuzzy gate
+# and used to clear BY DESIGN — the model card pinned it as a residual. This
+# layer closes it: each token folds to a romanization-robust consonantal key,
+# and a pair whose token key-lists agree exactly (or form the strict
+# patronymic-subset shape) flags as a WEAK phonetic-only possible match at its
+# real (conservative) fuzzy score — never confirmed, never suppressing or
+# lowering any existing hit. The fold is tuned for Arabic AND Cyrillic
+# romanization drift: digraphs collapse BEFORE run-collapse (else "kayoom"
+# loses its oo→u), the first vowel is kept but only up to the Arabic-real
+# distinctions ({e,i} and {o,u} merge; a stays apart — hassan/hussein must NOT
+# collide), and a trailing vowel is preserved so gender/nisba suffixes
+# (hana/hani, qassem/qasemi) stay distinct. Keys are computed on
+# transliteration-CANONICAL tokens (data/translit-groups.json), so khalid/
+# khaled or omar/umar share a key by group membership rather than luck, and
+# the particles abu/abd merge into their following token ("Abou Bakr" ≡
+# "Aboubakr"). Pure string ops — identical under the offline difflib stub.
+_PHON_DIGRAPHS = (("shch", "s"), ("sch", "s"), ("sh", "s"), ("ch", "c"),
+                  ("zh", "j"), ("kh", "k"), ("gh", "k"), ("ph", "f"),
+                  ("th", "t"), ("dh", "d"), ("dj", "j"), ("ck", "k"),
+                  ("ts", "c"), ("tz", "c"), ("x", "ks"), ("oo", "u"),
+                  ("ou", "u"), ("ee", "i"), ("ei", "i"), ("ey", "i"))
+_PHON_VOWEL_CLASS = {"a": "a", "e": "i", "i": "i", "o": "u", "u": "u"}
+_PHON_CHAR_MAP = str.maketrans({"q": "k", "c": "k", "g": "k", "w": "v",
+                                "p": "b", "d": "t", "z": "s"})
+_PHON_PARTICLES = {"abu", "abou", "abo", "abd"}
+
+@functools.lru_cache(maxsize=1 << 18)
+def phonetic_key(token):
+    """Romanization-robust key of one lowercase token (identity below 3 chars)."""
+    t = token
+    if len(t) < 3:
+        return t
+    for pat, rep in _PHON_DIGRAPHS:          # digraphs FIRST (before run-collapse)
+        t = t.replace(pat, rep)
+    t = re.sub(r"(.)\1+", r"\1", t)          # collapse doubled letters
+    t = t.replace("y", "i")
+    t = t.translate(_PHON_CHAR_MAP)
+    if len(t) > 3 and t.endswith("e"):       # French/Latin silent trailing e
+        t = t[:-1]
+    first = t[0]
+    fv = next((c for c in t[1:] if c in "aeiou"), "")
+    fv = _PHON_VOWEL_CLASS.get(fv, fv)
+    rest = "".join(c for c in t[1:] if c not in "aeiou" and c != "h")
+    tail = _PHON_VOWEL_CLASS[t[-1]] if len(t) > 1 and t[-1] in "aeiou" else ""
+    return re.sub(r"(.)\1+", r"\1", first + fv + rest + tail)
+
+def phonetic_tokens(norm):
+    """Distinctive tokens of a normalized name, particle-merged and folded to
+    their transliteration-canonical spellings — the token stream the phonetic
+    keys are computed over."""
+    toks = [t.lower() for t in core_tokens(norm)]
+    merged, i = [], 0
+    while i < len(toks):
+        if toks[i] in _PHON_PARTICLES and i + 1 < len(toks):
+            merged.append(toks[i] + toks[i + 1]); i += 2
+        else:
+            merged.append(toks[i]); i += 1
+    return [ai.translit_canon_token(t) for t in merged]
+
+@functools.lru_cache(maxsize=1 << 18)
+def _phonetic_profile(norm):
+    """Sorted (key, token-length) pairs, or None when the name has fewer than
+    two significant tokens — a single common token must never carry a
+    phonetic-only hit. Cached by normalized string, so list entries are folded
+    once per process however many subjects screen against them."""
+    toks = phonetic_tokens(norm)
+    if len(toks) < 2:
+        return None
+    return tuple(sorted((phonetic_key(t), len(t)) for t in toks))
+
+def _phonetic_pair_match(a_profile, b_profile):
+    """'equal' when both names' sorted key-lists agree exactly and every paired
+    token's raw lengths differ by ≤3 (a same-key token pair 4+ letters apart is
+    a different name wearing the same consonant skeleton); 'subset' when the
+    SHORTER side (≥2 tokens, each ≥4 chars) is wholly contained in the strictly
+    longer side's key multiset — the patronymic / extra-middle-name shape the
+    fuzzy subset gate misses when spellings drift beyond its 88 per-token bar.
+    None otherwise. Strictly additive: callers only ever ADD a hit on a match."""
+    if a_profile is None or b_profile is None:
+        return None
+    if len(a_profile) == len(b_profile):
+        if [p[0] for p in a_profile] == [p[0] for p in b_profile] and \
+           all(abs(p[1] - q[1]) <= 3 for p, q in zip(a_profile, b_profile)):
+            return "equal"
+        return None
+    short, long_ = (a_profile, b_profile) if len(a_profile) < len(b_profile) else (b_profile, a_profile)
+    if len(short) < 2 or sum(1 for p in short if p[1] >= 4) < 2:
+        return None
+    pool = [p[0] for p in long_]
+    for k, _len in short:
+        if k in pool:
+            pool.remove(k)
+        else:
+            return None
+    return "subset"
+
+def _phonetic_mode():
+    """MATCH_PHONETIC ∈ 1 (live, default) | shadow (count + log, no hits) | 0
+    (off). Read at call time so tests and operators can toggle per run; an
+    unknown value is rejected LOUDLY and the default kept."""
+    v = os.environ.get("MATCH_PHONETIC", "1").strip().lower()
+    if v in ("1", "shadow", "0"):
+        return v
+    log(f"MATCH_PHONETIC={v!r} is not one of 1|shadow|0 — using default 1")
+    return "1"
+
+_PHONETIC_SHADOW = {"count": 0}   # shadow-mode tally (read by tests/operators)
+
 # ── Exact match blocking (C-side prefilter, bit-identical results) ───────────
 # The full sweep scores every (subject, entry) pair in a Python loop — ~870
 # subjects × ~290k crime-watchlist names alone is ~250M pair evaluations whose
@@ -2364,6 +2475,48 @@ def _survivor_indices(variants, entries):
                 survivors.add(idx)
     return sorted(survivors)
 
+# ── Phonetic candidate index (keeps the C-side prefilter recall-complete) ────
+# The two rapidfuzz cutoffs above are necessary conditions of the FUZZY gates
+# only: a phonetic-only pair ("Muhamet Huseinn" ≈ 69) survives neither, so in
+# blocked mode the phonetic branch would be silently unreachable — the exact
+# defect class the blocking-equivalence property exists to catch. This index
+# restores completeness: a posting list per phonetic key, and a candidate is
+# any entry sharing ≥2 of a variant's distinct keys (or all of them when the
+# variant has fewer than 2 distinct keys). That count rule covers all three
+# hit shapes — equal key-lists share every key; a subset's shorter side (≥2
+# tokens by gate) appears in one posting per token; the reverse direction
+# contributes its ≥2 keys — so blocked and unblocked stay bit-identical.
+# Cache carries the same identity + length-rebuild invariants as _NORMS_CACHE.
+_PHON_IDX_CACHE = {}   # id(entries) -> (entries, postings, entry_count)
+
+def _phonetic_postings(entries):
+    key = id(entries)
+    cached = _PHON_IDX_CACHE.get(key)
+    if cached is None or cached[0] is not entries or cached[2] != len(entries):
+        postings = {}
+        for i, (en, _orig) in enumerate(entries):
+            prof = _phonetic_profile(en)
+            if prof is None:
+                continue
+            for k in {p[0] for p in prof}:
+                postings.setdefault(k, []).append(i)
+        cached = (entries, postings, len(entries))
+        _PHON_IDX_CACHE[key] = cached
+    return cached[1]
+
+def _phonetic_candidates(variant_profiles, entries):
+    postings = _phonetic_postings(entries)
+    cand = set()
+    for prof in variant_profiles:
+        keys = {p[0] for p in prof}
+        need = min(2, len(keys))
+        counts = {}
+        for k in keys:
+            for i in postings.get(k, ()):
+                counts[i] = counts.get(i, 0) + 1
+        cand.update(i for i, c in counts.items() if c >= need)
+    return cand
+
 def screen_name(name, all_lists):
     n = normalize(name)
     if len(n) < 4: return []
@@ -2376,8 +2529,20 @@ def screen_name(name, all_lists):
         if len(nv) >= 4:
             variants.add(nv)
     hits = []
+    # Phonetic layer state for this subject: profiles of every variant, or an
+    # empty list when the subject has <2 significant tokens (layer inert).
+    phon_mode = _phonetic_mode()
+    variant_profiles = []
+    if phon_mode != "0":
+        variant_profiles = [p for p in (_phonetic_profile(v) for v in variants)
+                            if p is not None]
     for list_name, entries in all_lists.items():
         surv = _survivor_indices(variants, entries)
+        if surv is not None and variant_profiles:
+            # Union the phonetic candidates in so the C-side prefilter stays
+            # recall-complete for the phonetic branch (bit-identical results
+            # with blocking on or off — asserted by the equivalence property).
+            surv = sorted(set(surv) | _phonetic_candidates(variant_profiles, entries))
         for en, orig in (entries if surv is None else (entries[i] for i in surv)):
             if len(en) < 2: continue
             best = None; best_tset = 0; subset = False
@@ -2414,6 +2579,29 @@ def screen_name(name, all_lists):
                              "name_score": full, "core_score": core, "set_score": best_tset,
                              "confidence": confidence_tier(core),
                              "match_context": match_context_for(orig)})
+            elif variant_profiles:
+                # Phonetic-only branch: strictly additive (an elif — it can
+                # never replace, lower or suppress a fuzzy hit). Recorded at
+                # the conservative min-based score so it always reads as a
+                # POSSIBLE match for MLRO disambiguation, never confirmed.
+                e_prof = _phonetic_profile(en)
+                pm = None
+                if e_prof is not None:
+                    for vp in variant_profiles:
+                        pm = _phonetic_pair_match(vp, e_prof)
+                        if pm:
+                            break
+                if pm:
+                    if phon_mode == "shadow":
+                        _PHONETIC_SHADOW["count"] += 1
+                        log(f'  PHONETIC-SHADOW: "{name}" ~ "{orig}" [{list_name}] '
+                            f"{pm} key match, fuzzy score {score} — no hit emitted (shadow mode)")
+                    else:
+                        hits.append({"list": list_name, "matched_entry": orig, "score": score,
+                                     "name_score": full, "core_score": core, "set_score": best_tset,
+                                     "phonetic": True, "phonetic_shape": pm,
+                                     "confidence": "WEAK (phonetic-only)",
+                                     "match_context": match_context_for(orig)})
     best = {}
     for h in hits:
         key = (h["list"], h["matched_entry"])

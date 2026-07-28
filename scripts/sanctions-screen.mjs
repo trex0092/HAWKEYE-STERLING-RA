@@ -107,6 +107,19 @@ export function resolveThreshold(raw) {
   return n;
 }
 
+/* Parse MATCH_PHONETIC — the phonetic-fold layer mode shared with screen.py:
+   '1' (live, default) | 'shadow' (log would-be hits, emit none) | '0' (off).
+   Unknown values are rejected LOUDLY and the default kept, so the layer is
+   never silently disabled by a config typo. */
+export function resolvePhoneticMode(raw) {
+  const v = String(raw == null ? '' : raw).trim().toLowerCase();
+  if (v === '') return '1';
+  if (v === '1' || v === 'shadow' || v === '0') return v;
+  console.error('sanctions-screen: MATCH_PHONETIC=' + JSON.stringify(String(raw))
+    + ' is not one of 1|shadow|0 — using the default 1 (phonetic layer live).');
+  return '1';
+}
+
 /* Recommendations / bands that mean "no action". Anything else the engine returns
    is treated as a positive signal (conservative — errs toward flagging). */
 const CLEAR_RE = /^(clear|no[_\s-]?match|no[_\s-]?hit|pass|passed|negative|none|nil|ok|false[_\s-]?positive|not[_\s-]?listed|low)$/i;
@@ -247,7 +260,17 @@ export function normalizeHit(h) {
   const list = h.list || h.listName || h.source || h.dataset || h.programme || h.program || h.regime || h.sanctionsList || h.name || '';
   const hitName = h.hitName || h.matchedName || h.caption || h.entity || (h.list ? h.name : '') || '';
   const score = num(h.matchScore != null ? h.matchScore : (h.score != null ? h.score : h.confidence));
-  return { list: String(list), hitName: String(hitName || ''), score };
+  const out = { list: String(list), hitName: String(hitName || ''), score };
+  /* A phonetic-only hit must stay visibly WEAK all the way to the case board —
+     the flag travels in the hitName suffix (state/alert/case builders all
+     render hitName) AND as a structured field. */
+  if (h.phonetic) {
+    out.phonetic = true;
+    if (out.hitName && !out.hitName.includes('[phonetic-only')) {
+      out.hitName += ' [phonetic-only — WEAK]';
+    }
+  }
+  return out;
 }
 
 /* Normalise one engine result row (keyed back to the subject it screened so
@@ -914,7 +937,8 @@ async function screenLocally(subjects, cfg) {
 
   const index = buildIndex(loaded.lists);
   const thr = cfg.threshold * 100;
-  console.log('sanctions-screen: indexed ' + index.size + ' designated names from ' + loaded.lists.length + ' list(s); matching ' + subjects.length + ' subjects (threshold ' + thr + ')');
+  const phonMode = resolvePhoneticMode(process.env.MATCH_PHONETIC);
+  console.log('sanctions-screen: indexed ' + index.size + ' designated names from ' + loaded.lists.length + ' list(s); matching ' + subjects.length + ' subjects (threshold ' + thr + ', phonetic ' + phonMode + ')');
 
   /* `degraded` reflects SANCTIONS coverage only (a list failed to load / parsed
      0 names). Adverse-media and PEP are best-effort enrichment signals — when
@@ -947,7 +971,13 @@ async function screenLocally(subjects, cfg) {
     }
   };
   const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
-    const raw = screenName(s.name, index, thr);   // { name, topScore, band, recommendation, hitCount, lists[] }
+    const raw = screenName(s.name, index, thr, phonMode);   // { name, topScore, band, recommendation, hitCount, lists[] }
+    if (raw.phoneticShadow && raw.phoneticShadow.length) {
+      for (const ps of raw.phoneticShadow) {
+        console.log('sanctions-screen: PHONETIC-SHADOW "' + s.name + '" ~ "' + ps.hitName
+          + '" [' + ps.list + '] ' + ps.shape + ' key match, score ' + ps.score + ' — no hit emitted');
+      }
+    }
     const lists = [...raw.lists];
     let band = raw.lists.length ? raw.band : '';
     let topScore = raw.lists.length ? raw.topScore : 0;

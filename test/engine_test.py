@@ -217,6 +217,77 @@ check("translit_canon_token folds group members to one representative",
       ai.translit_canon_token("umar") == ai.translit_canon_token("omar") and
       ai.translit_canon_token("zzz-ungrouped") == "zzz-ungrouped")
 
+# ── phonetic fold layer ──────────────────────────────────────────────────────
+print("screen.py — phonetic fold layer")
+check("phonetic_key folds romanization drift to one key",
+      screen.phonetic_key("muhamet") == screen.phonetic_key("muhammad") and
+      screen.phonetic_key("huseinn") == screen.phonetic_key("hussein") and
+      screen.phonetic_key("putyn") == screen.phonetic_key("putin") and
+      screen.phonetic_key("gadafi") == screen.phonetic_key("qadhafi") and
+      screen.phonetic_key("kayoom") == screen.phonetic_key("qayyum"))
+check("phonetic_key keeps the Arabic-real vowel distinctions (hassan≠hussein)",
+      screen.phonetic_key("hassan") != screen.phonetic_key("hussein") and
+      screen.phonetic_key("salim") != screen.phonetic_key("selim"))
+check("phonetic_key preserves a trailing vowel (gender/nisba suffixes distinct)",
+      screen.phonetic_key("hana") != screen.phonetic_key("hani") and
+      screen.phonetic_key("qassem") != screen.phonetic_key("qasemi"))
+check("phonetic_tokens merges abu/abd particles and folds to canonical spellings",
+      screen.phonetic_tokens(screen.normalize("Abou Bakr Trading LLC")) == ["aboubakr"] and
+      screen.phonetic_tokens(screen.normalize("Khaled Mansour")) ==
+      screen.phonetic_tokens(screen.normalize("Khalid Mansour")))
+check("single-token names never build a phonetic profile",
+      screen._phonetic_profile(screen.normalize("HAMAS")) is None)
+
+_PH_LIST = {"L": [(screen.normalize(x), x) for x in [
+    "MUHAMMAD HUSSEIN", "KHALIFA MUHAMMAD TURKI AL-SUBAIY", "ALI HUSSEIN"]]}
+_ph_hits = screen.screen_name("Muhamet Huseinn", _PH_LIST)
+check("the pinned multi-edit residual now flags as a phonetic-only WEAK hit",
+      len(_ph_hits) == 1 and _ph_hits[0].get("phonetic") is True and
+      _ph_hits[0]["confidence"] == "WEAK (phonetic-only)" and _ph_hits[0]["score"] < 85)
+check("phonetic subset shape catches the drifted patronymic chain",
+      any(h.get("phonetic") and h.get("phonetic_shape") == "subset"
+          for h in screen.screen_name("Khalifa Al Subaey", _PH_LIST)))
+check("phonetic-adjacent distinct names stay clear (ali hassan ≠ ali hussein)",
+      screen.screen_name("Ali Hassan", _PH_LIST) == [])
+_ph_env = os.environ.get("MATCH_PHONETIC")
+try:
+    os.environ["MATCH_PHONETIC"] = "0"
+    check("MATCH_PHONETIC=0 restores the historical clear (fuzzy gates untouched)",
+          screen.screen_name("Muhamet Huseinn", _PH_LIST) == [])
+    os.environ["MATCH_PHONETIC"] = "shadow"
+    _shadow_before = screen._PHONETIC_SHADOW["count"]
+    check("shadow mode emits no hit but counts the would-be phonetic match",
+          screen.screen_name("Muhamet Huseinn", _PH_LIST) == [] and
+          screen._PHONETIC_SHADOW["count"] == _shadow_before + 1)
+    os.environ["MATCH_PHONETIC"] = "banana"
+    check("an unknown MATCH_PHONETIC value is rejected loudly and defaults to live",
+          len(screen.screen_name("Muhamet Huseinn", _PH_LIST)) == 1)
+finally:
+    if _ph_env is None:
+        os.environ.pop("MATCH_PHONETIC", None)
+    else:
+        os.environ["MATCH_PHONETIC"] = _ph_env
+# Additivity: every layer-off hit survives the layer turning on, same score.
+_ADD_SUBJECTS = ["Muhamad Hussein Trading LLC", "Ali Hussein", "Sberbank",
+                 "Muhamet Huseinn", "Completely Unrelated Name"]
+try:
+    os.environ["MATCH_PHONETIC"] = "0"
+    _add_off = [screen.screen_name(s, _PH_LIST) for s in _ADD_SUBJECTS]
+    os.environ["MATCH_PHONETIC"] = "1"
+    _add_on = [screen.screen_name(s, _PH_LIST) for s in _ADD_SUBJECTS]
+finally:
+    if _ph_env is None:
+        os.environ.pop("MATCH_PHONETIC", None)
+    else:
+        os.environ["MATCH_PHONETIC"] = _ph_env
+_additive = True
+for _off_hits, _on_hits in zip(_add_off, _add_on):
+    _on_scores = {(h["list"], h["matched_entry"]): h["score"] for h in _on_hits}
+    for h in _off_hits:
+        if _on_scores.get((h["list"], h["matched_entry"])) != h["score"]:
+            _additive = False
+check("phonetic layer is strictly additive (no fuzzy hit removed or re-scored)", _additive)
+
 # ── typology / dedup / delta ─────────────────────────────────────────────────
 print("screen.py — typology / dedup / delta")
 check("typology buckets fraud", "Fraud / Financial Crime" in screen.typology_for(["fraud"]))
