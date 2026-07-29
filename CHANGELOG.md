@@ -10,6 +10,39 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Engine config — the Asana credential is checked where Asana is called, and the settings that gate a degraded run are documented (2026-07-29)
+
+- **`screen.py` no longer `KeyError`s at import.** It read `ASANA_TOKEN` with an
+  unguarded `os.environ[...]` at module load, while the `.mjs` scripts, every
+  workflow and `.env.example` all use **`ASANA_ACCESS_TOKEN`** — so copying
+  `.env.example` to `.env` and running `python screen.py` failed before a line
+  of the engine ran. Four consumers that only wanted the matcher worked around
+  it by injecting a placeholder credential. It now accepts **either** name and
+  normalises the result onto one, so `agents.py`'s credential broker (which
+  audits presence by name) stays correct.
+- **The safety that hard failure provided moved to where it belongs.**
+  `asana_request()` — the single Asana call path — now refuses to run without a
+  credential, because an unauthenticated Asana read does not fail cleanly: it
+  returns an error body that parses as zero tasks, and a screen over zero
+  customers would file as an all-clear. So the check fires when Asana is
+  actually used, instead of blocking consumers that never touch it.
+- **All four placeholder credentials are gone** — the two CI steps, the
+  EOCN reconcile step and the daily-screen runner. A step that parses external
+  downloads now holds no Asana credential at all. The old wiring pin is
+  replaced by a contract pin asserting **both** halves: either env name is
+  accepted, *and* `asana_request` still refuses an unauthenticated call.
+- **`.env.example` covers the engine.** It made 30 of the 77 variables the
+  engine reads assignable, and the gap included the **sanctions coverage
+  floors** (`LIST_FLOOR_*`, `LIST_FLOORS_ENFORCE`) and the **hard-fail gates**
+  (`DELIVERY_HARD_FAIL`, `EOCN_REVIEW_HARD_FAIL`) — the settings that decide
+  whether a degraded run fails loudly or passes quietly. Every operator-facing
+  variable is now documented with its default and what it costs you to change:
+  thresholds, AI gates, transaction-monitoring, circuit breakers, alarms. The
+  Python-side `MATCH_THRESHOLD` / `SHADOW_THRESHOLD` names were previously
+  described in a comment without ever being assignable. CI-injected values
+  (`GITHUB_*`, the per-list `*_HASH`, the date/step plumbing) are deliberately
+  excluded and say so — setting those by hand misreports a run.
+
 ### Tooling — Python becomes a governed language here, and `npm test` stops lying (2026-07-29)
 
 Three gaps that all had the same shape: a check that existed in one place and

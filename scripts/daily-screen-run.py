@@ -29,12 +29,13 @@ import xml.etree.ElementTree as ET
 # transliteration variants) is GONE: this fallback now screens through
 # the REAL engine matcher (screen.py screen_name — the audited one the
 # daily unified run uses), so a manual dispatch of this workflow can
-# never clear a name the daily engine would flag. screen.py reads
-# ASANA_TOKEN at import (config only); this step never calls Asana, so
-# a placeholder satisfies the import without handing a credential to
-# a step that parses external downloads (same pattern as
-# eocn-reconcile.yml — least privilege).
-os.environ.setdefault("ASANA_TOKEN", "import-only-placeholder")
+# never clear a name the daily engine would flag.
+#
+# No Asana credential is set here, by design: this step never calls Asana, and
+# screen.py no longer demands a token at import — the check moved to
+# asana_request(), the single call path. The placeholder that used to be needed
+# here is gone, so a step that parses external downloads holds no credential
+# at all (least privilege, same as eocn-reconcile.yml).
 import screen as engine
 
 # ---- load customers ----

@@ -60,9 +60,9 @@ except ImportError:  # offline path — identical primitives, stubbed scorer
     _rf.fuzz = types.SimpleNamespace(token_sort_ratio=_tsr, token_set_ratio=_tsr)
     sys.modules["rapidfuzz"] = _rf
 
-# screen.py reads this at module import time (see PR3 / open-actions on the
-# ASANA_TOKEN vs ASANA_ACCESS_TOKEN split); the probe makes no Asana call.
-os.environ.setdefault("ASANA_TOKEN", "matcher-parity-probe")
+# No Asana credential: the probe makes no Asana call, and screen.py no longer
+# requires a token at import (the check lives in asana_request(), the single
+# call path). ANTHROPIC_API_KEY is cleared so no probe run can reach a model.
 os.environ.pop("ANTHROPIC_API_KEY", None)
 
 import screen  # noqa: E402  (must follow the stubs above)

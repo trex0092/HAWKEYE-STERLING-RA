@@ -370,11 +370,29 @@ check('the issue step is always()-guarded so it still fires after the red bail',
 check('control-retry heals on missing SUCCESS (a red bail is now re-dispatched)',
   /conclusion.*success/.test(retryYml) && /sanctions-screen\.yml/.test(retryYml));
 
-/* ── wiring pin: the EOCN reconcile step can actually `import screen` ── */
+/* ── contract pin: the Asana credential is checked where Asana is CALLED, not
+   at import. screen.py used to read ASANA_TOKEN with an unguarded
+   os.environ[...] at module load, so every consumer that only wanted the
+   matcher had to inject a placeholder credential (this workflow, the fuzz and
+   benchmark CI steps, and the daily-screen runner all did). It now accepts
+   either env name, resolves to '' when neither is set, and refuses the call
+   inside asana_request() — so a matcher-only consumer holds NO credential, and
+   an unauthenticated Asana call is still impossible. Both halves are pinned:
+   drop the guard and an unauthenticated read would parse as zero customers and
+   file as an all-clear. ── */
+const screenPy = readFileSync(join(ROOT, 'screen.py'), 'utf8');
+check('screen.py accepts either ASANA_ACCESS_TOKEN or ASANA_TOKEN and does not KeyError at import',
+  /ASANA_TOKEN\s*=\s*os\.environ\.get\("ASANA_TOKEN"\)\s*or\s*os\.environ\.get\("ASANA_ACCESS_TOKEN"\)\s*or\s*""/.test(screenPy)
+  /* the subscript READ is what raised KeyError; the write-back that normalises
+     the resolved value onto one name is deliberate and must stay allowed */
+  && !/=\s*os\.environ\["ASANA_TOKEN"\]/.test(screenPy));
+const asanaReq = screenPy.match(/def asana_request\([\s\S]*?\n    kw\.setdefault\("headers"/);
+check('asana_request refuses to call Asana without a credential (the check the import used to do)',
+  !!asanaReq && /if not ASANA_TOKEN:/.test(asanaReq[0]) && /raise SystemExit/.test(asanaReq[0]));
 const eocnYml = readFileSync(join(ROOT, '.github/workflows/eocn-reconcile.yml'), 'utf8');
 const reconcileStep = eocnYml.match(/- name: Reconcile the local list[\s\S]*?(?=\n {6}- name: )/);
-check('eocn-reconcile provides ASANA_TOKEN to the import (screen.py reads it unconditionally at module load)',
-  !!reconcileStep && /ASANA_TOKEN:/.test(reconcileStep[0]));
+check('the matcher-only eocn-reconcile step now holds no Asana credential at all',
+  !!reconcileStep && !/ASANA_TOKEN:/.test(reconcileStep[0]));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
