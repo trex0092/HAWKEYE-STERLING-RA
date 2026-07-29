@@ -99,6 +99,95 @@ for (const a of appetite.appetite) {
   for (const p of a.enforced_by || []) check('appetite "' + a.id + '" enforcing path exists (' + p + ')', existsSync(join(ROOT, p)));
   for (const o of a.obligations || []) check('appetite "' + a.id + '" references a real obligation (' + o + ')', obligations.has(o));
   check('appetite "' + a.id + '" states a position', ['ZERO', 'LOW', 'MEASURED', 'BANDED'].includes(a.position));
+  /* ── 5. Appetite → tolerance ───────────────────────────────────────────────
+     A position is a direction; a tolerance is a boundary someone is told about
+     when it is crossed. Each of the three is required separately because each
+     fails separately: a ceiling with no owner has nobody to breach to, an owner
+     with no SLA has no clock, and a position with neither is a paragraph. */
+  check('appetite "' + a.id + '" states a numeric residual ceiling (1-25)',
+    Number.isInteger(a.residual_ceiling) && a.residual_ceiling >= 1 && a.residual_ceiling <= 25);
+  check('appetite "' + a.id + '" names an operational owner', typeof a.owner === 'string' && a.owner.length > 0);
+  check('appetite "' + a.id + '" states an escalation SLA', typeof a.escalation_sla === 'string' && a.escalation_sla.length > 20);
+}
+check('the appetite register explains how the residual ceilings were derived',
+  typeof appetite.residual_ceiling_basis === 'string' && appetite.residual_ceiling_basis.length > 100);
+/* Ceilings must be consistent per position type, or "ZERO" means one thing for
+   sanctions and another for privacy and the vocabulary carries no information. */
+const byPosition = new Map();
+for (const a of appetite.appetite) {
+  if (!byPosition.has(a.position)) byPosition.set(a.position, a.residual_ceiling);
+  check('appetite "' + a.id + '" ceiling matches every other ' + a.position + ' position (' + a.residual_ceiling + ')',
+    byPosition.get(a.position) === a.residual_ceiling);
+}
+/* A tighter appetite may not carry a looser ceiling. */
+const zero = byPosition.get('ZERO'), low = byPosition.get('LOW');
+check('ZERO carries a tighter ceiling than LOW (' + zero + ' < ' + low + ')', zero < low);
+
+/* ── 6. Every risk is claimed by exactly one appetite position ─────────────
+   An unclaimed risk is not scored against any ceiling, and an unscored risk is
+   indistinguishable from a compliant one in a count. A risk claimed twice is
+   scored against two different ceilings and the count double-reports it. */
+const registerMd = read('docs/aims/ai-risk-register.md');
+const registerIds = [...new Set([...registerMd.matchAll(/^\|\s*(R-\d+)\s*\|/gm)].map((m) => m[1]))];
+check('parsed the AI risk register (' + registerIds.length + ' risks)', registerIds.length > 0);
+const claims = new Map();
+for (const a of appetite.appetite) {
+  check('appetite "' + a.id + '" lists the risks it owns', Array.isArray(a.risks));
+  for (const r of a.risks || []) claims.set(r, [...(claims.get(r) || []), a.id]);
+}
+for (const r of registerIds) {
+  check('risk "' + r + '" is claimed by exactly one appetite position (' + (claims.get(r) || []).join(', ') + ')',
+    (claims.get(r) || []).length === 1);
+}
+for (const [r] of claims) check('appetite claims a risk the register actually carries (' + r + ')', registerIds.includes(r));
+check('no risk sits outside the appetite framework', computed.counters.risksWithoutAppetitePosition === 0);
+
+/* The register states the residual score AND its likelihood/impact factors; a
+   stated score that is not the product of its own factors is a transcription
+   error that would silently move a row above or below its ceiling. */
+const header = (registerMd.match(/^\|\s*ID\s*\|.*$/m) || [''])[0].split('|').map((c) => c.trim().toLowerCase());
+const iRes = header.indexOf('residual');
+for (const m of registerMd.matchAll(/^\|\s*(R-\d+)\s*\|.*$/gm)) {
+  const cells = m[0].split('|');
+  const score = Number((String(cells[iRes] || '').match(/\d+/) || [])[0]);
+  const l = Number(String(cells[iRes - 2] || '').trim()), i = Number(String(cells[iRes - 1] || '').trim());
+  check('risk "' + m[1] + '" residual score equals likelihood x impact (' + l + 'x' + i + '=' + score + ')', l * i === score);
+}
+
+/* ── 7. The snapshot carries the tolerance layer, not just the appetite ────
+   The KRI block in the snapshot is a PROJECTION: a field added to
+   data/risk-appetite.json and not copied into it never reaches a board pack.
+   This is the check that catches that silent loss. */
+for (const k of snap.kris || []) {
+  check('snapshot KRI "' + k.id + '" carries its owner', typeof k.owner === 'string' && k.owner.length > 0);
+  check('snapshot KRI "' + k.id + '" carries the escalation SLA of the position it measures',
+    typeof k.escalation_sla === 'string' && k.escalation_sla.length > 20);
+}
+for (const k of appetite.kris) {
+  check('KRI "' + k.id + '" names an owner', typeof k.owner === 'string' && k.owner.length > 0);
+  if (k.threshold_amber) {
+    check('KRI "' + k.id + '" amber band uses the same operator as its red line',
+      k.threshold_amber.operator === k.threshold.operator && typeof k.threshold_amber.value === 'number');
+    /* Amber must fire BEFORE red, or it is decoration. */
+    check('KRI "' + k.id + '" amber band is reached before the red line',
+      k.threshold.operator === '>=' ? k.threshold_amber.value > k.threshold.value : k.threshold_amber.value < k.threshold.value);
+  }
+}
+check('snapshot names the risks above appetite rather than only counting them',
+  Array.isArray((snap.appetite_scoring || {}).above_appetite)
+  && snap.appetite_scoring.above_appetite.length === snap.counters.residualAboveAppetite);
+check('every appetite position lists at least one KRI',
+  appetite.appetite.every((a) => Array.isArray(a.kris) && a.kris.length > 0));
+const kriIds = new Set(appetite.kris.map((k) => k.id));
+for (const a of appetite.appetite) {
+  for (const k of a.kris || []) check('appetite "' + a.id + '" references a real KRI (' + k + ')', kriIds.has(k));
+}
+/* Both directions: a KRI naming a position the position does not name back is
+   a measure nobody has agreed measures them. */
+for (const k of appetite.kris) {
+  const pos = appetite.appetite.find((a) => a.id === k.appetite_ref);
+  check('KRI "' + k.id + '" is listed by the position it claims to measure (' + k.appetite_ref + ')',
+    !!pos && (pos.kris || []).includes(k.id));
 }
 check('appetite records that ratification is a board act, not an assumed one',
   /DRAFT/i.test((appetite.approval || {}).status || ''));
@@ -112,6 +201,23 @@ if (bandLine.length === 3) {
   check('appetite CDD ceiling matches the engine (' + bands.CDD + ' vs ' + bandLine[1] + ')', String(bands.CDD) === bandLine[1]);
   check('appetite SDD ceiling matches the engine (' + bands.SDD + ' vs ' + bandLine[2] + ')', String(bands.SDD) === bandLine[2]);
 }
+
+/* ── 8. The breach ledger quotes lines that are still in force ─────────────
+   The ledger is the history the snapshot cannot carry (it holds no timestamp by
+   design). Its value depends entirely on the KRI IDs and metric names in it
+   still meaning what they meant when the row was written, so both are pinned.
+   Every currently-breached KRI must also appear in it — a breach the dashboard
+   shows and the ledger does not is a breach with no recorded escalation. */
+const ledger = read('docs/governance/kri-breach-ledger.md');
+for (const m of ledger.matchAll(/\|\s*(KRI-\d+)\s*\|\s*`([A-Za-z]+)`/g)) {
+  const k = appetite.kris.find((x) => x.id === m[1]);
+  check('breach ledger row "' + m[1] + '" names a KRI still in the register', !!k);
+  if (k) check('breach ledger row "' + m[1] + '" quotes the metric that KRI keys on (' + m[2] + ')', k.metric === m[2]);
+}
+for (const k of computed.kris.filter((x) => x.breached)) {
+  check('breached KRI "' + k.id + '" is recorded in the breach ledger', ledger.includes(k.id));
+}
+check('breach ledger states the append-only rule', /append-only/i.test(ledger));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;

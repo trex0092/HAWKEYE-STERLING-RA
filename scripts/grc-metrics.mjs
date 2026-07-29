@@ -205,6 +205,60 @@ export function openActionsWithoutTargetDate(root = ROOT) {
   }).length;
 }
 
+/* ── Residual risk against appetite ────────────────────────────────────────
+   docs/policies/risk-assessment-methodology.md §3 and §5 state the rule twice:
+   "residual risk is compared against the appetite; anything above appetite
+   requires a treatment plan with an owner and a date." Until every appetite
+   position carried a numeric `residual_ceiling`, that comparison could not be
+   made at all — "above appetite" had no operand — so the register's own auditor
+   checkpoint ("residual scores sit within appetite") was unfalsifiable.
+
+   The register is markdown-only, so the residual score is parsed out of the
+   table rather than read from a data file. Columns are located by HEADER NAME,
+   not by position: a column inserted into the register must not silently make
+   this read the wrong cell. The residual cell reads like `🟡 10 Medium`; the
+   number is the score.
+
+   Each risk is scored against the ceiling of the appetite position that claims
+   it in data/risk-appetite.json. A risk claimed by nobody is NOT skipped — it
+   is returned as unclaimed and fails the test suite, because an unscored risk
+   looks identical to a compliant one in a count. */
+export function residualVsAppetite(root = ROOT) {
+  const md = read(root, 'docs/aims/ai-risk-register.md');
+  const header = (md.match(/^\|\s*ID\s*\|.*$/m) || [''])[0];
+  const cols = header.split('|').map((c) => c.trim().toLowerCase());
+  const iResidual = cols.indexOf('residual');
+  const iTreatment = cols.findIndex((c) => c.startsWith('treatment'));
+
+  const rows = [];
+  for (const m of md.matchAll(/^\|\s*(R-\d+)\s*\|.*$/gm)) {
+    const cells = m[0].split('|');
+    const residual = Number((String(cells[iResidual] || '').match(/\d+/) || [])[0]);
+    rows.push({ id: m[1], residual, treatment: String(cells[iTreatment] || '').trim() });
+  }
+
+  const appetite = json(root, 'data/risk-appetite.json');
+  const owner = new Map();
+  for (const a of appetite.appetite) for (const r of a.risks || []) owner.set(r, a);
+
+  const above = [], unclaimed = [];
+  for (const r of rows) {
+    const a = owner.get(r.id);
+    if (!a) { unclaimed.push(r.id); continue; }
+    if (Number.isFinite(r.residual) && r.residual > a.residual_ceiling) {
+      /* A dated treatment is what the methodology asks for; a cadence ("· MLRO ·
+         quarterly") is a review rhythm, not a date. Recorded per row so the
+         board can see which of the two each above-appetite risk actually has. */
+      above.push({
+        risk: r.id, residual: r.residual, appetite: a.id, position: a.position,
+        ceiling: a.residual_ceiling, owner: a.owner,
+        dated_treatment: /\d{4}-\d{2}-\d{2}/.test(r.treatment)
+      });
+    }
+  }
+  return { scored: rows.length, above, unclaimed };
+}
+
 /* ── Assembly ─────────────────────────────────────────────────────────────── */
 export async function computeMetrics(root = ROOT) {
   const ce = controlEffectiveness(root);
@@ -213,6 +267,7 @@ export async function computeMetrics(root = ROOT) {
   const fc = findingClosure(root);
   const drift = await governanceDrift(root);
   const hygiene = obligationHygiene(root);
+  const rva = residualVsAppetite(root);
 
   const counters = {
     modelToolDeclarations: modelToolDeclarations(root),
@@ -220,7 +275,9 @@ export async function computeMetrics(root = ROOT) {
     unjustifiedSuppressions: unjustifiedSuppressions(root),
     obligationsWithoutOwner: hygiene.withoutOwner,
     obligationsWithoutWatchSource: hygiene.withoutWatchSource,
-    openActionsWithoutTargetDate: openActionsWithoutTargetDate(root)
+    openActionsWithoutTargetDate: openActionsWithoutTargetDate(root),
+    residualAboveAppetite: rva.above.length,
+    risksWithoutAppetitePosition: rva.unclaimed.length
   };
 
   const values = {
@@ -233,17 +290,37 @@ export async function computeMetrics(root = ROOT) {
 
   /* KRI evaluation — a KRI is breached when its metric violates the threshold.
      Uninstrumented KRIs are excluded from the rate and reported with reasons,
-     never counted as passing. */
+     never counted as passing.
+
+     A trigger framework needs a warning band, not just a red line, so a KRI may
+     carry `threshold_amber` — the earlier line whose crossing is a signal rather
+     than a breach. It is a SIBLING key, never a reshaping of `threshold`, which
+     the test suite hard-requires. Amber exists only where the red line has
+     headroom: a threshold of 0 or 100% has none by construction, and inventing
+     one there would be a warning that can never fire.
+
+     Every projected KRI carries its owner and the escalation SLA of the appetite
+     position it measures — a breach with no named recipient and no clock is a
+     dashboard, not a trigger framework. Note that this whole object is a
+     PROJECTION: a field added to data/risk-appetite.json and not listed here
+     never reaches the snapshot, so the governance data would exist and never be
+     measured. */
   const appetite = json(root, 'data/risk-appetite.json');
+  const positions = new Map(appetite.appetite.map((a) => [a.id, a]));
+  const violates = (t, v) => (t.operator === '>=' ? !(v >= t.value) : t.operator === '<=' ? !(v <= t.value) : null);
   const kris = appetite.kris.map((k) => {
-    if (!k.instrumented) return { id: k.id, label: k.label, metric: k.metric, value: null, instrumented: false, breached: null };
+    const pos = positions.get(k.appetite_ref) || {};
+    const base = {
+      id: k.id, label: k.label, metric: k.metric, appetite_ref: k.appetite_ref,
+      owner: k.owner || null, escalation_sla: pos.escalation_sla || null
+    };
+    if (!k.instrumented) return { ...base, value: null, instrumented: false, breached: null, amber: null };
     const value = values[k.metric] === undefined ? null : values[k.metric];
-    const t = k.threshold;
-    const breached = value === null ? null
-      : t.operator === '>=' ? !(value >= t.value)
-      : t.operator === '<=' ? !(value <= t.value)
-      : null;
-    return { id: k.id, label: k.label, metric: k.metric, value, threshold: t, instrumented: true, breached };
+    const breached = value === null ? null : violates(k.threshold, value);
+    /* Amber is reported only when the KRI is NOT already in breach — a red line
+       crossed is not also a warning. */
+    const amber = value === null || breached || !k.threshold_amber ? null : violates(k.threshold_amber, value);
+    return { ...base, value, threshold: k.threshold, threshold_amber: k.threshold_amber || null, instrumented: true, breached, amber };
   });
   const measurable = kris.filter((k) => k.instrumented && k.breached !== null);
   const breachedCount = measurable.filter((k) => k.breached).length;
@@ -261,6 +338,16 @@ export async function computeMetrics(root = ROOT) {
     },
     counters,
     kris,
+    /* Named, not just counted: a board that reads "1 risk above appetite" has to
+       go and find which one. The `dated_treatment` flag is the methodology's own
+       requirement scored per row — a treatment cell carrying a review cadence
+       but no date does not satisfy "a treatment plan with an owner and a date". */
+    appetite_scoring: {
+      basis: 'Every row of docs/aims/ai-risk-register.md scored against the residual_ceiling of the appetite position that claims it in data/risk-appetite.json. A ceiling is the highest residual the firm carries in that domain without a dated treatment plan; see residual_ceiling_basis for how the ceilings are derived from the methodology bands.',
+      risks_scored: rva.scored,
+      above_appetite: rva.above,
+      unclaimed_risks: rva.unclaimed
+    },
     control_gaps: ce.broken
   };
 }

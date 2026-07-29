@@ -31,7 +31,11 @@
       "statement": "No dealing with a designated party, and no silent clear. A confirmed match stops the relationship and starts the TFS procedure; a screening run that cannot load a core list must read DEGRADED rather than pass.",
       "enforced_by": ["screen.py", "docs/aims/tfs-name-match-procedure.md", "data/eocn-local-terrorist-list.json"],
       "obligations": ["OB-04", "OB-05", "OB-15"],
-      "kris": ["KRI-01"]
+      "kris": ["KRI-01"],
+      "owner": "MLRO",
+      "residual_ceiling": 6,
+      "risks": ["R-03", "R-04", "R-05"],
+      "escalation_sla": "Same business day to the MLRO; a confirmed designated-party match goes to the Board immediately and starts the TFS procedure."
     },
     {
       "id": "RA-02",
@@ -40,7 +44,11 @@
       "statement": "Risk is accepted by band, not by exception: CDD to 19, SDD to 22, EDD above. A prohibited outcome is never onboarded, and diligence may only ever be raised — never lowered — by a human, and only with a written reason.",
       "enforced_by": ["app.js", "index.html", "data/jurisdiction-risk.json"],
       "obligations": ["OB-01", "OB-02"],
-      "kris": ["KRI-02"]
+      "kris": ["KRI-02"],
+      "owner": "MLRO",
+      "residual_ceiling": 12,
+      "risks": ["R-13", "R-16"],
+      "escalation_sla": "Five business days to the MLRO; a prohibited outcome onboarded escalates immediately."
     },
     {
       "id": "RA-03",
@@ -49,7 +57,11 @@
       "statement": "No AI system decides, files, freezes or records. Models classify, draft and advise; humans decide. No model call may declare tools, and no generative prose may enter a filed report.",
       "enforced_by": ["data/tool-surfaces.json", "data/ai-assets.json", "ai.py"],
       "obligations": ["OB-07"],
-      "kris": ["KRI-03"]
+      "kris": ["KRI-03"],
+      "owner": "MLRO",
+      "residual_ceiling": 6,
+      "risks": ["R-01", "R-02", "R-10", "R-18"],
+      "escalation_sla": "Same business day to the MLRO. A model call that declares tools, or generative prose in a filed report, is an incident under the AI incident runbook, not a KRI breach to be logged."
     },
     {
       "id": "RA-04",
@@ -58,7 +70,11 @@
       "statement": "No personal data reaches a processor without an executed DPA and a confirmed transfer basis. Where the basis is unconfirmed the path is gated OFF, not merely documented as a risk.",
       "enforced_by": ["docs/governance/dpia-2026.md", "docs/aims/third-party-register.md", "ai.py"],
       "obligations": ["OB-14"],
-      "kris": ["KRI-04"]
+      "kris": ["KRI-04"],
+      "owner": "MLRO / DPO",
+      "residual_ceiling": 6,
+      "risks": ["R-06"],
+      "escalation_sla": "Same business day to the MLRO and the DPO; the affected path is gated OFF before the escalation, not after it."
     },
     {
       "id": "RA-05",
@@ -67,7 +83,11 @@
       "statement": "No instruction set reaches production unreviewed, and no agent holds an action that is not registered with a credential and a kill switch.",
       "enforced_by": ["data/prompt-assets.json", "data/tool-surfaces.json", "agents.py"],
       "obligations": ["OB-07"],
-      "kris": ["KRI-05"]
+      "kris": ["KRI-05"],
+      "owner": "Compliance Engineering",
+      "residual_ceiling": 6,
+      "risks": ["R-11"],
+      "escalation_sla": "Same business day to the maintainer and the MLRO; unreviewed instruction-set drift is reverted first and discussed second."
     },
     {
       "id": "RA-06",
@@ -76,7 +96,11 @@
       "statement": "Degradation is tolerated; silent degradation is not. A failed source, a dead run or a stale list is acceptable for as long as it is visible, alarmed and attributed — never absorbed into a clean-looking result.",
       "enforced_by": [".github/workflows/freshness-check.yml", "docs/governance/backup-recovery.md", "docs/governance/ai-incident-runbook.md"],
       "obligations": ["OB-15"],
-      "kris": ["KRI-06"]
+      "kris": ["KRI-06"],
+      "owner": "Compliance Engineering",
+      "residual_ceiling": 12,
+      "risks": ["R-08", "R-09", "R-12", "R-14", "R-15", "R-17"],
+      "escalation_sla": "Ten business days to the maintainer for a single breach; a sustained anomaly auto-escalates to a GitHub issue on the run that detects it."
     },
     {
       "id": "RA-07",
@@ -85,7 +109,11 @@
       "statement": "No secret in git history, no known-vulnerable dependency without a recorded justification, no unreviewed third-party action in a workflow.",
       "enforced_by": [".github/workflows/gitleaks.yml", ".github/workflows/osv-scanner.yml", "ci/osv-scanner.toml"],
       "obligations": [],
-      "kris": ["KRI-07"]
+      "kris": ["KRI-07"],
+      "owner": "Compliance Engineering",
+      "residual_ceiling": 6,
+      "risks": ["R-07", "R-19"],
+      "escalation_sla": "Same business day to the maintainer; a secret in git history escalates to the repo owner immediately and triggers the history-scrub runbook."
     },
     {
       "id": "RA-08",
@@ -94,9 +122,16 @@
       "statement": "Findings are accepted as a normal output of assurance; carrying them is not. Every finding gets a root cause, a corrective action and a verification, and CRITICAL/HIGH findings carry a regression test.",
       "enforced_by": ["docs/aims/corrective-actions.md", "docs/aims/internal-audit.md"],
       "obligations": ["OB-12"],
-      "kris": ["KRI-08"]
+      "kris": ["KRI-08", "KRI-09", "KRI-10"],
+      "owner": "MLRO (with Internal Audit)",
+      "residual_ceiling": 9,
+      "risks": ["R-20"],
+      "escalation_sla": "Reported at the next quarterly management review; a CRITICAL or HIGH finding open past its verification escalates to the MLRO within five business days."
     }
   ],
+
+  "residual_ceiling_basis": "A ceiling is the highest RESIDUAL score (likelihood x impact, 1-25) the firm will carry in that domain without a treatment plan that has an owner and a date. It is the number that makes docs/policies/risk-assessment-methodology.md section 3 enforceable: 'residual risk is compared against the appetite; anything above appetite requires a treatment plan with an owner and a date' could not be evaluated while no position stated one. Ceilings are set on the methodology's own published bands (Low 1-6, Medium 7-12, High 13-25), not chosen per risk: ZERO = 6, so nothing above the Low band is carried untreated; LOW = 9, findings are a normal output of assurance and may sit into the lower Medium band while closure holds; BANDED = 12 and MEASURED = 12, the top of Medium, because both positions accept risk up to a stated boundary rather than minimising it. A ceiling is NOT a prohibition and a breach is NOT a failure: it is the trigger that requires a dated treatment. Scored by residualAboveAppetite in scripts/grc-metrics.mjs against docs/aims/ai-risk-register.md; the ceilings themselves are appetite, so only the Board may move them (resolution R7).",
+  "risk_coverage_note": "Every risk in docs/aims/ai-risk-register.md is claimed by exactly one appetite position, and every position lists the risks it owns. test/grc-metrics.test.mjs fails on a risk claimed twice or by nobody, so a new register row cannot be scored against an appetite that does not exist, and an appetite position cannot quietly stop covering a risk.",
 
   "advisor_zero_tolerance": [
     "Confirmed sanctions hit count",
@@ -118,7 +153,8 @@
       "metric": "controlEffectivenessRate",
       "threshold": { "operator": ">=", "value": 100 },
       "instrumented": true,
-      "rationale": "Every control in the assurance matrix must still point at a proof artefact that exists. Anything less means a claimed control is unevidenced."
+      "rationale": "Every control in the assurance matrix must still point at a proof artefact that exists. Anything less means a claimed control is unevidenced.",
+      "owner": "Compliance Engineering"
     },
     {
       "id": "KRI-02",
@@ -127,7 +163,8 @@
       "metric": "obligationsWithoutOwner",
       "threshold": { "operator": "<=", "value": 0 },
       "instrumented": true,
-      "rationale": "An obligation nobody owns is the failure mode behind 'weak ownership of key controls'."
+      "rationale": "An obligation nobody owns is the failure mode behind 'weak ownership of key controls'.",
+      "owner": "MLRO"
     },
     {
       "id": "KRI-03",
@@ -136,7 +173,8 @@
       "metric": "modelToolDeclarations",
       "threshold": { "operator": "<=", "value": 0 },
       "instrumented": true,
-      "rationale": "The moment a model call declares tools, the model can reach a connector directly and RA-03 no longer holds."
+      "rationale": "The moment a model call declares tools, the model can reach a connector directly and RA-03 no longer holds.",
+      "owner": "Compliance Engineering"
     },
     {
       "id": "KRI-04",
@@ -145,7 +183,8 @@
       "metric": "thirdPartyAssessmentCoverage",
       "threshold": { "operator": ">=", "value": 100 },
       "instrumented": true,
-      "rationale": "A processor whose safeguard is unconfirmed is a transfer the firm cannot evidence a basis for."
+      "rationale": "A processor whose safeguard is unconfirmed is a transfer the firm cannot evidence a basis for.",
+      "owner": "MLRO / DPO"
     },
     {
       "id": "KRI-05",
@@ -154,7 +193,8 @@
       "metric": "governanceDriftCount",
       "threshold": { "operator": "<=", "value": 0 },
       "instrumented": true,
-      "rationale": "Sums prompt fingerprint mismatches and agent-register mismatches: either means production behaviour changed without a recorded decision."
+      "rationale": "Sums prompt fingerprint mismatches and agent-register mismatches: either means production behaviour changed without a recorded decision.",
+      "owner": "Compliance Engineering"
     },
     {
       "id": "KRI-06",
@@ -162,8 +202,10 @@
       "appetite_ref": "RA-06",
       "metric": "obligationsWithoutWatchSource",
       "threshold": { "operator": "<=", "value": 1 },
+      "threshold_amber": { "operator": "<=", "value": 0 },
       "instrumented": true,
-      "rationale": "An obligation with no watched source changes without anyone noticing. One is tolerated (ISO/IEC 42001, a standards-body publication rather than a supervisor feed); a second means a real blind spot."
+      "rationale": "An obligation with no watched source changes without anyone noticing. One is tolerated (ISO/IEC 42001, a standards-body publication rather than a supervisor feed); a second means a real blind spot.",
+      "owner": "Compliance Officer"
     },
     {
       "id": "KRI-07",
@@ -172,7 +214,8 @@
       "metric": "unjustifiedSuppressions",
       "threshold": { "operator": "<=", "value": 0 },
       "instrumented": true,
-      "rationale": "Suppression is acceptable; silent suppression is not. Every entry in ci/osv-scanner.toml must carry a reason."
+      "rationale": "Suppression is acceptable; silent suppression is not. Every entry in ci/osv-scanner.toml must carry a reason.",
+      "owner": "Compliance Engineering"
     },
     {
       "id": "KRI-08",
@@ -180,8 +223,10 @@
       "appetite_ref": "RA-08",
       "metric": "auditFindingClosureRate",
       "threshold": { "operator": ">=", "value": 90 },
+      "threshold_amber": { "operator": ">=", "value": 95 },
       "instrumented": true,
-      "rationale": "Findings may be open; a backlog of them may not."
+      "rationale": "Findings may be open; a backlog of them may not.",
+      "owner": "MLRO (with Internal Audit)"
     },
     {
       "id": "KRI-09",
@@ -191,7 +236,18 @@
       "threshold": { "operator": "<=", "value": 10 },
       "instrumented": false,
       "not_instrumented_reason": "Open items carry an owner and a closing condition but no target date, so nothing can be aged against a deadline. Instrumenting this means the board setting target dates on the open-actions register — recorded as the reason the metric reports null rather than zero.",
-      "rationale": "Kept in the register unmeasured rather than dropped: an appetite you cannot measure is a gap to state, not a line to delete."
+      "rationale": "Kept in the register unmeasured rather than dropped: an appetite you cannot measure is a gap to state, not a line to delete.",
+      "owner": "MLRO"
+    },
+    {
+      "id": "KRI-10",
+      "label": "Risks carried above their appetite ceiling",
+      "appetite_ref": "RA-08",
+      "metric": "residualAboveAppetite",
+      "threshold": { "operator": "<=", "value": 0 },
+      "instrumented": true,
+      "rationale": "The methodology requires a dated treatment plan for anything above appetite, and until every position stated a numeric residual_ceiling that rule could not be evaluated at all. This scores every row of docs/aims/ai-risk-register.md against the ceiling of the position that claims it. A non-zero value is not a failure — it is the register saying, in a number, which risks the firm is knowingly carrying above the line it drew. It is filed under RA-08 because carrying a risk above appetite is a remediation obligation: the treatment plan, its owner and its date are what close it.",
+      "owner": "MLRO (with Internal Audit)"
     }
   ]
 }

@@ -326,6 +326,24 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 174 markdown documents under docs/ (141 excluding docs/research/auto).
+*(29 July, seventh pass — **appetite became tolerance**. Each of the eight appetite positions now carries
+a numeric **residual ceiling**, a named operational **owner** and an **escalation SLA** — the three things
+a boundary needs that a direction does not. That makes two of the firm's own written rules enforceable for
+the first time: the methodology's *"anything above appetite requires a treatment plan with an owner and a
+date"* and the register's auditor checkpoint *"residual scores sit within appetite"*, neither of which
+could be evaluated while no position stated a number to be above. Ceilings are derived from the
+methodology's own published bands by position type (ZERO 6, LOW 9, BANDED/MEASURED 12), not chosen risk by
+risk, and only the Board may move them. All twenty register risks are now claimed by exactly one position
+— CI fails on a risk claimed twice or by nobody — and `residualAboveAppetite` scores every one on each run.
+It reports **1**: R-03, the sanctions false negative, at residual 10 against a ZERO position's ceiling of 6,
+with a treatment carrying an owner and a cadence but no date. The measure was breached the day it was
+created, which is what it is for. Also added: amber warning bands as a sibling key (only where the red line
+has headroom — a threshold of 0 or 100% has none), KRI owners and SLAs carried into the snapshot projection
+so the governance data cannot exist unmeasured, and `kri-breach-ledger.md`, the append-only breach history
+the byte-compared snapshot cannot carry. One curated document added; no workflow added; no scored control
+changed.)*
+
 Verified at HEAD: 56 workflows · 173 markdown documents under docs/ (140 excluding docs/research/auto).
 *(29 July, sixth pass — the **risk vocabulary**: `risk-glossary.md` translates the thirty terms of the
 risk lens into business language and, in each case, points at the authoritative definition already in

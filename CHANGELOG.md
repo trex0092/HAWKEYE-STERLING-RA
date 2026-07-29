@@ -10,6 +10,72 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — appetite became tolerance, and the register's own auditor checkpoint became testable (2026-07-29)
+
+The estate stated eight appetite positions and measured nine KRIs, and **not one
+position carried a number**. That left two rules the firm wrote for itself
+unenforceable — `risk-assessment-methodology.md` §3 (*"residual risk is compared
+against the appetite; anything above appetite requires a treatment plan with an
+owner and a date"*) and the AI risk register's own auditor checkpoint
+(*"residual scores sit within appetite"*). Neither could be evaluated, because
+*above appetite* had nothing to be above. An appetite position is a direction; a
+**tolerance** is a boundary someone is told about when it is crossed, and that
+needs three things a direction does not: a number, an owner, and a clock.
+
+- **A numeric `residual_ceiling` on every position**, derived from the
+  methodology's own published bands (Low 1–6 · Medium 7–12 · High 13–25) **by
+  position type, not risk by risk** — ZERO 6, LOW 9, BANDED and MEASURED 12 —
+  with the derivation recorded in `residual_ceiling_basis` so an auditor can
+  challenge the rule rather than guess at eight separate numbers. CI enforces
+  that positions of the same type carry the same ceiling and that ZERO is
+  tighter than LOW; the ceilings are appetite, so only the Board may move them.
+- **An operational `owner` and an `escalation_sla` on every position, and an
+  `owner` on every KRI** — each required separately by CI, because each fails
+  separately: a ceiling with no owner has nobody to breach to, an owner with no
+  SLA has no clock.
+- **All twenty register risks are now claimed by exactly one appetite position**,
+  in both directions, with `risksWithoutAppetitePosition` pinned at 0. A risk
+  claimed by nobody was never scored, and an unscored risk is indistinguishable
+  from a compliant one in a count.
+- **`residualAboveAppetite` scores every risk on every run** — parsing the
+  markdown register by **column header name**, never by position, so an inserted
+  column cannot silently make it read the wrong cell. **It reports 1**: R-03,
+  the sanctions false negative, sits at residual **10 Medium** against RA-01's
+  ceiling of **6**, and its treatment carries an owner and a quarterly cadence
+  but **no date** — recorded per row, because a cadence is a rhythm and the
+  methodology asks for a deadline. The snapshot **names** the risk rather than
+  only counting it. The measure was breached the day it was created; that is
+  what it is for, since the condition was already true and nothing counted it.
+- **Amber warning bands, as a sibling key `threshold_amber`** — never a
+  reshaping of `threshold`, which the suite hard-requires. Amber exists **only
+  where the red line has headroom**: a threshold of 0 or 100% has none by
+  construction, and a warning that can never fire is worse than none. Two KRIs
+  qualify; the rest read `—` rather than carrying an invented number.
+- **The snapshot's KRI block is a projection, and now says so.** Owners, SLAs
+  and amber verdicts are copied into it explicitly — a field added to
+  `data/risk-appetite.json` and not listed in the projection would reach no
+  board pack, so the governance data would exist and never be measured. A new
+  test asserts every projected KRI carries both.
+- **[`docs/governance/kri-breach-ledger.md`](docs/governance/kri-breach-ledger.md)
+  — the history the snapshot cannot carry.** `data/grc-metrics.json` is
+  byte-compared by CI and holds no timestamp by design, so it can only ever say
+  where a number is *now*. The ledger is append-only, records who was told and
+  what followed, keeps amber signals separate from breaches, and is pinned by CI:
+  every KRI it quotes must still exist with that metric, and **every currently
+  breached KRI must appear in it** — a breach the dashboard shows and the ledger
+  does not is a breach with no recorded escalation.
+- **Two stale claims fixed.** `risk-appetite-statement-2026.md` hand-quoted
+  "nine KRIs, eight instrumented" in its header — a count that goes stale on
+  every KRI change, now replaced by a pointer to the live snapshot — and RA-08
+  listed only KRI-08 while KRI-09 named RA-08 as its position, so the link ran
+  one way only. CI now checks both directions.
+- **Capacity is still not stated, and the statement says so.** Risk capacity is
+  a firm-level judgement about capital, licence and staffing that this
+  repository holds no input to. Named as a gap rather than quietly omitted.
+
+**R7 is not ratified by this change.** The statement stays DRAFT; ratification
+is a board act (open-actions item 17).
+
 ### Governance — registers say how they know, and the missing-deadline gap is now a number (2026-07-29)
 
 Register hygiene: four claims the registers made that the evidence did not
