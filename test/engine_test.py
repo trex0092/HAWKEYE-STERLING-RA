@@ -2447,6 +2447,97 @@ screen.prune_delta_state(_state, _dt_budget.date(2026, 7, 17))
 check("prune drops stale fingerprints but keeps the reserved budget key",
       "somefingerprint" not in _state and _state.get(screen.NOTES_BUDGET_KEY) == 39000)
 
+# ── A case note's TAIL is the disposition — never head-slice it ──────────────
+# create_case_subtask used to send `notes[:8000]`, cutting from the END. The end
+# of a case note is the only part the MLRO has to act on: the disposition
+# checkboxes (the decision record), the "Do not tip off / CR 74/2020" warning,
+# and for HIGH-risk cases the entire STR/SAR draft. Measured before the fix on a
+# 60-hit HIGH-risk case: 10,944 chars built, 8,000 delivered, all three blocks
+# gone — and no log line said so. 8,000 was also 8x stricter than the budget the
+# SAME notes field accepts on the report path.
+_cs_sent = []
+_orig_asana_req = screen.asana_request
+
+
+def _cs_stub(status_seq):
+    """Stub asana_request, recording each payload; returns the given statuses."""
+    seq = list(status_seq)
+    _cs_sent.clear()
+
+    def _req(method, url, **kw):
+        _cs_sent.append(kw.get("json", {}).get("data", {}))
+        code = seq.pop(0) if seq else 500
+        return types.SimpleNamespace(status_code=code, text="stub")
+    return _req
+
+
+_cs_disp = "Disposition: [ ] false positive   [ ] escalate / freeze (TFS)   [ ] investigate"
+_cs_tip = "Do not tip off. UAE Cabinet Resolution 74/2020 applies."
+_cs_str = "SUGGESTED STR/SAR DRAFT"
+# A note far past any budget, with the load-bearing blocks last (real ordering).
+_cs_note = ("Customer: Example Trading LLC\n"
+            + "".join(f"- [individual] Subject → OFAC SDN: \"MOHAMMED AL-{'X'*12} {i}\"  9{i%10}%\n"
+                      for i in range(4000))
+            + "\n" + _cs_disp + "\n" + _cs_tip + "\n\n" + _cs_str + "\n"
+            + "Narrative paragraph. " * 40)
+try:
+    screen.asana_request = _cs_stub([201])
+    _ok = screen.create_case_subtask("parent-gid", "🔴 SANCTIONS case: Example", _cs_note, "2026-07-29")
+    _sent = _cs_sent[0]["notes"]
+    check("create_case_subtask reports success when Asana accepts", _ok is True)
+    check("oversized case note is truncated, not sent whole", len(_sent) < len(_cs_note))
+    check("truncated case note KEEPS the disposition checkboxes", _cs_disp in _sent)
+    check("truncated case note KEEPS the tip-off warning (CR 74/2020)", _cs_tip in _sent)
+    check("truncated case note KEEPS the STR/SAR draft", _cs_str in _sent)
+    check("truncated case note marks the cut (not a silent amputation)",
+          "truncated" in _sent)
+    check("case note fits Asana's escaped rich-text budget",
+          screen._asana_notes_size(_sent) <= screen.CASE_NOTES_MAX)
+
+    # A case note within budget is delivered INTACT — the old 8,000-char slice
+    # cut notes the API would have taken in full.
+    _mid = "x" * 20000 + "\n" + _cs_disp
+    screen.asana_request = _cs_stub([201])
+    screen.create_case_subtask("parent-gid", "case", _mid, "2026-07-29")
+    check("a 20k-char case note is delivered INTACT (old cap cut it at 8,000)",
+          _cs_sent[0]["notes"] == _mid)
+
+    # A refused create is re-queued to the backlog and retried on later runs, so
+    # a payload Asana rejects at full budget would re-fail forever.
+    screen.asana_request = _cs_stub([400, 201])
+    _ok2 = screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    check("a size refusal (400) is re-bid at the smaller budget and succeeds", _ok2 is True)
+    check("the re-bid actually shrank the payload",
+          len(_cs_sent) == 2 and len(_cs_sent[1]["notes"]) < len(_cs_sent[0]["notes"]))
+    _cs_rebid = _cs_sent[1]["notes"] if len(_cs_sent) > 1 else ""
+    check("the re-bid STILL keeps the disposition block",
+          _cs_disp in _cs_rebid and _cs_tip in _cs_rebid)
+
+    # An auth/rate/network failure fails identically at any size — re-bidding
+    # smaller just burns a second call against the rate limit.
+    screen.asana_request = _cs_stub([401, 201])
+    _ok3 = screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    check("a non-size failure (401) is NOT re-bid smaller", _ok3 is False and len(_cs_sent) == 1)
+    screen.asana_request = _cs_stub([429, 201])
+    screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    check("a rate-limit (429) is NOT re-bid smaller either", len(_cs_sent) == 1)
+
+    # WIRING, not just behaviour: the head-slice must not come back.
+    _cs_src = _inspect.getsource(screen.create_case_subtask)
+    # Strip the docstring first — it NAMES the old `notes[:8000]` slice to
+    # explain the bug, and matching that prose would make this check vacuous.
+    # (getdoc() dedents, so it does not match the raw source; split on the
+    # delimiters and drop what lies between the first pair.)
+    _cs_parts = _cs_src.split('"""')
+    _cs_code = _cs_parts[0] + "".join(_cs_parts[2:])
+    check("the docstring-strip left real code to inspect (guard is not vacuous)",
+          "asana_request(" in _cs_code and "[:8000]" not in _cs_code.split("\n", 1)[0])
+    check("create_case_subtask never head-slices notes",
+          "[:8000]" not in _cs_code and 'notes or "")[:' not in _cs_code)
+    check("create_case_subtask routes notes through cap_notes", "cap_notes(" in _cs_code)
+finally:
+    screen.asana_request = _orig_asana_req
+
 # ── MLRO case backlog: overflow/failed items are cased LATER, not never ──────
 print("screen.py — case-cap overflow backlog")
 check("the backlog delta-state key can never collide with a fingerprint",

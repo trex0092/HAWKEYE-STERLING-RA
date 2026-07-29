@@ -948,6 +948,19 @@ def log(msg):
 # ── ASANA TRANSPORT (honours 429 rate-limit; retries transient errors) ────────
 ASANA_NOTES_MAX = 65000    # opening budget in worst-case rich-text bytes — see _asana_notes_size
 ASANA_NOTES_FLOOR = 12000  # shrink-chain floor: keeps the summary + sign-off intact
+# Case subtasks post to the SAME notes field as the daily report, so they get the
+# same budget. They used to be head-sliced at 8,000 characters — 8x stricter than
+# the report path for no reason, and cut from the WRONG END (see
+# create_case_subtask). CASE_NOTES_FLOOR is the retry budget if Asana still
+# refuses: a rejected create is re-queued to the backlog and would otherwise
+# re-fail on every future run.
+CASE_NOTES_MAX = 65000
+CASE_NOTES_FLOOR = 8000
+# A case note's tail is load-bearing: disposition checkboxes, the tip-off
+# warning, and (HIGH-risk) the whole STR/SAR draft all sit at the end. The
+# report's 1,200-char tail is sized for a sign-off block and would still cut the
+# disposition out from under a long STR draft.
+CASE_NOTES_TAIL = 6000
 
 # Asana's server-side size accounting is a black box (2026-07-16: it rejected
 # notes capped to a 65,000-byte NUMERIC-ENTITY WORST CASE, i.e. stricter than
@@ -1066,16 +1079,19 @@ def _asana_notes_size(s):
         total += cost
     return total
 
-def cap_notes(narrative, limit=None):
+def cap_notes(narrative, limit=None, tail_chars=1200):
     """Cap a report to Asana's notes limit WITHOUT amputating the sign-off / retention
     footer at the end — truncate the body, keep the tail. Sizes are measured with
     _asana_notes_size (worst-case rich-text bytes — see above); the head cut lands
     on a character boundary by construction. `limit` overrides ASANA_NOTES_MAX so
-    post_unified_task can retry with a smaller budget if Asana still refuses."""
+    post_unified_task can retry with a smaller budget if Asana still refuses.
+    `tail_chars` sizes the protected tail: the default suits the report's sign-off
+    block, while case subtasks need a larger one (CASE_NOTES_TAIL) because their
+    disposition block can sit above a long STR/SAR draft."""
     limit = ASANA_NOTES_MAX if limit is None else limit
     if _asana_notes_size(narrative) <= limit:
         return narrative
-    tail = narrative[-1200:]
+    tail = narrative[-tail_chars:]
     marker = "\n…[body truncated — see workflow run log]…\n"
     budget = limit - _asana_notes_size(tail) - _asana_notes_size(marker)
     lo, hi = 0, len(narrative)
@@ -4806,15 +4822,38 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     return None
 
 def create_case_subtask(parent_gid, name, notes, due_on):
-    """One trackable MLRO case per NEW hit — assigned, with a disposition to set."""
+    """One trackable MLRO case per NEW hit — assigned, with a disposition to set.
+
+    Notes are capped with cap_notes (keeps the TAIL), never head-sliced. The end
+    of a case note is the part that has to survive: the disposition checkboxes —
+    the MLRO's actual decision record — the "Do not tip off / CR 74/2020"
+    warning, and for HIGH-risk cases the whole STR/SAR draft. The old
+    `notes[:8000]` cut from exactly there, so any case with a long hit list
+    reached the queue with evidence but nothing to tick and no legal warning,
+    and said so in no log line. Measured on a 60-hit HIGH-risk case: 10,944
+    chars in, 8,000 delivered, all three blocks gone.
+
+    A rejected create is re-queued to the backlog and retried on later runs, so
+    a payload Asana refuses at full budget would re-fail forever — retry once at
+    CASE_NOTES_FLOOR before giving up."""
     if not parent_gid: return False
-    payload = {"data": {
-        "name": name[:250], "notes": (notes or "")[:8000], "assignee": ASANA_ASSIGNEE_GID,
-        "due_on": due_on, "parent": parent_gid,
-    }}
-    r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
-    if r is not None and r.status_code in (200, 201):
-        return True
+    body = notes or ""
+    r = None
+    for budget in (CASE_NOTES_MAX, CASE_NOTES_FLOOR):
+        payload = {"data": {
+            "name": name[:250],
+            "notes": cap_notes(body, budget, tail_chars=CASE_NOTES_TAIL),
+            "assignee": ASANA_ASSIGNEE_GID, "due_on": due_on, "parent": parent_gid,
+        }}
+        r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+        if r is not None and r.status_code in (200, 201):
+            return True
+        # Only a size/validation refusal is worth re-bidding smaller; an auth,
+        # rate-limit or network failure fails identically at any budget.
+        if getattr(r, "status_code", None) not in (400, 413):
+            break
+        if budget != CASE_NOTES_FLOOR:
+            log(f"  case subtask refused at {budget}-byte budget — retrying at {CASE_NOTES_FLOOR}")
     log(f"  case subtask failed: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
     return False
 

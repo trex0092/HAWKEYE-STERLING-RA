@@ -10,6 +10,28 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### MLRO cases — the disposition block was being cut off the end of long cases (2026-07-29)
+
+`create_case_subtask` sent `notes[:8000]`, a head slice. The **end** of a case
+note is the part that has to survive: the disposition checkboxes (the MLRO's
+actual decision record), the "Do not tip off — UAE Cabinet Resolution 74/2020
+applies" warning, and for HIGH-risk cases the entire STR/SAR draft. Any case
+with a long hit list therefore reached the queue with evidence but **nothing to
+tick and no legal warning**, and no log line said so. Measured on a 60-hit
+HIGH-risk case: 10,944 characters built, 8,000 delivered, all three blocks gone.
+
+8,000 characters was also **8x stricter than the budget the same Asana notes
+field accepts** on the report path (65,000 worst-case rich-text bytes), so cases
+were being cut that the API would have taken whole.
+
+Case notes now go through `cap_notes` — which truncates the body and keeps the
+tail — at the report path's budget, with a protected tail large enough that the
+disposition block survives even above a long STR draft, and a visible truncation
+marker instead of a silent cut. A refused create is re-queued to the backlog and
+retried on later runs, so a payload Asana rejects at full budget would re-fail
+forever; a size refusal (400/413) is now re-bid once at a smaller budget, while
+auth, rate-limit and network failures are not (they fail identically at any size).
+
 ### Screening state — a flaky fetch could erase the delivered-finding history (2026-07-29)
 
 Both state writers — the daily sweep and the onboarding run — restored the
