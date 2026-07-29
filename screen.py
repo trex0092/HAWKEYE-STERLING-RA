@@ -3857,10 +3857,10 @@ def _eu_official_fallback(names):
 #     run AFTER delivery so the outage still goes red and cannot become
 #     routine. (Treating outages as breaches killed the whole run, report and
 #     Asana delivery included, on any transient source outage.)
-# Only OFAC and UN have OpenSanctions mirror fallbacks (EU is itself fetched
-# from that mirror; UK and the local EOCN file have no second source), and the
-# legacy daily path has none, so outages here are real single-list gaps the
-# mirrors did not absorb.
+# OFAC, UN and UK fall back to their OpenSanctions mirrors and EU to the
+# official webgate XML (both load paths, since 2026-07-29); AU/CH and the
+# local EOCN file have no second source, so outages there are real
+# single-list gaps no fallback can absorb.
 # Floors are ~50% of the verified 2026-07-02 baseline counts (OFAC 19,129 /
 # UN 1,002 / UK 19,762 / EU 42,347 / EOCN 312): generous enough for real
 # de-listings, tight enough to catch a broken parse.
@@ -3881,6 +3881,55 @@ CORE_LIST_FLOORS = {
     "ch":   int(os.environ.get("LIST_FLOOR_CH",   "500")),
 }
 
+# ── Adaptive floor ratchet ────────────────────────────────────────────────────
+# The static floors above are point-in-time baselines (and AU/CH's are
+# provisional). Each run RAISES — never lowers — a list's effective floor to
+# ADAPTIVE_FLOOR_PCT of its trailing-median count from the persisted coverage
+# history (the same data/source-coverage-state.json that
+# monitoring.check_source_coverage maintains and the delta-state overlay
+# refreshes before every run), once ADAPTIVE_FLOOR_MIN_HISTORY days of history
+# exist. So "tighten AU/CH toward ~50% of the observed baseline" happens by
+# itself as history accrues, and a partial corruption that clears the static
+# floor but sits under half the observed baseline still refuses the run.
+# A FALLBACK-served list keeps the static floor: a mirror is a different
+# corpus (e.g. OFAC without the alt.csv alias fold), and judging it by the
+# primary's baseline would turn the fallback into a refusal trap.
+# Kill-switch: ADAPTIVE_FLOOR_PCT=0 (static floors only).
+ADAPTIVE_FLOOR_PCT = float(os.environ.get("ADAPTIVE_FLOOR_PCT", "0.5"))
+ADAPTIVE_FLOOR_MIN_HISTORY = int(os.environ.get("ADAPTIVE_FLOOR_MIN_HISTORY", "5"))
+
+def adaptive_core_floors(static=None, state_path=None):
+    """Effective per-list floors: the configured static floor, raised to
+    ADAPTIVE_FLOOR_PCT of the trailing-median observed count where enough
+    history exists. Never lowers a configured floor, and any read/parse
+    problem simply yields the static floors — the ratchet is an extra guard,
+    not a new failure mode."""
+    floors = dict(CORE_LIST_FLOORS if static is None else static)
+    if ADAPTIVE_FLOOR_PCT <= 0:
+        return floors
+    try:
+        with open(state_path or monitoring.COVERAGE_STATE_PATH) as f:
+            state = json.load(f)
+        for key in floors:
+            hist = sorted(c for c in (h.get("count")
+                          for h in (state.get(key) or {}).get("history", []))
+                          if isinstance(c, (int, float)) and c > 0)
+            if len(hist) < ADAPTIVE_FLOOR_MIN_HISTORY:
+                continue
+            n = len(hist)
+            med = hist[n // 2] if n % 2 else (hist[n // 2 - 1] + hist[n // 2]) / 2
+            floors[key] = max(floors[key], int(med * ADAPTIVE_FLOOR_PCT))
+    except Exception:
+        pass
+    return floors
+
+def _fallback_served(meta):
+    """Whether the list was served by a fallback source this run — the
+    provenance lives in the date field ('live (OpenSanctions mirror)' /
+    'live (EU official XML)')."""
+    d = str((meta or {}).get("date", "")).lower()
+    return "mirror" in d or "official xml" in d
+
 # Set by enforce_core_list_floors(); read by enforce_list_outage_gate() after
 # the report has been delivered (same post-delivery pattern as EOCN_REVIEW_ALERT).
 LIST_OUTAGE_ALERT = {"outages": []}
@@ -3900,22 +3949,29 @@ def core_list_floor_breaches(list_meta, floors=None, fetched=None):
     fetched maps list key -> whether source material was obtained; when
     fetched is None, or a key is missing from it, a sub-floor list counts as
     a breach (fail-closed, the original behavior). Lists absent from the
-    floors map (supplementary tier) are never floored."""
-    floors = CORE_LIST_FLOORS if floors is None else floors
+    floors map (supplementary tier) are never floored.
+    When floors is None (production), each PRIMARY-served list's floor is the
+    adaptive ratchet (static raised to a fraction of its trailing-median
+    observed count); a fallback-served list keeps the static floor. Explicit
+    floors are honored verbatim (tests, overrides)."""
+    static = CORE_LIST_FLOORS if floors is None else floors
+    adaptive = adaptive_core_floors(static) if floors is None else static
     breaches, outages = [], []
-    for key, floor in floors.items():
+    for key, floor in static.items():
         meta = (list_meta or {}).get(key)
         if meta is None:
             continue
         count = int(meta.get("count", 0) or 0)
-        if count >= floor:
+        eff = floor if _fallback_served(meta) else adaptive.get(key, floor)
+        if count >= eff:
             continue
+        note = "" if eff == floor else " (adaptive: raised from the observed baseline)"
         if fetched is not None and not fetched.get(key, True):
             outages.append(f"{key.upper()} source unavailable this run ({count:,} name(s) loaded, "
-                           f"floor {floor:,}): screening proceeds DEGRADED without it")
+                           f"floor {eff:,}{note}): screening proceeds DEGRADED without it")
         else:
             breaches.append(f"{key.upper()} loaded {count:,} name(s), below its coverage floor "
-                            f"of {floor:,} - possible failed download / bad parse / truncated source")
+                            f"of {eff:,}{note} - possible failed download / bad parse / truncated source")
     return breaches, outages
 
 def enforce_core_list_floors(list_meta, fetched=None):

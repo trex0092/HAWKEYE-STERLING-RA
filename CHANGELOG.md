@@ -10,6 +10,25 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — coverage floors ratchet themselves to the observed baseline (2026-07-29)
+
+The static floors are point-in-time baselines, and AU/CH shipped with
+provisional 500s and a TODO to tighten them by hand once runs logged real
+counts. Now the engine does the tightening itself: each run raises — never
+lowers — a primary-served core list's effective floor to
+`ADAPTIVE_FLOOR_PCT` (50%) of its trailing-median count from the coverage
+history `monitoring.check_source_coverage` already persists, once
+`ADAPTIVE_FLOOR_MIN_HISTORY` (5) days of history exist. A partial corruption
+that clears a stale static floor but sits under half the observed baseline
+now refuses the run. Fallback-served lists keep the static floor — a mirror
+is a different corpus (e.g. OFAC without the alias fold), and judging it by
+the primary's baseline would turn the fallback into a refusal trap. Any
+read/parse problem with the history yields the static floors: the ratchet is
+an extra guard, not a new failure mode. Kill-switch `ADAPTIVE_FLOOR_PCT=0`.
+Engine tests cover the ratchet, the minimum-history gate, the never-lower
+rule, the fallback exemption, and the missing-file path; the pre-existing
+static-floor tests are pinned hermetic against a nonexistent history file.
+
 ### Screening — every core list with a second origin now falls back to it (2026-07-29)
 
 The UN blob rotation caught by the 29 Jul proof run showed the remaining

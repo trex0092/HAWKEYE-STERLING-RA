@@ -1620,6 +1620,12 @@ check("a hit with no known attributes carries an empty context",
 screen.LIST_ENTRY_ATTRS.clear()
 
 print("screen — core-list coverage floors (zero/partial-load hard-fail)")
+# The static-floor tests below predate the adaptive ratchet and pin the STATIC
+# behavior, so point the coverage history at a path that does not exist — the
+# repo's committed source-coverage-state.json would otherwise raise the
+# effective floors mid-test (exactly what the ratchet is for in production).
+_prev_cov_path = screen.monitoring.COVERAGE_STATE_PATH
+screen.monitoring.COVERAGE_STATE_PATH = "/nonexistent/source-coverage-state.json"
 _meta_ok = {"ofac": {"count": 19129}, "un": {"count": 1002}, "uk": {"count": 19762},
             "eu": {"count": 42347}, "eocn": {"count": 312}}
 check("floors: healthy baseline counts pass", screen.core_list_floor_breaches(_meta_ok) == ([], []))
@@ -1689,6 +1695,51 @@ _floor_clean = screen.enforce_core_list_floors(_meta_ok)
 check("floors: a healthy load never refuses", _floor_clean == ([], []))
 screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
 screen.LIST_OUTAGE_ALERT["outages"] = []
+
+# ── Adaptive floor ratchet: floors rise to a fraction of the observed baseline ─
+# The AU/CH floors shipped provisional (500) with a TODO to tighten them once
+# runs logged real counts; the ratchet does that tightening automatically, and
+# catches partial corruption that clears a stale static floor.
+print("screen — adaptive floor ratchet (observed-baseline tightening)")
+_covf = _tmp.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump({
+    "au": {"history": [{"date": f"2026-07-{d:02d}", "count": 4000} for d in range(20, 27)]},
+    "ch": {"history": [{"date": "2026-07-26", "count": 6000}]},          # too short
+    "un": {"history": [{"date": f"2026-07-{d:02d}", "count": 700} for d in range(20, 27)]},
+}, _covf); _covf.close()
+_af = screen.adaptive_core_floors({"au": 500, "ch": 500, "un": 500}, state_path=_covf.name)
+check("ratchet raises a provisional floor to 50% of the trailing median",
+      _af["au"] == 2000)
+check("ratchet needs enough history days before it trusts a baseline",
+      _af["ch"] == 500)
+check("ratchet never lowers a configured floor (350 < static 500)",
+      _af["un"] == 500)
+check("a missing history file yields the static floors unchanged (no new failure mode)",
+      screen.adaptive_core_floors({"au": 500}, state_path="/nonexistent/x.json") == {"au": 500})
+_prev_pct = screen.ADAPTIVE_FLOOR_PCT
+screen.ADAPTIVE_FLOOR_PCT = 0.0
+check("kill-switch ADAPTIVE_FLOOR_PCT=0 keeps static floors only",
+      screen.adaptive_core_floors({"au": 500}, state_path=_covf.name) == {"au": 500})
+screen.ADAPTIVE_FLOOR_PCT = _prev_pct
+# End-to-end through the breach classifier: production path (floors=None) uses
+# the ratchet for a primary-served list, but a FALLBACK-served list keeps the
+# static floor — a mirror is a different corpus, and judging it by the
+# primary's baseline would turn the fallback into a refusal trap.
+screen.monitoring.COVERAGE_STATE_PATH = _covf.name
+_b_ad, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 1500, "date": "2026-07-29", "tier": "core"}})
+check("primary-served list below the ratcheted floor breaches (1,500 < 2,000)",
+      len(_b_ad) == 1 and "AU" in _b_ad[0] and "adaptive" in _b_ad[0])
+_b_mir, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 1500, "date": "live (OpenSanctions mirror)", "tier": "core"}})
+check("the same count served by a fallback keeps the static floor (no refusal trap)",
+      _b_mir == [])
+_b_mir_low, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 3, "date": "live (OpenSanctions mirror)", "tier": "core"}})
+check("a fallback-served list still breaches below the STATIC floor",
+      len(_b_mir_low) == 1 and "AU" in _b_mir_low[0])
+screen.monitoring.COVERAGE_STATE_PATH = _prev_cov_path
+os.unlink(_covf.name)
 
 print("hardening — atomic state writes")
 _hdir = _tmp.mkdtemp()
