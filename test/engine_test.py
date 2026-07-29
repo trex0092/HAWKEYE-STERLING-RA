@@ -1716,6 +1716,14 @@ check("ratchet never lowers a configured floor (350 < static 500)",
       _af["un"] == 500)
 check("a missing history file yields the static floors unchanged (no new failure mode)",
       screen.adaptive_core_floors({"au": 500}, state_path="/nonexistent/x.json") == {"au": 500})
+_badf = _tmp.NamedTemporaryFile("w", suffix=".json", delete=False)
+_badf.write("not json"); _badf.close()
+check("an unreadable history file yields the static floors (logged, not raised)",
+      screen.adaptive_core_floors({"au": 500}, state_path=_badf.name) == {"au": 500})
+json.dump({"au": {"history": "corrupt"}}, open(_badf.name, "w"))
+check("a malformed history entry yields the static floors (logged, not raised)",
+      screen.adaptive_core_floors({"au": 500}, state_path=_badf.name) == {"au": 500})
+os.unlink(_badf.name)
 _prev_pct = screen.ADAPTIVE_FLOOR_PCT
 screen.ADAPTIVE_FLOOR_PCT = 0.0
 check("kill-switch ADAPTIVE_FLOOR_PCT=0 keeps static floors only",

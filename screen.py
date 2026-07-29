@@ -3926,17 +3926,26 @@ def adaptive_core_floors(static=None, state_path=None):
     try:
         with open(state_path or monitoring.COVERAGE_STATE_PATH) as f:
             state = json.load(f)
-        for key in floors:
-            hist = sorted(c for c in (h.get("count")
-                          for h in (state.get(key) or {}).get("history", []))
-                          if isinstance(c, (int, float)) and c > 0)
-            if len(hist) < ADAPTIVE_FLOOR_MIN_HISTORY:
-                continue
-            n = len(hist)
-            med = hist[n // 2] if n % 2 else (hist[n // 2 - 1] + hist[n // 2]) / 2
-            floors[key] = max(floors[key], int(med * ADAPTIVE_FLOOR_PCT))
-    except Exception:
-        pass
+    except FileNotFoundError:
+        return floors   # no history yet (fresh checkout before the delta-state overlay)
+    except (OSError, ValueError) as e:
+        log(f"  adaptive floors: coverage history unreadable ({e}) — static floors apply")
+        return floors
+    if not isinstance(state, dict):
+        log("  adaptive floors: coverage history malformed (not an object) — static floors apply")
+        return floors
+    for key in floors:
+        entry = state.get(key)
+        raw = entry.get("history") if isinstance(entry, dict) else []
+        if not isinstance(raw, list):
+            raw = []
+        counts = sorted(h.get("count") for h in raw if isinstance(h, dict)
+                        and isinstance(h.get("count"), (int, float)) and h.get("count") > 0)
+        if len(counts) < ADAPTIVE_FLOOR_MIN_HISTORY:
+            continue
+        n = len(counts)
+        med = counts[n // 2] if n % 2 else (counts[n // 2 - 1] + counts[n // 2]) / 2
+        floors[key] = max(floors[key], int(med * ADAPTIVE_FLOOR_PCT))
     return floors
 
 def _fallback_served(meta):
