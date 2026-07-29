@@ -1754,6 +1754,60 @@ check("floors: a healthy load never refuses", _floor_clean == ([], []))
 screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
 screen.LIST_OUTAGE_ALERT["outages"] = []
 
+# ── Identity-based exclusion (false-positive DEMOTION, never suppression) ─────
+# One subject in the 29 Jul run carried 73 candidate designations, nearly all
+# different people sharing a common Arabic given name. Where BOTH sides publish
+# a DOB and a nationality and BOTH disagree, the candidate cannot be the
+# customer — it leaves the primary queue but stays in the record.
+print("screen — identity-based exclusion (demotion, not suppression)")
+screen.LIST_ENTRY_ATTRS.clear()
+screen.LIST_ENTRY_ATTRS[screen.normalize("KHAN, Mohammed")] = {
+    "dob": {"01 Jan 1955"}, "nationality": {"Afghanistan"}}
+screen.LIST_ENTRY_ATTRS[screen.normalize("MULTI YEAR")] = {
+    "dob": {"1955", "1960", "1962"}, "nationality": {"Somalia"}}
+screen.LIST_ENTRY_ATTRS[screen.normalize("NEAR YEAR")] = {
+    "dob": {"1978"}, "nationality": {"South Africa"}}
+screen.LIST_ENTRY_ATTRS[screen.normalize("NO DOB")] = {
+    "dob": set(), "nationality": {"Somalia"}}
+_cust = {"dob": "September 06, 1980", "nationality": "Pakistan"}
+# Every source writes dates differently — a YEAR comparison is the only one
+# reliable across all three, and a year gap is what distinguishes two people.
+check("DOB years parse from every source format (OFAC / UN / KYC)",
+      screen.dob_years("27 Nov 1978") == {1978}
+      and screen.dob_years("1979-03-03") == {1979}
+      and screen.dob_years("September 06, 1980") == {1980}
+      and screen.dob_years("1955 / 1960 / 1962") == {1955, 1960, 1962})
+check("a demonstrably different person is excluded, with a stated reason",
+      "25-year gap" in (screen.identity_exclusion_reason("KHAN, Mohammed", _cust) or ""))
+check("a multi-year designation is judged on its CLOSEST year",
+      "18-year gap" in (screen.identity_exclusion_reason("MULTI YEAR", _cust) or ""))
+# Fail-closed: anything unknown on either side keeps the candidate in the queue.
+check("a birth year within tolerance is never excluded",
+      screen.identity_exclusion_reason("NEAR YEAR", _cust) is None)
+check("a designation that publishes no DOB is never excluded",
+      screen.identity_exclusion_reason("NO DOB", _cust) is None)
+check("an unknown customer DOB never excludes (fail-closed)",
+      screen.identity_exclusion_reason("KHAN, Mohammed", {"dob": "", "nationality": "Pakistan"}) is None)
+check("an unknown customer nationality never excludes (fail-closed)",
+      screen.identity_exclusion_reason("KHAN, Mohammed", {"dob": "September 06, 1980", "nationality": ""}) is None)
+check("a MATCHING nationality never excludes, however far the years are",
+      screen.identity_exclusion_reason(
+          "KHAN, Mohammed", {"dob": "September 06, 1980", "nationality": "Afghanistan"}) is None)
+check("an entry with no published attributes at all is never excluded",
+      screen.identity_exclusion_reason("Totally Unknown Entry", _cust) is None)
+_prev_ie = screen.IDENTITY_EXCLUSION
+screen.IDENTITY_EXCLUSION = False
+check("kill-switch IDENTITY_EXCLUSION=0 excludes nothing",
+      screen.identity_exclusion_reason("KHAN, Mohammed", _cust) is None)
+screen.IDENTITY_EXCLUSION = _prev_ie
+# The whole point: this must DEMOTE, never suppress. The exclusion is a report
+# ordering decision — the hit itself must still exist for the delta state, the
+# MLRO case trail and the 10-year record.
+check("exclusion is a REPORT decision only — screen_name still returns the hit",
+      len(screen.screen_name("Mohammed Khan",
+                             {"OFAC SDN": [(screen.normalize("KHAN, Mohammed"), "KHAN, Mohammed")]})) >= 1)
+screen.LIST_ENTRY_ATTRS.clear()
+
 # ── Worldwide adverse-media locale rotation ───────────────────────────────────
 # The per-run locale budget is the empirical Google-News per-IP ceiling (raising
 # it tripped the limiter on 10-12 Jul and cost real recall), so worldwide reach

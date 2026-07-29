@@ -10,6 +10,43 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — false positives: identity-based demotion, never suppression (2026-07-29)
+
+The volume problem is real and measured: in the 29 Jul run a single subject
+carried **73 candidate designations**, and another 58 — nearly all of them
+different people who happen to share a common Arabic given name. That is alert
+fatigue, and alert fatigue is how a real hit gets missed.
+
+The engine now performs the same check the MLRO already does by eye. The report
+already prints the designation's DOB and nationality directly beneath the
+customer's; where **both axes are known on both sides and both disagree**, the
+candidate cannot be that customer, so it leaves the primary queue.
+
+It **demotes, it does not suppress**. The hit is still made, still stored in the
+delta state, still in the MLRO case trail and the 10-year record, and still
+printed in the report — under an `EXCLUDED ON IDENTITY` heading, each with the
+reason it was excluded ("customer born 1980, Pakistan · designation born 1955,
+Afghanistan — 25-year gap AND a different nationality") so an examiner can check
+the engine's reasoning instead of taking it on trust, and the MLRO can overrule
+it. **Recall is therefore mathematically untouched** — proven: the accuracy
+benchmark is bit-identical either way (recall 119/121, hard negatives 85/85).
+
+Deliberately fail-closed at every step: a missing customer DOB, a missing
+customer nationality, a designation that publishes no DOB, an unparseable date,
+a matching nationality, or a birth-year gap within tolerance — **any** of these
+keep the candidate in the primary queue. Year comparison is used rather than
+full dates because the three sources write dates three different ways
+("27 Nov 1978", "1979-03-03", "September 06, 1980") and some publish a year
+alone. Kill-switch `IDENTITY_EXCLUSION=0`; tolerance `IDENTITY_DOB_TOLERANCE_YEARS`
+(default 2, because designation records routinely carry approximate or
+multi-year birth dates).
+
+Not done, and deliberately: tightening the phonetic `subset` shape that admits
+these candidates in the first place. It would cut volume at the cost of recall
+on a live sanctions control, and the benchmark holds exactly one phonetic-subset
+pair, so the corpus cannot prove that trade safe.
+
+
 ### Screening — worldwide PEP + associates (RCA), and worldwide adverse media (2026-07-29)
 
 **PEPs and their relatives / close associates, worldwide.** The consolidated

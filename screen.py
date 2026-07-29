@@ -2189,6 +2189,70 @@ def match_context_for(matched_entry):
         bits.append("list nationality: " + ", ".join(sorted(a["nationality"])[:3]))
     return "; ".join(bits)
 
+# ── IDENTITY-BASED EXCLUSION (false-positive demotion, never suppression) ────
+# The volume problem is real: one subject in the 29 Jul run carried 73 candidate
+# designations, nearly all of them different people who share a common Arabic
+# given name. The MLRO already resolves most of those by eye in one step — the
+# report prints the designation's DOB/nationality directly beneath the
+# customer's — so the engine can do that same comparison and take the resolved
+# ones out of the primary queue.
+# This DEMOTES, it never suppresses: an excluded candidate stays in the record,
+# stays in the report under its own heading, and stays reviewable. Recall is
+# therefore untouched — the hit is still made, still stored, still auditable —
+# and the exclusion is stated with its reason so an examiner can check the
+# engine's reasoning rather than take it on trust.
+# Deliberately fail-closed: BOTH identity axes must be known on BOTH sides and
+# BOTH must disagree. A missing customer DOB, a list entry that publishes no
+# DOB, an unparseable date — any of these leave the candidate in the primary
+# queue. Kill-switch: IDENTITY_EXCLUSION=0.
+IDENTITY_EXCLUSION = os.environ.get("IDENTITY_EXCLUSION", "1") == "1"
+# Year tolerance: designation records routinely carry an approximate or
+# multi-year birth date ("1955 / 1960 / 1962"), so only a clear gap counts.
+IDENTITY_DOB_TOLERANCE = int(os.environ.get("IDENTITY_DOB_TOLERANCE_YEARS", "2"))
+
+_YEAR_RE = re.compile(r"(1[89]\d{2}|20\d{2})")
+
+def dob_years(value):
+    """Every 4-digit year in a date string, whatever the source's format.
+    Comparing YEARS rather than full dates is deliberate: the three sources
+    write dates three different ways ("27 Nov 1978", "1979-03-03",
+    "September 06, 1980") and some publish a year alone, so a year comparison
+    is the only one that is reliable across all of them — and a year gap is
+    what actually distinguishes two people."""
+    return {int(y) for y in _YEAR_RE.findall(str(value or ""))}
+
+def _country_key(value):
+    return re.sub(r"[^a-z]", "", str(value or "").lower())
+
+def identity_exclusion_reason(matched_entry, rec):
+    """Why this candidate cannot be the customer — or None to leave it in the
+    primary queue. Both axes must be known on both sides and both must
+    disagree; anything unknown keeps the candidate."""
+    if not IDENTITY_EXCLUSION or not rec:
+        return None
+    attrs = LIST_ENTRY_ATTRS.get(normalize(matched_entry or "")) or {}
+    list_dobs, list_nats = attrs.get("dob") or set(), attrs.get("nationality") or set()
+    if not list_dobs or not list_nats:
+        return None                      # the designation does not publish both
+    cust_years = dob_years(rec.get("dob"))
+    cust_nat = _country_key(rec.get("nationality"))
+    if not cust_years or not cust_nat:
+        return None                      # we do not know the customer's identity
+    list_years = set()
+    for d in list_dobs:
+        list_years |= dob_years(d)
+    if not list_years:
+        return None                      # unparseable list date — keep it
+    gap = min(abs(c - l) for c in cust_years for l in list_years)
+    if gap <= IDENTITY_DOB_TOLERANCE:
+        return None                      # birth years agree — could be the same person
+    list_nat_keys = {_country_key(n) for n in list_nats if _country_key(n)}
+    if not list_nat_keys or cust_nat in list_nat_keys:
+        return None                      # nationality agrees (or is unusable)
+    return (f"customer born {min(cust_years)}, {rec.get('nationality')} · "
+            f"designation born {sorted(list_years)[0]}, {sorted(list_nats)[0]} — "
+            f"{gap}-year gap AND a different nationality")
+
 def parse_ofac(data):
     names = set()
     _OFAC_ENT_ATTRS.clear()
@@ -4396,7 +4460,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             if m.get("arrangement"):
                 A(f"   Legal arrangement (R.25): {m['arrangement']} — every party screened; "
                   "a sanctioned/PEP party flags the arrangement.")
-            shown = sorted(m["hits"], key=lambda h: -h["score"])[:10]
+            # Identity-excluded candidates are DEMOTED, not dropped: they come
+            # out of the primary queue (where they crowd out the candidates that
+            # are still open questions — one subject carried 73 of them on
+            # 29 Jul) and are listed under their own heading below, each with
+            # the reason it cannot be the customer. Nothing is suppressed: the
+            # hit is still in m["hits"], still in the delta state, still in the
+            # audit trail, and the MLRO can still overrule it.
+            _open_hits = [h for h in m["hits"] if not h.get("identity_excluded")]
+            _excluded = [h for h in m["hits"] if h.get("identity_excluded")]
+            shown = sorted(_open_hits, key=lambda h: -h["score"])[:10]
             for h in shown:
                 conf = f" · {h.get('confidence','')}" if h.get("confidence") else ""
                 nflag = " 🆕" if h.get("is_new") else ""
@@ -4412,8 +4485,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                     A(f"        Identity (R.10): {h['identity']}")
                 if h.get("cdd_gaps"):
                     A(f"        ⚠ CDD gaps: {'; '.join(h['cdd_gaps'])}")
-            if len(m["hits"]) > 10:
-                A(f"   -> … +{len(m['hits']) - 10} more similar candidates (see run log)")
+            if len(_open_hits) > 10:
+                A(f"   -> … +{len(_open_hits) - 10} more similar candidates (see run log)")
+            if _excluded:
+                A(f"   EXCLUDED ON IDENTITY — {len(_excluded)} candidate(s) cannot be this customer "
+                  "(DOB and nationality both known on both sides, both disagree).")
+                A("   Recorded, not suppressed — review and overrule here if the identity data is wrong:")
+                for h in sorted(_excluded, key=lambda h: -h["score"])[:5]:
+                    A(f"     · {h['list']}: \"{h['matched_entry']}\" {_pct(h['score'])} — {h['identity_excluded']}")
+                if len(_excluded) > 5:
+                    A(f"     · … +{len(_excluded) - 5} more (see run log)")
             if ctrl:
                 A("   NOTE: company flagged because an owner / director / UBO matches a designation —"
                   " apply OFAC/EU 50%/control aggregation; treat the entity as designated by extension pending review.")
@@ -5048,6 +5129,14 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 if rec:
                     h["identity"] = kyc.identity_dossier(rec)
                     h["cdd_gaps"] = rec.get("cdd_gaps", [])
+                    # Identity-based DEMOTION (not suppression): where the
+                    # customer's and the designation's DOB and nationality are
+                    # both known and both disagree, this candidate is a
+                    # different person. The hit stays in the record and in the
+                    # report; it just stops competing for MLRO attention with
+                    # the candidates that are still open questions.
+                    h["identity_excluded"] = identity_exclusion_reason(
+                        h.get("matched_entry"), rec)
         nationalities = [i.get("nationality", "") for i in kyc_data.get("individuals", [])]
         jtier, jreason = kyc.jurisdiction_risk_for(m.get("country", ""), nationalities, jtable)
         m["jurisdiction"] = {"tier": jtier, "reason": jreason}
