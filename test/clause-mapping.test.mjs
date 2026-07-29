@@ -85,9 +85,26 @@ check('the 6.1.4 artefact declares itself as such', /6\.1\.4/.test(sia));
 check('the 6.1.4 artefact covers unfair or discriminatory outcomes', /discriminat/i.test(sia));
 check('the 6.1.4 artefact states who it is available to', /availab/i.test(sia));
 /* A ratified document may not silently grow new content under the old
-   signature: an amended version must be visible as unapproved. */
-check('the 6.1.4 artefact does not claim approval for its unapproved revision',
-  !/\|\s*1\.1\s*\|[^|]*\|[^|]*\|[^|]*\|\s*\*\*Ratified/i.test(sia));
+   signature. The rule is not "a new version may not be ratified" — v1.1 was
+   signed on its own account on 2026-07-29 — it is that **no row may claim
+   ratification without naming an approver and a date**. That catches both
+   failure modes: content amended under an earlier signature, and a row marked
+   Ratified with `_(pending)_` still in the approver column. */
+const signoffRows = [...sia.matchAll(/^\|\s*(\d+\.\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|/gm)];
+check('the 6.1.4 artefact has a version sign-off table (' + signoffRows.length + ' rows)', signoffRows.length > 0);
+for (const r of signoffRows) {
+  const [, version, date, , approver, status] = r;
+  if (!/ratified/i.test(status)) continue;
+  check('ratified version ' + version + ' names an approver',
+    approver.trim().length > 0 && !/pending|_|tbd|☐/i.test(approver));
+  check('ratified version ' + version + ' carries a ratification date',
+    /\d{4}-\d{2}-\d{2}/.test(status) && /\d{4}-\d{2}-\d{2}/.test(date));
+}
+/* Every version that exists must be accounted for as ratified or explicitly
+   pending — a row with neither is a version nobody decided about. */
+for (const r of signoffRows) {
+  check('sign-off row ' + r[1] + ' states a decision', /ratified|pending|withdrawn|superseded/i.test(r[5]));
+}
 
 /* ── 4. Each SoA uses only the status vocabulary it declares ─────────────── */
 const soaAims = read('docs/aims/statement-of-applicability.md');

@@ -79,6 +79,12 @@ verification. Retained for at least five years.
 
 | Field | Value |
 |---|---|
-| Approved by (MLRO) | ☐ |
-| Date of approval | ☐ |
-| Next review due | ☐ (12 months from approval) |
+| Approved by (MLRO) | **HS MLRO** |
+| Date of approval | **2026-07-29** |
+| Next review due | **2027-07-29** (12 months from approval) |
+
+**In force from 2026-07-29.** Approved by the HS MLRO under the MLRO's own
+authority — this instrument is a procedure, not a Board-approved policy, so it
+did not wait on the board sitting. Its register row in
+[`../../data/policies.json`](../../data/policies.json) is flipped to `in-force`
+and CI checks that this date appears here, in the document, and not only there.

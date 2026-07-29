@@ -6,10 +6,20 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-07-28 — items 16, 17 and 18 were added that day (MRM
-> ratification, risk-appetite ratification, and approval of the eighteen-instrument
-> policy pack) while this line still read 24 July. Items are numbered by who moves
-> next, not by importance.
+> **Last updated:** 2026-07-29 — the **HS MLRO** signed everything within MLRO
+> authority on this date: item 19 (Stakeholder Impact Assessment v1.1) **closed**;
+> the interim transaction-feed compensating control **adopted** (item 6 stays open
+> for the wiring); POL-19 and POL-30 **approved and in force** (item 18 stays open
+> for the sixteen Board instruments); and the advisor model change recorded in the
+> [model-validation sign-off log](model-validation-2026.md) §5. Items are numbered
+> by who moves next, not by importance.
+>
+> **Who signs what.** The **Board is HS Management**; the MLRO mandate is held by
+> the **HS MLRO**. An instrument's approver is fixed by its type, not by
+> convenience: policies, standards and charters are Board acts, procedures are the
+> MLRO's. Nothing here was signed by a role that does not hold the authority for
+> it — which is why seven items below still say *Board*, and why the audit item
+> still says *Internal Audit*.
 >
 > **No target dates.** Every item carries an owner and a closing condition, and
 > none carries a deadline — which is why KRI-09 (overdue issue rate) reports
@@ -25,7 +35,7 @@
 | 3 | Approve the queued Auto Release deployment holds in the Actions tab. Safe no-ops while `APP_VERSION` is unchanged; this is the release gate working as designed. | Repo owner | Approval queue empty | rolling |
 | 4 | Board sitting: execute [`board-minute-template-2026-07.md`](board-minute-template-2026-07.md) (resolutions R1 to R6) and the adoption block of [`ai-governance-committee-charter.md`](ai-governance-committee-charter.md). | Board | Signed minute filed; AI Policy Section 9 cites it; charter block signed | P2, P12 |
 | 5 | Return the completed 160-row citation mapping ([`../aims/advisor-citation-migration-worklist.md`](../aims/advisor-citation-migration-worklist.md)) and the written PDPL transfer-basis confirmation (Schedule B of the DPA pack). | Counsel | Each return becomes one mechanical PR; the CI citation guard drops its exemption | P28, P26 |
-| 6 | Transaction-feed decision: answer the four questions in [`../aims/transaction-feed-scoping.md`](../aims/transaction-feed-scoping.md) Section 6, or adopt the prepared manual compensating control — **draft ready to sign:** [`../aims/transaction-feed-compensating-control.md`](../aims/transaction-feed-compensating-control.md) §4. Q3-Q4 per the plan; no urgency. | MLRO / firm | Either the wiring PR per the note's Section 5, or the §4 adoption block signed | P8, P38 |
+| 6 | Transaction-feed wiring: answer the four questions in [`../aims/transaction-feed-scoping.md`](../aims/transaction-feed-scoping.md) Section 6 and connect a feed (`TXN_FEED_PATH`). **The interim manual compensating control was adopted and signed 2026-07-29** ([`../aims/transaction-feed-compensating-control.md`](../aims/transaction-feed-compensating-control.md) §4), so the gap is mitigated but **not closed** — `txn_monitor.py` is still INACTIVE and OB-03 / OB-13 / OB-21 remain *partial* against this item. | MLRO / firm | The wiring PR per the scoping note's Section 5, with the feed live and the three obligations moving to *met* | P8, P38 |
 | 7 | Deliver training beyond Compliance and populate the record table in [`../aims/competency-records.md`](../aims/competency-records.md). | MLRO / HR | Named rows with dates and evidence in the table | P10 |
 | 8 | First Internal Audit thematic review per [`../aims/internal-audit.md`](../aims/internal-audit.md); findings into the Section 6 log and CAPA. | Internal Audit | Audit log row completed with findings and status | P9 |
 | 9 | Extend the AI register enterprise-wide. Blocked by item 4: this belongs to the Committee once chartered. | AI Governance Committee | Enterprise rows added to the register | P11 |
@@ -34,9 +44,8 @@
 | 13 | Determine and minute whether the deploying entity must formally designate a DPO — **decision paper ready for the item-4 sitting:** [`dpo-determination-2026.md`](dpo-determination-2026.md) §4. | MLRO / Board | The §4 minute block signed; any appointment recorded in the [committee charter](ai-governance-committee-charter.md) roles | P41 |
 | 14 | Run the first backtesting cycle per [`backtesting-protocol-2026.md`](backtesting-protocol-2026.md) — blocked until ≥25 disposed cases accumulate (18 open / 0 disposed at creation), so disposition of the open screening cases is the path to unblocking it. | MLRO | Cycle-1 ledger row completed and signed; findings fed to the §5 validation sign-off | to open |
 | 15 | Execute the first manual red-team campaign round per [`../aims/red-team-log.md`](../aims/red-team-log.md) §3 (2026 Q3, with the quarterly review): non-lexical obfuscations + in-the-wild sweep. | MLRO / maintainer | Round-1 row completed; any corpus/detector change merged | to open |
-| 18 | Approve the [AML/CFT/CPF policy pack](../policies/README.md) — eighteen instruments drafted 2026-07-28 and **not in force** until approved: Board approval for the policies, standards and charter; MLRO approval for the two procedures. Each carries an approval block at its foot. | Board / MLRO | Each instrument's approval block completed with approver and date, its register row flipped from `draft` to `in-force`, and the date recorded in the document itself (CI checks the document, not just the register) | to open |
+| 18 | Approve the remaining **sixteen** instruments of the [AML/CFT/CPF policy pack](../policies/README.md) — drafted 2026-07-28 and **not in force** until the Board (HS Management) approves them. **The two procedures were approved by the HS MLRO on 2026-07-29** (POL-19 STR/DPMSR filing, POL-30 regulatory change management) under the MLRO's own authority and are now in force; the policies, standards and charter are Board acts and remain draft. | Board (HS Management) | Each remaining instrument's approval block completed with approver and date, and its register row flipped from `draft` to `in-force` (CI checks the document, not just the register) | to open |
 | 17 | Ratify the [Risk Appetite Statement](risk-appetite-statement-2026.md) (resolution **R7** of the minute template) and, with it, decide whether to set target dates on this register — the missing input that leaves the overdue-issue metric uninstrumented ([`grc-metrics.md`](grc-metrics.md) §3). | Board | R7 minuted; the statement's status line flips from DRAFT to ratified; if target dates are adopted, KRI-09 moves to instrumented | to open |
-| 19 | Approve **v1.1 of the [Stakeholder Impact Assessment](stakeholder-impact-assessment-2026.md)** — the ISO/IEC 42001 clause 6.1.4 designation, the unfair/discriminatory-outcome section and the availability clause, added 2026-07-29. v1.0 remains ratified and in force; the new sections are assessed but unapproved, and are not backdated into the 2026-07-02 signature that did not cover them. | MLRO | The v1.1 row in the sign-off table completed with approver and date | to open |
 | 16 | Ratify the MRM framework — model tiering, PSI thresholds and the backtesting protocol — at the item-4 board sitting. | Board | Ratification minuted; the governance-pillar row in [`model-risk-management-2026.md`](model-risk-management-2026.md) §3 flips to ✅ | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state

@@ -10,6 +10,56 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — the MLRO signs what the MLRO can sign (2026-07-29)
+
+Four approvals recorded under the **HS MLRO**'s own authority. The governing
+principle, and the reason this is four items and not eighteen: **an instrument's
+approver is fixed by its type, not by who is available.** Policies, standards and
+charters are Board acts (the Board is **HS Management**); procedures are the
+MLRO's. Nothing here was signed by a role that does not hold the authority for it.
+
+- **Stakeholder Impact Assessment v1.1 ratified** — the ISO/IEC 42001 clause
+  6.1.4 designation, the unfair-and-discriminatory-outcome section and the
+  availability clause. **Closes open-actions item 19.** v1.1 was signed on its own
+  account rather than folded into v1.0's 2026-07-02 signature, and both rows
+  stand in the sign-off table so the version history records what was approved
+  when.
+- **POL-19** (STR/DPMSR filing) and **POL-30** (regulatory change management)
+  **approved and in force to 2027-07-29.** Both approval blocks read *"Approved
+  by (MLRO)"* — they are procedures, so they did not wait on the board sitting.
+  The other **sixteen** pack instruments are Board acts and stay draft; item 18
+  remains open for them.
+- **Transaction-feed compensating control adopted** — and **item 6 stays open**,
+  deliberately. `OB-03`, `OB-13` and `OB-21` name item 6 as their closing
+  condition, and the control is *interim*: `txn_monitor.py` is still INACTIVE and
+  no feed is connected. Closing the item would have stranded three genuinely
+  unmet obligations with no tracked path and converted a visible gap into an
+  invisible one. The item is rewritten, not removed — the outstanding act is
+  wiring `TXN_FEED_PATH`.
+- **The Claude 5 model change recorded** in `model-validation-2026.md` §5, per §4
+  step 5 of change control, with its residual limitation stated: the live
+  guardrail eval is weekly and key-gated, so the first scheduled run is the
+  confirmation.
+
+**The CI guard on the 6.1.4 artefact was corrected, not relaxed.** It previously
+forbade a v1.1 row from reading *Ratified* — which was right while v1.1 was
+unsigned and wrong once it was signed. It now requires that **any row claiming
+ratification names an approver and carries a date**, catching both real failure
+modes: content amended under an earlier signature, and a row marked Ratified with
+`_(pending)_` still in the approver column.
+
+Verified by breaking it: removing every occurrence of the approval date from
+`str-dpmsr-filing-procedure.md` fails `policies.test.mjs`, so the signature is
+evidenced by the document rather than merely asserted in the register.
+
+**Still not done, and not signable:** R7 ratification, the board sitting, the ISO
+path decision, the MRM ratification and the DPO minute are Board acts. Item 11
+needs counsel's signature before the MLRO countersigns. Items 1, 2, 3, 5, 7, 8, 9,
+14 and 15 are acts that produce evidence — the history scrub, the emails, the
+release holds, counsel's mapping, the training delivery, the audit, the
+enterprise register, the backtesting cycle (blocked on ≥25 disposed cases) and
+the red-team round.
+
 ### Advisor — the guardrails stop disappearing under deep mode, and the models move to Claude 5 (2026-07-29)
 
 **`brain-soul.js` aborted its own API call at 26 s against a Netlify synchronous

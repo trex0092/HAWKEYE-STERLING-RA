@@ -143,7 +143,8 @@ override and its reason.
 | Quarter | Model / baseline version | Validation run (golden set) | Findings | Signed off (MLRO) | Date |
 |---|---|---|---|---|---|
 | 2026 Q2 | APP 3.7.0 / data 2026-06 | PASS (35/35) | No exceptions. Methodology, weights, thresholds and hard outcomes confirmed against the AML/CFT Risk Assessment Methodology. | MLRO / Head of Compliance | 2026-06-29 |
-| 2026 Q3 | _pending_ | _pending_ | | | 2026-09-30 |
+| 2026 Q3 — **advisor model change** | APP 3.7.2 / advisor `claude-sonnet-5` (balanced), `claude-opus-5` (deep), `claude-haiku-4-5` (speed) | PASS — full suite 72/72 incl. advisor assurance (76 checks), prompt-injection red team (100% detection / non-execution / no-downgrade) and the scoring golden set (35/35) | Provider model change under §4, recorded here per §4 step 5. **No scoring, hard-outcome or escalation logic changed** — the deterministic engine is untouched by this and the golden set is unmoved. Request shape unchanged (no `temperature`, `top_p` or `thinking` parameter). Two coupled changes: the governed routing (`MODEL_BY_MODE`) and `data/ai-assets.json` move together, pinned by CI; and the advisor's abort budget now derives from the platform execution cap, so a deep-mode request can no longer be killed mid-flight with its guardrails unrun. **Residual limitation:** the live guardrail eval against the new models has not yet run — it is weekly and key-gated, so the first scheduled run is the confirmation. | **HS MLRO** | 2026-07-29 |
+| 2026 Q3 — quarterly | _pending_ | _pending_ | | | 2026-09-30 |
 
 ---
 

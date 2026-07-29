@@ -41,7 +41,7 @@ document-control procedure.
 | 21 | Decommissioning & Retirement | A.6 | [decommissioning.md](decommissioning.md) |
 | 22 | Population-Stability Monitoring (PSI) | 9.1 / A.6.2 | [population-stability-monitoring.md](population-stability-monitoring.md) |
 | 23 | Red-Team Log (campaigns & corpus growth) | A.5.5 | [red-team-log.md](red-team-log.md) |
-| 24 | Transaction-Feed Compensating Control (interim, DRAFT) | A.6 | [transaction-feed-compensating-control.md](transaction-feed-compensating-control.md) |
+| 24 | Transaction-Feed Compensating Control (interim — **adopted 2026-07-29**) | A.6 | [transaction-feed-compensating-control.md](transaction-feed-compensating-control.md) |
 | 25 | TFS Name-Match Procedure (PNMR / CNMR / FFR) — registered instrument **POL-07** | A.6 / FATF R.6 | [tfs-name-match-procedure.md](tfs-name-match-procedure.md) |
 | 26 | Curated Sanctions List Update SOP (UAE EOCN) — registered instrument **POL-09** | A.6 | [eocn-list-update-sop.md](eocn-list-update-sop.md) |
 | 27 | Transaction-Feed Scoping Note (R-13 / FATF R.16 — scoping only, nothing connected) | A.6 | [transaction-feed-scoping.md](transaction-feed-scoping.md) |

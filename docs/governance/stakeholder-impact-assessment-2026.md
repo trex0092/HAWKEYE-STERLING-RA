@@ -13,7 +13,7 @@ mitigates it?*
 
 **Owner:** MLRO · Compliance Engineering
 **Approver:** MLRO
-**Version:** 1.1 (v1.0 ratified 2026-07-02; v1.1 **pending approval**) ·
+**Version:** 1.1 — **ratified 2026-07-29** by the HS MLRO (v1.0 ratified 2026-07-02) ·
 **Date:** 2026-07-29
 **Review:** annually and on any change to an AI model, scope, or data flow.
 **Clause mapping:** [`../aims/iso-42001-clause-6-1-mapping.md`](../aims/iso-42001-clause-6-1-mapping.md)
@@ -31,15 +31,13 @@ mitigates it?*
 > The [AI Risk Register](../aims/ai-risk-register.md) is the 6.1.2 artefact;
 > this document is the 6.1.4 one; neither substitutes for the other.
 
-> **v1.1 revision note.** v1.0 was ratified 2026-07-02 with signature evidence
-> and **remains in force**; its assessed content is unchanged. v1.1 adds the
-> 6.1.4 designation, the explicit unfair-and-discriminatory-outcome section
-> (§ *Unfair and discriminatory outcomes*) and the availability clause
-> (§ *Availability of this assessment*). Those additions are **not yet
-> approved** — re-approval is [open-actions](open-actions-register.md) item 19.
-> Until then the v1.0 ratification stands and the new sections are stated as
-> assessed-but-unratified, not backdated into a signature that did not cover
-> them.
+> **v1.1 revision note.** v1.0 was ratified 2026-07-02 with signature evidence.
+> v1.1 adds the 6.1.4 designation, the explicit unfair-and-discriminatory-outcome
+> section (§ *Unfair and discriminatory outcomes*) and the availability clause
+> (§ *Availability of this assessment*). Those additions were held as **assessed
+> but unratified** from 2026-07-29 until they were signed on their own account
+> the same day — deliberately not backdated into a signature that did not cover
+> them. Both versions and both signatures are recorded in the sign-off table.
 
 ## Scope
 The **AI surfaces**: the MLRO Advisor (`brain-soul.js` → Claude) and the optional
@@ -112,11 +110,19 @@ corrective actions are logged in [`../aims/corrective-actions.md`](../aims/corre
 | Version | Date | Author | Approver (MLRO / senior mgmt) | Status |
 |---|---|---|---|---|
 | 1.0 | 2026-06-30 | Compliance Engineering | Luisa Fernanda (MLRO) | **Ratified 2026-07-02** |
-| 1.1 | 2026-07-29 | Compliance Engineering | _(pending)_ | **Pending approval** — open-actions item 19 |
+| 1.1 | 2026-07-29 | Compliance Engineering | HS MLRO | **Ratified 2026-07-29** |
 
-> Signature evidence: Ratified 2026-07-02 by Luisa Fernanda (MLRO / workspace owner) — evidence: Asana task 1216233454512937 in HAWKEYE STERLING APP (name entered by the workspace owner, 2026-07-02T10:44Z; workspace is single-owner access).
+> Signature evidence (v1.0): Ratified 2026-07-02 by Luisa Fernanda (MLRO / workspace owner) — evidence: Asana task 1216233454512937 in HAWKEYE STERLING APP (name entered by the workspace owner, 2026-07-02T10:44Z; workspace is single-owner access).
 >
-> **v1.1 carries no signature and claims none.** The v1.0 ratification covered
-> the content assessed on 2026-06-30; it cannot retrospectively cover sections
-> written a month later. v1.0 remains the approved version and stays in force
-> while v1.1 awaits the MLRO's approval.
+> Signature evidence (v1.1): Ratified **2026-07-29** by the **HS MLRO**, who holds
+> the MLRO mandate for the deploying entity. The approval covers the additions
+> made in v1.1 — the ISO/IEC 42001 clause 6.1.4 designation, the *Unfair and
+> discriminatory outcomes* section, and the *Availability of this assessment*
+> section — and re-confirms the v1.0 content it supersedes. Closes open-actions
+> item 19.
+>
+> **v1.1 was approved on its own signature, not v1.0's.** The 2026-07-02
+> ratification covered the content assessed on 2026-06-30 and could not
+> retrospectively cover sections written a month later, so v1.1 was held as
+> *pending* until this date rather than folded into the earlier signature. Both
+> rows stand; the version history is the record of what was approved when.

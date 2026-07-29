@@ -6,7 +6,7 @@
 **Source of truth:** [`data/policies.json`](../../data/policies.json) (machine-readable; this page is the human view)
 **Enforcement:** [`test/policies.test.mjs`](../../test/policies.test.mjs) (CI, every pull request)
 **Review cadence:** annually, and whenever an instrument is added, approved or retired.
-**Last reviewed:** 2026-07-28
+**Last reviewed:** 2026-07-29
 
 > **The gap this closes.** The policies existed and the governance README indexed
 > them. What no artefact recorded was which instruments had actually been
@@ -38,7 +38,7 @@
 | POL-16 | [Sanctions & TFS](../policies/sanctions-tfs-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
 | POL-17 | [Counter-Proliferation Financing (CPF)](../policies/proliferation-financing-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
 | POL-18 | [Transaction Monitoring & Reporting](../policies/transaction-monitoring-reporting-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
-| POL-19 | [STR/DPMSR Filing Procedure (goAML)](../policies/str-dpmsr-filing-procedure.md) | procedure | MLRO | 📝 draft — item 18 | on approval |
+| POL-19 | [STR/DPMSR Filing Procedure (goAML)](../policies/str-dpmsr-filing-procedure.md) | procedure | MLRO | ✅ in force — **MLRO-approved 2026-07-29** | 2027-07-29 |
 | POL-20 | [Risk Assessment Methodology (EWRA/BWRA)](../policies/risk-assessment-methodology.md) | standard | MLRO | 📝 draft — item 18 | on approval |
 | POL-21 | [Responsible Sourcing](../policies/responsible-sourcing-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
 | POL-22 | [Record-Keeping & Retention](../policies/record-keeping-retention-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
@@ -49,7 +49,7 @@
 | POL-27 | [Information Security](../policies/information-security-policy.md) | policy | Compliance Eng. | 📝 draft — item 18 | on approval |
 | POL-28 | [Outsourcing & Third-Party Risk](../policies/outsourcing-third-party-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
 | POL-29 | [Independent Audit](../policies/independent-audit-policy.md) | policy | Internal Audit | 📝 draft — item 18 | on approval |
-| POL-30 | [Regulatory Change Management](../policies/regulatory-change-management-procedure.md) | procedure | Compliance Officer | 📝 draft — item 18 | on approval |
+| POL-30 | [Regulatory Change Management](../policies/regulatory-change-management-procedure.md) | procedure | Compliance Officer | ✅ in force — **MLRO-approved 2026-07-29** | 2027-07-29 |
 | POL-31 | [Conflict of Interest & Staff Conduct](../policies/conflict-of-interest-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
 | POL-32 | [Business Continuity & Resilience Plan](../aims/bcp.md) | standard | MLRO | ✅ in force | 2027-07-28 |
 | POL-33 | [AI Decommissioning & Retirement](../aims/decommissioning.md) | procedure | MLRO | ✅ in force | 2027-07-28 |
@@ -57,10 +57,17 @@
 | POL-35 | [Internal Audit Programme](../aims/internal-audit.md) | procedure | MLRO | ✅ in force | 2027-07-28 |
 | POL-36 | [Model Validation & Change Control](model-validation-2026.md) | standard | MLRO | ✅ in force | 2026-09-30 |
 
-**Thirty-six instruments.** Sixteen are in force. Twenty are drafts: two waiting
-on the same board sitting as the rest of the programme, and the eighteen-document
-[AML/CFT/CPF policy pack](../policies/README.md) drafted 2026-07-28 and awaiting
-approval under open-actions item 18.
+**Thirty-six instruments.** Eighteen are in force. Eighteen are drafts: two
+waiting on the same board sitting as the rest of the programme, and sixteen of
+the eighteen-document [AML/CFT/CPF policy pack](../policies/README.md), drafted
+2026-07-28 and awaiting Board approval under open-actions item 18.
+
+**The pack's two procedures went in force on 2026-07-29** — POL-19 (STR/DPMSR
+filing) and POL-30 (regulatory change management) — approved by the **HS MLRO**
+under the MLRO's own authority. Their approver is fixed by instrument *type*:
+a procedure is the MLRO's to approve, a policy, standard or charter is the
+Board's. That is why two of eighteen moved and sixteen did not, and it is the
+distinction an examiner checks first when a pack is approved piecemeal.
 
 Five of the in-force rows (POL-32 to POL-36) were added on 2026-07-28 for
 instruments that already existed, were owned and were operating — the business
@@ -70,8 +77,9 @@ been registered, so nothing tracked their approval or their next review. That
 is the failure this register exists to prevent, and it was hiding inside the
 register's own blind spot (see §2).
 
-Until the pack is approved it is **written, not operative** — the register says
-so, the documents say so, and CI fails if either claims otherwise.
+Until an instrument is approved it is **written, not operative** — the register
+says so, the document says so, and CI fails if either claims otherwise. Sixteen
+of the pack's eighteen are still in that state.
 
 ## 2. What CI enforces
 
@@ -84,7 +92,7 @@ so, the documents say so, and CI fails if either claims otherwise.
 - **An approval date must be evidenced by the document.** A register row may not
   claim ratification the instrument itself does not record, in ISO or long form.
 - **An instrument in force with no approval date must say what put it in force.**
-  Fifteen of the sixteen in-force rows have no discrete approval date — they were
+  Fifteen of the eighteen in-force rows have no discrete approval date — they were
   issued and operative from publication. That is a real answer, but until
   2026-07-29 it was only a prose sentence, so the register asserted a next-review
   date anchored to nothing a machine could read. Each such row now carries an
