@@ -6,7 +6,7 @@
    failure always reproduces locally.
    Usage: node test/sanctions-match-fuzz.test.mjs */
 import {
-  normalizeName, sigTokens, parseDelimited, levenshtein, similarity,
+  normalizeName, sigTokens, screenableTokens, parseDelimited, levenshtein, similarity,
   buildIndex, screenName
 } from '../scripts/sanctions-match.mjs';
 
@@ -61,13 +61,24 @@ for (let i = 0; i < 4000; i++) {
     /^[\p{L}\p{N} ]*$/u.test(n1) && !/[\p{M}\p{Lu}]/u.test(n1) && n1 === n1.trim() && !/\s\s/.test(n1));
 }
 
-/* ── sigTokens: every token significant (len>=3, not pure-digit) ── */
+/* ── sigTokens: every token significant (len>=2 — screen.py core_tokens parity
+   — not pure-digit); screenableTokens is the same set at the stricter len>=3,
+   so it is always a SUBSET. That subset relation is the invariant that keeps
+   widening candidate recall from ever quietly widening the auto-screenable
+   gate: sigTokens may grow, screenableTokens may not grow with it. ── */
 for (let i = 0; i < 2000; i++) {
   const norm = normalizeName(randStr(50));
-  let toks;
-  try { toks = sigTokens(norm); } catch { check('sigTokens never throws #' + i, false); continue; }
+  let toks, screenable;
+  try {
+    toks = sigTokens(norm);
+    screenable = screenableTokens(norm);
+  } catch { check('sigTokens never throws #' + i, false); continue; }
   check('sigTokens returns an array of qualifying tokens',
-    Array.isArray(toks) && toks.every(t => t.length >= 3 && !/^\d+$/.test(t) && t.indexOf(' ') === -1));
+    Array.isArray(toks) && toks.every(t => t.length >= 2 && !/^\d+$/.test(t) && t.indexOf(' ') === -1));
+  check('screenableTokens is the len>=3 subset of sigTokens',
+    Array.isArray(screenable)
+    && screenable.every(t => t.length >= 3 && toks.includes(t))
+    && screenable.length === toks.filter(t => t.length >= 3).length);
 }
 
 /* ── levenshtein: a true metric (identity, symmetry, bounds, triangle) ── */

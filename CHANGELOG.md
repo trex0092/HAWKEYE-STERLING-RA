@@ -10,6 +10,50 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — the two engines are now compared to each other, and a silent JS false negative is closed (2026-07-29)
+
+The sanctions matcher is implemented twice — `screen.py` (rapidfuzz) and
+[`scripts/sanctions-match.mjs`](scripts/sanctions-match.mjs), the zero-dependency
+reimplementation that drives the live screen in `sanctions-screen.yml`. Parity
+between them was held by hand, by eighteen "mirrors screen.py" comments, and
+**nothing compared the engines to each other**: the accuracy benchmarks score
+each backend against its own floor, and `test/benchmark_eval.py` says so outright
+— *"every floor is enforced per backend — the two are NOT comparable."*
+
+- **A silent false negative, found by building that comparison.** The JS engine
+  dropped tokens shorter than three characters from its candidate index. A
+  subject whose shared tokens were two letters long therefore had **no candidate
+  path at all** and screened **clear**, where `screen.py` hit it. Measured:
+  `"Yu Li Pang"` against listed `YU LI PING` — Python 90, JS **clear**;
+  `"Xi Da Wai"` against `XI DA WEI` — Python 89, JS **clear**. This is the same
+  shape as the Turkish dotless-ı miss fixed earlier, and it bites hardest on
+  transliterated CJK names. `sigTokens` now uses screen.py's `len(t) > 1` floor.
+  The change is recall-monotone — it only ever ADDS candidates — and **moved no
+  floor**: recall 97.5%, hard-negative clear 96.5%, adverse 100%, fn count 3, all
+  unchanged.
+- **The conservative gate it would have weakened is kept, explicitly.** Widening
+  `sigTokens` would have let an all-two-letter name ("Yu Li") past the
+  "not auto-screenable → MANUAL REVIEW" routing. New `screenableTokens()` keeps
+  that gate on the stricter ≥3 rule, so candidate recall and the auto-screenable
+  decision can no longer move together by accident — a fuzz property pins the
+  subset relation.
+- **[`test/matcher-parity.test.mjs`](test/matcher-parity.test.mjs)** — the guard
+  that was missing, driving both engines over a shared corpus via
+  [`scripts/matcher-parity-probe.py`](scripts/matcher-parity-probe.py). It
+  asserts exact parity on the lost-script predicate (the anti-silent-clear gate)
+  and on `normalize` for foldable names, and **directional** parity elsewhere:
+  screen.py's significant tokens must be a *subset* of the JS engine's, and a
+  screen.py hit must be reached by the JS engine too. Extra JS tokens are the
+  recall-safe direction and are tolerated (it keeps the name particles `BIN`/`AL`
+  that screen.py drops); keeping *fewer* is the silent-miss direction and fails.
+  Scores are deliberately not compared — rapidfuzz and the JS Levenshtein
+  legitimately differ by a point (93 vs 94), and CI's main job runs the difflib
+  backend while the fuzz job runs rapidfuzz.
+- Both historical parity failures are pinned in the corpus as permanent
+  regressions, and the test fails if either pin is removed. Verified by
+  reintroducing the bug: the guard catches the token divergence *and* both
+  resulting false negatives.
+
 ### Compliance — Conflict of Interest policy, five unregistered instruments, and a sweep that can no longer miss them (2026-07-28)
 
 Closing the two gaps a verification pass found after the policy pack landed.

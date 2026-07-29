@@ -168,7 +168,13 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile the Python screening engine
-        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py
+        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py scripts/matcher-parity-probe.py
+      - name: Run cross-engine matcher parity (screen.py vs sanctions-match.mjs)
+        # Runs here, AFTER setup-python, because it drives both engines: the node
+        # test shells to scripts/matcher-parity-probe.py. The per-backend accuracy
+        # floors compare each engine to ITSELF and are blind to drift between the
+        # two — this is the only check that compares them to EACH OTHER.
+        run: node test/matcher-parity.test.mjs
       - name: Run Python engine unit tests (screen + ai + agents + kyc + txn + monitoring)
         run: python test/engine_test.py
       - name: Run formal bias / fairness evaluation (R-05 — cross-script recall parity)
