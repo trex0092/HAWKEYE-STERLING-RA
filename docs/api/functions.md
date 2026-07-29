@@ -57,8 +57,11 @@ guardrailed cited answer. **No customer record is sent.**
 { "mode": "speed|default|deep", "persona": "…", "question": "…", "context": "…" }
 ```
 **Response** `{ ok, text, mode, model, elapsedMs, tippingOffFlagged, auditLine }`
-**Behaviour** — model per mode (`claude-haiku-4-5` / `claude-sonnet-4-6` /
-`claude-opus-4-8`); SOUL charter guardrails; tipping-off guard (P4) can withhold
+**Behaviour** — model per mode (`claude-haiku-4-5` / `claude-sonnet-5` /
+`claude-opus-5`); token budgets clipped to what the platform execution cap
+affords, and deep mode degraded to balanced — visibly, via `modeDegraded` and
+`modeDegradedReason` in the response — when the cap cannot carry it; SOUL charter
+guardrails; tipping-off guard (P4) can withhold
 output; injection/charter-leak detection; kill switch `ADVISOR_ENABLED`; upstream
 error bodies are **not** reflected to the client.
 
@@ -76,6 +79,7 @@ Receives `report-uri` CSP violation reports for monitoring. No secrets, no PII.
 | `ANTHROPIC_API_KEY` | brain-soul | Advisor (absent ⇒ Advisor off, no egress) |
 | `PRIMARY_ORIGIN` / `ALLOWED_ORIGINS` | all | CORS allow-list |
 | `ADVISOR_ENABLED` | brain-soul | kill switch |
+| `ADVISOR_PLATFORM_CAP_MS` | brain-soul | the site's function execution cap (default 10000). The abort budget and every mode's token budget derive from it, so the function returns its own governed answer rather than being killed mid-flight — a killed invocation runs none of the guards |
 
 *Error codes are uniform across functions: 400 invalid JSON · 403 origin/method ·
 405 non-POST · 413 body too large · 415 wrong content-type · 429 rate-limited ·

@@ -17,7 +17,7 @@ Super Tools citations in `assets/super-data.js`, and the country/risk data in
 1. **Schedule** — `.github/workflows/regulatory-watch.yml` runs every **Monday 06:00 UTC**, and on demand via *Run workflow*.
 2. **Fingerprint** — `scripts/reg-watch.mjs` fetches each source in [`data/reg-sources.json`](../data/reg-sources.json), strips markup, normalises the text, and hashes it. The hash is compared with the last-seen value in `data/reg-watch-state.json`. Markup-only churn does not move the hash; a real text change does. Fetch errors (404, timeouts) are recorded but never counted as a content change, so they cannot raise a false PR.
 3. **On change** — the workflow opens/updates a PR on branch `regulatory-watch/update` carrying the updated fingerprint state and a change report (which sources moved, with links).
-4. **Optional AI draft** — if an `ANTHROPIC_API_KEY` repository secret is set, `scripts/reg-draft.mjs` fetches each changed page and asks Claude (`claude-sonnet-4-6`) to draft a reviewer-facing proposal — what changed and which app entries likely need updating — written to `docs/research/auto/REG-UPDATE-<date>.md` and included in the PR. Without the secret, the PR is detection-only. The AI step **never** edits `super-data.js` directly.
+4. **Optional AI draft** — if an `ANTHROPIC_API_KEY` repository secret is set, `scripts/reg-draft.mjs` fetches each changed page and asks Claude (`claude-sonnet-5`) to draft a reviewer-facing proposal — what changed and which app entries likely need updating — written to `docs/research/auto/REG-UPDATE-<date>.md` and included in the PR. Without the secret, the PR is detection-only. The AI step **never** edits `super-data.js` directly.
 
 ### First-time setup
 

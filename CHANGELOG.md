@@ -10,6 +10,48 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Advisor — the guardrails stop disappearing under deep mode, and the models move to Claude 5 (2026-07-29)
+
+**`brain-soul.js` aborted its own API call at 26 s against a Netlify synchronous
+function cap of ~10 s** — 2.6× the platform limit. On a default-configured site
+deep mode was not merely slow, it was **killed by the platform mid-flight**, and
+that is worse than a slow answer: when the platform kills the invocation the
+function never returns, so **none of the guardrails run**. The tipping-off guard
+(P4), the PII guard, the injection and hallucination guards, the quality score
+and the audit line all silently did not happen, and the operator saw an opaque
+platform error instead of a governed refusal.
+
+- **The abort budget now derives from the platform cap and sits inside it** —
+  `ADVISOR_PLATFORM_CAP_MS` (default 10000) minus 1.5 s of headroom for the
+  guards and the response, so the function **always returns its own governed
+  answer**. CI asserts the budget is strictly less than the cap, that the
+  headroom is at least a second, and that no mode asks for more tokens than the
+  budget affords.
+- **Deep mode degrades loudly rather than pretending.** A 10 s cap affords ~1500
+  output tokens; deep mode's premise — steelman the counterargument, run a
+  pre-mortem, cite every relevant typology — does not fit, and shipping a
+  truncated answer under the deep label is exactly the paper-vs-practice gap
+  this estate exists to close. Below 4096 affordable tokens deep mode now
+  **degrades to balanced visibly**: `modeDegraded` and a reason in the response,
+  `modeDegraded=deep→balanced` on the audit line, and an amber banner in the UI.
+  The instruction set follows the *effective* mode, so a downgraded answer is
+  never asked for a full pre-mortem it cannot deliver. Same rule as everywhere
+  else here — degradation is tolerated, silent degradation is not (RA-06).
+  Raise the site cap with Netlify support, set `ADVISOR_PLATFORM_CAP_MS` to
+  match, and deep mode becomes available with no code change.
+- **Governed routing split from deployment affordability.** `MODEL_BY_MODE` is
+  what each mode *is*; `selectModel` applies the affordability layer on top.
+  `data/ai-assets.json` pins the former, so the model-change control stays
+  enforceable whatever cap a given site runs — otherwise the register would read
+  differently per deployment.
+- **Models refreshed to Claude 5** — `claude-sonnet-4-6` → **`claude-sonnet-5`**,
+  `claude-opus-4-8` → **`claude-opus-5`**; `claude-haiku-4-5` kept for speed
+  mode. Moved in the same commit as `data/ai-assets.json` and
+  `docs/models/advisor-llm.md`, as the model-change control requires, plus
+  `scripts/advisor-eval.mjs`, `scripts/advisor-bias-eval.mjs` and
+  `scripts/reg-draft.mjs`. No request-shape change was needed — the call sends
+  no `temperature`, `top_p` or `thinking` parameter.
+
 ### Governance — the chain between control families, and trust defined narrowly enough to measure (2026-07-29)
 
 The estate slices its governance four ways — a five-level operational stack, a

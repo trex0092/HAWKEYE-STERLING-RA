@@ -16,8 +16,8 @@
       "provider": "Anthropic (API, server-held ANTHROPIC_API_KEY; key never reaches the browser)",
       "models": [
         { "mode": "speed", "model": "claude-haiku-4-5-20251001", "max_tokens": 1024 },
-        { "mode": "balanced", "model": "claude-sonnet-4-6", "max_tokens": 4096 },
-        { "mode": "deep", "model": "claude-opus-4-8", "max_tokens": 8192 }
+        { "mode": "balanced", "model": "claude-sonnet-5", "max_tokens": 4096 },
+        { "mode": "deep", "model": "claude-opus-5", "max_tokens": 8192 }
       ],
       "personas": 16,
       "risk_tier": "MEDIUM",
