@@ -919,6 +919,15 @@ export function foldAliasSources(lists, sources) {
   return { folded, notes };
 }
 
+/* Per-source coverage floor (source.minNames): a list that parses far below its
+   known size is the same false-negative class as 0 names — a truncated download
+   or parser drift, not a mass de-listing. Mirrors screen.py's CORE_LIST_FLOORS
+   (~50% of verified baselines; provisional where no baseline is logged yet).
+   Pure so the test suite pins it offline. */
+export function belowFloor(source, names) {
+  return (names ? names.length : 0) < (Number(source && source.minNames) || 0);
+}
+
 /* Fetch + parse every enabled source into [{ id, name, names[] }]. A source that
    fails to fetch or yields zero names degrades coverage (reported, never a silent
    all-clear); a curated list with no entries degrades too. */
@@ -953,6 +962,17 @@ async function loadSanctionsLists(cfg) {
            DEGRADED, never a silent all-clear. */
         if (s.optional) { fetched++; notes.push(s.name + ' has no entries — optional internal list, coverage unaffected'); console.log('sanctions-screen: ' + s.id + ' empty (optional) — screened set unchanged'); return; }
         notes.push(s.name + ' parsed 0 names — coverage degraded'); console.error('sanctions-screen: ' + s.id + ' parsed 0 names'); return;
+      }
+      if (belowFloor(s, names)) {
+        /* The names that DID parse still screen — a hit on a truncated list is
+           a real hit — but the list is marked partial so standing matches are
+           carried forward instead of cleared (the same contract as a failed
+           alias file), and the run reports DEGRADED: a "no match" against a
+           truncated list is provisional, never an all-clear. */
+        lists.push({ id: s.id, name: s.name, names, partial: true });
+        notes.push(s.name + ' parsed ' + names.length + ' name(s), below its ' + s.minNames + ' coverage floor — truncated source; coverage degraded');
+        console.error('sanctions-screen: ' + s.id + ' below coverage floor (' + names.length + ' < ' + s.minNames + ')');
+        return;
       }
       lists.push({ id: s.id, name: s.name, names });
       fetched++;

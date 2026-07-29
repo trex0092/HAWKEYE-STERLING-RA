@@ -10,6 +10,24 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Case engine — coverage floors reach the JS screening path too (2026-07-29)
+
+`scripts/sanctions-screen.mjs` (the per-case / onboarding engine) degraded
+loudly on a fetch failure or a 0-name parse — but a list that parsed 50 of
+39,000 names counted as fully loaded: partial truncation was the one
+false-negative class the Python engine floors caught and the JS engine did
+not. Each source now carries a `minNames` coverage floor in its registry
+(`data/sanctions-sources.json`, `data/sanctions-extra.json`; ~50% of verified
+baselines, provisional where none is logged). A below-floor list still
+screens — a hit on a truncated list is a real hit — but is marked `partial`,
+which reuses the existing contract: standing matches are carried forward
+instead of cleared, and the run reports DEGRADED, so a "no match" against a
+truncated list is provisional, never an all-clear. Alias files (`mergeInto`)
+carry no floor (the fold's partial machinery covers them) and the optional
+internal watchlist keeps none (empty is a valid state). Tests pin the
+classifier and — the multi-homing lesson — that every enabled non-optional
+source in BOTH registries actually carries a floor.
+
 ### Screening — availability hardening: retry the blip, retry the day (2026-07-29)
 
 Two layers of self-healing for the failure classes no fallback ladder can
