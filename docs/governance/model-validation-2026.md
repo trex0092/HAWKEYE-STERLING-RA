@@ -3,6 +3,7 @@
 **Model:** Entity Risk Assessment scoring engine (DPMS) — `app.js` `computeAssessment()`
 **Model version:** APP_VERSION `3.7.0` · Risk-data baseline `RISK_DATA_VERSION = 2026-06`
 **Owner:** MLRO / Head of Compliance (`@trex0092`)
+**Approver:** MLRO · Registered as POL-36 in the [policy register](policy-register.md)
 **Status:** Validated · next review **2026-09-30** (quarterly)
 
 This pack is the independent validation record for the firm's customer (entity)

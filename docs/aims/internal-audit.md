@@ -1,5 +1,6 @@
 # Internal Audit Programme (AIMS 9.2)
 
+**Approver:** MLRO · Registered as POL-35 in the [policy register](../governance/policy-register.md)
 **Owner:** MLRO (programme) · system maintainer (evidence). **Cadence:** annual
 full-system audit (before the management review) + quarterly thematic audits +
 continuous automated evidence. **Related:**

@@ -326,6 +326,16 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 172 markdown documents under docs/ (139 excluding docs/research/auto).
+*(28 July, fifth pass — policy-pack completion: the Conflict of Interest & Staff Conduct policy (the
+instrument the pack was missing — declaration duties, recusal, four-eyes, gifts, no commercial override,
+and the MLRO's own conflicts routed to the Board chair), plus five instruments that already existed and
+were operating but had never been registered: the business continuity plan, the decommissioning
+procedure, the data-quality plan, the internal audit programme and the model-validation pack (POL-32 to
+POL-36). The anti-shadow-policy sweep was widened after it let two of those through on filename alone:
+it now keys on an `**Approver:**` header as well as the name pattern. One curated document added; no
+workflow added; no scored control changed. Thirty-six instruments registered, sixteen in force.)*
+
 Verified at HEAD: 56 workflows · 171 markdown documents under docs/ (138 excluding docs/research/auto).
 *(28 July, fourth pass — the AML/CFT/CPF **policy pack**: seventeen governing instruments drafted under
 `docs/policies/` (master policy, CDD/SDD/EDD, sanctions & TFS, CPF, transaction monitoring & reporting,

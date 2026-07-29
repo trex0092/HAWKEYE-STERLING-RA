@@ -10,6 +10,35 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Compliance — Conflict of Interest policy, five unregistered instruments, and a sweep that can no longer miss them (2026-07-28)
+
+Closing the two gaps a verification pass found after the policy pack landed.
+
+- **Conflict of Interest & Staff Conduct Policy**
+  ([docs/policies/conflict-of-interest-policy.md](docs/policies/conflict-of-interest-policy.md)) —
+  the instrument the pack was missing. Declaration on arrival, on change and
+  annually; withdrawal from the conflicted decision; four eyes on customer
+  acceptance, screening dispositions and filing decisions; gifts and outside
+  interests; **no commercial override of a compliance decision**; the MLRO's own
+  conflicts routed to the Board chair rather than to management; and a conflicts
+  register where an empty year is a finding, not a clean bill of health.
+  Distinct from `CODE_OF_CONDUCT.md`, which governs open-source contributors.
+- **Five instruments registered that were already operating** (POL-32 to
+  POL-36): the business continuity plan, the AI decommissioning procedure, the
+  data-quality plan, the internal audit programme, and the model-validation and
+  change-control pack. All owned, all current, none previously in the register —
+  so nothing tracked their approval or their next review date. Owner headers
+  normalised where they were prose rather than a declaration.
+- **The sweep that let two of them through is fixed.** `bcp.md` and
+  `decommissioning.md` were invisible to the anti-shadow-policy check purely
+  because of what they were called. It now runs on **two signals**: the widened
+  filename rule (adds *plan*, *standard*, *methodology*, *bcp*) **and** an
+  `**Approver:**` header, which is the one thing only an instrument claims.
+  Coverage went from 11 documents to 34.
+
+Thirty-six instruments registered, sixteen in force, twenty draft pending
+approval under open-actions item 18.
+
 ### Compliance — the AML/CFT/CPF policy pack: seventeen governing instruments (2026-07-28)
 
 The estate had controls, registers and evidence — and no policies. The registers
