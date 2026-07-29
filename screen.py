@@ -3020,7 +3020,10 @@ try:
     from rapidfuzz import process as _rf_process
 except Exception:
     _rf_process = None
-_NORMS_CACHE = {}   # id(entries) -> (entries, [norm, ...]) — strong ref pins the id
+_NORMS_CACHE = {}
+# One-shot latch so the blocking-disabled notice is logged once per run, not once
+# per subject per list.
+_BLOCKING_STATE = {"warned": False}   # id(entries) -> (entries, [norm, ...]) — strong ref pins the id
 
 def _entry_norms(entries):
     # Rebuild on length change as well as identity change: an entries list
@@ -3044,6 +3047,31 @@ def _survivor_indices(variants, entries):
     results, original speed)."""
     if not (MATCH_BLOCKING and _rf_process is not None
             and getattr(fuzz, "token_set_ratio", None)):
+        return None
+    # The prefilter's two cutoffs are only NECESSARY CONDITIONS of the hit gates
+    # while SHORT_ENTRY_THRESHOLD sits at or above them. That ordering was
+    # asserted in a comment and enforced nowhere: the threshold resolver accepts
+    # anything in [70, 100] and only rejects a RAISE, so the documented
+    # more-sensitive short-name challenger (MATCH_SHORT_ENTRY_THRESHOLD=80) was
+    # accepted silently — and then the short-entry gate fired on pairs neither
+    # cutoff surfaces. Measured with real rapidfuzz at that setting, blocked mode
+    # (the production default) returned NO hit for customer "HAMAZ" against
+    # designated "HAMAS" while unblocked mode returned one: a silent false
+    # negative created by making the matcher MORE sensitive.
+    # The `core` disjunct of that gate is not bounded by either cutoff at all
+    # (core can be 100 while the whole-string score is 33 — that is the shape the
+    # gate exists for), so rather than guess a bound, decline the prefilter and
+    # score every entry: `None` is the established "prefilter unavailable"
+    # contract, identical results at the original cost. Loud, because a silent
+    # performance cliff is its own kind of surprise.
+    if SHORT_ENTRY_THRESHOLD < max(THRESHOLD, TOKENSET_THRESHOLD):
+        if not _BLOCKING_STATE["warned"]:
+            _BLOCKING_STATE["warned"] = True
+            log(f"  match blocking DISABLED this run: MATCH_SHORT_ENTRY_THRESHOLD="
+                f"{SHORT_ENTRY_THRESHOLD:g} is below the prefilter's cutoffs "
+                f"(THRESHOLD={THRESHOLD}, TOKENSET={TOKENSET_THRESHOLD}), so the C-side "
+                "cutoffs would no longer be necessary conditions of the short-entry gate "
+                "— screening every entry instead (slower, identical recall)")
         return None
     norms = _entry_norms(entries)
     survivors = set()

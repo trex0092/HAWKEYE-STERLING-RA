@@ -10,6 +10,35 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Matcher — the prefilter could silently cancel a MORE sensitive setting (2026-07-29)
+
+The C-side blocking prefilter builds its cutoffs from `THRESHOLD` and
+`TOKENSET_THRESHOLD`. A comment justified omitting `SHORT_ENTRY_THRESHOLD` by
+asserting it "must be >= THRESHOLD, so the same cutoff covers it" — an ordering
+**asserted in prose and enforced nowhere**. The threshold resolver accepts
+anything in [70, 100] and only rejects a RAISE; *lowering* is documented as
+plain config ("the challenger runs more sensitive only"). So activating the
+documented short-name challenger, `MATCH_SHORT_ENTRY_THRESHOLD=80`, was accepted
+silently and then **made the engine miss designations**: measured with real
+rapidfuzz at the production default `MATCH_BLOCKING=1`, customer "HAMAZ" against
+designated "HAMAS" returned **no hit blocked / one hit unblocked**. Turning the
+sensitivity up produced a false negative.
+
+The `core` disjunct of that gate is not bounded by either cutoff at all (core
+can be 100 while the whole-string score is 33 — precisely the shape the gate
+exists for), so rather than guess a bound the engine now **declines the
+prefilter** when the configured threshold falls below what the cutoffs can
+bound, and says so in the log. `None` is the established "prefilter
+unavailable" contract: identical results at the original cost. At the default
+threshold blocking stays fully active, so there is no routine performance cost.
+
+Two tests pin it, and the first draft of the randomized one was **vacuous** —
+it passed with the guard removed, because the generator's token pool held only
+exact spellings of the short designations and the gap opens only for a
+NEAR-miss. Near-miss tokens were added, plus a deterministic check asserting the
+exact pairs measured diverging. Both now fail against the reverted guard.
+
+
 ### Case engine — a truncated alias file read as full coverage (2026-07-29)
 
 Alias sources (OFAC's `alt.csv`, folded into the SDN list via `mergeInto`) were
