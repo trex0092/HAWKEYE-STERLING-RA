@@ -1317,7 +1317,8 @@ _hit = screen.pep_mirror_lookup(_idx, "Politician Sample")   # word-order varian
 check("token-reordered names still hit the mirror index", _hit.get("hit") is True)
 check("mirror hits carry the OpenSanctions id + entity URL (QA-gate evidence)",
       _hit.get("id") == "Q1234" and "opensanctions.org/entities/Q1234" in _hit.get("source_url", ""))
-check("mirror hits are provenance-marked as mirror", "mirror" in _hit.get("category", "").lower()
+check("worldwide-net hits name their SOURCE (provenance, wording-independent)",
+      "opensanctions" in _hit.get("category", "").lower()
       and _hit.get("via_mirror") is True)
 _miss = screen.pep_mirror_lookup(_idx, "Unlisted Individual Name")
 check("a mirror miss is via_mirror (screened) but not a hit", _miss == {"hit": False, "via_mirror": True})
@@ -1752,6 +1753,74 @@ _floor_clean = screen.enforce_core_list_floors(_meta_ok)
 check("floors: a healthy load never refuses", _floor_clean == ([], []))
 screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
 screen.LIST_OUTAGE_ALERT["outages"] = []
+
+# ── Worldwide adverse-media locale rotation ───────────────────────────────────
+# The per-run locale budget is the empirical Google-News per-IP ceiling (raising
+# it tripped the limiter on 10-12 Jul and cost real recall), so worldwide reach
+# has to come from rotating the matrix, not from sending more requests. Before
+# rotation the same first-N markets were swept every day and the remaining ~66
+# were NEVER swept.
+print("screen — worldwide adverse-media locale rotation")
+import datetime as _dt2
+_TOT = len(screen.GNEWS_URLS)
+_covered, _days = set(), 0
+for _d in range(400):
+    _idx = screen.adverse_locale_indices(_dt2.datetime(2026, 7, 30) + _dt2.timedelta(days=_d))
+    _covered |= set(_idx); _days = _d + 1
+    if len(_covered) == _TOT:
+        break
+check("rotation reaches EVERY market in the matrix", len(_covered) == _TOT)
+check("it does so within the cycle the report states",
+      _days <= max(1, screen.adverse_rotation_cycle_days()))
+check("the per-run request budget is never exceeded (rate-limit ceiling holds)",
+      all(len(screen.adverse_locale_indices(_dt2.datetime(2026, 7, 30) + _dt2.timedelta(days=_d)))
+          <= screen.ADVERSE_LOCALES for _d in range(60)))
+# The targeted risk passes index into the pinned five (GNEWS_URLS[4:5] is the
+# Arabic pass), so those must be present on EVERY run, not rotated out.
+check("the pinned core editions are swept on every run",
+      all(set(range(screen.ADVERSE_CORE_LOCALES)) <=
+          set(screen.adverse_locale_indices(_dt2.datetime(2026, 7, 30) + _dt2.timedelta(days=_d)))
+          for _d in range(60)))
+check("the same run date always sweeps the same markets (reproducible evidence)",
+      screen.adverse_locale_indices(_dt2.datetime(2026, 8, 1)) ==
+      screen.adverse_locale_indices(_dt2.datetime(2026, 8, 1)))
+_prev_rot = screen.ADVERSE_ROTATE
+screen.ADVERSE_ROTATE = False
+check("ADVERSE_LOCALE_ROTATION=0 restores the fixed first-N behaviour",
+      screen.adverse_locale_indices(_dt2.datetime(2026, 8, 1)) == list(range(screen.ADVERSE_LOCALES)))
+screen.ADVERSE_ROTATE = _prev_rot
+
+# ── Worldwide PEP + RCA net ───────────────────────────────────────────────────
+# Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or a relative
+# / close associate with no English article returned a confident "no PEP". The
+# consolidated worldwide dataset now runs as a standing net over every
+# individual, and the PEP-vs-RCA role comes from the dataset's own topics column
+# rather than being asserted by us (FATF R.12 extends EDD to RCAs).
+print("screen — worldwide PEP + RCA net")
+_PEP_CSV = (b"id,schema,name,aliases,topics\n"
+            b"pep-1,Person,Nguyen Van Thanh,,role.pep\n"
+            b"rca-1,Person,Maria Consuela Obiang,Maria C Obiang,role.rca\n"
+            b"unk-1,Person,Someone Without Topics,,\n")
+_pep_idx = screen.parse_pep_index(_PEP_CSV)
+check("a politically exposed person is found and labelled PEP",
+      screen.pep_mirror_lookup(_pep_idx, "Nguyen Van Thanh").get("category", "").startswith("PEP —"))
+_rca = screen.pep_mirror_lookup(_pep_idx, "Maria Consuela Obiang")
+check("a RELATIVE / CLOSE ASSOCIATE is found and labelled RCA (FATF R.12)",
+      _rca.get("hit") and "RCA" in _rca.get("category", ""))
+check("an RCA is reachable by alias too",
+      screen.pep_mirror_lookup(_pep_idx, "Maria C Obiang").get("hit"))
+check("a row whose topics do not state a role is not claimed as either",
+      "not stated" in screen.pep_mirror_lookup(_pep_idx, "Someone Without Topics").get("category", ""))
+check("a name absent from the worldwide net does not hit",
+      not screen.pep_mirror_lookup(_pep_idx, "Nobody At All Here").get("hit"))
+check("the RCA hit carries the R.12 duty in its description",
+      "R.12" in _rca.get("description", ""))
+# The net must be wired to run over individuals Wikidata reported CLEAR — that
+# is the coverage gain; wiring it only to errored lookups (the pre-2026-07-29
+# behaviour) leaves the false negative in place.
+_src_enrich = _inspect.getsource(screen.screen_subject_set)
+check("the worldwide net screens individuals Wikidata reported clear, not just errored ones",
+      "_pep_clear" in _src_enrich and "load_pep_mirror()" in _src_enrich)
 
 # ── Coverage-alarm gate: an alarm the run survives is invisible to alerting ──
 # Drift alarms (core list shrank vs trailing median; EOCN mirror designations

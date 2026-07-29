@@ -1106,6 +1106,58 @@ def _resolve_locale_count(raw, total):
         return min(5, total)
 ADVERSE_LOCALES = _resolve_locale_count(os.environ.get("ADVERSE_LOCALES", "8"), len(GNEWS_LOCALES))
 
+# ── Worldwide locale ROTATION ────────────────────────────────────────────────
+# The matrix carries every market we can reach, but a run can only afford a
+# slice of it: one Google-News pass per subject per locale, self-throttled
+# through a shared send gate, so sweeping all of them on a 900-subject book
+# would take multiples of the runner's wall-clock limit. Capping at the first N
+# meant the SAME N markets every day and the rest were never swept at all —
+# adverse coverage that reads "worldwide" but is structurally blind to, say,
+# Latin America or East Asia.
+# Rotation fixes that without raising per-run cost: the pinned core editions
+# (US/GB/AE-en/TR/AE-ar — the ones the targeted risk passes index into) are
+# swept EVERY run, and the remaining budget is filled from the rest of the
+# matrix on a deterministic day-of-cycle window, so every market is swept
+# within a bounded, stated number of days. The report says which markets ran
+# and when the cycle completes — partial coverage that is disclosed, never
+# partial coverage that reads as complete. ADVERSE_LOCALE_ROTATION=0 restores
+# the old fixed first-N behaviour.
+ADVERSE_CORE_LOCALES = 5   # the pinned five; GNEWS_URLS[4:5] is the Arabic pass
+ADVERSE_ROTATE = os.environ.get("ADVERSE_LOCALE_ROTATION", "1") == "1"
+
+def adverse_locale_indices(run_time=None, budget=None, total=None):
+    """Indices into GNEWS_URLS to sweep this run: the pinned core, then a
+    rotating window over the remainder. Deterministic in the run date, so a
+    re-run of the same day sweeps the same markets (reproducible evidence)."""
+    total = len(GNEWS_URLS) if total is None else total
+    budget = ADVERSE_LOCALES if budget is None else budget
+    budget = max(1, min(total, budget))
+    core = min(ADVERSE_CORE_LOCALES, budget, total)
+    idx = list(range(core))
+    pool = list(range(core, total))
+    if not pool or len(idx) >= budget:
+        return idx[:budget]
+    if not ADVERSE_ROTATE:
+        return list(range(min(budget, total)))
+    room = budget - core
+    day = (run_time or datetime.datetime.utcnow()).toordinal()
+    start = (day * room) % len(pool)
+    idx += [pool[(start + i) % len(pool)] for i in range(min(room, len(pool)))]
+    return idx
+
+def adverse_rotation_cycle_days(budget=None, total=None):
+    """How many runs it takes to sweep every market once, at this budget."""
+    total = len(GNEWS_URLS) if total is None else total
+    budget = ADVERSE_LOCALES if budget is None else budget
+    budget = max(1, min(total, budget))
+    room = budget - min(ADVERSE_CORE_LOCALES, budget, total)
+    pool = max(0, total - min(ADVERSE_CORE_LOCALES, budget, total))
+    if not pool:
+        return 1
+    if room <= 0:
+        return 0        # 0 ⇒ never: the budget cannot reach beyond the core
+    return -(-pool // room)   # ceil
+
 # Articles kept per subject after dedup/ranking. The old hard-coded 5 truncated
 # real coverage for any subject whose flagged bucket alone exceeded it; 8 is
 # the new default with the ceiling env-tunable (validated 1-20, loud reject).
@@ -1394,8 +1446,11 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
         max_results = ADVERSE_MAX_RESULTS
     seen_titles = set()
     articles = []
+    # Worldwide sweep: the pinned core editions plus this run's rotating window
+    # over the rest of the matrix (see adverse_locale_indices).
+    _run_locales = [GNEWS_URLS[i] for i in adverse_locale_indices()]
     passes = [
-        (f'"{name}"', GNEWS_URLS[:ADVERSE_LOCALES]),   # broad: exact name, every locale
+        (f'"{name}"', _run_locales),                   # broad: exact name, this run's markets
         (f'"{name}" ({RISK_QUERY})', GNEWS_URLS[:1]),  # targeted: name + risk terms, en-US
     ]
     if ADVERSE_LOCALES >= 5:
@@ -1870,7 +1925,7 @@ def check_pep(name):
     _PEP_CACHE[key] = out
     return out
 
-# ── OPENSANCTIONS BULK LAYER (PEP mirror fallback + adverse-exposure watchlist)
+# ── OPENSANCTIONS BULK LAYER (worldwide PEP/RCA net + adverse-exposure watchlist)
 # data.opensanctions.org already serves EU FSF and the OFAC/UN mirrors, so it is
 # reachable wherever screening runs and — being one bulk file per run — immune to
 # the per-IP request limiters that take out the live feeds from shared runner IPs.
@@ -1881,11 +1936,25 @@ def check_pep(name):
 PEP_MIRROR_FALLBACK = os.environ.get("PEP_MIRROR_FALLBACK", "1") == "1"
 PEP_MIRROR_URL = "https://data.opensanctions.org/datasets/latest/peps/targets.simple.csv"
 
+def pep_role_from_topics(topics):
+    """PEP vs RCA, taken from the dataset's own `topics` column rather than
+    asserted by us. OpenSanctions tags a politically exposed person `role.pep`
+    and a relative or close associate `role.rca` (FATF R.12 extends the PEP
+    controls to family members and close associates, so an RCA hit carries the
+    same EDD duty as the PEP it derives from). Unknown/absent topics fall back
+    to the neutral wording — the label must never claim more than the data says."""
+    t = (topics or "").lower()
+    if "role.rca" in t:
+        return "RCA (relative / close associate of a PEP)"
+    if "role.pep" in t:
+        return "PEP"
+    return "PEP / RCA (role not stated by the source)"
+
 def parse_pep_index(data):
-    """targets.simple.csv → {normalized name/alias: {"id","label"}}, plus a
-    token-sorted secondary key per name so word-order variants still hit.
-    Exact-normalized index (NOT the fuzzy sanctions matcher): this is a
-    resilience net whose hits mean "listed — verify", so precision beats recall.
+    """targets.simple.csv → {normalized name/alias: {"id","label","role"}}, plus
+    a token-sorted secondary key per name so word-order variants still hit.
+    Exact-normalized index (NOT the fuzzy sanctions matcher): a hit means
+    "listed — verify", so precision beats recall here.
     Tolerant per-row — one malformed row never zeroes the index."""
     index = {}
     if not data:
@@ -1896,6 +1965,7 @@ def parse_pep_index(data):
             try:
                 pid = (row.get("id") or "").strip()
                 primary = (row.get("name") or "").strip()
+                role = pep_role_from_topics(row.get("topics"))
                 names = [primary] + [a.strip() for a in (row.get("aliases") or "").split(";")]
                 for n in names:
                     if not n:
@@ -1903,7 +1973,7 @@ def parse_pep_index(data):
                     k = _norm_lower(n)
                     if len(k) < 5:   # same auto-screenability floor as check_pep
                         continue
-                    entry = {"id": pid, "label": primary or n}
+                    entry = {"id": pid, "label": primary or n, "role": role}
                     index.setdefault(k, entry)
                     index.setdefault(" ".join(sorted(k.split())), entry)
             except Exception:
@@ -1913,35 +1983,45 @@ def parse_pep_index(data):
     return index
 
 def load_pep_mirror():
-    """One bulk download per run — called only when live lookups errored. Returns
-    the name index, or None when disabled/unavailable; callers leave the affected
-    individuals errored (loud, provisional) in that case."""
+    """One bulk download per run of the consolidated worldwide PEP dataset —
+    politically exposed persons AND their relatives / close associates (RCA),
+    every jurisdiction the dataset covers. Returns the name index, or None when
+    disabled/unavailable.
+
+    Loaded on EVERY run since 2026-07-29, not only when a live lookup errored:
+    Wikidata is an encyclopaedia, not a PEP register, so a domestic PEP or an
+    RCA with no English article was screened "no PEP" — a silent false negative
+    on an FATF R.12 duty. It is now the standing worldwide net and Wikidata is
+    the enrichment layer over it, so a miss on one is covered by the other."""
     if not PEP_MIRROR_FALLBACK:
-        log("  PEP mirror fallback disabled (PEP_MIRROR_FALLBACK=0) — errored lookups stay errored")
+        log("  worldwide PEP/RCA net disabled (PEP_MIRROR_FALLBACK=0) — Wikidata only")
         return None
-    data = download(PEP_MIRROR_URL, "OpenSanctions PEPs (mirror fallback)")
+    data = download(PEP_MIRROR_URL, "OpenSanctions PEPs + RCAs (worldwide net)")
     index = parse_pep_index(data)
     if not index:
         return None
-    log(f"  PEP mirror: {len(index):,} name keys loaded — re-covering individuals "
-        "the live lookup could not screen")
+    log(f"  worldwide PEP/RCA net: {len(index):,} name keys loaded "
+        "(politically exposed persons + relatives / close associates)")
     return index
 
 def pep_mirror_lookup(index, name):
-    """Exact-normalized (+ token-sorted) lookup against the bulk PEP index.
-    Hit ⇒ 'listed in the consolidated PEP dataset — verify' (provenance-marked
-    mirror). Miss ⇒ screened-by-mirror, no listing found (still provisional —
-    the mirror is a net, not the primary)."""
+    """Exact-normalized (+ token-sorted) lookup against the worldwide PEP/RCA
+    index. Hit ⇒ 'listed in the consolidated PEP dataset — verify', carrying the
+    role the DATASET states (PEP vs relative/close associate). Miss ⇒ screened
+    against the net, no listing found."""
     key = _norm_lower(name)
     if not key:
         return {"hit": False, "via_mirror": True}
     entry = index.get(key) or index.get(" ".join(sorted(key.split())))
     if not entry:
         return {"hit": False, "via_mirror": True}
+    role = entry.get("role") or "PEP / RCA (role not stated by the source)"
     return {"hit": True, "id": entry["id"], "label": entry["label"],
-            "category": "PEP (OpenSanctions peps watchlist — mirror)",
-            "description": "listed in the OpenSanctions consolidated PEP dataset "
-                           "(mirror fallback — Wikidata unavailable this run)",
+            "category": f"{role} — OpenSanctions worldwide PEP dataset",
+            "description": ("listed in the consolidated worldwide PEP dataset "
+                            "(politically exposed persons and their relatives / "
+                            "close associates). FATF R.12 applies the same EDD "
+                            "duty to an RCA as to the PEP they derive from."),
             "source_url": (f"https://www.opensanctions.org/entities/{entry['id']}/"
                            if entry["id"] else ""),
             "via_mirror": True}
@@ -4266,7 +4346,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
     sanc_status = "OK" if sanc_ok else ("DEGRADED" if any(core_loaded) else "FAILED")
     pep_status = ("DEGRADED" if pep_degraded
-                  else ("OK (mirror-assisted)" if pep_mirror else "OK"))
+                  else ("OK (worldwide PEP/RCA net)" if pep_mirror else "OK"))
     am_status = ("DEGRADED" if am_blackout
                  else ("DEGRADED (news)" if am_errors_n else "OK"))
 
@@ -4419,6 +4499,18 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A( "         EDD review required + assess STR grounds (tipping-off rules apply).")
             A("")
         A(f"   Source: Google News RSS ({ADVERSE_LOCALES}/{len(GNEWS_LOCALES)} worldwide locales) + GDELT global index (65+ languages) · {len(ADVERSE_KEYWORDS)} EN + {len(FOREIGN_KEYWORDS)} multilingual ({ADVERSE_LANG_COUNT}-language) red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
+        # Disclose WHICH markets ran and when the cycle completes. The per-run
+        # locale budget is the empirical Google-News per-IP ceiling, so full
+        # worldwide reach is achieved by rotating the matrix rather than by
+        # sending more requests — that is only honest if the report says so.
+        if ADVERSE_ROTATE and ADVERSE_LOCALES < len(GNEWS_LOCALES):
+            _ri = adverse_locale_indices(run_time)
+            _mkts = ", ".join(GNEWS_LOCALES[i][2] for i in _ri)
+            _cyc = adverse_rotation_cycle_days()
+            A(f"   Worldwide rotation: this run swept {_mkts}. The {ADVERSE_CORE_LOCALES} core editions run every day; the rest of the "
+              f"{len(GNEWS_LOCALES)}-market matrix rotates, so every market is swept within {_cyc} run(s). "
+              "GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
+              "the rotation adds local-language press on top of it.")
         if stats.get("watchlist_loaded"):
             A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
               f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
@@ -4439,8 +4531,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     if pep_degraded:
         A(f"   Status: DEGRADED this run ({stats.get('pep_errors',0)} individual(s) unscreened on BOTH sources) — treat 'no PEP' as provisional; re-run.")
     elif pep_mirror:
-        A(f"   Status: mirror-assisted this run — {pep_mirror} individual(s) screened via the OpenSanctions")
-        A("   PEP mirror because Wikidata was unavailable; a mirror hit means VERIFY, a miss is still provisional.")
+        A(f"   Status: {pep_mirror} individual(s) resolved by the WORLDWIDE PEP/RCA net (OpenSanctions")
+        A("   consolidated PEP dataset — politically exposed persons AND their relatives / close associates,")
+        A("   FATF R.12). The net screens every individual each run, so a domestic PEP or an RCA with no")
+        A("   English encyclopaedia entry is no longer filed as 'no PEP'. A hit means VERIFY; a miss is still provisional.")
     if not pep_findings:
         A("   No PEP matches identified." + ("  (provisional — see status above)" if pep_degraded else ""))
     else:
@@ -4509,7 +4603,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
     A("")
     A("Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT + Bing News")
-    A("adverse media + OpenSanctions crime watchlist, Wikidata PEP (OpenSanctions mirror fallback),")
+    A("adverse media + OpenSanctions crime watchlist, worldwide PEP/RCA net (OpenSanctions PEPs +")
+    A("relatives & close associates) enriched by Wikidata,")
     A(f"AI risk-rating & triage · {github_run_url()}")
     A("> " + ai.governance_footer())
     A("> Decision-support only; a 'no match' is never a clearance when a module is degraded (shown, never hidden).")
@@ -4705,7 +4800,7 @@ def tally_enrichment(results, wl_hits, wl_loaded):
       am_blackout  — of those, subjects with ZERO adverse coverage from ANY
                      source (the watchlist was missing too) — the original alarm
       pep_errors   — individuals with no PEP coverage from either source
-      pep_mirror   — individuals screened via the OpenSanctions mirror fallback
+      pep_mirror   — individuals resolved by the worldwide PEP/RCA net (OpenSanctions)
       watchlist    — subjects with ≥1 adverse-exposure watchlist finding
     """
     companies = individuals = 0
@@ -4869,16 +4964,42 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             if done % 50 == 0 or done == total:
                 log(f"  enriched {done}/{total}")
 
-    # PEP MIRROR FALLBACK — individuals whose live lookup errored get one bulk
-    # second chance (loud, provisional) instead of finishing as "PEP unknown".
-    pep_unresolved = [r for r in results
-                      if r["type"] == "INDIVIDUAL" and (r.get("pep") or {}).get("errored")]
-    if pep_unresolved:
-        log(f"  PEP: {len(pep_unresolved)} live lookup(s) failed — trying the OpenSanctions mirror")
+    # WORLDWIDE PEP + RCA NET — screened on EVERY run, over EVERY individual.
+    # Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or a
+    # relative / close associate with no English article returned a confident
+    # {"hit": False}, which is a silent false negative on an FATF R.12 duty
+    # (R.12 extends the PEP controls to family members and close associates).
+    # The consolidated worldwide dataset now runs as the standing net over all
+    # of them; Wikidata stays as the richer explanation layer on top. Three
+    # populations are covered here, in this order of precedence:
+    #   errored  — the live lookup failed: the net RESOLVES it (was the only
+    #              behaviour before 2026-07-29, and stays loud/provisional);
+    #   no hit   — Wikidata found nothing: the net gets its own say, which is
+    #              the coverage gain (domestic PEPs, RCAs, non-English figures);
+    #   hit      — Wikidata already flagged them: left untouched, since its
+    #              label/description is the more useful evidence for the MLRO.
+    _pep_individuals = [r for r in results if r["type"] == "INDIVIDUAL"]
+    _pep_errored = [r for r in _pep_individuals if (r.get("pep") or {}).get("errored")]
+    _pep_clear = [r for r in _pep_individuals
+                  if not (r.get("pep") or {}).get("errored")
+                  and not (r.get("pep") or {}).get("hit")]
+    if _pep_individuals:
+        if _pep_errored:
+            log(f"  PEP: {len(_pep_errored)} live lookup(s) failed — the worldwide net re-covers them")
         pep_index = load_pep_mirror()
         if pep_index is not None:
-            for r in pep_unresolved:
+            _net_new = 0
+            for r in _pep_errored:
                 r["pep"] = pep_mirror_lookup(pep_index, r["name"])
+            for r in _pep_clear:
+                _found = pep_mirror_lookup(pep_index, r["name"])
+                if _found.get("hit"):
+                    r["pep"] = _found
+                    _net_new += 1
+            log(f"  worldwide PEP/RCA net: screened {len(_pep_clear):,} individual(s) Wikidata "
+                f"reported clear — {_net_new} further PEP/RCA listing(s) found")
+        elif _pep_errored:
+            log("  PEP: worldwide net unavailable — errored lookups stay errored (loud, provisional)")
 
     # Pure tally — honest denominators (every subject counts, errors once per
     # subject) + findings merged across the news and watchlist nets.
