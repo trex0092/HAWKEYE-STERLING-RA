@@ -9,7 +9,8 @@
    "type": "curated",
    "parser": "curated",
    "enabled": true,
-   "_note": "EOCN publishes this only as PDF/Excel behind bot protection — no free machine-readable feed. Maintain the names in data/eocn-local-terrorist-list.json from the official EOCN download (https://www.uaeiec.gov.ae). While unpopulated it flags 'coverage incomplete', never a clean result."
+   "_note": "EOCN publishes this only as PDF/Excel behind bot protection — no free machine-readable feed. Maintain the names in data/eocn-local-terrorist-list.json from the official EOCN download (https://www.uaeiec.gov.ae). While unpopulated it flags 'coverage incomplete', never a clean result.",
+   "minNames": 150
   },
   {
    "id": "internal-watchlist",
@@ -30,7 +31,8 @@
    "type": "xml",
    "parser": "xml",
    "enabled": true,
-   "_note": "Best-effort generic-XML parse; if the structure changes it degrades visibly rather than silently."
+   "_note": "Best-effort generic-XML parse; if the structure changes it degrades visibly rather than silently.",
+   "minNames": 2500
   },
   {
    "id": "fr-dgt",
@@ -40,7 +42,8 @@
    "type": "json",
    "parser": "json",
    "enabled": true,
-   "_note": "France DGT national freeze register (Registre national des gels). Re-enabled 2026-07-08 with the documented ApiPublic base path (the previous path 404'd); the generic JSON parser assembles Nom/Prenom + aliases. A failed fetch or 0-name parse degrades coverage loudly, never silently."
+   "_note": "France DGT national freeze register (Registre national des gels). Re-enabled 2026-07-08 with the documented ApiPublic base path (the previous path 404'd); the generic JSON parser assembles Nom/Prenom + aliases. A failed fetch or 0-name parse degrades coverage loudly, never silently.",
+   "minNames": 500
   },
   {
    "id": "nz-terror",
@@ -71,7 +74,8 @@
    "enabled": true,
    "timeoutMs": 150000,
    "_note": "Switzerland SECO consolidated sanctions list (Gesamtliste XML via the SESAM search service). Re-enabled 2026-07-08 with the dedicated parseSecoXml extractor (nested name-part/value blocks). SESAM generates the full-list XML server-side and needs well over the default 60s (both 2026-07-08 runs aborted at the flat timeout), hence the per-source 150s. A failed fetch or 0-name parse degrades coverage loudly.",
-   "url": "https://www.sesam.search.admin.ch/sesam-search-web/pages/downloadXmlGesamtliste.xhtml?action=downloadXmlGesamtlisteAction"
+   "url": "https://www.sesam.search.admin.ch/sesam-search-web/pages/downloadXmlGesamtliste.xhtml?action=downloadXmlGesamtlisteAction",
+   "minNames": 500
   },
   {
    "id": "ch-seco-curated",
@@ -91,7 +95,8 @@
    "type": "csv",
    "parser": "eu",
    "enabled": true,
-   "_note": "DFAT bot-gates its own regulation8_consolidated.xlsx (404 to automated fetches), so the fetchable daily path is the OpenSanctions mirror — the same arrangement the EU FSF list has always used, on a host every screening workflow already allowlists. targets.simple.csv shape, parsed by the same parser as the EU list. The direct au-dfat source and the curated fallback below stay configured (disabled) as alternatives."
+   "_note": "DFAT bot-gates its own regulation8_consolidated.xlsx (404 to automated fetches), so the fetchable daily path is the OpenSanctions mirror — the same arrangement the EU FSF list has always used, on a host every screening workflow already allowlists. targets.simple.csv shape, parsed by the same parser as the EU list. The direct au-dfat source and the curated fallback below stay configured (disabled) as alternatives.",
+   "minNames": 500
   },
   {
    "id": "au-dfat",

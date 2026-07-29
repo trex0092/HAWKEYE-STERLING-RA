@@ -6,7 +6,7 @@ import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
-  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT
+  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
 import { readFileSync } from 'node:fs';
@@ -393,6 +393,29 @@ const eocnYml = readFileSync(join(ROOT, '.github/workflows/eocn-reconcile.yml'),
 const reconcileStep = eocnYml.match(/- name: Reconcile the local list[\s\S]*?(?=\n {6}- name: )/);
 check('the matcher-only eocn-reconcile step now holds no Asana credential at all',
   !!reconcileStep && !/ASANA_TOKEN:/.test(reconcileStep[0]));
+
+/* ── Per-source coverage floors (minNames) ────────────────────────────────────
+   A list parsing far below its known size is the 0-names false-negative class
+   (truncated download / parser drift), not a mass de-listing. The engine marks
+   it partial + degraded; these pin the classifier and that the registries
+   actually carry floors — a floor that exists but is configured nowhere is the
+   multi-homing bug class again. */
+check('belowFloor: under the floor classifies as truncated',
+  belowFloor({ minNames: 9000 }, Array.from({ length: 50 }, (_, i) => 'N' + i)));
+check('belowFloor: at/above the floor passes',
+  !belowFloor({ minNames: 3 }, ['A', 'B', 'C']));
+check('belowFloor: a source with no floor never classifies (alias files, curated extras)',
+  !belowFloor({}, []) && !belowFloor(null, null));
+const srcReg = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-sources.json'), 'utf8')).sources;
+const extraReg = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8')).sources;
+for (const s of srcReg.filter(s => !s.mergeInto)) {
+  check(`sources registry: ${s.id} carries a coverage floor`, Number(s.minNames) > 0);
+}
+for (const s of extraReg.filter(s => s.enabled !== false && !s.optional)) {
+  check(`extra registry: enabled non-optional ${s.id} carries a coverage floor`, Number(s.minNames) > 0);
+}
+check('the optional internal watchlist carries NO floor (empty is a valid state)',
+  !extraReg.find(s => s.id === 'internal-watchlist').minNames);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

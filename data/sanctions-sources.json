@@ -8,7 +8,8 @@
       "url": "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv",
       "type": "csv",
       "parser": "ofac",
-      "noHeader": true
+      "noHeader": true,
+      "minNames": 9000
     },
     {
       "id": "ofac-sdn-alt",
@@ -27,7 +28,8 @@
       "jurisdiction": "Global",
       "url": "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/consolidated.xml",
       "type": "xml",
-      "parser": "ofacxml"
+      "parser": "ofacxml",
+      "minNames": 100
     },
     {
       "id": "un-consolidated",
@@ -36,7 +38,8 @@
       "url": "https://scsanctions.un.org/resources/xml/en/consolidated.xml",
       "type": "xml",
       "marker": "<DATAID>",
-      "parser": "un"
+      "parser": "un",
+      "minNames": 500
     },
     {
       "id": "uk-ofsi",
@@ -44,7 +47,8 @@
       "jurisdiction": "Global",
       "url": "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv",
       "type": "csv",
-      "parser": "ofsi"
+      "parser": "ofsi",
+      "minNames": 9000
     },
     {
       "id": "eu-fsf",
@@ -52,7 +56,9 @@
       "jurisdiction": "Global",
       "url": "https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw",
       "type": "csv",
-      "parser": "eu"
+      "parser": "eu",
+      "minNames": 20000
     }
-  ]
+  ],
+  "_README_minNames": "minNames: per-source coverage floor. A list parsing below it is a truncated download / parser drift, not a mass de-listing: it still screens (hits are real) but is marked partial (standing matches carried, not cleared) and the run reports DEGRADED. Mirrors screen.py CORE_LIST_FLOORS (~50% of verified baselines). Alias files (mergeInto) carry no floor: the fold's partial machinery covers them."
 }
