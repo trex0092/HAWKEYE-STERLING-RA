@@ -10,6 +10,28 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — coverage alarms turn the run red; onboarding gets the gate chain (2026-07-29)
+
+Two gaps in the loud-failure chain:
+
+- **Coverage-drift alarms never failed the run.** A core list that silently
+  shrank ≥20% vs its trailing median (or EOCN mirror designations missing
+  locally) reached the report §⑤ and the QA gate — but the QA gate only logs,
+  so the Actions run stayed green and freshness/failure alerting saw a
+  healthy control while coverage drifted. New post-delivery
+  `enforce_coverage_alarm_gate()` (exit 6, kill-switch
+  `COVERAGE_ALARM_HARD_FAIL=0`), same deliver-first-then-red pattern as the
+  outage gate. The EOCN review-age alarm stays excluded — it has its own gate
+  and exit code.
+- **The onboarding run called none of the post-delivery gates.** A failed
+  onboarding delivery, an outaged core list, a lapsed EOCN review or a drift
+  alarm left a green 6-hourly run — and a new customer's screen is the one
+  the daily batch will not redo that day. `run_onboarding` now ends with the
+  same four-gate chain as the daily run.
+
+Tests pin the exit code, the kill-switch, the clean path, that BOTH run modes
+call all four gates (source inspection), and the no-double-gate exclusion.
+
 ### Case engine — coverage floors reach the JS screening path too (2026-07-29)
 
 `scripts/sanctions-screen.mjs` (the per-case / onboarding engine) degraded

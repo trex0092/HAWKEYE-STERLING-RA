@@ -3772,6 +3772,27 @@ def enforce_delivery_gate():
         if DELIVERY_HARD_FAIL:
             sys.exit(5)
 
+# Set by screen_subject_set() from monitoring.check_source_coverage plus the
+# EOCN mirror cross-check; read by enforce_coverage_alarm_gate() after the
+# report has been delivered. The EOCN review-age alarm is EXCLUDED — it
+# carries its own gate (exit 3). Kill-switch: COVERAGE_ALARM_HARD_FAIL=0.
+COVERAGE_ALARM_STATE = {"alarms": []}
+COVERAGE_ALARM_HARD_FAIL = os.environ.get("COVERAGE_ALARM_HARD_FAIL", "1") == "1"
+
+def enforce_coverage_alarm_gate():
+    """Post-delivery hard fail for source-coverage alarms — a core list that
+    silently shrank vs its trailing median, or EOCN mirror designations
+    missing from the curated local list. These alarms always reached the
+    report (§⑤) and the QA gate, but the RUN stayed green (the QA gate only
+    logs), so the freshness and Actions-failure alerting saw a healthy
+    control while coverage drifted. Same post-delivery pattern as the outage
+    gate: deliver the report first, then turn the run red."""
+    if COVERAGE_ALARM_STATE["alarms"]:
+        for a in COVERAGE_ALARM_STATE["alarms"]:
+            log(f"COVERAGE ALARM GATE: {a}")
+        if COVERAGE_ALARM_HARD_FAIL:
+            sys.exit(6)
+
 def load_eocn_mirror():
     """Returns (names, meta) for the OpenSanctions mirror of the UAE Local
     Terrorist List — SUPPLEMENTARY tier (drift tracking; never core coverage)."""
@@ -4750,6 +4771,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         coverage_result.setdefault("alarms", []).append(EOCN_REVIEW_ALERT["message"])
         coverage_result.setdefault("drops", []).append(EOCN_REVIEW_ALERT["message"])
         log(f"COVERAGE ALARM: {EOCN_REVIEW_ALERT['message']}")
+    # Persist for the post-delivery coverage gate: every alarm EXCEPT the
+    # review-age one, which has its own gate and exit code.
+    COVERAGE_ALARM_STATE["alarms"] = [
+        a for a in coverage_result.get("alarms", [])
+        if a != EOCN_REVIEW_ALERT.get("message")]
 
     # 1) SANCTIONS — entities + individuals, ALL matching candidates
     possible_matches, clear = screen_customers(customers, all_lists)
@@ -4967,6 +4993,7 @@ def run_unified(run_time):
     enforce_delivery_gate()
     enforce_list_outage_gate()
     enforce_eocn_review_gate()
+    enforce_coverage_alarm_gate()
 
 def run_onboarding(run_time):
     """Screen only customers created within the last ONBOARDING_WINDOW_HOURS, so a
@@ -4993,6 +5020,14 @@ def run_onboarding(run_time):
     all_lists, list_meta = load_all_lists()
     screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
     log("Onboarding run done.")
+    # Same post-delivery gate chain as the daily run — an onboarding report
+    # that never reached the MLRO queue, or an onboarding screen run against
+    # an outaged/drifting core list, must not leave a green run behind: a new
+    # customer's screen is the one the daily batch will NOT redo today.
+    enforce_delivery_gate()
+    enforce_list_outage_gate()
+    enforce_eocn_review_gate()
+    enforce_coverage_alarm_gate()
     enforce_delivery_gate()
     enforce_list_outage_gate()
     enforce_eocn_review_gate()

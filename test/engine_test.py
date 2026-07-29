@@ -1696,6 +1696,48 @@ check("floors: a healthy load never refuses", _floor_clean == ([], []))
 screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
 screen.LIST_OUTAGE_ALERT["outages"] = []
 
+# ── Coverage-alarm gate: an alarm the run survives is invisible to alerting ──
+# Drift alarms (core list shrank vs trailing median; EOCN mirror designations
+# missing locally) reached the report and the QA gate — but the QA gate only
+# logs, so the RUN stayed green and freshness/Actions alerting saw a healthy
+# control. Post-delivery exit 6, same pattern as the outage gate.
+print("screen — coverage alarm gate (post-delivery red)")
+screen.COVERAGE_ALARM_STATE["alarms"] = ["UN list coverage dropped 40% (fixture)"]
+_prev_cov_hard = screen.COVERAGE_ALARM_HARD_FAIL
+screen.COVERAGE_ALARM_HARD_FAIL = True
+_gate6 = False
+try:
+    screen.enforce_coverage_alarm_gate()
+except SystemExit as _e:
+    _gate6 = (_e.code == 6)
+check("coverage alarm gate: post-delivery exit (code 6) on a drift alarm", _gate6)
+screen.COVERAGE_ALARM_HARD_FAIL = False
+_gate6_soft = True
+try:
+    screen.enforce_coverage_alarm_gate()
+except SystemExit:
+    _gate6_soft = False
+check("coverage alarm gate: kill-switch COVERAGE_ALARM_HARD_FAIL=0 logs without exiting", _gate6_soft)
+screen.COVERAGE_ALARM_HARD_FAIL = _prev_cov_hard
+screen.COVERAGE_ALARM_STATE["alarms"] = []
+_gate6_clean = True
+try:
+    screen.enforce_coverage_alarm_gate()
+except SystemExit:
+    _gate6_clean = False
+check("coverage alarm gate: no alarms never exits", _gate6_clean)
+# Wiring pins: BOTH run modes call the full post-delivery gate chain (the
+# onboarding path called none of the gates until 2026-07-29 — a failed
+# onboarding delivery left a green run), and the review-age alarm is excluded
+# from the coverage gate (it has its own gate + exit code).
+for _nm, _fn in (("unified", screen.run_unified), ("onboarding", screen.run_onboarding)):
+    _sq = _inspect.getsource(_fn)
+    check(f"{_nm} run calls all four post-delivery gates",
+          all(g in _sq for g in ("enforce_delivery_gate", "enforce_list_outage_gate",
+                                 "enforce_eocn_review_gate", "enforce_coverage_alarm_gate")))
+check("the review-age alarm is excluded from the coverage gate (no double gate)",
+      'EOCN_REVIEW_ALERT.get("message")' in _inspect.getsource(screen.screen_subject_set))
+
 # ── Adaptive floor ratchet: floors rise to a fraction of the observed baseline ─
 # The AU/CH floors shipped provisional (500) with a TODO to tighten them once
 # runs logged real counts; the ratchet does that tightening automatically, and
