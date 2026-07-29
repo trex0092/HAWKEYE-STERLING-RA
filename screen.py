@@ -4334,8 +4334,8 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
             "notes": cap_notes(narrative, budget),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
-            "projects": [ASANA_ONGOING_MON_GID],
-            "memberships": [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}],
+            "projects": _mlro_queue_targets()[0],
+            "memberships": _mlro_queue_targets()[1],
         }}
         r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
         if r is not None and r.status_code in (200, 201):

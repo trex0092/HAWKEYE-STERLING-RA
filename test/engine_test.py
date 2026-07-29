@@ -1938,6 +1938,33 @@ finally:
 check("legacy daily post failure arms the delivery gate (no more green no-delivery)",
       _armed_daily)
 
+# The UNIFIED poster must multi-home into every MLRO queue. The 2026-07-29
+# proof run delivered to Ongoing Monitoring only: _mlro_queue_targets() existed
+# and both LEGACY posters used it, but the unified path — the one the daily
+# workflow actually takes — still hardcoded a single queue. Pin the payload.
+_posted = []
+def _record_post(method, url, **kw):
+    _posted.append(kw.get("json"))
+    class _R:
+        status_code = 201
+        text = ""
+        @staticmethod
+        def json(): return {"data": {"gid": "1"}}
+    return _R()
+screen.asana_request = _record_post
+try:
+    screen.post_unified_task("narrative", _dt.datetime(2026, 7, 29, 9, 0), [], [], [])
+finally:
+    screen.asana_request = _orig_asana_request
+_data = (_posted[0] or {}).get("data", {}) if _posted else {}
+check("unified daily task is multi-homed into BOTH MLRO queues (projects)",
+      set(_data.get("projects", [])) ==
+      {screen.ASANA_ONGOING_MON_GID, screen.ASANA_FOLLOWUPS_GID})
+_mem = {m.get("project"): m.get("section") for m in _data.get("memberships", [])}
+check("unified daily task lands in the Follow Ups delivery section",
+      _mem.get(screen.ASANA_FOLLOWUPS_GID) == screen.ASANA_FOLLOWUPS_SECTION_GID
+      and _mem.get(screen.ASANA_ONGOING_MON_GID) == screen.ASANA_SECTION_GID)
+
 # ── screen.py: adaptive notes budget (learned across runs via delta-state) ───
 # 2026-07-17: even the numeric-entity worst case at 65,000 bytes was rejected
 # by Asana, so the only reliable budget is the one that actually delivered.
