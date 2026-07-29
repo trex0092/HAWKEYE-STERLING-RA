@@ -21,8 +21,12 @@ paths = [
   '''\.env\.example''',
 ]
 regexes = [
-  # EU FSF public access token embedded in the sanctions-list download URL
-  '''token=dG9rZW4tMjAxNw''',
+  # EU FSF public access token embedded in the sanctions-list download URL.
+  # Matched as the BARE value (no token= prefix): the generic-api-key rule's
+  # secret group captures only the value, so a prefixed regex misses it when
+  # the URL sits in a source constant (screen.py EU_OFFICIAL_XML_URL) instead
+  # of a path-allowlisted registry file.
+  '''dG9rZW4tMjAxNw''',
   # Asana project GIDs are public object identifiers (they appear in task URLs),
   # not secrets. The default asana-client-id rule false-positives on any 16-digit
   # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
