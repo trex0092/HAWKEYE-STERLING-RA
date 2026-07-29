@@ -83,6 +83,17 @@ so, the documents say so, and CI fails if either claims otherwise.
   register asked for one; the headers were added in the same change.
 - **An approval date must be evidenced by the document.** A register row may not
   claim ratification the instrument itself does not record, in ISO or long form.
+- **An instrument in force with no approval date must say what put it in force.**
+  Fifteen of the sixteen in-force rows have no discrete approval date — they were
+  issued and operative from publication. That is a real answer, but until
+  2026-07-29 it was only a prose sentence, so the register asserted a next-review
+  date anchored to nothing a machine could read. Each such row now carries an
+  `approval_basis` from a closed vocabulary, and CI requires it:
+  `operative-on-publication` (issued by the accountable owner and effective on
+  publication; the review clock runs from the register's own review date) or
+  `adopted-at-management-review` (recorded as adopted at a management review, so
+  the clock runs from that review). "It just is" is what a null approval date
+  already said, and it is not an answer.
 - **A draft may not assert a next-review date**, and must name the open-actions
   item that approves it. Review clocks start at approval, not at drafting.
 - **Anti-shadow-policy sweep — two signals, not one.** A document is swept if

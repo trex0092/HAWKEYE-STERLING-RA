@@ -40,6 +40,15 @@ document-control procedure.
 | 22 | Population-Stability Monitoring (PSI) | 9.1 / A.6.2 | [population-stability-monitoring.md](population-stability-monitoring.md) |
 | 23 | Red-Team Log (campaigns & corpus growth) | A.5.5 | [red-team-log.md](red-team-log.md) |
 | 24 | Transaction-Feed Compensating Control (interim, DRAFT) | A.6 | [transaction-feed-compensating-control.md](transaction-feed-compensating-control.md) |
+| 25 | TFS Name-Match Procedure (PNMR / CNMR / FFR) — registered instrument **POL-07** | A.6 / FATF R.6 | [tfs-name-match-procedure.md](tfs-name-match-procedure.md) |
+| 26 | Curated Sanctions List Update SOP (UAE EOCN) — registered instrument **POL-09** | A.6 | [eocn-list-update-sop.md](eocn-list-update-sop.md) |
+| 27 | Transaction-Feed Scoping Note (R-13 / FATF R.16 — scoping only, nothing connected) | A.6 | [transaction-feed-scoping.md](transaction-feed-scoping.md) |
+| 28 | Advisor Citation Migration Worklist (160 rows, with counsel) | A.8.2 | [advisor-citation-migration-worklist.md](advisor-citation-migration-worklist.md) |
+
+> Rows 25–28 existed on disk but were absent from this index until 2026-07-29 —
+> including two **in-force registered instruments** (POL-07 and POL-09). This page
+> is the "start here" for an audit of the AIMS, so a document missing from it is
+> a document an auditor does not know to ask for.
 
 **Owner:** MLRO / Compliance. **Review cadence:** at least annually and on any
 material change to the AI system. **Retention:** 10 years (UAE FDL No. 26 of 2021,

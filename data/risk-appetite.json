@@ -108,7 +108,7 @@
     "High-risk customer EDD reviews overdue >30 days",
     "Unregulated/unlicensed VASP transactions"
   ],
-  "advisor_zero_tolerance_note": "Mirrored from ZERO_TOLERANCE in netlify/functions/brain-soul.js — the appetite thresholds the Advisor is told to treat as blocking. test/risk-appetite.test.mjs fails if the two lists diverge, so the stated appetite and the appetite the Advisor applies cannot drift apart.",
+  "advisor_zero_tolerance_note": "Mirrored from ZERO_TOLERANCE in netlify/functions/brain-soul.js — the appetite thresholds the Advisor is told to treat as blocking. test/grc-metrics.test.mjs fails if the two lists diverge (in both directions), so the stated appetite and the appetite the Advisor applies cannot drift apart.",
 
   "kris": [
     {

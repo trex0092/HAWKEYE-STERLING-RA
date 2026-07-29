@@ -74,6 +74,7 @@ as passing. CI enforces that distinction.
 | `unjustifiedSuppressions` | 0 | Every OSV suppression carries a written reason |
 | `obligationsWithoutOwner` | 0 | No orphaned obligation |
 | `obligationsWithoutWatchSource` | 1 | ISO/IEC 42001 — a standards body, not a supervisor feed. Tolerated at ≤ 1 |
+| `openActionsWithoutTargetDate` | 17 | Every open action carries an owner and a closing condition; **none carries a deadline**. This is the missing input behind KRI-09 (§3) — it counts rows in the [open-actions register](open-actions-register.md) whose `Target date` cell holds no ISO date. With no such column, every row counts. Setting the dates is a board act (item 17) |
 
 ## 5. What CI enforces
 

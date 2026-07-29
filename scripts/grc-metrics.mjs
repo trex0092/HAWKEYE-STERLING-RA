@@ -175,6 +175,36 @@ export function obligationHygiene(root = ROOT) {
   };
 }
 
+/* Open-actions items carrying no target date.
+   KRI-09 (overdue issue rate) reports null because nothing can be AGED: the
+   register records an owner and a closing condition per item, but no deadline.
+   Setting those dates is a board act — open-actions item 17 — so the metric
+   cannot honestly be instrumented from this side, and inventing dates to make a
+   KRI green would be the exact failure the register exists to prevent.
+   What CAN be measured is the size of the gap itself. This counts the items an
+   overdue-rate would have nothing to measure against, so the Board has a number
+   in front of it when it takes item 17, and so the day dates start appearing the
+   figure falls on its own.
+
+   It keys on a dedicated "target date" COLUMN, not on any date appearing in the
+   row. Scanning the prose was tried and is wrong: item 18 quotes 2026-07-28 as
+   the day the policy pack was drafted, which is not a deadline for anything, and
+   counting it as dated would understate the gap by one. The register carries no
+   such column today, so every item counts — which is the correct answer. Add the
+   column and the metric starts measuring per row without any change here. */
+export function openActionsWithoutTargetDate(root = ROOT) {
+  const md = read(root, 'docs/governance/open-actions-register.md');
+  const rows = [...md.matchAll(/^\|\s*\d+\s*\|.*$/gm)];
+  const header = (md.match(/^\|\s*#\s*\|.*$/m) || [''])[0];
+  const cols = header.split('|').map((c) => c.trim().toLowerCase());
+  const idx = cols.findIndex((c) => /target\s*date|due/.test(c));
+  if (idx === -1) return rows.length;   // no column: nothing is dated
+  return rows.filter((r) => {
+    const cell = (r.split('|')[idx] || '').trim();
+    return !/\d{4}-\d{2}-\d{2}/.test(cell);
+  }).length;
+}
+
 /* ── Assembly ─────────────────────────────────────────────────────────────── */
 export async function computeMetrics(root = ROOT) {
   const ce = controlEffectiveness(root);
@@ -189,7 +219,8 @@ export async function computeMetrics(root = ROOT) {
     governanceDriftCount: drift.total,
     unjustifiedSuppressions: unjustifiedSuppressions(root),
     obligationsWithoutOwner: hygiene.withoutOwner,
-    obligationsWithoutWatchSource: hygiene.withoutWatchSource
+    obligationsWithoutWatchSource: hygiene.withoutWatchSource,
+    openActionsWithoutTargetDate: openActionsWithoutTargetDate(root)
   };
 
   const values = {

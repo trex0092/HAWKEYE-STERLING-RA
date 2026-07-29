@@ -10,6 +10,46 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — registers say how they know, and the missing-deadline gap is now a number (2026-07-29)
+
+Register hygiene: four claims the registers made that the evidence did not
+support, and one honest count where an invented one was the tempting option.
+
+- **In-force instruments now declare *what put them in force*.** Fifteen of the
+  sixteen `in-force` rows in [`data/policies.json`](data/policies.json) carried
+  `approved_on: null` **and** a `next_review` date — a review clock anchored to
+  nothing. Each now carries an `approval_basis` from a closed two-value
+  vocabulary (`operative-on-publication`, `adopted-at-management-review`),
+  documented in `approval_basis_meanings` and **required by
+  [`test/policies.test.mjs`](test/policies.test.mjs)** on every in-force row
+  without an approval date. The vocabulary was derived from what the documents
+  already say, not invented: fourteen read "Operative on publication", POL-05
+  was adopted at a management review. No approval date was fabricated — the
+  seventeen open actions stay human acts.
+- **The missing deadlines are now counted rather than described.**
+  KRI-09 (overdue issue rate) reports *null* because no open action carries a
+  target date, and instrumenting it would have meant inventing seventeen
+  deadlines. Instead `scripts/grc-metrics.mjs` gained
+  **`openActionsWithoutTargetDate`** — it keys on a dedicated `Target date`
+  column and, with no such column, correctly counts every row (**17**). The
+  board gets a number for item 17, and the counter falls on its own the moment
+  dates start landing.
+- **`docs/aims/README.md` omitted four documents that exist on disk** — among
+  them **two in-force registered instruments**, the TFS Name-Match Procedure
+  (POL-07) and the EOCN List Update SOP (POL-09). That page is the "start here"
+  for an AIMS audit, so a document missing from it is a document an auditor does
+  not know to ask for. All twenty-nine are now indexed.
+- **Three stale cross-references corrected.** OB-10's note in
+  `data/obligations.json` said the risk register runs "R-01…R-13" when it runs
+  to **R-20**; `data/risk-appetite.json` cited `test/risk-appetite.test.mjs`,
+  which **does not exist** (the assertion lives in `test/grc-metrics.test.mjs`);
+  the open-actions register and item 18 called the AML/CFT/CPF pack
+  "seventeen instruments" against **eighteen** on disk and eighteen `draft` rows
+  in the register.
+- **The open-actions register's own "Last updated" line said 24 July** while
+  items 16–18 had landed on the 28th — the one line whose whole job is to say
+  how fresh the answer to "what is pending?" is.
+
 ### Governance — the risk vocabulary, and a guard for the links that hold the pack together (2026-07-29)
 
 The pack is written in fluent GRC dialect and had **no translation layer**.
