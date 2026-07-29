@@ -10,6 +10,32 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening state — a flaky fetch could erase the delivered-finding history (2026-07-29)
+
+Both state writers — the daily sweep and the onboarding run — restored the
+delta-state branch with `if git fetch origin screen-delta-state; then overlay;
+else cold start; fi`. `git fetch` exits **128 for a missing branch and 128 for
+an unreachable origin**, so the two are indistinguishable and a transient
+network flake was read as a first run. The run then diffed against `main`'s
+frozen copy and re-reported findings already delivered — and, because the
+commit step **force-pushes** the branch as `<main>` + one data commit, it
+overwrote the accumulated delta-state permanently. Both writers share that
+branch, so either one could destroy the other's history.
+
+`git ls-remote --exit-code` is the discriminator (`2` = ref genuinely absent,
+anything else = transport error). A cold start still proceeds; an unreachable
+origin now stops the run with an explicit error rather than silently screening
+with amnesia. The force-pushing commit step is additionally gated on the
+overlay having established a baseline, so a failed overlay cannot persist state
+built on one it never read.
+
+`anomaly-watch` — a state *reader* — already carried this guard; the two
+*writers* did not. Verified against the real `bash -e` GitHub uses, across four
+scenarios (branch present, branch absent, origin unreachable, fetch failing
+after a successful probe). `test/screening-state.test.mjs` now pins the
+discrimination for all three consumers, form-agnostically, along with the
+`set -e` capture idiom the guard depends on.
+
 ### Adverse media — the watchlist cannot "cover" a subject it cannot match (2026-07-29)
 
 `am_blackout` — the figure that turns the adverse module DEGRADED — counted a
