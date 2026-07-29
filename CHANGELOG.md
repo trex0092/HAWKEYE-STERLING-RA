@@ -10,6 +10,45 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Case engine — "not re-checked" must never read as "checked and clear" (2026-07-29)
+
+Three routes to the same false negative in `scripts/sanctions-screen.mjs`, all
+ending the same way: the standing match **deleted from state** and its open MLRO
+case auto-completed with the comment *"not flagged by the … screening run"* — a
+statement that is false, written into a record kept for ten years, and a
+completed case never re-opens. All three were reproduced against the live engine
+before anything changed.
+
+- **A MIXED standing match was wiped when only its sanctions half was
+  re-verified.** The guard required `prior.lists.every(ENRICHMENT)`, so a prior
+  of `['OFAC SDN', 'PEP (Wikidata)']` fell straight through it: on a run where
+  OFAC genuinely de-listed the subject and the PEP lookup errored or was
+  budget-skipped (routine on a large book), the never-re-verified PEP evidence
+  was deleted. Now **any** enrichment evidence on the prior blocks the clear.
+- **Switching an enrichment module off mass-cleared its standing matches.**
+  `enrichmentIncomplete` is only set when a module is configured ON and then
+  errors or runs out of budget; a module that is simply OFF performs no lookup
+  and sets no flag, making the row indistinguishable from a verified clear. So
+  `SCREEN_PEP=0` — the documented knob, most likely to be reached for **during**
+  a Wikidata outage, exactly when standing matches most need preserving —
+  cleared every PEP-derived match in the book in one run. `diffState` now takes
+  an **`evaluatedSignals`** set (the enrichment counterpart of `screenedLists`)
+  and carries forward any prior whose signal did not actually run.
+- **A subject that left the screened population kept a stale `lastSeen`.** The
+  loop only ever iterates this run's `results`, so a subject whose task was
+  completed, renamed, deleted — or whose project GID was narrowed — was never
+  seen, never cleared, and never marked. The case planner read the stale date as
+  "no longer flagged" and auto-completed on it. Such subjects are now **held**:
+  `lastSeen` is bumped so the case stays open, `notScreenedOn` records why, and
+  they are returned to the caller and logged so the population change is visible.
+  A subject that genuinely left the book still needs a human to dispose of its
+  case.
+
+Guarded against over-correction: a genuine de-listing, fully re-screened with
+every signal evaluated, still clears — pinned by a control test — and callers
+that pass no `evaluatedSignals` keep the previous behaviour.
+
+
 ### Screening — false positives: identity-based demotion, never suppression (2026-07-29)
 
 The volume problem is real and measured: in the 29 Jul run a single subject

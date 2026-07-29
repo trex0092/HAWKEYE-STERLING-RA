@@ -392,7 +392,7 @@ export function matchSignature(r) {
    matches to alert on, the cleared matches (informational), and the next state.
    Subjects that errored this run carry their prior state forward untouched —
    never wiped, never silently cleared. */
-export function diffState(prevState, results, today, threshold, screenedLists) {
+export function diffState(prevState, results, today, threshold, screenedLists, evaluatedSignals) {
   const prev = (prevState && prevState.subjects) || {};
   const nextSubjects = { ...prev };
   const alerts = [];
@@ -405,6 +405,12 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
   // Omitted on the external-engine path and in unit tests → guard inactive,
   // behaviour unchanged.
   const screened = screenedLists ? new Set(Array.from(screenedLists)) : null;
+  // Enrichment signals (PEP / adverse media / Interpol) whose module actually
+  // RAN this run — the enrichment counterpart of `screened`. A signal that was
+  // switched off produced no lookup and therefore no per-subject error flag, so
+  // without this set a disabled module is indistinguishable from a verified
+  // clear. Omitted → guard inactive, behaviour unchanged (tests, external path).
+  const evaluated = evaluatedSignals ? new Set(Array.from(evaluatedSignals)) : null;
 
   /* Carry a standing match forward as STILL ACTIVE (lastSeen = today). The case
      planner (screening-cases.mjs) treats a stale lastSeen as "no longer flagged"
@@ -472,10 +478,31 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
       // untouched (no alert, no clear); a later run that completes enrichment will
       // clear it legitimately. (A prior SANCTIONS hit is always re-checked locally,
       // so a genuine de-listing still clears.)
-      const priorEnrichmentOnly = Array.isArray(prior.lists) && prior.lists.length > 0
-        && prior.lists.every(l => ENRICHMENT_LISTS.has(l));
-      if (r.enrichmentIncomplete && priorEnrichmentOnly) {
+      // ANY enrichment evidence, not only an enrichment-ONLY prior. The guard
+      // used to require prior.lists.every(ENRICHMENT), so a MIXED prior
+      // (e.g. ['US OFAC — SDN list (CSV)', 'PEP (Wikidata)']) fell straight
+      // through it: on a run where OFAC genuinely de-listed the subject and the
+      // PEP lookup errored or was budget-skipped, the whole record — including
+      // the never-re-verified PEP evidence — was deleted and its MLRO case
+      // auto-completed with the false comment "not flagged by the … run".
+      // Clearing evidence we did not re-check is the same false-negative class
+      // as clearing against a list that failed to load.
+      const priorHasEnrichment = Array.isArray(prior.lists)
+        && prior.lists.some(l => ENRICHMENT_LISTS.has(l));
+      if (r.enrichmentIncomplete && priorHasEnrichment) {
         carryForward(r.key);   // keep the prior standing, marked still-active
+        continue;
+      }
+      // A prior enrichment signal whose MODULE DID NOT RUN this run is the same
+      // epistemic state as one that errored — we did not re-verify it — but it
+      // carries no per-subject flag, because no lookup happened at all. Without
+      // this, flipping SCREEN_PEP=0 (the documented knob, most likely to be
+      // reached for DURING a Wikidata outage, exactly when standing matches most
+      // need preserving) silently cleared every PEP-derived match in the book in
+      // one run and auto-completed their cases.
+      if (evaluated && Array.isArray(prior.lists)
+          && prior.lists.some(l => ENRICHMENT_LISTS.has(l) && !evaluated.has(l))) {
+        carryForward(r.key);
         continue;
       }
       // Degrade-loudly: if a SANCTIONS list that produced this prior match failed
@@ -498,7 +525,29 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
     }
   }
 
-  return { alerts, cleared, matchCount, nextState: { updated: today, subjects: nextSubjects } };
+  /* A standing match whose SUBJECT never appeared in this run's results was not
+     screened at all — the task was completed/off-boarded, renamed (which changes
+     its key), deleted, or an ASANA_*_PROJECT_GID was narrowed. The loop above
+     only ever iterates `results`, so such a subject kept its previous `lastSeen`
+     untouched; the case planner reads that stale date as "no longer flagged" and
+     auto-completes the open MLRO case with the comment "not flagged by the …
+     screening run" — a statement that is false, in a record kept for ten years,
+     and a completed case never re-opens.
+     These are held, not cleared and not silently frozen: `lastSeen` is bumped so
+     the case stays open, `notScreenedOn` records WHY it is being held, and they
+     are returned so the caller can surface the population change. A subject that
+     genuinely left the book still needs a human to dispose of its open case. */
+  const seenKeys = new Set(results.map(r => r && r.key));
+  const notScreened = [];
+  for (const key of Object.keys(prev)) {
+    if (seenKeys.has(key)) continue;
+    const prior = prev[key];
+    notScreened.push({ key, name: prior.name, prior, lastScreened: prior.lastSeen });
+    nextSubjects[key] = { ...prior, lastSeen: today, notScreenedOn: today };
+  }
+
+  return { alerts, cleared, notScreened, matchCount,
+           nextState: { updated: today, subjects: nextSubjects } };
 }
 
 /* The governance footer every screening output carries — detection is automatic,
@@ -1223,7 +1272,22 @@ async function main() {
      matches forward instead of clearing them off reduced coverage. */
   const screenedLists = ((screen.coverage && screen.coverage.lists) || [])
     .filter(L => !L.partial).map(L => L.name).filter(Boolean);
-  const { alerts, cleared, matchCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold, screenedLists);
+  /* Enrichment signals whose module actually RAN this run — the enrichment
+     counterpart of screenedLists. A module switched off performs no lookup and
+     so sets no per-subject error flag; without this, disabling one would make
+     every standing match it produced indistinguishable from a verified clear. */
+  const evaluatedSignals = [
+    cfg.adverseMedia ? 'Adverse media (Google News)' : null,
+    cfg.pep ? 'PEP (Wikidata)' : null,
+    cfg.interpol ? 'Interpol Red Notice' : null,
+  ].filter(Boolean);
+  const { alerts, cleared, notScreened, matchCount, nextState } =
+    diffState(prevState, screen.results, today, cfg.threshold, screenedLists, evaluatedSignals);
+  if (notScreened && notScreened.length) {
+    console.log(`sanctions-screen: ${notScreened.length} standing match(es) left the screened population — `
+      + 'cases HELD for manual disposition, not auto-cleared: '
+      + notScreened.map(n => n.name || n.key).join(', '));
+  }
   const meta = { screened: subjects.length, entities, individuals, degraded: screen.degraded, errored: screen.errored };
   const report = buildScreenReport(alerts, cleared, today, meta);
   const changes = buildChangesArtifact(alerts, today);
