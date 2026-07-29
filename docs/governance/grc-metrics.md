@@ -21,7 +21,7 @@
 |---|---|---|
 | **Control Effectiveness Rate** | **100%** (61/61) | Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof |
 | **Compliance Completion Rate** | **33.3%** (6/18) | Obligations at *met* ÷ regulatory obligations. 10 partial, 2 pending |
-| **KRI Breach Rate** | **12.5%** (1/8) | Instrumented KRIs in breach ÷ instrumented KRIs |
+| **KRI Breach Rate** | **22.2%** (2/9) | Instrumented KRIs in breach ÷ instrumented KRIs. KRI-04 and KRI-10 — see [`kri-breach-ledger.md`](kri-breach-ledger.md) |
 | **Overdue Issue Rate** | *not instrumented* | Open items carry an owner and a closing condition but no target date |
 | **Third-Party Assessment Coverage** | **71.4%** (5/7) | Vendors with a settled safeguard/DPA position ÷ vendors in the register |
 | **Audit Finding Closure Rate** | **95.2%** (20/21) | CAPA rows at *Closed* ÷ all CAPA rows |
@@ -76,7 +76,7 @@ as passing. CI enforces that distinction.
 | `unjustifiedSuppressions` | 0 | Every OSV suppression carries a written reason |
 | `obligationsWithoutOwner` | 0 | No orphaned obligation |
 | `obligationsWithoutWatchSource` | 1 | ISO/IEC 42001 — a standards body, not a supervisor feed. Tolerated at ≤ 1 |
-| `openActionsWithoutTargetDate` | 17 | Every open action carries an owner and a closing condition; **none carries a deadline**. This is the missing input behind KRI-09 (§3) — it counts rows in the [open-actions register](open-actions-register.md) whose `Target date` cell holds no ISO date. With no such column, every row counts. Setting the dates is a board act (item 17) |
+| `openActionsWithoutTargetDate` | 18 | Every open action carries an owner and a closing condition; **none carries a deadline**. This is the missing input behind KRI-09 (§3) — it counts rows in the [open-actions register](open-actions-register.md) whose `Target date` cell holds no ISO date. With no such column, every row counts. Setting the dates is a board act (item 17) |
 | `residualAboveAppetite` | 1 | Risks carried above the residual ceiling of the appetite position that claims them. **R-03** (sanctions false negative) at residual 10 against RA-01's ceiling of 6 — see §4a |
 | `risksWithoutAppetitePosition` | 0 | Every risk in the register is claimed by exactly one appetite position. A risk claimed by nobody is never scored, and an unscored risk is indistinguishable from a compliant one in a count |
 

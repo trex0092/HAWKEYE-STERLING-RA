@@ -10,6 +10,68 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — ISO/IEC 42001 clause 6.1.2 and 6.1.4 are separated, and the two statements of applicability stop contradicting each other (2026-07-29)
+
+**`6.1.2` and `6.1.4` appeared nowhere in `docs/`.** The estate satisfied both in
+substance and had never separated them on paper — which matters because the two
+clauses ask different questions about the same failures, and a risk assessment
+is routinely offered as though it answered both. It does not:
+
+| | 6.1.2 — risk to the firm | 6.1.4 — impact on the person |
+|---|---|---|
+| False negative (R-03) | Severe: regulatory breach, licence risk | Slight — not being flagged does not harm the person |
+| False positive (R-04) | Minor: analyst time, friction | **Severe** — de-risking, refused service, a record they cannot contest |
+
+The two readings point in **opposite directions**. A control set tuned only on
+the left column is tuned the wrong way for the people it acts on.
+
+- **[`docs/aims/iso-42001-clause-6-1-mapping.md`](docs/aims/iso-42001-clause-6-1-mapping.md)
+  — the mapping index**, with **bidirectional `R-nn` ↔ Annex A traceability**.
+  Before it, *no register row cited an Annex A control and neither SoA cited a
+  risk ID*, so "which control treats R-13?" had no answer anywhere in the tree.
+  Both tables are hand-maintained, so
+  [`test/clause-mapping.test.mjs`](test/clause-mapping.test.mjs) pins them: every
+  register risk must appear, every cited risk must still exist, and **every pair
+  must be present in both directions** — building it that way immediately found
+  two asymmetries (A.6.2.4 did not list R-04; A.4.4 did not list R-15).
+- **`stakeholder-impact-assessment-2026.md` is designated the canonical 6.1.4
+  artefact**, extended with a section on **unfair and discriminatory outcomes**
+  ("discriminatory" appeared **once** in the entire tree) and an availability
+  clause. Every row of the new section is a *comparison between populations*,
+  not a count, because that is where discrimination lives and no per-individual
+  row can see it. It records one tension it cannot resolve: fair-treatment
+  guidance says tell the affected person, and the tipping-off prohibition
+  (FDL 10/2025, Art. 25) makes telling them an offence. The statute governs, and
+  the conflict is written down rather than mitigated on paper.
+- **The ratified document was not silently amended.** v1.0 was ratified
+  2026-07-02 with signature evidence; a signature given then cannot cover
+  sections written a month later. v1.0 stays in force, the new content is
+  **v1.1 pending approval** (open-actions item 19), and a CI check fails if a
+  1.1 row ever claims ratification.
+- **`ai-impact-assessment.md` gained a date, a version and a named approver** —
+  it had **none of the three**, so nothing recorded when it was written, what had
+  changed, or who stood behind it. Also a §5a covering group-level outcomes,
+  which its two-column individuals-only table could not reach.
+- **The two statements of applicability contradicted each other about the same
+  control.** The AIMS statement asserted *"AI impact assessment
+  (individuals/society) — Implemented"* while the Advisor statement recorded
+  A.5.4 as 🟡 with its first bias cycle pending. The row is now **split into
+  A.5.2 and A.5.4** at their true and matching statuses, and **both statements
+  now cite the ratified SIA**, which *neither had cited at all* despite it being
+  the strongest 6.1.4 evidence either could offer. CI now fails if the two
+  disagree about A.5.4.
+- **Three vocabulary defects fixed.** `iso-42001-soa-2026.md` used 🟢 outside its
+  own four-value legend, and its open-items paragraph called the AI policy's
+  ratification *pending* while its own A.2.2 row recorded it as ratified
+  2026-07-02 — a file contradicting itself within twenty-five lines. The AIMS
+  statement used `Implemented (inactive)` for FATF R.16, a fifth value outside
+  its four declared ones; it is **Partial** (built, not operating), which its own
+  justification column already said. Both vocabularies are now CI-enforced.
+- **Both impact assessments entered the anti-shadow-policy sweep** the moment
+  they declared an approver, and are **excluded with written reasons**: an
+  assessment records a finding, it does not issue a rule. Signing a finding is
+  not creating an instrument.
+
 ### Governance — appetite became tolerance, and the register's own auditor checkpoint became testable (2026-07-29)
 
 The estate stated eight appetite positions and measured nine KRIs, and **not one

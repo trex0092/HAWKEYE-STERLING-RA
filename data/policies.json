@@ -597,6 +597,14 @@
   ],
   "excluded": [
     {
+      "path": "docs/aims/ai-impact-assessment.md",
+      "reason": "ISO/IEC 42001 A.5.2 / clause 6.1.4 impact assessment. An assessment records a finding about the system; it does not issue a rule anyone must follow, so it is not a governing instrument. It gained a named approver on 2026-07-29 — which is why the sweep now sees it — because an assessment nobody stands behind is worth no more than an unowned policy; that is a signature on a finding, not the creation of an instrument. Reviewed on the same annual cadence via the AIMS pack."
+    },
+    {
+      "path": "docs/governance/stakeholder-impact-assessment-2026.md",
+      "reason": "The canonical ISO/IEC 42001 clause 6.1.4 artefact — the assessment of impacts on individuals and groups. Same reasoning as the AI impact assessment: it is a finding with an approver, not a rule the firm issues. Its own version history and approval state are recorded in its sign-off table, which CI checks separately in test/clause-mapping.test.mjs."
+    },
+    {
       "path": "docs/governance/policy-register.md",
       "reason": "This register's own human view. It records instruments; it is not one, and registering it would make the sweep circular."
     },

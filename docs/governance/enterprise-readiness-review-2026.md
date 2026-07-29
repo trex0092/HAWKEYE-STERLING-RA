@@ -326,7 +326,7 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 56 workflows · 174 markdown documents under docs/ (141 excluding docs/research/auto).
+Verified at HEAD: 56 workflows · 175 markdown documents under docs/ (142 excluding docs/research/auto).
 *(29 July, seventh pass — **appetite became tolerance**. Each of the eight appetite positions now carries
 a numeric **residual ceiling**, a named operational **owner** and an **escalation SLA** — the three things
 a boundary needs that a direction does not. That makes two of the firm's own written rules enforceable for

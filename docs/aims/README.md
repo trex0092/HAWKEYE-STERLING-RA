@@ -8,8 +8,10 @@ These documents are decision-support and compliance evidence; they sit alongside
 technical controls (which are code- and CI-enforced) and the model card in
 [`../AI-GOVERNANCE.md`](../AI-GOVERNANCE.md).
 
-**Start here for audits:** the [ISO/IEC 42001 mandatory-documents crosswalk
-index](iso42001-mandatory-documents-index.md) maps all 33 required
+**Start here for audits:** the [clause 6.1 mapping index](iso-42001-clause-6-1-mapping.md)
+says which document answers which sub-clause and which Annex A control treats
+which risk — the two questions an assessor opens with. Then the
+[ISO/IEC 42001 mandatory-documents crosswalk index](iso42001-mandatory-documents-index.md) maps all 33 required
 documented-information items (+ the 2026-focus additions) to their evidence in
 this repo, including the AIMS objectives, communication process and
 document-control procedure.
@@ -19,7 +21,7 @@ document-control procedure.
 | 1 | AI System Inventory | A.4.2 | [ai-system-inventory.md](ai-system-inventory.md) |
 | 2 | AI Risk Register | 6.1 / A.5 | [ai-risk-register.md](ai-risk-register.md) |
 | 3 | Statement of Applicability | 6.1.3 / Annex A | [statement-of-applicability.md](statement-of-applicability.md) |
-| 4 | AI Impact Assessment (DPIA) | A.5.2 | [ai-impact-assessment.md](ai-impact-assessment.md) |
+| 4 | AI Impact Assessment (system view) | A.5.2 / 6.1.4 | [ai-impact-assessment.md](ai-impact-assessment.md) |
 | 5 | Third-Party / Vendor & DPA Register | A.10 | [third-party-register.md](third-party-register.md) |
 | 6 | Interested Parties & Requirements | 4.2 | [interested-parties.md](interested-parties.md) |
 | 7 | Competency & Awareness | 7.2 | [competency-records.md](competency-records.md) |
@@ -44,6 +46,7 @@ document-control procedure.
 | 26 | Curated Sanctions List Update SOP (UAE EOCN) — registered instrument **POL-09** | A.6 | [eocn-list-update-sop.md](eocn-list-update-sop.md) |
 | 27 | Transaction-Feed Scoping Note (R-13 / FATF R.16 — scoping only, nothing connected) | A.6 | [transaction-feed-scoping.md](transaction-feed-scoping.md) |
 | 28 | Advisor Citation Migration Worklist (160 rows, with counsel) | A.8.2 | [advisor-citation-migration-worklist.md](advisor-citation-migration-worklist.md) |
+| 29 | **Clause 6.1 Mapping Index** — which artefact answers 6.1.2 / 6.1.3 / 6.1.4, and bidirectional R-nn ↔ Annex A traceability | 6.1.2 / 6.1.3 / 6.1.4 | [iso-42001-clause-6-1-mapping.md](iso-42001-clause-6-1-mapping.md) |
 
 > Rows 25–28 existed on disk but were absent from this index until 2026-07-29 —
 > including two **in-force registered instruments** (POL-07 and POL-09). This page
