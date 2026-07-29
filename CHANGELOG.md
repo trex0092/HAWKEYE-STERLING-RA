@@ -10,6 +10,34 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Matcher / PEP — two more silent false negatives (2026-07-29)
+
+Both surfaced by adjudicating audit leads that had never actually been
+adjudicated, and both reproduced against the live engines before any change.
+
+- **German sharp-s was not folded by the JS engine.** `ß` has no NFKD
+  decomposition and lower-casing leaves it alone, so `Weiß` and its universal
+  ASCII spelling `Weiss` normalized to different strings. `screen.py` folds it
+  (its uppercase-first path maps ß→SS), so **designated "Weiß Trading" scored
+  100 in Python and 0 — a clean CLEAR — in the JS engine**, and
+  `lostScriptLetters` returns false for ß so it was not even routed to MANUAL
+  REVIEW. Longer names could survive on fuzzy similarity; short ones cleared
+  outright. This is precisely the class the cross-engine parity test exists to
+  catch (Turkish ı, two-letter tokens) — the corpus simply had no ß name, so the
+  pair is now pinned there. Fold is strictly widening.
+- **A PEP name whose every token is under 3 characters could never hit.** The
+  label test compares only tokens of 3+ characters, so for such a name the
+  token list was empty, `if want and …` short-circuited, and `check_pep`
+  returned — and **cached** — a confident `{"hit": false}`. That silently
+  cleared real people: **"Wu Yi" is a former Vice-Premier of China**, and the
+  whole shape of East Asian names romanized as two short syllables screened
+  clean. They now route to manual PEP/RCA review, like the existing non-Latin
+  path. The check runs BEFORE the lookup, so it also stops spending a Wikidata
+  call and a shared rate-gate slot on a name the matcher cannot compare. The
+  worldwide PEP/RCA net still screens these names by exact match, so this is
+  their second net, not their only one.
+
+
 ### Case engine — "not re-checked" must never read as "checked and clear" (2026-07-29)
 
 Three routes to the same false negative in `scripts/sanctions-screen.mjs`, all

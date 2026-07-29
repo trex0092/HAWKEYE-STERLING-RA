@@ -180,6 +180,19 @@ check("aliases still fold into a loaded primary",
 _pep_nl = screen.check_pep("محمد عبدالله")
 check("non-Latin PEP name is surfaced for manual review (not silently cleared)",
       _pep_nl.get("hit") is True and _pep_nl.get("review") is True and "MANUAL REVIEW" in _pep_nl.get("category", ""))
+# A name whose EVERY token is under 3 characters has no token the matcher will
+# compare, so the label test short-circuited and the function returned — and
+# CACHED — a confident {"hit": False}. That silently cleared real people: "Wu Yi"
+# is a former Vice-Premier of China, and the whole shape of East Asian names
+# romanized as two short syllables screened clean.
+for _short in ("Wu Yi", "Li Na", "Xi Bo"):
+    screen._PEP_CACHE.pop(screen._norm_lower(_short), None)
+    _r = screen.check_pep(_short)
+    check(f"'{_short}' routes to manual PEP review, never a confident 'no PEP'",
+          _r.get("review") is True and "MANUAL REVIEW" in _r.get("category", ""))
+    check(f"'{_short}' is not cached as a clean no-hit",
+          not (screen._PEP_CACHE.get(screen._norm_lower(_short)) or {}).get("hit") is False
+          or screen._norm_lower(_short) not in screen._PEP_CACHE)
 
 # A non-Latin-script name normalises to empty and so cannot be auto-matched — it
 # must NOT be filed "clear"; it is surfaced for manual screening instead.

@@ -40,7 +40,10 @@
     "AL BIN SAUD GROUP",
     "Hamas General Trading LLC",
     "Al Qaeda General Trading",
-    "Hummus Trading LLC"
+    "Hummus Trading LLC",
+    "Weiß Trading",
+    "Weiss Trading",
+    "Straßburg Handels GmbH"
   ],
   "names_note": "Grouped: Turkish-i regression class; diacritic Latin that MUST fold to A-Z; short/two-letter token class (the sigTokens regression); transliteration-variant class; lost-script class (Cyrillic/Arabic/CJK/Greek and unfoldable Latin) which both engines must FLAG rather than silently clear; and degenerate inputs (blank, symbols, digits, single char).",
   "pairs": [
@@ -103,6 +106,11 @@
       "subject": "Al Qaeda General Trading",
       "listed": "AL QAEDA",
       "why": "long entry whose distinctive core is ONE token (AL is a particle), so neither the min() gate (full=50) nor the subset gate (needs >=2 core tokens) could fire — also the score-tie that made screening depend on the process hash seed"
+    },
+    {
+      "subject": "Weiss Trading",
+      "listed": "Weiß Trading",
+      "why": "German sharp-s: ß has no NFKD decomposition and lower-casing leaves it, so the JS engine normalized it apart from the universal ss spelling and cleared a designation screen.py scored 100 — the same silent-JS-false-negative class as the Turkish ı and two-letter-token regressions"
     }
   ],
   "pairs_note": "Every pair is a TRUE match that both engines must reach. The invariant is engine-to-engine agreement on reachability, not score equality: rapidfuzz and the JS Levenshtein legitimately differ by a point or two (measured: 93 vs 94 on Muhammad Alfayed), so the test asserts both engines HIT, never that they score the same."

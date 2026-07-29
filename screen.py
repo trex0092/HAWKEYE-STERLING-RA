@@ -1874,6 +1874,22 @@ def check_pep(name):
                     "label": str(name).strip(),
                     "description": "screen this subject for PEP/RCA status manually against a domestic register"}
         return {"hit": False}
+    # Every token under 3 characters: the label test below compares only tokens
+    # of 3+ chars, so `want` would be empty, `if want and …` would short-circuit,
+    # and this returned — and CACHED — a confident {"hit": False}. That silently
+    # cleared real people: "Wu Yi" (a former Vice-Premier of China), "Li Na",
+    # "Xi Bo", and the whole shape of East Asian names romanized as two short
+    # syllables. Not screening a name is not the same as screening it clean.
+    # Checked BEFORE the lookup: there is no point spending a Wikidata call (and
+    # a slot in the shared rate gate) on a name this matcher cannot compare.
+    # The worldwide PEP/RCA net still screens these names by exact match, so
+    # this is their second net, not their only one.
+    if str(name).strip() and not [t for t in key.split(" ") if len(t) >= 3]:
+        return {"hit": True, "review": True, "id": "",
+                "category": "MANUAL REVIEW — every name token is too short to auto-screen for PEP",
+                "label": str(name).strip(),
+                "description": "no token of 3+ characters to match on (e.g. a two-syllable "
+                               "romanization); screen this subject for PEP/RCA status manually"}
     if key in _PEP_CACHE:
         return _PEP_CACHE[key]
     # Run-level breaker: once Wikidata refuses this runner, stop paying the
@@ -1900,6 +1916,8 @@ def check_pep(name):
     except Exception as e:
         _pep_failure()
         return {"errored": True, "error": str(e)[:200]}
+    # Tokens the label test compares. Guaranteed non-empty here: a name with no
+    # 3+-char token returned for manual review before the lookup was made.
     want = [t for t in key.split(" ") if len(t) >= 3]
     out = {"hit": False}
     for res in results:
