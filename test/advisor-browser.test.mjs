@@ -119,6 +119,15 @@ if (down.skipped) {
   check('an undegraded answer renders', fine.text.includes('Deterministic answer body.'));
   check('an undegraded answer shows NO downgrade banner', !/Mode downgraded/i.test(fine.text));
   check('the audit line is shown either way', fine.text.includes('AUDIT |'));
+
+  /* ── 3. The default mode is Balanced — pinned, not assumed ─────────────────
+     The backend defaults to balanced (claude-sonnet-5) and the model card
+     documents that as the default, but until 2026-07-29 the UI booted on Speed,
+     so the documented default and the experienced default disagreed. The answer
+     card renders the ACTIVE mode's label, so an untouched page answering in
+     anything but Balanced mode means the boot default drifted again. */
+  check('the untouched page answers in Balanced mode (the documented default)',
+    /Balanced mode/.test(fine.text) && !/Speed mode/.test(fine.text));
 }
 
 await browser.close();

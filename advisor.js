@@ -70,7 +70,13 @@ const PERSONAS = [
   {id:'warden',   name:'Warden',   role:'Board & MLRO Governance',              img:'assets/persona-warden.webp',   accent:'210,80,200',  pos:'52% 18%'}
 ];
 
-let state = {tab:'ask', mode:'Speed', question:'', askedQuestion:'', phase:'idle', liveAnswer:null, regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null, piiConfirmed:false};
+/* Balanced is the default mode ON PURPOSE, and it must stay so. The backend
+   defaults to `balanced` (claude-sonnet-5) and the model card documents that as
+   the default; until 2026-07-29 this state booted on Speed, so every operator's
+   first answer came from the weakest model — the worst possible pairing with
+   automation bias (risk R-10) on a surface whose output is regulatory decision
+   support. Speed and Deep are deliberate choices, not starting points. */
+let state = {tab:'ask', mode:'Balanced', question:'', askedQuestion:'', phase:'idle', liveAnswer:null, regOpen:null, qOpen:null, qaQuery:'', personaId:'sterling', toolId:'escalation', toolInputs:{}, toolResult:null, piiConfirmed:false};
 let reasoningTimer = null;
 /* Monotonic ask sequence — a response only renders if it belongs to the most
    recent ask() (or nothing was reset in between). Without it, a slow Deep-mode

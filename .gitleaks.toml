@@ -31,6 +31,9 @@ regexes = [
   '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log)
   '''1213914392047131''',  # section: Daily Sanctions Screening (screen.py + daily-sanctions-screen.yml)
   '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default; also quoted in the scripts/daily-screen-report.py provenance footer)
+  '''1216139945846994''',  # HR – Employees project (second screening population, ASANA_EMPLOYEE_DB_GID / ASANA_EMPLOYEE_PROJECT_GID default)
+  '''1215884707932023''',  # Follow Ups project (second MLRO delivery queue, ASANA_FOLLOWUPS_GID default)
+  '''1215884707932047''',  # section: Subject (Follow Ups delivery section, ASANA_FOLLOWUPS_SECTION_GID default)
   '''1215653768729951''',  # Risk Assessments - Madison LLC (former RA default)
   '''1215844297069727''',  # Regulations / Governance / Sanctions (merged into Ongoing Monitoring, then removed)
   # Section GIDs in the Ongoing Monitoring project (public identifiers), used by the

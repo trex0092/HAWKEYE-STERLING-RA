@@ -57,6 +57,18 @@ export const RESULTS_FILE = 'sanctions-screen-results.json';
 export const CUSTOMER_PROJECT_GID =
   process.env.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121';
 
+/* "HR – Employees" project — the SECOND screening population (staff screening,
+   MLRO-directed 2026-07-29). Same pipeline, same matcher, same case lifecycle
+   as customers. Set ASANA_EMPLOYEE_PROJECT_GID to an empty string to disable
+   employee screening EXPLICITLY; while configured, an unreachable or empty
+   employee project bails the run unscreened — the same contract as the
+   customer database, because a population that silently drops out of
+   screening is a silent clear for everyone in it. */
+export const EMPLOYEE_PROJECT_GID =
+  process.env.ASANA_EMPLOYEE_PROJECT_GID !== undefined
+    ? process.env.ASANA_EMPLOYEE_PROJECT_GID
+    : '1216139945846994';
+
 /* Consolidated designation lists screened against (data/sanctions-sources.json).
    Override the file with SANCTIONS_SOURCES_FILE. */
 export const SANCTIONS_SOURCES_FILE = process.env.SANCTIONS_SOURCES_FILE || 'data/sanctions-sources.json';
@@ -1167,6 +1179,15 @@ async function main() {
   try { subjects = await fetchAsanaSubjects(CUSTOMER_PROJECT_GID, asanaToken); }
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
+
+  if (EMPLOYEE_PROJECT_GID) {
+    let employees;
+    try { employees = await fetchAsanaSubjects(EMPLOYEE_PROJECT_GID, asanaToken); }
+    catch (e) { return bailUnscreened('could not read the HR – Employees project (' + (e && e.message || e) + ') — employee screening is configured, so the run must not proceed without it', today); }
+    if (!employees.length) return bailUnscreened('the HR – Employees project returned 0 subjects while employee screening is configured — set ASANA_EMPLOYEE_PROJECT_GID empty to disable it explicitly', today);
+    console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
+    subjects = subjects.concat(employees);
+  }
 
   const individuals = subjects.filter(s => s.entityType === 'individual').length;
   const entities = subjects.length - individuals;
