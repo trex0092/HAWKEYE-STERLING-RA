@@ -1,20 +1,20 @@
 {
  "version": 2,
- "description": "CI-enforced accuracy floors, per backend. Ratcheted 28 Jul 2026 to the 95% programme targets after hardening phases 1-4 landed (baseline: recall 57.0%/62.0%, adverse 57.9%/77.3%, repeat 50%). recall_min is the headline 95% floor; fn_count_max pins the ACHIEVED miss budget (3 documented residuals per engine) so no new miss can hide under the rate floor. negative_clear_min gates unnoted hard-negative hits only (noted budgeted canaries are reported separately); the JS engine's 0.964 carries its three pre-baseline Turkish-boilerplate false positives \u2014 a documented max()-scorer trade-off, the Python engine is the precision reference at 1.0. Floors may only rise \u2014 lowering one requires MLRO sign-off through model-validation change control (docs/governance/screening-accuracy-benchmark.md).",
+ "description": "CI-enforced accuracy floors, per backend. Ratcheted 28 Jul 2026 to the 95% programme targets after hardening phases 1-4 landed (baseline: recall 57.0%/62.0%, adverse 57.9%/77.3%, repeat 50%). recall_min is the headline 95% floor; fn_count_max pins the ACHIEVED miss budget (2 documented residuals on the Python engines since the 29 Jul 2026 near-exact-core gate recovered r081; 3 on js) so no new miss can hide under the rate floor. negative_clear_min gates unnoted hard-negative hits only (noted budgeted canaries are reported separately); the JS engine's 0.964 carries its three pre-baseline Turkish-boilerplate false positives — a documented max()-scorer trade-off, the Python engine is the precision reference at 1.0. Floors may only rise — lowering one requires MLRO sign-off through model-validation change control (docs/governance/screening-accuracy-benchmark.md).",
  "backends": {
   "py_rapidfuzz": {
    "recall_min": 0.95,
    "negative_clear_min": 1.0,
    "adverse_accuracy_min": 1.0,
    "repeat_accuracy_min": 1.0,
-   "fn_count_max": 3
+   "fn_count_max": 2
   },
   "py_difflib": {
    "recall_min": 0.95,
    "negative_clear_min": 1.0,
    "adverse_accuracy_min": 1.0,
    "repeat_accuracy_min": 1.0,
-   "fn_count_max": 3
+   "fn_count_max": 2
   },
   "js": {
    "recall_min": 0.95,

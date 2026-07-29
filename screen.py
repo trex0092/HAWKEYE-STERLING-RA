@@ -2970,9 +2970,24 @@ def screen_name(name, all_lists):
         for en, orig in (entries if surv is None else (entries[i] for i in surv)):
             if len(en) < 2: continue
             best = None; best_tset = 0; subset = False
-            for cand in variants:
+            # DETERMINISM + tie-break, both load-bearing for recall.
+            # `variants` is a SET, and the winner used to be "first variant with
+            # a strictly greater score". Python randomizes string hashes per
+            # process, so on a SCORE TIE between transliteration variants the
+            # recorded (full, core) — and therefore whether the pair passed the
+            # core gates at all — depended on set iteration order, i.e. on the
+            # process's hash seed. Measured 2026-07-29: "Al Qaeda General
+            # Trading" vs designated "AL QAEDA" (variants AL…/EL…, both scoring
+            # 50.0, cores 100.0 and 76.9) screened as a hit under
+            # PYTHONHASHSEED 0,1,2,4,5,6,8 and CLEAR under 3,7,9 — the same
+            # customer, the same list, a different day.
+            # Sorting makes the iteration deterministic; breaking ties on core
+            # (then full) keeps the best-EVIDENCED variant rather than an
+            # arbitrary one, which is the recall-safe direction and matches how
+            # `best_tset` and `subset` already accumulate across variants.
+            for cand in sorted(variants):
                 score, full, core, tset = match_score(cand, en)
-                if best is None or score > best[0]:
+                if best is None or (score, core, full) > (best[0], best[2], best[1]):
                     best = (score, full, core)
                 if tset > best_tset:
                     best_tset = tset
@@ -2985,7 +3000,27 @@ def screen_name(name, all_lists):
             # entries rather than the normal fuzzy gate. Long entries keep the
             # combined full+core gate unchanged.
             if len(en) < 6:
-                if score >= SHORT_ENTRY_THRESHOLD:
+                # The near-exact test must run on the DISTINCTIVE CORE as well as
+                # the decisive min(full, core) score. Until 2026-07-29 it tested
+                # min() alone, which is a sanctions FALSE NEGATIVE for the most
+                # obvious shape there is: a customer named after the designation
+                # plus legal-form boilerplate. "Hamas General Trading LLC" vs
+                # designated "HAMAS" scores full=33, core=100 → min=33, so the
+                # gate dropped it and the customer screened CLEAR, while the JS
+                # engine scored the same pair 100/critical (cross-engine
+                # divergence, both verified against the live matchers).
+                # The core test is tight, not loose: it fires only when the
+                # customer's ENTIRE distinctive core is the short designation —
+                # every other token being legal-form boilerplate. "Hummus
+                # Trading LLC" vs "HAMAS" cores at 55 and stays clear.
+                # The long-entry branch below already has this recall via its
+                # token-SUBSET gate; that gate cannot help here because
+                # _is_token_subset requires ≥2 distinctive tokens on the shorter
+                # side (its own false-positive guard), and a short designation is
+                # one token. Recorded at the conservative min-based score, so it
+                # reads as a POSSIBLE match for MLRO adjudication, never as a
+                # confirmed designation (the ≥100 confirmed test cannot fire).
+                if score >= SHORT_ENTRY_THRESHOLD or core >= SHORT_ENTRY_THRESHOLD:
                     hits.append({"list": list_name, "matched_entry": orig, "score": score,
                                  "name_score": full, "core_score": core,
                                  "confidence": confidence_tier(core),
@@ -2997,8 +3032,26 @@ def screen_name(name, all_lists):
             # token_set_ratio also flags — the patronymic-chain / extra-middle-name
             # case the min() misses. Recorded at the conservative min-based score so
             # it reads as a POSSIBLE match for MLRO disambiguation, never confirmed.
+            # Third gate — NEAR-EXACT CORE: the customer's distinctive core and
+            # the designation's are near-identical (≥ SHORT_ENTRY_THRESHOLD) and
+            # one name's tokens are a subset of the other's. This is the same
+            # false negative the short-entry branch above closes, in the shape
+            # the other two gates miss for LONG entries whose distinctive core is
+            # a single token: "Al Qaeda General Trading" vs designated "AL QAEDA"
+            # scores full=50 (boilerplate drags it under THRESHOLD) and cannot
+            # use the subset gate either, because AL is a particle so the core is
+            # one token and _is_token_subset requires ≥2 — it screened CLEAR
+            # while the JS engine scored it 100/critical.
+            # This does NOT weaken the min() control, which exists for the
+            # OPPOSITE shape (full high / core low — two firms sharing only
+            # legal-form boilerplate, "SANAYI VE TICARET ANONIM SIRKETI"). Here
+            # the cores are near-identical and only the boilerplate differs,
+            # which is the strongest identity signal short of full-string
+            # equality. Recorded at the conservative min-based score, so it
+            # reads as a POSSIBLE match for MLRO adjudication, never confirmed.
             if (score >= THRESHOLD and core >= CORE_THRESHOLD) or \
-               (subset and best_tset >= TOKENSET_THRESHOLD):
+               (subset and best_tset >= TOKENSET_THRESHOLD) or \
+               (core >= SHORT_ENTRY_THRESHOLD and best_tset >= TOKENSET_THRESHOLD):
                 hits.append({"list": list_name, "matched_entry": orig, "score": score,
                              "name_score": full, "core_score": core, "set_score": best_tset,
                              "confidence": confidence_tier(core),
