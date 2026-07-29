@@ -10,6 +10,32 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Case engine — a truncated alias file read as full coverage (2026-07-29)
+
+Alias sources (OFAC's `alt.csv`, folded into the SDN list via `mergeInto`) were
+deliberately exempted from coverage floors, on the reasoning — written into
+`_README_minNames` when the floors landed hours earlier — that "the fold's
+partial machinery covers them". **It does not.** That machinery fires only when
+the alias file is TOTALLY ABSENT. A truncated-but-nonzero `alt.csv` (a partial
+body, or an OFAC column shift that makes the parser return whatever it can)
+took the healthy path: no floor to fail, counted as fetched, so the run was not
+even DEGRADED.
+
+Then the fold made it invisible. `foldAliasSources` merges the alias names into
+the primary and **splices the alias row out**, never reading its `partial` flag
+— so even an alias list explicitly marked partial came out clean. Because alias
+hits are recorded under the **primary list's name**, an alias-derived standing
+match is indistinguishable from a primary one: the primary counted as fully
+re-verified, entered `screenedLists`, and `diffState` cleared the match and
+auto-completed its MLRO case.
+
+Both halves fixed: the alias source now carries its own `minNames` floor
+(provisional, sized to catch truncation rather than police churn), and the fold
+**propagates** reduced alias coverage onto the primary with a note, so the
+primary is excluded from `screenedLists` and its standing matches are carried
+forward rather than cleared. A complete alias fold still leaves the primary
+fully re-verified, so a healthy run does not degrade.
+
 ### Screening — identity exclusion now reaches the CASE QUEUE (2026-07-29)
 
 The identity-based demotion shipped hours earlier removed a candidate from the

@@ -475,5 +475,40 @@ for (const s of extraReg.filter(s => s.enabled !== false && !s.optional)) {
 check('the optional internal watchlist carries NO floor (empty is a valid state)',
   !extraReg.find(s => s.id === 'internal-watchlist').minNames);
 
+/* ── A truncated ALIAS file must not read as full coverage ────────────────────
+   Alias sources were exempted from floors on the theory that the fold's
+   `partial` machinery covered them. It does not: that machinery only fires when
+   the alias file is TOTALLY ABSENT. A truncated-but-nonzero alt.csv (partial
+   body, or an OFAC column shift) folded into the primary as if complete — and
+   because alias hits are recorded under the PRIMARY list's name, an
+   alias-derived standing match then cleared as though re-verified, with its
+   MLRO case auto-completed. Two halves, both needed. */
+const aliasSrc = srcReg.find(s => s.id === 'ofac-sdn-alt');
+check('the alias file carries its own coverage floor', Number(aliasSrc.minNames) > 0);
+check('a truncated alias parse is below that floor',
+  belowFloor(aliasSrc, Array.from({ length: 800 }, (_, i) => 'A' + i)));
+check('a healthy alias parse is not',
+  !belowFloor(aliasSrc, Array.from({ length: 17000 }, (_, i) => 'A' + i)));
+// The fold splices the alias row out, so a `partial` flag on it must be
+// PROPAGATED onto the primary or it vanishes silently.
+const _fl = [{ id: 'ofac-sdn', name: 'US OFAC — SDN list (CSV)', names: ['REAL PRIMARY'] },
+             { id: 'ofac-sdn-alt', name: 'US OFAC — SDN a.k.a. list (alt.csv)', names: ['ONE ALIAS'], partial: true }];
+const _fold = foldAliasSources(_fl, srcReg);
+check('reduced alias coverage marks the PRIMARY partial (it survives the fold)',
+  _fl[0].partial === true);
+check('and says so, so the report is not silently narrower',
+  _fold.notes.some(n => /INCOMPLETE a\.k\.a\./.test(n)));
+// A fully-loaded alias must NOT mark the primary partial, or every run degrades.
+const _fl2 = [{ id: 'ofac-sdn', name: 'US OFAC — SDN list (CSV)', names: ['REAL PRIMARY'] },
+              { id: 'ofac-sdn-alt', name: 'US OFAC — SDN a.k.a. list (alt.csv)', names: ['ALIAS ONE'] }];
+foldAliasSources(_fl2, srcReg);
+check('a COMPLETE alias fold leaves the primary fully re-verified',
+  !_fl2[0].partial && _fl2[0].names.includes('ALIAS ONE'));
+// End-to-end: partial primary must be excluded from screenedLists, which is what
+// makes diffState carry standing matches instead of clearing them.
+const _screened = [_fl[0]].filter(L => !L.partial).map(L => L.name);
+check('a partial primary is excluded from screenedLists (matches carried, not cleared)',
+  _screened.length === 0);
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

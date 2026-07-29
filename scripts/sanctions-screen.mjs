@@ -953,6 +953,17 @@ export function foldAliasSources(lists, sources) {
     if (alias && target) {
       const before = target.names.length;
       target.names = [...new Set([...target.names, ...alias.names])];
+      /* Reduced ALIAS coverage must survive the fold. The alias row is spliced
+         out here, so a `partial` flag on it would simply vanish — and because
+         alias hits are recorded under the PRIMARY list's name, an
+         alias-derived standing match is indistinguishable from a primary one
+         and would clear as if it had been re-verified. Propagate it: the
+         primary screened, but NOT with its full designation set. */
+      if (alias.partial) {
+        target.partial = true;
+        notes.push(target.name + ' screened with INCOMPLETE a.k.a. coverage (' + s.name
+          + ' loaded below its floor) — standing matches on this list are carried forward, not cleared');
+      }
       lists.splice(lists.indexOf(alias), 1);
       byId.delete(s.id);
       folded.push('folded ' + (target.names.length - before) + ' a.k.a. name(s) from ' + s.name + ' into ' + target.name);
