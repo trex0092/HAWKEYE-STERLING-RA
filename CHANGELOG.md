@@ -10,6 +10,24 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — the unified poster multi-homes too; second UN blob domain (2026-07-29)
+
+The 2026-07-29 live proof run (30455597768) succeeded — UN loaded over the
+rotated blob domain, AU/CH matched with 🆕 markers, an employee-project record
+was screened, no DEGRADED — but its report task landed **only in Ongoing
+Monitoring**. `_mlro_queue_targets()` existed and both legacy posters used it;
+the **unified** poster (`post_unified_task`, the path the daily workflow
+actually takes) still hardcoded a single queue. Fixed, and the payload is now
+pinned by two engine-test checks so a delivery target can't silently narrow
+again. Today's task was multi-homed into Follow Ups by hand (same task GID —
+multi-homing keeps the single audit trail).
+
+The same run's egress log also showed the UN rotating across **more than one**
+storage account: `umsaszjsdz5c04wqdhbq.blob.core.windows.net` was blocked at
+14:20:53 while `umsanrp1dltx4dj3sxtt` served the list. Both are now in the
+five workflow allowlists; a future rotation to a third account will surface as
+a DEGRADED banner (never a silent gap), per RA-01.
+
 ### Screening — the core-list set stops being hardcoded in four places (2026-07-29)
 
 Self-audit of the morning's AU/CH core-list addition found **four places that
