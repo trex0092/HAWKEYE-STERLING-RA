@@ -10,6 +10,17 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — identity exclusion now reaches the CASE QUEUE (2026-07-29)
+
+The identity-based demotion shipped hours earlier removed a candidate from the
+report's primary queue but **not from case creation**: `open_mlro_cases`
+filtered on `is_new` alone. Cases are capped per run, so a candidate we can
+already prove is a different person could consume that cap and push a genuine
+case into the backlog — and the MLRO's working time lives in the case queue, not
+in the report text. Demotion that stops at the report is cosmetic. Excluded
+candidates now raise no case; they remain in the report under their heading with
+the reason, and in the record.
+
 ### Matcher / PEP — two more silent false negatives (2026-07-29)
 
 Both surfaced by adjudicating audit leads that had never actually been

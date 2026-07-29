@@ -4773,7 +4773,14 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
     due_on = run_time.strftime("%Y-%m-%d")
     queue = []  # (priority, name, notes)
     for m in possible_matches:
-        new_hits = [h for h in m["hits"] if h.get("is_new")]
+        # Identity-excluded candidates raise no case. The report demotes them
+        # (recorded, reasoned, overrulable) but the CASE QUEUE is where the
+        # MLRO's actual working time goes, and cases are capped per run — so
+        # leaving them here meant a candidate we can already prove is a
+        # different person could consume the cap and push a genuine case into
+        # the backlog. Demotion that stops at the report text is cosmetic.
+        new_hits = [h for h in m["hits"]
+                    if h.get("is_new") and not h.get("identity_excluded")]
         if not new_hits: continue
         top = max(new_hits, key=lambda h: h["score"])
         ctrl = " [OWNERSHIP/CONTROL]" if top.get("control_linkage") else ""
