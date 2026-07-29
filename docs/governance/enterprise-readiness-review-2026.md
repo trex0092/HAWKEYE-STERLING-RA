@@ -326,7 +326,41 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 176 markdown documents under docs/ (143 excluding docs/research/auto).
+*(29 July, ninth pass — the **governance chain**. The estate slices its governance four ways — a five-level
+stack, a six-layer agentic model, a seven-stage lifecycle, an eleven-stage PbG map — and every one is a
+slicing of the same territory. None of them recorded which control's output another control *consumes*, so
+there was no control-to-control map anywhere: the assurance matrix is control → proof, §8a of the model card
+is pillar → control. `governance-chain.md` draws the missing edge — **Visibility → Explainability →
+Accountability → Trust** — with the failure propagation each break causes downstream, using real
+dependencies: a stale AI asset register voids the explainability statement's **scope claim**, which voids
+every accountability record built on it, because the records then describe a system that is not the one
+running. Read upward the table is a diagnostic: a trust indicator that will not hold is rarely a trust
+problem. **Trust** is also defined narrowly enough to be measured — the share of what the estate claims that
+an outsider can re-derive from the repository without asking anyone — with four indicators that already
+exist, two of which deliberately do not read green. One curated document added; no workflow added; no scored
+control changed.)*
+
 Verified at HEAD: 56 workflows · 175 markdown documents under docs/ (142 excluding docs/research/auto).
+*(29 July, eighth pass — **ISO/IEC 42001 clause 6.1.2 and 6.1.4 separated**. Neither clause number appeared
+anywhere in `docs/`: the estate satisfied both in substance and had never distinguished them, which matters
+because a risk assessment is routinely offered as though it answered both and it does not. A false negative
+is severe to the firm and slight to the screened person; a false positive is the reverse, and is the most
+damaging thing this system can do to someone. The two readings point in **opposite directions**, so a
+control set tuned only on the 6.1.2 column is tuned the wrong way for the people it acts on.
+`iso-42001-clause-6-1-mapping.md` records which artefact answers which sub-clause and carries **bidirectional
+R-nn ↔ Annex A** traceability — before it, no register row cited an Annex A control and neither SoA cited a
+risk ID, so *"which control treats R-13?"* had no answer anywhere in the tree. Requiring both directions in
+CI immediately found two asymmetries. The stakeholder impact assessment is designated the canonical 6.1.4
+artefact and extended with unfair/discriminatory outcomes (**"discriminatory" appeared once in the entire
+tree**) and an availability clause — every row a comparison between populations rather than a count, because
+that is where discrimination lives. Its ratified v1.0 was **not** silently amended: the additions are v1.1
+pending approval. And the two statements of applicability, which contradicted each other on A.5.4, are
+reconciled — with three status-vocabulary defects fixed, including a page that called the AI policy's
+ratification *pending* twenty-five lines after recording it as ratified. One curated document added; no
+workflow added; no scored control changed.)*
+
+Verified at HEAD: 56 workflows · 174 markdown documents under docs/ (141 excluding docs/research/auto).
 *(29 July, seventh pass — **appetite became tolerance**. Each of the eight appetite positions now carries
 a numeric **residual ceiling**, a named operational **owner** and an **escalation SLA** — the three things
 a boundary needs that a direction does not. That makes two of the firm's own written rules enforceable for

@@ -10,6 +10,49 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — the chain between control families, and trust defined narrowly enough to measure (2026-07-29)
+
+The estate slices its governance four ways — a five-level operational stack, a
+six-layer agentic model, a seven-stage lifecycle, an eleven-stage PbG map — and
+every one of them slices **the same territory**. What none of them recorded is
+which control's output another control *consumes*. The assurance matrix is
+control → *proof*; `AI-GOVERNANCE.md` §8a is pillar → *control*; there was **no
+control → control map anywhere**.
+
+- **[`docs/governance/governance-chain.md`](docs/governance/governance-chain.md)**
+  draws the missing edge — **Visibility → Explainability → Accountability →
+  Trust** — as an ordering that is load-bearing rather than rhetorical: you
+  cannot explain what you cannot see, and you cannot hold anyone accountable for
+  a decision you cannot explain.
+- **Failure propagation, with real dependencies.** A stale AI asset register
+  does not just leave one asset undocumented — it makes the explainability
+  statement's **scope claim** false, which makes every accountability record
+  built on it a record about a system that is not the one running. A drifted
+  prompt fingerprint leaves the audit line still able to say *what* a response
+  was and no longer able to support *why*. Read upward, the table is a
+  diagnostic: **a trust indicator that will not hold is rarely a trust problem** —
+  it is usually an accountability gap, which is usually an explainability gap,
+  which is almost always a visibility gap.
+- **Trust is defined so it can be falsified.** Before this page the only
+  occurrences of *trust* in the estate were security **trust boundaries**,
+  **Trusted Types**, and a tagline. It is now defined as *the share of what this
+  estate claims that an outsider can re-derive from the repository without
+  asking anyone who works here* — a property of the evidence, not of anyone's
+  opinion — with four indicators that already exist: control effectiveness
+  (100%), **recorded-breach completeness** (every breached KRI in the ledger,
+  CI-enforced — trust is not the absence of breaches but the absence of
+  *unrecorded* ones), generated-artefact integrity (three drift guards), and
+  honest nulls (KRI-09 reports null with its reason, never 0%).
+- **Two indicators deliberately do not read green** — `residualAboveAppetite` is
+  1 and `kriBreachRate` is 22.2%. An estate whose indicators were all perfect
+  would be telling you about its indicators, not its risks.
+- **Inline fenced mermaid, per the house convention.**
+  `docs/architecture/diagrams.md` states it — *renders natively on GitHub, no
+  tooling* — and the one `.mmd`+`.png` set in the tree was hand-rendered out of
+  band with no renderer in the repository and nothing in CI to catch a `.mmd`
+  drifting from its `.png`. Another PNG pair would add that same silent-drift
+  liability.
+
 ### Governance — ISO/IEC 42001 clause 6.1.2 and 6.1.4 are separated, and the two statements of applicability stop contradicting each other (2026-07-29)
 
 **`6.1.2` and `6.1.4` appeared nowhere in `docs/`.** The estate satisfied both in
