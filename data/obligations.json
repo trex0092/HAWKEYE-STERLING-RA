@@ -18,8 +18,17 @@
       "instrument": "Federal Decree-Law No. 10 of 2025; Cabinet Resolution No. 134 of 2025",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["index.html", "app.js", "kyc.py"],
-      "evidence": ["test/scoring-golden.test.js", "test/app.test.js", "docs/executive/regulatory-readiness.md"],
+      "controls": [
+        "docs/policies/customer-acceptance-cdd-policy.md",
+        "index.html",
+        "app.js",
+        "kyc.py"
+      ],
+      "evidence": [
+        "test/scoring-golden.test.js",
+        "test/app.test.js",
+        "docs/executive/regulatory-readiness.md"
+      ],
       "watch_source": "uae-moe",
       "status": "met",
       "note": "The 0-30 methodology scores identification, ownership and UBO factors; hard rules force PROHIBITED regardless of score."
@@ -30,8 +39,17 @@
       "instrument": "Federal Decree-Law No. 10 of 2025; Cabinet Resolution No. 134 of 2025",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["app.js", "screen.py", "data/jurisdiction-risk.json"],
-      "evidence": ["test/app.test.js", "test/screening-cases.test.mjs", "docs/aims/in-domain-aml-coverage.md"],
+      "controls": [
+        "docs/policies/customer-acceptance-cdd-policy.md",
+        "app.js",
+        "screen.py",
+        "data/jurisdiction-risk.json"
+      ],
+      "evidence": [
+        "test/app.test.js",
+        "test/screening-cases.test.mjs",
+        "docs/aims/in-domain-aml-coverage.md"
+      ],
       "watch_source": "uae-moe",
       "status": "met",
       "note": "EDD triggers are hard-coded escalations that override the numeric band; PEP/RCA/SOE detection runs in the daily screen."
@@ -42,8 +60,16 @@
       "instrument": "Federal Decree-Law No. 10 of 2025; Cabinet Resolution No. 134 of 2025",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["txn_monitor.py", "monitoring.py", "docs/aims/transaction-feed-compensating-control.md"],
-      "evidence": ["docs/aims/transaction-feed-scoping.md", "docs/aims/runtime-monitoring.md"],
+      "controls": [
+        "docs/policies/transaction-monitoring-reporting-policy.md",
+        "txn_monitor.py",
+        "monitoring.py",
+        "docs/aims/transaction-feed-compensating-control.md"
+      ],
+      "evidence": [
+        "docs/aims/transaction-feed-scoping.md",
+        "docs/aims/runtime-monitoring.md"
+      ],
       "watch_source": "uae-moe",
       "status": "partial",
       "open_action": 6,
@@ -55,8 +81,18 @@
       "instrument": "Cabinet Resolution No. 74 of 2020",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["screen.py", "data/eocn-local-terrorist-list.json", "data/internal-watchlist.json", "docs/aims/tfs-name-match-procedure.md"],
-      "evidence": ["test/sanctions-screen.test.mjs", "test/screening-benchmark.test.mjs", "docs/governance/sanctions-screening-gap-checklist-2026.md"],
+      "controls": [
+        "docs/policies/sanctions-tfs-policy.md",
+        "screen.py",
+        "data/eocn-local-terrorist-list.json",
+        "data/internal-watchlist.json",
+        "docs/aims/tfs-name-match-procedure.md"
+      ],
+      "evidence": [
+        "test/sanctions-screen.test.mjs",
+        "test/screening-benchmark.test.mjs",
+        "docs/governance/sanctions-screening-gap-checklist-2026.md"
+      ],
       "watch_source": "uae-eocn",
       "calendar_duty": "tfs-procedure-annual-review",
       "status": "met",
@@ -68,8 +104,14 @@
       "instrument": "Cabinet Resolution No. 74 of 2020",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["docs/aims/tfs-name-match-procedure.md", "docs/governance/ai-incident-runbook.md"],
-      "evidence": ["docs/governance/sanctions-screening-gap-checklist-2026.md"],
+      "controls": [
+        "docs/policies/str-dpmsr-filing-procedure.md",
+        "docs/aims/tfs-name-match-procedure.md",
+        "docs/governance/ai-incident-runbook.md"
+      ],
+      "evidence": [
+        "docs/governance/sanctions-screening-gap-checklist-2026.md"
+      ],
       "watch_source": "uae-eocn",
       "calendar_duty": "tfs-training-refresh-annual",
       "status": "partial",
@@ -82,8 +124,14 @@
       "instrument": "Federal Decree-Law No. 10 of 2025",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["str_dossier.py", "docs/aims/tfs-name-match-procedure.md"],
-      "evidence": ["docs/executive/regulatory-readiness.md"],
+      "controls": [
+        "docs/policies/str-dpmsr-filing-procedure.md",
+        "str_dossier.py",
+        "docs/aims/tfs-name-match-procedure.md"
+      ],
+      "evidence": [
+        "docs/executive/regulatory-readiness.md"
+      ],
       "watch_source": "uae-fiu",
       "status": "partial",
       "open_action": 7,
@@ -95,8 +143,15 @@
       "instrument": "Federal Decree-Law No. 10 of 2025, Article 25",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["netlify/functions/brain-soul.js", "docs/governance/ai-acceptable-use-policy.md"],
-      "evidence": ["test/advisor-assurance.test.js", "data/prompt-assets.json"],
+      "controls": [
+        "docs/policies/transaction-monitoring-reporting-policy.md",
+        "netlify/functions/brain-soul.js",
+        "docs/governance/ai-acceptable-use-policy.md"
+      ],
+      "evidence": [
+        "test/advisor-assurance.test.js",
+        "data/prompt-assets.json"
+      ],
       "watch_source": "uae-fiu",
       "status": "met",
       "note": "Charter prohibition plus an independent post-output guard: the Advisor withholds the answer rather than risk the disclosure. Red-team phrasings are pinned in CI."
@@ -107,8 +162,15 @@
       "instrument": "Federal Decree-Law No. 10 of 2025",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["docs/governance/data-retention.md", "scripts/retain-state.mjs"],
-      "evidence": ["test/retain-state.test.mjs", "docs/governance/backup-recovery.md"],
+      "controls": [
+        "docs/policies/record-keeping-retention-policy.md",
+        "docs/governance/data-retention.md",
+        "scripts/retain-state.mjs"
+      ],
+      "evidence": [
+        "test/retain-state.test.mjs",
+        "docs/governance/backup-recovery.md"
+      ],
       "watch_source": "uae-moe",
       "status": "met",
       "note": "Stores, retention windows, lineage and purge are documented and the purge path is tested."
@@ -119,8 +181,14 @@
       "instrument": "Federal Decree-Law No. 10 of 2025; Cabinet Resolution No. 134 of 2025",
       "category": "regulatory",
       "owner": "Board",
-      "controls": ["docs/governance/operating-model.md", "docs/governance/ai-governance-committee-charter.md"],
-      "evidence": ["docs/governance/board-minute-template-2026-07.md"],
+      "controls": [
+        "docs/policies/compliance-governance-charter.md",
+        "docs/governance/operating-model.md",
+        "docs/governance/ai-governance-committee-charter.md"
+      ],
+      "evidence": [
+        "docs/governance/board-minute-template-2026-07.md"
+      ],
       "watch_source": "uae-moe",
       "status": "partial",
       "open_action": 4,
@@ -132,8 +200,13 @@
       "instrument": "Federal Decree-Law No. 10 of 2025; Cabinet Resolution No. 134 of 2025",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["docs/aims/ai-risk-register.md"],
-      "evidence": ["docs/aims/management-review.md"],
+      "controls": [
+        "docs/policies/risk-assessment-methodology.md",
+        "docs/aims/ai-risk-register.md"
+      ],
+      "evidence": [
+        "docs/aims/management-review.md"
+      ],
       "watch_source": "uae-moe",
       "status": "pending",
       "note": "The repository holds the AI-system risk register (R-01…R-13), not the firm's business-wide assessment. The EWRA covers customers, products, channels and geographies the repository has no sight of; it is firm-side work."
@@ -144,8 +217,14 @@
       "instrument": "Federal Decree-Law No. 10 of 2025; Cabinet Resolution No. 134 of 2025",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["docs/aims/competency-records.md", "data/compliance-calendar.json"],
-      "evidence": ["docs/aims/competency-records.md"],
+      "controls": [
+        "docs/policies/training-awareness-policy.md",
+        "docs/aims/competency-records.md",
+        "data/compliance-calendar.json"
+      ],
+      "evidence": [
+        "docs/aims/competency-records.md"
+      ],
       "watch_source": "uae-moe",
       "calendar_duty": "ai-awareness-training-annual",
       "status": "partial",
@@ -158,8 +237,13 @@
       "instrument": "Federal Decree-Law No. 10 of 2025; Cabinet Resolution No. 134 of 2025",
       "category": "regulatory",
       "owner": "Internal Audit",
-      "controls": ["docs/aims/internal-audit.md"],
-      "evidence": ["docs/aims/corrective-actions.md"],
+      "controls": [
+        "docs/policies/independent-audit-policy.md",
+        "docs/aims/internal-audit.md"
+      ],
+      "evidence": [
+        "docs/aims/corrective-actions.md"
+      ],
       "watch_source": "uae-moe",
       "status": "partial",
       "open_action": 8,
@@ -171,8 +255,15 @@
       "instrument": "Federal Decree-Law No. 10 of 2025; Cabinet Resolution No. 134 of 2025",
       "category": "regulatory",
       "owner": "MLRO",
-      "controls": ["docs/aims/transaction-feed-compensating-control.md", "txn_monitor.py"],
-      "evidence": ["docs/aims/in-domain-aml-coverage.md", "docs/fraud-f3-mapping.md"],
+      "controls": [
+        "docs/policies/transaction-monitoring-reporting-policy.md",
+        "docs/aims/transaction-feed-compensating-control.md",
+        "txn_monitor.py"
+      ],
+      "evidence": [
+        "docs/aims/in-domain-aml-coverage.md",
+        "docs/fraud-f3-mapping.md"
+      ],
       "watch_source": "uae-moe",
       "status": "partial",
       "open_action": 6,
@@ -184,8 +275,17 @@
       "instrument": "Federal Decree-Law No. 45 of 2021 (PDPL)",
       "category": "regulatory",
       "owner": "MLRO / DPO (to be determined)",
-      "controls": ["docs/governance/dpia-2026.md", "docs/aims/pdpl-data-processing-assessment.md", "docs/governance/cross-border-transfer-position-2026.md", "docs/governance/dpo-determination-2026.md"],
-      "evidence": ["docs/aims/third-party-register.md", "data/tool-surfaces.json"],
+      "controls": [
+        "docs/policies/data-privacy-policy.md",
+        "docs/governance/dpia-2026.md",
+        "docs/aims/pdpl-data-processing-assessment.md",
+        "docs/governance/cross-border-transfer-position-2026.md",
+        "docs/governance/dpo-determination-2026.md"
+      ],
+      "evidence": [
+        "docs/aims/third-party-register.md",
+        "data/tool-surfaces.json"
+      ],
       "watch_source": "uae-cbuae",
       "status": "partial",
       "open_action": 11,
@@ -197,8 +297,16 @@
       "instrument": "Cabinet Resolution No. 74 of 2020",
       "category": "regulatory",
       "owner": "Compliance Engineering",
-      "controls": [".github/workflows/sanctions-watch.yml", ".github/workflows/daily-sanctions-screen.yml", "docs/aims/eocn-list-update-sop.md"],
-      "evidence": ["test/sanctions-watch.test.mjs", "test/freshness-check.test.mjs"],
+      "controls": [
+        "docs/policies/sanctions-tfs-policy.md",
+        ".github/workflows/sanctions-watch.yml",
+        ".github/workflows/daily-sanctions-screen.yml",
+        "docs/aims/eocn-list-update-sop.md"
+      ],
+      "evidence": [
+        "test/sanctions-watch.test.mjs",
+        "test/freshness-check.test.mjs"
+      ],
       "watch_source": "uae-eocn",
       "calendar_duty": "internal-watchlist-annual-review",
       "status": "met",
@@ -210,8 +318,13 @@
       "instrument": "Federal Decree-Law No. 10 of 2025",
       "category": "regulatory",
       "owner": "MLRO / firm",
-      "controls": ["data/compliance-calendar.json"],
-      "evidence": ["docs/executive/regulatory-readiness.md"],
+      "controls": [
+        "docs/policies/compliance-governance-charter.md",
+        "data/compliance-calendar.json"
+      ],
+      "evidence": [
+        "docs/executive/regulatory-readiness.md"
+      ],
       "watch_source": "uae-fiu",
       "status": "pending",
       "note": "Registration and credential currency are firm-side facts the repository cannot observe. Add the renewal anniversary to the compliance calendar once the date is known."
@@ -222,8 +335,13 @@
       "instrument": "Regulation (EU) 2024/1689 (EU AI Act)",
       "category": "voluntary",
       "owner": "MLRO",
-      "controls": ["docs/governance/eu-ai-act-assessment-2026.md"],
-      "evidence": ["docs/governance/nist-ai-rmf-mapping-2026.md", "docs/regulatory-watch.md"],
+      "controls": [
+        "docs/governance/eu-ai-act-assessment-2026.md"
+      ],
+      "evidence": [
+        "docs/governance/nist-ai-rmf-mapping-2026.md",
+        "docs/regulatory-watch.md"
+      ],
       "watch_source": "eu-ai-act",
       "status": "monitored",
       "note": "Assessed as outside territorial scope today (no EU establishment, no EU market offering); the design aligns voluntarily with the high-risk obligations should scope change. General applicability of the broader obligations falls on 2 August 2026 and the source is under Regulatory Watch, including the Digital Omnibus amendments."
@@ -234,8 +352,14 @@
       "instrument": "ISO/IEC 42001:2023 (voluntary standard)",
       "category": "voluntary",
       "owner": "Board",
-      "controls": ["docs/governance/iso-42001-soa-2026.md", "docs/aims/iso42001-mandatory-documents-index.md"],
-      "evidence": ["docs/aims/statement-of-applicability.md", "docs/aims/management-review.md"],
+      "controls": [
+        "docs/governance/iso-42001-soa-2026.md",
+        "docs/aims/iso42001-mandatory-documents-index.md"
+      ],
+      "evidence": [
+        "docs/aims/statement-of-applicability.md",
+        "docs/aims/management-review.md"
+      ],
       "watch_source": null,
       "calendar_duty": "governance-pack-annual-review",
       "status": "monitored",
@@ -248,11 +372,54 @@
       "instrument": "LBMA Responsible Gold Guidance; OECD Due Diligence Guidance",
       "category": "voluntary",
       "owner": "MLRO / firm",
-      "controls": ["docs/regulatory-watch.md"],
-      "evidence": ["docs/regulatory-watch.md"],
+      "controls": [
+        "docs/policies/responsible-sourcing-policy.md",
+        "docs/regulatory-watch.md"
+      ],
+      "evidence": [
+        "docs/regulatory-watch.md"
+      ],
       "watch_source": "lbma",
       "status": "monitored",
       "note": "LBMA and OECD sources are watched so a change in guidance is detected. The firm's responsible-sourcing programme (KYS, refinery due diligence, Step 4 audit) is outside this repository's scope."
+    },
+    {
+      "id": "OB-20",
+      "obligation": "Assess and control proliferation financing as a standalone risk, and cover it in internal controls and training",
+      "instrument": "Federal Decree-Law No. 10 of 2025, Article 3(3); Cabinet Resolution No. 134 of 2025",
+      "category": "regulatory",
+      "owner": "MLRO",
+      "controls": [
+        "docs/policies/proliferation-financing-policy.md",
+        "docs/policies/risk-assessment-methodology.md",
+        "screen.py"
+      ],
+      "evidence": [
+        "docs/policies/training-awareness-policy.md",
+        "docs/governance/sanctions-screening-gap-checklist-2026.md"
+      ],
+      "watch_source": "uae-eocn",
+      "status": "partial",
+      "open_action": 18,
+      "note": "PF became a standalone offence under FDL 10/2025 and can no longer be treated as a sub-case of sanctions screening. The CPF policy, the separate PF section in the risk-assessment method and the distinct PF training module are drafted; approval and the PF section of the business-wide assessment itself are outstanding."
+    },
+    {
+      "id": "OB-21",
+      "obligation": "Obtain, record and transmit full originator and beneficiary information for wire transfers at or above AED 3,500",
+      "instrument": "Cabinet Resolution No. 134 of 2025",
+      "category": "regulatory",
+      "owner": "MLRO",
+      "controls": [
+        "docs/policies/transaction-monitoring-reporting-policy.md",
+        "txn_monitor.py"
+      ],
+      "evidence": [
+        "docs/aims/transaction-feed-compensating-control.md"
+      ],
+      "watch_source": "uae-cbuae",
+      "status": "partial",
+      "open_action": 6,
+      "note": "The data requirement and the escalation rule for an incomplete incoming transfer are stated in policy; systematic enforcement depends on the same transaction-feed decision as OB-03 and OB-13."
     }
   ],
   "coverage_note": "Every obligation names the Regulatory Watch source that would tell us it changed, or states why none applies. test/obligations.test.mjs verifies that each watch_source exists in data/reg-sources.json, each calendar_duty exists in data/compliance-calendar.json, every control and evidence path exists on disk, every partial row names an open-actions register item, and that no obligation cites a repealed instrument (FDL 20/2018, Cabinet Decision 10/2019) as an operative basis."

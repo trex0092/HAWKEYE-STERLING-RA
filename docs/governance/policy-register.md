@@ -33,9 +33,31 @@
 | POL-11 | [Backup & Recovery](backup-recovery.md) | runbook | Compliance Eng. | ✅ in force | 2027-07-28 |
 | POL-12 | [App Setup Runbook](../app-setup-runbook.md) | runbook | Compliance Eng. | ✅ in force | 2027-07-28 |
 | POL-13 | [History Scrub Runbook](../security/history-scrub-runbook.md) | runbook | Repo owner | ✅ in force — execution is item 1 | 2027-07-28 |
+| POL-14 | [AML/CFT/CPF Policy](../policies/aml-cft-cpf-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-15 | [Customer Acceptance & CDD (SDD/EDD)](../policies/customer-acceptance-cdd-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-16 | [Sanctions & TFS](../policies/sanctions-tfs-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-17 | [Counter-Proliferation Financing (CPF)](../policies/proliferation-financing-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-18 | [Transaction Monitoring & Reporting](../policies/transaction-monitoring-reporting-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-19 | [STR/DPMSR Filing Procedure (goAML)](../policies/str-dpmsr-filing-procedure.md) | procedure | MLRO | 📝 draft — item 18 | on approval |
+| POL-20 | [Risk Assessment Methodology (EWRA/BWRA)](../policies/risk-assessment-methodology.md) | standard | MLRO | 📝 draft — item 18 | on approval |
+| POL-21 | [Responsible Sourcing](../policies/responsible-sourcing-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-22 | [Record-Keeping & Retention](../policies/record-keeping-retention-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-23 | [Training & Awareness](../policies/training-awareness-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-24 | [Compliance Programme Governance Charter](../policies/compliance-governance-charter.md) | charter | MLRO | 📝 draft — item 18 | on approval |
+| POL-25 | [Whistleblowing & Speak-Up](../policies/whistleblowing-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-26 | [Data Privacy (PDPL)](../policies/data-privacy-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-27 | [Information Security](../policies/information-security-policy.md) | policy | Compliance Eng. | 📝 draft — item 18 | on approval |
+| POL-28 | [Outsourcing & Third-Party Risk](../policies/outsourcing-third-party-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-29 | [Independent Audit](../policies/independent-audit-policy.md) | policy | Internal Audit | 📝 draft — item 18 | on approval |
+| POL-30 | [Regulatory Change Management](../policies/regulatory-change-management-procedure.md) | procedure | Compliance Officer | 📝 draft — item 18 | on approval |
 
-Eleven instruments are in force; two are drafts waiting on the same board
-sitting as the rest of the programme.
+**Thirty instruments.** Eleven are in force. Nineteen are drafts: two waiting on
+the same board sitting as the rest of the programme, and the seventeen-document
+[AML/CFT/CPF policy pack](../policies/README.md) drafted 2026-07-28 and awaiting
+approval under open-actions item 18.
+
+Until the pack is approved it is **written, not operative** — the register says
+so, the documents say so, and CI fails if either claims otherwise.
 
 ## 2. What CI enforces
 

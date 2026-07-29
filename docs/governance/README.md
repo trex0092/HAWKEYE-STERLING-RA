@@ -2,7 +2,8 @@
 
 Hawkeye Sterling V2. The governance layer above the code: policy,
 framework mappings, risk/impact assessments, registers, and operational runbooks.
-Sibling packs: [`../aims/README.md`](../aims/README.md) (ISO/IEC 42001 AIMS pack) ·
+Sibling packs: [`../policies/README.md`](../policies/README.md) (AML/CFT/CPF policy pack) ·
+[`../aims/README.md`](../aims/README.md) (ISO/IEC 42001 AIMS pack) ·
 [`../models/README.md`](../models/README.md) (model cards) ·
 [`../AI-GOVERNANCE.md`](../AI-GOVERNANCE.md) (master model card + control mapping).
 

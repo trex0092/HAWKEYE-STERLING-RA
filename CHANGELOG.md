@@ -10,6 +10,63 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Compliance — the AML/CFT/CPF policy pack: seventeen governing instruments (2026-07-28)
+
+The estate had controls, registers and evidence — and no policies. The registers
+pointed at procedures and runbooks; the instruments that say *how the firm
+applies* its obligations did not exist. This adds them, under `docs/policies/`,
+grounded in Federal Decree-Law No. 10 of 2025, Cabinet Resolution No. 134 of
+2025, Cabinet Decision No. 74 of 2020, the PDPL and the MoE circulars (2/2024,
+3/2025, 4/2025, 6/2025).
+
+- **Master:** [AML/CFT/CPF Policy](docs/policies/aml-cft-cpf-policy.md) — three
+  pillars, governance and accountability, prohibited business, personal
+  liability, and the evidence map. Everything else implements part of it.
+- **Customer & counterparty:** [CDD/SDD/EDD](docs/policies/customer-acceptance-cdd-policy.md)
+  (band outcomes and hard rules, UBO at 25% with nominees looked through, SDD
+  eligibility *and* its documentation duty, PEP handling, review cycles) ·
+  [Sanctions & TFS](docs/policies/sanctions-tfs-policy.md) (lists, 24-hour
+  rescreen on list update, freeze-without-delay, PNMR/CNMR/FFR deadlines,
+  DPMS circumvention indicators) ·
+  [CPF](docs/policies/proliferation-financing-policy.md) — proliferation
+  financing as a **standalone pillar**, not a footnote to sanctions ·
+  [Responsible Sourcing](docs/policies/responsible-sourcing-policy.md) (OECD
+  five steps, LBMA RGG, KYS, CAHRA/ASM).
+- **Transactions & reporting:** [Monitoring & Reporting](docs/policies/transaction-monitoring-reporting-policy.md)
+  (the **DPMSR-vs-STR** distinction, AED 55,000 thresholds with linked-series
+  aggregation, AED 3,500 wire data, tipping-off) and the
+  [goAML filing procedure](docs/policies/str-dpmsr-filing-procedure.md), which
+  logs **no-action decisions** to the same standard as filings.
+- **Programme:** [Governance Charter](docs/policies/compliance-governance-charter.md)
+  (MLRO independence and authority, annual report, twelve-month cycle) ·
+  [EWRA/BWRA methodology](docs/policies/risk-assessment-methodology.md) ·
+  [Training](docs/policies/training-awareness-policy.md) ·
+  [Independent Audit](docs/policies/independent-audit-policy.md) ·
+  [Whistleblowing](docs/policies/whistleblowing-policy.md) — the speak-up
+  element the estate had no instrument for ·
+  [Regulatory Change Management](docs/policies/regulatory-change-management-procedure.md).
+- **Data, security, suppliers:** [Record-Keeping & Retention](docs/policies/record-keeping-retention-policy.md)
+  (five years, **48-hour production**, holds) ·
+  [Data Privacy](docs/policies/data-privacy-policy.md) (PDPL lawful basis; a
+  data-subject request never overrides tipping-off) ·
+  [Information Security](docs/policies/information-security-policy.md) ·
+  [Outsourcing & Third-Party](docs/policies/outsourcing-third-party-policy.md).
+
+Every instrument is **DRAFT and not in force** until its approval block is
+completed — Board for policies, MLRO for procedures — tracked as new
+open-actions **item 18**. All seventeen are registered in
+`data/policies.json` (30 instruments now) and CI holds the line: an owner
+declared in the document itself, no approval date the document does not
+record, no next-review date on a draft, and no policy-shaped file left
+unregistered.
+
+Two obligations added: **OB-20** proliferation financing as a standalone risk
+(FDL 10/2025 Art. 3(3)) and **OB-21** wire-transfer originator/beneficiary data
+at AED 3,500 (CR 134/2025). Every existing obligation now names the governing
+instrument that discharges it. Compliance completion moves 37.5% → **33.3%**
+because the denominator grew by two — a dilution the metric reports rather than
+hides.
+
 ### Governance — policy register: ownership and approval records for every instrument (2026-07-28)
 
 The last repo-side gap from the GRC map (core component 4, policy management).

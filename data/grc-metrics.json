@@ -9,11 +9,11 @@
       "basis": "Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof. Manual rows (§4) are excluded by design."
     },
     "complianceCompletionRate": {
-      "value": 37.5,
+      "value": 33.3,
       "numerator": 6,
-      "denominator": 16,
+      "denominator": 18,
       "basis": "Obligations at status \"met\" ÷ regulatory obligations. \"partial\" means the control is built and evidenced but a human act is outstanding — see the open-actions item on each row.",
-      "partial": 8,
+      "partial": 10,
       "pending": 2
     },
     "kriBreachRate": {
