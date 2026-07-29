@@ -8,7 +8,7 @@ Modes:
   weekly_adverse : every Monday — adverse media on ALL 324 customers
 """
 
-import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
+import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time, html
 import threading
 import functools
 import xml.etree.ElementTree as ET
@@ -3807,6 +3807,41 @@ def _mirror_fallback(names, dataset, label):
     log(f"  {label}: official endpoint unavailable — screened via OpenSanctions mirror")
     return mirror_names, "live (OpenSanctions mirror)", sha256_of(data)
 
+# EU FSF is the one core list whose PRIMARY is the OpenSanctions host (webgate's
+# exports drift formats; the mirror's simple shape is what every parser here
+# shares) — so its fallback runs the OTHER way: official webgate XML, with the
+# public 2017 token the EU publishes for exactly this purpose (the same token
+# data/sanctions-sources.json documents and .gitleaks.toml allowlists).
+EU_OFFICIAL_XML_URL = ("https://webgate.ec.europa.eu/fsd/fsf/public/files/"
+                       "xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw")
+
+def parse_eu_official_xml(data):
+    """Names from the FSF fullSanctionsList XML: every <nameAlias> carries the
+    designation's full name in a wholeName attribute (entities and aliases
+    alike). Attribute extraction by regex keeps the fallback tolerant of the
+    schema-version churn that motivated using the mirror as primary; dedupe
+    folds entity names and aliases into one set like parse_simple_csv does."""
+    if not data:
+        return set()
+    text = data.decode("utf-8", "replace") if isinstance(data, bytes) else str(data)
+    names = {html.unescape(m).strip() for m in re.findall(r'wholeName="([^"]*)"', text)}
+    return {n for n in names if len(n) >= 3}
+
+def _eu_official_fallback(names):
+    """When the OpenSanctions eu_fsf mirror yields nothing, screen via the
+    official webgate XML instead. Same contract as _mirror_fallback: None when
+    the primary already loaded or the fallback is also down (the degrade-loudly
+    paths take over); provenance in the date field so the report and audit
+    trail show which source actually screened."""
+    if names:
+        return None
+    data = download(EU_OFFICIAL_XML_URL, "EU FSF (official webgate XML)")
+    xml_names = parse_eu_official_xml(data)
+    if not xml_names:
+        return None
+    log("  EU FSF: OpenSanctions mirror unavailable — screened via official webgate XML")
+    return xml_names, "live (EU official XML)", sha256_of(data)
+
 # ── Core-list coverage floors (zero/partial-load hard-fail) ──────────────────
 # A core list that loads ZERO names (parse failure, the PR #128 bug class) or a
 # fraction of its known size (truncated download, format drift) used to degrade
@@ -3953,10 +3988,23 @@ def load_all_lists():
     if fb:
         un_names, un_date, un_hash = fb
         un_fetched = True
+    uk_fetched = bool(uk_data)
+    eu_fetched = bool(eu_data)
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
+    fb = _mirror_fallback(uk_names, "gb_hmt_sanctions", "UK OFSI")
+    if fb:
+        uk_names, uk_date, uk_hash = fb
+        uk_fetched = True
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
+    fb = _eu_official_fallback(eu_names)
+    if fb:
+        eu_names, eu_date, eu_hash = fb
+        eu_fetched = True
     au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
     ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
+    # AU + CH have no second origin: DFAT bot-gates its .xlsx and SECO's own XML
+    # is a different schema again, so an OpenSanctions outage takes both down —
+    # that surfaces as the usual outage-gate DEGRADED, never a silent gap.
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
     list_meta = {
         "ofac": {"count":len(ofac_names),"date":ofac_date,"hash":ofac_hash,"tier":"core"},
@@ -3993,7 +4041,7 @@ def load_all_lists():
     # run degrades and turns the run red after delivery (outage gate).
     enforce_core_list_floors(list_meta, fetched={
         "ofac": ofac_fetched, "un": un_fetched,
-        "uk": bool(uk_data), "eu": bool(eu_data),
+        "uk": uk_fetched, "eu": eu_fetched,
         "au": bool(au_data), "ch": bool(ch_data),
         "eocn": EOCN_SOURCE_STATE["obtained"],
     })
@@ -4909,13 +4957,35 @@ def main():
     au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
     ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
 
+    # Same fallback ladder as load_all_lists — the legacy manual path must not
+    # be the one place a single-origin outage still bites. Fetched flags track
+    # "source material obtained" (primary bytes OR a fallback that answered).
+    ofac_fetched, un_fetched = bool(ofac_data), bool(un_data)
+    uk_fetched,   eu_fetched = bool(uk_data),   bool(eu_data)
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
-    # Aliases broaden a LOADED primary only (no mirror on this legacy path —
-    # a single sdn.csv outage with alt.csv up would otherwise read as OK).
-    ofac_names = _fold_ofac_aliases(ofac_names, ofac_alt_data)
+    # Fallback BEFORE the alias fold, or an alias-only load defeats the mirror
+    # (same trap load_all_lists documents at its own fold).
+    fb = _mirror_fallback(ofac_names, "us_ofac_sdn", "OFAC SDN")
+    if fb:
+        ofac_names, ofac_date, ofac_hash = fb   # mirror already carries aliases
+        ofac_fetched = True
+    else:
+        ofac_names = _fold_ofac_aliases(ofac_names, ofac_alt_data)
     un_names,   un_date,   un_hash   = parse_un(un_data)
+    fb = _mirror_fallback(un_names, "un_sc_sanctions", "UN Consolidated")
+    if fb:
+        un_names, un_date, un_hash = fb
+        un_fetched = True
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
+    fb = _mirror_fallback(uk_names, "gb_hmt_sanctions", "UK OFSI")
+    if fb:
+        uk_names, uk_date, uk_hash = fb
+        uk_fetched = True
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
+    fb = _eu_official_fallback(eu_names)
+    if fb:
+        eu_names, eu_date, eu_hash = fb
+        eu_fetched = True
     au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
     ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
@@ -4940,11 +5010,10 @@ def main():
     # Per-list coverage floors: an OBTAINED core list at zero (or a fraction
     # of its known size) is the same false-negative class as the all-empty
     # case above and refuses the run; a list with no obtainable source this
-    # run degrades and turns the run red after delivery (outage gate). This
-    # legacy path has NO mirror fallbacks, so bool(data) is the whole story.
+    # run degrades and turns the run red after delivery (outage gate).
     enforce_core_list_floors(list_meta, fetched={
-        "ofac": bool(ofac_data), "un": bool(un_data),
-        "uk": bool(uk_data), "eu": bool(eu_data),
+        "ofac": ofac_fetched, "un": un_fetched,
+        "uk": uk_fetched, "eu": eu_fetched,
         "au": bool(au_data), "ch": bool(ch_data),
         "eocn": EOCN_SOURCE_STATE["obtained"],
     })

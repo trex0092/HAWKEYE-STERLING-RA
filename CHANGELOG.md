@@ -10,6 +10,33 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — every core list with a second origin now falls back to it (2026-07-29)
+
+The UN blob rotation caught by the 29 Jul proof run showed the remaining
+fragility class: a core list with one reachable origin. OFAC and UN already
+fell back to their OpenSanctions mirrors; the ladder now covers the rest:
+
+- **UK OFSI** falls back to the `gb_hmt_sanctions` mirror (same
+  `_mirror_fallback` contract: only when the primary yields nothing, MIRROR
+  provenance in the list date, degrade-loudly unchanged when both are down).
+- **EU FSF** — the one core list whose *primary* is the OpenSanctions host —
+  falls back the other way, to the **official webgate XML** (public FSF token),
+  parsed by a new schema-tolerant `parse_eu_official_xml`. The webgate host is
+  now allowlisted in the two screening workflows that lacked it (the unified
+  daily path and onboarding).
+- The **legacy manual path** gets the full ladder too (OFAC/UN/UK/EU), with the
+  same fallback-before-alias-fold ordering the daily path documents.
+- **AU/CH** have no second origin (DFAT bot-gates its .xlsx; SECO's XML is a
+  third schema) — documented in the loader; an OpenSanctions outage surfaces
+  as the usual outage-gate DEGRADED, never a silent gap.
+- Engine tests pin the FSF XML parser, the EU fallback contract, and — the
+  multi-homing lesson — that **both** load paths actually wire every fallback,
+  via source inspection, so a helper existing but uncalled can't recur.
+
+Source-coverage drift monitoring (>20% shrink alarm vs trailing median) already
+covers AU/CH automatically as history accrues; their provisional 500 floors
+stay until observed baselines land.
+
 ### Screening — the unified poster multi-homes too; second UN blob domain (2026-07-29)
 
 The 2026-07-29 live proof run (30455597768) succeeded — UN loaded over the

@@ -1187,6 +1187,49 @@ screen.download = _orig_download
 check("parse_eu still parses via the shared simple-csv parser",
       screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
 
+# EU FSF is the one core list whose PRIMARY is the OpenSanctions host, so its
+# fallback runs the other way: official webgate XML. Names live in wholeName
+# attributes on <nameAlias> elements (entities and aliases alike).
+_FSF_XML = (b'<?xml version="1.0" encoding="UTF-8"?><export generationDate="2026-07-29">'
+            b'<sanctionEntity logicalId="1"><nameAlias wholeName="EVIL CORP" firstName=""/>'
+            b'<nameAlias wholeName="E &amp; CORP"/></sanctionEntity>'
+            b'<sanctionEntity logicalId="2"><nameAlias wholeName="BAD ACTOR"/></sanctionEntity>'
+            b'</export>')
+check("FSF official XML parses wholeName attributes (entities + aliases, unescaped)",
+      screen.parse_eu_official_xml(_FSF_XML) == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url) or _FSF_XML)
+_fb = screen._eu_official_fallback(set())
+check("EU fallback loads the official XML when the mirror yielded nothing",
+      bool(_fb) and _fb[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+check("EU fallback provenance is explicit in the list date (audit trail)",
+      bool(_fb) and "official" in _fb[1].lower())
+check("EU fallback targets webgate with the public FSF token",
+      bool(_dl_urls) and "webgate.ec.europa.eu" in _dl_urls[0] and "token=" in _dl_urls[0])
+check("no official-XML fetch when the mirror loaded",
+      screen._eu_official_fallback({"LOADED"}) is None and len(_dl_urls) == 1)
+screen.download = lambda url, label: None
+check("official XML also down → no fallback (degrade-loudly paths take over)",
+      screen._eu_official_fallback(set()) is None)
+screen.download = _orig_download
+
+# Every core list with a second origin must actually be WIRED to it, on BOTH
+# load paths — the 2026-07-29 multi-homing bug class was exactly a helper that
+# existed but one path didn't call. UK falls back to the OpenSanctions
+# gb_hmt_sanctions mirror; EU to the official XML; AU/CH have no second origin
+# (documented in the loader) and rely on the outage gate.
+import inspect as _inspect
+_src_daily  = _inspect.getsource(screen.load_all_lists)
+_src_legacy = _inspect.getsource(screen.main)
+for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
+    check(f"{_pname} path wires the OFAC mirror fallback", "us_ofac_sdn" in _psrc)
+    check(f"{_pname} path wires the UN mirror fallback", "un_sc_sanctions" in _psrc)
+    check(f"{_pname} path wires the UK mirror fallback", "gb_hmt_sanctions" in _psrc)
+    check(f"{_pname} path wires the EU official-XML fallback", "_eu_official_fallback" in _psrc)
+    check(f"{_pname} path folds OFAC aliases only when the mirror did not serve",
+          "_fold_ofac_aliases" in _psrc
+          and _psrc.find("us_ofac_sdn") < _psrc.find("_fold_ofac_aliases"))
+
 # ── EOCN mirror cross-check (TFS drift detector) ──────────────────────────────
 # The curated local UAE Local Terrorist List can go stale (EOCN updates arrive
 # by notification, not a machine endpoint) — a missed designation is a false
