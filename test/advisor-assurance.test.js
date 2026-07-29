@@ -233,6 +233,49 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     check('handler: the downgrade is recorded on the audit line', /modeDegraded=deep/.test(b.auditLine));
   }
 
+  // 6b-continuation. A deepContinue client gets REAL deep mode in guarded hops
+  // on an unaffordable site: the governed deep model, sliced inside the cap.
+  if (I.AFFORDABLE_TOKENS < I.DEEP_MIN_TOKENS) {
+    /* Own client IP: five extra calls on the shared bucket would trip the
+       10/min rate limit for the unrelated handler tests further down. */
+    const contIp = { 'x-nf-client-connection-ip': '203.0.113.77' };
+    // hop 1: the model hits max_tokens mid-answer -> a partial, not an answer
+    mockFetch(async () => ({ ok: true, json: async () => ({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'Part one of the deep analysis…' }] }) }));
+    r = await call(POST({ question: 'Deep dive.', mode: 'deep', deepContinue: true }, contIp), 'test-key');
+    b = JSON.parse(r.body);
+    check('continuation: hop 1 is a partial, not a degraded answer',
+      b.deepPartial === true && b.deepHop === 1 && !b.modeDegraded && b.effectiveMode === 'deep');
+    check('continuation: hop 1 uses the governed deep model', b.model === I.MODEL_BY_MODE.deep.model);
+    check('continuation: a partial carries no renderable payload',
+      b.text === undefined && b.auditLine === undefined && typeof b.deepAccumulated === 'string');
+
+    // hop 2: end_turn -> the full text is assembled, guarded and final
+    mockFetch(async () => ({ ok: true, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: ' Part two, concluding.' }] }) }));
+    r = await call(POST({ question: 'Deep dive.', mode: 'deep', deepContinue: true, deepHop: b.deepHop, deepAccumulated: b.deepAccumulated }, contIp), 'test-key');
+    const fin = JSON.parse(r.body);
+    check('continuation: the final hop returns the assembled text',
+      fin.ok === true && /Part one of the deep analysis/.test(fin.text) && /Part two, concluding\./.test(fin.text));
+    check('continuation: the final answer is deep, undegraded',
+      fin.effectiveMode === 'deep' && fin.modeDegraded === false && fin.model === I.MODEL_BY_MODE.deep.model);
+    check('continuation: the audit line records the hop count', /deepHops=2/.test(fin.auditLine));
+
+    // Invariant 1: NO UNGUARDED TOKEN EVER LEAVES. A partial whose accumulated
+    // text trips the tipping-off guard must be withheld ON THAT HOP -- not
+    // passed back to the client to be re-submitted.
+    mockFetch(async () => ({ ok: true, json: async () => ({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'Draft: Dear customer, we have filed an STR about you with the FIU.' }] }) }));
+    r = await call(POST({ question: 'Deep dive.', mode: 'deep', deepContinue: true }, contIp), 'test-key');
+    const guarded = JSON.parse(r.body);
+    check('continuation: a tipping-off partial is withheld mid-continuation, never returned',
+      guarded.deepPartial === undefined && guarded.tippingOffFlagged === true &&
+      /TIPPING-OFF GUARD ACTIVATED/.test(guarded.text) && !/Dear customer/.test(JSON.stringify(guarded)));
+
+    // The hop limit is a hard stop: at the limit, max_tokens finalises anyway.
+    mockFetch(async () => ({ ok: true, json: async () => ({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'still going' }] }) }));
+    r = await call(POST({ question: 'Deep dive.', mode: 'deep', deepContinue: true, deepHop: I.DEEP_HOP_LIMIT - 1, deepAccumulated: 'prior text ' }, contIp), 'test-key');
+    const capped = JSON.parse(r.body);
+    check('continuation: the hop limit finalises rather than looping', capped.deepPartial === undefined && capped.ok === true);
+  }
+
   // 6c. Tipping-off in the model output is withheld with Article 25 citation
   mockFetch(async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'Tell the customer we filed an STR with the FIU.' }] }) }));
   r = await call(POST({ question: 'Draft a note to the customer.' }), 'test-key');
