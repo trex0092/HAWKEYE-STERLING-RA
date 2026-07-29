@@ -6,8 +6,17 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-07-24. Items are numbered by who moves next, not by
-> importance.
+> **Last updated:** 2026-07-28 — items 16, 17 and 18 were added that day (MRM
+> ratification, risk-appetite ratification, and approval of the eighteen-instrument
+> policy pack) while this line still read 24 July. Items are numbered by who moves
+> next, not by importance.
+>
+> **No target dates.** Every item carries an owner and a closing condition, and
+> none carries a deadline — which is why KRI-09 (overdue issue rate) reports
+> *null* rather than zero. Setting those dates is a board act (item 17). The
+> gap is now counted: `openActionsWithoutTargetDate` in
+> [`../../data/grc-metrics.json`](../../data/grc-metrics.json). Adding a
+> `Target date` column to the table below starts the measurement per row.
 
 | # | Action | Owner | What closes it | Asana |
 |---|---|---|---|---|
@@ -25,8 +34,9 @@
 | 13 | Determine and minute whether the deploying entity must formally designate a DPO — **decision paper ready for the item-4 sitting:** [`dpo-determination-2026.md`](dpo-determination-2026.md) §4. | MLRO / Board | The §4 minute block signed; any appointment recorded in the [committee charter](ai-governance-committee-charter.md) roles | P41 |
 | 14 | Run the first backtesting cycle per [`backtesting-protocol-2026.md`](backtesting-protocol-2026.md) — blocked until ≥25 disposed cases accumulate (18 open / 0 disposed at creation), so disposition of the open screening cases is the path to unblocking it. | MLRO | Cycle-1 ledger row completed and signed; findings fed to the §5 validation sign-off | to open |
 | 15 | Execute the first manual red-team campaign round per [`../aims/red-team-log.md`](../aims/red-team-log.md) §3 (2026 Q3, with the quarterly review): non-lexical obfuscations + in-the-wild sweep. | MLRO / maintainer | Round-1 row completed; any corpus/detector change merged | to open |
-| 18 | Approve the [AML/CFT/CPF policy pack](../policies/README.md) — seventeen instruments drafted 2026-07-28 and **not in force** until approved: Board approval for the policies, standards and charter; MLRO approval for the two procedures. Each carries an approval block at its foot. | Board / MLRO | Each instrument's approval block completed with approver and date, its register row flipped from `draft` to `in-force`, and the date recorded in the document itself (CI checks the document, not just the register) | to open |
+| 18 | Approve the [AML/CFT/CPF policy pack](../policies/README.md) — eighteen instruments drafted 2026-07-28 and **not in force** until approved: Board approval for the policies, standards and charter; MLRO approval for the two procedures. Each carries an approval block at its foot. | Board / MLRO | Each instrument's approval block completed with approver and date, its register row flipped from `draft` to `in-force`, and the date recorded in the document itself (CI checks the document, not just the register) | to open |
 | 17 | Ratify the [Risk Appetite Statement](risk-appetite-statement-2026.md) (resolution **R7** of the minute template) and, with it, decide whether to set target dates on this register — the missing input that leaves the overdue-issue metric uninstrumented ([`grc-metrics.md`](grc-metrics.md) §3). | Board | R7 minuted; the statement's status line flips from DRAFT to ratified; if target dates are adopted, KRI-09 moves to instrumented | to open |
+| 19 | Approve **v1.1 of the [Stakeholder Impact Assessment](stakeholder-impact-assessment-2026.md)** — the ISO/IEC 42001 clause 6.1.4 designation, the unfair/discriminatory-outcome section and the availability clause, added 2026-07-29. v1.0 remains ratified and in force; the new sections are assessed but unapproved, and are not backdated into the 2026-07-02 signature that did not cover them. | MLRO | The v1.1 row in the sign-off table completed with approver and date | to open |
 | 16 | Ratify the MRM framework — model tiering, PSI thresholds and the backtesting protocol — at the item-4 board sitting. | Board | Ratification minuted; the governance-pillar row in [`model-risk-management-2026.md`](model-risk-management-2026.md) §3 flips to ✅ | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state

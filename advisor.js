@@ -250,6 +250,10 @@ function heroAnswerHtml(){
       +   '<span class="pill" data-csstext="'+pillStyle(ok?'low':'high')+'">'+esc(p.role)+'</span>'
       +   '<span class="conf"'+(ok?'':' data-csstext="color:#FF8A8A"')+'>'+(ok?'<i></i>':'&#9888; ')+esc(state.mode+' mode'+modelChip)+'</span>'
       + '</div>'
+      /* A mode the backend could not afford is stated, never swallowed: the
+         operator asked for deep analysis and must know they did not get it.
+         Degradation is tolerated here; silent degradation is not. */
+      + (la.modeDegraded ? '<div data-csstext="margin-bottom:16px;padding:10px 13px;border-radius:8px;background:#1A1408;border:1px solid rgba(255,180,60,0.28)"><div class="eyebrow" data-csstext="color:#FFC46B">&#9888; Mode downgraded to '+esc(la.effectiveMode||'balanced')+'</div><div data-csstext="font-size:11.5px;color:#C9CFDA;margin-top:5px">'+esc(la.modeDegradedReason||'')+'</div></div>' : '')
       + '<div class="summary" data-csstext="white-space:pre-line">'+esc(la.text)+'</div>'
       + govFlagsHtml(la)
       + (la.auditLine ? '<div data-csstext="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" data-csstext="font-size:9.5px;word-break:break-all;color:#8A94A8">'+esc(la.auditLine)+'</div></div>' : '')

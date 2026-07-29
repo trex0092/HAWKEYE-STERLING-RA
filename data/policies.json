@@ -9,6 +9,10 @@
     "draft": "Written and ready, NOT operative — awaiting an approval act by a named body.",
     "pending-adoption": "Operative in practice but not yet formally adopted by the body that must adopt it."
   },
+  "approval_basis_meanings": {
+    "operative-on-publication": "The instrument takes effect when published; no separate approval act was required. The approver named on the row remains accountable for it.",
+    "adopted-at-management-review": "Adopted through the periodic management review rather than by a discrete approval act; the review minute is the record."
+  },
   "instruments": [
     {
       "id": "POL-01",
@@ -35,6 +39,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication (2026-06-21) and enforced in-product by the acknowledgment gate before the Advisor answers; no separate approval act was required.",
       "review_cadence_months": 12,
       "next_review": "2027-06-21",
@@ -82,6 +87,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "adopted-at-management-review",
       "approval_note": "Reviewed at the management review rather than by a separate approval act.",
       "review_cadence_months": 12,
       "next_review": "2027-07-15",
@@ -98,6 +104,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication; last reviewed 2026-06-21.",
       "review_cadence_months": 12,
       "next_review": "2027-06-21",
@@ -113,6 +120,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication (2026-07-28); annual review and tabletop are calendared.",
       "review_cadence_months": 12,
       "next_review": "2026-09-15",
@@ -129,6 +137,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication; the automated half runs every CI build, the manual campaign quarterly.",
       "review_cadence_months": 3,
       "next_review": "2026-09-30",
@@ -145,6 +154,7 @@
       "status": "in-force",
       "version": "1.1",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication; §8 (internal watchlist) added 2026-07-28.",
       "review_cadence_months": 12,
       "next_review": "2026-09-15",
@@ -161,6 +171,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication (2026-06-21).",
       "review_cadence_months": 12,
       "next_review": "2027-06-21",
@@ -176,6 +187,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication.",
       "review_cadence_months": 12,
       "next_review": "2027-07-28",
@@ -191,6 +203,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication.",
       "review_cadence_months": 12,
       "next_review": "2027-07-28",
@@ -206,6 +219,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication; a one-off remediation procedure rather than a recurring control.",
       "review_cadence_months": 12,
       "next_review": "2027-07-28",
@@ -510,6 +524,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication; reviewed annually and after any incident. Owner header normalised 2026-07-28 when the instrument was registered.",
       "review_cadence_months": 12,
       "next_review": "2027-07-28",
@@ -525,6 +540,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication; dormant until a retirement decision, reviewed annually through the internal-audit A.6 row.",
       "review_cadence_months": 12,
       "next_review": "2027-07-28",
@@ -540,6 +556,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication (2026-06-29); reviewed annually and on any new data source.",
       "review_cadence_months": 12,
       "next_review": "2027-06-29",
@@ -555,6 +572,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication; annual full-system audit before the management review, plus quarterly thematic audits.",
       "review_cadence_months": 12,
       "next_review": "2027-07-28",
@@ -570,6 +588,7 @@
       "status": "in-force",
       "version": "1.0",
       "approved_on": null,
+      "approval_basis": "operative-on-publication",
       "approval_note": "Operative on publication; quarterly MLRO sign-off, next review recorded in the document (2026-09-30).",
       "review_cadence_months": 3,
       "next_review": "2026-09-30",
@@ -577,6 +596,14 @@
     }
   ],
   "excluded": [
+    {
+      "path": "docs/aims/ai-impact-assessment.md",
+      "reason": "ISO/IEC 42001 A.5.2 / clause 6.1.4 impact assessment. An assessment records a finding about the system; it does not issue a rule anyone must follow, so it is not a governing instrument. It gained a named approver on 2026-07-29 — which is why the sweep now sees it — because an assessment nobody stands behind is worth no more than an unowned policy; that is a signature on a finding, not the creation of an instrument. Reviewed on the same annual cadence via the AIMS pack."
+    },
+    {
+      "path": "docs/governance/stakeholder-impact-assessment-2026.md",
+      "reason": "The canonical ISO/IEC 42001 clause 6.1.4 artefact — the assessment of impacts on individuals and groups. Same reasoning as the AI impact assessment: it is a finding with an approver, not a rule the firm issues. Its own version history and approval state are recorded in its sign-off table, which CI checks separately in test/clause-mapping.test.mjs."
+    },
     {
       "path": "docs/governance/policy-register.md",
       "reason": "This register's own human view. It records instruments; it is not one, and registering it would make the sweep circular."

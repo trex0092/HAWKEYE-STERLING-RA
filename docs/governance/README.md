@@ -17,7 +17,10 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-policy.md](ai-policy.md) | Top-level standalone AI Policy (ratified 2026-07-02) | ISO 42001 A.2.2 |
-| [risk-appetite-statement-2026.md](risk-appetite-statement-2026.md) | Eight appetite positions + the acceptance scale + nine KRIs; CI pins the stated appetite to the appetite the code enforces (DRAFT — board R7) | ISO 31000 5.4.3; NIST AI RMF GOVERN 1.3 |
+| [risk-appetite-statement-2026.md](risk-appetite-statement-2026.md) | Eight appetite positions, each with a numeric residual ceiling, a named owner and an escalation SLA; the acceptance scale; the KRIs with their amber bands. CI pins the stated appetite to the appetite the code enforces and scores every register risk against its ceiling (DRAFT — board R7) | ISO 31000 5.4.3; NIST AI RMF GOVERN 1.3 |
+| [governance-chain.md](governance-chain.md) | The dependency map between control families — Visibility → Explainability → Accountability → Trust — with the failure propagation each break causes downstream, and **trust defined narrowly enough to be measured**. The estate had four slicings of the same territory and no control-to-control map | ISO 42001 4.4; COSO IC |
+| [kri-breach-ledger.md](kri-breach-ledger.md) | Append-only history of every KRI breach and amber signal, who was told and what followed — the history the byte-compared metrics snapshot cannot carry | ISO 31000 6.6; ISO 42001 9.1 |
+| [risk-glossary.md](risk-glossary.md) | The risk vocabulary in business language — appetite vs tolerance vs capacity, inherent vs residual vs target, risk owner vs control owner, issue vs incident vs near miss vs loss event, KRI vs KPI. Points at the authoritative definition in each case rather than restating it, and states the terms the estate does **not** yet use | ISO 31000 3; ISO Guide 73 |
 | [ai-acceptable-use-policy.md](ai-acceptable-use-policy.md) | Operator AUP — permitted/prohibited use, acknowledgment | ISO 42001 A.9.2 |
 | [explainability-statement-2026.md](explainability-statement-2026.md) | How outputs are interpretable; stated limits | NIST AI RMF MAP; AI Act Art. 13-style |
 | [grc-cybersecurity-model.md](grc-cybersecurity-model.md) | How the GRC layer and the security controls form one loop | NIST CSF GOVERN; ISO 42001 |

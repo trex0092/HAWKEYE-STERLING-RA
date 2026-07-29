@@ -22,7 +22,7 @@ const require = createRequire(import.meta.url);
 const { __internals: I } = require('../netlify/functions/brain-soul.js');
 
 const KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
 
 function skip(msg) { console.log('advisor-eval: ' + msg + ' — skipping.'); process.exit(0); }
 if (!KEY) skip('no ANTHROPIC_API_KEY');

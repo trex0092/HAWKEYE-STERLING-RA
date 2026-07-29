@@ -528,10 +528,74 @@ const KNOWLEDGE_CONTEXT = buildKnowledgeContext();
 
 // ── MODEL SELECTOR ────────────────────────────────────────────────────────────
 
+/* The function must finish INSIDE the platform's execution cap, which for a
+   synchronous Netlify function defaults to ~10 s and can only be raised per site
+   by Netlify support. The abort budget was 26 s — 2.6x the cap — so on a
+   default-configured site deep mode was not merely slow, it was killed by the
+   platform mid-flight. That is worse than a slow answer: when the platform kills
+   the invocation the function never returns, so NONE of the guards below run.
+   The tipping-off guard, the PII guard, the injection and hallucination guards,
+   the quality score and the audit line all silently do not happen, and the
+   operator sees an opaque platform error instead of a governed refusal.
+
+   So the budget is now derived from the platform cap and sits below it, and the
+   token budget per mode is sized to what can actually complete inside it. On a
+   site whose cap has been raised, set ADVISOR_PLATFORM_CAP_MS and both follow —
+   the abort budget and deep mode's token allowance move together, because
+   raising one without the other just moves where the failure happens. */
+const PLATFORM_CAP_MS = Math.max(3000, Number(process.env.ADVISOR_PLATFORM_CAP_MS) || 10000);
+/* Leave headroom for our own work after the API call returns: the guards, the
+   quality score and the JSON response are all on the clock too. */
+const ABORT_BUDGET_MS = Math.max(2000, PLATFORM_CAP_MS - 1500);
+
+/* Output tokens the abort budget can realistically carry. 180/s is a
+   deliberately conservative planning figure for the largest model; under-asking
+   truncates an answer, over-asking loses it and every guard with it. */
+const AFFORDABLE_TOKENS = Math.max(512, Math.round((ABORT_BUDGET_MS / 1000) * 180));
+
+/* Below this, "deep" is a label on a short answer. Deep mode's whole premise —
+   steelman the counterargument, run a pre-mortem, cite every relevant typology —
+   does not fit in a couple of thousand tokens, and shipping a truncated one
+   under the deep label is the paper-vs-practice gap this estate exists to avoid. */
+const DEEP_MIN_TOKENS = 4096;
+
+/* On a default-configured site the platform cap makes deep mode unaffordable.
+   It then degrades to balanced VISIBLY — the response says so, the audit line
+   says so — rather than silently returning a thin answer wearing the deep label.
+   Same rule as everywhere else here: degradation is tolerated, silent
+   degradation is not (RA-06). Raise the site cap with Netlify support and set
+   ADVISOR_PLATFORM_CAP_MS to match, and deep mode becomes available on its own. */
+/* The GOVERNED routing — what each mode is, independent of what any particular
+   deployment can afford. This is what data/ai-assets.json records and what the
+   model-change control pins: a model swap must move the register in the same
+   commit, and that must stay true whatever the platform cap happens to be. */
+const MODEL_BY_MODE = {
+  speed:    { model: 'claude-haiku-4-5-20251001', maxTokens: 1024 },
+  balanced: { model: 'claude-sonnet-5',           maxTokens: 4096 },
+  deep:     { model: 'claude-opus-5',             maxTokens: 8192 },
+};
+
 function selectModel(mode) {
-  if (mode === 'speed') return { model: 'claude-haiku-4-5-20251001', maxTokens: 1024 };
-  if (mode === 'deep')  return { model: 'claude-opus-4-8', maxTokens: 8192 };
-  return                       { model: 'claude-sonnet-4-6', maxTokens: 4096 };
+  const requested = mode === 'speed' || mode === 'deep' ? mode : 'balanced';
+
+  /* Deep mode is unaffordable under a default cap. It then degrades to balanced
+     VISIBLY rather than returning a thin answer wearing the deep label. */
+  if (requested === 'deep' && AFFORDABLE_TOKENS < DEEP_MIN_TOKENS) {
+    const fallback = MODEL_BY_MODE.balanced;
+    return {
+      model: fallback.model,
+      maxTokens: Math.min(fallback.maxTokens, AFFORDABLE_TOKENS),
+      effectiveMode: 'balanced',
+      degradedFrom: 'deep',
+      degradedReason: 'Deep mode needs ' + DEEP_MIN_TOKENS + ' output tokens to be worth the name, and the '
+        + (PLATFORM_CAP_MS / 1000).toFixed(0) + ' s platform execution cap affords ' + AFFORDABLE_TOKENS
+        + '. Answered in balanced mode instead. To enable deep mode, raise the site function timeout with '
+        + 'Netlify support and set ADVISOR_PLATFORM_CAP_MS to match.'
+    };
+  }
+
+  const chosen = MODEL_BY_MODE[requested];
+  return { model: chosen.model, maxTokens: Math.min(chosen.maxTokens, AFFORDABLE_TOKENS), effectiveMode: requested };
 }
 
 // ── SIMPLE HASH (audit line only) ─────────────────────────────────────────────
@@ -618,12 +682,16 @@ const handle = async (event) => {
 
   if (!question.trim()) return resp(400, { ok: false, error: 'question is required.' });
 
-  const { model, maxTokens } = selectModel(mode);
+  const { model, maxTokens, effectiveMode, degradedFrom, degradedReason } = selectModel(mode);
 
+  /* The instruction follows the EFFECTIVE mode, not the requested one: asking
+     for a full pre-mortem while affording a balanced token budget produces a
+     truncated deep answer, which is the failure this degradation exists to
+     avoid. */
   const modeInstruction =
-    mode === 'deep'
+    effectiveMode === 'deep'
       ? 'Apply DEEP mode: steelman the counterargument, run a pre-mortem, apply meta-cognition. Multi-perspective analysis. Cite every typology and red-flag ID relevant to the question.'
-      : mode === 'speed'
+      : effectiveMode === 'speed'
       ? 'Apply SPEED mode: concise structured answer, key facts only, primary recommendation.'
       : 'Apply BALANCED mode: structured sections, cite relevant typologies and red flags, include gaps and next steps.';
 
@@ -635,7 +703,7 @@ const handle = async (event) => {
   let text = '', ok = true;
 
   const ctrl = new AbortController();
-  const abortTimer = setTimeout(() => ctrl.abort(), 26000);
+  const abortTimer = setTimeout(() => ctrl.abort(), ABORT_BUDGET_MS);
   try {
     const apiResp = await fetch('https://api.anthropic.com/v1/messages', {
       signal: ctrl.signal,
@@ -681,7 +749,10 @@ const handle = async (event) => {
     // stack-shaped or carry environment detail) — log it server-side, return a
     // generic marker. Mirrors the upstream-error hygiene on the !ok path above.
     if (err && err.name === 'AbortError') {
-      text = '[Brain timeout: Anthropic API did not respond within 26 s.]';
+      text = '[Brain timeout: the Anthropic API did not respond within '
+        + (ABORT_BUDGET_MS / 1000).toFixed(1) + ' s, the budget this function has inside the '
+        + (PLATFORM_CAP_MS / 1000).toFixed(0) + ' s platform execution cap. The guards below still ran on this '
+        + 'message. Retry, use a faster mode, or raise the cap and ADVISOR_PLATFORM_CAP_MS together.]';
     } else {
       console.warn('brain-soul: ' + (err && err.message ? err.message : String(err)));
       text = '[Brain error]';
@@ -715,6 +786,7 @@ const handle = async (event) => {
 
   const auditLine = 'AUDIT | ' + new Date().toISOString() +
     ' | model=' + model + ' | mode=' + mode +
+    (degradedFrom ? ' | modeDegraded=' + degradedFrom + '→' + effectiveMode : '') +
     ' | elapsedMs=' + elapsedMs + ' | ok=' + ok +
     ' | hash=' + simpleHash(question) +
     ' | quality=' + quality +
@@ -726,7 +798,9 @@ const handle = async (event) => {
     (latencyFlagged ? ' | latencyFlagged' : '') +
     ' | "This output is decision support, not a decision. MLRO review required."';
 
-  return resp(200, { ok, text, mode, model, elapsedMs, tippingOffFlagged,
+  return resp(200, { ok, text, mode, effectiveMode, modeDegraded: !!degradedFrom,
+    modeDegradedReason: degradedReason || null,
+    model, elapsedMs, tippingOffFlagged,
     piiFlagged, structureFlagged, budgetFlagged, latencyFlagged,
     hallFlagged, injectionFlagged, anomFlagged, quality, auditLine });
 };
@@ -739,6 +813,7 @@ exports.__internals = {
   SOUL_CHARTER, KNOWLEDGE_CONTEXT, TIPPING_OFF_PATTERNS, tippingOffGuard,
   PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
   hallucinationGuard, injectionGuard, anomalyGuard, qualityScore,
-  selectModel, simpleHash, buildKnowledgeContext,
+  selectModel, MODEL_BY_MODE, PLATFORM_CAP_MS, ABORT_BUDGET_MS, AFFORDABLE_TOKENS, DEEP_MIN_TOKENS,
+  simpleHash, buildKnowledgeContext,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
 };

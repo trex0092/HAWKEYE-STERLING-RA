@@ -40,7 +40,7 @@
 - **Agent classification:** Assistive generative-AI, **non-agentic** (no tools, no autonomous
   actions, no writes).
 - **Controls:** `SOUL_CHARTER` (prohibitions P1–P10), refusal protocol, prompt-injection resistance,
-  post-output tipping-off guard (Article 25, FDL 10/2025), 26 s timeout, audit line on every
+  post-output tipping-off guard (Article 25, FDL 10/2025), abort budget derived from the platform execution cap (`ADVISOR_PLATFORM_CAP_MS`, default 10 s) so the guards always run, audit line on every
   response, CORS origin guard. **Assurance:** `test/advisor-assurance.test.js` (offline, in CI) and
   the key-gated live eval `scripts/advisor-eval.mjs` (weekly).
 - **Data flow & retention:** transient; Anthropic API usage with no training on inputs; the function

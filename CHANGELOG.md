@@ -10,6 +10,304 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Advisor — the guardrails stop disappearing under deep mode, and the models move to Claude 5 (2026-07-29)
+
+**`brain-soul.js` aborted its own API call at 26 s against a Netlify synchronous
+function cap of ~10 s** — 2.6× the platform limit. On a default-configured site
+deep mode was not merely slow, it was **killed by the platform mid-flight**, and
+that is worse than a slow answer: when the platform kills the invocation the
+function never returns, so **none of the guardrails run**. The tipping-off guard
+(P4), the PII guard, the injection and hallucination guards, the quality score
+and the audit line all silently did not happen, and the operator saw an opaque
+platform error instead of a governed refusal.
+
+- **The abort budget now derives from the platform cap and sits inside it** —
+  `ADVISOR_PLATFORM_CAP_MS` (default 10000) minus 1.5 s of headroom for the
+  guards and the response, so the function **always returns its own governed
+  answer**. CI asserts the budget is strictly less than the cap, that the
+  headroom is at least a second, and that no mode asks for more tokens than the
+  budget affords.
+- **Deep mode degrades loudly rather than pretending.** A 10 s cap affords ~1500
+  output tokens; deep mode's premise — steelman the counterargument, run a
+  pre-mortem, cite every relevant typology — does not fit, and shipping a
+  truncated answer under the deep label is exactly the paper-vs-practice gap
+  this estate exists to close. Below 4096 affordable tokens deep mode now
+  **degrades to balanced visibly**: `modeDegraded` and a reason in the response,
+  `modeDegraded=deep→balanced` on the audit line, and an amber banner in the UI.
+  The instruction set follows the *effective* mode, so a downgraded answer is
+  never asked for a full pre-mortem it cannot deliver. Same rule as everywhere
+  else here — degradation is tolerated, silent degradation is not (RA-06).
+  Raise the site cap with Netlify support, set `ADVISOR_PLATFORM_CAP_MS` to
+  match, and deep mode becomes available with no code change.
+- **Governed routing split from deployment affordability.** `MODEL_BY_MODE` is
+  what each mode *is*; `selectModel` applies the affordability layer on top.
+  `data/ai-assets.json` pins the former, so the model-change control stays
+  enforceable whatever cap a given site runs — otherwise the register would read
+  differently per deployment.
+- **Models refreshed to Claude 5** — `claude-sonnet-4-6` → **`claude-sonnet-5`**,
+  `claude-opus-4-8` → **`claude-opus-5`**; `claude-haiku-4-5` kept for speed
+  mode. Moved in the same commit as `data/ai-assets.json` and
+  `docs/models/advisor-llm.md`, as the model-change control requires, plus
+  `scripts/advisor-eval.mjs`, `scripts/advisor-bias-eval.mjs` and
+  `scripts/reg-draft.mjs`. No request-shape change was needed — the call sends
+  no `temperature`, `top_p` or `thinking` parameter.
+
+### Governance — the chain between control families, and trust defined narrowly enough to measure (2026-07-29)
+
+The estate slices its governance four ways — a five-level operational stack, a
+six-layer agentic model, a seven-stage lifecycle, an eleven-stage PbG map — and
+every one of them slices **the same territory**. What none of them recorded is
+which control's output another control *consumes*. The assurance matrix is
+control → *proof*; `AI-GOVERNANCE.md` §8a is pillar → *control*; there was **no
+control → control map anywhere**.
+
+- **[`docs/governance/governance-chain.md`](docs/governance/governance-chain.md)**
+  draws the missing edge — **Visibility → Explainability → Accountability →
+  Trust** — as an ordering that is load-bearing rather than rhetorical: you
+  cannot explain what you cannot see, and you cannot hold anyone accountable for
+  a decision you cannot explain.
+- **Failure propagation, with real dependencies.** A stale AI asset register
+  does not just leave one asset undocumented — it makes the explainability
+  statement's **scope claim** false, which makes every accountability record
+  built on it a record about a system that is not the one running. A drifted
+  prompt fingerprint leaves the audit line still able to say *what* a response
+  was and no longer able to support *why*. Read upward, the table is a
+  diagnostic: **a trust indicator that will not hold is rarely a trust problem** —
+  it is usually an accountability gap, which is usually an explainability gap,
+  which is almost always a visibility gap.
+- **Trust is defined so it can be falsified.** Before this page the only
+  occurrences of *trust* in the estate were security **trust boundaries**,
+  **Trusted Types**, and a tagline. It is now defined as *the share of what this
+  estate claims that an outsider can re-derive from the repository without
+  asking anyone who works here* — a property of the evidence, not of anyone's
+  opinion — with four indicators that already exist: control effectiveness
+  (100%), **recorded-breach completeness** (every breached KRI in the ledger,
+  CI-enforced — trust is not the absence of breaches but the absence of
+  *unrecorded* ones), generated-artefact integrity (three drift guards), and
+  honest nulls (KRI-09 reports null with its reason, never 0%).
+- **Two indicators deliberately do not read green** — `residualAboveAppetite` is
+  1 and `kriBreachRate` is 22.2%. An estate whose indicators were all perfect
+  would be telling you about its indicators, not its risks.
+- **Inline fenced mermaid, per the house convention.**
+  `docs/architecture/diagrams.md` states it — *renders natively on GitHub, no
+  tooling* — and the one `.mmd`+`.png` set in the tree was hand-rendered out of
+  band with no renderer in the repository and nothing in CI to catch a `.mmd`
+  drifting from its `.png`. Another PNG pair would add that same silent-drift
+  liability.
+
+### Governance — ISO/IEC 42001 clause 6.1.2 and 6.1.4 are separated, and the two statements of applicability stop contradicting each other (2026-07-29)
+
+**`6.1.2` and `6.1.4` appeared nowhere in `docs/`.** The estate satisfied both in
+substance and had never separated them on paper — which matters because the two
+clauses ask different questions about the same failures, and a risk assessment
+is routinely offered as though it answered both. It does not:
+
+| | 6.1.2 — risk to the firm | 6.1.4 — impact on the person |
+|---|---|---|
+| False negative (R-03) | Severe: regulatory breach, licence risk | Slight — not being flagged does not harm the person |
+| False positive (R-04) | Minor: analyst time, friction | **Severe** — de-risking, refused service, a record they cannot contest |
+
+The two readings point in **opposite directions**. A control set tuned only on
+the left column is tuned the wrong way for the people it acts on.
+
+- **[`docs/aims/iso-42001-clause-6-1-mapping.md`](docs/aims/iso-42001-clause-6-1-mapping.md)
+  — the mapping index**, with **bidirectional `R-nn` ↔ Annex A traceability**.
+  Before it, *no register row cited an Annex A control and neither SoA cited a
+  risk ID*, so "which control treats R-13?" had no answer anywhere in the tree.
+  Both tables are hand-maintained, so
+  [`test/clause-mapping.test.mjs`](test/clause-mapping.test.mjs) pins them: every
+  register risk must appear, every cited risk must still exist, and **every pair
+  must be present in both directions** — building it that way immediately found
+  two asymmetries (A.6.2.4 did not list R-04; A.4.4 did not list R-15).
+- **`stakeholder-impact-assessment-2026.md` is designated the canonical 6.1.4
+  artefact**, extended with a section on **unfair and discriminatory outcomes**
+  ("discriminatory" appeared **once** in the entire tree) and an availability
+  clause. Every row of the new section is a *comparison between populations*,
+  not a count, because that is where discrimination lives and no per-individual
+  row can see it. It records one tension it cannot resolve: fair-treatment
+  guidance says tell the affected person, and the tipping-off prohibition
+  (FDL 10/2025, Art. 25) makes telling them an offence. The statute governs, and
+  the conflict is written down rather than mitigated on paper.
+- **The ratified document was not silently amended.** v1.0 was ratified
+  2026-07-02 with signature evidence; a signature given then cannot cover
+  sections written a month later. v1.0 stays in force, the new content is
+  **v1.1 pending approval** (open-actions item 19), and a CI check fails if a
+  1.1 row ever claims ratification.
+- **`ai-impact-assessment.md` gained a date, a version and a named approver** —
+  it had **none of the three**, so nothing recorded when it was written, what had
+  changed, or who stood behind it. Also a §5a covering group-level outcomes,
+  which its two-column individuals-only table could not reach.
+- **The two statements of applicability contradicted each other about the same
+  control.** The AIMS statement asserted *"AI impact assessment
+  (individuals/society) — Implemented"* while the Advisor statement recorded
+  A.5.4 as 🟡 with its first bias cycle pending. The row is now **split into
+  A.5.2 and A.5.4** at their true and matching statuses, and **both statements
+  now cite the ratified SIA**, which *neither had cited at all* despite it being
+  the strongest 6.1.4 evidence either could offer. CI now fails if the two
+  disagree about A.5.4.
+- **Three vocabulary defects fixed.** `iso-42001-soa-2026.md` used 🟢 outside its
+  own four-value legend, and its open-items paragraph called the AI policy's
+  ratification *pending* while its own A.2.2 row recorded it as ratified
+  2026-07-02 — a file contradicting itself within twenty-five lines. The AIMS
+  statement used `Implemented (inactive)` for FATF R.16, a fifth value outside
+  its four declared ones; it is **Partial** (built, not operating), which its own
+  justification column already said. Both vocabularies are now CI-enforced.
+- **Both impact assessments entered the anti-shadow-policy sweep** the moment
+  they declared an approver, and are **excluded with written reasons**: an
+  assessment records a finding, it does not issue a rule. Signing a finding is
+  not creating an instrument.
+
+### Governance — appetite became tolerance, and the register's own auditor checkpoint became testable (2026-07-29)
+
+The estate stated eight appetite positions and measured nine KRIs, and **not one
+position carried a number**. That left two rules the firm wrote for itself
+unenforceable — `risk-assessment-methodology.md` §3 (*"residual risk is compared
+against the appetite; anything above appetite requires a treatment plan with an
+owner and a date"*) and the AI risk register's own auditor checkpoint
+(*"residual scores sit within appetite"*). Neither could be evaluated, because
+*above appetite* had nothing to be above. An appetite position is a direction; a
+**tolerance** is a boundary someone is told about when it is crossed, and that
+needs three things a direction does not: a number, an owner, and a clock.
+
+- **A numeric `residual_ceiling` on every position**, derived from the
+  methodology's own published bands (Low 1–6 · Medium 7–12 · High 13–25) **by
+  position type, not risk by risk** — ZERO 6, LOW 9, BANDED and MEASURED 12 —
+  with the derivation recorded in `residual_ceiling_basis` so an auditor can
+  challenge the rule rather than guess at eight separate numbers. CI enforces
+  that positions of the same type carry the same ceiling and that ZERO is
+  tighter than LOW; the ceilings are appetite, so only the Board may move them.
+- **An operational `owner` and an `escalation_sla` on every position, and an
+  `owner` on every KRI** — each required separately by CI, because each fails
+  separately: a ceiling with no owner has nobody to breach to, an owner with no
+  SLA has no clock.
+- **All twenty register risks are now claimed by exactly one appetite position**,
+  in both directions, with `risksWithoutAppetitePosition` pinned at 0. A risk
+  claimed by nobody was never scored, and an unscored risk is indistinguishable
+  from a compliant one in a count.
+- **`residualAboveAppetite` scores every risk on every run** — parsing the
+  markdown register by **column header name**, never by position, so an inserted
+  column cannot silently make it read the wrong cell. **It reports 1**: R-03,
+  the sanctions false negative, sits at residual **10 Medium** against RA-01's
+  ceiling of **6**, and its treatment carries an owner and a quarterly cadence
+  but **no date** — recorded per row, because a cadence is a rhythm and the
+  methodology asks for a deadline. The snapshot **names** the risk rather than
+  only counting it. The measure was breached the day it was created; that is
+  what it is for, since the condition was already true and nothing counted it.
+- **Amber warning bands, as a sibling key `threshold_amber`** — never a
+  reshaping of `threshold`, which the suite hard-requires. Amber exists **only
+  where the red line has headroom**: a threshold of 0 or 100% has none by
+  construction, and a warning that can never fire is worse than none. Two KRIs
+  qualify; the rest read `—` rather than carrying an invented number.
+- **The snapshot's KRI block is a projection, and now says so.** Owners, SLAs
+  and amber verdicts are copied into it explicitly — a field added to
+  `data/risk-appetite.json` and not listed in the projection would reach no
+  board pack, so the governance data would exist and never be measured. A new
+  test asserts every projected KRI carries both.
+- **[`docs/governance/kri-breach-ledger.md`](docs/governance/kri-breach-ledger.md)
+  — the history the snapshot cannot carry.** `data/grc-metrics.json` is
+  byte-compared by CI and holds no timestamp by design, so it can only ever say
+  where a number is *now*. The ledger is append-only, records who was told and
+  what followed, keeps amber signals separate from breaches, and is pinned by CI:
+  every KRI it quotes must still exist with that metric, and **every currently
+  breached KRI must appear in it** — a breach the dashboard shows and the ledger
+  does not is a breach with no recorded escalation.
+- **Two stale claims fixed.** `risk-appetite-statement-2026.md` hand-quoted
+  "nine KRIs, eight instrumented" in its header — a count that goes stale on
+  every KRI change, now replaced by a pointer to the live snapshot — and RA-08
+  listed only KRI-08 while KRI-09 named RA-08 as its position, so the link ran
+  one way only. CI now checks both directions.
+- **Capacity is still not stated, and the statement says so.** Risk capacity is
+  a firm-level judgement about capital, licence and staffing that this
+  repository holds no input to. Named as a gap rather than quietly omitted.
+
+**R7 is not ratified by this change.** The statement stays DRAFT; ratification
+is a board act (open-actions item 17).
+
+### Governance — registers say how they know, and the missing-deadline gap is now a number (2026-07-29)
+
+Register hygiene: four claims the registers made that the evidence did not
+support, and one honest count where an invented one was the tempting option.
+
+- **In-force instruments now declare *what put them in force*.** Fifteen of the
+  sixteen `in-force` rows in [`data/policies.json`](data/policies.json) carried
+  `approved_on: null` **and** a `next_review` date — a review clock anchored to
+  nothing. Each now carries an `approval_basis` from a closed two-value
+  vocabulary (`operative-on-publication`, `adopted-at-management-review`),
+  documented in `approval_basis_meanings` and **required by
+  [`test/policies.test.mjs`](test/policies.test.mjs)** on every in-force row
+  without an approval date. The vocabulary was derived from what the documents
+  already say, not invented: fourteen read "Operative on publication", POL-05
+  was adopted at a management review. No approval date was fabricated — the
+  seventeen open actions stay human acts.
+- **The missing deadlines are now counted rather than described.**
+  KRI-09 (overdue issue rate) reports *null* because no open action carries a
+  target date, and instrumenting it would have meant inventing seventeen
+  deadlines. Instead `scripts/grc-metrics.mjs` gained
+  **`openActionsWithoutTargetDate`** — it keys on a dedicated `Target date`
+  column and, with no such column, correctly counts every row (**17**). The
+  board gets a number for item 17, and the counter falls on its own the moment
+  dates start landing.
+- **`docs/aims/README.md` omitted four documents that exist on disk** — among
+  them **two in-force registered instruments**, the TFS Name-Match Procedure
+  (POL-07) and the EOCN List Update SOP (POL-09). That page is the "start here"
+  for an AIMS audit, so a document missing from it is a document an auditor does
+  not know to ask for. All twenty-nine are now indexed.
+- **Three stale cross-references corrected.** OB-10's note in
+  `data/obligations.json` said the risk register runs "R-01…R-13" when it runs
+  to **R-20**; `data/risk-appetite.json` cited `test/risk-appetite.test.mjs`,
+  which **does not exist** (the assertion lives in `test/grc-metrics.test.mjs`);
+  the open-actions register and item 18 called the AML/CFT/CPF pack
+  "seventeen instruments" against **eighteen** on disk and eighteen `draft` rows
+  in the register.
+- **The open-actions register's own "Last updated" line said 24 July** while
+  items 16–18 had landed on the 28th — the one line whose whole job is to say
+  how fresh the answer to "what is pending?" is.
+
+### Governance — the risk vocabulary, and a guard for the links that hold the pack together (2026-07-29)
+
+The pack is written in fluent GRC dialect and had **no translation layer**.
+Seventeen of the thirty terms in a standard risk lens appeared **nowhere** in
+`docs/` — risk capacity, target residual risk, control owner, control weakness,
+compliance gap, loss event, performance indicator among them — while *issue* (41
+documents) and *incident* (40) were used constantly and never once defined or
+distinguished.
+
+- **[`docs/governance/risk-glossary.md`](docs/governance/risk-glossary.md)** —
+  the thirty terms in business language, grouped by what they actually decide:
+  the four levels of risk-taking (appetite vs tolerance vs **capacity**), risk
+  levels, accountability (**risk owner vs control owner**), control failure vs
+  control **weakness**, the four failure words (**issue vs incident vs near miss
+  vs loss event**), and **KRI vs performance indicator**.
+- **It links rather than restates.** Every entry points at the definition that
+  already exists — `risk-assessment-methodology.md` §3 for inherent/residual and
+  the Strong/Adequate/Weak/Absent control ratings, `ai-risk-register.md` for the
+  scoring key and the four treatments, `obligation-register.md` §3 and the
+  `status_meanings` blocks for the status vocabularies — so the glossary cannot
+  drift away from the registers it explains.
+- **It records what is *not* governed as plainly as what is.** Risk capacity,
+  target residual risk, control owner, loss event and a severity scale have no
+  home in this estate, and the page says so. A glossary that quietly implies a
+  control the firm does not have is worse than no glossary.
+- **It disambiguates a term that already means something else here.**
+  `near-miss` has four uses in the pack and **all four are matcher-score
+  margins** against the 0.85 threshold — not "a failure caught in time".
+- **It names the gap that makes two stated rules unenforceable.**
+  `risk-assessment-methodology.md` requires that *"anything above appetite
+  requires a treatment plan with an owner and a date"*, and the risk register
+  lists *"residual scores sit within appetite"* as an auditor checkpoint.
+  Neither is testable today, because no appetite position states a numeric
+  residual ceiling.
+
+**[`test/doc-links.test.mjs`](test/doc-links.test.mjs) — relative links now have
+a guard.** `scripts/link-check.mjs` extracts `https?://` only, so a
+cross-reference to a file that does not exist was invisible to CI — across
+**1,182 relative links in 179 documents**, in a pack whose registers are built
+out of links to their own evidence. Zero were broken, which is the point: the
+guard is preventive, it pins a property the estate already has, and it verified
+the glossary's own forty-four links on the way in. Fragments (`#anchor`) are
+deliberately out of scope — GitHub's slug rules would make it cry wolf — but the
+file half of `file.md#section` is checked.
+
 ### Engine config — the Asana credential is checked where Asana is called, and the settings that gate a degraded run are documented (2026-07-29)
 
 - **`screen.py` no longer `KeyError`s at import.** It read `ASANA_TOKEN` with an

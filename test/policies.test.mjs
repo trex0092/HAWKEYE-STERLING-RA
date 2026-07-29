@@ -34,11 +34,18 @@ catch (e) { console.log('FAIL  data/policies.json parses (' + e.message + ')'); 
 /* ── 1. Schema ──────────────────────────────────────────────────────────── */
 const TYPES = ['policy', 'standard', 'procedure', 'runbook', 'charter', 'statement'];
 const STATUSES = ['in-force', 'draft', 'pending-adoption'];
+/* How an instrument came to be in force when there is no discrete approval
+   date. A closed set on purpose: "it just is" is what the null approved_on
+   already said, and it is not an answer. */
+const BASES = ['operative-on-publication', 'adopted-at-management-review'];
 const REQUIRED = ['id', 'title', 'path', 'type', 'owner', 'approver', 'status', 'version', 'review_cadence_months', 'note'];
 
 check('register has instruments', Array.isArray(reg.instruments) && reg.instruments.length > 0);
 check('register declares an owner role', !!reg.owner_role);
 check('register documents what each status means', !!reg.status_meanings && STATUSES.every((s) => !!reg.status_meanings[s]));
+check('register documents what each approval basis means',
+  !!reg.approval_basis_meanings
+  && BASES.every((b) => typeof reg.approval_basis_meanings[b] === 'string' && reg.approval_basis_meanings[b].length > 20));
 check('register has a shadow-policy note', !!reg.shadow_policy_note);
 check('register last_reviewed is a parseable date', Number.isFinite(Date.parse(reg.last_reviewed || '')));
 
@@ -79,6 +86,17 @@ for (const p of reg.instruments) {
   } else {
     check('unapproved instrument "' + p.id + '" explains why there is no approval date',
       typeof p.approval_note === 'string' && p.approval_note.length > 20);
+    /* An instrument that is IN FORCE with no approval date must say, in a fixed
+       vocabulary, what put it in force — otherwise its next-review date is
+       anchored to nothing and the register asserts a review clock it cannot
+       justify. Fifteen of the sixteen in-force instruments are in this position;
+       the prose note alone was not machine-checkable, so the basis is now a
+       field. Drafts are exempt: they name the open action that will approve
+       them instead (checked below). */
+    if (p.status === 'in-force') {
+      check('in-force instrument "' + p.id + '" declares the basis on which it is in force',
+        BASES.includes(p.approval_basis));
+    }
   }
   if (p.status === 'draft') {
     check('draft instrument "' + p.id + '" asserts no next-review date', p.next_review === null);

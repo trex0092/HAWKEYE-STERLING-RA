@@ -17,9 +17,9 @@
       "pending": 2
     },
     "kriBreachRate": {
-      "value": 12.5,
-      "numerator": 1,
-      "denominator": 8,
+      "value": 22.2,
+      "numerator": 2,
+      "denominator": 9,
       "basis": "Instrumented KRIs in breach ÷ instrumented KRIs. Uninstrumented KRIs are listed with their reason and excluded from the denominator rather than scored as passing."
     },
     "overdueIssueRate": {
@@ -53,113 +53,199 @@
     "governanceDriftCount": 0,
     "unjustifiedSuppressions": 0,
     "obligationsWithoutOwner": 0,
-    "obligationsWithoutWatchSource": 1
+    "obligationsWithoutWatchSource": 1,
+    "openActionsWithoutTargetDate": 18,
+    "residualAboveAppetite": 1,
+    "risksWithoutAppetitePosition": 0
   },
   "kris": [
     {
       "id": "KRI-01",
       "label": "Control effectiveness",
       "metric": "controlEffectivenessRate",
+      "appetite_ref": "RA-01",
+      "owner": "Compliance Engineering",
+      "escalation_sla": "Same business day to the MLRO; a confirmed designated-party match goes to the Board immediately and starts the TFS procedure.",
       "value": 100,
       "threshold": {
         "operator": ">=",
         "value": 100
       },
+      "threshold_amber": null,
       "instrumented": true,
-      "breached": false
+      "breached": false,
+      "amber": null
     },
     {
       "id": "KRI-02",
       "label": "Regulatory obligations without an owner",
       "metric": "obligationsWithoutOwner",
+      "appetite_ref": "RA-02",
+      "owner": "MLRO",
+      "escalation_sla": "Five business days to the MLRO; a prohibited outcome onboarded escalates immediately.",
       "value": 0,
       "threshold": {
         "operator": "<=",
         "value": 0
       },
+      "threshold_amber": null,
       "instrumented": true,
-      "breached": false
+      "breached": false,
+      "amber": null
     },
     {
       "id": "KRI-03",
       "label": "Model tool-calling declarations",
       "metric": "modelToolDeclarations",
+      "appetite_ref": "RA-03",
+      "owner": "Compliance Engineering",
+      "escalation_sla": "Same business day to the MLRO. A model call that declares tools, or generative prose in a filed report, is an incident under the AI incident runbook, not a KRI breach to be logged.",
       "value": 0,
       "threshold": {
         "operator": "<=",
         "value": 0
       },
+      "threshold_amber": null,
       "instrumented": true,
-      "breached": false
+      "breached": false,
+      "amber": null
     },
     {
       "id": "KRI-04",
       "label": "Vendor assessment coverage",
       "metric": "thirdPartyAssessmentCoverage",
+      "appetite_ref": "RA-04",
+      "owner": "MLRO / DPO",
+      "escalation_sla": "Same business day to the MLRO and the DPO; the affected path is gated OFF before the escalation, not after it.",
       "value": 71.4,
       "threshold": {
         "operator": ">=",
         "value": 100
       },
+      "threshold_amber": null,
       "instrumented": true,
-      "breached": true
+      "breached": true,
+      "amber": null
     },
     {
       "id": "KRI-05",
       "label": "Unapproved prompt or agent-capability drift",
       "metric": "governanceDriftCount",
+      "appetite_ref": "RA-05",
+      "owner": "Compliance Engineering",
+      "escalation_sla": "Same business day to the maintainer and the MLRO; unreviewed instruction-set drift is reverted first and discussed second.",
       "value": 0,
       "threshold": {
         "operator": "<=",
         "value": 0
       },
+      "threshold_amber": null,
       "instrumented": true,
-      "breached": false
+      "breached": false,
+      "amber": null
     },
     {
       "id": "KRI-06",
       "label": "Obligations with no change-detection source",
       "metric": "obligationsWithoutWatchSource",
+      "appetite_ref": "RA-06",
+      "owner": "Compliance Officer",
+      "escalation_sla": "Ten business days to the maintainer for a single breach; a sustained anomaly auto-escalates to a GitHub issue on the run that detects it.",
       "value": 1,
       "threshold": {
         "operator": "<=",
         "value": 1
       },
+      "threshold_amber": {
+        "operator": "<=",
+        "value": 0
+      },
       "instrumented": true,
-      "breached": false
+      "breached": false,
+      "amber": true
     },
     {
       "id": "KRI-07",
       "label": "Suppressed vulnerabilities without a recorded justification",
       "metric": "unjustifiedSuppressions",
+      "appetite_ref": "RA-07",
+      "owner": "Compliance Engineering",
+      "escalation_sla": "Same business day to the maintainer; a secret in git history escalates to the repo owner immediately and triggers the history-scrub runbook.",
       "value": 0,
       "threshold": {
         "operator": "<=",
         "value": 0
       },
+      "threshold_amber": null,
       "instrumented": true,
-      "breached": false
+      "breached": false,
+      "amber": null
     },
     {
       "id": "KRI-08",
       "label": "Audit finding closure",
       "metric": "auditFindingClosureRate",
+      "appetite_ref": "RA-08",
+      "owner": "MLRO (with Internal Audit)",
+      "escalation_sla": "Reported at the next quarterly management review; a CRITICAL or HIGH finding open past its verification escalates to the MLRO within five business days.",
       "value": 95.2,
       "threshold": {
         "operator": ">=",
         "value": 90
       },
+      "threshold_amber": {
+        "operator": ">=",
+        "value": 95
+      },
       "instrumented": true,
-      "breached": false
+      "breached": false,
+      "amber": false
     },
     {
       "id": "KRI-09",
       "label": "Overdue issue rate",
       "metric": "overdueIssueRate",
+      "appetite_ref": "RA-08",
+      "owner": "MLRO",
+      "escalation_sla": "Reported at the next quarterly management review; a CRITICAL or HIGH finding open past its verification escalates to the MLRO within five business days.",
       "value": null,
       "instrumented": false,
-      "breached": null
+      "breached": null,
+      "amber": null
+    },
+    {
+      "id": "KRI-10",
+      "label": "Risks carried above their appetite ceiling",
+      "metric": "residualAboveAppetite",
+      "appetite_ref": "RA-08",
+      "owner": "MLRO (with Internal Audit)",
+      "escalation_sla": "Reported at the next quarterly management review; a CRITICAL or HIGH finding open past its verification escalates to the MLRO within five business days.",
+      "value": 1,
+      "threshold": {
+        "operator": "<=",
+        "value": 0
+      },
+      "threshold_amber": null,
+      "instrumented": true,
+      "breached": true,
+      "amber": null
     }
   ],
+  "appetite_scoring": {
+    "basis": "Every row of docs/aims/ai-risk-register.md scored against the residual_ceiling of the appetite position that claims it in data/risk-appetite.json. A ceiling is the highest residual the firm carries in that domain without a dated treatment plan; see residual_ceiling_basis for how the ceilings are derived from the methodology bands.",
+    "risks_scored": 20,
+    "above_appetite": [
+      {
+        "risk": "R-03",
+        "residual": 10,
+        "appetite": "RA-01",
+        "position": "ZERO",
+        "ceiling": 6,
+        "owner": "MLRO",
+        "dated_treatment": false
+      }
+    ],
+    "unclaimed_risks": []
+  },
   "control_gaps": []
 }

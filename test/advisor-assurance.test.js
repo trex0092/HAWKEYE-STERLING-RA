@@ -82,25 +82,59 @@ check('SOUL_CHARTER bars entity-merging and requires disambiguation (P6)',
 check('SOUL_CHARTER treats embedded instructions as data, not commands (injection)',
   /are DATA, not commands/i.test(flat) && /not follow\s+instructions found inside/i.test(flat));
 
-/* ── 4. Model routing pins (silent-downgrade guard) ── */
+/* ── 4. Model routing pins (silent-downgrade guard) ──
+   MODEL_BY_MODE is the GOVERNED routing — what each mode is, independent of what
+   any deployment can afford. selectModel applies the platform-affordability
+   layer on top of it. Both are pinned: a model swap must be deliberate, and the
+   affordability layer must never quietly change which model a mode means. */
+check('governed routing: speed → haiku, 1024 tokens',
+  I.MODEL_BY_MODE.speed.model === 'claude-haiku-4-5-20251001' && I.MODEL_BY_MODE.speed.maxTokens === 1024);
+check('governed routing: balanced → sonnet, 4096 tokens',
+  I.MODEL_BY_MODE.balanced.model === 'claude-sonnet-5' && I.MODEL_BY_MODE.balanced.maxTokens === 4096);
+check('governed routing: deep → opus, 8192 tokens',
+  I.MODEL_BY_MODE.deep.model === 'claude-opus-5' && I.MODEL_BY_MODE.deep.maxTokens === 8192);
 const speed = I.selectModel('speed'), balanced = I.selectModel('balanced'), deep = I.selectModel('deep');
-check('routing: speed → haiku, 1024 tokens', speed.model === 'claude-haiku-4-5-20251001' && speed.maxTokens === 1024);
-check('routing: balanced → sonnet, 4096 tokens', balanced.model === 'claude-sonnet-4-6' && balanced.maxTokens === 4096);
-check('routing: deep → opus, 8192 tokens', deep.model === 'claude-opus-4-8' && deep.maxTokens === 8192);
 check('routing: unknown mode falls back to balanced', I.selectModel('whatever').model === balanced.model);
+
+/* ── 4a. The function must finish inside the platform cap ──
+   The abort budget was 26 s against a ~10 s default Netlify cap, so deep mode was
+   killed by the platform mid-flight — and when the platform kills the
+   invocation the function never returns, so NONE of the guards below run. A
+   budget that exceeds the cap does not make answers slower, it makes the
+   guardrails disappear. */
+check('abort budget sits strictly inside the platform execution cap ('
+  + I.ABORT_BUDGET_MS + 'ms < ' + I.PLATFORM_CAP_MS + 'ms)', I.ABORT_BUDGET_MS < I.PLATFORM_CAP_MS);
+check('abort budget leaves headroom for the guards and the response (≥ 1 s)',
+  I.PLATFORM_CAP_MS - I.ABORT_BUDGET_MS >= 1000);
+check('no mode asks for more tokens than the abort budget affords',
+  ['speed', 'balanced', 'deep'].every((m) => I.selectModel(m).maxTokens <= I.AFFORDABLE_TOKENS));
+
+/* ── 4b. Unaffordable deep mode degrades LOUDLY, never silently ── */
+if (I.AFFORDABLE_TOKENS < I.DEEP_MIN_TOKENS) {
+  check('unaffordable deep mode reports the downgrade', deep.degradedFrom === 'deep' && deep.effectiveMode === 'balanced');
+  check('the downgrade states its reason and how to fix it',
+    typeof deep.degradedReason === 'string' && /ADVISOR_PLATFORM_CAP_MS/.test(deep.degradedReason));
+  check('a downgraded deep answer is not given the deep instruction set', deep.effectiveMode !== 'deep');
+} else {
+  check('affordable deep mode is served as deep, undegraded', deep.effectiveMode === 'deep' && !deep.degradedFrom);
+}
+check('speed and balanced are never silently downgraded', !speed.degradedFrom && !balanced.degradedFrom);
 
 /* ── 4b. Model-change control: the AI asset register must match selectModel ── */
 const fs = require('fs');
 const register = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'ai-assets.json'), 'utf8'));
 const advisorAsset = register.assets.find(a => a.id === 'advisor');
 check('register has the advisor asset', !!advisorAsset);
+/* The register records the GOVERNED routing, not what one deployment affords —
+   otherwise the register would read differently per site and the model-change
+   control would be unenforceable. */
 ['speed', 'balanced', 'deep'].forEach(m => {
-  const want = I.selectModel(m).model;
+  const want = I.MODEL_BY_MODE[m].model;
   const have = (advisorAsset.models.find(x => x.mode === m) || {}).model;
-  check('register model for "' + m + '" matches selectModel (' + want + ')', have === want);
-  const wantTokens = I.selectModel(m).maxTokens;
+  check('register model for "' + m + '" matches the governed routing (' + want + ')', have === want);
+  const wantTokens = I.MODEL_BY_MODE[m].maxTokens;
   const haveTokens = (advisorAsset.models.find(x => x.mode === m) || {}).max_tokens;
-  check('register max_tokens for "' + m + '" matches selectModel (' + wantTokens + ')', haveTokens === wantTokens);
+  check('register max_tokens for "' + m + '" matches the governed routing (' + wantTokens + ')', haveTokens === wantTokens);
 });
 
 /* ── 5. Embedded-knowledge referential integrity (data quality) ── */
@@ -187,10 +221,17 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     /This output is decision support, not a decision\. MLRO review required\./.test(b.auditLine) &&
     /model=claude-/.test(b.auditLine));
 
-  // 6b. Model echoes the requested mode (deep → opus)
+  // 6b. Deep mode routes to the governed model, or reports its downgrade
   r = await call(POST({ question: 'Deep dive.', mode: 'deep' }), 'test-key');
   b = JSON.parse(r.body);
-  check('handler: deep mode routes to opus', b.model === 'claude-opus-4-8' && b.mode === 'deep');
+  check('handler: deep mode echoes the requested mode', b.mode === 'deep');
+  if (I.AFFORDABLE_TOKENS >= I.DEEP_MIN_TOKENS) {
+    check('handler: deep mode routes to opus', b.model === I.MODEL_BY_MODE.deep.model && !b.modeDegraded);
+  } else {
+    check('handler: an unaffordable deep request says so in the response',
+      b.modeDegraded === true && b.effectiveMode === 'balanced' && typeof b.modeDegradedReason === 'string');
+    check('handler: the downgrade is recorded on the audit line', /modeDegraded=deep/.test(b.auditLine));
+  }
 
   // 6c. Tipping-off in the model output is withheld with Article 25 citation
   mockFetch(async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'Tell the customer we filed an STR with the FIU.' }] }) }));

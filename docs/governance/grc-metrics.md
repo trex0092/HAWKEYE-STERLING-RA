@@ -21,7 +21,7 @@
 |---|---|---|
 | **Control Effectiveness Rate** | **100%** (61/61) | Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof |
 | **Compliance Completion Rate** | **33.3%** (6/18) | Obligations at *met* ÷ regulatory obligations. 10 partial, 2 pending |
-| **KRI Breach Rate** | **12.5%** (1/8) | Instrumented KRIs in breach ÷ instrumented KRIs |
+| **KRI Breach Rate** | **22.2%** (2/9) | Instrumented KRIs in breach ÷ instrumented KRIs. KRI-04 and KRI-10 — see [`kri-breach-ledger.md`](kri-breach-ledger.md) |
 | **Overdue Issue Rate** | *not instrumented* | Open items carry an owner and a closing condition but no target date |
 | **Third-Party Assessment Coverage** | **71.4%** (5/7) | Vendors with a settled safeguard/DPA position ÷ vendors in the register |
 | **Audit Finding Closure Rate** | **95.2%** (20/21) | CAPA rows at *Closed* ÷ all CAPA rows |
@@ -47,7 +47,9 @@ human acts are not.
 
 **Third-party coverage at 71.4%** is the two outstanding vendor confirmations —
 the Asana DPA on file and Anthropic's counsel transfer-basis — which are
-open-actions items 2 and 5. It is the one KRI currently in breach (KRI-04).
+open-actions items 2 and 5. It is one of the two KRIs currently in breach
+(KRI-04); the other is KRI-10, below. Both are recorded with their follow-ups in
+the [KRI breach ledger](kri-breach-ledger.md).
 
 **Audit finding closure at 95.2%** is HA-08: the transaction-monitoring engine
 is built and its feed connection is a firm decision (item 6). One open finding
@@ -74,6 +76,27 @@ as passing. CI enforces that distinction.
 | `unjustifiedSuppressions` | 0 | Every OSV suppression carries a written reason |
 | `obligationsWithoutOwner` | 0 | No orphaned obligation |
 | `obligationsWithoutWatchSource` | 1 | ISO/IEC 42001 — a standards body, not a supervisor feed. Tolerated at ≤ 1 |
+| `openActionsWithoutTargetDate` | 18 | Every open action carries an owner and a closing condition; **none carries a deadline**. This is the missing input behind KRI-09 (§3) — it counts rows in the [open-actions register](open-actions-register.md) whose `Target date` cell holds no ISO date. With no such column, every row counts. Setting the dates is a board act (item 17) |
+| `residualAboveAppetite` | 1 | Risks carried above the residual ceiling of the appetite position that claims them. **R-03** (sanctions false negative) at residual 10 against RA-01's ceiling of 6 — see §4a |
+| `risksWithoutAppetitePosition` | 0 | Every risk in the register is claimed by exactly one appetite position. A risk claimed by nobody is never scored, and an unscored risk is indistinguishable from a compliant one in a count |
+
+### 4a. Residual risk against appetite
+
+The methodology says the same thing twice — *"anything above appetite requires a
+treatment plan with an owner and a date"* (§3) and *"treat anything above
+appetite… with owner and target date"* (§5) — and until 2026-07-29 neither could
+be evaluated, because no appetite position stated a number to be above. Each now
+carries a `residual_ceiling` derived from the methodology's own bands, and every
+row of the [AI risk register](../aims/ai-risk-register.md) is scored against the
+ceiling of the position that claims it.
+
+The snapshot **names** the risks above the line rather than only counting them
+(`appetite_scoring.above_appetite`), and records per row whether its treatment
+carries an actual date or only a review cadence — because a cadence is a rhythm,
+not a deadline, and the methodology asks for the deadline.
+
+A non-zero value is not a failure. It is the register stating, in a number, which
+risks the firm is knowingly carrying above the line it drew.
 
 ## 5. What CI enforces
 
