@@ -29,6 +29,23 @@ const suites = readdirSync(join(ROOT, 'test'))
   .sort();
 if (suites.length === 0) { console.error('no unit suites found under test/'); process.exit(1); }
 
+/* The PYTHON suites — the screening engine's own tests. Until 2026-07-29 these
+   ran ONLY in ci.yml, so `npm test` was green for a developer who had just
+   changed screen.py and broken it; the engine is ~5,900 lines and the largest
+   suite carries 389 assertions. test/ci-coverage.test.mjs ties this list to
+   ci.yml in BOTH directions, so a Python suite can no longer be wired into one
+   and forgotten in the other.
+
+   A missing interpreter or a missing engine dependency is reported as a LOUD
+   SKIP, never as a pass: the repo's own rule for the screening engine is that a
+   module which cannot run reads DEGRADED rather than clear, and a test runner
+   owes the same honesty. Only ModuleNotFoundError qualifies — every other
+   non-zero exit is a real failure. */
+const pySuites = readdirSync(join(ROOT, 'test'))
+  .filter((f) => f.endsWith('.py'))
+  .sort();
+const PYTHON = process.env.PYTHON || 'python3';
+
 /* ci.yml steps that regenerate-and-compare a committed artefact. Kept in sync
    with ci.yml by test/ci-coverage.test.mjs, which ties the two lists together
    in both directions — so a drift check can never be added here and skipped in
@@ -41,10 +58,32 @@ const DRIFT_CHECKS = [
 ];
 
 const failures = [];
+const skipped = [];
 for (const f of suites) {
   console.log(`\n=== node test/${f} ===`);
   const r = spawnSync(process.execPath, [join('test', f)], { cwd: ROOT, stdio: 'inherit' });
   if (r.status !== 0) failures.push(f);
+}
+for (const f of pySuites) {
+  console.log(`\n=== ${PYTHON} test/${f} ===`);
+  /* Captured, not inherited, so a ModuleNotFoundError can be told apart from a
+     genuine assertion failure; the output is echoed either way. */
+  const r = spawnSync(PYTHON, [join('test', f)], {
+    cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, ASANA_TOKEN: process.env.ASANA_TOKEN || 'local-test-runner' },
+  });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  if (r.status === 0) continue;
+  const why = String(r.stderr || '');
+  const missing = why.match(/ModuleNotFoundError: No module named '([^']+)'/);
+  if (r.error?.code === 'ENOENT') {
+    skipped.push(`test/${f} — no '${PYTHON}' on PATH (install Python 3.11+, or set PYTHON=)`);
+  } else if (missing) {
+    skipped.push(`test/${f} — missing engine dependency '${missing[1]}' (pip install -r ci/requirements.txt)`);
+  } else {
+    failures.push(`test/${f}`);
+  }
 }
 for (const c of DRIFT_CHECKS) {
   console.log(`\n=== node ${c.script} --check ===`);
@@ -52,6 +91,12 @@ for (const c of DRIFT_CHECKS) {
   if (r.status !== 0) { failures.push(`${c.script} --check (${c.label}) — regenerate with: ${c.fix}`); }
 }
 
-const total = suites.length + DRIFT_CHECKS.length;
-console.log(`\n${total - failures.length}/${total} checks passed (${suites.length} suites + ${DRIFT_CHECKS.length} drift checks)`);
+const total = suites.length + pySuites.length + DRIFT_CHECKS.length;
+const ran = total - skipped.length;
+console.log(`\n${ran - failures.length}/${ran} checks passed (${suites.length} node suites + ${pySuites.length - skipped.length}/${pySuites.length} python suites + ${DRIFT_CHECKS.length} drift checks)`);
+if (skipped.length) {
+  /* Loud on purpose. A skipped engine suite is NOT a pass — CI runs all of
+     them, so a local skip only means this machine cannot see what CI will. */
+  console.log(`\n⚠ ${skipped.length} python suite(s) SKIPPED — not run, not passed:\n  ` + skipped.join('\n  '));
+}
 if (failures.length) { console.log('failed:\n  ' + failures.join('\n  ')); process.exit(1); }

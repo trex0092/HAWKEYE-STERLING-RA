@@ -1,14 +1,20 @@
 /* CI drift guard — every test file on disk must actually be executed by a
    workflow, so newly-added coverage can't be silently orphaned. ci.yml lists
-   each unit test by hand (there is no test runner / package.json in this repo),
-   so a new test/*.test.* that nobody wires into ci.yml would never run. This
-   guard fails the moment that happens.
+   each unit test by hand, so a new test/*.test.* that nobody wires into ci.yml
+   would never run. This guard fails the moment that happens.
+
+   (The header used to claim "there is no test runner / package.json in this
+   repo". Both have existed for some time — package.json ships the pinned dev
+   toolchain and scripts/run-tests.mjs is what `npm test` invokes — and rules 2
+   and 4 below now tie that runner to ci.yml in both directions.)
 
    Rules:
      - test/*.test.js  + test/*.test.mjs  → must run as `node test/<name>` in ci.yml
-     - test/*.py                          → must run as `python test/<name>` in ci.yml
+     - test/*.py                          → must run as `python test/<name>` in ci.yml,
+                                            and be discovered by scripts/run-tests.mjs
      - test/*.spec.mjs (Playwright)       → must be matched by a testMatch regex in
                                             one of the playwright*.config.mjs files
+     - drift checks                       → ci.yml and scripts/run-tests.mjs must agree
    Usage: node test/ci-coverage.test.mjs */
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -29,12 +35,23 @@ for (const f of nodeTests) {
   check(`ci.yml runs node test/${f}`, ci.includes(`node test/${f}`));
 }
 
-/* 2. Python tests → wired into ci.yml as `python test/<name>`. */
+/* 2. Python tests → wired into ci.yml as `python test/<name>`, AND discovered
+   by the local runner. This used to check the CI direction only, which is the
+   same one-way asymmetry that let a stale artefact reach main on 2026-07-28
+   (see rule 4): the engine's five Python suites ran in CI and nowhere else, so
+   `npm test` was green for a developer who had just broken screen.py. The
+   runner now globs test/*.py, and the glob is asserted here so the two can
+   never drift apart again. */
 const pyTests = testFiles.filter((f) => f.endsWith('.py')).sort();
 check('found python tests to verify', pyTests.length > 0);
 for (const f of pyTests) {
   check(`ci.yml runs python test/${f}`, ci.includes(`python test/${f}`));
 }
+const runnerSrc = read('scripts/run-tests.mjs');
+check(
+  'scripts/run-tests.mjs discovers the python suites too (npm test and CI agree)',
+  /readdirSync\(join\(ROOT, 'test'\)\)[\s\S]{0,120}endsWith\('\.py'\)/.test(runnerSrc)
+);
 
 /* 3. Playwright specs → matched by a testMatch regex in a playwright config, so
    a new *.spec.mjs is actually executed by the visual or cross-browser job. */

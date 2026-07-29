@@ -173,7 +173,9 @@ jobs:
         # screening path that no compile step, test or linter could reach
         # because they lived inside a YAML string. They are ordinary files now,
         # so they compile here with everything else.
-        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py scripts/matcher-parity-probe.py scripts/daily-screen-fetch.py scripts/daily-screen-run.py scripts/daily-screen-report.py
+        # str_dossier.py was missing from this list while being exercised by
+        # test/engine_test.py — tested, but never syntax-gated.
+        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py str_dossier.py scripts/matcher-parity-probe.py scripts/daily-screen-fetch.py scripts/daily-screen-run.py scripts/daily-screen-report.py
       - name: Run cross-engine matcher parity (screen.py vs sanctions-match.mjs)
         # Runs here, AFTER setup-python, because it drives both engines: the node
         # test shells to scripts/matcher-parity-probe.py. The per-backend accuracy

@@ -21,7 +21,7 @@ import sys
 # to be put back for the engine import below to keep working.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import json, os, re, hashlib
+import json, os
 import xml.etree.ElementTree as ET
 
 # The weak inline matcher this step used to carry (token_sort top-3,
@@ -365,7 +365,7 @@ results_data = {
 with open("/tmp/results.json","w") as f:
     json.dump(results_data, f, ensure_ascii=False, indent=2)
 
-print(f"\n=== RESULTS ===")
+print("\n=== RESULTS ===")
 print(f"Total screened:    {len(customers)}")
 print(f"Confirmed hits:    {len(confirmed_hits)}")
 print(f"Potential matches: {len(potential_matches)}")

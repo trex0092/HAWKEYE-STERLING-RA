@@ -10,6 +10,47 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Tooling — Python becomes a governed language here, and `npm test` stops lying (2026-07-29)
+
+Three gaps that all had the same shape: a check that existed in one place and
+not the other, so the green signal was narrower than it looked.
+
+- **Ruff on the screening engine.** ~5,900 lines of Python that make sanctions
+  decisions had **no static analysis at all** — the only gate was
+  `python -m py_compile`, a syntax check — and `pyproject.toml` was pure
+  metadata with no `[tool.*]` section. Ruff now runs in
+  [`lint.yml`](.github/workflows/lint.yml), pinned and hash-locked in
+  [`ci/ruff-requirements.txt`](ci/ruff-requirements.txt) like semgrep and zizmor
+  before it. Rule selection deliberately mirrors `eslint.config.mjs` — pyflakes
+  correctness (`F`) plus `E9`, **not** the pycodestyle formatting families: the
+  engine's house style puts short guards on one line and ruff flags 125 such
+  sites, and restyling a sanctions matcher for a formatter is a large, risky
+  diff with no correctness payoff. It found 16 real items, all fixed —
+  including two imports that were dead inside the workflow YAML where nothing
+  could see them.
+- **`npm test` now runs the five Python suites.** They ran only in CI, so a
+  developer who had just broken `screen.py` got a green `npm test` — the 389
+  assertions in the largest suite never fired. A missing interpreter or engine
+  dependency is a **loud skip, never a pass** (`⚠ n python suite(s) SKIPPED —
+  not run, not passed`), on the same principle the engine applies to a list it
+  cannot load. `test/matcher-parity.test.mjs` follows the identical policy.
+  `npm test` goes from 65 checks to 70.
+- **The one-way rule that allowed it is now bidirectional.**
+  `test/ci-coverage.test.mjs` enforced "every `test/*.py` appears in ci.yml" but
+  never the reverse — the same asymmetry its own §4 says let a stale artefact
+  reach `main` on 2026-07-28. It now also asserts the runner discovers them.
+  Its header claim that "there is no test runner / package.json in this repo"
+  is corrected; both have existed for some time.
+- **`str_dossier.py` joins the `py_compile` gate** — it was exercised by
+  `test/engine_test.py` but never syntax-checked.
+- **`i18n.js`, `sw.js` and `sw-register.js` are actually linted now.** They were
+  absent from `npm run lint` *and* from every `files:` block in
+  `eslint.config.mjs`, so adding them to the script alone would have applied
+  zero rules and read as "linted" while catching nothing — verified: an
+  undefined-variable reference in `sw.js` raised no error. They get real config
+  blocks (`sw.js` with service-worker globals rather than window ones), and the
+  same reference now fails as `no-undef`.
+
 ### Screening — 842 lines of the daily screen come out of the workflow YAML (2026-07-29)
 
 The daily sanctions screen carried three inline `python3 << PYEOF` heredocs

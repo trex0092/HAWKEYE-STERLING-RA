@@ -45,7 +45,7 @@ pat = os.environ["ASANA_PAT"]
 project_gid = os.environ["CUSTOMER_DB_GID"]
 headers = {"Authorization": f"Bearer {pat}"}
 customers = []
-url = f"https://app.asana.com/api/1.0/tasks"
+url = "https://app.asana.com/api/1.0/tasks"
 params = {
     "project": project_gid,
     "opt_fields": "name,gid,permalink_url,notes",

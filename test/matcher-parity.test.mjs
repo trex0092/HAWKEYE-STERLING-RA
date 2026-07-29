@@ -70,11 +70,25 @@ const probe = spawnSync(
 );
 
 if (probe.status !== 0) {
-  /* A missing interpreter must never read as "parity holds". Fail loudly —
-     the same principle the screening engine applies to a list it cannot load:
-     DEGRADED is reported, never a silent clear. */
+  /* A probe that did not run must never read as "parity holds". It is reported
+     either as a LOUD SKIP or as a failure, never as a pass — the same rule the
+     screening engine applies to a list it cannot load: DEGRADED, never a silent
+     clear. The split matches scripts/run-tests.mjs: an absent interpreter or a
+     missing engine dependency is an environment gap (skip, exit 0 so a JS-only
+     developer is not blocked); anything else is a real defect (fail). CI always
+     has both, so in CI this only ever takes the failure branch. */
+  const why = String(probe.stderr || '');
+  const missing = why.match(/ModuleNotFoundError: No module named '([^']+)'/);
+  const gap = probe.error?.code === 'ENOENT'
+    ? `no '${process.env.PYTHON || 'python3'}' on PATH`
+    : (missing ? `missing engine dependency '${missing[1]}'` : null);
+  if (gap) {
+    console.log(`⚠ SKIPPED — cross-engine parity NOT verified: ${gap}.`);
+    console.log('  Install Python 3.11+ and ci/requirements.txt to run it locally; CI always runs it.');
+    process.exit(0);
+  }
   console.log('FAIL  screen.py parity probe did not run');
-  console.log('      exit=' + probe.status + ' ' + String(probe.stderr || probe.error || '').trim().split('\n').slice(-4).join('\n      '));
+  console.log('      exit=' + probe.status + ' ' + why.trim().split('\n').slice(-4).join('\n      '));
   process.exit(1);
 }
 
