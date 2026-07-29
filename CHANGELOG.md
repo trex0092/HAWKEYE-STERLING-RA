@@ -10,6 +10,46 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### "This subject was never screened" must not lose its place to ten candidates (2026-07-29)
+
+A subject whose name the matcher cannot handle (non-Latin script, or under four
+matchable characters) gets a **MANUAL REVIEW** marker in the daily report — the
+statement that it was never auto-screened at all, and must be screened by hand.
+
+That marker scores `0` by construction, and the report shows
+`sorted(hits, -score)[:10]`. So the moment a customer had ten other candidates,
+the marker sorted last and was **dropped** — replaced by "… +N more similar
+candidates", which reads as more of the same rather than "this subject was not
+screened". It carries no `is_new`, so `open_mlro_cases` raises no case for it
+either: the report line was its only surface. #351 dealt with a real subject
+carrying 73 candidate designations, so ten is not a hypothetical threshold.
+
+The marker is now pinned outside the top-ten cut — it is a coverage statement,
+not a candidate competing on score — and the overflow counter counts candidates
+only, so the number no longer includes the pinned line.
+
+Found in the residual note of an adjudication verdict that had otherwise cleared
+the lead; the two lenses had split on it.
+
+### Ongoing Monitoring — a CLEAR card could suppress the same day's HIT card (2026-07-29)
+
+The Adverse Media / PEP card is deduplicated per day so a re-run does not post
+twice. The check matched on the date plus the words "Adverse Media" or "PEP" —
+but **both** card names carry "Adverse Media", so CLEAR and HIT were treated as
+interchangeable and whichever landed first suppressed the other.
+
+A run earlier in the day that found nothing — or found nothing *because its feed
+was degraded* — therefore suppressed a later run's HIT card, and Ongoing
+Monitoring was left showing **CLEAR for a day on which hits were found**. The
+path there is the one that matters most: a manual dispatch or a re-run, which is
+exactly what you do after noticing the scheduled run was degraded.
+
+The dedup is now direction-aware: a HIT card supersedes today's CLEAR card,
+nothing supersedes a HIT, and a CLEAR run never overwrites a day already
+reported as a hit. The boundary guard against `9 Jul` matching `19 Jul` is
+retained. The predicate is exported as `omCardToSkip` so the invariant is tested
+directly rather than asserted by replication.
+
 ### Coverage attestation — a customer row we cannot screen is a gap, not a non-event (2026-07-29)
 
 `get_all_customers` dropped any Asana customer row missing a name or a gid with

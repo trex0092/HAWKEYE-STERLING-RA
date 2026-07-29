@@ -4588,7 +4588,17 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             # audit trail, and the MLRO can still overrule it.
             _open_hits = [h for h in m["hits"] if not h.get("identity_excluded")]
             _excluded = [h for h in m["hits"] if h.get("identity_excluded")]
-            shown = sorted(_open_hits, key=lambda h: -h["score"])[:10]
+            # The MANUAL REVIEW marker is a COVERAGE STATEMENT, not a candidate
+            # competing on score: it says this subject was never auto-screened at
+            # all. It scores 0 by construction (_manual_review_hit), so a plain
+            # score sort dropped it the moment a customer had 10 other
+            # candidates — and it carries no is_new, so it opens no MLRO case
+            # either. The report line was its only surface, replaced by "+N more
+            # similar candidates", which reads as more of the same rather than
+            # "this subject was not screened". Pin it outside the top-10.
+            _unscreened = [h for h in _open_hits if h.get("unscreenable")]
+            _scored = [h for h in _open_hits if not h.get("unscreenable")]
+            shown = _unscreened + sorted(_scored, key=lambda h: -h["score"])[:10]
             for h in shown:
                 conf = f" · {h.get('confidence','')}" if h.get("confidence") else ""
                 nflag = " 🆕" if h.get("is_new") else ""
@@ -4604,8 +4614,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                     A(f"        Identity (R.10): {h['identity']}")
                 if h.get("cdd_gaps"):
                     A(f"        ⚠ CDD gaps: {'; '.join(h['cdd_gaps'])}")
-            if len(_open_hits) > 10:
-                A(f"   -> … +{len(_open_hits) - 10} more similar candidates (see run log)")
+            if len(_scored) > 10:
+                A(f"   -> … +{len(_scored) - 10} more similar candidates (see run log)")
             if _excluded:
                 A(f"   EXCLUDED ON IDENTITY — {len(_excluded)} candidate(s) cannot be this customer "
                   "(DOB and nationality both known on both sides, both disagree).")
