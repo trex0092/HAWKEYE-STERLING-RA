@@ -2759,8 +2759,28 @@ def _individuals_union(struct_names, notes):
             out.append(nm)
     return out
 
+# Customer rows that cannot be screened because the Asana record is missing a
+# name or a gid. Dropping one silently is a COVERAGE GAP, not a non-event: the
+# attestation's denominator is computed from the surviving list, so the report
+# would claim complete coverage over a book that quietly lost a record. Carried
+# so the report can name them and the MLRO can fix the source record.
+CUSTOMER_ROWS_SKIPPED = []
+
+def _skipped_rows_note():
+    """Attestation suffix for un-screenable customer rows — names the records so
+    the MLRO can fix them, rather than leaving a bare number to be read as noise."""
+    if not CUSTOMER_ROWS_SKIPPED:
+        return "          <- every customer record carried a name and an ID"
+    refs = ", ".join((r.get("permalink") or r.get("gid") or "<no identifier>")
+                     for r in CUSTOMER_ROWS_SKIPPED[:10])
+    more = f" (+{len(CUSTOMER_ROWS_SKIPPED) - 10} more)" if len(CUSTOMER_ROWS_SKIPPED) > 10 else ""
+    return ("          <- MISSING name/ID in the Asana record: these customers were NOT "
+            f"screened by any net. Fix the record, then re-run.\n"
+            f"                             {refs}{more}")
+
 def get_all_customers():
     customers = []
+    CUSTOMER_ROWS_SKIPPED.clear()
     params = {
         "project": ASANA_CUSTOMER_DB_GID,
         "opt_fields": "gid,name,notes,permalink_url,created_at",
@@ -2774,7 +2794,16 @@ def get_all_customers():
         data = r.json() if isinstance(r.json(), dict) else {}
         for t in (data.get("data") or []):
             if not t.get("gid") or not t.get("name"):
-                continue  # skip malformed row, never crash the whole run
+                # Keep the run alive (never crash the whole book on one bad row)
+                # but NEVER drop it silently — it is a customer we did not screen.
+                missing = "gid" if not t.get("gid") else "name"
+                ident = t.get("permalink_url") or t.get("gid") or "<no identifier>"
+                CUSTOMER_ROWS_SKIPPED.append({
+                    "gid": t.get("gid", ""), "permalink": t.get("permalink_url", ""),
+                    "missing": missing,
+                })
+                log(f"  ⚠ customer row NOT screenable (missing {missing}): {ident}")
+                continue
             notes = t.get("notes") or ""
             # Structured KYC (FATF R.10/R.25): DOB, nationality, ID, share %, role,
             # CDD gaps, legal-arrangement detection. Falls back to the regex name
@@ -3803,7 +3832,9 @@ RUN PROVENANCE
   Engine:             screen.py  (Google News RSS - no external paid feed)
 
 SCOPE & COVERAGE ATTESTATION
-  Customers in database:     {stats["customers_total"]}
+  Customers in database:     {stats["customers_total"] + stats.get("customer_rows_skipped", 0)}
+  Customers screened:        {stats["customers_total"]}
+  Rows NOT screenable:       {stats.get("customer_rows_skipped", 0)}{_skipped_rows_note()}
   Companies screened:        {stats["companies_screened"]}
   Individuals screened:      {stats["individuals_screened"]}  (shareholders / UBOs / directors from KYC records)
   Total subjects screened:   {stats["subjects_total"]}  ({coverage_pct}% of attempted)
@@ -3895,6 +3926,7 @@ def run_weekly_adverse(customers, run_time):
     run_end = now_uae()
     stats = {
         "customers_total": len(customers),
+        "customer_rows_skipped": len(CUSTOMER_ROWS_SKIPPED),
         "companies_screened": companies_screened,
         "individuals_screened": individuals_screened,
         "subjects_total": companies_screened + individuals_screened,
@@ -5328,7 +5360,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     cdd_gaps_total = sum(m.get("cdd_gap_count", 0) for m in possible_matches)
     arrangements = sum(1 for m in possible_matches if m.get("arrangement"))
 
-    stats = {"customers_total": len(customers), "companies_screened": companies,
+    stats = {"customers_total": len(customers),
+             "customer_rows_skipped": len(CUSTOMER_ROWS_SKIPPED),
+             "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": subjects_total,
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
              "am_blackout": counts["am_blackout"], "pep_mirror": counts["pep_mirror"],

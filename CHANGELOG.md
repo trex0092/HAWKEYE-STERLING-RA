@@ -10,6 +10,22 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Coverage attestation — a customer row we cannot screen is a gap, not a non-event (2026-07-29)
+
+`get_all_customers` dropped any Asana customer row missing a name or a gid with
+a bare `continue`. Nothing recorded it — and `customers_total`, printed under
+**SCOPE & COVERAGE ATTESTATION** as "Customers in database", is `len(customers)`,
+i.e. the count *after* the exclusion. So a record that was never screened by any
+net simply vanished from the denominator, and the attestation claimed complete
+coverage of a book that had quietly lost it.
+
+Skipped rows are now recorded with their permalink and the reason, logged as
+they occur, and attested: "Customers in database" is the true total, with the
+screened count and the un-screenable count reported separately and the affected
+records named so the MLRO can fix them. A clean book states so affirmatively
+rather than printing an ambiguous zero. The run still never crashes on one bad
+row.
+
 ### MLRO cases — the disposition block was being cut off the end of long cases (2026-07-29)
 
 `create_case_subtask` sent `notes[:8000]`, a head slice. The **end** of a case

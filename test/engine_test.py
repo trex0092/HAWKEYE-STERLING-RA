@@ -1409,6 +1409,75 @@ finally:
     if os.path.exists(_ev_path):
         os.remove(_ev_path)
 
+# ── A customer row we cannot screen is a coverage gap, not a non-event ───────
+# get_all_customers dropped any Asana row missing a name or gid with a bare
+# `continue`. Nothing recorded it, and `customers_total` — printed under SCOPE &
+# COVERAGE ATTESTATION as "Customers in database" — is len(customers), i.e. the
+# count AFTER the exclusion. So the attestation understated the book and claimed
+# complete coverage over what was left.
+print("screen.py — un-screenable customer rows are attested, not dropped")
+_gac_orig = screen.asana_request
+# Employee screening pulls a SECOND project inside get_all_customers and has its
+# own (correct) fail-closed guard on an empty result; disable it so this block
+# exercises the customer path only.
+_gac_emp = screen.ASANA_EMPLOYEE_DB_GID
+
+
+def _gac_stub(rows):
+    pages = [{"data": rows}, {"data": []}]
+
+    def _req(method, url, **kw):
+        body = pages.pop(0) if pages else {"data": []}
+        return types.SimpleNamespace(status_code=200, json=lambda b=body: b, text="")
+    return _req
+
+
+_gac_rows = [
+    {"gid": "1", "name": "Alpha Trading LLC", "notes": "", "permalink_url": "https://app.asana.com/0/0/1"},
+    {"gid": "2", "name": "", "notes": "", "permalink_url": "https://app.asana.com/0/0/2"},
+    {"gid": "", "name": "Ghost Co", "notes": "", "permalink_url": "https://app.asana.com/0/0/3"},
+    {"gid": "4", "name": "Beta Metals FZE", "notes": "", "permalink_url": "https://app.asana.com/0/0/4"},
+]
+try:
+    screen.ASANA_EMPLOYEE_DB_GID = ""
+    screen.asana_request = _gac_stub(_gac_rows)
+    _gac = screen.get_all_customers()
+    check("screenable customer rows are still screened",
+          [c["name"] for c in _gac] == ["Alpha Trading LLC", "Beta Metals FZE"])
+    check("a row missing its name is RECORDED, not silently dropped",
+          any(r["gid"] == "2" and r["missing"] == "name" for r in screen.CUSTOMER_ROWS_SKIPPED))
+    check("a row missing its gid is RECORDED too",
+          any(r["missing"] == "gid" for r in screen.CUSTOMER_ROWS_SKIPPED))
+    check("every skipped row carries a permalink so the MLRO can fix the record",
+          all(r["permalink"] for r in screen.CUSTOMER_ROWS_SKIPPED))
+    # The attestation's denominator must be the WHOLE book, not the survivors.
+    _true_total = len(_gac) + len(screen.CUSTOMER_ROWS_SKIPPED)
+    check("the true denominator exceeds the screened count when rows are skipped",
+          _true_total == 4 and len(_gac) == 2)
+    _note = screen._skipped_rows_note()
+    check("the attestation note names the un-screenable records",
+          "https://app.asana.com/0/0/2" in _note and "NOT" in _note)
+    # A clean book must make an affirmative statement, not print an ambiguous 0.
+    screen.CUSTOMER_ROWS_SKIPPED.clear()
+    check("a clean book attests affirmatively rather than leaving a bare zero",
+          "every customer record carried a name and an ID" in screen._skipped_rows_note())
+    # State must not leak between runs (the list is module-level).
+    screen.CUSTOMER_ROWS_SKIPPED.append({"gid": "stale", "permalink": "x", "missing": "name"})
+    screen.asana_request = _gac_stub([_gac_rows[0], _gac_rows[3]])
+    screen.get_all_customers()
+    check("a later clean run does not inherit the previous run's skipped rows",
+          screen.CUSTOMER_ROWS_SKIPPED == [])
+    # WIRING: the report must print the true total, not len(customers).
+    _att = _inspect.getsource(screen)
+    check("the attestation adds the skipped rows back into 'Customers in database'",
+          'stats["customers_total"] + stats.get("customer_rows_skipped", 0)' in _att)
+    check("the attestation also reports the screened count separately",
+          "Customers screened:" in _att and "Rows NOT screenable:" in _att)
+finally:
+    screen.asana_request = _gac_orig
+    screen.ASANA_EMPLOYEE_DB_GID = _gac_emp
+    screen.CUSTOMER_ROWS_SKIPPED.clear()
+
 # ── tally_enrichment: honest denominators (the 42-subjects incident) ──────────
 print("screen.py — tally_enrichment (honest metrics)")
 def _res(t, name, am_error=False, adverse=None, pep=None):
