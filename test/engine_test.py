@@ -1741,6 +1741,51 @@ check("a fallback-served list still breaches below the STATIC floor",
 screen.monitoring.COVERAGE_STATE_PATH = _prev_cov_path
 os.unlink(_covf.name)
 
+# ── download() retry: a transient blip must not burn a list's origin ──────────
+# One TCP reset on the primary used to force the mirror (or a DEGRADED day
+# where no mirror exists). Transients (network error, 5xx, 429) retry with
+# backoff; any other 4xx fails immediately — a bot gate will not heal within
+# one run, and retrying it only delays the fallback ladder that CAN.
+print("screen — download retry (transient vs permanent failures)")
+_dl_calls = {"n": 0}
+class _RespOK:
+    status_code = 200
+    content = b"DATA"
+    def raise_for_status(self): pass
+class _HTTPErr(Exception):
+    def __init__(self, resp): super().__init__(str(resp.status_code)); self.response = resp
+class _Resp4xx:
+    status_code = 403
+    content = b""
+    def raise_for_status(self): raise _HTTPErr(self)
+class _Resp5xx(_Resp4xx):
+    status_code = 503
+class _Resp429(_Resp4xx):
+    status_code = 429
+_orig_req_get, _orig_sleep = screen.requests.get, screen.time.sleep
+screen.time.sleep = lambda s: None
+def _flaky(url, **kw):
+    _dl_calls["n"] += 1
+    if _dl_calls["n"] < 3:
+        raise ConnectionError("reset")
+    return _RespOK()
+screen.requests.get = _flaky
+check("a transient network blip retries to success",
+      screen.download("http://x", "L") == b"DATA" and _dl_calls["n"] == 3)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp4xx())[1]
+check("a permanent 4xx fails immediately — no retry burn before the fallback ladder",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == 1)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp5xx())[1]
+check("a 5xx retries to exhaustion then yields None (degrade paths take over)",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == screen.DOWNLOAD_ATTEMPTS)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp429())[1]
+check("429 is transient (rate limits pass) — retried like a 5xx",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == screen.DOWNLOAD_ATTEMPTS)
+screen.requests.get, screen.time.sleep = _orig_req_get, _orig_sleep
+
 print("hardening — atomic state writes")
 _hdir = _tmp.mkdtemp()
 _hcwd = os.getcwd(); os.chdir(_hdir)

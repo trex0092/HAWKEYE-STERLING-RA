@@ -15,6 +15,7 @@ on:
   schedule:
     - cron: '7 0 * * *'    # 00:07 UTC = 04:07 UAE, daily (odd minute) — early start lets the DEEPER ~4-4.5h sweep (5 locales + targeted query) still deliver by ~08:30 UAE, same UTC day (keeps freshness-check valid)
     - cron: '7 3 * * *'    # 03:07 UTC self-healing retry — the 24 & 25 Jul 00:07 runs died to runner-VM shutdowns mid-sweep and stayed red until someone manually re-ran hours later. This firing is a NO-OP (preflight skips the sweep) whenever today already has a successful run; it only screens when the mandatory daily control would otherwise be missing, and still delivers by ~08:30 UAE.
+    - cron: '7 6 * * *'    # 06:07 UTC last-chance retry — the first two slots are 3h apart, so a single 3-4h outage window (GitHub Actions or an upstream source) could still cost the whole day. Same NO-OP preflight; when it does have to screen, delivery lands ~11:30 UAE — late, but a late daily screening beats a missing one for a mandatory control.
   workflow_dispatch:        # Manual trigger
 
 # Results are posted to Asana via the screen's own token. contents:write is used

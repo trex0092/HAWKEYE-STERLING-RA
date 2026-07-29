@@ -10,6 +10,24 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — availability hardening: retry the blip, retry the day (2026-07-29)
+
+Two layers of self-healing for the failure classes no fallback ladder can
+absorb:
+
+- **`download()` retries transients** (network errors, 5xx, 429) with a short
+  backoff before giving up — one TCP reset used to burn a list's primary
+  origin, forcing the mirror (or a DEGRADED day where no mirror exists). Any
+  other 4xx still fails immediately: a bot gate will not heal within one run,
+  and retrying it only delays the fallback ladder that can. `DOWNLOAD_ATTEMPTS`
+  (default 3), tests cover all four classes.
+- **A third daily cron slot** (06:07 UTC) on the unified screening workflow.
+  The first two slots sit 3h apart, so a single 3–4h outage window (GitHub
+  Actions or an upstream source) could still cost the whole day. The new slot
+  is the same NO-OP-when-already-green preflight; when it does have to screen,
+  delivery lands ~11:30 UAE — late, but a late daily screening beats a missing
+  one for a mandatory control.
+
 ### Screening — coverage floors ratchet themselves to the observed baseline (2026-07-29)
 
 The static floors are point-in-time baselines, and AU/CH shipped with

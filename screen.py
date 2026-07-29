@@ -2046,17 +2046,33 @@ def screen_watchlist(subjects_all, entries, ids, today_iso):
     return out
 
 # ── LIST DOWNLOADS ────────────────────────────────────────────────────────────
+DOWNLOAD_ATTEMPTS = int(os.environ.get("DOWNLOAD_ATTEMPTS", "3"))
+
 def download(url, label):
+    """Fetch one source list. Transient failures (network errors, 5xx, 429)
+    retry with a short backoff — a single TCP reset must not burn a list's
+    primary origin, forcing the mirror (or a DEGRADED day where no mirror
+    exists). Any other 4xx fails immediately: a bot gate or moved endpoint
+    will not heal within one run, and retrying it only delays the fallback
+    ladder that CAN."""
     log(f"Downloading {label}...")
-    try:
-        r = requests.get(url, timeout=90,
-                         headers={"User-Agent": "HawkeyeSterlingCompliance/3.0"})
-        r.raise_for_status()
-        log(f"  {label}: {len(r.content):,} bytes")
-        return r.content
-    except Exception as e:
-        log(f"  ERROR {label}: {e}")
-        return None
+    last_err = None
+    for attempt in range(max(1, DOWNLOAD_ATTEMPTS)):
+        if attempt:
+            time.sleep(2 * attempt)   # 2s, 4s: transient-blip scale, not outage scale
+        try:
+            r = requests.get(url, timeout=90,
+                             headers={"User-Agent": "HawkeyeSterlingCompliance/3.0"})
+            r.raise_for_status()
+            log(f"  {label}: {len(r.content):,} bytes")
+            return r.content
+        except Exception as e:
+            last_err = e
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code is not None and 400 <= code < 500 and code != 429:
+                break
+    log(f"  ERROR {label}: {last_err}")
+    return None
 
 # ── List-entry attributes (DOB / nationality) for match adjudication ─────────
 # Name-only matching forces the MLRO to open the source list just to see
