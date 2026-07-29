@@ -62,6 +62,7 @@ jobs:
             wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
             scsanctions.un.org:443
             unsolprodfiles.blob.core.windows.net:443
+            umsanrp1dltx4dj3sxtt.blob.core.windows.net:443
             webgate.ec.europa.eu:443
             ofsistorage.blob.core.windows.net:443
             app.asana.com:443

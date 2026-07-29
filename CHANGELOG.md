@@ -10,6 +10,51 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — the DEGRADED cause is fixed (not the flag), AU + CH become core lists, and staff join the screening population (2026-07-29)
+
+**Diagnosis first.** The daily screen has run green every day — what was failing
+was inside it: the harden-runner egress log for the 29 Jul sweep shows
+`domain not allowed: umsanrp1dltx4dj3sxtt.blob.core.windows.net`. The UN
+rotated its list-hosting Azure storage account; every screening workflow still
+allowlisted only the old one (`unsolprodfiles`), so the UN Consolidated fetch
+died mid-redirect and the run honestly reported **DEGRADED** — which is the
+control working, not the defect. The defect was the stale allowlist, and that
+is what is fixed: the new UN blob domain is allowlisted in **all five**
+screening workflows. **The DEGRADED flag itself is untouched and stays** —
+RA-01's ratified position is *"a screening run that cannot load a core list
+must read DEGRADED rather than pass"*, and suppressing the label would convert
+visible outages into silent clears.
+
+- **Australia (DFAT Regulation 8) and Switzerland (SECO) are now CORE lists**,
+  screened directly every run in **both engines** via the OpenSanctions mirrors
+  (`au_dfat_sanctions`, `ch_seco_sanctions`, `targets.simple.csv` — the same
+  host and shape the EU list has always used, so **no new egress endpoint**).
+  Previously both were "cross-referenced" prose: DFAT bot-gates its .xlsx and
+  the curated fallbacks sat empty and disabled. Both carry coverage floors
+  (provisional and deliberately low — no verified baseline existed at
+  introduction; tighten toward ~50% of observed counts once real runs have
+  logged them, `LIST_FLOOR_AU` / `LIST_FLOOR_CH`). The daily core set is now
+  **UN · OFAC (SDN + a.k.a.) · UK OFSI · EU FSF · Australia DFAT ·
+  Switzerland SECO · UAE EOCN**, plus Canada SEMA / France DGT / the internal
+  watchlist as supplementary — with worldwide adverse media (Google News ×5
+  locales, Bing, GDELT) and worldwide PEP (OpenSanctions PEPs + Wikidata)
+  already daily.
+- **The HR – Employees project is a screening population** in both engines —
+  each staff member screened as an individual through the same matcher, guards,
+  delta state and case lifecycle as customers. Configured-but-unreachable (or
+  empty) is **FATAL**, the same contract as the customer database: a population
+  that silently drops out of screening is a silent clear for everyone in it.
+  Disable only explicitly (`ASANA_EMPLOYEE_DB_GID=""` /
+  `ASANA_EMPLOYEE_PROJECT_GID=""`).
+- **Daily deliverables are multi-homed into BOTH MLRO queues** — Ongoing
+  Monitoring (review record) and **Follow Ups** (action queue) — one task, two
+  projects, a single audit trail. A delivery that reaches neither still arms
+  the delivery gate and turns the run red.
+- The daily report's coverage section now shows AU and CH as directly-screened
+  core lists with their counts, replacing the "cross-referenced periodically"
+  prose that a reader could mistake for screening.
+
+
 ### Advisor — the default mode is Balanced, as the model card always claimed (2026-07-29)
 
 The backend defaults to `balanced` (`claude-sonnet-5`) and the model card

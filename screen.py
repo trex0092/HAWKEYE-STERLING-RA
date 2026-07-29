@@ -63,6 +63,32 @@ RUN_MODE              = os.environ.get("RUN_MODE", "full_batch")  # full_batch |
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
 ASANA_ONGOING_MON_GID = "1213914392047129"
 ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
+# ── Second screening population + second delivery queue (MLRO, 2026-07-29) ──
+# Screening reads BOTH populations: the Customer Database (customers + their
+# UBOs/owners) and the HR – Employees project (staff screening — FATF R.18 /
+# CR 134/2025 employee due diligence). Set ASANA_EMPLOYEE_DB_GID empty to
+# disable employee screening explicitly; an unreachable or empty project while
+# configured is FATAL, exactly like the customer database — a screening
+# population that silently drops out is a silent clear.
+ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", "1216139945846994")
+# Every daily deliverable is multi-homed into BOTH MLRO queues: Ongoing
+# Monitoring (the review record) and Follow Ups (the action queue). One task,
+# two projects — Asana multi-homing, so there is a single audit trail.
+ASANA_FOLLOWUPS_GID = os.environ.get("ASANA_FOLLOWUPS_GID", "1215884707932023")
+ASANA_FOLLOWUPS_SECTION_GID = os.environ.get("ASANA_FOLLOWUPS_SECTION_GID", "1215884707932047")
+
+def _mlro_queue_targets():
+    """projects + memberships for a daily deliverable, multi-homed into every
+    configured MLRO queue. Failure to reach ANY queue is a delivery failure."""
+    projects = [ASANA_ONGOING_MON_GID]
+    memberships = [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}]
+    if ASANA_FOLLOWUPS_GID:
+        projects.append(ASANA_FOLLOWUPS_GID)
+        m = {"project": ASANA_FOLLOWUPS_GID}
+        if ASANA_FOLLOWUPS_SECTION_GID:
+            m["section"] = ASANA_FOLLOWUPS_SECTION_GID
+        memberships.append(m)
+    return projects, memberships
 ASANA_ASSIGNEE_GID    = "1213645083721304"   # default case/OM assignee (MLRO)
 
 # ── Match thresholds — env-tunable, ONE-WAY (challenger runs more sensitive
@@ -2568,6 +2594,61 @@ def get_all_customers():
         raise RuntimeError(
             "FATAL: 0 customers read from the Asana Customer Database — refusing to "
             "screen or post an all-clear. Check ASANA_CUSTOMER_DB_GID and the token's access.")
+
+    # ── Employee screening (HR – Employees project) ──────────────────────────
+    # Staff are a screening population in their own right (employee due
+    # diligence): each task NAME is the person, screened as an individual, with
+    # any structured note parsed exactly like a customer note. Same pipeline,
+    # same matcher, same guards, same delta state — an employee hit raises the
+    # same case a customer hit would. Configured-but-unreachable (or empty) is
+    # FATAL for the same reason the customer fail-safe exists: a population
+    # that silently drops out of screening is a silent clear for everyone in it.
+    if ASANA_EMPLOYEE_DB_GID:
+        employees = []
+        eparams = {
+            "project": ASANA_EMPLOYEE_DB_GID,
+            "opt_fields": "gid,name,notes,permalink_url,created_at",
+            "limit": 100,
+        }
+        while True:
+            r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=eparams)
+            if r is None or r.status_code not in (200, 201):
+                raise RuntimeError(
+                    f"FATAL: Asana employee fetch failed "
+                    f"({getattr(r,'status_code','network')}) — refusing to screen a "
+                    f"population that silently dropped out. Check ASANA_EMPLOYEE_DB_GID "
+                    f"or set it empty to disable employee screening explicitly.")
+            data = r.json() if isinstance(r.json(), dict) else {}
+            for t in (data.get("data") or []):
+                if not t.get("gid") or not t.get("name"):
+                    continue
+                notes = t.get("notes") or ""
+                kyc_data = kyc.parse_customer(notes)
+                individuals = _individuals_union(
+                    [t["name"]] + [i["name"] for i in kyc_data.get("individuals", [])], notes)
+                employees.append({
+                    "gid": t["gid"],
+                    "name": t["name"],
+                    "permalink": t.get("permalink_url", ""),
+                    "created_at": t.get("created_at", ""),
+                    "individuals": individuals,
+                    "entity_owners": [],
+                    "kyc": kyc_data,
+                    "country": kyc_data.get("country", ""),
+                    "has_assessment": len(notes.strip()) > 100,
+                    "kind": "employee",
+                })
+            next_page = data.get("next_page") or None
+            if not next_page or not next_page.get("offset"):
+                break
+            eparams["offset"] = next_page["offset"]
+        if not employees:
+            raise RuntimeError(
+                "FATAL: 0 employees read from the HR – Employees project while employee "
+                "screening is configured — refusing to screen a population that silently "
+                "dropped out. Check ASANA_EMPLOYEE_DB_GID or set it empty to disable.")
+        log(f"Loaded {len(employees)} employees (screened with the same pipeline as customers)")
+        customers.extend(employees)
     return customers
 
 # ── SCREENING ─────────────────────────────────────────────────────────────────
@@ -3532,9 +3613,8 @@ def run_weekly_adverse(customers, run_time):
             "notes": cap_notes(narrative),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
-            "projects": [ASANA_ONGOING_MON_GID],
-            "memberships": [{"project": ASANA_ONGOING_MON_GID,
-                             "section": ASANA_SECTION_GID}],
+            "projects": _mlro_queue_targets()[0],
+            "memberships": _mlro_queue_targets()[1],
         }
     }
     r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
@@ -3551,16 +3631,15 @@ def post_daily_task(narrative, run_time, run_label, n_matches):
     dt = run_time.strftime("%d %b %Y")
     flag = "⚠️" if n_matches > 0 else "✅"
     task_name = (f"🔍 {flag} Daily Sanctions Screening — "
-                 f"OFAC / UN / EU / UK / UAE EOCN — {dt} ({run_label})")
+                 f"OFAC / UN / EU / UK / AU / CH / UAE EOCN — {dt} ({run_label})")
     payload = {
         "data": {
             "name": task_name,
             "notes": cap_notes(narrative),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
-            "projects": [ASANA_ONGOING_MON_GID],
-            "memberships": [{"project": ASANA_ONGOING_MON_GID,
-                             "section": ASANA_SECTION_GID}],
+            "projects": _mlro_queue_targets()[0],
+            "memberships": _mlro_queue_targets()[1],
         }
     }
     r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
@@ -3758,6 +3837,13 @@ CORE_LIST_FLOORS = {
     "uk":   int(os.environ.get("LIST_FLOOR_UK",   "9000")),
     "eu":   int(os.environ.get("LIST_FLOOR_EU",   "20000")),
     "eocn": int(os.environ.get("LIST_FLOOR_EOCN", "150")),
+    # AU/CH (added 2026-07-29, OpenSanctions mirrors of DFAT Regulation 8 and
+    # SECO's consolidated list): floors are PROVISIONAL and deliberately low —
+    # no verified baseline count existed at introduction, and a too-tight
+    # provisional floor would refuse whole runs. Tighten toward ~50% of the
+    # observed baseline once the first runs have logged real counts.
+    "au":   int(os.environ.get("LIST_FLOOR_AU",   "500")),
+    "ch":   int(os.environ.get("LIST_FLOOR_CH",   "500")),
 }
 
 # Set by enforce_core_list_floors(); read by enforce_list_outage_gate() after
@@ -3838,6 +3924,12 @@ def load_all_lists():
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
     uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
+    # AU + CH core lists via the OpenSanctions mirrors (same host, same
+    # targets.simple.csv shape as the EU list): DFAT bot-gates its .xlsx and
+    # SECO's XML needs its own endpoint, so the mirror is the reliable daily
+    # path — exactly the arrangement the EU list has always used.
+    au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
+    ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
     # Track whether SOURCE MATERIAL was obtained per list (primary bytes, or a
     # mirror that answered): the floor check uses it to tell corruption (data
     # present but tiny: refuse) from an outage (nothing obtained: degrade).
@@ -3863,12 +3955,16 @@ def load_all_lists():
         un_fetched = True
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
+    au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
+    ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
     list_meta = {
         "ofac": {"count":len(ofac_names),"date":ofac_date,"hash":ofac_hash,"tier":"core"},
         "un":   {"count":len(un_names),"date":un_date,"hash":un_hash,"tier":"core"},
         "uk":   {"count":len(uk_names),"date":uk_date,"hash":uk_hash,"tier":"core"},
         "eu":   {"count":len(eu_names),"date":eu_date,"hash":eu_hash,"tier":"core"},
+        "au":   {"count":len(au_names),"date":au_date,"hash":au_hash,"tier":"core"},
+        "ch":   {"count":len(ch_names),"date":ch_date,"hash":ch_hash,"tier":"core"},
         "eocn": {"count":len(eocn_names),"date":eocn_date,"hash":eocn_hash,"tier":"core"},
     }
     # TFS drift detector: alarm if the OpenSanctions mirror carries a UAE Local
@@ -3887,9 +3983,9 @@ def load_all_lists():
     # Fail-safe: if EVERY core sanctions list failed to load, screening would clear
     # every customer for sanctions and post a green ✅. Abort instead — a total
     # list-fetch failure must never masquerade as "all clear".
-    if sum(list_meta[k]["count"] for k in ("ofac","un","uk","eu","eocn")) == 0:
+    if sum(list_meta[k]["count"] for k in ("ofac","un","uk","eu","au","ch","eocn")) == 0:
         raise RuntimeError(
-            "FATAL: no core sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
+            "FATAL: no core sanctions list could be loaded (OFAC/UN/UK/EU/AU/CH/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
     # Per-list coverage floors: an OBTAINED core list at zero (or a fraction
     # of its known size) is the same false-negative class as the all-empty
@@ -3898,14 +3994,17 @@ def load_all_lists():
     enforce_core_list_floors(list_meta, fetched={
         "ofac": ofac_fetched, "un": un_fetched,
         "uk": bool(uk_data), "eu": bool(eu_data),
+        "au": bool(au_data), "ch": bool(ch_data),
         "eocn": EOCN_SOURCE_STATE["obtained"],
     })
     all_lists = {
-        "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
-        "UN Consolidated": [(normalize(n),n) for n in un_names],
-        "UK OFSI":         [(normalize(n),n) for n in uk_names],
-        "EU FSF":          [(normalize(n),n) for n in eu_names],
-        "UAE EOCN":        [(normalize(n),n) for n in eocn_names],
+        "OFAC SDN":         [(normalize(n),n) for n in ofac_names],
+        "UN Consolidated":  [(normalize(n),n) for n in un_names],
+        "UK OFSI":          [(normalize(n),n) for n in uk_names],
+        "EU FSF":           [(normalize(n),n) for n in eu_names],
+        "Australia DFAT":   [(normalize(n),n) for n in au_names],
+        "Switzerland SECO": [(normalize(n),n) for n in ch_names],
+        "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
     # ── Supplementary lists (best-effort): broaden coverage when reachable, but a
     # fetch miss is reported as "not reached", NOT as a degraded core control. ──
@@ -4040,6 +4139,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A(_list_status_line(list_meta, "un",   "UN Consolidated"))
     A(_list_status_line(list_meta, "eu",   "EU FSF"))
     A(_list_status_line(list_meta, "uk",   "UK OFSI"))
+    A(_list_status_line(list_meta, "au",   "Australia DFAT"))
+    A(_list_status_line(list_meta, "ch",   "Switzerland SECO"))
     A(_list_status_line(list_meta, "eocn", "UAE EOCN"))
     if not sanc_ok:
         _down = [lbl for k, lbl in (("ofac","OFAC"),("un","UN"),("uk","UK OFSI"),("eu","EU FSF"))
@@ -4800,6 +4901,8 @@ def main():
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
     uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
+    au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
+    ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
 
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
     # Aliases broaden a LOADED primary only (no mirror on this legacy path —
@@ -4808,6 +4911,8 @@ def main():
     un_names,   un_date,   un_hash   = parse_un(un_data)
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
+    au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
+    ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
 
     list_meta = {
@@ -4815,6 +4920,8 @@ def main():
         "un":    {"count":len(un_names),    "date":un_date,    "hash":un_hash},
         "uk":    {"count":len(uk_names),    "date":uk_date,    "hash":uk_hash},
         "eu":    {"count":len(eu_names),    "date":eu_date,    "hash":eu_hash},
+        "au":    {"count":len(au_names),    "date":au_date,    "hash":au_hash},
+        "ch":    {"count":len(ch_names),    "date":ch_date,    "hash":ch_hash},
         "eocn":  {"count":len(eocn_names),  "date":eocn_date,  "hash":eocn_hash},
     }
 
@@ -4823,7 +4930,7 @@ def main():
     # failure must never masquerade as "all clear".
     if sum(m["count"] for m in list_meta.values()) == 0:
         raise RuntimeError(
-            "FATAL: no sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
+            "FATAL: no sanctions list could be loaded (OFAC/UN/UK/EU/AU/CH/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
     # Per-list coverage floors: an OBTAINED core list at zero (or a fraction
     # of its known size) is the same false-negative class as the all-empty
@@ -4833,15 +4940,18 @@ def main():
     enforce_core_list_floors(list_meta, fetched={
         "ofac": bool(ofac_data), "un": bool(un_data),
         "uk": bool(uk_data), "eu": bool(eu_data),
+        "au": bool(au_data), "ch": bool(ch_data),
         "eocn": EOCN_SOURCE_STATE["obtained"],
     })
 
     all_lists = {
-        "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
-        "UN Consolidated": [(normalize(n),n) for n in un_names],
-        "UK OFSI":         [(normalize(n),n) for n in uk_names],
-        "EU FSF":          [(normalize(n),n) for n in eu_names],
-        "UAE EOCN":        [(normalize(n),n) for n in eocn_names],
+        "OFAC SDN":         [(normalize(n),n) for n in ofac_names],
+        "UN Consolidated":  [(normalize(n),n) for n in un_names],
+        "UK OFSI":          [(normalize(n),n) for n in uk_names],
+        "EU FSF":           [(normalize(n),n) for n in eu_names],
+        "Australia DFAT":   [(normalize(n),n) for n in au_names],
+        "Switzerland SECO": [(normalize(n),n) for n in ch_names],
+        "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
     # Internal firm watchlist (optional): added AFTER the all-empty guard and
     # the floors so firm-internal names can never satisfy a core-coverage

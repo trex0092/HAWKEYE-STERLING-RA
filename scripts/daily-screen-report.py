@@ -203,23 +203,20 @@ LISTS SCREENED
    File Hash: {uk_hash}
    Status:    {uk_status}
 
-ℹ️ Switzerland SECO — Consolidated sanctions ("Gesamtliste")
-   Source:    State Secretariat for Economic Affairs (SECO)
+✅ Switzerland SECO — Consolidated sanctions ("Gesamtliste")
+   Source:    State Secretariat for Economic Affairs (SECO), screened
+              DIRECTLY each run via the OpenSanctions ch_seco_sanctions
+              mirror (targets.simple.csv) — a CORE list with a coverage
+              floor since 2026-07-29. Reference publication:
               https://www.seco.admin.ch/en/searching-for-subjects-sanctions
-   Status:    CROSS-REFERENCED — the great majority of SECO
-              designations mirror the UN and EU lists screened above.
-              A direct machine-readable feed is pending (the SECO portal
-              serves an HTML page, not raw XML), so the MLRO reconciles
-              against the official SECO publication periodically.
 
-ℹ️ Australia DFAT — Consolidated List (Regulation 8)
-   Source:    Australian Sanctions Office / DFAT
+✅ Australia DFAT — Consolidated List (Regulation 8)
+   Source:    Australian Sanctions Office / DFAT, screened DIRECTLY each
+              run via the OpenSanctions au_dfat_sanctions mirror
+              (targets.simple.csv) — a CORE list with a coverage floor
+              since 2026-07-29. DFAT's own .xlsx stays bot-gated, so the
+              mirror is the fetchable daily path; reference publication:
               https://www.dfat.gov.au/international-relations/security/sanctions/consolidated-list
-   Status:    CROSS-REFERENCED — DFAT autonomous designations largely
-              overlap the UN / OFAC / EU lists screened above. The bulk
-              file is browser/bot-gated (no machine-readable fetch), so
-              the MLRO reconciles against the official DFAT download
-              periodically.
 
 ✅ UAE EOCN — Local Terrorist List (Executive Office / EOCN)
    Source:    UAE Executive Office for Control & Non-Proliferation
