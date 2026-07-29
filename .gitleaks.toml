@@ -12,7 +12,9 @@ description = "Public, non-secret values: the EU consolidated-list access token 
 # public Asana GIDs + the public EU FSF token, all covered by the regex allowlist
 # below); a whole-file exemption would also blind the scan to a REAL secret later
 # added to those files, so the specific public values are allow-listed by regex
-# instead and the files themselves are scanned normally.
+# instead and the files themselves are scanned normally. Because the allowlist is
+# by VALUE and not by path, it followed the daily-screen code unchanged when that
+# was extracted out of the workflow YAML into scripts/daily-screen-*.py.
 paths = [
   '''data/sanctions-sources\.json''',
   '''data/reg-sources\.json''',
@@ -28,7 +30,7 @@ regexes = [
   '''1216203370612916''',  # section: Assessment Report (pipeline report delivery target)
   '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log)
   '''1213914392047131''',  # section: Daily Sanctions Screening (screen.py + daily-sanctions-screen.yml)
-  '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default)
+  '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default; also quoted in the scripts/daily-screen-report.py provenance footer)
   '''1215653768729951''',  # Risk Assessments - Madison LLC (former RA default)
   '''1215844297069727''',  # Regulations / Governance / Sanctions (merged into Ongoing Monitoring, then removed)
   # Section GIDs in the Ongoing Monitoring project (public identifiers), used by the

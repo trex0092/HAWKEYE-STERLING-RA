@@ -10,6 +10,36 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — 842 lines of the daily screen come out of the workflow YAML (2026-07-29)
+
+The daily sanctions screen carried three inline `python3 << PYEOF` heredocs
+inside [`daily-sanctions-screen.yml`](.github/workflows/daily-sanctions-screen.yml)
+— 842 lines of the live screening path (fetch the customer/principal list,
+screen it through the real `screen.py` matcher, build the report and file the
+Asana task). Inside a YAML string that code was invisible to
+`python -m py_compile`, unreachable by any test, and unlintable by semgrep, which
+scans `.py` files and not YAML. It was the least-governed code in the repository
+and it ran every day.
+
+- Extracted **verbatim** — byte-for-byte, verified by diffing the dedented
+  heredoc bodies against the new files — into
+  [`scripts/daily-screen-fetch.py`](scripts/daily-screen-fetch.py),
+  [`scripts/daily-screen-run.py`](scripts/daily-screen-run.py) and
+  [`scripts/daily-screen-report.py`](scripts/daily-screen-report.py). The
+  workflow drops from **1,135 lines to 290** and now just calls them.
+- **One real behavioural difference, handled.** A heredoc piped to `python3`
+  runs with `sys.path[0] == ''` (the working directory), so `import screen`
+  resolved; a script file gets its own directory instead. `daily-screen-run.py`
+  puts the repo root back explicitly, and the import is verified to resolve.
+- All three are now in the `py_compile` gate in `ci.yml`, so a syntax error in
+  the daily screening path fails CI instead of failing at 02:00 GST.
+- Smoke-verified end to end: the screening step loads its inputs, degrades
+  loudly on missing list files (the SOURCE OUTAGE path), loads the 326-name
+  in-repo UAE EOCN list, and stops only at `GITHUB_ENV` — which exists only
+  inside Actions.
+- `.gitleaks.toml` gains a note that its allowlist is by value, not by path, so
+  it followed the extracted code unchanged.
+
 ### Screening — the two engines are now compared to each other, and a silent JS false negative is closed (2026-07-29)
 
 The sanctions matcher is implemented twice — `screen.py` (rapidfuzz) and
