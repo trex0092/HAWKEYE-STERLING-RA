@@ -10,6 +10,42 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — worldwide PEP + associates (RCA), and worldwide adverse media (2026-07-29)
+
+**PEPs and their relatives / close associates, worldwide.** The consolidated
+OpenSanctions PEP dataset — politically exposed persons **and their relatives
+and close associates** — was already downloaded, already allowlisted, and
+already parsed … but only as a *fallback*, used when a Wikidata lookup errored.
+Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or an RCA with
+no English article returned a confident `{"hit": false}`, which is a silent
+false negative on an **FATF R.12** duty (R.12 extends the PEP controls to family
+members and close associates). The dataset is now the **standing worldwide net,
+screened over every individual on every run**, with Wikidata kept as the richer
+explanation layer on top. Three populations are covered, in precedence order:
+lookups that **errored** (resolved by the net, as before), lookups that returned
+**no hit** (the net now gets its own say — this is the coverage gain), and
+lookups that **hit** (left untouched, Wikidata's description is better evidence).
+The PEP-vs-RCA role is taken from the dataset's own `topics` column
+(`role.pep` / `role.rca`) rather than asserted, and a row that states no role is
+labelled "role not stated by the source" — the label never claims more than the
+data.
+
+**Adverse media across every market, without raising request volume.** 74
+Google-News market editions are configured but only the first 8 were ever swept
+— and the *same* 8 every day, so ~66 markets (all of Latin America, most of
+Europe, East Asia, most of the Arabic press) were **never swept at all**, behind
+a report line that read "worldwide". The per-run budget cannot simply be raised:
+8 is the empirical per-IP ceiling for Google News from a GitHub runner (at 14
+locales the limiter tripped on 10–12 Jul and cost real recall). So coverage now
+comes from **deterministic rotation** instead of more requests: the 5 pinned core
+editions (which the targeted risk passes index into) run every day, and the rest
+of the matrix rotates on a day-of-cycle window — **every market is swept within
+23 runs, at identical request volume**. Rotation is deterministic in the run
+date, so re-running a day reproduces its evidence. The report now discloses
+which markets ran and when the cycle completes; GDELT's global index still runs
+on every subject every run, so worldwide reach is not gated on the rotation.
+`ADVERSE_LOCALE_ROTATION=0` restores the old fixed first-N behaviour.
+
 ### Matcher — two sanctions false negatives and a nondeterminism defect (2026-07-29)
 
 Found by an adversarial audit of the screening stack; all three reproduced
