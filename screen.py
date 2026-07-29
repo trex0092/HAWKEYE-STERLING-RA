@@ -2106,6 +2106,12 @@ def load_adverse_watchlist():
     return entries, ids, {"count": len(entries), "date": "live (OpenSanctions mirror)",
                           "hash": sha256_of(data), "tier": "supplementary"}
 
+# Subject names the watchlist matcher could not screen this run (non-Latin
+# script, or under 4 matchable characters after normalize). Populated by
+# screen_watchlist and read by tally_enrichment so a subject the watchlist never
+# actually screened is not counted as covered by it.
+WATCHLIST_UNSCREENABLE = set()
+
 def screen_watchlist(subjects_all, entries, ids, today_iso):
     """One local pass of every DISTINCT subject name against the crime watchlist,
     using the same matcher + thresholds as sanctions screening. Returns
@@ -2116,6 +2122,11 @@ def screen_watchlist(subjects_all, entries, ids, today_iso):
         return {}
     wl = {WATCHLIST_LABEL: entries}
     out = {}
+    # Subject names the watchlist matcher could not screen at all. Exposed via
+    # WATCHLIST_UNSCREENABLE rather than the return value so every existing
+    # caller of this function keeps its contract.
+    unscreenable = WATCHLIST_UNSCREENABLE
+    unscreenable.clear()
     names = sorted({s[1] for s in subjects_all})
     # Heartbeat: this pass fuzzy-matches every distinct subject against ~290k
     # watchlist names and ran 33 minutes on 24 Jul with zero output — exactly
@@ -2141,6 +2152,20 @@ def screen_watchlist(subjects_all, entries, ids, today_iso):
                 "watchlist": True, "score": h["score"]})
         if arts:
             out[name] = arts
+        elif _unscreenable(name):
+            # The matcher returns NOTHING for a name it cannot screen (recorded
+            # in non-Latin script, or collapsing under 4 matchable characters),
+            # and "no watchlist listing" is indistinguishable from "never
+            # screened" once it leaves this function. That mattered: when the
+            # news sweep errored, the report told the MLRO "the adverse-exposure
+            # WATCHLIST still screened every subject", and am_blackout only
+            # counted a subject as uncovered when the WHOLE watchlist failed to
+            # load — so a subject that was both news-dead AND unscreenable had
+            # ZERO adverse coverage and was reported as covered.
+            # Record it so the caller can account for it honestly. The sanctions
+            # path already surfaces these names for manual review
+            # (_manual_review_hit); this is the adverse-side equivalent.
+            unscreenable.add(name)
     return out
 
 # ── LIST DOWNLOADS ────────────────────────────────────────────────────────────
@@ -4589,8 +4614,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
           "(news feeds AND watchlist unavailable). Treat their 'no adverse media' as provisional; re-run.")
     elif am_errors_n:
         A(f"   Status: news sweep lost for {am_errors_n} subject(s) (feed rate-limited the runner) — "
-          "the adverse-exposure WATCHLIST still screened every subject; fresh-news recall is narrowed, "
-          "standing exposure is covered.")
+          "the adverse-exposure WATCHLIST screened every subject it can match; fresh-news recall is "
+          "narrowed, standing exposure is covered. (A subject the watchlist cannot match either — a "
+          "name in non-Latin script, or under 4 matchable characters — is counted in the DEGRADED "
+          "blackout figure above, not here.)")
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
@@ -4948,8 +4975,15 @@ def tally_enrichment(results, wl_hits, wl_loaded):
         subj_err = False
         if r["am_error"]:
             am_errors += 1
-            if not wl_loaded:
-                # No net could screen this subject — actionable failure.
+            # No net could screen this subject — actionable failure. The
+            # watchlist counts as covering a subject only if it could actually
+            # SCREEN it: a name the matcher cannot handle (non-Latin script, or
+            # under 4 matchable characters) gets nothing from the watchlist even
+            # when the list loaded perfectly, so a news-dead subject with such a
+            # name has ZERO adverse coverage. Counting only `not wl_loaded` here
+            # meant those subjects were reported as covered while the report told
+            # the MLRO the watchlist "screened every subject".
+            if not wl_loaded or r["name"] in WATCHLIST_UNSCREENABLE:
                 am_blackout += 1
                 subj_err = True
         # Adverse findings merge both nets: flagged news articles (when the sweep

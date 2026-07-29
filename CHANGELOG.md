@@ -10,6 +10,27 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Adverse media — the watchlist cannot "cover" a subject it cannot match (2026-07-29)
+
+`am_blackout` — the figure that turns the adverse module DEGRADED — counted a
+subject as having zero coverage only when the **whole watchlist failed to
+load**. But the watchlist is screened with the same matcher as sanctions, and
+that matcher returns nothing for a name it cannot handle (recorded in non-Latin
+script, or collapsing under 4 matchable characters). Such a subject gets nothing
+from the watchlist **even when the list loaded perfectly** — while the report
+told the MLRO, in exactly the run where the news sweep had failed, that "the
+adverse-exposure WATCHLIST still screened every subject".
+
+So a subject that was both news-dead *and* unscreenable had **no adverse
+coverage from any net**, and was reported as covered. The sanctions path already
+surfaces these names for manual review; the adverse path had no equivalent.
+
+`screen_watchlist` now records the names it could not screen, `tally_enrichment`
+counts those as blackouts when their news sweep also failed, and the report line
+no longer claims universal coverage — it says the watchlist screened every
+subject **it can match**, and points at the DEGRADED figure for the rest.
+
+
 ### Matcher — the prefilter could silently cancel a MORE sensitive setting (2026-07-29)
 
 The C-side blocking prefilter builds its cutoffs from `THRESHOLD` and

@@ -1767,6 +1767,33 @@ check("floors: a healthy load never refuses", _floor_clean == ([], []))
 screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
 screen.LIST_OUTAGE_ALERT["outages"] = []
 
+# ── The watchlist cannot "cover" a subject it cannot match ────────────────────
+# am_blackout counted a subject as having ZERO adverse coverage only when the
+# WHOLE watchlist failed to load. But screen_name returns nothing for a name the
+# matcher cannot handle (non-Latin script, or under 4 matchable characters), so
+# such a subject gets nothing from the watchlist even when it loaded perfectly —
+# and the report told the MLRO the watchlist "still screened every subject".
+# A news-dead subject with such a name therefore had NO adverse coverage at all
+# and was reported as covered.
+print("screen — the watchlist cannot cover a subject it cannot match")
+_wl_entries = [(screen.normalize("BAD ACTOR"), "BAD ACTOR")]
+_wl_subs = [("ENTITY", "محمد عبدالله", None, {}), ("ENTITY", "Bad Actor", None, {}),
+            ("ENTITY", "Clean Co Ltd", None, {})]
+_wl_hits = screen.screen_watchlist(_wl_subs, _wl_entries, {}, "2026-07-30")
+check("the watchlist still finds a matchable listing", len(_wl_hits.get("Bad Actor", [])) == 1)
+check("a name the matcher cannot screen is RECORDED as unscreened, not silently missed",
+      "محمد عبدالله" in screen.WATCHLIST_UNSCREENABLE
+      and "Clean Co Ltd" not in screen.WATCHLIST_UNSCREENABLE)
+_mkres = lambda nm: [{"type": "ENTITY", "name": nm, "parent": "", "permalink": "",
+                      "adverse": None, "pep": None, "am_error": True}]
+check("news-dead + unscreenable + watchlist LOADED still counts as a blackout",
+      screen.tally_enrichment(_mkres("محمد عبدالله"), _wl_hits, True)[0]["am_blackout"] == 1)
+check("news-dead + matchable + watchlist loaded is NOT a blackout (the net really covered it)",
+      screen.tally_enrichment(_mkres("Clean Co Ltd"), _wl_hits, True)[0]["am_blackout"] == 0)
+check("a whole-watchlist outage still blacks out every news-dead subject",
+      screen.tally_enrichment(_mkres("Clean Co Ltd"), {}, False)[0]["am_blackout"] == 1)
+screen.WATCHLIST_UNSCREENABLE.clear()
+
 # ── Identity-based exclusion (false-positive DEMOTION, never suppression) ─────
 # One subject in the 29 Jul run carried 73 candidate designations, nearly all
 # different people sharing a common Arabic given name. Where BOTH sides publish
