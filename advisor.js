@@ -356,22 +356,43 @@ function ask(){
   /* fetch() does not reject on HTTP 4xx/5xx, and the backend returns
      {ok:false, error:'…'} for those (503 no API key, 403 origin, 429 rate-limit).
      Map any body lacking `text` to a visible error instead of a blank answer. */
-  const brainFetch = fetch('/.netlify/functions/brain-soul', {
+  const callBrain = (extra) => fetch('/.netlify/functions/brain-soul', {
     method: 'POST',
     headers: fnHeaders(),
-    body: JSON.stringify({
+    body: JSON.stringify(Object.assign({
       question: q,
       mode: MODE_TO_REASONING[state.mode] || 'balanced',
       persona: state.personaId,
-    }),
+      /* Declares this client can drive the guarded deep continuation: on a
+         default-capped site the backend serves deep mode in affordable slices
+         instead of degrading it to balanced. Old cached clients omit this and
+         keep the visible-degrade behaviour. */
+      deepContinue: true,
+    }, extra || {})),
   }).then(r => r.json().catch(() => {
     /* A non-JSON body means the platform killed the function (Netlify's
-       synchronous-function execution limit — most likely a long Deep-mode
-       call), not a missing API key. Say so instead of misdirecting ops. */
+       synchronous-function execution limit), not a missing API key. Say so
+       instead of misdirecting ops. */
     return {ok:false, error: r.status >= 500
-      ? 'The advisor timed out at the platform level (HTTP ' + r.status + '). Deep mode can exceed the function execution limit — try Balanced or Speed, or raise the Netlify function timeout.'
+      ? 'The advisor timed out at the platform level (HTTP ' + r.status + ') — please try again.'
       : 'The advisor returned an unreadable response (HTTP ' + r.status + ') — please try again.'};
   }));
+
+  /* Deep continuation loop. A `deepPartial` reply is NEVER rendered — it only
+     carries the accumulated text back for the next hop (every hop's accumulation
+     has already passed the server-side tipping-off guard). The final reply is
+     the fully-guarded answer. The hop bound mirrors the server's DEEP_HOP_LIMIT
+     with headroom, so a disagreeing server cannot loop this client forever. */
+  const brainFetch = (async () => {
+    let data = await callBrain();
+    let hops = 0;
+    while (data && data.deepPartial && data.deepAccumulated && hops < 10) {
+      if (myAsk !== askSeq) return data; // superseded — stop burning hops
+      hops++;
+      data = await callBrain({ deepHop: data.deepHop, deepAccumulated: data.deepAccumulated });
+    }
+    return data;
+  })();
 
   Promise.all([brainFetch, minDelay])
   .then(([data]) => {

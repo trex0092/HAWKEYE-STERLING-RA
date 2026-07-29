@@ -59,8 +59,13 @@ guardrailed cited answer. **No customer record is sent.**
 **Response** `{ ok, text, mode, model, elapsedMs, tippingOffFlagged, auditLine }`
 **Behaviour** — model per mode (`claude-haiku-4-5` / `claude-sonnet-5` /
 `claude-opus-5`); token budgets clipped to what the platform execution cap
-affords, and deep mode degraded to balanced — visibly, via `modeDegraded` and
-`modeDegradedReason` in the response — when the cap cannot carry it; SOUL charter
+affords. Where the cap cannot carry deep mode in one call, a client declaring
+`deepContinue: true` gets it as a **guarded continuation**: several sync hops of
+the deep model (assistant-prefill resume), the tipping-off guard re-run over the
+full accumulated text on **every** hop, intermediate `deepPartial` responses
+carrying only the resume state (never rendered), and `deepHops=N` on the final
+audit line. Clients that do not declare it get a visible degrade to balanced via
+`modeDegraded` / `modeDegradedReason`. SOUL charter
 guardrails; tipping-off guard (P4) can withhold
 output; injection/charter-leak detection; kill switch `ADVISOR_ENABLED`; upstream
 error bodies are **not** reflected to the client.

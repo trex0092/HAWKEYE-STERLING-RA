@@ -575,8 +575,43 @@ const MODEL_BY_MODE = {
   deep:     { model: 'claude-opus-5',             maxTokens: 8192 },
 };
 
-function selectModel(mode) {
+/* ── Deep continuation ───────────────────────────────────────────────────────
+   A 4096+-token deep answer can NEVER fit a default ~10 s synchronous cap, and
+   the two obvious escapes are both wrong for this surface: a background
+   function is plan-gated and would put operator content at rest in a new store
+   (an RA-04 concern), and streaming is architecturally incompatible with the
+   tipping-off guard — the guard must see the COMPLETE output before the
+   operator does, and a streamed sentence cannot be unstreamed.
+
+   So deep mode is served as a GUARDED CONTINUATION: the governed deep model
+   generates the answer across several synchronous calls that each fit the cap,
+   using assistant prefill to resume exactly where the previous hop stopped.
+   Two invariants make this safe:
+
+     1. NO UNGUARDED TOKEN EVER LEAVES. The tipping-off guard runs over the
+        full accumulated text on EVERY hop, not just the last — a partial that
+        trips it is withheld immediately and the continuation ends there.
+     2. THE CLIENT NEVER DISPLAYS A PARTIAL. Intermediate hops return the
+        accumulated text only so the next hop can resume; the UI renders
+        nothing until the final, fully-guarded response.
+
+   The client opts in with `deepContinue: true`; a client that does not (an old
+   cached advisor.js) gets the visible degrade below, unchanged. On a site
+   whose cap affords deep in one call, none of this runs. */
+const DEEP_HOP_LIMIT = Math.max(2, Math.min(8, Math.ceil(MODEL_BY_MODE.deep.maxTokens / AFFORDABLE_TOKENS)));
+
+function selectModel(mode, deepContinue) {
   const requested = mode === 'speed' || mode === 'deep' ? mode : 'balanced';
+
+  /* A continuation-capable client gets real deep mode in affordable slices. */
+  if (requested === 'deep' && AFFORDABLE_TOKENS < DEEP_MIN_TOKENS && deepContinue) {
+    return {
+      model: MODEL_BY_MODE.deep.model,
+      maxTokens: Math.min(MODEL_BY_MODE.deep.maxTokens, AFFORDABLE_TOKENS),
+      effectiveMode: 'deep',
+      continuation: true
+    };
+  }
 
   /* Deep mode is unaffordable under a default cap. It then degrades to balanced
      VISIBLY rather than returning a thin answer wearing the deep label. */
@@ -682,7 +717,16 @@ const handle = async (event) => {
 
   if (!question.trim()) return resp(400, { ok: false, error: 'question is required.' });
 
-  const { model, maxTokens, effectiveMode, degradedFrom, degradedReason } = selectModel(mode);
+  /* Continuation state, round-tripped through the client between hops. The
+     accumulated text is the model's OWN prior output being resumed — it is
+     never displayed until the final hop's guards pass, and the tipping-off
+     guard re-checks the whole of it on every hop, so a client that tampers
+     with it gains nothing the guards would not catch. */
+  const deepContinue = body.deepContinue === true;
+  const deepHop = Number.isInteger(body.deepHop) && body.deepHop > 0 ? Math.min(body.deepHop, DEEP_HOP_LIMIT) : 0;
+  const accumulated = deepHop > 0 ? String(body.deepAccumulated || '').slice(0, 60000) : '';
+
+  const { model, maxTokens, effectiveMode, degradedFrom, degradedReason, continuation } = selectModel(mode, deepContinue);
 
   /* The instruction follows the EFFECTIVE mode, not the requested one: asking
      for a full pre-mortem while affording a balanced token budget produces a
@@ -699,8 +743,16 @@ const handle = async (event) => {
   const systemPrompt  = [SOUL_CHARTER, KNOWLEDGE_CONTEXT, personaSuffix].join('\n\n');
   const userMessage   = modeInstruction + '\n\nQUESTION:\n' + question + (context.trim() ? '\n\nCONTEXT:\n' + context : '');
 
+  /* On a resumed hop the prior output is replayed as an assistant prefill so
+     the model continues mid-thought. trimEnd() on both what is SENT and what is
+     KEPT — the API rejects trailing whitespace in a prefill, and keeping a
+     different string from the one sent would desynchronise the resume point. */
+  const priorText = continuation && accumulated ? accumulated.replace(/\s+$/, '') : '';
+  const messages = [{ role: 'user', content: userMessage }];
+  if (priorText) messages.push({ role: 'assistant', content: priorText });
+
   const start = Date.now();
-  let text = '', ok = true;
+  let text = '', ok = true, stopReason = '';
 
   const ctrl = new AbortController();
   const abortTimer = setTimeout(() => ctrl.abort(), ABORT_BUDGET_MS);
@@ -717,7 +769,7 @@ const handle = async (event) => {
         model,
         max_tokens: maxTokens,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
+        messages,
       }),
     });
 
@@ -736,6 +788,7 @@ const handle = async (event) => {
       // defensively and degrade to a generic message.
       const data = await apiResp.json().catch(() => null);
       const blocks = (data && Array.isArray(data.content)) ? data.content : [];
+      stopReason = String((data && data.stop_reason) || '');
       text = blocks.filter(b => b && b.type === 'text').map(b => b.text).join('');
       if (!text) {
         ok = false;
@@ -763,6 +816,29 @@ const handle = async (event) => {
 
   const elapsedMs = Date.now() - start;
 
+  /* ── Continuation decision ──────────────────────────────────────────────
+     The full text so far is prior output + this hop's chunk. Invariant 1: the
+     tipping-off guard checks the WHOLE of it on every hop — if it fires here,
+     the continuation ends and the guard message is the final answer, exactly
+     as it would be on a single-call path. Invariant 2: a partial response
+     carries the accumulated text for the next hop and nothing renderable. */
+  if (continuation) {
+    const full = priorText + text;
+    if (ok && tippingOffGuard(full)) {
+      text = full; // fall through: the guard block below withholds it
+    } else if (ok && stopReason === 'max_tokens' && deepHop + 1 < DEEP_HOP_LIMIT) {
+      return resp(200, {
+        ok: true, deepPartial: true, deepHop: deepHop + 1, deepAccumulated: full,
+        mode, effectiveMode: 'deep', model, elapsedMs
+      });
+    } else {
+      /* Final hop: end_turn, the hop limit, or an API failure. On a failure
+         mid-continuation the error marker is the final text — the same honest
+         degradation as the single-call path, never a silent partial. */
+      text = ok ? full : text;
+    }
+  }
+
   const tippingOffFlagged = tippingOffGuard(text);
   if (tippingOffFlagged) {
     text = '[TIPPING-OFF GUARD ACTIVATED — output withheld per P4 of the compliance charter. ' +
@@ -787,6 +863,7 @@ const handle = async (event) => {
   const auditLine = 'AUDIT | ' + new Date().toISOString() +
     ' | model=' + model + ' | mode=' + mode +
     (degradedFrom ? ' | modeDegraded=' + degradedFrom + '→' + effectiveMode : '') +
+    (continuation ? ' | deepHops=' + (deepHop + 1) : '') +
     ' | elapsedMs=' + elapsedMs + ' | ok=' + ok +
     ' | hash=' + simpleHash(question) +
     ' | quality=' + quality +
@@ -813,7 +890,7 @@ exports.__internals = {
   SOUL_CHARTER, KNOWLEDGE_CONTEXT, TIPPING_OFF_PATTERNS, tippingOffGuard,
   PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
   hallucinationGuard, injectionGuard, anomalyGuard, qualityScore,
-  selectModel, MODEL_BY_MODE, PLATFORM_CAP_MS, ABORT_BUDGET_MS, AFFORDABLE_TOKENS, DEEP_MIN_TOKENS,
+  selectModel, MODEL_BY_MODE, PLATFORM_CAP_MS, ABORT_BUDGET_MS, AFFORDABLE_TOKENS, DEEP_MIN_TOKENS, DEEP_HOP_LIMIT,
   simpleHash, buildKnowledgeContext,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
 };

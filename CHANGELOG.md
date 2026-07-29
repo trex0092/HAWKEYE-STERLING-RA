@@ -10,6 +10,46 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Advisor — deep mode works on a default site, the eval covers every model and fires on model change, and the downgrade banner is browser-verified (2026-07-29)
+
+Three residual limitations from the morning's model refresh, each stated at the
+time and each now closed with evidence rather than restated.
+
+- **The Claude 5 models are live-confirmed, and confirmation can no longer lag a
+  swap.** The behavioural eval was dispatched against the real API the same day
+  — run 30452220311, **all guardrail cases held, zero regressions** (the
+  fail-on-regression step did not fire; the egress log shows the
+  `api.anthropic.com` call). Structurally: `scripts/advisor-eval.mjs` now
+  evaluates **every model of the governed routing**, read from `MODEL_BY_MODE`
+  rather than restated — the single-model default would have left the deep tier
+  unverified by exactly the swap that just happened — and `advisor-eval.yml`
+  **fires on any push to `main` touching `brain-soul.js`, `data/ai-assets.json`
+  or the eval itself**, so the confirmation window is minutes, not up to a week.
+- **Deep mode is genuinely available on a default-capped site — as a guarded
+  continuation.** A 4096+-token deep answer can never fit a ~10 s synchronous
+  cap, and both obvious escapes are wrong for this surface: a background
+  function is plan-gated and puts operator content at rest in a new store
+  (RA-04), and **streaming is architecturally incompatible with the tipping-off
+  guard** — the guard must see the complete output before the operator does,
+  and a streamed sentence cannot be unstreamed. Instead the governed deep model
+  (`claude-opus-5`) generates the answer across up to `DEEP_HOP_LIMIT`
+  synchronous hops (assistant-prefill resume), under two CI-pinned invariants:
+  **no unguarded token ever leaves** — the tipping-off guard runs over the full
+  accumulated text on *every* hop, and a partial that trips it is withheld on
+  that hop, never returned for resubmission — and **the client renders nothing
+  until the final fully-guarded response**. The audit line records `deepHops=N`.
+  Old cached clients that don't declare `deepContinue` keep the previous
+  visible degrade; raised-cap sites keep single-call deep; the hop budget
+  (~6 × 1530 ≈ 8k tokens) matches what a raised cap would afford.
+- **The downgrade banner is verified in a real browser, not assumed.**
+  `test/advisor-browser.test.mjs` drives Chromium against the real
+  `advisor.html` — through the AUP acknowledgment gate, which the check
+  confirmed blocks every send until accepted — stubs the function, and asserts
+  the banner is on screen with its reason and remedy, **and** that an
+  undegraded answer shows no banner, so the warning cannot decay into noise.
+  Skips loudly when no browser is available, same contract as the Python
+  suites.
+
 ### Governance — the MLRO signs what the MLRO can sign (2026-07-29)
 
 Four approvals recorded under the **HS MLRO**'s own authority. The governing
