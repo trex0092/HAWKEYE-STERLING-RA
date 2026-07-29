@@ -853,6 +853,32 @@ async function fetchTaskNames(projectGid, token) {
   return names;
 }
 
+/* Same-day dedup for the Adverse Media / PEP card — DIRECTION-AWARE.
+
+   Both card names carry the words "Adverse Media", so the old flat
+   date + keyword match treated a CLEAR card and a HIT card as interchangeable:
+   whichever landed first suppressed the other. A run earlier in the day that
+   found nothing (or found nothing because its feed was degraded) therefore
+   SUPPRESSED a later run's HIT card, and Ongoing Monitoring was left showing
+   CLEAR for a day on which hits were found. The realistic path is exactly the
+   one that matters — a manual dispatch or a re-run after noticing the scheduled
+   run was degraded, which is precisely when the HIT card has to post.
+
+   A HIT card supersedes today's CLEAR card. Nothing supersedes a HIT.
+   Returns the name of the card that makes this post redundant, or null to post. */
+export function omCardToSkip(names, dateStr, hasHits) {
+  /* Boundary-guarded date match: "9 Jul 2026" is a substring of "19 Jul 2026",
+     so a bare includes() could dedupe against a different day's card. */
+  const dateRe = new RegExp('(^|[^0-9])' + String(dateStr).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^0-9])');
+  const sameDay = (names || []).filter(
+    (n) => dateRe.test(n) && (n.includes('Adverse Media') || n.includes('PEP')));
+  if (!sameDay.length) return null;
+  const existingHit = sameDay.find((n) => n.includes('HIT'));
+  if (existingHit) return existingHit;   // already reported at the higher severity
+  if (!hasHits) return sameDay[0];       // CLEAR over CLEAR — nothing new to say
+  return null;                           // HIT supersedes today's CLEAR — POST it
+}
+
 /* Create a task in the Ongoing Monitoring project and file it under its section.
    Returns the task permalink (or null). Filing under the section is non-fatal. */
 async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
@@ -888,11 +914,11 @@ async function postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, t
       : 'Adverse Media & PEP — CLEAR — ' + dateStr;
 
     const names = await fetchTaskNames(projectGid, token);
-    /* Boundary-guarded date match: "9 Jul 2026" is a substring of "19 Jul 2026",
-       so a bare includes() could dedupe against a different day's card. */
-    const dateRe = new RegExp('(^|[^0-9])' + dateStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^0-9])');
-    const already = names.find(n => dateRe.test(n) && (n.includes('Adverse Media') || n.includes('PEP')));
+    const already = omCardToSkip(names, dateStr, hasHits);
     if (already) { console.log('sanctions-screen: already posted: ' + already); return { posted: false, skipped: true, name: already }; }
+    if (hasHits && names.some(n => n.includes(dateStr) && n.includes('CLEAR'))) {
+      console.log('sanctions-screen: superseding today\'s CLEAR card — this run found hits');
+    }
 
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const notes = buildAmPepNotes({ today, tomorrow, run: runUrl(), subjects: subjects.length, amHits, pepHits,

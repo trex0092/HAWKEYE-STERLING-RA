@@ -6,7 +6,7 @@ import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
-  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor
+  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
 import { readFileSync } from 'node:fs';
@@ -509,6 +509,43 @@ check('a COMPLETE alias fold leaves the primary fully re-verified',
 const _screened = [_fl[0]].filter(L => !L.partial).map(L => L.name);
 check('a partial primary is excluded from screenedLists (matches carried, not cleared)',
   _screened.length === 0);
+
+/* ── same-day Ongoing-Monitoring dedup is DIRECTION-AWARE ──
+   Both card names carry the words "Adverse Media", so the old flat
+   date + keyword match treated CLEAR and HIT as interchangeable: whichever
+   landed first suppressed the other. A run earlier in the day that found
+   nothing — or found nothing because its feed was degraded — therefore
+   suppressed a later run's HIT card, leaving Ongoing Monitoring showing CLEAR
+   for a day on which hits were found. Reachable via workflow_dispatch or a
+   re-run, i.e. exactly what you do after noticing a degraded run. */
+const _omDate = '29 Jul 2026';
+const _omClear = 'Adverse Media & PEP — CLEAR — ' + _omDate;
+const _omHit = '\u26a0 Adverse Media / PEP HIT — ' + _omDate + ' — 3 subject(s)';
+
+check('a HIT card is POSTED even though today already has a CLEAR card',
+  omCardToSkip([_omClear], _omDate, true) === null);
+check('a CLEAR card does not repeat over today\'s CLEAR card',
+  omCardToSkip([_omClear], _omDate, false) === _omClear);
+check('nothing supersedes a HIT card — a later HIT run does not duplicate it',
+  omCardToSkip([_omHit], _omDate, true) === _omHit);
+check('a CLEAR card never overwrites the day after a HIT was reported',
+  omCardToSkip([_omHit], _omDate, false) === _omHit);
+check('with both cards present, a further HIT run is redundant',
+  omCardToSkip([_omClear, _omHit], _omDate, true) === _omHit);
+check('an empty project posts the first card of the day (CLEAR)',
+  omCardToSkip([], _omDate, false) === null);
+check('an empty project posts the first card of the day (HIT)',
+  omCardToSkip([], _omDate, true) === null);
+// The boundary guard the original dedup already had must survive: "9 Jul 2026"
+// is a substring of "19 Jul 2026".
+check('another day\'s card never dedupes today',
+  omCardToSkip(['Adverse Media & PEP — CLEAR — 9 Jul 2026'], _omDate, true) === null);
+check('a same-prefix date does not collide (9 Jul vs 19 Jul)',
+  omCardToSkip(['Adverse Media & PEP — CLEAR — 19 Jul 2026'], '9 Jul 2026', false) === null);
+// Unrelated Ongoing-Monitoring cards on the same date must not dedupe either.
+check('an unrelated same-day OM card does not suppress the AM/PEP card',
+  omCardToSkip(['Quarterly review — ' + _omDate], _omDate, true) === null);
+
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
