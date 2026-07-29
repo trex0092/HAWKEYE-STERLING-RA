@@ -76,7 +76,7 @@ as passing. CI enforces that distinction.
 | `unjustifiedSuppressions` | 0 | Every OSV suppression carries a written reason |
 | `obligationsWithoutOwner` | 0 | No orphaned obligation |
 | `obligationsWithoutWatchSource` | 1 | ISO/IEC 42001 — a standards body, not a supervisor feed. Tolerated at ≤ 1 |
-| `openActionsWithoutTargetDate` | 18 | Every open action carries an owner and a closing condition; **none carries a deadline**. This is the missing input behind KRI-09 (§3) — it counts rows in the [open-actions register](open-actions-register.md) whose `Target date` cell holds no ISO date. With no such column, every row counts. Setting the dates is a board act (item 17) |
+| `openActionsWithoutTargetDate` | 17 | Every open action carries an owner and a closing condition; **none carries a deadline**. This is the missing input behind KRI-09 (§3) — it counts rows in the [open-actions register](open-actions-register.md) whose `Target date` cell holds no ISO date. With no such column, every row counts. Setting the dates is a board act (item 17) |
 | `residualAboveAppetite` | 1 | Risks carried above the residual ceiling of the appetite position that claims them. **R-03** (sanctions false negative) at residual 10 against RA-01's ceiling of 6 — see §4a |
 | `risksWithoutAppetitePosition` | 0 | Every risk in the register is claimed by exactly one appetite position. A risk claimed by nobody is never scored, and an unscored risk is indistinguishable from a compliant one in a count |
 

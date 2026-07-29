@@ -6,11 +6,19 @@ version-controlled and registered in
 obligations they discharge are in
 [`../governance/obligation-register.md`](../governance/obligation-register.md).
 
-> **Status: DRAFT.** Every instrument in this pack is prepared for approval and
-> is **not in force** until its approval block is completed — Board approval for
-> policies, MLRO approval for procedures (open-actions item 18). CI enforces
-> that status: a document cannot claim an approval date the document itself does
-> not record, and a draft may not assert a next-review date.
+> **Status: mostly DRAFT — two instruments are in force.** An instrument here is
+> **not in force** until its approval block is completed, and *who* completes it
+> is fixed by instrument type: **Board approval for policies, standards and the
+> charter; MLRO approval for procedures** (open-actions item 18).
+>
+> On **2026-07-29** the **HS MLRO** approved the two procedures within that
+> authority — **POL-19** (STR/DPMSR filing) and **POL-30** (regulatory change
+> management) — and both are now in force to 2027-07-29. The remaining
+> **sixteen** are Board acts and stay draft until HS Management signs them.
+>
+> CI enforces this: a document cannot claim an approval date the document itself
+> does not record, and a draft may not assert a next-review date. A procedure
+> approved by the MLRO is not evidence that the policies around it were.
 
 ## Master instrument
 

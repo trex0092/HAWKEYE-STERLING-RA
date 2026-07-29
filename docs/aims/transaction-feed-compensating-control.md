@@ -1,11 +1,14 @@
 # Transaction-Feed Compensating Control (Manual) — Interim
 
-> **DRAFT — awaiting MLRO adoption.** Prepared 2026-07-24 for open-actions
-> register **item 6**. The live transaction feed stays INERT until the four
-> [scoping decisions](transaction-feed-scoping.md) (§6) are answered; register
-> item 6 allows the alternative of a **recorded manual compensating control**.
-> This is that record, ready to adopt. Adopting it closes item 6 *as the
-> interim decision* — the §6 questions remain the route to the wired feed.
+> **ADOPTED 2026-07-29 by the HS MLRO** — see the §4 adoption block. Prepared
+> 2026-07-24 for open-actions register **item 6**. The live transaction feed
+> stays INERT until the four [scoping decisions](transaction-feed-scoping.md)
+> (§6) are answered; item 6 allowed the alternative of a **recorded manual
+> compensating control**, and this is that record, now operative.
+>
+> Adoption settles the **interim decision only**. Item 6 stays open for the
+> wiring decision, and the three obligations it carries stay at *partial* — see
+> the note under §4.
 
 ## 1. Control statement
 
@@ -44,4 +47,18 @@ management review checks the log's continuity — gaps escalate as a CAPA.
 
 | Adopted as interim control (yes/no) | First review week | Signed (MLRO) | Date |
 |---|---|---|---|
-| _pending_ | | | |
+| **Yes** | Week commencing 2026-08-03 | **HS MLRO** | **2026-07-29** |
+
+**Adopted 2026-07-29 by the HS MLRO.** This control is now operative and its
+review cadence runs from the first review week above.
+
+> **What this adoption does and does not do.** It records a manual compensating
+> control for the transaction-monitoring gap; it does **not** close the gap.
+> `txn_monitor.py` remains INACTIVE, no feed is connected, and **OB-03**
+> (ongoing monitoring), **OB-13** (DPMS cash-threshold reporting) and **OB-21**
+> (wire-transfer originator/beneficiary data) stay at *partial* against
+> [open-actions](../governance/open-actions-register.md) **item 6**, which
+> remains open for the wiring decision. R-13 keeps its residual of 12.
+>
+> An interim control that were allowed to close the obligation would be worse
+> than none: it would convert a visible gap into an invisible one.
