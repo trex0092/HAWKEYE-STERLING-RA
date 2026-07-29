@@ -10,6 +10,27 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### "This subject was never screened" must not lose its place to ten candidates (2026-07-29)
+
+A subject whose name the matcher cannot handle (non-Latin script, or under four
+matchable characters) gets a **MANUAL REVIEW** marker in the daily report — the
+statement that it was never auto-screened at all, and must be screened by hand.
+
+That marker scores `0` by construction, and the report shows
+`sorted(hits, -score)[:10]`. So the moment a customer had ten other candidates,
+the marker sorted last and was **dropped** — replaced by "… +N more similar
+candidates", which reads as more of the same rather than "this subject was not
+screened". It carries no `is_new`, so `open_mlro_cases` raises no case for it
+either: the report line was its only surface. #351 dealt with a real subject
+carrying 73 candidate designations, so ten is not a hypothetical threshold.
+
+The marker is now pinned outside the top-ten cut — it is a coverage statement,
+not a candidate competing on score — and the overflow counter counts candidates
+only, so the number no longer includes the pinned line.
+
+Found in the residual note of an adjudication verdict that had otherwise cleared
+the lead; the two lenses had split on it.
+
 ### Ongoing Monitoring — a CLEAR card could suppress the same day's HIT card (2026-07-29)
 
 The Adverse Media / PEP card is deduplicated per day so a re-run does not post

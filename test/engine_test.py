@@ -1863,6 +1863,54 @@ check("a whole-watchlist outage still blacks out every news-dead subject",
       screen.tally_enrichment(_mkres("Clean Co Ltd"), {}, False)[0]["am_blackout"] == 1)
 screen.WATCHLIST_UNSCREENABLE.clear()
 
+# ── "This subject was never screened" must not lose its place to 10 candidates ─
+# The MANUAL REVIEW marker is a COVERAGE STATEMENT, not a candidate: it says the
+# subject could not be auto-screened at all. It scores 0 by construction, so the
+# report's `sorted(hits, -score)[:10]` dropped it as soon as a customer had 10
+# other candidates — and it carries no is_new, so open_mlro_cases raises no case
+# for it either. The report line was its ONLY surface, replaced by "+N more
+# similar candidates", which reads as more of the same. #351 handled a real
+# subject with 73 candidates, so >10 is not hypothetical.
+print("screen — the unscreenable marker outranks the top-10 candidate cut")
+import datetime as _dt_mr   # _dtmod is imported further down this file, not yet in scope
+_mr_hit = screen._manual_review_hit("ENTITY", "شركة الأمل", False)
+check("the manual-review marker scores 0 (why a score sort drops it)", _mr_hit["score"] == 0)
+check("the manual-review marker opens no MLRO case (report is its only surface)",
+      not _mr_hit.get("is_new"))
+
+
+def _mr_render(n_others):
+    others = [{"subject_type": "INDIVIDUAL", "subject_name": f"Owner {i}",
+               "control_linkage": False, "list": "OFAC SDN",
+               "matched_entry": f"AL-EXAMPLE, P{i}", "score": 90 - i,
+               "confidence": "medium"} for i in range(n_others)]
+    m = {"name": "شركة الأمل", "permalink": "", "hits": [_mr_hit] + others}
+    stats = {"customers_total": 1, "customer_rows_skipped": 0, "companies_screened": 1,
+             "individuals_screened": n_others, "subjects_total": 1 + n_others,
+             "errors": 0, "am_errors": 0, "am_blackout": 0, "pep_errors": 0,
+             "pep_mirror": 0, "watchlist_findings": 0, "watchlist_loaded": True,
+             "delta": {}}
+    _buf = _io.StringIO()
+    with _ctx.redirect_stdout(_buf):
+        return screen.build_unified_narrative([m], [], [], [], {}, stats,
+                                              _dt_mr.datetime(2026, 7, 29))
+
+
+_mr_small, _mr_big, _mr_huge = _mr_render(5), _mr_render(15), _mr_render(73)
+check("unscreenable marker survives when the customer has few candidates",
+      "not auto-screenable" in _mr_small)
+check("unscreenable marker survives PAST the 10-candidate cut",
+      "not auto-screenable" in _mr_big)
+check("unscreenable marker survives a 73-candidate customer (the real #351 shape)",
+      "not auto-screenable" in _mr_huge)
+# The overflow counter must count CANDIDATES, not the pinned coverage statement.
+check("the '+N more' count excludes the pinned marker (15 candidates -> +5)",
+      "+5 more similar candidates" in _mr_big)
+check("the '+N more' count excludes the pinned marker (73 candidates -> +63)",
+      "+63 more similar candidates" in _mr_huge)
+check("no overflow line at all when candidates fit (5 -> none)",
+      "more similar candidates" not in _mr_small)
+
 # ── Identity-based exclusion (false-positive DEMOTION, never suppression) ─────
 # One subject in the 29 Jul run carried 73 candidate designations, nearly all
 # different people sharing a common Arabic given name. Where BOTH sides publish
