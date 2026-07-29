@@ -159,11 +159,13 @@ for (const f of Object.keys(EXEMPT)) {
    control's window, instead of the alarm silently tolerating stale runs. */
 const EXPECTED_CRONS = {
   'sanctions-watch.yml':      ['7 5 * * *'],
-  // 03:07 is the self-healing retry firing (preflight no-ops it whenever the
-  // day already has a successful run) — the control is still daily and its
-  // maxAgeDays window is unchanged; the retry can only ADD a run on days the
-  // 00:07 firing died (as on 24-25 Jul, runner-VM shutdowns).
-  'weekly-adverse-media.yml': ['7 0 * * *', '7 3 * * *'],
+  // 03:07 and 06:07 are self-healing retry firings (preflight no-ops them
+  // whenever the day already has a successful run) — the control is still
+  // daily and its maxAgeDays window is unchanged; the retries can only ADD a
+  // run on days an earlier firing died (as on 24-25 Jul, runner-VM
+  // shutdowns). 06:07 exists because the first two slots sit 3h apart, so a
+  // single 3-4h outage window could still cost the whole day.
+  'weekly-adverse-media.yml': ['7 0 * * *', '7 3 * * *', '7 6 * * *'],
   'regulatory-watch.yml':     ['19 6 * * *'],
   'sanctions-screen.yml':     ['37 5 * * *'],
   'fatf-watchdog.yml':        ['7 6 * * *'],
