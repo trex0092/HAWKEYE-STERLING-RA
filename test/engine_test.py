@@ -1619,6 +1619,63 @@ check("a hit with no known attributes carries an empty context",
       len(_plain_hits) == 1 and _plain_hits[0]["match_context"] == "")
 screen.LIST_ENTRY_ATTRS.clear()
 
+# ── Designation-embedded-in-customer-name recall (2026-07-29 false negatives) ─
+# The single most obvious sanctions shape there is — a customer named after the
+# designation plus legal-form boilerplate — screened CLEAR in this engine while
+# the JS engine scored the same pairs 100/critical. Two distinct gaps:
+#   short entry (<6 chars): the near-exact gate tested only min(full, core), and
+#     boilerplate drags `full` down ("Hamas General Trading LLC" full=33/core=100);
+#   long entry whose distinctive core is ONE token: min() fails the same way, and
+#     the token-SUBSET gate cannot fire because _is_token_subset requires >=2 core
+#     tokens ("Al Qaeda General Trading" — AL is a particle, so the core is "QAEDA").
+print("screen — a designation embedded in a customer name must never clear")
+_emb_lists = {"OFAC SDN": [(screen.normalize(e), e) for e in
+                           ["HAMAS", "ISIL", "ANO", "AL QAEDA", "PETRO PARS"]]}
+for _subj, _entry in (("Hamas General Trading LLC", "HAMAS"),
+                      ("ISIL General Trading LLC", "ISIL"),
+                      ("Ano Holdings Company Limited", "ANO"),
+                      ("Al Qaeda General Trading", "AL QAEDA"),
+                      ("Al-Qaeda Holdings FZE", "AL QAEDA"),
+                      ("Petro Pars International DMCC", "PETRO PARS")):
+    _h = screen.screen_name(_subj, _emb_lists)
+    check(f"'{_subj}' flags the designated '{_entry}'",
+          any(x["matched_entry"] == _entry for x in _h))
+# The gate stays tight: it fires only when the customer's ENTIRE distinctive core
+# is the designation. A near-spelling with its own distinctive core must clear,
+# or the fix trades a false negative for alert fatigue.
+for _subj in ("Hummus Trading LLC", "Emirates Gold DMCC", "Ahmed Mohammed Al Rashid",
+              "Bullion Street Gold Trading L.L.C", "Dijllah Jewellery FZE"):
+    check(f"'{_subj}' still screens clear (no false-positive blow-up)",
+          screen.screen_name(_subj, _emb_lists) == [])
+# A hit won on the core alone is recorded at the CONSERVATIVE min-based score, so
+# it reads as a POSSIBLE match for MLRO adjudication — the >=100 "confirmed
+# designation" test (screen_subject_set) must not be able to fire on it.
+_emb_hit = screen.screen_name("Hamas General Trading LLC", _emb_lists)
+check("a core-only hit is never scored as a CONFIRMED designation",
+      _emb_hit and all(x["score"] < 100 for x in _emb_hit))
+
+# ── Variant tie-break is deterministic and keeps the best-evidenced variant ────
+# `variants` is a set and the winner used to be "first variant scoring strictly
+# higher". Python randomizes string hashes per process, so on a SCORE TIE the
+# recorded (full, core) — and therefore whether the pair passed the core gates —
+# depended on the hash seed: "Al Qaeda General Trading" vs "AL QAEDA" measurably
+# flipped between HIT and CLEAR across PYTHONHASHSEED values. Sorting fixes the
+# order; the tie-break must additionally keep the HIGHER-CORE variant, which this
+# pins by making the better variant sort LAST (sorting alone would still miss it).
+_orig_variants, _orig_match_score = screen.ai.name_variants, screen.match_score
+try:
+    # Patch through screen.ai: this suite loads `ai` as its own module object,
+    # so patching the local one would not reach the engine.
+    screen.ai.name_variants = lambda name: ["ZULU CORP"] if name == "ALPHA CORP" else []
+    # Tie on score; the higher-core variant is the one that sorts later.
+    screen.match_score = lambda cand, en: (
+        (50.0, 50.0, 100.0, 100.0) if cand.startswith("ZULU") else (50.0, 50.0, 60.0, 100.0))
+    _tb = screen.screen_name("ALPHA CORP", {"OFAC SDN": [(screen.normalize("TARGET"), "TARGET")]})
+    check("a score tie keeps the higher-core variant (hash-seed determinism)",
+          len(_tb) == 1 and _tb[0]["core_score"] == 100.0)
+finally:
+    screen.ai.name_variants, screen.match_score = _orig_variants, _orig_match_score
+
 print("screen — core-list coverage floors (zero/partial-load hard-fail)")
 # The static-floor tests below predate the adaptive ratchet and pin the STATIC
 # behavior, so point the coverage history at a path that does not exist — the

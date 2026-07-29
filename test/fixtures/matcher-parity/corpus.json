@@ -37,20 +37,73 @@
     "###",
     "12345",
     "A",
-    "AL BIN SAUD GROUP"
+    "AL BIN SAUD GROUP",
+    "Hamas General Trading LLC",
+    "Al Qaeda General Trading",
+    "Hummus Trading LLC"
   ],
   "names_note": "Grouped: Turkish-i regression class; diacritic Latin that MUST fold to A-Z; short/two-letter token class (the sigTokens regression); transliteration-variant class; lost-script class (Cyrillic/Arabic/CJK/Greek and unfoldable Latin) which both engines must FLAG rather than silently clear; and degenerate inputs (blank, symbols, digits, single char).",
   "pairs": [
-    { "subject": "Kılıç", "listed": "KILIC", "why": "Turkish dotless i must fold identically in both engines (historical JS false negative)" },
-    { "subject": "Yu Li Pang", "listed": "YU LI PING", "why": "two-letter name tokens must reach the candidate index in both engines (historical JS false negative)" },
-    { "subject": "Xi Da Wai", "listed": "XI DA WEI", "why": "all-short-token transliterated name with one long token" },
-    { "subject": "Muhammad Alfayed", "listed": "MOHAMMED AL FAYED", "why": "transliteration variant plus particle merge" },
-    { "subject": "Usama bin Ladin", "listed": "USAMA BIN LADIN", "why": "name-particle handling, exact spelling" },
-    { "subject": "Osama Bin Laden", "listed": "USAMA BIN LADIN", "why": "canonical transliteration variant" },
-    { "subject": "Vladimir Putin", "listed": "VLADIMIR PUTIN", "why": "exact designated-name match" },
-    { "subject": "Müller", "listed": "MULLER", "why": "diacritic Latin folds to A-Z in both engines" },
-    { "subject": "Sterling Bullion FZE", "listed": "STERLING BULLION LIMITED", "why": "corporate-suffix stripping leaves the distinctive core in both engines" },
-    { "subject": "HAMAS", "listed": "HAMAS", "why": "short designated entity, near-exact gate" }
+    {
+      "subject": "Kılıç",
+      "listed": "KILIC",
+      "why": "Turkish dotless i must fold identically in both engines (historical JS false negative)"
+    },
+    {
+      "subject": "Yu Li Pang",
+      "listed": "YU LI PING",
+      "why": "two-letter name tokens must reach the candidate index in both engines (historical JS false negative)"
+    },
+    {
+      "subject": "Xi Da Wai",
+      "listed": "XI DA WEI",
+      "why": "all-short-token transliterated name with one long token"
+    },
+    {
+      "subject": "Muhammad Alfayed",
+      "listed": "MOHAMMED AL FAYED",
+      "why": "transliteration variant plus particle merge"
+    },
+    {
+      "subject": "Usama bin Ladin",
+      "listed": "USAMA BIN LADIN",
+      "why": "name-particle handling, exact spelling"
+    },
+    {
+      "subject": "Osama Bin Laden",
+      "listed": "USAMA BIN LADIN",
+      "why": "canonical transliteration variant"
+    },
+    {
+      "subject": "Vladimir Putin",
+      "listed": "VLADIMIR PUTIN",
+      "why": "exact designated-name match"
+    },
+    {
+      "subject": "Müller",
+      "listed": "MULLER",
+      "why": "diacritic Latin folds to A-Z in both engines"
+    },
+    {
+      "subject": "Sterling Bullion FZE",
+      "listed": "STERLING BULLION LIMITED",
+      "why": "corporate-suffix stripping leaves the distinctive core in both engines"
+    },
+    {
+      "subject": "HAMAS",
+      "listed": "HAMAS",
+      "why": "short designated entity, near-exact gate"
+    },
+    {
+      "subject": "Hamas General Trading LLC",
+      "listed": "HAMAS",
+      "why": "short designation + legal-form boilerplate: full=33 drags min() under the near-exact gate while the distinctive core is exact — screened CLEAR in screen.py until 2026-07-29 while the JS engine scored it 100/critical"
+    },
+    {
+      "subject": "Al Qaeda General Trading",
+      "listed": "AL QAEDA",
+      "why": "long entry whose distinctive core is ONE token (AL is a particle), so neither the min() gate (full=50) nor the subset gate (needs >=2 core tokens) could fire — also the score-tie that made screening depend on the process hash seed"
+    }
   ],
   "pairs_note": "Every pair is a TRUE match that both engines must reach. The invariant is engine-to-engine agreement on reachability, not score equality: rapidfuzz and the JS Levenshtein legitimately differ by a point or two (measured: 93 vs 94 on Muhammad Alfayed), so the test asserts both engines HIT, never that they score the same."
 }

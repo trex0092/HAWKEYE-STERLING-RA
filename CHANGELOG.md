@@ -10,6 +10,49 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Matcher — two sanctions false negatives and a nondeterminism defect (2026-07-29)
+
+Found by an adversarial audit of the screening stack; all three reproduced
+against the live matchers before any code changed.
+
+- **A designation embedded in a customer name could screen CLEAR.** The
+  near-exact gate for short (<6 char) entries tested only the decisive
+  `min(full, core)` score, which legal-form boilerplate drags down:
+  **"Hamas General Trading LLC" vs designated "HAMAS"** scores full=33 /
+  core=100 → min=33, so it cleared — while the JS engine scored the same pair
+  100/critical. Same for ISIL, ANO and any short designation plus boilerplate.
+- **The same shape for LONG entries whose distinctive core is one token.**
+  "Al Qaeda General Trading" vs "AL QAEDA": full=50 fails the min() gate, and
+  the token-SUBSET gate cannot fire because `_is_token_subset` requires ≥2 core
+  tokens (its own false-positive guard) and AL is a particle, so the core is
+  just "QAEDA". Both branches now also test the **distinctive core** for a
+  near-exact match. This does not weaken `min()`, which exists for the
+  OPPOSITE shape (full high / core low — two firms sharing only boilerplate).
+  The gate is tight: it fires only when the customer's *entire* distinctive
+  core is the designation, so "Hummus Trading LLC" still clears.
+- **Screening was nondeterministic.** The per-variant winner was "first variant
+  scoring strictly higher", iterated over a Python **set**. String hashes are
+  randomised per process, so on a score TIE between transliteration variants
+  the recorded core — and therefore whether the pair passed the core gates —
+  depended on the hash seed. Measured: the Al Qaeda pair screened HIT under
+  `PYTHONHASHSEED` 0,1,2,4,5,6,8 and **CLEAR under 3,7,9** — same customer,
+  same list, different day. Variants are now iterated **sorted**, with ties
+  broken on core then full, keeping the best-evidenced variant.
+
+Measured effect, both Python backends: **recall 118/121 → 119/121 (97.5% →
+98.3%)** — the recovered case is r081, a Turkish corporate whose `A.S.` /
+`ANONIM SIRKETI` boilerplate is exactly this shape — with the **hard-negative
+clear rate unchanged at 85/85 (100%)**: no false-positive cost. `fn_count_max`
+ratcheted 3 → 2 on both Python backends so the recovered case cannot silently
+regress. Cross-engine parity holds (12/12) and the blocking-equivalence
+property is green under real rapidfuzz. A core-only hit is recorded at the
+conservative min-based score, so it reads as a POSSIBLE match for MLRO
+adjudication and can never be scored as a confirmed designation.
+
+Recorded in `docs/governance/model-validation-2026.md` §5 **pending MLRO
+sign-off** — this is a change to the deterministic engine's matching behaviour
+and needs the MLRO's signature under §4 change control.
+
 ### Screening — coverage alarms turn the run red; onboarding gets the gate chain (2026-07-29)
 
 Two gaps in the loud-failure chain:
