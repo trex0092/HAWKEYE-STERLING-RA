@@ -20,7 +20,8 @@
       "parser": "ofacalt",
       "noHeader": true,
       "mergeInto": "ofac-sdn",
-      "_note": "The SDN's weak/strong a.k.a. names live in this SEPARATE headerless file (ent_num, alt_num, alt_type, alt_name, remarks). The screen folds them into the primary OFAC SDN list (mergeInto) so an alias hit reads as the SDN designation it is — screening sdn.csv's primary names alone is a false-negative gap (a party operating under an SDN alias would screen clear; mirrors screen.py parse_ofac_alt). If this file fails to load, the primary SDN list still screens but is flagged partial: alias coverage missing, standing SDN matches carried forward, never cleared off reduced coverage."
+      "_note": "The SDN's weak/strong a.k.a. names live in this SEPARATE headerless file (ent_num, alt_num, alt_type, alt_name, remarks). The screen folds them into the primary OFAC SDN list (mergeInto) so an alias hit reads as the SDN designation it is — screening sdn.csv's primary names alone is a false-negative gap (a party operating under an SDN alias would screen clear; mirrors screen.py parse_ofac_alt). If this file fails to load, the primary SDN list still screens but is flagged partial: alias coverage missing, standing SDN matches carried forward, never cleared off reduced coverage. COVERAGE FLOOR: minNames is PROVISIONAL and deliberately well below the observed a.k.a. count — it exists to catch a truncated body or a column shift (which would yield hundreds, not thousands), not to police normal churn. Ratchet it toward ~50% of the observed baseline once runs have logged real counts, per the floors-only-rise convention.",
+      "minNames": 5000
     },
     {
       "id": "ofac-consolidated",
@@ -60,5 +61,5 @@
       "minNames": 20000
     }
   ],
-  "_README_minNames": "minNames: per-source coverage floor. A list parsing below it is a truncated download / parser drift, not a mass de-listing: it still screens (hits are real) but is marked partial (standing matches carried, not cleared) and the run reports DEGRADED. Mirrors screen.py CORE_LIST_FLOORS (~50% of verified baselines). Alias files (mergeInto) carry no floor: the fold's partial machinery covers them."
+  "_README_minNames": "minNames: per-source coverage floor. A list parsing below it is a truncated download / parser drift, not a mass de-listing: it still screens (hits are real) but is marked partial (standing matches carried, not cleared) and the run reports DEGRADED. Mirrors screen.py CORE_LIST_FLOORS (~50% of verified baselines). Alias files (mergeInto) carry a floor TOO. They were exempted on the theory that the fold's partial machinery covered them, but that machinery only handles a TOTALLY ABSENT alias file — a truncated-but-nonzero one folded in as full coverage, and because alias hits are recorded under the PRIMARY list name, an alias-derived standing match then cleared as if re-verified."
 }

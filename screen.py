@@ -1874,6 +1874,22 @@ def check_pep(name):
                     "label": str(name).strip(),
                     "description": "screen this subject for PEP/RCA status manually against a domestic register"}
         return {"hit": False}
+    # Every token under 3 characters: the label test below compares only tokens
+    # of 3+ chars, so `want` would be empty, `if want and …` would short-circuit,
+    # and this returned — and CACHED — a confident {"hit": False}. That silently
+    # cleared real people: "Wu Yi" (a former Vice-Premier of China), "Li Na",
+    # "Xi Bo", and the whole shape of East Asian names romanized as two short
+    # syllables. Not screening a name is not the same as screening it clean.
+    # Checked BEFORE the lookup: there is no point spending a Wikidata call (and
+    # a slot in the shared rate gate) on a name this matcher cannot compare.
+    # The worldwide PEP/RCA net still screens these names by exact match, so
+    # this is their second net, not their only one.
+    if str(name).strip() and not [t for t in key.split(" ") if len(t) >= 3]:
+        return {"hit": True, "review": True, "id": "",
+                "category": "MANUAL REVIEW — every name token is too short to auto-screen for PEP",
+                "label": str(name).strip(),
+                "description": "no token of 3+ characters to match on (e.g. a two-syllable "
+                               "romanization); screen this subject for PEP/RCA status manually"}
     if key in _PEP_CACHE:
         return _PEP_CACHE[key]
     # Run-level breaker: once Wikidata refuses this runner, stop paying the
@@ -1900,6 +1916,8 @@ def check_pep(name):
     except Exception as e:
         _pep_failure()
         return {"errored": True, "error": str(e)[:200]}
+    # Tokens the label test compares. Guaranteed non-empty here: a name with no
+    # 3+-char token returned for manual review before the lookup was made.
     want = [t for t in key.split(" ") if len(t) >= 3]
     out = {"hit": False}
     for res in results:
@@ -4755,7 +4773,14 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
     due_on = run_time.strftime("%Y-%m-%d")
     queue = []  # (priority, name, notes)
     for m in possible_matches:
-        new_hits = [h for h in m["hits"] if h.get("is_new")]
+        # Identity-excluded candidates raise no case. The report demotes them
+        # (recorded, reasoned, overrulable) but the CASE QUEUE is where the
+        # MLRO's actual working time goes, and cases are capped per run — so
+        # leaving them here meant a candidate we can already prove is a
+        # different person could consume the cap and push a genuine case into
+        # the backlog. Demotion that stops at the report text is cosmetic.
+        new_hits = [h for h in m["hits"]
+                    if h.get("is_new") and not h.get("identity_excluded")]
         if not new_hits: continue
         top = max(new_hits, key=lambda h: h["score"])
         ctrl = " [OWNERSHIP/CONTROL]" if top.get("control_linkage") else ""

@@ -180,6 +180,19 @@ check("aliases still fold into a loaded primary",
 _pep_nl = screen.check_pep("محمد عبدالله")
 check("non-Latin PEP name is surfaced for manual review (not silently cleared)",
       _pep_nl.get("hit") is True and _pep_nl.get("review") is True and "MANUAL REVIEW" in _pep_nl.get("category", ""))
+# A name whose EVERY token is under 3 characters has no token the matcher will
+# compare, so the label test short-circuited and the function returned — and
+# CACHED — a confident {"hit": False}. That silently cleared real people: "Wu Yi"
+# is a former Vice-Premier of China, and the whole shape of East Asian names
+# romanized as two short syllables screened clean.
+for _short in ("Wu Yi", "Li Na", "Xi Bo"):
+    screen._PEP_CACHE.pop(screen._norm_lower(_short), None)
+    _r = screen.check_pep(_short)
+    check(f"'{_short}' routes to manual PEP review, never a confident 'no PEP'",
+          _r.get("review") is True and "MANUAL REVIEW" in _r.get("category", ""))
+    check(f"'{_short}' is not cached as a clean no-hit",
+          not (screen._PEP_CACHE.get(screen._norm_lower(_short)) or {}).get("hit") is False
+          or screen._norm_lower(_short) not in screen._PEP_CACHE)
 
 # A non-Latin-script name normalises to empty and so cannot be auto-matched — it
 # must NOT be filed "clear"; it is surfaced for manual screening instead.
@@ -1795,6 +1808,39 @@ check("a MATCHING nationality never excludes, however far the years are",
           "KHAN, Mohammed", {"dob": "September 06, 1980", "nationality": "Afghanistan"}) is None)
 check("an entry with no published attributes at all is never excluded",
       screen.identity_exclusion_reason("Totally Unknown Entry", _cust) is None)
+# The demotion has to reach the CASE QUEUE, not just the report text. Cases are
+# capped per run, so an excluded candidate left in the queue could consume the
+# cap and push a genuine case into the backlog — demotion that stops at the
+# report is cosmetic.
+import datetime as _dtmod
+_case_names = []
+class _CaseResp:
+    status_code = 201
+    text = ""
+    @staticmethod
+    def json(): return {"data": {"gid": "1"}}
+def _rec_case(method, url, **kw):
+    _case_names.append(((kw.get("json") or {}).get("data") or {}).get("name", ""))
+    return _CaseResp()
+_mk_match = lambda excl: [{"name": "Acme", "permalink": "p", "gid": "g", "hits": [
+    {"is_new": True, "score": 78, "list": "OFAC SDN", "matched_entry": "KHAN, Mohammed",
+     "subject_type": "INDIVIDUAL", "subject_name": "A", "identity_excluded": excl}]}]
+_orig_ar = screen.asana_request
+try:
+    screen.asana_request = _rec_case
+    _case_names.clear()
+    screen.open_mlro_cases("parent", _mk_match(None), [], [], _dtmod.datetime(2026, 7, 30))
+    _n_open = len(_case_names)
+    _case_names.clear()
+    screen.open_mlro_cases("parent", _mk_match("25-year gap AND a different nationality"),
+                           [], [], _dtmod.datetime(2026, 7, 30))
+    _n_excl = len(_case_names)
+finally:
+    screen.asana_request = _orig_ar
+check("an open candidate still raises an MLRO case", _n_open == 1)
+check("an identity-excluded candidate raises NO case (the queue, not just the report)",
+      _n_excl == 0)
+
 _prev_ie = screen.IDENTITY_EXCLUSION
 screen.IDENTITY_EXCLUSION = False
 check("kill-switch IDENTITY_EXCLUSION=0 excludes nothing",

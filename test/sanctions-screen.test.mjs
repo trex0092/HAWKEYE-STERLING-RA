@@ -358,6 +358,64 @@ const mx3 = diffState(mx1.nextState, [sanctionsOnlyOk], '2026-07-26', 0.85, ['OF
 check('once enrichment completes and the PEP hit is gone, the record updates (one changed-alert)',
   mx3.alerts.length === 1 && mx3.nextState.subjects.m.lists.join() === 'OFAC SDN');
 
+/* ── "not re-checked" must never read as "checked and clear" ──────────────────
+   Three routes to the same false negative, all of which ended in the record
+   being DELETED and its MLRO case auto-completed with the comment "not flagged
+   by the … screening run" — a false statement in a ten-year audit trail, and a
+   completed case never re-opens. */
+const ALL_SIGNALS = ['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice'];
+const mixedStanding = () => ({ updated: null, subjects: { m: {
+  name: 'M Co', band: 'high', topScore: 96, recommendation: 'sanctions-match',
+  lists: ['OFAC SDN', 'PEP (Wikidata)'], signature: 's', firstSeen: '2026-07-01', lastSeen: '2026-07-25' } } });
+const clearRow = (extra = {}) => Object.assign(normalizeResult(
+  { name: 'M Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] },
+  { key: 'm', name: 'M Co' }), extra);
+
+// 1. MIXED prior whose SANCTIONS half genuinely clears while enrichment was
+//    budget-skipped. The old guard required prior.lists.EVERY(enrichment), so a
+//    mixed prior fell through it and the unverified PEP evidence was deleted.
+const un1 = diffState(mixedStanding(), [clearRow({ enrichmentIncomplete: true })],
+  '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('a MIXED standing match is not wiped when enrichment could not be re-verified',
+  un1.cleared.length === 0 && !!un1.nextState.subjects.m
+  && un1.nextState.subjects.m.lists.includes('PEP (Wikidata)'));
+
+// 2. The enrichment MODULE was switched off (SCREEN_PEP=0 — the knob most
+//    likely to be reached for DURING a Wikidata outage). No lookup runs, so no
+//    per-subject flag is set and the row is indistinguishable from a verified
+//    clear: every PEP-derived match in the book cleared at once.
+const un2 = diffState(mixedStanding(), [clearRow({ enrichmentIncomplete: false })],
+  '2026-07-26', 0.85, ['OFAC SDN'], ['Adverse media (Google News)']);   // PEP not evaluated
+check('a standing match is not cleared by a signal whose MODULE did not run',
+  un2.cleared.length === 0 && !!un2.nextState.subjects.m);
+
+// 3. The subject left the fetched population entirely (task completed, renamed,
+//    deleted, or a project GID narrowed). diffState only iterates `results`, so
+//    the subject kept a stale lastSeen that the case planner reads as
+//    "no longer flagged" and auto-completes on.
+const un3 = diffState(mixedStanding(), [], '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('a subject that left the population is HELD, not cleared',
+  un3.cleared.length === 0 && !!un3.nextState.subjects.m);
+check('its case is kept open (lastSeen bumped) and the reason recorded',
+  un3.nextState.subjects.m.lastSeen === '2026-07-26'
+  && un3.nextState.subjects.m.notScreenedOn === '2026-07-26');
+check('the population change is surfaced to the caller, not silently absorbed',
+  un3.notScreened.length === 1 && un3.notScreened[0].key === 'm'
+  && un3.notScreened[0].lastScreened === '2026-07-25');
+
+// CONTROL — the guards must not freeze state forever: a genuine de-listing,
+// fully re-screened with every signal evaluated, must STILL clear.
+const un4 = diffState(mixedStanding(), [clearRow({ enrichmentIncomplete: false })],
+  '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('a genuine de-listing still clears when everything WAS re-verified',
+  un4.cleared.length === 1 && !un4.nextState.subjects.m);
+// Back-compat: callers that pass no evaluatedSignals (external engine path,
+// older tests) keep the previous behaviour — the guard is inactive, not fatal.
+const un5 = diffState(mixedStanding(), [clearRow({ enrichmentIncomplete: false })],
+  '2026-07-26', 0.85, ['OFAC SDN']);
+check('omitting evaluatedSignals leaves behaviour unchanged (guard inactive)',
+  un5.cleared.length === 1);
+
 /* ── wiring pins: red unscreened bail + retry/liveness contract ── */
 const screenSrc = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
 const screenYml = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');
@@ -416,6 +474,41 @@ for (const s of extraReg.filter(s => s.enabled !== false && !s.optional)) {
 }
 check('the optional internal watchlist carries NO floor (empty is a valid state)',
   !extraReg.find(s => s.id === 'internal-watchlist').minNames);
+
+/* ── A truncated ALIAS file must not read as full coverage ────────────────────
+   Alias sources were exempted from floors on the theory that the fold's
+   `partial` machinery covered them. It does not: that machinery only fires when
+   the alias file is TOTALLY ABSENT. A truncated-but-nonzero alt.csv (partial
+   body, or an OFAC column shift) folded into the primary as if complete — and
+   because alias hits are recorded under the PRIMARY list's name, an
+   alias-derived standing match then cleared as though re-verified, with its
+   MLRO case auto-completed. Two halves, both needed. */
+const aliasSrc = srcReg.find(s => s.id === 'ofac-sdn-alt');
+check('the alias file carries its own coverage floor', Number(aliasSrc.minNames) > 0);
+check('a truncated alias parse is below that floor',
+  belowFloor(aliasSrc, Array.from({ length: 800 }, (_, i) => 'A' + i)));
+check('a healthy alias parse is not',
+  !belowFloor(aliasSrc, Array.from({ length: 17000 }, (_, i) => 'A' + i)));
+// The fold splices the alias row out, so a `partial` flag on it must be
+// PROPAGATED onto the primary or it vanishes silently.
+const _fl = [{ id: 'ofac-sdn', name: 'US OFAC — SDN list (CSV)', names: ['REAL PRIMARY'] },
+             { id: 'ofac-sdn-alt', name: 'US OFAC — SDN a.k.a. list (alt.csv)', names: ['ONE ALIAS'], partial: true }];
+const _fold = foldAliasSources(_fl, srcReg);
+check('reduced alias coverage marks the PRIMARY partial (it survives the fold)',
+  _fl[0].partial === true);
+check('and says so, so the report is not silently narrower',
+  _fold.notes.some(n => /INCOMPLETE a\.k\.a\./.test(n)));
+// A fully-loaded alias must NOT mark the primary partial, or every run degrades.
+const _fl2 = [{ id: 'ofac-sdn', name: 'US OFAC — SDN list (CSV)', names: ['REAL PRIMARY'] },
+              { id: 'ofac-sdn-alt', name: 'US OFAC — SDN a.k.a. list (alt.csv)', names: ['ALIAS ONE'] }];
+foldAliasSources(_fl2, srcReg);
+check('a COMPLETE alias fold leaves the primary fully re-verified',
+  !_fl2[0].partial && _fl2[0].names.includes('ALIAS ONE'));
+// End-to-end: partial primary must be excluded from screenedLists, which is what
+// makes diffState carry standing matches instead of clearing them.
+const _screened = [_fl[0]].filter(L => !L.partial).map(L => L.name);
+check('a partial primary is excluded from screenedLists (matches carried, not cleared)',
+  _screened.length === 0);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

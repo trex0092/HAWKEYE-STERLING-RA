@@ -10,6 +10,110 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Case engine — a truncated alias file read as full coverage (2026-07-29)
+
+Alias sources (OFAC's `alt.csv`, folded into the SDN list via `mergeInto`) were
+deliberately exempted from coverage floors, on the reasoning — written into
+`_README_minNames` when the floors landed hours earlier — that "the fold's
+partial machinery covers them". **It does not.** That machinery fires only when
+the alias file is TOTALLY ABSENT. A truncated-but-nonzero `alt.csv` (a partial
+body, or an OFAC column shift that makes the parser return whatever it can)
+took the healthy path: no floor to fail, counted as fetched, so the run was not
+even DEGRADED.
+
+Then the fold made it invisible. `foldAliasSources` merges the alias names into
+the primary and **splices the alias row out**, never reading its `partial` flag
+— so even an alias list explicitly marked partial came out clean. Because alias
+hits are recorded under the **primary list's name**, an alias-derived standing
+match is indistinguishable from a primary one: the primary counted as fully
+re-verified, entered `screenedLists`, and `diffState` cleared the match and
+auto-completed its MLRO case.
+
+Both halves fixed: the alias source now carries its own `minNames` floor
+(provisional, sized to catch truncation rather than police churn), and the fold
+**propagates** reduced alias coverage onto the primary with a note, so the
+primary is excluded from `screenedLists` and its standing matches are carried
+forward rather than cleared. A complete alias fold still leaves the primary
+fully re-verified, so a healthy run does not degrade.
+
+### Screening — identity exclusion now reaches the CASE QUEUE (2026-07-29)
+
+The identity-based demotion shipped hours earlier removed a candidate from the
+report's primary queue but **not from case creation**: `open_mlro_cases`
+filtered on `is_new` alone. Cases are capped per run, so a candidate we can
+already prove is a different person could consume that cap and push a genuine
+case into the backlog — and the MLRO's working time lives in the case queue, not
+in the report text. Demotion that stops at the report is cosmetic. Excluded
+candidates now raise no case; they remain in the report under their heading with
+the reason, and in the record.
+
+### Matcher / PEP — two more silent false negatives (2026-07-29)
+
+Both surfaced by adjudicating audit leads that had never actually been
+adjudicated, and both reproduced against the live engines before any change.
+
+- **German sharp-s was not folded by the JS engine.** `ß` has no NFKD
+  decomposition and lower-casing leaves it alone, so `Weiß` and its universal
+  ASCII spelling `Weiss` normalized to different strings. `screen.py` folds it
+  (its uppercase-first path maps ß→SS), so **designated "Weiß Trading" scored
+  100 in Python and 0 — a clean CLEAR — in the JS engine**, and
+  `lostScriptLetters` returns false for ß so it was not even routed to MANUAL
+  REVIEW. Longer names could survive on fuzzy similarity; short ones cleared
+  outright. This is precisely the class the cross-engine parity test exists to
+  catch (Turkish ı, two-letter tokens) — the corpus simply had no ß name, so the
+  pair is now pinned there. Fold is strictly widening.
+- **A PEP name whose every token is under 3 characters could never hit.** The
+  label test compares only tokens of 3+ characters, so for such a name the
+  token list was empty, `if want and …` short-circuited, and `check_pep`
+  returned — and **cached** — a confident `{"hit": false}`. That silently
+  cleared real people: **"Wu Yi" is a former Vice-Premier of China**, and the
+  whole shape of East Asian names romanized as two short syllables screened
+  clean. They now route to manual PEP/RCA review, like the existing non-Latin
+  path. The check runs BEFORE the lookup, so it also stops spending a Wikidata
+  call and a shared rate-gate slot on a name the matcher cannot compare. The
+  worldwide PEP/RCA net still screens these names by exact match, so this is
+  their second net, not their only one.
+
+
+### Case engine — "not re-checked" must never read as "checked and clear" (2026-07-29)
+
+Three routes to the same false negative in `scripts/sanctions-screen.mjs`, all
+ending the same way: the standing match **deleted from state** and its open MLRO
+case auto-completed with the comment *"not flagged by the … screening run"* — a
+statement that is false, written into a record kept for ten years, and a
+completed case never re-opens. All three were reproduced against the live engine
+before anything changed.
+
+- **A MIXED standing match was wiped when only its sanctions half was
+  re-verified.** The guard required `prior.lists.every(ENRICHMENT)`, so a prior
+  of `['OFAC SDN', 'PEP (Wikidata)']` fell straight through it: on a run where
+  OFAC genuinely de-listed the subject and the PEP lookup errored or was
+  budget-skipped (routine on a large book), the never-re-verified PEP evidence
+  was deleted. Now **any** enrichment evidence on the prior blocks the clear.
+- **Switching an enrichment module off mass-cleared its standing matches.**
+  `enrichmentIncomplete` is only set when a module is configured ON and then
+  errors or runs out of budget; a module that is simply OFF performs no lookup
+  and sets no flag, making the row indistinguishable from a verified clear. So
+  `SCREEN_PEP=0` — the documented knob, most likely to be reached for **during**
+  a Wikidata outage, exactly when standing matches most need preserving —
+  cleared every PEP-derived match in the book in one run. `diffState` now takes
+  an **`evaluatedSignals`** set (the enrichment counterpart of `screenedLists`)
+  and carries forward any prior whose signal did not actually run.
+- **A subject that left the screened population kept a stale `lastSeen`.** The
+  loop only ever iterates this run's `results`, so a subject whose task was
+  completed, renamed, deleted — or whose project GID was narrowed — was never
+  seen, never cleared, and never marked. The case planner read the stale date as
+  "no longer flagged" and auto-completed on it. Such subjects are now **held**:
+  `lastSeen` is bumped so the case stays open, `notScreenedOn` records why, and
+  they are returned to the caller and logged so the population change is visible.
+  A subject that genuinely left the book still needs a human to dispose of its
+  case.
+
+Guarded against over-correction: a genuine de-listing, fully re-screened with
+every signal evaluated, still clears — pinned by a control test — and callers
+that pass no `evaluatedSignals` keep the previous behaviour.
+
+
 ### Screening — false positives: identity-based demotion, never suppression (2026-07-29)
 
 The volume problem is real and measured: in the 29 Jul run a single subject

@@ -34,6 +34,17 @@ export function normalizeName(s) {
        via its uppercase-first ASCII path; this restores parity). Fold is
        strictly widening: ı-vs-ı pairs matched before and still do. */
     .replace(/ı/g, 'i')
+    /* German sharp-s: exactly the same class as the ı above, and found the same
+       way — by comparing the two engines rather than by reasoning. ß has no
+       NFKD decomposition and lower-casing leaves it alone, so "Weiß" and its
+       universal ASCII spelling "Weiss" normalized to different strings. screen.py
+       folds it (its uppercase-first path maps ß→SS, the Unicode uppercase of ß),
+       so the designated "Weiß Trading" scored 100 there and 0 here — a silent
+       cross-engine false negative, and lostScriptLetters returns false for ß so
+       it was not even routed to MANUAL REVIEW. Longer names could survive on
+       fuzzy similarity; short ones cleared outright. Strictly widening, like the
+       ı fold: ß-vs-ß pairs matched before and still do. */
+    .replace(/ß/g, 'ss')
     .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
