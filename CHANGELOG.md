@@ -10,6 +10,21 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Advisor — the default mode is Balanced, as the model card always claimed (2026-07-29)
+
+The backend defaults to `balanced` (`claude-sonnet-5`) and the model card
+documents that as the default — but the UI booted on **Speed**, so every
+operator's first answer actually came from `claude-haiku-4-5`, the weakest
+model. On a surface whose known risk is **automation bias** (R-10 — the
+operator trusting the output too much), defaulting to the least capable
+reasoning is the worst possible pairing, and the documented default and the
+experienced default disagreed: the paper-vs-practice gap in one line of state.
+
+The UI now boots on **Balanced**. Speed and Deep remain one click away —
+deliberate choices, not starting points — and the browser check pins the boot
+default so it cannot silently drift again.
+
+
 ### Advisor — deep mode works on a default site, the eval covers every model and fires on model change, and the downgrade banner is browser-verified (2026-07-29)
 
 Three residual limitations from the morning's model refresh, each stated at the
