@@ -245,7 +245,8 @@ except Exception as e:
 #   breach - the file is present but parsed below floor (corruption/
 #            truncation): compute NO results, deliver a REFUSAL
 #            notice instead of a report, fail AFTER delivery.
-_floors = {"OFAC SDN": 1000, "UN Consolidated": 200, "EU FSF": 500, "UK OFSI": 1000, "UAE EOCN": 100}
+_floors = {"OFAC SDN": 1000, "UN Consolidated": 200, "EU FSF": 500, "UK OFSI": 1000, "UAE EOCN": 100,
+           "Australia DFAT": 500, "Switzerland SECO": 500}
 _srcfile = {"OFAC SDN": "/tmp/ofac_sdn.xml", "UN Consolidated": "/tmp/un_consolidated.xml",
             "EU FSF": "/tmp/eu_sanctions.xml", "UK OFSI": "/tmp/uk_ofsi.csv",
             "UAE EOCN": "data/eocn-local-terrorist-list.json"}
@@ -258,6 +259,11 @@ _obtained = {_l: os.path.exists(_p) and os.path.getsize(_p) > 0 for _l, _p in _s
 # extracted, so an empty/corrupt/absent local file degrades (like the
 # engine) instead of refusing the whole run.
 _obtained["UAE EOCN"] = _by_list.get("UAE EOCN", 0) > 0
+# AU/CH are downloaded live by the engine (no /tmp source file on this retired
+# manual path), so "obtained" is names-extracted — a fetch failure classifies as
+# an outage (screen DEGRADED, fail after delivery), never as a refusal.
+_obtained["Australia DFAT"] = _by_list.get("Australia DFAT", 0) > 0
+_obtained["Switzerland SECO"] = _by_list.get("Switzerland SECO", 0) > 0
 _enforce = os.environ.get("LIST_FLOORS_ENFORCE", "1") == "1"
 _short = [_l for _l in _floors if _by_list.get(_l, 0) < _floors[_l]]
 _outages = [_l for _l in _short if not _obtained[_l]]
