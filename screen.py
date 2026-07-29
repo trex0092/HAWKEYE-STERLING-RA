@@ -4040,11 +4040,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     # is labelled mirror-assisted so the MLRO knows the primary source was down.
     pep_degraded = stats.get("pep_errors", 0) > 0
     pep_mirror = stats.get("pep_mirror", 0)
-    # Sanctions coverage: DEGRADED if ANY core list failed to load (not just if all
-    # of them did) — a run missing 1 of 5 core lists is not a clean "OK". EOCN is
-    # tier "core" in list_meta and must count here too: a dead local-terrorist
-    # list parse is a coverage loss, not an OK run.
-    core_loaded = [list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu","eocn")]
+    # Sanctions coverage: DEGRADED if ANY core list failed to load (not just if
+    # all of them did) — a run missing one core list is not a clean "OK". The
+    # core set is DERIVED from list_meta's tier, never enumerated here: this
+    # line silently missed AU and CH for a few hours on 2026-07-29 because it
+    # hardcoded the original five, which is exactly how a new core list's
+    # outage would have stopped flipping the banner.
+    # An entry with NO tier counts as core (fail-closed): a list_meta built
+    # without tiers must never make this comprehension empty — all([]) is True,
+    # which would read a fully-untagged meta as clean coverage.
+    core_loaded = [m.get("count", 0) > 0 for m in list_meta.values() if m.get("tier", "core") == "core"]
     sanc_ok = all(core_loaded)
     # Adverse-media coverage, three-state: DEGRADED only when subjects had ZERO
     # adverse coverage from ANY net (news dead AND no watchlist); DEGRADED (news)

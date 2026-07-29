@@ -114,9 +114,11 @@ def qa_gate(possible_matches, adverse_findings, pep_findings, list_meta, stats):
     still posts, degrading loudly) but is surfaced for the MLRO."""
     issues = []
 
-    # Degrade-loudly: the five CORE lists must have loaded.
+    # Degrade-loudly: every CORE list must have loaded (seven since 2026-07-29:
+    # AU DFAT and CH SECO joined the original five).
     for k, label in [("ofac", "OFAC SDN"), ("un", "UN"), ("uk", "UK OFSI"),
-                     ("eu", "EU FSF"), ("eocn", "UAE EOCN")]:
+                     ("eu", "EU FSF"), ("au", "Australia DFAT"),
+                     ("ch", "Switzerland SECO"), ("eocn", "UAE EOCN")]:
         if list_meta.get(k, {}).get("count", 0) <= 0:
             issues.append(f"core list {label} unavailable — sanctions module must read DEGRADED")
 
@@ -202,7 +204,7 @@ def build_attestation(audit, ai_mode, injection_blocked, list_meta):
     qa = audit.get("qa", {})
     viol = audit.get("cred_violations") or []
     core_ok = all(list_meta.get(k, {}).get("count", 0) > 0
-                  for k in ("ofac", "un", "uk", "eu", "eocn"))
+                  for k in ("ofac", "un", "uk", "eu", "au", "ch", "eocn"))
     privacy = ("on-runner, no data egress (no LLM key)" if ai_mode == "deterministic"
                else "LLM key present → PDPL data-processing assessment required")
     rows = [

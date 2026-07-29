@@ -10,6 +10,28 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — the core-list set stops being hardcoded in four places (2026-07-29)
+
+Self-audit of the morning's AU/CH core-list addition found **four places that
+still enumerated the original five lists** — each one a spot where an Australia
+or Switzerland outage would have been invisible to that specific control while
+the floors and outage gate caught it elsewhere:
+
+- `screen.py` — the report's **DEGRADED banner** derived coverage from a
+  hardcoded five-tuple. Now derived from `list_meta`'s tier, with **no tier
+  defaulting to core (fail-closed)** — the engine test proved the first draft of
+  this fix fail-open: an untagged meta made the comprehension empty and
+  `all([])` read as clean coverage.
+- `agents.py` — the **QA gate** checked five core lists; an AU/CH outage would
+  have passed QA silently. Now seven.
+- `agents.py` — the per-run **attestation**'s `core_ok` likewise. Now seven.
+- `scripts/daily-screen-run.py` — the retired manual path's floor
+  classification now floors AU/CH too, with obtained-from-results semantics
+  (like EOCN), so a fetch failure classifies as an outage, never a refusal.
+
+Test fixtures updated to the seven-list core meta. 73/73 checks pass.
+
+
 ### Screening — the DEGRADED cause is fixed (not the flag), AU + CH become core lists, and staff join the screening population (2026-07-29)
 
 **Diagnosis first.** The daily screen has run green every day — what was failing

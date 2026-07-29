@@ -552,13 +552,13 @@ qa_ok = agents.qa_gate(
     [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}], "risk": {"rating": "HIGH"}}],
     [{"subject_name": "X", "articles": [{"url": "http://a", "triage": {"ai": True}}]}],
     [{"subject_name": "P", "id": "Q1"}],
-    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}}, {})
+    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "au": {"count": 1}, "ch": {"count": 1}, "eocn": {"count": 1}}, {})
 check("QA gate passes a clean report", qa_ok["passed"])
 qa_bad = agents.qa_gate(
     [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}]}],   # no risk rating
     [{"subject_name": "X", "articles": [{"triage": {"injection_suspected": ["x"], "ai": True}}]}],  # injection model-classified + no url
     [{"subject_name": "P"}],  # PEP missing source
-    {"ofac": {"count": 0}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}}, {})  # OFAC down
+    {"ofac": {"count": 0}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "au": {"count": 1}, "ch": {"count": 1}, "eocn": {"count": 1}}, {})  # OFAC down
 check("QA gate catches integrity violations", (not qa_bad["passed"]) and len(qa_bad["issues"]) >= 4)
 
 # ── regression tests for the deep-audit fixes ────────────────────────────────
@@ -613,7 +613,7 @@ for act, secret in agents.ACTION_CREDENTIAL.items():
 att = agents.build_attestation(
     {"qa": {"passed": True}, "creds": {"events": []}, "cred_violations": []},
     "deterministic", 0,
-    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}})
+    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "au": {"count": 1}, "ch": {"count": 1}, "eocn": {"count": 1}})
 check("attestation lists all 10 framework controls", att.count("GOVERNANCE ·") == 5 and att.count("COMPLIANCE ·") == 5)
 check("attestation reports ALL CONTROLS ATTESTED on a clean run", "ALL CONTROLS ATTESTED" in att)
 
@@ -770,7 +770,7 @@ check("without a today reference, staleness is inactive (backward compatible)",
 # coverage + runtime anomalies feed the QA gate (degrade loudly)
 _qa_cov = agents.qa_gate(
     [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}], "risk": {"rating": "HIGH"}}], [], [],
-    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}},
+    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "au": {"count": 1}, "ch": {"count": 1}, "eocn": {"count": 1}},
     {"coverage": {"alarms": ["OFAC dropped 50%"]}, "monitoring": {"anomalies": ["latency 900s"]}})
 check("QA gate surfaces coverage drift + runtime anomaly as issues", (not _qa_cov["passed"]) and len(_qa_cov["issues"]) == 2)
 
