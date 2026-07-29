@@ -175,7 +175,7 @@ def main():
             print(f"   MISS (false negative): '{c}'  ↮  '{d}'")
     gap = max(recalls.values()) - min(recalls.values())
     print("\n" + "-" * 64)
-    print(f"Per-group recall: " + ", ".join(f"{g} {r*100:.0f}%" for g, r in recalls.items()))
+    print("Per-group recall: " + ", ".join(f"{g} {r*100:.0f}%" for g, r in recalls.items()))
     print(f"Fairness gap (max-min recall): {gap*100:.0f}%   (limit {MAX_RECALL_GAP*100:.0f}%)")
 
     # False-positive control (must hold across groups).

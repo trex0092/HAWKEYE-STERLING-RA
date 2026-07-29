@@ -168,7 +168,20 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile the Python screening engine
-        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py
+        # scripts/daily-screen-*.py were inline heredocs in
+        # daily-sanctions-screen.yml until 2026-07-29 — ~840 lines of the daily
+        # screening path that no compile step, test or linter could reach
+        # because they lived inside a YAML string. They are ordinary files now,
+        # so they compile here with everything else.
+        # str_dossier.py was missing from this list while being exercised by
+        # test/engine_test.py — tested, but never syntax-gated.
+        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py str_dossier.py scripts/matcher-parity-probe.py scripts/daily-screen-fetch.py scripts/daily-screen-run.py scripts/daily-screen-report.py
+      - name: Run cross-engine matcher parity (screen.py vs sanctions-match.mjs)
+        # Runs here, AFTER setup-python, because it drives both engines: the node
+        # test shells to scripts/matcher-parity-probe.py. The per-backend accuracy
+        # floors compare each engine to ITSELF and are blind to drift between the
+        # two — this is the only check that compares them to EACH OTHER.
+        run: node test/matcher-parity.test.mjs
       - name: Run Python engine unit tests (screen + ai + agents + kyc + txn + monitoring)
         run: python test/engine_test.py
       - name: Run formal bias / fairness evaluation (R-05 — cross-script recall parity)
@@ -267,12 +280,8 @@ jobs:
       - name: Install the hash-locked engine dependencies (incl. hypothesis)
         run: python -m pip install --quiet --require-hashes -r ci/requirements.txt
       - name: Run property-based fuzzing of the text-normalisation layer (hypothesis)
-        env:
-          ASANA_TOKEN: dummy   # screen.py requires it at import; never used by the properties
         run: python test/fuzz_properties.py
       - name: Run screening accuracy benchmark — Python rapidfuzz backend (authoritative floors)
-        env:
-          ASANA_TOKEN: dummy   # screen.py requires it at import; never used by the benchmark
         run: python test/benchmark_eval.py
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

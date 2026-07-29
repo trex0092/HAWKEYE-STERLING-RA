@@ -1,8 +1,9 @@
 name: Lint
 
-# ESLint on the Node scripts/tests/functions (real-breakage rules only) and
-# HTMLHint on the three screens. ESLint is enforced; HTMLHint is reported but
-# non-blocking (the hand-written HTML uses patterns HTMLHint is picky about).
+# ESLint on the Node scripts/tests/functions and Ruff on the Python screening
+# engine — both scoped to real-breakage rules only — plus HTMLHint on the three
+# screens. ESLint and Ruff are enforced; HTMLHint is reported but non-blocking
+# (the hand-written HTML uses patterns HTMLHint is picky about).
 
 on:
   pull_request:
@@ -36,12 +37,17 @@ jobs:
             objects.githubusercontent.com:443
             nodejs.org:443
             registry.npmjs.org:443
+            pypi.org:443
+            files.pythonhosted.org:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
 
       - name: Install the pinned dev toolchain
         # npm ci restores the exact package-lock.json versions instead of the
@@ -52,6 +58,16 @@ jobs:
 
       - name: ESLint (app logic, scripts, tests, functions)
         run: npm run lint
+
+      - name: Install the pinned Ruff
+        run: pip install --quiet --require-hashes -r ci/ruff-requirements.txt
+
+      - name: Ruff (Python screening engine, real-breakage rules only)
+        # Until 2026-07-29 the ~5,900 lines of Python that make the screening
+        # decisions had no static analysis at all — `py_compile` (a syntax
+        # check) was the only gate. Rule selection lives in pyproject.toml and
+        # mirrors the ESLint scope above: pyflakes correctness, not formatting.
+        run: ruff check .
 
       - name: HTMLHint (screens) — report only
         continue-on-error: true

@@ -65,16 +65,12 @@ jobs:
 
       - name: Reconcile the local list against the OpenSanctions mirror
         id: reconcile
-        env:
-          # `import screen` reads ASANA_TOKEN unconditionally at module load
-          # (screen.py config) and KeyErrors without it — which killed every run
-          # of this workflow at the import line. This step only uses the pure
-          # list helpers (load_eocn_mirror + crosscheck_eocn: an OpenSanctions
-          # download and set arithmetic) and never calls Asana, so a placeholder
-          # satisfies the import WITHOUT handing a live credential to a step
-          # that parses an external download. The real secret stays confined to
-          # the "File the review task in Asana" step below.
-          ASANA_TOKEN: import-only-placeholder
+        # No Asana credential here by design: this step only uses the pure list
+        # helpers (load_eocn_mirror + crosscheck_eocn — an OpenSanctions download
+        # and set arithmetic) and never calls Asana. screen.py no longer demands
+        # a token at import, so the placeholder that used to be needed here is
+        # gone; the real secret stays confined to the "File the review task in
+        # Asana" step below.
         run: |
           python3 << 'PYEOF'
           import datetime, json, os, sys

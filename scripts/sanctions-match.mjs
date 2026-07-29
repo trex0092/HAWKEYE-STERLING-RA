@@ -53,6 +53,21 @@ const CORP_STOP = new Set([
 
 /* Significant tokens of a normalized name (drop corp/common words, very short
    tokens and pure digits). Used both for candidate lookup and token scoring.
+
+   The ≥2 length floor is screen.py parity (core_tokens: `len(t) > 1`). It used
+   to be ≥3 here, which silently dropped two-letter name tokens from the
+   candidate index — so a subject whose only shared tokens were two letters long
+   had NO candidate path and cleared, while screen.py hit it. Measured on a
+   mixed-length transliterated name ("Yu Li Pang" vs listed "YU LI PING"): JS
+   cleared, Python scored 90. Same failure shape as the Turkish-ı miss in
+   normalizeName above, and the same class the phonetic layer exists to prevent:
+   a silent cross-engine false negative. Restoring parity is recall-monotone —
+   it only ever ADDS candidates — and moved no benchmark floor.
+
+   NOTE this is deliberately NOT the gate for "can this name be auto-screened at
+   all" — see screenableTokens below, which keeps the stricter ≥3 rule so an
+   all-two-letter name still routes to MANUAL REVIEW rather than being fuzzed.
+
    HOT PATH: similarity()/isTokenSubset() recompute an entry's tokens for every
    (variant × candidate) pair, so results are memoized by the normalized string
    (bounded, and frozen — treat the returned array as read-only). */
@@ -64,7 +79,7 @@ export function sigTokens(norm) {
   if (hit) return hit;
   const out = [];
   for (const t of key.split(' ')) {
-    if (t.length < 3) continue;
+    if (t.length < 2) continue;
     if (/^\d+$/.test(t)) continue;
     if (CORP_STOP.has(t)) continue;
     out.push(t);
@@ -72,6 +87,15 @@ export function sigTokens(norm) {
   Object.freeze(out);
   if (SIG_CACHE.size < SIG_CACHE_MAX) SIG_CACHE.set(key, out);
   return out;
+}
+
+/* Tokens distinctive enough for the name to be AUTO-screenable: sigTokens minus
+   the two-letter ones. A name with none of these ("Yu Li", a symbols-only
+   record) has no distinctive handle for a human to trust an automated clear on,
+   so screenName routes it to MANUAL REVIEW instead. Kept separate from
+   sigTokens so widening candidate recall can never quietly narrow that gate. */
+export function screenableTokens(norm) {
+  return sigTokens(norm).filter((t) => t.length >= 3);
 }
 
 /* ── Delimited / structured list parsers ──────────────────────────────────── */
@@ -977,7 +1001,7 @@ export function screenName(name, index, threshold = 85, phonetic = '1') {
      candidate path: returning "clear" would be a silent sanctions false
      negative. Route it to MANUAL REVIEW instead (screen.py _unscreenable /
      _manual_review_hit parity). An exact designated-name match still wins. */
-  const toks = sigTokens(norm);
+  const toks = screenableTokens(norm);
   if (!exactAny && (!norm || !toks.length)) {
     return {
       name, topScore: 0, band: 'medium', recommendation: 'review', hitCount: 1,

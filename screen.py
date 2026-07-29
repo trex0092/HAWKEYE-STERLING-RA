@@ -39,7 +39,24 @@ except ImportError:
     import pdfplumber
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-ASANA_TOKEN           = os.environ["ASANA_TOKEN"]
+# Asana credential — accept EITHER name. The .mjs scripts, every workflow and
+# .env.example all use ASANA_ACCESS_TOKEN; screen.py alone required ASANA_TOKEN
+# and read it with an unguarded os.environ[...] AT IMPORT, so copying
+# .env.example to .env and running `python screen.py` raised KeyError before a
+# line of the engine ran. Four call sites that only want the matcher worked
+# around it by injecting a placeholder credential.
+#
+# The import no longer fails. The safety the hard failure provided — never call
+# Asana unauthenticated — moves to asana_request(), the single call path, where
+# it belongs: a missing credential now fails at the moment Asana is actually
+# used, with a message that says why it matters, instead of blocking consumers
+# that never touch Asana at all.
+#
+# Resolution is normalised back into the environment so agents.py's credential
+# broker (which audits presence BY NAME) and any subprocess see one name.
+ASANA_TOKEN           = os.environ.get("ASANA_TOKEN") or os.environ.get("ASANA_ACCESS_TOKEN") or ""
+if ASANA_TOKEN:
+    os.environ["ASANA_TOKEN"] = ASANA_TOKEN
 TRIGGER_TYPE          = os.environ.get("TRIGGER_TYPE", "workflow_dispatch")
 RUN_MODE              = os.environ.get("RUN_MODE", "full_batch")  # full_batch | weekly_adverse
 
@@ -970,6 +987,17 @@ def asana_request(method, url, **kw):
     """Single Asana call path. Retries on 429 (respecting Retry-After) and 5xx so a
     burst of reads/posts never crashes the run. Returns the final response (caller
     inspects status); returns None only if the network failed every attempt."""
+    # The credential check the import used to do, moved to the point of use. An
+    # unauthenticated Asana read does not fail cleanly — it returns an error
+    # body that parses as JSON with zero tasks, which downstream reads as "no
+    # customers" and files as an all-clear. That is the silent false negative
+    # this engine exists to prevent, so refuse the call outright.
+    if not ASANA_TOKEN:
+        raise SystemExit(
+            "FATAL: no Asana credential — set ASANA_ACCESS_TOKEN (or ASANA_TOKEN). "
+            "Refusing to call Asana unauthenticated: the error body parses as zero "
+            "tasks, and a screen over zero customers would file as an all-clear."
+        )
     kw.setdefault("headers", ASANA_HEADERS)
     kw.setdefault("timeout", 30)
     last = None
@@ -1578,7 +1606,7 @@ def format_adverse_block(name: str, articles: list, subject_type: str) -> str:
     if flagged_count > 0:
         lines.append(f"   ⚠️  {flagged_count} potentially adverse headline(s) found:")
     else:
-        lines.append(f"   ✅ No adverse headlines identified in top results.")
+        lines.append("   ✅ No adverse headlines identified in top results.")
     for a in articles:
         flag = "🚩" if a["flagged"] else "  "
         lines.append(f"   {flag} {a['title']}")
@@ -2328,10 +2356,10 @@ def parse_eocn(pdf_path):
             date_label += " · REVIEW OVERDUE"
         return names, date_label, json_hash
     if os.path.exists(EOCN_JSON_PATH):
-        log(f"  EOCN JSON present but yielded no names - manual update required")
+        log("  EOCN JSON present but yielded no names - manual update required")
     # 2) Fallback: a raw PDF uploaded to repo root.
     if not os.path.exists(pdf_path):
-        log(f"  EOCN list not found — manual check required")
+        log("  EOCN list not found — manual check required")
         return names, "NOT AVAILABLE — populate data/eocn-local-terrorist-list.json", ""
     try:
         with open(pdf_path, "rb") as _f:
@@ -3158,9 +3186,9 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                 if h.get("match_context"):
                     lines.append(f"   List Attributes: {h['match_context']}")
             lines += [
-                f"   Action:          IMMEDIATE ESCALATION TO MLRO",
-                f"                    Do not tip off customer.",
-                f"                    Cabinet Resolution No. 74/2020 applies.",""
+                "   Action:          IMMEDIATE ESCALATION TO MLRO",
+                "                    Do not tip off customer.",
+                "                    Cabinet Resolution No. 74/2020 applies.",""
             ]
         confirmed_text = "\n".join(lines)
 
@@ -3186,7 +3214,7 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                 if h.get("match_context"):
                     lines.append(f"   List Attributes: {h['match_context']}")
             lines += [
-                f"   MLRO Decision:   ☐ False Positive   ☐ Escalate   ☐ Investigate",
+                "   MLRO Decision:   ☐ False Positive   ☐ Escalate   ☐ Investigate",
                 "",
                 f"   ADVERSE MEDIA — {m['name']}",
             ]
@@ -4064,7 +4092,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 sev = f"  [{tr.get('severity','')} · relevance {tr.get('relevance','')}]" if tr else ""
                 A(f"   [!] {a['title']}{nflag}{sev}")
                 if tr.get("injection_suspected"):
-                    A(f"       ⚠ input flagged (possible prompt-injection) — classified deterministically, model not used")
+                    A("       ⚠ input flagged (possible prompt-injection) — classified deterministically, model not used")
                 cat = f"   {{{', '.join(a['categories'])}}}" if a.get("categories") else ""
                 A(f"       {a.get('source','?')} — {a.get('date','?')}{cat}")
                 if a.get("also_reported_by"):
@@ -4171,8 +4199,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("   Reviewed by: ____________________   Date: __________")
     A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
     A("")
-    A(f"Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT + Bing News")
-    A(f"adverse media + OpenSanctions crime watchlist, Wikidata PEP (OpenSanctions mirror fallback),")
+    A("Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT + Bing News")
+    A("adverse media + OpenSanctions crime watchlist, Wikidata PEP (OpenSanctions mirror fallback),")
     A(f"AI risk-rating & triage · {github_run_url()}")
     A("> " + ai.governance_footer())
     A("> Decision-support only; a 'no match' is never a clearance when a module is degraded (shown, never hidden).")

@@ -10,6 +10,154 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Engine config — the Asana credential is checked where Asana is called, and the settings that gate a degraded run are documented (2026-07-29)
+
+- **`screen.py` no longer `KeyError`s at import.** It read `ASANA_TOKEN` with an
+  unguarded `os.environ[...]` at module load, while the `.mjs` scripts, every
+  workflow and `.env.example` all use **`ASANA_ACCESS_TOKEN`** — so copying
+  `.env.example` to `.env` and running `python screen.py` failed before a line
+  of the engine ran. Four consumers that only wanted the matcher worked around
+  it by injecting a placeholder credential. It now accepts **either** name and
+  normalises the result onto one, so `agents.py`'s credential broker (which
+  audits presence by name) stays correct.
+- **The safety that hard failure provided moved to where it belongs.**
+  `asana_request()` — the single Asana call path — now refuses to run without a
+  credential, because an unauthenticated Asana read does not fail cleanly: it
+  returns an error body that parses as zero tasks, and a screen over zero
+  customers would file as an all-clear. So the check fires when Asana is
+  actually used, instead of blocking consumers that never touch it.
+- **All four placeholder credentials are gone** — the two CI steps, the
+  EOCN reconcile step and the daily-screen runner. A step that parses external
+  downloads now holds no Asana credential at all. The old wiring pin is
+  replaced by a contract pin asserting **both** halves: either env name is
+  accepted, *and* `asana_request` still refuses an unauthenticated call.
+- **`.env.example` covers the engine.** It made 30 of the 77 variables the
+  engine reads assignable, and the gap included the **sanctions coverage
+  floors** (`LIST_FLOOR_*`, `LIST_FLOORS_ENFORCE`) and the **hard-fail gates**
+  (`DELIVERY_HARD_FAIL`, `EOCN_REVIEW_HARD_FAIL`) — the settings that decide
+  whether a degraded run fails loudly or passes quietly. Every operator-facing
+  variable is now documented with its default and what it costs you to change:
+  thresholds, AI gates, transaction-monitoring, circuit breakers, alarms. The
+  Python-side `MATCH_THRESHOLD` / `SHADOW_THRESHOLD` names were previously
+  described in a comment without ever being assignable. CI-injected values
+  (`GITHUB_*`, the per-list `*_HASH`, the date/step plumbing) are deliberately
+  excluded and say so — setting those by hand misreports a run.
+
+### Tooling — Python becomes a governed language here, and `npm test` stops lying (2026-07-29)
+
+Three gaps that all had the same shape: a check that existed in one place and
+not the other, so the green signal was narrower than it looked.
+
+- **Ruff on the screening engine.** ~5,900 lines of Python that make sanctions
+  decisions had **no static analysis at all** — the only gate was
+  `python -m py_compile`, a syntax check — and `pyproject.toml` was pure
+  metadata with no `[tool.*]` section. Ruff now runs in
+  [`lint.yml`](.github/workflows/lint.yml), pinned and hash-locked in
+  [`ci/ruff-requirements.txt`](ci/ruff-requirements.txt) like semgrep and zizmor
+  before it. Rule selection deliberately mirrors `eslint.config.mjs` — pyflakes
+  correctness (`F`) plus `E9`, **not** the pycodestyle formatting families: the
+  engine's house style puts short guards on one line and ruff flags 125 such
+  sites, and restyling a sanctions matcher for a formatter is a large, risky
+  diff with no correctness payoff. It found 16 real items, all fixed —
+  including two imports that were dead inside the workflow YAML where nothing
+  could see them.
+- **`npm test` now runs the five Python suites.** They ran only in CI, so a
+  developer who had just broken `screen.py` got a green `npm test` — the 389
+  assertions in the largest suite never fired. A missing interpreter or engine
+  dependency is a **loud skip, never a pass** (`⚠ n python suite(s) SKIPPED —
+  not run, not passed`), on the same principle the engine applies to a list it
+  cannot load. `test/matcher-parity.test.mjs` follows the identical policy.
+  `npm test` goes from 65 checks to 70.
+- **The one-way rule that allowed it is now bidirectional.**
+  `test/ci-coverage.test.mjs` enforced "every `test/*.py` appears in ci.yml" but
+  never the reverse — the same asymmetry its own §4 says let a stale artefact
+  reach `main` on 2026-07-28. It now also asserts the runner discovers them.
+  Its header claim that "there is no test runner / package.json in this repo"
+  is corrected; both have existed for some time.
+- **`str_dossier.py` joins the `py_compile` gate** — it was exercised by
+  `test/engine_test.py` but never syntax-checked.
+- **`i18n.js`, `sw.js` and `sw-register.js` are actually linted now.** They were
+  absent from `npm run lint` *and* from every `files:` block in
+  `eslint.config.mjs`, so adding them to the script alone would have applied
+  zero rules and read as "linted" while catching nothing — verified: an
+  undefined-variable reference in `sw.js` raised no error. They get real config
+  blocks (`sw.js` with service-worker globals rather than window ones), and the
+  same reference now fails as `no-undef`.
+
+### Screening — 842 lines of the daily screen come out of the workflow YAML (2026-07-29)
+
+The daily sanctions screen carried three inline `python3 << PYEOF` heredocs
+inside [`daily-sanctions-screen.yml`](.github/workflows/daily-sanctions-screen.yml)
+— 842 lines of the live screening path (fetch the customer/principal list,
+screen it through the real `screen.py` matcher, build the report and file the
+Asana task). Inside a YAML string that code was invisible to
+`python -m py_compile`, unreachable by any test, and unlintable by semgrep, which
+scans `.py` files and not YAML. It was the least-governed code in the repository
+and it ran every day.
+
+- Extracted **verbatim** — byte-for-byte, verified by diffing the dedented
+  heredoc bodies against the new files — into
+  [`scripts/daily-screen-fetch.py`](scripts/daily-screen-fetch.py),
+  [`scripts/daily-screen-run.py`](scripts/daily-screen-run.py) and
+  [`scripts/daily-screen-report.py`](scripts/daily-screen-report.py). The
+  workflow drops from **1,135 lines to 290** and now just calls them.
+- **One real behavioural difference, handled.** A heredoc piped to `python3`
+  runs with `sys.path[0] == ''` (the working directory), so `import screen`
+  resolved; a script file gets its own directory instead. `daily-screen-run.py`
+  puts the repo root back explicitly, and the import is verified to resolve.
+- All three are now in the `py_compile` gate in `ci.yml`, so a syntax error in
+  the daily screening path fails CI instead of failing at 02:00 GST.
+- Smoke-verified end to end: the screening step loads its inputs, degrades
+  loudly on missing list files (the SOURCE OUTAGE path), loads the 326-name
+  in-repo UAE EOCN list, and stops only at `GITHUB_ENV` — which exists only
+  inside Actions.
+- `.gitleaks.toml` gains a note that its allowlist is by value, not by path, so
+  it followed the extracted code unchanged.
+
+### Screening — the two engines are now compared to each other, and a silent JS false negative is closed (2026-07-29)
+
+The sanctions matcher is implemented twice — `screen.py` (rapidfuzz) and
+[`scripts/sanctions-match.mjs`](scripts/sanctions-match.mjs), the zero-dependency
+reimplementation that drives the live screen in `sanctions-screen.yml`. Parity
+between them was held by hand, by eighteen "mirrors screen.py" comments, and
+**nothing compared the engines to each other**: the accuracy benchmarks score
+each backend against its own floor, and `test/benchmark_eval.py` says so outright
+— *"every floor is enforced per backend — the two are NOT comparable."*
+
+- **A silent false negative, found by building that comparison.** The JS engine
+  dropped tokens shorter than three characters from its candidate index. A
+  subject whose shared tokens were two letters long therefore had **no candidate
+  path at all** and screened **clear**, where `screen.py` hit it. Measured:
+  `"Yu Li Pang"` against listed `YU LI PING` — Python 90, JS **clear**;
+  `"Xi Da Wai"` against `XI DA WEI` — Python 89, JS **clear**. This is the same
+  shape as the Turkish dotless-ı miss fixed earlier, and it bites hardest on
+  transliterated CJK names. `sigTokens` now uses screen.py's `len(t) > 1` floor.
+  The change is recall-monotone — it only ever ADDS candidates — and **moved no
+  floor**: recall 97.5%, hard-negative clear 96.5%, adverse 100%, fn count 3, all
+  unchanged.
+- **The conservative gate it would have weakened is kept, explicitly.** Widening
+  `sigTokens` would have let an all-two-letter name ("Yu Li") past the
+  "not auto-screenable → MANUAL REVIEW" routing. New `screenableTokens()` keeps
+  that gate on the stricter ≥3 rule, so candidate recall and the auto-screenable
+  decision can no longer move together by accident — a fuzz property pins the
+  subset relation.
+- **[`test/matcher-parity.test.mjs`](test/matcher-parity.test.mjs)** — the guard
+  that was missing, driving both engines over a shared corpus via
+  [`scripts/matcher-parity-probe.py`](scripts/matcher-parity-probe.py). It
+  asserts exact parity on the lost-script predicate (the anti-silent-clear gate)
+  and on `normalize` for foldable names, and **directional** parity elsewhere:
+  screen.py's significant tokens must be a *subset* of the JS engine's, and a
+  screen.py hit must be reached by the JS engine too. Extra JS tokens are the
+  recall-safe direction and are tolerated (it keeps the name particles `BIN`/`AL`
+  that screen.py drops); keeping *fewer* is the silent-miss direction and fails.
+  Scores are deliberately not compared — rapidfuzz and the JS Levenshtein
+  legitimately differ by a point (93 vs 94), and CI's main job runs the difflib
+  backend while the fuzz job runs rapidfuzz.
+- Both historical parity failures are pinned in the corpus as permanent
+  regressions, and the test fails if either pin is removed. Verified by
+  reintroducing the bug: the guard catches the token divergence *and* both
+  resulting false negatives.
+
 ### Compliance — Conflict of Interest policy, five unregistered instruments, and a sweep that can no longer miss them (2026-07-28)
 
 Closing the two gaps a verification pass found after the policy pack landed.

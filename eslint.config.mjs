@@ -76,6 +76,33 @@ export default [
     rules: baseRules,
   },
   {
+    /* Sibling same-origin browser scripts that ship with the three screens but
+       were NOT covered by any block until 2026-07-29 — they were absent from
+       `npm run lint` AND from this config, so adding them to the script alone
+       would have applied zero rules and read as "linted" while catching
+       nothing (verified: an undefined-variable reference in sw.js raised no
+       error). sw.js is the service worker, so it gets the worker globals
+       rather than the window ones. */
+    files: ['i18n.js', 'sw-register.js'],
+    languageOptions: { ecmaVersion: 2023, sourceType: 'script', globals: browserAppGlobals },
+    rules: baseRules,
+  },
+  {
+    files: ['sw.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'script',
+      globals: {
+        ...browserGlobals,
+        self: 'readonly', caches: 'readonly', clients: 'readonly',
+        skipWaiting: 'readonly', registration: 'readonly', location: 'readonly',
+        navigator: 'readonly', Request: 'readonly', Response: 'readonly',
+        Headers: 'readonly', addEventListener: 'readonly',
+      },
+    },
+    rules: baseRules,
+  },
+  {
     files: ['scripts/**/*.mjs', 'test/**/*.mjs'],
     languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...nodeGlobals, ...browserGlobals } },
     rules: baseRules,

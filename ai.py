@@ -462,7 +462,7 @@ def draft_str(customer_name, permalink, sanctions_hits, pep, adverse_articles, r
     UAE FIU goAML portal. AI/automation drafts; a human always files."""
     L = ["SUSPICIOUS TRANSACTION REPORT — DRAFT (for MLRO review; file via goAML)",
          "=" * 64,
-         f"Reporting entity:   Hawkeye Sterling LLC",
+         "Reporting entity:   Hawkeye Sterling LLC",
          f"Subject:            {customer_name}",
          f"Customer record:    {permalink}",
          f"Assessed risk:      {risk['rating']}",
