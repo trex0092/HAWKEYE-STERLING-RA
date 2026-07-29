@@ -32,6 +32,7 @@ primitives emitted here are pure string transforms that never call the fuzzy
 scorer, so the stub cannot change a single value in the output.
 """
 import difflib
+import importlib.util
 import json
 import os
 import sys
@@ -48,9 +49,10 @@ _requests.get = lambda *a, **k: None
 _requests.post = lambda *a, **k: None
 sys.modules.setdefault("requests", _requests)
 
-try:  # production path — the real scorer, when it is installed
-    import rapidfuzz  # noqa: F401
-except ImportError:  # offline path — identical primitives, stubbed scorer
+# Probe for the real scorer WITHOUT importing it: screen.py does its own
+# `from rapidfuzz import fuzz` below, so importing here only to test
+# availability leaves an unused binding (CodeQL "Unused import").
+if importlib.util.find_spec("rapidfuzz") is None:  # offline path — stubbed scorer
     def _tsr(a, b):
         a = " ".join(sorted(a.split()))
         b = " ".join(sorted(b.split()))

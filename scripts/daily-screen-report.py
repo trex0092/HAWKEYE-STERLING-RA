@@ -393,7 +393,12 @@ if r.status_code == 201:
 else:
     print(f"❌ Task creation failed — HTTP {r.status_code}")
     print(r.text)
-    exit(1)
+    # SystemExit, not exit(): the builtin `exit` is injected by the `site`
+    # module and is not guaranteed to exist (python -S, some embedded runtimes),
+    # so a delivery failure could itself die with NameError instead of failing
+    # cleanly. Matches daily-screen-fetch.py, and is what CodeQL flags here —
+    # the alert only became visible once this left the workflow YAML.
+    raise SystemExit(1)
 
 # ---- post comment on each confirmed hit customer task ----
 for h in confirmed:
