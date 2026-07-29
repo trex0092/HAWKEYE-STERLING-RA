@@ -1187,6 +1187,49 @@ screen.download = _orig_download
 check("parse_eu still parses via the shared simple-csv parser",
       screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
 
+# EU FSF is the one core list whose PRIMARY is the OpenSanctions host, so its
+# fallback runs the other way: official webgate XML. Names live in wholeName
+# attributes on <nameAlias> elements (entities and aliases alike).
+_FSF_XML = (b'<?xml version="1.0" encoding="UTF-8"?><export generationDate="2026-07-29">'
+            b'<sanctionEntity logicalId="1"><nameAlias wholeName="EVIL CORP" firstName=""/>'
+            b'<nameAlias wholeName="E &amp; CORP"/></sanctionEntity>'
+            b'<sanctionEntity logicalId="2"><nameAlias wholeName="BAD ACTOR"/></sanctionEntity>'
+            b'</export>')
+check("FSF official XML parses wholeName attributes (entities + aliases, unescaped)",
+      screen.parse_eu_official_xml(_FSF_XML) == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url) or _FSF_XML)
+_fb = screen._eu_official_fallback(set())
+check("EU fallback loads the official XML when the mirror yielded nothing",
+      bool(_fb) and _fb[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+check("EU fallback provenance is explicit in the list date (audit trail)",
+      bool(_fb) and "official" in _fb[1].lower())
+check("EU fallback targets webgate with the public FSF token",
+      bool(_dl_urls) and "webgate.ec.europa.eu" in _dl_urls[0] and "token=" in _dl_urls[0])
+check("no official-XML fetch when the mirror loaded",
+      screen._eu_official_fallback({"LOADED"}) is None and len(_dl_urls) == 1)
+screen.download = lambda url, label: None
+check("official XML also down → no fallback (degrade-loudly paths take over)",
+      screen._eu_official_fallback(set()) is None)
+screen.download = _orig_download
+
+# Every core list with a second origin must actually be WIRED to it, on BOTH
+# load paths — the 2026-07-29 multi-homing bug class was exactly a helper that
+# existed but one path didn't call. UK falls back to the OpenSanctions
+# gb_hmt_sanctions mirror; EU to the official XML; AU/CH have no second origin
+# (documented in the loader) and rely on the outage gate.
+import inspect as _inspect
+_src_daily  = _inspect.getsource(screen.load_all_lists)
+_src_legacy = _inspect.getsource(screen.main)
+for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
+    check(f"{_pname} path wires the OFAC mirror fallback", "us_ofac_sdn" in _psrc)
+    check(f"{_pname} path wires the UN mirror fallback", "un_sc_sanctions" in _psrc)
+    check(f"{_pname} path wires the UK mirror fallback", "gb_hmt_sanctions" in _psrc)
+    check(f"{_pname} path wires the EU official-XML fallback", "_eu_official_fallback" in _psrc)
+    check(f"{_pname} path folds OFAC aliases only when the mirror did not serve",
+          "_fold_ofac_aliases" in _psrc
+          and _psrc.find("us_ofac_sdn") < _psrc.find("_fold_ofac_aliases"))
+
 # ── EOCN mirror cross-check (TFS drift detector) ──────────────────────────────
 # The curated local UAE Local Terrorist List can go stale (EOCN updates arrive
 # by notification, not a machine endpoint) — a missed designation is a false
@@ -1577,6 +1620,12 @@ check("a hit with no known attributes carries an empty context",
 screen.LIST_ENTRY_ATTRS.clear()
 
 print("screen — core-list coverage floors (zero/partial-load hard-fail)")
+# The static-floor tests below predate the adaptive ratchet and pin the STATIC
+# behavior, so point the coverage history at a path that does not exist — the
+# repo's committed source-coverage-state.json would otherwise raise the
+# effective floors mid-test (exactly what the ratchet is for in production).
+_prev_cov_path = screen.monitoring.COVERAGE_STATE_PATH
+screen.monitoring.COVERAGE_STATE_PATH = "/nonexistent/source-coverage-state.json"
 _meta_ok = {"ofac": {"count": 19129}, "un": {"count": 1002}, "uk": {"count": 19762},
             "eu": {"count": 42347}, "eocn": {"count": 312}}
 check("floors: healthy baseline counts pass", screen.core_list_floor_breaches(_meta_ok) == ([], []))
@@ -1646,6 +1695,104 @@ _floor_clean = screen.enforce_core_list_floors(_meta_ok)
 check("floors: a healthy load never refuses", _floor_clean == ([], []))
 screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
 screen.LIST_OUTAGE_ALERT["outages"] = []
+
+# ── Adaptive floor ratchet: floors rise to a fraction of the observed baseline ─
+# The AU/CH floors shipped provisional (500) with a TODO to tighten them once
+# runs logged real counts; the ratchet does that tightening automatically, and
+# catches partial corruption that clears a stale static floor.
+print("screen — adaptive floor ratchet (observed-baseline tightening)")
+_covf = _tmp.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump({
+    "au": {"history": [{"date": f"2026-07-{d:02d}", "count": 4000} for d in range(20, 27)]},
+    "ch": {"history": [{"date": "2026-07-26", "count": 6000}]},          # too short
+    "un": {"history": [{"date": f"2026-07-{d:02d}", "count": 700} for d in range(20, 27)]},
+}, _covf); _covf.close()
+_af = screen.adaptive_core_floors({"au": 500, "ch": 500, "un": 500}, state_path=_covf.name)
+check("ratchet raises a provisional floor to 50% of the trailing median",
+      _af["au"] == 2000)
+check("ratchet needs enough history days before it trusts a baseline",
+      _af["ch"] == 500)
+check("ratchet never lowers a configured floor (350 < static 500)",
+      _af["un"] == 500)
+check("a missing history file yields the static floors unchanged (no new failure mode)",
+      screen.adaptive_core_floors({"au": 500}, state_path="/nonexistent/x.json") == {"au": 500})
+_badf = _tmp.NamedTemporaryFile("w", suffix=".json", delete=False)
+_badf.write("not json"); _badf.close()
+check("an unreadable history file yields the static floors (logged, not raised)",
+      screen.adaptive_core_floors({"au": 500}, state_path=_badf.name) == {"au": 500})
+json.dump({"au": {"history": "corrupt"}}, open(_badf.name, "w"))
+check("a malformed history entry yields the static floors (logged, not raised)",
+      screen.adaptive_core_floors({"au": 500}, state_path=_badf.name) == {"au": 500})
+os.unlink(_badf.name)
+_prev_pct = screen.ADAPTIVE_FLOOR_PCT
+screen.ADAPTIVE_FLOOR_PCT = 0.0
+check("kill-switch ADAPTIVE_FLOOR_PCT=0 keeps static floors only",
+      screen.adaptive_core_floors({"au": 500}, state_path=_covf.name) == {"au": 500})
+screen.ADAPTIVE_FLOOR_PCT = _prev_pct
+# End-to-end through the breach classifier: production path (floors=None) uses
+# the ratchet for a primary-served list, but a FALLBACK-served list keeps the
+# static floor — a mirror is a different corpus, and judging it by the
+# primary's baseline would turn the fallback into a refusal trap.
+screen.monitoring.COVERAGE_STATE_PATH = _covf.name
+_b_ad, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 1500, "date": "2026-07-29", "tier": "core"}})
+check("primary-served list below the ratcheted floor breaches (1,500 < 2,000)",
+      len(_b_ad) == 1 and "AU" in _b_ad[0] and "adaptive" in _b_ad[0])
+_b_mir, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 1500, "date": "live (OpenSanctions mirror)", "tier": "core"}})
+check("the same count served by a fallback keeps the static floor (no refusal trap)",
+      _b_mir == [])
+_b_mir_low, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 3, "date": "live (OpenSanctions mirror)", "tier": "core"}})
+check("a fallback-served list still breaches below the STATIC floor",
+      len(_b_mir_low) == 1 and "AU" in _b_mir_low[0])
+screen.monitoring.COVERAGE_STATE_PATH = _prev_cov_path
+os.unlink(_covf.name)
+
+# ── download() retry: a transient blip must not burn a list's origin ──────────
+# One TCP reset on the primary used to force the mirror (or a DEGRADED day
+# where no mirror exists). Transients (network error, 5xx, 429) retry with
+# backoff; any other 4xx fails immediately — a bot gate will not heal within
+# one run, and retrying it only delays the fallback ladder that CAN.
+print("screen — download retry (transient vs permanent failures)")
+_dl_calls = {"n": 0}
+class _RespOK:
+    status_code = 200
+    content = b"DATA"
+    def raise_for_status(self): pass
+class _HTTPErr(Exception):
+    def __init__(self, resp): super().__init__(str(resp.status_code)); self.response = resp
+class _Resp4xx:
+    status_code = 403
+    content = b""
+    def raise_for_status(self): raise _HTTPErr(self)
+class _Resp5xx(_Resp4xx):
+    status_code = 503
+class _Resp429(_Resp4xx):
+    status_code = 429
+_orig_req_get, _orig_sleep = screen.requests.get, screen.time.sleep
+screen.time.sleep = lambda s: None
+def _flaky(url, **kw):
+    _dl_calls["n"] += 1
+    if _dl_calls["n"] < 3:
+        raise ConnectionError("reset")
+    return _RespOK()
+screen.requests.get = _flaky
+check("a transient network blip retries to success",
+      screen.download("http://x", "L") == b"DATA" and _dl_calls["n"] == 3)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp4xx())[1]
+check("a permanent 4xx fails immediately — no retry burn before the fallback ladder",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == 1)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp5xx())[1]
+check("a 5xx retries to exhaustion then yields None (degrade paths take over)",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == screen.DOWNLOAD_ATTEMPTS)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp429())[1]
+check("429 is transient (rate limits pass) — retried like a 5xx",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == screen.DOWNLOAD_ATTEMPTS)
+screen.requests.get, screen.time.sleep = _orig_req_get, _orig_sleep
 
 print("hardening — atomic state writes")
 _hdir = _tmp.mkdtemp()

@@ -72,6 +72,7 @@ jobs:
             umsanrp1dltx4dj3sxtt.blob.core.windows.net:443
             umsaszjsdz5c04wqdhbq.blob.core.windows.net:443
             ofsistorage.blob.core.windows.net:443
+            webgate.ec.europa.eu:443
             data.opensanctions.org:443
             www.international.gc.ca:443
             news.google.com:443

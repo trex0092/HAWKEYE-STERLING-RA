@@ -10,6 +10,70 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Screening — availability hardening: retry the blip, retry the day (2026-07-29)
+
+Two layers of self-healing for the failure classes no fallback ladder can
+absorb:
+
+- **`download()` retries transients** (network errors, 5xx, 429) with a short
+  backoff before giving up — one TCP reset used to burn a list's primary
+  origin, forcing the mirror (or a DEGRADED day where no mirror exists). Any
+  other 4xx still fails immediately: a bot gate will not heal within one run,
+  and retrying it only delays the fallback ladder that can. `DOWNLOAD_ATTEMPTS`
+  (default 3), tests cover all four classes.
+- **A third daily cron slot** (06:07 UTC) on the unified screening workflow.
+  The first two slots sit 3h apart, so a single 3–4h outage window (GitHub
+  Actions or an upstream source) could still cost the whole day. The new slot
+  is the same NO-OP-when-already-green preflight; when it does have to screen,
+  delivery lands ~11:30 UAE — late, but a late daily screening beats a missing
+  one for a mandatory control.
+
+### Screening — coverage floors ratchet themselves to the observed baseline (2026-07-29)
+
+The static floors are point-in-time baselines, and AU/CH shipped with
+provisional 500s and a TODO to tighten them by hand once runs logged real
+counts. Now the engine does the tightening itself: each run raises — never
+lowers — a primary-served core list's effective floor to
+`ADAPTIVE_FLOOR_PCT` (50%) of its trailing-median count from the coverage
+history `monitoring.check_source_coverage` already persists, once
+`ADAPTIVE_FLOOR_MIN_HISTORY` (5) days of history exist. A partial corruption
+that clears a stale static floor but sits under half the observed baseline
+now refuses the run. Fallback-served lists keep the static floor — a mirror
+is a different corpus (e.g. OFAC without the alias fold), and judging it by
+the primary's baseline would turn the fallback into a refusal trap. Any
+read/parse problem with the history yields the static floors: the ratchet is
+an extra guard, not a new failure mode. Kill-switch `ADAPTIVE_FLOOR_PCT=0`.
+Engine tests cover the ratchet, the minimum-history gate, the never-lower
+rule, the fallback exemption, and the missing-file path; the pre-existing
+static-floor tests are pinned hermetic against a nonexistent history file.
+
+### Screening — every core list with a second origin now falls back to it (2026-07-29)
+
+The UN blob rotation caught by the 29 Jul proof run showed the remaining
+fragility class: a core list with one reachable origin. OFAC and UN already
+fell back to their OpenSanctions mirrors; the ladder now covers the rest:
+
+- **UK OFSI** falls back to the `gb_hmt_sanctions` mirror (same
+  `_mirror_fallback` contract: only when the primary yields nothing, MIRROR
+  provenance in the list date, degrade-loudly unchanged when both are down).
+- **EU FSF** — the one core list whose *primary* is the OpenSanctions host —
+  falls back the other way, to the **official webgate XML** (public FSF token),
+  parsed by a new schema-tolerant `parse_eu_official_xml`. The webgate host is
+  now allowlisted in the two screening workflows that lacked it (the unified
+  daily path and onboarding).
+- The **legacy manual path** gets the full ladder too (OFAC/UN/UK/EU), with the
+  same fallback-before-alias-fold ordering the daily path documents.
+- **AU/CH** have no second origin (DFAT bot-gates its .xlsx; SECO's XML is a
+  third schema) — documented in the loader; an OpenSanctions outage surfaces
+  as the usual outage-gate DEGRADED, never a silent gap.
+- Engine tests pin the FSF XML parser, the EU fallback contract, and — the
+  multi-homing lesson — that **both** load paths actually wire every fallback,
+  via source inspection, so a helper existing but uncalled can't recur.
+
+Source-coverage drift monitoring (>20% shrink alarm vs trailing median) already
+covers AU/CH automatically as history accrues; their provisional 500 floors
+stay until observed baselines land.
+
 ### Screening — the unified poster multi-homes too; second UN blob domain (2026-07-29)
 
 The 2026-07-29 live proof run (30455597768) succeeded — UN loaded over the
