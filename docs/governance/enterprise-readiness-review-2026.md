@@ -326,6 +326,19 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 173 markdown documents under docs/ (140 excluding docs/research/auto).
+*(29 July, sixth pass — the **risk vocabulary**: `risk-glossary.md` translates the thirty terms of the
+risk lens into business language and, in each case, points at the authoritative definition already in
+the estate rather than restating it — so the glossary cannot drift from the register it explains. It
+records what is **not** governed as plainly as what is: risk capacity, target residual risk, control
+owner, loss event and a severity scale have no home here, and the page says so instead of implying a
+control that does not exist. It also disambiguates `near-miss`, which in this repository already means
+a matcher-score margin and not a failure that was caught in time. Shipped with it, a relative-link
+guard (`test/doc-links.test.mjs`): the existing checker probes external URLs only, so a cross-reference
+to a file that does not exist was invisible to CI across 1,182 links. Zero were broken — the guard is
+preventive, and it verified this page's own forty-four links on the way in. One curated document added;
+no workflow added; no scored control changed.)*
+
 Verified at HEAD: 56 workflows · 172 markdown documents under docs/ (139 excluding docs/research/auto).
 *(28 July, fifth pass — policy-pack completion: the Conflict of Interest & Staff Conduct policy (the
 instrument the pack was missing — declaration duties, recusal, four-eyes, gifts, no commercial override,

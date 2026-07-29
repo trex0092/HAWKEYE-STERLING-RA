@@ -18,6 +18,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 |---|---|---|
 | [ai-policy.md](ai-policy.md) | Top-level standalone AI Policy (ratified 2026-07-02) | ISO 42001 A.2.2 |
 | [risk-appetite-statement-2026.md](risk-appetite-statement-2026.md) | Eight appetite positions + the acceptance scale + nine KRIs; CI pins the stated appetite to the appetite the code enforces (DRAFT — board R7) | ISO 31000 5.4.3; NIST AI RMF GOVERN 1.3 |
+| [risk-glossary.md](risk-glossary.md) | The risk vocabulary in business language — appetite vs tolerance vs capacity, inherent vs residual vs target, risk owner vs control owner, issue vs incident vs near miss vs loss event, KRI vs KPI. Points at the authoritative definition in each case rather than restating it, and states the terms the estate does **not** yet use | ISO 31000 3; ISO Guide 73 |
 | [ai-acceptable-use-policy.md](ai-acceptable-use-policy.md) | Operator AUP — permitted/prohibited use, acknowledgment | ISO 42001 A.9.2 |
 | [explainability-statement-2026.md](explainability-statement-2026.md) | How outputs are interpretable; stated limits | NIST AI RMF MAP; AI Act Art. 13-style |
 | [grc-cybersecurity-model.md](grc-cybersecurity-model.md) | How the GRC layer and the security controls form one loop | NIST CSF GOVERN; ISO 42001 |

@@ -112,6 +112,10 @@ jobs:
         run: node test/pep-check.test.mjs
       - name: Run link-check unit tests
         run: node test/link-check.test.mjs
+      - name: Run documentation relative-link guard (every [..](..) resolves on disk)
+        # scripts/link-check.mjs probes EXTERNAL urls only, so a relative
+        # cross-reference to a file that does not exist was invisible to CI.
+        run: node test/doc-links.test.mjs
       - name: Run Asana Netlify-function tests (timeout + non-JSON handling)
         run: node test/asana-functions.test.js
       - name: Run Asana reconciliation diff tests (drift detection)

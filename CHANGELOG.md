@@ -10,6 +10,51 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Governance — the risk vocabulary, and a guard for the links that hold the pack together (2026-07-29)
+
+The pack is written in fluent GRC dialect and had **no translation layer**.
+Seventeen of the thirty terms in a standard risk lens appeared **nowhere** in
+`docs/` — risk capacity, target residual risk, control owner, control weakness,
+compliance gap, loss event, performance indicator among them — while *issue* (41
+documents) and *incident* (40) were used constantly and never once defined or
+distinguished.
+
+- **[`docs/governance/risk-glossary.md`](docs/governance/risk-glossary.md)** —
+  the thirty terms in business language, grouped by what they actually decide:
+  the four levels of risk-taking (appetite vs tolerance vs **capacity**), risk
+  levels, accountability (**risk owner vs control owner**), control failure vs
+  control **weakness**, the four failure words (**issue vs incident vs near miss
+  vs loss event**), and **KRI vs performance indicator**.
+- **It links rather than restates.** Every entry points at the definition that
+  already exists — `risk-assessment-methodology.md` §3 for inherent/residual and
+  the Strong/Adequate/Weak/Absent control ratings, `ai-risk-register.md` for the
+  scoring key and the four treatments, `obligation-register.md` §3 and the
+  `status_meanings` blocks for the status vocabularies — so the glossary cannot
+  drift away from the registers it explains.
+- **It records what is *not* governed as plainly as what is.** Risk capacity,
+  target residual risk, control owner, loss event and a severity scale have no
+  home in this estate, and the page says so. A glossary that quietly implies a
+  control the firm does not have is worse than no glossary.
+- **It disambiguates a term that already means something else here.**
+  `near-miss` has four uses in the pack and **all four are matcher-score
+  margins** against the 0.85 threshold — not "a failure caught in time".
+- **It names the gap that makes two stated rules unenforceable.**
+  `risk-assessment-methodology.md` requires that *"anything above appetite
+  requires a treatment plan with an owner and a date"*, and the risk register
+  lists *"residual scores sit within appetite"* as an auditor checkpoint.
+  Neither is testable today, because no appetite position states a numeric
+  residual ceiling.
+
+**[`test/doc-links.test.mjs`](test/doc-links.test.mjs) — relative links now have
+a guard.** `scripts/link-check.mjs` extracts `https?://` only, so a
+cross-reference to a file that does not exist was invisible to CI — across
+**1,182 relative links in 179 documents**, in a pack whose registers are built
+out of links to their own evidence. Zero were broken, which is the point: the
+guard is preventive, it pins a property the estate already has, and it verified
+the glossary's own forty-four links on the way in. Fragments (`#anchor`) are
+deliberately out of scope — GitHub's slug rules would make it cry wolf — but the
+file half of `file.md#section` is checked.
+
 ### Engine config — the Asana credential is checked where Asana is called, and the settings that gate a degraded run are documented (2026-07-29)
 
 - **`screen.py` no longer `KeyError`s at import.** It read `ASANA_TOKEN` with an
