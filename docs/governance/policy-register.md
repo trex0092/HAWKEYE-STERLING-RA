@@ -50,11 +50,25 @@
 | POL-28 | [Outsourcing & Third-Party Risk](../policies/outsourcing-third-party-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
 | POL-29 | [Independent Audit](../policies/independent-audit-policy.md) | policy | Internal Audit | 📝 draft — item 18 | on approval |
 | POL-30 | [Regulatory Change Management](../policies/regulatory-change-management-procedure.md) | procedure | Compliance Officer | 📝 draft — item 18 | on approval |
+| POL-31 | [Conflict of Interest & Staff Conduct](../policies/conflict-of-interest-policy.md) | policy | MLRO | 📝 draft — item 18 | on approval |
+| POL-32 | [Business Continuity & Resilience Plan](../aims/bcp.md) | standard | MLRO | ✅ in force | 2027-07-28 |
+| POL-33 | [AI Decommissioning & Retirement](../aims/decommissioning.md) | procedure | MLRO | ✅ in force | 2027-07-28 |
+| POL-34 | [Data-Quality Plan](../aims/data-quality-plan.md) | standard | MLRO | ✅ in force | 2027-06-29 |
+| POL-35 | [Internal Audit Programme](../aims/internal-audit.md) | procedure | MLRO | ✅ in force | 2027-07-28 |
+| POL-36 | [Model Validation & Change Control](model-validation-2026.md) | standard | MLRO | ✅ in force | 2026-09-30 |
 
-**Thirty instruments.** Eleven are in force. Nineteen are drafts: two waiting on
-the same board sitting as the rest of the programme, and the seventeen-document
+**Thirty-six instruments.** Sixteen are in force. Twenty are drafts: two waiting
+on the same board sitting as the rest of the programme, and the eighteen-document
 [AML/CFT/CPF policy pack](../policies/README.md) drafted 2026-07-28 and awaiting
 approval under open-actions item 18.
+
+Five of the in-force rows (POL-32 to POL-36) were added on 2026-07-28 for
+instruments that already existed, were owned and were operating — the business
+continuity plan, the decommissioning procedure, the data-quality plan, the
+internal audit programme and the model-validation pack. They had simply never
+been registered, so nothing tracked their approval or their next review. That
+is the failure this register exists to prevent, and it was hiding inside the
+register's own blind spot (see §2).
 
 Until the pack is approved it is **written, not operative** — the register says
 so, the documents say so, and CI fails if either claims otherwise.
@@ -71,15 +85,23 @@ so, the documents say so, and CI fails if either claims otherwise.
   claim ratification the instrument itself does not record, in ISO or long form.
 - **A draft may not assert a next-review date**, and must name the open-actions
   item that approves it. Review clocks start at approval, not at drafting.
-- **Anti-shadow-policy sweep.** Every `docs/**` file whose name carries
-  *policy*, *procedure*, *charter*, *runbook* or *sop* must be either registered
-  or explicitly excluded with a written reason. A procedure cannot be written,
-  relied on, and left unowned and unreviewed.
+- **Anti-shadow-policy sweep — two signals, not one.** A document is swept if
+  **either** its filename carries *policy*, *procedure*, *charter*, *runbook*,
+  *sop*, *plan*, *standard*, *methodology* or *bcp*, **or** its header declares
+  an `**Approver:**`. Anything swept must be registered or excluded with a
+  written reason.
 
-Three documents are excluded with reasons: the UAE AI Charter mapping and the
+  The second signal exists because the first one missed real instruments:
+  `bcp.md` and `decommissioning.md` were owned, operative and unregistered
+  purely because of what they were called. A register that only catches
+  well-named documents is a register with a blind spot, so the rule now also
+  keys on the thing only an instrument claims — that someone approves it.
+
+Five documents are excluded with reasons: the UAE AI Charter mapping and the
 ISO 42001 Statement of Applicability (external framework artefacts, not
-instruments the firm issues) and the explainability statement (descriptive
-documentation).
+instruments the firm issues), the explainability statement (descriptive
+documentation), and the two index pages — this register and the policy pack's
+own README, which list instruments rather than being ones.
 
 ## 3. How an instrument changes
 

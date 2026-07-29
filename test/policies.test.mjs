@@ -101,14 +101,25 @@ for (const p of reg.instruments.filter((x) => x.calendar_duty)) {
   check('instrument "' + p.id + '" calendar_duty exists (' + p.calendar_duty + ')', duties.has(p.calendar_duty));
 }
 
-/* ── 4. Anti-shadow-policy sweep ─────────────────────────────────────────── */
-const INSTRUMENT_NAME = /(^|-)(policy|procedure|charter|runbook|sop)(-|\.|$)/i;
+/* ── 4. Anti-shadow-policy sweep ───────────────────────────────────────────
+   TWO signals, because the naming rule alone let real instruments through:
+   bcp.md and decommissioning.md were owned, operative and unregistered until
+   2026-07-28 purely because their filenames carried none of the keywords.
+
+   (a) NAME — the keyword rule, widened with plan/standard/methodology/bcp.
+   (b) APPROVER — any document declaring an "**Approver:**" in its header is
+       claiming to be an instrument someone signs off, whatever it is called.
+       Registers, assessments and mappings do not carry one, so this catches
+       the class the filename rule cannot see. */
+const INSTRUMENT_NAME = /(^|-)(policy|procedure|charter|runbook|sop|plan|standard|methodology|bcp)(-|\.|$)/i;
+const DECLARES_APPROVER = /^\*\*Approver[:*]/im;
 const found = [];
 (function walk(rel) {
   for (const entry of readdirSync(join(ROOT, rel))) {
     const child = rel + '/' + entry;
     if (statSync(join(ROOT, child)).isDirectory()) { walk(child); continue; }
-    if (entry.endsWith('.md') && INSTRUMENT_NAME.test(entry)) found.push(child);
+    if (!entry.endsWith('.md')) continue;
+    if (INSTRUMENT_NAME.test(entry) || DECLARES_APPROVER.test(read(child).slice(0, 1200))) found.push(child);
   }
 })('docs');
 

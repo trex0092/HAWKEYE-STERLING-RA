@@ -1,6 +1,7 @@
 # AI System Decommissioning & Retirement (AIMS A.6 — lifecycle end)
 
 **Owner:** MLRO (decision + records) · system maintainer (execution).
+**Approver:** MLRO · Registered as POL-33 in the [policy register](../governance/policy-register.md)
 **Cadence:** dormant — executed on a retirement decision; reviewed annually by the
 [internal audit](internal-audit.md) §4 (A.6 row). **Related:**
 [`../governance/data-retention.md`](../governance/data-retention.md) ·
