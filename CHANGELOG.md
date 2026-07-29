@@ -10,6 +10,70 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Coverage attestation — a customer row we cannot screen is a gap, not a non-event (2026-07-29)
+
+`get_all_customers` dropped any Asana customer row missing a name or a gid with
+a bare `continue`. Nothing recorded it — and `customers_total`, printed under
+**SCOPE & COVERAGE ATTESTATION** as "Customers in database", is `len(customers)`,
+i.e. the count *after* the exclusion. So a record that was never screened by any
+net simply vanished from the denominator, and the attestation claimed complete
+coverage of a book that had quietly lost it.
+
+Skipped rows are now recorded with their permalink and the reason, logged as
+they occur, and attested: "Customers in database" is the true total, with the
+screened count and the un-screenable count reported separately and the affected
+records named so the MLRO can fix them. A clean book states so affirmatively
+rather than printing an ambiguous zero. The run still never crashes on one bad
+row.
+
+### MLRO cases — the disposition block was being cut off the end of long cases (2026-07-29)
+
+`create_case_subtask` sent `notes[:8000]`, a head slice. The **end** of a case
+note is the part that has to survive: the disposition checkboxes (the MLRO's
+actual decision record), the "Do not tip off — UAE Cabinet Resolution 74/2020
+applies" warning, and for HIGH-risk cases the entire STR/SAR draft. Any case
+with a long hit list therefore reached the queue with evidence but **nothing to
+tick and no legal warning**, and no log line said so. Measured on a 60-hit
+HIGH-risk case: 10,944 characters built, 8,000 delivered, all three blocks gone.
+
+8,000 characters was also **8x stricter than the budget the same Asana notes
+field accepts** on the report path (65,000 worst-case rich-text bytes), so cases
+were being cut that the API would have taken whole.
+
+Case notes now go through `cap_notes` — which truncates the body and keeps the
+tail — at the report path's budget, with a protected tail large enough that the
+disposition block survives even above a long STR draft, and a visible truncation
+marker instead of a silent cut. A refused create is re-queued to the backlog and
+retried on later runs, so a payload Asana rejects at full budget would re-fail
+forever; a size refusal (400/413) is now re-bid once at a smaller budget, while
+auth, rate-limit and network failures are not (they fail identically at any size).
+
+### Screening state — a flaky fetch could erase the delivered-finding history (2026-07-29)
+
+Both state writers — the daily sweep and the onboarding run — restored the
+delta-state branch with `if git fetch origin screen-delta-state; then overlay;
+else cold start; fi`. `git fetch` exits **128 for a missing branch and 128 for
+an unreachable origin**, so the two are indistinguishable and a transient
+network flake was read as a first run. The run then diffed against `main`'s
+frozen copy and re-reported findings already delivered — and, because the
+commit step **force-pushes** the branch as `<main>` + one data commit, it
+overwrote the accumulated delta-state permanently. Both writers share that
+branch, so either one could destroy the other's history.
+
+`git ls-remote --exit-code` is the discriminator (`2` = ref genuinely absent,
+anything else = transport error). A cold start still proceeds; an unreachable
+origin now stops the run with an explicit error rather than silently screening
+with amnesia. The force-pushing commit step is additionally gated on the
+overlay having established a baseline, so a failed overlay cannot persist state
+built on one it never read.
+
+`anomaly-watch` — a state *reader* — already carried this guard; the two
+*writers* did not. Verified against the real `bash -e` GitHub uses, across four
+scenarios (branch present, branch absent, origin unreachable, fetch failing
+after a successful probe). `test/screening-state.test.mjs` now pins the
+discrimination for all three consumers, form-agnostically, along with the
+`set -e` capture idiom the guard depends on.
+
 ### Adverse media — the watchlist cannot "cover" a subject it cannot match (2026-07-29)
 
 `am_blackout` — the figure that turns the adverse module DEGRADED — counted a

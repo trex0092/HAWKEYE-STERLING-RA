@@ -88,6 +88,7 @@ jobs:
           persist-credentials: false
 
       - name: Overlay latest delta-state (shared with the daily sweep, on screen-delta-state)
+        id: overlay
         env:
           STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
         run: |
@@ -97,7 +98,42 @@ jobs:
           # With STATE_ENCRYPTION_KEY set the branch carries <file>.enc instead
           # of subject-data plaintext (P30): decrypt restores the working files;
           # an .enc with no key fails loudly rather than running with amnesia.
-          if git fetch origin screen-delta-state --depth=1 2>/dev/null; then
+          #
+          # AMNESIA GUARD (same defect, same fix as the daily sweep): `git fetch`
+          # exits 128 for BOTH "no such branch" and "could not reach origin", so
+          # a bare `if git fetch` read a transient network flake as a cold start
+          # — and the commit step below force-pushes, so that run would have
+          # destroyed the daily sweep's accumulated state too (both writers share
+          # this branch). `git ls-remote --exit-code` separates them: 2 = ref
+          # genuinely absent, anything else = transport error.
+          # `&& rc=0 || rc=$?` — GitHub runs this block as `bash -e`, where a
+          # BARE failing command aborts the step before `rc=$?` can be read, so
+          # a legitimate cold start (rc=2) would kill the run. The `||` puts it
+          # in a condition context, which set -e exempts.
+          branch_exists=
+          for attempt in 1 2 3; do
+            git ls-remote --exit-code --heads origin screen-delta-state >/dev/null 2>&1 && rc=0 || rc=$?
+            [ "$rc" -eq 0 ] && { branch_exists=1; break; }
+            [ "$rc" -eq 2 ] && { branch_exists=0; break; }
+            echo "ls-remote for screen-delta-state failed (attempt $attempt, rc=$rc) — retrying"
+            sleep $((attempt * 3))
+          done
+          if [ -z "$branch_exists" ]; then
+            echo "::error::cannot reach origin to determine whether screen-delta-state exists — refusing to run: proceeding would diff against stale state and force-push over the delivered-finding history"
+            exit 1
+          fi
+
+          if [ "$branch_exists" = 1 ]; then
+            fetched=
+            for attempt in 1 2 3; do
+              git fetch origin screen-delta-state --depth=1 && { fetched=1; break; }
+              echo "delta-state fetch failed (attempt $attempt) — retrying"
+              sleep $((attempt * 3))
+            done
+            if [ -z "$fetched" ]; then
+              echo "::error::screen-delta-state exists but could not be fetched — refusing to run with state amnesia (the commit step force-pushes, so this run would destroy the accumulated delta-state)"
+              exit 1
+            fi
             for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
               git checkout FETCH_HEAD -- "$f" 2>/dev/null || true
               git checkout FETCH_HEAD -- "$f.enc" 2>/dev/null || true
@@ -107,6 +143,7 @@ jobs:
           else
             echo "no screen-delta-state branch yet — using state from main"
           fi
+          echo "state_ready=1" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -129,7 +166,11 @@ jobs:
         run: python screen.py
 
       - name: Commit delta-state (what has already been reported)
-        if: always()
+        # always() so an early-exit/failed run still persists what it DID
+        # deliver — but never when the overlay could not establish the prior
+        # state: this push is a --force, and pushing state built on an unknown
+        # baseline overwrites the delivered-finding history it failed to read.
+        if: always() && steps.overlay.outputs.state_ready == '1'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
