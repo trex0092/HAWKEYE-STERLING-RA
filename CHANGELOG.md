@@ -10,6 +10,59 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The last recall miss was one missing transliteration pair — screen.py now clears the whole corpus (2026-07-30)
+
+`r110` — `Hossam Din Farag` vs designated `Husam Deen Faraj` — was the only
+recall pair **both** engines missed, and had stood as a residual since the
+corpus was built. A designated party not flagged is the most serious error the
+matcher can make, so it was worth chasing to the cause.
+
+Two of the three tokens already folded:
+
+```
+canonical subject : hossam  deen  farag
+canonical listed  : hossam  deen  faraj
+```
+
+`hossam/husam` and `deen/din` were both in `data/translit-groups.json`.
+**`farag/faraj` was not** — and it blocked both paths at once: fuzzy scored 75,
+and the phonetic keys split `FARK` vs `FARJ`.
+
+That is Arabic **ج** (jim): Standard Arabic writes it `j`, Egyptian Arabic
+writes it `g`. The file already carried `cemal / djamel / gamal / jamal`, so the
+class was established — it was simply incomplete. Adding `farag/faraj`, and
+`gaber` to the existing `jaber/jabir` group, closes it.
+
+| | before | after |
+|---|---|---|
+| `screen.py` recall | 124/125 | **132/132 (100%)** |
+| `screen.py` hard negatives | 85/85 | 85/85 |
+| JS recall | 123/125 | **131/132** |
+| JS hard negatives | 85/85 | 85/85 |
+
+**Both engines now clear every hard negative, and `screen.py` links every recall
+pair in the corpus.** The only remaining miss anywhere is `r120` (JS only,
+allowlisted with its measured refutation).
+
+#### Six groups measured, then not added
+
+The first attempt added the whole Egyptian jim class — `nagi/naji`,
+`ragab/rajab`, `hegazi/hejazi`, `khadiga/khadija`, `magdi/majdi`,
+`nagib/najib` — on the reasoning that the class is real. Measuring the corpus
+coverage refuted that: 78 of the existing 89 groups (88%) are exercised by the
+benchmark, so six unexercised additions would more than double the unverified
+portion of the file.
+
+Adding a labelled pair for each then showed why they were unnecessary: **all six
+pass with no transliteration group at all** — fuzzy similarity already links
+them. Only `farag/faraj` and `gaber` are load-bearing, each verified by removing
+it individually and watching its pair reopen.
+
+The six pairs are kept as corpus **anchors** with mechanism `fuzzy` — which is
+what actually catches them; labelling them `translit` would have been false —
+so a future regression that breaks them is caught, without carrying five groups
+that widen the false-positive surface for no measured gain.
+
 ### The case engine had no precision gate at all, and one missing Turkish token was costing recall (2026-07-30)
 
 The two engines combined their score paths by **opposite** rules, and both were

@@ -880,6 +880,62 @@
    "listed": "Khaled Bin Rasheed",
    "mechanism": "phonetic",
    "note": "Hard ch (Chaled/Khaled) and soft ch (Rachid/Rasheed) in ONE name: the two readings of 'ch' must coexist, so no single fold of 'ch' can serve both."
+  },
+  {
+   "id": "r126",
+   "group": "arabic",
+   "subject": "Nagi Fathi Saleh",
+   "listed": "Naji Fathi Saleh",
+   "mechanism": "fuzzy",
+   "note": "Egyptian Arabic writes jim as 'g' where Standard Arabic writes 'j'. Measured: fuzzy similarity already links this pair with no transliteration group, so no group was added for it — the anchor guards that it stays linked."
+  },
+  {
+   "id": "r127",
+   "group": "arabic",
+   "subject": "Ragab Mostafa Hassan",
+   "listed": "Rajab Mostafa Hassan",
+   "mechanism": "fuzzy",
+   "note": "Egyptian jim: Ragab / Rajab."
+  },
+  {
+   "id": "r128",
+   "group": "arabic",
+   "subject": "Ahmed Hegazi Mansour",
+   "listed": "Ahmed Hejazi Mansour",
+   "mechanism": "fuzzy",
+   "note": "Egyptian jim on a surname: Hegazi / Hejazi."
+  },
+  {
+   "id": "r129",
+   "group": "arabic",
+   "subject": "Khadiga Ali Mahmoud",
+   "listed": "Khadija Ali Mahmoud",
+   "mechanism": "fuzzy",
+   "note": "Egyptian jim: Khadiga / Khadija."
+  },
+  {
+   "id": "r130",
+   "group": "arabic",
+   "subject": "Magdi Abdel Aziz Farouk",
+   "listed": "Majdi Abdel Aziz Farouk",
+   "mechanism": "fuzzy",
+   "note": "Egyptian jim: Magdi / Majdi."
+  },
+  {
+   "id": "r131",
+   "group": "arabic",
+   "subject": "Nagib Sami Rashid",
+   "listed": "Najib Sami Rashid",
+   "mechanism": "fuzzy",
+   "note": "Egyptian jim: Nagib / Najib."
+  },
+  {
+   "id": "r132",
+   "group": "arabic",
+   "subject": "Gaber Hussein Tawfik",
+   "listed": "Jaber Hussein Tawfik",
+   "mechanism": "translit",
+   "note": "Egyptian jim: Gaber joins the existing jaber/jabir group."
   }
  ]
 }
