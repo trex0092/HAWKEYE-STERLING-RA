@@ -126,6 +126,11 @@ jobs:
         # Offline suites prove brain-soul RETURNS modeDegraded; only this proves
         # the operator SEES it. Skips loudly if no browser is available.
         run: node test/advisor-browser.test.mjs
+      - name: Browser-check that a FAILED console refresh is visible (not tooltip-only)
+        # The refresh outcome lived in the button's `title`, which has no touch
+        # equivalent — so on a phone a failed refresh was silent while stale
+        # figures stayed on screen. Skips loudly if no browser is available.
+        run: node test/console-browser.test.mjs
       - name: Run Asana Netlify-function tests (timeout + non-JSON handling)
         run: node test/asana-functions.test.js
       - name: Run Asana reconciliation diff tests (drift detection)

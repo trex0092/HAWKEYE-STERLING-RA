@@ -118,6 +118,13 @@ header{display:flex;align-items:center;justify-content:space-between;gap:14px;pa
 .asana-refresh .ar-ico{display:inline-block;font-size:16px;line-height:1;font-weight:700;background:linear-gradient(135deg,#B45CFF,#FF5CA8 80%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:arGlow 2.2s ease-in-out infinite}
 .asana-refresh:hover .ar-ico{animation-duration:1.1s}
 .asana-refresh.spinning .ar-ico{animation:spin .8s linear infinite}
+/* Refresh outcome. The button's `title` was the only feedback and a tooltip has
+   no touch equivalent, so a FAILED refresh was silent on a phone while stale
+   figures stayed on screen. Neutral while informing, unmissable when the data
+   on display is of unknown age. */
+.asana-refresh-status{margin-top:7px;font-size:11px;line-height:1.5;color:#8A94A8;min-height:0}
+.asana-refresh-status:empty{display:none}
+.asana-refresh-status.failed{color:#F0B4B4;background:rgba(255,90,90,0.10);border:1px solid rgba(255,90,90,0.34);border-radius:8px;padding:7px 10px;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 @media(max-width:1080px){.grid{grid-template-columns:1fr}}
 @media(max-width:760px){.tiles{grid-template-columns:1fr 1fr}.lower{grid-template-columns:1fr}.sub,.live,.clock{display:none}

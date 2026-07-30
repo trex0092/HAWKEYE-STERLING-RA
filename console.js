@@ -89,8 +89,24 @@ const ASANA_MIRROR_EP = '/.netlify/functions/asana-mirror';
 function rerenderConsole(){ AGG = aggregate(readRegister()); updateThreat(); renderStats(); renderMix(); renderJur(); renderAlerts(); }
 function refreshFromAsana(btn){
   if(typeof fetch==='undefined') return;
+  /* Report the outcome where it can actually be seen. The button's `title` was
+     the ONLY feedback, and a tooltip has no touch equivalent — so on a phone a
+     FAILED refresh was silent: the spinner stopped, the stale register stayed on
+     screen, and nothing said it was stale. A console that shows old figures
+     without saying they are old is the same fault class as a health panel that
+     reports "healthy" after a failed call. */
+  const say = (text, failed) => {
+    const el = document.getElementById('asanaRefreshStatus');
+    if(!el) return;
+    el.textContent = text;
+    el.classList.toggle('failed', !!failed);
+  };
   if(btn){ btn.disabled=true; btn.classList.add('spinning'); btn.setAttribute('title','Refreshing…'); }
-  const done = t => { if(btn){ btn.disabled=false; btn.classList.remove('spinning'); btn.setAttribute('title', t); } };
+  say('Refreshing from Asana…', false);
+  const done = (t, failed) => {
+    if(btn){ btn.disabled=false; btn.classList.remove('spinning'); btn.setAttribute('title', t); }
+    say(t, failed);
+  };
   fetch(ASANA_MIRROR_EP, {method:'POST', headers: fnHeaders(), body: JSON.stringify({action:'read'})})
     .then(r=>r.json()).then(d=>{
       if(d && d.ok && Array.isArray(d.register)){
@@ -99,9 +115,17 @@ function refreshFromAsana(btn){
           date:String(r.date||''), nextReview:String(r.nextReview||''), jurisdiction:String(r.jurisdiction||'—'),
           savedAt:String(r.savedAt||'') })).filter(r=>r.ref);
         rerenderConsole();
-        done('Refreshed '+_asanaFetched.length+' from Asana');
-      } else done('Refresh failed — try again');
-    }).catch(()=> done('Refresh failed — try again'));
+        done('Refreshed '+_asanaFetched.length+' from Asana', false);
+        /* A clean refresh clears the notice rather than leaving a stale success
+           line sitting under a panel it no longer describes. */
+        setTimeout(()=>{ const el=document.getElementById('asanaRefreshStatus');
+          if(el && !el.classList.contains('failed')) el.textContent=''; }, 6000);
+      } else {
+        /* Name the consequence, not just the event: the figures on screen are
+           now of unknown age, which is the part that matters to an MLRO. */
+        done('⚠ Refresh failed — the figures shown are NOT up to date. Try again.', true);
+      }
+    }).catch(()=> done('⚠ Refresh failed (network) — the figures shown are NOT up to date. Try again.', true));
 }
 function aggregate(items){
   // Local calendar date, matching app.js toISO(): nextReview is stored as a

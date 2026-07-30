@@ -95,6 +95,12 @@
               <div class="streaming"><i></i>ON DEVICE</div>
             </div>
           </div>
+          <!-- Refresh outcome, visible and announced. The button's `title` was the
+               ONLY feedback, and a tooltip has no touch equivalent — so on a phone a
+               FAILED refresh was completely silent: the spinner stopped, the stale
+               register stayed on screen, and nothing said so. role=status +
+               aria-live announces it; the .failed class makes it unmissable. -->
+          <div id="asanaRefreshStatus" class="asana-refresh-status" role="status" aria-live="polite"></div>
           <div id="alertStream"></div>
         </div>
 
