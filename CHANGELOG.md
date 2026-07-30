@@ -10,6 +10,56 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### A failed console refresh was silent on a phone, and left stale figures on screen (2026-07-30)
+
+Found by sweeping for the fault class behind the Advisor telemetry bug: **a
+status indicator that does not report reality.**
+
+The Operations Console's "Refresh from Asana" button reported its outcome
+through the button's **`title` attribute and nothing else**:
+
+```js
+const done = t => { …; btn.setAttribute('title', t); };
+…
+} else done('Refresh failed — try again');
+```
+
+A tooltip has no touch equivalent. On a phone — which is where this console is
+actually read — a failed refresh was **completely silent**: the spinner stopped,
+the register stayed on display, and nothing said the figures were of unknown
+age. On failure `rerenderConsole()` is (correctly) not called, so what remains on
+screen is the *previous* fetch, presented exactly as if it were current.
+
+For an MLRO reading case counts, overdue reviews and prohibited-relationship
+figures, silently-stale numbers are the problem, not the failed request.
+
+The outcome now renders into a `role="status" aria-live="polite"` region beside
+the stream header, and the message names the **consequence** rather than the
+event:
+
+```
+⚠ Refresh failed — the figures shown are NOT up to date. Try again.
+```
+
+The network-level failure (the `.catch` path, previously identical to the
+API-level one) says so distinctly. A successful refresh reports plainly and
+clears itself after a few seconds rather than leaving a stale success line under
+a panel it no longer describes.
+
+Browser-verified rather than asserted, matching the standard #342 set for the
+downgrade banner and #365 for the advisor strip: real Chromium drives the real
+button, the Asana mirror endpoint is stubbed, and the checks cover the API
+failure, the **network** failure, assistive-tech announcement, and the negative —
+a successful refresh must not be marked failed, or the warning becomes noise
+operators learn to ignore.
+
+Negative-controlled: reverting to tooltip-only feedback fails 6 of the 9 checks.
+
+Also checked and found **correct**, so left alone: `renderAnimated()` refreshes
+only the numeric panels and not the alert stream — that is the count-up tween,
+and alerts are not tweened; and `rerenderConsole()` does cover all four data
+panels after a refresh.
+
 ### The phonetic tables could drift silently — measured, then made impossible (2026-07-30)
 
 Four defects this week were the same shape: **two implementations of one idea
