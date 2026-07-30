@@ -861,9 +861,15 @@ def _canonical_fingerprint(url, title):
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 # Cyrillic → Latin romanization (BGN/PCGN-style, the rendering sanctions
-# publishers actually use). Longest-key-first at application time so multi-letter
-# forms win over their prefixes. Covers Russian/Ukrainian/Belarusian/Serbian —
-# the scripts that dominate current OFAC/EU/UK designations.
+# publishers actually use). Covers Russian/Ukrainian/Belarusian/Serbian — the
+# scripts that dominate current OFAC/EU/UK designations.
+#
+# Every KEY is a single character; the multi-letter forms (Щ→SHCH, Х→KH) are
+# VALUES. So a plain per-character pass is already exact — there is no
+# longest-match ordering to get wrong, and no prefix collision is possible.
+# (An earlier revision kept a length-sorted key list for that ordering; CodeQL
+# correctly flagged it as dead, because with single-char keys it can never be
+# needed. Removed rather than silenced.)
 _CYRILLIC_ROMAN = {
     "Щ": "SHCH", "Ш": "SH", "Ч": "CH", "Ц": "TS", "Ж": "ZH", "Ю": "YU", "Я": "YA",
     "Ё": "YE", "Є": "YE", "Ї": "YI", "Ъ": "", "Ь": "", "Э": "E", "Ы": "Y",
@@ -873,7 +879,6 @@ _CYRILLIC_ROMAN = {
     "Ў": "U", "Ф": "F", "Х": "KH", "Ђ": "DJ", "Љ": "LJ", "Њ": "NJ", "Ћ": "C",
     "Џ": "DZ", "Ј": "J",
 }
-_CYRILLIC_KEYS = sorted(_CYRILLIC_ROMAN, key=len, reverse=True)
 
 def romanize(name):
     """Best-effort Latin rendering of a non-Latin name, for MATCHING only.

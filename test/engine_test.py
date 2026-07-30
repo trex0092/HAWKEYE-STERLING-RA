@@ -1269,6 +1269,14 @@ check("an empty-key entry does NOT match an unrelated name (no false positive)",
 # Cyrillic is NO LONGER unmatchable — romanize() rescues it. This is the
 # improvement, pinned so it cannot silently regress.
 _cyr_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in ["\u0425\u0410\u041c\u0410\u0421"]]}
+# romanize() applies its table with a plain per-character pass. That is exact
+# ONLY while every key is a single character (the multi-letter forms are values:
+# Щ→SHCH, Х→KH). If a future edit adds a multi-char key it would be silently
+# skipped — no error, just a name that stops romanizing. Pin the assumption.
+check("every romanization key is a single character (per-character pass is exact)",
+      all(len(k) == 1 for k in screen._CYRILLIC_ROMAN))
+check("romanization output is pure ASCII (feeds the Latin-only pipeline)",
+      all(v.isascii() for v in screen._CYRILLIC_ROMAN.values()))
 check("a Cyrillic designation is now indexed under a real key (romanized)",
       _cyr_lists["OFAC SDN"][0][0] == "KHAMAS")
 check("a Cyrillic designation is now MATCHABLE (was dead before romanization)",
