@@ -3,17 +3,31 @@ name: Site Currency (live deploy vs main)
 # Closes the gap the 27 Jun - 25 Jul incident exposed: Netlify production
 # deploys silently stopped publishing and the live site served a month-old
 # bundle, while Site Health stayed green (the OLD deploy still rendered) and
-# nothing compared what production SERVES against what main SHIPS. This probe
-# does exactly that comparison daily: the APP_VERSION served by the live
-# site's app.js versus the APP_VERSION at HEAD of main.
+# nothing compared what production SERVES against what main SHIPS.
 #
-# Self-arming: while the live site still serves the pre-app.js-split bundle
-# (the already-reported 27 Jun outage, awaiting the one-time Netlify re-link /
-# build-hook setup), the probe annotates a warning and stays green — that
-# outage is known, ticketed, and cannot be fixed from CI. From the first
-# modern publish onward, any future drift older than the grace window turns
-# the run red and files an Asana alert, so production can never again fall
-# silently behind main.
+# THIS PROBE ITSELF FAILED THAT WAY ON 30 JUL 2026. It compared the live
+# site's APP_VERSION with the one at HEAD of main, found 3.7.2 on both sides
+# and reported
+#
+#     CURRENT - production serves the version at HEAD of main
+#
+# while production was serving commit 403f091f (PR #338) and main had moved
+# 31 commits past it: PRs #339-#369 - every screening hardening, the advisor
+# error hints and the console staleness alert - had never reached the live
+# site. The probe was not wrong about what it measured. APP_VERSION is a
+# hand-maintained string that had not moved since 16 Jul, so the check passed
+# by comparing a constant with itself. Its second escape hatch had rotted the
+# same way: the "pre-app.js-split bundle" branch that annotated a warning and
+# stayed green could no longer fire, because the stale deploy does serve an
+# app.js. Both success criteria were true-once and had become unconditional.
+#
+# It now compares CONTENT. netlify.toml publishes the repo root with no build
+# step, so every served asset is a checked-in file byte-for-byte: hashing them
+# is an exact test of "is production serving this commit?", and any merge that
+# changes what the site serves necessarily changes a hash. Nothing has to be
+# remembered, and there is no branch that can pass without evidence - a site
+# that cannot be read is reported UNVERIFIABLE and fails, because an unread
+# site is not a current site. See scripts/site-currency.mjs.
 
 on:
   schedule:
@@ -46,46 +60,27 @@ jobs:
             api.github.com:443
             codeload.github.com:443
             objects.githubusercontent.com:443
+            nodejs.org:443
             hawkeye-sterling-ra.netlify.app:443
             app.asana.com:443
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0   # git log -S dates the current APP_VERSION for the grace window
 
-      - name: Compare live APP_VERSION with main
-        run: |
-          set -u
-          repo_ver=$(grep -oE "const APP_VERSION = '[0-9.]+'" app.js | grep -oE "[0-9.]+")
-          if [ -z "$repo_ver" ]; then
-            echo "::error::could not read APP_VERSION from app.js at HEAD — probe needs updating"
-            exit 1
-          fi
-          live_ver=$(curl -sSL --max-time 30 "$LIVE_ORIGIN/app.js" | grep -oE "APP_VERSION = '[0-9.]+'" | grep -oE "[0-9.]+" | head -1 || true)
-          if [ -z "$live_ver" ]; then
-            # Pre-app.js-split bundle: the known 27 Jun production-deploy outage.
-            # Known, reported, and only fixable via the one-time Netlify UI step
-            # (re-link the repository, or create a main build hook and save it as
-            # the NETLIFY_BUILD_HOOK_URL secret for netlify-production-deploy.yml).
-            echo "::warning::live site still serves the pre-app.js-split bundle (production deploys stopped 27 Jun). This probe arms automatically after the first modern publish."
-            echo "repo main: $repo_ver | live: <pre-split bundle>"
-            exit 0
-          fi
-          echo "repo main: $repo_ver | live: $live_ver"
-          if [ "$live_ver" = "$repo_ver" ]; then
-            echo "CURRENT — production serves the version at HEAD of main"
-            exit 0
-          fi
-          bumped_at=$(git log -1 --format=%ct -S "const APP_VERSION = '$repo_ver'" -- app.js || echo "")
-          now=$(date -u +%s)
-          age=$(( now - ${bumped_at:-now} ))
-          if [ "$age" -le "$GRACE_SECONDS" ]; then
-            echo "LAG — main moved to $repo_ver ${age}s ago (grace ${GRACE_SECONDS}s); deploy expected shortly"
-            exit 0
-          fi
-          echo "::error::PRODUCTION DRIFT — live serves $live_ver but main has shipped $repo_ver for ${age}s (> ${GRACE_SECONDS}s grace). Production deploys have stopped publishing again: check the Netlify deploy log / run netlify-production-deploy.yml."
-          exit 1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Compare every served asset with main
+        env:
+          # Dates the divergent assets over the commits API (the probe never
+          # shells out to git). Unauthenticated calls share the runner's IP
+          # rate limit; without a token a limited call returns NaN and the
+          # divergence is treated as drift rather than excused as lag — safe,
+          # but noisier than it needs to be.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/site-currency.mjs
 
       - name: Alert in Asana on production drift
         if: failure()
@@ -95,4 +90,4 @@ jobs:
         run: |
           node scripts/asana-alert.mjs \
             "PRODUCTION DRIFT: the live site is serving an older build than main" \
-            "The Site Currency probe found the deployed site's APP_VERSION behind main beyond the grace window — production deploys have stopped publishing (as happened silently from 27 Jun to 25 Jul). Re-run the Netlify Production Deploy workflow (needs the NETLIFY_BUILD_HOOK_URL secret) or check the Netlify project's deploy log: $RUN_URL"
+            "The Site Currency probe hashed every asset production serves and found them diverging from main beyond the grace window — deploys are not publishing, so merged fixes are NOT live for users (this is how PRs #339-#369 sat undeployed for a month behind a probe that reported CURRENT). The run log names each stale asset. Fix: re-link the repository under Netlify -> Build & deploy -> Continuous deployment, or create a main build hook and save it as the NETLIFY_BUILD_HOOK_URL secret so netlify-production-deploy.yml can publish. $RUN_URL"

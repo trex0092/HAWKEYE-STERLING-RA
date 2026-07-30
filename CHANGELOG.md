@@ -10,6 +10,90 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The deploy monitor passed by comparing a constant with itself (2026-07-30)
+
+The `netlify: failed` badge turned out not to be a badge problem. Reading the
+Netlify deploy API directly:
+
+```
+published deploy: 6a697674771b1f000883cd99
+created_at:       2026-07-29T03:41:40Z
+commit_ref:       403f091f  (PR #338)
+deploy_source:    api
+summary:          "All files already uploaded by a previous deploy
+                   with the same commits."
+```
+
+Main is **31 commits past that point**. Everything from #339 to #369 — every
+screening hardening, the advisor error hints, the console staleness alert — is
+merged and **not on the live site**. No Netlify check-run appears on any of the
+last eight `main` commits, so the Git integration is not firing on pushes; the
+GitHub-native fallback, `netlify-production-deploy.yml`, is a soft no-op
+because `NETLIFY_BUILD_HOOK_URL` was never created.
+
+**Three layers reported green over that.** Each had a success criterion that
+was true once and had since become unconditional:
+
+1. **Site Currency** compared the live `APP_VERSION` with the one at HEAD.
+   Both read `3.7.2`, so it printed *"CURRENT — production serves the version
+   at HEAD of main"*. It was not wrong about what it measured: `APP_VERSION`
+   is hand-maintained and had not moved since 16 July, so the check passed by
+   comparing a constant with itself.
+2. **Its own escape hatch** — a warning-and-stay-green branch for the
+   pre-`app.js`-split 27 Jun bundle — could no longer fire, because the stale
+   deploy does serve an `app.js`.
+3. **The deploy workflow's publish-wait** succeeded as soon as `/app.js`
+   served *any* `APP_VERSION`. That distinguished a modern publish from the
+   27 Jun bundle exactly once; afterwards it would have reported `PUBLISHED`
+   within seconds of a build hook that did nothing at all.
+
+Currency is now measured on **content**. `netlify.toml` publishes the repo root
+with no build step, so every served asset is a checked-in file byte-for-byte:
+`scripts/site-currency.mjs` sha256s each root `.html`/`.js`/`.css`/
+`.webmanifest` — discovered from disk, not listed, so a new asset is covered
+the day it is added — and compares it with the live origin. Any merge that
+changes what the site serves necessarily changes a hash, so nothing has to be
+remembered. A site that cannot be read reports `UNVERIFIABLE` and **fails**: an
+unread site is not a current site, and no branch can pass without evidence.
+
+Verified end to end against the two commits that matter, not just unit-tested.
+Served the exact tree production is publishing (`403f091f`) on a local origin:
+
+```
+STALE  advisor.js    repo 5efc66575c70 != live ed433973c799
+STALE  console.css   repo 25da781b8fc9 != live fcf5a633ad09
+STALE  console.html  repo ea58c7f71e51 != live 4e0a077c9fc8
+STALE  console.js    repo 3d18d0cbfd1a != live 7a59c1e75038
+verdict: DRIFT
+```
+
+Served `HEAD` — `CURRENT`, every asset matching. The four stale files are the
+user-visible fixes from #365, #366 and #368; `app.js` is identical across the
+two commits, which is precisely why the version-string probe passed. The old
+check was blind exactly where the damage was.
+
+The deploy workflow's publish-wait now runs the same script, so it can only go
+green once the live site serves *the commit being deployed*. And its
+missing-secret path, which stays deliberately non-fatal so ordinary merges are
+not blocked by a one-time UI step, now names the consequence rather than the
+omission: **this merge is not deployed**.
+
+Dating a divergence — the one thing separating deploy lag from real drift — is
+read from the commits API, not from `git log`. The repo's
+`hawkeye-no-child-process` Semgrep rule forbids subprocess spawning in script
+code, and a monitoring probe is the wrong place to make an exception for a
+command-injection vector; `fetch` is already this script's transport and
+`api.github.com` is already on both callers' egress allowlists. When a date
+cannot be established the divergence counts as **drift** — one that cannot be
+proven recent must not be excused as lag. Only divergent assets are dated, and
+only when a grace window could act on the answer, so a healthy site makes no
+API calls at all.
+
+`npm test` 77/77 (21 new checks); lint clean. Restoring production itself is a
+one-time Netlify action and is not in this diff — re-link the repository under
+Build & deploy → Continuous deployment, or create a `main` build hook and save
+it as the `NETLIFY_BUILD_HOOK_URL` secret.
+
 ### One dead function was hiding the state of every other one (2026-07-30)
 
 Found by running the new health probe for real rather than trusting it. The

@@ -179,6 +179,8 @@ jobs:
         run: node test/readiness-review.test.mjs
       - name: Run CI coverage drift guard (every test file is wired into a workflow)
         run: node test/ci-coverage.test.mjs
+      - name: Run site-currency verdict tests (a stale or unreadable site can never read as current)
+        run: node test/site-currency.test.mjs
       - name: Run branch-protection drift guard (required contexts match check names; no path-gated required checks)
         run: node test/protection-contexts.test.mjs
       - name: Run screening state + egress drift guard (state readers/writers share a branch; OFAC/UN redirect hosts allowlisted)
