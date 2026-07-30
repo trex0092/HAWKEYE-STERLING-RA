@@ -111,6 +111,16 @@
       "subject": "Weiss Trading",
       "listed": "Weiß Trading",
       "why": "German sharp-s: ß has no NFKD decomposition and lower-casing leaves it, so the JS engine normalized it apart from the universal ss spelling and cleared a designation screen.py scored 100 — the same silent-JS-false-negative class as the Turkish ı and two-letter-token regressions"
+    },
+    {
+      "subject": "ХАМАС",
+      "why": "Cyrillic subject vs Latin designation. screen.py romanizes to KHAMAS; this engine kept Cyrillic (хамас) and could never match the Latin entry — Python would hit, JS would not, breaking the directional parity contract.",
+      "listed": "KHAMAS"
+    },
+    {
+      "subject": "Калашников Концерн",
+      "why": "Cyrillic corporate designation against its Latin rendering — the shape that dominates current Russia-related OFAC/EU/UK listings.",
+      "listed": "KALASHNIKOV KONTSERN"
     }
   ],
   "pairs_note": "Every pair is a TRUE match that both engines must reach. The invariant is engine-to-engine agreement on reachability, not score equality: rapidfuzz and the JS Levenshtein legitimately differ by a point or two (measured: 93 vs 94 on Muhammad Alfayed), so the test asserts both engines HIT, never that they score the same."

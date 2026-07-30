@@ -860,14 +860,98 @@ def _canonical_fingerprint(url, title):
     return "t:" + _name_sig(title)
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
-def normalize(name):
-    if not name: return ""
+# Cyrillic → Latin romanization (BGN/PCGN-style, the rendering sanctions
+# publishers actually use). Covers Russian/Ukrainian/Belarusian/Serbian — the
+# scripts that dominate current OFAC/EU/UK designations.
+#
+# Every KEY is a single character; the multi-letter forms (Щ→SHCH, Х→KH) are
+# VALUES. So a plain per-character pass is already exact — there is no
+# longest-match ordering to get wrong, and no prefix collision is possible.
+# (An earlier revision kept a length-sorted key list for that ordering; CodeQL
+# correctly flagged it as dead, because with single-char keys it can never be
+# needed. Removed rather than silenced.)
+_CYRILLIC_ROMAN = {
+    "Щ": "SHCH", "Ш": "SH", "Ч": "CH", "Ц": "TS", "Ж": "ZH", "Ю": "YU", "Я": "YA",
+    "Ё": "YE", "Є": "YE", "Ї": "YI", "Ъ": "", "Ь": "", "Э": "E", "Ы": "Y",
+    "А": "A", "Б": "B", "В": "V", "Г": "G", "Ґ": "G", "Д": "D", "Е": "E",
+    "З": "Z", "И": "I", "І": "I", "Й": "Y", "К": "K", "Л": "L", "М": "M",
+    "Н": "N", "О": "O", "П": "P", "Р": "R", "С": "S", "Т": "T", "У": "U",
+    "Ў": "U", "Ф": "F", "Х": "KH", "Ђ": "DJ", "Љ": "LJ", "Њ": "NJ", "Ћ": "C",
+    "Џ": "DZ", "Ј": "J",
+}
+
+def romanize(name):
+    """Best-effort Latin rendering of a non-Latin name, for MATCHING only.
+
+    Applied ONLY as a fallback inside normalize() when the Latin pipeline yields
+    nothing — see the note there. Scripts without a deterministic romanization
+    (Arabic, which omits short vowels; CJK) are deliberately NOT guessed at: a
+    wrong transliteration would be a false CLEAR, which is worse than the
+    honest MANUAL REVIEW those names already receive."""
+    s = unicodedata.normalize("NFC", str(name or "")).upper()
+    out = []
+    for ch in s:
+        out.append(_CYRILLIC_ROMAN[ch] if ch in _CYRILLIC_ROMAN else ch)
+    return "".join(out)
+
+def _normalize_latin(name):
+    """The original Latin-only pipeline, unchanged."""
     name = name.upper()
     name = unicodedata.normalize("NFD", name)
     name = "".join(c for c in name if unicodedata.category(c) != "Mn")
     name = re.sub(r"[^A-Z0-9 ]", " ", name)
     name = re.sub(r"\s+", " ", name).strip()
     return name
+
+def normalize(name):
+    """Matching key for a name.
+
+    A designation published only in Cyrillic used to normalize to "" — indexed
+    under an empty key, so it could never match any customer, while still being
+    counted in the "screened against N list names" attestation (see
+    count_unmatchable_entries). Romanizing rescues those designations.
+
+    SAFETY PROPERTY, and the reason this is a safe place to do it: romanization
+    runs ONLY when the Latin pipeline returns "". Every name that already had a
+    non-empty key keeps exactly the key it had, byte for byte. So no existing
+    match, score, delta fingerprint or dedup key can move — the only reachable
+    change is that entries which previously matched NOTHING can now match. That
+    makes this additive-recall by construction, not a threshold change.
+
+    Names in scripts with no deterministic romanization still return "" and keep
+    their MANUAL REVIEW routing (_unscreenable tests the ORIGINAL string, so a
+    romanized name is still surfaced for a human as well as screened)."""
+    if not name: return ""
+    latin = _normalize_latin(name)
+    if latin:
+        return latin
+    roman = _normalize_latin(romanize(name))
+    if roman:
+        return roman
+    # Scripts with no deterministic romanization (Arabic omits short vowels;
+    # CJK has no letter mapping at all) are PRESERVED, not guessed at. The JS
+    # engine already did this — it matches an Arabic subject against an
+    # Arabic-published designation at 100 — while screen.py stripped the name to
+    # "" and returned NO hits for the same pair. Since screen.py runs the daily
+    # screening, an Arabic-script designation on the UN list was unmatchable in
+    # production and matchable only in the case engine.
+    #
+    # Preserving is strictly better than transliterating here: romanizing محمد
+    # yields the consonant skeleton MHMD, which does not resemble the Latin
+    # "MOHAMMED" it would need to match, so it would buy no recall while
+    # inventing false-positive surface. Same-script exact/fuzzy matching needs
+    # no guess at all.
+    return _normalize_preserve_script(name)
+
+def _normalize_preserve_script(name):
+    """Keep letters/digits of ANY script, drop marks and punctuation.
+
+    Mirrors the JS engine's `[^\\p{L}\\p{N}]+` fold so both engines key an
+    Arabic or CJK name the same way."""
+    s = unicodedata.normalize("NFD", str(name or ""))
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = "".join(c if (unicodedata.category(c)[0] in ("L", "N")) else " " for c in s)
+    return re.sub(r"\s+", " ", s).strip().upper()
 
 def _pct(score) -> str:
     # Floor, never round: a 99.6 similarity must read "99%", not "100%" — only a
@@ -4142,6 +4226,29 @@ def crosscheck_eocn(local_names, mirror_names):
             missing.append(n)
     return sorted(missing)
 
+def eocn_uncomparable(mirror_names):
+    """Mirror designations that could not be COMPARED at all, because normalize()
+    strips them to nothing (a wholly non-Latin name — Arabic is the common case
+    on this list).
+
+    crosscheck_eocn skips these: its `if ks` guard means an empty key is never
+    reported as missing. That silence is the dangerous part. The reconciler
+    writes "No divergence — the local list already covers every mirror
+    designation" whenever crosscheck returns [], and an MLRO signs the weekly
+    review on that sentence — while an unknown number of designations were never
+    actually compared. On the UAE Local Terrorist List that is a TFS freeze
+    duty, so "not compared" must never read as "covered".
+
+    Reported separately rather than folded into `missing`: these names cannot be
+    matched by the current Latin-only matcher either, so auto-appending them
+    would grow the file with entries that can never screen. They need a human to
+    transliterate against the official EOCN publication."""
+    out = []
+    for n in mirror_names or ():
+        if not normalize(n):
+            out.append(n)
+    return sorted(out)
+
 def _mirror_fallback(names, dataset, label):
     """When an official core-list endpoint yields nothing (unreachable, refused
     redirect, garbled payload), fall back to its OpenSanctions mirror — same
@@ -4370,6 +4477,36 @@ def enforce_list_outage_gate():
         if LIST_FLOORS_ENFORCE:
             sys.exit(4)
 
+_LIST_META_KEY = {"OFAC SDN": "ofac", "UN Consolidated": "un", "UK OFSI": "uk",
+                  "EU FSF": "eu", "Australia DFAT": "au", "Switzerland SECO": "ch",
+                  "UAE EOCN": "eocn"}
+
+def count_unmatchable_entries(all_lists, list_meta):
+    """Record, per list, how many designations can NEVER match a customer name.
+
+    A designation published only in non-Latin script normalizes to "" and is
+    indexed under an empty key, so screen_name can never return it. It causes no
+    false positives (an empty key matches nothing) — but it IS counted in that
+    list's `count`, i.e. in the "screened against N list names" attestation. Same
+    shape as the watchlist-coverage gap and the EOCN cross-check gap: counted as
+    covered, actually unscreenable, and silent.
+
+    Counting it makes the number auditable instead of assumed. If the sources
+    carry none, this records 0 and costs nothing. Called from BOTH list-building
+    paths — the unified loader and the legacy main() — because a guard only one
+    path calls is the recurring defect in this engine."""
+    for label, entries in (all_lists or {}).items():
+        dead = [orig for key, orig in entries if not key]
+        mk = _LIST_META_KEY.get(label)
+        if mk and mk in (list_meta or {}):
+            list_meta[mk]["unmatchable"] = len(dead)
+        if dead:
+            shown = ", ".join(dead[:3]) + (f" +{len(dead) - 3} more" if len(dead) > 3 else "")
+            log(f"  UNMATCHABLE LIST ENTRIES: {label} carries {len(dead)} designation(s) that "
+                f"normalize to nothing (non-Latin script) — counted in coverage but they can "
+                f"never match any customer name: {shown}")
+    return list_meta
+
 def load_all_lists():
     LIST_ENTRY_ATTRS.clear()   # adjudication attributes are per-load state
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
@@ -4439,13 +4576,25 @@ def load_all_lists():
     # and the "screened vs N list names" audit line stay exact.
     eocn_mirror_names, eocn_mirror_meta = load_eocn_mirror()
     missing_locally = crosscheck_eocn(eocn_names, eocn_mirror_names)
+    uncomparable = eocn_uncomparable(eocn_mirror_names)
     list_meta["eocn"]["mirror"] = eocn_mirror_meta
     list_meta["eocn"]["crosscheck_missing"] = missing_locally
+    list_meta["eocn"]["crosscheck_uncomparable"] = uncomparable
     if missing_locally:
         shown = ", ".join(missing_locally[:5]) + (f" +{len(missing_locally)-5} more"
                                                   if len(missing_locally) > 5 else "")
         log(f"  EOCN CROSS-CHECK ALARM: {len(missing_locally)} mirror designation(s) "
             f"not in the local list: {shown}")
+    # A designation the cross-check could not even compare is NOT evidence of
+    # coverage. Silence here is what let "no divergence" be written into a
+    # signed MLRO review while these were never looked at.
+    if uncomparable:
+        shown = ", ".join(uncomparable[:5]) + (f" +{len(uncomparable)-5} more"
+                                               if len(uncomparable) > 5 else "")
+        log(f"  EOCN CROSS-CHECK GAP: {len(uncomparable)} mirror designation(s) could not be "
+            f"compared (non-Latin script — the matcher normalises to Latin); these are NOT "
+            f"confirmed present locally and need transliteration against the official EOCN "
+            f"publication: {shown}")
     # Fail-safe: if EVERY core sanctions list failed to load, screening would clear
     # every customer for sanctions and post a green ✅. Abort instead — a total
     # list-fetch failure must never masquerade as "all clear".
@@ -4472,6 +4621,7 @@ def load_all_lists():
         "Switzerland SECO": [(normalize(n),n) for n in ch_names],
         "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
+    count_unmatchable_entries(all_lists, list_meta)
     # ── Supplementary lists (best-effort): broaden coverage when reachable, but a
     # fetch miss is reported as "not reached", NOT as a degraded core control. ──
     ca_data = download("https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml","Canada SEMA")
@@ -5576,6 +5726,7 @@ def main():
         "Switzerland SECO": [(normalize(n),n) for n in ch_names],
         "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
+    count_unmatchable_entries(all_lists, list_meta)
     # Internal firm watchlist (optional): added AFTER the all-empty guard and
     # the floors so firm-internal names can never satisfy a core-coverage
     # fail-safe on this path either; empty is a valid state.

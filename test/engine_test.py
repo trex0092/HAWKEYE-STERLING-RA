@@ -1243,6 +1243,65 @@ for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
           "_fold_ofac_aliases" in _psrc
           and _psrc.find("us_ofac_sdn") < _psrc.find("_fold_ofac_aliases"))
 
+# ── Unmatchable core-list entries are counted, not assumed away ───────────────
+# A designation published only in non-Latin script normalizes to "" and is
+# indexed under an empty key, so screen_name can NEVER return it. It causes no
+# false positive (an empty key matches nothing) but it IS counted in that list's
+# `count` — the "screened against N list names" attestation. Third instance of
+# the same shape as the watchlist-coverage and EOCN cross-check gaps: counted as
+# covered, actually unscreenable, silent.
+print("screen.py — unmatchable core-list entries")
+_um_lists = {
+    # After script preservation, Arabic and CJK are MATCHABLE (same-script), so
+    # the only thing that still normalizes to "" is a name with no letters or
+    # digits at all — pure punctuation/symbols, which some feeds emit as filler.
+    "OFAC SDN": [(screen.normalize(n), n) for n in ["\u2620 \u2620", "BAD ACTOR", "--- ---"]],
+    "UN Consolidated": [(screen.normalize(n), n) for n in ["CLEAN ONE", "CLEAN TWO"]],
+}
+check("a letterless designation is indexed under an empty key (the mechanism)",
+      ("", "\u2620 \u2620") in _um_lists["OFAC SDN"])
+check("an empty-key entry can never be returned by the matcher",
+      screen.screen_name("\u2620 \u2620", _um_lists) == []
+      and screen.screen_name("Bad Actor", _um_lists)[0]["matched_entry"] == "BAD ACTOR")
+check("an empty-key entry does NOT match an unrelated name (no false positive)",
+      screen.screen_name("Totally Unrelated Trading Ltd", _um_lists) == [])
+# Cyrillic is romanized; Arabic and CJK are preserved. Both are now live keys —
+# this is the improvement, pinned so it cannot silently regress.
+_cyr_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in ["\u0425\u0410\u041c\u0410\u0421"]]}
+check("a Cyrillic designation is romanized to a real key",
+      _cyr_lists["OFAC SDN"][0][0] == "KHAMAS")
+check("a Cyrillic designation is MATCHABLE (was dead before romanization)",
+      len(screen.screen_name("\u0425\u0410\u041c\u0410\u0421", _cyr_lists)) == 1)
+_ar_name = "\u0645\u062d\u0645\u062f \u0635\u0627\u0644\u062d \u0627\u0644\u062d\u0648\u062b\u064a"
+_ar_lists = {"UN Consolidated": [(screen.normalize(_ar_name), _ar_name)]}
+check("an Arabic designation keeps its script and is MATCHABLE (parity with the JS engine)",
+      screen.normalize(_ar_name) != ""
+      and len(screen.screen_name(_ar_name, _ar_lists)) == 1
+      and screen.screen_name(_ar_name, _ar_lists)[0]["score"] == 100)
+check("a CJK designation is preserved too",
+      screen.normalize("\u4e2d\u56fd\u6838\u5de5\u4e1a") != "")
+# Preserved-script subjects are STILL routed to manual review — screened AND
+# seen by a human, never one instead of the other.
+check("a preserved-script subject still routes to MANUAL REVIEW as well",
+      screen._unscreenable(_ar_name) and screen._unscreenable("\u4e2d\u56fd\u6838\u5de5\u4e1a"))
+_um_meta = {"ofac": {"count": 3}, "un": {"count": 2}}
+screen.count_unmatchable_entries(_um_lists, _um_meta)
+check("the unmatchable count is recorded per list",
+      _um_meta["ofac"]["unmatchable"] == 2)
+check("a fully matchable list records zero (no false alarm)",
+      _um_meta["un"]["unmatchable"] == 0)
+check("counting is safe on empty/None inputs",
+      screen.count_unmatchable_entries({}, {}) == {}
+      and screen.count_unmatchable_entries(None, None) is None)
+# WIRING: both list-building paths must call it — a guard only one path calls is
+# the recurring defect in this engine.
+_um_src = _inspect.getsource(screen)
+_um_calls = [l for l in _um_src.splitlines()
+             if "count_unmatchable_entries(all_lists, list_meta)" in l
+             and not l.lstrip().startswith("def ")]
+check("both list-building paths call the counter (unified loader + legacy main)",
+      len(_um_calls) == 2)
+
 # ── EOCN mirror cross-check (TFS drift detector) ──────────────────────────────
 # The curated local UAE Local Terrorist List can go stale (EOCN updates arrive
 # by notification, not a machine endpoint) — a missed designation is a false
@@ -1259,6 +1318,37 @@ check("token-reordered spellings of a local name do NOT false-alarm",
 check("local-only names are never flagged (curated file is authoritative)",
       screen.crosscheck_eocn(["ONLY LOCAL PERSON"], []) == [])
 check("empty inputs are safe", screen.crosscheck_eocn([], []) == [])
+
+# A mirror designation the cross-check cannot COMPARE is not evidence of
+# coverage. normalize() strips a wholly non-Latin name to '', and
+# crosscheck_eocn's `if ks` guard then skips it — so it is never reported as
+# missing. The reconciler wrote "No divergence — the local list already covers
+# every mirror designation" whenever crosscheck returned [], and an MLRO signed
+# the weekly TFS review on that sentence while those names were never looked at.
+_letterless = ["\u2620 \u2620", "--- ---"]
+check("a letterless mirror name normalises to nothing (the mechanism)",
+      screen.normalize(_letterless[0]) == "")
+check("crosscheck still cannot report it missing (documented, not fixed there)",
+      screen.crosscheck_eocn(["LOCAL PERSON"], _letterless) == [])
+check("eocn_uncomparable surfaces exactly those names instead of dropping them",
+      screen.eocn_uncomparable(_letterless) == sorted(_letterless))
+check("a comparable-but-absent designation is STILL reported as missing",
+      screen.crosscheck_eocn(["LOCAL PERSON"], _letterless + ["NEW LATIN GROUP"]) == ["NEW LATIN GROUP"])
+# Arabic mirror designations are now COMPARABLE (script preserved), so the gap
+# this guard was written for is largely closed at the source.
+check("an Arabic mirror designation is now comparable, not skipped",
+      screen.eocn_uncomparable(["\u0645\u062d\u0645\u062f"]) == []
+      and screen.crosscheck_eocn(["LOCAL PERSON"], ["\u0645\u062d\u0645\u062f"]) == ["\u0645\u062d\u0645\u062f"])
+check("an all-Latin mirror raises no uncomparable false alarm",
+      screen.eocn_uncomparable(["AL QAEDA (AQ)", "BOKO HARAM"]) == [])
+check("uncomparable handles empty and None safely",
+      screen.eocn_uncomparable([]) == [] and screen.eocn_uncomparable(None) == [])
+# WIRING: the daily run must record and log the gap, not just compute it.
+_src_eocn_gap = _inspect.getsource(screen)
+check("the daily run records the uncomparable set in list_meta",
+      'list_meta["eocn"]["crosscheck_uncomparable"]' in _src_eocn_gap)
+check("the daily run logs an explicit CROSS-CHECK GAP line",
+      "EOCN CROSS-CHECK GAP" in _src_eocn_gap)
 
 _dl_eocn = []
 screen.download = lambda url, label: (_dl_eocn.append(url) or _SIMPLE)

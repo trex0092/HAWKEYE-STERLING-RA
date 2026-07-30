@@ -402,8 +402,18 @@ check('an empty subject name stays clear (nothing to review)',
    folding them to the empty key — zero tokens, zero candidates, silent clear) ── */
 check('normalizeName keeps Arabic letters (harakat stripped)',
   normalizeName('مُحَمَّد صَالِح') === normalizeName('محمد صالح') && normalizeName('محمد صالح').length > 0);
-check('normalizeName keeps Cyrillic letters',
-  normalizeName('Владимир Путин') === 'владимир путин');
+/* Cyrillic is now ROMANIZED rather than kept verbatim. The original guard here
+   ("keeps Cyrillic letters") existed to stop [^a-z0-9] erasing the name to the
+   empty key — a zero-token, zero-candidate silent clear. That intent is what
+   matters and romanization satisfies it strictly better: the key is non-empty
+   AND it now aligns with the LATIN spelling the sanctions bodies publish, so
+   the subject matches the real designation instead of only a Cyrillic-spelled
+   one. Asserted as the intent (non-empty, no silent clear, matches its Latin
+   rendering) rather than the superseded mechanism. */
+check('normalizeName romanizes Cyrillic to a non-empty Latin key (never the empty key)',
+  normalizeName('Владимир Путин') === 'vladimir putin');
+check('a Cyrillic subject still yields tokens and candidates (the original regression)',
+  normalizeName('Владимир Путин').length > 0 && sigTokens(normalizeName('Владимир Путин')).length > 0);
 const arIndex = buildIndex([{ id: 'un', name: 'UN Consolidated', names: ['محمد صالح الحوثي'] }]);
 const arHit = screenName('محمد صالح الحوثي', arIndex, 85);
 check('Arabic-script subject matches an Arabic-script designation (not a silent clear)',
@@ -432,6 +442,35 @@ check('same-script curated match still beats the lost-script routing',
   screenName('محمد صالح الحوثي', arIndex, 85).recommendation === 'sanctions-match');
 check('a Latin subject that clears is untouched by the lost-script routing',
   screenName('Totally Unrelated Firm', latinIdx, 85).recommendation === 'clear');
+
+/* ── Cyrillic romanization: a real match, not a MANUAL REVIEW referral ──
+   screen.py used to strip Cyrillic to "" (a designation indexed under an empty
+   key could never match) and now romanizes it. This engine kept Cyrillic as-is,
+   so a Cyrillic subject could match a Cyrillic list entry but never the LATIN
+   designation the sanctions bodies actually publish — it fell through to
+   lostScriptLetters and came back as MANUAL REVIEW.
+
+   NOTE on why this is asserted here and not in the parity corpus: the parity
+   contract only requires that screen.py's hit is "reached" by this engine, and
+   a MANUAL REVIEW routing satisfies that. So parity passes with or without
+   romanization — it cannot pin this. What changed is the OUTCOME QUALITY: an
+   automated 100% sanctions match instead of a human referral. That is what
+   these checks hold. */
+{
+  const idx = buildIndex([{ id: 'p', name: 'OFAC SDN', names: ['KHAMAS', 'KALASHNIKOV KONTSERN'] }]);
+  const r = screenName('\u0425\u0410\u041c\u0410\u0421', idx);
+  check('a Cyrillic subject matches its LATIN designation at 100 (not MANUAL REVIEW)',
+    r.topScore === 100 && r.lists[0].list === 'OFAC SDN' && r.lists[0].hitName === 'KHAMAS');
+  check('and is banded as a real sanctions match',
+    r.band === 'critical' && r.recommendation === 'sanctions-match');
+  const c = screenName('\u041a\u0430\u043b\u0430\u0448\u043d\u0438\u043a\u043e\u0432 \u041a\u043e\u043d\u0446\u0435\u0440\u043d', idx);
+  check('a Cyrillic corporate designation matches its Latin rendering',
+    c.topScore === 100 && c.lists[0].hitName === 'KALASHNIKOV KONTSERN');
+  // Scripts with no deterministic romanization must STILL route to manual review.
+  const ar = screenName('\u0645\u062d\u0645\u062f \u0639\u0628\u062f\u0627\u0644\u0644\u0647', idx);
+  check('Arabic still routes to MANUAL REVIEW (no guessed transliteration)',
+    ar.lists[0].list === 'MANUAL REVIEW');
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

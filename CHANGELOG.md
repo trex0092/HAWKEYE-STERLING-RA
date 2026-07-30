@@ -10,6 +10,170 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Arabic and CJK designations are now matchable; alert streams reach the MLRO queue (2026-07-30)
+
+**Arabic/CJK — script preservation, not transliteration.** The JS case engine
+already matched an Arabic subject against an Arabic-published designation at
+100, while `screen.py` stripped the name to `""` and returned **no hits for the
+same pair**. Since `screen.py` runs the *daily* screening, an Arabic-script
+designation on the UN list was unmatchable in production and matchable only in
+the case engine.
+
+`normalize()` now falls back Latin → Cyrillic romanization → **script
+preservation**. Preserving is strictly better than transliterating here:
+romanizing `محمد` yields the consonant skeleton `MHMD`, which does not resemble
+the Latin "MOHAMMED" it would need to match — it would buy no recall while
+inventing false-positive surface. Same-script matching needs no guess at all.
+Preserved-script subjects are still routed to MANUAL REVIEW *as well as*
+screened.
+
+The additive-only invariant still holds and is still enforced by property test:
+across 1,302 benchmark and parity strings, **0 existing keys moved, 29
+previously-dead keys rescued** (up from 9).
+
+`normalize()`'s contract changed as a result — it is no longer closed over
+`[A-Z0-9 ]`. The property now asserts what holds for every branch: letters,
+digits and single spaces only; no combining marks; no punctuation; trimmed.
+
+**Scheduling delay — measured, and NOT fixed by re-timing.** An earlier note
+here proposed moving the first cron out of the midnight hour. The data refutes
+it: Regulatory Watch's **06:19** slot is delayed **2h05m–3h51m**, statistically
+the same as the 00:07 slot's ~3.2–3.9h. The delay is systemic to this repo's
+Actions scheduling, not midnight congestion. Moving the slot earlier is also
+*unsafe* — `freshness-check` pins this control at `maxAgeDays: 0`, so a run
+landing on the previous UTC day would raise a false "control missed its cadence"
+alarm. The cron is unchanged; the false claim that the sweep "lands in Asana
+before ~09:00 UAE" is removed from both the file header and the schedule block
+and replaced with the measured reality (~12:00 UAE).
+
+**Alert streams mirrored.** `sanctions-watch` (list changes) and
+`sanctions-screen` (the case engine, which posted 40-new-match days) now mirror
+into "Sanctions/Media/PEP - Monitoring" → "Daily Sanctions Screening", joining
+the law-change card. Additive — the #305 destination is untouched.
+
+### Test harness — a failing property crashed the runner instead of reporting it
+
+`check()` did `str(e).splitlines()[0]`. A bare `assert` carries an **empty**
+message, so `splitlines()` returned `[]` and indexing it raised `IndexError` —
+the whole property runner died and a real failure looked like a broken harness.
+It now falls back to the exception type name.
+
+
+### Cyrillic designations are now screened, not silently dead (2026-07-30)
+
+A sanctions designation published only in Cyrillic normalized to `""` in
+`screen.py`, was indexed under an empty key, and could therefore **never match
+any customer** — while still counting toward the "screened against N list names"
+attestation. Russia-related designations dominate current OFAC/EU/UK actions, so
+this was a live recall hole on the busiest listing stream.
+
+`romanize()` renders Cyrillic to Latin (BGN/PCGN-style, the spelling the
+sanctions bodies publish), and `normalize()` uses it **only as a fallback when
+the Latin pipeline returns `""`**.
+
+That placement is the whole safety argument, and it is now a property test:
+every name that already had a non-empty key keeps **exactly** that key, byte for
+byte, so no existing match, score, delta fingerprint or dedup key can move. The
+only reachable change is that entries which previously matched nothing can now
+match. Verified across **1,296 real benchmark and parity strings: 0 keys moved,
+9 previously-dead keys rescued.**
+
+Scripts without a deterministic romanization — Arabic (which omits short vowels)
+and CJK — are deliberately **not** guessed at. A wrong transliteration would be
+a false CLEAR, which is worse than the honest MANUAL REVIEW they already get.
+
+**Cross-engine parity.** The JS engine kept Cyrillic verbatim (`ХАМАС` →
+`хамас`), so it matched a Cyrillic list entry but never the Latin designation.
+Once `screen.py` romanized, Python would hit where JS did not — a directional
+parity break. The same table now folds in `scripts/sanctions-match.mjs`, and
+both engines produce identical keys.
+
+Worth recording how that was pinned: the parity corpus **cannot** hold this,
+because a MANUAL REVIEW routing already counts as "reached by the JS engine", so
+parity passes with or without romanization. What actually changed is the outcome
+quality, and that is what the JS tests assert:
+
+```
+without romanization:  MANUAL REVIEW   score 0    band medium    -> a human task
+with    romanization:  KHAMAS          score 100  band critical  -> sanctions-match
+```
+
+The pre-existing guard "normalizeName keeps Cyrillic letters" was rewritten to
+its *intent* — non-empty key, no silent clear, and now matching the Latin
+rendering — rather than the superseded mechanism.
+
+Benchmark unmoved: recall 119/121 (98.3%), hard negatives 85/85 (100%).
+
+
+### Sanctions designations that can never match are now counted, not assumed away (2026-07-30)
+
+The core sanctions index is built as `[(normalize(n), n) for n in names]`. A
+designation published **only in non-Latin script** normalizes to `""` and is
+indexed under an empty key, so `screen_name` can never return it:
+
+```
+normalize('ХАМАС') -> ''
+screen_name('ХАМАС', {...}) -> []
+```
+
+It causes no false positive — an empty key matches nothing — but it **is**
+counted in that list's `count`, which is the "screened against N list names"
+coverage attestation. So the run could attest more screening reach than it
+actually had, and nothing said so.
+
+This is the third instance of one shape: **counted as covered, actually
+unscreenable, silent** — after the adverse watchlist (#354) and the EOCN
+cross-check (#359). `count_unmatchable_entries()` now records the figure per
+list in `list_meta[...]["unmatchable"]` and logs an explicit
+`UNMATCHABLE LIST ENTRIES` line when non-zero. A fully matchable list records
+`0` and logs nothing.
+
+Called from **both** list-building paths — the unified loader and the legacy
+`main()` — and a test asserts both call sites exist, because a guard only one
+path calls has been the recurring defect in this engine.
+
+No live instance is currently demonstrated: the curated in-repo lists carry zero
+such entries, and the core lists are fetched at runtime and could not be
+inspected offline. The point is that the number is now auditable rather than
+assumed.
+
+### Model validation — matcher recall row signed (2026-07-30)
+
+The 2026 Q3 matcher-recall row in `docs/governance/model-validation-2026.md` §5
+is signed **HS MLRO**, recorded on the MLRO's explicit instruction. No pending
+sign-off rows remain.
+
+
+### "Not compared" was being reported as "covered" on a TFS freeze list (2026-07-30)
+
+The weekly EOCN reconciliation cross-checks the curated UAE Local Terrorist List
+against the OpenSanctions `ae_local_terrorists` mirror, and writes the result
+into `lastReviewedEvidence` — the sentence an MLRO signs when merging the review.
+
+`crosscheck_eocn` matches on `normalize()`, which strips a wholly non-Latin name
+to `""`. Its `if ks` guard then **skips** such a name entirely, so it can never
+be reported as missing. Whenever the comparable names all matched, the reconciler
+wrote:
+
+> "No divergence — the local list already covers every mirror designation."
+
+That sentence was not established. An unknown number of designations had never
+been compared at all. Reproduced: two Arabic-script designations genuinely absent
+from the local list produced `crosscheck_eocn(...) == []`. On the UAE Local
+Terrorist List this is a **freeze duty**, so "not compared" must never read as
+"covered".
+
+`eocn_uncomparable()` now surfaces exactly those names. They are reported
+*separately*, not folded into `missing` and not auto-appended: the Latin-only
+matcher could not screen them either, so appending would grow the file with
+entries that can never match — they need a human transliteration against the
+official EOCN publication. The daily run records them in
+`list_meta["eocn"]["crosscheck_uncomparable"]` and logs an explicit
+`EOCN CROSS-CHECK GAP` line, and the reconciler's evidence note now says
+"No divergence among the COMPARABLE designations" plus a named NOT COMPARED
+list, instead of claiming full coverage.
+
+
 ### Law-change cards were filed correctly and still never seen (2026-07-29)
 
 PR #305 ("Route every pipeline Asana delivery to HAWKEYE STERLING APP", merged

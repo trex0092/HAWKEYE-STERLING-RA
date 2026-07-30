@@ -2,9 +2,12 @@
 # HAWKEYE STERLING — DAILY ADVERSE MEDIA SCREENING
 # GitHub Actions Workflow — Hawkeye Sterling V2
 # ============================================================
-# Runs daily at 04:00 UAE (00:00 UTC) so the DEEPER ~4-4.5h sweep (5 locales
-# US/GB/AE/TR/AR + a targeted risk-term query) still lands in Asana before
-# ~09:00 UAE. Screens ALL companies AND their associated individuals
+# Scheduled 00:07 UTC daily. GitHub delivers this repo's scheduled events 2-4h
+# late (measured, hour-independent — see the schedule block), so the ~4-4.5h
+# sweep actually starts ~03:30 UTC and lands in Asana around 12:00 UAE. An
+# earlier revision of this header promised "before ~09:00 UAE"; that was never
+# achieved and the claim is removed rather than restated.
+# Screens ALL companies AND their associated individuals
 # (shareholders / UBOs / directors) via Google News RSS.
 # Posts one audit-grade summary task in Ongoing Monitoring.
 # ============================================================
@@ -13,7 +16,18 @@ name: Daily Screening (Sanctions + Adverse Media + PEP)
 
 on:
   schedule:
-    - cron: '7 0 * * *'    # 00:07 UTC = 04:07 UAE, daily (odd minute) — early start lets the DEEPER ~4-4.5h sweep (5 locales + targeted query) still deliver by ~08:30 UAE, same UTC day (keeps freshness-check valid)
+    # MEASURED SCHEDULING DELAY — read before re-timing this.
+    # GitHub delivers this repo's scheduled events 2-4h late, every day, and the
+    # delay is NOT specific to the midnight hour: over 16 days the 00:07 slot
+    # started 03:20-03:58 UTC, and Regulatory Watch's 06:19 slot started
+    # 08:24-10:10 (2h05m-3h51m late) across the same period. So the sweep begins
+    # ~03:30 UTC and, at ~4-4.5h, delivers around 12:00 UAE — NOT the ~08:30 an
+    # earlier revision of this comment claimed. That promise was never met.
+    # Moving the slot does not fix it (the delay is hour-independent) and moving
+    # it before 00:00 UTC is actively unsafe: freshness-check pins this control
+    # at maxAgeDays 0, so a run landing on the previous UTC day would raise a
+    # false "mandatory control missed its cadence" alarm. Left at 00:07.
+    - cron: '7 0 * * *'    # 00:07 UTC = 04:07 UAE, daily (odd minute) — earliest same-UTC-day start; actual start ~03:30 UTC after GitHub's delay
     - cron: '7 3 * * *'    # 03:07 UTC self-healing retry — the 24 & 25 Jul 00:07 runs died to runner-VM shutdowns mid-sweep and stayed red until someone manually re-ran hours later. This firing is a NO-OP (preflight skips the sweep) whenever today already has a successful run; it only screens when the mandatory daily control would otherwise be missing, and still delivers by ~08:30 UAE.
     - cron: '7 6 * * *'    # 06:07 UTC last-chance retry — the first two slots are 3h apart, so a single 3-4h outage window (GitHub Actions or an upstream source) could still cost the whole day. Same NO-OP preflight; when it does have to screen, delivery lands ~11:30 UAE — late, but a late daily screening beats a missing one for a mandatory control.
   workflow_dispatch:        # Manual trigger

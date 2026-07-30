@@ -135,6 +135,15 @@ jobs:
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
           # "Sanctions updates" section of the Ongoing Monitoring project
           ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
+          # MIRROR: also file this alert in the queue the MLRO works from —
+          # project 1213914392047129 "Sanctions/Media/PEP - Monitoring",
+          # section 1213914392047131 "Daily Sanctions Screening". #305 routed
+          # every pipeline card to the app project, so these alerts were being
+          # created correctly into a queue nobody watches for them. One task,
+          # two memberships — additive; the #305 destination is unchanged.
+          # Clear ASANA_MIRROR_PROJECT_GID to disable.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID || '1213914392047129' }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID || '1213914392047131' }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           SCREEN_PEP: ${{ vars.SCREEN_PEP }}

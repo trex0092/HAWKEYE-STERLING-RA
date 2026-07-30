@@ -4,6 +4,9 @@
 import {
   isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana
 } from '../scripts/asana-notify.mjs';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve, join } from 'node:path';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -127,6 +130,27 @@ const noSec = await capturePayload({ project: APP, mirror: [{ project: MON }] })
 check('a sectionless mirror still joins the project',
   noSec.projects.includes(MON) && (noSec.memberships || []).some(m => m.project === MON && !('section' in m)));
 
+
+/* Every ALERT stream that lands in the app project must also reach the queue
+   the MLRO works from. Asserted by inspecting the workflows, because the bug
+   was never in the code — notifyAsana did the right thing with what it was
+   given; the workflows simply never gave it a mirror, and the step names/
+   comments claimed otherwise. */
+{
+  const ROOT2 = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const MON = '1213914392047129';
+  for (const wf of ['regulatory-watch.yml', 'sanctions-watch.yml', 'sanctions-screen.yml']) {
+    const y = readFileSync(join(ROOT2, '.github/workflows', wf), 'utf8');
+    /* Match the ASSIGNMENT, not the bare identifier: the explanatory comment
+       above it says "Clear ASANA_MIRROR_PROJECT_GID to disable", so an
+       includes() on the name alone passes even with the env line deleted —
+       caught by a negative control that failed to fail. */
+    const assigned = new RegExp(`ASANA_MIRROR_PROJECT_GID:\\s*\\$\\{\\{[^}]*${MON}`).test(y);
+    check(`${wf} mirrors its alert into the MLRO queue`, assigned);
+    check(`${wf} still delivers to the #305 destination as well (additive)`,
+      y.includes('1216203370612914'));
+  }
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -98,6 +98,15 @@ jobs:
               sys.exit(1)
 
           missing = screen.crosscheck_eocn(local_names, mirror_names)
+          # Designations the cross-check cannot compare at all (non-Latin script
+          # normalises to ''). NOT auto-folded: the Latin-only matcher could not
+          # screen them either, so appending them would grow the file with
+          # entries that can never match. They are named in the evidence note so
+          # the reviewer knows what was outside the comparison.
+          uncomparable = screen.eocn_uncomparable(mirror_names)
+          if uncomparable:
+              print(f"::warning::{len(uncomparable)} mirror designation(s) could not be compared "
+                    f"(non-Latin script): {uncomparable[:5]}")
           today = datetime.date.today().isoformat()
 
           for name in missing:
@@ -111,7 +120,18 @@ jobs:
               f"{str(meta.get('hash',''))[:16]}…). "
               + (f"{len(missing)} mirror designation(s) folded in with the exact mirror rendering "
                  f"kept as an alias: " + "; ".join(missing) + ". " if missing else
-                 "No divergence — the local list already covers every mirror designation. ")
+                 ("No divergence among the COMPARABLE designations. " if uncomparable else
+                  "No divergence — the local list already covers every mirror designation. "))
+              # A designation that could not be compared is not evidence of
+              # coverage. Without this clause the note said "covers every mirror
+              # designation" while these were never looked at, and an MLRO signed
+              # the weekly review on that sentence.
+              + (f"NOT COMPARED: {len(uncomparable)} mirror designation(s) are wholly non-Latin "
+                 f"and normalise to nothing, so the cross-check could neither confirm nor deny "
+                 f"them locally — they require transliteration against the official publication: "
+                 + "; ".join(uncomparable[:10])
+                 + (f" (+{len(uncomparable)-10} more)" if len(uncomparable) > 10 else "") + ". "
+                 if uncomparable else "")
               + "Mirror-derived, pending MLRO confirmation against the official EOCN publication "
                 "(https://www.uaeiec.gov.ae): merging this branch to main records that review."
           )
