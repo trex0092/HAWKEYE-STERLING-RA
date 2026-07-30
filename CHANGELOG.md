@@ -10,6 +10,45 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Sanctions designations that can never match are now counted, not assumed away (2026-07-30)
+
+The core sanctions index is built as `[(normalize(n), n) for n in names]`. A
+designation published **only in non-Latin script** normalizes to `""` and is
+indexed under an empty key, so `screen_name` can never return it:
+
+```
+normalize('ХАМАС') -> ''
+screen_name('ХАМАС', {...}) -> []
+```
+
+It causes no false positive — an empty key matches nothing — but it **is**
+counted in that list's `count`, which is the "screened against N list names"
+coverage attestation. So the run could attest more screening reach than it
+actually had, and nothing said so.
+
+This is the third instance of one shape: **counted as covered, actually
+unscreenable, silent** — after the adverse watchlist (#354) and the EOCN
+cross-check (#359). `count_unmatchable_entries()` now records the figure per
+list in `list_meta[...]["unmatchable"]` and logs an explicit
+`UNMATCHABLE LIST ENTRIES` line when non-zero. A fully matchable list records
+`0` and logs nothing.
+
+Called from **both** list-building paths — the unified loader and the legacy
+`main()` — and a test asserts both call sites exist, because a guard only one
+path calls has been the recurring defect in this engine.
+
+No live instance is currently demonstrated: the curated in-repo lists carry zero
+such entries, and the core lists are fetched at runtime and could not be
+inspected offline. The point is that the number is now auditable rather than
+assumed.
+
+### Model validation — matcher recall row signed (2026-07-30)
+
+The 2026 Q3 matcher-recall row in `docs/governance/model-validation-2026.md` §5
+is signed **HS MLRO**, recorded on the MLRO's explicit instruction. No pending
+sign-off rows remain.
+
+
 ### "Not compared" was being reported as "covered" on a TFS freeze list (2026-07-30)
 
 The weekly EOCN reconciliation cross-checks the curated UAE Local Terrorist List

@@ -1243,6 +1243,43 @@ for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
           "_fold_ofac_aliases" in _psrc
           and _psrc.find("us_ofac_sdn") < _psrc.find("_fold_ofac_aliases"))
 
+# ── Unmatchable core-list entries are counted, not assumed away ───────────────
+# A designation published only in non-Latin script normalizes to "" and is
+# indexed under an empty key, so screen_name can NEVER return it. It causes no
+# false positive (an empty key matches nothing) but it IS counted in that list's
+# `count` — the "screened against N list names" attestation. Third instance of
+# the same shape as the watchlist-coverage and EOCN cross-check gaps: counted as
+# covered, actually unscreenable, silent.
+print("screen.py — unmatchable core-list entries")
+_um_lists = {
+    "OFAC SDN": [(screen.normalize(n), n) for n in ["\u0425\u0410\u041c\u0410\u0421", "BAD ACTOR", "\u4e2d\u56fd\u6838\u5de5\u4e1a"]],
+    "UN Consolidated": [(screen.normalize(n), n) for n in ["CLEAN ONE", "CLEAN TWO"]],
+}
+check("a non-Latin designation is indexed under an empty key (the mechanism)",
+      ("", "\u0425\u0410\u041c\u0410\u0421") in _um_lists["OFAC SDN"])
+check("an empty-key entry can never be returned by the matcher",
+      screen.screen_name("\u0425\u0410\u041c\u0410\u0421", _um_lists) == []
+      and screen.screen_name("Bad Actor", _um_lists)[0]["matched_entry"] == "BAD ACTOR")
+check("an empty-key entry does NOT match an unrelated name (no false positive)",
+      screen.screen_name("Totally Unrelated Trading Ltd", _um_lists) == [])
+_um_meta = {"ofac": {"count": 3}, "un": {"count": 2}}
+screen.count_unmatchable_entries(_um_lists, _um_meta)
+check("the unmatchable count is recorded per list",
+      _um_meta["ofac"]["unmatchable"] == 2)
+check("a fully matchable list records zero (no false alarm)",
+      _um_meta["un"]["unmatchable"] == 0)
+check("counting is safe on empty/None inputs",
+      screen.count_unmatchable_entries({}, {}) == {}
+      and screen.count_unmatchable_entries(None, None) is None)
+# WIRING: both list-building paths must call it — a guard only one path calls is
+# the recurring defect in this engine.
+_um_src = _inspect.getsource(screen)
+_um_calls = [l for l in _um_src.splitlines()
+             if "count_unmatchable_entries(all_lists, list_meta)" in l
+             and not l.lstrip().startswith("def ")]
+check("both list-building paths call the counter (unified loader + legacy main)",
+      len(_um_calls) == 2)
+
 # ── EOCN mirror cross-check (TFS drift detector) ──────────────────────────────
 # The curated local UAE Local Terrorist List can go stale (EOCN updates arrive
 # by notification, not a machine endpoint) — a missed designation is a false

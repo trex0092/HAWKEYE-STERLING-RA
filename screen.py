@@ -4393,6 +4393,36 @@ def enforce_list_outage_gate():
         if LIST_FLOORS_ENFORCE:
             sys.exit(4)
 
+_LIST_META_KEY = {"OFAC SDN": "ofac", "UN Consolidated": "un", "UK OFSI": "uk",
+                  "EU FSF": "eu", "Australia DFAT": "au", "Switzerland SECO": "ch",
+                  "UAE EOCN": "eocn"}
+
+def count_unmatchable_entries(all_lists, list_meta):
+    """Record, per list, how many designations can NEVER match a customer name.
+
+    A designation published only in non-Latin script normalizes to "" and is
+    indexed under an empty key, so screen_name can never return it. It causes no
+    false positives (an empty key matches nothing) — but it IS counted in that
+    list's `count`, i.e. in the "screened against N list names" attestation. Same
+    shape as the watchlist-coverage gap and the EOCN cross-check gap: counted as
+    covered, actually unscreenable, and silent.
+
+    Counting it makes the number auditable instead of assumed. If the sources
+    carry none, this records 0 and costs nothing. Called from BOTH list-building
+    paths — the unified loader and the legacy main() — because a guard only one
+    path calls is the recurring defect in this engine."""
+    for label, entries in (all_lists or {}).items():
+        dead = [orig for key, orig in entries if not key]
+        mk = _LIST_META_KEY.get(label)
+        if mk and mk in (list_meta or {}):
+            list_meta[mk]["unmatchable"] = len(dead)
+        if dead:
+            shown = ", ".join(dead[:3]) + (f" +{len(dead) - 3} more" if len(dead) > 3 else "")
+            log(f"  UNMATCHABLE LIST ENTRIES: {label} carries {len(dead)} designation(s) that "
+                f"normalize to nothing (non-Latin script) — counted in coverage but they can "
+                f"never match any customer name: {shown}")
+    return list_meta
+
 def load_all_lists():
     LIST_ENTRY_ATTRS.clear()   # adjudication attributes are per-load state
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
@@ -4507,6 +4537,7 @@ def load_all_lists():
         "Switzerland SECO": [(normalize(n),n) for n in ch_names],
         "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
+    count_unmatchable_entries(all_lists, list_meta)
     # ── Supplementary lists (best-effort): broaden coverage when reachable, but a
     # fetch miss is reported as "not reached", NOT as a degraded core control. ──
     ca_data = download("https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml","Canada SEMA")
@@ -5611,6 +5642,7 @@ def main():
         "Switzerland SECO": [(normalize(n),n) for n in ch_names],
         "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
+    count_unmatchable_entries(all_lists, list_meta)
     # Internal firm watchlist (optional): added AFTER the all-empty guard and
     # the floors so firm-internal names can never satisfy a core-coverage
     # fail-safe on this path either; empty is a valid state.
