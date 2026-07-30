@@ -10,6 +10,37 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Law-change cards were filed correctly and still never seen (2026-07-29)
+
+PR #305 ("Route every pipeline Asana delivery to HAWKEYE STERLING APP", merged
+22 Jul 2026) redirected every pipeline card to the app project. The Regulatory
+Watch card — the law-change feed — is worked from a different project, so from
+that day it was being created successfully and read as *nothing arrived* to the
+person watching for it. Eight days of law-change deltas, including OFAC Recent
+Actions and an LBMA Responsible Sourcing change, landed where nobody was looking.
+
+Two things made it invisible rather than obvious:
+
+- the workflow step was named **"Notify Asana — Ongoing Monitoring project"**
+  while pointing at the app project; and
+- the comment above the GIDs described `1216203370612916` as *"the Regulatory
+  changes section of the Ongoing Monitoring project"*. Verified against the live
+  API, `1216203370612914` is **HAWKEYE STERLING APP** and `1216203370612916` is
+  its **Assessment Report** section — neither is what the comment claimed. A
+  reviewer auditing the delivery path would have read the comment and moved on.
+
+The card is now **mirrored**: one task with two project memberships (the same
+multi-homing the daily screening already uses for its dual MLRO queue). The #305
+destination is untouched — this is additive — and the card also appears in
+"Sanctions/Media/PEP - Monitoring" → "Regulatory changes", where it is actually
+worked. One task, so there is no duplicate to reconcile. The step name and the
+GID comments now state the verified project and section names.
+
+Note for the record: the daily sanctions/adverse/PEP screening was never
+affected. It delivers via its own dual-queue path to "Sanctions/Media/PEP -
+Monitoring" and has posted every day throughout.
+
+
 ### "This subject was never screened" must not lose its place to ten candidates (2026-07-29)
 
 A subject whose name the matcher cannot handle (non-Latin script, or under four

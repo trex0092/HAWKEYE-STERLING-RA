@@ -2,7 +2,7 @@
    shared transient-failure policy (retry classification + backoff) and the
    re-run duplicate guard used by every monitoring delivery stream. */
 import {
-  isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody
+  isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana
 } from '../scripts/asana-notify.mjs';
 
 let passed = 0, failed = 0;
@@ -66,6 +66,67 @@ check('buildHtmlBody produces a single <body> root with escaped content', (() =>
   const h = buildHtmlBody({ heading: 'A & B', summary: 's', changes: [{ name: '<X>', url: 'https://u', status: 'new' }], runLink: 'https://r' });
   return h.startsWith('<body>') && h.endsWith('</body>') && h.includes('&lt;X&gt;') && h.includes('A &amp; B');
 })());
+
+/* ── MIRROR: one card, two project memberships ──
+   #305 routed every pipeline Asana card to the HAWKEYE STERLING APP project.
+   The law-change queue is worked from a DIFFERENT project, so from 22 Jul 2026
+   the Regulatory Watch card was filed correctly and still read as "nothing
+   arrived" to its reader. Mirroring is additive: the #305 destination keeps
+   receiving the card, and it also appears where it is worked. One task, so
+   there is no duplicate to reconcile and no dedup interaction. */
+async function capturePayload(opts) {
+  const orig = globalThis.fetch;
+  const prevTok = process.env.ASANA_ACCESS_TOKEN;
+  process.env.ASANA_ACCESS_TOKEN = 'test-token';
+  let captured = null;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('/tasks') && init && init.method === 'POST') {
+      captured = JSON.parse(init.body).data;
+      return { ok: true, status: 201, json: async () => ({ data: { gid: 'T1', permalink_url: 'https://p' } }), text: async () => '' };
+    }
+    return { ok: true, status: 200, json: async () => ({ data: [] }), text: async () => '' };
+  };
+  try { await notifyAsana('Regulatory Watch — 3 source changes', 'body', opts); }
+  finally {
+    globalThis.fetch = orig;
+    if (prevTok === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = prevTok;
+  }
+  return captured;
+}
+
+const APP = '1216203370612914', APP_SEC = '1216203370612916';
+const MON = '1213914392047129', MON_SEC = '1216203873114460';
+
+const mirrored = await capturePayload({ project: APP, section: APP_SEC, mirror: [{ project: MON, section: MON_SEC }] });
+check('a mirrored card still reaches the primary (#305) project',
+  mirrored.projects.includes(APP));
+check('a mirrored card ALSO reaches the queue it is worked from',
+  mirrored.projects.includes(MON));
+const mships = mirrored.memberships || [];
+check('the mirror is filed under its own section, not the project default',
+  mships.some(m => m.project === MON && m.section === MON_SEC));
+check('the primary keeps its own section membership',
+  mships.some(m => m.project === APP && m.section === APP_SEC));
+check('mirroring creates ONE task, not two (no duplicate to reconcile)',
+  Array.isArray(mirrored.projects) && mirrored.projects.length === 2);
+
+/* Absent a mirror the payload must be byte-identical to the old behaviour —
+   every other delivery stream shares this function. */
+const plain = await capturePayload({ project: APP, section: APP_SEC });
+check('no mirror configured leaves the payload exactly as before',
+  plain.projects.length === 1 && plain.projects[0] === APP && plain.memberships === undefined);
+
+/* A mirror pointing at the primary must not produce a self-membership. */
+const self = await capturePayload({ project: APP, mirror: [{ project: APP, section: APP_SEC }] });
+check('a mirror equal to the primary is deduped away',
+  self.projects.length === 1 && self.memberships === undefined);
+
+/* A mirror without a section still joins the project (default section). */
+const noSec = await capturePayload({ project: APP, mirror: [{ project: MON }] });
+check('a sectionless mirror still joins the project',
+  noSec.projects.includes(MON) && (noSec.memberships || []).some(m => m.project === MON && !('section' in m)));
+
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -155,16 +155,29 @@ jobs:
           ARCHIVE_SPN_KEYS: ${{ secrets.ARCHIVE_SPN_KEYS }}
         run: node scripts/reg-draft.mjs
 
-      - name: Notify Asana — Ongoing Monitoring project
+      - name: Notify Asana — HAWKEYE STERLING APP + the law-change queue
         id: asana
         # Don't fail the run if Asana is unreachable; the issue fallback covers it.
         continue-on-error: true
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          # PRIMARY (unchanged, per #305 "Route every pipeline Asana delivery to
+          # HAWKEYE STERLING APP"): project 1216203370612914 = HAWKEYE STERLING
+          # APP, section 1216203370612916 = "Assessment Report". The old comment
+          # here called these "the Regulatory changes section of the Ongoing
+          # Monitoring project" — they are neither, and that mislabel is why the
+          # reroute went unnoticed. Names verified against the live API.
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          # "Regulatory changes" section of the Ongoing Monitoring project
           ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
+          # MIRROR: the card is ALSO filed in the queue the MLRO actually works —
+          # project 1213914392047129 = "Sanctions/Media/PEP - Monitoring",
+          # section 1216203873114460 = "Regulatory changes" (the destination
+          # every Regulatory Watch card used until #305 merged on 22 Jul 2026).
+          # One task, two memberships — additive, nothing is moved away from the
+          # #305 destination. Clear ASANA_MIRROR_PROJECT_GID to disable.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_LAWCHANGE_PROJECT_GID || '1213914392047129' }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_LAWCHANGE_SECTION_GID || '1216203873114460' }}
           # Step output crosses into the shell via env (never inline ${{ }} in run:),
           # so a hostile character in a generated title can never become shell syntax.
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
