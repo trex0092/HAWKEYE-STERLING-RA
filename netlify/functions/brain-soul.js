@@ -421,7 +421,30 @@ function structureGuard(text) {
    only fires after the multi-second platform budget. The user was therefore
    looking at a bare "[API error NNN]" with no way to know whether it meant a
    dead key, an unavailable model, or a quota stop. */
-function apiErrorHint(status) {
+/* Some upstream conditions are not distinguishable by status code alone, and
+   getting the hint WRONG is its own failure — it sends the operator to fix
+   something that is not broken.
+
+   Measured case: the account hit its spend cap and the API answered
+
+     HTTP 400 — "You have reached your specified API usage limits.
+                 You will regain access on 2026-08-01 at 00:00 UTC."
+
+   A bare 400 hint reads "malformed request", which would have had someone
+   debugging a payload while the real fix was a billing limit. So the body is
+   CLASSIFIED here (never reflected — the wording below is ours, the provider's
+   text stays in the function log) to separate quota from malformed. */
+function isUsageLimit(status, errBody) {
+  if (status !== 400 && status !== 429) return false;
+  return /usage limit|credit balance|quota|billing|spend|insufficient funds/i.test(String(errBody || ''));
+}
+
+function apiErrorHint(status, errBody) {
+  if (isUsageLimit(status, errBody)) {
+    return ' — the API account has hit its usage limit or run out of credit. This is a BILLING'
+      + ' limit, not a broken key and not a bad request: raise or remove the cap in the Anthropic'
+      + ' Console (Billing → Limits), or wait for the stated reset. Do not rotate the key.';
+  }
   if (status === 401 || status === 403) {
     return ' — the ANTHROPIC_API_KEY in the Netlify environment is missing, invalid or revoked.'
       + ' Rotate the key in Site configuration → Environment variables, then redeploy.';
@@ -431,10 +454,11 @@ function apiErrorHint(status) {
       + ' Check the model IDs in MODEL_BY_MODE against the keys entitlements.';
   }
   if (status === 429) {
-    return ' — rate limited or out of quota upstream. Retry shortly, or check the plan limits on the API account.';
+    return ' — rate limited upstream. Retry shortly; if it persists, check the plan limits on the API account.';
   }
   if (status === 400 || status === 422) {
-    return ' — the request was rejected as malformed upstream (see the function log for the provider detail).';
+    /* Reached only when the body did NOT match the usage-limit signature above. */
+    return ' — the request was rejected upstream as malformed (see the function log for the provider detail).';
   }
   if (status === 529 || status >= 500) {
     return ' — the upstream API is unavailable or overloaded. This one is not a configuration fault; retry shortly.';
@@ -817,7 +841,7 @@ const handle = async (event) => {
       // messages used by the Asana/backup functions).
       const errBody = await apiResp.text().catch(() => '');
       if (errBody) console.warn('brain-soul: Anthropic API error ' + apiResp.status + ': ' + errBody.slice(0, 300));
-      text = '[API error ' + apiResp.status + apiErrorHint(apiResp.status) + ']';
+      text = '[API error ' + apiResp.status + apiErrorHint(apiResp.status, errBody) + ']';
     } else {
       // A 200 with a null/empty/invalid body must not throw into the catch below
       // (which would then leak an internal error string to the client). Parse
@@ -927,6 +951,6 @@ exports.__internals = {
   PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
   hallucinationGuard, injectionGuard, anomalyGuard, qualityScore,
   selectModel, MODEL_BY_MODE, PLATFORM_CAP_MS, ABORT_BUDGET_MS, AFFORDABLE_TOKENS, DEEP_MIN_TOKENS, DEEP_HOP_LIMIT,
-  simpleHash, buildKnowledgeContext,
+  simpleHash, buildKnowledgeContext, apiErrorHint, isUsageLimit,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
 };

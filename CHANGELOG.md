@@ -10,6 +10,53 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The Advisor was out of API credit, and the hint would have sent someone to rotate a working key (2026-07-30)
+
+The Advisor outage is now diagnosed from evidence rather than inference. The
+`advisor-eval` run of 2026-07-30 11:52 calls `api.anthropic.com` directly with
+the real key, and every one of its 24 evals across all three models returned:
+
+```
+advisor-eval: API error 400 — You have reached your specified API usage limits.
+              You will regain access on 2026-08-01 at 00:00 UTC.
+```
+
+So the key is **valid**. The account hit a **spend cap**. Every Advisor call got
+HTTP 400 back in ~360 ms, which is precisely the latency the on-device telemetry
+recorded next to "last call failed".
+
+**The hint shipped hours earlier was confidently wrong about it.** A bare 400
+mapped to *"the request was rejected as malformed upstream"* — which would have
+had someone debugging a payload while the real fix was a billing limit. A hint
+that is precisely wrong is worse than a bare status code: it spends the
+operator's time in the wrong place and, in the `function-health` wording, told
+them to **rotate a key that works**.
+
+`isUsageLimit(status, body)` now classifies the upstream body — never reflects
+it; the wording is ours and the provider's text stays in the function log — and
+separates the two causes on both statuses that can carry them:
+
+| upstream | reported as |
+|---|---|
+| 400 + *"usage limits"* / *"credit balance"* | **billing cap** — raise it in the Anthropic Console, or wait for the reset. **Do not rotate the key.** |
+| 400, any other body | malformed request |
+| 429 + *"credit balance too low"* | **billing cap** |
+| 429, any other body | rate limiting — retry |
+
+The `function-health` alert carries the same correction: the two causes need
+**opposite** fixes, so it now says to read the detail before acting rather than
+naming one remedy.
+
+Eight checks pin it, including that a genuinely malformed 400 is still called
+malformed, that a plain 429 is still rate limiting, that the classifier never
+fires on an auth or overload body, and that classifying the body did not start
+**reflecting** it. Negative-controlled: neutering the classifier fails three.
+
+Worth recording plainly: the earlier diagnosis in this session ranked
+401/revoked-key as most likely. It was 400/quota. The reasoning that located the
+fault *inside the API call* was right — the ranking of causes was not, and only
+the log settled it.
+
 ### The Advisor health alarm proved the API key EXISTS, never that it WORKS — 10 green days over a dead Advisor (2026-07-30)
 
 Reported: the Advisor would not answer, and **nothing had alerted anyone**. That
