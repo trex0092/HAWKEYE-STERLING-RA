@@ -784,13 +784,40 @@ export function translitCanonToken(tok) {
    hassan/hussein never collide); a trailing vowel is preserved so gender/nisba
    suffixes (hana/hani, qassem/qasemi) stay distinct; keys are computed on
    transliteration-CANONICAL tokens with abu/abd merged into their successor. */
-const PHON_DIGRAPHS = [['shch', 's'], ['sch', 's'], ['sh', 's'], ['tch', 'c'], ['ch', 'c'],
-  ['zh', 'j'], ['kh', 'k'], ['gh', 'k'], ['ph', 'f'], ['th', 't'], ['dh', 'd'],
-  ['dj', 'j'], ['ck', 'k'], ['ts', 'c'], ['tz', 'c'], ['x', 'ks'], ['oo', 'u'],
-  ['ou', 'u'], ['ee', 'i'], ['ei', 'i'], ['ey', 'i']];
-const PHON_VOWEL_CLASS = { a: 'a', e: 'i', i: 'i', o: 'u', u: 'u' };
-const PHON_CHAR_MAP = { q: 'k', c: 'k', g: 'k', w: 'v', p: 'b', d: 't', z: 's' };
-const PHON_PARTICLES = new Set(['abu', 'abou', 'abo', 'abd']);
+/* Phonetic-fold tables — loaded from the shared data file so BOTH engines fold
+   identically (screen.py loads the same file). These were duplicated in code; a
+   duplicated table in this repo has drifted twice already (transliteration
+   groups, then the corporate stopwords, the latter costing three hard-negative
+   false positives). Verified before extraction that dropping one digraph from
+   THIS copy broke no test, so the drift would have been silent.
+
+   ORDER MATTERS: digraphs are applied in sequence as plain substring
+   replacements, so longer forms must precede their own prefixes (shch before
+   sch before sh; tch before ch). File order is preserved and asserted by
+   test/phonetic-tables.test.mjs.
+
+   FAIL LOUD on a missing/invalid file: a silently-empty fold table would key
+   every name differently from the list it is screened against. */
+function loadPhoneticTables() {
+  const path = new URL('../data/phonetic-tables.json', import.meta.url);
+  const d = JSON.parse(readFileSync(path, 'utf8'));
+  const digraphs = Array.isArray(d.digraphs) ? d.digraphs : [];
+  if (!digraphs.length) throw new Error('phonetic tables file has no digraphs: ' + path);
+  for (const g of digraphs) {
+    if (!Array.isArray(g) || g.length !== 2 || !g[0] || g[0] !== String(g[0]).toLowerCase()) {
+      throw new Error('malformed digraph: ' + JSON.stringify(g));
+    }
+  }
+  if (!d.vowelClass || !d.charMap || !Array.isArray(d.particles) || !d.particles.length) {
+    throw new Error('phonetic tables file is missing a required table: ' + path);
+  }
+  return { digraphs, vowelClass: d.vowelClass, charMap: d.charMap, particles: new Set(d.particles) };
+}
+const PHON_TABLES = loadPhoneticTables();
+const PHON_DIGRAPHS = PHON_TABLES.digraphs;
+const PHON_VOWEL_CLASS = PHON_TABLES.vowelClass;
+const PHON_CHAR_MAP = PHON_TABLES.charMap;
+const PHON_PARTICLES = PHON_TABLES.particles;
 const PHON_KEY_CACHE = new Map();
 const PHON_KEY_CACHE_MAX = 300000;
 

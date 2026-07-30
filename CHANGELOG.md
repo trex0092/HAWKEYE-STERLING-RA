@@ -10,6 +10,62 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The phonetic tables could drift silently — measured, then made impossible (2026-07-30)
+
+Four defects this week were the same shape: **two implementations of one idea
+that drifted apart.** Two of those tables have since been moved to shared data
+files (`translit-groups.json`, `corporate-stopwords.json`). This is a sweep for
+the rest.
+
+Four phonetic-fold tables were still duplicated in code — digraphs, vowel
+classes, character map, particles. They were checked and found **currently
+identical**, but only because the `tch` digraph added this week was
+hand-synchronised into both files. Nothing enforced it.
+
+So the exposure was measured directly: **one digraph (`kh`) was deleted from the
+JS copy alone.**
+
+```
+full suite            74/74   pass
+cross-engine parity   10/10   pass
+JS benchmark          recall 131/132, hard negatives 85/85   unmoved
+```
+
+Nothing failed. The drift would have been completely silent — and `kh` is what
+makes Arabic **خ** written `kh` fold with the same name written `ch`, the exact
+class the `r122`–`r125` hard-`ch` recall pairs were added to protect.
+
+The four tables now live in `data/phonetic-tables.json`, loaded by both engines,
+fail-loud on a missing or malformed file. Same treatment the other two shared
+files get.
+
+`test/phonetic-tables.test.mjs` guards the part a schema check would miss:
+**digraph order is load-bearing.** They are applied in sequence as plain
+substring replacements, so any pattern that is a prefix of a later one would
+consume it first and silently change every key — `sh` before `shch` makes `shch`
+unreachable, and `ch` before `tch` is precisely what kept Tchaikovski and
+Chaykovskiy apart until `r099` was closed. The guard rejects any such ordering
+generally, spot-checks the two orderings whose violation has cost recall, and
+then verifies behaviourally that every folding pair still keys alike and that
+distinct names do not collapse.
+
+Negative-controlled: deleting `kh` — the edit that previously broke nothing —
+now fails the suite; swapping `tch` and `ch` fails both the ordering check and
+the behavioural one.
+
+#### One assertion I got wrong
+
+The first version of the guard asserted `salah`/`saleh` must not share a
+phonetic key. They do share `sal`, and the translit-groups file keeps them in
+separate groups — but those are **different contracts**, and I conflated them.
+The group firewall means "never swap one spelling for the other when generating
+variants", so the equivalence is not spread across the corpus. It does not mean
+the two must never score alike: `Mohammed Salah` against designated
+`Mohammed Saleh` is one letter apart and scores **93 on fuzzy alone**, phonetic
+layer or not. Surfacing that for MLRO review is correct behaviour. The
+assertion was pinning the wrong contract and was replaced, with the reasoning
+recorded in the test so it is not "fixed" back.
+
 ### The last recall miss was one missing transliteration pair — screen.py now clears the whole corpus (2026-07-30)
 
 `r110` — `Hossam Din Farag` vs designated `Husam Deen Faraj` — was the only
