@@ -472,5 +472,18 @@ check('a Latin subject that clears is untouched by the lost-script routing',
     ar.lists[0].list === 'MANUAL REVIEW');
 }
 
+/* Cross-engine key agreement for the folds screen.py applies. Each of these
+   was a live divergence: й/ё (introduced with the Cyrillic table and missed
+   because the names checked contained neither) and the stroke letters, which
+   screen.py folded to ASCII while this engine kept them as themselves. */
+for (const [raw, want] of [
+  ['\u0421\u0435\u0440\u0433\u0435\u0439', 'sergey'], ['\u0401\u043b\u043a\u0430', 'yelka'],
+  ['\u0141ukasz Nowak', 'lukasz nowak'], ['\u0110or\u0111evi\u0107', 'dordevic'],
+  ['\u00d8st', 'ost'], ['\u00de\u00f3r', 'thor'], ['\u00c6thelred', 'aethelred'],
+]) {
+  check(`normalizeName folds ${raw} to ${want} (cross-engine key agreement)`,
+    normalizeName(raw) === want);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

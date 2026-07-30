@@ -10,6 +10,139 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Cross-engine parity is now swept over 206 pairs, not spot-checked over 15 (2026-07-30)
+
+The parity test checked **15 curated pairs** and counted a MANUAL REVIEW
+routing as "reached by the JS engine". Both loosenesses were deliberate, but
+together they let a real recall gap hide: the case engine could **CLEAR a
+subject the daily screen flags**, and nothing failed.
+
+Sweeping every pair the screening benchmark already maintains — 121 recall +
+85 hard negatives — with a strict criterion (a genuine list hit, not a
+manual-review referral) found **two live divergences**:
+
+```
+r099  "Tchaikovski Andrei" vs "Chaykovskiy Andrey"   screen.py 88.9  JS 83
+r120  "Achraf Ganouchi"    vs "Ashraf Ghannouchi"    screen.py 87.5  JS 82
+```
+
+Both are transliteration variants, and both are **scoring** differences rather
+than wiring gaps — the JS phonetic mode makes no difference to either. Closing
+them means tuning JS similarity, which trades directly against the 85 hard
+negatives, so they are **recorded rather than silently fixed**: each is
+allowlisted individually with its measured scores and the reason.
+
+The allowlist is self-policing. A second check fails if an allowlisted
+divergence starts passing, so it must shrink and cannot rot into a blanket
+exemption. Both directions are negative-controlled.
+
+A third entry, `n030`, is a hard negative where `screen.py` hits at 88 — a known
+budgeted false positive already recorded in the benchmark. JS declining to
+follow makes JS *more* correct there, so that divergence is in the safe
+direction and is documented as such.
+
+Method note: the first version of this sweep reported 19 Python misses, which
+contradicted the benchmark's 119/121 recall. The harness was wrong — it applied
+a `score >= 85` filter on top of `screen_name`, which already applies its own
+gates, so legitimate hits were being discarded. Corrected before any of it was
+reported as a finding.
+
+
+### The two matchers now key every name identically — enforced by test (2026-07-30)
+
+Three cross-engine divergences have reached production over this project's life
+(Turkish `ı`, German `ß`, Cyrillic), each found by diffing the engines rather
+than by reasoning. That diff is now a **property test**, so the fourth cannot.
+Running it took the count from **19 divergences to 0**, and finding the last few
+required fixing real defects rather than adjusting the test:
+
+- **Mixed-script names silently lost their non-Latin half.** The Latin pipeline
+  ran first and won outright, so any name producing *some* Latin output had the
+  rest discarded. Live in the curated TFS list: the EOCN alias
+  `إتلاف 14 فبراير (البحرين)` keyed as **`14`** — the digits alone satisfied the
+  Latin pipeline, so the script-preservation fallback never fired. A designated
+  alias keyed as `14` matches nothing it should and is a collision waiting to
+  happen. `محمد صالح TRADING LLC` keyed as `TRADING LLC` — pure corporate
+  boilerplate with no identifying signal. The pipeline is now unified: romanize
+  and fold first, then keep the letters/digits of whatever script survives,
+  exactly as the JS engine does.
+
+- **NFD → NFKD.** JS used NFKD, Python NFD, so fullwidth forms (common in
+  CJK-region corporate records), digraph ligatures and Roman numerals keyed
+  differently. Measured before switching: **0 keys move** across 1,631 corpus
+  names — ordinary names contain no compatibility characters.
+
+- **A lowercase key could leak out.** NFKD expands modifier and superscript
+  letters into *lowercase* ASCII (`ª`→`a`, `ʲ`→`j`), and the uppercase step ran
+  only at the front — so those names keyed with a stray lowercase letter that
+  could never meet an uppercase key, and `normalize()` stopped being idempotent.
+  Found by the idempotence property, not by reasoning: **170 characters** were
+  affected.
+
+- **Accented Cyrillic left Cyrillic in a Latin key.** `Ѐ Ѓ Ќ Ѝ` are precomposed
+  and absent from the romanization table, so the first pass missed them and NFKD
+  then reduced them to *base Cyrillic*, which the preservation branch kept
+  verbatim. The table is applied a second time after the mark-strip (a no-op on
+  Latin). That closed the last 39 idempotence failures.
+
+- **Re-composition side effect.** That second pass initially called `romanize()`,
+  which re-applies NFC — re-composing Hangul that NFKD had just decomposed, so
+  Korean names keyed differently across engines. The pure per-character mapping
+  is now separate from the NFC-applying wrapper. Caught by the cross-engine
+  property within seconds of adding it.
+
+The additive-only property is **replaced, not deleted**: two of these changes
+move keys on purpose, so claiming additivity would be false. What is asserted
+instead — and still covers the overwhelming majority of the book — is that a
+name written in plain ASCII Latin keys exactly as it always did.
+
+Benchmark unmoved: recall 119/121, hard negatives 85/85.
+
+
+### Stroke letters were being deleted from names, not folded (2026-07-30)
+
+Found by running the two matchers over the same 1,645-name corpus and diffing
+their keys — the method the repo's own comments credit for the Turkish `ı` and
+German `ß` fixes ("found by comparing the two engines rather than by
+reasoning"). It surfaced **19 divergences**.
+
+**Ł Ø Đ Þ Æ Œ have no NFD decomposition**, so `[^A-Z0-9 ]` deleted them outright:
+
+```
+"Łukasz Nowak"   ->  UKASZ NOWAK
+"Đorđević"       ->  OR EVIC
+"ØSTERGAARD A/S" ->  STERGAARD A S
+"Æthelred"       ->  THELRED
+```
+
+A customer record almost always carries the plain ASCII spelling — "Lukasz
+Nowak" → `LUKASZ NOWAK` — so the designation and the customer keyed differently
+and **could never match**. Exactly the class already fixed twice, for the letters
+those fixes missed. Both engines now fold them to ASCII.
+
+**This DOES move existing keys**, deliberately, because the old ones were lossy.
+Names containing these letters get a new delta-state fingerprint and will
+re-alert once. The additive-only property is therefore rescoped to what remains
+exactly true: the non-Latin *fallback* (romanization, then script preservation)
+never moves a key the Latin pipeline already produced.
+
+### Cyrillic й / ё keyed differently in the two engines (regression, same day)
+
+Introduced with the Cyrillic romanization earlier today. `й` and `ё` are
+**precomposed** (и+breve, е+diaeresis), and the JS engine ran `NFKD` +
+mark-strip *before* its Cyrillic table — so they arrived as `и`/`е` and produced
+`sergei`/`elka`, while `screen.py` romanized the composed form to `sergey`/
+`yelka`, the spellings OFAC and the EU publish. Two of the commonest Russian
+characters, keyed differently across engines.
+
+It was missed because the seven names verified at the time contained neither
+letter. The JS engine now maps them before `NFKD`, and cross-engine agreement is
+pinned per-character rather than by spot-checking names.
+
+Divergences down from 19 to 9; the remainder are compatibility-form differences
+(`²`, `½`, Roman numerals, fullwidth) and mixed-script names, tracked separately.
+
+
 ### Arabic and CJK designations are now matchable; alert streams reach the MLRO queue (2026-07-30)
 
 **Arabic/CJK — script preservation, not transliteration.** The JS case engine
