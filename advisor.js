@@ -138,7 +138,18 @@ function govRecord(data){
   g.usage = keep.reduce((o,k)=>{ o[k]=g.usage[k]; return o; }, {});
   ['hallFlagged','injectionFlagged','anomFlagged','structureFlagged','latencyFlagged','tippingOffFlagged'].forEach(f=>{ if(data[f]) g.flags[f] = (g.flags[f]||0) + 1; });
   if(Array.isArray(data.piiFlagged) && data.piiFlagged.length) g.flags.piiFlagged = (g.flags.piiFlagged||0) + 1;
-  if(ok) g.lastOk = new Date().toISOString(); else g.lastErr = new Date().toISOString();
+  if(ok){ g.lastOk = new Date().toISOString(); }
+  else {
+    g.lastErr = new Date().toISOString();
+    /* Record WHY, not just WHEN. "⚠ last call failed" with no reason sent a real
+       incident to a maintainer to decode: the backend had already returned the
+       actionable text ("[API error 401 — the ANTHROPIC_API_KEY … is revoked]"),
+       but the strip threw it away, so the operator saw a bare warning and the
+       answer pane had to be re-triggered to see the cause. Bounded, on-device,
+       and never carries the provider's error body — the backend strips that. */
+    const why = (data && (data.error || data.text)) ? String(data.error || data.text) : '';
+    g.lastErrWhy = why ? why.slice(0, 200) : '';
+  }
   govSave(g);
 }
 function pct(arr, p){ if(!arr.length) return null; const s = arr.slice().sort((a,b)=>a-b); return s[Math.min(s.length-1, Math.floor((p/100)*s.length))]; }
@@ -146,7 +157,8 @@ function govStats(){
   const g = govLoad();
   const today = govDay(new Date());
   return { calls:g.calls||0, today:(g.usage[today]&&g.usage[today].n)||0,
-    p50:pct(g.lat,50), p95:pct(g.lat,95), lastOk:g.lastOk, lastErr:g.lastErr, flags:g.flags||{} };
+    p50:pct(g.lat,50), p95:pct(g.lat,95), lastOk:g.lastOk, lastErr:g.lastErr,
+    lastErrWhy:g.lastErrWhy||'', flags:g.flags||{} };
 }
 /* Governance chips rendered beside the Advisor response (HALL/THREAT/ANOM/PERF/LAT). */
 function govFlagsHtml(la){
@@ -168,16 +180,36 @@ function govStatsHtml(){
   const s = govStats();
   if(!s.calls) return '';
   const item = (lbl,val)=>'<span data-csstext="display:inline-flex;flex-direction:column;line-height:1.3"><b data-csstext="color:#9FB0C8;font-size:12px">'+esc(val)+'</b><span data-csstext="font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#8A94A8">'+esc(lbl)+'</span></span>';
-  const health = s.lastErr && (!s.lastOk || s.lastErr > s.lastOk) ? '⚠ last call failed' : (s.lastOk ? 'healthy' : '—');
+  const failing = s.lastErr && (!s.lastOk || s.lastErr > s.lastOk);
+  const health = failing ? '⚠ last call failed' : (s.lastOk ? 'healthy' : '—');
+  /* The reason sits under the strip, full width — a bare "last call failed" is
+     not an operable signal, and the backend has already made this text safe to
+     show (status code + next step, never the provider's error body). */
+  const why = (failing && s.lastErrWhy)
+    ? '<div data-csstext="margin-top:8px;padding:9px 12px;border-radius:8px;background:#180E12;border:1px solid rgba(255,120,120,0.22);color:#E9B7B7;font-size:11.5px;line-height:1.45">'
+      + esc(s.lastErrWhy) + '</div>'
+    : '';
   return '<div class="sec-lbl" data-csstext="margin:18px 0 9px"><span>Advisor telemetry (on-device)</span><i></i></div>'
     + '<div data-csstext="display:flex;gap:18px;flex-wrap:wrap;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)">'
     +   item('calls', s.calls) + item('today', s.today)
     +   item('latency p50', s.p50!=null ? Math.round(s.p50)+'ms' : '—')
     +   item('latency p95', s.p95!=null ? Math.round(s.p95)+'ms' : '—')
     +   item('health', health)
-    + '</div>';
+    + '</div>'
+    + why;
 }
 
+/* The strip is a SIBLING of #hero, and answering only re-renders #hero — so the
+   live health panel kept showing the state from the last full render. A panel
+   that reports "healthy" (or nothing) immediately after a call has just failed
+   is worse than no panel: it is the failure being hidden by the thing whose job
+   is to surface it. Refresh it wherever a call is recorded. */
+function refreshGovStrip(){
+  const el = $('govStrip');
+  if(!el) return;
+  el.innerHTML = govStatsHtml();
+  applyCssText(el);
+}
 function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
 function tone(t){
   if(t==='high') return {c:'#FF6B6B', bg:'rgba(255,87,87,0.10)',  bd:'rgba(255,87,87,0.45)'};
@@ -312,7 +344,7 @@ function renderAsk(){
     + '<div>'
     +   '<div data-csstext="margin-bottom:16px"><div class="sec-lbl" data-csstext="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'
     +   '<div id="hero" role="status" aria-live="polite">'+heroHtml()+'</div>'
-    +   govStatsHtml()
+    +   '<div id="govStrip">'+govStatsHtml()+'</div>'
     + '</div>'
     + '</div>';
   applyCssText($('main'));
@@ -405,6 +437,7 @@ function ask(){
     if(myAsk !== askSeq) return; // superseded by a newer ask() or reset()
     state.liveAnswer = answerFromResponse(data);
     try{ govRecord(data); }catch(e){}
+    try{ refreshGovStrip(); }catch(e){}
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
     bindHero();
@@ -413,6 +446,7 @@ function ask(){
     if(myAsk !== askSeq) return;
     state.liveAnswer = {ok: false, text: 'The brain is unavailable — ensure ANTHROPIC_API_KEY is set in Netlify environment variables and redeploy.'};
     try{ govRecord({ok:false}); }catch(e){}
+    try{ refreshGovStrip(); }catch(e){}
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
     bindHero();
