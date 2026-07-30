@@ -91,15 +91,28 @@ export function normalizeName(s) {
    out of token-set comparison and candidate generation so a shared "trading" or
    "llc" never manufactures a match. Personal-name particles (al, bin, ibn…) are
    deliberately NOT here: they help match individuals. */
-const CORP_STOP = new Set([
-  'llc', 'ltd', 'limited', 'inc', 'incorporated', 'co', 'company', 'corp',
-  'corporation', 'group', 'holding', 'holdings', 'trading', 'general', 'gen',
-  'international', 'intl', 'est', 'establishment', 'enterprise', 'enterprises',
-  'industries', 'industrial', 'services', 'service', 'global', 'national',
-  'fz', 'fze', 'fzc', 'fzco', 'fzllc', 'dmcc', 'jlt', 'llp', 'plc', 'sa', 'sal',
-  'ag', 'gmbh', 'bv', 'nv', 'pte', 'pvt', 'srl', 'spa', 'sarl', 'ojsc', 'pjsc',
-  'jsc', 'ooo', 'oao', 'zao', 'the', 'and', 'of', 'for', 'a', 's'
-]);
+/* Corporate / legal-form / sector boilerplate, loaded from the shared data file
+   so BOTH engines strip exactly the same tokens (screen.py loads the same file).
+   The two in-code tables this replaces had drifted to 58 tokens here and 79 in
+   screen.py with only 42 in common — and the gap was not cosmetic: this engine
+   kept "insaat sanayi ve ticaret sirketi" as distinctive, so two unrelated
+   Turkish firms scored 89 and it raised three hard-negative false positives
+   screen.py never made. Same failure mode the translit-groups file already
+   exists to prevent, one table over.
+
+   FAIL LOUD on a missing/invalid file: silently losing the list would quietly
+   inflate every corporate score — a precision degrade nobody would see. */
+function loadCorpStop() {
+  const path = new URL('../data/corporate-stopwords.json', import.meta.url);
+  const data = JSON.parse(readFileSync(path, 'utf8'));
+  const toks = data && Array.isArray(data.tokens) ? data.tokens : [];
+  if (!toks.length) throw new Error('corporate stopword file contains no tokens: ' + path);
+  for (const t of toks) {
+    if (!t || t !== String(t).toLowerCase()) throw new Error('malformed stopword token: ' + JSON.stringify(t));
+  }
+  return new Set(toks);
+}
+const CORP_STOP = loadCorpStop();
 
 /* Significant tokens of a normalized name (drop corp/common words, very short
    tokens and pure digits). Used both for candidate lookup and token scoring.

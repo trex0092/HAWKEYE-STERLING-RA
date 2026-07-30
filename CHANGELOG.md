@@ -10,6 +10,63 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The two engines' boilerplate lists had drifted, and it cost three false positives (2026-07-30)
+
+Both engines strip corporate boilerplate before the decisive "core" similarity
+check, so two unrelated firms sharing a legal form or sector phrase do not score
+as a match. Each carried its own in-code table. They had drifted:
+
+```
+screen.py STOPWORD_TOKENS   79 tokens
+sanctions-match.mjs CORP_STOP 58 tokens
+in common                    42
+```
+
+The gap was not cosmetic. The JS matcher had no Turkish corporate vocabulary, so
+`insaat sanayi ve ticaret sirketi` ("construction industry and trade company")
+counted as **distinctive**:
+
+```
+subject  Anka  Insaat Sanayi Ve Ticaret Limited Sirketi
+listed   Toros Insaat Sanayi Ve Ticaret Limited Sirketi
+                JS: 89, high band, sanctions-match
+```
+
+`Anka` and `Toros` are different companies. `screen.py` cleared it — its core
+tokens reduce to `ANKA` vs `TOROS` — but the case engine raised it. Three of the
+85 hard negatives failed this way (`n009`, `n011`, and `n001` once the file is
+trimmed), all of them the same shape: everything shared except the one token
+that identifies the company. A false positive here costs MLRO review time and
+can wrongly freeze a customer.
+
+The list now lives in `data/corporate-stopwords.json`, loaded by both engines,
+fail-loud on a missing or malformed file — the same treatment
+`data/translit-groups.json` already gets, and whose own loader comment records
+that *"the duplicated in-code tables had already drifted once."* Same lesson,
+one table over.
+
+The shared file is the **union** of both tables (96 tokens), so neither engine
+loses a token it used to strip. Measured on both:
+
+| | before | after |
+|---|---|---|
+| JS hard negatives | 82/85 | **84/85** |
+| JS recall | 123/125 | 123/125 |
+| `screen.py` hard negatives | 85/85 | 85/85 |
+| `screen.py` recall | 123/125 | 123/125 |
+
+`n010` (Golden Gate / Silver Gate) still fails in JS and is untouched here — it
+is not a boilerplate problem, `gate` is genuinely distinctive; it is a
+similarity-scoring difference and remains open.
+
+Guarded by `test/corporate-stopwords.test.mjs`: schema, sortedness, continuity
+(every token either engine stripped before must survive), the Turkish block
+named explicitly so nobody trims it as noise, an assertion that distinctive
+company tokens are **never** on the list, and a single-source check that fails
+if either engine falls back to an in-code table. Negative-controlled: removing
+the Turkish block returns the false positives and fails 3 checks; pointing JS
+back at an in-code table fails 3 more.
+
 ### One of the two allowlisted recall gaps closed; the other refuted with evidence (2026-07-30)
 
 Two transliteration pairs had sat allowlisted in the cross-engine parity test
