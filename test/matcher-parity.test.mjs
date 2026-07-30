@@ -187,8 +187,18 @@ const benchPairs = [
 
 /* id -> why this divergence is tolerated. Each was measured, not assumed. */
 const KNOWN_DIVERGENCES = {
-  r099: 'transliteration variant "Tchaikovski Andrei" vs "Chaykovskiy Andrey": screen.py 88.9 (MODERATE), JS 83 — below its 85 gate. Scoring difference, not a wiring gap; the JS phonetic mode does not change it. Closing it means tuning JS similarity, which trades against the 85 hard negatives.',
-  r120: 'transliteration variant "Achraf Ganouchi" vs "Ashraf Ghannouchi": screen.py 87.5 (MODERATE), JS 82. Same class as r099.',
+  /* r099 was here. CLOSED by adding the "tch" digraph ahead of "ch", so
+     "Tchaikovski" and "Chaykovskiy" key alike in BOTH engines. Measured free:
+     JS recall 118 -> 119, hard negatives unchanged, screen.py unchanged, and
+     every hard-ch pair (Chalid/Khalid, Khristos/Christos) still keys alike. */
+  r120: 'transliteration variant "Achraf Ganouchi" vs "Ashraf Ghannouchi": screen.py 87.5 (MODERATE), JS 82. '
+    + 'The blocker is achraf->AKRF vs ashraf->ASRF: "ch" is keyed as the hard-k reading. Folding "ch" to the '
+    + 'sibilant reading DOES close this pair (JS 118->120) and costs nothing on the hard negatives — but it was '
+    + 'MEASURED to break the hard-ch class outright: Chalid/Khalid, Chaled/Khaled, Christos/Khristos, '
+    + 'Zacharia/Zakaria and Michail/Mikhail all stop keying alike. Arabic kha written "ch" is far more common in '
+    + 'this book than the French sibilant spelling, so the trade is refused. Recall pairs r122-r125 were added to '
+    + 'the benchmark so that change now FAILS the floor instead of looking free. Closing r120 needs multi-key '
+    + 'phonetic profiles (both readings emitted per token), not a different single fold.',
   n030: 'HARD NEGATIVE. screen.py hits at 88 — a known, budgeted false positive already recorded in the benchmark. JS declining to follow is JS being MORE correct, so this divergence is in the safe direction.',
 };
 

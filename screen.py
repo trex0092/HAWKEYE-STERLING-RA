@@ -3143,7 +3143,7 @@ def confidence_tier(core):
 # khaled or omar/umar share a key by group membership rather than luck, and
 # the particles abu/abd merge into their following token ("Abou Bakr" ≡
 # "Aboubakr"). Pure string ops — identical under the offline difflib stub.
-_PHON_DIGRAPHS = (("shch", "s"), ("sch", "s"), ("sh", "s"), ("ch", "c"),
+_PHON_DIGRAPHS = (("shch", "s"), ("sch", "s"), ("sh", "s"), ("tch", "c"), ("ch", "c"),
                   ("zh", "j"), ("kh", "k"), ("gh", "k"), ("ph", "f"),
                   ("th", "t"), ("dh", "d"), ("dj", "j"), ("ck", "k"),
                   ("ts", "c"), ("tz", "c"), ("x", "ks"), ("oo", "u"),

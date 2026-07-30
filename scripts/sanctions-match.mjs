@@ -750,7 +750,7 @@ export function translitCanonToken(tok) {
    hassan/hussein never collide); a trailing vowel is preserved so gender/nisba
    suffixes (hana/hani, qassem/qasemi) stay distinct; keys are computed on
    transliteration-CANONICAL tokens with abu/abd merged into their successor. */
-const PHON_DIGRAPHS = [['shch', 's'], ['sch', 's'], ['sh', 's'], ['ch', 'c'],
+const PHON_DIGRAPHS = [['shch', 's'], ['sch', 's'], ['sh', 's'], ['tch', 'c'], ['ch', 'c'],
   ['zh', 'j'], ['kh', 'k'], ['gh', 'k'], ['ph', 'f'], ['th', 't'], ['dh', 'd'],
   ['dj', 'j'], ['ck', 'k'], ['ts', 'c'], ['tz', 'c'], ['x', 'ks'], ['oo', 'u'],
   ['ou', 'u'], ['ee', 'i'], ['ei', 'i'], ['ey', 'i']];

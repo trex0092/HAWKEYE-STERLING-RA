@@ -10,6 +10,53 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### One of the two allowlisted recall gaps closed; the other refuted with evidence (2026-07-30)
+
+Two transliteration pairs had sat allowlisted in the cross-engine parity test
+because closing them "means tuning JS similarity, which trades against the hard
+negatives". That was an assumption. It is now measured, and it was wrong in an
+interesting way — the fix was never a threshold at all, but the shared phonetic
+digraph table.
+
+**r099 — closed, free.** `Tchaikovski` keyed `TAKVSKI` and `Chaykovskiy` keyed
+`KAKVSKI`, because `tch` was not in the digraph table and only its `ch` tail
+folded. Adding `tch` ahead of `ch` makes both key `KAKVSKI`. Measured on both
+engines: **JS recall 118 → 119**, hard negatives unchanged, `screen.py`
+unchanged, every hard-`ch` pair still intact. `tch` is never the hard-k reading,
+so it can be folded without ambiguity.
+
+**r120 — refuted, and the trap is now guarded.** The blocker is `achraf`→`AKRF`
+vs `ashraf`→`ASRF`: `ch` is keyed as hard-k, but in French transliteration it is
+/ʃ/. Folding `ch` to the sibilant closes r120 *and* r099 — **JS recall 118 → 120
+with no hard-negative cost at all.** On the old corpus it looked free.
+
+It is not. Direct probe:
+
+```
+                 baseline            ch -> sibilant
+chalid/khalid    KALT   = KALT       SALT  ≠ KALT     BROKEN
+chaled/khaled    KALT   = KALT       SALT  ≠ KALT     BROKEN
+christos/khristos KIRSTS = KIRSTS    SIRSTS ≠ KIRSTS  BROKEN
+zacharia/zakaria SAKRA  = SAKRA      SASRA ≠ SAKRA    BROKEN
+michail/mikhail  MIKL   = MIKL       MISL  ≠ MIKL     BROKEN
+```
+
+Arabic خ and Greek χ are written `ch` by German and French sources and `kh` by
+English ones. For this book that class matters considerably more than one French
+sibilant spelling, so the trade is **refused**.
+
+The corpus contained twelve pairs with `ch` in them and **not one** from the
+hard-`ch` class, which is why the benchmark called the change free. Four recall
+pairs were added — `r122` Chalid/Khalid, `r123` Zacharia/Zakaria, `r124`
+Christos Michail/Khristos Mikhail, `r125` Chaled Bin Rachid/Khaled Bin Rasheed
+(both readings in one name) — and with them the sibilant fold now **fails the
+benchmark floor** instead of passing it.
+
+r120 stays allowlisted, but its note is no longer speculation: it records the
+measurement, names the class that breaks, and states what closing it would
+actually require — multi-key phonetic profiles emitting both readings per token,
+not a different single fold.
+
 ### The manual-review net fired on names it had just learned to screen, and went quiet on names it had not (2026-07-30)
 
 `_lost_script_letters` decides whether a subject can be auto-screened at all. It

@@ -184,6 +184,24 @@ check("the report prints the not-fully-screened caveat on a scored row",
       "NOT FULLY SCREENED" in _dsp and "manual_review_reason" in _dsp)
 check("mixed-script names also route to manual PEP review (not silent 'no PEP')",
       screen.check_pep("محمد صالح TRADING LLC").get("review") is True)
+
+# ── "ch" carries two readings and the key must serve both ────────────────────
+# Hard ch (Arabic kha, Greek chi) is written "ch" by German/French sources and
+# "kh" by English ones: Chalid/Khalid, Christos/Khristos. Soft ch (French /sh/)
+# is the Achraf/Ashraf class. Folding "ch" to the sibilant reading closes the
+# soft class and LOOKED free on the old corpus — it cost nothing on the hard
+# negatives — but it breaks every hard-ch pair below. Recall pairs r122-r125
+# exist so that change now fails the benchmark floor instead of passing.
+for _a, _b in [("chalid", "khalid"), ("chaled", "khaled"), ("christos", "khristos"),
+               ("zacharia", "zakaria"), ("michail", "mikhail")]:
+    check(f"hard-ch {_a!r}/{_b!r} keys alike (broken by folding ch to the sibilant)",
+          screen.phonetic_key(_a) == screen.phonetic_key(_b))
+# "tch" is unambiguous — it is never the hard-k reading — so it may be folded
+# with "ch" safely. This is what closed the r099 parity divergence.
+check("'tch' folds with 'ch' so Tchaikovski and Chaykovskiy key alike (r099)",
+      screen.phonetic_key("tchaikovski") == screen.phonetic_key("chaykovskiy"))
+check("folding 'tch' did not disturb the hard-ch reading",
+      screen.phonetic_key("chalid") == screen.phonetic_key("khalid"))
 # Union of extractors: a recognised structured block must not hide Name: lines
 # elsewhere in the note (the old `structured or regex` either/or did).
 _union_notes = ("SECTION 4 — IDENTIFICATION\n"
