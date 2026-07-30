@@ -72,6 +72,28 @@ Six checks in `advisor-assurance` pin it so the end-to-end call cannot be
 weakened back to a status-code check. Negative-controlled: deleting the step
 fails five of them.
 
+#### The same blindness, one token over
+
+`asana-task` and `risk-backup` check `ASANA_ACCESS_TOKEN`'s presence before body
+validation too, so their `{}` probes also return 400 whenever the variable is
+merely set — a **revoked Asana token passed both every day** as well. That
+matters more than it sounds: Asana is where every case, alert and register
+backup lands.
+
+A real `asana-task` call would **create a task**, which a daily probe must not
+do. So the token is exercised through `asana-mirror` `action:"read"` — it finds
+and parses the two backup tasks, has no side effect, returns `ok:true` even for
+an empty register (so a site with no backups yet does not cry wolf), and already
+returns a **distinct** 401: *"Asana token unauthorized — rotate
+ASANA_ACCESS_TOKEN"*.
+
+One deliberate non-alarm: `APP_SHARED_TOKEN` is an operator opt-in, and once it
+is on an unauthenticated probe cannot reach Asana at all. That case is
+distinguished by its error text and **skips** rather than failing — a daily false
+alarm is its own failure mode, and it trains people to ignore the real one. The
+classifier was verified against all four inputs (`ok:true`, revoked token,
+app-gated, unparseable) before shipping.
+
 ### A failed console refresh was silent on a phone, and left stale figures on screen (2026-07-30)
 
 Found by sweeping for the fault class behind the Advisor telemetry bug: **a

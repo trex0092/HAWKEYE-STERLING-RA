@@ -400,6 +400,24 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   check('the recorded detail is collapsed to a single line before $GITHUB_OUTPUT',
     /replace\(\/\[\\r\\n\]\+\/g/.test(HEALTH));
 
+  /* The SAME blindness applies one token over: asana-task and risk-backup also
+     check ASANA_ACCESS_TOKEN's presence before body validation, so their {}
+     probes return 400 whenever the variable is merely set — a REVOKED Asana
+     token passed both every day too. A real asana-task call would CREATE a task,
+     which a daily probe must not do, so the token is exercised through
+     asana-mirror action:"read" (side-effect free). */
+  check('the Asana token is proven to WORK, not just to be configured',
+    /asana_token_e2e/.test(HEALTH) && /"action"\s*:\s*"read"/.test(HEALTH));
+  check('the Asana probe is read-only — a daily probe must not create tasks',
+    !/asana-mirror[\s\S]{0,400}"action"\s*:\s*"write"/.test(HEALTH));
+  /* APP_SHARED_TOKEN is an operator opt-in; when it is on, an unauthenticated
+     probe cannot reach Asana at all. That must SKIP, not alarm — a daily false
+     alarm is its own failure mode and trains people to ignore the real one. */
+  check('enabling APP_SHARED_TOKEN skips the probe instead of alarming daily',
+    /gated/.test(HEALTH) && /X-App-Token/i.test(HEALTH));
+  check('the alert carries whether the Asana token actually works',
+    /Asana token works:/.test(HEALTH));
+
   // restore environment
   global.fetch = origFetch;
   if (origKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = origKey;
