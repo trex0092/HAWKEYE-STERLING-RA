@@ -158,22 +158,33 @@ CASE_SUBTASK_CAP        = int(os.environ.get("CASE_SUBTASK_CAP", "40"))         
 # merely share "SANAYI VE TICARET ANONIM SIRKETI"). Stripped to a distinctive
 # "core" before a second, decisive similarity check. NOT applied to the stored
 # list (only to the comparison), so designations are never weakened.
-STOPWORD_TOKENS = {
-    # legal forms
-    "LLC","L","C","LTD","LIMITED","INC","CORP","CORPORATION","CO","COMPANY",
-    "PLC","GMBH","SA","SARL","SRL","SPA","BV","NV","AG","PTE","PVT","PJSC","PSC",
-    "FZE","FZCO","FZC","DMCC","DWC","FZ","JLT","WLL","EST","TRADING","GENERAL",
-    # UAE / GCC free-zone & generic
-    "INTERNATIONAL","GROUP","HOLDING","HOLDINGS","ENTERPRISE","ENTERPRISES",
-    "INDUSTRIES","INDUSTRY","COMMODITIES","GLOBAL","OVERSEAS","COMMERCIAL",
-    "BUSINESS","SERVICES","SOLUTIONS","INVESTMENT","INVESTMENTS","CAPITAL",
-    # Turkish corporate boilerplate (very common in this book of business)
-    "ANONIM","SIRKETI","SIRKET","SANAYI","SANAYII","TICARET","VE","URETIM",
-    "MADENCILIK","ENERJI","TURIZM","INSAAT","ITHALAT","IHRACAT","LIMITED",
-    "GAYRIMENKUL","YATIRIM","KIYMETLI","MADENLER","METAL","ALTIN",
-    # generic connectors
-    "AND","OF","THE","FOR","AL","BIN","BINT",
-}
+#
+# Loaded from the shared data file so BOTH engines strip exactly the same
+# boilerplate. The two in-code tables this replaces had drifted to 79 tokens
+# here and 58 in scripts/sanctions-match.mjs with only 42 in common, and the
+# gap was not cosmetic: the JS engine kept "INSAAT SANAYI VE TICARET SIRKETI"
+# as distinctive, so two unrelated Turkish firms scored 89 and it raised three
+# hard-negative false positives screen.py never made. Same failure the
+# translit-groups file already exists to prevent, one table over.
+#
+# FAIL LOUD on a missing/invalid file: silently losing the boilerplate list
+# would quietly inflate every corporate score, which is a precision degrade
+# nobody would see.
+STOPWORD_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "data", "corporate-stopwords.json")
+
+def _load_stopword_tokens(path=STOPWORD_PATH):
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    toks = data.get("tokens") or []
+    if not toks:
+        raise ValueError(f"corporate stopword file {path} contains no tokens")
+    for t in toks:
+        if (not t) or t != str(t).lower():
+            raise ValueError(f"malformed stopword token in {path}: {t!r}")
+    return {t.upper() for t in toks}
+
+STOPWORD_TOKENS = _load_stopword_tokens()   # raises at import — never silently empty
 
 # Map an adverse-media keyword to a typology bucket for MLRO triage.
 KEYWORD_TYPOLOGY = [
@@ -3143,7 +3154,7 @@ def confidence_tier(core):
 # khaled or omar/umar share a key by group membership rather than luck, and
 # the particles abu/abd merge into their following token ("Abou Bakr" ≡
 # "Aboubakr"). Pure string ops — identical under the offline difflib stub.
-_PHON_DIGRAPHS = (("shch", "s"), ("sch", "s"), ("sh", "s"), ("ch", "c"),
+_PHON_DIGRAPHS = (("shch", "s"), ("sch", "s"), ("sh", "s"), ("tch", "c"), ("ch", "c"),
                   ("zh", "j"), ("kh", "k"), ("gh", "k"), ("ph", "f"),
                   ("th", "t"), ("dh", "d"), ("dj", "j"), ("ck", "k"),
                   ("ts", "c"), ("tz", "c"), ("x", "ks"), ("oo", "u"),

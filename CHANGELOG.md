@@ -10,6 +10,164 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The case engine had no precision gate at all, and one missing Turkish token was costing recall (2026-07-30)
+
+The two engines combined their score paths by **opposite** rules, and both were
+documented as deliberate:
+
+```
+screen.py     decisive = min(full, core)     "a pair only scores high if BOTH the
+                                              whole string AND its distinctive
+                                              core agree"
+sanctions-match.mjs  Math.max(lev, core, token)   "strictly recall-monotone: can
+                                                   only rise, never lower an
+                                                   existing score"
+```
+
+A `max()` cannot reject anything. So the case engine had no precision gate, and
+two firms sharing everything except the token that **names** them scored on
+their boilerplate:
+
+```
+Golden Gate General Trading  vs  Silver Gate General Trading   -> JS 85, flagged
+                                                                  screen.py: clear
+```
+
+The JS matcher now applies screen.py's `min(full, core)` gate when both sides
+have a distinctive core. A pure person-name has no boilerplate to strip, so the
+gate stays out of the way there.
+
+The gate is **not** recall-monotone — it can lower a score — so it was measured
+rather than reasoned about. Its one apparent recall cost turned out not to be
+the gate at all: **`as` (Turkish A.Ş., *anonim şirketi*) was in neither engine's
+stopword list**, so `Anadolu Kiymetli Madenler Ticaret AS` and
+`Anadolu Kiymetli Madenler Ticaret` compared as `anadolu as` vs `anadolu` and
+fell below the gate. Adding it to the shared file fixed the cause — and closed
+a pair `screen.py` had recorded as a **residual known miss**.
+
+Both changes together, measured on both engines:
+
+| | before | after |
+|---|---|---|
+| JS hard negatives | 84/85 | **85/85** |
+| JS recall | 123/125 | 123/125 |
+| `screen.py` hard negatives | 85/85 | 85/85 |
+| `screen.py` recall | 123/125 | **124/125** |
+
+Both engines now clear **every** hard negative, and the only remaining recall
+misses are `r110` (both engines) and `r120` (JS only, allowlisted with its
+measured refutation).
+
+Pinned in `test/corporate-stopwords.test.mjs`: the boilerplate shape scores
+below the gate, the Turkish variant of the same shape does too, a real typo
+behind a corporate suffix **still** scores, and a pure person-name is untouched.
+Negative-controlled: reverting to the bare `max()` returns the false positive
+and fails 2 checks; removing `as` loses `r085` again and fails its own.
+
+### The two engines' boilerplate lists had drifted, and it cost three false positives (2026-07-30)
+
+Both engines strip corporate boilerplate before the decisive "core" similarity
+check, so two unrelated firms sharing a legal form or sector phrase do not score
+as a match. Each carried its own in-code table. They had drifted:
+
+```
+screen.py STOPWORD_TOKENS   79 tokens
+sanctions-match.mjs CORP_STOP 58 tokens
+in common                    42
+```
+
+The gap was not cosmetic. The JS matcher had no Turkish corporate vocabulary, so
+`insaat sanayi ve ticaret sirketi` ("construction industry and trade company")
+counted as **distinctive**:
+
+```
+subject  Anka  Insaat Sanayi Ve Ticaret Limited Sirketi
+listed   Toros Insaat Sanayi Ve Ticaret Limited Sirketi
+                JS: 89, high band, sanctions-match
+```
+
+`Anka` and `Toros` are different companies. `screen.py` cleared it — its core
+tokens reduce to `ANKA` vs `TOROS` — but the case engine raised it. Three of the
+85 hard negatives failed this way (`n009`, `n011`, and `n001` once the file is
+trimmed), all of them the same shape: everything shared except the one token
+that identifies the company. A false positive here costs MLRO review time and
+can wrongly freeze a customer.
+
+The list now lives in `data/corporate-stopwords.json`, loaded by both engines,
+fail-loud on a missing or malformed file — the same treatment
+`data/translit-groups.json` already gets, and whose own loader comment records
+that *"the duplicated in-code tables had already drifted once."* Same lesson,
+one table over.
+
+The shared file is the **union** of both tables (96 tokens), so neither engine
+loses a token it used to strip. Measured on both:
+
+| | before | after |
+|---|---|---|
+| JS hard negatives | 82/85 | **84/85** |
+| JS recall | 123/125 | 123/125 |
+| `screen.py` hard negatives | 85/85 | 85/85 |
+| `screen.py` recall | 123/125 | 123/125 |
+
+`n010` (Golden Gate / Silver Gate) still fails in JS and is untouched here — it
+is not a boilerplate problem, `gate` is genuinely distinctive; it is a
+similarity-scoring difference and remains open.
+
+Guarded by `test/corporate-stopwords.test.mjs`: schema, sortedness, continuity
+(every token either engine stripped before must survive), the Turkish block
+named explicitly so nobody trims it as noise, an assertion that distinctive
+company tokens are **never** on the list, and a single-source check that fails
+if either engine falls back to an in-code table. Negative-controlled: removing
+the Turkish block returns the false positives and fails 3 checks; pointing JS
+back at an in-code table fails 3 more.
+
+### One of the two allowlisted recall gaps closed; the other refuted with evidence (2026-07-30)
+
+Two transliteration pairs had sat allowlisted in the cross-engine parity test
+because closing them "means tuning JS similarity, which trades against the hard
+negatives". That was an assumption. It is now measured, and it was wrong in an
+interesting way — the fix was never a threshold at all, but the shared phonetic
+digraph table.
+
+**r099 — closed, free.** `Tchaikovski` keyed `TAKVSKI` and `Chaykovskiy` keyed
+`KAKVSKI`, because `tch` was not in the digraph table and only its `ch` tail
+folded. Adding `tch` ahead of `ch` makes both key `KAKVSKI`. Measured on both
+engines: **JS recall 118 → 119**, hard negatives unchanged, `screen.py`
+unchanged, every hard-`ch` pair still intact. `tch` is never the hard-k reading,
+so it can be folded without ambiguity.
+
+**r120 — refuted, and the trap is now guarded.** The blocker is `achraf`→`AKRF`
+vs `ashraf`→`ASRF`: `ch` is keyed as hard-k, but in French transliteration it is
+/ʃ/. Folding `ch` to the sibilant closes r120 *and* r099 — **JS recall 118 → 120
+with no hard-negative cost at all.** On the old corpus it looked free.
+
+It is not. Direct probe:
+
+```
+                 baseline            ch -> sibilant
+chalid/khalid    KALT   = KALT       SALT  ≠ KALT     BROKEN
+chaled/khaled    KALT   = KALT       SALT  ≠ KALT     BROKEN
+christos/khristos KIRSTS = KIRSTS    SIRSTS ≠ KIRSTS  BROKEN
+zacharia/zakaria SAKRA  = SAKRA      SASRA ≠ SAKRA    BROKEN
+michail/mikhail  MIKL   = MIKL       MISL  ≠ MIKL     BROKEN
+```
+
+Arabic خ and Greek χ are written `ch` by German and French sources and `kh` by
+English ones. For this book that class matters considerably more than one French
+sibilant spelling, so the trade is **refused**.
+
+The corpus contained twelve pairs with `ch` in them and **not one** from the
+hard-`ch` class, which is why the benchmark called the change free. Four recall
+pairs were added — `r122` Chalid/Khalid, `r123` Zacharia/Zakaria, `r124`
+Christos Michail/Khristos Mikhail, `r125` Chaled Bin Rachid/Khaled Bin Rasheed
+(both readings in one name) — and with them the sibilant fold now **fails the
+benchmark floor** instead of passing it.
+
+r120 stays allowlisted, but its note is no longer speculation: it records the
+measurement, names the class that breaks, and states what closing it would
+actually require — multi-key phonetic profiles emitting both readings per token,
+not a different single fold.
+
 ### The manual-review net fired on names it had just learned to screen, and went quiet on names it had not (2026-07-30)
 
 `_lost_script_letters` decides whether a subject can be auto-screened at all. It

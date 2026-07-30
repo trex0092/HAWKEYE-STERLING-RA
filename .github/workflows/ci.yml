@@ -98,6 +98,8 @@ jobs:
         run: node test/screening-benchmark.test.mjs
       - name: Validate the shared transliteration groups data (both-engine source of truth)
         run: node test/translit-data.test.mjs
+      - name: Validate the shared corporate stopword data (both-engine source of truth)
+        run: node test/corporate-stopwords.test.mjs
       - name: Run GLEIF LEI-check unit tests
         run: node test/lei-check.test.mjs
       - name: Run legal-citation guard (repealed instruments never cited as operative)

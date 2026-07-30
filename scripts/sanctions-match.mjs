@@ -91,15 +91,28 @@ export function normalizeName(s) {
    out of token-set comparison and candidate generation so a shared "trading" or
    "llc" never manufactures a match. Personal-name particles (al, bin, ibn…) are
    deliberately NOT here: they help match individuals. */
-const CORP_STOP = new Set([
-  'llc', 'ltd', 'limited', 'inc', 'incorporated', 'co', 'company', 'corp',
-  'corporation', 'group', 'holding', 'holdings', 'trading', 'general', 'gen',
-  'international', 'intl', 'est', 'establishment', 'enterprise', 'enterprises',
-  'industries', 'industrial', 'services', 'service', 'global', 'national',
-  'fz', 'fze', 'fzc', 'fzco', 'fzllc', 'dmcc', 'jlt', 'llp', 'plc', 'sa', 'sal',
-  'ag', 'gmbh', 'bv', 'nv', 'pte', 'pvt', 'srl', 'spa', 'sarl', 'ojsc', 'pjsc',
-  'jsc', 'ooo', 'oao', 'zao', 'the', 'and', 'of', 'for', 'a', 's'
-]);
+/* Corporate / legal-form / sector boilerplate, loaded from the shared data file
+   so BOTH engines strip exactly the same tokens (screen.py loads the same file).
+   The two in-code tables this replaces had drifted to 58 tokens here and 79 in
+   screen.py with only 42 in common — and the gap was not cosmetic: this engine
+   kept "insaat sanayi ve ticaret sirketi" as distinctive, so two unrelated
+   Turkish firms scored 89 and it raised three hard-negative false positives
+   screen.py never made. Same failure mode the translit-groups file already
+   exists to prevent, one table over.
+
+   FAIL LOUD on a missing/invalid file: silently losing the list would quietly
+   inflate every corporate score — a precision degrade nobody would see. */
+function loadCorpStop() {
+  const path = new URL('../data/corporate-stopwords.json', import.meta.url);
+  const data = JSON.parse(readFileSync(path, 'utf8'));
+  const toks = data && Array.isArray(data.tokens) ? data.tokens : [];
+  if (!toks.length) throw new Error('corporate stopword file contains no tokens: ' + path);
+  for (const t of toks) {
+    if (!t || t !== String(t).toLowerCase()) throw new Error('malformed stopword token: ' + JSON.stringify(t));
+  }
+  return new Set(toks);
+}
+const CORP_STOP = loadCorpStop();
 
 /* Significant tokens of a normalized name (drop corp/common words, very short
    tokens and pure digits). Used both for candidate lookup and token scoring.
@@ -606,8 +619,24 @@ export function levenshtein(a, b) {
    LLC" vs "MUHAMMAD HUSSEIN" — the full-string distance is dominated by the
    suffix, the core distance is not), and a token-set score (catches reordered /
    partial names like "Putin Vladimir" vs "Vladimir Vladimirovich Putin").
-   Strictly recall-monotone vs the pre-core version: a max() over a superset of
-   score paths can only rise, never lower an existing score. */
+
+   That max() is then GATED BY THE CORE when both sides have one — screen.py's
+   `min(full, core)` rule, which this engine did not have. The max alone is
+   recall-monotone by construction and so can never reject anything: two firms
+   sharing everything BUT the token that names them scored on their boilerplate
+   and were flagged. "Golden Gate General Trading" vs designated "Silver Gate
+   General Trading" scored 85 here and cleared in screen.py, whose min() exists
+   precisely to collapse that shape.
+
+   The gate is NOT recall-monotone — it can lower a score — so it was measured
+   before being adopted rather than reasoned about: on the labelled corpus it
+   moved JS hard negatives 84/85 -> 85/85 with recall unchanged at 123/125.
+   Its one apparent recall cost (r085) turned out to be a missing stopword, not
+   the gate: "as" (Turkish A.Ş.) was in neither engine's list, so
+   "anadolu as" and "anadolu" read as different cores. Adding it to the shared
+   file fixed the cause and gained screen.py a pair it had recorded as a
+   residual miss. Do not re-widen this to a bare max() without re-running the
+   benchmark on BOTH engines. */
 export function similarity(a, b) {
   if (!a || !b) return 0;
   if (a === b) return 100;
@@ -632,7 +661,12 @@ export function similarity(a, b) {
   if (ca && cb && (ca !== a || cb !== b)) {
     core = ca === cb ? 100 : (1 - levenshtein(ca, cb) / Math.max(ca.length, cb.length)) * 100;
   }
-  return Math.max(lev, core, token);
+  const best = Math.max(lev, core, token);
+  /* Core gate (screen.py min(full, core) parity) — only when BOTH sides have a
+     distinctive core to compare. A pure person-name has no boilerplate to
+     strip, so ca === a and the gate stays out of the way. */
+  if (ca && cb && (ca !== a || cb !== b)) return Math.min(best, core);
+  return best;
 }
 
 /* ── Subset (patronymic / extra-middle-name) recall gate — screen.py parity ──
@@ -750,7 +784,7 @@ export function translitCanonToken(tok) {
    hassan/hussein never collide); a trailing vowel is preserved so gender/nisba
    suffixes (hana/hani, qassem/qasemi) stay distinct; keys are computed on
    transliteration-CANONICAL tokens with abu/abd merged into their successor. */
-const PHON_DIGRAPHS = [['shch', 's'], ['sch', 's'], ['sh', 's'], ['ch', 'c'],
+const PHON_DIGRAPHS = [['shch', 's'], ['sch', 's'], ['sh', 's'], ['tch', 'c'], ['ch', 'c'],
   ['zh', 'j'], ['kh', 'k'], ['gh', 'k'], ['ph', 'f'], ['th', 't'], ['dh', 'd'],
   ['dj', 'j'], ['ck', 'k'], ['ts', 'c'], ['tz', 'c'], ['x', 'ks'], ['oo', 'u'],
   ['ou', 'u'], ['ee', 'i'], ['ei', 'i'], ['ey', 'i']];

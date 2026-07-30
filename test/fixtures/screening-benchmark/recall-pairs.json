@@ -848,6 +848,38 @@
    "subject": "Djaffar Boumedienne",
    "listed": "Jaafar Bumedien",
    "mechanism": "phonetic"
+  },
+  {
+   "id": "r122",
+   "group": "arabic",
+   "subject": "Chalid Al Fahim",
+   "listed": "Khalid Al Fahim",
+   "mechanism": "phonetic",
+   "note": "Arabic kha: German/French sources write 'ch' where English writes 'kh'. Guards the HARD-ch reading — this pair breaks if 'ch' is folded to the sibilant reading to chase the Achraf/Ashraf class (r120)."
+  },
+  {
+   "id": "r123",
+   "group": "arabic",
+   "subject": "Zacharia Bin Nasser",
+   "listed": "Zakaria Bin Nasser",
+   "mechanism": "phonetic",
+   "note": "Same hard-ch guard as r122, on a different consonant environment."
+  },
+  {
+   "id": "r124",
+   "group": "cyrillic",
+   "subject": "Christos Michail Pavlou",
+   "listed": "Khristos Mikhail Pavlou",
+   "mechanism": "phonetic",
+   "note": "Greek chi transliterated 'ch' or 'kh' — two hard-ch tokens in one name."
+  },
+  {
+   "id": "r125",
+   "group": "arabic",
+   "subject": "Chaled Bin Rachid",
+   "listed": "Khaled Bin Rasheed",
+   "mechanism": "phonetic",
+   "note": "Hard ch (Chaled/Khaled) and soft ch (Rachid/Rasheed) in ONE name: the two readings of 'ch' must coexist, so no single fold of 'ch' can serve both."
   }
  ]
 }
