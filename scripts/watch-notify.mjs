@@ -78,7 +78,13 @@ if (!asanaEnabled()) {
 
 try {
   const section = process.env.ASANA_SECTION_GID || undefined;
-  const url = await notifyAsana(title, notes, { project: REG_PROJECT_GID, html, section });
+  /* Also file the law-change card in the queue it is actually worked from (see
+     the MIRROR note in asana-notify). Unset ASANA_MIRROR_PROJECT_GID to stop. */
+  const mirror = process.env.ASANA_MIRROR_PROJECT_GID
+    ? [{ project: process.env.ASANA_MIRROR_PROJECT_GID,
+         section: process.env.ASANA_MIRROR_SECTION_GID || undefined }]
+    : [];
+  const url = await notifyAsana(title, notes, { project: REG_PROJECT_GID, html, section, mirror });
   console.log('watch-notify: Asana card created' + (url ? ' — ' + url : ''));
   process.exit(0);
 } catch (e) {
