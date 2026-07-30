@@ -288,6 +288,34 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   r = await call(POST({ question: 'Anything.' }), 'test-key');
   b = JSON.parse(r.body);
   check('handler: upstream API error → ok:false, no throw', r.statusCode === 200 && b.ok === false && /API error 529/.test(b.text));
+  check('handler: a 5xx says it is NOT a configuration fault (so nobody rotates a working key)',
+    /not a configuration fault/i.test(b.text));
+
+  /* A bare "[API error NNN]" left the operator guessing whether a dead key, an
+     unavailable model or a quota stop had occurred — the failure that prompted
+     this was a live "⚠ last call failed" with no actionable detail. Each status
+     must now carry its own next step, and none of them may echo the provider's
+     error BODY (auth / quota / billing / org detail stays server-side). */
+  const HINTS = [
+    [401, /ANTHROPIC_API_KEY/, 'dead key'],
+    [403, /ANTHROPIC_API_KEY/, 'forbidden key'],
+    [404, /model is not available/i, 'model not entitled'],
+    [429, /rate limited|quota/i, 'quota'],
+    [400, /malformed/i, 'bad request'],
+  ];
+  let hintsOk = true, bodyLeak = false;
+  for (const [status, re] of HINTS) {
+    mockFetch(async () => ({ ok: false, status, text: async () => 'SECRET-PROVIDER-DETAIL org_id=abc123' }));
+    /* Distinct per-status client IP: these probes must not consume the shared
+       default rate-limit bucket the later cases rely on (same reason 6d-bis/ter
+       below use their own IP). */
+    const rr = JSON.parse((await call(
+      POST({ question: 'Anything.' }, { 'x-nf-client-connection-ip': '198.51.100.' + status }), 'test-key')).body);
+    if (!re.test(rr.text) || !new RegExp('API error ' + status).test(rr.text)) hintsOk = false;
+    if (/SECRET-PROVIDER-DETAIL|org_id/.test(rr.text)) bodyLeak = true;
+  }
+  check('handler: every upstream status carries an operator-actionable next step', hintsOk);
+  check('handler: the provider error BODY is still never reflected to the client', !bodyLeak);
 
   // 6d-bis/ter use a DISTINCT client IP so they don't consume the shared default
   // rate-limit bucket that the later cases rely on.

@@ -406,6 +406,42 @@ function structureGuard(text) {
   return !(hasScope && hasGaps);
 }
 
+/* Operator-actionable hint for an upstream API status, appended to the bare
+   status code the client renders.
+
+   The provider's own error BODY is never reflected — it can carry auth, quota,
+   billing or org detail — and that stays true here: this maps only the status
+   CODE, which the client already sees, onto the operator action it implies.
+
+   The gap this closes was found from a real failure: the Advisor telemetry read
+   "⚠ last call failed" at 362ms. That latency is diagnostic — the early
+   rejections (403 origin, 401 token, 429 rate limit, 503 no key) return no
+   elapsedMs, so a recorded latency proves the call cleared every gate and failed
+   inside the model call; and 362ms is far too fast for the abort path, which
+   only fires after the multi-second platform budget. The user was therefore
+   looking at a bare "[API error NNN]" with no way to know whether it meant a
+   dead key, an unavailable model, or a quota stop. */
+function apiErrorHint(status) {
+  if (status === 401 || status === 403) {
+    return ' — the ANTHROPIC_API_KEY in the Netlify environment is missing, invalid or revoked.'
+      + ' Rotate the key in Site configuration → Environment variables, then redeploy.';
+  }
+  if (status === 404) {
+    return ' — the configured model is not available to this API key.'
+      + ' Check the model IDs in MODEL_BY_MODE against the keys entitlements.';
+  }
+  if (status === 429) {
+    return ' — rate limited or out of quota upstream. Retry shortly, or check the plan limits on the API account.';
+  }
+  if (status === 400 || status === 422) {
+    return ' — the request was rejected as malformed upstream (see the function log for the provider detail).';
+  }
+  if (status === 529 || status >= 500) {
+    return ' — the upstream API is unavailable or overloaded. This one is not a configuration fault; retry shortly.';
+  }
+  return '';
+}
+
 // ── COST / LATENCY BUDGET ───────────────────────────────────────────────────────
 function budgetFlag(elapsedMs, mode) {
   const cap = Number(process.env.ADVISOR_BUDGET_MS || 20000);
@@ -781,7 +817,7 @@ const handle = async (event) => {
       // messages used by the Asana/backup functions).
       const errBody = await apiResp.text().catch(() => '');
       if (errBody) console.warn('brain-soul: Anthropic API error ' + apiResp.status + ': ' + errBody.slice(0, 300));
-      text = '[API error ' + apiResp.status + ']';
+      text = '[API error ' + apiResp.status + apiErrorHint(apiResp.status) + ']';
     } else {
       // A 200 with a null/empty/invalid body must not throw into the catch below
       // (which would then leak an internal error string to the client). Parse
