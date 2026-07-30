@@ -1550,7 +1550,7 @@ try:
     # A clean book must make an affirmative statement, not print an ambiguous 0.
     screen.CUSTOMER_ROWS_SKIPPED.clear()
     check("a clean book attests affirmatively rather than leaving a bare zero",
-          "every customer record carried a name and an ID" in screen._skipped_rows_note())
+          "every customer and employee record carried a name and an ID" in screen._skipped_rows_note())
     # State must not leak between runs (the list is module-level).
     screen.CUSTOMER_ROWS_SKIPPED.append({"gid": "stale", "permalink": "x", "missing": "name"})
     screen.asana_request = _gac_stub([_gac_rows[0], _gac_rows[3]])
@@ -1559,13 +1559,76 @@ try:
           screen.CUSTOMER_ROWS_SKIPPED == [])
     # WIRING: the report must print the true total, not len(customers).
     _att = _inspect.getsource(screen)
-    check("the attestation adds the skipped rows back into 'Customers in database'",
+    check("the attestation adds the skipped rows back into the population total",
           'stats["customers_total"] + stats.get("customer_rows_skipped", 0)' in _att)
     check("the attestation also reports the screened count separately",
-          "Customers screened:" in _att and "Rows NOT screenable:" in _att)
+          "Records screened:" in _att and "Rows NOT screenable:" in _att)
 finally:
     screen.asana_request = _gac_orig
     screen.ASANA_EMPLOYEE_DB_GID = _gac_emp
+    screen.CUSTOMER_ROWS_SKIPPED.clear()
+
+# ── The SAME guard, on the employee population ───────────────────────────────
+# Employees are a screening population in their own right and run through this
+# same pipeline, but the employee loop dropped malformed rows with a bare
+# `continue` — no record, no log line, no attestation — while the comment above
+# it claimed "same guards". A staff member whose Asana row lost its name simply
+# vanished: not screened, not counted, not reported.
+#
+# The block above could not have caught it: it sets ASANA_EMPLOYEE_DB_GID = ""
+# to keep the customer path isolated, so the untested path was the broken one.
+# This block drives BOTH projects in one call.
+print("screen.py — un-screenable EMPLOYEE rows are attested too, not dropped")
+import re as _re_emp
+_emp_orig = screen.asana_request
+_emp_gid = screen.ASANA_EMPLOYEE_DB_GID
+
+
+def _two_project_stub(customer_rows, employee_rows):
+    """get_all_customers requests the customer project, then the employee
+    project; neither response carries next_page, so one page each."""
+    pages = [{"data": customer_rows}, {"data": employee_rows}]
+
+    def _req(method, url, **kw):
+        body = pages.pop(0) if pages else {"data": []}
+        return types.SimpleNamespace(status_code=200, json=lambda b=body: b, text="")
+    return _req
+
+
+try:
+    screen.ASANA_EMPLOYEE_DB_GID = "EMP123"
+    screen.asana_request = _two_project_stub(
+        [{"gid": "1", "name": "Alpha Trading LLC", "notes": "", "permalink_url": "https://app.asana.com/0/0/1"}],
+        [
+            {"gid": "e1", "name": "Sara Al Marri", "notes": "", "permalink_url": "https://app.asana.com/0/0/e1"},
+            {"gid": "e2", "name": "", "notes": "", "permalink_url": "https://app.asana.com/0/0/e2"},
+            {"gid": "", "name": "Nameless Staffer", "notes": "", "permalink_url": "https://app.asana.com/0/0/e3"},
+        ])
+    _both = screen.get_all_customers()
+    check("screenable employees are still screened alongside customers",
+          sorted(c["name"] for c in _both) == ["Alpha Trading LLC", "Sara Al Marri"])
+    check("an employee row missing its name is RECORDED, not silently dropped",
+          any(r["gid"] == "e2" and r["missing"] == "name" for r in screen.CUSTOMER_ROWS_SKIPPED))
+    check("an employee row missing its gid is RECORDED too",
+          any(r["missing"] == "gid" and r.get("population") == "employee"
+              for r in screen.CUSTOMER_ROWS_SKIPPED))
+    check("skipped rows say WHICH population they came from",
+          {r.get("population") for r in screen.CUSTOMER_ROWS_SKIPPED} == {"employee"})
+    # The whole point: the attestation denominator must cover both populations.
+    check("the population total counts the unscreened employees back in",
+          len(_both) + len(screen.CUSTOMER_ROWS_SKIPPED) == 4 and len(_both) == 2)
+    check("the attestation note names the un-screenable employee records",
+          "https://app.asana.com/0/0/e2" in screen._skipped_rows_note()
+          and "employee:" in screen._skipped_rows_note())
+    # Both populations must reach the recorder through ONE code path, so a future
+    # population cannot be added with its own quiet `continue`.
+    _src = _inspect.getsource(screen.get_all_customers)
+    check("no screening population drops a row without recording it",
+          _src.count("_record_skipped_row(") == 2
+          and not _re_emp.search(r'if not t\.get\("gid"\) or not t\.get\("name"\):\s*\n\s*continue', _src))
+finally:
+    screen.asana_request = _emp_orig
+    screen.ASANA_EMPLOYEE_DB_GID = _emp_gid
     screen.CUSTOMER_ROWS_SKIPPED.clear()
 
 # ── tally_enrichment: honest denominators (the 42-subjects incident) ──────────

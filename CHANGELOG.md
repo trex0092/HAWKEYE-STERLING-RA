@@ -10,6 +10,35 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Employee rows that lost their name vanished from screening without a trace (2026-07-30)
+
+Employees are a screening population in their own right and run through the same
+pipeline as customers. The customer loop records any Asana row missing a name or
+a gid — such a row is a subject nobody screened, so it is logged, carried into
+`CUSTOMER_ROWS_SKIPPED`, added back into the attestation's population total, and
+named in the report so the MLRO can fix the source record.
+
+The employee loop dropped the same row with a bare `continue`. No record, no log
+line, no attestation — while the comment three lines above it read *"Same
+pipeline, same matcher, **same guards**, same delta state"*. A staff member whose
+Asana row lost its name simply disappeared: not screened, not counted, not
+reported, and the population total silently excluded them.
+
+Both populations now reach the recorder through **one** function,
+`_record_skipped_row(task, population)`, and each skipped row carries which
+population it came from so the attestation names it precisely. The attestation
+lines are relabelled `Records in database (customers + employees)` /
+`Records screened`, because employees were already inside that count while the
+label said "Customers".
+
+The test that should have caught this set `ASANA_EMPLOYEE_DB_GID = ""` to keep
+the customer path isolated — so the untested path was the broken one. It now
+drives **both** projects in a single call, and a structural check fails if any
+future population is added with its own quiet `continue`. Negative-controlled:
+restoring the bare `continue` fails 6 checks.
+
+Two instances of *"a guard exists but one path doesn't call it"* in two days.
+
 ### The daily brief's 24h window silently skipped 8.37h of alerts in a month of clean runs (2026-07-30)
 
 The Daily Compliance Brief reported on a fixed `now − 24h` window. That assumes
