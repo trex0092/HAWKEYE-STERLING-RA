@@ -888,11 +888,17 @@ def romanize(name):
     (Arabic, which omits short vowels; CJK) are deliberately NOT guessed at: a
     wrong transliteration would be a false CLEAR, which is worse than the
     honest MANUAL REVIEW those names already receive."""
-    s = unicodedata.normalize("NFC", str(name or "")).upper()
-    out = []
-    for ch in s:
-        out.append(_CYRILLIC_ROMAN[ch] if ch in _CYRILLIC_ROMAN else ch)
-    return "".join(out)
+    return _cyr_map(unicodedata.normalize("NFC", str(name or "")).upper())
+
+def _cyr_map(s):
+    """Pure per-character Cyrillic->Latin mapping — NO Unicode normalization.
+
+    Kept separate from romanize() because romanize() applies NFC, and calling it
+    a second time inside _fold_for_key RE-COMPOSED text that NFKD had just
+    decomposed: Hangul syllables came back composed here while the JS engine
+    left them as jamo, so the two engines keyed Korean names differently. Caught
+    by the cross-engine property the moment it was added."""
+    return "".join(_CYRILLIC_ROMAN.get(ch, ch) for ch in s)
 
 # Latin letters with a STROKE or a ligature have no NFD decomposition, so the
 # [^A-Z0-9 ] strip below deletes them outright: "Łukasz Nowak" became
@@ -909,8 +915,9 @@ _LATIN_STROKE_FOLD = {
 }
 
 def _normalize_latin(name):
-    """The Latin pipeline: uppercase, strip combining marks, fold stroke letters
-    and ligatures to ASCII, then keep only [A-Z0-9 ]."""
+    """The strict Latin pipeline: uppercase, strip combining marks, fold stroke
+    letters and ligatures to ASCII, then keep only [A-Z0-9 ]. Non-Latin letters
+    are DROPPED — kept for callers that specifically need an ASCII-only key."""
     name = name.upper()
     name = unicodedata.normalize("NFD", name)
     name = "".join(c for c in name if unicodedata.category(c) != "Mn")
@@ -919,6 +926,41 @@ def _normalize_latin(name):
     name = re.sub(r"[^A-Z0-9 ]", " ", name)
     name = re.sub(r"\s+", " ", name).strip()
     return name
+
+def _fold_for_key(name):
+    """Romanize + fold, then keep letters/digits of ANY script.
+
+    Mirrors the JS engine's pipeline so both key a name identically. Ordering
+    matters: romanize BEFORE the mark-strip, because й and ё are precomposed and
+    stripping their marks first turns them into и/е (the divergence that keyed
+    "Сергей" as sergey here and sergei there)."""
+    s = romanize(str(name or ""))        # uppercases internally; no-op off-Cyrillic
+    # NFKD, not NFD, to match the JS engine: it also folds COMPATIBILITY forms —
+    # fullwidth (ＦＵＬＬＷＩＤＴＨ -> FULLWIDTH, common in CJK-region corporate
+    # records), digraph ligatures (ǅ -> DZ) and Roman numerals (Ⅻ -> XII). NFD
+    # leaves all of those as themselves, so the two engines keyed them
+    # differently. Measured: over 1,631 corpus names the switch moves ZERO keys —
+    # ordinary names contain no compatibility characters.
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    # Romanize AGAIN, now that accents are gone. Accented Cyrillic (Ѐ, Ѓ, Ќ, Ѝ)
+    # is precomposed and absent from the table, so the first pass missed it;
+    # NFKD then reduced it to BASE CYRILLIC, which the preservation branch kept
+    # verbatim — leaving a Cyrillic letter in a key whose siblings were Latin,
+    # and breaking idempotence. Running the table twice is safe: it is a no-op
+    # on Latin, so the first pass's output is unchanged by the second. Uses the
+    # PURE mapping — romanize() would re-apply NFC and re-compose what NFKD just
+    # decomposed (Hangul), diverging from the JS engine.
+    s = _cyr_map(s)
+    # Upper AGAIN, after the decomposition. NFKD expands modifier and superscript
+    # letters into LOWERCASE ascii (ª -> a, ʲ -> j, ʰ -> h), so uppercasing only
+    # at the front left a stray lowercase letter in the key — it would never meet
+    # an uppercase key, and normalize() stopped being idempotent. Caught by the
+    # idempotence property, not by reasoning.
+    s = s.upper()
+    s = "".join(_LATIN_STROKE_FOLD.get(c, c) for c in s)
+    s = "".join(c if unicodedata.category(c)[0] in ("L", "N") else " " for c in s)
+    return re.sub(r"\s+", " ", s).strip()
 
 def normalize(name):
     """Matching key for a name.
@@ -939,12 +981,22 @@ def normalize(name):
     their MANUAL REVIEW routing (_unscreenable tests the ORIGINAL string, so a
     romanized name is still surfaced for a human as well as screened)."""
     if not name: return ""
-    latin = _normalize_latin(name)
-    if latin:
-        return latin
-    roman = _normalize_latin(romanize(name))
-    if roman:
-        return roman
+    # MIXED-SCRIPT DROP: the Latin pipeline used to run first and win outright,
+    # so a name that produced ANY Latin output had its non-Latin letters thrown
+    # away silently. Live instance in data/eocn-local-terrorist-list.json — the
+    # alias "إتلاف 14 فبراير (البحرين)" keyed as "14", because the digits alone
+    # satisfied the Latin pipeline and the script-preservation fallback never
+    # fired. A designated alias keyed as "14" matches nothing it should and is
+    # a collision waiting to happen. Likewise "محمد صالح TRADING LLC" keyed as
+    # "TRADING LLC" — pure corporate boilerplate, no identifying signal left.
+    #
+    # So romanize + fold FIRST, then keep the letters/digits of whatever script
+    # survives, exactly as the JS engine does. For a pure-Latin name this is
+    # identical to the old pipeline (measured: 1,631 corpus names, only the 3
+    # genuinely mixed-script ones move).
+    folded = _fold_for_key(name)
+    if folded:
+        return folded
     # Scripts with no deterministic romanization (Arabic omits short vowels;
     # CJK has no letter mapping at all) are PRESERVED, not guessed at. The JS
     # engine already did this — it matches an Arabic subject against an

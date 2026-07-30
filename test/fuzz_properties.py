@@ -310,48 +310,57 @@ def _corpus_names():
     return seen
 
 
-def prop_romanization_never_moves_an_existing_key():
-    """Romanization must be ADDITIVE-ONLY.
+def prop_ascii_latin_names_keep_their_historic_key():
+    """A pure-ASCII-Latin name must key exactly as the original pipeline did.
 
-    normalize() falls back to romanize() only when the Latin pipeline yields "".
-    That is the whole safety argument for putting it there: every name that
-    already had a non-empty key must keep exactly that key, so no existing
-    match, score, delta fingerprint or dedup key can move. Only entries that
-    previously matched NOTHING may become live.
+    The engine now romanizes Cyrillic, preserves other scripts, folds stroke
+    letters and uses NFKD. Two of those DO move keys on purpose (the stroke fold
+    repaired keys that had silently lost a letter; the unified pipeline stopped
+    mixed-script names from dropping their non-Latin half). So "additive-only"
+    no longer describes the whole design and asserting it would be false.
 
-    This property re-derives the ORIGINAL Latin-only pipeline independently and
-    asserts byte equality wherever it produced anything."""
+    What must still hold — and covers the overwhelming majority of the book — is
+    that a name written in plain ASCII Latin is untouched by any of it."""
     import unicodedata as _ud, re as _re
 
     def original(name):
-        """The LATIN pipeline as it stands, independently re-derived.
-
-        It includes the stroke/ligature fold (Ł→L, Ø→O, Đ→D…). That fold is a
-        DELIBERATE key move — it repairs keys that silently dropped a letter
-        ("Łukasz Nowak" used to key as UKASZ NOWAK) — so it belongs to the
-        reference pipeline, not to the thing under test. What this property
-        guards is narrower and still exactly true: the non-Latin FALLBACK
-        (romanization, then script preservation) must never move a key the
-        Latin pipeline already produced."""
         if not name:
             return ""
         n = name.upper()
         n = _ud.normalize("NFD", n)
         n = "".join(c for c in n if _ud.category(c) != "Mn")
-        n = "".join(screen._LATIN_STROKE_FOLD.get(c, c) for c in n)
         n = _re.sub(r"[^A-Z0-9 ]", " ", n)
         return _re.sub(r"\s+", " ", n).strip()
 
-    moved, rescued = [], 0
+    moved = []
     for name in _corpus_names():
-        old = original(name)
-        new = screen.normalize(name)
-        if old and new != old:
-            moved.append((name, old, new))
-        elif not old and new:
-            rescued += 1
-    assert not moved, f"romanization MOVED {len(moved)} existing key(s): {moved[:3]}"
-    return f"{rescued} previously-dead key(s) rescued, 0 existing keys moved"
+        if not name.isascii():
+            continue
+        if screen.normalize(name) != original(name):
+            moved.append((name, original(name), screen.normalize(name)))
+    assert not moved, f"ASCII-Latin key MOVED: {moved[:3]}"
+    return "ASCII-Latin keys unchanged"
+
+
+def prop_engines_key_identically():
+    """The two matchers must key every corpus name the same way.
+
+    Three cross-engine divergences have reached production this way (Turkish ı,
+    German ß, Cyrillic), each found by diffing the engines rather than by
+    reasoning. This runs that diff as a test so the fourth cannot."""
+    import json as _json, subprocess as _sp
+    names = sorted(n for n in _corpus_names() if n and len(n) < 120)
+    out = _sp.check_output(
+        ["node", "--input-type=module", "-e",
+         'import { normalizeName } from "./scripts/sanctions-match.mjs";'
+         'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{'
+         'console.log(JSON.stringify(JSON.parse(d).map(normalizeName)));});'],
+        input=_json.dumps(names).encode())
+    js = _json.loads(out)
+    div = [(n, screen.normalize(n).lower(), j)
+           for n, j in zip(names, js) if screen.normalize(n).lower() != j]
+    assert not div, f"{len(div)} cross-engine key divergence(s): {div[:3]}"
+    return f"{len(names)} names key identically in both engines"
 
 check("normalize is casing-insensitive", prop_normalize_case_insensitive)
 check("_latin_fold output is lowercase with no combining marks", prop_latin_fold_structure)
@@ -366,8 +375,8 @@ check("match blocking stays result-identical with a LOWERED short-entry threshol
 check("the measured lowered-threshold divergences stay fixed (deterministic pairs)",
       prop_blocking_equivalence_known_sensitive_pairs)
 check("match blocking stays result-identical after in-place list growth", prop_blocking_survives_inplace_list_growth)
-check("the non-Latin fallback is additive-only — it never moves a Latin key",
-      prop_romanization_never_moves_an_existing_key)
+check("a pure-ASCII-Latin name keeps its historic key", prop_ascii_latin_names_keep_their_historic_key)
+check("both engines key every corpus name identically", prop_engines_key_identically)
 
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
