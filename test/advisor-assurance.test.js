@@ -372,6 +372,34 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   b = JSON.parse(r.body);
   check('handler: screening answer without scope/gaps is structureFlagged', b.structureFlagged === true && /structureFlagged/.test(b.auditLine));
 
+  /* ── 7. The health probe must prove the Advisor ANSWERS, not just that a key
+     is set ───────────────────────────────────────────────────────────────────
+     brain-soul checks ANTHROPIC_API_KEY's PRESENCE before it parses the body, so
+     an empty-body probe returns 400 whenever the variable is merely set. A key
+     that is present but REVOKED, EXPIRED or unentitled to the routed model
+     returns 400 to that probe while every real call dies at the API.
+
+     Not hypothetical: function-health.yml ran green ten days running,
+     2026-07-30 included, while the Advisor answered nothing and its on-device
+     telemetry read "last call failed". The alarm that exists to catch a dead
+     Advisor could not see the way it actually died. These checks stop the
+     end-to-end call being weakened back to a status-code check. */
+  const HEALTH = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'function-health.yml'), 'utf8');
+  check('health probe makes a REAL Advisor call, not only a malformed-body probe',
+    /"question"\s*:/.test(HEALTH) && /brain_soul_e2e/.test(HEALTH));
+  check('health probe requires ok:true — a 200 carrying ok:false must fail the run',
+    /j\.ok\s*===\s*true/.test(HEALTH) && /"\$OK"\s*!=\s*"true"/.test(HEALTH));
+  check('the end-to-end probe uses the cheapest mode (a daily paid call stays trivial)',
+    /"mode"\s*:\s*"speed"/.test(HEALTH));
+  check('the alert distinguishes "configured" from "actually working"',
+    /CONFIGURED BUT NOT WORKING/.test(HEALTH));
+  check('the probe records WHY it could not answer, for the alert to carry',
+    /answered=/.test(HEALTH) && /detail=/.test(HEALTH));
+  /* A multi-line value corrupts $GITHUB_OUTPUT's key=value format and is an
+     output-injection vector, so the detail is collapsed to one line. */
+  check('the recorded detail is collapsed to a single line before $GITHUB_OUTPUT',
+    /replace\(\/\[\\r\\n\]\+\/g/.test(HEALTH));
+
   // restore environment
   global.fetch = origFetch;
   if (origKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = origKey;
