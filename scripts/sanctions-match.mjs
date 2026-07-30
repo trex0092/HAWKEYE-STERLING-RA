@@ -619,8 +619,24 @@ export function levenshtein(a, b) {
    LLC" vs "MUHAMMAD HUSSEIN" — the full-string distance is dominated by the
    suffix, the core distance is not), and a token-set score (catches reordered /
    partial names like "Putin Vladimir" vs "Vladimir Vladimirovich Putin").
-   Strictly recall-monotone vs the pre-core version: a max() over a superset of
-   score paths can only rise, never lower an existing score. */
+
+   That max() is then GATED BY THE CORE when both sides have one — screen.py's
+   `min(full, core)` rule, which this engine did not have. The max alone is
+   recall-monotone by construction and so can never reject anything: two firms
+   sharing everything BUT the token that names them scored on their boilerplate
+   and were flagged. "Golden Gate General Trading" vs designated "Silver Gate
+   General Trading" scored 85 here and cleared in screen.py, whose min() exists
+   precisely to collapse that shape.
+
+   The gate is NOT recall-monotone — it can lower a score — so it was measured
+   before being adopted rather than reasoned about: on the labelled corpus it
+   moved JS hard negatives 84/85 -> 85/85 with recall unchanged at 123/125.
+   Its one apparent recall cost (r085) turned out to be a missing stopword, not
+   the gate: "as" (Turkish A.Ş.) was in neither engine's list, so
+   "anadolu as" and "anadolu" read as different cores. Adding it to the shared
+   file fixed the cause and gained screen.py a pair it had recorded as a
+   residual miss. Do not re-widen this to a bare max() without re-running the
+   benchmark on BOTH engines. */
 export function similarity(a, b) {
   if (!a || !b) return 0;
   if (a === b) return 100;
@@ -645,7 +661,12 @@ export function similarity(a, b) {
   if (ca && cb && (ca !== a || cb !== b)) {
     core = ca === cb ? 100 : (1 - levenshtein(ca, cb) / Math.max(ca.length, cb.length)) * 100;
   }
-  return Math.max(lev, core, token);
+  const best = Math.max(lev, core, token);
+  /* Core gate (screen.py min(full, core) parity) — only when BOTH sides have a
+     distinctive core to compare. A pure person-name has no boilerplate to
+     strip, so ca === a and the gate stays out of the way. */
+  if (ca && cb && (ca !== a || cb !== b)) return Math.min(best, core);
+  return best;
 }
 
 /* ── Subset (patronymic / extra-middle-name) recall gate — screen.py parity ──

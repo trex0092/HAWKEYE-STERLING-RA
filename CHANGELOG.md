@@ -10,6 +10,60 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The case engine had no precision gate at all, and one missing Turkish token was costing recall (2026-07-30)
+
+The two engines combined their score paths by **opposite** rules, and both were
+documented as deliberate:
+
+```
+screen.py     decisive = min(full, core)     "a pair only scores high if BOTH the
+                                              whole string AND its distinctive
+                                              core agree"
+sanctions-match.mjs  Math.max(lev, core, token)   "strictly recall-monotone: can
+                                                   only rise, never lower an
+                                                   existing score"
+```
+
+A `max()` cannot reject anything. So the case engine had no precision gate, and
+two firms sharing everything except the token that **names** them scored on
+their boilerplate:
+
+```
+Golden Gate General Trading  vs  Silver Gate General Trading   -> JS 85, flagged
+                                                                  screen.py: clear
+```
+
+The JS matcher now applies screen.py's `min(full, core)` gate when both sides
+have a distinctive core. A pure person-name has no boilerplate to strip, so the
+gate stays out of the way there.
+
+The gate is **not** recall-monotone — it can lower a score — so it was measured
+rather than reasoned about. Its one apparent recall cost turned out not to be
+the gate at all: **`as` (Turkish A.Ş., *anonim şirketi*) was in neither engine's
+stopword list**, so `Anadolu Kiymetli Madenler Ticaret AS` and
+`Anadolu Kiymetli Madenler Ticaret` compared as `anadolu as` vs `anadolu` and
+fell below the gate. Adding it to the shared file fixed the cause — and closed
+a pair `screen.py` had recorded as a **residual known miss**.
+
+Both changes together, measured on both engines:
+
+| | before | after |
+|---|---|---|
+| JS hard negatives | 84/85 | **85/85** |
+| JS recall | 123/125 | 123/125 |
+| `screen.py` hard negatives | 85/85 | 85/85 |
+| `screen.py` recall | 123/125 | **124/125** |
+
+Both engines now clear **every** hard negative, and the only remaining recall
+misses are `r110` (both engines) and `r120` (JS only, allowlisted with its
+measured refutation).
+
+Pinned in `test/corporate-stopwords.test.mjs`: the boilerplate shape scores
+below the gate, the Turkish variant of the same shape does too, a real typo
+behind a corporate suffix **still** scores, and a pure person-name is untouched.
+Negative-controlled: reverting to the bare `max()` returns the false positive
+and fails 2 checks; removing `as` loses `r085` again and fails its own.
+
 ### The two engines' boilerplate lists had drifted, and it cost three false positives (2026-07-30)
 
 Both engines strip corporate boilerplate before the decisive "core" similarity
