@@ -1,0 +1,113 @@
+{
+ "version": 1,
+ "description": "Phonetic-fold tables for the romanization-robust key both engines compute (screen.py phonetic_key / scripts/sanctions-match.mjs phoneticKey). Single source of truth: these were duplicated in code, and a duplicated table in this repo has drifted twice already (transliteration groups, then corporate stopwords - the latter costing three hard-negative false positives). Verified before extraction that dropping one digraph from the JS copy broke NO test, so the drift would have been silent.",
+ "digraphOrderMatters": "digraphs are applied IN ORDER and each is a plain substring replacement, so longer forms must precede their own prefixes: shch before sch before sh, and tch before ch. Reordering silently changes every key.",
+ "digraphs": [
+  [
+   "shch",
+   "s"
+  ],
+  [
+   "sch",
+   "s"
+  ],
+  [
+   "sh",
+   "s"
+  ],
+  [
+   "tch",
+   "c"
+  ],
+  [
+   "ch",
+   "c"
+  ],
+  [
+   "zh",
+   "j"
+  ],
+  [
+   "kh",
+   "k"
+  ],
+  [
+   "gh",
+   "k"
+  ],
+  [
+   "ph",
+   "f"
+  ],
+  [
+   "th",
+   "t"
+  ],
+  [
+   "dh",
+   "d"
+  ],
+  [
+   "dj",
+   "j"
+  ],
+  [
+   "ck",
+   "k"
+  ],
+  [
+   "ts",
+   "c"
+  ],
+  [
+   "tz",
+   "c"
+  ],
+  [
+   "x",
+   "ks"
+  ],
+  [
+   "oo",
+   "u"
+  ],
+  [
+   "ou",
+   "u"
+  ],
+  [
+   "ee",
+   "i"
+  ],
+  [
+   "ei",
+   "i"
+  ],
+  [
+   "ey",
+   "i"
+  ]
+ ],
+ "vowelClass": {
+  "a": "a",
+  "e": "i",
+  "i": "i",
+  "o": "u",
+  "u": "u"
+ },
+ "charMap": {
+  "q": "k",
+  "c": "k",
+  "g": "k",
+  "w": "v",
+  "p": "b",
+  "d": "t",
+  "z": "s"
+ },
+ "particles": [
+  "abd",
+  "abo",
+  "abou",
+  "abu"
+ ]
+}

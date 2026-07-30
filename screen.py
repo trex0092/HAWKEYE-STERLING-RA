@@ -3154,15 +3154,43 @@ def confidence_tier(core):
 # khaled or omar/umar share a key by group membership rather than luck, and
 # the particles abu/abd merge into their following token ("Abou Bakr" ≡
 # "Aboubakr"). Pure string ops — identical under the offline difflib stub.
-_PHON_DIGRAPHS = (("shch", "s"), ("sch", "s"), ("sh", "s"), ("tch", "c"), ("ch", "c"),
-                  ("zh", "j"), ("kh", "k"), ("gh", "k"), ("ph", "f"),
-                  ("th", "t"), ("dh", "d"), ("dj", "j"), ("ck", "k"),
-                  ("ts", "c"), ("tz", "c"), ("x", "ks"), ("oo", "u"),
-                  ("ou", "u"), ("ee", "i"), ("ei", "i"), ("ey", "i"))
-_PHON_VOWEL_CLASS = {"a": "a", "e": "i", "i": "i", "o": "u", "u": "u"}
-_PHON_CHAR_MAP = str.maketrans({"q": "k", "c": "k", "g": "k", "w": "v",
-                                "p": "b", "d": "t", "z": "s"})
-_PHON_PARTICLES = {"abu", "abou", "abo", "abd"}
+# Phonetic-fold tables — loaded from the shared data file so BOTH engines fold
+# identically (scripts/sanctions-match.mjs loads the same file). These were
+# duplicated in code; a duplicated table in this repo has drifted twice already
+# (transliteration groups, then the corporate stopwords, the latter costing
+# three hard-negative false positives). Verified before extraction that dropping
+# one digraph from the JS copy broke NO test, so this drift would have been
+# silent too.
+#
+# ORDER MATTERS: digraphs are applied in sequence as plain substring
+# replacements, so longer forms must precede their own prefixes (shch before
+# sch before sh; tch before ch). The loader preserves file order and
+# test/phonetic-tables.test.mjs asserts it.
+#
+# FAIL LOUD on a missing/invalid file: a silently-empty fold table would key
+# every name differently from the list it is screened against.
+PHONETIC_TABLES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "data", "phonetic-tables.json")
+
+def _load_phonetic_tables(path=PHONETIC_TABLES_PATH):
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    digraphs = data.get("digraphs") or []
+    if not digraphs:
+        raise ValueError(f"phonetic tables file {path} contains no digraphs")
+    for d in digraphs:
+        if (not isinstance(d, list)) or len(d) != 2 or not d[0] or d[0] != str(d[0]).lower():
+            raise ValueError(f"malformed digraph in {path}: {d!r}")
+    vowels = data.get("vowelClass") or {}
+    chars = data.get("charMap") or {}
+    particles = data.get("particles") or []
+    if not (vowels and chars and particles):
+        raise ValueError(f"phonetic tables file {path} is missing a required table")
+    return (tuple((a, b) for a, b in digraphs), dict(vowels),
+            str.maketrans(dict(chars)), set(particles))
+
+(_PHON_DIGRAPHS, _PHON_VOWEL_CLASS,
+ _PHON_CHAR_MAP, _PHON_PARTICLES) = _load_phonetic_tables()   # raises at import
 
 @functools.lru_cache(maxsize=1 << 18)
 def phonetic_key(token):
