@@ -384,6 +384,32 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
      telemetry read "last call failed". The alarm that exists to catch a dead
      Advisor could not see the way it actually died. These checks stop the
      end-to-end call being weakened back to a status-code check. */
+  /* A hint that is confidently WRONG is its own failure — it sends the operator
+     to fix something that is not broken. The live incident: the account hit its
+     spend cap and the API answered HTTP 400 with "You have reached your
+     specified API usage limits", which a bare 400 hint called "malformed
+     request". That would have had someone debugging a payload while the real
+     fix was a billing limit. The body is CLASSIFIED (never reflected) to tell
+     quota apart from malformed, on both statuses that can carry it. */
+  const LIMIT_MSG = 'You have reached your specified API usage limits. You will regain access on 2026-08-01 at 00:00 UTC.';
+  check('a 400 carrying a usage-limit body is named as BILLING, not malformed',
+    /usage limit or run out of credit/i.test(I.apiErrorHint(400, LIMIT_MSG))
+    && !/malformed/i.test(I.apiErrorHint(400, LIMIT_MSG)));
+  check('the quota hint tells the operator NOT to rotate a working key',
+    /Do not rotate the key/i.test(I.apiErrorHint(400, LIMIT_MSG)));
+  check('a genuinely malformed 400 is still called malformed',
+    /malformed/i.test(I.apiErrorHint(400, 'messages: field required')));
+  check('a 429 that is really a credit exhaustion is named as BILLING too',
+    /usage limit or run out of credit/i.test(I.apiErrorHint(429, 'Your credit balance is too low')));
+  check('a plain 429 is still reported as rate limiting, not billing',
+    /rate limited/i.test(I.apiErrorHint(429, 'rate_limit_error'))
+    && !/run out of credit/i.test(I.apiErrorHint(429, 'rate_limit_error')));
+  check('the classifier never fires on an auth or overload body',
+    !I.isUsageLimit(401, 'authentication_error') && !I.isUsageLimit(529, 'overloaded_error'));
+  /* The provider's own words must still never reach the client. */
+  check('classifying the body does not start reflecting it',
+    !I.apiErrorHint(400, LIMIT_MSG).includes('2026-08-01'));
+
   const HEALTH = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'function-health.yml'), 'utf8');
   check('health probe makes a REAL Advisor call, not only a malformed-body probe',
     /"question"\s*:/.test(HEALTH) && /brain_soul_e2e/.test(HEALTH));
