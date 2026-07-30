@@ -1252,16 +1252,27 @@ for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
 # covered, actually unscreenable, silent.
 print("screen.py — unmatchable core-list entries")
 _um_lists = {
-    "OFAC SDN": [(screen.normalize(n), n) for n in ["\u0425\u0410\u041c\u0410\u0421", "BAD ACTOR", "\u4e2d\u56fd\u6838\u5de5\u4e1a"]],
+    # Arabic and CJK have no deterministic romanization (Arabic omits short
+    # vowels), so romanize() deliberately does not guess at them — a wrong
+    # transliteration would be a false CLEAR. They stay unmatchable by design.
+    "OFAC SDN": [(screen.normalize(n), n) for n in
+                 ["\u0645\u062d\u0645\u062f \u0639\u0628\u062f\u0627\u0644\u0644\u0647", "BAD ACTOR", "\u4e2d\u56fd\u6838\u5de5\u4e1a"]],
     "UN Consolidated": [(screen.normalize(n), n) for n in ["CLEAN ONE", "CLEAN TWO"]],
 }
-check("a non-Latin designation is indexed under an empty key (the mechanism)",
-      ("", "\u0425\u0410\u041c\u0410\u0421") in _um_lists["OFAC SDN"])
+check("a non-romanizable designation is indexed under an empty key (the mechanism)",
+      ("", "\u4e2d\u56fd\u6838\u5de5\u4e1a") in _um_lists["OFAC SDN"])
 check("an empty-key entry can never be returned by the matcher",
-      screen.screen_name("\u0425\u0410\u041c\u0410\u0421", _um_lists) == []
+      screen.screen_name("\u4e2d\u56fd\u6838\u5de5\u4e1a", _um_lists) == []
       and screen.screen_name("Bad Actor", _um_lists)[0]["matched_entry"] == "BAD ACTOR")
 check("an empty-key entry does NOT match an unrelated name (no false positive)",
       screen.screen_name("Totally Unrelated Trading Ltd", _um_lists) == [])
+# Cyrillic is NO LONGER unmatchable — romanize() rescues it. This is the
+# improvement, pinned so it cannot silently regress.
+_cyr_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in ["\u0425\u0410\u041c\u0410\u0421"]]}
+check("a Cyrillic designation is now indexed under a real key (romanized)",
+      _cyr_lists["OFAC SDN"][0][0] == "KHAMAS")
+check("a Cyrillic designation is now MATCHABLE (was dead before romanization)",
+      len(screen.screen_name("\u0425\u0410\u041c\u0410\u0421", _cyr_lists)) == 1)
 _um_meta = {"ofac": {"count": 3}, "un": {"count": 2}}
 screen.count_unmatchable_entries(_um_lists, _um_meta)
 check("the unmatchable count is recorded per list",

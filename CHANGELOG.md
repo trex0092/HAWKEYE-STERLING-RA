@@ -10,6 +10,52 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Cyrillic designations are now screened, not silently dead (2026-07-30)
+
+A sanctions designation published only in Cyrillic normalized to `""` in
+`screen.py`, was indexed under an empty key, and could therefore **never match
+any customer** — while still counting toward the "screened against N list names"
+attestation. Russia-related designations dominate current OFAC/EU/UK actions, so
+this was a live recall hole on the busiest listing stream.
+
+`romanize()` renders Cyrillic to Latin (BGN/PCGN-style, the spelling the
+sanctions bodies publish), and `normalize()` uses it **only as a fallback when
+the Latin pipeline returns `""`**.
+
+That placement is the whole safety argument, and it is now a property test:
+every name that already had a non-empty key keeps **exactly** that key, byte for
+byte, so no existing match, score, delta fingerprint or dedup key can move. The
+only reachable change is that entries which previously matched nothing can now
+match. Verified across **1,296 real benchmark and parity strings: 0 keys moved,
+9 previously-dead keys rescued.**
+
+Scripts without a deterministic romanization — Arabic (which omits short vowels)
+and CJK — are deliberately **not** guessed at. A wrong transliteration would be
+a false CLEAR, which is worse than the honest MANUAL REVIEW they already get.
+
+**Cross-engine parity.** The JS engine kept Cyrillic verbatim (`ХАМАС` →
+`хамас`), so it matched a Cyrillic list entry but never the Latin designation.
+Once `screen.py` romanized, Python would hit where JS did not — a directional
+parity break. The same table now folds in `scripts/sanctions-match.mjs`, and
+both engines produce identical keys.
+
+Worth recording how that was pinned: the parity corpus **cannot** hold this,
+because a MANUAL REVIEW routing already counts as "reached by the JS engine", so
+parity passes with or without romanization. What actually changed is the outcome
+quality, and that is what the JS tests assert:
+
+```
+without romanization:  MANUAL REVIEW   score 0    band medium    -> a human task
+with    romanization:  KHAMAS          score 100  band critical  -> sanctions-match
+```
+
+The pre-existing guard "normalizeName keeps Cyrillic letters" was rewritten to
+its *intent* — non-empty key, no silent clear, and now matching the Latin
+rendering — rather than the superseded mechanism.
+
+Benchmark unmoved: recall 119/121 (98.3%), hard negatives 85/85 (100%).
+
+
 ### Sanctions designations that can never match are now counted, not assumed away (2026-07-30)
 
 The core sanctions index is built as `[(normalize(n), n) for n in names]`. A

@@ -45,6 +45,28 @@ export function normalizeName(s) {
        fuzzy similarity; short ones cleared outright. Strictly widening, like the
        ı fold: ß-vs-ß pairs matched before and still do. */
     .replace(/ß/g, 'ss')
+    /* Cyrillic → Latin, mirroring screen.py's romanize(). Found by comparing
+       the engines, like the ı and ß folds above. screen.py used to strip
+       Cyrillic to "" (a designation indexed under an empty key could never
+       match); it now romanizes, so a Cyrillic subject scores against a LATIN
+       designation there. This engine kept Cyrillic as-is — "ХАМАС" → "хамас" —
+       which matches a Cyrillic list entry but never the Latin "KHAMAS". That
+       asymmetry breaks the directional parity contract the moment screen.py
+       romanizes: Python hits, JS does not. Same table, same order (multi-letter
+       forms first so they win over their prefixes). Strictly widening —
+       Cyrillic-vs-Cyrillic pairs matched before and still do, because both
+       sides romanize identically. */
+    .replace(/щ/g, 'shch').replace(/ш/g, 'sh').replace(/ч/g, 'ch')
+    .replace(/ц/g, 'ts').replace(/ж/g, 'zh').replace(/ю/g, 'yu').replace(/я/g, 'ya')
+    .replace(/[ёє]/g, 'ye').replace(/ї/g, 'yi').replace(/[ъь]/g, '')
+    .replace(/э/g, 'e').replace(/ы/g, 'y').replace(/х/g, 'kh')
+    .replace(/ђ/g, 'dj').replace(/љ/g, 'lj').replace(/њ/g, 'nj')
+    .replace(/ћ/g, 'c').replace(/џ/g, 'dz').replace(/ј/g, 'j')
+    .replace(/а/g, 'a').replace(/б/g, 'b').replace(/в/g, 'v').replace(/[гґ]/g, 'g')
+    .replace(/д/g, 'd').replace(/е/g, 'e').replace(/з/g, 'z').replace(/[иі]/g, 'i')
+    .replace(/й/g, 'y').replace(/к/g, 'k').replace(/л/g, 'l').replace(/м/g, 'm')
+    .replace(/н/g, 'n').replace(/о/g, 'o').replace(/п/g, 'p').replace(/р/g, 'r')
+    .replace(/с/g, 's').replace(/т/g, 't').replace(/[уў]/g, 'u').replace(/ф/g, 'f')
     .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 

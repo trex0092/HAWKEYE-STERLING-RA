@@ -269,6 +269,63 @@ def prop_blocking_survives_inplace_list_growth(entry_names, late_entry):
 
 check("normalize is idempotent on arbitrary unicode", prop_normalize_idempotent)
 check("normalize output is closed over [A-Z0-9 ], trimmed, single-spaced", prop_normalize_alphabet)
+def _corpus_names():
+    """Every string in the benchmark + parity fixtures, plus generated shapes."""
+    import glob as _glob, json as _json
+    seen = set()
+    def walk(o):
+        if isinstance(o, str):
+            seen.add(o)
+        elif isinstance(o, dict):
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    for f in (_glob.glob("test/fixtures/screening-benchmark/*.json")
+              + _glob.glob("test/fixtures/matcher-parity/*.json")):
+        try:
+            walk(_json.load(open(f, encoding="utf-8")))
+        except Exception:
+            pass
+    seen |= {"", "  ", "Weiß", "Kılıç", "O'Brien & Sons", "123", "AL-QAEDA (AQ)",
+             "ХАМАС", "محمد", "中国", "Ünal Öztürk", "N/A"}
+    return seen
+
+
+def prop_romanization_never_moves_an_existing_key():
+    """Romanization must be ADDITIVE-ONLY.
+
+    normalize() falls back to romanize() only when the Latin pipeline yields "".
+    That is the whole safety argument for putting it there: every name that
+    already had a non-empty key must keep exactly that key, so no existing
+    match, score, delta fingerprint or dedup key can move. Only entries that
+    previously matched NOTHING may become live.
+
+    This property re-derives the ORIGINAL Latin-only pipeline independently and
+    asserts byte equality wherever it produced anything."""
+    import unicodedata as _ud, re as _re
+
+    def original(name):
+        if not name:
+            return ""
+        n = name.upper()
+        n = _ud.normalize("NFD", n)
+        n = "".join(c for c in n if _ud.category(c) != "Mn")
+        n = _re.sub(r"[^A-Z0-9 ]", " ", n)
+        return _re.sub(r"\s+", " ", n).strip()
+
+    moved, rescued = [], 0
+    for name in _corpus_names():
+        old = original(name)
+        new = screen.normalize(name)
+        if old and new != old:
+            moved.append((name, old, new))
+        elif not old and new:
+            rescued += 1
+    assert not moved, f"romanization MOVED {len(moved)} existing key(s): {moved[:3]}"
+    return f"{rescued} previously-dead key(s) rescued, 0 existing keys moved"
+
 check("normalize is casing-insensitive", prop_normalize_case_insensitive)
 check("_latin_fold output is lowercase with no combining marks", prop_latin_fold_structure)
 check("_normalize_ar is idempotent", prop_normalize_ar_idempotent)
@@ -282,6 +339,8 @@ check("match blocking stays result-identical with a LOWERED short-entry threshol
 check("the measured lowered-threshold divergences stay fixed (deterministic pairs)",
       prop_blocking_equivalence_known_sensitive_pairs)
 check("match blocking stays result-identical after in-place list growth", prop_blocking_survives_inplace_list_growth)
+check("romanization is additive-only — it never moves an existing normalize() key",
+      prop_romanization_never_moves_an_existing_key)
 
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

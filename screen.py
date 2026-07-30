@@ -860,14 +860,67 @@ def _canonical_fingerprint(url, title):
     return "t:" + _name_sig(title)
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
-def normalize(name):
-    if not name: return ""
+# Cyrillic → Latin romanization (BGN/PCGN-style, the rendering sanctions
+# publishers actually use). Longest-key-first at application time so multi-letter
+# forms win over their prefixes. Covers Russian/Ukrainian/Belarusian/Serbian —
+# the scripts that dominate current OFAC/EU/UK designations.
+_CYRILLIC_ROMAN = {
+    "Щ": "SHCH", "Ш": "SH", "Ч": "CH", "Ц": "TS", "Ж": "ZH", "Ю": "YU", "Я": "YA",
+    "Ё": "YE", "Є": "YE", "Ї": "YI", "Ъ": "", "Ь": "", "Э": "E", "Ы": "Y",
+    "А": "A", "Б": "B", "В": "V", "Г": "G", "Ґ": "G", "Д": "D", "Е": "E",
+    "З": "Z", "И": "I", "І": "I", "Й": "Y", "К": "K", "Л": "L", "М": "M",
+    "Н": "N", "О": "O", "П": "P", "Р": "R", "С": "S", "Т": "T", "У": "U",
+    "Ў": "U", "Ф": "F", "Х": "KH", "Ђ": "DJ", "Љ": "LJ", "Њ": "NJ", "Ћ": "C",
+    "Џ": "DZ", "Ј": "J",
+}
+_CYRILLIC_KEYS = sorted(_CYRILLIC_ROMAN, key=len, reverse=True)
+
+def romanize(name):
+    """Best-effort Latin rendering of a non-Latin name, for MATCHING only.
+
+    Applied ONLY as a fallback inside normalize() when the Latin pipeline yields
+    nothing — see the note there. Scripts without a deterministic romanization
+    (Arabic, which omits short vowels; CJK) are deliberately NOT guessed at: a
+    wrong transliteration would be a false CLEAR, which is worse than the
+    honest MANUAL REVIEW those names already receive."""
+    s = unicodedata.normalize("NFC", str(name or "")).upper()
+    out = []
+    for ch in s:
+        out.append(_CYRILLIC_ROMAN[ch] if ch in _CYRILLIC_ROMAN else ch)
+    return "".join(out)
+
+def _normalize_latin(name):
+    """The original Latin-only pipeline, unchanged."""
     name = name.upper()
     name = unicodedata.normalize("NFD", name)
     name = "".join(c for c in name if unicodedata.category(c) != "Mn")
     name = re.sub(r"[^A-Z0-9 ]", " ", name)
     name = re.sub(r"\s+", " ", name).strip()
     return name
+
+def normalize(name):
+    """Matching key for a name.
+
+    A designation published only in Cyrillic used to normalize to "" — indexed
+    under an empty key, so it could never match any customer, while still being
+    counted in the "screened against N list names" attestation (see
+    count_unmatchable_entries). Romanizing rescues those designations.
+
+    SAFETY PROPERTY, and the reason this is a safe place to do it: romanization
+    runs ONLY when the Latin pipeline returns "". Every name that already had a
+    non-empty key keeps exactly the key it had, byte for byte. So no existing
+    match, score, delta fingerprint or dedup key can move — the only reachable
+    change is that entries which previously matched NOTHING can now match. That
+    makes this additive-recall by construction, not a threshold change.
+
+    Names in scripts with no deterministic romanization still return "" and keep
+    their MANUAL REVIEW routing (_unscreenable tests the ORIGINAL string, so a
+    romanized name is still surfaced for a human as well as screened)."""
+    if not name: return ""
+    latin = _normalize_latin(name)
+    if latin:
+        return latin
+    return _normalize_latin(romanize(name))
 
 def _pct(score) -> str:
     # Floor, never round: a 99.6 similarity must read "99%", not "100%" — only a
