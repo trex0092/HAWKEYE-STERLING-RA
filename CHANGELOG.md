@@ -10,6 +10,53 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The daily brief's 24h window silently skipped 8.37h of alerts in a month of clean runs (2026-07-30)
+
+The Daily Compliance Brief reported on a fixed `now − 24h` window. That assumes
+consecutive briefs are exactly 24h apart. They are not — GitHub delays cron by
+hours and the delay varies run to run, so the interval between briefs drifts
+either side of 24h.
+
+Measured over the **last 30 briefs — every one a successful run, none missed**:
+
+```
+gaps between consecutive briefs   29
+gaps longer than 24h              14   (max 25.93h)
+alert activity in no brief at all  8.37h
+```
+
+Every hour by which two briefs were more than 24h apart was a window whose
+alerts appeared in **no brief**, while the next brief still printed
+`✅ ALL CLEAR — no new monitoring alerts in the last 24h`. Counted as covered,
+actually uncovered, silent — the fourth instance of that pattern in this
+codebase. A single missed run would have added a full day on top of the 8.37h.
+
+The window is now **anchored to the previous brief's own creation time**, so
+coverage is contiguous by construction: jitter and missed runs are absorbed by
+the next brief instead of falling through it, and an alert on the boundary is
+reported twice rather than not at all. The header states the real span
+("last 26h (since the previous brief)") rather than a nominal 24h.
+
+Two ways the anchor can be unavailable, both of which now **say so** instead of
+presenting an assumed window as a measured one:
+
+- **No previous brief found** — the genuine first run, or missing history. The
+  brief notes that coverage before the window is unconfirmed.
+- **Previous brief older than the 168h ceiling** — the brief leads with a
+  `⚠ COVERAGE GAP` naming the uncovered span and directing the reader to Asana.
+
+Pinned by 14 new checks, including the measured 30-run schedule replayed
+end-to-end asserting no instant falls outside every window — plus a companion
+check that the same schedule genuinely defeats a fixed 24h cutoff, so the test
+corpus cannot quietly stop exercising the defect. Both directions
+negative-controlled: reverting the anchoring fails 7 checks, suppressing the
+coverage-gap notice fails its own.
+
+`weekly-summary.mjs` was checked for the same defect and does **not** have it:
+its window is calendar-day granular and its cron cannot slip past midnight, so
+jitter is harmless, and a missed week shows as a visible date jump between two
+cards rather than a hidden sub-day hole between consecutive dates.
+
 ### Cross-engine parity is now swept over 206 pairs, not spot-checked over 15 (2026-07-30)
 
 The parity test checked **15 curated pairs** and counted a MANUAL REVIEW

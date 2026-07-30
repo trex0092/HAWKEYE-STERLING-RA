@@ -57,7 +57,7 @@ export const EXEMPT = {
   'compliance-calendar.yml': 'dated reminder feed from data/compliance-calendar.json; occurrences are title-deduped, due-dated Asana tasks filed inside a ≥14-day lead window with a 7-day grace tail — a missed weekly run delays a reminder inside its window and the overdue task surfaces in Asana; no ingestion duty',
   'container-scan.yml': 'security scan of the published image (post-publication CVE watch); red badge is the alarm',
   'control-retry.yml': 'self-healing dispatcher over the daily controls above; the controls themselves are what this alarm monitors, and a dead dispatcher just means a missing control stays missing — which this alarm then catches',
-  'daily-brief.yml': 'reporting digest; absence is recipient-noticed, no ingestion duty',
+  'daily-brief.yml': 'reporting digest; absence is recipient-noticed, no ingestion duty — and the next brief anchors its window to the previous brief, so a missed or delayed run is absorbed into the following brief rather than leaving alerts in no brief at all',
   'eocn-reconcile.yml': 'prepares the weekly EOCN review branch + files the sign-off task; the review duty itself is enforced by the daily screening review-age gate (exit 3 past 7 days), which is what this alarm monitors',
   'dast-zap.yml': 'security scan of the deployed site',
   'freshness-check.yml': 'this alarm itself',
