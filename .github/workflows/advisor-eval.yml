@@ -16,6 +16,18 @@ on:
   schedule:
     - cron: '9 8 * * 1'   # 08:09 UTC every Monday, after the daily watchers (odd minute)
   workflow_dispatch:
+  # A model change must not wait up to a week for its live confirmation. The
+  # 2026-07-29 Claude 5 swap merged on a Wednesday, which left the guardrails
+  # unverified against the new models until the following Monday — recorded as a
+  # residual limitation in model-validation-2026.md §5 at the time. Now the eval
+  # fires on any push to main that touches the files that define which model
+  # runs, so the confirmation window is minutes, not days.
+  push:
+    branches: [main]
+    paths:
+      - 'netlify/functions/brain-soul.js'
+      - 'data/ai-assets.json'
+      - 'scripts/advisor-eval.mjs'
 
 # Least privilege at the top level; the job declares its own write scope.
 permissions:

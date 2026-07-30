@@ -1,5 +1,9 @@
 # Data-Quality Plan (AIMS A.7)
 
+**Owner:** MLRO (accountable) · Compliance Engineering (operational)
+**Approver:** MLRO · Registered as POL-34 in the [policy register](../governance/policy-register.md)
+**Review cadence:** annually, and on any new data source.
+
 How the firm assures the quality of the data its AI system depends on — the reference lists it
 screens against and the customer data it screens. Quality is a control: a stale list or a
 malformed record is a screening failure. **Owner:** MLRO / Compliance Engineering.

@@ -57,6 +57,18 @@ export const RESULTS_FILE = 'sanctions-screen-results.json';
 export const CUSTOMER_PROJECT_GID =
   process.env.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121';
 
+/* "HR – Employees" project — the SECOND screening population (staff screening,
+   MLRO-directed 2026-07-29). Same pipeline, same matcher, same case lifecycle
+   as customers. Set ASANA_EMPLOYEE_PROJECT_GID to an empty string to disable
+   employee screening EXPLICITLY; while configured, an unreachable or empty
+   employee project bails the run unscreened — the same contract as the
+   customer database, because a population that silently drops out of
+   screening is a silent clear for everyone in it. */
+export const EMPLOYEE_PROJECT_GID =
+  process.env.ASANA_EMPLOYEE_PROJECT_GID !== undefined
+    ? process.env.ASANA_EMPLOYEE_PROJECT_GID
+    : '1216139945846994';
+
 /* Consolidated designation lists screened against (data/sanctions-sources.json).
    Override the file with SANCTIONS_SOURCES_FILE. */
 export const SANCTIONS_SOURCES_FILE = process.env.SANCTIONS_SOURCES_FILE || 'data/sanctions-sources.json';
@@ -104,7 +116,60 @@ export function resolveThreshold(raw) {
       + DEFAULT_THRESHOLD + ' so fuzzy matching is never silently disabled.');
     return DEFAULT_THRESHOLD;
   }
+  /* ONE-WAY rule (docs/governance/champion-challenger-thresholds.md): a value
+     ABOVE the champion default weakens screening, so it needs the explicit
+     override flag as a separate decision — mirrored in screen.py's
+     _resolve_match_threshold. Lowering (more sensitive) stays a plain config. */
+  if (n > DEFAULT_THRESHOLD && String(process.env.SCREEN_MATCH_THRESHOLD_ALLOW_RAISE || '') !== '1') {
+    console.error('sanctions-screen: SCREEN_MATCH_THRESHOLD=' + JSON.stringify(String(raw))
+      + ' would RAISE the cutoff above the champion default ' + DEFAULT_THRESHOLD
+      + ' (less sensitive screening). One-way rule: raises require'
+      + ' SCREEN_MATCH_THRESHOLD_ALLOW_RAISE=1 — using the default.');
+    return DEFAULT_THRESHOLD;
+  }
   return n;
+}
+
+/* Parse SCREEN_SHADOW_THRESHOLD — a log-only challenger band (fraction, must
+   sit BELOW the live threshold). A clear subject whose best score lands in
+   [shadow, threshold) is logged and written to the results file's shadow[]
+   array — never an alert, never a case, never in the delta state. Off unless
+   set; invalid values reject loudly to off (it never changes live matching). */
+export function resolveShadowThreshold(raw, threshold) {
+  if (raw == null || String(raw).trim() === '') return null;
+  const n = Number(raw);
+  const thr = typeof threshold === 'number' ? threshold : DEFAULT_THRESHOLD;
+  if (!Number.isFinite(n) || n <= 0 || n >= thr) {
+    console.error('sanctions-screen: SCREEN_SHADOW_THRESHOLD=' + JSON.stringify(String(raw))
+      + ' is not a fraction in (0, ' + thr + ') — shadow challenger disabled.');
+    return null;
+  }
+  return n;
+}
+
+/* The shadow-band row for one raw engine result, or null. Pure — unit-tested;
+   only CLEAR results are eligible (anything the engine flags is already an
+   alert and needs no shadow evidence). */
+export function shadowBandRow(raw, shadowThr, thr) {
+  if (shadowThr == null || !raw || raw.recommendation !== 'clear') return null;
+  const score = typeof raw.topScore === 'number' ? raw.topScore : 0;
+  if (score >= shadowThr * 100 && score < (thr == null ? DEFAULT_THRESHOLD : thr) * 100) {
+    return { name: raw.name, topScore: score };
+  }
+  return null;
+}
+
+/* Parse MATCH_PHONETIC — the phonetic-fold layer mode shared with screen.py:
+   '1' (live, default) | 'shadow' (log would-be hits, emit none) | '0' (off).
+   Unknown values are rejected LOUDLY and the default kept, so the layer is
+   never silently disabled by a config typo. */
+export function resolvePhoneticMode(raw) {
+  const v = String(raw == null ? '' : raw).trim().toLowerCase();
+  if (v === '') return '1';
+  if (v === '1' || v === 'shadow' || v === '0') return v;
+  console.error('sanctions-screen: MATCH_PHONETIC=' + JSON.stringify(String(raw))
+    + ' is not one of 1|shadow|0 — using the default 1 (phonetic layer live).');
+  return '1';
 }
 
 /* Recommendations / bands that mean "no action". Anything else the engine returns
@@ -136,8 +201,14 @@ export function parseSubject(task) {
   const notes = String((task && task.notes) || '');
   const jurisdiction = matchField(notes, /(?:Jurisdiction|Country of Incorporation|Country of Registration|Country)\s*[:\-]\s*([^\n]+)/i);
   const idNumber = matchField(notes, /(?:Trade Licence|Trade License|Licen[cs]e No\.?|Registration(?: No\.?| Number)?|Commercial Register(?:ation)?(?: No\.?)?)\s*[:\-]\s*([^\n]+)/i);
+  /* A name that folds to nothing (symbols-only / unscreenable record) must
+     still get a DISTINCT stable key: on the shared empty key '', the second
+     such customer was deduped away before screening and never even reached
+     MANUAL REVIEW. The raw-string fallback cannot collide with a normalized
+     key (normalizeName output never contains ':'). */
+  const key = normalizeName(name) || (name ? 'raw:' + name : '');
   return {
-    key: normalizeName(name),
+    key,
     name,
     entityType: 'organisation',
     jurisdiction: jurisdiction || undefined,
@@ -241,7 +312,17 @@ export function normalizeHit(h) {
   const list = h.list || h.listName || h.source || h.dataset || h.programme || h.program || h.regime || h.sanctionsList || h.name || '';
   const hitName = h.hitName || h.matchedName || h.caption || h.entity || (h.list ? h.name : '') || '';
   const score = num(h.matchScore != null ? h.matchScore : (h.score != null ? h.score : h.confidence));
-  return { list: String(list), hitName: String(hitName || ''), score };
+  const out = { list: String(list), hitName: String(hitName || ''), score };
+  /* A phonetic-only hit must stay visibly WEAK all the way to the case board —
+     the flag travels in the hitName suffix (state/alert/case builders all
+     render hitName) AND as a structured field. */
+  if (h.phonetic) {
+    out.phonetic = true;
+    if (out.hitName && !out.hitName.includes('[phonetic-only')) {
+      out.hitName += ' [phonetic-only — WEAK]';
+    }
+  }
+  return out;
 }
 
 /* Normalise one engine result row (keyed back to the subject it screened so
@@ -311,7 +392,7 @@ export function matchSignature(r) {
    matches to alert on, the cleared matches (informational), and the next state.
    Subjects that errored this run carry their prior state forward untouched —
    never wiped, never silently cleared. */
-export function diffState(prevState, results, today, threshold, screenedLists) {
+export function diffState(prevState, results, today, threshold, screenedLists, evaluatedSignals) {
   const prev = (prevState && prevState.subjects) || {};
   const nextSubjects = { ...prev };
   const alerts = [];
@@ -324,6 +405,12 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
   // Omitted on the external-engine path and in unit tests → guard inactive,
   // behaviour unchanged.
   const screened = screenedLists ? new Set(Array.from(screenedLists)) : null;
+  // Enrichment signals (PEP / adverse media / Interpol) whose module actually
+  // RAN this run — the enrichment counterpart of `screened`. A signal that was
+  // switched off produced no lookup and therefore no per-subject error flag, so
+  // without this set a disabled module is indistinguishable from a verified
+  // clear. Omitted → guard inactive, behaviour unchanged (tests, external path).
+  const evaluated = evaluatedSignals ? new Set(Array.from(evaluatedSignals)) : null;
 
   /* Carry a standing match forward as STILL ACTIVE (lastSeen = today). The case
      planner (screening-cases.mjs) treats a stale lastSeen as "no longer flagged"
@@ -391,10 +478,31 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
       // untouched (no alert, no clear); a later run that completes enrichment will
       // clear it legitimately. (A prior SANCTIONS hit is always re-checked locally,
       // so a genuine de-listing still clears.)
-      const priorEnrichmentOnly = Array.isArray(prior.lists) && prior.lists.length > 0
-        && prior.lists.every(l => ENRICHMENT_LISTS.has(l));
-      if (r.enrichmentIncomplete && priorEnrichmentOnly) {
+      // ANY enrichment evidence, not only an enrichment-ONLY prior. The guard
+      // used to require prior.lists.every(ENRICHMENT), so a MIXED prior
+      // (e.g. ['US OFAC — SDN list (CSV)', 'PEP (Wikidata)']) fell straight
+      // through it: on a run where OFAC genuinely de-listed the subject and the
+      // PEP lookup errored or was budget-skipped, the whole record — including
+      // the never-re-verified PEP evidence — was deleted and its MLRO case
+      // auto-completed with the false comment "not flagged by the … run".
+      // Clearing evidence we did not re-check is the same false-negative class
+      // as clearing against a list that failed to load.
+      const priorHasEnrichment = Array.isArray(prior.lists)
+        && prior.lists.some(l => ENRICHMENT_LISTS.has(l));
+      if (r.enrichmentIncomplete && priorHasEnrichment) {
         carryForward(r.key);   // keep the prior standing, marked still-active
+        continue;
+      }
+      // A prior enrichment signal whose MODULE DID NOT RUN this run is the same
+      // epistemic state as one that errored — we did not re-verify it — but it
+      // carries no per-subject flag, because no lookup happened at all. Without
+      // this, flipping SCREEN_PEP=0 (the documented knob, most likely to be
+      // reached for DURING a Wikidata outage, exactly when standing matches most
+      // need preserving) silently cleared every PEP-derived match in the book in
+      // one run and auto-completed their cases.
+      if (evaluated && Array.isArray(prior.lists)
+          && prior.lists.some(l => ENRICHMENT_LISTS.has(l) && !evaluated.has(l))) {
+        carryForward(r.key);
         continue;
       }
       // Degrade-loudly: if a SANCTIONS list that produced this prior match failed
@@ -417,7 +525,29 @@ export function diffState(prevState, results, today, threshold, screenedLists) {
     }
   }
 
-  return { alerts, cleared, matchCount, nextState: { updated: today, subjects: nextSubjects } };
+  /* A standing match whose SUBJECT never appeared in this run's results was not
+     screened at all — the task was completed/off-boarded, renamed (which changes
+     its key), deleted, or an ASANA_*_PROJECT_GID was narrowed. The loop above
+     only ever iterates `results`, so such a subject kept its previous `lastSeen`
+     untouched; the case planner reads that stale date as "no longer flagged" and
+     auto-completes the open MLRO case with the comment "not flagged by the …
+     screening run" — a statement that is false, in a record kept for ten years,
+     and a completed case never re-opens.
+     These are held, not cleared and not silently frozen: `lastSeen` is bumped so
+     the case stays open, `notScreenedOn` records WHY it is being held, and they
+     are returned so the caller can surface the population change. A subject that
+     genuinely left the book still needs a human to dispose of its open case. */
+  const seenKeys = new Set(results.map(r => r && r.key));
+  const notScreened = [];
+  for (const key of Object.keys(prev)) {
+    if (seenKeys.has(key)) continue;
+    const prior = prev[key];
+    notScreened.push({ key, name: prior.name, prior, lastScreened: prior.lastSeen });
+    nextSubjects[key] = { ...prior, lastSeen: today, notScreenedOn: today };
+  }
+
+  return { alerts, cleared, notScreened, matchCount,
+           nextState: { updated: today, subjects: nextSubjects } };
 }
 
 /* The governance footer every screening output carries — detection is automatic,
@@ -723,6 +853,32 @@ async function fetchTaskNames(projectGid, token) {
   return names;
 }
 
+/* Same-day dedup for the Adverse Media / PEP card — DIRECTION-AWARE.
+
+   Both card names carry the words "Adverse Media", so the old flat
+   date + keyword match treated a CLEAR card and a HIT card as interchangeable:
+   whichever landed first suppressed the other. A run earlier in the day that
+   found nothing (or found nothing because its feed was degraded) therefore
+   SUPPRESSED a later run's HIT card, and Ongoing Monitoring was left showing
+   CLEAR for a day on which hits were found. The realistic path is exactly the
+   one that matters — a manual dispatch or a re-run after noticing the scheduled
+   run was degraded, which is precisely when the HIT card has to post.
+
+   A HIT card supersedes today's CLEAR card. Nothing supersedes a HIT.
+   Returns the name of the card that makes this post redundant, or null to post. */
+export function omCardToSkip(names, dateStr, hasHits) {
+  /* Boundary-guarded date match: "9 Jul 2026" is a substring of "19 Jul 2026",
+     so a bare includes() could dedupe against a different day's card. */
+  const dateRe = new RegExp('(^|[^0-9])' + String(dateStr).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^0-9])');
+  const sameDay = (names || []).filter(
+    (n) => dateRe.test(n) && (n.includes('Adverse Media') || n.includes('PEP')));
+  if (!sameDay.length) return null;
+  const existingHit = sameDay.find((n) => n.includes('HIT'));
+  if (existingHit) return existingHit;   // already reported at the higher severity
+  if (!hasHits) return sameDay[0];       // CLEAR over CLEAR — nothing new to say
+  return null;                           // HIT supersedes today's CLEAR — POST it
+}
+
 /* Create a task in the Ongoing Monitoring project and file it under its section.
    Returns the task permalink (or null). Filing under the section is non-fatal. */
 async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
@@ -758,11 +914,11 @@ async function postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, t
       : 'Adverse Media & PEP — CLEAR — ' + dateStr;
 
     const names = await fetchTaskNames(projectGid, token);
-    /* Boundary-guarded date match: "9 Jul 2026" is a substring of "19 Jul 2026",
-       so a bare includes() could dedupe against a different day's card. */
-    const dateRe = new RegExp('(^|[^0-9])' + dateStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^0-9])');
-    const already = names.find(n => dateRe.test(n) && (n.includes('Adverse Media') || n.includes('PEP')));
+    const already = omCardToSkip(names, dateStr, hasHits);
     if (already) { console.log('sanctions-screen: already posted: ' + already); return { posted: false, skipped: true, name: already }; }
+    if (hasHits && names.some(n => n.includes(dateStr) && n.includes('CLEAR'))) {
+      console.log('sanctions-screen: superseding today\'s CLEAR card — this run found hits');
+    }
 
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const notes = buildAmPepNotes({ today, tomorrow, run: runUrl(), subjects: subjects.length, amHits, pepHits,
@@ -823,6 +979,17 @@ export function foldAliasSources(lists, sources) {
     if (alias && target) {
       const before = target.names.length;
       target.names = [...new Set([...target.names, ...alias.names])];
+      /* Reduced ALIAS coverage must survive the fold. The alias row is spliced
+         out here, so a `partial` flag on it would simply vanish — and because
+         alias hits are recorded under the PRIMARY list's name, an
+         alias-derived standing match is indistinguishable from a primary one
+         and would clear as if it had been re-verified. Propagate it: the
+         primary screened, but NOT with its full designation set. */
+      if (alias.partial) {
+        target.partial = true;
+        notes.push(target.name + ' screened with INCOMPLETE a.k.a. coverage (' + s.name
+          + ' loaded below its floor) — standing matches on this list are carried forward, not cleared');
+      }
       lists.splice(lists.indexOf(alias), 1);
       byId.delete(s.id);
       folded.push('folded ' + (target.names.length - before) + ' a.k.a. name(s) from ' + s.name + ' into ' + target.name);
@@ -836,6 +1003,15 @@ export function foldAliasSources(lists, sources) {
     }
   }
   return { folded, notes };
+}
+
+/* Per-source coverage floor (source.minNames): a list that parses far below its
+   known size is the same false-negative class as 0 names — a truncated download
+   or parser drift, not a mass de-listing. Mirrors screen.py's CORE_LIST_FLOORS
+   (~50% of verified baselines; provisional where no baseline is logged yet).
+   Pure so the test suite pins it offline. */
+export function belowFloor(source, names) {
+  return (names ? names.length : 0) < (Number(source && source.minNames) || 0);
 }
 
 /* Fetch + parse every enabled source into [{ id, name, names[] }]. A source that
@@ -864,7 +1040,26 @@ async function loadSanctionsLists(cfg) {
          full-list XML on request and blows the flat 60s budget). */
       const body = await fetchListBody(s, Number(s.timeoutMs) || cfg.listTimeoutMs);
       const names = parseList(s, body);
-      if (!names.length) { notes.push(s.name + ' parsed 0 names — coverage degraded'); console.error('sanctions-screen: ' + s.id + ' parsed 0 names'); return; }
+      if (!names.length) {
+        /* An OPTIONAL source (source.optional — the firm-internal watchlist)
+           may legitimately be empty: "no internal designations" is a valid
+           state, reported informationally and counted as fetched so it never
+           degrades coverage. Official lists keep the fail-safe: empty means
+           DEGRADED, never a silent all-clear. */
+        if (s.optional) { fetched++; notes.push(s.name + ' has no entries — optional internal list, coverage unaffected'); console.log('sanctions-screen: ' + s.id + ' empty (optional) — screened set unchanged'); return; }
+        notes.push(s.name + ' parsed 0 names — coverage degraded'); console.error('sanctions-screen: ' + s.id + ' parsed 0 names'); return;
+      }
+      if (belowFloor(s, names)) {
+        /* The names that DID parse still screen — a hit on a truncated list is
+           a real hit — but the list is marked partial so standing matches are
+           carried forward instead of cleared (the same contract as a failed
+           alias file), and the run reports DEGRADED: a "no match" against a
+           truncated list is provisional, never an all-clear. */
+        lists.push({ id: s.id, name: s.name, names, partial: true });
+        notes.push(s.name + ' parsed ' + names.length + ' name(s), below its ' + s.minNames + ' coverage floor — truncated source; coverage degraded');
+        console.error('sanctions-screen: ' + s.id + ' below coverage floor (' + names.length + ' < ' + s.minNames + ')');
+        return;
+      }
       lists.push({ id: s.id, name: s.name, names });
       fetched++;
       console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');
@@ -908,7 +1103,11 @@ async function screenLocally(subjects, cfg) {
 
   const index = buildIndex(loaded.lists);
   const thr = cfg.threshold * 100;
-  console.log('sanctions-screen: indexed ' + index.size + ' designated names from ' + loaded.lists.length + ' list(s); matching ' + subjects.length + ' subjects (threshold ' + thr + ')');
+  const phonMode = resolvePhoneticMode(process.env.MATCH_PHONETIC);
+  const shadowThr = resolveShadowThreshold(process.env.SCREEN_SHADOW_THRESHOLD, cfg.threshold);
+  const shadow = [];
+  console.log('sanctions-screen: indexed ' + index.size + ' designated names from ' + loaded.lists.length + ' list(s); matching ' + subjects.length + ' subjects (threshold ' + thr + ', phonetic ' + phonMode
+    + (shadowThr != null ? ', shadow ' + shadowThr * 100 : '') + ')');
 
   /* `degraded` reflects SANCTIONS coverage only (a list failed to load / parsed
      0 names). Adverse-media and PEP are best-effort enrichment signals — when
@@ -941,7 +1140,19 @@ async function screenLocally(subjects, cfg) {
     }
   };
   const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
-    const raw = screenName(s.name, index, thr);   // { name, topScore, band, recommendation, hitCount, lists[] }
+    const raw = screenName(s.name, index, thr, phonMode);   // { name, topScore, band, recommendation, hitCount, lists[] }
+    const sbRow = shadowBandRow(raw, shadowThr, cfg.threshold);
+    if (sbRow) {
+      shadow.push(sbRow);
+      console.log('sanctions-screen: SHADOW-CHALLENGER "' + sbRow.name + '" best score '
+        + sbRow.topScore + ' in [' + shadowThr * 100 + ', ' + thr + ') — log-only, no alert');
+    }
+    if (raw.phoneticShadow && raw.phoneticShadow.length) {
+      for (const ps of raw.phoneticShadow) {
+        console.log('sanctions-screen: PHONETIC-SHADOW "' + s.name + '" ~ "' + ps.hitName
+          + '" [' + ps.list + '] ' + ps.shape + ' key match, score ' + ps.score + ' — no hit emitted');
+      }
+    }
     const lists = [...raw.lists];
     let band = raw.lists.length ? raw.band : '';
     let topScore = raw.lists.length ? raw.topScore : 0;
@@ -956,7 +1167,7 @@ async function screenLocally(subjects, cfg) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (am.errored) { amErrors++; enrichmentIncomplete = true; }
       else if (am.hit) {
-        lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : ''), score: am.score });
+        lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : '') + (am.tier === 'weak' ? ' [weak-tier — generic terms only, corroboration needed]' : ''), score: am.score });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
     }
@@ -1002,7 +1213,7 @@ async function screenLocally(subjects, cfg) {
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -1075,6 +1286,15 @@ async function main() {
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
 
+  if (EMPLOYEE_PROJECT_GID) {
+    let employees;
+    try { employees = await fetchAsanaSubjects(EMPLOYEE_PROJECT_GID, asanaToken); }
+    catch (e) { return bailUnscreened('could not read the HR – Employees project (' + (e && e.message || e) + ') — employee screening is configured, so the run must not proceed without it', today); }
+    if (!employees.length) return bailUnscreened('the HR – Employees project returned 0 subjects while employee screening is configured — set ASANA_EMPLOYEE_PROJECT_GID empty to disable it explicitly', today);
+    console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
+    subjects = subjects.concat(employees);
+  }
+
   const individuals = subjects.filter(s => s.entityType === 'individual').length;
   const entities = subjects.length - individuals;
   console.log('sanctions-screen: screening ' + subjects.length + ' subjects (' + entities + ' entities + ' + individuals + ' principals/UBOs) from the FULL Customer Database against the free consolidated lists'
@@ -1089,7 +1309,22 @@ async function main() {
      matches forward instead of clearing them off reduced coverage. */
   const screenedLists = ((screen.coverage && screen.coverage.lists) || [])
     .filter(L => !L.partial).map(L => L.name).filter(Boolean);
-  const { alerts, cleared, matchCount, nextState } = diffState(prevState, screen.results, today, cfg.threshold, screenedLists);
+  /* Enrichment signals whose module actually RAN this run — the enrichment
+     counterpart of screenedLists. A module switched off performs no lookup and
+     so sets no per-subject error flag; without this, disabling one would make
+     every standing match it produced indistinguishable from a verified clear. */
+  const evaluatedSignals = [
+    cfg.adverseMedia ? 'Adverse media (Google News)' : null,
+    cfg.pep ? 'PEP (Wikidata)' : null,
+    cfg.interpol ? 'Interpol Red Notice' : null,
+  ].filter(Boolean);
+  const { alerts, cleared, notScreened, matchCount, nextState } =
+    diffState(prevState, screen.results, today, cfg.threshold, screenedLists, evaluatedSignals);
+  if (notScreened && notScreened.length) {
+    console.log(`sanctions-screen: ${notScreened.length} standing match(es) left the screened population — `
+      + 'cases HELD for manual disposition, not auto-cleared: '
+      + notScreened.map(n => n.name || n.key).join(', '));
+  }
   const meta = { screened: subjects.length, entities, individuals, degraded: screen.degraded, errored: screen.errored };
   const report = buildScreenReport(alerts, cleared, today, meta);
   const changes = buildChangesArtifact(alerts, today);
@@ -1106,6 +1341,9 @@ async function main() {
     lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({ name: L.name, count: (L.names || []).length })),
     failures: screen.notes || [],
     enrichment: { amErrors: screen.amErrors || 0, pepErrors: screen.pepErrors || 0, skipped: screen.enrichSkipped || 0 },
+    /* Log-only challenger evidence (SCREEN_SHADOW_THRESHOLD) — kept OUT of
+       alerts/matchCount/state; feeds the champion-challenger decision log. */
+    shadow: screen.shadow || [],
     alerts: alerts.map(a => ({
       key: a.key, name: a.name, jurisdiction: a.jurisdiction || '', band: a.band,
       topScore: a.topScore, recommendation: a.recommendation,

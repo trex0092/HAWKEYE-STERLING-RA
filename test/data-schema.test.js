@@ -105,5 +105,40 @@ try {
   }
 } catch (e) { check('eocn-local-terrorist-list.json schema (' + e.message + ')', false); }
 
+// ── data/internal-watchlist.json (optional firm-internal list, checklist A4) ──
+// Screened by BOTH engines in addition to the official lists. Optional by
+// design: empty entries is a valid state and must never degrade coverage —
+// which only holds if the sanctions-extra source entry keeps `optional: true`.
+// These checks pin the file shape AND that wiring.
+try {
+  const iw = read('internal-watchlist.json');
+  check('internal watchlist: lastReviewed is a YYYY-MM-DD date', isDate(iw.lastReviewed));
+  check('internal watchlist: populated flag is a boolean', typeof iw.populated === 'boolean');
+  check('internal watchlist: entries is an array', Array.isArray(iw.entries));
+  check('internal watchlist: count matches the number of entries (' + iw.count + ' vs ' + (iw.entries || []).length + ')',
+    iw.count === (iw.entries || []).length);
+  check('internal watchlist: populated flag agrees with entries', iw.populated === ((iw.entries || []).length > 0));
+  let iwOk = true;
+  for (const e of iw.entries || []) {
+    if (typeof e === 'string') { if (!e.trim()) iwOk = false; }
+    else if (e && typeof e === 'object') { if (!isStr(e.name)) iwOk = false; }
+    else iwOk = false;
+  }
+  check('internal watchlist: every entry is a name string or {name, aliases}', iwOk);
+
+  const extra = read('sanctions-extra.json');
+  const src = ((extra || {}).sources || []).find(s => s && s.id === 'internal-watchlist');
+  check('internal watchlist: wired as a sanctions-extra source', !!src);
+  if (src) {
+    check('internal watchlist source: enabled and points at the file',
+      src.enabled === true && src.file === 'data/internal-watchlist.json' && src.parser === 'curated');
+    check('internal watchlist source: optional flag set (empty must never degrade coverage)',
+      src.optional === true);
+  }
+
+  const sop2 = fs.readFileSync(path.join(__dirname, '..', 'docs', 'aims', 'eocn-list-update-sop.md'), 'utf8');
+  check('internal watchlist: covered by the update SOP', sop2.includes('internal-watchlist.json'));
+} catch (e) { check('internal-watchlist.json schema (' + e.message + ')', false); }
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;

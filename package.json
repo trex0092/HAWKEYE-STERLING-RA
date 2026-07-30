@@ -15,7 +15,7 @@
   },
   "packageManager": "npm@10.9.7",
   "scripts": {
-    "lint": "eslint app.js console.js advisor.js scripts test netlify",
+    "lint": "eslint app.js console.js advisor.js i18n.js sw.js sw-register.js scripts test netlify",
     "lint:html": "htmlhint index.html console.html advisor.html",
     "test": "node scripts/run-tests.mjs",
     "test:visual": "playwright test --config=playwright.config.mjs",
@@ -26,7 +26,7 @@
     "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.61.1",
     "axe-core": "4.12.1",
-    "eslint": "10.7.0",
+    "eslint": "10.8.0",
     "fast-check": "4.9.0",
     "htmlhint": "1.9.2"
   }

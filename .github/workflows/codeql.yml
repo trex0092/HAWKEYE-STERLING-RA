@@ -55,7 +55,7 @@ jobs:
         with:
           node-version: 22
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           languages: javascript-typescript,actions,python
           queries: security-and-quality
@@ -70,7 +70,7 @@ jobs:
               - design
               - test
       - name: Run CodeQL analysis
-        uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
       - name: Alert in Asana
         if: failure() && github.event_name == 'schedule'
         env:

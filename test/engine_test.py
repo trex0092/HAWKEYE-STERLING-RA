@@ -180,6 +180,19 @@ check("aliases still fold into a loaded primary",
 _pep_nl = screen.check_pep("محمد عبدالله")
 check("non-Latin PEP name is surfaced for manual review (not silently cleared)",
       _pep_nl.get("hit") is True and _pep_nl.get("review") is True and "MANUAL REVIEW" in _pep_nl.get("category", ""))
+# A name whose EVERY token is under 3 characters has no token the matcher will
+# compare, so the label test short-circuited and the function returned — and
+# CACHED — a confident {"hit": False}. That silently cleared real people: "Wu Yi"
+# is a former Vice-Premier of China, and the whole shape of East Asian names
+# romanized as two short syllables screened clean.
+for _short in ("Wu Yi", "Li Na", "Xi Bo"):
+    screen._PEP_CACHE.pop(screen._norm_lower(_short), None)
+    _r = screen.check_pep(_short)
+    check(f"'{_short}' routes to manual PEP review, never a confident 'no PEP'",
+          _r.get("review") is True and "MANUAL REVIEW" in _r.get("category", ""))
+    check(f"'{_short}' is not cached as a clean no-hit",
+          not (screen._PEP_CACHE.get(screen._norm_lower(_short)) or {}).get("hit") is False
+          or screen._norm_lower(_short) not in screen._PEP_CACHE)
 
 # A non-Latin-script name normalises to empty and so cannot be auto-matched — it
 # must NOT be filed "clear"; it is surfaced for manual screening instead.
@@ -199,6 +212,231 @@ print("ai.py — transliteration")
 v = ai.name_variants("Mohammed Al Hussein")
 check("transliteration yields variants", any("muhammad" in x for x in v) and any("mohamed" in x for x in v))
 check("name_variants always includes the base", any("mohammed al hussein" == x for x in v))
+# Shared-data groups (data/translit-groups.json): spellings the old in-code
+# table lacked must now swap — each was a silent-clear class before the file.
+check("name_variants swaps khaled/khalid (new shared-data group)",
+      "khalid mansour" in ai.name_variants("Khaled Mansour"))
+check("name_variants swaps sergei/sergey (Cyrillic romanization group)",
+      "sergey ivanov" in ai.name_variants("Sergei Ivanov"))
+check("name_variants swaps volodymyr/vladimir (cross-language forms)",
+      "vladimir melnyk" in ai.name_variants("Volodymyr Melnyk"))
+check("salah is NOT a saleh variant — different underlying names",
+      not any("saleh" in x for x in ai.name_variants("Salah Mansour")))
+check("translit groups load from the shared data file and stay disjoint",
+      len(ai._TRANSLIT_GROUPS) >= 80 and
+      len({m for g in ai._TRANSLIT_GROUPS for m in g}) == sum(len(g) for g in ai._TRANSLIT_GROUPS))
+check("translit_canon_token folds group members to one representative",
+      ai.translit_canon_token("khalid") == ai.translit_canon_token("khaled") and
+      ai.translit_canon_token("umar") == ai.translit_canon_token("omar") and
+      ai.translit_canon_token("zzz-ungrouped") == "zzz-ungrouped")
+
+# ── phonetic fold layer ──────────────────────────────────────────────────────
+print("screen.py — phonetic fold layer")
+check("phonetic_key folds romanization drift to one key",
+      screen.phonetic_key("muhamet") == screen.phonetic_key("muhammad") and
+      screen.phonetic_key("huseinn") == screen.phonetic_key("hussein") and
+      screen.phonetic_key("putyn") == screen.phonetic_key("putin") and
+      screen.phonetic_key("gadafi") == screen.phonetic_key("qadhafi") and
+      screen.phonetic_key("kayoom") == screen.phonetic_key("qayyum"))
+check("phonetic_key keeps the Arabic-real vowel distinctions (hassan≠hussein)",
+      screen.phonetic_key("hassan") != screen.phonetic_key("hussein") and
+      screen.phonetic_key("salim") != screen.phonetic_key("selim"))
+check("phonetic_key preserves a trailing vowel (gender/nisba suffixes distinct)",
+      screen.phonetic_key("hana") != screen.phonetic_key("hani") and
+      screen.phonetic_key("qassem") != screen.phonetic_key("qasemi"))
+check("phonetic_tokens merges abu/abd particles and folds to canonical spellings",
+      screen.phonetic_tokens(screen.normalize("Abou Bakr Trading LLC")) == ["aboubakr"] and
+      screen.phonetic_tokens(screen.normalize("Khaled Mansour")) ==
+      screen.phonetic_tokens(screen.normalize("Khalid Mansour")))
+check("single-token names never build a phonetic profile",
+      screen._phonetic_profile(screen.normalize("HAMAS")) is None)
+
+_PH_LIST = {"L": [(screen.normalize(x), x) for x in [
+    "MUHAMMAD HUSSEIN", "KHALIFA MUHAMMAD TURKI AL-SUBAIY", "ALI HUSSEIN"]]}
+_ph_hits = screen.screen_name("Muhamet Huseinn", _PH_LIST)
+check("the pinned multi-edit residual now flags as a phonetic-only WEAK hit",
+      len(_ph_hits) == 1 and _ph_hits[0].get("phonetic") is True and
+      _ph_hits[0]["confidence"] == "WEAK (phonetic-only)" and _ph_hits[0]["score"] < 85)
+check("phonetic subset shape catches the drifted patronymic chain",
+      any(h.get("phonetic") and h.get("phonetic_shape") == "subset"
+          for h in screen.screen_name("Khalifa Al Subaey", _PH_LIST)))
+check("phonetic-adjacent distinct names stay clear (ali hassan ≠ ali hussein)",
+      screen.screen_name("Ali Hassan", _PH_LIST) == [])
+_ph_env = os.environ.get("MATCH_PHONETIC")
+try:
+    os.environ["MATCH_PHONETIC"] = "0"
+    check("MATCH_PHONETIC=0 restores the historical clear (fuzzy gates untouched)",
+          screen.screen_name("Muhamet Huseinn", _PH_LIST) == [])
+    os.environ["MATCH_PHONETIC"] = "shadow"
+    _shadow_before = screen._PHONETIC_SHADOW["count"]
+    check("shadow mode emits no hit but counts the would-be phonetic match",
+          screen.screen_name("Muhamet Huseinn", _PH_LIST) == [] and
+          screen._PHONETIC_SHADOW["count"] == _shadow_before + 1)
+    os.environ["MATCH_PHONETIC"] = "banana"
+    check("an unknown MATCH_PHONETIC value is rejected loudly and defaults to live",
+          len(screen.screen_name("Muhamet Huseinn", _PH_LIST)) == 1)
+finally:
+    if _ph_env is None:
+        os.environ.pop("MATCH_PHONETIC", None)
+    else:
+        os.environ["MATCH_PHONETIC"] = _ph_env
+# Additivity: every layer-off hit survives the layer turning on, same score.
+_ADD_SUBJECTS = ["Muhamad Hussein Trading LLC", "Ali Hussein", "Sberbank",
+                 "Muhamet Huseinn", "Completely Unrelated Name"]
+try:
+    os.environ["MATCH_PHONETIC"] = "0"
+    _add_off = [screen.screen_name(s, _PH_LIST) for s in _ADD_SUBJECTS]
+    os.environ["MATCH_PHONETIC"] = "1"
+    _add_on = [screen.screen_name(s, _PH_LIST) for s in _ADD_SUBJECTS]
+finally:
+    if _ph_env is None:
+        os.environ.pop("MATCH_PHONETIC", None)
+    else:
+        os.environ["MATCH_PHONETIC"] = _ph_env
+_additive = True
+for _off_hits, _on_hits in zip(_add_off, _add_on):
+    _on_scores = {(h["list"], h["matched_entry"]): h["score"] for h in _on_hits}
+    for h in _off_hits:
+        if _on_scores.get((h["list"], h["matched_entry"])) != h["score"]:
+            _additive = False
+check("phonetic layer is strictly additive (no fuzzy hit removed or re-scored)", _additive)
+
+# ── adverse media: tiers, description scanning, counter eligibility ──────────
+print("screen.py — adverse media hardening")
+check("adverse_keywords_for finds risk terms the headline hides in the description",
+      screen.match_adverse_keywords("Trader steps back from board duties") == [] and
+      "arrest" in screen.adverse_keywords_for(
+          "Trader steps back from board duties",
+          "The move follows his arrest last week in the money laundering case."))
+check("keyword_tier: generics are weak, real crime terms are strong",
+      screen.keyword_tier(["politic", "lawsuit"]) == "weak" and
+      screen.keyword_tier(["lawsuit", "money laundering"]) == "strong" and
+      screen.keyword_tier([]) is None)
+_aa = screen.adverse_actionable
+check("actionable: strong keyword + name in headline",
+      _aa("Khalid Otaibi", {"flagged": True, "title": "Khalid Otaibi arrested in fraud case",
+                            "keywords": ["arrest", "fraud"], "source": "reuters.com"}))
+check("not actionable: weak-only tier without a second outlet",
+      not _aa("Atlas Group", {"flagged": True, "title": "Atlas Group faces lawsuit",
+                              "keywords": ["lawsuit"], "source": "a.example.com"}))
+check("actionable: weak tier corroborated by a second independent outlet",
+      _aa("Atlas Group", {"flagged": True, "title": "Atlas Group faces lawsuit",
+                          "keywords": ["lawsuit"], "source": "a.example.com",
+                          "also_reported_by": ["b.example.com"]}))
+check("not actionable: wrong-subject story (low name relevance)",
+      not _aa("Khalid Nasser Al Qasimi", {"flagged": True, "title": "Nasser detained in Cairo fraud probe",
+                                          "keywords": ["fraud"], "source": "x.example.com"}))
+check("actionable: cross-script (Arabic) headline is UNSCORABLE, never excluded",
+      _aa("Khalid Otaibi", {"flagged": True, "title": "توقيف تاجر في قضية غسل الأموال",
+                            "keywords": ["money laundering"], "source": "aljazeera.net"}))
+check("canonical fingerprint strips tracking params and falls back on aggregators",
+      screen._canonical_fingerprint("https://www.apnews.com/article/x?utm_source=rss", "T") ==
+      screen._canonical_fingerprint("https://apnews.com/article/x?ncid=tw", "T") and
+      screen._canonical_fingerprint("https://news.google.com/rss/articles/abc", "Same Story")
+      .startswith("t:"))
+# Counter: the same article re-served across days under rotating params counts
+# ONCE (no manufactured escalation); three distinct strong stories still fire.
+import tempfile as _tf
+with _tf.TemporaryDirectory() as _td:
+    _ev = os.path.join(_td, "ev.json")
+    for day, params in (("2026-06-20", "?utm_source=rss"), ("2026-06-25", "?ncid=tw"),
+                        ("2026-06-30", "?ref=daily")):
+        screen.update_adverse_evidence([{
+            "subject_name": "Resurfaced Story LLC", "subject_type": "COMPANY", "parent": "",
+            "articles": [{"title": f"Fraud probe report {params}", "source": "apnews.com",
+                          "url": "https://apnews.com/article/fraud-probe" + params,
+                          "keywords": ["fraud"], "categories": [], "flagged": True}],
+        }], day, path=_ev)
+    _rep = screen.update_adverse_evidence([], "2026-07-01", path=_ev)
+    check("repeat counter: one article under rotating params never fires the pattern",
+          "Resurfaced Story LLC" not in _rep)
+with _tf.TemporaryDirectory() as _td:
+    _ev = os.path.join(_td, "ev.json")
+    for day, t in (("2026-06-20", "Acme Corp arrested in fraud case"),
+                   ("2026-06-25", "Acme Corp faces money laundering charges"),
+                   ("2026-06-30", "Acme Corp assets frozen in bribery inquiry")):
+        screen.update_adverse_evidence([{
+            "subject_name": "Acme Corp", "subject_type": "COMPANY", "parent": "",
+            "articles": [{"title": t, "source": "reuters.com",
+                          "url": "https://reuters.com/" + t.replace(" ", "-").lower(),
+                          "keywords": screen.match_adverse_keywords(t),
+                          "categories": [], "flagged": True}],
+        }], day, path=_ev)
+    _rep = screen.update_adverse_evidence([], "2026-07-01", path=_ev)
+    check("repeat counter: three distinct strong stories still fire the pattern",
+          _rep.get("Acme Corp") == 3)
+check("source_tier_for ranks known wires tier 1 and unknowns tier 3",
+      screen.source_tier_for({"url": "https://www.reuters.com/world/x", "source": ""}) == 1 and
+      screen.source_tier_for({"url": "", "source": "Reuters"}) == 1 and
+      screen.source_tier_for({"url": "https://blog.example.xyz/p", "source": "Some Blog"}) == 3)
+check("ADVERSE_MAX_RESULTS default is 8 and validates loudly",
+      screen.ADVERSE_MAX_RESULTS == 8 and screen._resolve_adverse_max("99") == 8 and
+      screen._resolve_adverse_max("12") == 12)
+
+# ── threshold env-tunability (one-way) + shadow challenger ───────────────────
+print("screen.py — threshold resolver / shadow challenger")
+_thr_env = {k: os.environ.get(k) for k in
+            ("MATCH_THRESHOLD", "MATCH_THRESHOLD_ALLOW_RAISE", "SHADOW_THRESHOLD")}
+try:
+    os.environ.pop("MATCH_THRESHOLD_ALLOW_RAISE", None)
+    os.environ.pop("MATCH_THRESHOLD", None)
+    check("threshold resolver: unset env keeps the champion default",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 85)
+    os.environ["MATCH_THRESHOLD"] = "80"
+    check("threshold resolver: lowering (more sensitive) is a plain config",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 80)
+    os.environ["MATCH_THRESHOLD"] = "90"
+    check("threshold resolver: a bare raise is rejected to the default (one-way rule)",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 85)
+    os.environ["MATCH_THRESHOLD_ALLOW_RAISE"] = "1"
+    check("threshold resolver: a raise passes only with MATCH_THRESHOLD_ALLOW_RAISE=1",
+          screen._resolve_match_threshold("MATCH_THRESHOLD", 85) == 90)
+    os.environ.pop("MATCH_THRESHOLD_ALLOW_RAISE", None)
+    for bad in ("0.85", "abc", "40", "101", ""):
+        os.environ["MATCH_THRESHOLD"] = bad
+        if screen._resolve_match_threshold("MATCH_THRESHOLD", 85) != 85:
+            check(f"threshold resolver rejects {bad!r}", False)
+            break
+    else:
+        check("threshold resolver rejects fractions, garbage and out-of-range values", True)
+    # Shadow resolver: range [70, THRESHOLD), off when unset/invalid.
+    os.environ.pop("SHADOW_THRESHOLD", None)
+    check("shadow resolver: off when unset", screen._resolve_shadow_threshold() is None)
+    os.environ["SHADOW_THRESHOLD"] = "80"
+    check("shadow resolver: accepts a value inside [70, THRESHOLD)",
+          screen._resolve_shadow_threshold() == 80)
+    os.environ["SHADOW_THRESHOLD"] = str(screen.THRESHOLD)
+    check("shadow resolver: rejects a value at/above the live threshold",
+          screen._resolve_shadow_threshold() is None)
+finally:
+    for k, v in _thr_env.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+# Shadow band behaviour inside screen_name: "Marvin Ostrowski" vs "MERVIN
+# OSTRAVSKI" scores 81.2 under this suite's difflib stub — inside [80, 85),
+# failing every champion gate AND the phonetic gate (marvin/mervin first-vowel
+# a≠i·e, ostrowski/ostravski first-vowel u≠a) — a clean challenger-band
+# specimen with no transliteration-group involvement.
+_SHW_LIST = {"L": [(screen.normalize("MERVIN OSTRAVSKI"), "MERVIN OSTRAVSKI")]}
+_shw_orig = screen.SHADOW_THRESHOLD_VALUE
+try:
+    screen.SHADOW_THRESHOLD_VALUE = 80
+    _shw_count = screen._SHADOW_CHALLENGER["count"]
+    _shw_hits = screen.screen_name("Marvin Ostrowski", _SHW_LIST)
+    check("shadow band counts a [shadow, THRESHOLD) pair without emitting a hit",
+          _shw_hits == [] and screen._SHADOW_CHALLENGER["count"] == _shw_count + 1)
+    check("shadow example log records the pair",
+          any(e["entry"] == "MERVIN OSTRAVSKI" for e in screen._SHADOW_CHALLENGER["examples"]))
+    screen.SHADOW_THRESHOLD_VALUE = None
+    _shw_count2 = screen._SHADOW_CHALLENGER["count"]
+    screen.screen_name("Marvin Ostrowski", _SHW_LIST)
+    check("shadow off: the same pair leaves no tally and no hit",
+          screen._SHADOW_CHALLENGER["count"] == _shw_count2)
+finally:
+    screen.SHADOW_THRESHOLD_VALUE = _shw_orig
 
 # ── typology / dedup / delta ─────────────────────────────────────────────────
 print("screen.py — typology / dedup / delta")
@@ -327,13 +565,13 @@ qa_ok = agents.qa_gate(
     [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}], "risk": {"rating": "HIGH"}}],
     [{"subject_name": "X", "articles": [{"url": "http://a", "triage": {"ai": True}}]}],
     [{"subject_name": "P", "id": "Q1"}],
-    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}}, {})
+    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "au": {"count": 1}, "ch": {"count": 1}, "eocn": {"count": 1}}, {})
 check("QA gate passes a clean report", qa_ok["passed"])
 qa_bad = agents.qa_gate(
     [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}]}],   # no risk rating
     [{"subject_name": "X", "articles": [{"triage": {"injection_suspected": ["x"], "ai": True}}]}],  # injection model-classified + no url
     [{"subject_name": "P"}],  # PEP missing source
-    {"ofac": {"count": 0}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}}, {})  # OFAC down
+    {"ofac": {"count": 0}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "au": {"count": 1}, "ch": {"count": 1}, "eocn": {"count": 1}}, {})  # OFAC down
 check("QA gate catches integrity violations", (not qa_bad["passed"]) and len(qa_bad["issues"]) >= 4)
 
 # ── regression tests for the deep-audit fixes ────────────────────────────────
@@ -388,7 +626,7 @@ for act, secret in agents.ACTION_CREDENTIAL.items():
 att = agents.build_attestation(
     {"qa": {"passed": True}, "creds": {"events": []}, "cred_violations": []},
     "deterministic", 0,
-    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}})
+    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "au": {"count": 1}, "ch": {"count": 1}, "eocn": {"count": 1}})
 check("attestation lists all 10 framework controls", att.count("GOVERNANCE ·") == 5 and att.count("COMPLIANCE ·") == 5)
 check("attestation reports ALL CONTROLS ATTESTED on a clean run", "ALL CONTROLS ATTESTED" in att)
 
@@ -545,7 +783,7 @@ check("without a today reference, staleness is inactive (backward compatible)",
 # coverage + runtime anomalies feed the QA gate (degrade loudly)
 _qa_cov = agents.qa_gate(
     [{"name": "X", "hits": [{"matched_entry": "Y", "score": 88}], "risk": {"rating": "HIGH"}}], [], [],
-    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "eocn": {"count": 1}},
+    {"ofac": {"count": 1}, "un": {"count": 1}, "uk": {"count": 1}, "eu": {"count": 1}, "au": {"count": 1}, "ch": {"count": 1}, "eocn": {"count": 1}},
     {"coverage": {"alarms": ["OFAC dropped 50%"]}, "monitoring": {"anomalies": ["latency 900s"]}})
 check("QA gate surfaces coverage drift + runtime anomaly as issues", (not _qa_cov["passed"]) and len(_qa_cov["issues"]) == 2)
 
@@ -729,7 +967,10 @@ def _gnews_first_ok(*_a, **_k):
     raise OSError("connection refused")
 screen.requests.get = _gnews_first_ok
 _arts = screen.search_adverse_media("Partly Cloudy DMCC")
-check("a subject with any success sweeps all locales (no early exit)", _calls["gnews"] == 7)
+# Full sweep = ADVERSE_LOCALES broad fetches + the en-US risk-term pass + the
+# AE:ar Arabic pass (locale-derived, so the default bump 5 -> 8 is covered).
+check("a subject with any success sweeps all locales (no early exit)",
+      _calls["gnews"] == screen.ADVERSE_LOCALES + 2)
 check("partial coverage is kept, not raised away", len(_arts) == 1)
 
 # GDELT circuit breaker: N consecutive hard failures open the circuit for the
@@ -959,6 +1200,49 @@ screen.download = _orig_download
 check("parse_eu still parses via the shared simple-csv parser",
       screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
 
+# EU FSF is the one core list whose PRIMARY is the OpenSanctions host, so its
+# fallback runs the other way: official webgate XML. Names live in wholeName
+# attributes on <nameAlias> elements (entities and aliases alike).
+_FSF_XML = (b'<?xml version="1.0" encoding="UTF-8"?><export generationDate="2026-07-29">'
+            b'<sanctionEntity logicalId="1"><nameAlias wholeName="EVIL CORP" firstName=""/>'
+            b'<nameAlias wholeName="E &amp; CORP"/></sanctionEntity>'
+            b'<sanctionEntity logicalId="2"><nameAlias wholeName="BAD ACTOR"/></sanctionEntity>'
+            b'</export>')
+check("FSF official XML parses wholeName attributes (entities + aliases, unescaped)",
+      screen.parse_eu_official_xml(_FSF_XML) == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url) or _FSF_XML)
+_fb = screen._eu_official_fallback(set())
+check("EU fallback loads the official XML when the mirror yielded nothing",
+      bool(_fb) and _fb[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+check("EU fallback provenance is explicit in the list date (audit trail)",
+      bool(_fb) and "official" in _fb[1].lower())
+check("EU fallback targets webgate with the public FSF token",
+      bool(_dl_urls) and "webgate.ec.europa.eu" in _dl_urls[0] and "token=" in _dl_urls[0])
+check("no official-XML fetch when the mirror loaded",
+      screen._eu_official_fallback({"LOADED"}) is None and len(_dl_urls) == 1)
+screen.download = lambda url, label: None
+check("official XML also down → no fallback (degrade-loudly paths take over)",
+      screen._eu_official_fallback(set()) is None)
+screen.download = _orig_download
+
+# Every core list with a second origin must actually be WIRED to it, on BOTH
+# load paths — the 2026-07-29 multi-homing bug class was exactly a helper that
+# existed but one path didn't call. UK falls back to the OpenSanctions
+# gb_hmt_sanctions mirror; EU to the official XML; AU/CH have no second origin
+# (documented in the loader) and rely on the outage gate.
+import inspect as _inspect
+_src_daily  = _inspect.getsource(screen.load_all_lists)
+_src_legacy = _inspect.getsource(screen.main)
+for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
+    check(f"{_pname} path wires the OFAC mirror fallback", "us_ofac_sdn" in _psrc)
+    check(f"{_pname} path wires the UN mirror fallback", "un_sc_sanctions" in _psrc)
+    check(f"{_pname} path wires the UK mirror fallback", "gb_hmt_sanctions" in _psrc)
+    check(f"{_pname} path wires the EU official-XML fallback", "_eu_official_fallback" in _psrc)
+    check(f"{_pname} path folds OFAC aliases only when the mirror did not serve",
+          "_fold_ofac_aliases" in _psrc
+          and _psrc.find("us_ofac_sdn") < _psrc.find("_fold_ofac_aliases"))
+
 # ── EOCN mirror cross-check (TFS drift detector) ──────────────────────────────
 # The curated local UAE Local Terrorist List can go stale (EOCN updates arrive
 # by notification, not a machine endpoint) — a missed designation is a false
@@ -1046,7 +1330,8 @@ _hit = screen.pep_mirror_lookup(_idx, "Politician Sample")   # word-order varian
 check("token-reordered names still hit the mirror index", _hit.get("hit") is True)
 check("mirror hits carry the OpenSanctions id + entity URL (QA-gate evidence)",
       _hit.get("id") == "Q1234" and "opensanctions.org/entities/Q1234" in _hit.get("source_url", ""))
-check("mirror hits are provenance-marked as mirror", "mirror" in _hit.get("category", "").lower()
+check("worldwide-net hits name their SOURCE (provenance, wording-independent)",
+      "opensanctions" in _hit.get("category", "").lower()
       and _hit.get("via_mirror") is True)
 _miss = screen.pep_mirror_lookup(_idx, "Unlisted Individual Name")
 check("a mirror miss is via_mirror (screened) but not a hit", _miss == {"hit": False, "via_mirror": True})
@@ -1123,6 +1408,75 @@ try:
 finally:
     if os.path.exists(_ev_path):
         os.remove(_ev_path)
+
+# ── A customer row we cannot screen is a coverage gap, not a non-event ───────
+# get_all_customers dropped any Asana row missing a name or gid with a bare
+# `continue`. Nothing recorded it, and `customers_total` — printed under SCOPE &
+# COVERAGE ATTESTATION as "Customers in database" — is len(customers), i.e. the
+# count AFTER the exclusion. So the attestation understated the book and claimed
+# complete coverage over what was left.
+print("screen.py — un-screenable customer rows are attested, not dropped")
+_gac_orig = screen.asana_request
+# Employee screening pulls a SECOND project inside get_all_customers and has its
+# own (correct) fail-closed guard on an empty result; disable it so this block
+# exercises the customer path only.
+_gac_emp = screen.ASANA_EMPLOYEE_DB_GID
+
+
+def _gac_stub(rows):
+    pages = [{"data": rows}, {"data": []}]
+
+    def _req(method, url, **kw):
+        body = pages.pop(0) if pages else {"data": []}
+        return types.SimpleNamespace(status_code=200, json=lambda b=body: b, text="")
+    return _req
+
+
+_gac_rows = [
+    {"gid": "1", "name": "Alpha Trading LLC", "notes": "", "permalink_url": "https://app.asana.com/0/0/1"},
+    {"gid": "2", "name": "", "notes": "", "permalink_url": "https://app.asana.com/0/0/2"},
+    {"gid": "", "name": "Ghost Co", "notes": "", "permalink_url": "https://app.asana.com/0/0/3"},
+    {"gid": "4", "name": "Beta Metals FZE", "notes": "", "permalink_url": "https://app.asana.com/0/0/4"},
+]
+try:
+    screen.ASANA_EMPLOYEE_DB_GID = ""
+    screen.asana_request = _gac_stub(_gac_rows)
+    _gac = screen.get_all_customers()
+    check("screenable customer rows are still screened",
+          [c["name"] for c in _gac] == ["Alpha Trading LLC", "Beta Metals FZE"])
+    check("a row missing its name is RECORDED, not silently dropped",
+          any(r["gid"] == "2" and r["missing"] == "name" for r in screen.CUSTOMER_ROWS_SKIPPED))
+    check("a row missing its gid is RECORDED too",
+          any(r["missing"] == "gid" for r in screen.CUSTOMER_ROWS_SKIPPED))
+    check("every skipped row carries a permalink so the MLRO can fix the record",
+          all(r["permalink"] for r in screen.CUSTOMER_ROWS_SKIPPED))
+    # The attestation's denominator must be the WHOLE book, not the survivors.
+    _true_total = len(_gac) + len(screen.CUSTOMER_ROWS_SKIPPED)
+    check("the true denominator exceeds the screened count when rows are skipped",
+          _true_total == 4 and len(_gac) == 2)
+    _note = screen._skipped_rows_note()
+    check("the attestation note names the un-screenable records",
+          "https://app.asana.com/0/0/2" in _note and "NOT" in _note)
+    # A clean book must make an affirmative statement, not print an ambiguous 0.
+    screen.CUSTOMER_ROWS_SKIPPED.clear()
+    check("a clean book attests affirmatively rather than leaving a bare zero",
+          "every customer record carried a name and an ID" in screen._skipped_rows_note())
+    # State must not leak between runs (the list is module-level).
+    screen.CUSTOMER_ROWS_SKIPPED.append({"gid": "stale", "permalink": "x", "missing": "name"})
+    screen.asana_request = _gac_stub([_gac_rows[0], _gac_rows[3]])
+    screen.get_all_customers()
+    check("a later clean run does not inherit the previous run's skipped rows",
+          screen.CUSTOMER_ROWS_SKIPPED == [])
+    # WIRING: the report must print the true total, not len(customers).
+    _att = _inspect.getsource(screen)
+    check("the attestation adds the skipped rows back into 'Customers in database'",
+          'stats["customers_total"] + stats.get("customer_rows_skipped", 0)' in _att)
+    check("the attestation also reports the screened count separately",
+          "Customers screened:" in _att and "Rows NOT screenable:" in _att)
+finally:
+    screen.asana_request = _gac_orig
+    screen.ASANA_EMPLOYEE_DB_GID = _gac_emp
+    screen.CUSTOMER_ROWS_SKIPPED.clear()
 
 # ── tally_enrichment: honest denominators (the 42-subjects incident) ──────────
 print("screen.py — tally_enrichment (honest metrics)")
@@ -1280,6 +1634,27 @@ _un_names, _un_date, _un_sig = screen.parse_un(_laughs)
 check("parse_un degrades safely on a DTD payload (no crash, no names)", _un_names == set())
 _ca_names, _ca_status, _ca_sig = screen.parse_canada(_xxe)
 check("parse_canada degrades safely on a DTD payload (no crash, no names)", _ca_names == set())
+# SEMA aliases (regression: never captured — an alias-only match screened clear
+# against this supplementary list). Both published shapes must parse.
+_ca_alias_xml = (b"<?xml version='1.0'?><data-set>"
+                 b"<record><Entity>ACME SHIPPING LLC</Entity>"
+                 b"<Aliases>ACME MARITIME; AL-ACME LINES</Aliases></record>"
+                 b"<record><GivenName>Ivan</GivenName><LastName>Petrov</LastName>"
+                 b"<Aliases><Alias>Ivan the Wolf</Alias><Alias>I. Petroff</Alias></Aliases></record>"
+                 b"<record><Aliases>ORPHAN ALIAS</Aliases></record>"
+                 b"<record><Entity>PLACEHOLDER CO</Entity><Aliases>n/a</Aliases></record>"
+                 b"</data-set>")
+_ca_n, _ca_s, _ = screen.parse_canada(_ca_alias_xml)
+check("SEMA semicolon-form aliases are screened",
+      {"ACME MARITIME", "AL-ACME LINES"} <= _ca_n)
+check("SEMA nested <Alias> elements are screened",
+      {"Ivan the Wolf", "I. Petroff"} <= _ca_n)
+check("SEMA primary entity/person names still parse alongside aliases",
+      "ACME SHIPPING LLC" in _ca_n and "Ivan Petrov" in _ca_n and _ca_s == "live")
+check("an alias block with no primary record name cannot inject names",
+      "ORPHAN ALIAS" not in _ca_n)
+check("placeholder alias values (n/a) are not screened as names",
+      "n/a" not in _ca_n and not any(x.lower() == "n/a" for x in _ca_n))
 
 print("screen — list-entry adjudication attributes (DOB/nationality context)")
 screen.LIST_ENTRY_ATTRS.clear()
@@ -1327,7 +1702,70 @@ check("a hit with no known attributes carries an empty context",
       len(_plain_hits) == 1 and _plain_hits[0]["match_context"] == "")
 screen.LIST_ENTRY_ATTRS.clear()
 
+# ── Designation-embedded-in-customer-name recall (2026-07-29 false negatives) ─
+# The single most obvious sanctions shape there is — a customer named after the
+# designation plus legal-form boilerplate — screened CLEAR in this engine while
+# the JS engine scored the same pairs 100/critical. Two distinct gaps:
+#   short entry (<6 chars): the near-exact gate tested only min(full, core), and
+#     boilerplate drags `full` down ("Hamas General Trading LLC" full=33/core=100);
+#   long entry whose distinctive core is ONE token: min() fails the same way, and
+#     the token-SUBSET gate cannot fire because _is_token_subset requires >=2 core
+#     tokens ("Al Qaeda General Trading" — AL is a particle, so the core is "QAEDA").
+print("screen — a designation embedded in a customer name must never clear")
+_emb_lists = {"OFAC SDN": [(screen.normalize(e), e) for e in
+                           ["HAMAS", "ISIL", "ANO", "AL QAEDA", "PETRO PARS"]]}
+for _subj, _entry in (("Hamas General Trading LLC", "HAMAS"),
+                      ("ISIL General Trading LLC", "ISIL"),
+                      ("Ano Holdings Company Limited", "ANO"),
+                      ("Al Qaeda General Trading", "AL QAEDA"),
+                      ("Al-Qaeda Holdings FZE", "AL QAEDA"),
+                      ("Petro Pars International DMCC", "PETRO PARS")):
+    _h = screen.screen_name(_subj, _emb_lists)
+    check(f"'{_subj}' flags the designated '{_entry}'",
+          any(x["matched_entry"] == _entry for x in _h))
+# The gate stays tight: it fires only when the customer's ENTIRE distinctive core
+# is the designation. A near-spelling with its own distinctive core must clear,
+# or the fix trades a false negative for alert fatigue.
+for _subj in ("Hummus Trading LLC", "Emirates Gold DMCC", "Ahmed Mohammed Al Rashid",
+              "Bullion Street Gold Trading L.L.C", "Dijllah Jewellery FZE"):
+    check(f"'{_subj}' still screens clear (no false-positive blow-up)",
+          screen.screen_name(_subj, _emb_lists) == [])
+# A hit won on the core alone is recorded at the CONSERVATIVE min-based score, so
+# it reads as a POSSIBLE match for MLRO adjudication — the >=100 "confirmed
+# designation" test (screen_subject_set) must not be able to fire on it.
+_emb_hit = screen.screen_name("Hamas General Trading LLC", _emb_lists)
+check("a core-only hit is never scored as a CONFIRMED designation",
+      _emb_hit and all(x["score"] < 100 for x in _emb_hit))
+
+# ── Variant tie-break is deterministic and keeps the best-evidenced variant ────
+# `variants` is a set and the winner used to be "first variant scoring strictly
+# higher". Python randomizes string hashes per process, so on a SCORE TIE the
+# recorded (full, core) — and therefore whether the pair passed the core gates —
+# depended on the hash seed: "Al Qaeda General Trading" vs "AL QAEDA" measurably
+# flipped between HIT and CLEAR across PYTHONHASHSEED values. Sorting fixes the
+# order; the tie-break must additionally keep the HIGHER-CORE variant, which this
+# pins by making the better variant sort LAST (sorting alone would still miss it).
+_orig_variants, _orig_match_score = screen.ai.name_variants, screen.match_score
+try:
+    # Patch through screen.ai: this suite loads `ai` as its own module object,
+    # so patching the local one would not reach the engine.
+    screen.ai.name_variants = lambda name: ["ZULU CORP"] if name == "ALPHA CORP" else []
+    # Tie on score; the higher-core variant is the one that sorts later.
+    screen.match_score = lambda cand, en: (
+        (50.0, 50.0, 100.0, 100.0) if cand.startswith("ZULU") else (50.0, 50.0, 60.0, 100.0))
+    _tb = screen.screen_name("ALPHA CORP", {"OFAC SDN": [(screen.normalize("TARGET"), "TARGET")]})
+    check("a score tie keeps the higher-core variant (hash-seed determinism)",
+          len(_tb) == 1 and _tb[0]["core_score"] == 100.0)
+finally:
+    screen.ai.name_variants, screen.match_score = _orig_variants, _orig_match_score
+
 print("screen — core-list coverage floors (zero/partial-load hard-fail)")
+# The static-floor tests below predate the adaptive ratchet and pin the STATIC
+# behavior, so point the coverage history at a path that does not exist — the
+# repo's committed source-coverage-state.json would otherwise raise the
+# effective floors mid-test (exactly what the ratchet is for in production).
+_prev_cov_path = screen.monitoring.COVERAGE_STATE_PATH
+screen.monitoring.COVERAGE_STATE_PATH = "/nonexistent/source-coverage-state.json"
 _meta_ok = {"ofac": {"count": 19129}, "un": {"count": 1002}, "uk": {"count": 19762},
             "eu": {"count": 42347}, "eocn": {"count": 312}}
 check("floors: healthy baseline counts pass", screen.core_list_floor_breaches(_meta_ok) == ([], []))
@@ -1397,6 +1835,376 @@ _floor_clean = screen.enforce_core_list_floors(_meta_ok)
 check("floors: a healthy load never refuses", _floor_clean == ([], []))
 screen.LIST_FLOORS_ENFORCE = _prev_floors_enforce
 screen.LIST_OUTAGE_ALERT["outages"] = []
+
+# ── The watchlist cannot "cover" a subject it cannot match ────────────────────
+# am_blackout counted a subject as having ZERO adverse coverage only when the
+# WHOLE watchlist failed to load. But screen_name returns nothing for a name the
+# matcher cannot handle (non-Latin script, or under 4 matchable characters), so
+# such a subject gets nothing from the watchlist even when it loaded perfectly —
+# and the report told the MLRO the watchlist "still screened every subject".
+# A news-dead subject with such a name therefore had NO adverse coverage at all
+# and was reported as covered.
+print("screen — the watchlist cannot cover a subject it cannot match")
+_wl_entries = [(screen.normalize("BAD ACTOR"), "BAD ACTOR")]
+_wl_subs = [("ENTITY", "محمد عبدالله", None, {}), ("ENTITY", "Bad Actor", None, {}),
+            ("ENTITY", "Clean Co Ltd", None, {})]
+_wl_hits = screen.screen_watchlist(_wl_subs, _wl_entries, {}, "2026-07-30")
+check("the watchlist still finds a matchable listing", len(_wl_hits.get("Bad Actor", [])) == 1)
+check("a name the matcher cannot screen is RECORDED as unscreened, not silently missed",
+      "محمد عبدالله" in screen.WATCHLIST_UNSCREENABLE
+      and "Clean Co Ltd" not in screen.WATCHLIST_UNSCREENABLE)
+_mkres = lambda nm: [{"type": "ENTITY", "name": nm, "parent": "", "permalink": "",
+                      "adverse": None, "pep": None, "am_error": True}]
+check("news-dead + unscreenable + watchlist LOADED still counts as a blackout",
+      screen.tally_enrichment(_mkres("محمد عبدالله"), _wl_hits, True)[0]["am_blackout"] == 1)
+check("news-dead + matchable + watchlist loaded is NOT a blackout (the net really covered it)",
+      screen.tally_enrichment(_mkres("Clean Co Ltd"), _wl_hits, True)[0]["am_blackout"] == 0)
+check("a whole-watchlist outage still blacks out every news-dead subject",
+      screen.tally_enrichment(_mkres("Clean Co Ltd"), {}, False)[0]["am_blackout"] == 1)
+screen.WATCHLIST_UNSCREENABLE.clear()
+
+# ── "This subject was never screened" must not lose its place to 10 candidates ─
+# The MANUAL REVIEW marker is a COVERAGE STATEMENT, not a candidate: it says the
+# subject could not be auto-screened at all. It scores 0 by construction, so the
+# report's `sorted(hits, -score)[:10]` dropped it as soon as a customer had 10
+# other candidates — and it carries no is_new, so open_mlro_cases raises no case
+# for it either. The report line was its ONLY surface, replaced by "+N more
+# similar candidates", which reads as more of the same. #351 handled a real
+# subject with 73 candidates, so >10 is not hypothetical.
+print("screen — the unscreenable marker outranks the top-10 candidate cut")
+import datetime as _dt_mr   # _dtmod is imported further down this file, not yet in scope
+_mr_hit = screen._manual_review_hit("ENTITY", "شركة الأمل", False)
+check("the manual-review marker scores 0 (why a score sort drops it)", _mr_hit["score"] == 0)
+check("the manual-review marker opens no MLRO case (report is its only surface)",
+      not _mr_hit.get("is_new"))
+
+
+def _mr_render(n_others):
+    others = [{"subject_type": "INDIVIDUAL", "subject_name": f"Owner {i}",
+               "control_linkage": False, "list": "OFAC SDN",
+               "matched_entry": f"AL-EXAMPLE, P{i}", "score": 90 - i,
+               "confidence": "medium"} for i in range(n_others)]
+    m = {"name": "شركة الأمل", "permalink": "", "hits": [_mr_hit] + others}
+    stats = {"customers_total": 1, "customer_rows_skipped": 0, "companies_screened": 1,
+             "individuals_screened": n_others, "subjects_total": 1 + n_others,
+             "errors": 0, "am_errors": 0, "am_blackout": 0, "pep_errors": 0,
+             "pep_mirror": 0, "watchlist_findings": 0, "watchlist_loaded": True,
+             "delta": {}}
+    _buf = _io.StringIO()
+    with _ctx.redirect_stdout(_buf):
+        return screen.build_unified_narrative([m], [], [], [], {}, stats,
+                                              _dt_mr.datetime(2026, 7, 29))
+
+
+_mr_small, _mr_big, _mr_huge = _mr_render(5), _mr_render(15), _mr_render(73)
+check("unscreenable marker survives when the customer has few candidates",
+      "not auto-screenable" in _mr_small)
+check("unscreenable marker survives PAST the 10-candidate cut",
+      "not auto-screenable" in _mr_big)
+check("unscreenable marker survives a 73-candidate customer (the real #351 shape)",
+      "not auto-screenable" in _mr_huge)
+# The overflow counter must count CANDIDATES, not the pinned coverage statement.
+check("the '+N more' count excludes the pinned marker (15 candidates -> +5)",
+      "+5 more similar candidates" in _mr_big)
+check("the '+N more' count excludes the pinned marker (73 candidates -> +63)",
+      "+63 more similar candidates" in _mr_huge)
+check("no overflow line at all when candidates fit (5 -> none)",
+      "more similar candidates" not in _mr_small)
+
+# ── Identity-based exclusion (false-positive DEMOTION, never suppression) ─────
+# One subject in the 29 Jul run carried 73 candidate designations, nearly all
+# different people sharing a common Arabic given name. Where BOTH sides publish
+# a DOB and a nationality and BOTH disagree, the candidate cannot be the
+# customer — it leaves the primary queue but stays in the record.
+print("screen — identity-based exclusion (demotion, not suppression)")
+screen.LIST_ENTRY_ATTRS.clear()
+screen.LIST_ENTRY_ATTRS[screen.normalize("KHAN, Mohammed")] = {
+    "dob": {"01 Jan 1955"}, "nationality": {"Afghanistan"}}
+screen.LIST_ENTRY_ATTRS[screen.normalize("MULTI YEAR")] = {
+    "dob": {"1955", "1960", "1962"}, "nationality": {"Somalia"}}
+screen.LIST_ENTRY_ATTRS[screen.normalize("NEAR YEAR")] = {
+    "dob": {"1978"}, "nationality": {"South Africa"}}
+screen.LIST_ENTRY_ATTRS[screen.normalize("NO DOB")] = {
+    "dob": set(), "nationality": {"Somalia"}}
+_cust = {"dob": "September 06, 1980", "nationality": "Pakistan"}
+# Every source writes dates differently — a YEAR comparison is the only one
+# reliable across all three, and a year gap is what distinguishes two people.
+check("DOB years parse from every source format (OFAC / UN / KYC)",
+      screen.dob_years("27 Nov 1978") == {1978}
+      and screen.dob_years("1979-03-03") == {1979}
+      and screen.dob_years("September 06, 1980") == {1980}
+      and screen.dob_years("1955 / 1960 / 1962") == {1955, 1960, 1962})
+check("a demonstrably different person is excluded, with a stated reason",
+      "25-year gap" in (screen.identity_exclusion_reason("KHAN, Mohammed", _cust) or ""))
+check("a multi-year designation is judged on its CLOSEST year",
+      "18-year gap" in (screen.identity_exclusion_reason("MULTI YEAR", _cust) or ""))
+# Fail-closed: anything unknown on either side keeps the candidate in the queue.
+check("a birth year within tolerance is never excluded",
+      screen.identity_exclusion_reason("NEAR YEAR", _cust) is None)
+check("a designation that publishes no DOB is never excluded",
+      screen.identity_exclusion_reason("NO DOB", _cust) is None)
+check("an unknown customer DOB never excludes (fail-closed)",
+      screen.identity_exclusion_reason("KHAN, Mohammed", {"dob": "", "nationality": "Pakistan"}) is None)
+check("an unknown customer nationality never excludes (fail-closed)",
+      screen.identity_exclusion_reason("KHAN, Mohammed", {"dob": "September 06, 1980", "nationality": ""}) is None)
+check("a MATCHING nationality never excludes, however far the years are",
+      screen.identity_exclusion_reason(
+          "KHAN, Mohammed", {"dob": "September 06, 1980", "nationality": "Afghanistan"}) is None)
+check("an entry with no published attributes at all is never excluded",
+      screen.identity_exclusion_reason("Totally Unknown Entry", _cust) is None)
+# The demotion has to reach the CASE QUEUE, not just the report text. Cases are
+# capped per run, so an excluded candidate left in the queue could consume the
+# cap and push a genuine case into the backlog — demotion that stops at the
+# report is cosmetic.
+import datetime as _dtmod
+_case_names = []
+class _CaseResp:
+    status_code = 201
+    text = ""
+    @staticmethod
+    def json(): return {"data": {"gid": "1"}}
+def _rec_case(method, url, **kw):
+    _case_names.append(((kw.get("json") or {}).get("data") or {}).get("name", ""))
+    return _CaseResp()
+_mk_match = lambda excl: [{"name": "Acme", "permalink": "p", "gid": "g", "hits": [
+    {"is_new": True, "score": 78, "list": "OFAC SDN", "matched_entry": "KHAN, Mohammed",
+     "subject_type": "INDIVIDUAL", "subject_name": "A", "identity_excluded": excl}]}]
+_orig_ar = screen.asana_request
+try:
+    screen.asana_request = _rec_case
+    _case_names.clear()
+    screen.open_mlro_cases("parent", _mk_match(None), [], [], _dtmod.datetime(2026, 7, 30))
+    _n_open = len(_case_names)
+    _case_names.clear()
+    screen.open_mlro_cases("parent", _mk_match("25-year gap AND a different nationality"),
+                           [], [], _dtmod.datetime(2026, 7, 30))
+    _n_excl = len(_case_names)
+finally:
+    screen.asana_request = _orig_ar
+check("an open candidate still raises an MLRO case", _n_open == 1)
+check("an identity-excluded candidate raises NO case (the queue, not just the report)",
+      _n_excl == 0)
+
+_prev_ie = screen.IDENTITY_EXCLUSION
+screen.IDENTITY_EXCLUSION = False
+check("kill-switch IDENTITY_EXCLUSION=0 excludes nothing",
+      screen.identity_exclusion_reason("KHAN, Mohammed", _cust) is None)
+screen.IDENTITY_EXCLUSION = _prev_ie
+# The whole point: this must DEMOTE, never suppress. The exclusion is a report
+# ordering decision — the hit itself must still exist for the delta state, the
+# MLRO case trail and the 10-year record.
+check("exclusion is a REPORT decision only — screen_name still returns the hit",
+      len(screen.screen_name("Mohammed Khan",
+                             {"OFAC SDN": [(screen.normalize("KHAN, Mohammed"), "KHAN, Mohammed")]})) >= 1)
+screen.LIST_ENTRY_ATTRS.clear()
+
+# ── Worldwide adverse-media locale rotation ───────────────────────────────────
+# The per-run locale budget is the empirical Google-News per-IP ceiling (raising
+# it tripped the limiter on 10-12 Jul and cost real recall), so worldwide reach
+# has to come from rotating the matrix, not from sending more requests. Before
+# rotation the same first-N markets were swept every day and the remaining ~66
+# were NEVER swept.
+print("screen — worldwide adverse-media locale rotation")
+import datetime as _dt2
+_TOT = len(screen.GNEWS_URLS)
+_covered, _days = set(), 0
+for _d in range(400):
+    _idx = screen.adverse_locale_indices(_dt2.datetime(2026, 7, 30) + _dt2.timedelta(days=_d))
+    _covered |= set(_idx); _days = _d + 1
+    if len(_covered) == _TOT:
+        break
+check("rotation reaches EVERY market in the matrix", len(_covered) == _TOT)
+check("it does so within the cycle the report states",
+      _days <= max(1, screen.adverse_rotation_cycle_days()))
+check("the per-run request budget is never exceeded (rate-limit ceiling holds)",
+      all(len(screen.adverse_locale_indices(_dt2.datetime(2026, 7, 30) + _dt2.timedelta(days=_d)))
+          <= screen.ADVERSE_LOCALES for _d in range(60)))
+# The targeted risk passes index into the pinned five (GNEWS_URLS[4:5] is the
+# Arabic pass), so those must be present on EVERY run, not rotated out.
+check("the pinned core editions are swept on every run",
+      all(set(range(screen.ADVERSE_CORE_LOCALES)) <=
+          set(screen.adverse_locale_indices(_dt2.datetime(2026, 7, 30) + _dt2.timedelta(days=_d)))
+          for _d in range(60)))
+check("the same run date always sweeps the same markets (reproducible evidence)",
+      screen.adverse_locale_indices(_dt2.datetime(2026, 8, 1)) ==
+      screen.adverse_locale_indices(_dt2.datetime(2026, 8, 1)))
+_prev_rot = screen.ADVERSE_ROTATE
+screen.ADVERSE_ROTATE = False
+check("ADVERSE_LOCALE_ROTATION=0 restores the fixed first-N behaviour",
+      screen.adverse_locale_indices(_dt2.datetime(2026, 8, 1)) == list(range(screen.ADVERSE_LOCALES)))
+screen.ADVERSE_ROTATE = _prev_rot
+
+# ── Worldwide PEP + RCA net ───────────────────────────────────────────────────
+# Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or a relative
+# / close associate with no English article returned a confident "no PEP". The
+# consolidated worldwide dataset now runs as a standing net over every
+# individual, and the PEP-vs-RCA role comes from the dataset's own topics column
+# rather than being asserted by us (FATF R.12 extends EDD to RCAs).
+print("screen — worldwide PEP + RCA net")
+_PEP_CSV = (b"id,schema,name,aliases,topics\n"
+            b"pep-1,Person,Nguyen Van Thanh,,role.pep\n"
+            b"rca-1,Person,Maria Consuela Obiang,Maria C Obiang,role.rca\n"
+            b"unk-1,Person,Someone Without Topics,,\n")
+_pep_idx = screen.parse_pep_index(_PEP_CSV)
+check("a politically exposed person is found and labelled PEP",
+      screen.pep_mirror_lookup(_pep_idx, "Nguyen Van Thanh").get("category", "").startswith("PEP —"))
+_rca = screen.pep_mirror_lookup(_pep_idx, "Maria Consuela Obiang")
+check("a RELATIVE / CLOSE ASSOCIATE is found and labelled RCA (FATF R.12)",
+      _rca.get("hit") and "RCA" in _rca.get("category", ""))
+check("an RCA is reachable by alias too",
+      screen.pep_mirror_lookup(_pep_idx, "Maria C Obiang").get("hit"))
+check("a row whose topics do not state a role is not claimed as either",
+      "not stated" in screen.pep_mirror_lookup(_pep_idx, "Someone Without Topics").get("category", ""))
+check("a name absent from the worldwide net does not hit",
+      not screen.pep_mirror_lookup(_pep_idx, "Nobody At All Here").get("hit"))
+check("the RCA hit carries the R.12 duty in its description",
+      "R.12" in _rca.get("description", ""))
+# The net must be wired to run over individuals Wikidata reported CLEAR — that
+# is the coverage gain; wiring it only to errored lookups (the pre-2026-07-29
+# behaviour) leaves the false negative in place.
+_src_enrich = _inspect.getsource(screen.screen_subject_set)
+check("the worldwide net screens individuals Wikidata reported clear, not just errored ones",
+      "_pep_clear" in _src_enrich and "load_pep_mirror()" in _src_enrich)
+
+# ── Coverage-alarm gate: an alarm the run survives is invisible to alerting ──
+# Drift alarms (core list shrank vs trailing median; EOCN mirror designations
+# missing locally) reached the report and the QA gate — but the QA gate only
+# logs, so the RUN stayed green and freshness/Actions alerting saw a healthy
+# control. Post-delivery exit 6, same pattern as the outage gate.
+print("screen — coverage alarm gate (post-delivery red)")
+screen.COVERAGE_ALARM_STATE["alarms"] = ["UN list coverage dropped 40% (fixture)"]
+_prev_cov_hard = screen.COVERAGE_ALARM_HARD_FAIL
+screen.COVERAGE_ALARM_HARD_FAIL = True
+_gate6 = False
+try:
+    screen.enforce_coverage_alarm_gate()
+except SystemExit as _e:
+    _gate6 = (_e.code == 6)
+check("coverage alarm gate: post-delivery exit (code 6) on a drift alarm", _gate6)
+screen.COVERAGE_ALARM_HARD_FAIL = False
+_gate6_soft = True
+try:
+    screen.enforce_coverage_alarm_gate()
+except SystemExit:
+    _gate6_soft = False
+check("coverage alarm gate: kill-switch COVERAGE_ALARM_HARD_FAIL=0 logs without exiting", _gate6_soft)
+screen.COVERAGE_ALARM_HARD_FAIL = _prev_cov_hard
+screen.COVERAGE_ALARM_STATE["alarms"] = []
+_gate6_clean = True
+try:
+    screen.enforce_coverage_alarm_gate()
+except SystemExit:
+    _gate6_clean = False
+check("coverage alarm gate: no alarms never exits", _gate6_clean)
+# Wiring pins: BOTH run modes call the full post-delivery gate chain (the
+# onboarding path called none of the gates until 2026-07-29 — a failed
+# onboarding delivery left a green run), and the review-age alarm is excluded
+# from the coverage gate (it has its own gate + exit code).
+for _nm, _fn in (("unified", screen.run_unified), ("onboarding", screen.run_onboarding)):
+    _sq = _inspect.getsource(_fn)
+    check(f"{_nm} run calls all four post-delivery gates",
+          all(g in _sq for g in ("enforce_delivery_gate", "enforce_list_outage_gate",
+                                 "enforce_eocn_review_gate", "enforce_coverage_alarm_gate")))
+check("the review-age alarm is excluded from the coverage gate (no double gate)",
+      'EOCN_REVIEW_ALERT.get("message")' in _inspect.getsource(screen.screen_subject_set))
+
+# ── Adaptive floor ratchet: floors rise to a fraction of the observed baseline ─
+# The AU/CH floors shipped provisional (500) with a TODO to tighten them once
+# runs logged real counts; the ratchet does that tightening automatically, and
+# catches partial corruption that clears a stale static floor.
+print("screen — adaptive floor ratchet (observed-baseline tightening)")
+_covf = _tmp.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump({
+    "au": {"history": [{"date": f"2026-07-{d:02d}", "count": 4000} for d in range(20, 27)]},
+    "ch": {"history": [{"date": "2026-07-26", "count": 6000}]},          # too short
+    "un": {"history": [{"date": f"2026-07-{d:02d}", "count": 700} for d in range(20, 27)]},
+}, _covf); _covf.close()
+_af = screen.adaptive_core_floors({"au": 500, "ch": 500, "un": 500}, state_path=_covf.name)
+check("ratchet raises a provisional floor to 50% of the trailing median",
+      _af["au"] == 2000)
+check("ratchet needs enough history days before it trusts a baseline",
+      _af["ch"] == 500)
+check("ratchet never lowers a configured floor (350 < static 500)",
+      _af["un"] == 500)
+check("a missing history file yields the static floors unchanged (no new failure mode)",
+      screen.adaptive_core_floors({"au": 500}, state_path="/nonexistent/x.json") == {"au": 500})
+_badf = _tmp.NamedTemporaryFile("w", suffix=".json", delete=False)
+_badf.write("not json"); _badf.close()
+check("an unreadable history file yields the static floors (logged, not raised)",
+      screen.adaptive_core_floors({"au": 500}, state_path=_badf.name) == {"au": 500})
+json.dump({"au": {"history": "corrupt"}}, open(_badf.name, "w"))
+check("a malformed history entry yields the static floors (logged, not raised)",
+      screen.adaptive_core_floors({"au": 500}, state_path=_badf.name) == {"au": 500})
+os.unlink(_badf.name)
+_prev_pct = screen.ADAPTIVE_FLOOR_PCT
+screen.ADAPTIVE_FLOOR_PCT = 0.0
+check("kill-switch ADAPTIVE_FLOOR_PCT=0 keeps static floors only",
+      screen.adaptive_core_floors({"au": 500}, state_path=_covf.name) == {"au": 500})
+screen.ADAPTIVE_FLOOR_PCT = _prev_pct
+# End-to-end through the breach classifier: production path (floors=None) uses
+# the ratchet for a primary-served list, but a FALLBACK-served list keeps the
+# static floor — a mirror is a different corpus, and judging it by the
+# primary's baseline would turn the fallback into a refusal trap.
+screen.monitoring.COVERAGE_STATE_PATH = _covf.name
+_b_ad, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 1500, "date": "2026-07-29", "tier": "core"}})
+check("primary-served list below the ratcheted floor breaches (1,500 < 2,000)",
+      len(_b_ad) == 1 and "AU" in _b_ad[0] and "adaptive" in _b_ad[0])
+_b_mir, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 1500, "date": "live (OpenSanctions mirror)", "tier": "core"}})
+check("the same count served by a fallback keeps the static floor (no refusal trap)",
+      _b_mir == [])
+_b_mir_low, _ = screen.core_list_floor_breaches(
+    {"au": {"count": 3, "date": "live (OpenSanctions mirror)", "tier": "core"}})
+check("a fallback-served list still breaches below the STATIC floor",
+      len(_b_mir_low) == 1 and "AU" in _b_mir_low[0])
+screen.monitoring.COVERAGE_STATE_PATH = _prev_cov_path
+os.unlink(_covf.name)
+
+# ── download() retry: a transient blip must not burn a list's origin ──────────
+# One TCP reset on the primary used to force the mirror (or a DEGRADED day
+# where no mirror exists). Transients (network error, 5xx, 429) retry with
+# backoff; any other 4xx fails immediately — a bot gate will not heal within
+# one run, and retrying it only delays the fallback ladder that CAN.
+print("screen — download retry (transient vs permanent failures)")
+_dl_calls = {"n": 0}
+class _RespOK:
+    status_code = 200
+    content = b"DATA"
+    def raise_for_status(self): pass
+class _HTTPErr(Exception):
+    def __init__(self, resp): super().__init__(str(resp.status_code)); self.response = resp
+class _Resp4xx:
+    status_code = 403
+    content = b""
+    def raise_for_status(self): raise _HTTPErr(self)
+class _Resp5xx(_Resp4xx):
+    status_code = 503
+class _Resp429(_Resp4xx):
+    status_code = 429
+_orig_req_get, _orig_sleep = screen.requests.get, screen.time.sleep
+screen.time.sleep = lambda s: None
+def _flaky(url, **kw):
+    _dl_calls["n"] += 1
+    if _dl_calls["n"] < 3:
+        raise ConnectionError("reset")
+    return _RespOK()
+screen.requests.get = _flaky
+check("a transient network blip retries to success",
+      screen.download("http://x", "L") == b"DATA" and _dl_calls["n"] == 3)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp4xx())[1]
+check("a permanent 4xx fails immediately — no retry burn before the fallback ladder",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == 1)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp5xx())[1]
+check("a 5xx retries to exhaustion then yields None (degrade paths take over)",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == screen.DOWNLOAD_ATTEMPTS)
+_dl_calls["n"] = 0
+screen.requests.get = lambda url, **kw: (_dl_calls.__setitem__("n", _dl_calls["n"] + 1), _Resp429())[1]
+check("429 is transient (rate limits pass) — retried like a 5xx",
+      screen.download("http://x", "L") is None and _dl_calls["n"] == screen.DOWNLOAD_ATTEMPTS)
+screen.requests.get, screen.time.sleep = _orig_req_get, _orig_sleep
 
 print("hardening — atomic state writes")
 _hdir = _tmp.mkdtemp()
@@ -1689,6 +2497,33 @@ finally:
 check("legacy daily post failure arms the delivery gate (no more green no-delivery)",
       _armed_daily)
 
+# The UNIFIED poster must multi-home into every MLRO queue. The 2026-07-29
+# proof run delivered to Ongoing Monitoring only: _mlro_queue_targets() existed
+# and both LEGACY posters used it, but the unified path — the one the daily
+# workflow actually takes — still hardcoded a single queue. Pin the payload.
+_posted = []
+def _record_post(method, url, **kw):
+    _posted.append(kw.get("json"))
+    class _R:
+        status_code = 201
+        text = ""
+        @staticmethod
+        def json(): return {"data": {"gid": "1"}}
+    return _R()
+screen.asana_request = _record_post
+try:
+    screen.post_unified_task("narrative", _dt.datetime(2026, 7, 29, 9, 0), [], [], [])
+finally:
+    screen.asana_request = _orig_asana_request
+_data = (_posted[0] or {}).get("data", {}) if _posted else {}
+check("unified daily task is multi-homed into BOTH MLRO queues (projects)",
+      set(_data.get("projects", [])) ==
+      {screen.ASANA_ONGOING_MON_GID, screen.ASANA_FOLLOWUPS_GID})
+_mem = {m.get("project"): m.get("section") for m in _data.get("memberships", [])}
+check("unified daily task lands in the Follow Ups delivery section",
+      _mem.get(screen.ASANA_FOLLOWUPS_GID) == screen.ASANA_FOLLOWUPS_SECTION_GID
+      and _mem.get(screen.ASANA_ONGOING_MON_GID) == screen.ASANA_SECTION_GID)
+
 # ── screen.py: adaptive notes budget (learned across runs via delta-state) ───
 # 2026-07-17: even the numeric-entity worst case at 65,000 bytes was rejected
 # by Asana, so the only reliable budget is the one that actually delivered.
@@ -1728,6 +2563,172 @@ _state = {"somefingerprint": "2020-01-01", screen.NOTES_BUDGET_KEY: 39000}
 screen.prune_delta_state(_state, _dt_budget.date(2026, 7, 17))
 check("prune drops stale fingerprints but keeps the reserved budget key",
       "somefingerprint" not in _state and _state.get(screen.NOTES_BUDGET_KEY) == 39000)
+
+# ── A case note's TAIL is the disposition — never head-slice it ──────────────
+# create_case_subtask used to send `notes[:8000]`, cutting from the END. The end
+# of a case note is the only part the MLRO has to act on: the disposition
+# checkboxes (the decision record), the "Do not tip off / CR 74/2020" warning,
+# and for HIGH-risk cases the entire STR/SAR draft. Measured before the fix on a
+# 60-hit HIGH-risk case: 10,944 chars built, 8,000 delivered, all three blocks
+# gone — and no log line said so. 8,000 was also 8x stricter than the budget the
+# SAME notes field accepts on the report path.
+_cs_sent = []
+_orig_asana_req = screen.asana_request
+
+
+def _cs_stub(status_seq):
+    """Stub asana_request, recording each payload; returns the given statuses."""
+    seq = list(status_seq)
+    _cs_sent.clear()
+
+    def _req(method, url, **kw):
+        _cs_sent.append(kw.get("json", {}).get("data", {}))
+        code = seq.pop(0) if seq else 500
+        return types.SimpleNamespace(status_code=code, text="stub")
+    return _req
+
+
+_cs_disp = "Disposition: [ ] false positive   [ ] escalate / freeze (TFS)   [ ] investigate"
+_cs_tip = "Do not tip off. UAE Cabinet Resolution 74/2020 applies."
+_cs_str = "SUGGESTED STR/SAR DRAFT"
+# A note far past any budget, with the load-bearing blocks last (real ordering).
+_cs_note = ("Customer: Example Trading LLC\n"
+            + "".join(f"- [individual] Subject → OFAC SDN: \"MOHAMMED AL-{'X'*12} {i}\"  9{i%10}%\n"
+                      for i in range(4000))
+            + "\n" + _cs_disp + "\n" + _cs_tip + "\n\n" + _cs_str + "\n"
+            + "Narrative paragraph. " * 40)
+try:
+    screen.asana_request = _cs_stub([201])
+    _ok = screen.create_case_subtask("parent-gid", "🔴 SANCTIONS case: Example", _cs_note, "2026-07-29")
+    _sent = _cs_sent[0]["notes"]
+    check("create_case_subtask reports success when Asana accepts", _ok is True)
+    check("oversized case note is truncated, not sent whole", len(_sent) < len(_cs_note))
+    check("truncated case note KEEPS the disposition checkboxes", _cs_disp in _sent)
+    check("truncated case note KEEPS the tip-off warning (CR 74/2020)", _cs_tip in _sent)
+    check("truncated case note KEEPS the STR/SAR draft", _cs_str in _sent)
+    check("truncated case note marks the cut (not a silent amputation)",
+          "truncated" in _sent)
+    check("case note fits Asana's escaped rich-text budget",
+          screen._asana_notes_size(_sent) <= screen.CASE_NOTES_MAX)
+
+    # A case note within budget is delivered INTACT — the old 8,000-char slice
+    # cut notes the API would have taken in full.
+    _mid = "x" * 20000 + "\n" + _cs_disp
+    screen.asana_request = _cs_stub([201])
+    screen.create_case_subtask("parent-gid", "case", _mid, "2026-07-29")
+    check("a 20k-char case note is delivered INTACT (old cap cut it at 8,000)",
+          _cs_sent[0]["notes"] == _mid)
+
+    # A refused create is re-queued to the backlog and retried on later runs, so
+    # a payload Asana rejects at full budget would re-fail forever.
+    screen.asana_request = _cs_stub([400, 201])
+    _ok2 = screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    check("a size refusal (400) is re-bid at the smaller budget and succeeds", _ok2 is True)
+    check("the re-bid actually shrank the payload",
+          len(_cs_sent) == 2 and len(_cs_sent[1]["notes"]) < len(_cs_sent[0]["notes"]))
+    _cs_rebid = _cs_sent[1]["notes"] if len(_cs_sent) > 1 else ""
+    check("the re-bid STILL keeps the disposition block",
+          _cs_disp in _cs_rebid and _cs_tip in _cs_rebid)
+
+    # An auth/rate/network failure fails identically at any size — re-bidding
+    # smaller just burns a second call against the rate limit.
+    screen.asana_request = _cs_stub([401, 201])
+    _ok3 = screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    check("a non-size failure (401) is NOT re-bid smaller", _ok3 is False and len(_cs_sent) == 1)
+    screen.asana_request = _cs_stub([429, 201])
+    screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    check("a rate-limit (429) is NOT re-bid smaller either", len(_cs_sent) == 1)
+
+    # WIRING, not just behaviour: the head-slice must not come back.
+    _cs_src = _inspect.getsource(screen.create_case_subtask)
+    # Strip the docstring first — it NAMES the old `notes[:8000]` slice to
+    # explain the bug, and matching that prose would make this check vacuous.
+    # (getdoc() dedents, so it does not match the raw source; split on the
+    # delimiters and drop what lies between the first pair.)
+    _cs_parts = _cs_src.split('"""')
+    _cs_code = _cs_parts[0] + "".join(_cs_parts[2:])
+    check("the docstring-strip left real code to inspect (guard is not vacuous)",
+          "asana_request(" in _cs_code and "[:8000]" not in _cs_code.split("\n", 1)[0])
+    check("create_case_subtask never head-slices notes",
+          "[:8000]" not in _cs_code and 'notes or "")[:' not in _cs_code)
+    check("create_case_subtask routes notes through cap_notes", "cap_notes(" in _cs_code)
+finally:
+    screen.asana_request = _orig_asana_req
+
+# ── MLRO case backlog: overflow/failed items are cased LATER, not never ──────
+print("screen.py — case-cap overflow backlog")
+check("the backlog delta-state key can never collide with a fingerprint",
+      screen.CASE_BACKLOG_KEY.startswith("__meta_"))
+_state_bl = {"somefingerprint": "2020-01-01",
+             screen.CASE_BACKLOG_KEY: [{"p": 0, "name": "x", "notes": "y", "queued": "2026-07-20"}]}
+screen.prune_delta_state(_state_bl, _dt_budget.date(2026, 7, 17))
+check("prune keeps the reserved backlog key",
+      isinstance(_state_bl.get(screen.CASE_BACKLOG_KEY), list))
+check("malformed backlog state degrades to empty, never a crash",
+      screen.load_case_backlog({screen.CASE_BACKLOG_KEY: "garbage"}) == []
+      and screen.load_case_backlog({screen.CASE_BACKLOG_KEY: [{"notes": 1}, None]}) == []
+      and screen.load_case_backlog({}) == [])
+
+def _bl_match(name, score=90):
+    return {"name": name, "permalink": "", "hits": [
+        {"is_new": True, "score": score, "list": "OFAC SDN", "subject_type": "ENTITY",
+         "subject_name": name, "matched_entry": "ENTRY", "confidence": "STRONG"}]}
+
+_bl_created = []
+_orig_create_case = screen.create_case_subtask
+screen.create_case_subtask = lambda parent, nm, notes, due: (_bl_created.append((nm, notes)), True)[1]
+_orig_cap = screen.CASE_SUBTASK_CAP
+screen.CASE_SUBTASK_CAP = 2
+_bl_run_time = _dt_budget.datetime(2026, 7, 27, 9, 0)
+try:
+    # Run 1: four new items, cap 2 → two cased, two carried in state.
+    _st = {}
+    _n = screen.open_mlro_cases("parent-gid", [_bl_match(f"Firm {i}") for i in range(4)],
+                                [], [], _bl_run_time, state=_st)
+    _carried = screen.load_case_backlog(_st)
+    check("cap overflow lands in the reserved backlog, not the void",
+          _n == 2 and len(_bl_created) == 2 and len(_carried) == 2
+          and all(e["queued"] == "2026-07-27" for e in _carried))
+    # Run 2 (next day): no new items → the backlog drains, with provenance.
+    _bl_created.clear()
+    _n2 = screen.open_mlro_cases("parent-gid", [], [], [],
+                                 _dt_budget.datetime(2026, 7, 28, 9, 0), state=_st)
+    check("a later run with free capacity drains the backlog (cased later, not never)",
+          _n2 == 2 and len(_bl_created) == 2
+          and all("backlogged since the 2026-07-27 run" in notes for _, notes in _bl_created)
+          and screen.load_case_backlog(_st) == [])
+    # Priority: a carried sanctions case (older queued date) beats today's new one.
+    _st2 = {screen.CASE_BACKLOG_KEY: [{"p": 0, "name": "🔴 SANCTIONS case: Old Carried — OFAC SDN 90%",
+                                       "notes": "old", "queued": "2026-07-20"}]}
+    _bl_created.clear()
+    screen.open_mlro_cases("parent-gid", [_bl_match("Today New")], [], [], _bl_run_time, state=_st2)
+    check("backlogged sanctions items outrank today's within the cap (oldest first)",
+          len(_bl_created) == 2 and "Old Carried" in _bl_created[0][0]
+          and "Today New" in _bl_created[1][0])
+    # A failed create with a live parent is retried from the backlog next run.
+    screen.create_case_subtask = lambda parent, nm, notes, due: False
+    _st3 = {}
+    _n3 = screen.open_mlro_cases("parent-gid", [_bl_match("Flaky Create")], [], [], _bl_run_time, state=_st3)
+    check("a failed subtask create is carried to the backlog for retry",
+          _n3 == 0 and len(screen.load_case_backlog(_st3)) == 1)
+    # No parent (delivery failed): nothing cased, and the state must NOT gain a
+    # backlog — the run's items re-alert as new next run anyway.
+    _st4 = {}
+    screen.open_mlro_cases(None, [_bl_match("No Parent")], [], [], _bl_run_time, state=_st4)
+    check("no delivery → no backlog write (items re-alert as new next run)",
+          screen.CASE_BACKLOG_KEY not in _st4)
+    # Same-name dedup: an item re-listed today never duplicates its carried copy.
+    screen.create_case_subtask = lambda parent, nm, notes, due: (_bl_created.append((nm, notes)), True)[1]
+    _bl_created.clear()
+    _dup_name = "🔴 SANCTIONS case: Firm 0 — OFAC SDN 90%"
+    _st5 = {screen.CASE_BACKLOG_KEY: [{"p": 0, "name": _dup_name, "notes": "old", "queued": "2026-07-20"}]}
+    screen.open_mlro_cases("parent-gid", [_bl_match("Firm 0")], [], [], _bl_run_time, state=_st5)
+    check("a re-listed item dedupes against its carried backlog copy (one case, not two)",
+          sum(1 for nm, _ in _bl_created if nm == _dup_name) == 1
+          and screen.load_case_backlog(_st5) == [])
+finally:
+    screen.create_case_subtask = _orig_create_case
+    screen.CASE_SUBTASK_CAP = _orig_cap
 
 print()
 if _fail:

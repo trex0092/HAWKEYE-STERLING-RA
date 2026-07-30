@@ -1,7 +1,8 @@
 /* Unit tests for adverse-media screening pure logic (no network).
    Usage: node test/adverse-media.test.mjs */
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
-  LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool } from '../scripts/adverse-media.mjs';
+  LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
+  canonicalLink, sourceTierFor } from '../scripts/adverse-media.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -141,6 +142,48 @@ check('mapPool preserves order and runs every item under a concurrency bound',
 
 check('gdeltUrl broadened default terms still target the global artlist JSON',
   gdeltUrl('Acme Co').includes('maxrecords=75') && decodeURIComponent(gdeltUrl('Acme Co')).includes('terrorist financing'));
+
+/* ── Phase-4 hardening: description scanning, tiers, canonical dedup ──────── */
+const descRss = '<rss><channel><item><title>Acme Corp restructures Gulf operations</title>'
+  + '<link>https://www.ft.com/content/acme-restructure?utm_source=rss</link>'
+  + '<source>FT</source><pubDate>Mon, 20 Jul 2026 08:00:00 GMT</pubDate>'
+  + '<description>&lt;p&gt;The shake-up follows a &lt;b&gt;money laundering&lt;/b&gt; probe into two units.&lt;/p&gt;</description>'
+  + '</item></channel></rss>';
+const descItems = parseRss(descRss);
+check('parseRss captures and tag-strips the item description',
+  descItems.length === 1 && descItems[0].description.includes('money laundering')
+  && !descItems[0].description.includes('<'));
+check('scoreAdverseMedia flags on a description-only risk term (was headline-blind)',
+  scoreAdverseMedia('Acme Corp', descItems, ALL_TERMS).hit === true
+  && scoreAdverseMedia('Acme Corp', [{ title: descItems[0].title }], ALL_TERMS).hit === false);
+check('weak-only generic terms flag at tier weak / 75 / medium (for the record, not escalation)',
+  (() => {
+    const r = scoreAdverseMedia('Atlas Group', [{ title: 'Atlas Group faces lawsuit over lease' }], ALL_TERMS);
+    return r.hit === true && r.tier === 'weak' && r.score === 75 && r.band === 'medium';
+  })());
+check('a strong term keeps 90/high/tier strong; a normal crime term 80/medium/normal',
+  scoreAdverseMedia('Acme', [{ title: 'Acme money laundering probe' }], ALL_TERMS).tier === 'strong'
+  && scoreAdverseMedia('Acme', [{ title: 'Acme fraud charges filed' }], ALL_TERMS).tier === 'normal');
+check('stem terms close the exact-word gaps (sanctioned / laundered / kickback / guilty)',
+  scoreAdverseMedia('Gulf Falcon', [{ title: 'Gulf Falcon sanctioned by OFAC' }], ALL_TERMS).hit
+  && scoreAdverseMedia('Waleed Nasser', [{ title: 'Waleed Nasser laundered proceeds, court told' }], ALL_TERMS).hit
+  && scoreAdverseMedia('Ibrahim Yildiz', [{ title: 'Ibrahim Yildiz kickback investigation widens' }], ALL_TERMS).hit
+  && scoreAdverseMedia('Rashid Al Marri', [{ title: 'Rashid Al Marri guilty of insider trading' }], ALL_TERMS).hit);
+check('canonicalLink strips tracking params, fragments, www and trailing slashes',
+  canonicalLink('https://www.apnews.com/article/x?utm_source=rss&ncid=tw#frag') === 'apnews.com/article/x'
+  && canonicalLink('https://apnews.com/article/x/') === 'apnews.com/article/x'
+  && canonicalLink('not a url') === '');
+check('dedupItems collapses the same article under rotating tracking params (was 3 items)',
+  dedupItems([
+    { title: 'A', link: 'https://apnews.com/article/x?utm_source=rss' },
+    { title: 'A2', link: 'https://www.apnews.com/article/x?ncid=tw' },
+    { title: 'A3', link: 'https://apnews.com/article/x?ref=daily' },
+  ]).length === 1);
+check('sourceTierFor ranks known wires tier 1, regionals tier 2, unknowns tier 3',
+  sourceTierFor({ link: 'https://www.reuters.com/world/x' }) === 1
+  && sourceTierFor({ link: 'https://www.cnn.com/x' }) === 2
+  && sourceTierFor({ link: 'https://blog.example.xyz/p' }) === 3
+  && sourceTierFor({ source: 'Reuters' }) === 1);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

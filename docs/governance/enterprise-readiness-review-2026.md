@@ -326,7 +326,129 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 56 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
+Verified at HEAD: 56 workflows · 176 markdown documents under docs/ (143 excluding docs/research/auto).
+*(29 July, ninth pass — the **governance chain**. The estate slices its governance four ways — a five-level
+stack, a six-layer agentic model, a seven-stage lifecycle, an eleven-stage PbG map — and every one is a
+slicing of the same territory. None of them recorded which control's output another control *consumes*, so
+there was no control-to-control map anywhere: the assurance matrix is control → proof, §8a of the model card
+is pillar → control. `governance-chain.md` draws the missing edge — **Visibility → Explainability →
+Accountability → Trust** — with the failure propagation each break causes downstream, using real
+dependencies: a stale AI asset register voids the explainability statement's **scope claim**, which voids
+every accountability record built on it, because the records then describe a system that is not the one
+running. Read upward the table is a diagnostic: a trust indicator that will not hold is rarely a trust
+problem. **Trust** is also defined narrowly enough to be measured — the share of what the estate claims that
+an outsider can re-derive from the repository without asking anyone — with four indicators that already
+exist, two of which deliberately do not read green. One curated document added; no workflow added; no scored
+control changed.)*
+
+Verified at HEAD: 56 workflows · 175 markdown documents under docs/ (142 excluding docs/research/auto).
+*(29 July, eighth pass — **ISO/IEC 42001 clause 6.1.2 and 6.1.4 separated**. Neither clause number appeared
+anywhere in `docs/`: the estate satisfied both in substance and had never distinguished them, which matters
+because a risk assessment is routinely offered as though it answered both and it does not. A false negative
+is severe to the firm and slight to the screened person; a false positive is the reverse, and is the most
+damaging thing this system can do to someone. The two readings point in **opposite directions**, so a
+control set tuned only on the 6.1.2 column is tuned the wrong way for the people it acts on.
+`iso-42001-clause-6-1-mapping.md` records which artefact answers which sub-clause and carries **bidirectional
+R-nn ↔ Annex A** traceability — before it, no register row cited an Annex A control and neither SoA cited a
+risk ID, so *"which control treats R-13?"* had no answer anywhere in the tree. Requiring both directions in
+CI immediately found two asymmetries. The stakeholder impact assessment is designated the canonical 6.1.4
+artefact and extended with unfair/discriminatory outcomes (**"discriminatory" appeared once in the entire
+tree**) and an availability clause — every row a comparison between populations rather than a count, because
+that is where discrimination lives. Its ratified v1.0 was **not** silently amended: the additions are v1.1
+pending approval. And the two statements of applicability, which contradicted each other on A.5.4, are
+reconciled — with three status-vocabulary defects fixed, including a page that called the AI policy's
+ratification *pending* twenty-five lines after recording it as ratified. One curated document added; no
+workflow added; no scored control changed.)*
+
+Verified at HEAD: 56 workflows · 174 markdown documents under docs/ (141 excluding docs/research/auto).
+*(29 July, seventh pass — **appetite became tolerance**. Each of the eight appetite positions now carries
+a numeric **residual ceiling**, a named operational **owner** and an **escalation SLA** — the three things
+a boundary needs that a direction does not. That makes two of the firm's own written rules enforceable for
+the first time: the methodology's *"anything above appetite requires a treatment plan with an owner and a
+date"* and the register's auditor checkpoint *"residual scores sit within appetite"*, neither of which
+could be evaluated while no position stated a number to be above. Ceilings are derived from the
+methodology's own published bands by position type (ZERO 6, LOW 9, BANDED/MEASURED 12), not chosen risk by
+risk, and only the Board may move them. All twenty register risks are now claimed by exactly one position
+— CI fails on a risk claimed twice or by nobody — and `residualAboveAppetite` scores every one on each run.
+It reports **1**: R-03, the sanctions false negative, at residual 10 against a ZERO position's ceiling of 6,
+with a treatment carrying an owner and a cadence but no date. The measure was breached the day it was
+created, which is what it is for. Also added: amber warning bands as a sibling key (only where the red line
+has headroom — a threshold of 0 or 100% has none), KRI owners and SLAs carried into the snapshot projection
+so the governance data cannot exist unmeasured, and `kri-breach-ledger.md`, the append-only breach history
+the byte-compared snapshot cannot carry. One curated document added; no workflow added; no scored control
+changed.)*
+
+Verified at HEAD: 56 workflows · 173 markdown documents under docs/ (140 excluding docs/research/auto).
+*(29 July, sixth pass — the **risk vocabulary**: `risk-glossary.md` translates the thirty terms of the
+risk lens into business language and, in each case, points at the authoritative definition already in
+the estate rather than restating it — so the glossary cannot drift from the register it explains. It
+records what is **not** governed as plainly as what is: risk capacity, target residual risk, control
+owner, loss event and a severity scale have no home here, and the page says so instead of implying a
+control that does not exist. It also disambiguates `near-miss`, which in this repository already means
+a matcher-score margin and not a failure that was caught in time. Shipped with it, a relative-link
+guard (`test/doc-links.test.mjs`): the existing checker probes external URLs only, so a cross-reference
+to a file that does not exist was invisible to CI across 1,182 links. Zero were broken — the guard is
+preventive, and it verified this page's own forty-four links on the way in. One curated document added;
+no workflow added; no scored control changed.)*
+
+Verified at HEAD: 56 workflows · 172 markdown documents under docs/ (139 excluding docs/research/auto).
+*(28 July, fifth pass — policy-pack completion: the Conflict of Interest & Staff Conduct policy (the
+instrument the pack was missing — declaration duties, recusal, four-eyes, gifts, no commercial override,
+and the MLRO's own conflicts routed to the Board chair), plus five instruments that already existed and
+were operating but had never been registered: the business continuity plan, the decommissioning
+procedure, the data-quality plan, the internal audit programme and the model-validation pack (POL-32 to
+POL-36). The anti-shadow-policy sweep was widened after it let two of those through on filename alone:
+it now keys on an `**Approver:**` header as well as the name pattern. One curated document added; no
+workflow added; no scored control changed. Thirty-six instruments registered, sixteen in force.)*
+
+Verified at HEAD: 56 workflows · 171 markdown documents under docs/ (138 excluding docs/research/auto).
+*(28 July, fourth pass — the AML/CFT/CPF **policy pack**: seventeen governing instruments drafted under
+`docs/policies/` (master policy, CDD/SDD/EDD, sanctions & TFS, CPF, transaction monitoring & reporting,
+goAML filing procedure, EWRA methodology, responsible sourcing, record-keeping, training, governance
+charter, whistleblowing, data privacy, information security, outsourcing, independent audit, regulatory
+change management). Registered as **draft** pending approval (open-actions item 18) — the estate had the
+controls and the registers, but not the instruments that say how the controls are applied. Two obligations
+added: OB-20 proliferation financing as a standalone pillar, OB-21 wire-transfer data at AED 3,500.
+Eighteen curated documents added; no workflow added; no scored control changed. Compliance completion
+moves 37.5% → 33.3% because the denominator grew by two — an honest dilution, not a regression.)*
+
+Verified at HEAD: 56 workflows · 153 markdown documents under docs/ (120 excluding docs/research/auto).
+*(28 July, third pass — policy register (`data/policies.json` + `policy-register.md`): thirteen
+governing instruments with owner, type, status, approval record and next review, eleven in force and
+two draft pending the same board sitting. CI now requires each instrument to declare its owner in its
+own header — five documents had none until the register asked — an approval date to be evidenced by
+the document itself, a draft to assert no review date, and every policy/procedure/charter/runbook/SOP
+under docs/ to be registered or excluded with a reason. One curated document added; no scored control
+changed.)*
+
+Verified at HEAD: 56 workflows · 152 markdown documents under docs/ (119 excluding docs/research/auto).
+*(28 July, second pass — GRC framework completion: Risk Appetite Statement (DRAFT, board R7), obligation
+register and the GRC metrics layer, with `data/risk-appetite.json`, `data/obligations.json` and a
+generated `data/grc-metrics.json` behind them. Three curated governance documents added; no workflow
+added. New enforced invariants: the stated appetite must match the zero-tolerance list and band cutoffs
+the code applies, every obligation must reach a live control and a watch source, and the metrics
+snapshot fails CI when stale. Scored controls unchanged — but the estate is now measured: control
+effectiveness 100%, compliance completion 37.5%, third-party coverage 71.4%, finding closure 95.2%,
+one KRI in breach (vendor assessments, already open-actions items 2 and 5).)*
+
+Verified at HEAD: 56 workflows · 149 markdown documents under docs/ (116 excluding docs/research/auto).
+*(28 July — AI-governance register completion: the prompt lifecycle register (PromptOps) and the
+tool & connector register, each with a machine-readable source of truth (`data/prompt-assets.json`,
+`data/tool-surfaces.json`), a human view, and a CI drift guard (`test/prompt-register.test.mjs`,
+`test/tool-register.test.mjs`). Two curated governance documents added; no workflow added. Control
+coverage ADDED — prompt change control and the agent-capability inventory were previously
+ungoverned — and one new enforced invariant: a model call declaring `tools`/`tool_choice` now fails
+CI. No scored control weakened.)*
+
+Verified at HEAD: 56 workflows · 147 markdown documents under docs/ (114 excluding docs/research/auto).
+*(28 July — screening accuracy hardening programme: labelled benchmark corpus with per-backend
+CI floors (recall 57→97.5%, adverse 58→100%, repeat 50→100%), shared transliteration data,
+phonetic fold layer, one-way threshold config + log-only shadow challenger, adverse-media
+description scanning / keyword tiers / gated repeat counter. One curated governance document
+added (screening-accuracy-benchmark.md). Detection controls STRENGTHENED — no scored control
+weakened; bias floors raised 70→90%/group.)*
+
+Verified at HEAD on 25 July (third pass): 56 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
 *(25 July, third pass: the EOCN Reconcile preparer — twice-weekly mirror cross-check pushed to a
 review branch whose human merge records the MLRO sign-off; the review-age gate itself is
 unchanged. Netlify deploy gains a path-filtered push trigger (inert until its secret exists);

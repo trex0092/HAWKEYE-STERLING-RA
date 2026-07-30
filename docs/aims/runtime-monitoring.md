@@ -96,6 +96,20 @@ one of the last *N* runs (default 3). When that happens:
   baseline, and any anomalies / coverage drift, in plain language for the MLRO.
 - **QA gate** — coverage alarms and runtime anomalies become integrity issues, so
   the governance attestation reads "ATTENTION" rather than silently passing.
+- **Run conclusion** — the post-delivery gate chain turns the run itself red so
+  alerting keyed on the Actions conclusion (freshness check, failure e-mail)
+  fires. The report is always delivered FIRST; then the run fails with a
+  distinct exit code per cause, on both the daily and the onboarding path:
+  | exit | gate | cause |
+  |---|---|---|
+  | 3 | EOCN review gate | curated local list's manual review lapsed (`EOCN_REVIEW_MAX_AGE_DAYS`) |
+  | 4 | list outage gate | a core sanctions list had no obtainable source this run (screened DEGRADED) |
+  | 5 | delivery gate | the screening report never reached the MLRO queue |
+  | 6 | coverage-alarm gate | a core list shrank vs its trailing median, or EOCN mirror designations are missing locally |
+  A coverage floor breach (source obtained but parsed below floor — corruption)
+  refuses the run BEFORE screening instead, so results computed against corrupt
+  data can never post. Each gate has its own kill-switch (`*_HARD_FAIL=0`) that
+  keeps the alarm but not the exit.
 - **Escalation** — a sustained anomaly auto-routes to a GitHub issue (see above).
 - **Logs** — every alarm/anomaly is also written to the run log.
 

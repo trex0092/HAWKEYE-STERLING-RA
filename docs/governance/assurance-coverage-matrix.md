@@ -11,7 +11,7 @@ GitHub Actions workflow). *Frequency* = when it runs. *Evidence* = where the
 result is recorded. All referenced workflows live in `.github/workflows/`; tests
 in `test/`.
 
-_Last reviewed: 2026-07-02 · Owner: Compliance Engineering · Review: with each
+_Last reviewed: 2026-07-28 · Owner: Compliance Engineering · Review: with each
 material change, and at the quarterly management review._
 
 ---
@@ -49,6 +49,8 @@ material change, and at the quarterly management review._
 | Matching quality (fuzzy, transliteration, Arabic) with fairness bound | `test/sanctions-match.test.mjs`, `test/sanctions-match-fuzz.test.mjs`, `test/engine_test.py` (recall-gap check) | Every push/PR | CI run log |
 | Screening engine unit coverage | `test/sanctions-screen.test.mjs` (50 checks) | Every push/PR | CI run log |
 | Mandatory-daily controls actually ran today | `freshness-check.yml` → `scripts/freshness-check.mjs` | Daily 09:00 UTC | Asana alert on staleness |
+| Internal firm watchlist screened alongside official lists (optional — empty never degrades, populated always screens) | `test/data-schema.test.js` (shape + `optional` wiring); supplementary-tier load in `screen.py` / optional source in `sanctions-screen.mjs` | Every push/PR + per screen run | Screening report "Internal — Firm Watchlist" line |
+| Sanctions/EOCN hit → TFS path (suspend, PNMR/CNMR/FFR, freeze) — procedure + routing | — (manual procedure; §4 below) | Per event + annual tabletop | [`tfs-name-match-procedure.md`](../aims/tfs-name-match-procedure.md) §4 event log; decision-tree gate 1a |
 | Screening observability metrics | `scripts/screening-metrics.mjs` (in `sanctions-screen.yml`) | Per screen run | Run log (§3 KPIs) |
 
 ### 1.4 Regulatory & list watch
@@ -56,7 +58,7 @@ material change, and at the quarterly management review._
 | Control | Automated proof | Frequency | Evidence |
 |---|---|---|---|
 | Consolidated sanction-list changes detected (OFAC/UN/EU/UK) | `sanctions-watch.yml` (+ `test/sanctions-watch.test.mjs`) | Daily 05:00 UTC | Card in *Ongoing Monitoring* → Sanctions updates; issue fallback |
-| Regulator source changes detected (20 UAE/global sources) | `regulatory-watch.yml` (+ `test/reg-watch.test.mjs`) | Daily 06:00 UTC | Card → Regulatory changes; issue fallback |
+| Regulator source changes detected (22 UAE/global sources, incl. the EU AI Act page) | `regulatory-watch.yml` (+ `test/reg-watch.test.mjs`) | Daily 06:00 UTC | Card → Regulatory changes; issue fallback |
 | FATF black/grey list moves + affected-assessment digest | `fatf-watchdog.yml` (+ `test/watchdog.test.mjs`) | Daily 06:00 UTC (digest monthly) | Card → FATF list moves; review task |
 | Daily compliance brief composed from the monitoring projects | `daily-brief.yml` (+ `test/daily-brief.test.mjs`) | Daily 07:00 UTC | Brief card in *Ongoing Monitoring* |
 | Anomaly watch over watcher outputs | `anomaly-watch.yml` | Daily | Run log / alert |
@@ -106,6 +108,14 @@ material change, and at the quarterly management review._
 | Bias eval (deterministic dimension; live-LLM pairs gated on DPA) | `advisor-bias-eval.yml` + `test/bias_eval.py` | Quarterly | [`advisor-bias-review-2026.md`](advisor-bias-review-2026.md) |
 | Prompt-injection red team | `test/redteam_injection.py` | Every push/PR | CI run log; [`red-team-procedure`](../aims/red-team-procedure.md) |
 | LLM egress gated until DPA executed (`LLM_TRIAGE=0`) | Env gate in `onboarding-screen.yml` / `weekly-adverse-media.yml` | Every run | Workflow env; [`third-party-register`](../aims/third-party-register.md) |
+| AI asset register: schema + shadow-AI scan; quarterly review currency | `test/ai-assets.test.js` (shape, CI); register-review row in `governance-report.yml` (currency — REVIEW OVERDUE past 100 days) | Every push/PR + daily | CI run log; daily governance card |
+| Prompt change control: every governed prompt matches its approved fingerprint; anti-shadow-prompt scan | `test/prompt-register.test.mjs` (SHA-256 per prompt region; re-pin via `scripts/prompt-register.mjs --update`) | Every push/PR | CI run log; [`prompt-lifecycle-register`](prompt-lifecycle-register.md) + `data/prompt-assets.json` history |
+| Agent capability inventory: action/authz/credential table matches `agents.py` both ways; runtime invariants intact | `test/tool-register.test.mjs` | Every push/PR | CI run log; [`tool-connector-register`](tool-connector-register.md) |
+| No model call may declare tools / `tool_choice` (no model→connector path) | `test/tool-register.test.mjs` (scan of every model-API caller) | Every push/PR | CI run log |
+| Obligation register: instruments current, controls reachable, watch source per obligation, partial rows tied to a live open action | `test/obligations.test.mjs` | Every push/PR | CI run log; [`obligation-register`](obligation-register.md) |
+| Stated risk appetite matches the appetite the code enforces (zero-tolerance list + band cutoffs) | `test/grc-metrics.test.mjs` (parses `netlify/functions/brain-soul.js` and `app.js`) | Every push/PR | CI run log; [`risk-appetite-statement-2026`](risk-appetite-statement-2026.md) |
+| Policy register: every instrument owned in its own header, approval dates evidenced, no unregistered policy/procedure/runbook | `test/policies.test.mjs` | Every push/PR | CI run log; [`policy-register`](policy-register.md) |
+| GRC metrics snapshot cannot go stale in a board pack | `grc-metrics.mjs` `--check` (CI step + `npm test` drift check) | Every push/PR | CI run log; [`grc-metrics`](grc-metrics.md) |
 
 ### 1.9 Quality & accessibility
 
@@ -116,6 +126,24 @@ material change, and at the quarterly management review._
 | Performance/SEO budgets | `lighthouse.yml` | Path-triggered | LHCI artifact |
 | Visual regression vs committed baseline | `visual.yml` (read-only compare; write scopes only on baseline dispatch) | Path-triggered | Playwright report artifact |
 | Documentation link integrity + changelog format | `link-check.yml`, `test/changelog.test.mjs` | Weekly + push | CI run log |
+
+### 1.10 Governance-evidence index (Level-4 evidence types)
+
+Monitoring shows *what happened*; evidence proves *who authorised it, why, and
+that it is independently verifiable*. This index maps each evidence type of the
+five-level Operational AI Governance Stack
+([crosswalk §C](ai-frameworks-crosswalk-2026.md)) to the artefact that
+satisfies it — everything below already exists elsewhere in this matrix; this
+names it as evidence an examiner can demand.
+
+| Evidence type | Artefact | Automated proof | Where an examiner finds it |
+|---|---|---|---|
+| Governance decision ledger | [`open-actions-register.md`](open-actions-register.md) + minuted decisions ([board minute template](board-minute-template-2026-07.md)) + [ADR-001](adr-001-deterministic-vs-learned.md) | — (manual, §4 cadence) | `docs/governance/` |
+| Runtime evidence | Tamper-evident hash-chained activity log; workflow run logs; daily governance card | `test/app.test.js` (chain verify); `governance-report.yml` | In-app log (tokenised export); Asana *AI & Platform Governance* section |
+| Human override records | One-way analyst override with mandatory justification, written to the activity log | `test/app.test.js` (override cases) | In-app activity log |
+| Authorization chain | MLRO sign-off + dual attestation; CODEOWNERS-gated change control; policy ratification signatures | `test/app.test.js` (RBAC paths); branch protection | [`ai-policy.md`](ai-policy.md) §9; [`model-validation-2026.md`](model-validation-2026.md) |
+| Independent audit evidence | Tokenised exports verifiable off-app; Sigstore release attestations + SBOM; SARIF artefacts | `test/export-integrity.test.js`; `release.yml` (+ `test/sbom.test.mjs`) | GitHub releases / security tab |
+| Decision provenance | Contributing factors behind every score; versioned risk data (`RISK_DATA_VERSION`); Advisor audit line ("decision support, not a decision") | `test/scoring-golden.test.js`; `test/advisor-assurance.test.js` | On-screen + activity log |
 
 ---
 
@@ -139,6 +167,7 @@ workflow has a loud failure path (red run, GitHub-issue fallback, or Asana alert
 | Watcher change volume (reg/sanctions/FATF cards) | *Ongoing Monitoring* sections | Daily |
 | CI health (suite pass rate, 45 test files) | GitHub Actions | Per push |
 | Supply-chain score | OpenSSF Scorecard | Weekly |
+| GovernanceScore — composite control-suite health (0–100; pass=1, attention=0.5, fail=0) | Daily governance report (title + body, with Δ vs previous) | Daily |
 | Advisor eval outcomes (guardrail regressions, bias divergence) | Eval workflow runs / review docs | Weekly / quarterly |
 
 ## 4 · Manual assurance cadence (no automated proof — by design)
@@ -150,6 +179,7 @@ workflow has a loud failure path (red run, GitHub-issue fallback, or Asana alert
 | **Manual penetration test** of the live app + functions (beyond the automated ZAP baseline): authenticated-flow abuse, business-logic, rate-limit bypass, CORS/origin edge cases | Firm (external tester recommended) | **Annual** | Report filed in `docs/governance/`; findings → [`corrective-actions.md`](../aims/corrective-actions.md) |
 | Review of deferred architectural decisions (function auth / Netlify Identity, distributed rate limiting, WebAuthn) | Firm | Annual or on risk change | This doc + [`ai-governance-gap-analysis-2026.md`](ai-governance-gap-analysis-2026.md) |
 | Asana token custody: scoped service account + rotation on personnel change | Firm (Asana admin) | On change / annual | [`third-party-register.md`](../aims/third-party-register.md) |
+| TFS name-match procedure review + tabletop walk-through (suspend → verify → PNMR/CNMR+FFR → release) | MLRO | Annual (calendar duty) + after every real TFS event | [`tfs-name-match-procedure.md`](../aims/tfs-name-match-procedure.md) §4 event log |
 
 ## 5 · Known gaps (stated, not hidden)
 

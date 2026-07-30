@@ -5,6 +5,7 @@
 
 **Owner:** MLRO (accountable) · Compliance Engineering (operational)
 **Source of truth:** [`data/ai-assets.json`](../../data/ai-assets.json) (machine-readable; this page is the human view)
+**Sibling registers:** [`prompt-lifecycle-register.md`](prompt-lifecycle-register.md) — what each surface is *told* to do (fingerprinted, version-controlled) · [`tool-connector-register.md`](tool-connector-register.md) — what may be *invoked*, by whom, with which credential
 **Review cadence:** Quarterly, and on any change to model id, provider, prompt charter, or data flow.
 **Last reviewed:** 2026-07-15
 
@@ -39,7 +40,7 @@
 - **Agent classification:** Assistive generative-AI, **non-agentic** (no tools, no autonomous
   actions, no writes).
 - **Controls:** `SOUL_CHARTER` (prohibitions P1–P10), refusal protocol, prompt-injection resistance,
-  post-output tipping-off guard (Article 25, FDL 10/2025), 26 s timeout, audit line on every
+  post-output tipping-off guard (Article 25, FDL 10/2025), abort budget derived from the platform execution cap (`ADVISOR_PLATFORM_CAP_MS`, default 10 s) so the guards always run, audit line on every
   response, CORS origin guard. **Assurance:** `test/advisor-assurance.test.js` (offline, in CI) and
   the key-gated live eval `scripts/advisor-eval.mjs` (weekly).
 - **Data flow & retention:** transient; Anthropic API usage with no training on inputs; the function

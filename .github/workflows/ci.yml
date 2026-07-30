@@ -94,6 +94,10 @@ jobs:
         run: node test/sanctions-match.test.mjs
       - name: Run sanctions matcher property/fuzz tests
         run: node test/sanctions-match-fuzz.test.mjs
+      - name: Run screening accuracy benchmark — JS backend (labelled corpus, CI floors)
+        run: node test/screening-benchmark.test.mjs
+      - name: Validate the shared transliteration groups data (both-engine source of truth)
+        run: node test/translit-data.test.mjs
       - name: Run GLEIF LEI-check unit tests
         run: node test/lei-check.test.mjs
       - name: Run legal-citation guard (repealed instruments never cited as operative)
@@ -108,6 +112,16 @@ jobs:
         run: node test/pep-check.test.mjs
       - name: Run link-check unit tests
         run: node test/link-check.test.mjs
+      - name: Run documentation relative-link guard (every [..](..) resolves on disk)
+        # scripts/link-check.mjs probes EXTERNAL urls only, so a relative
+        # cross-reference to a file that does not exist was invisible to CI.
+        run: node test/doc-links.test.mjs
+      - name: Run ISO 42001 clause 6.1 mapping guard (6.1.2/6.1.3/6.1.4 + R-nn to Annex A both ways)
+        run: node test/clause-mapping.test.mjs
+      - name: Run the advisor browser check (the mode-downgrade banner reaches the operator)
+        # Offline suites prove brain-soul RETURNS modeDegraded; only this proves
+        # the operator SEES it. Skips loudly if no browser is available.
+        run: node test/advisor-browser.test.mjs
       - name: Run Asana Netlify-function tests (timeout + non-JSON handling)
         run: node test/asana-functions.test.js
       - name: Run Asana reconciliation diff tests (drift detection)
@@ -116,6 +130,8 @@ jobs:
         run: node test/ratelimit.test.js
       - name: Check Regulatory Watch docs are in sync with the registry
         run: node scripts/reg-sources-doc.mjs --check
+      - name: Check the GRC metrics snapshot is in sync with the estate
+        run: node scripts/grc-metrics.mjs --check
       - name: Run console + advisor screen smoke tests
         run: node test/screens.test.js
       - name: Run advisor full-surface smoke tests (every Q&A subject + tool + ask phase)
@@ -126,6 +142,16 @@ jobs:
         run: node test/advisor-bias-eval.test.mjs
       - name: Run AI asset register schema test
         run: node test/ai-assets.test.js
+      - name: Run prompt register test (prompt fingerprints + change control)
+        run: node test/prompt-register.test.mjs
+      - name: Run tool & connector register test (agent authz + no model tool-calling)
+        run: node test/tool-register.test.mjs
+      - name: Run obligation register test (instruments, controls, watch sources)
+        run: node test/obligations.test.mjs
+      - name: Run GRC metrics test (metric bases + KRI wiring + appetite vs code)
+        run: node test/grc-metrics.test.mjs
+      - name: Run policy register test (ownership, approval record, shadow-policy sweep)
+        run: node test/policies.test.mjs
       - name: Run data/*.json integrity test
         run: node test/data-json.test.js
       - name: Run data/*.json schema test (sanctions sources + state shape)
@@ -152,11 +178,29 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile the Python screening engine
-        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py
+        # scripts/daily-screen-*.py were inline heredocs in
+        # daily-sanctions-screen.yml until 2026-07-29 — ~840 lines of the daily
+        # screening path that no compile step, test or linter could reach
+        # because they lived inside a YAML string. They are ordinary files now,
+        # so they compile here with everything else.
+        # str_dossier.py was missing from this list while being exercised by
+        # test/engine_test.py — tested, but never syntax-gated.
+        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py str_dossier.py scripts/matcher-parity-probe.py scripts/daily-screen-fetch.py scripts/daily-screen-run.py scripts/daily-screen-report.py
+      - name: Run cross-engine matcher parity (screen.py vs sanctions-match.mjs)
+        # Runs here, AFTER setup-python, because it drives both engines: the node
+        # test shells to scripts/matcher-parity-probe.py. The per-backend accuracy
+        # floors compare each engine to ITSELF and are blind to drift between the
+        # two — this is the only check that compares them to EACH OTHER.
+        run: node test/matcher-parity.test.mjs
       - name: Run Python engine unit tests (screen + ai + agents + kyc + txn + monitoring)
         run: python test/engine_test.py
       - name: Run formal bias / fairness evaluation (R-05 — cross-script recall parity)
         run: python test/bias_eval.py
+      - name: Run screening accuracy benchmark — Python difflib backend (labelled corpus, CI floors)
+        # No rapidfuzz in this job's image: the harness records backend=py_difflib
+        # and enforces that backend's own floors. The authoritative rapidfuzz gate
+        # runs in the fuzz job below, which installs the real engine deps.
+        run: python test/benchmark_eval.py
       - name: Run prompt-injection red-team (R-02 — detection + non-execution)
         run: python test/redteam_injection.py
       - name: Browser smoke test (reduced motion — stable)
@@ -246,9 +290,9 @@ jobs:
       - name: Install the hash-locked engine dependencies (incl. hypothesis)
         run: python -m pip install --quiet --require-hashes -r ci/requirements.txt
       - name: Run property-based fuzzing of the text-normalisation layer (hypothesis)
-        env:
-          ASANA_TOKEN: dummy   # screen.py requires it at import; never used by the properties
         run: python test/fuzz_properties.py
+      - name: Run screening accuracy benchmark — Python rapidfuzz backend (authoritative floors)
+        run: python test/benchmark_eval.py
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22

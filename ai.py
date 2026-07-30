@@ -137,21 +137,43 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
         return None
 
 # ── TRANSLITERATION (Arabic / Turkish name variants for better recall) ────────
-# Common equivalent spellings in this book of business. Conservative: only
-# well-established particle / name swaps, to improve recall without inflating
-# false positives.
-_TRANSLIT_GROUPS = [
-    {"mohammed", "muhammad", "mohamed", "mohammad", "muhammed", "mohd"},
-    {"abdul", "abdel", "abd al", "abdal", "abd el"},
-    {"bin", "ibn", "ben"},
-    {"al", "el"},
-    {"ahmed", "ahmad"},
-    {"yousef", "yusuf", "yousuf", "youssef"},
-    {"hussein", "husain", "hussain", "husein"},
-    {"sheikh", "shaikh", "shaykh"},
-    {"abdulrahman", "abdul rahman", "abdelrahman"},
-    {"ismail", "ismael", "esmail"},
-]
+# Transliteration-equivalent spelling groups: loaded from the shared data file
+# so BOTH engines (this module and scripts/sanctions-match.mjs) swap exactly the
+# same spellings — the duplicated in-code tables the file replaces had already
+# drifted once. Conservative rule: a group only contains spellings of the SAME
+# underlying name. FAIL LOUD on a missing/invalid file: a silently-empty group
+# list would be a quiet recall degrade, against the estate's degrade-loudly rule
+# — better no run than an unknowingly weaker one.
+_TRANSLIT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "data", "translit-groups.json")
+
+def _load_translit_groups(path=_TRANSLIT_PATH):
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    groups = [set(g) for g in data["groups"]]
+    if not groups:
+        raise ValueError(f"translit groups file {path} contains no groups")
+    for g in groups:
+        if len(g) < 2 or any((not m) or m != m.lower() for m in g):
+            raise ValueError(f"malformed translit group in {path}: {sorted(g)}")
+    return groups
+
+_TRANSLIT_GROUPS = _load_translit_groups()   # raises at import — never silently empty
+
+# Canonical representative per single-word member (first single-word member of
+# the group in sorted order) — the fold the phonetic layer keys on, so
+# "khalid"/"khaled" or "omar"/"umar" share one canonical token. Multi-word
+# members ("abd al") are swap-only: they never canonicalise a single token.
+_TRANSLIT_CANON = {}
+for _g in _TRANSLIT_GROUPS:
+    _singles = sorted(m for m in _g if " " not in m)
+    if _singles:
+        for _m in _singles:
+            _TRANSLIT_CANON[_m] = _singles[0]
+
+def translit_canon_token(tok: str) -> str:
+    """The canonical spelling of one lowercase token (itself when ungrouped)."""
+    return _TRANSLIT_CANON.get(tok, tok)
 
 def _ascii_fold(s: str) -> str:
     # Uppercase BEFORE decomposing (mirrors screen.py normalize()): lowercase
@@ -162,9 +184,29 @@ def _ascii_fold(s: str) -> str:
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
     return re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9 ]", " ", s)).strip().lower()
 
-def name_variants(name: str, cap: int = 12):
+def _variant_cap() -> int:
+    """Deterministic-cap size for name_variants, env-tunable. 32 covers the
+    worst realistic case under single-group-swap semantics (each group present
+    in a name contributes group_size-1 variants of the base; swaps never
+    compose), with headroom. Invalid values are rejected LOUDLY and the default
+    kept — mirroring scripts/sanctions-screen.mjs resolveThreshold()."""
+    raw = os.environ.get("TRANSLIT_VARIANT_CAP", "")
+    if not raw:
+        return 32
+    try:
+        v = int(raw)
+    except ValueError:
+        v = 0
+    if v >= 1:
+        return v
+    print(f"TRANSLIT_VARIANT_CAP={raw!r} is not a positive integer — using default 32")
+    return 32
+
+def name_variants(name: str, cap: int = None):
     """Return a small set of transliteration-equivalent spellings of `name`
     (including itself). Used to widen sanctions matching recall."""
+    if cap is None:
+        cap = _variant_cap()
     base = _ascii_fold(name)
     if not base:
         return set()
@@ -420,7 +462,7 @@ def draft_str(customer_name, permalink, sanctions_hits, pep, adverse_articles, r
     UAE FIU goAML portal. AI/automation drafts; a human always files."""
     L = ["SUSPICIOUS TRANSACTION REPORT — DRAFT (for MLRO review; file via goAML)",
          "=" * 64,
-         f"Reporting entity:   Hawkeye Sterling LLC",
+         "Reporting entity:   Hawkeye Sterling LLC",
          f"Subject:            {customer_name}",
          f"Customer record:    {permalink}",
          f"Assessed risk:      {risk['rating']}",

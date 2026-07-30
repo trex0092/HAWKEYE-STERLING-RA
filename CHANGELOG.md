@@ -10,6 +10,1598 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Law-change cards were filed correctly and still never seen (2026-07-29)
+
+PR #305 ("Route every pipeline Asana delivery to HAWKEYE STERLING APP", merged
+22 Jul 2026) redirected every pipeline card to the app project. The Regulatory
+Watch card — the law-change feed — is worked from a different project, so from
+that day it was being created successfully and read as *nothing arrived* to the
+person watching for it. Eight days of law-change deltas, including OFAC Recent
+Actions and an LBMA Responsible Sourcing change, landed where nobody was looking.
+
+Two things made it invisible rather than obvious:
+
+- the workflow step was named **"Notify Asana — Ongoing Monitoring project"**
+  while pointing at the app project; and
+- the comment above the GIDs described `1216203370612916` as *"the Regulatory
+  changes section of the Ongoing Monitoring project"*. Verified against the live
+  API, `1216203370612914` is **HAWKEYE STERLING APP** and `1216203370612916` is
+  its **Assessment Report** section — neither is what the comment claimed. A
+  reviewer auditing the delivery path would have read the comment and moved on.
+
+The card is now **mirrored**: one task with two project memberships (the same
+multi-homing the daily screening already uses for its dual MLRO queue). The #305
+destination is untouched — this is additive — and the card also appears in
+"Sanctions/Media/PEP - Monitoring" → "Regulatory changes", where it is actually
+worked. One task, so there is no duplicate to reconcile. The step name and the
+GID comments now state the verified project and section names.
+
+Note for the record: the daily sanctions/adverse/PEP screening was never
+affected. It delivers via its own dual-queue path to "Sanctions/Media/PEP -
+Monitoring" and has posted every day throughout.
+
+
+### "This subject was never screened" must not lose its place to ten candidates (2026-07-29)
+
+A subject whose name the matcher cannot handle (non-Latin script, or under four
+matchable characters) gets a **MANUAL REVIEW** marker in the daily report — the
+statement that it was never auto-screened at all, and must be screened by hand.
+
+That marker scores `0` by construction, and the report shows
+`sorted(hits, -score)[:10]`. So the moment a customer had ten other candidates,
+the marker sorted last and was **dropped** — replaced by "… +N more similar
+candidates", which reads as more of the same rather than "this subject was not
+screened". It carries no `is_new`, so `open_mlro_cases` raises no case for it
+either: the report line was its only surface. #351 dealt with a real subject
+carrying 73 candidate designations, so ten is not a hypothetical threshold.
+
+The marker is now pinned outside the top-ten cut — it is a coverage statement,
+not a candidate competing on score — and the overflow counter counts candidates
+only, so the number no longer includes the pinned line.
+
+Found in the residual note of an adjudication verdict that had otherwise cleared
+the lead; the two lenses had split on it.
+
+### Ongoing Monitoring — a CLEAR card could suppress the same day's HIT card (2026-07-29)
+
+The Adverse Media / PEP card is deduplicated per day so a re-run does not post
+twice. The check matched on the date plus the words "Adverse Media" or "PEP" —
+but **both** card names carry "Adverse Media", so CLEAR and HIT were treated as
+interchangeable and whichever landed first suppressed the other.
+
+A run earlier in the day that found nothing — or found nothing *because its feed
+was degraded* — therefore suppressed a later run's HIT card, and Ongoing
+Monitoring was left showing **CLEAR for a day on which hits were found**. The
+path there is the one that matters most: a manual dispatch or a re-run, which is
+exactly what you do after noticing the scheduled run was degraded.
+
+The dedup is now direction-aware: a HIT card supersedes today's CLEAR card,
+nothing supersedes a HIT, and a CLEAR run never overwrites a day already
+reported as a hit. The boundary guard against `9 Jul` matching `19 Jul` is
+retained. The predicate is exported as `omCardToSkip` so the invariant is tested
+directly rather than asserted by replication.
+
+### Coverage attestation — a customer row we cannot screen is a gap, not a non-event (2026-07-29)
+
+`get_all_customers` dropped any Asana customer row missing a name or a gid with
+a bare `continue`. Nothing recorded it — and `customers_total`, printed under
+**SCOPE & COVERAGE ATTESTATION** as "Customers in database", is `len(customers)`,
+i.e. the count *after* the exclusion. So a record that was never screened by any
+net simply vanished from the denominator, and the attestation claimed complete
+coverage of a book that had quietly lost it.
+
+Skipped rows are now recorded with their permalink and the reason, logged as
+they occur, and attested: "Customers in database" is the true total, with the
+screened count and the un-screenable count reported separately and the affected
+records named so the MLRO can fix them. A clean book states so affirmatively
+rather than printing an ambiguous zero. The run still never crashes on one bad
+row.
+
+### MLRO cases — the disposition block was being cut off the end of long cases (2026-07-29)
+
+`create_case_subtask` sent `notes[:8000]`, a head slice. The **end** of a case
+note is the part that has to survive: the disposition checkboxes (the MLRO's
+actual decision record), the "Do not tip off — UAE Cabinet Resolution 74/2020
+applies" warning, and for HIGH-risk cases the entire STR/SAR draft. Any case
+with a long hit list therefore reached the queue with evidence but **nothing to
+tick and no legal warning**, and no log line said so. Measured on a 60-hit
+HIGH-risk case: 10,944 characters built, 8,000 delivered, all three blocks gone.
+
+8,000 characters was also **8x stricter than the budget the same Asana notes
+field accepts** on the report path (65,000 worst-case rich-text bytes), so cases
+were being cut that the API would have taken whole.
+
+Case notes now go through `cap_notes` — which truncates the body and keeps the
+tail — at the report path's budget, with a protected tail large enough that the
+disposition block survives even above a long STR draft, and a visible truncation
+marker instead of a silent cut. A refused create is re-queued to the backlog and
+retried on later runs, so a payload Asana rejects at full budget would re-fail
+forever; a size refusal (400/413) is now re-bid once at a smaller budget, while
+auth, rate-limit and network failures are not (they fail identically at any size).
+
+### Screening state — a flaky fetch could erase the delivered-finding history (2026-07-29)
+
+Both state writers — the daily sweep and the onboarding run — restored the
+delta-state branch with `if git fetch origin screen-delta-state; then overlay;
+else cold start; fi`. `git fetch` exits **128 for a missing branch and 128 for
+an unreachable origin**, so the two are indistinguishable and a transient
+network flake was read as a first run. The run then diffed against `main`'s
+frozen copy and re-reported findings already delivered — and, because the
+commit step **force-pushes** the branch as `<main>` + one data commit, it
+overwrote the accumulated delta-state permanently. Both writers share that
+branch, so either one could destroy the other's history.
+
+`git ls-remote --exit-code` is the discriminator (`2` = ref genuinely absent,
+anything else = transport error). A cold start still proceeds; an unreachable
+origin now stops the run with an explicit error rather than silently screening
+with amnesia. The force-pushing commit step is additionally gated on the
+overlay having established a baseline, so a failed overlay cannot persist state
+built on one it never read.
+
+`anomaly-watch` — a state *reader* — already carried this guard; the two
+*writers* did not. Verified against the real `bash -e` GitHub uses, across four
+scenarios (branch present, branch absent, origin unreachable, fetch failing
+after a successful probe). `test/screening-state.test.mjs` now pins the
+discrimination for all three consumers, form-agnostically, along with the
+`set -e` capture idiom the guard depends on.
+
+### Adverse media — the watchlist cannot "cover" a subject it cannot match (2026-07-29)
+
+`am_blackout` — the figure that turns the adverse module DEGRADED — counted a
+subject as having zero coverage only when the **whole watchlist failed to
+load**. But the watchlist is screened with the same matcher as sanctions, and
+that matcher returns nothing for a name it cannot handle (recorded in non-Latin
+script, or collapsing under 4 matchable characters). Such a subject gets nothing
+from the watchlist **even when the list loaded perfectly** — while the report
+told the MLRO, in exactly the run where the news sweep had failed, that "the
+adverse-exposure WATCHLIST still screened every subject".
+
+So a subject that was both news-dead *and* unscreenable had **no adverse
+coverage from any net**, and was reported as covered. The sanctions path already
+surfaces these names for manual review; the adverse path had no equivalent.
+
+`screen_watchlist` now records the names it could not screen, `tally_enrichment`
+counts those as blackouts when their news sweep also failed, and the report line
+no longer claims universal coverage — it says the watchlist screened every
+subject **it can match**, and points at the DEGRADED figure for the rest.
+
+
+### Matcher — the prefilter could silently cancel a MORE sensitive setting (2026-07-29)
+
+The C-side blocking prefilter builds its cutoffs from `THRESHOLD` and
+`TOKENSET_THRESHOLD`. A comment justified omitting `SHORT_ENTRY_THRESHOLD` by
+asserting it "must be >= THRESHOLD, so the same cutoff covers it" — an ordering
+**asserted in prose and enforced nowhere**. The threshold resolver accepts
+anything in [70, 100] and only rejects a RAISE; *lowering* is documented as
+plain config ("the challenger runs more sensitive only"). So activating the
+documented short-name challenger, `MATCH_SHORT_ENTRY_THRESHOLD=80`, was accepted
+silently and then **made the engine miss designations**: measured with real
+rapidfuzz at the production default `MATCH_BLOCKING=1`, customer "HAMAZ" against
+designated "HAMAS" returned **no hit blocked / one hit unblocked**. Turning the
+sensitivity up produced a false negative.
+
+The `core` disjunct of that gate is not bounded by either cutoff at all (core
+can be 100 while the whole-string score is 33 — precisely the shape the gate
+exists for), so rather than guess a bound the engine now **declines the
+prefilter** when the configured threshold falls below what the cutoffs can
+bound, and says so in the log. `None` is the established "prefilter
+unavailable" contract: identical results at the original cost. At the default
+threshold blocking stays fully active, so there is no routine performance cost.
+
+Two tests pin it, and the first draft of the randomized one was **vacuous** —
+it passed with the guard removed, because the generator's token pool held only
+exact spellings of the short designations and the gap opens only for a
+NEAR-miss. Near-miss tokens were added, plus a deterministic check asserting the
+exact pairs measured diverging. Both now fail against the reverted guard.
+
+
+### Case engine — a truncated alias file read as full coverage (2026-07-29)
+
+Alias sources (OFAC's `alt.csv`, folded into the SDN list via `mergeInto`) were
+deliberately exempted from coverage floors, on the reasoning — written into
+`_README_minNames` when the floors landed hours earlier — that "the fold's
+partial machinery covers them". **It does not.** That machinery fires only when
+the alias file is TOTALLY ABSENT. A truncated-but-nonzero `alt.csv` (a partial
+body, or an OFAC column shift that makes the parser return whatever it can)
+took the healthy path: no floor to fail, counted as fetched, so the run was not
+even DEGRADED.
+
+Then the fold made it invisible. `foldAliasSources` merges the alias names into
+the primary and **splices the alias row out**, never reading its `partial` flag
+— so even an alias list explicitly marked partial came out clean. Because alias
+hits are recorded under the **primary list's name**, an alias-derived standing
+match is indistinguishable from a primary one: the primary counted as fully
+re-verified, entered `screenedLists`, and `diffState` cleared the match and
+auto-completed its MLRO case.
+
+Both halves fixed: the alias source now carries its own `minNames` floor
+(provisional, sized to catch truncation rather than police churn), and the fold
+**propagates** reduced alias coverage onto the primary with a note, so the
+primary is excluded from `screenedLists` and its standing matches are carried
+forward rather than cleared. A complete alias fold still leaves the primary
+fully re-verified, so a healthy run does not degrade.
+
+### Screening — identity exclusion now reaches the CASE QUEUE (2026-07-29)
+
+The identity-based demotion shipped hours earlier removed a candidate from the
+report's primary queue but **not from case creation**: `open_mlro_cases`
+filtered on `is_new` alone. Cases are capped per run, so a candidate we can
+already prove is a different person could consume that cap and push a genuine
+case into the backlog — and the MLRO's working time lives in the case queue, not
+in the report text. Demotion that stops at the report is cosmetic. Excluded
+candidates now raise no case; they remain in the report under their heading with
+the reason, and in the record.
+
+### Matcher / PEP — two more silent false negatives (2026-07-29)
+
+Both surfaced by adjudicating audit leads that had never actually been
+adjudicated, and both reproduced against the live engines before any change.
+
+- **German sharp-s was not folded by the JS engine.** `ß` has no NFKD
+  decomposition and lower-casing leaves it alone, so `Weiß` and its universal
+  ASCII spelling `Weiss` normalized to different strings. `screen.py` folds it
+  (its uppercase-first path maps ß→SS), so **designated "Weiß Trading" scored
+  100 in Python and 0 — a clean CLEAR — in the JS engine**, and
+  `lostScriptLetters` returns false for ß so it was not even routed to MANUAL
+  REVIEW. Longer names could survive on fuzzy similarity; short ones cleared
+  outright. This is precisely the class the cross-engine parity test exists to
+  catch (Turkish ı, two-letter tokens) — the corpus simply had no ß name, so the
+  pair is now pinned there. Fold is strictly widening.
+- **A PEP name whose every token is under 3 characters could never hit.** The
+  label test compares only tokens of 3+ characters, so for such a name the
+  token list was empty, `if want and …` short-circuited, and `check_pep`
+  returned — and **cached** — a confident `{"hit": false}`. That silently
+  cleared real people: **"Wu Yi" is a former Vice-Premier of China**, and the
+  whole shape of East Asian names romanized as two short syllables screened
+  clean. They now route to manual PEP/RCA review, like the existing non-Latin
+  path. The check runs BEFORE the lookup, so it also stops spending a Wikidata
+  call and a shared rate-gate slot on a name the matcher cannot compare. The
+  worldwide PEP/RCA net still screens these names by exact match, so this is
+  their second net, not their only one.
+
+
+### Case engine — "not re-checked" must never read as "checked and clear" (2026-07-29)
+
+Three routes to the same false negative in `scripts/sanctions-screen.mjs`, all
+ending the same way: the standing match **deleted from state** and its open MLRO
+case auto-completed with the comment *"not flagged by the … screening run"* — a
+statement that is false, written into a record kept for ten years, and a
+completed case never re-opens. All three were reproduced against the live engine
+before anything changed.
+
+- **A MIXED standing match was wiped when only its sanctions half was
+  re-verified.** The guard required `prior.lists.every(ENRICHMENT)`, so a prior
+  of `['OFAC SDN', 'PEP (Wikidata)']` fell straight through it: on a run where
+  OFAC genuinely de-listed the subject and the PEP lookup errored or was
+  budget-skipped (routine on a large book), the never-re-verified PEP evidence
+  was deleted. Now **any** enrichment evidence on the prior blocks the clear.
+- **Switching an enrichment module off mass-cleared its standing matches.**
+  `enrichmentIncomplete` is only set when a module is configured ON and then
+  errors or runs out of budget; a module that is simply OFF performs no lookup
+  and sets no flag, making the row indistinguishable from a verified clear. So
+  `SCREEN_PEP=0` — the documented knob, most likely to be reached for **during**
+  a Wikidata outage, exactly when standing matches most need preserving —
+  cleared every PEP-derived match in the book in one run. `diffState` now takes
+  an **`evaluatedSignals`** set (the enrichment counterpart of `screenedLists`)
+  and carries forward any prior whose signal did not actually run.
+- **A subject that left the screened population kept a stale `lastSeen`.** The
+  loop only ever iterates this run's `results`, so a subject whose task was
+  completed, renamed, deleted — or whose project GID was narrowed — was never
+  seen, never cleared, and never marked. The case planner read the stale date as
+  "no longer flagged" and auto-completed on it. Such subjects are now **held**:
+  `lastSeen` is bumped so the case stays open, `notScreenedOn` records why, and
+  they are returned to the caller and logged so the population change is visible.
+  A subject that genuinely left the book still needs a human to dispose of its
+  case.
+
+Guarded against over-correction: a genuine de-listing, fully re-screened with
+every signal evaluated, still clears — pinned by a control test — and callers
+that pass no `evaluatedSignals` keep the previous behaviour.
+
+
+### Screening — false positives: identity-based demotion, never suppression (2026-07-29)
+
+The volume problem is real and measured: in the 29 Jul run a single subject
+carried **73 candidate designations**, and another 58 — nearly all of them
+different people who happen to share a common Arabic given name. That is alert
+fatigue, and alert fatigue is how a real hit gets missed.
+
+The engine now performs the same check the MLRO already does by eye. The report
+already prints the designation's DOB and nationality directly beneath the
+customer's; where **both axes are known on both sides and both disagree**, the
+candidate cannot be that customer, so it leaves the primary queue.
+
+It **demotes, it does not suppress**. The hit is still made, still stored in the
+delta state, still in the MLRO case trail and the 10-year record, and still
+printed in the report — under an `EXCLUDED ON IDENTITY` heading, each with the
+reason it was excluded ("customer born 1980, Pakistan · designation born 1955,
+Afghanistan — 25-year gap AND a different nationality") so an examiner can check
+the engine's reasoning instead of taking it on trust, and the MLRO can overrule
+it. **Recall is therefore mathematically untouched** — proven: the accuracy
+benchmark is bit-identical either way (recall 119/121, hard negatives 85/85).
+
+Deliberately fail-closed at every step: a missing customer DOB, a missing
+customer nationality, a designation that publishes no DOB, an unparseable date,
+a matching nationality, or a birth-year gap within tolerance — **any** of these
+keep the candidate in the primary queue. Year comparison is used rather than
+full dates because the three sources write dates three different ways
+("27 Nov 1978", "1979-03-03", "September 06, 1980") and some publish a year
+alone. Kill-switch `IDENTITY_EXCLUSION=0`; tolerance `IDENTITY_DOB_TOLERANCE_YEARS`
+(default 2, because designation records routinely carry approximate or
+multi-year birth dates).
+
+Not done, and deliberately: tightening the phonetic `subset` shape that admits
+these candidates in the first place. It would cut volume at the cost of recall
+on a live sanctions control, and the benchmark holds exactly one phonetic-subset
+pair, so the corpus cannot prove that trade safe.
+
+
+### Screening — worldwide PEP + associates (RCA), and worldwide adverse media (2026-07-29)
+
+**PEPs and their relatives / close associates, worldwide.** The consolidated
+OpenSanctions PEP dataset — politically exposed persons **and their relatives
+and close associates** — was already downloaded, already allowlisted, and
+already parsed … but only as a *fallback*, used when a Wikidata lookup errored.
+Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or an RCA with
+no English article returned a confident `{"hit": false}`, which is a silent
+false negative on an **FATF R.12** duty (R.12 extends the PEP controls to family
+members and close associates). The dataset is now the **standing worldwide net,
+screened over every individual on every run**, with Wikidata kept as the richer
+explanation layer on top. Three populations are covered, in precedence order:
+lookups that **errored** (resolved by the net, as before), lookups that returned
+**no hit** (the net now gets its own say — this is the coverage gain), and
+lookups that **hit** (left untouched, Wikidata's description is better evidence).
+The PEP-vs-RCA role is taken from the dataset's own `topics` column
+(`role.pep` / `role.rca`) rather than asserted, and a row that states no role is
+labelled "role not stated by the source" — the label never claims more than the
+data.
+
+**Adverse media across every market, without raising request volume.** 74
+Google-News market editions are configured but only the first 8 were ever swept
+— and the *same* 8 every day, so ~66 markets (all of Latin America, most of
+Europe, East Asia, most of the Arabic press) were **never swept at all**, behind
+a report line that read "worldwide". The per-run budget cannot simply be raised:
+8 is the empirical per-IP ceiling for Google News from a GitHub runner (at 14
+locales the limiter tripped on 10–12 Jul and cost real recall). So coverage now
+comes from **deterministic rotation** instead of more requests: the 5 pinned core
+editions (which the targeted risk passes index into) run every day, and the rest
+of the matrix rotates on a day-of-cycle window — **every market is swept within
+23 runs, at identical request volume**. Rotation is deterministic in the run
+date, so re-running a day reproduces its evidence. The report now discloses
+which markets ran and when the cycle completes; GDELT's global index still runs
+on every subject every run, so worldwide reach is not gated on the rotation.
+`ADVERSE_LOCALE_ROTATION=0` restores the old fixed first-N behaviour.
+
+### Matcher — two sanctions false negatives and a nondeterminism defect (2026-07-29)
+
+Found by an adversarial audit of the screening stack; all three reproduced
+against the live matchers before any code changed.
+
+- **A designation embedded in a customer name could screen CLEAR.** The
+  near-exact gate for short (<6 char) entries tested only the decisive
+  `min(full, core)` score, which legal-form boilerplate drags down:
+  **"Hamas General Trading LLC" vs designated "HAMAS"** scores full=33 /
+  core=100 → min=33, so it cleared — while the JS engine scored the same pair
+  100/critical. Same for ISIL, ANO and any short designation plus boilerplate.
+- **The same shape for LONG entries whose distinctive core is one token.**
+  "Al Qaeda General Trading" vs "AL QAEDA": full=50 fails the min() gate, and
+  the token-SUBSET gate cannot fire because `_is_token_subset` requires ≥2 core
+  tokens (its own false-positive guard) and AL is a particle, so the core is
+  just "QAEDA". Both branches now also test the **distinctive core** for a
+  near-exact match. This does not weaken `min()`, which exists for the
+  OPPOSITE shape (full high / core low — two firms sharing only boilerplate).
+  The gate is tight: it fires only when the customer's *entire* distinctive
+  core is the designation, so "Hummus Trading LLC" still clears.
+- **Screening was nondeterministic.** The per-variant winner was "first variant
+  scoring strictly higher", iterated over a Python **set**. String hashes are
+  randomised per process, so on a score TIE between transliteration variants
+  the recorded core — and therefore whether the pair passed the core gates —
+  depended on the hash seed. Measured: the Al Qaeda pair screened HIT under
+  `PYTHONHASHSEED` 0,1,2,4,5,6,8 and **CLEAR under 3,7,9** — same customer,
+  same list, different day. Variants are now iterated **sorted**, with ties
+  broken on core then full, keeping the best-evidenced variant.
+
+Measured effect, both Python backends: **recall 118/121 → 119/121 (97.5% →
+98.3%)** — the recovered case is r081, a Turkish corporate whose `A.S.` /
+`ANONIM SIRKETI` boilerplate is exactly this shape — with the **hard-negative
+clear rate unchanged at 85/85 (100%)**: no false-positive cost. `fn_count_max`
+ratcheted 3 → 2 on both Python backends so the recovered case cannot silently
+regress. Cross-engine parity holds (12/12) and the blocking-equivalence
+property is green under real rapidfuzz. A core-only hit is recorded at the
+conservative min-based score, so it reads as a POSSIBLE match for MLRO
+adjudication and can never be scored as a confirmed designation.
+
+Recorded in `docs/governance/model-validation-2026.md` §5 **pending MLRO
+sign-off** — this is a change to the deterministic engine's matching behaviour
+and needs the MLRO's signature under §4 change control.
+
+### Screening — coverage alarms turn the run red; onboarding gets the gate chain (2026-07-29)
+
+Two gaps in the loud-failure chain:
+
+- **Coverage-drift alarms never failed the run.** A core list that silently
+  shrank ≥20% vs its trailing median (or EOCN mirror designations missing
+  locally) reached the report §⑤ and the QA gate — but the QA gate only logs,
+  so the Actions run stayed green and freshness/failure alerting saw a
+  healthy control while coverage drifted. New post-delivery
+  `enforce_coverage_alarm_gate()` (exit 6, kill-switch
+  `COVERAGE_ALARM_HARD_FAIL=0`), same deliver-first-then-red pattern as the
+  outage gate. The EOCN review-age alarm stays excluded — it has its own gate
+  and exit code.
+- **The onboarding run called none of the post-delivery gates.** A failed
+  onboarding delivery, an outaged core list, a lapsed EOCN review or a drift
+  alarm left a green 6-hourly run — and a new customer's screen is the one
+  the daily batch will not redo that day. `run_onboarding` now ends with the
+  same four-gate chain as the daily run.
+
+Tests pin the exit code, the kill-switch, the clean path, that BOTH run modes
+call all four gates (source inspection), and the no-double-gate exclusion.
+
+### Case engine — coverage floors reach the JS screening path too (2026-07-29)
+
+`scripts/sanctions-screen.mjs` (the per-case / onboarding engine) degraded
+loudly on a fetch failure or a 0-name parse — but a list that parsed 50 of
+39,000 names counted as fully loaded: partial truncation was the one
+false-negative class the Python engine floors caught and the JS engine did
+not. Each source now carries a `minNames` coverage floor in its registry
+(`data/sanctions-sources.json`, `data/sanctions-extra.json`; ~50% of verified
+baselines, provisional where none is logged). A below-floor list still
+screens — a hit on a truncated list is a real hit — but is marked `partial`,
+which reuses the existing contract: standing matches are carried forward
+instead of cleared, and the run reports DEGRADED, so a "no match" against a
+truncated list is provisional, never an all-clear. Alias files (`mergeInto`)
+carry no floor (the fold's partial machinery covers them) and the optional
+internal watchlist keeps none (empty is a valid state). Tests pin the
+classifier and — the multi-homing lesson — that every enabled non-optional
+source in BOTH registries actually carries a floor.
+
+### Screening — availability hardening: retry the blip, retry the day (2026-07-29)
+
+Two layers of self-healing for the failure classes no fallback ladder can
+absorb:
+
+- **`download()` retries transients** (network errors, 5xx, 429) with a short
+  backoff before giving up — one TCP reset used to burn a list's primary
+  origin, forcing the mirror (or a DEGRADED day where no mirror exists). Any
+  other 4xx still fails immediately: a bot gate will not heal within one run,
+  and retrying it only delays the fallback ladder that can. `DOWNLOAD_ATTEMPTS`
+  (default 3), tests cover all four classes.
+- **A third daily cron slot** (06:07 UTC) on the unified screening workflow.
+  The first two slots sit 3h apart, so a single 3–4h outage window (GitHub
+  Actions or an upstream source) could still cost the whole day. The new slot
+  is the same NO-OP-when-already-green preflight; when it does have to screen,
+  delivery lands ~11:30 UAE — late, but a late daily screening beats a missing
+  one for a mandatory control.
+
+### Screening — coverage floors ratchet themselves to the observed baseline (2026-07-29)
+
+The static floors are point-in-time baselines, and AU/CH shipped with
+provisional 500s and a TODO to tighten them by hand once runs logged real
+counts. Now the engine does the tightening itself: each run raises — never
+lowers — a primary-served core list's effective floor to
+`ADAPTIVE_FLOOR_PCT` (50%) of its trailing-median count from the coverage
+history `monitoring.check_source_coverage` already persists, once
+`ADAPTIVE_FLOOR_MIN_HISTORY` (5) days of history exist. A partial corruption
+that clears a stale static floor but sits under half the observed baseline
+now refuses the run. Fallback-served lists keep the static floor — a mirror
+is a different corpus (e.g. OFAC without the alias fold), and judging it by
+the primary's baseline would turn the fallback into a refusal trap. Any
+read/parse problem with the history yields the static floors: the ratchet is
+an extra guard, not a new failure mode. Kill-switch `ADAPTIVE_FLOOR_PCT=0`.
+Engine tests cover the ratchet, the minimum-history gate, the never-lower
+rule, the fallback exemption, and the missing-file path; the pre-existing
+static-floor tests are pinned hermetic against a nonexistent history file.
+
+### Screening — every core list with a second origin now falls back to it (2026-07-29)
+
+The UN blob rotation caught by the 29 Jul proof run showed the remaining
+fragility class: a core list with one reachable origin. OFAC and UN already
+fell back to their OpenSanctions mirrors; the ladder now covers the rest:
+
+- **UK OFSI** falls back to the `gb_hmt_sanctions` mirror (same
+  `_mirror_fallback` contract: only when the primary yields nothing, MIRROR
+  provenance in the list date, degrade-loudly unchanged when both are down).
+- **EU FSF** — the one core list whose *primary* is the OpenSanctions host —
+  falls back the other way, to the **official webgate XML** (public FSF token),
+  parsed by a new schema-tolerant `parse_eu_official_xml`. The webgate host is
+  now allowlisted in the two screening workflows that lacked it (the unified
+  daily path and onboarding).
+- The **legacy manual path** gets the full ladder too (OFAC/UN/UK/EU), with the
+  same fallback-before-alias-fold ordering the daily path documents.
+- **AU/CH** have no second origin (DFAT bot-gates its .xlsx; SECO's XML is a
+  third schema) — documented in the loader; an OpenSanctions outage surfaces
+  as the usual outage-gate DEGRADED, never a silent gap.
+- Engine tests pin the FSF XML parser, the EU fallback contract, and — the
+  multi-homing lesson — that **both** load paths actually wire every fallback,
+  via source inspection, so a helper existing but uncalled can't recur.
+
+Source-coverage drift monitoring (>20% shrink alarm vs trailing median) already
+covers AU/CH automatically as history accrues; their provisional 500 floors
+stay until observed baselines land.
+
+### Screening — the unified poster multi-homes too; second UN blob domain (2026-07-29)
+
+The 2026-07-29 live proof run (30455597768) succeeded — UN loaded over the
+rotated blob domain, AU/CH matched with 🆕 markers, an employee-project record
+was screened, no DEGRADED — but its report task landed **only in Ongoing
+Monitoring**. `_mlro_queue_targets()` existed and both legacy posters used it;
+the **unified** poster (`post_unified_task`, the path the daily workflow
+actually takes) still hardcoded a single queue. Fixed, and the payload is now
+pinned by two engine-test checks so a delivery target can't silently narrow
+again. Today's task was multi-homed into Follow Ups by hand (same task GID —
+multi-homing keeps the single audit trail).
+
+The same run's egress log also showed the UN rotating across **more than one**
+storage account: `umsaszjsdz5c04wqdhbq.blob.core.windows.net` was blocked at
+14:20:53 while `umsanrp1dltx4dj3sxtt` served the list. Both are now in the
+five workflow allowlists; a future rotation to a third account will surface as
+a DEGRADED banner (never a silent gap), per RA-01.
+
+### Screening — the core-list set stops being hardcoded in four places (2026-07-29)
+
+Self-audit of the morning's AU/CH core-list addition found **four places that
+still enumerated the original five lists** — each one a spot where an Australia
+or Switzerland outage would have been invisible to that specific control while
+the floors and outage gate caught it elsewhere:
+
+- `screen.py` — the report's **DEGRADED banner** derived coverage from a
+  hardcoded five-tuple. Now derived from `list_meta`'s tier, with **no tier
+  defaulting to core (fail-closed)** — the engine test proved the first draft of
+  this fix fail-open: an untagged meta made the comprehension empty and
+  `all([])` read as clean coverage.
+- `agents.py` — the **QA gate** checked five core lists; an AU/CH outage would
+  have passed QA silently. Now seven.
+- `agents.py` — the per-run **attestation**'s `core_ok` likewise. Now seven.
+- `scripts/daily-screen-run.py` — the retired manual path's floor
+  classification now floors AU/CH too, with obtained-from-results semantics
+  (like EOCN), so a fetch failure classifies as an outage, never a refusal.
+
+Test fixtures updated to the seven-list core meta. 73/73 checks pass.
+
+
+### Screening — the DEGRADED cause is fixed (not the flag), AU + CH become core lists, and staff join the screening population (2026-07-29)
+
+**Diagnosis first.** The daily screen has run green every day — what was failing
+was inside it: the harden-runner egress log for the 29 Jul sweep shows
+`domain not allowed: umsanrp1dltx4dj3sxtt.blob.core.windows.net`. The UN
+rotated its list-hosting Azure storage account; every screening workflow still
+allowlisted only the old one (`unsolprodfiles`), so the UN Consolidated fetch
+died mid-redirect and the run honestly reported **DEGRADED** — which is the
+control working, not the defect. The defect was the stale allowlist, and that
+is what is fixed: the new UN blob domain is allowlisted in **all five**
+screening workflows. **The DEGRADED flag itself is untouched and stays** —
+RA-01's ratified position is *"a screening run that cannot load a core list
+must read DEGRADED rather than pass"*, and suppressing the label would convert
+visible outages into silent clears.
+
+- **Australia (DFAT Regulation 8) and Switzerland (SECO) are now CORE lists**,
+  screened directly every run in **both engines** via the OpenSanctions mirrors
+  (`au_dfat_sanctions`, `ch_seco_sanctions`, `targets.simple.csv` — the same
+  host and shape the EU list has always used, so **no new egress endpoint**).
+  Previously both were "cross-referenced" prose: DFAT bot-gates its .xlsx and
+  the curated fallbacks sat empty and disabled. Both carry coverage floors
+  (provisional and deliberately low — no verified baseline existed at
+  introduction; tighten toward ~50% of observed counts once real runs have
+  logged them, `LIST_FLOOR_AU` / `LIST_FLOOR_CH`). The daily core set is now
+  **UN · OFAC (SDN + a.k.a.) · UK OFSI · EU FSF · Australia DFAT ·
+  Switzerland SECO · UAE EOCN**, plus Canada SEMA / France DGT / the internal
+  watchlist as supplementary — with worldwide adverse media (Google News ×5
+  locales, Bing, GDELT) and worldwide PEP (OpenSanctions PEPs + Wikidata)
+  already daily.
+- **The HR – Employees project is a screening population** in both engines —
+  each staff member screened as an individual through the same matcher, guards,
+  delta state and case lifecycle as customers. Configured-but-unreachable (or
+  empty) is **FATAL**, the same contract as the customer database: a population
+  that silently drops out of screening is a silent clear for everyone in it.
+  Disable only explicitly (`ASANA_EMPLOYEE_DB_GID=""` /
+  `ASANA_EMPLOYEE_PROJECT_GID=""`).
+- **Daily deliverables are multi-homed into BOTH MLRO queues** — Ongoing
+  Monitoring (review record) and **Follow Ups** (action queue) — one task, two
+  projects, a single audit trail. A delivery that reaches neither still arms
+  the delivery gate and turns the run red.
+- The daily report's coverage section now shows AU and CH as directly-screened
+  core lists with their counts, replacing the "cross-referenced periodically"
+  prose that a reader could mistake for screening.
+
+
+### Advisor — the default mode is Balanced, as the model card always claimed (2026-07-29)
+
+The backend defaults to `balanced` (`claude-sonnet-5`) and the model card
+documents that as the default — but the UI booted on **Speed**, so every
+operator's first answer actually came from `claude-haiku-4-5`, the weakest
+model. On a surface whose known risk is **automation bias** (R-10 — the
+operator trusting the output too much), defaulting to the least capable
+reasoning is the worst possible pairing, and the documented default and the
+experienced default disagreed: the paper-vs-practice gap in one line of state.
+
+The UI now boots on **Balanced**. Speed and Deep remain one click away —
+deliberate choices, not starting points — and the browser check pins the boot
+default so it cannot silently drift again.
+
+
+### Advisor — deep mode works on a default site, the eval covers every model and fires on model change, and the downgrade banner is browser-verified (2026-07-29)
+
+Three residual limitations from the morning's model refresh, each stated at the
+time and each now closed with evidence rather than restated.
+
+- **The Claude 5 models are live-confirmed, and confirmation can no longer lag a
+  swap.** The behavioural eval was dispatched against the real API the same day
+  — run 30452220311, **all guardrail cases held, zero regressions** (the
+  fail-on-regression step did not fire; the egress log shows the
+  `api.anthropic.com` call). Structurally: `scripts/advisor-eval.mjs` now
+  evaluates **every model of the governed routing**, read from `MODEL_BY_MODE`
+  rather than restated — the single-model default would have left the deep tier
+  unverified by exactly the swap that just happened — and `advisor-eval.yml`
+  **fires on any push to `main` touching `brain-soul.js`, `data/ai-assets.json`
+  or the eval itself**, so the confirmation window is minutes, not up to a week.
+- **Deep mode is genuinely available on a default-capped site — as a guarded
+  continuation.** A 4096+-token deep answer can never fit a ~10 s synchronous
+  cap, and both obvious escapes are wrong for this surface: a background
+  function is plan-gated and puts operator content at rest in a new store
+  (RA-04), and **streaming is architecturally incompatible with the tipping-off
+  guard** — the guard must see the complete output before the operator does,
+  and a streamed sentence cannot be unstreamed. Instead the governed deep model
+  (`claude-opus-5`) generates the answer across up to `DEEP_HOP_LIMIT`
+  synchronous hops (assistant-prefill resume), under two CI-pinned invariants:
+  **no unguarded token ever leaves** — the tipping-off guard runs over the full
+  accumulated text on *every* hop, and a partial that trips it is withheld on
+  that hop, never returned for resubmission — and **the client renders nothing
+  until the final fully-guarded response**. The audit line records `deepHops=N`.
+  Old cached clients that don't declare `deepContinue` keep the previous
+  visible degrade; raised-cap sites keep single-call deep; the hop budget
+  (~6 × 1530 ≈ 8k tokens) matches what a raised cap would afford.
+- **The downgrade banner is verified in a real browser, not assumed.**
+  `test/advisor-browser.test.mjs` drives Chromium against the real
+  `advisor.html` — through the AUP acknowledgment gate, which the check
+  confirmed blocks every send until accepted — stubs the function, and asserts
+  the banner is on screen with its reason and remedy, **and** that an
+  undegraded answer shows no banner, so the warning cannot decay into noise.
+  Skips loudly when no browser is available, same contract as the Python
+  suites.
+
+### Governance — the MLRO signs what the MLRO can sign (2026-07-29)
+
+Four approvals recorded under the **HS MLRO**'s own authority. The governing
+principle, and the reason this is four items and not eighteen: **an instrument's
+approver is fixed by its type, not by who is available.** Policies, standards and
+charters are Board acts (the Board is **HS Management**); procedures are the
+MLRO's. Nothing here was signed by a role that does not hold the authority for it.
+
+- **Stakeholder Impact Assessment v1.1 ratified** — the ISO/IEC 42001 clause
+  6.1.4 designation, the unfair-and-discriminatory-outcome section and the
+  availability clause. **Closes open-actions item 19.** v1.1 was signed on its own
+  account rather than folded into v1.0's 2026-07-02 signature, and both rows
+  stand in the sign-off table so the version history records what was approved
+  when.
+- **POL-19** (STR/DPMSR filing) and **POL-30** (regulatory change management)
+  **approved and in force to 2027-07-29.** Both approval blocks read *"Approved
+  by (MLRO)"* — they are procedures, so they did not wait on the board sitting.
+  The other **sixteen** pack instruments are Board acts and stay draft; item 18
+  remains open for them.
+- **Transaction-feed compensating control adopted** — and **item 6 stays open**,
+  deliberately. `OB-03`, `OB-13` and `OB-21` name item 6 as their closing
+  condition, and the control is *interim*: `txn_monitor.py` is still INACTIVE and
+  no feed is connected. Closing the item would have stranded three genuinely
+  unmet obligations with no tracked path and converted a visible gap into an
+  invisible one. The item is rewritten, not removed — the outstanding act is
+  wiring `TXN_FEED_PATH`.
+- **The Claude 5 model change recorded** in `model-validation-2026.md` §5, per §4
+  step 5 of change control, with its residual limitation stated: the live
+  guardrail eval is weekly and key-gated, so the first scheduled run is the
+  confirmation.
+
+**The CI guard on the 6.1.4 artefact was corrected, not relaxed.** It previously
+forbade a v1.1 row from reading *Ratified* — which was right while v1.1 was
+unsigned and wrong once it was signed. It now requires that **any row claiming
+ratification names an approver and carries a date**, catching both real failure
+modes: content amended under an earlier signature, and a row marked Ratified with
+`_(pending)_` still in the approver column.
+
+Verified by breaking it: removing every occurrence of the approval date from
+`str-dpmsr-filing-procedure.md` fails `policies.test.mjs`, so the signature is
+evidenced by the document rather than merely asserted in the register.
+
+**Still not done, and not signable:** R7 ratification, the board sitting, the ISO
+path decision, the MRM ratification and the DPO minute are Board acts. Item 11
+needs counsel's signature before the MLRO countersigns. Items 1, 2, 3, 5, 7, 8, 9,
+14 and 15 are acts that produce evidence — the history scrub, the emails, the
+release holds, counsel's mapping, the training delivery, the audit, the
+enterprise register, the backtesting cycle (blocked on ≥25 disposed cases) and
+the red-team round.
+
+### Advisor — the guardrails stop disappearing under deep mode, and the models move to Claude 5 (2026-07-29)
+
+**`brain-soul.js` aborted its own API call at 26 s against a Netlify synchronous
+function cap of ~10 s** — 2.6× the platform limit. On a default-configured site
+deep mode was not merely slow, it was **killed by the platform mid-flight**, and
+that is worse than a slow answer: when the platform kills the invocation the
+function never returns, so **none of the guardrails run**. The tipping-off guard
+(P4), the PII guard, the injection and hallucination guards, the quality score
+and the audit line all silently did not happen, and the operator saw an opaque
+platform error instead of a governed refusal.
+
+- **The abort budget now derives from the platform cap and sits inside it** —
+  `ADVISOR_PLATFORM_CAP_MS` (default 10000) minus 1.5 s of headroom for the
+  guards and the response, so the function **always returns its own governed
+  answer**. CI asserts the budget is strictly less than the cap, that the
+  headroom is at least a second, and that no mode asks for more tokens than the
+  budget affords.
+- **Deep mode degrades loudly rather than pretending.** A 10 s cap affords ~1500
+  output tokens; deep mode's premise — steelman the counterargument, run a
+  pre-mortem, cite every relevant typology — does not fit, and shipping a
+  truncated answer under the deep label is exactly the paper-vs-practice gap
+  this estate exists to close. Below 4096 affordable tokens deep mode now
+  **degrades to balanced visibly**: `modeDegraded` and a reason in the response,
+  `modeDegraded=deep→balanced` on the audit line, and an amber banner in the UI.
+  The instruction set follows the *effective* mode, so a downgraded answer is
+  never asked for a full pre-mortem it cannot deliver. Same rule as everywhere
+  else here — degradation is tolerated, silent degradation is not (RA-06).
+  Raise the site cap with Netlify support, set `ADVISOR_PLATFORM_CAP_MS` to
+  match, and deep mode becomes available with no code change.
+- **Governed routing split from deployment affordability.** `MODEL_BY_MODE` is
+  what each mode *is*; `selectModel` applies the affordability layer on top.
+  `data/ai-assets.json` pins the former, so the model-change control stays
+  enforceable whatever cap a given site runs — otherwise the register would read
+  differently per deployment.
+- **Models refreshed to Claude 5** — `claude-sonnet-4-6` → **`claude-sonnet-5`**,
+  `claude-opus-4-8` → **`claude-opus-5`**; `claude-haiku-4-5` kept for speed
+  mode. Moved in the same commit as `data/ai-assets.json` and
+  `docs/models/advisor-llm.md`, as the model-change control requires, plus
+  `scripts/advisor-eval.mjs`, `scripts/advisor-bias-eval.mjs` and
+  `scripts/reg-draft.mjs`. No request-shape change was needed — the call sends
+  no `temperature`, `top_p` or `thinking` parameter.
+
+### Governance — the chain between control families, and trust defined narrowly enough to measure (2026-07-29)
+
+The estate slices its governance four ways — a five-level operational stack, a
+six-layer agentic model, a seven-stage lifecycle, an eleven-stage PbG map — and
+every one of them slices **the same territory**. What none of them recorded is
+which control's output another control *consumes*. The assurance matrix is
+control → *proof*; `AI-GOVERNANCE.md` §8a is pillar → *control*; there was **no
+control → control map anywhere**.
+
+- **[`docs/governance/governance-chain.md`](docs/governance/governance-chain.md)**
+  draws the missing edge — **Visibility → Explainability → Accountability →
+  Trust** — as an ordering that is load-bearing rather than rhetorical: you
+  cannot explain what you cannot see, and you cannot hold anyone accountable for
+  a decision you cannot explain.
+- **Failure propagation, with real dependencies.** A stale AI asset register
+  does not just leave one asset undocumented — it makes the explainability
+  statement's **scope claim** false, which makes every accountability record
+  built on it a record about a system that is not the one running. A drifted
+  prompt fingerprint leaves the audit line still able to say *what* a response
+  was and no longer able to support *why*. Read upward, the table is a
+  diagnostic: **a trust indicator that will not hold is rarely a trust problem** —
+  it is usually an accountability gap, which is usually an explainability gap,
+  which is almost always a visibility gap.
+- **Trust is defined so it can be falsified.** Before this page the only
+  occurrences of *trust* in the estate were security **trust boundaries**,
+  **Trusted Types**, and a tagline. It is now defined as *the share of what this
+  estate claims that an outsider can re-derive from the repository without
+  asking anyone who works here* — a property of the evidence, not of anyone's
+  opinion — with four indicators that already exist: control effectiveness
+  (100%), **recorded-breach completeness** (every breached KRI in the ledger,
+  CI-enforced — trust is not the absence of breaches but the absence of
+  *unrecorded* ones), generated-artefact integrity (three drift guards), and
+  honest nulls (KRI-09 reports null with its reason, never 0%).
+- **Two indicators deliberately do not read green** — `residualAboveAppetite` is
+  1 and `kriBreachRate` is 22.2%. An estate whose indicators were all perfect
+  would be telling you about its indicators, not its risks.
+- **Inline fenced mermaid, per the house convention.**
+  `docs/architecture/diagrams.md` states it — *renders natively on GitHub, no
+  tooling* — and the one `.mmd`+`.png` set in the tree was hand-rendered out of
+  band with no renderer in the repository and nothing in CI to catch a `.mmd`
+  drifting from its `.png`. Another PNG pair would add that same silent-drift
+  liability.
+
+### Governance — ISO/IEC 42001 clause 6.1.2 and 6.1.4 are separated, and the two statements of applicability stop contradicting each other (2026-07-29)
+
+**`6.1.2` and `6.1.4` appeared nowhere in `docs/`.** The estate satisfied both in
+substance and had never separated them on paper — which matters because the two
+clauses ask different questions about the same failures, and a risk assessment
+is routinely offered as though it answered both. It does not:
+
+| | 6.1.2 — risk to the firm | 6.1.4 — impact on the person |
+|---|---|---|
+| False negative (R-03) | Severe: regulatory breach, licence risk | Slight — not being flagged does not harm the person |
+| False positive (R-04) | Minor: analyst time, friction | **Severe** — de-risking, refused service, a record they cannot contest |
+
+The two readings point in **opposite directions**. A control set tuned only on
+the left column is tuned the wrong way for the people it acts on.
+
+- **[`docs/aims/iso-42001-clause-6-1-mapping.md`](docs/aims/iso-42001-clause-6-1-mapping.md)
+  — the mapping index**, with **bidirectional `R-nn` ↔ Annex A traceability**.
+  Before it, *no register row cited an Annex A control and neither SoA cited a
+  risk ID*, so "which control treats R-13?" had no answer anywhere in the tree.
+  Both tables are hand-maintained, so
+  [`test/clause-mapping.test.mjs`](test/clause-mapping.test.mjs) pins them: every
+  register risk must appear, every cited risk must still exist, and **every pair
+  must be present in both directions** — building it that way immediately found
+  two asymmetries (A.6.2.4 did not list R-04; A.4.4 did not list R-15).
+- **`stakeholder-impact-assessment-2026.md` is designated the canonical 6.1.4
+  artefact**, extended with a section on **unfair and discriminatory outcomes**
+  ("discriminatory" appeared **once** in the entire tree) and an availability
+  clause. Every row of the new section is a *comparison between populations*,
+  not a count, because that is where discrimination lives and no per-individual
+  row can see it. It records one tension it cannot resolve: fair-treatment
+  guidance says tell the affected person, and the tipping-off prohibition
+  (FDL 10/2025, Art. 25) makes telling them an offence. The statute governs, and
+  the conflict is written down rather than mitigated on paper.
+- **The ratified document was not silently amended.** v1.0 was ratified
+  2026-07-02 with signature evidence; a signature given then cannot cover
+  sections written a month later. v1.0 stays in force, the new content is
+  **v1.1 pending approval** (open-actions item 19), and a CI check fails if a
+  1.1 row ever claims ratification.
+- **`ai-impact-assessment.md` gained a date, a version and a named approver** —
+  it had **none of the three**, so nothing recorded when it was written, what had
+  changed, or who stood behind it. Also a §5a covering group-level outcomes,
+  which its two-column individuals-only table could not reach.
+- **The two statements of applicability contradicted each other about the same
+  control.** The AIMS statement asserted *"AI impact assessment
+  (individuals/society) — Implemented"* while the Advisor statement recorded
+  A.5.4 as 🟡 with its first bias cycle pending. The row is now **split into
+  A.5.2 and A.5.4** at their true and matching statuses, and **both statements
+  now cite the ratified SIA**, which *neither had cited at all* despite it being
+  the strongest 6.1.4 evidence either could offer. CI now fails if the two
+  disagree about A.5.4.
+- **Three vocabulary defects fixed.** `iso-42001-soa-2026.md` used 🟢 outside its
+  own four-value legend, and its open-items paragraph called the AI policy's
+  ratification *pending* while its own A.2.2 row recorded it as ratified
+  2026-07-02 — a file contradicting itself within twenty-five lines. The AIMS
+  statement used `Implemented (inactive)` for FATF R.16, a fifth value outside
+  its four declared ones; it is **Partial** (built, not operating), which its own
+  justification column already said. Both vocabularies are now CI-enforced.
+- **Both impact assessments entered the anti-shadow-policy sweep** the moment
+  they declared an approver, and are **excluded with written reasons**: an
+  assessment records a finding, it does not issue a rule. Signing a finding is
+  not creating an instrument.
+
+### Governance — appetite became tolerance, and the register's own auditor checkpoint became testable (2026-07-29)
+
+The estate stated eight appetite positions and measured nine KRIs, and **not one
+position carried a number**. That left two rules the firm wrote for itself
+unenforceable — `risk-assessment-methodology.md` §3 (*"residual risk is compared
+against the appetite; anything above appetite requires a treatment plan with an
+owner and a date"*) and the AI risk register's own auditor checkpoint
+(*"residual scores sit within appetite"*). Neither could be evaluated, because
+*above appetite* had nothing to be above. An appetite position is a direction; a
+**tolerance** is a boundary someone is told about when it is crossed, and that
+needs three things a direction does not: a number, an owner, and a clock.
+
+- **A numeric `residual_ceiling` on every position**, derived from the
+  methodology's own published bands (Low 1–6 · Medium 7–12 · High 13–25) **by
+  position type, not risk by risk** — ZERO 6, LOW 9, BANDED and MEASURED 12 —
+  with the derivation recorded in `residual_ceiling_basis` so an auditor can
+  challenge the rule rather than guess at eight separate numbers. CI enforces
+  that positions of the same type carry the same ceiling and that ZERO is
+  tighter than LOW; the ceilings are appetite, so only the Board may move them.
+- **An operational `owner` and an `escalation_sla` on every position, and an
+  `owner` on every KRI** — each required separately by CI, because each fails
+  separately: a ceiling with no owner has nobody to breach to, an owner with no
+  SLA has no clock.
+- **All twenty register risks are now claimed by exactly one appetite position**,
+  in both directions, with `risksWithoutAppetitePosition` pinned at 0. A risk
+  claimed by nobody was never scored, and an unscored risk is indistinguishable
+  from a compliant one in a count.
+- **`residualAboveAppetite` scores every risk on every run** — parsing the
+  markdown register by **column header name**, never by position, so an inserted
+  column cannot silently make it read the wrong cell. **It reports 1**: R-03,
+  the sanctions false negative, sits at residual **10 Medium** against RA-01's
+  ceiling of **6**, and its treatment carries an owner and a quarterly cadence
+  but **no date** — recorded per row, because a cadence is a rhythm and the
+  methodology asks for a deadline. The snapshot **names** the risk rather than
+  only counting it. The measure was breached the day it was created; that is
+  what it is for, since the condition was already true and nothing counted it.
+- **Amber warning bands, as a sibling key `threshold_amber`** — never a
+  reshaping of `threshold`, which the suite hard-requires. Amber exists **only
+  where the red line has headroom**: a threshold of 0 or 100% has none by
+  construction, and a warning that can never fire is worse than none. Two KRIs
+  qualify; the rest read `—` rather than carrying an invented number.
+- **The snapshot's KRI block is a projection, and now says so.** Owners, SLAs
+  and amber verdicts are copied into it explicitly — a field added to
+  `data/risk-appetite.json` and not listed in the projection would reach no
+  board pack, so the governance data would exist and never be measured. A new
+  test asserts every projected KRI carries both.
+- **[`docs/governance/kri-breach-ledger.md`](docs/governance/kri-breach-ledger.md)
+  — the history the snapshot cannot carry.** `data/grc-metrics.json` is
+  byte-compared by CI and holds no timestamp by design, so it can only ever say
+  where a number is *now*. The ledger is append-only, records who was told and
+  what followed, keeps amber signals separate from breaches, and is pinned by CI:
+  every KRI it quotes must still exist with that metric, and **every currently
+  breached KRI must appear in it** — a breach the dashboard shows and the ledger
+  does not is a breach with no recorded escalation.
+- **Two stale claims fixed.** `risk-appetite-statement-2026.md` hand-quoted
+  "nine KRIs, eight instrumented" in its header — a count that goes stale on
+  every KRI change, now replaced by a pointer to the live snapshot — and RA-08
+  listed only KRI-08 while KRI-09 named RA-08 as its position, so the link ran
+  one way only. CI now checks both directions.
+- **Capacity is still not stated, and the statement says so.** Risk capacity is
+  a firm-level judgement about capital, licence and staffing that this
+  repository holds no input to. Named as a gap rather than quietly omitted.
+
+**R7 is not ratified by this change.** The statement stays DRAFT; ratification
+is a board act (open-actions item 17).
+
+### Governance — registers say how they know, and the missing-deadline gap is now a number (2026-07-29)
+
+Register hygiene: four claims the registers made that the evidence did not
+support, and one honest count where an invented one was the tempting option.
+
+- **In-force instruments now declare *what put them in force*.** Fifteen of the
+  sixteen `in-force` rows in [`data/policies.json`](data/policies.json) carried
+  `approved_on: null` **and** a `next_review` date — a review clock anchored to
+  nothing. Each now carries an `approval_basis` from a closed two-value
+  vocabulary (`operative-on-publication`, `adopted-at-management-review`),
+  documented in `approval_basis_meanings` and **required by
+  [`test/policies.test.mjs`](test/policies.test.mjs)** on every in-force row
+  without an approval date. The vocabulary was derived from what the documents
+  already say, not invented: fourteen read "Operative on publication", POL-05
+  was adopted at a management review. No approval date was fabricated — the
+  seventeen open actions stay human acts.
+- **The missing deadlines are now counted rather than described.**
+  KRI-09 (overdue issue rate) reports *null* because no open action carries a
+  target date, and instrumenting it would have meant inventing seventeen
+  deadlines. Instead `scripts/grc-metrics.mjs` gained
+  **`openActionsWithoutTargetDate`** — it keys on a dedicated `Target date`
+  column and, with no such column, correctly counts every row (**17**). The
+  board gets a number for item 17, and the counter falls on its own the moment
+  dates start landing.
+- **`docs/aims/README.md` omitted four documents that exist on disk** — among
+  them **two in-force registered instruments**, the TFS Name-Match Procedure
+  (POL-07) and the EOCN List Update SOP (POL-09). That page is the "start here"
+  for an AIMS audit, so a document missing from it is a document an auditor does
+  not know to ask for. All twenty-nine are now indexed.
+- **Three stale cross-references corrected.** OB-10's note in
+  `data/obligations.json` said the risk register runs "R-01…R-13" when it runs
+  to **R-20**; `data/risk-appetite.json` cited `test/risk-appetite.test.mjs`,
+  which **does not exist** (the assertion lives in `test/grc-metrics.test.mjs`);
+  the open-actions register and item 18 called the AML/CFT/CPF pack
+  "seventeen instruments" against **eighteen** on disk and eighteen `draft` rows
+  in the register.
+- **The open-actions register's own "Last updated" line said 24 July** while
+  items 16–18 had landed on the 28th — the one line whose whole job is to say
+  how fresh the answer to "what is pending?" is.
+
+### Governance — the risk vocabulary, and a guard for the links that hold the pack together (2026-07-29)
+
+The pack is written in fluent GRC dialect and had **no translation layer**.
+Seventeen of the thirty terms in a standard risk lens appeared **nowhere** in
+`docs/` — risk capacity, target residual risk, control owner, control weakness,
+compliance gap, loss event, performance indicator among them — while *issue* (41
+documents) and *incident* (40) were used constantly and never once defined or
+distinguished.
+
+- **[`docs/governance/risk-glossary.md`](docs/governance/risk-glossary.md)** —
+  the thirty terms in business language, grouped by what they actually decide:
+  the four levels of risk-taking (appetite vs tolerance vs **capacity**), risk
+  levels, accountability (**risk owner vs control owner**), control failure vs
+  control **weakness**, the four failure words (**issue vs incident vs near miss
+  vs loss event**), and **KRI vs performance indicator**.
+- **It links rather than restates.** Every entry points at the definition that
+  already exists — `risk-assessment-methodology.md` §3 for inherent/residual and
+  the Strong/Adequate/Weak/Absent control ratings, `ai-risk-register.md` for the
+  scoring key and the four treatments, `obligation-register.md` §3 and the
+  `status_meanings` blocks for the status vocabularies — so the glossary cannot
+  drift away from the registers it explains.
+- **It records what is *not* governed as plainly as what is.** Risk capacity,
+  target residual risk, control owner, loss event and a severity scale have no
+  home in this estate, and the page says so. A glossary that quietly implies a
+  control the firm does not have is worse than no glossary.
+- **It disambiguates a term that already means something else here.**
+  `near-miss` has four uses in the pack and **all four are matcher-score
+  margins** against the 0.85 threshold — not "a failure caught in time".
+- **It names the gap that makes two stated rules unenforceable.**
+  `risk-assessment-methodology.md` requires that *"anything above appetite
+  requires a treatment plan with an owner and a date"*, and the risk register
+  lists *"residual scores sit within appetite"* as an auditor checkpoint.
+  Neither is testable today, because no appetite position states a numeric
+  residual ceiling.
+
+**[`test/doc-links.test.mjs`](test/doc-links.test.mjs) — relative links now have
+a guard.** `scripts/link-check.mjs` extracts `https?://` only, so a
+cross-reference to a file that does not exist was invisible to CI — across
+**1,182 relative links in 179 documents**, in a pack whose registers are built
+out of links to their own evidence. Zero were broken, which is the point: the
+guard is preventive, it pins a property the estate already has, and it verified
+the glossary's own forty-four links on the way in. Fragments (`#anchor`) are
+deliberately out of scope — GitHub's slug rules would make it cry wolf — but the
+file half of `file.md#section` is checked.
+
+### Engine config — the Asana credential is checked where Asana is called, and the settings that gate a degraded run are documented (2026-07-29)
+
+- **`screen.py` no longer `KeyError`s at import.** It read `ASANA_TOKEN` with an
+  unguarded `os.environ[...]` at module load, while the `.mjs` scripts, every
+  workflow and `.env.example` all use **`ASANA_ACCESS_TOKEN`** — so copying
+  `.env.example` to `.env` and running `python screen.py` failed before a line
+  of the engine ran. Four consumers that only wanted the matcher worked around
+  it by injecting a placeholder credential. It now accepts **either** name and
+  normalises the result onto one, so `agents.py`'s credential broker (which
+  audits presence by name) stays correct.
+- **The safety that hard failure provided moved to where it belongs.**
+  `asana_request()` — the single Asana call path — now refuses to run without a
+  credential, because an unauthenticated Asana read does not fail cleanly: it
+  returns an error body that parses as zero tasks, and a screen over zero
+  customers would file as an all-clear. So the check fires when Asana is
+  actually used, instead of blocking consumers that never touch it.
+- **All four placeholder credentials are gone** — the two CI steps, the
+  EOCN reconcile step and the daily-screen runner. A step that parses external
+  downloads now holds no Asana credential at all. The old wiring pin is
+  replaced by a contract pin asserting **both** halves: either env name is
+  accepted, *and* `asana_request` still refuses an unauthenticated call.
+- **`.env.example` covers the engine.** It made 30 of the 77 variables the
+  engine reads assignable, and the gap included the **sanctions coverage
+  floors** (`LIST_FLOOR_*`, `LIST_FLOORS_ENFORCE`) and the **hard-fail gates**
+  (`DELIVERY_HARD_FAIL`, `EOCN_REVIEW_HARD_FAIL`) — the settings that decide
+  whether a degraded run fails loudly or passes quietly. Every operator-facing
+  variable is now documented with its default and what it costs you to change:
+  thresholds, AI gates, transaction-monitoring, circuit breakers, alarms. The
+  Python-side `MATCH_THRESHOLD` / `SHADOW_THRESHOLD` names were previously
+  described in a comment without ever being assignable. CI-injected values
+  (`GITHUB_*`, the per-list `*_HASH`, the date/step plumbing) are deliberately
+  excluded and say so — setting those by hand misreports a run.
+
+### Tooling — Python becomes a governed language here, and `npm test` stops lying (2026-07-29)
+
+Three gaps that all had the same shape: a check that existed in one place and
+not the other, so the green signal was narrower than it looked.
+
+- **Ruff on the screening engine.** ~5,900 lines of Python that make sanctions
+  decisions had **no static analysis at all** — the only gate was
+  `python -m py_compile`, a syntax check — and `pyproject.toml` was pure
+  metadata with no `[tool.*]` section. Ruff now runs in
+  [`lint.yml`](.github/workflows/lint.yml), pinned and hash-locked in
+  [`ci/ruff-requirements.txt`](ci/ruff-requirements.txt) like semgrep and zizmor
+  before it. Rule selection deliberately mirrors `eslint.config.mjs` — pyflakes
+  correctness (`F`) plus `E9`, **not** the pycodestyle formatting families: the
+  engine's house style puts short guards on one line and ruff flags 125 such
+  sites, and restyling a sanctions matcher for a formatter is a large, risky
+  diff with no correctness payoff. It found 16 real items, all fixed —
+  including two imports that were dead inside the workflow YAML where nothing
+  could see them.
+- **`npm test` now runs the five Python suites.** They ran only in CI, so a
+  developer who had just broken `screen.py` got a green `npm test` — the 389
+  assertions in the largest suite never fired. A missing interpreter or engine
+  dependency is a **loud skip, never a pass** (`⚠ n python suite(s) SKIPPED —
+  not run, not passed`), on the same principle the engine applies to a list it
+  cannot load. `test/matcher-parity.test.mjs` follows the identical policy.
+  `npm test` goes from 65 checks to 70.
+- **The one-way rule that allowed it is now bidirectional.**
+  `test/ci-coverage.test.mjs` enforced "every `test/*.py` appears in ci.yml" but
+  never the reverse — the same asymmetry its own §4 says let a stale artefact
+  reach `main` on 2026-07-28. It now also asserts the runner discovers them.
+  Its header claim that "there is no test runner / package.json in this repo"
+  is corrected; both have existed for some time.
+- **`str_dossier.py` joins the `py_compile` gate** — it was exercised by
+  `test/engine_test.py` but never syntax-checked.
+- **`i18n.js`, `sw.js` and `sw-register.js` are actually linted now.** They were
+  absent from `npm run lint` *and* from every `files:` block in
+  `eslint.config.mjs`, so adding them to the script alone would have applied
+  zero rules and read as "linted" while catching nothing — verified: an
+  undefined-variable reference in `sw.js` raised no error. They get real config
+  blocks (`sw.js` with service-worker globals rather than window ones), and the
+  same reference now fails as `no-undef`.
+
+### Screening — 842 lines of the daily screen come out of the workflow YAML (2026-07-29)
+
+The daily sanctions screen carried three inline `python3 << PYEOF` heredocs
+inside [`daily-sanctions-screen.yml`](.github/workflows/daily-sanctions-screen.yml)
+— 842 lines of the live screening path (fetch the customer/principal list,
+screen it through the real `screen.py` matcher, build the report and file the
+Asana task). Inside a YAML string that code was invisible to
+`python -m py_compile`, unreachable by any test, and unlintable by semgrep, which
+scans `.py` files and not YAML. It was the least-governed code in the repository
+and it ran every day.
+
+- Extracted **verbatim** — byte-for-byte, verified by diffing the dedented
+  heredoc bodies against the new files — into
+  [`scripts/daily-screen-fetch.py`](scripts/daily-screen-fetch.py),
+  [`scripts/daily-screen-run.py`](scripts/daily-screen-run.py) and
+  [`scripts/daily-screen-report.py`](scripts/daily-screen-report.py). The
+  workflow drops from **1,135 lines to 290** and now just calls them.
+- **One real behavioural difference, handled.** A heredoc piped to `python3`
+  runs with `sys.path[0] == ''` (the working directory), so `import screen`
+  resolved; a script file gets its own directory instead. `daily-screen-run.py`
+  puts the repo root back explicitly, and the import is verified to resolve.
+- All three are now in the `py_compile` gate in `ci.yml`, so a syntax error in
+  the daily screening path fails CI instead of failing at 02:00 GST.
+- Smoke-verified end to end: the screening step loads its inputs, degrades
+  loudly on missing list files (the SOURCE OUTAGE path), loads the 326-name
+  in-repo UAE EOCN list, and stops only at `GITHUB_ENV` — which exists only
+  inside Actions.
+- `.gitleaks.toml` gains a note that its allowlist is by value, not by path, so
+  it followed the extracted code unchanged.
+
+### Screening — the two engines are now compared to each other, and a silent JS false negative is closed (2026-07-29)
+
+The sanctions matcher is implemented twice — `screen.py` (rapidfuzz) and
+[`scripts/sanctions-match.mjs`](scripts/sanctions-match.mjs), the zero-dependency
+reimplementation that drives the live screen in `sanctions-screen.yml`. Parity
+between them was held by hand, by eighteen "mirrors screen.py" comments, and
+**nothing compared the engines to each other**: the accuracy benchmarks score
+each backend against its own floor, and `test/benchmark_eval.py` says so outright
+— *"every floor is enforced per backend — the two are NOT comparable."*
+
+- **A silent false negative, found by building that comparison.** The JS engine
+  dropped tokens shorter than three characters from its candidate index. A
+  subject whose shared tokens were two letters long therefore had **no candidate
+  path at all** and screened **clear**, where `screen.py` hit it. Measured:
+  `"Yu Li Pang"` against listed `YU LI PING` — Python 90, JS **clear**;
+  `"Xi Da Wai"` against `XI DA WEI` — Python 89, JS **clear**. This is the same
+  shape as the Turkish dotless-ı miss fixed earlier, and it bites hardest on
+  transliterated CJK names. `sigTokens` now uses screen.py's `len(t) > 1` floor.
+  The change is recall-monotone — it only ever ADDS candidates — and **moved no
+  floor**: recall 97.5%, hard-negative clear 96.5%, adverse 100%, fn count 3, all
+  unchanged.
+- **The conservative gate it would have weakened is kept, explicitly.** Widening
+  `sigTokens` would have let an all-two-letter name ("Yu Li") past the
+  "not auto-screenable → MANUAL REVIEW" routing. New `screenableTokens()` keeps
+  that gate on the stricter ≥3 rule, so candidate recall and the auto-screenable
+  decision can no longer move together by accident — a fuzz property pins the
+  subset relation.
+- **[`test/matcher-parity.test.mjs`](test/matcher-parity.test.mjs)** — the guard
+  that was missing, driving both engines over a shared corpus via
+  [`scripts/matcher-parity-probe.py`](scripts/matcher-parity-probe.py). It
+  asserts exact parity on the lost-script predicate (the anti-silent-clear gate)
+  and on `normalize` for foldable names, and **directional** parity elsewhere:
+  screen.py's significant tokens must be a *subset* of the JS engine's, and a
+  screen.py hit must be reached by the JS engine too. Extra JS tokens are the
+  recall-safe direction and are tolerated (it keeps the name particles `BIN`/`AL`
+  that screen.py drops); keeping *fewer* is the silent-miss direction and fails.
+  Scores are deliberately not compared — rapidfuzz and the JS Levenshtein
+  legitimately differ by a point (93 vs 94), and CI's main job runs the difflib
+  backend while the fuzz job runs rapidfuzz.
+- Both historical parity failures are pinned in the corpus as permanent
+  regressions, and the test fails if either pin is removed. Verified by
+  reintroducing the bug: the guard catches the token divergence *and* both
+  resulting false negatives.
+
+### Compliance — Conflict of Interest policy, five unregistered instruments, and a sweep that can no longer miss them (2026-07-28)
+
+Closing the two gaps a verification pass found after the policy pack landed.
+
+- **Conflict of Interest & Staff Conduct Policy**
+  ([docs/policies/conflict-of-interest-policy.md](docs/policies/conflict-of-interest-policy.md)) —
+  the instrument the pack was missing. Declaration on arrival, on change and
+  annually; withdrawal from the conflicted decision; four eyes on customer
+  acceptance, screening dispositions and filing decisions; gifts and outside
+  interests; **no commercial override of a compliance decision**; the MLRO's own
+  conflicts routed to the Board chair rather than to management; and a conflicts
+  register where an empty year is a finding, not a clean bill of health.
+  Distinct from `CODE_OF_CONDUCT.md`, which governs open-source contributors.
+- **Five instruments registered that were already operating** (POL-32 to
+  POL-36): the business continuity plan, the AI decommissioning procedure, the
+  data-quality plan, the internal audit programme, and the model-validation and
+  change-control pack. All owned, all current, none previously in the register —
+  so nothing tracked their approval or their next review date. Owner headers
+  normalised where they were prose rather than a declaration.
+- **The sweep that let two of them through is fixed.** `bcp.md` and
+  `decommissioning.md` were invisible to the anti-shadow-policy check purely
+  because of what they were called. It now runs on **two signals**: the widened
+  filename rule (adds *plan*, *standard*, *methodology*, *bcp*) **and** an
+  `**Approver:**` header, which is the one thing only an instrument claims.
+  Coverage went from 11 documents to 34.
+
+Thirty-six instruments registered, sixteen in force, twenty draft pending
+approval under open-actions item 18.
+
+### Compliance — the AML/CFT/CPF policy pack: seventeen governing instruments (2026-07-28)
+
+The estate had controls, registers and evidence — and no policies. The registers
+pointed at procedures and runbooks; the instruments that say *how the firm
+applies* its obligations did not exist. This adds them, under `docs/policies/`,
+grounded in Federal Decree-Law No. 10 of 2025, Cabinet Resolution No. 134 of
+2025, Cabinet Decision No. 74 of 2020, the PDPL and the MoE circulars (2/2024,
+3/2025, 4/2025, 6/2025).
+
+- **Master:** [AML/CFT/CPF Policy](docs/policies/aml-cft-cpf-policy.md) — three
+  pillars, governance and accountability, prohibited business, personal
+  liability, and the evidence map. Everything else implements part of it.
+- **Customer & counterparty:** [CDD/SDD/EDD](docs/policies/customer-acceptance-cdd-policy.md)
+  (band outcomes and hard rules, UBO at 25% with nominees looked through, SDD
+  eligibility *and* its documentation duty, PEP handling, review cycles) ·
+  [Sanctions & TFS](docs/policies/sanctions-tfs-policy.md) (lists, 24-hour
+  rescreen on list update, freeze-without-delay, PNMR/CNMR/FFR deadlines,
+  DPMS circumvention indicators) ·
+  [CPF](docs/policies/proliferation-financing-policy.md) — proliferation
+  financing as a **standalone pillar**, not a footnote to sanctions ·
+  [Responsible Sourcing](docs/policies/responsible-sourcing-policy.md) (OECD
+  five steps, LBMA RGG, KYS, CAHRA/ASM).
+- **Transactions & reporting:** [Monitoring & Reporting](docs/policies/transaction-monitoring-reporting-policy.md)
+  (the **DPMSR-vs-STR** distinction, AED 55,000 thresholds with linked-series
+  aggregation, AED 3,500 wire data, tipping-off) and the
+  [goAML filing procedure](docs/policies/str-dpmsr-filing-procedure.md), which
+  logs **no-action decisions** to the same standard as filings.
+- **Programme:** [Governance Charter](docs/policies/compliance-governance-charter.md)
+  (MLRO independence and authority, annual report, twelve-month cycle) ·
+  [EWRA/BWRA methodology](docs/policies/risk-assessment-methodology.md) ·
+  [Training](docs/policies/training-awareness-policy.md) ·
+  [Independent Audit](docs/policies/independent-audit-policy.md) ·
+  [Whistleblowing](docs/policies/whistleblowing-policy.md) — the speak-up
+  element the estate had no instrument for ·
+  [Regulatory Change Management](docs/policies/regulatory-change-management-procedure.md).
+- **Data, security, suppliers:** [Record-Keeping & Retention](docs/policies/record-keeping-retention-policy.md)
+  (five years, **48-hour production**, holds) ·
+  [Data Privacy](docs/policies/data-privacy-policy.md) (PDPL lawful basis; a
+  data-subject request never overrides tipping-off) ·
+  [Information Security](docs/policies/information-security-policy.md) ·
+  [Outsourcing & Third-Party](docs/policies/outsourcing-third-party-policy.md).
+
+Every instrument is **DRAFT and not in force** until its approval block is
+completed — Board for policies, MLRO for procedures — tracked as new
+open-actions **item 18**. All seventeen are registered in
+`data/policies.json` (30 instruments now) and CI holds the line: an owner
+declared in the document itself, no approval date the document does not
+record, no next-review date on a draft, and no policy-shaped file left
+unregistered.
+
+Two obligations added: **OB-20** proliferation financing as a standalone risk
+(FDL 10/2025 Art. 3(3)) and **OB-21** wire-transfer originator/beneficiary data
+at AED 3,500 (CR 134/2025). Every existing obligation now names the governing
+instrument that discharges it. Compliance completion moves 37.5% → **33.3%**
+because the denominator grew by two — a dilution the metric reports rather than
+hides.
+
+### Governance — policy register: ownership and approval records for every instrument (2026-07-28)
+
+The last repo-side gap from the GRC map (core component 4, policy management).
+The policies existed and were indexed; what nothing recorded was which had been
+**approved**, by whom, when they fall due, and — for five of them — who owned
+them at all.
+
+- **Policy register** — [`data/policies.json`](data/policies.json)
+  + [`docs/governance/policy-register.md`](docs/governance/policy-register.md)
+  + `test/policies.test.mjs`. Thirteen governing instruments (policies,
+  standards, procedures, runbooks, charters) with owner, approver, type,
+  status, version, approval record and next review; eleven in force, two draft
+  pending the same board sitting.
+- **Ownership is now declared in the document, not only in the register.** CI
+  requires an `**Owner:**` line in each instrument's own header, so ownership
+  survives someone reading the document without the register. Five documents —
+  the committee charter, backup & recovery, the app setup runbook, the
+  red-team procedure and the history scrub runbook — had no declared owner
+  until this register asked for one; headers were added in the same change.
+- **Approval honesty.** A row may not claim a ratification the document itself
+  does not record (checked in ISO and long-form date), a draft may not assert a
+  next-review date (review clocks start at approval), and a draft must name the
+  open-actions item that approves it.
+- **Anti-shadow-policy sweep.** Every `docs/**` file whose name carries
+  *policy*, *procedure*, *charter*, *runbook* or *sop* must be registered or
+  excluded with a written reason — three external framework artefacts are
+  excluded with theirs.
+
+Also: the model-endpoint scan in `scripts/grc-metrics.mjs` is now an anchored
+regex rather than a substring `includes()`. It reads source text, not URLs, so
+there is no hostname to parse — but the substring shape is what CodeQL's
+incomplete-URL-sanitization query fires on, and the intent is clearer stated as
+a pattern match (`test/` is already excluded from CodeQL for exactly this class
+of alert, per the CA-13 triage record).
+
+### Governance — risk appetite, obligation register and a measured GRC layer (2026-07-28)
+
+Closed the three gaps a modern-GRC self-check surfaced: no stated risk
+appetite, no obligation inventory, and no management metrics. Same pattern as
+the registers above — JSON source of truth, human view, CI guard.
+
+- **Risk Appetite Statement** — [`data/risk-appetite.json`](data/risk-appetite.json)
+  + [`docs/governance/risk-appetite-statement-2026.md`](docs/governance/risk-appetite-statement-2026.md).
+  Eight positions (sanctions/TFS, customer acceptance, AI in decisions, personal
+  data, prompt/agent change control, resilience, supply chain, remediation), the
+  CDD ≤ 19 / SDD ≤ 22 / EDD acceptance scale with its hard rules, and nine KRIs.
+  The statement describes the appetite the estate **already enforces**, and CI
+  keeps it that way: `test/grc-metrics.test.mjs` parses `ZERO_TOLERANCE` out of
+  `netlify/functions/brain-soul.js` and the band cutoffs out of `app.js` and
+  fails if either diverges from the published text, in both directions. DRAFT
+  until board resolution **R7** (new open-actions item 17, new R7 block in the
+  minute template).
+- **Obligation register** — [`data/obligations.json`](data/obligations.json)
+  + [`docs/governance/obligation-register.md`](docs/governance/obligation-register.md).
+  Nineteen obligations (16 regulatory, 3 voluntary/monitored) mapped to
+  instrument, owner, controls, evidence, the Regulatory Watch source that would
+  detect a change, and the compliance-calendar duty that files the reminder.
+  `test/obligations.test.mjs` verifies every control and evidence path exists,
+  every watch source and calendar duty id is real, each of the three UAE
+  supervisors carries at least one obligation, every *partial* row names a live
+  open-actions item, and — reusing the legal-citation guard's rule — that no
+  obligation cites a repealed instrument (FDL 20/2018, CD 10/2019) as its basis.
+- **GRC metrics** — [`scripts/grc-metrics.mjs`](scripts/grc-metrics.mjs),
+  generated [`data/grc-metrics.json`](data/grc-metrics.json)
+  + [`docs/governance/grc-metrics.md`](docs/governance/grc-metrics.md).
+  Five of the six management ratios computed from committed artefacts — control
+  effectiveness **100%** (60/60), compliance completion **37.5%** (6/16 met, 8
+  partial waiting on a human act, 2 firm-side), KRI breach **12.5%** (1/8),
+  third-party coverage **71.4%** (the two outstanding vendor confirmations),
+  finding closure **95.2%** (HA-08, the transaction feed) — plus the counters
+  the KRIs key on. The sixth, overdue-issue rate, reports **null with its
+  reason** (open items carry owners and closing conditions but no target dates)
+  and its KRI stays marked *not instrumented*, excluded from the breach
+  denominator rather than scored as passing; instrumenting it is part of R7.
+  Freshness is enforced by `node scripts/grc-metrics.mjs --check`, wired into
+  both `ci.yml` and `scripts/run-tests.mjs` so a stale board figure fails the
+  build instead of reaching a board pack.
+
+Also: an explicit `SCANNERS` allowlist shared by the three scanning suites — a
+file whose job is to detect model-API callers necessarily contains the patterns
+it looks for, and must not be mistaken for one.
+
+### Governance — prompt lifecycle and tool/connector registers, both CI-enforced (2026-07-28)
+
+Closed the two coverage gaps left by the 10-concept AI-governance self-check:
+prompt management (PromptOps) and MCP-class integration surfaces. Both follow
+the established register pattern — machine-readable JSON as the source of
+truth, a human view under `docs/governance/`, and a CI guard that fails on
+drift rather than a page that quietly rots.
+
+- **Prompt lifecycle register** — [`data/prompt-assets.json`](data/prompt-assets.json)
+  + [`docs/governance/prompt-lifecycle-register.md`](docs/governance/prompt-lifecycle-register.md).
+  Seven governed prompt artefacts across the three registered AI surfaces
+  (`SOUL_CHARTER`, the knowledge-context template, the 16 persona suffixes,
+  `GROUNDING_SYSTEM`, both `ai.py` user templates, and the reg-draft template),
+  each pinned to a **SHA-256 of its exact source region** with a purpose, the
+  risk if changed unreviewed, its runtime guards, its assurance controls, a
+  version and an approval record. Editing a prompt now fails
+  `test/prompt-register.test.mjs` until the change is reviewed and re-pinned
+  (`node scripts/prompt-register.mjs --update`), so an instruction set cannot
+  reach production without a recorded decision — the gap between
+  `test/advisor-assurance.test.js` (which checks that phrases are *present*)
+  and change control (which asks *who approved this wording*). The suite also
+  runs an anti-shadow-prompt scan: any file calling the model API without a
+  registered prompt is a red build, in both directions against
+  `data/ai-assets.json`.
+- **Tool & connector register** — [`data/tool-surfaces.json`](data/tool-surfaces.json)
+  + [`docs/governance/tool-connector-register.md`](docs/governance/tool-connector-register.md).
+  The capability view that sat between the asset register (which surfaces
+  exist) and the third-party register (which processors we contract with):
+  all ten agent actions with their credentials and holders, the nine connector
+  surfaces with hosts, what leaves and kill switches, and the MCP posture —
+  no server exposed, no client shipped, no repository secret ever handed to
+  operator-side MCP tooling. `test/tool-register.test.mjs` cross-checks the
+  action table, the agent roster and `ACTION_CREDENTIAL` against `agents.py`
+  in **both** directions, re-verifies the runtime invariants
+  (`asana.write` is DeliveryAgent's alone; no agent may file), confirms every
+  declared credential is a real secret and every declared host appears in a
+  declared caller, and — the load-bearing one — **fails if any model call ever
+  declares `tools`/`tool_choice`** while the register says tool-calling is off.
+  Re-opening the path from model output to a live connector is now a reviewed
+  code change, not a configuration flip.
+
+### Sanctions screening — TFS gap checklist intake: name-match procedure (PNMR/CNMR/FFR), internal watchlist, training cadence (2026-07-28)
+
+Self-assessed the screening estate against a 36-item UAE TFS practitioner
+checklist (Cabinet Decision 74/2020 context) — ~30 items pass with citable
+evidence (`docs/governance/sanctions-screening-gap-checklist-2026.md`) — and
+closed the three gaps it surfaced in the same change:
+
+- **TFS name-match procedure** (`docs/aims/tfs-name-match-procedure.md`) — the
+  material gap (checklist D3): a sanctions name match carries duties an
+  ordinary alert does not, and the alert decision tree previously ended at
+  "file STR/SAR" while the incident runbook cited a "TFS procedure" that did
+  not exist. New procedure: suspend dealings **without delay** → same-day
+  identifier verification → **PNMR** (potential) or **freeze + CNMR + FFR**
+  (confirmed) via goAML → release only on written EOCN/FIU basis, with a §4
+  TFS event log, tipping-off discipline, and the STR assessed in parallel —
+  never instead. Wired in: TFS gate **1a** in the decision tree (list hits
+  branch before the STR question), runbook link fixed, MLRO competency row +
+  training-record topic, annual review/tabletop + training-refresh duties in
+  the compliance calendar.
+- **Internal firm watchlist** (checklist A4) — `data/internal-watchlist.json`
+  screened by BOTH engines in addition to the official lists: supplementary
+  tier in `screen.py` (added after the all-empty guard and floors so internal
+  names can never satisfy a core-coverage fail-safe) and an `optional: true`
+  curated source in `data/sanctions-extra.json` (JS engine). Empty is a valid
+  state ("no internal designations") reported informationally — official
+  lists keep the opposite fail-safe (empty = DEGRADED). Both daily narratives
+  render the list's line; shape + wiring pinned by 10 new checks in
+  `test/data-schema.test.js`; maintained under the EOCN SOP's new §8; hits
+  route through the ordinary tree, never the TFS path.
+- **Training cadence** (G1/J3) — sanctions-evasion typologies + TFS handling
+  added to the competency baseline, with an annual refresh duty (also after
+  material screening changes) and an internal-watchlist annual review in
+  `data/compliance-calendar.json` (3 new duties).
+
+Stated, not hidden: transaction screening stays the known R-13 feed gap;
+input-side data quality accepted at current base size. Coverage matrix gains
+the internal-watchlist control row and the TFS manual-assurance row.
+
+### EU AI Act — Digital Omnibus amendment intake: assessment updated, EU watch source added (2026-07-28)
+
+The Digital Omnibus AI amendments are now adopted law (Parliament 16 Jun 2026,
+Council 29 Jun, final act signed 8 Jul; pending OJ publication) — one day after
+the EU AI Act assessment was written against the original Regulation. Its §7.5
+"Act evolution" re-assessment trigger fired; headline conclusions survive (not
+territorially bound, not high-risk, Art. 50 disclosure implemented and
+CI-asserted).
+
+- **Assessment updated** (`docs/governance/eu-ai-act-assessment-2026.md`):
+  Art. 5 sweep extended to the new ninth prohibition (NCII/CSAM generation —
+  not present, text-only system); Art. 4 literacy note records the legal floor
+  softening to "support the development" while **deliberately keeping the
+  stricter original standard**; Art. 50(2) machine-readable-marking timing
+  (2 Dec 2026, legacy) noted with the internal-use position; AI Office
+  exclusive-competence note (same-provider GPAI systems — the opposite of this
+  architecture); postponed high-risk dates recorded as runway in §7; dated
+  assessment-log row added.
+- **Watch gap closed** (`data/reg-sources.json`): §7.5 claimed Act evolution was
+  watched via the regulatory-watch pipeline, but the source list contained no
+  EU AI-regulation source — the Omnibus arrived via manual intake. A dedicated
+  `eu-ai-act` source (Commission AI regulatory-framework page) is now
+  fingerprinted daily like every other source; count references trued up
+  (20 → 22 across the coverage matrix §1.4 and the stack scorecard).
+
+### Operational AI Governance Stack — crosswalk §C, Level-4 evidence index, GovernanceScore + register review currency (2026-07-28)
+
+Adopts the five-level *Operational AI Governance Stack* (visibility → monitoring
+→ controls → evidence → continuous governance) as a third external crosswalk and
+closes the two small gaps the mapping surfaced.
+
+- **Crosswalk §C** (`docs/governance/ai-frameworks-crosswalk-2026.md`):
+  level-by-level mapping, with the deliberate non-controls stated in the open
+  (conversation monitoring — ephemeral by design, PDPL/data-minimisation;
+  discovery/permission tooling — N/A while the estate is fully enumerated) and
+  their re-trigger condition (adoption of platform-built agents).
+- **Governance-evidence index**
+  (`docs/governance/assurance-coverage-matrix.md` §1.10): the six Level-4
+  evidence types (decision ledger, runtime evidence, override records,
+  authorization chain, independent audit evidence, decision provenance) each
+  mapped to the existing artefact and automated proof that satisfies it —
+  monitoring says what happened; evidence proves who authorised it.
+- **GovernanceScore** (`scripts/governance-report.mjs`): composite 0–100 health
+  of the scored controls (pass=1, attention=0.5, fail=0; info rows excluded) in
+  the daily card's title and body, with Δ against the previous report parsed
+  from the task titles the idempotency listing already fetched (zero extra API
+  calls). New KPI row in the coverage matrix §3.
+- **Register review currency** (same script): `data/ai-assets.json` declares a
+  quarterly review cadence but nothing enforced it — the daily card now carries
+  a register-review row (pass / REVIEW OVERDUE past the 100-day window / fail on
+  a missing or unreadable date), so an unreviewed inventory can only rot loudly.
+  The schema test additionally requires a declared cadence and a parseable
+  `last_reviewed` (shape only in CI — currency stays with the daily report, so
+  no time-bomb tests).
+- **Full five-level scorecard**
+  (`docs/governance/operational-ai-governance-stack-2026.md`): tile-by-tile
+  assessment in the house format of the 6-layer doc — all five levels ✅, the
+  two absent tiles documented as deliberate non-controls with named re-trigger
+  conditions (platform-built agents, tool/action permissions, a second
+  operator). Cross-linked from the 6-layer doc, crosswalk §C and the
+  governance-pack index.
+
+### Screening accuracy hardening — measured 95% floors: benchmark corpus, shared transliteration, phonetic fold, one-way thresholds, adverse-media tiers (2026-07-28)
+
+Six-phase programme raising the sanctions + adverse-media screening estate to
+CI-enforced 95% accuracy floors, measured on a new labelled benchmark run
+through **both real engines** — measurement landed first, so every phase is
+falsifiable against a frozen pre-hardening baseline. All hardening is
+**recall-monotone**: no change unflags, drops or suppresses anything; precision
+comes from tiering and escalation weighting. Headline movement (identical on
+py_rapidfuzz / py_difflib / js): sanctions recall **57.0%/62.0% → 97.5%**,
+adverse-media classification **57.9%/77.3% → 100%**, repeat-signal accuracy
+**50% → 100%**, hard negatives held (100% Python / 96.5% JS, documented).
+
+- **Benchmark + frozen baseline** (`test/fixtures/screening-benchmark/`,
+  `scripts/screening-benchmark.mjs`, `test/benchmark_eval.py`,
+  `test/screening-benchmark.test.mjs`): 121 labelled true-equivalent pairs
+  (per script group and catching mechanism), 85 hard negatives (one budgeted
+  canary, n030), 114 labelled adverse headlines across 8 languages incl.
+  description-only and wrong-subject cases, 6 multi-day repeat scenarios.
+  Per-backend floors in `floors.json` ratchet only upward (MLRO sign-off to
+  lower); the rapidfuzz backend gates in the fuzz job (real deps), the difflib
+  stub in the bare test job. Governance:
+  `docs/governance/screening-accuracy-benchmark.md`.
+- **Shared transliteration source of truth** (`data/translit-groups.json`,
+  89 disjoint groups / 267 members, loaded fail-loud by BOTH engines,
+  schema-guarded by `test/translit-data.test.mjs`): closes the khaled/khalid
+  class and every Cyrillic/Ukrainian romanization pair the duplicated 10-group
+  in-code tables missed. Deliberate firewalls: salah≠saleh, sayed≠said,
+  selim≠salim stay ungrouped. Variant cap 12→32 (`TRANSLIT_VARIANT_CAP`).
+  Fail-before: khaled→khalid produced no variant pre-change.
+- **Phonetic fold layer** (`phonetic_key`/`phoneticKey`, identical spec both
+  engines, zero new dependencies): the model card's pinned "clears by design"
+  residual — every significant token ≥2 edits off ("Muhamet Huseinn" ≈ 69) —
+  now flags as a **WEAK (phonetic-only)** possible match at its real
+  conservative score, never confirmed-looking. Strictly additive (property-
+  tested: the layer never removes or re-scores a fuzzy hit); dedicated
+  phonetic posting indexes keep blocked/unblocked screening bit-identical
+  (hypothesis property extended over a multi-edit drift pool);
+  `MATCH_PHONETIC` = 1 | shadow | 0. The negative-test pin is FLIPPED, with
+  the kill-switch restoring the historical clear as the regression guard.
+  Also: the JS engine now folds Turkish dotless ı (Kılıç ≡ Kilic — found by
+  the corpus, screen.py parity).
+- **One-way env-tunable thresholds + shadow challenger**: the four match
+  cutoffs (85/82/97/93) are env-tunable, range-validated, and ONE-WAY —
+  raising above the champion default needs the explicit `…ALLOW_RAISE=1`
+  override; the champion/challenger doc's proposed 0.80 shadow run is now
+  wired LOG-ONLY in both engines (`SHADOW_THRESHOLD` /
+  `SCREEN_SHADOW_THRESHOLD`) — counted and logged, never a hit, case or
+  delta entry.
+- **Adverse media — precision without suppression**: feed descriptions
+  captured and scanned alongside headlines (the largest measured recall
+  loss); strong/weak keyword tiers (generic "political"/"lawsuit"/"ESG"
+  headlines stay flagged for the record but need a second independent outlet
+  to count toward escalation); the ≥3-stories/90-days repeat counter now
+  counts DISTINCT canonical-URL fingerprints among counter-eligible entries —
+  wrong-subject same-surname stories (relevance LOW) never count,
+  cross-script (Arabic/Russian/Chinese) headlines are UNSCORABLE and always
+  pass the relevance gate, one article re-served under rotating tracking
+  params counts once, and legacy evidence entries stay eligible (no
+  retroactive suppression). JS gains the stem terms its exact-word list
+  missed ("sanctioned", "launder", "kickback", "guilty", "contraband" …).
+  `ADVERSE_MAX_RESULTS` env (default 8, was hard-coded 5),
+  `ADVERSE_LOCALES` default 5→8, source-credibility ranking tiers
+  (`data/source-credibility.json` — annotation/ordering only).
+- **Floors ratcheted** (`floors.json` v2): recall ≥95% with the miss budget
+  capped at the 3 documented residuals per engine (triple-token drift with a
+  phonetically ambiguous g/j pair; Turkish legal-form abbreviation on the
+  Python min(full,core) side; two JS-only plain-Levenshtein prefix-cluster
+  gaps); adverse/repeat at the achieved 100%. `test/bias_eval.py` floors
+  70%→90% per group, gap 30%→10%, with new Cyrillic-expanded, CJK and
+  Phonetic groups — 100% recall in all six groups under both backends, zero
+  false positives.
+- **One-time re-surface note**: standing subjects that now gain a phonetic or
+  transliteration hit will alert once as new/changed (the conservative
+  outcome, same as the audit-round precedent), bounded by the per-run case
+  cap and backlog drain.
+- Model cards revised (`sanctions-name-matcher.md` — residual flipped;
+  `adverse-media-classifier.md` — also corrects the stale two-feed/5-locale
+  description to the actual three feeds + watchlist net), `.env.example`
+  knobs documented, README gains the benchmark section.
+
+### JS engine follow-up: cleared-case reopen, fuzzy candidate blocking, empty-key dedupe (2026-07-27)
+
+- **Cleared cases reopen on a re-flag** (owner-authorized design change — the
+  old "manual reopen by design" pin is superseded): a subject re-flagged after
+  its case was cleared now gets a FRESH case with an SLA restarting from the
+  re-flag day, a "⚠ RE-FLAGGED AFTER CLEARANCE" banner linking the prior case
+  and its cleared date, and state replaced wholesale (`reopenedFrom`/
+  `reopenedAt` provenance) so aging restarts cleanly and a second clearance +
+  third re-flag works identically. The daily digest resolves the subject to
+  the NEW open case, not the old completed one. Rationale: the shipped config
+  suppresses alerts, so the case board is the only delivery surface — a
+  re-listed customer with no open case was a dropped-review risk.
+- **Fuzzy candidate blocking** — the matcher's exact-token candidate index is
+  now backed by trigram and prefix+length posting lists: a subject token with
+  NO exact bucket admits near-tokens verified at `levenshtein ≤ 1` or
+  InDel ≥ 88 ("Vladimyr Putyn" → flags at 86; "Wladimir Putin" → 93; both
+  silently cleared before). Hot path unchanged within +0.8% (measured, 89k
+  entries); recall-monotone; over-cap buckets used only as a last resort.
+  Honest bound, pinned as a negative test: a name ≥2 edits off in every
+  token still scores under the 85 gate and clears — recorded on the model
+  card.
+- **Empty-key dedupe** — two distinct symbol-only/unscreenable customers
+  previously shared the empty normalization key and the second was dropped
+  before screening; empty-normalization subjects now key on their raw name
+  (collision-proof `raw:` prefix) and each surfaces its own MANUAL REVIEW row.
+
+### Screening follow-up: case backlog, SEMA aliases, fallback matcher parity (2026-07-27)
+
+Round two of the full-screening correctness audit — the items deferred for an
+owner decision, now authorized:
+
+- **MLRO case backlog** — items past `CASE_SUBTASK_CAP` (40/run), and items
+  whose Asana subtask create failed, used to get a log line and nothing else:
+  the delta engine marked them standing, so they never re-entered the case
+  queue — reported once, cased never. They now ride a reserved backlog key in
+  the delta state (`__meta_case_backlog__`, same pattern as the notes-budget
+  key: survives pruning, persisted only on delivery) and drain on later runs
+  whenever the day's NEW items leave capacity free — sanctions first, oldest
+  first, with "(backlogged since …)" provenance on the case, same-name dedup
+  against re-listed items, and a LOUD bound at 400 carried items.
+- **Canada SEMA aliases** — `parse_canada` captured no `<Aliases>` content, so
+  a party operating under a SEMA-listed a.k.a. screened clear against this
+  supplementary list. Both published shapes now parse (nested `<Alias>`
+  elements and flat semicolon-separated text), gated on the record carrying a
+  primary name and filtered for placeholders.
+- **Retired fallback workflow uses the real matcher** — the manual-dispatch
+  `daily-sanctions-screen.yml` carried its own inline matcher (token_sort
+  top-3, break on first hit, no core/subset/short-entry gates, no
+  transliteration variants): a fallback that could clear names the daily
+  engine flags, on exactly the days it would be dispatched. Its screening
+  step now imports the engine and screens through `screen_name` (same gates,
+  same C prefilter, placeholder `ASANA_TOKEN` at import — the step never
+  calls Asana), keeps the results-file schema, surfaces unscreenable names as
+  MANUAL REVIEW rows, and reserves "confirmed" for genuine exact (≥100)
+  matches. Verified end-to-end offline against the in-repo EOCN list
+  (exact → confirmed 100, transliteration variant → potential 96,
+  Arabic-only → MANUAL REVIEW, unrelated → clear, outage degrade intact).
+
 ### JS sanctions engine: four silent-clear classes closed, unscreened days go red (2026-07-27)
 
 The full-screening correctness audit's JS pass found the daily case engine

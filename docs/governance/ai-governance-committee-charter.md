@@ -1,5 +1,8 @@
 # AI Governance Committee Charter
 
+**Owner:** Board (accountable) · MLRO (custodian until adoption)
+**Review cadence:** annually from adoption, and on any change to the committee's remit.
+
 > **Status: DRAFT, prepared for Board adoption. This document charters nothing
 > until the adoption block in Section 8 is completed and signed at a Board
 > sitting.** Prepared 2026-07-16 by Compliance Engineering so that the

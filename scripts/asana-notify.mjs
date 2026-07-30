@@ -131,6 +131,21 @@ export async function notifyAsana(name, notes, opts = {}) {
     projects: [project],
     due_on: due
   };
+  /* MIRROR — one task, multiple project memberships (the same multi-homing the
+     daily screening uses for its dual MLRO queue). #305 routed every pipeline
+     card to the HAWKEYE STERLING APP project; the reader who actually works the
+     law-change queue watches a different project, so from 22 Jul the card was
+     being filed correctly and still read as "nothing arrived". Mirroring is
+     ADDITIVE — the #305 destination is untouched, the card simply also appears
+     where it is worked. One task, so no duplicate to reconcile. */
+  const mirror = (opts.mirror || []).filter(m => m && m.project && m.project !== project);
+  if (mirror.length) {
+    data.projects = [project, ...mirror.map(m => m.project)];
+    data.memberships = [
+      ...(opts.section ? [{ project, section: opts.section }] : []),
+      ...mirror.map(m => (m.section ? { project: m.project, section: m.section } : { project: m.project })),
+    ];
+  }
   /* Idempotency guard — never double-post the same card on a workflow re-run.
      Best-effort: if the check itself fails we still post (losing an alert is
      worse than a rare duplicate). */

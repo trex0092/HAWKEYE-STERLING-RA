@@ -134,6 +134,20 @@ _NAME_TOKEN = st.sampled_from([
     "rashid", "hussain", "usama", "ladin", "awad", "karim", "trading",
     "general", "llc", "dmcc", "fze", "holdings", "international", "quds",
     "force", "hamas", "ano", "irisl", "x", "petro", "pars",
+    # phonetic-fold drift pool: multi-edit romanization variants that only the
+    # phonetic branch can link — with these in the pool, the blocking
+    # equivalence property below also proves the phonetic candidate index is
+    # recall-complete (a phonetic-only pair missed in blocked mode would
+    # diverge from the unblocked loop and fail the property).
+    "muhamet", "huseinn", "hussein", "putin", "putyn", "vladimyr", "vladimir",
+    "khalifa", "subaey", "subaiy", "turki", "gadafi", "qadhafi", "abou", "bakr",
+    # NEAR-MISSES of the short designations above. Without these the sensitive
+    # short-entry property below is VACUOUS: at a lowered threshold the gap only
+    # opens for a pair that ALMOST matches a short name (scoring 80-84, under
+    # both prefilter cutoffs), and a pool of exact tokens only ever generates
+    # exact matches, which the prefilter surfaces anyway. Measured: the property
+    # passed with the guard removed until these were added.
+    "hamaz", "hamasxy", "irisi", "maham", "anno",
 ])
 _NAME = st.lists(_NAME_TOKEN, min_size=1, max_size=6).map(" ".join)
 
@@ -151,6 +165,81 @@ def prop_blocking_equivalence(entry_names, subject_names):
     finally:
         screen.MATCH_BLOCKING = orig
     assert base == fast
+
+
+@PROP
+@given(st.lists(_NAME, min_size=1, max_size=12), st.lists(_NAME, min_size=1, max_size=6))
+def prop_blocking_equivalence_sensitive_short_entry(entry_names, subject_names):
+    # The same equivalence, but with the documented MORE-SENSITIVE short-name
+    # challenger active. The prefilter's cutoffs (THRESHOLD, TOKENSET_THRESHOLD)
+    # are necessary conditions of the hit gates only while SHORT_ENTRY_THRESHOLD
+    # sits at or above them — an ordering that was asserted in a comment and
+    # enforced nowhere, while LOWERING that knob needs no override at all. At
+    # MATCH_SHORT_ENTRY_THRESHOLD=80 blocked mode returned NO hit for customer
+    # "HAMAZ" against designated "HAMAS" where unblocked returned one: making the
+    # matcher more sensitive silently created a false negative. The engine now
+    # declines the prefilter when it cannot bound the gate, and this property is
+    # what proves it — the pool carries the short designations (hamas, ano,
+    # irisl) that exercise exactly this path.
+    lists = {"P": [(screen.normalize(e), e) for e in entry_names]}
+    orig_thr, orig_blocking = screen.SHORT_ENTRY_THRESHOLD, screen.MATCH_BLOCKING
+    try:
+        screen.SHORT_ENTRY_THRESHOLD = 80
+        screen.MATCH_BLOCKING = False
+        base = [screen.screen_name(s, lists) for s in subject_names]
+        screen.MATCH_BLOCKING = True
+        fast = [screen.screen_name(s, lists) for s in subject_names]
+    finally:
+        screen.SHORT_ENTRY_THRESHOLD, screen.MATCH_BLOCKING = orig_thr, orig_blocking
+    assert base == fast
+
+
+def prop_blocking_equivalence_known_sensitive_pairs():
+    """The measured regression, pinned deterministically. The randomized property
+    above only catches this if the generator happens to draw a near-miss of a
+    short designation, so these exact pairs — the ones observed diverging with
+    real rapidfuzz at MATCH_SHORT_ENTRY_THRESHOLD=80 — are asserted outright."""
+    lists = {"P": [(screen.normalize(e), e) for e in ("HAMAS", "IRISL", "MAHAN", "ANO")]}
+    orig_thr, orig_blocking = screen.SHORT_ENTRY_THRESHOLD, screen.MATCH_BLOCKING
+    try:
+        screen.SHORT_ENTRY_THRESHOLD = 80
+        for subj in ("HAMAZ", "HAMASXY", "IRISI", "MAHAM", "MAHAM GENERAL TRADING LLC"):
+            screen.MATCH_BLOCKING = False
+            base = screen.screen_name(subj, lists)
+            screen.MATCH_BLOCKING = True
+            fast = screen.screen_name(subj, lists)
+            assert base == fast, (
+                f"{subj!r}: blocking OFF found {len(base)} hit(s), blocking ON found "
+                f"{len(fast)} — the production prefilter is dropping a pair the gate accepts")
+    finally:
+        screen.SHORT_ENTRY_THRESHOLD, screen.MATCH_BLOCKING = orig_thr, orig_blocking
+
+
+@PROP
+@given(st.lists(_NAME, min_size=1, max_size=10), st.lists(_NAME, min_size=1, max_size=5))
+def prop_phonetic_additivity(entry_names, subject_names):
+    # The phonetic branch is an elif behind the fuzzy gates: turning the layer
+    # ON may only ADD hits — every layer-off hit must survive with an identical
+    # score. A violation would mean the layer replaced or re-scored a fuzzy
+    # hit, i.e. a recall-monotonicity break.
+    lists = {"P": [(screen.normalize(e), e) for e in entry_names]}
+    orig = os.environ.get("MATCH_PHONETIC")
+    try:
+        os.environ["MATCH_PHONETIC"] = "0"
+        off = [screen.screen_name(s, lists) for s in subject_names]
+        os.environ["MATCH_PHONETIC"] = "1"
+        on = [screen.screen_name(s, lists) for s in subject_names]
+    finally:
+        if orig is None:
+            os.environ.pop("MATCH_PHONETIC", None)
+        else:
+            os.environ["MATCH_PHONETIC"] = orig
+    for base, wide in zip(off, on):
+        got = {(h["list"], h["matched_entry"]): h["score"] for h in wide}
+        for h in base:
+            key = (h["list"], h["matched_entry"])
+            assert key in got and got[key] == h["score"], (
+                f"phonetic layer changed a fuzzy hit: {key} {h['score']} -> {got.get(key)}")
 
 
 @PROP
@@ -188,6 +277,10 @@ check("match_adverse_keywords is total, deterministic and duplicate-free", prop_
 check("match_adverse_keywords always finds a planted English keyword", prop_match_keywords_finds_planted_term)
 check("sha256_of yields stable 64-char lowercase hex", prop_sha256_shape)
 check("match blocking on/off is result-identical under real rapidfuzz", prop_blocking_equivalence)
+check("match blocking stays result-identical with a LOWERED short-entry threshold",
+      prop_blocking_equivalence_sensitive_short_entry)
+check("the measured lowered-threshold divergences stay fixed (deterministic pairs)",
+      prop_blocking_equivalence_known_sensitive_pairs)
 check("match blocking stays result-identical after in-place list growth", prop_blocking_survives_inplace_list_growth)
 
 print("\n%d passed, %d failed" % (passed, failed))

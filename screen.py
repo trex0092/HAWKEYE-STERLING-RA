@@ -8,8 +8,9 @@ Modes:
   weekly_adverse : every Monday — adverse media on ALL 324 customers
 """
 
-import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time
+import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time, html
 import threading
+import functools
 import xml.etree.ElementTree as ET
 import concurrent.futures
 
@@ -38,21 +39,115 @@ except ImportError:
     import pdfplumber
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-ASANA_TOKEN           = os.environ["ASANA_TOKEN"]
+# Asana credential — accept EITHER name. The .mjs scripts, every workflow and
+# .env.example all use ASANA_ACCESS_TOKEN; screen.py alone required ASANA_TOKEN
+# and read it with an unguarded os.environ[...] AT IMPORT, so copying
+# .env.example to .env and running `python screen.py` raised KeyError before a
+# line of the engine ran. Four call sites that only want the matcher worked
+# around it by injecting a placeholder credential.
+#
+# The import no longer fails. The safety the hard failure provided — never call
+# Asana unauthenticated — moves to asana_request(), the single call path, where
+# it belongs: a missing credential now fails at the moment Asana is actually
+# used, with a message that says why it matters, instead of blocking consumers
+# that never touch Asana at all.
+#
+# Resolution is normalised back into the environment so agents.py's credential
+# broker (which audits presence BY NAME) and any subprocess see one name.
+ASANA_TOKEN           = os.environ.get("ASANA_TOKEN") or os.environ.get("ASANA_ACCESS_TOKEN") or ""
+if ASANA_TOKEN:
+    os.environ["ASANA_TOKEN"] = ASANA_TOKEN
 TRIGGER_TYPE          = os.environ.get("TRIGGER_TYPE", "workflow_dispatch")
 RUN_MODE              = os.environ.get("RUN_MODE", "full_batch")  # full_batch | weekly_adverse
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
 ASANA_ONGOING_MON_GID = "1213914392047129"
 ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
+# ── Second screening population + second delivery queue (MLRO, 2026-07-29) ──
+# Screening reads BOTH populations: the Customer Database (customers + their
+# UBOs/owners) and the HR – Employees project (staff screening — FATF R.18 /
+# CR 134/2025 employee due diligence). Set ASANA_EMPLOYEE_DB_GID empty to
+# disable employee screening explicitly; an unreachable or empty project while
+# configured is FATAL, exactly like the customer database — a screening
+# population that silently drops out is a silent clear.
+ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", "1216139945846994")
+# Every daily deliverable is multi-homed into BOTH MLRO queues: Ongoing
+# Monitoring (the review record) and Follow Ups (the action queue). One task,
+# two projects — Asana multi-homing, so there is a single audit trail.
+ASANA_FOLLOWUPS_GID = os.environ.get("ASANA_FOLLOWUPS_GID", "1215884707932023")
+ASANA_FOLLOWUPS_SECTION_GID = os.environ.get("ASANA_FOLLOWUPS_SECTION_GID", "1215884707932047")
+
+def _mlro_queue_targets():
+    """projects + memberships for a daily deliverable, multi-homed into every
+    configured MLRO queue. Failure to reach ANY queue is a delivery failure."""
+    projects = [ASANA_ONGOING_MON_GID]
+    memberships = [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}]
+    if ASANA_FOLLOWUPS_GID:
+        projects.append(ASANA_FOLLOWUPS_GID)
+        m = {"project": ASANA_FOLLOWUPS_GID}
+        if ASANA_FOLLOWUPS_SECTION_GID:
+            m["section"] = ASANA_FOLLOWUPS_SECTION_GID
+        memberships.append(m)
+    return projects, memberships
 ASANA_ASSIGNEE_GID    = "1213645083721304"   # default case/OM assignee (MLRO)
 
-THRESHOLD             = 85   # combined (full + core) similarity to flag a match
-CORE_THRESHOLD        = 82   # distinctive-token similarity required (false-positive guard)
-SHORT_ENTRY_THRESHOLD = 97   # near-exact gate for short (<6 char) designated names (HAMAS, IRISL …)
-TOKENSET_THRESHOLD    = 93   # strict additive gate: token-set (subset/patronymic) recall without FP blow-up
+# ── Match thresholds — env-tunable, ONE-WAY (challenger runs more sensitive
+# only, per docs/governance/champion-challenger-thresholds.md). A value ABOVE
+# the champion default would weaken screening, so it is rejected loudly unless
+# MATCH_THRESHOLD_ALLOW_RAISE=1 is set as an explicit, separate decision.
+# Invalid values never silently change matching — loud reject, default kept
+# (mirrors scripts/sanctions-screen.mjs resolveThreshold).
+def _resolve_match_threshold(env_name, default, lo=70, hi=100):
+    raw = os.environ.get(env_name, "")
+    if not str(raw).strip():
+        return default
+    try:
+        v = float(raw)
+    except ValueError:
+        v = None
+    if v is None or not (lo <= v <= hi):
+        print(f"{env_name}={raw!r} is not a number in [{lo},{hi}] — using the champion "
+              f"default {default} so matching is never silently weakened", flush=True)
+        return default
+    if v > default and os.environ.get("MATCH_THRESHOLD_ALLOW_RAISE", "0") != "1":
+        print(f"{env_name}={raw!r} would RAISE the cutoff above the champion default "
+              f"{default} (less sensitive screening). One-way rule: raises require "
+              f"MATCH_THRESHOLD_ALLOW_RAISE=1 — using the default", flush=True)
+        return default
+    return v
+
+THRESHOLD             = _resolve_match_threshold("MATCH_THRESHOLD", 85)              # combined (full + core) similarity to flag a match
+CORE_THRESHOLD        = _resolve_match_threshold("MATCH_CORE_THRESHOLD", 82)         # distinctive-token similarity required (false-positive guard)
+SHORT_ENTRY_THRESHOLD = _resolve_match_threshold("MATCH_SHORT_ENTRY_THRESHOLD", 97)  # near-exact gate for short (<6 char) designated names (HAMAS, IRISL …)
+TOKENSET_THRESHOLD    = _resolve_match_threshold("MATCH_TOKENSET_THRESHOLD", 93)     # strict additive gate: token-set (subset/patronymic) recall without FP blow-up
+
+# ── Shadow challenger (docs/governance/champion-challenger-thresholds.md §3) ──
+# SHADOW_THRESHOLD (0-100, must sit below MATCH_THRESHOLD) turns on a LOG-ONLY
+# challenger band: a (subject, entry) pair whose min(full, core) lands in
+# [shadow, THRESHOLD) and fails every champion gate is counted and logged —
+# never a hit, never a case, never in the delta state. This is the evidence
+# feed the champion/challenger decision log needs before any live threshold
+# change. Off unless explicitly set; invalid values reject loudly to off.
+def _resolve_shadow_threshold():
+    raw = os.environ.get("SHADOW_THRESHOLD", "")
+    if not str(raw).strip():
+        return None
+    try:
+        v = float(raw)
+    except ValueError:
+        v = None
+    if v is None or not (70 <= v < THRESHOLD):
+        print(f"SHADOW_THRESHOLD={raw!r} is not a number in [70, {THRESHOLD}) — shadow "
+              f"challenger disabled (it never changes live matching either way)", flush=True)
+        return None
+    return v
+
+SHADOW_THRESHOLD_VALUE = _resolve_shadow_threshold()
+_SHADOW_CHALLENGER = {"count": 0, "examples": []}   # run-level tally (log-only evidence)
+_SHADOW_LOG_CAP = 25                                 # bounded example log lines per run
 EOCN_PDF_PATH         = "eocn_list.pdf"
 EOCN_JSON_PATH        = "data/eocn-local-terrorist-list.json"
+INTERNAL_WATCHLIST_PATH = "data/internal-watchlist.json"
 DELTA_STATE_PATH      = "data/screen-delta-state.json"  # what we've already reported (delta engine)
 UAE_TZ_OFFSET         = 4
 ONBOARDING_WINDOW_HOURS = int(os.environ.get("ONBOARDING_WINDOW_HOURS", "26"))  # "new customer" window
@@ -621,6 +716,149 @@ def match_adverse_keywords(title: str) -> list:
             matched.append(canon)
     return matched
 
+_RSS_TAG_RE = re.compile(r"<[^>]+>")
+def _strip_rss_description(text):
+    """RSS <description> → plain text: HTML tags stripped, common entities
+    decoded, whitespace collapsed, bounded (feeds embed whole link farms)."""
+    s = _RSS_TAG_RE.sub(" ", str(text or ""))
+    s = (s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+          .replace("&quot;", '"').replace("&#39;", "'").replace("&nbsp;", " "))
+    return re.sub(r"\s+", " ", s).strip()[:1000]
+
+# ── Keyword tiers + description scanning + counter eligibility ───────────────
+# WEAK keywords are the high-noise generics: they legitimately flag a headline
+# for the record (an analyst may still care), but a "political rally" or a
+# commercial "lawsuit" headline must not carry the same escalation weight as
+# "money laundering". Tiering NEVER unflags an article — it only gates the
+# ≥3-stories/90-days repeat counter (see adverse_actionable), where weak-only
+# stories need a second independent outlet to count.
+KEYWORD_TIER_WEAK = {
+    "politic", "illegal", "unlawful", "breach", "regulatory breach", "lawsuit",
+    "court case", "litigate", "verdict", "fined", "esg", "pollution",
+    "toxic waste", "environmental violation", "greenwashing", "deforestation",
+    "land grabbing", "indigenous rights", "nuclear", "dual-use", "exploitation",
+    "conflict of interest", "human rights", "due diligence failure",
+}
+
+def keyword_tier(keywords):
+    """'strong' when ANY matched keyword is outside the weak set; 'weak' when
+    every matched keyword is a generic; None for an unflagged article."""
+    if not keywords:
+        return None
+    return "weak" if all(kw in KEYWORD_TIER_WEAK for kw in keywords) else "strong"
+
+def adverse_keywords_for(title, description=""):
+    """Adverse keywords across the headline AND the feed's description/snippet.
+    Headline-only scanning missed every story whose risk terms sit below the
+    fold ("X steps back from board duties" / "…follows his arrest last week…")
+    — the single largest measured adverse-media recall loss. Union preserves
+    title-keyword order first (report display is title-led), then adds
+    description-only finds. Strictly additive: a title-flagged article can
+    never lose a keyword by also scanning its description."""
+    matched = list(match_adverse_keywords(title))
+    if description:
+        for kw in match_adverse_keywords(description):
+            if kw not in matched:
+                matched.append(kw)
+    return matched
+
+def _counter_relevance(subject, title):
+    """Name-relevance for repeat-counter gating: HIGH/MEDIUM/LOW from
+    ai._name_relevance, plus UNSCORABLE when the headline's script shares no
+    Latin letters with the folded subject (Arabic/Cyrillic/CJK press) — a
+    Latin-token overlap test is meaningless there, and gating on it would
+    silently exclude exactly the non-English coverage this deployment exists
+    to catch. UNSCORABLE therefore passes the relevance gate (recall-monotone:
+    cross-script evidence is never dropped by a scorer that cannot read it)."""
+    folded = ai._ascii_fold(title)
+    if not re.search(r"[a-z]", folded):
+        return "UNSCORABLE"
+    return ai._name_relevance(subject, title)
+
+def adverse_actionable(subject, article):
+    """True when one flagged article is eligible for the ≥3-stories/90-days
+    repeat-escalation counter. Flag status, evidence retention and report
+    display are NEVER touched by this predicate — it only decides escalation
+    weight: (a) the story must plausibly be about the subject (relevance HIGH/
+    MEDIUM, or UNSCORABLE cross-script); (b) a weak-tier (generic-keyword)
+    story must be corroborated by a second independent outlet before it
+    counts."""
+    kws = article.get("keywords") or []
+    if not (article.get("flagged") or kws):
+        return False
+    if _counter_relevance(subject, article.get("title", "")) == "LOW":
+        return False
+    tier = article.get("tier") or keyword_tier(kws)
+    if tier == "weak":
+        domains = article.get("domains")
+        if domains is None:
+            domains = [article.get("source", "")] + list(article.get("also_reported_by") or [])
+        return len({d for d in domains if d}) >= 2
+    return True
+
+# ── Source-credibility tiers (annotation + ordering ONLY, never a gate) ──────
+# data/source-credibility.json maps known outlets to tier 1 (wire services /
+# regulators / established Gulf dailies) or tier 2 (mainstream regional);
+# everything else is tier 3. Used to rank what survives the per-subject cap —
+# a missing/invalid file degrades to everything-tier-3, loudly, because
+# ranking is quality-of-life, not a screening control.
+def _load_source_tiers():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "data", "source-credibility.json")
+    tiers = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        for tier, key in ((1, "tier1"), (2, "tier2")):
+            for dom in data.get(key, []):
+                tiers[str(dom).lower()] = tier
+    except Exception as e:
+        print(f"source-credibility tiers unavailable ({type(e).__name__}) — "
+              f"all sources rank tier 3 (ordering only; screening unaffected)", flush=True)
+    return tiers
+
+_SOURCE_TIERS = _load_source_tiers()
+
+def source_tier_for(article):
+    """Credibility tier (1 best … 3 default) for one article, from its URL host
+    or, failing that, its outlet display name folded against domain labels."""
+    m = re.match(r"https?://([^/?#]+)", str(article.get("url") or ""), re.I)
+    if m:
+        host = m.group(1).lower()
+        host = host[4:] if host.startswith("www.") else host
+        while host:
+            if host in _SOURCE_TIERS:
+                return _SOURCE_TIERS[host]
+            dot = host.find(".")
+            if dot < 0:
+                break
+            host = host[dot + 1:]
+    name = re.sub(r"[^a-z0-9]", "", str(article.get("source") or "").lower())
+    if name:
+        for dom, tier in _SOURCE_TIERS.items():
+            if dom.split(".")[0] == name:
+                return tier
+    return 3
+
+# Aggregator hosts whose links are opaque redirectors with per-fetch tracking
+# params — a URL there never identifies the underlying article, so the
+# fingerprint falls back to the title signature (same rationale as the
+# delta-state key: titles are stable, aggregator URLs are not).
+_AGGREGATOR_HOSTS = {"news.google.com", "www.bing.com", "bing.com"}
+
+def _canonical_fingerprint(url, title):
+    """Stable identity of one story for repeat counting: lowercase host minus
+    www. + path, query/fragment stripped — so the same article re-served under
+    rotating utm/tracking params counts ONCE across days. Aggregator or
+    missing URLs fall back to the normalized-title signature."""
+    m = re.match(r"https?://([^/?#]+)([^?#]*)", str(url or "").strip(), re.I)
+    if m:
+        host = m.group(1).lower().lstrip(".")
+        host = host[4:] if host.startswith("www.") else host
+        if host and host not in _AGGREGATOR_HOSTS:
+            return f"u:{host}{m.group(2).rstrip('/')}"
+    return "t:" + _name_sig(title)
+
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def normalize(name):
     if not name: return ""
@@ -710,6 +948,19 @@ def log(msg):
 # ── ASANA TRANSPORT (honours 429 rate-limit; retries transient errors) ────────
 ASANA_NOTES_MAX = 65000    # opening budget in worst-case rich-text bytes — see _asana_notes_size
 ASANA_NOTES_FLOOR = 12000  # shrink-chain floor: keeps the summary + sign-off intact
+# Case subtasks post to the SAME notes field as the daily report, so they get the
+# same budget. They used to be head-sliced at 8,000 characters — 8x stricter than
+# the report path for no reason, and cut from the WRONG END (see
+# create_case_subtask). CASE_NOTES_FLOOR is the retry budget if Asana still
+# refuses: a rejected create is re-queued to the backlog and would otherwise
+# re-fail on every future run.
+CASE_NOTES_MAX = 65000
+CASE_NOTES_FLOOR = 8000
+# A case note's tail is load-bearing: disposition checkboxes, the tip-off
+# warning, and (HIGH-risk) the whole STR/SAR draft all sit at the end. The
+# report's 1,200-char tail is sized for a sign-off block and would still cut the
+# disposition out from under a long STR draft.
+CASE_NOTES_TAIL = 6000
 
 # Asana's server-side size accounting is a black box (2026-07-16: it rejected
 # notes capped to a 65,000-byte NUMERIC-ENTITY WORST CASE, i.e. stricter than
@@ -721,6 +972,27 @@ ASANA_NOTES_FLOOR = 12000  # shrink-chain floor: keeps the summary + sign-off in
 # chain below the remembered value remains the universal safety net.
 NOTES_BUDGET_KEY = "__meta_asana_notes_budget__"  # reserved — never a fingerprint
 NOTES_BUDGET = {"stored": None, "learned": None}  # loaded from / saved to delta-state
+
+# ── MLRO case backlog (reserved delta-state key) ─────────────────────────────
+# Items past CASE_SUBTASK_CAP (or whose subtask create failed) used to get a
+# log line and nothing else: the delta engine marked them standing, so they
+# never re-entered the case queue on any later run — reported once, cased
+# never. They are now carried in a reserved backlog inside the delta state and
+# drained on later runs whenever the day's NEW items leave capacity free
+# (sanctions first, oldest first). Bounded LOUDLY, never silently.
+CASE_BACKLOG_KEY = "__meta_case_backlog__"        # reserved — never a fingerprint
+CASE_BACKLOG_MAX = 400                            # hard bound on carried items (log names the overflow)
+
+def load_case_backlog(state):
+    """Backlog entries from the delta state: [{p, name, notes, queued}] —
+    malformed/legacy content degrades to an empty backlog, never a crash."""
+    out = []
+    for e in (state.get(CASE_BACKLOG_KEY) or []) if isinstance(state, dict) else []:
+        if (isinstance(e, dict) and isinstance(e.get("name"), str) and e["name"]
+                and isinstance(e.get("notes"), str)):
+            out.append({"p": int(e.get("p", 0) or 0), "name": e["name"],
+                        "notes": e["notes"], "queued": str(e.get("queued", ""))[:10]})
+    return out
 
 def _clamp_notes_budget(v):
     """A budget read from state is advisory — clamp garbage into the sane range."""
@@ -754,6 +1026,17 @@ def asana_request(method, url, **kw):
     """Single Asana call path. Retries on 429 (respecting Retry-After) and 5xx so a
     burst of reads/posts never crashes the run. Returns the final response (caller
     inspects status); returns None only if the network failed every attempt."""
+    # The credential check the import used to do, moved to the point of use. An
+    # unauthenticated Asana read does not fail cleanly — it returns an error
+    # body that parses as JSON with zero tasks, which downstream reads as "no
+    # customers" and files as an all-clear. That is the silent false negative
+    # this engine exists to prevent, so refuse the call outright.
+    if not ASANA_TOKEN:
+        raise SystemExit(
+            "FATAL: no Asana credential — set ASANA_ACCESS_TOKEN (or ASANA_TOKEN). "
+            "Refusing to call Asana unauthenticated: the error body parses as zero "
+            "tasks, and a screen over zero customers would file as an all-clear."
+        )
     kw.setdefault("headers", ASANA_HEADERS)
     kw.setdefault("timeout", 30)
     last = None
@@ -796,16 +1079,19 @@ def _asana_notes_size(s):
         total += cost
     return total
 
-def cap_notes(narrative, limit=None):
+def cap_notes(narrative, limit=None, tail_chars=1200):
     """Cap a report to Asana's notes limit WITHOUT amputating the sign-off / retention
     footer at the end — truncate the body, keep the tail. Sizes are measured with
     _asana_notes_size (worst-case rich-text bytes — see above); the head cut lands
     on a character boundary by construction. `limit` overrides ASANA_NOTES_MAX so
-    post_unified_task can retry with a smaller budget if Asana still refuses."""
+    post_unified_task can retry with a smaller budget if Asana still refuses.
+    `tail_chars` sizes the protected tail: the default suits the report's sign-off
+    block, while case subtasks need a larger one (CASE_NOTES_TAIL) because their
+    disposition block can sit above a long STR/SAR draft."""
     limit = ASANA_NOTES_MAX if limit is None else limit
     if _asana_notes_size(narrative) <= limit:
         return narrative
-    tail = narrative[-1200:]
+    tail = narrative[-tail_chars:]
     marker = "\n…[body truncated — see workflow run log]…\n"
     budget = limit - _asana_notes_size(tail) - _asana_notes_size(marker)
     lo, hi = 0, len(narrative)
@@ -834,7 +1120,76 @@ def _resolve_locale_count(raw, total):
         return max(1, min(total, int(s)))
     except (TypeError, ValueError):
         return min(5, total)
-ADVERSE_LOCALES = _resolve_locale_count(os.environ.get("ADVERSE_LOCALES", "5"), len(GNEWS_LOCALES))
+ADVERSE_LOCALES = _resolve_locale_count(os.environ.get("ADVERSE_LOCALES", "8"), len(GNEWS_LOCALES))
+
+# ── Worldwide locale ROTATION ────────────────────────────────────────────────
+# The matrix carries every market we can reach, but a run can only afford a
+# slice of it: one Google-News pass per subject per locale, self-throttled
+# through a shared send gate, so sweeping all of them on a 900-subject book
+# would take multiples of the runner's wall-clock limit. Capping at the first N
+# meant the SAME N markets every day and the rest were never swept at all —
+# adverse coverage that reads "worldwide" but is structurally blind to, say,
+# Latin America or East Asia.
+# Rotation fixes that without raising per-run cost: the pinned core editions
+# (US/GB/AE-en/TR/AE-ar — the ones the targeted risk passes index into) are
+# swept EVERY run, and the remaining budget is filled from the rest of the
+# matrix on a deterministic day-of-cycle window, so every market is swept
+# within a bounded, stated number of days. The report says which markets ran
+# and when the cycle completes — partial coverage that is disclosed, never
+# partial coverage that reads as complete. ADVERSE_LOCALE_ROTATION=0 restores
+# the old fixed first-N behaviour.
+ADVERSE_CORE_LOCALES = 5   # the pinned five; GNEWS_URLS[4:5] is the Arabic pass
+ADVERSE_ROTATE = os.environ.get("ADVERSE_LOCALE_ROTATION", "1") == "1"
+
+def adverse_locale_indices(run_time=None, budget=None, total=None):
+    """Indices into GNEWS_URLS to sweep this run: the pinned core, then a
+    rotating window over the remainder. Deterministic in the run date, so a
+    re-run of the same day sweeps the same markets (reproducible evidence)."""
+    total = len(GNEWS_URLS) if total is None else total
+    budget = ADVERSE_LOCALES if budget is None else budget
+    budget = max(1, min(total, budget))
+    core = min(ADVERSE_CORE_LOCALES, budget, total)
+    idx = list(range(core))
+    pool = list(range(core, total))
+    if not pool or len(idx) >= budget:
+        return idx[:budget]
+    if not ADVERSE_ROTATE:
+        return list(range(min(budget, total)))
+    room = budget - core
+    day = (run_time or datetime.datetime.utcnow()).toordinal()
+    start = (day * room) % len(pool)
+    idx += [pool[(start + i) % len(pool)] for i in range(min(room, len(pool)))]
+    return idx
+
+def adverse_rotation_cycle_days(budget=None, total=None):
+    """How many runs it takes to sweep every market once, at this budget."""
+    total = len(GNEWS_URLS) if total is None else total
+    budget = ADVERSE_LOCALES if budget is None else budget
+    budget = max(1, min(total, budget))
+    room = budget - min(ADVERSE_CORE_LOCALES, budget, total)
+    pool = max(0, total - min(ADVERSE_CORE_LOCALES, budget, total))
+    if not pool:
+        return 1
+    if room <= 0:
+        return 0        # 0 ⇒ never: the budget cannot reach beyond the core
+    return -(-pool // room)   # ceil
+
+# Articles kept per subject after dedup/ranking. The old hard-coded 5 truncated
+# real coverage for any subject whose flagged bucket alone exceeded it; 8 is
+# the new default with the ceiling env-tunable (validated 1-20, loud reject).
+def _resolve_adverse_max(raw):
+    s = str(raw or "").strip()
+    if not s:
+        return 8
+    try:
+        v = int(s)
+        if 1 <= v <= 20:
+            return v
+    except ValueError:
+        pass
+    print(f"ADVERSE_MAX_RESULTS={raw!r} is not an integer in [1,20] — using default 8", flush=True)
+    return 8
+ADVERSE_MAX_RESULTS = _resolve_adverse_max(os.environ.get("ADVERSE_MAX_RESULTS", "8"))
 # A targeted second pass: the name AND a cluster of material risk terms, so adverse
 # coverage surfaces even when it isn't in the subject's top general-news headlines.
 RISK_QUERY = ("fraud OR sanctions OR \"money laundering\" OR arrest OR investigation OR "
@@ -1045,7 +1400,8 @@ def parse_bing_news(data, max_results: int = 8) -> list:
                 if el.tag.split("}")[-1] == "Source" and (el.text or "").strip():
                     source = el.text.strip()
                     break
-            matched = match_adverse_keywords(title)
+            desc = _strip_rss_description(item.findtext("description") or "")
+            matched = adverse_keywords_for(title, desc)
             pub = item.findtext("pubDate") or ""
             ts = _parse_rss_date(pub)
             dm = re.search(r"(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})", pub)
@@ -1058,8 +1414,10 @@ def parse_bing_news(data, max_results: int = 8) -> list:
                 "date": date,
                 "ts": ts,
                 "url": (item.findtext("link") or "").strip(),
+                "snippet": desc[:300],
                 "flagged": bool(matched),
                 "keywords": matched,
+                "tier": keyword_tier(matched),
                 "categories": typology_for(matched),
             })
             if len(arts) >= max_results * 3:
@@ -1080,7 +1438,7 @@ def search_bing_news(name: str, max_results: int = 8) -> list:
         raise RuntimeError(f"Bing News HTTP {r.status_code}")
     return parse_bing_news(r.content, max_results)
 
-def search_adverse_media(name: str, max_results: int = 8) -> list:
+def search_adverse_media(name: str, max_results: int = None) -> list:
     """
     Deep adverse-media search via Google News RSS.
       Pass 1 — exact name across the first ADVERSE_LOCALES worldwide locales
@@ -1100,10 +1458,15 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
     LOUDLY (am_error) instead of spiralling into a retry storm.
     Returns list of dicts: {title, source, date, ts, url, flagged, keywords, categories}.
     """
+    if max_results is None:
+        max_results = ADVERSE_MAX_RESULTS
     seen_titles = set()
     articles = []
+    # Worldwide sweep: the pinned core editions plus this run's rotating window
+    # over the rest of the matrix (see adverse_locale_indices).
+    _run_locales = [GNEWS_URLS[i] for i in adverse_locale_indices()]
     passes = [
-        (f'"{name}"', GNEWS_URLS[:ADVERSE_LOCALES]),   # broad: exact name, every locale
+        (f'"{name}"', _run_locales),                   # broad: exact name, this run's markets
         (f'"{name}" ({RISK_QUERY})', GNEWS_URLS[:1]),  # targeted: name + risk terms, en-US
     ]
     if ADVERSE_LOCALES >= 5:
@@ -1142,15 +1505,21 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
                         source = ((source_el.text or "").strip() if source_el is not None else "") or "Unknown"
                         pub_date = (pubdate_el.text or "")[:16] if pubdate_el is not None else ""
                         link = (link_el.text or "") if link_el is not None else ""
-                        matched = match_adverse_keywords(title)
+                        # The RSS description carries the article's first lines
+                        # (HTML-wrapped) — scan it too: risk terms often sit
+                        # below a neutral headline. Tags stripped, bounded.
+                        desc = _strip_rss_description(item.findtext("description") or "")
+                        matched = adverse_keywords_for(title, desc)
                         articles.append({
                             "title": title,
                             "source": source,
                             "date": pub_date,
                             "ts": _parse_rss_date(pubdate_el.text if pubdate_el is not None else ""),
                             "url": link,
+                            "snippet": desc[:300],
                             "flagged": bool(matched),
                             "keywords": matched,
+                            "tier": keyword_tier(matched),
                             "categories": typology_for(matched),
                         })
                     ok = True
@@ -1265,7 +1634,12 @@ def search_adverse_media(name: str, max_results: int = 8) -> list:
 
     articles = dedup_stories(articles)
     # Sort: flagged first, then most-recent first (recency ranking).
-    articles.sort(key=lambda x: (not x["flagged"], -(x.get("ts") or 0)))
+    # Ranking: flagged first, then source credibility (tier 1 wire services /
+    # regulators before unknown outlets), then recency — so when the cap
+    # truncates, what survives is the flagged, best-sourced, freshest coverage.
+    for a in articles:
+        a["source_tier"] = source_tier_for(a)
+    articles.sort(key=lambda x: (not x["flagged"], x.get("source_tier", 3), -(x.get("ts") or 0)))
     return articles[:max_results]
 
 # RFC-822 dates from Google News RSS -> epoch seconds for recency ranking.
@@ -1329,7 +1703,7 @@ def format_adverse_block(name: str, articles: list, subject_type: str) -> str:
     if flagged_count > 0:
         lines.append(f"   ⚠️  {flagged_count} potentially adverse headline(s) found:")
     else:
-        lines.append(f"   ✅ No adverse headlines identified in top results.")
+        lines.append("   ✅ No adverse headlines identified in top results.")
     for a in articles:
         flag = "🚩" if a["flagged"] else "  "
         lines.append(f"   {flag} {a['title']}")
@@ -1372,12 +1746,21 @@ def update_adverse_evidence(adverse_findings, today_iso, path=None):
             if not subj or not a.get("title") or key in seen:
                 continue
             seen.add(key)
+            domains = sorted({d for d in
+                              [a.get("source", "")] + list(a.get("also_reported_by") or []) if d})
             entries.append({
                 "date": str(today_iso)[:10], "subject": subj,
                 "subject_type": f_.get("subject_type", ""), "parent": f_.get("parent") or "",
                 "title": a.get("title", ""), "source": a.get("source", ""),
                 "url": a.get("url", ""), "keywords": a.get("keywords", []),
                 "categories": a.get("categories", []),
+                # Counter-gating evidence (28 Jul 2026 hardening): keyword tier,
+                # name-relevance at log time, corroborating outlets, and the
+                # canonical story fingerprint. Display/retention unchanged.
+                "tier": a.get("tier") or keyword_tier(a.get("keywords", [])),
+                "relevance": _counter_relevance(subj, a.get("title", "")),
+                "domains": domains,
+                "fingerprint": _canonical_fingerprint(a.get("url", ""), a.get("title", "")),
             })
 
     def _age_days(e):
@@ -1392,11 +1775,33 @@ def update_adverse_evidence(adverse_findings, today_iso, path=None):
     # half-written evidence file that the next run reads as corrupt.
     if not _atomic_write_text(path, json.dumps(entries, ensure_ascii=False, indent=1)):
         log("  evidence log write failed — screening output unaffected")
-    counts = {}
+    # Repeat-pattern signal, hardened: count DISTINCT story fingerprints (the
+    # same article re-served across days under rotating tracking params counts
+    # once) among COUNTER-ELIGIBLE entries — relevance HIGH/MEDIUM/UNSCORABLE
+    # (never LOW: a same-surname story about someone else must not manufacture
+    # an escalation) and strong keyword tier, or weak tier corroborated by a
+    # second independent outlet. Every entry stays in the log and the report
+    # regardless — only its ESCALATION weight is gated. Entries written before
+    # this hardening carry none of the gating fields and stay counter-eligible
+    # (no retroactive suppression of standing evidence), on their title
+    # fingerprint.
+    counts, excluded = {}, 0
     for e in entries:
-        if _age_days(e) <= REPEAT_WINDOW_DAYS:
-            counts[e["subject"]] = counts.get(e["subject"], 0) + 1
-    return {subj: n for subj, n in counts.items() if n >= REPEAT_THRESHOLD}
+        if _age_days(e) > REPEAT_WINDOW_DAYS:
+            continue
+        legacy = "fingerprint" not in e
+        eligible = legacy or (
+            e.get("relevance") != "LOW"
+            and (e.get("tier") != "weak" or len(e.get("domains") or []) >= 2))
+        if not eligible:
+            excluded += 1
+            continue
+        fp = e.get("fingerprint") or ("t:" + _name_sig(e.get("title", "")))
+        counts.setdefault(e["subject"], set()).add(fp)
+    if excluded:
+        log(f"  adverse evidence: {excluded} in-window item(s) logged but excluded from the "
+            f"repeat counter (low relevance / uncorroborated weak tier) — display unaffected")
+    return {subj: len(fps) for subj, fps in counts.items() if len(fps) >= REPEAT_THRESHOLD}
 
 # ── PEP — POLITICALLY EXPOSED PERSONS (free, Wikidata, individuals only) ──────
 # No genuinely free commercial-use PEP *list* exists (OpenSanctions etc. are
@@ -1485,6 +1890,22 @@ def check_pep(name):
                     "label": str(name).strip(),
                     "description": "screen this subject for PEP/RCA status manually against a domestic register"}
         return {"hit": False}
+    # Every token under 3 characters: the label test below compares only tokens
+    # of 3+ chars, so `want` would be empty, `if want and …` would short-circuit,
+    # and this returned — and CACHED — a confident {"hit": False}. That silently
+    # cleared real people: "Wu Yi" (a former Vice-Premier of China), "Li Na",
+    # "Xi Bo", and the whole shape of East Asian names romanized as two short
+    # syllables. Not screening a name is not the same as screening it clean.
+    # Checked BEFORE the lookup: there is no point spending a Wikidata call (and
+    # a slot in the shared rate gate) on a name this matcher cannot compare.
+    # The worldwide PEP/RCA net still screens these names by exact match, so
+    # this is their second net, not their only one.
+    if str(name).strip() and not [t for t in key.split(" ") if len(t) >= 3]:
+        return {"hit": True, "review": True, "id": "",
+                "category": "MANUAL REVIEW — every name token is too short to auto-screen for PEP",
+                "label": str(name).strip(),
+                "description": "no token of 3+ characters to match on (e.g. a two-syllable "
+                               "romanization); screen this subject for PEP/RCA status manually"}
     if key in _PEP_CACHE:
         return _PEP_CACHE[key]
     # Run-level breaker: once Wikidata refuses this runner, stop paying the
@@ -1511,6 +1932,8 @@ def check_pep(name):
     except Exception as e:
         _pep_failure()
         return {"errored": True, "error": str(e)[:200]}
+    # Tokens the label test compares. Guaranteed non-empty here: a name with no
+    # 3+-char token returned for manual review before the lookup was made.
     want = [t for t in key.split(" ") if len(t) >= 3]
     out = {"hit": False}
     for res in results:
@@ -1536,7 +1959,7 @@ def check_pep(name):
     _PEP_CACHE[key] = out
     return out
 
-# ── OPENSANCTIONS BULK LAYER (PEP mirror fallback + adverse-exposure watchlist)
+# ── OPENSANCTIONS BULK LAYER (worldwide PEP/RCA net + adverse-exposure watchlist)
 # data.opensanctions.org already serves EU FSF and the OFAC/UN mirrors, so it is
 # reachable wherever screening runs and — being one bulk file per run — immune to
 # the per-IP request limiters that take out the live feeds from shared runner IPs.
@@ -1547,11 +1970,25 @@ def check_pep(name):
 PEP_MIRROR_FALLBACK = os.environ.get("PEP_MIRROR_FALLBACK", "1") == "1"
 PEP_MIRROR_URL = "https://data.opensanctions.org/datasets/latest/peps/targets.simple.csv"
 
+def pep_role_from_topics(topics):
+    """PEP vs RCA, taken from the dataset's own `topics` column rather than
+    asserted by us. OpenSanctions tags a politically exposed person `role.pep`
+    and a relative or close associate `role.rca` (FATF R.12 extends the PEP
+    controls to family members and close associates, so an RCA hit carries the
+    same EDD duty as the PEP it derives from). Unknown/absent topics fall back
+    to the neutral wording — the label must never claim more than the data says."""
+    t = (topics or "").lower()
+    if "role.rca" in t:
+        return "RCA (relative / close associate of a PEP)"
+    if "role.pep" in t:
+        return "PEP"
+    return "PEP / RCA (role not stated by the source)"
+
 def parse_pep_index(data):
-    """targets.simple.csv → {normalized name/alias: {"id","label"}}, plus a
-    token-sorted secondary key per name so word-order variants still hit.
-    Exact-normalized index (NOT the fuzzy sanctions matcher): this is a
-    resilience net whose hits mean "listed — verify", so precision beats recall.
+    """targets.simple.csv → {normalized name/alias: {"id","label","role"}}, plus
+    a token-sorted secondary key per name so word-order variants still hit.
+    Exact-normalized index (NOT the fuzzy sanctions matcher): a hit means
+    "listed — verify", so precision beats recall here.
     Tolerant per-row — one malformed row never zeroes the index."""
     index = {}
     if not data:
@@ -1562,6 +1999,7 @@ def parse_pep_index(data):
             try:
                 pid = (row.get("id") or "").strip()
                 primary = (row.get("name") or "").strip()
+                role = pep_role_from_topics(row.get("topics"))
                 names = [primary] + [a.strip() for a in (row.get("aliases") or "").split(";")]
                 for n in names:
                     if not n:
@@ -1569,7 +2007,7 @@ def parse_pep_index(data):
                     k = _norm_lower(n)
                     if len(k) < 5:   # same auto-screenability floor as check_pep
                         continue
-                    entry = {"id": pid, "label": primary or n}
+                    entry = {"id": pid, "label": primary or n, "role": role}
                     index.setdefault(k, entry)
                     index.setdefault(" ".join(sorted(k.split())), entry)
             except Exception:
@@ -1579,35 +2017,45 @@ def parse_pep_index(data):
     return index
 
 def load_pep_mirror():
-    """One bulk download per run — called only when live lookups errored. Returns
-    the name index, or None when disabled/unavailable; callers leave the affected
-    individuals errored (loud, provisional) in that case."""
+    """One bulk download per run of the consolidated worldwide PEP dataset —
+    politically exposed persons AND their relatives / close associates (RCA),
+    every jurisdiction the dataset covers. Returns the name index, or None when
+    disabled/unavailable.
+
+    Loaded on EVERY run since 2026-07-29, not only when a live lookup errored:
+    Wikidata is an encyclopaedia, not a PEP register, so a domestic PEP or an
+    RCA with no English article was screened "no PEP" — a silent false negative
+    on an FATF R.12 duty. It is now the standing worldwide net and Wikidata is
+    the enrichment layer over it, so a miss on one is covered by the other."""
     if not PEP_MIRROR_FALLBACK:
-        log("  PEP mirror fallback disabled (PEP_MIRROR_FALLBACK=0) — errored lookups stay errored")
+        log("  worldwide PEP/RCA net disabled (PEP_MIRROR_FALLBACK=0) — Wikidata only")
         return None
-    data = download(PEP_MIRROR_URL, "OpenSanctions PEPs (mirror fallback)")
+    data = download(PEP_MIRROR_URL, "OpenSanctions PEPs + RCAs (worldwide net)")
     index = parse_pep_index(data)
     if not index:
         return None
-    log(f"  PEP mirror: {len(index):,} name keys loaded — re-covering individuals "
-        "the live lookup could not screen")
+    log(f"  worldwide PEP/RCA net: {len(index):,} name keys loaded "
+        "(politically exposed persons + relatives / close associates)")
     return index
 
 def pep_mirror_lookup(index, name):
-    """Exact-normalized (+ token-sorted) lookup against the bulk PEP index.
-    Hit ⇒ 'listed in the consolidated PEP dataset — verify' (provenance-marked
-    mirror). Miss ⇒ screened-by-mirror, no listing found (still provisional —
-    the mirror is a net, not the primary)."""
+    """Exact-normalized (+ token-sorted) lookup against the worldwide PEP/RCA
+    index. Hit ⇒ 'listed in the consolidated PEP dataset — verify', carrying the
+    role the DATASET states (PEP vs relative/close associate). Miss ⇒ screened
+    against the net, no listing found."""
     key = _norm_lower(name)
     if not key:
         return {"hit": False, "via_mirror": True}
     entry = index.get(key) or index.get(" ".join(sorted(key.split())))
     if not entry:
         return {"hit": False, "via_mirror": True}
+    role = entry.get("role") or "PEP / RCA (role not stated by the source)"
     return {"hit": True, "id": entry["id"], "label": entry["label"],
-            "category": "PEP (OpenSanctions peps watchlist — mirror)",
-            "description": "listed in the OpenSanctions consolidated PEP dataset "
-                           "(mirror fallback — Wikidata unavailable this run)",
+            "category": f"{role} — OpenSanctions worldwide PEP dataset",
+            "description": ("listed in the consolidated worldwide PEP dataset "
+                            "(politically exposed persons and their relatives / "
+                            "close associates). FATF R.12 applies the same EDD "
+                            "duty to an RCA as to the PEP they derive from."),
             "source_url": (f"https://www.opensanctions.org/entities/{entry['id']}/"
                            if entry["id"] else ""),
             "via_mirror": True}
@@ -1674,6 +2122,12 @@ def load_adverse_watchlist():
     return entries, ids, {"count": len(entries), "date": "live (OpenSanctions mirror)",
                           "hash": sha256_of(data), "tier": "supplementary"}
 
+# Subject names the watchlist matcher could not screen this run (non-Latin
+# script, or under 4 matchable characters after normalize). Populated by
+# screen_watchlist and read by tally_enrichment so a subject the watchlist never
+# actually screened is not counted as covered by it.
+WATCHLIST_UNSCREENABLE = set()
+
 def screen_watchlist(subjects_all, entries, ids, today_iso):
     """One local pass of every DISTINCT subject name against the crime watchlist,
     using the same matcher + thresholds as sanctions screening. Returns
@@ -1684,6 +2138,11 @@ def screen_watchlist(subjects_all, entries, ids, today_iso):
         return {}
     wl = {WATCHLIST_LABEL: entries}
     out = {}
+    # Subject names the watchlist matcher could not screen at all. Exposed via
+    # WATCHLIST_UNSCREENABLE rather than the return value so every existing
+    # caller of this function keeps its contract.
+    unscreenable = WATCHLIST_UNSCREENABLE
+    unscreenable.clear()
     names = sorted({s[1] for s in subjects_all})
     # Heartbeat: this pass fuzzy-matches every distinct subject against ~290k
     # watchlist names and ran 33 minutes on 24 Jul with zero output — exactly
@@ -1709,20 +2168,50 @@ def screen_watchlist(subjects_all, entries, ids, today_iso):
                 "watchlist": True, "score": h["score"]})
         if arts:
             out[name] = arts
+        elif _unscreenable(name):
+            # The matcher returns NOTHING for a name it cannot screen (recorded
+            # in non-Latin script, or collapsing under 4 matchable characters),
+            # and "no watchlist listing" is indistinguishable from "never
+            # screened" once it leaves this function. That mattered: when the
+            # news sweep errored, the report told the MLRO "the adverse-exposure
+            # WATCHLIST still screened every subject", and am_blackout only
+            # counted a subject as uncovered when the WHOLE watchlist failed to
+            # load — so a subject that was both news-dead AND unscreenable had
+            # ZERO adverse coverage and was reported as covered.
+            # Record it so the caller can account for it honestly. The sanctions
+            # path already surfaces these names for manual review
+            # (_manual_review_hit); this is the adverse-side equivalent.
+            unscreenable.add(name)
     return out
 
 # ── LIST DOWNLOADS ────────────────────────────────────────────────────────────
+DOWNLOAD_ATTEMPTS = int(os.environ.get("DOWNLOAD_ATTEMPTS", "3"))
+
 def download(url, label):
+    """Fetch one source list. Transient failures (network errors, 5xx, 429)
+    retry with a short backoff — a single TCP reset must not burn a list's
+    primary origin, forcing the mirror (or a DEGRADED day where no mirror
+    exists). Any other 4xx fails immediately: a bot gate or moved endpoint
+    will not heal within one run, and retrying it only delays the fallback
+    ladder that CAN."""
     log(f"Downloading {label}...")
-    try:
-        r = requests.get(url, timeout=90,
-                         headers={"User-Agent": "HawkeyeSterlingCompliance/3.0"})
-        r.raise_for_status()
-        log(f"  {label}: {len(r.content):,} bytes")
-        return r.content
-    except Exception as e:
-        log(f"  ERROR {label}: {e}")
-        return None
+    last_err = None
+    for attempt in range(max(1, DOWNLOAD_ATTEMPTS)):
+        if attempt:
+            time.sleep(2 * attempt)   # 2s, 4s: transient-blip scale, not outage scale
+        try:
+            r = requests.get(url, timeout=90,
+                             headers={"User-Agent": "HawkeyeSterlingCompliance/3.0"})
+            r.raise_for_status()
+            log(f"  {label}: {len(r.content):,} bytes")
+            return r.content
+        except Exception as e:
+            last_err = e
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code is not None and 400 <= code < 500 and code != 429:
+                break
+    log(f"  ERROR {label}: {last_err}")
+    return None
 
 # ── List-entry attributes (DOB / nationality) for match adjudication ─────────
 # Name-only matching forces the MLRO to open the source list just to see
@@ -1758,6 +2247,70 @@ def match_context_for(matched_entry):
     if a["nationality"]:
         bits.append("list nationality: " + ", ".join(sorted(a["nationality"])[:3]))
     return "; ".join(bits)
+
+# ── IDENTITY-BASED EXCLUSION (false-positive demotion, never suppression) ────
+# The volume problem is real: one subject in the 29 Jul run carried 73 candidate
+# designations, nearly all of them different people who share a common Arabic
+# given name. The MLRO already resolves most of those by eye in one step — the
+# report prints the designation's DOB/nationality directly beneath the
+# customer's — so the engine can do that same comparison and take the resolved
+# ones out of the primary queue.
+# This DEMOTES, it never suppresses: an excluded candidate stays in the record,
+# stays in the report under its own heading, and stays reviewable. Recall is
+# therefore untouched — the hit is still made, still stored, still auditable —
+# and the exclusion is stated with its reason so an examiner can check the
+# engine's reasoning rather than take it on trust.
+# Deliberately fail-closed: BOTH identity axes must be known on BOTH sides and
+# BOTH must disagree. A missing customer DOB, a list entry that publishes no
+# DOB, an unparseable date — any of these leave the candidate in the primary
+# queue. Kill-switch: IDENTITY_EXCLUSION=0.
+IDENTITY_EXCLUSION = os.environ.get("IDENTITY_EXCLUSION", "1") == "1"
+# Year tolerance: designation records routinely carry an approximate or
+# multi-year birth date ("1955 / 1960 / 1962"), so only a clear gap counts.
+IDENTITY_DOB_TOLERANCE = int(os.environ.get("IDENTITY_DOB_TOLERANCE_YEARS", "2"))
+
+_YEAR_RE = re.compile(r"(1[89]\d{2}|20\d{2})")
+
+def dob_years(value):
+    """Every 4-digit year in a date string, whatever the source's format.
+    Comparing YEARS rather than full dates is deliberate: the three sources
+    write dates three different ways ("27 Nov 1978", "1979-03-03",
+    "September 06, 1980") and some publish a year alone, so a year comparison
+    is the only one that is reliable across all of them — and a year gap is
+    what actually distinguishes two people."""
+    return {int(y) for y in _YEAR_RE.findall(str(value or ""))}
+
+def _country_key(value):
+    return re.sub(r"[^a-z]", "", str(value or "").lower())
+
+def identity_exclusion_reason(matched_entry, rec):
+    """Why this candidate cannot be the customer — or None to leave it in the
+    primary queue. Both axes must be known on both sides and both must
+    disagree; anything unknown keeps the candidate."""
+    if not IDENTITY_EXCLUSION or not rec:
+        return None
+    attrs = LIST_ENTRY_ATTRS.get(normalize(matched_entry or "")) or {}
+    list_dobs, list_nats = attrs.get("dob") or set(), attrs.get("nationality") or set()
+    if not list_dobs or not list_nats:
+        return None                      # the designation does not publish both
+    cust_years = dob_years(rec.get("dob"))
+    cust_nat = _country_key(rec.get("nationality"))
+    if not cust_years or not cust_nat:
+        return None                      # we do not know the customer's identity
+    list_years = set()
+    for d in list_dobs:
+        list_years |= dob_years(d)
+    if not list_years:
+        return None                      # unparseable list date — keep it
+    gap = min(abs(c - l) for c in cust_years for l in list_years)
+    if gap <= IDENTITY_DOB_TOLERANCE:
+        return None                      # birth years agree — could be the same person
+    list_nat_keys = {_country_key(n) for n in list_nats if _country_key(n)}
+    if not list_nat_keys or cust_nat in list_nat_keys:
+        return None                      # nationality agrees (or is unusable)
+    return (f"customer born {min(cust_years)}, {rec.get('nationality')} · "
+            f"designation born {sorted(list_years)[0]}, {sorted(list_nats)[0]} — "
+            f"{gap}-year gap AND a different nationality")
 
 def parse_ofac(data):
     names = set()
@@ -1954,8 +2507,23 @@ def parse_canada(data):
         for rec in root.iter():
             # Each record groups name parts as child elements; collect name-ish fields.
             entity = given = last = ""
+            aliases = []
             for ch in list(rec):
                 tag = ch.tag.split("}")[-1].lower()
+                if "alias" in tag or tag == "aka":
+                    # Aliases were previously never captured — a party operating
+                    # under a SEMA-listed a.k.a. screened clear against this
+                    # (supplementary) list. Tolerant of both shapes: nested
+                    # <Aliases><Alias>A</Alias>…> (one alias per child element)
+                    # and flat <Aliases>A; B</Aliases> (semicolon-separated).
+                    kids = list(ch)
+                    chunks = ([" ".join(" ".join(k.itertext()).split()) for k in kids]
+                              if kids else re.split(r"[;\n]", ch.text or ""))
+                    for a in chunks:
+                        a = a.strip().strip('"').strip()
+                        if len(a) >= 2 and not _OWNER_JUNK_RE.match(a):
+                            aliases.append(a)
+                    continue
                 val = (ch.text or "").strip()
                 if not val: continue
                 if "entity" in tag or tag == "name": entity = entity or val
@@ -1964,6 +2532,11 @@ def parse_canada(data):
             if entity: names.add(entity)
             person = " ".join(p for p in [given, last] if p)
             if person and len(person) > 3: names.add(person)
+            # An alias designates the SAME party — screened like a primary name.
+            # Gated on the record carrying a primary, so a stray alias-shaped
+            # element outside a real record cannot inject names.
+            if entity or (person and len(person) > 3):
+                names.update(aliases)
     except Exception as e:
         log(f"  Canada SEMA parse error: {e}")
     if not names: return names, "unavailable", ""
@@ -2028,10 +2601,10 @@ def parse_eocn(pdf_path):
             date_label += " · REVIEW OVERDUE"
         return names, date_label, json_hash
     if os.path.exists(EOCN_JSON_PATH):
-        log(f"  EOCN JSON present but yielded no names - manual update required")
+        log("  EOCN JSON present but yielded no names - manual update required")
     # 2) Fallback: a raw PDF uploaded to repo root.
     if not os.path.exists(pdf_path):
-        log(f"  EOCN list not found — manual check required")
+        log("  EOCN list not found — manual check required")
         return names, "NOT AVAILABLE — populate data/eocn-local-terrorist-list.json", ""
     try:
         with open(pdf_path, "rb") as _f:
@@ -2050,6 +2623,41 @@ def parse_eocn(pdf_path):
     except Exception as e:
         log(f"  EOCN parse error: {e}")
         return names, "PARSE ERROR", ""
+
+def parse_internal_watchlist(path=None):
+    """Optional firm-internal watchlist (data/internal-watchlist.json): names
+    the firm designates internally — declined customers, known fraud
+    counterparties, court/police notices — screened IN ADDITION to the
+    official lists. Supplementary tier: never floored, never core coverage,
+    and EMPTY `entries` is a VALID state ("no internal designations"),
+    reported informationally — unlike the official curated lists, where empty
+    means DEGRADED coverage. Same entry shapes as the EOCN curated file
+    (plain string, or {name, aliases})."""
+    path = path or INTERNAL_WATCHLIST_PATH
+    names = set()
+    if not os.path.exists(path):
+        return names, "not configured", ""
+    try:
+        with open(path, "rb") as _f:
+            raw = _f.read()
+        data = json.loads(raw)
+        for e in data.get("entries", []):
+            if isinstance(e, str):
+                n = e.strip()
+                if n: names.add(n)
+            elif isinstance(e, dict):
+                n = (e.get("name") or "").strip()
+                if n: names.add(n)
+                for a in e.get("aliases", []) or []:
+                    a = (a or "").strip()
+                    if a: names.add(a)
+        if names:
+            log(f"  INTERNAL: {len(names)} firm-designated name(s) from {path}")
+            return names, f"from maintained list ({path})", sha256_of(raw)
+        return names, "none designated (empty list is a valid state)", sha256_of(raw)
+    except Exception as e:
+        log(f"  INTERNAL watchlist parse error: {e} — fix {path}")
+        return names, "PARSE ERROR — fix data/internal-watchlist.json", ""
 
 # ── CUSTOMER LOADING ──────────────────────────────────────────────────────────
 SKIP_TOKENS = [
@@ -2151,8 +2759,28 @@ def _individuals_union(struct_names, notes):
             out.append(nm)
     return out
 
+# Customer rows that cannot be screened because the Asana record is missing a
+# name or a gid. Dropping one silently is a COVERAGE GAP, not a non-event: the
+# attestation's denominator is computed from the surviving list, so the report
+# would claim complete coverage over a book that quietly lost a record. Carried
+# so the report can name them and the MLRO can fix the source record.
+CUSTOMER_ROWS_SKIPPED = []
+
+def _skipped_rows_note():
+    """Attestation suffix for un-screenable customer rows — names the records so
+    the MLRO can fix them, rather than leaving a bare number to be read as noise."""
+    if not CUSTOMER_ROWS_SKIPPED:
+        return "          <- every customer record carried a name and an ID"
+    refs = ", ".join((r.get("permalink") or r.get("gid") or "<no identifier>")
+                     for r in CUSTOMER_ROWS_SKIPPED[:10])
+    more = f" (+{len(CUSTOMER_ROWS_SKIPPED) - 10} more)" if len(CUSTOMER_ROWS_SKIPPED) > 10 else ""
+    return ("          <- MISSING name/ID in the Asana record: these customers were NOT "
+            f"screened by any net. Fix the record, then re-run.\n"
+            f"                             {refs}{more}")
+
 def get_all_customers():
     customers = []
+    CUSTOMER_ROWS_SKIPPED.clear()
     params = {
         "project": ASANA_CUSTOMER_DB_GID,
         "opt_fields": "gid,name,notes,permalink_url,created_at",
@@ -2166,7 +2794,16 @@ def get_all_customers():
         data = r.json() if isinstance(r.json(), dict) else {}
         for t in (data.get("data") or []):
             if not t.get("gid") or not t.get("name"):
-                continue  # skip malformed row, never crash the whole run
+                # Keep the run alive (never crash the whole book on one bad row)
+                # but NEVER drop it silently — it is a customer we did not screen.
+                missing = "gid" if not t.get("gid") else "name"
+                ident = t.get("permalink_url") or t.get("gid") or "<no identifier>"
+                CUSTOMER_ROWS_SKIPPED.append({
+                    "gid": t.get("gid", ""), "permalink": t.get("permalink_url", ""),
+                    "missing": missing,
+                })
+                log(f"  ⚠ customer row NOT screenable (missing {missing}): {ident}")
+                continue
             notes = t.get("notes") or ""
             # Structured KYC (FATF R.10/R.25): DOB, nationality, ID, share %, role,
             # CDD gaps, legal-arrangement detection. Falls back to the regex name
@@ -2205,6 +2842,61 @@ def get_all_customers():
         raise RuntimeError(
             "FATAL: 0 customers read from the Asana Customer Database — refusing to "
             "screen or post an all-clear. Check ASANA_CUSTOMER_DB_GID and the token's access.")
+
+    # ── Employee screening (HR – Employees project) ──────────────────────────
+    # Staff are a screening population in their own right (employee due
+    # diligence): each task NAME is the person, screened as an individual, with
+    # any structured note parsed exactly like a customer note. Same pipeline,
+    # same matcher, same guards, same delta state — an employee hit raises the
+    # same case a customer hit would. Configured-but-unreachable (or empty) is
+    # FATAL for the same reason the customer fail-safe exists: a population
+    # that silently drops out of screening is a silent clear for everyone in it.
+    if ASANA_EMPLOYEE_DB_GID:
+        employees = []
+        eparams = {
+            "project": ASANA_EMPLOYEE_DB_GID,
+            "opt_fields": "gid,name,notes,permalink_url,created_at",
+            "limit": 100,
+        }
+        while True:
+            r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=eparams)
+            if r is None or r.status_code not in (200, 201):
+                raise RuntimeError(
+                    f"FATAL: Asana employee fetch failed "
+                    f"({getattr(r,'status_code','network')}) — refusing to screen a "
+                    f"population that silently dropped out. Check ASANA_EMPLOYEE_DB_GID "
+                    f"or set it empty to disable employee screening explicitly.")
+            data = r.json() if isinstance(r.json(), dict) else {}
+            for t in (data.get("data") or []):
+                if not t.get("gid") or not t.get("name"):
+                    continue
+                notes = t.get("notes") or ""
+                kyc_data = kyc.parse_customer(notes)
+                individuals = _individuals_union(
+                    [t["name"]] + [i["name"] for i in kyc_data.get("individuals", [])], notes)
+                employees.append({
+                    "gid": t["gid"],
+                    "name": t["name"],
+                    "permalink": t.get("permalink_url", ""),
+                    "created_at": t.get("created_at", ""),
+                    "individuals": individuals,
+                    "entity_owners": [],
+                    "kyc": kyc_data,
+                    "country": kyc_data.get("country", ""),
+                    "has_assessment": len(notes.strip()) > 100,
+                    "kind": "employee",
+                })
+            next_page = data.get("next_page") or None
+            if not next_page or not next_page.get("offset"):
+                break
+            eparams["offset"] = next_page["offset"]
+        if not employees:
+            raise RuntimeError(
+                "FATAL: 0 employees read from the HR – Employees project while employee "
+                "screening is configured — refusing to screen a population that silently "
+                "dropped out. Check ASANA_EMPLOYEE_DB_GID or set it empty to disable.")
+        log(f"Loaded {len(employees)} employees (screened with the same pipeline as customers)")
+        customers.extend(employees)
     return customers
 
 # ── SCREENING ─────────────────────────────────────────────────────────────────
@@ -2263,6 +2955,116 @@ def confidence_tier(core):
     if core >= 85: return "MODERATE"
     return "WEAK"
 
+# ── PHONETIC FOLD (romanization-drift recall) ────────────────────────────────
+# A name whose EVERY significant token sits ≥2 edits off the listed spelling
+# ("Muhamet Huseinn" vs "MUHAMMAD HUSSEIN" ≈ 69) scores below every fuzzy gate
+# and used to clear BY DESIGN — the model card pinned it as a residual. This
+# layer closes it: each token folds to a romanization-robust consonantal key,
+# and a pair whose token key-lists agree exactly (or form the strict
+# patronymic-subset shape) flags as a WEAK phonetic-only possible match at its
+# real (conservative) fuzzy score — never confirmed, never suppressing or
+# lowering any existing hit. The fold is tuned for Arabic AND Cyrillic
+# romanization drift: digraphs collapse BEFORE run-collapse (else "kayoom"
+# loses its oo→u), the first vowel is kept but only up to the Arabic-real
+# distinctions ({e,i} and {o,u} merge; a stays apart — hassan/hussein must NOT
+# collide), and a trailing vowel is preserved so gender/nisba suffixes
+# (hana/hani, qassem/qasemi) stay distinct. Keys are computed on
+# transliteration-CANONICAL tokens (data/translit-groups.json), so khalid/
+# khaled or omar/umar share a key by group membership rather than luck, and
+# the particles abu/abd merge into their following token ("Abou Bakr" ≡
+# "Aboubakr"). Pure string ops — identical under the offline difflib stub.
+_PHON_DIGRAPHS = (("shch", "s"), ("sch", "s"), ("sh", "s"), ("ch", "c"),
+                  ("zh", "j"), ("kh", "k"), ("gh", "k"), ("ph", "f"),
+                  ("th", "t"), ("dh", "d"), ("dj", "j"), ("ck", "k"),
+                  ("ts", "c"), ("tz", "c"), ("x", "ks"), ("oo", "u"),
+                  ("ou", "u"), ("ee", "i"), ("ei", "i"), ("ey", "i"))
+_PHON_VOWEL_CLASS = {"a": "a", "e": "i", "i": "i", "o": "u", "u": "u"}
+_PHON_CHAR_MAP = str.maketrans({"q": "k", "c": "k", "g": "k", "w": "v",
+                                "p": "b", "d": "t", "z": "s"})
+_PHON_PARTICLES = {"abu", "abou", "abo", "abd"}
+
+@functools.lru_cache(maxsize=1 << 18)
+def phonetic_key(token):
+    """Romanization-robust key of one lowercase token (identity below 3 chars)."""
+    t = token
+    if len(t) < 3:
+        return t
+    for pat, rep in _PHON_DIGRAPHS:          # digraphs FIRST (before run-collapse)
+        t = t.replace(pat, rep)
+    t = re.sub(r"(.)\1+", r"\1", t)          # collapse doubled letters
+    t = t.replace("y", "i")
+    t = t.translate(_PHON_CHAR_MAP)
+    if len(t) > 3 and t.endswith("e"):       # French/Latin silent trailing e
+        t = t[:-1]
+    first = t[0]
+    fv = next((c for c in t[1:] if c in "aeiou"), "")
+    fv = _PHON_VOWEL_CLASS.get(fv, fv)
+    rest = "".join(c for c in t[1:] if c not in "aeiou" and c != "h")
+    tail = _PHON_VOWEL_CLASS[t[-1]] if len(t) > 1 and t[-1] in "aeiou" else ""
+    return re.sub(r"(.)\1+", r"\1", first + fv + rest + tail)
+
+def phonetic_tokens(norm):
+    """Distinctive tokens of a normalized name, particle-merged and folded to
+    their transliteration-canonical spellings — the token stream the phonetic
+    keys are computed over."""
+    toks = [t.lower() for t in core_tokens(norm)]
+    merged, i = [], 0
+    while i < len(toks):
+        if toks[i] in _PHON_PARTICLES and i + 1 < len(toks):
+            merged.append(toks[i] + toks[i + 1]); i += 2
+        else:
+            merged.append(toks[i]); i += 1
+    return [ai.translit_canon_token(t) for t in merged]
+
+@functools.lru_cache(maxsize=1 << 18)
+def _phonetic_profile(norm):
+    """Sorted (key, token-length) pairs, or None when the name has fewer than
+    two significant tokens — a single common token must never carry a
+    phonetic-only hit. Cached by normalized string, so list entries are folded
+    once per process however many subjects screen against them."""
+    toks = phonetic_tokens(norm)
+    if len(toks) < 2:
+        return None
+    return tuple(sorted((phonetic_key(t), len(t)) for t in toks))
+
+def _phonetic_pair_match(a_profile, b_profile):
+    """'equal' when both names' sorted key-lists agree exactly and every paired
+    token's raw lengths differ by ≤3 (a same-key token pair 4+ letters apart is
+    a different name wearing the same consonant skeleton); 'subset' when the
+    SHORTER side (≥2 tokens, each ≥4 chars) is wholly contained in the strictly
+    longer side's key multiset — the patronymic / extra-middle-name shape the
+    fuzzy subset gate misses when spellings drift beyond its 88 per-token bar.
+    None otherwise. Strictly additive: callers only ever ADD a hit on a match."""
+    if a_profile is None or b_profile is None:
+        return None
+    if len(a_profile) == len(b_profile):
+        if [p[0] for p in a_profile] == [p[0] for p in b_profile] and \
+           all(abs(p[1] - q[1]) <= 3 for p, q in zip(a_profile, b_profile)):
+            return "equal"
+        return None
+    short, long_ = (a_profile, b_profile) if len(a_profile) < len(b_profile) else (b_profile, a_profile)
+    if len(short) < 2 or sum(1 for p in short if p[1] >= 4) < 2:
+        return None
+    pool = [p[0] for p in long_]
+    for k, _len in short:
+        if k in pool:
+            pool.remove(k)
+        else:
+            return None
+    return "subset"
+
+def _phonetic_mode():
+    """MATCH_PHONETIC ∈ 1 (live, default) | shadow (count + log, no hits) | 0
+    (off). Read at call time so tests and operators can toggle per run; an
+    unknown value is rejected LOUDLY and the default kept."""
+    v = os.environ.get("MATCH_PHONETIC", "1").strip().lower()
+    if v in ("1", "shadow", "0"):
+        return v
+    log(f"MATCH_PHONETIC={v!r} is not one of 1|shadow|0 — using default 1")
+    return "1"
+
+_PHONETIC_SHADOW = {"count": 0}   # shadow-mode tally (read by tests/operators)
+
 # ── Exact match blocking (C-side prefilter, bit-identical results) ───────────
 # The full sweep scores every (subject, entry) pair in a Python loop — ~870
 # subjects × ~290k crime-watchlist names alone is ~250M pair evaluations whose
@@ -2288,7 +3090,10 @@ try:
     from rapidfuzz import process as _rf_process
 except Exception:
     _rf_process = None
-_NORMS_CACHE = {}   # id(entries) -> (entries, [norm, ...]) — strong ref pins the id
+_NORMS_CACHE = {}
+# One-shot latch so the blocking-disabled notice is logged once per run, not once
+# per subject per list.
+_BLOCKING_STATE = {"warned": False}   # id(entries) -> (entries, [norm, ...]) — strong ref pins the id
 
 def _entry_norms(entries):
     # Rebuild on length change as well as identity change: an entries list
@@ -2313,15 +3118,88 @@ def _survivor_indices(variants, entries):
     if not (MATCH_BLOCKING and _rf_process is not None
             and getattr(fuzz, "token_set_ratio", None)):
         return None
+    # The prefilter's two cutoffs are only NECESSARY CONDITIONS of the hit gates
+    # while SHORT_ENTRY_THRESHOLD sits at or above them. That ordering was
+    # asserted in a comment and enforced nowhere: the threshold resolver accepts
+    # anything in [70, 100] and only rejects a RAISE, so the documented
+    # more-sensitive short-name challenger (MATCH_SHORT_ENTRY_THRESHOLD=80) was
+    # accepted silently — and then the short-entry gate fired on pairs neither
+    # cutoff surfaces. Measured with real rapidfuzz at that setting, blocked mode
+    # (the production default) returned NO hit for customer "HAMAZ" against
+    # designated "HAMAS" while unblocked mode returned one: a silent false
+    # negative created by making the matcher MORE sensitive.
+    # The `core` disjunct of that gate is not bounded by either cutoff at all
+    # (core can be 100 while the whole-string score is 33 — that is the shape the
+    # gate exists for), so rather than guess a bound, decline the prefilter and
+    # score every entry: `None` is the established "prefilter unavailable"
+    # contract, identical results at the original cost. Loud, because a silent
+    # performance cliff is its own kind of surprise.
+    if SHORT_ENTRY_THRESHOLD < max(THRESHOLD, TOKENSET_THRESHOLD):
+        if not _BLOCKING_STATE["warned"]:
+            _BLOCKING_STATE["warned"] = True
+            log(f"  match blocking DISABLED this run: MATCH_SHORT_ENTRY_THRESHOLD="
+                f"{SHORT_ENTRY_THRESHOLD:g} is below the prefilter's cutoffs "
+                f"(THRESHOLD={THRESHOLD}, TOKENSET={TOKENSET_THRESHOLD}), so the C-side "
+                "cutoffs would no longer be necessary conditions of the short-entry gate "
+                "— screening every entry instead (slower, identical recall)")
+        return None
     norms = _entry_norms(entries)
     survivors = set()
+    # With the shadow challenger on, the full-string cutoff drops to the shadow
+    # band's floor so shadow-band pairs survive the prefilter too — the shadow
+    # tally must be identical with blocking on or off (score ≥ shadow ⇒ full ≥
+    # shadow keeps the cutoff a necessary condition, same argument as the hit
+    # gates). Costs more survivors only while a challenger is being evidenced.
+    full_cutoff = THRESHOLD if SHADOW_THRESHOLD_VALUE is None else min(THRESHOLD, SHADOW_THRESHOLD_VALUE)
     for cand in variants:
-        for scorer, cutoff in ((fuzz.token_sort_ratio, THRESHOLD),
+        for scorer, cutoff in ((fuzz.token_sort_ratio, full_cutoff),
                                (fuzz.token_set_ratio, TOKENSET_THRESHOLD)):
             for _choice, _score, idx in _rf_process.extract(
                     cand, norms, scorer=scorer, score_cutoff=cutoff, limit=None):
                 survivors.add(idx)
     return sorted(survivors)
+
+# ── Phonetic candidate index (keeps the C-side prefilter recall-complete) ────
+# The two rapidfuzz cutoffs above are necessary conditions of the FUZZY gates
+# only: a phonetic-only pair ("Muhamet Huseinn" ≈ 69) survives neither, so in
+# blocked mode the phonetic branch would be silently unreachable — the exact
+# defect class the blocking-equivalence property exists to catch. This index
+# restores completeness: a posting list per phonetic key, and a candidate is
+# any entry sharing ≥2 of a variant's distinct keys (or all of them when the
+# variant has fewer than 2 distinct keys). That count rule covers all three
+# hit shapes — equal key-lists share every key; a subset's shorter side (≥2
+# tokens by gate) appears in one posting per token; the reverse direction
+# contributes its ≥2 keys — so blocked and unblocked stay bit-identical.
+# Cache carries the same identity + length-rebuild invariants as _NORMS_CACHE.
+_PHON_IDX_CACHE = {}   # id(entries) -> (entries, postings, entry_count)
+
+def _phonetic_postings(entries):
+    key = id(entries)
+    cached = _PHON_IDX_CACHE.get(key)
+    if cached is None or cached[0] is not entries or cached[2] != len(entries):
+        postings = {}
+        for i, (en, _orig) in enumerate(entries):
+            prof = _phonetic_profile(en)
+            if prof is None:
+                continue
+            for k in {p[0] for p in prof}:
+                postings.setdefault(k, []).append(i)
+        cached = (entries, postings, len(entries))
+        _PHON_IDX_CACHE[key] = cached
+    return cached[1]
+
+def _phonetic_candidates(variant_profiles, entries):
+    postings = _phonetic_postings(entries)
+    cand = set()
+    for prof in variant_profiles:
+        keys = {p[0] for p in prof}
+        need = min(2, len(keys))
+        counts = {}
+        for k in keys:
+            for i in postings.get(k, ()):
+                counts[i] = counts.get(i, 0) + 1
+        cand.update(i for i, c in counts.items() if c >= need)
+    return cand
 
 def screen_name(name, all_lists):
     n = normalize(name)
@@ -2335,14 +3213,41 @@ def screen_name(name, all_lists):
         if len(nv) >= 4:
             variants.add(nv)
     hits = []
+    # Phonetic layer state for this subject: profiles of every variant, or an
+    # empty list when the subject has <2 significant tokens (layer inert).
+    phon_mode = _phonetic_mode()
+    variant_profiles = []
+    if phon_mode != "0":
+        variant_profiles = [p for p in (_phonetic_profile(v) for v in variants)
+                            if p is not None]
     for list_name, entries in all_lists.items():
         surv = _survivor_indices(variants, entries)
+        if surv is not None and variant_profiles:
+            # Union the phonetic candidates in so the C-side prefilter stays
+            # recall-complete for the phonetic branch (bit-identical results
+            # with blocking on or off — asserted by the equivalence property).
+            surv = sorted(set(surv) | _phonetic_candidates(variant_profiles, entries))
         for en, orig in (entries if surv is None else (entries[i] for i in surv)):
             if len(en) < 2: continue
             best = None; best_tset = 0; subset = False
-            for cand in variants:
+            # DETERMINISM + tie-break, both load-bearing for recall.
+            # `variants` is a SET, and the winner used to be "first variant with
+            # a strictly greater score". Python randomizes string hashes per
+            # process, so on a SCORE TIE between transliteration variants the
+            # recorded (full, core) — and therefore whether the pair passed the
+            # core gates at all — depended on set iteration order, i.e. on the
+            # process's hash seed. Measured 2026-07-29: "Al Qaeda General
+            # Trading" vs designated "AL QAEDA" (variants AL…/EL…, both scoring
+            # 50.0, cores 100.0 and 76.9) screened as a hit under
+            # PYTHONHASHSEED 0,1,2,4,5,6,8 and CLEAR under 3,7,9 — the same
+            # customer, the same list, a different day.
+            # Sorting makes the iteration deterministic; breaking ties on core
+            # (then full) keeps the best-EVIDENCED variant rather than an
+            # arbitrary one, which is the recall-safe direction and matches how
+            # `best_tset` and `subset` already accumulate across variants.
+            for cand in sorted(variants):
                 score, full, core, tset = match_score(cand, en)
-                if best is None or score > best[0]:
+                if best is None or (score, core, full) > (best[0], best[2], best[1]):
                     best = (score, full, core)
                 if tset > best_tset:
                     best_tset = tset
@@ -2355,7 +3260,27 @@ def screen_name(name, all_lists):
             # entries rather than the normal fuzzy gate. Long entries keep the
             # combined full+core gate unchanged.
             if len(en) < 6:
-                if score >= SHORT_ENTRY_THRESHOLD:
+                # The near-exact test must run on the DISTINCTIVE CORE as well as
+                # the decisive min(full, core) score. Until 2026-07-29 it tested
+                # min() alone, which is a sanctions FALSE NEGATIVE for the most
+                # obvious shape there is: a customer named after the designation
+                # plus legal-form boilerplate. "Hamas General Trading LLC" vs
+                # designated "HAMAS" scores full=33, core=100 → min=33, so the
+                # gate dropped it and the customer screened CLEAR, while the JS
+                # engine scored the same pair 100/critical (cross-engine
+                # divergence, both verified against the live matchers).
+                # The core test is tight, not loose: it fires only when the
+                # customer's ENTIRE distinctive core is the short designation —
+                # every other token being legal-form boilerplate. "Hummus
+                # Trading LLC" vs "HAMAS" cores at 55 and stays clear.
+                # The long-entry branch below already has this recall via its
+                # token-SUBSET gate; that gate cannot help here because
+                # _is_token_subset requires ≥2 distinctive tokens on the shorter
+                # side (its own false-positive guard), and a short designation is
+                # one token. Recorded at the conservative min-based score, so it
+                # reads as a POSSIBLE match for MLRO adjudication, never as a
+                # confirmed designation (the ≥100 confirmed test cannot fire).
+                if score >= SHORT_ENTRY_THRESHOLD or core >= SHORT_ENTRY_THRESHOLD:
                     hits.append({"list": list_name, "matched_entry": orig, "score": score,
                                  "name_score": full, "core_score": core,
                                  "confidence": confidence_tier(core),
@@ -2367,12 +3292,66 @@ def screen_name(name, all_lists):
             # token_set_ratio also flags — the patronymic-chain / extra-middle-name
             # case the min() misses. Recorded at the conservative min-based score so
             # it reads as a POSSIBLE match for MLRO disambiguation, never confirmed.
+            # Third gate — NEAR-EXACT CORE: the customer's distinctive core and
+            # the designation's are near-identical (≥ SHORT_ENTRY_THRESHOLD) and
+            # one name's tokens are a subset of the other's. This is the same
+            # false negative the short-entry branch above closes, in the shape
+            # the other two gates miss for LONG entries whose distinctive core is
+            # a single token: "Al Qaeda General Trading" vs designated "AL QAEDA"
+            # scores full=50 (boilerplate drags it under THRESHOLD) and cannot
+            # use the subset gate either, because AL is a particle so the core is
+            # one token and _is_token_subset requires ≥2 — it screened CLEAR
+            # while the JS engine scored it 100/critical.
+            # This does NOT weaken the min() control, which exists for the
+            # OPPOSITE shape (full high / core low — two firms sharing only
+            # legal-form boilerplate, "SANAYI VE TICARET ANONIM SIRKETI"). Here
+            # the cores are near-identical and only the boilerplate differs,
+            # which is the strongest identity signal short of full-string
+            # equality. Recorded at the conservative min-based score, so it
+            # reads as a POSSIBLE match for MLRO adjudication, never confirmed.
             if (score >= THRESHOLD and core >= CORE_THRESHOLD) or \
-               (subset and best_tset >= TOKENSET_THRESHOLD):
+               (subset and best_tset >= TOKENSET_THRESHOLD) or \
+               (core >= SHORT_ENTRY_THRESHOLD and best_tset >= TOKENSET_THRESHOLD):
                 hits.append({"list": list_name, "matched_entry": orig, "score": score,
                              "name_score": full, "core_score": core, "set_score": best_tset,
                              "confidence": confidence_tier(core),
                              "match_context": match_context_for(orig)})
+            else:
+                # Phonetic-only branch: strictly additive (behind the fuzzy
+                # gates — it can never replace, lower or suppress a fuzzy
+                # hit). Recorded at the conservative min-based score so it
+                # always reads as a POSSIBLE match for MLRO disambiguation,
+                # never confirmed.
+                pm = None
+                if variant_profiles:
+                    e_prof = _phonetic_profile(en)
+                    if e_prof is not None:
+                        for vp in variant_profiles:
+                            pm = _phonetic_pair_match(vp, e_prof)
+                            if pm:
+                                break
+                if pm:
+                    if phon_mode == "shadow":
+                        _PHONETIC_SHADOW["count"] += 1
+                        log(f'  PHONETIC-SHADOW: "{name}" ~ "{orig}" [{list_name}] '
+                            f"{pm} key match, fuzzy score {score} — no hit emitted (shadow mode)")
+                    else:
+                        hits.append({"list": list_name, "matched_entry": orig, "score": score,
+                                     "name_score": full, "core_score": core, "set_score": best_tset,
+                                     "phonetic": True, "phonetic_shape": pm,
+                                     "confidence": "WEAK (phonetic-only)",
+                                     "match_context": match_context_for(orig)})
+                elif SHADOW_THRESHOLD_VALUE is not None and score >= SHADOW_THRESHOLD_VALUE:
+                    # Shadow challenger band [shadow, THRESHOLD): counted and
+                    # logged as decision-log evidence — NEVER a hit, a case or
+                    # a delta-state entry.
+                    _SHADOW_CHALLENGER["count"] += 1
+                    if len(_SHADOW_CHALLENGER["examples"]) < _SHADOW_LOG_CAP:
+                        _SHADOW_CHALLENGER["examples"].append(
+                            {"subject": name, "entry": orig, "list": list_name,
+                             "score": round(score, 1)})
+                        log(f'  SHADOW-CHALLENGER: "{name}" ~ "{orig}" [{list_name}] '
+                            f"score {score:.1f} in [{SHADOW_THRESHOLD_VALUE:g}, {THRESHOLD:g}) — log-only, no hit")
     best = {}
     for h in hits:
         key = (h["list"], h["matched_entry"])
@@ -2563,6 +3542,22 @@ def classify_deltas(possible_matches, adverse_findings, pep_findings, state, tod
         if is_new: n_p += 1
     return {"sanctions": n_s, "adverse": n_a, "pep": n_p}
 
+def _internal_watchlist_block(list_meta):
+    """Report block for the optional firm-internal watchlist. Zero entries is
+    a valid state ("no internal designations") — rendered informationally,
+    never as UNAVAILABLE, so an intentionally empty optional list can't read
+    as an outage."""
+    m = list_meta.get("internal", {})
+    n = int(m.get("count", 0) or 0)
+    head = ("✅ Internal — Firm Watchlist (optional, screened in addition to official lists)"
+            if n else
+            "▫ Internal — Firm Watchlist (optional — none designated; empty is a valid state)")
+    return (f"{head}\n"
+            f"   Source:    Maintained in-repo — data/internal-watchlist.json\n"
+            f"   Entries:   {n:,}\n"
+            f"   List Date: {m.get('date','unknown')}\n"
+            f"   File Hash: {m.get('hash') or 'N/A'}")
+
 # ── NARRATIVE BUILDER — DAILY ─────────────────────────────────────────────────
 def build_daily_narrative(customers, possible_matches, clear, list_meta,
                            run_time, run_label):
@@ -2601,9 +3596,9 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                 if h.get("match_context"):
                     lines.append(f"   List Attributes: {h['match_context']}")
             lines += [
-                f"   Action:          IMMEDIATE ESCALATION TO MLRO",
-                f"                    Do not tip off customer.",
-                f"                    Cabinet Resolution No. 74/2020 applies.",""
+                "   Action:          IMMEDIATE ESCALATION TO MLRO",
+                "                    Do not tip off customer.",
+                "                    Cabinet Resolution No. 74/2020 applies.",""
             ]
         confirmed_text = "\n".join(lines)
 
@@ -2629,7 +3624,7 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                 if h.get("match_context"):
                     lines.append(f"   List Attributes: {h['match_context']}")
             lines += [
-                f"   MLRO Decision:   ☐ False Positive   ☐ Escalate   ☐ Investigate",
+                "   MLRO Decision:   ☐ False Positive   ☐ Escalate   ☐ Investigate",
                 "",
                 f"   ADVERSE MEDIA — {m['name']}",
             ]
@@ -2695,6 +3690,8 @@ LISTS SCREENED
 
 {list_line("eocn","UAE EOCN — Local Terrorist List",
            "Maintained in-repo — data/eocn-local-terrorist-list.json")}
+
+{_internal_watchlist_block(list_meta)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCOPE
@@ -2835,7 +3832,9 @@ RUN PROVENANCE
   Engine:             screen.py  (Google News RSS - no external paid feed)
 
 SCOPE & COVERAGE ATTESTATION
-  Customers in database:     {stats["customers_total"]}
+  Customers in database:     {stats["customers_total"] + stats.get("customer_rows_skipped", 0)}
+  Customers screened:        {stats["customers_total"]}
+  Rows NOT screenable:       {stats.get("customer_rows_skipped", 0)}{_skipped_rows_note()}
   Companies screened:        {stats["companies_screened"]}
   Individuals screened:      {stats["individuals_screened"]}  (shareholders / UBOs / directors from KYC records)
   Total subjects screened:   {stats["subjects_total"]}  ({coverage_pct}% of attempted)
@@ -2903,7 +3902,7 @@ def run_weekly_adverse(customers, run_time):
             subjects.append(("INDIVIDUAL", ind, c["name"]))
         for subj_type, subj_name, parent in subjects:
             try:
-                articles = search_adverse_media(subj_name, max_results=5)
+                articles = search_adverse_media(subj_name, max_results=ADVERSE_MAX_RESULTS)
                 if subj_type == "COMPANY":
                     companies_screened += 1
                 else:
@@ -2927,6 +3926,7 @@ def run_weekly_adverse(customers, run_time):
     run_end = now_uae()
     stats = {
         "customers_total": len(customers),
+        "customer_rows_skipped": len(CUSTOMER_ROWS_SKIPPED),
         "companies_screened": companies_screened,
         "individuals_screened": individuals_screened,
         "subjects_total": companies_screened + individuals_screened,
@@ -2945,9 +3945,8 @@ def run_weekly_adverse(customers, run_time):
             "notes": cap_notes(narrative),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
-            "projects": [ASANA_ONGOING_MON_GID],
-            "memberships": [{"project": ASANA_ONGOING_MON_GID,
-                             "section": ASANA_SECTION_GID}],
+            "projects": _mlro_queue_targets()[0],
+            "memberships": _mlro_queue_targets()[1],
         }
     }
     r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
@@ -2964,16 +3963,15 @@ def post_daily_task(narrative, run_time, run_label, n_matches):
     dt = run_time.strftime("%d %b %Y")
     flag = "⚠️" if n_matches > 0 else "✅"
     task_name = (f"🔍 {flag} Daily Sanctions Screening — "
-                 f"OFAC / UN / EU / UK / UAE EOCN — {dt} ({run_label})")
+                 f"OFAC / UN / EU / UK / AU / CH / UAE EOCN — {dt} ({run_label})")
     payload = {
         "data": {
             "name": task_name,
             "notes": cap_notes(narrative),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
-            "projects": [ASANA_ONGOING_MON_GID],
-            "memberships": [{"project": ASANA_ONGOING_MON_GID,
-                             "section": ASANA_SECTION_GID}],
+            "projects": _mlro_queue_targets()[0],
+            "memberships": _mlro_queue_targets()[1],
         }
     }
     r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
@@ -3090,6 +4088,27 @@ def enforce_delivery_gate():
         if DELIVERY_HARD_FAIL:
             sys.exit(5)
 
+# Set by screen_subject_set() from monitoring.check_source_coverage plus the
+# EOCN mirror cross-check; read by enforce_coverage_alarm_gate() after the
+# report has been delivered. The EOCN review-age alarm is EXCLUDED — it
+# carries its own gate (exit 3). Kill-switch: COVERAGE_ALARM_HARD_FAIL=0.
+COVERAGE_ALARM_STATE = {"alarms": []}
+COVERAGE_ALARM_HARD_FAIL = os.environ.get("COVERAGE_ALARM_HARD_FAIL", "1") == "1"
+
+def enforce_coverage_alarm_gate():
+    """Post-delivery hard fail for source-coverage alarms — a core list that
+    silently shrank vs its trailing median, or EOCN mirror designations
+    missing from the curated local list. These alarms always reached the
+    report (§⑤) and the QA gate, but the RUN stayed green (the QA gate only
+    logs), so the freshness and Actions-failure alerting saw a healthy
+    control while coverage drifted. Same post-delivery pattern as the outage
+    gate: deliver the report first, then turn the run red."""
+    if COVERAGE_ALARM_STATE["alarms"]:
+        for a in COVERAGE_ALARM_STATE["alarms"]:
+            log(f"COVERAGE ALARM GATE: {a}")
+        if COVERAGE_ALARM_HARD_FAIL:
+            sys.exit(6)
+
 def load_eocn_mirror():
     """Returns (names, meta) for the OpenSanctions mirror of the UAE Local
     Terrorist List — SUPPLEMENTARY tier (drift tracking; never core coverage)."""
@@ -3141,6 +4160,41 @@ def _mirror_fallback(names, dataset, label):
     log(f"  {label}: official endpoint unavailable — screened via OpenSanctions mirror")
     return mirror_names, "live (OpenSanctions mirror)", sha256_of(data)
 
+# EU FSF is the one core list whose PRIMARY is the OpenSanctions host (webgate's
+# exports drift formats; the mirror's simple shape is what every parser here
+# shares) — so its fallback runs the OTHER way: official webgate XML, with the
+# public 2017 token the EU publishes for exactly this purpose (the same token
+# data/sanctions-sources.json documents and .gitleaks.toml allowlists).
+EU_OFFICIAL_XML_URL = ("https://webgate.ec.europa.eu/fsd/fsf/public/files/"
+                       "xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw")
+
+def parse_eu_official_xml(data):
+    """Names from the FSF fullSanctionsList XML: every <nameAlias> carries the
+    designation's full name in a wholeName attribute (entities and aliases
+    alike). Attribute extraction by regex keeps the fallback tolerant of the
+    schema-version churn that motivated using the mirror as primary; dedupe
+    folds entity names and aliases into one set like parse_simple_csv does."""
+    if not data:
+        return set()
+    text = data.decode("utf-8", "replace") if isinstance(data, bytes) else str(data)
+    names = {html.unescape(m).strip() for m in re.findall(r'wholeName="([^"]*)"', text)}
+    return {n for n in names if len(n) >= 3}
+
+def _eu_official_fallback(names):
+    """When the OpenSanctions eu_fsf mirror yields nothing, screen via the
+    official webgate XML instead. Same contract as _mirror_fallback: None when
+    the primary already loaded or the fallback is also down (the degrade-loudly
+    paths take over); provenance in the date field so the report and audit
+    trail show which source actually screened."""
+    if names:
+        return None
+    data = download(EU_OFFICIAL_XML_URL, "EU FSF (official webgate XML)")
+    xml_names = parse_eu_official_xml(data)
+    if not xml_names:
+        return None
+    log("  EU FSF: OpenSanctions mirror unavailable — screened via official webgate XML")
+    return xml_names, "live (EU official XML)", sha256_of(data)
+
 # ── Core-list coverage floors (zero/partial-load hard-fail) ──────────────────
 # A core list that loads ZERO names (parse failure, the PR #128 bug class) or a
 # fraction of its known size (truncated download, format drift) used to degrade
@@ -3156,10 +4210,10 @@ def _mirror_fallback(names, dataset, label):
 #     run AFTER delivery so the outage still goes red and cannot become
 #     routine. (Treating outages as breaches killed the whole run, report and
 #     Asana delivery included, on any transient source outage.)
-# Only OFAC and UN have OpenSanctions mirror fallbacks (EU is itself fetched
-# from that mirror; UK and the local EOCN file have no second source), and the
-# legacy daily path has none, so outages here are real single-list gaps the
-# mirrors did not absorb.
+# OFAC, UN and UK fall back to their OpenSanctions mirrors and EU to the
+# official webgate XML (both load paths, since 2026-07-29); AU/CH and the
+# local EOCN file have no second source, so outages there are real
+# single-list gaps no fallback can absorb.
 # Floors are ~50% of the verified 2026-07-02 baseline counts (OFAC 19,129 /
 # UN 1,002 / UK 19,762 / EU 42,347 / EOCN 312): generous enough for real
 # de-listings, tight enough to catch a broken parse.
@@ -3171,7 +4225,72 @@ CORE_LIST_FLOORS = {
     "uk":   int(os.environ.get("LIST_FLOOR_UK",   "9000")),
     "eu":   int(os.environ.get("LIST_FLOOR_EU",   "20000")),
     "eocn": int(os.environ.get("LIST_FLOOR_EOCN", "150")),
+    # AU/CH (added 2026-07-29, OpenSanctions mirrors of DFAT Regulation 8 and
+    # SECO's consolidated list): floors are PROVISIONAL and deliberately low —
+    # no verified baseline count existed at introduction, and a too-tight
+    # provisional floor would refuse whole runs. Tighten toward ~50% of the
+    # observed baseline once the first runs have logged real counts.
+    "au":   int(os.environ.get("LIST_FLOOR_AU",   "500")),
+    "ch":   int(os.environ.get("LIST_FLOOR_CH",   "500")),
 }
+
+# ── Adaptive floor ratchet ────────────────────────────────────────────────────
+# The static floors above are point-in-time baselines (and AU/CH's are
+# provisional). Each run RAISES — never lowers — a list's effective floor to
+# ADAPTIVE_FLOOR_PCT of its trailing-median count from the persisted coverage
+# history (the same data/source-coverage-state.json that
+# monitoring.check_source_coverage maintains and the delta-state overlay
+# refreshes before every run), once ADAPTIVE_FLOOR_MIN_HISTORY days of history
+# exist. So "tighten AU/CH toward ~50% of the observed baseline" happens by
+# itself as history accrues, and a partial corruption that clears the static
+# floor but sits under half the observed baseline still refuses the run.
+# A FALLBACK-served list keeps the static floor: a mirror is a different
+# corpus (e.g. OFAC without the alt.csv alias fold), and judging it by the
+# primary's baseline would turn the fallback into a refusal trap.
+# Kill-switch: ADAPTIVE_FLOOR_PCT=0 (static floors only).
+ADAPTIVE_FLOOR_PCT = float(os.environ.get("ADAPTIVE_FLOOR_PCT", "0.5"))
+ADAPTIVE_FLOOR_MIN_HISTORY = int(os.environ.get("ADAPTIVE_FLOOR_MIN_HISTORY", "5"))
+
+def adaptive_core_floors(static=None, state_path=None):
+    """Effective per-list floors: the configured static floor, raised to
+    ADAPTIVE_FLOOR_PCT of the trailing-median observed count where enough
+    history exists. Never lowers a configured floor, and any read/parse
+    problem simply yields the static floors — the ratchet is an extra guard,
+    not a new failure mode."""
+    floors = dict(CORE_LIST_FLOORS if static is None else static)
+    if ADAPTIVE_FLOOR_PCT <= 0:
+        return floors
+    try:
+        with open(state_path or monitoring.COVERAGE_STATE_PATH) as f:
+            state = json.load(f)
+    except FileNotFoundError:
+        return floors   # no history yet (fresh checkout before the delta-state overlay)
+    except (OSError, ValueError) as e:
+        log(f"  adaptive floors: coverage history unreadable ({e}) — static floors apply")
+        return floors
+    if not isinstance(state, dict):
+        log("  adaptive floors: coverage history malformed (not an object) — static floors apply")
+        return floors
+    for key in floors:
+        entry = state.get(key)
+        raw = entry.get("history") if isinstance(entry, dict) else []
+        if not isinstance(raw, list):
+            raw = []
+        counts = sorted(h.get("count") for h in raw if isinstance(h, dict)
+                        and isinstance(h.get("count"), (int, float)) and h.get("count") > 0)
+        if len(counts) < ADAPTIVE_FLOOR_MIN_HISTORY:
+            continue
+        n = len(counts)
+        med = counts[n // 2] if n % 2 else (counts[n // 2 - 1] + counts[n // 2]) / 2
+        floors[key] = max(floors[key], int(med * ADAPTIVE_FLOOR_PCT))
+    return floors
+
+def _fallback_served(meta):
+    """Whether the list was served by a fallback source this run — the
+    provenance lives in the date field ('live (OpenSanctions mirror)' /
+    'live (EU official XML)')."""
+    d = str((meta or {}).get("date", "")).lower()
+    return "mirror" in d or "official xml" in d
 
 # Set by enforce_core_list_floors(); read by enforce_list_outage_gate() after
 # the report has been delivered (same post-delivery pattern as EOCN_REVIEW_ALERT).
@@ -3192,22 +4311,29 @@ def core_list_floor_breaches(list_meta, floors=None, fetched=None):
     fetched maps list key -> whether source material was obtained; when
     fetched is None, or a key is missing from it, a sub-floor list counts as
     a breach (fail-closed, the original behavior). Lists absent from the
-    floors map (supplementary tier) are never floored."""
-    floors = CORE_LIST_FLOORS if floors is None else floors
+    floors map (supplementary tier) are never floored.
+    When floors is None (production), each PRIMARY-served list's floor is the
+    adaptive ratchet (static raised to a fraction of its trailing-median
+    observed count); a fallback-served list keeps the static floor. Explicit
+    floors are honored verbatim (tests, overrides)."""
+    static = CORE_LIST_FLOORS if floors is None else floors
+    adaptive = adaptive_core_floors(static) if floors is None else static
     breaches, outages = [], []
-    for key, floor in floors.items():
+    for key, floor in static.items():
         meta = (list_meta or {}).get(key)
         if meta is None:
             continue
         count = int(meta.get("count", 0) or 0)
-        if count >= floor:
+        eff = floor if _fallback_served(meta) else adaptive.get(key, floor)
+        if count >= eff:
             continue
+        note = "" if eff == floor else " (adaptive: raised from the observed baseline)"
         if fetched is not None and not fetched.get(key, True):
             outages.append(f"{key.upper()} source unavailable this run ({count:,} name(s) loaded, "
-                           f"floor {floor:,}): screening proceeds DEGRADED without it")
+                           f"floor {eff:,}{note}): screening proceeds DEGRADED without it")
         else:
             breaches.append(f"{key.upper()} loaded {count:,} name(s), below its coverage floor "
-                            f"of {floor:,} - possible failed download / bad parse / truncated source")
+                            f"of {eff:,}{note} - possible failed download / bad parse / truncated source")
     return breaches, outages
 
 def enforce_core_list_floors(list_meta, fetched=None):
@@ -3251,6 +4377,12 @@ def load_all_lists():
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
     uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
+    # AU + CH core lists via the OpenSanctions mirrors (same host, same
+    # targets.simple.csv shape as the EU list): DFAT bot-gates its .xlsx and
+    # SECO's XML needs its own endpoint, so the mirror is the reliable daily
+    # path — exactly the arrangement the EU list has always used.
+    au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
+    ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
     # Track whether SOURCE MATERIAL was obtained per list (primary bytes, or a
     # mirror that answered): the floor check uses it to tell corruption (data
     # present but tiny: refuse) from an outage (nothing obtained: degrade).
@@ -3274,14 +4406,31 @@ def load_all_lists():
     if fb:
         un_names, un_date, un_hash = fb
         un_fetched = True
+    uk_fetched = bool(uk_data)
+    eu_fetched = bool(eu_data)
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
+    fb = _mirror_fallback(uk_names, "gb_hmt_sanctions", "UK OFSI")
+    if fb:
+        uk_names, uk_date, uk_hash = fb
+        uk_fetched = True
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
+    fb = _eu_official_fallback(eu_names)
+    if fb:
+        eu_names, eu_date, eu_hash = fb
+        eu_fetched = True
+    au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
+    ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
+    # AU + CH have no second origin: DFAT bot-gates its .xlsx and SECO's own XML
+    # is a different schema again, so an OpenSanctions outage takes both down —
+    # that surfaces as the usual outage-gate DEGRADED, never a silent gap.
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
     list_meta = {
         "ofac": {"count":len(ofac_names),"date":ofac_date,"hash":ofac_hash,"tier":"core"},
         "un":   {"count":len(un_names),"date":un_date,"hash":un_hash,"tier":"core"},
         "uk":   {"count":len(uk_names),"date":uk_date,"hash":uk_hash,"tier":"core"},
         "eu":   {"count":len(eu_names),"date":eu_date,"hash":eu_hash,"tier":"core"},
+        "au":   {"count":len(au_names),"date":au_date,"hash":au_hash,"tier":"core"},
+        "ch":   {"count":len(ch_names),"date":ch_date,"hash":ch_hash,"tier":"core"},
         "eocn": {"count":len(eocn_names),"date":eocn_date,"hash":eocn_hash,"tier":"core"},
     }
     # TFS drift detector: alarm if the OpenSanctions mirror carries a UAE Local
@@ -3300,9 +4449,9 @@ def load_all_lists():
     # Fail-safe: if EVERY core sanctions list failed to load, screening would clear
     # every customer for sanctions and post a green ✅. Abort instead — a total
     # list-fetch failure must never masquerade as "all clear".
-    if sum(list_meta[k]["count"] for k in ("ofac","un","uk","eu","eocn")) == 0:
+    if sum(list_meta[k]["count"] for k in ("ofac","un","uk","eu","au","ch","eocn")) == 0:
         raise RuntimeError(
-            "FATAL: no core sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
+            "FATAL: no core sanctions list could be loaded (OFAC/UN/UK/EU/AU/CH/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
     # Per-list coverage floors: an OBTAINED core list at zero (or a fraction
     # of its known size) is the same false-negative class as the all-empty
@@ -3310,15 +4459,18 @@ def load_all_lists():
     # run degrades and turns the run red after delivery (outage gate).
     enforce_core_list_floors(list_meta, fetched={
         "ofac": ofac_fetched, "un": un_fetched,
-        "uk": bool(uk_data), "eu": bool(eu_data),
+        "uk": uk_fetched, "eu": eu_fetched,
+        "au": bool(au_data), "ch": bool(ch_data),
         "eocn": EOCN_SOURCE_STATE["obtained"],
     })
     all_lists = {
-        "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
-        "UN Consolidated": [(normalize(n),n) for n in un_names],
-        "UK OFSI":         [(normalize(n),n) for n in uk_names],
-        "EU FSF":          [(normalize(n),n) for n in eu_names],
-        "UAE EOCN":        [(normalize(n),n) for n in eocn_names],
+        "OFAC SDN":         [(normalize(n),n) for n in ofac_names],
+        "UN Consolidated":  [(normalize(n),n) for n in un_names],
+        "UK OFSI":          [(normalize(n),n) for n in uk_names],
+        "EU FSF":           [(normalize(n),n) for n in eu_names],
+        "Australia DFAT":   [(normalize(n),n) for n in au_names],
+        "Switzerland SECO": [(normalize(n),n) for n in ch_names],
+        "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
     # ── Supplementary lists (best-effort): broaden coverage when reachable, but a
     # fetch miss is reported as "not reached", NOT as a degraded core control. ──
@@ -3327,6 +4479,14 @@ def load_all_lists():
     list_meta["canada"] = {"count":len(ca_names),"date":ca_date,"hash":ca_hash,"tier":"supplementary"}
     if ca_names:
         all_lists["Canada (SEMA)"] = [(normalize(n),n) for n in ca_names]
+    # Internal firm watchlist (optional, checklist A4): screened IN ADDITION to
+    # the official lists. Supplementary tier so firm-internal names can never
+    # satisfy a core-coverage fail-safe (floors sum core keys only), and empty
+    # is a valid state.
+    iw_names, iw_date, iw_hash = parse_internal_watchlist()
+    list_meta["internal"] = {"count":len(iw_names),"date":iw_date,"hash":iw_hash,"tier":"supplementary"}
+    if iw_names:
+        all_lists["Internal Watchlist"] = [(normalize(n),n) for n in iw_names]
     return all_lists, list_meta
 
 def _list_status_line(list_meta, key, label):
@@ -3346,11 +4506,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     # is labelled mirror-assisted so the MLRO knows the primary source was down.
     pep_degraded = stats.get("pep_errors", 0) > 0
     pep_mirror = stats.get("pep_mirror", 0)
-    # Sanctions coverage: DEGRADED if ANY core list failed to load (not just if all
-    # of them did) — a run missing 1 of 5 core lists is not a clean "OK". EOCN is
-    # tier "core" in list_meta and must count here too: a dead local-terrorist
-    # list parse is a coverage loss, not an OK run.
-    core_loaded = [list_meta.get(k, {}).get("count", 0) > 0 for k in ("ofac","un","uk","eu","eocn")]
+    # Sanctions coverage: DEGRADED if ANY core list failed to load (not just if
+    # all of them did) — a run missing one core list is not a clean "OK". The
+    # core set is DERIVED from list_meta's tier, never enumerated here: this
+    # line silently missed AU and CH for a few hours on 2026-07-29 because it
+    # hardcoded the original five, which is exactly how a new core list's
+    # outage would have stopped flipping the banner.
+    # An entry with NO tier counts as core (fail-closed): a list_meta built
+    # without tiers must never make this comprehension empty — all([]) is True,
+    # which would read a fully-untagged meta as clean coverage.
+    core_loaded = [m.get("count", 0) > 0 for m in list_meta.values() if m.get("tier", "core") == "core"]
     sanc_ok = all(core_loaded)
     # Adverse-media coverage, three-state: DEGRADED only when subjects had ZERO
     # adverse coverage from ANY net (news dead AND no watchlist); DEGRADED (news)
@@ -3364,7 +4529,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
     sanc_status = "OK" if sanc_ok else ("DEGRADED" if any(core_loaded) else "FAILED")
     pep_status = ("DEGRADED" if pep_degraded
-                  else ("OK (mirror-assisted)" if pep_mirror else "OK"))
+                  else ("OK (worldwide PEP/RCA net)" if pep_mirror else "OK"))
     am_status = ("DEGRADED" if am_blackout
                  else ("DEGRADED (news)" if am_errors_n else "OK"))
 
@@ -3414,7 +4579,26 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             if m.get("arrangement"):
                 A(f"   Legal arrangement (R.25): {m['arrangement']} — every party screened; "
                   "a sanctioned/PEP party flags the arrangement.")
-            shown = sorted(m["hits"], key=lambda h: -h["score"])[:10]
+            # Identity-excluded candidates are DEMOTED, not dropped: they come
+            # out of the primary queue (where they crowd out the candidates that
+            # are still open questions — one subject carried 73 of them on
+            # 29 Jul) and are listed under their own heading below, each with
+            # the reason it cannot be the customer. Nothing is suppressed: the
+            # hit is still in m["hits"], still in the delta state, still in the
+            # audit trail, and the MLRO can still overrule it.
+            _open_hits = [h for h in m["hits"] if not h.get("identity_excluded")]
+            _excluded = [h for h in m["hits"] if h.get("identity_excluded")]
+            # The MANUAL REVIEW marker is a COVERAGE STATEMENT, not a candidate
+            # competing on score: it says this subject was never auto-screened at
+            # all. It scores 0 by construction (_manual_review_hit), so a plain
+            # score sort dropped it the moment a customer had 10 other
+            # candidates — and it carries no is_new, so it opens no MLRO case
+            # either. The report line was its only surface, replaced by "+N more
+            # similar candidates", which reads as more of the same rather than
+            # "this subject was not screened". Pin it outside the top-10.
+            _unscreened = [h for h in _open_hits if h.get("unscreenable")]
+            _scored = [h for h in _open_hits if not h.get("unscreenable")]
+            shown = _unscreened + sorted(_scored, key=lambda h: -h["score"])[:10]
             for h in shown:
                 conf = f" · {h.get('confidence','')}" if h.get("confidence") else ""
                 nflag = " 🆕" if h.get("is_new") else ""
@@ -3430,8 +4614,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                     A(f"        Identity (R.10): {h['identity']}")
                 if h.get("cdd_gaps"):
                     A(f"        ⚠ CDD gaps: {'; '.join(h['cdd_gaps'])}")
-            if len(m["hits"]) > 10:
-                A(f"   -> … +{len(m['hits']) - 10} more similar candidates (see run log)")
+            if len(_scored) > 10:
+                A(f"   -> … +{len(_scored) - 10} more similar candidates (see run log)")
+            if _excluded:
+                A(f"   EXCLUDED ON IDENTITY — {len(_excluded)} candidate(s) cannot be this customer "
+                  "(DOB and nationality both known on both sides, both disagree).")
+                A("   Recorded, not suppressed — review and overrule here if the identity data is wrong:")
+                for h in sorted(_excluded, key=lambda h: -h["score"])[:5]:
+                    A(f"     · {h['list']}: \"{h['matched_entry']}\" {_pct(h['score'])} — {h['identity_excluded']}")
+                if len(_excluded) > 5:
+                    A(f"     · … +{len(_excluded) - 5} more (see run log)")
             if ctrl:
                 A("   NOTE: company flagged because an owner / director / UBO matches a designation —"
                   " apply OFAC/EU 50%/control aggregation; treat the entity as designated by extension pending review.")
@@ -3445,6 +4637,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A(_list_status_line(list_meta, "un",   "UN Consolidated"))
     A(_list_status_line(list_meta, "eu",   "EU FSF"))
     A(_list_status_line(list_meta, "uk",   "UK OFSI"))
+    A(_list_status_line(list_meta, "au",   "Australia DFAT"))
+    A(_list_status_line(list_meta, "ch",   "Switzerland SECO"))
     A(_list_status_line(list_meta, "eocn", "UAE EOCN"))
     if not sanc_ok:
         _down = [lbl for k, lbl in (("ofac","OFAC"),("un","UN"),("uk","UK OFSI"),("eu","EU FSF"))
@@ -3455,9 +4649,13 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("   Supplementary lists (best-effort — never affect core coverage):")
         for k in supp:
             m_ = supp[k]
-            label = {"canada": "Canada (SEMA)"}.get(k, k)
+            label = {"canada": "Canada (SEMA)", "internal": "Internal Watchlist"}.get(k, k)
             if m_.get("count", 0) > 0:
                 A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
+            elif k == "internal":
+                # Optional firm list: empty means "no internal designations",
+                # a valid state — not an unreached source.
+                A(f"      {label}: no internal designations (empty list is a valid state)")
             else:
                 A(f"      {label}: not reached this run (supplementary — core lists unaffected)")
     A("")
@@ -3474,8 +4672,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
           "(news feeds AND watchlist unavailable). Treat their 'no adverse media' as provisional; re-run.")
     elif am_errors_n:
         A(f"   Status: news sweep lost for {am_errors_n} subject(s) (feed rate-limited the runner) — "
-          "the adverse-exposure WATCHLIST still screened every subject; fresh-news recall is narrowed, "
-          "standing exposure is covered.")
+          "the adverse-exposure WATCHLIST screened every subject it can match; fresh-news recall is "
+          "narrowed, standing exposure is covered. (A subject the watchlist cannot match either — a "
+          "name in non-Latin script, or under 4 matchable characters — is counted in the DEGRADED "
+          "blackout figure above, not here.)")
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
@@ -3493,7 +4693,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 sev = f"  [{tr.get('severity','')} · relevance {tr.get('relevance','')}]" if tr else ""
                 A(f"   [!] {a['title']}{nflag}{sev}")
                 if tr.get("injection_suspected"):
-                    A(f"       ⚠ input flagged (possible prompt-injection) — classified deterministically, model not used")
+                    A("       ⚠ input flagged (possible prompt-injection) — classified deterministically, model not used")
                 cat = f"   {{{', '.join(a['categories'])}}}" if a.get("categories") else ""
                 A(f"       {a.get('source','?')} — {a.get('date','?')}{cat}")
                 if a.get("also_reported_by"):
@@ -3511,6 +4711,18 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A( "         EDD review required + assess STR grounds (tipping-off rules apply).")
             A("")
         A(f"   Source: Google News RSS ({ADVERSE_LOCALES}/{len(GNEWS_LOCALES)} worldwide locales) + GDELT global index (65+ languages) · {len(ADVERSE_KEYWORDS)} EN + {len(FOREIGN_KEYWORDS)} multilingual ({ADVERSE_LANG_COUNT}-language) red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
+        # Disclose WHICH markets ran and when the cycle completes. The per-run
+        # locale budget is the empirical Google-News per-IP ceiling, so full
+        # worldwide reach is achieved by rotating the matrix rather than by
+        # sending more requests — that is only honest if the report says so.
+        if ADVERSE_ROTATE and ADVERSE_LOCALES < len(GNEWS_LOCALES):
+            _ri = adverse_locale_indices(run_time)
+            _mkts = ", ".join(GNEWS_LOCALES[i][2] for i in _ri)
+            _cyc = adverse_rotation_cycle_days()
+            A(f"   Worldwide rotation: this run swept {_mkts}. The {ADVERSE_CORE_LOCALES} core editions run every day; the rest of the "
+              f"{len(GNEWS_LOCALES)}-market matrix rotates, so every market is swept within {_cyc} run(s). "
+              "GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
+              "the rotation adds local-language press on top of it.")
         if stats.get("watchlist_loaded"):
             A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
               f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
@@ -3531,8 +4743,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     if pep_degraded:
         A(f"   Status: DEGRADED this run ({stats.get('pep_errors',0)} individual(s) unscreened on BOTH sources) — treat 'no PEP' as provisional; re-run.")
     elif pep_mirror:
-        A(f"   Status: mirror-assisted this run — {pep_mirror} individual(s) screened via the OpenSanctions")
-        A("   PEP mirror because Wikidata was unavailable; a mirror hit means VERIFY, a miss is still provisional.")
+        A(f"   Status: {pep_mirror} individual(s) resolved by the WORLDWIDE PEP/RCA net (OpenSanctions")
+        A("   consolidated PEP dataset — politically exposed persons AND their relatives / close associates,")
+        A("   FATF R.12). The net screens every individual each run, so a domestic PEP or an RCA with no")
+        A("   English encyclopaedia entry is no longer filed as 'no PEP'. A hit means VERIFY; a miss is still provisional.")
     if not pep_findings:
         A("   No PEP matches identified." + ("  (provisional — see status above)" if pep_degraded else ""))
     else:
@@ -3600,8 +4814,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("   Reviewed by: ____________________   Date: __________")
     A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
     A("")
-    A(f"Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT + Bing News")
-    A(f"adverse media + OpenSanctions crime watchlist, Wikidata PEP (OpenSanctions mirror fallback),")
+    A("Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT + Bing News")
+    A("adverse media + OpenSanctions crime watchlist, worldwide PEP/RCA net (OpenSanctions PEPs +")
+    A("relatives & close associates) enriched by Wikidata,")
     A(f"AI risk-rating & triage · {github_run_url()}")
     A("> " + ai.governance_footer())
     A("> Decision-support only; a 'no match' is never a clearance when a module is degraded (shown, never hidden).")
@@ -3629,8 +4844,8 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
             "notes": cap_notes(narrative, budget),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
-            "projects": [ASANA_ONGOING_MON_GID],
-            "memberships": [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}],
+            "projects": _mlro_queue_targets()[0],
+            "memberships": _mlro_queue_targets()[1],
         }}
         r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
         if r is not None and r.status_code in (200, 201):
@@ -3649,25 +4864,59 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     return None
 
 def create_case_subtask(parent_gid, name, notes, due_on):
-    """One trackable MLRO case per NEW hit — assigned, with a disposition to set."""
+    """One trackable MLRO case per NEW hit — assigned, with a disposition to set.
+
+    Notes are capped with cap_notes (keeps the TAIL), never head-sliced. The end
+    of a case note is the part that has to survive: the disposition checkboxes —
+    the MLRO's actual decision record — the "Do not tip off / CR 74/2020"
+    warning, and for HIGH-risk cases the whole STR/SAR draft. The old
+    `notes[:8000]` cut from exactly there, so any case with a long hit list
+    reached the queue with evidence but nothing to tick and no legal warning,
+    and said so in no log line. Measured on a 60-hit HIGH-risk case: 10,944
+    chars in, 8,000 delivered, all three blocks gone.
+
+    A rejected create is re-queued to the backlog and retried on later runs, so
+    a payload Asana refuses at full budget would re-fail forever — retry once at
+    CASE_NOTES_FLOOR before giving up."""
     if not parent_gid: return False
-    payload = {"data": {
-        "name": name[:250], "notes": (notes or "")[:8000], "assignee": ASANA_ASSIGNEE_GID,
-        "due_on": due_on, "parent": parent_gid,
-    }}
-    r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
-    if r is not None and r.status_code in (200, 201):
-        return True
+    body = notes or ""
+    r = None
+    for budget in (CASE_NOTES_MAX, CASE_NOTES_FLOOR):
+        payload = {"data": {
+            "name": name[:250],
+            "notes": cap_notes(body, budget, tail_chars=CASE_NOTES_TAIL),
+            "assignee": ASANA_ASSIGNEE_GID, "due_on": due_on, "parent": parent_gid,
+        }}
+        r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+        if r is not None and r.status_code in (200, 201):
+            return True
+        # Only a size/validation refusal is worth re-bidding smaller; an auth,
+        # rate-limit or network failure fails identically at any budget.
+        if getattr(r, "status_code", None) not in (400, 413):
+            break
+        if budget != CASE_NOTES_FLOOR:
+            log(f"  case subtask refused at {budget}-byte budget — retrying at {CASE_NOTES_FLOOR}")
     log(f"  case subtask failed: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
     return False
 
-def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time):
+def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
+                    state=None):
     """Create an assigned subtask for each NEW item (sanctions, PEP, adverse),
-    capped at CASE_SUBTASK_CAP; any overflow is logged, never silently dropped."""
+    capped at CASE_SUBTASK_CAP per run. Overflow and failed creates go to the
+    reserved backlog in `state` (persisted with the delta state on delivery)
+    and are drained on later runs — sanctions first, oldest first — so an item
+    past the cap is cased LATER, not never."""
     due_on = run_time.strftime("%Y-%m-%d")
     queue = []  # (priority, name, notes)
     for m in possible_matches:
-        new_hits = [h for h in m["hits"] if h.get("is_new")]
+        # Identity-excluded candidates raise no case. The report demotes them
+        # (recorded, reasoned, overrulable) but the CASE QUEUE is where the
+        # MLRO's actual working time goes, and cases are capped per run — so
+        # leaving them here meant a candidate we can already prove is a
+        # different person could consume the cap and push a genuine case into
+        # the backlog. Demotion that stops at the report text is cosmetic.
+        new_hits = [h for h in m["hits"]
+                    if h.get("is_new") and not h.get("identity_excluded")]
         if not new_hits: continue
         top = max(new_hits, key=lambda h: h["score"])
         ctrl = " [OWNERSHIP/CONTROL]" if top.get("control_linkage") else ""
@@ -3712,14 +4961,48 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         notes += ["", "Disposition: [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR"]
         queue.append((2, nm, "\n".join(notes)))
 
-    queue.sort(key=lambda x: x[0])  # sanctions first, then PEP, then adverse
+    # Merge today's NEW items with the carried backlog. Sort key (priority,
+    # queued-date, arrival order): a backlogged sanctions case beats today's
+    # adverse case, and within a priority the longest-waiting item goes first.
+    today_iso = due_on
+    entries = [{"p": p, "name": nm, "notes": notes, "queued": today_iso}
+               for p, nm, notes in sorted(queue, key=lambda x: x[0])]
+    today_names = {e["name"] for e in entries}
+    backlog = [e for e in load_case_backlog(state) if e["name"] not in today_names]
+    if backlog:
+        log(f"  case backlog: {len(backlog)} carried item(s) eligible this run")
+    combined = sorted(entries + backlog,
+                      key=lambda e: (e["p"], e["queued"] or today_iso))
     created = 0
-    for _, nm, notes in queue[:CASE_SUBTASK_CAP]:
-        if create_case_subtask(parent_gid, nm, notes, due_on):
+    leftover = []
+    for i, e in enumerate(combined):
+        if i >= CASE_SUBTASK_CAP or not create_case_subtask(
+                parent_gid, e["name"],
+                (e["notes"] + (f"\n\n(backlogged since the {e['queued']} run — "
+                               f"case capacity or a create failure deferred it)"
+                               if e["queued"] and e["queued"] != today_iso else "")),
+                due_on):
+            leftover.append(e)
+        else:
             created += 1
-    if len(queue) > CASE_SUBTASK_CAP:
-        log(f"  case cap: created {created}, {len(queue) - CASE_SUBTASK_CAP} additional NEW item(s) "
-            f"not turned into subtasks (see report body)")
+    if state is not None:
+        # A failed create with a live parent is retried from the backlog next
+        # run; with NO parent (delivery failed) the state is never persisted and
+        # everything re-alerts as new, so skip the pointless carry.
+        if parent_gid:
+            if len(leftover) > CASE_BACKLOG_MAX:
+                log(f"  case backlog OVER CAP: dropping {len(leftover) - CASE_BACKLOG_MAX} "
+                    f"oldest-priority-last item(s) beyond {CASE_BACKLOG_MAX} — raise "
+                    f"CASE_SUBTASK_CAP or clear the queue (items remain in the report body)")
+                leftover = leftover[:CASE_BACKLOG_MAX]
+            if leftover:
+                log(f"  case backlog: {len(leftover)} item(s) carried to the next run")
+            state[CASE_BACKLOG_KEY] = [
+                {"p": e["p"], "name": e["name"][:250], "notes": e["notes"][:8000],
+                 "queued": e["queued"] or today_iso} for e in leftover]
+    if len(combined) > CASE_SUBTASK_CAP:
+        log(f"  case cap: created {created}, {len(combined) - CASE_SUBTASK_CAP} additional NEW item(s) "
+            f"deferred to the case backlog (all remain in the report body)")
     else:
         log(f"  MLRO cases created: {created}")
     return created
@@ -3759,7 +5042,7 @@ def tally_enrichment(results, wl_hits, wl_loaded):
       am_blackout  — of those, subjects with ZERO adverse coverage from ANY
                      source (the watchlist was missing too) — the original alarm
       pep_errors   — individuals with no PEP coverage from either source
-      pep_mirror   — individuals screened via the OpenSanctions mirror fallback
+      pep_mirror   — individuals resolved by the worldwide PEP/RCA net (OpenSanctions)
       watchlist    — subjects with ≥1 adverse-exposure watchlist finding
     """
     companies = individuals = 0
@@ -3773,8 +5056,15 @@ def tally_enrichment(results, wl_hits, wl_loaded):
         subj_err = False
         if r["am_error"]:
             am_errors += 1
-            if not wl_loaded:
-                # No net could screen this subject — actionable failure.
+            # No net could screen this subject — actionable failure. The
+            # watchlist counts as covering a subject only if it could actually
+            # SCREEN it: a name the matcher cannot handle (non-Latin script, or
+            # under 4 matchable characters) gets nothing from the watchlist even
+            # when the list loaded perfectly, so a news-dead subject with such a
+            # name has ZERO adverse coverage. Counting only `not wl_loaded` here
+            # meant those subjects were reported as covered while the report told
+            # the MLRO the watchlist "screened every subject".
+            if not wl_loaded or r["name"] in WATCHLIST_UNSCREENABLE:
                 am_blackout += 1
                 subj_err = True
         # Adverse findings merge both nets: flagged news articles (when the sweep
@@ -3878,6 +5168,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         coverage_result.setdefault("alarms", []).append(EOCN_REVIEW_ALERT["message"])
         coverage_result.setdefault("drops", []).append(EOCN_REVIEW_ALERT["message"])
         log(f"COVERAGE ALARM: {EOCN_REVIEW_ALERT['message']}")
+    # Persist for the post-delivery coverage gate: every alarm EXCEPT the
+    # review-age one, which has its own gate and exit code.
+    COVERAGE_ALARM_STATE["alarms"] = [
+        a for a in coverage_result.get("alarms", [])
+        if a != EOCN_REVIEW_ALERT.get("message")]
 
     # 1) SANCTIONS — entities + individuals, ALL matching candidates
     possible_matches, clear = screen_customers(customers, all_lists)
@@ -3896,7 +5191,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         r = {"type": subj_type, "name": subj_name, "parent": parent,
              "permalink": c.get("permalink", ""), "adverse": None, "pep": None, "am_error": False}
         try:
-            articles = search_adverse_media(subj_name, max_results=5)
+            articles = search_adverse_media(subj_name, max_results=ADVERSE_MAX_RESULTS)
             r["adverse"] = [a for a in articles if a["flagged"]]
         except Exception as e:
             r["am_error"] = True; r["am_msg"] = str(e)[:120]
@@ -3918,16 +5213,42 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             if done % 50 == 0 or done == total:
                 log(f"  enriched {done}/{total}")
 
-    # PEP MIRROR FALLBACK — individuals whose live lookup errored get one bulk
-    # second chance (loud, provisional) instead of finishing as "PEP unknown".
-    pep_unresolved = [r for r in results
-                      if r["type"] == "INDIVIDUAL" and (r.get("pep") or {}).get("errored")]
-    if pep_unresolved:
-        log(f"  PEP: {len(pep_unresolved)} live lookup(s) failed — trying the OpenSanctions mirror")
+    # WORLDWIDE PEP + RCA NET — screened on EVERY run, over EVERY individual.
+    # Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or a
+    # relative / close associate with no English article returned a confident
+    # {"hit": False}, which is a silent false negative on an FATF R.12 duty
+    # (R.12 extends the PEP controls to family members and close associates).
+    # The consolidated worldwide dataset now runs as the standing net over all
+    # of them; Wikidata stays as the richer explanation layer on top. Three
+    # populations are covered here, in this order of precedence:
+    #   errored  — the live lookup failed: the net RESOLVES it (was the only
+    #              behaviour before 2026-07-29, and stays loud/provisional);
+    #   no hit   — Wikidata found nothing: the net gets its own say, which is
+    #              the coverage gain (domestic PEPs, RCAs, non-English figures);
+    #   hit      — Wikidata already flagged them: left untouched, since its
+    #              label/description is the more useful evidence for the MLRO.
+    _pep_individuals = [r for r in results if r["type"] == "INDIVIDUAL"]
+    _pep_errored = [r for r in _pep_individuals if (r.get("pep") or {}).get("errored")]
+    _pep_clear = [r for r in _pep_individuals
+                  if not (r.get("pep") or {}).get("errored")
+                  and not (r.get("pep") or {}).get("hit")]
+    if _pep_individuals:
+        if _pep_errored:
+            log(f"  PEP: {len(_pep_errored)} live lookup(s) failed — the worldwide net re-covers them")
         pep_index = load_pep_mirror()
         if pep_index is not None:
-            for r in pep_unresolved:
+            _net_new = 0
+            for r in _pep_errored:
                 r["pep"] = pep_mirror_lookup(pep_index, r["name"])
+            for r in _pep_clear:
+                _found = pep_mirror_lookup(pep_index, r["name"])
+                if _found.get("hit"):
+                    r["pep"] = _found
+                    _net_new += 1
+            log(f"  worldwide PEP/RCA net: screened {len(_pep_clear):,} individual(s) Wikidata "
+                f"reported clear — {_net_new} further PEP/RCA listing(s) found")
+        elif _pep_errored:
+            log("  PEP: worldwide net unavailable — errored lookups stay errored (loud, provisional)")
 
     # Pure tally — honest denominators (every subject counts, errors once per
     # subject) + findings merged across the news and watchlist nets.
@@ -3976,6 +5297,14 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 if rec:
                     h["identity"] = kyc.identity_dossier(rec)
                     h["cdd_gaps"] = rec.get("cdd_gaps", [])
+                    # Identity-based DEMOTION (not suppression): where the
+                    # customer's and the designation's DOB and nationality are
+                    # both known and both disagree, this candidate is a
+                    # different person. The hit stays in the record and in the
+                    # report; it just stops competing for MLRO attention with
+                    # the candidates that are still open questions.
+                    h["identity_excluded"] = identity_exclusion_reason(
+                        h.get("matched_entry"), rec)
         nationalities = [i.get("nationality", "") for i in kyc_data.get("individuals", [])]
         jtier, jreason = kyc.jurisdiction_risk_for(m.get("country", ""), nationalities, jtable)
         m["jurisdiction"] = {"tier": jtier, "reason": jreason}
@@ -4041,7 +5370,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     cdd_gaps_total = sum(m.get("cdd_gap_count", 0) for m in possible_matches)
     arrangements = sum(1 for m in possible_matches if m.get("arrangement"))
 
-    stats = {"customers_total": len(customers), "companies_screened": companies,
+    stats = {"customers_total": len(customers),
+             "customer_rows_skipped": len(CUSTOMER_ROWS_SKIPPED),
+             "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": subjects_total,
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
              "am_blackout": counts["am_blackout"], "pep_mirror": counts["pep_mirror"],
@@ -4068,8 +5399,10 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                         pep_findings, list_meta, stats, run_time)
     parent_gid = post_unified_task(narrative, run_time, possible_matches,
                                    adverse_findings, pep_findings, mode=mode)
-    # MLRO case subtasks for the NEW items only (keeps the case list actionable)
-    open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time)
+    # MLRO case subtasks for the NEW items only (keeps the case list actionable);
+    # overflow/failed items ride the reserved backlog inside `state`.
+    open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
+                    state=state)
     # Persist the delta-state ONLY once the report was delivered. If the post
     # failed (parent_gid is None), keep the prior state so today's new matches are
     # flagged new again on the next run instead of being silently suppressed.
@@ -4093,6 +5426,7 @@ def run_unified(run_time):
     enforce_delivery_gate()
     enforce_list_outage_gate()
     enforce_eocn_review_gate()
+    enforce_coverage_alarm_gate()
 
 def run_onboarding(run_time):
     """Screen only customers created within the last ONBOARDING_WINDOW_HOURS, so a
@@ -4119,6 +5453,14 @@ def run_onboarding(run_time):
     all_lists, list_meta = load_all_lists()
     screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
     log("Onboarding run done.")
+    # Same post-delivery gate chain as the daily run — an onboarding report
+    # that never reached the MLRO queue, or an onboarding screen run against
+    # an outaged/drifting core list, must not leave a green run behind: a new
+    # customer's screen is the one the daily batch will NOT redo today.
+    enforce_delivery_gate()
+    enforce_list_outage_gate()
+    enforce_eocn_review_gate()
+    enforce_coverage_alarm_gate()
     enforce_delivery_gate()
     enforce_list_outage_gate()
     enforce_eocn_review_gate()
@@ -4161,14 +5503,40 @@ def main():
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
     uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
+    au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
+    ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
 
+    # Same fallback ladder as load_all_lists — the legacy manual path must not
+    # be the one place a single-origin outage still bites. Fetched flags track
+    # "source material obtained" (primary bytes OR a fallback that answered).
+    ofac_fetched, un_fetched = bool(ofac_data), bool(un_data)
+    uk_fetched,   eu_fetched = bool(uk_data),   bool(eu_data)
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
-    # Aliases broaden a LOADED primary only (no mirror on this legacy path —
-    # a single sdn.csv outage with alt.csv up would otherwise read as OK).
-    ofac_names = _fold_ofac_aliases(ofac_names, ofac_alt_data)
+    # Fallback BEFORE the alias fold, or an alias-only load defeats the mirror
+    # (same trap load_all_lists documents at its own fold).
+    fb = _mirror_fallback(ofac_names, "us_ofac_sdn", "OFAC SDN")
+    if fb:
+        ofac_names, ofac_date, ofac_hash = fb   # mirror already carries aliases
+        ofac_fetched = True
+    else:
+        ofac_names = _fold_ofac_aliases(ofac_names, ofac_alt_data)
     un_names,   un_date,   un_hash   = parse_un(un_data)
+    fb = _mirror_fallback(un_names, "un_sc_sanctions", "UN Consolidated")
+    if fb:
+        un_names, un_date, un_hash = fb
+        un_fetched = True
     uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
+    fb = _mirror_fallback(uk_names, "gb_hmt_sanctions", "UK OFSI")
+    if fb:
+        uk_names, uk_date, uk_hash = fb
+        uk_fetched = True
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
+    fb = _eu_official_fallback(eu_names)
+    if fb:
+        eu_names, eu_date, eu_hash = fb
+        eu_fetched = True
+    au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
+    ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
 
     list_meta = {
@@ -4176,6 +5544,8 @@ def main():
         "un":    {"count":len(un_names),    "date":un_date,    "hash":un_hash},
         "uk":    {"count":len(uk_names),    "date":uk_date,    "hash":uk_hash},
         "eu":    {"count":len(eu_names),    "date":eu_date,    "hash":eu_hash},
+        "au":    {"count":len(au_names),    "date":au_date,    "hash":au_hash},
+        "ch":    {"count":len(ch_names),    "date":ch_date,    "hash":ch_hash},
         "eocn":  {"count":len(eocn_names),  "date":eocn_date,  "hash":eocn_hash},
     }
 
@@ -4184,26 +5554,35 @@ def main():
     # failure must never masquerade as "all clear".
     if sum(m["count"] for m in list_meta.values()) == 0:
         raise RuntimeError(
-            "FATAL: no sanctions list could be loaded (OFAC/UN/UK/EU/EOCN all empty) "
+            "FATAL: no sanctions list could be loaded (OFAC/UN/UK/EU/AU/CH/EOCN all empty) "
             "— refusing to screen or post an all-clear.")
     # Per-list coverage floors: an OBTAINED core list at zero (or a fraction
     # of its known size) is the same false-negative class as the all-empty
     # case above and refuses the run; a list with no obtainable source this
-    # run degrades and turns the run red after delivery (outage gate). This
-    # legacy path has NO mirror fallbacks, so bool(data) is the whole story.
+    # run degrades and turns the run red after delivery (outage gate).
     enforce_core_list_floors(list_meta, fetched={
-        "ofac": bool(ofac_data), "un": bool(un_data),
-        "uk": bool(uk_data), "eu": bool(eu_data),
+        "ofac": ofac_fetched, "un": un_fetched,
+        "uk": uk_fetched, "eu": eu_fetched,
+        "au": bool(au_data), "ch": bool(ch_data),
         "eocn": EOCN_SOURCE_STATE["obtained"],
     })
 
     all_lists = {
-        "OFAC SDN":        [(normalize(n),n) for n in ofac_names],
-        "UN Consolidated": [(normalize(n),n) for n in un_names],
-        "UK OFSI":         [(normalize(n),n) for n in uk_names],
-        "EU FSF":          [(normalize(n),n) for n in eu_names],
-        "UAE EOCN":        [(normalize(n),n) for n in eocn_names],
+        "OFAC SDN":         [(normalize(n),n) for n in ofac_names],
+        "UN Consolidated":  [(normalize(n),n) for n in un_names],
+        "UK OFSI":          [(normalize(n),n) for n in uk_names],
+        "EU FSF":           [(normalize(n),n) for n in eu_names],
+        "Australia DFAT":   [(normalize(n),n) for n in au_names],
+        "Switzerland SECO": [(normalize(n),n) for n in ch_names],
+        "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
+    # Internal firm watchlist (optional): added AFTER the all-empty guard and
+    # the floors so firm-internal names can never satisfy a core-coverage
+    # fail-safe on this path either; empty is a valid state.
+    iw_names, iw_date, iw_hash = parse_internal_watchlist()
+    list_meta["internal"] = {"count":len(iw_names),"date":iw_date,"hash":iw_hash,"tier":"supplementary"}
+    if iw_names:
+        all_lists["Internal Watchlist"] = [(normalize(n),n) for n in iw_names]
 
     log("Fetching customers...")
     customers = get_all_customers()

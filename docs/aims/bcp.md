@@ -1,7 +1,10 @@
 # Business Continuity & Resilience Plan (AIMS A.6)
 
+**Owner:** MLRO (accountable) · system maintainer (operational)
+**Approver:** MLRO · Registered as POL-32 in the [policy register](../governance/policy-register.md)
+**Review cadence:** annually, and after any incident.
+
 How the screening control keeps operating (or fails safely) under disruption.
-Owner: MLRO / system maintainer. Review: annually + after any incident.
 
 ## Resilience already built in
 - **Degrade loudly:** a run that cannot screen never reports "all clear" — it shows

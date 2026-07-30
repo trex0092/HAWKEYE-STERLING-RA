@@ -12,15 +12,21 @@ description = "Public, non-secret values: the EU consolidated-list access token 
 # public Asana GIDs + the public EU FSF token, all covered by the regex allowlist
 # below); a whole-file exemption would also blind the scan to a REAL secret later
 # added to those files, so the specific public values are allow-listed by regex
-# instead and the files themselves are scanned normally.
+# instead and the files themselves are scanned normally. Because the allowlist is
+# by VALUE and not by path, it followed the daily-screen code unchanged when that
+# was extracted out of the workflow YAML into scripts/daily-screen-*.py.
 paths = [
   '''data/sanctions-sources\.json''',
   '''data/reg-sources\.json''',
   '''\.env\.example''',
 ]
 regexes = [
-  # EU FSF public access token embedded in the sanctions-list download URL
-  '''token=dG9rZW4tMjAxNw''',
+  # EU FSF public access token embedded in the sanctions-list download URL.
+  # Matched as the BARE value (no token= prefix): the generic-api-key rule's
+  # secret group captures only the value, so a prefixed regex misses it when
+  # the URL sits in a source constant (screen.py EU_OFFICIAL_XML_URL) instead
+  # of a path-allowlisted registry file.
+  '''dG9rZW4tMjAxNw''',
   # Asana project GIDs are public object identifiers (they appear in task URLs),
   # not secrets. The default asana-client-id rule false-positives on any 16-digit
   # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
@@ -28,7 +34,10 @@ regexes = [
   '''1216203370612916''',  # section: Assessment Report (pipeline report delivery target)
   '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log)
   '''1213914392047131''',  # section: Daily Sanctions Screening (screen.py + daily-sanctions-screen.yml)
-  '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default)
+  '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default; also quoted in the scripts/daily-screen-report.py provenance footer)
+  '''1216139945846994''',  # HR – Employees project (second screening population, ASANA_EMPLOYEE_DB_GID / ASANA_EMPLOYEE_PROJECT_GID default)
+  '''1215884707932023''',  # Follow Ups project (second MLRO delivery queue, ASANA_FOLLOWUPS_GID default)
+  '''1215884707932047''',  # section: Subject (Follow Ups delivery section, ASANA_FOLLOWUPS_SECTION_GID default)
   '''1215653768729951''',  # Risk Assessments - Madison LLC (former RA default)
   '''1215844297069727''',  # Regulations / Governance / Sanctions (merged into Ongoing Monitoring, then removed)
   # Section GIDs in the Ongoing Monitoring project (public identifiers), used by the

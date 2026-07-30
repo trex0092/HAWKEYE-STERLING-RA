@@ -9,7 +9,10 @@ Asana automation layer (GitHub Actions watchers + assessment delivery).
 
 > **Companion docs:** the AI inventory lives in [`ai-asset-register.md`](ai-asset-register.md) (L1),
 > retention in [`data-retention.md`](data-retention.md) (L2), and the tile-level security posture in
-> [`ai-governance-gap-analysis-2026.md`](ai-governance-gap-analysis-2026.md).
+> [`ai-governance-gap-analysis-2026.md`](ai-governance-gap-analysis-2026.md). The five-*level*
+> operational-stack view of the same territory (visibility → monitoring → controls → evidence →
+> continuous governance) is scored separately in
+> [`operational-ai-governance-stack-2026.md`](operational-ai-governance-stack-2026.md).
 
 ---
 
@@ -51,8 +54,14 @@ automations** (lineage, quality, audit) rather than as models.
 | Agent classification | ✅ | Each asset classified assistive/agentic + autonomy described |
 | Risk tiering | ✅ | Advisor = MEDIUM, reg-draft = LOW, with rationale |
 | Ownership assignment | ✅ | MLRO accountable / Compliance Engineering operational |
+| Prompt inventory & change control | ✅ | [`data/prompt-assets.json`](../../data/prompt-assets.json) + [`prompt-lifecycle-register.md`](prompt-lifecycle-register.md) — seven prompts fingerprinted; an edit fails `test/prompt-register.test.mjs` until re-approved **(added 2026-07-28)** |
+| Tool & connector inventory | ✅ | [`data/tool-surfaces.json`](../../data/tool-surfaces.json) + [`tool-connector-register.md`](tool-connector-register.md) — actions, credentials, egress and MCP posture, cross-checked against `agents.py` **(added 2026-07-28)** |
 
 **Verdict:** ✅. The register is the new control; any future AI surface must be added before deploy.
+**Update 2026-07-28.** Inventory now answers all three questions, not one: *which*
+surfaces exist (asset register), *what* they are told to do (prompt register), and
+*what they may invoke* (tool & connector register). Each has a machine-readable
+source of truth and a CI drift guard.
 
 ## Layer 2 — Data Governance Foundation
 *"Good data powers trustworthy AI."*

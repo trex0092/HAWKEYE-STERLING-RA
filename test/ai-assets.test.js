@@ -23,6 +23,11 @@ catch (e) { console.log('FAIL  data/ai-assets.json parses (' + e.message + ')');
 check('register parses and has an assets array', Array.isArray(reg.assets) && reg.assets.length > 0);
 check('register declares an owner role', !!reg.owner_role);
 check('register has a shadow-AI note (the anti-shadow-AI control)', !!reg.shadow_ai_note);
+check('register declares a review cadence', !!reg.review_cadence);
+// Shape only — currency (quarterly, 100-day window) is enforced daily by the
+// governance report's register-review row, never by CI (no time-bomb tests).
+check('register last_reviewed is a parseable date',
+  Number.isFinite(Date.parse(reg.last_reviewed || '')));
 
 const TIERS = ['LOW', 'MEDIUM', 'HIGH'];
 const REQUIRED = ['id', 'name', 'classification', 'surface_file', 'provider',
@@ -75,6 +80,12 @@ if (advisor) {
 // registered surface, or an allowlisted eval harness (an assurance control
 // over a registered surface, documented in the advisor asset's controls).
 const EVAL_HARNESSES = new Set(['scripts/advisor-eval.mjs', 'scripts/advisor-bias-eval.mjs']);
+/* Files whose job is to SCAN for model-API callers necessarily contain the host
+   string they look for, and call nothing. Kept in step with the exported
+   SCANNERS set in scripts/grc-metrics.mjs — this suite is CommonJS and cannot
+   import that ESM module synchronously, so test/grc-metrics.test.mjs asserts
+   the two lists are identical. */
+const SCANNERS = new Set(['scripts/grc-metrics.mjs']);
 const SCAN_DIRS = ['', 'scripts', 'netlify/functions'];
 const apiCallers = [];
 for (const d of SCAN_DIRS) {
@@ -82,6 +93,7 @@ for (const d of SCAN_DIRS) {
   for (const f of fs.readdirSync(abs)) {
     if (!/\.(js|mjs|py)$/.test(f)) continue;
     const rel = d ? d + '/' + f : f;
+    if (SCANNERS.has(rel)) continue;
     const full = path.join(abs, f);
     if (!fs.statSync(full).isFile()) continue;
     if (fs.readFileSync(full, 'utf8').includes('api.anthropic.com')) apiCallers.push(rel);

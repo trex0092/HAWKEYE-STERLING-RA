@@ -17,7 +17,7 @@ Super Tools citations in `assets/super-data.js`, and the country/risk data in
 1. **Schedule** — `.github/workflows/regulatory-watch.yml` runs every **Monday 06:00 UTC**, and on demand via *Run workflow*.
 2. **Fingerprint** — `scripts/reg-watch.mjs` fetches each source in [`data/reg-sources.json`](../data/reg-sources.json), strips markup, normalises the text, and hashes it. The hash is compared with the last-seen value in `data/reg-watch-state.json`. Markup-only churn does not move the hash; a real text change does. Fetch errors (404, timeouts) are recorded but never counted as a content change, so they cannot raise a false PR.
 3. **On change** — the workflow opens/updates a PR on branch `regulatory-watch/update` carrying the updated fingerprint state and a change report (which sources moved, with links).
-4. **Optional AI draft** — if an `ANTHROPIC_API_KEY` repository secret is set, `scripts/reg-draft.mjs` fetches each changed page and asks Claude (`claude-sonnet-4-6`) to draft a reviewer-facing proposal — what changed and which app entries likely need updating — written to `docs/research/auto/REG-UPDATE-<date>.md` and included in the PR. Without the secret, the PR is detection-only. The AI step **never** edits `super-data.js` directly.
+4. **Optional AI draft** — if an `ANTHROPIC_API_KEY` repository secret is set, `scripts/reg-draft.mjs` fetches each changed page and asks Claude (`claude-sonnet-5`) to draft a reviewer-facing proposal — what changed and which app entries likely need updating — written to `docs/research/auto/REG-UPDATE-<date>.md` and included in the PR. Without the secret, the PR is detection-only. The AI step **never** edits `super-data.js` directly.
 
 ### First-time setup
 
@@ -71,6 +71,12 @@ Worldwide, UAE-weighted. The narrative is what each source is, why it is watched
 | **UNODC — Money Laundering & Organised Crime** | The UN Office on Drugs and Crime's AML portal: custodian of the Vienna and Palermo Conventions, publisher of predicate-offence and organised-crime research, the Global Programme against Money Laundering (GPML) outputs and model legislation. A change usually means new typology research or convention-related guidance. Feeds: typology, predicate-offence and international-cooperation answers. |
 | **EU — High-Risk Third Countries (AML/CFT)** | The European Commission's list of third countries with strategic AML/CFT deficiencies (Delegated Regulation under the 4th/5th AMLD, aligned with but not identical to FATF's grey list), which triggers mandatory enhanced due diligence for EU-obliged entities on any listed-country nexus. A change usually means additions/removals with direct EDD consequences. Feeds: high-risk-jurisdiction EDD answers and the EWRA country-risk weighting — additions/removals must be mirrored the same week. |
 | **Responsible Jewellery Council (RJC)** | The jewellery and watch industry's standards and certification body: the Code of Practices (COP — full-scope responsible business including AML/KYC provisions), the Chain of Custody (CoC) standard, and the Laboratory Grown Material Standard (LGMS), each with assessment manuals and accredited-auditor requirements. Publishes standards revisions, audit/certification-requirement changes (e.g. Standards & Audit Changes information packs), governance announcements and progress reports. A change usually means revised certification requirements members must meet at next audit. Feeds: gold/jewellery sector answers, responsible-sourcing tools, and RJC-certification citations. |
+
+### EU
+
+| Source | Narrative |
+| --- | --- |
+| **European Commission — EU AI Act regulatory framework (incl. Digital Omnibus amendments)** | The Commission's canonical AI Act policy page: entry-into-force and application dates, amendments (e.g. the 2026 Digital Omnibus package), guidance and delegated acts. Watched because docs/governance/eu-ai-act-assessment-2026.md commits (§7.5) to re-assess on Act evolution — this feed is what fires that trigger; the Digital Omnibus itself arrived via manual intake on 2026-07-28, which exposed the missing source. |
 
 <!-- END:reg-sources -->
 

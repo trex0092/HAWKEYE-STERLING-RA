@@ -1,0 +1,196 @@
+{
+  "schema": "hawkeye-sterling.prompt-register/v1",
+  "description": "Authoritative inventory of every governed prompt artefact in the Hawkeye Sterling suite — the instructions that shape an LLM surface's behaviour, versioned and fingerprinted so a prompt cannot change without a recorded review. Companion to data/ai-assets.json (which inventories the surfaces themselves): every prompt here serves an asset there. The human view is docs/governance/prompt-lifecycle-register.md.",
+  "owner_role": "MLRO (accountable) / Compliance Engineering (operational)",
+  "review_cadence": "Quarterly with the AI asset register, AND on every edit to a fingerprinted region — the edit is itself the review trigger, because test/prompt-register.test.mjs fails until the row is re-approved.",
+  "change_control": "docs/governance/model-validation-2026.md",
+  "last_reviewed": "2026-07-28",
+  "prompts": [
+    {
+      "id": "advisor-soul-charter",
+      "name": "MLRO Soul Charter",
+      "serves_asset": "advisor",
+      "role": "system",
+      "surface_file": "netlify/functions/brain-soul.js",
+      "symbol": "SOUL_CHARTER",
+      "region": {
+        "from": "const SOUL_CHARTER = `",
+        "to": "`;"
+      },
+      "purpose": "The behavioural constitution of the Advisor: 10 absolute prohibitions (P1-P10), the refusal protocol, the match-confidence taxonomy, the allegation taxonomy, and the prompt-injection resistance clause. Everything the Advisor must never do is stated here, not inferred.",
+      "risk_if_changed_unreviewed": "Silent removal of a prohibition would let the Advisor assert sanctions status, upgrade allegations, or tip off — none of which any downstream guard fully compensates for.",
+      "guards": [
+        "test/advisor-assurance.test.js — content assertions: P1-P10 present, REFUSAL PROTOCOL, PROMPT-INJECTION RESISTANCE, Article 25 / FDL 10/2025 basis, NO_MATCH/EXACT taxonomy",
+        "Runtime charter-leak detector (hallucination guard) in the same surface",
+        "Post-output tipping-off guard (independent of the prompt text)"
+      ],
+      "assurance": [
+        "test/advisor-assurance.test.js",
+        "scripts/advisor-eval.mjs",
+        "scripts/advisor-bias-eval.mjs"
+      ],
+      "version": 1,
+      "sha256": "079099dfacc41e98e3bcb8c481537491070eda6fe1f586d7ee3186a15383dee8",
+      "approved_on": "2026-07-28",
+      "approved_by": "Compliance Engineering (baseline registration of the text already in production; first MLRO ratification due at the next quarterly review)"
+    },
+    {
+      "id": "advisor-knowledge-context",
+      "name": "Embedded Brain Knowledge template",
+      "serves_asset": "advisor",
+      "role": "system",
+      "surface_file": "netlify/functions/brain-soul.js",
+      "symbol": "buildKnowledgeContext / KNOWLEDGE_CONTEXT",
+      "region": {
+        "from": "function buildKnowledgeContext() {",
+        "to": "const KNOWLEDGE_CONTEXT = buildKnowledgeContext();"
+      },
+      "purpose": "The template that frames the typology catalogue, KRIs, high-severity red flags and zero-tolerance appetite into the second block of the system prompt. Fingerprints the framing, not the catalogue content.",
+      "risk_if_changed_unreviewed": "A reframing could drop a whole knowledge block (e.g. the appetite thresholds) from the system prompt while every content test on the underlying arrays still passes.",
+      "guards": [
+        "test/advisor-assurance.test.js — integrity of the injected arrays (unique typology ids, red flags reference known typologies, KRI bands well-formed, appetite list non-empty)",
+        "The catalogue content itself is versioned by git history on the same file; this row governs the framing that carries it into the prompt"
+      ],
+      "assurance": [
+        "test/advisor-assurance.test.js"
+      ],
+      "version": 1,
+      "sha256": "d1728ec3e0b5a71187e05587000f22c001c5c04a783f3f81508fe90683b76c16",
+      "approved_on": "2026-07-28",
+      "approved_by": "Compliance Engineering (baseline registration)"
+    },
+    {
+      "id": "advisor-persona-suffix",
+      "name": "Persona suffixes (16)",
+      "serves_asset": "advisor",
+      "role": "system-fragment-set",
+      "surface_file": "netlify/functions/brain-soul.js",
+      "symbol": "PERSONA_SUFFIX",
+      "region": {
+        "from": "const PERSONA_SUFFIX = {",
+        "to": "\n};"
+      },
+      "purpose": "Per-persona specialism appended as the third block of the system prompt. A persona narrows focus; it must never widen authority beyond the charter.",
+      "risk_if_changed_unreviewed": "A persona line that grants a capability (e.g. 'you may confirm sanctions matches') would contradict the charter from inside the same system prompt.",
+      "guards": [
+        "test/ai-assets.test.js — persona count must match advisor.js PERSONAS and data/ai-assets.json",
+        "Charter blocks are concatenated first; the persona suffix cannot remove a prohibition"
+      ],
+      "assurance": [
+        "test/ai-assets.test.js",
+        "scripts/advisor-bias-eval.mjs"
+      ],
+      "version": 1,
+      "sha256": "02df0ba4e0c6cec87fbfccc2d6635fff68c7c74bd3a6b96e7ac0a18317484367",
+      "approved_on": "2026-07-28",
+      "approved_by": "Compliance Engineering (baseline registration)"
+    },
+    {
+      "id": "triage-grounding-system",
+      "name": "Grounding + prompt-security contract",
+      "serves_asset": "ai-triage",
+      "role": "system",
+      "surface_file": "ai.py",
+      "symbol": "GROUNDING_SYSTEM",
+      "region": {
+        "from": "GROUNDING_SYSTEM = (",
+        "to": "\n\n"
+      },
+      "purpose": "The only system prompt used by any Python-side model call: use ONLY supplied facts, invent nothing, choose the conservative answer when uncertain, and treat everything inside <<UNTRUSTED>>…<<END>> as data to classify rather than instructions to obey.",
+      "risk_if_changed_unreviewed": "Weakening the untrusted-data clause re-opens the prompt-injection path from open-web headlines into a compliance classification.",
+      "guards": [
+        "test/redteam_injection.py — standing injection corpus: detection, non-execution, no-downgrade (CI-enforced)",
+        "Injection-pattern screen in ai.py blocks flagged items BEFORE any model call",
+        "Fail-closed gate: LLM_TRIAGE=0 keeps the whole surface dormant"
+      ],
+      "assurance": [
+        "test/redteam_injection.py",
+        "docs/aims/red-team-procedure.md"
+      ],
+      "version": 1,
+      "sha256": "433c934a4a14f87b0d24995876d4237cef37df7befe178d33a8d8928933b934b",
+      "approved_on": "2026-07-28",
+      "approved_by": "Compliance Engineering (baseline registration)"
+    },
+    {
+      "id": "triage-classify-user",
+      "name": "Adverse-media classification template",
+      "serves_asset": "ai-triage",
+      "role": "user-template",
+      "surface_file": "ai.py",
+      "symbol": "classify prompt (adverse-media triage)",
+      "region": {
+        "from": "prompt = (\"Classify the untrusted news headline",
+        "to": "max_tokens=120)"
+      },
+      "purpose": "The minimised payload actually sent to the processor: subject name + one headline + source/date, each wrapped as untrusted, with a compact-JSON output contract. The fingerprint deliberately extends to the llm_complete call so the system-prompt binding and the 120-token budget are governed with the text.",
+      "risk_if_changed_unreviewed": "Any field added here is a cross-border transfer of additional personal data beyond Schedule A of the Anthropic DPA pack (name + single headline).",
+      "guards": [
+        "_wrap_untrusted / _sanitize_untrusted on every interpolated value",
+        "Severity clamped to the allowed set after the call",
+        "Data-minimisation assertion in docs/aims/anthropic-dpa-execution-pack.md Schedule A"
+      ],
+      "assurance": [
+        "test/redteam_injection.py"
+      ],
+      "version": 1,
+      "sha256": "242279251a283ca1dc256c17500c305e1ff8cb15c14172ed94ff444d6de19906",
+      "approved_on": "2026-07-28",
+      "approved_by": "Compliance Engineering (baseline registration)"
+    },
+    {
+      "id": "triage-narrative-user",
+      "name": "MLRO narrative template (report prose)",
+      "serves_asset": "ai-triage",
+      "role": "user-template",
+      "surface_file": "ai.py",
+      "symbol": "narrative prompt (_llm_in_reports gate)",
+      "region": {
+        "from": "prompt = (f\"Customer: ",
+        "to": "max_tokens=160)"
+      },
+      "purpose": "Two-sentence narrative for the MLRO, reachable only when REPORT_ALLOW_LLM is enabled. Production keeps it OFF, so no generative prose enters a filed report.",
+      "risk_if_changed_unreviewed": "This is the one template whose output could reach a filed compliance document; a loosened 'invent nothing' clause would put unevidenced prose into an STR-adjacent artefact.",
+      "guards": [
+        "REPORT_ALLOW_LLM=0 in production (hard anti-hallucination rule)",
+        "Deterministic fallback narrative on any LLM error — degrade loudly",
+        "Same GROUNDING_SYSTEM contract applies"
+      ],
+      "assurance": [
+        "test/redteam_injection.py"
+      ],
+      "version": 1,
+      "sha256": "34fa3f5ba11eedb66df0d32c83255b03b6bce0f6c977f5e9a6dbb60781686796",
+      "approved_on": "2026-07-28",
+      "approved_by": "Compliance Engineering (baseline registration)"
+    },
+    {
+      "id": "reg-draft-analyst",
+      "name": "Regulatory-Watch drafting template",
+      "serves_asset": "reg-draft",
+      "role": "user-template",
+      "surface_file": "scripts/reg-draft.mjs",
+      "symbol": "draftFor prompt",
+      "region": {
+        "from": "const prompt = [",
+        "to": "].join('\\n');"
+      },
+      "purpose": "Turns a detected change on a public regulatory source into a short reviewer-facing proposal, grounded in the computed delta, with an explicit SEVERITY line and a do-not-invent-citations instruction.",
+      "risk_if_changed_unreviewed": "Dropping the 'do NOT invent article or circular numbers' clause would let fabricated instrument references enter a drafted regulatory proposal.",
+      "guards": [
+        "Public regulatory text only — no customer data reaches this prompt",
+        "Output is never auto-published: every draft lands in a commit/PR for human ratification",
+        "Runs only when ANTHROPIC_API_KEY is present"
+      ],
+      "assurance": [
+        "test/reg-watch.test.mjs",
+        "test/legal-citations.test.mjs"
+      ],
+      "version": 1,
+      "sha256": "79b604047a090a120b8fbacf173eb02ce0c3519aa3c57a3c6d4eb300edf03d79",
+      "approved_on": "2026-07-28",
+      "approved_by": "Compliance Engineering (baseline registration)"
+    }
+  ],
+  "shadow_prompt_note": "No governed prompt exists outside this register. test/prompt-register.test.mjs scans every file that calls the model API and fails CI if such a file has no registered prompt row, so a new surface cannot ship with an unreviewed instruction set. The eval harnesses (scripts/advisor-eval.mjs, scripts/advisor-bias-eval.mjs) and the red-team corpus (test/redteam_injection.py) carry adversarial inputs by design: they are assurance controls over the prompts above, listed in each row's assurance field rather than registered as governed prompts of their own."
+}

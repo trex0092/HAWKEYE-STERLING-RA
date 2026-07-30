@@ -16,3 +16,40 @@ authors = [{ name = "Hawkeye Sterling" }]
 [project.urls]
 Homepage = "https://hawkeye-sterling-ra.netlify.app"
 Repository = "https://github.com/trex0092/HAWKEYE-STERLING-RA"
+
+# ── Ruff ──────────────────────────────────────────────────────────────────────
+# Until 2026-07-29 this file was metadata only and the ~5,900 lines of Python
+# that make the screening decisions had NO static analysis at all — the single
+# gate was `python -m py_compile`, a syntax check. Ruff closes that.
+#
+# The rule selection deliberately mirrors eslint.config.mjs, which states its
+# own scope as "real breakage (undeclared names, unused symbols, empty blocks,
+# duplicate keys, unsafe negation)":
+#
+#   F   pyflakes      — undefined names, unused imports/variables, redefinitions,
+#                       f-strings with no placeholder. Real defects.
+#   E9  syntax/IO     — errors that stop the file running at all.
+#
+# The pycodestyle FORMATTING families (E1/E2/E3/E4/E7, W) are deliberately NOT
+# selected. The engine's house style puts short guards on one line
+# (`if not name: return ""`) and groups imports (`import os, json, datetime`);
+# ruff flags 125 such sites. Restyling a sanctions matcher to satisfy a
+# formatter is a large, risky diff with no correctness payoff, and it is not
+# what this gate is for. Adding a rule family here is a deliberate act — do it
+# when it catches defects, not to make the engine look like someone else's.
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["assets", "node_modules"]
+
+[tool.ruff.lint]
+select = ["F", "E9"]
+
+[tool.ruff.lint.per-file-ignores]
+# The offline test harnesses and the parity probe MUST install their stub
+# modules into sys.modules before importing the engine, so their imports
+# legitimately sit below executable code. (E402 is not in `select` above, so
+# this is belt-and-braces should the formatting families ever be enabled.)
+"test/*.py" = ["E402"]
+"scripts/matcher-parity-probe.py" = ["E402"]
+"scripts/daily-screen-run.py" = ["E402"]

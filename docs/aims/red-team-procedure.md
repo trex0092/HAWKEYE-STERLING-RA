@@ -1,5 +1,8 @@
 # Prompt-Injection Red-Team Procedure (AIMS A.5.5 / risk R-02)
 
+**Owner:** MLRO (accountable) · system maintainer (operational)
+**Review cadence:** quarterly, with the manual campaign round.
+
 The standing adversarial test for **prompt injection** via adverse-media text —
 the risk recorded as **R-02**. Owner: system maintainer / MLRO. Cadence: every CI
 run + after any change to the triage prompt, the detector, or the model.

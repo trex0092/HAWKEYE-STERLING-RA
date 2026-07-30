@@ -528,10 +528,109 @@ const KNOWLEDGE_CONTEXT = buildKnowledgeContext();
 
 // ── MODEL SELECTOR ────────────────────────────────────────────────────────────
 
-function selectModel(mode) {
-  if (mode === 'speed') return { model: 'claude-haiku-4-5-20251001', maxTokens: 1024 };
-  if (mode === 'deep')  return { model: 'claude-opus-4-8', maxTokens: 8192 };
-  return                       { model: 'claude-sonnet-4-6', maxTokens: 4096 };
+/* The function must finish INSIDE the platform's execution cap, which for a
+   synchronous Netlify function defaults to ~10 s and can only be raised per site
+   by Netlify support. The abort budget was 26 s — 2.6x the cap — so on a
+   default-configured site deep mode was not merely slow, it was killed by the
+   platform mid-flight. That is worse than a slow answer: when the platform kills
+   the invocation the function never returns, so NONE of the guards below run.
+   The tipping-off guard, the PII guard, the injection and hallucination guards,
+   the quality score and the audit line all silently do not happen, and the
+   operator sees an opaque platform error instead of a governed refusal.
+
+   So the budget is now derived from the platform cap and sits below it, and the
+   token budget per mode is sized to what can actually complete inside it. On a
+   site whose cap has been raised, set ADVISOR_PLATFORM_CAP_MS and both follow —
+   the abort budget and deep mode's token allowance move together, because
+   raising one without the other just moves where the failure happens. */
+const PLATFORM_CAP_MS = Math.max(3000, Number(process.env.ADVISOR_PLATFORM_CAP_MS) || 10000);
+/* Leave headroom for our own work after the API call returns: the guards, the
+   quality score and the JSON response are all on the clock too. */
+const ABORT_BUDGET_MS = Math.max(2000, PLATFORM_CAP_MS - 1500);
+
+/* Output tokens the abort budget can realistically carry. 180/s is a
+   deliberately conservative planning figure for the largest model; under-asking
+   truncates an answer, over-asking loses it and every guard with it. */
+const AFFORDABLE_TOKENS = Math.max(512, Math.round((ABORT_BUDGET_MS / 1000) * 180));
+
+/* Below this, "deep" is a label on a short answer. Deep mode's whole premise —
+   steelman the counterargument, run a pre-mortem, cite every relevant typology —
+   does not fit in a couple of thousand tokens, and shipping a truncated one
+   under the deep label is the paper-vs-practice gap this estate exists to avoid. */
+const DEEP_MIN_TOKENS = 4096;
+
+/* On a default-configured site the platform cap makes deep mode unaffordable.
+   It then degrades to balanced VISIBLY — the response says so, the audit line
+   says so — rather than silently returning a thin answer wearing the deep label.
+   Same rule as everywhere else here: degradation is tolerated, silent
+   degradation is not (RA-06). Raise the site cap with Netlify support and set
+   ADVISOR_PLATFORM_CAP_MS to match, and deep mode becomes available on its own. */
+/* The GOVERNED routing — what each mode is, independent of what any particular
+   deployment can afford. This is what data/ai-assets.json records and what the
+   model-change control pins: a model swap must move the register in the same
+   commit, and that must stay true whatever the platform cap happens to be. */
+const MODEL_BY_MODE = {
+  speed:    { model: 'claude-haiku-4-5-20251001', maxTokens: 1024 },
+  balanced: { model: 'claude-sonnet-5',           maxTokens: 4096 },
+  deep:     { model: 'claude-opus-5',             maxTokens: 8192 },
+};
+
+/* ── Deep continuation ───────────────────────────────────────────────────────
+   A 4096+-token deep answer can NEVER fit a default ~10 s synchronous cap, and
+   the two obvious escapes are both wrong for this surface: a background
+   function is plan-gated and would put operator content at rest in a new store
+   (an RA-04 concern), and streaming is architecturally incompatible with the
+   tipping-off guard — the guard must see the COMPLETE output before the
+   operator does, and a streamed sentence cannot be unstreamed.
+
+   So deep mode is served as a GUARDED CONTINUATION: the governed deep model
+   generates the answer across several synchronous calls that each fit the cap,
+   using assistant prefill to resume exactly where the previous hop stopped.
+   Two invariants make this safe:
+
+     1. NO UNGUARDED TOKEN EVER LEAVES. The tipping-off guard runs over the
+        full accumulated text on EVERY hop, not just the last — a partial that
+        trips it is withheld immediately and the continuation ends there.
+     2. THE CLIENT NEVER DISPLAYS A PARTIAL. Intermediate hops return the
+        accumulated text only so the next hop can resume; the UI renders
+        nothing until the final, fully-guarded response.
+
+   The client opts in with `deepContinue: true`; a client that does not (an old
+   cached advisor.js) gets the visible degrade below, unchanged. On a site
+   whose cap affords deep in one call, none of this runs. */
+const DEEP_HOP_LIMIT = Math.max(2, Math.min(8, Math.ceil(MODEL_BY_MODE.deep.maxTokens / AFFORDABLE_TOKENS)));
+
+function selectModel(mode, deepContinue) {
+  const requested = mode === 'speed' || mode === 'deep' ? mode : 'balanced';
+
+  /* A continuation-capable client gets real deep mode in affordable slices. */
+  if (requested === 'deep' && AFFORDABLE_TOKENS < DEEP_MIN_TOKENS && deepContinue) {
+    return {
+      model: MODEL_BY_MODE.deep.model,
+      maxTokens: Math.min(MODEL_BY_MODE.deep.maxTokens, AFFORDABLE_TOKENS),
+      effectiveMode: 'deep',
+      continuation: true
+    };
+  }
+
+  /* Deep mode is unaffordable under a default cap. It then degrades to balanced
+     VISIBLY rather than returning a thin answer wearing the deep label. */
+  if (requested === 'deep' && AFFORDABLE_TOKENS < DEEP_MIN_TOKENS) {
+    const fallback = MODEL_BY_MODE.balanced;
+    return {
+      model: fallback.model,
+      maxTokens: Math.min(fallback.maxTokens, AFFORDABLE_TOKENS),
+      effectiveMode: 'balanced',
+      degradedFrom: 'deep',
+      degradedReason: 'Deep mode needs ' + DEEP_MIN_TOKENS + ' output tokens to be worth the name, and the '
+        + (PLATFORM_CAP_MS / 1000).toFixed(0) + ' s platform execution cap affords ' + AFFORDABLE_TOKENS
+        + '. Answered in balanced mode instead. To enable deep mode, raise the site function timeout with '
+        + 'Netlify support and set ADVISOR_PLATFORM_CAP_MS to match.'
+    };
+  }
+
+  const chosen = MODEL_BY_MODE[requested];
+  return { model: chosen.model, maxTokens: Math.min(chosen.maxTokens, AFFORDABLE_TOKENS), effectiveMode: requested };
 }
 
 // ── SIMPLE HASH (audit line only) ─────────────────────────────────────────────
@@ -618,12 +717,25 @@ const handle = async (event) => {
 
   if (!question.trim()) return resp(400, { ok: false, error: 'question is required.' });
 
-  const { model, maxTokens } = selectModel(mode);
+  /* Continuation state, round-tripped through the client between hops. The
+     accumulated text is the model's OWN prior output being resumed — it is
+     never displayed until the final hop's guards pass, and the tipping-off
+     guard re-checks the whole of it on every hop, so a client that tampers
+     with it gains nothing the guards would not catch. */
+  const deepContinue = body.deepContinue === true;
+  const deepHop = Number.isInteger(body.deepHop) && body.deepHop > 0 ? Math.min(body.deepHop, DEEP_HOP_LIMIT) : 0;
+  const accumulated = deepHop > 0 ? String(body.deepAccumulated || '').slice(0, 60000) : '';
 
+  const { model, maxTokens, effectiveMode, degradedFrom, degradedReason, continuation } = selectModel(mode, deepContinue);
+
+  /* The instruction follows the EFFECTIVE mode, not the requested one: asking
+     for a full pre-mortem while affording a balanced token budget produces a
+     truncated deep answer, which is the failure this degradation exists to
+     avoid. */
   const modeInstruction =
-    mode === 'deep'
+    effectiveMode === 'deep'
       ? 'Apply DEEP mode: steelman the counterargument, run a pre-mortem, apply meta-cognition. Multi-perspective analysis. Cite every typology and red-flag ID relevant to the question.'
-      : mode === 'speed'
+      : effectiveMode === 'speed'
       ? 'Apply SPEED mode: concise structured answer, key facts only, primary recommendation.'
       : 'Apply BALANCED mode: structured sections, cite relevant typologies and red flags, include gaps and next steps.';
 
@@ -631,11 +743,19 @@ const handle = async (event) => {
   const systemPrompt  = [SOUL_CHARTER, KNOWLEDGE_CONTEXT, personaSuffix].join('\n\n');
   const userMessage   = modeInstruction + '\n\nQUESTION:\n' + question + (context.trim() ? '\n\nCONTEXT:\n' + context : '');
 
+  /* On a resumed hop the prior output is replayed as an assistant prefill so
+     the model continues mid-thought. trimEnd() on both what is SENT and what is
+     KEPT — the API rejects trailing whitespace in a prefill, and keeping a
+     different string from the one sent would desynchronise the resume point. */
+  const priorText = continuation && accumulated ? accumulated.replace(/\s+$/, '') : '';
+  const messages = [{ role: 'user', content: userMessage }];
+  if (priorText) messages.push({ role: 'assistant', content: priorText });
+
   const start = Date.now();
-  let text = '', ok = true;
+  let text = '', ok = true, stopReason = '';
 
   const ctrl = new AbortController();
-  const abortTimer = setTimeout(() => ctrl.abort(), 26000);
+  const abortTimer = setTimeout(() => ctrl.abort(), ABORT_BUDGET_MS);
   try {
     const apiResp = await fetch('https://api.anthropic.com/v1/messages', {
       signal: ctrl.signal,
@@ -649,7 +769,7 @@ const handle = async (event) => {
         model,
         max_tokens: maxTokens,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
+        messages,
       }),
     });
 
@@ -668,6 +788,7 @@ const handle = async (event) => {
       // defensively and degrade to a generic message.
       const data = await apiResp.json().catch(() => null);
       const blocks = (data && Array.isArray(data.content)) ? data.content : [];
+      stopReason = String((data && data.stop_reason) || '');
       text = blocks.filter(b => b && b.type === 'text').map(b => b.text).join('');
       if (!text) {
         ok = false;
@@ -681,7 +802,10 @@ const handle = async (event) => {
     // stack-shaped or carry environment detail) — log it server-side, return a
     // generic marker. Mirrors the upstream-error hygiene on the !ok path above.
     if (err && err.name === 'AbortError') {
-      text = '[Brain timeout: Anthropic API did not respond within 26 s.]';
+      text = '[Brain timeout: the Anthropic API did not respond within '
+        + (ABORT_BUDGET_MS / 1000).toFixed(1) + ' s, the budget this function has inside the '
+        + (PLATFORM_CAP_MS / 1000).toFixed(0) + ' s platform execution cap. The guards below still ran on this '
+        + 'message. Retry, use a faster mode, or raise the cap and ADVISOR_PLATFORM_CAP_MS together.]';
     } else {
       console.warn('brain-soul: ' + (err && err.message ? err.message : String(err)));
       text = '[Brain error]';
@@ -691,6 +815,29 @@ const handle = async (event) => {
   }
 
   const elapsedMs = Date.now() - start;
+
+  /* ── Continuation decision ──────────────────────────────────────────────
+     The full text so far is prior output + this hop's chunk. Invariant 1: the
+     tipping-off guard checks the WHOLE of it on every hop — if it fires here,
+     the continuation ends and the guard message is the final answer, exactly
+     as it would be on a single-call path. Invariant 2: a partial response
+     carries the accumulated text for the next hop and nothing renderable. */
+  if (continuation) {
+    const full = priorText + text;
+    if (ok && tippingOffGuard(full)) {
+      text = full; // fall through: the guard block below withholds it
+    } else if (ok && stopReason === 'max_tokens' && deepHop + 1 < DEEP_HOP_LIMIT) {
+      return resp(200, {
+        ok: true, deepPartial: true, deepHop: deepHop + 1, deepAccumulated: full,
+        mode, effectiveMode: 'deep', model, elapsedMs
+      });
+    } else {
+      /* Final hop: end_turn, the hop limit, or an API failure. On a failure
+         mid-continuation the error marker is the final text — the same honest
+         degradation as the single-call path, never a silent partial. */
+      text = ok ? full : text;
+    }
+  }
 
   const tippingOffFlagged = tippingOffGuard(text);
   if (tippingOffFlagged) {
@@ -715,6 +862,8 @@ const handle = async (event) => {
 
   const auditLine = 'AUDIT | ' + new Date().toISOString() +
     ' | model=' + model + ' | mode=' + mode +
+    (degradedFrom ? ' | modeDegraded=' + degradedFrom + '→' + effectiveMode : '') +
+    (continuation ? ' | deepHops=' + (deepHop + 1) : '') +
     ' | elapsedMs=' + elapsedMs + ' | ok=' + ok +
     ' | hash=' + simpleHash(question) +
     ' | quality=' + quality +
@@ -726,7 +875,9 @@ const handle = async (event) => {
     (latencyFlagged ? ' | latencyFlagged' : '') +
     ' | "This output is decision support, not a decision. MLRO review required."';
 
-  return resp(200, { ok, text, mode, model, elapsedMs, tippingOffFlagged,
+  return resp(200, { ok, text, mode, effectiveMode, modeDegraded: !!degradedFrom,
+    modeDegradedReason: degradedReason || null,
+    model, elapsedMs, tippingOffFlagged,
     piiFlagged, structureFlagged, budgetFlagged, latencyFlagged,
     hallFlagged, injectionFlagged, anomFlagged, quality, auditLine });
 };
@@ -739,6 +890,7 @@ exports.__internals = {
   SOUL_CHARTER, KNOWLEDGE_CONTEXT, TIPPING_OFF_PATTERNS, tippingOffGuard,
   PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
   hallucinationGuard, injectionGuard, anomalyGuard, qualityScore,
-  selectModel, simpleHash, buildKnowledgeContext,
+  selectModel, MODEL_BY_MODE, PLATFORM_CAP_MS, ABORT_BUDGET_MS, AFFORDABLE_TOKENS, DEEP_MIN_TOKENS, DEEP_HOP_LIMIT,
+  simpleHash, buildKnowledgeContext,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
 };
