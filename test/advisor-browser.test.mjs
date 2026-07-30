@@ -128,6 +128,26 @@ if (down.skipped) {
      anything but Balanced mode means the boot default drifted again. */
   check('the untouched page answers in Balanced mode (the documented default)',
     /Balanced mode/.test(fine.text) && !/Speed mode/.test(fine.text));
+
+  /* ── 4. A FAILED call must say why, on screen ─────────────────────────────
+     Reported live: the telemetry strip read "⚠ last call failed" and nothing
+     else, so the operator could not tell a dead API key from an upstream
+     outage and the incident came to a maintainer to decode. The backend had
+     already returned actionable text; the strip discarded it. Both halves are
+     browser-verified here rather than asserted: the answer pane must show the
+     backend's reason, and the telemetry strip must carry it too. */
+  const failed = await ask({
+    ok: false,
+    text: '[API error 401 — the ANTHROPIC_API_KEY in the Netlify environment is missing, invalid or revoked.'
+      + ' Rotate the key in Site configuration → Environment variables, then redeploy.]',
+    mode: 'balanced', model: 'claude-sonnet-5', elapsedMs: 362,
+  });
+  check('a failed call shows the status code on screen', /API error 401/.test(failed.text));
+  check('a failed call names the action, not just the code', /ANTHROPIC_API_KEY/.test(failed.text));
+  check('the telemetry strip still reports the failure', /last call failed/i.test(failed.text));
+  check('the telemetry strip carries the REASON, not just the warning',
+    /Rotate the key/i.test(failed.text));
+  check('a failed call renders without a JavaScript error', failed.errors.length === 0);
 }
 
 await browser.close();

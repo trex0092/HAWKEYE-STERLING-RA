@@ -199,6 +199,17 @@ function govStatsHtml(){
     + why;
 }
 
+/* The strip is a SIBLING of #hero, and answering only re-renders #hero — so the
+   live health panel kept showing the state from the last full render. A panel
+   that reports "healthy" (or nothing) immediately after a call has just failed
+   is worse than no panel: it is the failure being hidden by the thing whose job
+   is to surface it. Refresh it wherever a call is recorded. */
+function refreshGovStrip(){
+  const el = $('govStrip');
+  if(!el) return;
+  el.innerHTML = govStatsHtml();
+  applyCssText(el);
+}
 function persona(){ return PERSONAS.find(p=>p.id===state.personaId) || PERSONAS[0]; }
 function tone(t){
   if(t==='high') return {c:'#FF6B6B', bg:'rgba(255,87,87,0.10)',  bd:'rgba(255,87,87,0.45)'};
@@ -333,7 +344,7 @@ function renderAsk(){
     + '<div>'
     +   '<div data-csstext="margin-bottom:16px"><div class="sec-lbl" data-csstext="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'
     +   '<div id="hero" role="status" aria-live="polite">'+heroHtml()+'</div>'
-    +   govStatsHtml()
+    +   '<div id="govStrip">'+govStatsHtml()+'</div>'
     + '</div>'
     + '</div>';
   applyCssText($('main'));
@@ -426,6 +437,7 @@ function ask(){
     if(myAsk !== askSeq) return; // superseded by a newer ask() or reset()
     state.liveAnswer = answerFromResponse(data);
     try{ govRecord(data); }catch(e){}
+    try{ refreshGovStrip(); }catch(e){}
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
     bindHero();
@@ -434,6 +446,7 @@ function ask(){
     if(myAsk !== askSeq) return;
     state.liveAnswer = {ok: false, text: 'The brain is unavailable — ensure ANTHROPIC_API_KEY is set in Netlify environment variables and redeploy.'};
     try{ govRecord({ok:false}); }catch(e){}
+    try{ refreshGovStrip(); }catch(e){}
     state.phase = 'answer';
     $('hero').innerHTML = heroHtml(); applyCssText($('hero'));
     bindHero();
