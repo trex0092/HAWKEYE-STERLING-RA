@@ -2919,15 +2919,34 @@ def _individuals_union(struct_names, notes):
 # so the report can name them and the MLRO can fix the source record.
 CUSTOMER_ROWS_SKIPPED = []
 
+def _record_skipped_row(task, population):
+    """Record a screening-population row that carried no usable identity, for
+    EVERY population that feeds the same pipeline.
+
+    Employees are screened through this pipeline too, and the employee loop
+    originally dropped malformed rows with a bare `continue` — no record, no log
+    line — while the comment above it claimed "same guards". A staff member whose
+    Asana row lost its name simply vanished: not screened, not counted, not
+    reported, and the attestation's population total silently excluded them.
+    Same defect this list exists to prevent, one population over."""
+    missing = "gid" if not task.get("gid") else "name"
+    ident = task.get("permalink_url") or task.get("gid") or "<no identifier>"
+    CUSTOMER_ROWS_SKIPPED.append({
+        "gid": task.get("gid", ""), "permalink": task.get("permalink_url", ""),
+        "missing": missing, "population": population,
+    })
+    log(f"  ⚠ {population} row NOT screenable (missing {missing}): {ident}")
+
 def _skipped_rows_note():
-    """Attestation suffix for un-screenable customer rows — names the records so
-    the MLRO can fix them, rather than leaving a bare number to be read as noise."""
+    """Attestation suffix for un-screenable rows — names the records so the MLRO
+    can fix them, rather than leaving a bare number to be read as noise."""
     if not CUSTOMER_ROWS_SKIPPED:
-        return "          <- every customer record carried a name and an ID"
-    refs = ", ".join((r.get("permalink") or r.get("gid") or "<no identifier>")
-                     for r in CUSTOMER_ROWS_SKIPPED[:10])
+        return "          <- every customer and employee record carried a name and an ID"
+    refs = ", ".join(
+        f"{r.get('population', 'customer')}:{r.get('permalink') or r.get('gid') or '<no identifier>'}"
+        for r in CUSTOMER_ROWS_SKIPPED[:10])
     more = f" (+{len(CUSTOMER_ROWS_SKIPPED) - 10} more)" if len(CUSTOMER_ROWS_SKIPPED) > 10 else ""
-    return ("          <- MISSING name/ID in the Asana record: these customers were NOT "
+    return ("          <- MISSING name/ID in the Asana record: these subjects were NOT "
             f"screened by any net. Fix the record, then re-run.\n"
             f"                             {refs}{more}")
 
@@ -2949,13 +2968,7 @@ def get_all_customers():
             if not t.get("gid") or not t.get("name"):
                 # Keep the run alive (never crash the whole book on one bad row)
                 # but NEVER drop it silently — it is a customer we did not screen.
-                missing = "gid" if not t.get("gid") else "name"
-                ident = t.get("permalink_url") or t.get("gid") or "<no identifier>"
-                CUSTOMER_ROWS_SKIPPED.append({
-                    "gid": t.get("gid", ""), "permalink": t.get("permalink_url", ""),
-                    "missing": missing,
-                })
-                log(f"  ⚠ customer row NOT screenable (missing {missing}): {ident}")
+                _record_skipped_row(t, "customer")
                 continue
             notes = t.get("notes") or ""
             # Structured KYC (FATF R.10/R.25): DOB, nationality, ID, share %, role,
@@ -3022,6 +3035,10 @@ def get_all_customers():
             data = r.json() if isinstance(r.json(), dict) else {}
             for t in (data.get("data") or []):
                 if not t.get("gid") or not t.get("name"):
+                    # Same guard as the customer loop above — an employee row
+                    # without a usable identity is a person we did not screen,
+                    # and must never leave the run silently.
+                    _record_skipped_row(t, "employee")
                     continue
                 notes = t.get("notes") or ""
                 kyc_data = kyc.parse_customer(notes)
@@ -3513,14 +3530,42 @@ def screen_name(name, all_lists):
     return sorted(best.values(), key=lambda x: -x["score"])
 
 def _lost_script_letters(name):
-    """True when the name carries LETTERS that normalize() strips entirely —
-    Arabic/Cyrillic/CJK/Greek script, or unfoldable Latin like Ł/Æ. Their
-    content vanishes from the match key, so the fuzzy pass compares only the
-    Latin/digit residue. Diacritic Latin (Müller, İnönü) folds to A-Z and is
-    NOT flagged. NFD after upper() mirrors normalize()'s own pipeline."""
-    up = unicodedata.normalize("NFD", str(name or "").upper())
-    return any(unicodedata.category(c).startswith("L") and not ("A" <= c <= "Z")
-               for c in up)
+    """True when normalize() cannot reduce the name to a pure Latin match key —
+    its OUTPUT still carries non-A-Z letters (Arabic/Cyrillic/CJK/Greek). Those
+    names cannot be cross-matched against a Latin-spelled designation, so the
+    fuzzy pass would compare only the Latin/digit residue. Diacritic Latin
+    (Müller, İnönü) and folded Latin (Łukasz, Đorđević) reduce to A-Z and are
+    NOT flagged.
+
+    This asks the normaliser what it actually produced instead of predicting it
+    from the input. The old input-side test — uppercase, NFD, "is every letter
+    A-Z?" — was accurate only while the normaliser DELETED the unfoldable Latin
+    letters Ł Ø Đ Þ Æ Œ. Once those were given a real fold (Ł→L, Þ→TH, Æ→AE) the
+    input test still called them lost, so every Polish, Scandinavian, Balkan,
+    Vietnamese and Icelandic name raised a MANUAL REVIEW card alongside the
+    correct hit — alert fatigue on exactly the population the fold had just
+    made screenable.
+
+    Two tests, because there are two distinct ways a name resists auto-screening
+    and only ONE of them was fixed by the fold:
+
+      (a) normalize()'s OUTPUT still carries non-A-Z letters — the script was
+          preserved (Arabic, CJK), so there is no Latin key to compare at all.
+      (b) the INPUT carried non-Latin-script letters — Cyrillic, Greek. Those
+          ARE romanised into a Latin key, but romanisation is one convention
+          among several (Чайковский → Tchaikovski / Chaykovskiy / Tschaikowski),
+          so a designation spelled by another convention can still be missed.
+          The manual-review net stays for them.
+
+    A Latin letter that folds within Latin (Ł→L, Þ→TH) is neither: the fold is
+    deterministic and the customer's own ASCII spelling keys identically. Those
+    are the only names this predicate stopped flagging."""
+    if any(unicodedata.category(c).startswith("L") and not ("A" <= c <= "Z")
+           for c in normalize(name)):
+        return True
+    return any(unicodedata.category(c).startswith("L")
+               and not unicodedata.name(c, "").startswith("LATIN")
+               for c in str(name or ""))
 
 def _unscreenable(name):
     # A name that carries content but collapses to fewer than 4 matchable chars
@@ -3985,8 +4030,8 @@ RUN PROVENANCE
   Engine:             screen.py  (Google News RSS - no external paid feed)
 
 SCOPE & COVERAGE ATTESTATION
-  Customers in database:     {stats["customers_total"] + stats.get("customer_rows_skipped", 0)}
-  Customers screened:        {stats["customers_total"]}
+  Records in database:       {stats["customers_total"] + stats.get("customer_rows_skipped", 0)}  (customers + employees)
+  Records screened:          {stats["customers_total"]}
   Rows NOT screenable:       {stats.get("customer_rows_skipped", 0)}{_skipped_rows_note()}
   Companies screened:        {stats["companies_screened"]}
   Individuals screened:      {stats["individuals_screened"]}  (shareholders / UBOs / directors from KYC records)

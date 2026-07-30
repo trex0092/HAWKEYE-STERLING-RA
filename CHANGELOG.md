@@ -10,6 +10,136 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The manual-review net fired on names it had just learned to screen, and went quiet on names it had not (2026-07-30)
+
+`_lost_script_letters` decides whether a subject can be auto-screened at all. It
+predicted the answer from the **input** — uppercase, NFD, "is every letter
+A-Z?" — which was accurate only while the normaliser *deleted* the unfoldable
+Latin letters `Ł Ø Đ Þ Æ Œ`.
+
+Giving those letters a real fold (`Ł→L`, `Þ→TH`, `Æ→AE`) made the prediction
+wrong in both directions at once.
+
+**Over-firing.** A folded name keys to pure A-Z and screens correctly, but the
+input test still called its letters lost:
+
+```
+"Łukasz Nowak"  ->  LUKASZ NOWAK   hits OFAC "LUKASZ NOWAK" at 100
+                    ...and ALSO raised a MANUAL REVIEW card
+```
+
+Every Polish, Scandinavian, Balkan, Vietnamese and Icelandic name raised a
+manual-review card **alongside its correct hit** — alert fatigue on exactly the
+population the fold had just made screenable.
+
+**Under-firing.** In `scripts/daily-screen-run.py` the caveat was an `elif`, so
+any hit at all suppressed it. `screen.py` appends the manual-review finding and
+*then* the fuzzy hits, so a subject carries both — the delta run kept only one.
+A romanised name almost always has a hit:
+
+```
+"Сергей Иванов"  ->  SERGEY IVANOV  matches that spelling at 100
+                     row read as a clean scored match; the fact that the
+                     subject was never screened from its own script was lost
+```
+
+The predicate now asks the normaliser what it **actually produced**, with two
+tests, because there are two distinct ways a name resists screening:
+
+- the **output** still carries non-A-Z letters — the script was preserved
+  (Arabic, CJK), so there is no Latin key to compare at all;
+- the **input** carried non-Latin-script letters (Cyrillic, Greek). Those *are*
+  romanised into a Latin key, but romanisation is one convention among several
+  (Чайковский → Tchaikovski / Chaykovskiy / Tschaikowski), so a designation
+  spelled another way can still be missed. **The net stays for them.**
+
+A Latin letter that folds within Latin is neither, and is the *only* class that
+stopped being flagged. The delta run now computes the flag independently of the
+hits branch, a scored hit on a not-fully-screened name never routes straight to
+`CONFIRMED`, and the report prints a `⚠ NOT FULLY SCREENED` line on the row.
+
+Both engines were updated together and agree on **all 2,893** corpus strings
+(the JS mirror had the same stale input-side test). Benchmark unmoved: recall
+`119/121`, hard negatives `85/85`. Negative-controlled three ways — restoring
+the input-side predicate fails 8 checks, restoring the `elif` fails its wiring
+check, and reverting the JS mirror alone breaks cross-engine parity.
+
+### Employee rows that lost their name vanished from screening without a trace (2026-07-30)
+
+Employees are a screening population in their own right and run through the same
+pipeline as customers. The customer loop records any Asana row missing a name or
+a gid — such a row is a subject nobody screened, so it is logged, carried into
+`CUSTOMER_ROWS_SKIPPED`, added back into the attestation's population total, and
+named in the report so the MLRO can fix the source record.
+
+The employee loop dropped the same row with a bare `continue`. No record, no log
+line, no attestation — while the comment three lines above it read *"Same
+pipeline, same matcher, **same guards**, same delta state"*. A staff member whose
+Asana row lost its name simply disappeared: not screened, not counted, not
+reported, and the population total silently excluded them.
+
+Both populations now reach the recorder through **one** function,
+`_record_skipped_row(task, population)`, and each skipped row carries which
+population it came from so the attestation names it precisely. The attestation
+lines are relabelled `Records in database (customers + employees)` /
+`Records screened`, because employees were already inside that count while the
+label said "Customers".
+
+The test that should have caught this set `ASANA_EMPLOYEE_DB_GID = ""` to keep
+the customer path isolated — so the untested path was the broken one. It now
+drives **both** projects in a single call, and a structural check fails if any
+future population is added with its own quiet `continue`. Negative-controlled:
+restoring the bare `continue` fails 6 checks.
+
+Two instances of *"a guard exists but one path doesn't call it"* in two days.
+
+### The daily brief's 24h window silently skipped 8.37h of alerts in a month of clean runs (2026-07-30)
+
+The Daily Compliance Brief reported on a fixed `now − 24h` window. That assumes
+consecutive briefs are exactly 24h apart. They are not — GitHub delays cron by
+hours and the delay varies run to run, so the interval between briefs drifts
+either side of 24h.
+
+Measured over the **last 30 briefs — every one a successful run, none missed**:
+
+```
+gaps between consecutive briefs   29
+gaps longer than 24h              14   (max 25.93h)
+alert activity in no brief at all  8.37h
+```
+
+Every hour by which two briefs were more than 24h apart was a window whose
+alerts appeared in **no brief**, while the next brief still printed
+`✅ ALL CLEAR — no new monitoring alerts in the last 24h`. Counted as covered,
+actually uncovered, silent — the fourth instance of that pattern in this
+codebase. A single missed run would have added a full day on top of the 8.37h.
+
+The window is now **anchored to the previous brief's own creation time**, so
+coverage is contiguous by construction: jitter and missed runs are absorbed by
+the next brief instead of falling through it, and an alert on the boundary is
+reported twice rather than not at all. The header states the real span
+("last 26h (since the previous brief)") rather than a nominal 24h.
+
+Two ways the anchor can be unavailable, both of which now **say so** instead of
+presenting an assumed window as a measured one:
+
+- **No previous brief found** — the genuine first run, or missing history. The
+  brief notes that coverage before the window is unconfirmed.
+- **Previous brief older than the 168h ceiling** — the brief leads with a
+  `⚠ COVERAGE GAP` naming the uncovered span and directing the reader to Asana.
+
+Pinned by 14 new checks, including the measured 30-run schedule replayed
+end-to-end asserting no instant falls outside every window — plus a companion
+check that the same schedule genuinely defeats a fixed 24h cutoff, so the test
+corpus cannot quietly stop exercising the defect. Both directions
+negative-controlled: reverting the anchoring fails 7 checks, suppressing the
+coverage-gap notice fails its own.
+
+`weekly-summary.mjs` was checked for the same defect and does **not** have it:
+its window is calendar-day granular and its cron cannot slip past midnight, so
+jitter is harmless, and a missed week shows as a visible date jump between two
+cards rather than a hidden sub-day hole between consecutive dates.
+
 ### Cross-engine parity is now swept over 206 pairs, not spot-checked over 15 (2026-07-30)
 
 The parity test checked **15 curated pairs** and counted a MANUAL REVIEW

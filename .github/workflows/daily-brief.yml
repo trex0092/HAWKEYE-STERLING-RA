@@ -1,11 +1,17 @@
 name: Daily Compliance Brief
 
-# One consolidated Asana task each morning that rolls up the last 24h of
-# monitoring (FATF, sanctions list changes, customer-screening hits, regulatory
-# changes, site/function health) plus the current standing posture. It always
-# files — "all clear" on a quiet day — so there is a daily record that monitoring
-# ran. Runs after the daily watchers (sanctions 05:00/06:00, FATF/regulatory
-# 06:00) so it captures the day's alerts. Needs the ASANA_ACCESS_TOKEN secret.
+# One consolidated Asana task each morning that rolls up monitoring since the
+# previous brief (FATF, sanctions list changes, customer-screening hits,
+# regulatory changes, site/function health) plus the current standing posture. It
+# always files — "all clear" on a quiet day — so there is a daily record that
+# monitoring ran. Runs after the daily watchers (sanctions 05:00/06:00,
+# FATF/regulatory 06:00) so it captures the day's alerts.
+#
+# The reported window is anchored to the previous brief, NOT a fixed 24h: this
+# cron is routinely delayed by hours and the delay varies, so consecutive briefs
+# land 22.5–26h apart. A fixed 24h lookback dropped every hour past 24 into a
+# window no brief reported on. Do not reintroduce one here.
+# Needs the ASANA_ACCESS_TOKEN secret.
 on:
   schedule:
     - cron: '9 7 * * *' # 07:09 UTC daily (11:09 UAE), after the daily watchers; odd minute — top-of-hour crons are GitHub's most-delayed slot
