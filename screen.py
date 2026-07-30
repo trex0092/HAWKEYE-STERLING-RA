@@ -4142,6 +4142,29 @@ def crosscheck_eocn(local_names, mirror_names):
             missing.append(n)
     return sorted(missing)
 
+def eocn_uncomparable(mirror_names):
+    """Mirror designations that could not be COMPARED at all, because normalize()
+    strips them to nothing (a wholly non-Latin name — Arabic is the common case
+    on this list).
+
+    crosscheck_eocn skips these: its `if ks` guard means an empty key is never
+    reported as missing. That silence is the dangerous part. The reconciler
+    writes "No divergence — the local list already covers every mirror
+    designation" whenever crosscheck returns [], and an MLRO signs the weekly
+    review on that sentence — while an unknown number of designations were never
+    actually compared. On the UAE Local Terrorist List that is a TFS freeze
+    duty, so "not compared" must never read as "covered".
+
+    Reported separately rather than folded into `missing`: these names cannot be
+    matched by the current Latin-only matcher either, so auto-appending them
+    would grow the file with entries that can never screen. They need a human to
+    transliterate against the official EOCN publication."""
+    out = []
+    for n in mirror_names or ():
+        if not normalize(n):
+            out.append(n)
+    return sorted(out)
+
 def _mirror_fallback(names, dataset, label):
     """When an official core-list endpoint yields nothing (unreachable, refused
     redirect, garbled payload), fall back to its OpenSanctions mirror — same
@@ -4439,13 +4462,25 @@ def load_all_lists():
     # and the "screened vs N list names" audit line stay exact.
     eocn_mirror_names, eocn_mirror_meta = load_eocn_mirror()
     missing_locally = crosscheck_eocn(eocn_names, eocn_mirror_names)
+    uncomparable = eocn_uncomparable(eocn_mirror_names)
     list_meta["eocn"]["mirror"] = eocn_mirror_meta
     list_meta["eocn"]["crosscheck_missing"] = missing_locally
+    list_meta["eocn"]["crosscheck_uncomparable"] = uncomparable
     if missing_locally:
         shown = ", ".join(missing_locally[:5]) + (f" +{len(missing_locally)-5} more"
                                                   if len(missing_locally) > 5 else "")
         log(f"  EOCN CROSS-CHECK ALARM: {len(missing_locally)} mirror designation(s) "
             f"not in the local list: {shown}")
+    # A designation the cross-check could not even compare is NOT evidence of
+    # coverage. Silence here is what let "no divergence" be written into a
+    # signed MLRO review while these were never looked at.
+    if uncomparable:
+        shown = ", ".join(uncomparable[:5]) + (f" +{len(uncomparable)-5} more"
+                                               if len(uncomparable) > 5 else "")
+        log(f"  EOCN CROSS-CHECK GAP: {len(uncomparable)} mirror designation(s) could not be "
+            f"compared (non-Latin script — the matcher normalises to Latin); these are NOT "
+            f"confirmed present locally and need transliteration against the official EOCN "
+            f"publication: {shown}")
     # Fail-safe: if EVERY core sanctions list failed to load, screening would clear
     # every customer for sanctions and post a green ✅. Abort instead — a total
     # list-fetch failure must never masquerade as "all clear".

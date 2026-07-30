@@ -1260,6 +1260,33 @@ check("local-only names are never flagged (curated file is authoritative)",
       screen.crosscheck_eocn(["ONLY LOCAL PERSON"], []) == [])
 check("empty inputs are safe", screen.crosscheck_eocn([], []) == [])
 
+# A mirror designation the cross-check cannot COMPARE is not evidence of
+# coverage. normalize() strips a wholly non-Latin name to '', and
+# crosscheck_eocn's `if ks` guard then skips it — so it is never reported as
+# missing. The reconciler wrote "No divergence — the local list already covers
+# every mirror designation" whenever crosscheck returned [], and an MLRO signed
+# the weekly TFS review on that sentence while those names were never looked at.
+_ar = ["\u062a\u0646\u0638\u064a\u0645 \u0627\u0644\u0642\u0627\u0639\u062f\u0629",
+       "\u0645\u0646\u0638\u0645\u0629 \u0625\u0631\u0647\u0627\u0628\u064a\u0629"]
+check("a wholly non-Latin mirror name normalises to nothing (the mechanism)",
+      screen.normalize(_ar[0]) == "")
+check("crosscheck still cannot report it missing (documented, not fixed there)",
+      screen.crosscheck_eocn(["LOCAL PERSON"], _ar) == [])
+check("eocn_uncomparable surfaces exactly those names instead of dropping them",
+      screen.eocn_uncomparable(_ar) == sorted(_ar))
+check("a comparable-but-absent designation is STILL reported as missing",
+      screen.crosscheck_eocn(["LOCAL PERSON"], _ar + ["NEW LATIN GROUP"]) == ["NEW LATIN GROUP"])
+check("an all-Latin mirror raises no uncomparable false alarm",
+      screen.eocn_uncomparable(["AL QAEDA (AQ)", "BOKO HARAM"]) == [])
+check("uncomparable handles empty and None safely",
+      screen.eocn_uncomparable([]) == [] and screen.eocn_uncomparable(None) == [])
+# WIRING: the daily run must record and log the gap, not just compute it.
+_src_eocn_gap = _inspect.getsource(screen)
+check("the daily run records the uncomparable set in list_meta",
+      'list_meta["eocn"]["crosscheck_uncomparable"]' in _src_eocn_gap)
+check("the daily run logs an explicit CROSS-CHECK GAP line",
+      "EOCN CROSS-CHECK GAP" in _src_eocn_gap)
+
 _dl_eocn = []
 screen.download = lambda url, label: (_dl_eocn.append(url) or _SIMPLE)
 _mn, _mm = screen.load_eocn_mirror()

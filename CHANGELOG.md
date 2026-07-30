@@ -10,6 +10,36 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### "Not compared" was being reported as "covered" on a TFS freeze list (2026-07-30)
+
+The weekly EOCN reconciliation cross-checks the curated UAE Local Terrorist List
+against the OpenSanctions `ae_local_terrorists` mirror, and writes the result
+into `lastReviewedEvidence` — the sentence an MLRO signs when merging the review.
+
+`crosscheck_eocn` matches on `normalize()`, which strips a wholly non-Latin name
+to `""`. Its `if ks` guard then **skips** such a name entirely, so it can never
+be reported as missing. Whenever the comparable names all matched, the reconciler
+wrote:
+
+> "No divergence — the local list already covers every mirror designation."
+
+That sentence was not established. An unknown number of designations had never
+been compared at all. Reproduced: two Arabic-script designations genuinely absent
+from the local list produced `crosscheck_eocn(...) == []`. On the UAE Local
+Terrorist List this is a **freeze duty**, so "not compared" must never read as
+"covered".
+
+`eocn_uncomparable()` now surfaces exactly those names. They are reported
+*separately*, not folded into `missing` and not auto-appended: the Latin-only
+matcher could not screen them either, so appending would grow the file with
+entries that can never match — they need a human transliteration against the
+official EOCN publication. The daily run records them in
+`list_meta["eocn"]["crosscheck_uncomparable"]` and logs an explicit
+`EOCN CROSS-CHECK GAP` line, and the reconciler's evidence note now says
+"No divergence among the COMPARABLE designations" plus a named NOT COMPARED
+list, instead of claiming full coverage.
+
+
 ### Law-change cards were filed correctly and still never seen (2026-07-29)
 
 PR #305 ("Route every pipeline Asana delivery to HAWKEYE STERLING APP", merged
