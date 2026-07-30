@@ -10,6 +10,44 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Cross-engine parity is now swept over 206 pairs, not spot-checked over 15 (2026-07-30)
+
+The parity test checked **15 curated pairs** and counted a MANUAL REVIEW
+routing as "reached by the JS engine". Both loosenesses were deliberate, but
+together they let a real recall gap hide: the case engine could **CLEAR a
+subject the daily screen flags**, and nothing failed.
+
+Sweeping every pair the screening benchmark already maintains — 121 recall +
+85 hard negatives — with a strict criterion (a genuine list hit, not a
+manual-review referral) found **two live divergences**:
+
+```
+r099  "Tchaikovski Andrei" vs "Chaykovskiy Andrey"   screen.py 88.9  JS 83
+r120  "Achraf Ganouchi"    vs "Ashraf Ghannouchi"    screen.py 87.5  JS 82
+```
+
+Both are transliteration variants, and both are **scoring** differences rather
+than wiring gaps — the JS phonetic mode makes no difference to either. Closing
+them means tuning JS similarity, which trades directly against the 85 hard
+negatives, so they are **recorded rather than silently fixed**: each is
+allowlisted individually with its measured scores and the reason.
+
+The allowlist is self-policing. A second check fails if an allowlisted
+divergence starts passing, so it must shrink and cannot rot into a blanket
+exemption. Both directions are negative-controlled.
+
+A third entry, `n030`, is a hard negative where `screen.py` hits at 88 — a known
+budgeted false positive already recorded in the benchmark. JS declining to
+follow makes JS *more* correct there, so that divergence is in the safe
+direction and is documented as such.
+
+Method note: the first version of this sweep reported 19 Python misses, which
+contradicted the benchmark's 119/121 recall. The harness was wrong — it applied
+a `score >= 85` filter on top of `screen_name`, which already applies its own
+gates, so legitimate hits were being discarded. Corrected before any of it was
+reported as a finding.
+
+
 ### The two matchers now key every name identically — enforced by test (2026-07-30)
 
 Three cross-engine divergences have reached production over this project's life

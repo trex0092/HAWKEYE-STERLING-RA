@@ -45,7 +45,7 @@ import { spawnSync } from 'node:child_process'; // nosemgrep: hawkeye-no-child-p
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import {
-  normalizeName, sigTokens, lostScriptLetters, buildIndex, screenName
+  normalizeName, sigTokens, lostScriptLetters, buildIndex, screenName, MANUAL_REVIEW_LIST
 } from '../scripts/sanctions-match.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -163,6 +163,65 @@ check(
   pairDiffs.length === 0,
   pairDiffs.join('\n      ')
 );
+
+/* ── 4b. FULL-CORPUS sweep, strict criterion ─────────────────────────────────
+   Section 4 checks 15 curated pairs and counts a MANUAL REVIEW routing as
+   "reached by the JS engine". Both looseness's are deliberate there, but they
+   mean a real recall gap can hide: the case engine can CLEAR a subject the
+   daily screen flags, and nothing fails.
+
+   This sweeps every pair the screening benchmark already maintains (121 recall
+   + 85 hard negatives) and requires a genuine list hit on the JS side — not a
+   manual-review referral. Divergences are allowlisted individually, WITH the
+   measured scores, so the gap is bounded and visible rather than unknown. The
+   allowlist is self-policing: if an entry starts passing it must be removed,
+   so it cannot quietly rot into a blanket exemption. */
+const benchPairs = [
+  ...JSON.parse(readFileSync(join(ROOT, 'test/fixtures/screening-benchmark/recall-pairs.json'), 'utf8')).pairs
+    .map((p) => ({ ...p, kind: 'recall' })),
+  ...(() => {
+    const raw = JSON.parse(readFileSync(join(ROOT, 'test/fixtures/screening-benchmark/hard-negatives.json'), 'utf8'));
+    return (Array.isArray(raw) ? raw : raw.pairs || []).map((p) => ({ ...p, kind: 'hard-negative' }));
+  })(),
+].filter((p) => p.subject && p.listed);
+
+/* id -> why this divergence is tolerated. Each was measured, not assumed. */
+const KNOWN_DIVERGENCES = {
+  r099: 'transliteration variant "Tchaikovski Andrei" vs "Chaykovskiy Andrey": screen.py 88.9 (MODERATE), JS 83 — below its 85 gate. Scoring difference, not a wiring gap; the JS phonetic mode does not change it. Closing it means tuning JS similarity, which trades against the 85 hard negatives.',
+  r120: 'transliteration variant "Achraf Ganouchi" vs "Ashraf Ghannouchi": screen.py 87.5 (MODERATE), JS 82. Same class as r099.',
+  n030: 'HARD NEGATIVE. screen.py hits at 88 — a known, budgeted false positive already recorded in the benchmark. JS declining to follow is JS being MORE correct, so this divergence is in the safe direction.',
+};
+
+const benchProbe = spawnSync(
+  process.env.PYTHON || 'python3',
+  [join(ROOT, 'scripts/matcher-parity-probe.py')],
+  { input: JSON.stringify({ names: [], pairs: benchPairs.map((p) => ({ subject: p.subject, listed: p.listed })) }),
+    encoding: 'utf8', cwd: ROOT },
+);
+const benchPy = benchProbe.status === 0 ? JSON.parse(benchProbe.stdout) : null;
+check('the benchmark-corpus probe ran', Boolean(benchPy),
+  (benchProbe.stderr || '').slice(0, 300));
+
+if (benchPy) {
+  const unexpected = [], staleAllow = [];
+  benchPairs.forEach((pair, i) => {
+    if (!benchPy.pairs[i].hit) return;            // screen.py did not hit: nothing to require
+    const idx = buildIndex([{ id: 'p', name: 'PARITY', names: [pair.listed] }]);
+    const r = screenName(pair.subject, idx, 85);
+    const jsHit = (r.lists || []).some((x) => x.list !== MANUAL_REVIEW_LIST);
+    const allowed = Object.prototype.hasOwnProperty.call(KNOWN_DIVERGENCES, pair.id);
+    if (!jsHit && !allowed) {
+      unexpected.push(`${pair.id} [${pair.kind}] ${JSON.stringify(pair.subject)} vs ${JSON.stringify(pair.listed)}: screen.py HIT (${benchPy.pairs[i].score}) but JS ${r.topScore || 0} — no list hit`);
+    }
+    if (jsHit && allowed) staleAllow.push(pair.id);
+  });
+  const pyHits = benchPy.pairs.filter((p) => p.hit).length;
+  check(`every screen.py hit across the FULL benchmark corpus reaches the JS engine (${pyHits}/${benchPairs.length} py hits, ${Object.keys(KNOWN_DIVERGENCES).length} allowlisted)`,
+    unexpected.length === 0, unexpected.join('\n      '));
+  check('no allowlisted divergence has silently started passing (the allowlist must shrink, never rot)',
+    staleAllow.length === 0,
+    `${staleAllow.join(', ')} now pass — remove them from KNOWN_DIVERGENCES`);
+}
 
 /* ── 5. the corpus itself must keep covering both regression classes ─────── */
 check(
