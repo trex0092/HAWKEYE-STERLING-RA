@@ -61,11 +61,17 @@ jobs:
         with:
           disable-sudo: true
           # Build hooks live on api.netlify.com; the publish check reads the
-          # live site. Nothing else is contacted.
+          # live site. The GitHub/nodejs.org endpoints are the checkout and the
+          # Node toolchain the publish check runs on. Nothing else is contacted.
           egress-policy: block
           allowed-endpoints: >
             api.netlify.com:443
             hawkeye-sterling-ra.netlify.app:443
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
 
       - name: Trigger Netlify production build via build hook
         id: kick
@@ -108,7 +114,17 @@ jobs:
               echo "Probed and empty: NETLIFY_BUILD_HOOK_URL and common variants (NETLIFY_BUILD_HOOK, NETLIFY_BUILDHOOK_URL, NETLIFY_HOOK_URL, BUILD_HOOK_URL, NETLIFY_WEBHOOK_URL), plus the Variables tab."
               echo "Remaining causes: saved under an ENVIRONMENT (this workflow binds none — re-save as a Repository secret), saved on a different repository, or never saved on the GitHub side at all."
               if [ "$EVENT" = "push" ]; then
-                echo "::warning::NETLIFY_BUILD_HOOK_URL secret not set — skipping (push firing)."
+                # Deliberately non-fatal so ordinary merges are not blocked by a
+                # one-time setup step nobody can perform from CI — but the
+                # warning must name the CONSEQUENCE, not just the missing
+                # secret. Netlify's own Git integration has not published a
+                # production deploy from a push since 27 Jun (no Netlify
+                # check-run appears on any main commit), so with this secret
+                # absent there is NO path from a merge to the live site at all.
+                # Site Currency (08:07 UTC daily) is the alarm that this has
+                # happened; it went undetected for a month because it was
+                # comparing a hand-maintained version string instead of content.
+                echo "::warning::NETLIFY_BUILD_HOOK_URL is not set, so THIS MERGE IS NOT DEPLOYED — it is on main but not on the live site, and Netlify's Git integration has not published a push-triggered production build since 27 Jun. Set the secret (see the header of this workflow) or re-link the repository in Netlify."
                 echo "kicked=false" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
@@ -124,21 +140,46 @@ jobs:
           fi
           echo "kicked=true" >> "$GITHUB_OUTPUT"
 
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.kick.outputs.kicked == 'true'
+        with:
+          persist-credentials: false
+          fetch-depth: 0   # site-currency.mjs dates each divergent asset
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.kick.outputs.kicked == 'true'
+        with:
+          node-version-file: .nvmrc
+
       - name: Wait for the publish to reach the live site
         if: steps.kick.outputs.kicked == 'true'
+        env:
+          LIVE_ORIGIN: https://hawkeye-sterling-ra.netlify.app
+          GRACE_SECONDS: '0'   # this step exists to confirm THIS commit published; no lag allowance
         run: |
           set -u
-          # The 27 Jun bundle predates the app.js split, so the first modern
-          # publish is unambiguous: /app.js starts serving an APP_VERSION.
-          # Poll up to 10 minutes (a no-build static publish takes ~1-2).
+          # This step used to succeed as soon as /app.js served ANY APP_VERSION.
+          # That was a valid signal exactly once — while the live site still
+          # carried the pre-app.js-split 27 Jun bundle, its appearance meant a
+          # modern publish had landed. After the first modern publish the
+          # condition became permanently true, so the step would have reported
+          # "PUBLISHED" within seconds even if the build hook had done nothing
+          # at all. On 30 Jul that was the live state: production was serving a
+          # 31-commit-old build that DOES contain an APP_VERSION.
+          #
+          # It now verifies the only thing worth verifying — that the site
+          # serves the bytes of the commit being deployed. Poll up to 10
+          # minutes (a no-build static publish takes ~1-2).
           for i in $(seq 1 30); do
-            live=$(curl -sSL "https://hawkeye-sterling-ra.netlify.app/app.js" | grep -oE "APP_VERSION = '[0-9.]+'" | head -1 || true)
-            if [ -n "$live" ]; then
-              echo "PUBLISHED: live site now serves $live"
+            # --quiet: an expected "not yet" poll must not file a red annotation
+            # on a step that is about to succeed.
+            if node scripts/site-currency.mjs --quiet > /tmp/currency.txt 2>&1; then
+              echo "PUBLISHED: the live site now serves this commit."
               exit 0
             fi
             echo "  not published yet (check $i/30) — waiting 20s"
             sleep 20
           done
-          echo "::error::Build was triggered but the live site still serves the pre-split bundle after 10 minutes — check the deploy log in the Netlify UI (app.netlify.com/projects/hawkeye-sterling-ra/deploys)."
+          cat /tmp/currency.txt
+          echo "::error::Build was triggered but after 10 minutes the live site still does not serve this commit's assets (see the divergences listed above) — check the deploy log in the Netlify UI (app.netlify.com/projects/hawkeye-sterling-ra/deploys)."
           exit 1
