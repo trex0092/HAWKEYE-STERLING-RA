@@ -1961,6 +1961,38 @@ screen.WATCHLIST_UNSCREENABLE.clear()
 # for it either. The report line was its ONLY surface, replaced by "+N more
 # similar candidates", which reads as more of the same. #351 handled a real
 # subject with 73 candidates, so >10 is not hypothetical.
+# ── Stroke letters and ligatures must fold to ASCII, not vanish ──────────────
+# Ł Ø Đ Þ Æ Œ have no NFD decomposition, so the [^A-Z0-9 ] strip DELETED them:
+# "Łukasz Nowak" keyed as UKASZ NOWAK and "Đorđević" as OR EVIC. The customer
+# record almost always carries the plain ASCII spelling ("Lukasz Nowak" ->
+# LUKASZ NOWAK), so designation and customer keyed differently and could never
+# match. Same class as the Turkish ı and German ß folds, for the letters they
+# missed. NOTE this DOES move keys — deliberately, because the old ones were
+# lossy — so it is not covered by the additive-only fallback property.
+print("screen — stroke/ligature letters fold to ASCII instead of vanishing")
+for _raw, _want in [("\u0141ukasz Nowak", "LUKASZ NOWAK"), ("\u0110or\u0111evi\u0107", "DORDEVIC"),
+                    ("\u00d8STERGAARD A/S", "OSTERGAARD A S"), ("\u00de\u00f3r", "THOR"),
+                    ("\u00c6thelred Holdings", "AETHELRED HOLDINGS"), ("\u0152uvre", "OEUVRE")]:
+    check("%s folds to %s (letter kept, not dropped)" % (_raw, _want),
+          screen.normalize(_raw) == _want)
+check("the ASCII spelling a customer record carries now MATCHES the designation",
+      screen.normalize("Lukasz Nowak") == screen.normalize("\u0141ukasz Nowak"))
+_sl = {"OFAC SDN": [(screen.normalize("\u0141UKASZ NOWAK"), "\u0141UKASZ NOWAK")]}
+check("an ASCII-spelled customer hits a stroke-letter designation at 100",
+      len(screen.screen_name("Lukasz Nowak", _sl)) == 1
+      and screen.screen_name("Lukasz Nowak", _sl)[0]["score"] == 100)
+
+# ── Cyrillic й / ё must romanize the same way in BOTH engines ────────────────
+# They are PRECOMPOSED (и+breve, е+diaeresis). The JS engine ran NFKD +
+# mark-strip BEFORE its Cyrillic table, turning them into и/е, so it produced
+# "sergei"/"elka" while screen.py produced "sergey"/"yelka" — the spellings OFAC
+# and the EU actually publish. Introduced with the Cyrillic fold and missed
+# because the names checked at the time contained neither letter.
+check("cyrillic short-i romanizes to Y (the published spelling), not I",
+      screen.normalize("\u0421\u0435\u0440\u0433\u0435\u0439") == "SERGEY")
+check("cyrillic yo romanizes to YE, not E",
+      screen.normalize("\u0401\u043b\u043a\u0430") == "YELKA")
+
 print("screen — the unscreenable marker outranks the top-10 candidate cut")
 import datetime as _dt_mr   # _dtmod is imported further down this file, not yet in scope
 _mr_hit = screen._manual_review_hit("ENTITY", "شركة الأمل", False)

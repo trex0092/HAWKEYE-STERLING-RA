@@ -25,8 +25,25 @@ import { readFileSync } from 'node:fs';
    sanctions-screen.mjs re-exports this. */
 export function normalizeName(s) {
   return String(s == null ? '' : s)
+    /* BEFORE NFKD — й and ё are PRECOMPOSED (и+breve, е+diaeresis), so the
+       mark-strip below turns them into и/е and the Cyrillic table then renders
+       "Сергей" as "sergei" and "Ёлка" as "elka". screen.py romanizes on the
+       composed form and produces "sergey"/"yelka", the spellings OFAC and the
+       EU actually publish. That divergence was introduced with the Cyrillic
+       fold and missed because the seven names I checked contained neither
+       letter — a cross-engine key mismatch on two of the commonest Russian
+       characters. Map them first, matching screen.py. */
+    .replace(/[йЙ]/g, 'y').replace(/[ёЁ]/g, 'ye').replace(/[їЇ]/g, 'yi')
     .normalize('NFKD').replace(/\p{M}+/gu, '')
     .toLowerCase()
+    /* Stroke letters and ligatures have no NFKD decomposition, so they survive
+       here as themselves while screen.py folds them to ASCII (Ł→L, Ø→O, Đ→D…).
+       The customer record usually carries the plain ASCII spelling, so without
+       this fold "łukasz" never meets "lukasz". Same class as the ı and ß folds
+       below, for the letters those missed. Strictly widening. */
+    .replace(/ł/g, 'l').replace(/ø/g, 'o').replace(/[đð]/g, 'd')
+    .replace(/þ/g, 'th').replace(/æ/g, 'ae').replace(/œ/g, 'oe')
+    .replace(/ħ/g, 'h').replace(/ŧ/g, 't').replace(/ə/g, 'e').replace(/ŋ/g, 'ng')
     /* Turkish dotless ı has no NFKD decomposition and is NOT folded by
        lowercasing, so "Kılıç" and "Kilic" normalized to different strings and
        an ı-spelled subject could sit a phantom 2 edits from its own name —

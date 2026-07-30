@@ -10,6 +10,50 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Stroke letters were being deleted from names, not folded (2026-07-30)
+
+Found by running the two matchers over the same 1,645-name corpus and diffing
+their keys — the method the repo's own comments credit for the Turkish `ı` and
+German `ß` fixes ("found by comparing the two engines rather than by
+reasoning"). It surfaced **19 divergences**.
+
+**Ł Ø Đ Þ Æ Œ have no NFD decomposition**, so `[^A-Z0-9 ]` deleted them outright:
+
+```
+"Łukasz Nowak"   ->  UKASZ NOWAK
+"Đorđević"       ->  OR EVIC
+"ØSTERGAARD A/S" ->  STERGAARD A S
+"Æthelred"       ->  THELRED
+```
+
+A customer record almost always carries the plain ASCII spelling — "Lukasz
+Nowak" → `LUKASZ NOWAK` — so the designation and the customer keyed differently
+and **could never match**. Exactly the class already fixed twice, for the letters
+those fixes missed. Both engines now fold them to ASCII.
+
+**This DOES move existing keys**, deliberately, because the old ones were lossy.
+Names containing these letters get a new delta-state fingerprint and will
+re-alert once. The additive-only property is therefore rescoped to what remains
+exactly true: the non-Latin *fallback* (romanization, then script preservation)
+never moves a key the Latin pipeline already produced.
+
+### Cyrillic й / ё keyed differently in the two engines (regression, same day)
+
+Introduced with the Cyrillic romanization earlier today. `й` and `ё` are
+**precomposed** (и+breve, е+diaeresis), and the JS engine ran `NFKD` +
+mark-strip *before* its Cyrillic table — so they arrived as `и`/`е` and produced
+`sergei`/`elka`, while `screen.py` romanized the composed form to `sergey`/
+`yelka`, the spellings OFAC and the EU publish. Two of the commonest Russian
+characters, keyed differently across engines.
+
+It was missed because the seven names verified at the time contained neither
+letter. The JS engine now maps them before `NFKD`, and cross-engine agreement is
+pinned per-character rather than by spot-checking names.
+
+Divergences down from 19 to 9; the remainder are compatibility-form differences
+(`²`, `½`, Roman numerals, fullwidth) and mixed-script names, tracked separately.
+
+
 ### Arabic and CJK designations are now matchable; alert streams reach the MLRO queue (2026-07-30)
 
 **Arabic/CJK — script preservation, not transliteration.** The JS case engine

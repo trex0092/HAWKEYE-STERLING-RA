@@ -324,11 +324,21 @@ def prop_romanization_never_moves_an_existing_key():
     import unicodedata as _ud, re as _re
 
     def original(name):
+        """The LATIN pipeline as it stands, independently re-derived.
+
+        It includes the stroke/ligature fold (Ł→L, Ø→O, Đ→D…). That fold is a
+        DELIBERATE key move — it repairs keys that silently dropped a letter
+        ("Łukasz Nowak" used to key as UKASZ NOWAK) — so it belongs to the
+        reference pipeline, not to the thing under test. What this property
+        guards is narrower and still exactly true: the non-Latin FALLBACK
+        (romanization, then script preservation) must never move a key the
+        Latin pipeline already produced."""
         if not name:
             return ""
         n = name.upper()
         n = _ud.normalize("NFD", n)
         n = "".join(c for c in n if _ud.category(c) != "Mn")
+        n = "".join(screen._LATIN_STROKE_FOLD.get(c, c) for c in n)
         n = _re.sub(r"[^A-Z0-9 ]", " ", n)
         return _re.sub(r"\s+", " ", n).strip()
 
@@ -356,7 +366,7 @@ check("match blocking stays result-identical with a LOWERED short-entry threshol
 check("the measured lowered-threshold divergences stay fixed (deterministic pairs)",
       prop_blocking_equivalence_known_sensitive_pairs)
 check("match blocking stays result-identical after in-place list growth", prop_blocking_survives_inplace_list_growth)
-check("romanization is additive-only — it never moves an existing normalize() key",
+check("the non-Latin fallback is additive-only — it never moves a Latin key",
       prop_romanization_never_moves_an_existing_key)
 
 print("\n%d passed, %d failed" % (passed, failed))

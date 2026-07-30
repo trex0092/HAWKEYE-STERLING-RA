@@ -894,11 +894,28 @@ def romanize(name):
         out.append(_CYRILLIC_ROMAN[ch] if ch in _CYRILLIC_ROMAN else ch)
     return "".join(out)
 
+# Latin letters with a STROKE or a ligature have no NFD decomposition, so the
+# [^A-Z0-9 ] strip below deletes them outright: "Łukasz Nowak" became
+# "UKASZ NOWAK" and "Đorđević" became "OR EVIC". The customer record almost
+# always carries the plain ASCII spelling ("Lukasz Nowak"), which normalizes to
+# LUKASZ NOWAK — so the designation and the customer keyed differently and the
+# pair could never match. Exactly the class already fixed for Turkish ı and
+# German ß, for the letters those fixes missed. Folding is strictly widening:
+# pairs that matched before still match.
+_LATIN_STROKE_FOLD = {
+    "Ł": "L", "Ø": "O", "Đ": "D", "Ð": "D", "Þ": "TH", "Æ": "AE", "Œ": "OE",
+    "Ħ": "H", "Ŧ": "T", "Ə": "E", "Ɖ": "D", "Ɔ": "O", "Ŋ": "NG", "ẞ": "SS",
+    "ı": "I", "ß": "SS",
+}
+
 def _normalize_latin(name):
-    """The original Latin-only pipeline, unchanged."""
+    """The Latin pipeline: uppercase, strip combining marks, fold stroke letters
+    and ligatures to ASCII, then keep only [A-Z0-9 ]."""
     name = name.upper()
     name = unicodedata.normalize("NFD", name)
     name = "".join(c for c in name if unicodedata.category(c) != "Mn")
+    # After upper()+NFD: fold what NFD cannot decompose, before the strip.
+    name = "".join(_LATIN_STROKE_FOLD.get(c, c) for c in name)
     name = re.sub(r"[^A-Z0-9 ]", " ", name)
     name = re.sub(r"\s+", " ", name).strip()
     return name
