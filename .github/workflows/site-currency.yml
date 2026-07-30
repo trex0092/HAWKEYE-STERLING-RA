@@ -67,13 +67,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0   # git log dates each divergent asset for the grace window
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
 
       - name: Compare every served asset with main
+        env:
+          # Dates the divergent assets over the commits API (the probe never
+          # shells out to git). Unauthenticated calls share the runner's IP
+          # rate limit; without a token a limited call returns NaN and the
+          # divergence is treated as drift rather than excused as lag — safe,
+          # but noisier than it needs to be.
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/site-currency.mjs
 
       - name: Alert in Asana on production drift

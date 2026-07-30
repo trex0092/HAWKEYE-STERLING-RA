@@ -48,7 +48,6 @@
  */
 
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -115,21 +114,52 @@ export function decide(results, { graceSeconds = 86400, now = Math.floor(Date.no
     stale,
     unreadable: [],
     reason:
-      `${stale.length} asset(s) diverge from main, the oldest for ${oldest}s ` +
-      `(> ${graceSeconds}s grace) — production deploys are not publishing`,
+      `${stale.length} asset(s) diverge from main, ` +
+      (Number.isFinite(oldest)
+        ? `the oldest for ${oldest}s (> ${graceSeconds}s grace)`
+        : 'at least one of them undatable so none can be excused as deploy lag') +
+      ' — production deploys are not publishing',
   };
 }
 
-function lastChangedAt(name) {
+/**
+ * Unix seconds of the asset's most recent commit on the deploy branch, used
+ * only to tell deploy lag from real drift.
+ *
+ * Read over the API rather than by shelling out to `git log`: the
+ * hawkeye-no-child-process rule in `.semgrep/hawkeye.yml` forbids subprocess
+ * spawning anywhere in application, script or function code, and a monitoring
+ * probe is not the place to make an exception for a command-injection vector.
+ * `fetch` is already this script's transport, and api.github.com is already on
+ * both callers' egress allowlists.
+ *
+ * Returns NaN whenever the date cannot be established — no repo slug, no
+ * network, a rate limit, an unparseable body. `decide()` treats an undatable
+ * divergence as DRIFT, which is the safe direction: a divergence we cannot
+ * prove is recent must not be excused as lag.
+ */
+async function lastChangedAt(name, { timeoutMs = 15000 } = {}) {
+  const slug = process.env.GITHUB_REPOSITORY;
+  if (!slug) return NaN;
+  const branch = process.env.DEPLOY_BRANCH || 'main';
+  const url =
+    `https://api.github.com/repos/${slug}/commits` +
+    `?path=${encodeURIComponent(name)}&sha=${encodeURIComponent(branch)}&per_page=1`;
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const out = execFileSync('git', ['log', '-1', '--format=%ct', '--', name], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }).trim();
-    const ts = Number.parseInt(out, 10);
-    return Number.isFinite(ts) ? ts : NaN;
+    const res = await fetch(url, { headers, signal: ac.signal });
+    if (!res.ok) return NaN;
+    const body = await res.json();
+    const iso = body?.[0]?.commit?.committer?.date;
+    const ms = Date.parse(iso || '');
+    return Number.isFinite(ms) ? Math.floor(ms / 1000) : NaN;
   } catch {
     return NaN;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -164,19 +194,26 @@ export async function compare({ origin, graceSeconds = 86400, timeoutMs = 30000 
         status: liveHash === repoHash ? 'match' : 'differ',
         repoHash,
         liveHash,
-        changedAt: lastChangedAt(name),
+        changedAt: NaN,
       });
     } else {
-      results.push({
-        name,
-        status: fetched.status,
-        repoHash,
-        liveHash: null,
-        detail: fetched.detail,
-        changedAt: lastChangedAt(name),
-      });
+      results.push({ name, status: fetched.status, repoHash, liveHash: null, detail: fetched.detail, changedAt: NaN });
     }
   }
+
+  /* Date only the divergences, and only when a grace window can act on the
+     answer. A matching asset's history is irrelevant, and with grace at zero
+     (the deploy workflow's publish-wait, which polls up to 30 times) every
+     divergence is drift regardless of age — so a healthy site makes no API
+     calls at all, and the polling caller makes none either. */
+  if (graceSeconds > 0) {
+    await Promise.all(
+      results
+        .filter((r) => r.status === 'differ' || r.status === 'missing')
+        .map(async (r) => { r.changedAt = await lastChangedAt(r.name); }),
+    );
+  }
+
   return { results, decision: decide(results, { graceSeconds }) };
 }
 

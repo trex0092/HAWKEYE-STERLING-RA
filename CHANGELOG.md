@@ -78,6 +78,17 @@ missing-secret path, which stays deliberately non-fatal so ordinary merges are
 not blocked by a one-time UI step, now names the consequence rather than the
 omission: **this merge is not deployed**.
 
+Dating a divergence — the one thing separating deploy lag from real drift — is
+read from the commits API, not from `git log`. The repo's
+`hawkeye-no-child-process` Semgrep rule forbids subprocess spawning in script
+code, and a monitoring probe is the wrong place to make an exception for a
+command-injection vector; `fetch` is already this script's transport and
+`api.github.com` is already on both callers' egress allowlists. When a date
+cannot be established the divergence counts as **drift** — one that cannot be
+proven recent must not be excused as lag. Only divergent assets are dated, and
+only when a grace window could act on the answer, so a healthy site makes no
+API calls at all.
+
 `npm test` 77/77 (21 new checks); lint clean. Restoring production itself is a
 one-time Netlify action and is not in this diff — re-link the repository under
 Build & deploy → Continuous deployment, or create a `main` build hook and save
