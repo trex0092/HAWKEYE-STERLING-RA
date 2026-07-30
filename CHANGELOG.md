@@ -10,6 +10,55 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### Arabic and CJK designations are now matchable; alert streams reach the MLRO queue (2026-07-30)
+
+**Arabic/CJK — script preservation, not transliteration.** The JS case engine
+already matched an Arabic subject against an Arabic-published designation at
+100, while `screen.py` stripped the name to `""` and returned **no hits for the
+same pair**. Since `screen.py` runs the *daily* screening, an Arabic-script
+designation on the UN list was unmatchable in production and matchable only in
+the case engine.
+
+`normalize()` now falls back Latin → Cyrillic romanization → **script
+preservation**. Preserving is strictly better than transliterating here:
+romanizing `محمد` yields the consonant skeleton `MHMD`, which does not resemble
+the Latin "MOHAMMED" it would need to match — it would buy no recall while
+inventing false-positive surface. Same-script matching needs no guess at all.
+Preserved-script subjects are still routed to MANUAL REVIEW *as well as*
+screened.
+
+The additive-only invariant still holds and is still enforced by property test:
+across 1,302 benchmark and parity strings, **0 existing keys moved, 29
+previously-dead keys rescued** (up from 9).
+
+`normalize()`'s contract changed as a result — it is no longer closed over
+`[A-Z0-9 ]`. The property now asserts what holds for every branch: letters,
+digits and single spaces only; no combining marks; no punctuation; trimmed.
+
+**Scheduling delay — measured, and NOT fixed by re-timing.** An earlier note
+here proposed moving the first cron out of the midnight hour. The data refutes
+it: Regulatory Watch's **06:19** slot is delayed **2h05m–3h51m**, statistically
+the same as the 00:07 slot's ~3.2–3.9h. The delay is systemic to this repo's
+Actions scheduling, not midnight congestion. Moving the slot earlier is also
+*unsafe* — `freshness-check` pins this control at `maxAgeDays: 0`, so a run
+landing on the previous UTC day would raise a false "control missed its cadence"
+alarm. The cron is unchanged; the false claim that the sweep "lands in Asana
+before ~09:00 UAE" is removed from both the file header and the schedule block
+and replaced with the measured reality (~12:00 UAE).
+
+**Alert streams mirrored.** `sanctions-watch` (list changes) and
+`sanctions-screen` (the case engine, which posted 40-new-match days) now mirror
+into "Sanctions/Media/PEP - Monitoring" → "Daily Sanctions Screening", joining
+the law-change card. Additive — the #305 destination is untouched.
+
+### Test harness — a failing property crashed the runner instead of reporting it
+
+`check()` did `str(e).splitlines()[0]`. A bare `assert` carries an **empty**
+message, so `splitlines()` returned `[]` and indexing it raised `IndexError` —
+the whole property runner died and a real failure looked like a broken harness.
+It now falls back to the exception type name.
+
+
 ### Cyrillic designations are now screened, not silently dead (2026-07-30)
 
 A sanctions designation published only in Cyrillic normalized to `""` in

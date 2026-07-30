@@ -44,7 +44,13 @@ def check(name, fn):
         print("  ok  " + name)
     except BaseException as e:  # hypothesis raises falsifying examples as errors
         failed += 1
-        print("FAIL  " + name + " — " + str(e).splitlines()[0][:200])
+        # A bare `assert` carries an empty message, so splitlines() returns []
+        # and indexing it crashed the whole runner — a failing property looked
+        # like a broken harness instead of a reported failure. Fall back to the
+        # exception type so every failure is legible.
+        _lines = str(e).splitlines()
+        _msg = _lines[0][:200] if _lines else type(e).__name__
+        print("FAIL  " + name + " — " + _msg)
 
 
 TEXT = st.text(max_size=200)
@@ -61,11 +67,22 @@ def prop_normalize_idempotent(s):
 @PROP
 @given(TEXT)
 def prop_normalize_alphabet(s):
+    import unicodedata as _ud
     out = screen.normalize(s)
     assert isinstance(out, str)
-    assert all(c.isascii() and (c.isupper() or c.isdigit() or c == " ") for c in out)
+    # CONTRACT CHANGE: normalize() is no longer closed over [A-Z0-9 ]. When the
+    # ASCII pipeline yields nothing it falls back to romanization and then to
+    # SCRIPT PRESERVATION, so an Arabic/CJK name — or a Latin letter with no
+    # ASCII decomposition, e.g. 'ƀ' — keeps its own characters. What still holds
+    # for EVERY branch: only letters, digits and single spaces; no combining
+    # marks; no punctuation; trimmed.
+    assert all(_ud.category(c)[0] in ("L", "N") or c == " " for c in out), out
+    assert all(_ud.category(c) != "Mn" for c in out), out
     assert out == out.strip()
     assert "  " not in out
+    # The ASCII branch must still be exactly as before when it produces anything.
+    if out and all(c.isascii() for c in out):
+        assert all(c.isupper() or c.isdigit() or c == " " for c in out), out
 
 
 @PROP

@@ -317,7 +317,13 @@ async function main() {
     try {
       const html = buildResultsDigestHtml(results, a => (casesState[a.key] || {}).taskGid || null);
       const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203370612916';
-      const url = await notifyAsana(resultsDigestTitle(results), '', { project: projectGid, section: sectionGid, html, assignee: assignee });
+      /* Mirror the daily case digest into the queue the MLRO actually works
+         (see the MIRROR note in asana-notify). One task, two memberships. */
+      const mirror = process.env.ASANA_MIRROR_PROJECT_GID
+        ? [{ project: process.env.ASANA_MIRROR_PROJECT_GID,
+             section: process.env.ASANA_MIRROR_SECTION_GID || undefined }]
+        : [];
+      const url = await notifyAsana(resultsDigestTitle(results), '', { project: projectGid, section: sectionGid, html, assignee: assignee, mirror });
       console.log('screening-cases: daily results digest posted to Asana' + (url ? ' — ' + url : ''));
     } catch (e) {
       failed++;

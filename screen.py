@@ -925,7 +925,33 @@ def normalize(name):
     latin = _normalize_latin(name)
     if latin:
         return latin
-    return _normalize_latin(romanize(name))
+    roman = _normalize_latin(romanize(name))
+    if roman:
+        return roman
+    # Scripts with no deterministic romanization (Arabic omits short vowels;
+    # CJK has no letter mapping at all) are PRESERVED, not guessed at. The JS
+    # engine already did this — it matches an Arabic subject against an
+    # Arabic-published designation at 100 — while screen.py stripped the name to
+    # "" and returned NO hits for the same pair. Since screen.py runs the daily
+    # screening, an Arabic-script designation on the UN list was unmatchable in
+    # production and matchable only in the case engine.
+    #
+    # Preserving is strictly better than transliterating here: romanizing محمد
+    # yields the consonant skeleton MHMD, which does not resemble the Latin
+    # "MOHAMMED" it would need to match, so it would buy no recall while
+    # inventing false-positive surface. Same-script exact/fuzzy matching needs
+    # no guess at all.
+    return _normalize_preserve_script(name)
+
+def _normalize_preserve_script(name):
+    """Keep letters/digits of ANY script, drop marks and punctuation.
+
+    Mirrors the JS engine's `[^\\p{L}\\p{N}]+` fold so both engines key an
+    Arabic or CJK name the same way."""
+    s = unicodedata.normalize("NFD", str(name or ""))
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = "".join(c if (unicodedata.category(c)[0] in ("L", "N")) else " " for c in s)
+    return re.sub(r"\s+", " ", s).strip().upper()
 
 def _pct(score) -> str:
     # Floor, never round: a 99.6 similarity must read "99%", not "100%" — only a

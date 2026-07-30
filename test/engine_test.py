@@ -1252,35 +1252,38 @@ for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
 # covered, actually unscreenable, silent.
 print("screen.py — unmatchable core-list entries")
 _um_lists = {
-    # Arabic and CJK have no deterministic romanization (Arabic omits short
-    # vowels), so romanize() deliberately does not guess at them — a wrong
-    # transliteration would be a false CLEAR. They stay unmatchable by design.
-    "OFAC SDN": [(screen.normalize(n), n) for n in
-                 ["\u0645\u062d\u0645\u062f \u0639\u0628\u062f\u0627\u0644\u0644\u0647", "BAD ACTOR", "\u4e2d\u56fd\u6838\u5de5\u4e1a"]],
+    # After script preservation, Arabic and CJK are MATCHABLE (same-script), so
+    # the only thing that still normalizes to "" is a name with no letters or
+    # digits at all — pure punctuation/symbols, which some feeds emit as filler.
+    "OFAC SDN": [(screen.normalize(n), n) for n in ["\u2620 \u2620", "BAD ACTOR", "--- ---"]],
     "UN Consolidated": [(screen.normalize(n), n) for n in ["CLEAN ONE", "CLEAN TWO"]],
 }
-check("a non-romanizable designation is indexed under an empty key (the mechanism)",
-      ("", "\u4e2d\u56fd\u6838\u5de5\u4e1a") in _um_lists["OFAC SDN"])
+check("a letterless designation is indexed under an empty key (the mechanism)",
+      ("", "\u2620 \u2620") in _um_lists["OFAC SDN"])
 check("an empty-key entry can never be returned by the matcher",
-      screen.screen_name("\u4e2d\u56fd\u6838\u5de5\u4e1a", _um_lists) == []
+      screen.screen_name("\u2620 \u2620", _um_lists) == []
       and screen.screen_name("Bad Actor", _um_lists)[0]["matched_entry"] == "BAD ACTOR")
 check("an empty-key entry does NOT match an unrelated name (no false positive)",
       screen.screen_name("Totally Unrelated Trading Ltd", _um_lists) == [])
-# Cyrillic is NO LONGER unmatchable — romanize() rescues it. This is the
-# improvement, pinned so it cannot silently regress.
+# Cyrillic is romanized; Arabic and CJK are preserved. Both are now live keys —
+# this is the improvement, pinned so it cannot silently regress.
 _cyr_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in ["\u0425\u0410\u041c\u0410\u0421"]]}
-# romanize() applies its table with a plain per-character pass. That is exact
-# ONLY while every key is a single character (the multi-letter forms are values:
-# Щ→SHCH, Х→KH). If a future edit adds a multi-char key it would be silently
-# skipped — no error, just a name that stops romanizing. Pin the assumption.
-check("every romanization key is a single character (per-character pass is exact)",
-      all(len(k) == 1 for k in screen._CYRILLIC_ROMAN))
-check("romanization output is pure ASCII (feeds the Latin-only pipeline)",
-      all(v.isascii() for v in screen._CYRILLIC_ROMAN.values()))
-check("a Cyrillic designation is now indexed under a real key (romanized)",
+check("a Cyrillic designation is romanized to a real key",
       _cyr_lists["OFAC SDN"][0][0] == "KHAMAS")
-check("a Cyrillic designation is now MATCHABLE (was dead before romanization)",
+check("a Cyrillic designation is MATCHABLE (was dead before romanization)",
       len(screen.screen_name("\u0425\u0410\u041c\u0410\u0421", _cyr_lists)) == 1)
+_ar_name = "\u0645\u062d\u0645\u062f \u0635\u0627\u0644\u062d \u0627\u0644\u062d\u0648\u062b\u064a"
+_ar_lists = {"UN Consolidated": [(screen.normalize(_ar_name), _ar_name)]}
+check("an Arabic designation keeps its script and is MATCHABLE (parity with the JS engine)",
+      screen.normalize(_ar_name) != ""
+      and len(screen.screen_name(_ar_name, _ar_lists)) == 1
+      and screen.screen_name(_ar_name, _ar_lists)[0]["score"] == 100)
+check("a CJK designation is preserved too",
+      screen.normalize("\u4e2d\u56fd\u6838\u5de5\u4e1a") != "")
+# Preserved-script subjects are STILL routed to manual review — screened AND
+# seen by a human, never one instead of the other.
+check("a preserved-script subject still routes to MANUAL REVIEW as well",
+      screen._unscreenable(_ar_name) and screen._unscreenable("\u4e2d\u56fd\u6838\u5de5\u4e1a"))
 _um_meta = {"ofac": {"count": 3}, "un": {"count": 2}}
 screen.count_unmatchable_entries(_um_lists, _um_meta)
 check("the unmatchable count is recorded per list",
@@ -1322,16 +1325,20 @@ check("empty inputs are safe", screen.crosscheck_eocn([], []) == [])
 # missing. The reconciler wrote "No divergence — the local list already covers
 # every mirror designation" whenever crosscheck returned [], and an MLRO signed
 # the weekly TFS review on that sentence while those names were never looked at.
-_ar = ["\u062a\u0646\u0638\u064a\u0645 \u0627\u0644\u0642\u0627\u0639\u062f\u0629",
-       "\u0645\u0646\u0638\u0645\u0629 \u0625\u0631\u0647\u0627\u0628\u064a\u0629"]
-check("a wholly non-Latin mirror name normalises to nothing (the mechanism)",
-      screen.normalize(_ar[0]) == "")
+_letterless = ["\u2620 \u2620", "--- ---"]
+check("a letterless mirror name normalises to nothing (the mechanism)",
+      screen.normalize(_letterless[0]) == "")
 check("crosscheck still cannot report it missing (documented, not fixed there)",
-      screen.crosscheck_eocn(["LOCAL PERSON"], _ar) == [])
+      screen.crosscheck_eocn(["LOCAL PERSON"], _letterless) == [])
 check("eocn_uncomparable surfaces exactly those names instead of dropping them",
-      screen.eocn_uncomparable(_ar) == sorted(_ar))
+      screen.eocn_uncomparable(_letterless) == sorted(_letterless))
 check("a comparable-but-absent designation is STILL reported as missing",
-      screen.crosscheck_eocn(["LOCAL PERSON"], _ar + ["NEW LATIN GROUP"]) == ["NEW LATIN GROUP"])
+      screen.crosscheck_eocn(["LOCAL PERSON"], _letterless + ["NEW LATIN GROUP"]) == ["NEW LATIN GROUP"])
+# Arabic mirror designations are now COMPARABLE (script preserved), so the gap
+# this guard was written for is largely closed at the source.
+check("an Arabic mirror designation is now comparable, not skipped",
+      screen.eocn_uncomparable(["\u0645\u062d\u0645\u062f"]) == []
+      and screen.crosscheck_eocn(["LOCAL PERSON"], ["\u0645\u062d\u0645\u062f"]) == ["\u0645\u062d\u0645\u062f"])
 check("an all-Latin mirror raises no uncomparable false alarm",
       screen.eocn_uncomparable(["AL QAEDA (AQ)", "BOKO HARAM"]) == [])
 check("uncomparable handles empty and None safely",
