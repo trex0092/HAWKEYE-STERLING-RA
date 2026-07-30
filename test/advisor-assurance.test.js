@@ -372,6 +372,52 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   b = JSON.parse(r.body);
   check('handler: screening answer without scope/gaps is structureFlagged', b.structureFlagged === true && /structureFlagged/.test(b.auditLine));
 
+  /* ── 7. The health probe must prove the Advisor ANSWERS, not just that a key
+     is set ───────────────────────────────────────────────────────────────────
+     brain-soul checks ANTHROPIC_API_KEY's PRESENCE before it parses the body, so
+     an empty-body probe returns 400 whenever the variable is merely set. A key
+     that is present but REVOKED, EXPIRED or unentitled to the routed model
+     returns 400 to that probe while every real call dies at the API.
+
+     Not hypothetical: function-health.yml ran green ten days running,
+     2026-07-30 included, while the Advisor answered nothing and its on-device
+     telemetry read "last call failed". The alarm that exists to catch a dead
+     Advisor could not see the way it actually died. These checks stop the
+     end-to-end call being weakened back to a status-code check. */
+  const HEALTH = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'function-health.yml'), 'utf8');
+  check('health probe makes a REAL Advisor call, not only a malformed-body probe',
+    /"question"\s*:/.test(HEALTH) && /brain_soul_e2e/.test(HEALTH));
+  check('health probe requires ok:true — a 200 carrying ok:false must fail the run',
+    /j\.ok\s*===\s*true/.test(HEALTH) && /"\$OK"\s*!=\s*"true"/.test(HEALTH));
+  check('the end-to-end probe uses the cheapest mode (a daily paid call stays trivial)',
+    /"mode"\s*:\s*"speed"/.test(HEALTH));
+  check('the alert distinguishes "configured" from "actually working"',
+    /CONFIGURED BUT NOT WORKING/.test(HEALTH));
+  check('the probe records WHY it could not answer, for the alert to carry',
+    /answered=/.test(HEALTH) && /detail=/.test(HEALTH));
+  /* A multi-line value corrupts $GITHUB_OUTPUT's key=value format and is an
+     output-injection vector, so the detail is collapsed to one line. */
+  check('the recorded detail is collapsed to a single line before $GITHUB_OUTPUT',
+    /replace\(\/\[\\r\\n\]\+\/g/.test(HEALTH));
+
+  /* The SAME blindness applies one token over: asana-task and risk-backup also
+     check ASANA_ACCESS_TOKEN's presence before body validation, so their {}
+     probes return 400 whenever the variable is merely set — a REVOKED Asana
+     token passed both every day too. A real asana-task call would CREATE a task,
+     which a daily probe must not do, so the token is exercised through
+     asana-mirror action:"read" (side-effect free). */
+  check('the Asana token is proven to WORK, not just to be configured',
+    /asana_token_e2e/.test(HEALTH) && /"action"\s*:\s*"read"/.test(HEALTH));
+  check('the Asana probe is read-only — a daily probe must not create tasks',
+    !/asana-mirror[\s\S]{0,400}"action"\s*:\s*"write"/.test(HEALTH));
+  /* APP_SHARED_TOKEN is an operator opt-in; when it is on, an unauthenticated
+     probe cannot reach Asana at all. That must SKIP, not alarm — a daily false
+     alarm is its own failure mode and trains people to ignore the real one. */
+  check('enabling APP_SHARED_TOKEN skips the probe instead of alarming daily',
+    /gated/.test(HEALTH) && /X-App-Token/i.test(HEALTH));
+  check('the alert carries whether the Asana token actually works',
+    /Asana token works:/.test(HEALTH));
+
   // restore environment
   global.fetch = origFetch;
   if (origKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = origKey;

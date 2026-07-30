@@ -10,6 +10,90 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### The Advisor health alarm proved the API key EXISTS, never that it WORKS — 10 green days over a dead Advisor (2026-07-30)
+
+Reported: the Advisor would not answer, and **nothing had alerted anyone**. That
+second part is the more serious finding.
+
+`function-health.yml` probes `brain-soul` daily with an empty body and treats
+HTTP 400 as healthy, logging:
+
+```
+ok: brain-soul is live and ANTHROPIC_API_KEY is present
+```
+
+`brain-soul` checks the key's **presence** before it parses the body:
+
+```
+origin → token → rate limit → ADVISOR_ENABLED → KEY MISSING (503)
+       → content-type → body size → JSON parse (400)
+```
+
+So a `{}` probe reaches 400 whenever the variable is merely **set**. The probe
+never calls the Anthropic API at all. A key that is present but **revoked,
+expired, out of quota, or not entitled to the routed model** returns 400 to that
+probe every single day, while every real user call dies upstream at 401/403/404.
+
+The run history is unambiguous — **ten consecutive successes, including
+2026-07-30 07:43**, over an Advisor that answered nothing:
+
+```
+2026-07-30 07:43  success      2026-07-25 07:29  success
+2026-07-29 08:01  success      2026-07-24 07:43  success
+2026-07-28 07:56  success      2026-07-23 07:43  success
+2026-07-27 08:49  success      2026-07-22 07:41  success
+2026-07-26 07:48  success      2026-07-21 09:24  success
+```
+
+This is the session's recurring pattern — *counted as covered, actually not
+covered, silent* — landing at the **monitoring** layer: the alarm that exists to
+catch a dead Advisor could not see the way it actually dies.
+
+The workflow now makes **one real end-to-end call** in speed mode (haiku, the
+cheapest route, so a daily paid call stays trivial) and requires `ok: true`.
+That is the only signal that proves the key is live, entitled to its model and
+within quota. The original 400 probe is kept — it still distinguishes
+"undeployed" from "key missing" for free — but its success message no longer
+overstates what it tested.
+
+The Asana alert now names the distinction that matters, because the two failure
+modes need opposite responses:
+
+> `answered: false` with brain-soul HTTP 400 means the key is **CONFIGURED BUT
+> NOT WORKING** — revoked, expired, out of quota, or not entitled to the routed
+> model; rotate it in Netlify Site configuration → Environment variables and
+> redeploy.
+
+The probe records *why* it could not answer, collapsed to a single line —
+a multi-line value corrupts `$GITHUB_OUTPUT`'s `key=value` format and is an
+output-injection vector.
+
+Six checks in `advisor-assurance` pin it so the end-to-end call cannot be
+weakened back to a status-code check. Negative-controlled: deleting the step
+fails five of them.
+
+#### The same blindness, one token over
+
+`asana-task` and `risk-backup` check `ASANA_ACCESS_TOKEN`'s presence before body
+validation too, so their `{}` probes also return 400 whenever the variable is
+merely set — a **revoked Asana token passed both every day** as well. That
+matters more than it sounds: Asana is where every case, alert and register
+backup lands.
+
+A real `asana-task` call would **create a task**, which a daily probe must not
+do. So the token is exercised through `asana-mirror` `action:"read"` — it finds
+and parses the two backup tasks, has no side effect, returns `ok:true` even for
+an empty register (so a site with no backups yet does not cry wolf), and already
+returns a **distinct** 401: *"Asana token unauthorized — rotate
+ASANA_ACCESS_TOKEN"*.
+
+One deliberate non-alarm: `APP_SHARED_TOKEN` is an operator opt-in, and once it
+is on an unauthenticated probe cannot reach Asana at all. That case is
+distinguished by its error text and **skips** rather than failing — a daily false
+alarm is its own failure mode, and it trains people to ignore the real one. The
+classifier was verified against all four inputs (`ok:true`, revoked token,
+app-gated, unparseable) before shipping.
+
 ### A failed console refresh was silent on a phone, and left stale figures on screen (2026-07-30)
 
 Found by sweeping for the fault class behind the Advisor telemetry bug: **a

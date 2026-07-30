@@ -13,6 +13,13 @@ name: Function Health
 #   token, and reached body validation. A 500/503 means the secret is gone
 #   (asana-task / risk-backup -> ASANA_ACCESS_TOKEN; brain-soul -> ANTHROPIC_API_KEY);
 #   anything else (502, 0) means the function crashed or is undeployed.
+#
+# Why 400 is NOT sufficient for the Advisor:
+#   That probe proves the key EXISTS, never that it WORKS — brain-soul checks the
+#   key before parsing the body, so a REVOKED or unentitled key still returns 400.
+#   This workflow ran green ten days running, 2026-07-30 included, while the
+#   Advisor answered nothing. So the Advisor also gets a real end-to-end call
+#   asserting ok:true. Do not reduce that back to a status-code check.
 
 on:
   schedule:
@@ -97,7 +104,91 @@ jobs:
             echo "FAIL: expected 400 (question required), got $STATUS — 503 = ANTHROPIC_API_KEY missing, other = function down"
             exit 1
           fi
-          echo "ok: brain-soul is live and ANTHROPIC_API_KEY is present"
+          echo "ok: brain-soul is deployed and ANTHROPIC_API_KEY is CONFIGURED (not yet proven to work)"
+
+      # ── The probe above proves the key EXISTS. It never proved it WORKS. ──
+      #
+      # brain-soul checks the key's presence BEFORE it parses the body, so an
+      # empty-body POST returns 400 whenever the variable is merely set. A key
+      # that is present but REVOKED, EXPIRED, or without access to the routed
+      # model returns 400 to this probe every day while every real user call
+      # dies at the Anthropic API with 401/403/404.
+      #
+      # That is exactly what happened: ten consecutive green runs of this
+      # workflow — including 2026-07-30 07:43 — while the Advisor answered
+      # nothing and its on-device telemetry read "last call failed". The alarm
+      # that exists to catch a dead Advisor could not see the way it actually
+      # died, so nobody was told.
+      #
+      # So: make one real end-to-end call. Speed mode (haiku, 1024 tokens) keeps
+      # it to a trivial daily cost, and ok:true is the only signal that proves
+      # the key is live, entitled to its model, and within quota.
+      - name: Prove the Advisor can actually ANSWER (end-to-end, not just configured)
+        id: brain_soul_e2e
+        run: |
+          BODY=$(curl -s --max-time 45 \
+            -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/brain-soul" \
+            -H "Content-Type: application/json" -H "Origin: https://hawkeye-sterling-ra.netlify.app" \
+            -d '{"question":"Reply with the single word OK.","mode":"speed"}') && rc=0 || rc=$?
+          if [ "${rc:-0}" -ne 0 ]; then
+            echo "answered=curl-failed" >> "$GITHUB_OUTPUT"
+            echo "FAIL: could not reach brain-soul (curl rc=$rc)"
+            exit 1
+          fi
+          # `ok` is the function's own verdict: false carries the upstream status
+          # in `text` (e.g. "[API error 401 — …]"), which is safe to print because
+          # the function never reflects the provider's error body.
+          OK=$(printf '%s' "$BODY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);process.stdout.write(j&&j.ok===true?"true":"false")}catch{process.stdout.write("unparseable")}})')
+          # Collapse newlines: a multi-line value corrupts the key=value format of
+          # $GITHUB_OUTPUT and is an output-injection vector.
+          DETAIL=$(printf '%s' "$BODY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let t;try{const j=JSON.parse(s);t=String((j&&(j.error||j.text))||"")}catch{t=s}process.stdout.write(t.replace(/[\r\n]+/g," ").slice(0,300))})')
+          echo "answered=$OK" >> "$GITHUB_OUTPUT"
+          echo "detail=$DETAIL" >> "$GITHUB_OUTPUT"
+          if [ "$OK" != "true" ]; then
+            echo "FAIL: the Advisor is configured but CANNOT ANSWER — $DETAIL"
+            exit 1
+          fi
+          echo "ok: the Advisor answered end-to-end (key live, model entitled, within quota)"
+
+      # ── Same blindness, one token over ────────────────────────────────────
+      # asana-task and risk-backup check ASANA_ACCESS_TOKEN's PRESENCE before
+      # body validation too, so their {} probes also return 400 whenever the
+      # variable is merely set. A REVOKED Asana token passes both every day.
+      #
+      # A real asana-task call would CREATE a task, which a daily probe must not
+      # do. asana-mirror action:"read" exercises the same token with no side
+      # effect — it finds and parses the two backup tasks — and already returns a
+      # DISTINCT 401 ("Asana token unauthorized — rotate ASANA_ACCESS_TOKEN") that
+      # is separable from the app-gate 401 by its text. An empty register still
+      # returns ok:true, so a site with no backups yet does not cry wolf.
+      - name: Prove the Asana token actually WORKS (read-only, no side effect)
+        id: asana_token_e2e
+        run: |
+          BODY=$(curl -s --max-time 30 \
+            -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-mirror" \
+            -H "Content-Type: application/json" -H "Origin: https://hawkeye-sterling-ra.netlify.app" \
+            -d '{"action":"read"}') && rc=0 || rc=$?
+          if [ "${rc:-0}" -ne 0 ]; then
+            echo "works=curl-failed" >> "$GITHUB_OUTPUT"
+            echo "FAIL: could not reach asana-mirror (curl rc=$rc)"
+            exit 1
+          fi
+          VERDICT=$(printf '%s' "$BODY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let o="unparseable";try{const j=JSON.parse(s);if(j&&j.ok===true)o="true";else if(/X-App-Token/i.test(String(j&&j.error||"")))o="gated";else o="false"}catch{}process.stdout.write(o)})')
+          echo "works=$VERDICT" >> "$GITHUB_OUTPUT"
+          # APP_SHARED_TOKEN is an operator opt-in; when it is on, an unauthenticated
+          # probe cannot reach Asana at all. Skip rather than alarm — a daily false
+          # alarm is its own failure mode, and the gate itself is not a fault.
+          if [ "$VERDICT" = "gated" ]; then
+            echo "SKIP: APP_SHARED_TOKEN is enabled, so this probe cannot exercise the Asana token"
+            exit 0
+          fi
+          if [ "$VERDICT" != "true" ]; then
+            DETAIL=$(printf '%s' "$BODY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let t;try{const j=JSON.parse(s);t=String((j&&j.error)||"")}catch{t=s}process.stdout.write(t.replace(/[\r\n]+/g," ").slice(0,300))})')
+            echo "detail=$DETAIL" >> "$GITHUB_OUTPUT"
+            echo "FAIL: the Asana token is configured but does NOT work — $DETAIL"
+            exit 1
+          fi
+          echo "ok: the Asana token is live (mirror read succeeded)"
 
       - name: Alert in Asana on failure
         if: failure()
@@ -107,7 +198,10 @@ jobs:
           ASANA_STATUS: ${{ steps.asana_task.outputs.status }}
           BACKUP_STATUS: ${{ steps.risk_backup.outputs.status }}
           BRAIN_STATUS: ${{ steps.brain_soul.outputs.status }}
+          BRAIN_ANSWERED: ${{ steps.brain_soul_e2e.outputs.answered }}
+          BRAIN_DETAIL: ${{ steps.brain_soul_e2e.outputs.detail }}
+          ASANA_TOKEN_WORKS: ${{ steps.asana_token_e2e.outputs.works }}
         run: |
           node scripts/asana-alert.mjs \
             "FUNCTION DOWN: Netlify functions failed health check" \
-            "One or more Netlify functions returned an unexpected status. asana-task: HTTP ${ASANA_STATUS:-unreachable}, risk-backup: HTTP ${BACKUP_STATUS:-unreachable}, brain-soul: HTTP ${BRAIN_STATUS:-unreachable}. HTTP 500/503 = a required secret (ASANA_ACCESS_TOKEN / ANTHROPIC_API_KEY) is missing or revoked. Anything else = function crashed or undeployed. Check Netlify deploys: https://app.netlify.com/projects/hawkeye-sterling-ra — Run log: $RUN_URL"
+            "One or more Netlify functions failed the health check. asana-task: HTTP ${ASANA_STATUS:-unreachable}, risk-backup: HTTP ${BACKUP_STATUS:-unreachable}, brain-soul: HTTP ${BRAIN_STATUS:-unreachable}, Advisor answered end-to-end: ${BRAIN_ANSWERED:-not-reached}, Asana token works: ${ASANA_TOKEN_WORKS:-not-reached}. ${BRAIN_DETAIL:+Advisor detail: ${BRAIN_DETAIL}. }HTTP 500/503 = a required secret (ASANA_ACCESS_TOKEN / ANTHROPIC_API_KEY) is missing. Anything else = function crashed or undeployed. NOTE: 'answered: false' with brain-soul HTTP 400 means the key is CONFIGURED BUT NOT WORKING — revoked, expired, out of quota, or not entitled to the routed model; rotate it in Netlify Site configuration → Environment variables and redeploy. Check Netlify deploys: https://app.netlify.com/projects/hawkeye-sterling-ra — Run log: $RUN_URL"
