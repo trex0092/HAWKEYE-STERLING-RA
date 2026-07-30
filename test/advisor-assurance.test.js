@@ -444,6 +444,25 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   check('the alert carries whether the Asana token actually works',
     /Asana token works:/.test(HEALTH));
 
+  /* Every probe must run INDEPENDENTLY. GitHub's default step condition is
+     success(), so without a guard the first failing probe SKIPS every later
+     one — a single dead function then hides the state of all the others and
+     the alert reports them as "not-reached". Observed live on 2026-07-30: the
+     Advisor returned 400, so the Asana-token probe never ran at all and
+     ASANA_TOKEN_WORKS came back empty. One outage must never mask another. */
+  const probeIds = ['risk_backup', 'brain_soul', 'brain_soul_e2e', 'asana_token_e2e'];
+  const guarded = probeIds.filter((id) => {
+    const at = HEALTH.indexOf('id: ' + id);
+    if (at < 0) return false;
+    /* the guard must sit in THIS step, before the next step begins */
+    const nextStep = HEALTH.indexOf('\n      - name:', at);
+    return /if:\s*'!cancelled\(\)'/.test(HEALTH.slice(at, nextStep < 0 ? undefined : nextStep));
+  });
+  check('every probe runs independently — one outage must not mask another',
+    guarded.length === probeIds.length);
+  /* ...and the alert still only fires on a real failure. */
+  check('the alert step still fires only on failure', /if:\s*failure\(\)/.test(HEALTH));
+
   // restore environment
   global.fetch = origFetch;
   if (origKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = origKey;

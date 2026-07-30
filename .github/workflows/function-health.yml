@@ -78,6 +78,12 @@ jobs:
 
       - name: Probe risk-backup function
         id: risk_backup
+        # Run even if an earlier probe failed: without this the first
+        # failure SKIPS every later step, so one dead function hides the
+        # state of all the others and the alert reports them as
+        # "not-reached". Observed live — a 400 from the Advisor meant the
+        # Asana-token probe never ran at all.
+        if: '!cancelled()'
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/risk-backup" \
@@ -93,6 +99,12 @@ jobs:
 
       - name: Probe brain-soul function
         id: brain_soul
+        # Run even if an earlier probe failed: without this the first
+        # failure SKIPS every later step, so one dead function hides the
+        # state of all the others and the alert reports them as
+        # "not-reached". Observed live — a 400 from the Advisor meant the
+        # Asana-token probe never ran at all.
+        if: '!cancelled()'
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/brain-soul" \
@@ -125,6 +137,12 @@ jobs:
       # the key is live, entitled to its model, and within quota.
       - name: Prove the Advisor can actually ANSWER (end-to-end, not just configured)
         id: brain_soul_e2e
+        # Run even if an earlier probe failed: without this the first
+        # failure SKIPS every later step, so one dead function hides the
+        # state of all the others and the alert reports them as
+        # "not-reached". Observed live — a 400 from the Advisor meant the
+        # Asana-token probe never ran at all.
+        if: '!cancelled()'
         run: |
           BODY=$(curl -s --max-time 45 \
             -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/brain-soul" \
@@ -163,6 +181,12 @@ jobs:
       # returns ok:true, so a site with no backups yet does not cry wolf.
       - name: Prove the Asana token actually WORKS (read-only, no side effect)
         id: asana_token_e2e
+        # Run even if an earlier probe failed: without this the first
+        # failure SKIPS every later step, so one dead function hides the
+        # state of all the others and the alert reports them as
+        # "not-reached". Observed live — a 400 from the Advisor meant the
+        # Asana-token probe never ran at all.
+        if: '!cancelled()'
         run: |
           BODY=$(curl -s --max-time 30 \
             -X POST "https://hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-mirror" \

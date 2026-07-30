@@ -10,6 +10,36 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+### One dead function was hiding the state of every other one (2026-07-30)
+
+Found by running the new health probe for real rather than trusting it. The
+dispatched run reported:
+
+```
+FAIL: the Advisor is configured but CANNOT ANSWER — [API error 400]
+BRAIN_ANSWERED: false
+ASANA_TOKEN_WORKS:            ← empty
+```
+
+`ASANA_TOKEN_WORKS` was empty because that step **never ran**. GitHub's default
+step condition is `success()`, and no probe in this workflow carried a guard —
+so the first failing probe skipped every later one. A single dead function hid
+the state of all the others, and the alert reported them as `not-reached`.
+
+This is **pre-existing**, not new: `asana-task` failing has always skipped
+`risk-backup` and `brain-soul` too. The end-to-end probes added earlier today
+simply made it visible, because for the first time a probe actually failed.
+
+For a health check this is the worst possible ordering property — the alarm
+degrades exactly when there is most to report. Every probe now carries
+`if: '!cancelled()'`, so all five run and the alert carries the full picture;
+the alert itself still fires only on `failure()`.
+
+Pinned by a check that locates each probe's own step block and requires the
+guard inside it — matching on the file as a whole would pass on a guard that
+belonged to a different step. Negative-controlled: removing the guard from one
+probe fails it.
+
 ### The Advisor was out of API credit, and the hint would have sent someone to rotate a working key (2026-07-30)
 
 The Advisor outage is now diagnosed from evidence rather than inference. The
