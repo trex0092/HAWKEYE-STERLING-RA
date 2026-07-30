@@ -117,6 +117,71 @@ check("diacritic Latin (Müller/İnönü) folds cleanly — NOT flagged for revi
       not screen._lost_script_letters("Müller İnönü Trading LLC"))
 check("pure ASCII names are NOT flagged for script review",
       not screen._lost_script_letters("Acme General Trading LLC"))
+# ── The predicate must ask the normaliser, not predict it ────────────────────
+# _lost_script_letters used to test the INPUT (upper -> NFD -> "every letter
+# A-Z?"). That was accurate only while the normaliser DELETED the unfoldable
+# Latin letters. Once they were given a real fold (Ł->L, Þ->TH, Æ->AE), the
+# input test still called them lost, so every Polish/Scandinavian/Balkan/
+# Vietnamese/Icelandic name raised a MANUAL REVIEW card ALONGSIDE its correct
+# hit — alert fatigue on exactly the population the fold had just made
+# screenable. These names key to pure A-Z and are fully screenable.
+for _stroke in ["Łukasz Nowak", "Đorđević Milan", "ØSTERGAARD A/S",
+                "Þór Einarsson", "Æther Ltd", "Œuvre SA", "Nguyễn Văn Đức"]:
+    check(f"stroke-Latin {_stroke.split()[0]!r} folds to A-Z — NOT flagged for review",
+          not screen._lost_script_letters(_stroke)
+          and screen.normalize(_stroke).replace(" ", "").isalnum()
+          and screen.normalize(_stroke).isupper())
+# The net must NOT loosen for scripts that are TRANSLITERATED rather than
+# folded: BGN/PCGN is one romanisation among several, so a designation spelled
+# by another convention can still be missed and the manual duty stands.
+for _translit in ["Сергей Иванов", "Ёлка", "Αθηνά Παπαδοπούλου"]:
+    check(f"romanised {_translit.split()[0]!r} still carries the manual-review net",
+          screen._lost_script_letters(_translit))
+# And scripts kept as-is (no Latin key at all) stay flagged.
+for _kept in ["محمد صالح", "김정은", "إتلاف 14 فبراير (البحرين)"]:
+    check(f"script-preserved {_kept.split()[0]!r} stays flagged for review",
+          screen._lost_script_letters(_kept))
+# A stroke-Latin customer must now screen cleanly against its ASCII designation
+# with NO manual-review rider attached.
+_stroke_lists = {"OFAC SDN": [(screen.normalize("LUKASZ NOWAK"), "LUKASZ NOWAK")]}
+_pm_stroke, _ = screen.screen_customers(
+    [{"name": "Łukasz Nowak", "individuals": [], "entity_owners": [], "permalink": "x"}],
+    _stroke_lists)
+check("a stroke-Latin name hits its ASCII designation with no manual-review rider",
+      len(_pm_stroke) == 1
+      and any(h["list"] == "OFAC SDN" for h in _pm_stroke[0]["hits"])
+      and not any(h.get("unscreenable") for h in _pm_stroke[0]["hits"]))
+
+# ── The manual-review caveat rides ALONGSIDE hits, it is not an alternative ──
+# screen.py appends the manual-review finding and THEN the fuzzy hits, so a
+# subject can carry both. scripts/daily-screen-run.py used `elif`, which dropped
+# the caveat whenever the name produced any hit — and a romanised name usually
+# does: "Сергей Иванов" keys to SERGEY IVANOV and matches that spelling at 100.
+# The row then read as a clean scored match while the fact that the subject was
+# never fully screened from its own script was thrown away.
+_cyr_lists = {"OFAC SDN": [(screen.normalize("SERGEY IVANOV"), "SERGEY IVANOV")]}
+_cyr_hits = screen.screen_name("Сергей Иванов", _cyr_lists)
+check("a romanised name can be BOTH unscreenable and a scoring hit (the hazard)",
+      bool(_cyr_hits) and screen._unscreenable("Сергей Иванов"))
+_pm_cyr, _ = screen.screen_customers(
+    [{"name": "Сергей Иванов", "individuals": [], "entity_owners": [], "permalink": "x"}],
+    _cyr_lists)
+check("screen.py records the hit AND the manual-review finding, not one or the other",
+      len(_pm_cyr) == 1
+      and any(h["list"] == "OFAC SDN" for h in _pm_cyr[0]["hits"])
+      and any(h.get("unscreenable") for h in _pm_cyr[0]["hits"]))
+# Wiring: the delta-run script must not gate the caveat behind `if hits`.
+with open("scripts/daily-screen-run.py", encoding="utf-8") as _dsr_f:
+    _dsr = _dsr_f.read()
+check("the delta run computes the manual-review flag independently of the hits branch",
+      "unscreenable = engine._unscreenable(cname)" in _dsr
+      and _dsr.index("unscreenable = engine._unscreenable(cname)") < _dsr.index("if hits:"))
+check("a hit on a not-fully-screened name never routes straight to CONFIRMED",
+      'top["score"] >= 100 and not unscreenable' in _dsr)
+with open("scripts/daily-screen-report.py", encoding="utf-8") as _dsp_f:
+    _dsp = _dsp_f.read()
+check("the report prints the not-fully-screened caveat on a scored row",
+      "NOT FULLY SCREENED" in _dsp and "manual_review_reason" in _dsp)
 check("mixed-script names also route to manual PEP review (not silent 'no PEP')",
       screen.check_pep("محمد صالح TRADING LLC").get("review") is True)
 # Union of extractors: a recognised structured block must not hide Name: lines

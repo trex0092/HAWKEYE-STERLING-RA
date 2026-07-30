@@ -336,6 +336,20 @@ for customer in customers:
         "role": customer.get("role", ""),
     }
     hits = engine.screen_name(cname, all_lists)
+    # Engine parity: screen.py adds the manual-review finding ALONGSIDE any hits,
+    # not instead of them. An `elif` here dropped the caveat whenever the name
+    # produced any hit at all — and a romanised name usually does. "Сергей
+    # Иванов" keys to SERGEY IVANOV and matches that spelling at 100, so the row
+    # read as a clean scored match while the fact that BGN/PCGN is one
+    # transliteration among several (and a designation spelled another way may
+    # not have been reached) was thrown away. Same for a mixed-script name whose
+    # Latin residue matches boilerplate.
+    unscreenable = engine._unscreenable(cname)
+    if unscreenable:
+        row["manual_review"] = True
+        row["manual_review_reason"] = (
+            "name not auto-screenable from its own script (non-Latin script, romanised "
+            "spelling, or too short) — screen this customer manually against all lists")
     if hits:
         top = hits[0]   # engine-sorted, best score first
         row.update({
@@ -344,14 +358,16 @@ for customer in customers:
             "programme": programme.get((top["list"], top["matched_entry"]), ""),
             "score": round(top["score"]),
         })
-        (confirmed_hits if top["score"] >= 100 else potential_matches).append(row)
-    elif engine._unscreenable(cname):
-        # Non-Latin-script / too-short names cannot be auto-screened —
-        # a silent "clear" would be a false negative (engine parity:
-        # surfaced as a reviewable POTENTIAL row, never dropped).
+        # A hit found on a name we could not fully screen is NOT a closed result:
+        # it is a lead plus an open manual-screening duty, so it never routes to
+        # `confirmed` on the strength of a score alone.
+        (confirmed_hits if (top["score"] >= 100 and not unscreenable)
+         else potential_matches).append(row)
+    elif unscreenable:
+        # No hit AND not auto-screenable: a silent "clear" would be a false
+        # negative, so the subject is surfaced as a reviewable POTENTIAL row.
         row.update({
-            "matched_name": ("name not auto-screenable (non-Latin script or too short) "
-                             "— screen this customer manually against all lists"),
+            "matched_name": row["manual_review_reason"],
             "matched_list": "MANUAL REVIEW", "programme": "", "score": 0,
         })
         potential_matches.append(row)

@@ -125,11 +125,16 @@ else:
             f"   Matched Entity:  {p['matched_name']}\n"
             f"   Match Score:     {p['score']}%\n"
             f"   Reason Flagged:  Name similarity / transliteration variant\n"
-            f"   MLRO Decision\n"
-            f"   Required By:     Next business day\n"
-            f"   Decision:        ☐ False Positive — Clear\n"
-            f"                    ☐ True Match — Escalate\n"
-            f"                    ☐ Further Investigation Required"
+            # A scored hit on a name the matcher could not fully screen must not
+            # read as a completed screening: the manual duty stays open whatever
+            # the score says.
+            + (f"   ⚠ NOT FULLY SCREENED: {p['manual_review_reason']}\n"
+               if p.get('manual_review') and p.get('matched_list') != 'MANUAL REVIEW' else "")
+            + "   MLRO Decision\n"
+            "   Required By:     Next business day\n"
+            "   Decision:        ☐ False Positive — Clear\n"
+            "                    ☐ True Match — Escalate\n"
+            "                    ☐ Further Investigation Required"
         )
     potential_text = "\n\n".join(lines)
 

@@ -997,19 +997,33 @@ const COMMON_TOKEN_CAP = 2500;
    must surface it as a reviewable finding, never a clear. */
 export const MANUAL_REVIEW_LIST = 'MANUAL REVIEW';
 
-/* True when the name carries LETTERS that the Latin A-Z fold loses entirely —
-   Arabic/Cyrillic/CJK/Greek script, or unfoldable Latin like Ł/Æ. Mirrors
-   screen.py's _lost_script_letters exactly (uppercase → NFD → drop combining
-   marks → any remaining letter outside A-Z is lost): diacritic Latin (Müller)
-   and Turkish dotless ı fold cleanly and are NOT flagged. Used to keep a
-   non-Latin-script subject from silently clearing against Latin-indexed lists. */
+/* True when a name cannot be auto-screened against Latin-indexed lists. Mirrors
+   screen.py's _lost_script_letters exactly — keep the two in step, the parity
+   test compares them.
+
+   Two tests, because there are two distinct ways a name resists screening:
+
+     (a) normalizeName()'s OUTPUT still carries non-A-Z letters — the script was
+         preserved (Arabic, CJK), so there is no Latin key to compare at all.
+     (b) the INPUT carried non-Latin-script letters (Cyrillic, Greek). Those ARE
+         romanised into a Latin key, but romanisation is one convention among
+         several, so a designation spelled another way can still be missed.
+
+   Diacritic Latin (Müller), Turkish dotless ı, and stroke Latin (Łukasz,
+   Đorđević, Þór) all reduce deterministically to A-Z and are NOT flagged. The
+   older input-side test flagged the stroke letters, which was right only while
+   the normaliser DELETED them; once they were given a real fold it raised a
+   manual-review card for every Polish/Scandinavian/Balkan/Vietnamese name the
+   fold had just made screenable. */
 export function lostScriptLetters(name) {
-  const up = String(name == null ? '' : name).toUpperCase().normalize('NFD');
-  for (const c of up) {
+  /* normalizeName() emits lower case; the A-Z test is on the letter, not its case. */
+  for (const c of normalizeName(name).toUpperCase()) {
     if (/\p{M}/u.test(c)) continue;
     if (/\p{L}/u.test(c) && (c < 'A' || c > 'Z')) return true;
   }
-  return false;
+  /* Latin-script letters fold deterministically; anything else was romanised. */
+  return [...String(name == null ? '' : name)]
+    .some(c => /\p{L}/u.test(c) && !/\p{Script=Latin}/u.test(c));
 }
 
 /* Screen one subject name against the index. Returns a raw engine-shaped row

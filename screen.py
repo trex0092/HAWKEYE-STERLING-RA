@@ -3530,14 +3530,42 @@ def screen_name(name, all_lists):
     return sorted(best.values(), key=lambda x: -x["score"])
 
 def _lost_script_letters(name):
-    """True when the name carries LETTERS that normalize() strips entirely —
-    Arabic/Cyrillic/CJK/Greek script, or unfoldable Latin like Ł/Æ. Their
-    content vanishes from the match key, so the fuzzy pass compares only the
-    Latin/digit residue. Diacritic Latin (Müller, İnönü) folds to A-Z and is
-    NOT flagged. NFD after upper() mirrors normalize()'s own pipeline."""
-    up = unicodedata.normalize("NFD", str(name or "").upper())
-    return any(unicodedata.category(c).startswith("L") and not ("A" <= c <= "Z")
-               for c in up)
+    """True when normalize() cannot reduce the name to a pure Latin match key —
+    its OUTPUT still carries non-A-Z letters (Arabic/Cyrillic/CJK/Greek). Those
+    names cannot be cross-matched against a Latin-spelled designation, so the
+    fuzzy pass would compare only the Latin/digit residue. Diacritic Latin
+    (Müller, İnönü) and folded Latin (Łukasz, Đorđević) reduce to A-Z and are
+    NOT flagged.
+
+    This asks the normaliser what it actually produced instead of predicting it
+    from the input. The old input-side test — uppercase, NFD, "is every letter
+    A-Z?" — was accurate only while the normaliser DELETED the unfoldable Latin
+    letters Ł Ø Đ Þ Æ Œ. Once those were given a real fold (Ł→L, Þ→TH, Æ→AE) the
+    input test still called them lost, so every Polish, Scandinavian, Balkan,
+    Vietnamese and Icelandic name raised a MANUAL REVIEW card alongside the
+    correct hit — alert fatigue on exactly the population the fold had just
+    made screenable.
+
+    Two tests, because there are two distinct ways a name resists auto-screening
+    and only ONE of them was fixed by the fold:
+
+      (a) normalize()'s OUTPUT still carries non-A-Z letters — the script was
+          preserved (Arabic, CJK), so there is no Latin key to compare at all.
+      (b) the INPUT carried non-Latin-script letters — Cyrillic, Greek. Those
+          ARE romanised into a Latin key, but romanisation is one convention
+          among several (Чайковский → Tchaikovski / Chaykovskiy / Tschaikowski),
+          so a designation spelled by another convention can still be missed.
+          The manual-review net stays for them.
+
+    A Latin letter that folds within Latin (Ł→L, Þ→TH) is neither: the fold is
+    deterministic and the customer's own ASCII spelling keys identically. Those
+    are the only names this predicate stopped flagging."""
+    if any(unicodedata.category(c).startswith("L") and not ("A" <= c <= "Z")
+           for c in normalize(name)):
+        return True
+    return any(unicodedata.category(c).startswith("L")
+               and not unicodedata.name(c, "").startswith("LATIN")
+               for c in str(name or ""))
 
 def _unscreenable(name):
     # A name that carries content but collapses to fewer than 4 matchable chars
