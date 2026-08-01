@@ -93,9 +93,9 @@
    "jurisdiction": "Australia",
    "url": "https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv",
    "type": "csv",
-   "parser": "eu",
+   "parser": "opensanctions",
    "enabled": true,
-   "_note": "DFAT bot-gates its own regulation8_consolidated.xlsx (404 to automated fetches), so the fetchable daily path is the OpenSanctions mirror — the same arrangement the EU FSF list has always used, on a host every screening workflow already allowlists. targets.simple.csv shape, parsed by the same parser as the EU list. The direct au-dfat source and the curated fallback below stay configured (disabled) as alternatives.",
+   "_note": "DFAT bot-gates its own regulation8_consolidated.xlsx (404 to automated fetches), so the fetchable daily path is the OpenSanctions mirror, on a host every screening workflow already allowlists. targets.simple.csv shape (comma CSV: name + ;-separated aliases), parsed by the dedicated opensanctions parser — NOT the eu parser: the EU webgate CSV is semicolon-delimited with WholeName columns, and reading a simple.csv through it yields zero names (observed 2026-08-01 once the egress block that had masked this source lifted). The direct au-dfat source and the curated fallback below stay configured (disabled) as alternatives.",
    "minNames": 500
   },
   {
