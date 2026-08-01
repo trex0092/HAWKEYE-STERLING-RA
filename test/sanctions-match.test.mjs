@@ -2,7 +2,7 @@
    Usage: node test/sanctions-match.test.mjs */
 import {
   normalizeName, sigTokens, parseDelimited, parseOfacCsv, parseOfacAltCsv, parseOfacXml, parseUnXml, parseOfsiCsv,
-  parseEuCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
+  parseEuCsv, parseOpenSanctionsCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName, nameVariants, translitCanonToken, indelRatio, tokenSetRatio, isTokenSubset,
   MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters, trigramsOf, fuzzyTokenMatches,
   unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList,
@@ -73,6 +73,24 @@ check('parseOfsiCsv finds header below a banner and joins Name columns',
 const eu = parseEuCsv('Id;NameAlias_WholeName;NameAlias_FirstName;NameAlias_LastName\n1;Vladimir Putin;Vladimir;Putin\n2;;Ivan;Ivanov\n');
 check('parseEuCsv prefers WholeName, falls back to first+last',
   eu.includes('Vladimir Putin') && eu.includes('Ivan Ivanov'));
+
+/* ── OpenSanctions targets.simple.csv (comma CSV: name + ;-separated aliases).
+   Regression: au-dfat-opensanctions declared parser "eu", and the semicolon
+   split read the whole simple.csv as one column — 0 names, i.e. the entire
+   DFAT mirror silently unscreened (masked until the egress fix let the
+   download through, observed live 2026-08-01). ── */
+const osBody = 'id,schema,name,aliases,countries\n' +
+  'Q1,Person,"DOE, JOHN","Johnny Doe;J. Doe",au\n' +
+  'Q2,Organization,BAD CORP LLC,,au\n' +
+  'Q3,Person,عبد الله محمد,"Abdullah Mohammed",ae\n';
+const os = parseOpenSanctionsCsv(osBody);
+check('parseOpenSanctionsCsv pulls names + splits ;-separated aliases (quoted commas intact)',
+  os.includes('DOE, JOHN') && os.includes('Johnny Doe') && os.includes('J. Doe') &&
+  os.includes('BAD CORP LLC') && os.includes('عبد الله محمد') && os.includes('Abdullah Mohammed'));
+check('the eu parser reads a simple.csv to ZERO names (why the dedicated parser exists)',
+  parseEuCsv(osBody).length === 0);
+check('parseList dispatches parser "opensanctions" ahead of the id fallthrough rules',
+  parseList({ id: 'au-dfat-opensanctions', parser: 'opensanctions' }, osBody).includes('BAD CORP LLC'));
 
 /* ── generic national XML (Canada/SECO shape) ── */
 const gx = parseGenericXml('<record><GivenName>John</GivenName><LastName>Smith</LastName><Aliases>Johnny Smith/J. Smith</Aliases></record><record><Entity>BAD CORP LLC</Entity></record>');

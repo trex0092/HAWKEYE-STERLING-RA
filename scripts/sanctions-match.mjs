@@ -323,6 +323,34 @@ export function parseEuCsv(body) {
   return names;
 }
 
+/* OpenSanctions targets.simple.csv (comma-delimited, quoted; one row per
+   entity with a lowercase `name` column and a `;`-separated `aliases`
+   column) — the mirror format the au-dfat-opensanctions source serves, and
+   the same shape screen.py reads via parse_simple_csv. NOT the EU webgate
+   CSV: that one is semicolon-delimited with WholeName columns, and reading
+   a simple.csv through parseEuCsv yields exactly zero names — the DFAT
+   mirror ran that way (masked by an egress block) until 2026-08-01. */
+export function parseOpenSanctionsCsv(body) {
+  const rows = parseDelimited(body, ',');
+  if (rows.length < 2) return [];
+  const header = rows[0].map(c => c.trim().toLowerCase());
+  const nameIdx = header.indexOf('name'), aliasIdx = header.indexOf('aliases');
+  if (nameIdx < 0) return [];
+  const names = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const n = (r[nameIdx] || '').trim();
+    if (n) names.push(n);
+    if (aliasIdx >= 0) {
+      for (const piece of String(r[aliasIdx] || '').split(';')) {
+        const a = piece.trim();
+        if (a) names.push(a);
+      }
+    }
+  }
+  return names;
+}
+
 /* Best-effort generic sanctions XML (Canada SEMA, Switzerland SECO and similar):
    join given/last name tags, take whole/entity name tags, and split alias tags.
    Returns [] if nothing recognisable is found (caller flags coverage degraded). */
@@ -578,6 +606,7 @@ export function parseList(source, body) {
   if (p === 'ofac' || /^ofac/.test(id)) return parseOfacCsv(body);
   if (p === 'un' || /^un[-_]/.test(id)) return parseUnXml(body);
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);
+  if (p === 'opensanctions') return parseOpenSanctionsCsv(body); // targets.simple.csv mirrors (comma CSV: name + ;-separated aliases)
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
   if (p === 'json') return parseJsonList(body);
   if (p === 'curated' || source.type === 'curated') return parseCuratedList(body);
