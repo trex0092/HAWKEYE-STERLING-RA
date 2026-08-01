@@ -22,6 +22,17 @@ on:
 permissions:
   contents: read
 
+# Serialize, never cancel: the historical failure mode (queued gated runs
+# cancelling each other, red badge with no real failure) came from
+# cancel-in-progress on a fully-gated workflow. With the gate now confined to
+# the `release` job, a non-cancelling group only prevents the remaining race —
+# two rapid merges for the SAME version both passing `check` and colliding on
+# `gh release create`; the second run now waits and lands as a green
+# "already released" no-op instead.
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest

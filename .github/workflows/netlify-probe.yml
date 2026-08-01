@@ -28,6 +28,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Harden the runner (egress block)
+        # The one job in the repo that ran without egress control. Read-only
+        # probe: GitHub REST (statuses/check-runs), the Netlify badge API, and
+        # the live site. Nothing else is contacted.
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            api.netlify.com:443
+            hawkeye-sterling-ra.netlify.app:443
+
       - name: Commit statuses + check runs on recent main commits
         env:
           GH_TOKEN: ${{ github.token }}
