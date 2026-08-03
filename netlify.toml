@@ -6,6 +6,16 @@
 [build]
   publish = "."
 
+# Serve every checked-in file BYTE-FOR-BYTE — never let Netlify's post-processing
+# (HTML/CSS/JS bundling & minification, image compression, snippet injection,
+# pretty-URLs) mutate the published assets. This app is hand-optimised and runs
+# under a strict pure-'self' CSP with Trusted Types; any injected snippet or
+# rewritten markup would both violate the CSP and make the served bytes diverge
+# from what main ships — exactly the drift the Site Currency probe guards. Off by
+# repo policy so it can never be toggled on in the UI without a reviewed change.
+[build.processing]
+  skip_processing = true
+
 # Serverless: Asana task delivery on assessment completion.
 [functions]
   directory = "netlify/functions"
