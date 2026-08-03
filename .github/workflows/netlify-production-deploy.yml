@@ -54,7 +54,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25 # headroom for the ~18-min publish-verify poll (slow Free-tier CDN propagation)
     steps:
       - name: Harden the runner (egress block)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -168,18 +168,25 @@ jobs:
           # 31-commit-old build that DOES contain an APP_VERSION.
           #
           # It now verifies the only thing worth verifying — that the site
-          # serves the bytes of the commit being deployed. Poll up to 10
-          # minutes (a no-build static publish takes ~1-2).
-          for i in $(seq 1 30); do
+          # serves the bytes of the commit being deployed. Poll up to ~18
+          # minutes: a no-build static publish uploads in ~15-30s, but CDN
+          # propagation of the fresh atomic deploy to the edge node this runner
+          # hits is SLOW and variable on the Free (nf_team_dev) tier — measured
+          # 2026-08-03 at ~12 min on three consecutive deploys, so the old
+          # 10-min window timed out here while the independent daily Site
+          # Currency probe (24h grace) confirmed the same deploys were current.
+          # This is deploy-lag tolerance, NOT a weakening of the drift check:
+          # the content comparison stays byte-exact, only the wait is longer.
+          for i in $(seq 1 54); do
             # --quiet: an expected "not yet" poll must not file a red annotation
             # on a step that is about to succeed.
             if node scripts/site-currency.mjs --quiet > /tmp/currency.txt 2>&1; then
               echo "PUBLISHED: the live site now serves this commit."
               exit 0
             fi
-            echo "  not published yet (check $i/30) — waiting 20s"
+            echo "  not published yet (check $i/54) — waiting 20s"
             sleep 20
           done
           cat /tmp/currency.txt
-          echo "::error::Build was triggered but after 10 minutes the live site still does not serve this commit's assets (see the divergences listed above) — check the deploy log in the Netlify UI (app.netlify.com/projects/hawkeye-sterling-ra/deploys)."
+          echo "::error::Build was triggered but after ~18 minutes the live site still does not serve this commit's assets (see the divergences listed above) — check the deploy log in the Netlify UI (app.netlify.com/projects/hawkeye-sterling-ra/deploys)."
           exit 1
