@@ -29,6 +29,8 @@ import os
 import screen
 import kyc
 import txn_monitor
+import ai
+import str_dossier
 
 # ── input caps (defence in depth on untrusted MCP arguments) ──────────────────
 MAX_NAME_LEN = 512
@@ -243,6 +245,62 @@ def jurisdiction_risk(country="", nationalities=None):
     }
 
 
+# ── TOOL: name_variants ───────────────────────────────────────────────────────
+def name_variants(name):
+    """Return the transliteration-equivalent spellings the matcher screens under
+    (Mohammed/Muhammad, Abdul/Abdel, bin/ibn …), including the name itself. Makes
+    screening recall transparent: it shows WHY a fuzzy hit fired, or which
+    spellings a subject was actually checked against."""
+    s = _req_str(name, "name")
+    # ai.name_variants returns a set — sort to a deterministic, JSON-serialisable list.
+    variants = sorted(ai.name_variants(s))
+    return {"input": s, "variants": variants, "count": len(variants)}
+
+
+# ── TOOL: adverse_media_scan ──────────────────────────────────────────────────
+def adverse_media_scan(headline):
+    """Deterministically scan one news headline/snippet for the adverse-media
+    keyword taxonomy (fraud, laundering, sanctions, corruption, terrorism …).
+    No model, no network — pure keyword matching, so it never invents an
+    allegation. Returns the matched keywords; an MLRO reads the article to
+    confirm relevance."""
+    s = _req_str(headline, "headline", cap=10_000)
+    keywords = screen.match_adverse_keywords(s)
+    return {
+        "headline": s,
+        "keywords": keywords,
+        "keyword_count": len(keywords),
+        "flagged": bool(keywords),
+        "note": "keyword signal only — decision-support; an MLRO confirms the article is about the subject "
+                "and genuinely adverse before any action.",
+    }
+
+
+# ── TOOL: assemble_str_dossier ────────────────────────────────────────────────
+def assemble_str_dossier(case):
+    """Assemble a DRAFT goAML-aligned suspicious-transaction-report dossier from a
+    case object. DRAFT ONLY: it never files anything — the MLRO verifies every
+    ground and submits through goAML. Rejects an incomplete case with the exact
+    missing fields so the caller can complete it.
+
+    case: {customer:{name,...}, risk:{rating,factors}, hits:[...], subject?,
+    transactions?, indicators?, adverse_articles?, pep?, prepared_by?}.
+    """
+    if not isinstance(case, dict):
+        raise ValueError("'case' must be an object")
+    errors = str_dossier.validate_case(case)
+    if errors:
+        raise ValueError("case is incomplete: " + "; ".join(errors))
+    dossier = str_dossier.build_dossier(case)
+    return {
+        "draft": True,
+        "customer": (case.get("customer") or {}).get("name", ""),
+        "risk_rating": (case.get("risk") or {}).get("rating", ""),
+        "dossier_markdown": dossier,
+        "note": "DRAFT ONLY — not filed. The MLRO must verify every ground and submit through goAML.",
+    }
+
+
 # ── registry: the single source of truth the server builds its tool list from ──
 # name -> (callable, human description, JSON-Schema inputSchema).
 TOOLS = {
@@ -323,6 +381,36 @@ TOOLS = {
                     "description": "Nationalities of principals/UBOs (optional).",
                 },
             },
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_name_variants": (
+        name_variants,
+        name_variants.__doc__,
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string", "description": "The name to expand into spelling variants."}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_adverse_media_scan": (
+        adverse_media_scan,
+        adverse_media_scan.__doc__,
+        {
+            "type": "object",
+            "properties": {"headline": {"type": "string", "description": "The news headline/snippet to scan."}},
+            "required": ["headline"],
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_assemble_str_dossier": (
+        assemble_str_dossier,
+        assemble_str_dossier.__doc__,
+        {
+            "type": "object",
+            "properties": {"case": {"type": "object", "description": "The case object (customer, risk, hits, …)."}},
+            "required": ["case"],
             "additionalProperties": False,
         },
     ),

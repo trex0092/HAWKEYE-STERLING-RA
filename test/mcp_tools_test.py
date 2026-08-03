@@ -108,6 +108,39 @@ check("jurisdiction_risk returns a shape with tier + list_available", "tier" in 
 expect_valueerror("jurisdiction_risk needs at least one input", lambda: mcp_tools.jurisdiction_risk("", []))
 expect_valueerror("jurisdiction_risk rejects non-string nationality", lambda: mcp_tools.jurisdiction_risk("UAE", [1]))
 
+# ── mcp_tools.name_variants ───────────────────────────────────────────────────
+print("mcp_tools — name_variants")
+nv = mcp_tools.name_variants("Mohammed Al Rashid")
+check("name_variants includes the name itself and reports a count", nv["count"] == len(nv["variants"]) and nv["count"] >= 1)
+check("name_variants returns a list of strings", all(isinstance(v, str) for v in nv["variants"]))
+expect_valueerror("name_variants rejects a non-string", lambda: mcp_tools.name_variants(None))
+
+# ── mcp_tools.adverse_media_scan ──────────────────────────────────────────────
+print("mcp_tools — adverse_media_scan")
+am = mcp_tools.adverse_media_scan("Trader charged in money laundering and fraud scheme")
+check("adverse_media_scan flags a clearly adverse headline", am["flagged"] is True and am["keyword_count"] >= 1)
+clean_am = mcp_tools.adverse_media_scan("Company opens a new office in Dubai")
+check("adverse_media_scan does not flag a benign headline", clean_am["flagged"] is False)
+expect_valueerror("adverse_media_scan rejects a non-string", lambda: mcp_tools.adverse_media_scan(42))
+
+# ── mcp_tools.assemble_str_dossier ────────────────────────────────────────────
+print("mcp_tools — assemble_str_dossier")
+_valid_case = {
+    "customer": {"name": "EXAMPLE TRADING FZE"},
+    "risk": {"rating": "HIGH", "factors": ["sanctions name match on UBO"]},
+    "hits": [{"list": "UN Consolidated", "matched_entry": "EXAMPLE PERSON", "score": 97}],
+}
+dz = mcp_tools.assemble_str_dossier(_valid_case)
+check("assemble_str_dossier returns a DRAFT-marked markdown dossier", dz["draft"] is True
+      and isinstance(dz["dossier_markdown"], str) and "DRAFT" in dz["dossier_markdown"].upper())
+check("assemble_str_dossier carries the customer + rating", dz["customer"] == "EXAMPLE TRADING FZE" and dz["risk_rating"] == "HIGH")
+expect_valueerror("assemble_str_dossier rejects a non-object case", lambda: mcp_tools.assemble_str_dossier("nope"))
+try:
+    mcp_tools.assemble_str_dossier({"customer": {"name": ""}, "risk": {"rating": "BOGUS", "factors": []}})
+    check("assemble_str_dossier rejects an incomplete case with the missing fields", False)
+except ValueError as e:
+    check("assemble_str_dossier rejects an incomplete case with the missing fields", "incomplete" in str(e) and "hits" in str(e))
+
 # ── mcp_tools.call_tool dispatch ──────────────────────────────────────────────
 print("mcp_tools — dispatch")
 check("call_tool dispatches a known tool", mcp_tools.call_tool("hawkeye_normalize_name", {"name": "Test"})["normalized"] == "TEST")
@@ -117,6 +150,30 @@ except KeyError:
     check("call_tool raises KeyError for unknown tool", True)
 check("every registered tool has a callable, description and inputSchema",
       all(callable(v[0]) and isinstance(v[1], str) and isinstance(v[2], dict) for v in mcp_tools.TOOLS.values()))
+
+# Serialisation guard: EVERY tool's output must be JSON-serialisable, because the
+# server hands it back as JSON text — a tool returning a set/tuple/etc. crashes
+# the call at runtime (regression: name_variants returned a set). Call each tool
+# with representative valid args and assert json.dumps succeeds.
+print("mcp_tools — output serialisability (all tools)")
+_valid_args = {
+    "hawkeye_normalize_name": {"name": "Test Person"},
+    "hawkeye_screen_name": {"name": "Test Person Ltd", "watchlist": ["ACME LLC"]},
+    "hawkeye_screen_internal_watchlist": {"name": "Test Person Ltd"},
+    "hawkeye_monitor_transactions": {"transactions": [{"customer": "C", "date": "2026-01-01", "amount": 55000, "method": "cash"}]},
+    "hawkeye_analyze_kyc_note": {"notes": "SECTION 4\nIndividual 1 — Director\nName: JANE DOE\n"},
+    "hawkeye_jurisdiction_risk": {"country": "Iran"},
+    "hawkeye_name_variants": {"name": "Mohammed Abdul Rahman"},
+    "hawkeye_adverse_media_scan": {"headline": "Firm fined for fraud"},
+    "hawkeye_assemble_str_dossier": {"case": {"customer": {"name": "X FZE"}, "risk": {"rating": "HIGH", "factors": ["f"]}, "hits": [{"list": "UN", "matched_entry": "y", "score": 90}]}},
+}
+check("_valid_args covers every registered tool", set(_valid_args) == set(mcp_tools.TOOLS))
+for _tname, _targs in _valid_args.items():
+    try:
+        json.dumps(mcp_tools.call_tool(_tname, _targs))
+        check(f"{_tname} output is JSON-serialisable", True)
+    except Exception as _e:
+        check(f"{_tname} output is JSON-serialisable ({type(_e).__name__}: {_e})", False)
 
 # ── mcp_server — JSON-RPC 2.0 protocol ────────────────────────────────────────
 print("mcp_server — protocol")

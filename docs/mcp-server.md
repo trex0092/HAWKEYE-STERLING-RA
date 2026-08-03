@@ -67,6 +67,9 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | `hawkeye_monitor_transactions` | Run the FATF R.16 rule-set (cash threshold, structuring, velocity, round-amount, high-risk geography, CDD trigger) over one customer's transactions. |
 | `hawkeye_analyze_kyc_note` | Parse a structured KYC note into identity records + the CDD gaps an MLRO must close; ID numbers are privacy-masked. |
 | `hawkeye_jurisdiction_risk` | Return the FATF / locally-designated risk tier for a country and/or principals' nationalities. |
+| `hawkeye_name_variants` | Expand a name into the transliteration-equivalent spellings the matcher screens under (Mohammed/Muhammad, Abdul/Abdel, bin/ibn …) — makes fuzzy-match recall transparent. |
+| `hawkeye_adverse_media_scan` | Deterministically scan a headline for the adverse-media keyword taxonomy (fraud, laundering, sanctions, corruption, terrorism …); no model, so it never invents an allegation. |
+| `hawkeye_assemble_str_dossier` | Assemble a **DRAFT** goAML-aligned STR dossier from a case object; rejects an incomplete case with the exact missing fields. Draft only — the MLRO verifies and files. |
 
 ## Resources (read-only reference data)
 

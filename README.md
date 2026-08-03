@@ -202,9 +202,10 @@ by **09:00 UAE**:
 
 A **Model Context Protocol (MCP)** server exposes the deterministic screening
 engine — sanctions/watchlist name screening, transaction monitoring, KYC/CDD gap
-analysis and jurisdiction-risk tiering — as MCP **tools**, **resources** and
-**prompts** an AI agent (Claude Desktop, an SDK client, the MCP Inspector) can
-discover and call. MCP is the open standard that connects an AI model to external
+analysis, jurisdiction-risk tiering, transliteration-variant expansion,
+adverse-media keyword scanning and DRAFT STR-dossier assembly — as MCP **tools**,
+**resources** and **prompts** an AI agent (Claude Desktop, an SDK client, the MCP
+Inspector) can discover and call. MCP is the open standard that connects an AI model to external
 tools through one uniform interface; this server is the bridge between an agent
 and the engine that already powers the daily screening workflow.
 
