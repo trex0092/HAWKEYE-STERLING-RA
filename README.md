@@ -94,6 +94,7 @@ The core application lives in [`index.html`](index.html) with its logic in the s
 - [Screenshots](#screenshots)
 - [Features](#features)
 - [Automated daily screening engine + AI layer](#automated-daily-screening-engine--ai-layer)
+- [MCP server (AI-agent access to the engine)](#mcp-server-ai-agent-access-to-the-engine)
 - [Risk methodology](#risk-methodology)
 - [Data management & privacy](#data-management--privacy)
 - [Device security](#device-security)
@@ -196,6 +197,33 @@ by **09:00 UAE**:
 - **Runtime credential scoping** — a credential broker hands a secret to an agent only if it is authorized for an action that needs it; every grant/denial is logged and **the secret value is never recorded** (presence is masked).
 - **QA / governance gate** — before publish, a deterministic gate verifies degrade-loudly, that every finding carries its source, that no prompt-injection item was model-classified, and that every flagged subject has a risk rating; failures surface as **⚠ ATTENTION** in the report, never silently passed.
 - **Observability** — the report's **§⑥ Agentic Operating Model** prints the full agent audit trail + QA gate + credential-scoping summary for every run.
+
+## MCP server (AI-agent access to the engine)
+
+A **Model Context Protocol (MCP)** server exposes the deterministic screening
+engine — sanctions/watchlist name screening, transaction monitoring, KYC/CDD gap
+analysis and jurisdiction-risk tiering — as MCP **tools**, **resources** and
+**prompts** an AI agent (Claude Desktop, an SDK client, the MCP Inspector) can
+discover and call. MCP is the open standard that connects an AI model to external
+tools through one uniform interface; this server is the bridge between an agent
+and the engine that already powers the daily screening workflow.
+
+- **Zero new dependencies.** The stdio transport (newline-delimited JSON-RPC 2.0)
+  is implemented in the Python standard library — no `mcp`/FastMCP install,
+  nothing added to `ci/requirements.txt`, no new supply-chain surface.
+- **Decision-support only.** Every tool is read-only, deterministic and offline;
+  nothing onboards, files or freezes — an MLRO adjudicates every result.
+- **Untrusted input.** Tool arguments come from an LLM and are type-checked and
+  size-capped at the boundary before reaching the engine.
+
+```bash
+pip install --require-hashes -r ci/requirements.txt   # engine runtime deps
+python3 mcp_server.py                                  # serve on stdio
+```
+
+Files: [`mcp_server.py`](mcp_server.py) (transport), [`mcp_tools.py`](mcp_tools.py)
+(engine wrappers), [`test/mcp_tools_test.py`](test/mcp_tools_test.py) (tests,
+wired into CI). Full reference: [`docs/mcp-server.md`](docs/mcp-server.md).
 
 ## Risk methodology
 
@@ -355,6 +383,10 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 ├── app.css                     # Application styles (externalised for a pure-'self' CSP)
 ├── console.js / advisor.js     # Logic for the console + advisor pages
 ├── fonts.css / assets/fonts/   # Self-hosted web fonts (no third-party origin)
+├── mcp_server.py               # MCP stdio server (zero-dep JSON-RPC 2.0) exposing the engine
+├── mcp_tools.py                # Deterministic MCP tool wrappers over screen/kyc/txn_monitor
+├── test/mcp_tools_test.py      # MCP server + tool-layer unit tests
+├── docs/mcp-server.md          # MCP server reference (tools, resources, prompts, safety)
 ├── test/app.test.js            # Functional test suite (no dependencies)
 ├── test/watchdog.test.mjs      # FATF watchdog unit tests
 ├── test/reg-watch.test.mjs     # Regulatory Watch unit tests

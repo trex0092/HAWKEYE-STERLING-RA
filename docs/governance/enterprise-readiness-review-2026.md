@@ -326,6 +326,16 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 56 workflows · 177 markdown documents under docs/ (144 excluding docs/research/auto).
+*(3 August, tenth pass — an **MCP server**. `mcp_server.py` exposes the deterministic screening engine
+(sanctions/watchlist name screening, FATF R.16 transaction monitoring, KYC/CDD gap analysis, jurisdiction-risk
+tiering) to AI agents over the Model Context Protocol, implemented in the Python standard library alone —
+zero new dependencies, nothing added to `ci/requirements.txt`, no new supply-chain surface. `mcp_tools.py`
+holds the deterministic, decision-support-only tool wrappers (arguments validated and size-capped at the
+boundary) and `test/mcp_tools_test.py` — wired into ci.yml — covers both the tool layer and the JSON-RPC 2.0
+protocol surface. One curated document added (`docs/mcp-server.md`); no workflow added; no scored control
+changed — every tool is decision-support only, consistent with the existing engine posture.)*
+
 Verified at HEAD: 56 workflows · 176 markdown documents under docs/ (143 excluding docs/research/auto).
 *(29 July, ninth pass — the **governance chain**. The estate slices its governance four ways — a five-level
 stack, a six-layer agentic model, a seven-stage lifecycle, an eleven-stage PbG map — and every one is a

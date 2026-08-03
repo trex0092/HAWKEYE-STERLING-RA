@@ -196,7 +196,7 @@ jobs:
         # so they compile here with everything else.
         # str_dossier.py was missing from this list while being exercised by
         # test/engine_test.py — tested, but never syntax-gated.
-        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py str_dossier.py scripts/matcher-parity-probe.py scripts/daily-screen-fetch.py scripts/daily-screen-run.py scripts/daily-screen-report.py
+        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py str_dossier.py mcp_tools.py mcp_server.py scripts/matcher-parity-probe.py scripts/daily-screen-fetch.py scripts/daily-screen-run.py scripts/daily-screen-report.py
       - name: Run cross-engine matcher parity (screen.py vs sanctions-match.mjs)
         # Runs here, AFTER setup-python, because it drives both engines: the node
         # test shells to scripts/matcher-parity-probe.py. The per-backend accuracy
@@ -205,6 +205,8 @@ jobs:
         run: node test/matcher-parity.test.mjs
       - name: Run Python engine unit tests (screen + ai + agents + kyc + txn + monitoring)
         run: python test/engine_test.py
+      - name: Run MCP server + tool-layer unit tests (protocol + engine wrappers)
+        run: python test/mcp_tools_test.py
       - name: Run formal bias / fairness evaluation (R-05 — cross-script recall parity)
         run: python test/bias_eval.py
       - name: Run screening accuracy benchmark — Python difflib backend (labelled corpus, CI floors)
