@@ -285,4 +285,6 @@ if __name__ == "__main__":
     try:
         serve()
     except KeyboardInterrupt:
-        pass
+        # Ctrl-C / SIGINT is the normal way to stop a stdio server — exit
+        # quietly with no traceback rather than treating it as an error.
+        log("interrupted — shutting down")
