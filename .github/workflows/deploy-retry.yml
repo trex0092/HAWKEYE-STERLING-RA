@@ -1,0 +1,79 @@
+name: Deploy Retry
+
+# A production-deploy verification killed by runner infrastructure used to
+# leave a permanent red that nobody retried: on 2026-08-04 four consecutive
+# runner-shutdown signals (polls 35/39/40/32 of the ~18-minute publish-verify
+# loop — the only job in this repo that lives past five minutes) each ended a
+# "Netlify Production Deploy" run as failure while the deploy itself was fine.
+# Open-actions register item 26 owns that gap; this workflow is its first
+# half: a failed deploy run re-dispatches the workflow ONCE, capped, so an
+# infrastructure kill self-heals while a genuine verification failure still
+# lands red in front of a human.
+#
+# Degrade loudly, never silently:
+#   - the failed run KEEPS its red — nothing here rewrites history;
+#   - the re-dispatch is capped at 3 production-deploy runs per UTC day; at
+#     the cap THIS run goes red and says so instead of looping the build hook
+#     (a Netlify build spends the team's build minutes);
+#   - a re-dispatched run that fails again counts toward the cap, so the
+#     chain is: push-run red -> one automatic retry -> human.
+
+on:
+  workflow_run:
+    workflows: ["Netlify Production Deploy (build hook)"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-retry
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    permissions:
+      actions: write # list the day's deploy runs + dispatch the deploy workflow
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      - name: Re-dispatch once, capped per UTC day
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const wf = 'netlify-production-deploy.yml';
+            const today = new Date().toISOString().slice(0, 10);
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: wf,
+              created: `>=${today}T00:00:00Z`,
+              per_page: 50,
+            });
+            const todayRuns = data.workflow_runs.length;
+            core.info(`production-deploy runs today (UTC): ${todayRuns}`);
+            core.info(`failed run being handled: ${context.payload.workflow_run.html_url}`);
+            if (todayRuns >= 3) {
+              await core.summary
+                .addRaw(`Deploy retry cap reached: ${todayRuns} production-deploy runs today (max 3). `)
+                .addRaw('Not re-dispatching — a human look is needed, not another build (register item 26).')
+                .write();
+              core.setFailed(`retry cap: ${todayRuns} deploy runs today — investigate the failed run instead of re-building.`);
+              return;
+            }
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: wf,
+              ref: 'main',
+            });
+            core.notice(`Re-dispatched ${wf} once (${todayRuns} run(s) already today, cap 3).`);

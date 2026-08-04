@@ -326,6 +326,17 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 58 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(4 August, thirteenth pass — **deploy self-heal + self-identifying drift**. Same-day follow-through on
+register item 26's first half after four runner-shutdown kills ended production-deploy verifications as
+red with the deploy itself healthy: `deploy-retry.yml` re-dispatches a failed "Netlify Production Deploy"
+run once, capped at three deploy runs per UTC day — the failed run keeps its red, the cap goes red itself
+rather than looping the build hook. And the afternoon's HTML-drift diagnosis (three shells mutated at
+serve time, every other asset byte-identical) took Netlify API archaeology because `site-currency.mjs`
+reported hashes only — it now prints a bounded excerpt of the first divergent region per stale asset, so
+the next injector names itself in the failing log. Verification + automation additions only — no scored
+control changed.)*
+
 Verified at HEAD: 57 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
 *(4 August, twelfth pass — **the self-accounting cycle**. The August 2026 full-repo audit closed the
 estate's accounting gaps: a documentation map (`docs/README.md`), a data-provenance dictionary
