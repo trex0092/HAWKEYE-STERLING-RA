@@ -25,6 +25,10 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [explainability-statement-2026.md](explainability-statement-2026.md) | How outputs are interpretable; stated limits | NIST AI RMF MAP; AI Act Art. 13-style |
 | [grc-cybersecurity-model.md](grc-cybersecurity-model.md) | How the GRC layer and the security controls form one loop | NIST CSF GOVERN; ISO 42001 |
 | [adr-001-deterministic-vs-learned.md](adr-001-deterministic-vs-learned.md) | Why the operative core is deterministic; revisit triggers + governed path to a first learned model | ADR; SR 11-7 |
+| [adr-002-zero-runtime-dependencies.md](adr-002-zero-runtime-dependencies.md) | Why the served app has no runtime deps and the MCP server is stdlib-only; the supply-chain rationale | ADR |
+| [adr-003-pure-self-csp.md](adr-003-pure-self-csp.md) | Why the CSP is pure-`'self'` with nothing inline, and what sustains it | ADR |
+| [adr-004-client-side-persistence.md](adr-004-client-side-persistence.md) | Why persistence is on-device and endpoints are effectively public — costs owned, exit path registered (items 20/23) | ADR |
+| [adr-005-dual-engine-matcher.md](adr-005-dual-engine-matcher.md) | Why the matcher exists twice (py + mjs), the parity + recall-monotone rules, consolidation owned by item 27 | ADR |
 
 ## Framework mappings & assessments
 

@@ -6,7 +6,7 @@
    workflow and docs counts, so any change to the estate forces a conscious
    re-verification (and, when warranted, a re-score) of the review.
    Usage: node test/readiness-review.test.mjs */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { countWorkflows, countDocs, countAutoDocs } from '../scripts/board-figures.mjs';
@@ -37,6 +37,24 @@ if (m) {
   const autoDocs = countAutoDocs();
   check(`addendum docs count matches disk (${docsClaim} vs ${docsTotal})`, docsClaim === docsTotal);
   check(`addendum curated-docs count matches disk (${curatedClaim} vs ${docsTotal - autoDocs})`, curatedClaim === docsTotal - autoDocs);
+}
+
+/* ── §5 anti-rot guard ───────────────────────────────────────────────────
+   The §5 gap table marked six artefacts ✗ (missing) for weeks after they
+   shipped — model cards, the architecture set, the KPI dashboard, the demo
+   pack, the executive brief, the committee charter — because nothing tied a
+   ✗ verdict to the disk it described. This fails any row still claiming ✗
+   whose backticked docs/ path exists. Bare-filename proposals (e.g. "extend
+   ai-frameworks-crosswalk-2026.md") stay legal: the FILE existing is not the
+   EXTENSION existing, so only docs/-prefixed paths are treated as the claim
+   "this artefact does not exist". */
+const gapRows = review.split('\n').filter((l) => /^\|.*\|\s*✗\s*\|/.test(l));
+for (const row of gapRows) {
+  const label = (row.match(/^\|\s*([^|]+?)\s*\|/) || [, 'unlabelled'])[1];
+  const claimed = [...row.matchAll(/`(docs\/[^`]+)`/g)].map((m) => m[1]);
+  const existing = claimed.filter((p) => existsSync(join(ROOT, p)));
+  check('§5 row "' + label + '" marked ✗ names no docs/ path that already exists' +
+    (existing.length ? ' — stale: ' + existing.join(', ') : ''), existing.length === 0);
 }
 
 /* ── README honesty section ──────────────────────────────────────────────
