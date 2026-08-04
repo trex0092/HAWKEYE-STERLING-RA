@@ -10,8 +10,8 @@ abstract: >-
 type: software
 authors:
   - name: "Hawkeye Sterling"
-version: "3.7.2"
-date-released: "2026-06-26"
+version: "3.8.0"
+date-released: "2026-08-04"
 license: LicenseRef-Proprietary
 repository-code: "https://github.com/trex0092/HAWKEYE-STERLING-RA"
 url: "https://hawkeye-sterling-ra.netlify.app"

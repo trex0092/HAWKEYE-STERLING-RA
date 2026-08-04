@@ -36,7 +36,7 @@ import agents
 import mcp_tools
 
 SERVER_NAME = "hawkeye-sterling-aml"
-SERVER_VERSION = "3.7.2"
+SERVER_VERSION = "3.8.0"
 # Protocol revisions this server understands; it echoes the client's requested
 # version when supported, else offers its preferred (newest) one.
 SUPPORTED_PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")

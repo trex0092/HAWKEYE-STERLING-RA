@@ -435,7 +435,7 @@ function renderQa(){
   $('main').innerHTML =
     '<div class="qa-wrap">'
     + '<div class="sec-lbl"><span>Regulatory Q&amp;A</span><i></i></div>'
-    + '<div class="qa-desc">Source-cited regulatory questions, grouped by topic and grounded in UAE Federal Decree-Law No. 10 of 2025, Cabinet Decision 134/2025 and FATF. Pick a question to read its cited answer.</div>'
+    + '<div class="qa-desc">Source-cited regulatory questions, grouped by topic and grounded in UAE Federal Decree-Law No. 10 of 2025, Cabinet Resolution No. (134) of 2025 and FATF. Pick a question to read its cited answer.</div>'
     + '<input class="qa-filter" id="qaFilter" aria-label="Filter questions" placeholder="Filter questions…">'
     + '<div class="reg-groups" id="regGroups"></div>'
     + '</div>';
@@ -493,7 +493,7 @@ const TOOL_BAND = {CDD:'Customer Due Diligence', SDD:'Simplified Due Diligence',
 const TOOL_CFA = {IR:'Iran', KP:'North Korea', MM:'Myanmar', IRAN:'Iran', 'NORTH KOREA':'North Korea', MYANMAR:'Myanmar'};
 const CITED_FRAMEWORK = [
   {ref:'UAE Federal Decree-Law No. 10 of 2025', note:'AML/CFT framework — CDD, record-keeping, STR and targeted financial sanctions.'},
-  {ref:'Cabinet Decision No. 134 of 2025', note:'Implementing regulation — risk-based procedures and reporting obligations.'},
+  {ref:'Cabinet Resolution No. (134) of 2025', note:'Implementing regulation (Executive Regulations of FDL 10/2025) — risk-based procedures and reporting obligations.'},
   {ref:'FATF Recommendations', note:'International AML/CFT standards (Recs 1, 6, 10, 12, 19, 20, 22-25).'}
 ];
 const GROUP_PLAY = {

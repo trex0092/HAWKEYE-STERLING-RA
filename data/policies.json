@@ -591,6 +591,23 @@
       "review_cadence_months": 3,
       "next_review": "2026-09-30",
       "note": "Registered 2026-07-28. The change-control instrument the prompt register already cites as its authority — it governed changes while sitting outside the register that tracks instruments."
+    },
+    {
+      "id": "POL-37",
+      "title": "Deploy Rollback Runbook",
+      "path": "docs/security/deploy-rollback-runbook.md",
+      "type": "runbook",
+      "owner": "Repo owner",
+      "approver": "Repo owner",
+      "status": "in-force",
+      "version": "1.0",
+      "approved_on": null,
+      "approval_basis": "operative-on-publication",
+      "approval_note": "Operative on publication (2026-08-04); an operational recovery procedure, not a Board instrument.",
+      "review_cadence_months": 12,
+      "next_review": "2027-08-04",
+      "open_action": 26,
+      "note": "Fast-pin vs revert paths with byte-exact site-currency verification; automation of the re-run/rollback is open-actions item 26."
     }
   ],
   "excluded": [
