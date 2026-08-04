@@ -326,6 +326,15 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 57 workflows · 177 markdown documents under docs/ (144 excluding docs/research/auto).
+*(4 August, eleventh pass — **Dependabot auto-rebase**. `dependabot-autorebase.yml` closes the automation
+gap that strict up-to-date protection left in the Dependabot flow: when one armed bump merged, every other
+approved, CI-green bump was stranded "behind" until a hand-clicked "Update branch" (#383/#384 this morning).
+The sweep comments `@dependabot rebase` on armed-but-behind Dependabot PRs — Dependabot's own force-push
+re-runs the checks, so the approve-once-lands-itself promise of `dependabot-automerge.yml` now holds across
+a multi-PR weekly batch. Egress-blocked, comment-only, majors untouched. Automation addition only — no
+scored control changed.)*
+
 Verified at HEAD: 56 workflows · 177 markdown documents under docs/ (144 excluding docs/research/auto).
 *(3 August, tenth pass — an **MCP server**. `mcp_server.py` exposes the deterministic screening engine
 (sanctions/watchlist name screening, FATF R.16 transaction monitoring, KYC/CDD gap analysis, jurisdiction-risk
