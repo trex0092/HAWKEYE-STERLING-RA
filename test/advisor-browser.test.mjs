@@ -98,7 +98,7 @@ async function ask(payload) {
 const OK_BASE = {
   ok: true, text: 'Deterministic answer body.', mode: 'deep', model: 'claude-sonnet-5',
   elapsedMs: 900, tippingOffFlagged: false, piiFlagged: [], structureFlagged: false,
-  budgetFlagged: false, latencyFlagged: false, hallFlagged: false, injectionFlagged: false,
+  budgetFlagged: false, latencyFlagged: false, hallFlagged: false, citeFlagged: [], injectionFlagged: false,
   anomFlagged: false, quality: 90, auditLine: 'AUDIT | model=claude-sonnet-5 | mode=deep',
 };
 

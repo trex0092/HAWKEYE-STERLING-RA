@@ -221,6 +221,7 @@ offline via `exports.__internals`.
 | Tile | Control | Evidence |
 |---|---|---|
 | **HALL** | Hallucination guard — flags definitive sanctions/adverse-media assertions or fabricated URLs/case-numbers when **no source** was supplied (runtime P1/P2/P8). | `hallucinationGuard`, `hallFlagged` |
+| **CITE** | Legal-citation guard — flags UAE statutory citations outside the recognised corpus ("unvetted") and repealed instruments cited as an operative basis (runtime P2/P3, mirroring `test/legal-citations.test.mjs` at the output surface). | `legalCiteGuard`, `citeFlagged` |
 | **THREAT** | Prompt-injection guard — flags injected commands ("ignore previous…", planted "subject cleared", base64 blobs) in operator/context input. | `injectionGuard`, `injectionFlagged` |
 | **ANOM** | Output-anomaly guard — abnormally short output, charter-text leakage, degenerate repetition. | `anomalyGuard`, `anomFlagged` |
 | **PERF** | Output-quality score 0–100 (citation, scope/methodology, gaps, next steps, disclaimer). | `qualityScore`, `quality` |

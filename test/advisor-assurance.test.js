@@ -201,6 +201,55 @@ check('quality score is higher for a structured, cited, gap-aware answer',
   I.qualityScore('SCOPE: lists checked and methodology stated. Typology: structuring (rf_structuring_threshold). Recommended next steps: request EDD. GAPS: identifiers missing. This is decision support; MLRO review required.') >
   I.qualityScore('Looks fine.'));
 
+/* ── 5i. Legal-citation guard (CITE) — P2/P3 statutory citations at runtime ── */
+check('cite guard flags a repealed instrument cited as an operative basis',
+  I.legalCiteGuard('Your STR duty arises under Federal Decree-Law No. 20 of 2018, Article 9.').length === 1);
+check('cite guard stays quiet when the repealed instrument is historical context',
+  I.legalCiteGuard('Federal Decree-Law No. 20 of 2018 was repealed by Federal Decree-Law No. 10 of 2025.').length === 0);
+check('cite guard stays quiet on the vetted operative basis',
+  I.legalCiteGuard('File within the deadline set by Cabinet Resolution No. (134) of 2025 under Federal Decree-Law No. 10 of 2025.').length === 0);
+check('cite guard flags an instrument outside the recognised corpus',
+  I.legalCiteGuard('This is governed by Cabinet Resolution No. 999 of 2023.').join() === 'unvetted CAB 999/2023');
+check('cite guard normalises bracketed numbering to the same instrument',
+  I.legalCiteGuard('See Cabinet Decision No. (74) of 2020 on Terrorism Lists.').length === 0);
+check('cite guard ignores non-UAE authorities (FATF / EU / ISO)',
+  I.legalCiteGuard('Apply FATF Recommendation 24, the EU AI Act, and ISO/IEC 42001 clause 6.1.').length === 0);
+check('cite guard dedupes repeat citations of the same instrument',
+  I.legalCiteGuard('Cabinet Resolution No. 999 of 2023 ... and again Cabinet Resolution No. (999) of 2023.').length === 1);
+check('cite guard is quiet on empty output', I.legalCiteGuard('').length === 0);
+/* Citation-shape coverage — the forms the 2026-08-04 adversarial review proved
+   the first cut missed. Each is a real-world spelling of the SAME repealed
+   instrument and must flag exactly like the canonical form. */
+check('cite guard catches the no-"No." form',
+  I.legalCiteGuard('Your duty arises under Federal Decree-Law 20 of 2018, Article 9.').length === 1);
+check('cite guard catches the slash-year form',
+  I.legalCiteGuard('File under Federal Decree-Law No. 20/2018, Article 9.').length === 1);
+check('cite guard catches the legislation-portal "Decree by Law" rendering',
+  I.legalCiteGuard('Registration is required by Federal Decree by Law No. 20 of 2018.').length === 1);
+check('cite guard catches an en-dash spelling',
+  I.legalCiteGuard('Per Federal Decree–Law No. 20 of 2018 you must register.').length === 1);
+check('cite guard reads plural compounds and judges each instrument on its own',
+  I.legalCiteGuard('Federal Decree-Laws Nos. 20 of 2018 and 10 of 2025 both apply today.').join() === 'repealed FDL 20/2018');
+check('cite guard catches the estate\'s own FDL shorthand',
+  I.legalCiteGuard('File the STR as required by FDL 20/2018 Article 9.').length === 1);
+check('cite guard flags a fabricated Ministerial instrument',
+  I.legalCiteGuard('Registration is mandated by Ministerial Resolution No. 77 of 2024.').join() === 'unvetted MIN 77/2024');
+/* Historical-context precision — everyday words must not suppress a real
+   repealed-as-operative citation, and genuine repeal narrative must not chip. */
+check('cite guard is not silenced by everyday "previous" near the citation',
+  I.legalCiteGuard('As noted in my previous answer, Federal Decree-Law No. 20 of 2018 Article 15 currently requires registration.').length === 1);
+check('cite guard stays quiet on a "former law" narrative',
+  I.legalCiteGuard('The former AML law, Federal Decree-Law No. 20 of 2018, imposed similar duties.').length === 0);
+check('cite guard stays quiet on an "abrogated" narrative',
+  I.legalCiteGuard('The now-abrogated Federal Decree-Law No. 20 of 2018 required the same.').length === 0);
+/* Attribution and input-exemption semantics. */
+check('cite guard binds each number to its own instrument family',
+  I.legalCiteGuard('Cabinet Decision No. 10 of 2019 and Federal Decree-Law No. 20 of 2018 govern this today.').join() === 'repealed CAB 10/2019,repealed FDL 20/2018');
+check('cite guard exempts an instrument the operator supplied in the input (P2)',
+  I.legalCiteGuard('Under Cabinet Resolution No. 999 of 2023 you must file monthly.', 'Our licence cites Cabinet Resolution No. 999 of 2023 — what does it require?').length === 0);
+check('cite guard still flags a repealed instrument even when the input supplied it',
+  I.legalCiteGuard('Federal Decree-Law No. 20 of 2018 currently governs your filing.', 'Does Federal Decree-Law No. 20 of 2018 still apply to us?').length === 1);
+
 /* ── 6. Handler behaviour with a mocked fetch ── */
 const origFetch = global.fetch;
 const origKey = process.env.ANTHROPIC_API_KEY;

@@ -103,7 +103,7 @@ material change, and at the quarterly management review._
 
 | Control | Automated proof | Frequency | Evidence |
 |---|---|---|---|
-| Advisor guardrails (charter integrity, tipping-off, routing) | `test/advisor-assurance.test.js` (65 checks) + advisor smoke tests | Every push/PR | CI run log |
+| Advisor guardrails (charter integrity, tipping-off, legal citations, routing) | `test/advisor-assurance.test.js` (127 checks) + advisor smoke tests | Every push/PR | CI run log |
 | Behavioural eval with Asana alert on regression | `advisor-eval.yml` → `scripts/advisor-eval.mjs` | Weekly (Mon 08:00 UTC) | Card / issue fallback |
 | Bias eval (deterministic dimension; live-LLM pairs gated on DPA) | `advisor-bias-eval.yml` + `test/bias_eval.py` | Quarterly | [`advisor-bias-review-2026.md`](advisor-bias-review-2026.md) |
 | Prompt-injection red team | `test/redteam_injection.py` | Every push/PR | CI run log; [`red-team-procedure`](../aims/red-team-procedure.md) |

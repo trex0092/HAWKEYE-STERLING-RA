@@ -100,11 +100,17 @@ P1.  YOU WILL NOT ASSERT THAT ANY PERSON, ENTITY, VESSEL, AIRCRAFT, ADDRESS,
      asserted."
 
 P2.  YOU WILL NOT FABRICATE ADVERSE MEDIA, CITATIONS, URLS, CASE NUMBERS,
-     REGULATOR PRESS RELEASES, COURT FILINGS, PARAGRAPH REFERENCES, OR
-     JOURNALIST NAMES. Every adverse media claim must be traceable to source
-     text present in the input. If no source text is supplied, respond:
-     "No source material provided. Adverse media cannot be assessed without
-     primary sources."
+     REGULATOR PRESS RELEASES, COURT FILINGS, PARAGRAPH REFERENCES,
+     JOURNALIST NAMES, OR STATUTORY PROVISIONS. Every adverse media claim
+     must be traceable to source text present in the input. If no source text
+     is supplied, respond: "No source material provided. Adverse media cannot
+     be assessed without primary sources." Cite UAE legal instruments ONLY
+     from the vetted operative basis — Federal Decree-Law No. 10 of 2025 and
+     its Executive Regulation, Cabinet Resolution No. (134) of 2025 — or from
+     instruments supplied in the current input. NEVER quote or paraphrase an
+     article you cannot ground in supplied text: if unsure of the exact
+     instrument, number, or article, SAY SO. An approximated citation is a
+     fabricated one.
 
 P3.  YOU WILL NOT GENERATE LEGAL CONCLUSIONS. Describe observable facts and
      flag them as indicators, red flags, or typology matches. Final legal
@@ -499,6 +505,120 @@ function hallucinationGuard(text, hasSources) {
   // A proper P1/P2 refusal explicitly declares the absence of sources — never a hallucination.
   if (/\bno\s+(?:authoritative\s+)?(?:source|sanctions?\s+list|primary\s+sources?|list\s+(?:supplied|provided))\b/i.test(s)) return false;
   return HALL_ASSERTION_PATTERNS.some(re => re.test(s)) || HALL_CITATION_PATTERNS.some(re => re.test(s));
+}
+
+// ── LEGAL-CITATION GUARD (CITE) ─────────────────────────────────────────────────
+// P2/P3's runtime counterpart for STATUTORY citations — the surface HALL does
+// not cover. A UAE instrument cited outside the estate's recognised corpus is
+// either fabricated or unvetted, and a repealed instrument cited as a current
+// basis repeats at runtime exactly the drift the repo-level guard
+// (test/legal-citations.test.mjs) exists to prevent in committed files — where
+// that static guard cannot see. Flags (never withholds): the operator gets a
+// CITE chip naming the citation to verify against the basis list. Non-UAE
+// authorities (FATF recommendations, EU acts, ISO standards) are out of scope —
+// the pattern matches only the UAE instrument citation forms.
+// Family token, matched separately from the number/year pair so real-world
+// citation shapes all resolve: "No. 10 of 2025", "10 of 2025" (no No. token),
+// "No. 10/2025" (slash year), "Decree by Law" (the official legislation-portal
+// rendering), "Decree–Law" (en dash), plural compounds ("Decree-Laws Nos. 45
+// of 2021 and 10 of 2025") and the estate's own "FDL 10/2025" shorthand.
+// "Federal Law" deliberately collapses into the FDL family: the guard hunts
+// fabricated and repealed instruments, and flagging every series slip
+// ("Federal Law" for "Federal Decree-Law") would teach operators to ignore
+// the chip — series precision stays with the MLRO.
+const CITE_FAMILY_RE = /\b(Federal\s+Decree(?:[-\s–—]\s*|\s+by\s+)Laws?|Federal\s+Laws?|Cabinet\s+Resolutions?|Cabinet\s+Decisions?|Ministerial\s+(?:Resolutions?|Decisions?)|FDL)\b/gi;
+// number/year pair(s) following a family token: "(134) of 2025", "Nos. 45 of
+// 2021 and 10 of 2025", "10/2025". Year is constrained to 19xx/20xx so prose
+// like "45 of 60 cases" never reads as an instrument.
+const CITE_PAIR_RE = /\(?(\d{1,4})\)?\s*(?:of\s+((?:19|20)\d{2})|\/\s*((?:19|20)\d{2}))/g;
+// The deliberately NARROW vetted set the guard stays quiet on — the operative
+// AML basis plus the current-instrument citations the estate itself makes.
+// "Unvetted" does not mean "wrong": a real instrument outside this set still
+// gets a chip, because the operator — not the model — is the one who vets it.
+// (Charter P2 names only FDL 10/2025 + CR 134/2025 as the citation basis; the
+// guard recognises slightly more so routine PDPL/TFS/tax references the estate
+// itself cites do not train operators to dismiss the chip.)
+const CITE_RECOGNIZED = new Set([
+  'FDL 10/2025',  // Federal Decree-Law No. 10 of 2025 — the operative AML/CFT law
+  'CAB 134/2025', // Cabinet Resolution No. (134) of 2025 — its Executive Regulation
+  'CAB 74/2020',  // Cabinet Decision No. (74) of 2020 — TFS / sanctions-list implementation
+  'FDL 45/2021',  // Federal Decree-Law No. 45 of 2021 — PDPL (data protection)
+  'FDL 47/2022',  // Federal Decree-Law No. 47 of 2022 — corporate tax (cited in the governance corpus)
+  'FDL 7/2024',   // Federal Decree-Law No. (7) of 2024 — tax procedures (cited in the governance corpus)
+  // Instruments the Super Tools Q&A corpus (assets/super-data.js) and the
+  // regulatory-source registry cite — their questions reach this Advisor
+  // verbatim via "Take to the advisor", so correct answers on the estate's own
+  // topics must not chip:
+  'CAB 58/2020',  // Cabinet Decision No. (58) of 2020 — beneficial-ownership (UBO) regulation
+  'CAB 109/2023', // Cabinet Decision No. (109) of 2023 — UBO regulation amendment
+  'CAB 57/2018',  // Cabinet Decision No. (57) of 2018 — cited by the Q&A corpus
+  'CAB 57/2020',  // Cabinet Decision No. (57) of 2020 — cited by the Q&A corpus
+  'CAB 111/2022', // Cabinet Decision No. (111) of 2022 — cited by the Q&A corpus
+  'FDL 26/2021',  // Federal Decree-Law No. 26 of 2021 — AML amendment law (data/reg-sources.json)
+  'FDL 33/2021',  // Federal Decree-Law No. 33 of 2021 — labour law (the Advisor's HR domain)
+  'FDL 7/2014',   // Federal Law No. 7 of 2014 — counter-terrorism offences (TF topics)
+]);
+const CITE_REPEALED = {
+  'FDL 20/2018': 'repealed by Federal Decree-Law No. 10 of 2025',
+  'CAB 10/2019': 'superseded by Cabinet Resolution No. (134) of 2025',
+  'FDL 4/2002': 'the original AML law, repealed by Federal Decree-Law No. (20) of 2018 and in turn by FDL 10/2025',
+};
+// Markers that tie a repealed instrument to HISTORICAL narrative. Precise
+// legal-history vocabulary only: everyday advisory words ("previous",
+// "historic", bare "replace") appeared near enough real sentences to suppress
+// genuine repealed-as-operative citations, so they are deliberately absent —
+// the cost is an occasional chip on an unusual repeal narrative, which is the
+// safe direction for a verify-this signal.
+const CITE_HISTORICAL_RE = /repeal|supersed|abrogat|\bformer(?:ly)?\b|replaced\s+by|no\s+longer\s+in\s+force|\bold\s+law\b|\bprior\s+law\b|predecessor/i;
+function citeFamilyKey(token) {
+  if (/^cabinet/i.test(token)) return 'CAB';
+  if (/^ministerial/i.test(token)) return 'MIN';
+  return 'FDL'; // Federal Decree-Law / Federal Law / the FDL shorthand
+}
+// Extract "FAMILY n/yyyy" keys with their positions. Each family token owns
+// the pairs in a bounded window that STOPS at the next family token, so in
+// "Cabinet Resolution No. 10 of 2019 and Federal Decree-Law No. 20 of 2018" (both repealed/superseded)
+// each pair binds to its own instrument family, never its neighbour's.
+function citeExtract(text) {
+  const s = String(text || '');
+  const fams = [];
+  const famRe = new RegExp(CITE_FAMILY_RE.source, 'gi');
+  let f;
+  while ((f = famRe.exec(s)) !== null) fams.push({ token: f[1], start: f.index, end: f.index + f[0].length });
+  const found = [];
+  for (let i = 0; i < fams.length; i++) {
+    const windowEnd = Math.min(fams[i].end + 100, i + 1 < fams.length ? fams[i + 1].start : s.length);
+    const windowText = s.slice(fams[i].end, windowEnd);
+    const pairRe = new RegExp(CITE_PAIR_RE.source, 'g');
+    let p;
+    while ((p = pairRe.exec(windowText)) !== null) {
+      found.push({ key: citeFamilyKey(fams[i].token) + ' ' + Number(p[1]) + '/' + (p[2] || p[3]), at: fams[i].end + p.index });
+    }
+  }
+  return found;
+}
+function legalCiteGuard(text, inputText) {
+  const s = String(text || '');
+  // Charter P2 permits citing instruments supplied in the current input — an
+  // instrument the operator themselves pasted is verifiable, so it is exempt
+  // from the "unvetted" flag (repealed-as-operative still flags: supplying an
+  // instrument does not make citing it as CURRENT law correct).
+  const inputKeys = new Set(citeExtract(inputText).map(c => c.key));
+  const flags = [];
+  for (const c of citeExtract(s)) {
+    if (CITE_RECOGNIZED.has(c.key)) continue;
+    let marker;
+    if (c.key in CITE_REPEALED) {
+      const windowText = s.slice(Math.max(0, c.at - 90), c.at + 90);
+      if (CITE_HISTORICAL_RE.test(windowText)) continue; // repeal narrative → fine
+      marker = 'repealed ' + c.key;
+    } else {
+      if (inputKeys.has(c.key)) continue;                // operator-supplied → verifiable
+      marker = 'unvetted ' + c.key;
+    }
+    if (!flags.includes(marker)) flags.push(marker);
+  }
+  return flags;
 }
 
 // ── PROMPT-INJECTION GUARD (THREAT) ─────────────────────────────────────────────
@@ -917,6 +1037,7 @@ const handle = async (event) => {
   const latencyFlagged = budgetFlagged;                       // LAT: latency is a first-class signal
   const injectionFlagged = injectionGuard(question, context); // THREAT: input-side, independent of output
   const hallFlagged = ok && !tippingOffFlagged ? hallucinationGuard(text, hasSources) : false;
+  const citeFlagged = ok && !tippingOffFlagged ? legalCiteGuard(text, question + '\n' + context) : []; // CITE: repealed/unvetted UAE instrument citations (input-supplied instruments exempt per P2)
   const anomFlagged = ok && !tippingOffFlagged ? anomalyGuard(text, ok) : false;
   const quality = ok && !tippingOffFlagged ? qualityScore(text) : 0;
 
@@ -930,6 +1051,7 @@ const handle = async (event) => {
     (piiFlagged.length ? ' | pii=' + piiFlagged.join('+') : '') +
     (structureFlagged ? ' | structureFlagged' : '') +
     (hallFlagged ? ' | hallFlagged' : '') +
+    (citeFlagged.length ? ' | cite=' + citeFlagged.join('+') : '') +
     (injectionFlagged ? ' | injectionFlagged' : '') +
     (anomFlagged ? ' | anomFlagged' : '') +
     (latencyFlagged ? ' | latencyFlagged' : '') +
@@ -939,7 +1061,7 @@ const handle = async (event) => {
     modeDegradedReason: degradedReason || null,
     model, elapsedMs, tippingOffFlagged,
     piiFlagged, structureFlagged, budgetFlagged, latencyFlagged,
-    hallFlagged, injectionFlagged, anomFlagged, quality, auditLine });
+    hallFlagged, citeFlagged, injectionFlagged, anomFlagged, quality, auditLine });
 };
 
 // ── TEST HANDLE ────────────────────────────────────────────────────────────────
@@ -949,7 +1071,7 @@ const handle = async (event) => {
 exports.__internals = {
   SOUL_CHARTER, KNOWLEDGE_CONTEXT, TIPPING_OFF_PATTERNS, tippingOffGuard,
   PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
-  hallucinationGuard, injectionGuard, anomalyGuard, qualityScore,
+  hallucinationGuard, legalCiteGuard, CITE_RECOGNIZED, CITE_REPEALED, injectionGuard, anomalyGuard, qualityScore,
   selectModel, MODEL_BY_MODE, PLATFORM_CAP_MS, ABORT_BUDGET_MS, AFFORDABLE_TOKENS, DEEP_MIN_TOKENS, DEEP_HOP_LIMIT,
   simpleHash, buildKnowledgeContext, apiErrorHint, isUsageLimit,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
