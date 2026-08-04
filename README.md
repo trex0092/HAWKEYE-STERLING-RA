@@ -102,6 +102,7 @@ The core application lives in [`index.html`](index.html) with its logic in the s
 - [Tests](#tests)
 - [Accessibility](#accessibility)
 - [Project structure](#project-structure)
+- [System state & known limitations](#system-state--known-limitations)
 - [Contributing & support](#contributing--support)
 - [Security](#security)
 - [License](#license)
@@ -409,12 +410,57 @@ The application targets WCAG 2.1 Level AA for its core assessment workflow:
 ├── Dockerfile                  # Self-hosting image (GHCR, digest-pinned base, published per release)
 ├── netlify.toml                # Static publish config (repo root, no build)
 ├── netlify/functions/          # Serverless: Asana task delivery + risk-data mirror
-├── docs/                       # README screenshots + governance/research notes
-│   ├── governance/             # AI governance & security gap analysis
+├── docs/                       # ~190 documents — see docs/ for the full estate
+│   ├── aims/                   # ISO/IEC 42001 AIMS pack (risk register, BCP, audits…)
+│   ├── governance/             # AI policy, crosswalks, registers, ADRs, readiness review
+│   ├── policies/               # AML/CFT/CPF policy pack
+│   ├── models/                 # Per-feature model cards
+│   ├── security/               # Runbooks (history scrub, deploy rollback), scanning triage
+│   ├── architecture/           # System context, trust boundaries, data flows
+│   ├── executive/              # Brief, ROI, readiness, roadmap, KPI dashboard
+│   ├── user-guides/            # Analyst / administrator / reviewer-MLRO guides
+│   ├── api/                    # Netlify functions reference
+│   ├── research/               # Regulatory research + auto-generated updates
+│   ├── demo/                   # Demo script, sample data, scenarios
 │   └── screenshots/            # README captures of the three screens
 ├── design/                     # Original design handoff (reference only, not served logic)
+├── GOVERNANCE.md               # Repository decision rights (Board / MLRO / maintainer)
+├── MAINTAINERS.md              # Maintainer roster + succession record
+├── CLAUDE.md                   # Enforced invariants, for AI agents and second operators
 └── README.md
 ```
+
+## System state & known limitations
+
+An honest map of what runs, what waits on a human act, and where the accepted
+architectural limits are. The tracking record is the
+[open-actions register](docs/governance/open-actions-register.md); the horizon
+view is the [roadmap](docs/executive/roadmap.md).
+
+- **Transaction monitoring is built and inert.** The FATF R.16 rules engine
+  (`txn_monitor.py`) is implemented and unit-tested but INACTIVE until a
+  transaction feed is connected (`TXN_FEED_PATH`) — register item 6, risk
+  R-13. An interim manual compensating control was adopted 2026-07-29.
+- **Part of the policy pack is draft.** Two procedures are approved and in
+  force; sixteen instruments await Board approval (register item 18).
+- **Function endpoints are effectively public by design.** A static browser
+  app cannot keep a real secret; Origin and shared-token checks deter but do
+  not authenticate — [`netlify/functions/_auth.js`](netlify/functions/_auth.js)
+  states this honestly. Verified identity is register item 20.
+- **Assessments persist on-device only** (`localStorage`); the only off-device
+  copy is the override-sheet mirror. A server-side persistence tier with an
+  RPO/RTO statement is register item 23.
+- **The LLM layer ships disabled.** Every LLM path is fail-closed behind
+  `ANTHROPIC_API_KEY` *plus* an explicit opt-in flag, both default off pending
+  the Anthropic DPA — production behaviour is deterministic-only.
+- **Alert delivery is Asana-only.** A delivery failure fails the run loudly,
+  but no second channel pages anyone — register item 21.
+- **Arabic coverage is partial.** The assessment screen is fully translated;
+  console/advisor carry minimal AR chrome (register item 28), and long-form
+  legal prose stays English by recorded decision
+  ([`docs/i18n-ar-legal-review.md`](docs/i18n-ar-legal-review.md)).
+- **Accessibility** limitations are listed under
+  [Accessibility](#accessibility).
 
 ## Contributing & support
 

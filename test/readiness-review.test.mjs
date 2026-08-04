@@ -39,5 +39,19 @@ if (m) {
   check(`addendum curated-docs count matches disk (${curatedClaim} vs ${docsTotal - autoDocs})`, curatedClaim === docsTotal - autoDocs);
 }
 
+/* ── README honesty section ──────────────────────────────────────────────
+   The system's declared limitations live in the register and the AIMS pack,
+   but the README is what a first reader actually opens. This pins the
+   "System state & known limitations" section so the front door can never
+   again describe a system with no inert engine, no draft policies and no
+   unauthenticated endpoints. */
+const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
+const stateSect = (readme.split(/^## System state & known limitations$/m)[1] || '').split(/\n## /)[0];
+check('README carries a "System state & known limitations" section', stateSect.length > 0);
+check('README system-state section links the open-actions register', stateSect.includes('docs/governance/open-actions-register.md'));
+check('README system-state section names the inert transaction monitor', /txn_monitor\.py/.test(stateSect) && /INACTIVE/.test(stateSect));
+check('README system-state section states the endpoints-are-public limitation', /effectively public/.test(stateSect));
+check('README system-state section states the on-device persistence limit', /localStorage/.test(stateSect));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
