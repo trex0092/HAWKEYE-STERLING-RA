@@ -219,5 +219,30 @@ for (const k of computed.kris.filter((x) => x.breached)) {
 }
 check('breach ledger states the append-only rule', /append-only/i.test(ledger));
 
+/* ── 7. Open-actions target dates ───────────────────────────────────────────
+   The register's Target-date column is the input KRI-09 waits on. Two things
+   keep it honest: the column must exist (the scanner falls back to counting
+   every row if it vanishes, silently restoring the pre-2026-08 state), and a
+   cell may only be an ISO date or an explicit em-dash — a blank, a "TBD" or a
+   prose deadline would either undercount the gap or invent one. */
+const register = read('docs/governance/open-actions-register.md');
+const regHeader = (register.match(/^\|\s*#\s*\|.*$/m) || [''])[0];
+const regCols = regHeader.split('|').map((c) => c.trim().toLowerCase());
+const tdIdx = regCols.findIndex((c) => /target\s*date|due/.test(c));
+check('open-actions register carries a Target date column', tdIdx !== -1);
+const regRows = [...register.matchAll(/^\|\s*\d+\s*\|.*$/gm)].map((m) => m[0]);
+check('open-actions register parses (' + regRows.length + ' rows)', regRows.length > 0);
+let dated = 0;
+for (const r of regRows) {
+  const num = (r.match(/^\|\s*(\d+)/) || [])[1];
+  const cell = (r.split('|')[tdIdx] || '').trim();
+  check('item ' + num + ' target-date cell is an ISO date or an explicit em-dash ("' + cell + '")',
+    /^(\d{4}-\d{2}-\d{2}|—)$/.test(cell));
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cell)) dated++;
+}
+check('at least the August 2026 engineering items carry dates', dated >= 9);
+check('the counter equals the undated rows (' + computed.counters.openActionsWithoutTargetDate + ')',
+  computed.counters.openActionsWithoutTargetDate === regRows.length - dated);
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;

@@ -176,9 +176,8 @@ export function obligationHygiene(root = ROOT) {
 }
 
 /* Open-actions items carrying no target date.
-   KRI-09 (overdue issue rate) reports null because nothing can be AGED: the
-   register records an owner and a closing condition per item, but no deadline.
-   Setting those dates is a board act — open-actions item 17 — so the metric
+   KRI-09 (overdue issue rate) reports null because its GOVERNANCE rows cannot
+   be aged: dating them is a board act — open-actions item 17 — so the metric
    cannot honestly be instrumented from this side, and inventing dates to make a
    KRI green would be the exact failure the register exists to prevent.
    What CAN be measured is the size of the gap itself. This counts the items an
@@ -189,12 +188,16 @@ export function obligationHygiene(root = ROOT) {
    It keys on a dedicated "target date" COLUMN, not on any date appearing in the
    row. Scanning the prose was tried and is wrong: item 18 quotes 2026-07-28 as
    the day the policy pack was drafted, which is not a deadline for anything, and
-   counting it as dated would understate the gap by one. The register carries no
-   such column today, so every item counts — which is the correct answer. Add the
-   column and the metric starts measuring per row without any change here. */
+   counting it as dated would understate the gap by one. The column exists as of
+   2026-08-04, so the metric measures per row: engineering items opened by the
+   August 2026 audit carry maintainer-set dates, and the governance rows count
+   here until the Board dates them. */
 export function openActionsWithoutTargetDate(root = ROOT) {
   const md = read(root, 'docs/governance/open-actions-register.md');
-  const rows = [...md.matchAll(/^\|\s*\d+\s*\|.*$/gm)];
+  /* .map((m) => m[0]): the dated-column branch below splits each row, and a
+     RegExpMatchArray has no .split — the branch first ran the day the column
+     appeared (2026-08-04), which is when this would have thrown. */
+  const rows = [...md.matchAll(/^\|\s*\d+\s*\|.*$/gm)].map((m) => m[0]);
   const header = (md.match(/^\|\s*#\s*\|.*$/m) || [''])[0];
   const cols = header.split('|').map((c) => c.trim().toLowerCase());
   const idx = cols.findIndex((c) => /target\s*date|due/.test(c));
@@ -332,7 +335,7 @@ export async function computeMetrics(root = ROOT) {
       controlEffectivenessRate: { value: ce.rate, numerator: ce.effective, denominator: ce.tested, basis: 'Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof. Manual rows (§4) are excluded by design.' },
       complianceCompletionRate: { value: cc.rate, numerator: cc.met, denominator: cc.total, basis: 'Obligations at status "met" ÷ regulatory obligations. "partial" means the control is built and evidenced but a human act is outstanding — see the open-actions item on each row.', partial: cc.partial, pending: cc.pending },
       kriBreachRate: { value: pct(breachedCount, measurable.length), numerator: breachedCount, denominator: measurable.length, basis: 'Instrumented KRIs in breach ÷ instrumented KRIs. Uninstrumented KRIs are listed with their reason and excluded from the denominator rather than scored as passing.' },
-      overdueIssueRate: { value: null, numerator: null, denominator: null, basis: 'Not instrumented: open items carry an owner and a closing condition but no target date, so nothing can be aged. See KRI-09 in data/risk-appetite.json.' },
+      overdueIssueRate: { value: null, numerator: null, denominator: null, basis: 'Not instrumented: the register’s governance rows carry no target date pending the Board’s item-17 decision, so the KRI cannot be aged; the engineering rows opened 2026-08 carry maintainer-set dates and are counted per row by openActionsWithoutTargetDate. See KRI-09 in data/risk-appetite.json.' },
       thirdPartyAssessmentCoverage: { value: tp.rate, numerator: tp.assessed, denominator: tp.total, basis: 'Vendors whose safeguard/DPA position is settled ÷ vendors in the third-party register. A cell still asking for a confirmation counts as outstanding.', outstanding: tp.outstanding },
       auditFindingClosureRate: { value: fc.rate, numerator: fc.closed, denominator: fc.total, basis: 'CAPA rows (CA-nn corrective + HA-nn hardening) at status Closed ÷ all CAPA rows.', open: fc.open }
     },
