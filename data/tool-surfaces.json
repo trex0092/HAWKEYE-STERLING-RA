@@ -3,7 +3,7 @@
   "description": "Authoritative capability view of the suite: every action an agent may take, the credential that action requires, and every external service the automated pipeline may reach. data/ai-assets.json inventories the AI surfaces and docs/aims/third-party-register.md governs the vendor relationship (DPA, residency, data shared); THIS register governs what may be invoked, by whom, with which secret, and how it is revoked. The human view is docs/governance/tool-connector-register.md.",
   "owner_role": "MLRO (accountable) / Compliance Engineering (operational)",
   "review_cadence": "Quarterly with the AI asset register, and on any new action, credential, or egress host.",
-  "last_reviewed": "2026-07-28",
+  "last_reviewed": "2026-08-04",
 
   "model_tool_calling": {
     "enabled": false,
@@ -12,9 +12,9 @@
   },
 
   "mcp_posture": {
-    "server_exposed": false,
+    "server_exposed": true,
     "client_shipped": false,
-    "statement": "The suite exposes no Model Context Protocol server and ships no MCP client. Maintainers may reconcile the Asana workspace through MCP tooling in their own assistant (see docs/asana-integration-audit.md); that acts as the human, under the human's own Asana credential, and is reconciled by scripts/asana-reconcile.mjs like any other manual edit. No repository secret is ever handed to an MCP client.",
+    "statement": "mcp_server.py (shipped 2026-08-03, #377/#378) exposes the deterministic engine tools over LOCAL stdio only: stdlib-only JSON-RPC, no network listener, no repository secret readable by or handed to any MCP client, every argument validated and capped, and — since 2026-08-04 — every tool call recorded to the shared agents.AgentLog as McpAgent (action mcp.tool; outcome labels only, never subject names). This row and the mcp.tool action reconcile the register to that shipped surface: the previous statement here ('the suite exposes no MCP server') predated #377 and had become false. Maintainers may still reconcile the Asana workspace through MCP tooling in their own assistant (see docs/asana-integration-audit.md); that acts as the human, under the human's own Asana credential, and is reconciled by scripts/asana-reconcile.mjs like any other manual edit. No repository secret is ever handed to an MCP client.",
     "onboarding_rule": "Adding an MCP server, a tool definition, or any new connector requires: a row in this register (action + credential + egress host + kill switch), a line in docs/aims/third-party-register.md if a new processor is involved, a DPIA delta if personal data crosses a new boundary, and MLRO approval recorded in the change. CI fails on an unregistered action or credential before the question of approval arises."
   },
 
@@ -28,7 +28,8 @@
     { "id": "match",        "effect": "compute", "credential": null, "connector": null, "held_by": ["SanctionsAgent"],              "purpose": "On-runner name matching against the downloaded lists." },
     { "id": "compute",      "effect": "compute", "credential": null, "connector": null, "held_by": ["RiskAgent", "NetworkAgent"],   "purpose": "Deterministic risk scoring and related-party detection." },
     { "id": "propose",      "effect": "draft",   "credential": null, "connector": null, "held_by": ["CaseAgent"],                   "purpose": "Draft MLRO cases and STR content. PROPOSE only — the split from filing is the human-in-the-loop boundary." },
-    { "id": "audit",        "effect": "read",    "credential": null, "connector": null, "held_by": ["QAAgent"],                     "purpose": "Pre-publish integrity gate over the assembled report." }
+    { "id": "audit",        "effect": "read",    "credential": null, "connector": null, "held_by": ["QAAgent"],                     "purpose": "Pre-publish integrity gate over the assembled report." },
+    { "id": "mcp.tool",     "effect": "compute", "credential": null, "connector": null, "held_by": ["McpAgent"],                    "purpose": "Serve a deterministic engine tool (normalize/screen/monitor/analyze) to a local MCP client over stdio. No credential, no egress: transport is local stdio only, arguments are validated and capped at the boundary, and every call is audit-logged to agents.AgentLog with outcome labels only — argument values (screening subjects) never enter the trail." }
   ],
 
   "agents": [
@@ -40,7 +41,8 @@
     { "name": "NetworkAgent",      "role": "Related-party / network detection",             "authz": ["compute"] },
     { "name": "CaseAgent",         "role": "Draft MLRO cases + STR (PROPOSE only)",         "authz": ["propose"] },
     { "name": "QAAgent",           "role": "Integrity / governance gate before publish",    "authz": ["audit"] },
-    { "name": "DeliveryAgent",     "role": "Post the report to Asana (no decisions)",       "authz": ["asana.write"] }
+    { "name": "DeliveryAgent",     "role": "Post the report to Asana (no decisions)",       "authz": ["asana.write"] },
+    { "name": "McpAgent",          "role": "Serve engine tools over MCP stdio (decision support, PROPOSE-class)", "authz": ["mcp.tool"] }
   ],
 
   "invariants": [

@@ -235,7 +235,7 @@
       "metric": "overdueIssueRate",
       "threshold": { "operator": "<=", "value": 10 },
       "instrumented": false,
-      "not_instrumented_reason": "Open items carry an owner and a closing condition but no target date, so nothing can be aged against a deadline. Instrumenting this means the board setting target dates on the open-actions register — recorded as the reason the metric reports null rather than zero.",
+      "not_instrumented_reason": "The register's governance rows carry an owner and a closing condition but no target date, so the KRI cannot be aged against a deadline. Instrumenting it means the board setting target dates on those rows (item 17) — recorded as the reason the metric reports null rather than zero. The engineering rows opened by the August 2026 audit carry maintainer-set dates and are counted per row by openActionsWithoutTargetDate.",
       "rationale": "Kept in the register unmeasured rather than dropped: an appetite you cannot measure is a gap to state, not a line to delete.",
       "owner": "MLRO"
     },

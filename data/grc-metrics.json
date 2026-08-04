@@ -26,7 +26,7 @@
       "value": null,
       "numerator": null,
       "denominator": null,
-      "basis": "Not instrumented: open items carry an owner and a closing condition but no target date, so nothing can be aged. See KRI-09 in data/risk-appetite.json."
+      "basis": "Not instrumented: the register’s governance rows carry no target date pending the Board’s item-17 decision, so the KRI cannot be aged; the engineering rows opened 2026-08 carry maintainer-set dates and are counted per row by openActionsWithoutTargetDate. See KRI-09 in data/risk-appetite.json."
     },
     "thirdPartyAssessmentCoverage": {
       "value": 71.4,

@@ -36,6 +36,7 @@ AGENTS = [
     {"name": "CaseAgent",         "role": "Draft MLRO cases + STR (PROPOSE only)",        "authz": ["propose"]},
     {"name": "QAAgent",           "role": "Integrity / governance gate before publish",   "authz": ["audit"]},
     {"name": "DeliveryAgent",     "role": "Post the report to Asana (no decisions)",      "authz": ["asana.write"]},
+    {"name": "McpAgent",          "role": "Serve engine tools over MCP stdio (decision support, PROPOSE-class)", "authz": ["mcp.tool"]},
 ]
 AUTHORIZED = {a["name"]: set(a["authz"]) for a in AGENTS}
 

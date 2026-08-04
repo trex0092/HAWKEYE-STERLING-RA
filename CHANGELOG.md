@@ -10,6 +10,62 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+## [3.8.0] — 2026-08-04
+
+### The repo's accounting of itself became the deliverable (2026-08-04)
+
+The August 2026 full-repo audit asked what a "perfect" repo still lacked. The
+answer, in this repo's own currency: every remaining gap either closed with a
+guard, or declared in the governance system with an owner and a date.
+
+- **Declared, dated, measured.** Nine engineering items the code cannot close
+  alone (endpoint auth, a second alert channel, distributed rate limiting, a
+  persistence tier, error telemetry, toolchain deepening, deploy self-heal,
+  engine decomposition, Arabic UI chrome) joined the
+  [open-actions register](docs/governance/open-actions-register.md) as items
+  20–28 — together with the `Target date` column the register's preamble had
+  reserved. Governance rows stay undated (that is the Board's item-17 act);
+  the counter behind KRI-09 now measures per row. The dormant dated-column
+  branch of `grc-metrics.mjs` threw on first use and was fixed with it.
+- **Repo governance layer.** `GOVERNANCE.md` (decision rights),
+  `MAINTAINERS.md` (succession against the flagged R-17 key-person risk) and
+  `CLAUDE.md` (the CI-enforced invariants, so agents and second operators
+  learn them before the build teaches them). README gained a guarded
+  "System state & known limitations" section — the inert transaction
+  monitor, draft policy instruments, effectively-public endpoints and
+  on-device-only persistence were all documented, none visible from the
+  front door.
+- **Docs estate.** `docs/README.md` (first index over ~190 documents),
+  `data/README.md` (per-file provenance incl. the retain-on-change semantics
+  of `data/retention/`), ADR-002..005 (zero runtime deps, pure-`'self'` CSP,
+  client-side persistence with its registered exit path, the parity-locked
+  dual-engine matcher), a deploy-rollback runbook, and a truth-up of the
+  readiness review's §5 gap table — six rows still claimed ✗ for artefacts
+  that shipped weeks ago; a new guard fails any ✗ row whose `docs/` path
+  exists.
+- **MCP audit trail closed.** Tool calls over MCP were the one engine entry
+  point that left no trace in the append-only `AgentLog`. `McpAgent` now
+  records every outcome (never argument values — screening subjects are
+  PII), holds exactly `["mcp.tool"]`, and can never be issued a secret. The
+  capability registers (`data/tool-surfaces.json`, the tool-connector page)
+  still declared "no MCP server is exposed" — false since #377 — and were
+  reconciled to the shipped surface.
+- **Advisor integrity.** The seeded fallback ANSWER — a canned "Enhanced Due
+  Diligence · High confidence" card rendered under whatever the user actually
+  asked whenever no live answer existed — is gone; the idle hero renders
+  instead, and the tests that pinned the canned card now pin its absence.
+- **Quiet hardening.** screen.py's import-time pip self-installer became
+  opt-in (`HSRA_BOOTSTRAP_DEPS=1`) with a loud default; skip links landed on
+  all three screens (pa11y's blind spot, now pinned by tests); the a11y
+  workflow's path filter now covers the JS/CSS that builds the audited DOM;
+  `assets/super-data.js` joined ESLint and both Semgrep target lists, and
+  the MCP layer + STR assembler joined the blocking Semgrep Python targets.
+- **This changelog.** v3.7.1 and v3.7.2 shipped as tags without their own
+  sections and 4,000+ lines had pooled under `[Unreleased]`; the sections
+  below were restored retroactively along the tag boundaries, and
+  `test/changelog.test.mjs` now requires a `## [x.y.z]` section for the
+  version the estate declares — the guard that would have caught the drift.
+
 ### The deploy monitor passed by comparing a constant with itself (2026-07-30)
 
 The `netlify: failed` badge turned out not to be a badge problem. Reading the
@@ -3367,6 +3423,12 @@ documented as maintainer actions.
   (2/10 on CII-Best-Practices), not *passing*; the doc previously overstated
   this. Licensing decision recorded: proprietary stays (2026-07-11).
 
+## [3.7.2] — 2026-07-11
+
+*(Heading restored retroactively 2026-08-04 — v3.7.2 was tagged 2026-07-11
+without its own section. Content per the tag's auto-generated notes: PRs #214
+and #218.)*
+
 ### Added (perfection pass)
 
 - **Meta descriptions on all three screens** — the one recurring sub-100
@@ -3409,6 +3471,12 @@ documented as maintainer actions.
   path rules (20 auto-applied labels, incl. `security` and a `compliance`
   rule scoped to the firm-approved risk-baseline data files), and label-sync
   reconciles everything on merge.
+
+## [3.7.1] — 2026-07-11
+
+*(Heading restored retroactively 2026-08-04 — v3.7.1 was tagged 2026-07-11
+without its own section; everything below through the 3.7.0 boundary shipped
+in it. Exact PR list: the tag's auto-generated notes.)*
 
 ### Added / hardened (brand purge + supply-chain scoring) — v3.7.1
 

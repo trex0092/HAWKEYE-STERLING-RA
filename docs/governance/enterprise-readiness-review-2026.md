@@ -104,18 +104,18 @@ Legend: ✅ exists · ◐ partial (extend, don't create) · ✗ missing (create)
 | AI Monitoring Strategy | ✅ | `docs/aims/runtime-monitoring.md` + daily AI Governance Report |
 | AI Change Management | ✅ | `docs/governance/model-validation-2026.md` §4–5 (frozen values, sign-off log) |
 | AI Vendor / Third-Party Risk | ✅ | `docs/aims/third-party-register.md` (Anthropic DPA state, Asana, GitHub, Netlify) |
-| AI Review Committee ToR | ✗ | [PROPOSED] `docs/governance/ai-review-committee-tor.md` — sized honestly for a small firm (MLRO + senior manager + external advisor, quarterly, quorum 2) |
+| AI Review Committee ToR | ◐ | Drafted as `docs/governance/ai-governance-committee-charter.md` (MLRO + senior manager + external advisor, quorum 2); **adoption block awaits the item-4 board sitting** — flipped from ✗ 2026-08-04 |
 | Responsible/Ethical AI | ✅ | AI policy principles + `ai-acceptable-use-policy.md` |
 | Explainability / Transparency | ✅ | `docs/governance/explainability-statement-2026.md`; [AI] output labelling in-app |
 | Fairness | ✅ | `docs/aims/bias-fairness-testing.md` + CI recall-gap bound + quarterly live bias eval (DPA-gated) |
 | Accountability | ✅ | Role tables in AI policy §5; git-signed history |
 | Data Governance / Privacy | ✅ | `data-quality-plan.md`, `pdpl-data-processing-assessment.md`, `dpia-2026.md`, `data-retention.md` |
 | Security / Auditability | ✅ | `SECURITY.md`, `docs/security/`, hash-chained log, evidence trails |
-| Model cards (per AI feature) | ✗ | [PROPOSED] `docs/models/` — see §6-B |
-| Architecture diagram set | ✗ | [PROPOSED] `docs/architecture/` — see §11 |
-| KPI dashboard | ✗ | [PROPOSED] `docs/executive/kpi-dashboard.md` (+ generated HTML) — see §12 |
-| Demo pack | ✗ | [PROPOSED] `docs/demo/` — see §14 |
-| Executive brief / ROI | ✗ | [PROPOSED] `docs/executive/` — see §6-A |
+| Model cards (per AI feature) | ✅ | `docs/models/` — six cards + README (§6-B delivered; flipped from ✗ 2026-08-04) |
+| Architecture diagram set | ✅ | `docs/architecture/diagrams.md` — context, trust boundaries, swimlanes, decision flow (§11 delivered; flipped from ✗ 2026-08-04) |
+| KPI dashboard | ✅ | `docs/executive/kpi-dashboard.md` (§12 delivered; flipped from ✗ 2026-08-04) |
+| Demo pack | ✅ | `docs/demo/` — script, sample data, scenarios (§14 delivered; flipped from ✗ 2026-08-04) |
+| Executive brief / ROI | ✅ | `docs/executive/executive-brief.md` + `docs/executive/business-value.md` (§6-A delivered; flipped from ✗ 2026-08-04) |
 | COSO / ISO 31000 crosswalk | ✗ | [PROPOSED] extend `ai-frameworks-crosswalk-2026.md` with two columns |
 
 ---
@@ -325,6 +325,19 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 (the interim verification recorded 127 total documents); and (ii) state-branch sync (#314): fifteen
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
+
+Verified at HEAD: 57 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(4 August, twelfth pass — **the self-accounting cycle**. The August 2026 full-repo audit closed the
+estate's accounting gaps: a documentation map (`docs/README.md`), a data-provenance dictionary
+(`data/README.md`, incl. the retain-on-change semantics of `data/retention/`), four retroactive ADRs
+(002 zero-runtime-deps · 003 pure-'self' CSP · 004 client-side persistence with its registered exit
+path · 005 dual-engine matcher), a deploy-rollback runbook, and root governance for the repository
+itself (`GOVERNANCE.md`, `MAINTAINERS.md`, `CLAUDE.md` — see the 2026-08-04 register update for the
+nine dated engineering items). §5 was re-verified against disk the same day: six rows still claiming
+✗/[PROPOSED] for artefacts that meanwhile shipped (model cards, architecture set, KPI dashboard, demo
+pack, executive brief, committee charter) were flipped with dates, and a CI guard now fails any ✗ row
+whose `docs/` path exists — a gap table that rots is worse than no gap table. Documentation and
+verification additions only — no scored control changed.)*
 
 Verified at HEAD: 57 workflows · 177 markdown documents under docs/ (144 excluding docs/research/auto).
 *(4 August, eleventh pass — **Dependabot auto-rebase**. `dependabot-autorebase.yml` closes the automation

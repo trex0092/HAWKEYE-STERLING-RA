@@ -145,7 +145,7 @@ check('AUP gate disappears after acknowledgment', !els.main.innerHTML.includes('
 function hero(phase, mut){ api.state.phase = phase; if(mut) mut(); try { return api.heroHtml(); } catch(e){ return 'THREW:'+e.message; } }
 check('Ask: idle hero renders', /hero-title/.test(hero('idle', () => { api.state.liveAnswer = null; })));
 check('Ask: reasoning hero renders', /hero-reason/.test(hero('reasoning')));
-check('Ask: default ANSWER renders', (() => { const h = hero('answer', () => { api.state.liveAnswer = null; api.state.askedQuestion = 'Q?'; }); return h.includes('Advisor response') && h.includes('Cited legal basis'); })());
+check('Ask: a null live answer renders the idle hero, never a canned verdict', (() => { const h = hero('answer', () => { api.state.liveAnswer = null; api.state.askedQuestion = 'Q?'; }); return /hero-title/.test(h) && !h.includes('Enhanced Due Diligence') && !h.includes('High confidence'); })());
 check('Ask: live brain answer renders', (() => { const h = hero('answer', () => { api.state.liveAnswer = {ok:true, text:'A cited live answer body.', model:'claude'}; }); return h.includes('A cited live answer body.'); })());
 check('Ask: brain-unavailable error renders', (() => { const h = hero('answer', () => { api.state.liveAnswer = {ok:false, text:'The brain is unavailable.'}; }); return h.includes('The brain is unavailable.'); })());
 

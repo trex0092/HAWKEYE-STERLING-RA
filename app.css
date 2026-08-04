@@ -571,3 +571,12 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 .warn-amber{ color:#ff8c42; }
 #gaugeArc{ transition:stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1); }
 .sb-bar-pointer{ left:0; }
+
+/* ── Skip link (keyboard / assistive tech) ──
+   Parked off-canvas (not display:none) so it is always exposed to AT and
+   becomes the first tab stop; on focus it drops into the top-left corner.
+   #main carries tabindex="-1" as the jump target — suppress the focus ring
+   the programmatic jump would paint on a non-interactive container. */
+.skip-link{ position:absolute; left:-9999px; top:0; z-index:2147483000; padding:10px 16px; border-radius:0 0 10px 0; background:#0B101A; color:#EDEFF4; border:1px solid rgba(255,255,255,0.22); font-size:13px; text-decoration:none; }
+.skip-link:focus{ left:0; }
+#main:focus{ outline:none; }

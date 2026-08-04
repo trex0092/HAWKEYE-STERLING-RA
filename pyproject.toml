@@ -6,7 +6,7 @@
 # published to an index.
 [project]
 name = "hawkeye-sterling-ra"
-version = "3.7.2"
+version = "3.8.0"
 description = "AML/CFT entity risk assessment suite — Python screening engine (sanctions/watchlist screening, adverse media, PEP, KYC, transaction monitoring, AI advisory)."
 readme = "README.md"
 requires-python = ">=3.11"

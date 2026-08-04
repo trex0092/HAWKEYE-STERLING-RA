@@ -32,10 +32,11 @@ tools/call, resources/list, resources/read, prompts/list, prompts/get.
 import json
 import sys
 
+import agents
 import mcp_tools
 
 SERVER_NAME = "hawkeye-sterling-aml"
-SERVER_VERSION = "3.7.2"
+SERVER_VERSION = "3.8.0"
 # Protocol revisions this server understands; it echoes the client's requested
 # version when supported, else offers its preferred (newest) one.
 SUPPORTED_PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
@@ -52,6 +53,22 @@ INTERNAL_ERROR = -32603
 def log(msg):
     """Diagnostics go to stderr — stdout is reserved for JSON-RPC frames."""
     print(f"[mcp_server] {msg}", file=sys.stderr, flush=True)
+
+
+# ── AUDIT TRAIL ───────────────────────────────────────────────────────────────
+# Every other engine entry point records to the shared append-only AgentLog;
+# tool calls arriving over MCP must not be the one unlogged path into the
+# engine. McpAgent's allow-list is exactly ["mcp.tool"] — no credentialed
+# action, so the broker can never hand it a secret.
+AUDIT_LOG = agents.AgentLog()
+
+
+def _audit(tool, outcome, ok):
+    """Record a tool-call outcome. Outcome labels only — never argument
+    values: screening subjects are PII and this trail is rendered into
+    reports."""
+    AUDIT_LOG.record("McpAgent", "mcp.tool", f"{tool}: {outcome}", ok=ok)
+    log(f"tool {tool}: {outcome}")
 
 
 # ── PROMPTS (reusable, grounding-first templates) ─────────────────────────────
@@ -161,22 +178,27 @@ def handle_tools_call(params):
     name = params.get("name")
     arguments = params.get("arguments", {})
     if not isinstance(name, str) or not name:
+        _audit("(none)", "missing-tool-name", ok=False)
         return {"content": [{"type": "text", "text": "tool name is required"}], "isError": True}, False
     try:
         out = mcp_tools.call_tool(name, arguments)
     except KeyError:
+        _audit(name, "unknown-tool", ok=False)
         known = ", ".join(mcp_tools.TOOLS.keys())
         return {"content": [{"type": "text",
                              "text": f"unknown tool '{name}'. Available tools: {known}"}],
                 "isError": True}, False
     except ValueError as e:
+        _audit(name, "invalid-arguments", ok=False)
         return {"content": [{"type": "text", "text": f"invalid arguments: {e}"}],
                 "isError": True}, False
     except Exception as e:  # engine fault — surface it, never a silent success
+        _audit(name, f"error:{type(e).__name__}", ok=False)
         log(f"tool '{name}' raised {type(e).__name__}: {e}")
         return {"content": [{"type": "text",
                              "text": f"tool execution error ({type(e).__name__}): {e}"}],
                 "isError": True}, False
+    _audit(name, "ok", ok=True)
     text = json.dumps(out, ensure_ascii=False, indent=2)
     return {"content": [{"type": "text", "text": text}], "structuredContent": out, "isError": False}, False
 
