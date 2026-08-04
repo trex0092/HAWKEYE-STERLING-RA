@@ -31,6 +31,7 @@
         "Post-output tipping-off guard (Article 25, FDL 10/2025)",
         "Runtime output-structure validator (P7/P9 scope+gaps): structureFlagged",
         "Input PII guard (Emirates ID / passport / IBAN): piiFlagged + client warning",
+        "Runtime legal-citation guard (repealed / unvetted UAE instruments named per hit): citeFlagged + client CITE chip",
         "Explicit kill switch: ADVISOR_ENABLED=false -> 503",
         "Cost/latency budget flag: budgetFlagged (ADVISOR_BUDGET_MS)",
         "In-app AI Acceptable-Use Policy acknowledgment gate (hsra.aup.ack.v1)",

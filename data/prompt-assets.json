@@ -22,6 +22,7 @@
       "guards": [
         "test/advisor-assurance.test.js — content assertions: P1-P10 present, REFUSAL PROTOCOL, PROMPT-INJECTION RESISTANCE, Article 25 / FDL 10/2025 basis, NO_MATCH/EXACT taxonomy",
         "Runtime charter-leak detector (hallucination guard) in the same surface",
+        "Runtime legal-citation guard (CITE) — P2 statutory-citation discipline verified on every output",
         "Post-output tipping-off guard (independent of the prompt text)"
       ],
       "assurance": [
@@ -29,10 +30,10 @@
         "scripts/advisor-eval.mjs",
         "scripts/advisor-bias-eval.mjs"
       ],
-      "version": 1,
-      "sha256": "079099dfacc41e98e3bcb8c481537491070eda6fe1f586d7ee3186a15383dee8",
-      "approved_on": "2026-07-28",
-      "approved_by": "Compliance Engineering (baseline registration of the text already in production; first MLRO ratification due at the next quarterly review)"
+      "version": 2,
+      "sha256": "16c68715cf60e2ca19c82560bd5a098d22768e99613045e797520ee98d976e05",
+      "approved_on": "2026-08-04",
+      "approved_by": "Compliance Engineering (v2: P2 extended with statutory-citation discipline — cite only the vetted operative basis, never approximate an article — landed alongside the CITE runtime guard; approval takes effect through the owner-reviewed PR merge, MLRO ratification at the next quarterly review)"
     },
     {
       "id": "advisor-knowledge-context",

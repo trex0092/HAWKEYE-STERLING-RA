@@ -138,6 +138,7 @@ function govRecord(data){
   g.usage = keep.reduce((o,k)=>{ o[k]=g.usage[k]; return o; }, {});
   ['hallFlagged','injectionFlagged','anomFlagged','structureFlagged','latencyFlagged','tippingOffFlagged'].forEach(f=>{ if(data[f]) g.flags[f] = (g.flags[f]||0) + 1; });
   if(Array.isArray(data.piiFlagged) && data.piiFlagged.length) g.flags.piiFlagged = (g.flags.piiFlagged||0) + 1;
+  if(Array.isArray(data.citeFlagged) && data.citeFlagged.length) g.flags.citeFlagged = (g.flags.citeFlagged||0) + 1;
   if(ok){ g.lastOk = new Date().toISOString(); }
   else {
     g.lastErr = new Date().toISOString();
@@ -167,6 +168,7 @@ function govFlagsHtml(la){
   const mk = (txt, tn) => '<span class="pill" data-csstext="'+pillStyle(tn)+';font-size:9px;padding:3px 8px">'+esc(txt)+'</span>';
   if(typeof la.quality === 'number') chips.push(mk('quality '+la.quality+'/100', la.quality>=70?'low':la.quality>=40?'med':'high'));
   if(la.hallFlagged)      chips.push(mk('⚠ HALL — unsourced assertion', 'high'));
+  if(Array.isArray(la.citeFlagged) && la.citeFlagged.length) chips.push(mk('⚠ CITE — verify legal citation: '+la.citeFlagged.join(', '), 'high'));
   if(la.injectionFlagged) chips.push(mk('⚠ THREAT — injection in input', 'high'));
   if(la.anomFlagged)      chips.push(mk('⚠ ANOM — output anomaly', 'med'));
   if(la.structureFlagged) chips.push(mk('⚠ scope/gaps missing', 'med'));
