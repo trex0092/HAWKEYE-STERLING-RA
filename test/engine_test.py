@@ -2998,6 +2998,21 @@ finally:
     screen.create_case_subtask = _orig_create_case
     screen.CASE_SUBTASK_CAP = _orig_cap
 
+# ── import-time pip self-install stays opt-in (supply-chain posture) ──────────
+# The dependency fallback in screen.py must never install anything as a side
+# effect of a bare import: the pip path has to sit behind HSRA_BOOTSTRAP_DEPS=1
+# and the ungated branch has to raise with the install command. Source-scan,
+# because actually exercising pip in CI is exactly what the gate forbids.
+print("\nscreen.py — bootstrap gate")
+_src = open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read()
+_fallback = _src.split("except ImportError:", 1)[1].split("# ── CONFIG", 1)[0]
+check("the pip fallback is gated behind HSRA_BOOTSTRAP_DEPS=1",
+      'os.environ.get("HSRA_BOOTSTRAP_DEPS") == "1"' in _fallback
+      and _fallback.index('HSRA_BOOTSTRAP_DEPS') < _fallback.index('subprocess.run'))
+check("the ungated branch raises with the exact install command",
+      "raise ImportError" in _fallback
+      and "pip install -r ci/requirements.txt" in _fallback)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

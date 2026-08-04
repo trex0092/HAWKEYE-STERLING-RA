@@ -24,28 +24,11 @@ function fnHeaders(){
    two visually distinct choices produced identical requests. */
 const MODES = ['Speed','Balanced','Deep'];
 
-const ANSWER = {
-  verdict:'Enhanced Due Diligence', tone:'high', confidence:'High confidence',
-  summary:'A UAE-licensed dealer in precious metals and stones (DPMS) is a DNFBP under the federal AML framework. Where the trader handles gold at or above the AED 55,000 cash threshold, or shows higher-risk indicators such as cross-border sourcing or PEP involvement, enhanced due diligence is required before the relationship proceeds.',
-  basis:[
-    {ref:'FATF Rec. 22 & 23', note:'Extends CDD, record-keeping and reporting duties to dealers in precious metals and stones.'},
-    {ref:'FATF Rec. 10', note:'Standard customer due diligence and verification of beneficial ownership.'},
-    {ref:'UAE Cabinet Resolution No. (134) of 2025', note:'Executive Regulations of FDL 10/2025: identification, verification and ongoing monitoring obligations (supersedes Cabinet Decision No. (10) of 2019).'},
-    {ref:'MoE DPMS Guidance', note:'Cash-transaction reporting (DPMSR) at or above AED 55,000, single or linked.'}
-  ],
-  guide:[
-    {n:'01', text:'Confirm the entity is a licensed DPMS and identify the trading activity — mined, recycled, or both.'},
-    {n:'02', text:'Screen the customer and all beneficial owners against sanctions, PEP and adverse-media lists.'},
-    {n:'03', text:'Assess geographic exposure: UAE-domestic versus cross-border sourcing from higher-risk jurisdictions.'},
-    {n:'04', text:'Apply the cash test — single or linked transactions at or above AED 55,000 trigger a DPMSR filing.'}
-  ],
-  steps:[
-    'Collect trade licence, beneficial-ownership declaration and source-of-funds evidence.',
-    'Establish the expected transaction profile and set an ongoing-monitoring cadence.',
-    'File a DPMSR for any qualifying cash transaction within the statutory window.',
-    'Record the EDD rationale and obtain senior-management onboarding approval.'
-  ]
-};
+/* There is deliberately NO seeded fallback answer. A canned verdict rendered
+   under whatever the user actually asked ("Enhanced Due Diligence · High
+   confidence") is an integrity hazard for a cited legal tool — every rendered
+   answer must come from state.liveAnswer, and its absence renders the idle
+   hero, never a substitute. */
 
 /* Regulatory Q&A renders window.REG_GROUPS — 56 topic groups / 311 cited
    questions in assets/super-data.js. Each question is {q, a, refs:[{ref,note}]}
@@ -300,27 +283,10 @@ function heroAnswerHtml(){
       + '<button class="again" id="askAgain" data-csstext="margin-top:18px"><span>&#8634;</span> Ask another</button>'
       + '</div></div>';
   }
-  const a = ANSWER;
-  const basis = a.basis.map(b=>'<div class="basis"><div class="ref">'+esc(b.ref)+'</div><div class="note">'+esc(b.note)+'</div></div>').join('');
-  const guide = a.guide.map(g=>'<div class="guide-row"><span class="n">'+esc(g.n)+'</span><span class="tx">'+esc(g.text)+'</span></div>').join('');
-  const steps = a.steps.map(s=>'<div class="step-row"><span class="ck">&#10003;</span><span class="tx">'+esc(s)+'</span></div>').join('');
-  return '<div class="card ans"><div class="card-pad">'
-    + '<div class="sec-lbl"><span>Advisor response</span><i></i></div>'
-    + '<div class="eyebrow">You asked</div>'
-    + '<div class="asked">'+esc(state.askedQuestion)+'</div>'
-    + '<div data-csstext="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
-    +   '<span class="pill" data-csstext="'+pillStyle(a.tone)+'">'+esc(a.verdict)+'</span>'
-    +   '<span class="conf"><i></i>'+esc(a.confidence)+'</span>'
-    + '</div>'
-    + '<div class="summary">'+esc(a.summary)+'</div>'
-    + '<div class="block-h">Cited legal basis<i></i></div>'
-    + '<div data-csstext="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">'+basis+'</div>'
-    + '<div class="block-h">Decision guide<i></i></div>'
-    + '<div data-csstext="display:flex;flex-direction:column;gap:11px;margin-bottom:22px">'+guide+'</div>'
-    + '<div class="block-h">Recommended steps<i></i></div>'
-    + '<div data-csstext="display:flex;flex-direction:column;gap:9px;margin-bottom:24px">'+steps+'</div>'
-    + '<button class="again" id="askAgain"><span>&#8634;</span> Ask another</button>'
-    + '</div></div>';
+  /* No live answer in the answer phase: render the idle hero. Substituting a
+     canned verdict here presented "High confidence" advice the backend never
+     gave — removed 2026-08-04. */
+  return heroIdleHtml();
 }
 function heroHtml(){
   if(state.phase==='reasoning') return heroReasoningHtml();

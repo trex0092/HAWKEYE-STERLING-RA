@@ -28,15 +28,26 @@ try:
     from rapidfuzz import fuzz
     import pdfplumber
 except ImportError:
-    # Fallback for environments where deps were not pre-installed. Install the
-    # PINNED versions from requirements.txt (single source of truth) via the
-    # current interpreter — never an unpinned, shell-invoked `pip install`.
-    import subprocess
-    import sys
-    _req = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ci", "requirements.txt")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", _req], check=False)
-    from rapidfuzz import fuzz
-    import pdfplumber
+    # Missing engine deps. Installing them as a SIDE EFFECT of `import screen`
+    # is a supply-chain smell for a compliance engine (network + code execution
+    # the importer never asked for), so the self-install is OPT-IN via
+    # HSRA_BOOTSTRAP_DEPS=1 — and even then only the PINNED set from
+    # ci/requirements.txt via the current interpreter, never an unpinned,
+    # shell-invoked `pip install`. Every workflow that runs the engine
+    # preinstalls instead; the default path fails loud with the exact command.
+    if os.environ.get("HSRA_BOOTSTRAP_DEPS") == "1":
+        import subprocess
+        import sys
+        _req = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ci", "requirements.txt")
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", _req], check=False)
+        from rapidfuzz import fuzz
+        import pdfplumber
+    else:
+        raise ImportError(
+            "screen.py needs its pinned engine deps (rapidfuzz, pdfplumber). "
+            "Install them first: python -m pip install -r ci/requirements.txt "
+            "— or set HSRA_BOOTSTRAP_DEPS=1 to let the engine install the pinned set itself."
+        )
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 # Asana credential — accept EITHER name. The .mjs scripts, every workflow and

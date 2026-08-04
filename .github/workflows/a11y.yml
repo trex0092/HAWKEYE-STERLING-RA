@@ -4,12 +4,43 @@ name: Accessibility (a11y)
 # screens are clean (0 issues), so a newly-introduced WCAG2AA violation fails the
 # gate rather than merging silently. Results are still mirrored to the job summary.
 
+# The path filter covers everything that builds the rendered DOM, not just the
+# HTML shells: app.js/console.js/advisor.js construct most of what pa11y
+# audits, the stylesheets carry contrast and focus-visibility, i18n flips
+# lang/dir, and assets/super-data.js feeds the advisor's rendered Q&A. Filtering
+# on the three .html files alone left every JS-built WCAG regression unaudited.
 on:
   push:
     branches: [main]
-    paths: ['index.html', 'console.html', 'advisor.html']
+    paths:
+      - 'index.html'
+      - 'console.html'
+      - 'advisor.html'
+      - 'app.js'
+      - 'console.js'
+      - 'advisor.js'
+      - 'i18n.js'
+      - 'app.css'
+      - 'console.css'
+      - 'advisor.css'
+      - 'fonts.css'
+      - 'assets/**'
+      - '.github/workflows/a11y.yml'
   pull_request:
-    paths: ['index.html', 'console.html', 'advisor.html']
+    paths:
+      - 'index.html'
+      - 'console.html'
+      - 'advisor.html'
+      - 'app.js'
+      - 'console.js'
+      - 'advisor.js'
+      - 'i18n.js'
+      - 'app.css'
+      - 'console.css'
+      - 'advisor.css'
+      - 'fonts.css'
+      - 'assets/**'
+      - '.github/workflows/a11y.yml'
   schedule:
     - cron: '9 8 * * 1'   # Mondays 08:09 UTC (odd minute)
   workflow_dispatch:

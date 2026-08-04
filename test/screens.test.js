@@ -183,12 +183,21 @@ function runScreen(file, bridge, seed){
     && els.hero.innerHTML.includes('Reviewing the cited legal sources'));
   check('advisor: brain fetch was dispatched on ask', fetches.length >= 1 && fetches[0].url.includes('brain-soul'));
   /* Simulate the static fallback answer path (liveAnswer null → renders ANSWER object) */
+  /* A null live answer must NEVER render a substitute verdict: the canned
+     "Enhanced Due Diligence · High confidence" card this test used to pin was
+     removed 2026-08-04 as an integrity hazard — the idle hero renders instead. */
   api.state.phase = 'answer'; api.state.liveAnswer = null;
   document.getElementById('hero').innerHTML = api.heroHtml();
-  check('advisor: answer renders verdict, citation and steps', api.state.phase === 'answer'
-    && els.hero.innerHTML.includes('Enhanced Due Diligence')
-    && els.hero.innerHTML.includes('FATF Rec. 22 &amp; 23')
-    && els.hero.innerHTML.includes('Decision guide'));
+  check('advisor: a null live answer renders the idle hero, never a canned verdict',
+    !els.hero.innerHTML.includes('Enhanced Due Diligence')
+    && !els.hero.innerHTML.includes('High confidence')
+    && els.hero.innerHTML.includes('Ask me anything'));
+  const live = {ok:true, text:'Live cited answer body.', model:'claude'};
+  api.state.liveAnswer = live;
+  document.getElementById('hero').innerHTML = api.heroHtml();
+  check('advisor: the live answer renders with the audit surface', els.hero.innerHTML.includes('Live cited answer body.')
+    && els.hero.innerHTML.includes('Advisor response'));
+  api.state.liveAnswer = null;
   api.reset();
   check('advisor: Ask another returns to the idle hero', api.state.phase === 'idle'
     && els.hero.innerHTML.includes('Ask me anything'));
@@ -312,6 +321,25 @@ function runScreen(file, bridge, seed){
 })();
 
 function esc_(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── a11y: skip links (WCAG 2.4.1) on console + advisor ──
+   pa11y cannot flag a missing skip link, so its presence is pinned here the
+   same way test/app.test.js pins index.html's. */
+(function(){
+  for(const page of ['console.html', 'advisor.html']){
+    const raw = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');
+    check(page + ': skip link is the first element in <body>',
+      /<body>\s*(\n\s*)*<a class="skip-link" href="#main">/.test(raw));
+    check(page + ': skip link targets a focusable #main', /id="main" tabindex="-1"/.test(raw));
+  }
+  for(const sheet of ['console.css', 'advisor.css']){
+    const css = fs.readFileSync(path.join(__dirname, '..', sheet), 'utf8');
+    check(sheet + ': skip link parked off-canvas until focus (never display:none)',
+      css.includes('.skip-link{ position:absolute; left:-9999px;')
+      && css.includes('.skip-link:focus{ left:0; }')
+      && !/\.skip-link\{[^}]*display:none/.test(css));
+  }
+})();
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

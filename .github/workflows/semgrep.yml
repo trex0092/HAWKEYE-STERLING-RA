@@ -59,14 +59,19 @@ jobs:
         # Targets = the executable JS surface + the Python screening engine
         # (the hawkeye-py-* rules are dead code without the .py targets).
         # test/*.py stays out so the gate's surface tracks shipped code only.
+        # assets/super-data.js is served under the CSP like any script — a
+        # "data" file is exactly where a smuggled expression would hide; the
+        # MCP layer and the STR assembler joined when they shipped un-SAST'd
+        # (#377/#378, found 2026-08-04).
         run: |
           semgrep scan --config .semgrep/hawkeye.yml --error --metrics off \
-            app.js console.js advisor.js scripts netlify \
-            screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py
+            app.js console.js advisor.js assets/super-data.js scripts netlify \
+            screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py \
+            mcp_server.py mcp_tools.py str_dossier.py
 
       - name: Semgrep — community rulesets (advisory)
         continue-on-error: true
         run: |
           semgrep scan --config p/javascript --config p/security-audit \
             --metrics off --no-error \
-            app.js console.js advisor.js scripts netlify | tee -a "$GITHUB_STEP_SUMMARY"
+            app.js console.js advisor.js assets/super-data.js scripts netlify | tee -a "$GITHUB_STEP_SUMMARY"

@@ -899,6 +899,18 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
   check('generated supplier select is labelled', appjs.includes('<label for="sel_${prefix}_${i}">'));
   check('no bare <label> remains — all are associated', !/<label>/.test(html));
 
+  /* a11y: skip link (WCAG 2.4.1 bypass blocks) — pa11y cannot catch its
+     absence, so this pins it: first-in-body link to a focusable #main. */
+  const cssApp = fs.readFileSync(path.join(__dirname, '..', 'app.css'), 'utf8');
+  check('skip link is the first element in <body>',
+    /<body>\s*(\n\s*)*<a class="skip-link" href="#main">/.test(html));
+  check('skip link targets a focusable main container',
+    html.includes('id="main" tabindex="-1"'));
+  check('skip link is parked off-canvas until keyboard focus (never display:none)',
+    cssApp.includes('.skip-link{ position:absolute; left:-9999px;')
+    && cssApp.includes('.skip-link:focus{ left:0; }')
+    && !/\.skip-link\{[^}]*display:none/.test(cssApp));
+
   /* ── 27. Encryption-at-rest primitives (WebCrypto) ── */
   await (async function(){
     const salt = crypto.getRandomValues(new Uint8Array(16));

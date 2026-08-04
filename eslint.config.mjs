@@ -88,6 +88,17 @@ export default [
     rules: baseRules,
   },
   {
+    /* The advisor's data payload (window.SUPER_TOOLS / window.REG_GROUPS) —
+       served same-origin under the CSP like every other script, yet excluded
+       from lint AND semgrep targets until 2026-08-04. Data-only by intent,
+       which is exactly why it must stay under the no-string-to-code rules:
+       an expression smuggled into a "data" file would otherwise be the one
+       unlinted, un-SAST'd execution path on the page. */
+    files: ['assets/super-data.js'],
+    languageOptions: { ecmaVersion: 2023, sourceType: 'script', globals: browserAppGlobals },
+    rules: baseRules,
+  },
+  {
     files: ['sw.js'],
     languageOptions: {
       ecmaVersion: 2023,
