@@ -1,0 +1,126 @@
+name: Dependabot Auto-Rebase
+
+# Closes the last manual step in the Dependabot flow that dependabot-automerge.yml
+# promises to remove. Branch protection requires branches to be UP TO DATE with
+# main before merge (settings.yml: required_status_checks.strict — tests must run
+# against the post-merge tree), and Dependabot's weekly batch opens several PRs
+# in one pass — so the first armed bump to land leaves every other open bump
+# "behind", where GitHub auto-merge stalls forever. 2026-08-04 showed the loop:
+# #383 and #384 were both approved and armed; #383 merged and stranded #384,
+# and each needed a hand-clicked "Update branch" (the merge commits authored by
+# the owner on both PRs). This workflow spots armed-but-behind Dependabot PRs
+# and comments `@dependabot rebase`, so an APPROVED, CI-green bump lands itself
+# even when a sibling merged first.
+#
+# Why ask Dependabot instead of calling the update-branch API ourselves: a
+# branch update made with the workflow GITHUB_TOKEN cannot trigger other
+# workflows, so the refreshed head would get NO check runs and strict
+# protection would wait on them forever — a harder deadlock than "behind".
+# Dependabot is a platform service, not an Actions workflow: it processes the
+# comment command regardless of who wrote it, and its force-push runs the full
+# check suite as dependabot[bot].
+#
+# Why `schedule` and not just `push`: the usual strander IS an auto-merge, and
+# those pushes to main are made by github-actions[bot] with the GITHUB_TOKEN —
+# invisible to push triggers (same rule as above). The push trigger reacts
+# instantly to owner-bypass merges; the 2-hourly sweep catches the rest.
+#
+# The owner's approval survives the refresh: GitHub only dismisses stale
+# approvals when a push CHANGES THE PR DIFF (verified live on #384, 2026-08-04
+# — the review re-anchored to the refreshed head). A rebase that does change
+# the diff dismisses the approval, and that is the correct outcome: re-review.
+#
+# Deliberately narrow, mirroring dependabot-automerge.yml's trust decisions:
+#   - Dependabot-authored PRs only, and only ones with auto-merge ARMED — a
+#     major (left unarmed for a deliberate manual merge) is not churned; the
+#     human updates it at review time.
+#   - only when the PR is actually BEHIND — CLEAN/BLOCKED/DIRTY are left alone
+#     (DIRTY = conflicts; Dependabot's own rebase-strategy already covers those);
+#   - at most one ask per PR per 6 hours — no comment storms if Dependabot lags;
+#   - never approves, merges, or edits anything itself.
+# Keeping the per-ecosystem weekly PRs (rather than consolidating them into one
+# multi-ecosystem PR) is deliberate: each owner-approved bump is a reviewed
+# changeset for the Scorecard Code-Review window
+# (docs/governance/scorecard-9.5-path.md, route B).
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 */2 * * *' # sweep for strandings left by auto-merge pushes (invisible to the push trigger)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-autorebase
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    permissions:
+      pull-requests: write # gh pr list + the rebase-request comment
+      issues: write # PR comments ride the issues endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (egress block)
+        # Egress = the GitHub API only (PR list, comment lookup, comment). No
+        # checkout — nothing here needs the tree.
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      - name: Ask Dependabot to rebase armed-but-behind PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          rc=0
+          list="$(gh pr list --repo "$REPO" --author 'app/dependabot' --state open \
+            --json number,mergeStateStatus,autoMergeRequest)" \
+            || { echo "::error::PR list query failed"; exit 1; }
+          rows="$(printf '%s' "$list" | python3 -c '
+          import json, sys
+          for pr in json.load(sys.stdin):
+              n = pr.get("number")
+              state = pr.get("mergeStateStatus") or "UNKNOWN"
+              armed = "armed" if pr.get("autoMergeRequest") else "unarmed"
+              print(n, state, armed)')"
+          if [ -z "$rows" ]; then
+            echo "No open Dependabot PRs."
+            exit 0
+          fi
+          while read -r num state armed; do
+            [ -z "$num" ] && continue
+            if [ "$armed" != "armed" ]; then
+              echo "SKIP #$num — auto-merge not armed (major or disarmed; manual-merge path)"
+              continue
+            fi
+            if [ "$state" != "BEHIND" ]; then
+              echo "OK   #$num — $state; nothing to do"
+              continue
+            fi
+            # One ask per PR per 6 hours, even across firings.
+            recent="$(gh api "repos/$REPO/issues/$num/comments?per_page=100" --jq '
+              [.[] | select(.user.login == "github-actions[bot]")
+                   | select(.body | contains("@dependabot rebase"))
+                   | select((now - (.created_at | fromdateiso8601)) < 21600)] | length')" \
+              || { echo "::error::comment lookup failed for #$num"; rc=1; continue; }
+            if [ "$recent" -gt 0 ]; then
+              echo "WAIT #$num — BEHIND, but a rebase was already requested <6h ago"
+              continue
+            fi
+            if gh pr comment "$num" --repo "$REPO" --body '@dependabot rebase'; then
+              echo "ASK  #$num — BEHIND and armed; asked Dependabot to rebase"
+            else
+              echo "::error::rebase-request comment failed for #$num"
+              rc=1
+            fi
+          done <<< "$rows"
+          exit "$rc"
