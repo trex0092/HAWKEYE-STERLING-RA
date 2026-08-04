@@ -30,8 +30,16 @@ caller and fails CI the moment a tool declaration appears while the register
 says tool-calling is off — so re-opening that path is a reviewed code change,
 never a quiet configuration flip.
 
-**No MCP server is exposed and no MCP client ships.** Maintainers may reconcile
-the Asana workspace through MCP tooling in their own assistant (see
+**One MCP server ships; no MCP client does.** `mcp_server.py` (2026-08-03,
+#377/#378) exposes the deterministic engine tools over **local stdio only** —
+stdlib JSON-RPC, no network listener, every argument validated and capped, and
+since 2026-08-04 every tool call recorded to the shared `agents.AgentLog` as
+`McpAgent` (outcome labels only, never subject names; see
+[`../mcp-server.md`](../mcp-server.md) § Audit trail). The statement that
+previously stood here — "no MCP server is exposed" — predated #377 and had
+become false; this page and `data/tool-surfaces.json` were reconciled to the
+shipped surface on 2026-08-04. Maintainers may still reconcile the Asana
+workspace through MCP tooling in their own assistant (see
 [`asana-integration-audit.md`](../asana-integration-audit.md)); that acts as the
 human, under the human's own credential, and any drift it creates is caught by
 `scripts/asana-reconcile.mjs` like any other manual edit. **No repository secret
@@ -58,6 +66,7 @@ fails if the two disagree in either direction.
 | `compute` | compute | — | RiskAgent, NetworkAgent | Deterministic scoring |
 | `propose` | draft | — | CaseAgent | **Propose only** — no agent holds a filing action |
 | `audit` | read | — | QAAgent | Pre-publish integrity gate |
+| `mcp.tool` | compute | — | McpAgent | Serve engine tools over local MCP stdio; every call audit-logged, no credential, no egress |
 
 **Invariants CI re-checks against `agents.py`, not just against this page:**
 `asana.write` belongs to DeliveryAgent alone; `state.commit` is refused to

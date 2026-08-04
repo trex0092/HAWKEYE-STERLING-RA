@@ -249,6 +249,43 @@ check("serve emitted a -32700 parse-error frame for bad JSON", any(f.get("error"
 check("serve did NOT reply to the notification", not any(f.get("id") is None and "result" in f for f in frames))
 check("serve ran the tools/call (id 2) and normalised", any(f.get("id") == 2 and f["result"]["structuredContent"]["normalized"] == "ACME" for f in frames))
 
+# ── audit trail — MCP tool calls join the shared AgentLog ─────────────────────
+# Every other engine entry point records to agents.AgentLog; until 2026-08-04
+# a tool call arriving over MCP left no trace in the trail the rest of the
+# system treats as mandatory. These pin the wiring: every outcome path writes
+# an entry, and argument VALUES (screening subjects are PII) never do.
+print("mcp_server — audit trail")
+_base = len(mcp_server.AUDIT_LOG.entries)
+rpc("tools/call", {"name": "hawkeye_normalize_name", "arguments": {"name": "Zeta Quantum Trading FZE"}})
+_e = mcp_server.AUDIT_LOG.entries[-1]
+check("a successful tool call appends exactly one audit entry",
+      len(mcp_server.AUDIT_LOG.entries) == _base + 1)
+check("the entry is McpAgent acting within its mcp.tool authorization",
+      _e["agent"] == "McpAgent" and _e["action"] == "mcp.tool" and _e["authorized"] is True and _e["ok"] is True)
+check("the entry names the tool and the ok outcome", _e["detail"] == "hawkeye_normalize_name: ok")
+
+rpc("tools/call", {"name": "no_such_tool", "arguments": {}})
+check("an unknown tool is audited ok=False with the unknown-tool outcome",
+      mcp_server.AUDIT_LOG.entries[-1]["detail"] == "no_such_tool: unknown-tool"
+      and mcp_server.AUDIT_LOG.entries[-1]["ok"] is False)
+
+rpc("tools/call", {"name": "hawkeye_normalize_name", "arguments": {"name": 123}})
+check("bad argument shape is audited ok=False as invalid-arguments",
+      mcp_server.AUDIT_LOG.entries[-1]["detail"] == "hawkeye_normalize_name: invalid-arguments"
+      and mcp_server.AUDIT_LOG.entries[-1]["ok"] is False)
+
+rpc("tools/call", {"arguments": {}})
+check("a missing tool name is audited ok=False",
+      mcp_server.AUDIT_LOG.entries[-1]["detail"] == "(none): missing-tool-name"
+      and mcp_server.AUDIT_LOG.entries[-1]["ok"] is False)
+
+check("argument values (screening subjects) never reach the audit trail",
+      all("Zeta Quantum" not in e["detail"] for e in mcp_server.AUDIT_LOG.entries))
+check("McpAgent is registered with exactly the mcp.tool authorization",
+      any(a["name"] == "McpAgent" and a["authz"] == ["mcp.tool"] for a in __import__("agents").AGENTS))
+check("the credential broker can never issue McpAgent a secret",
+      __import__("agents").CredentialBroker(env={"ASANA_TOKEN": "x"}).issue("McpAgent", "asana.write") is None)
+
 total_fail = len(_fail)
 print("\n" + ("ALL MCP TESTS PASSED" if not total_fail else f"{total_fail} MCP TEST(S) FAILED"))
 sys.exit(1 if total_fail else 0)

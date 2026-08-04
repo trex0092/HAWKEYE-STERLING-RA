@@ -101,3 +101,22 @@ malformed JSON yields a JSON-RPC `-32700` frame and never crashes the loop.
 - **Untrusted input.** Every argument is validated and capped at the boundary.
 - **No secrets.** The server reads no credentials and returns none; it only
   wraps the local deterministic engine.
+
+## Audit trail
+
+Tool calls arriving over MCP record to the same append-only `agents.AgentLog`
+every other engine entry point uses (added 2026-08-04 — MCP was briefly the
+one unlogged path into the engine). The server acts as **`McpAgent`**, whose
+allow-list is exactly `["mcp.tool"]`:
+
+- Every call appends `{agent, action, detail, authorized, ok}` — the detail is
+  `<tool>: <outcome>` where outcome is `ok`, `unknown-tool`,
+  `invalid-arguments`, `missing-tool-name` or `error:<ExceptionType>`.
+- **Argument values never enter the trail** — screening subjects are PII and
+  the trail is renderable into reports. Outcome labels only.
+- The same line is mirrored to stderr (stdout stays reserved for JSON-RPC
+  frames), so a session transcript shows what was called without showing who
+  was screened.
+- `McpAgent` holds no credentialed action: `agents.CredentialBroker` can never
+  issue it a secret. Guards: the audit-trail section of
+  [`test/mcp_tools_test.py`](../test/mcp_tools_test.py).
