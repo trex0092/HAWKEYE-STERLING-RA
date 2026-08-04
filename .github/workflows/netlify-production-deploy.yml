@@ -190,3 +190,51 @@ jobs:
           cat /tmp/currency.txt
           echo "::error::Build was triggered but after ~18 minutes the live site still does not serve this commit's assets (see the divergences listed above) — check the deploy log in the Netlify UI (app.netlify.com/projects/hawkeye-sterling-ra/deploys)."
           exit 1
+
+  # Self-heal — register item 26's first half. On 2026-08-04 four consecutive
+  # runner-shutdown signals killed the ~18-minute publish-verify poll above
+  # (checks 35/39/40/32) and each left this workflow red with the deploy
+  # itself healthy; nothing retried. This job runs only when the deploy job
+  # fails, on a fresh runner, for seconds — far inside the kill horizon — and
+  # re-dispatches the workflow once via workflow_dispatch, the same chaining
+  # pattern auto-release.yml uses for the container publish (the workflow-lint
+  # zizmor gate keeps workflow_run chaining off the table by design).
+  #
+  # Degrade loudly, never silently:
+  #   - the failed deploy job KEEPS its red — nothing here rewrites history;
+  #   - only a push-triggered failure retries, so a retried run that fails
+  #     again stops at a human instead of chaining;
+  #   - a hard cap of 3 workflow runs per UTC day backstops even that — at
+  #     the cap this job goes red itself and says so, because a Netlify build
+  #     spends the team's build minutes and a fourth identical failure needs
+  #     eyes, not another build.
+  retry:
+    needs: deploy
+    if: ${{ failure() && github.event_name == 'push' }}
+    permissions:
+      actions: write # count today's runs + dispatch this workflow once
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+
+      - name: Re-dispatch once, capped per UTC day
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          today=$(date -u +%F)
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/netlify-production-deploy.yml/runs?created=%3E%3D${today}T00:00:00Z&per_page=50" --jq '.workflow_runs | length')
+          echo "production-deploy runs today (UTC): $runs"
+          if [ "$runs" -ge 3 ]; then
+            echo "::error::Deploy retry cap reached ($runs runs today, max 3) — a human look is needed, not another build (open-actions register item 26)."
+            exit 1
+          fi
+          gh workflow run netlify-production-deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+          echo "::notice::Re-dispatched netlify-production-deploy.yml once ($runs run(s) already today, cap 3)."

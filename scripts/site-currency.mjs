@@ -59,6 +59,46 @@ export function sha256(buf) {
   return createHash('sha256').update(buf).digest('hex');
 }
 
+/**
+ * Bounded excerpt of the first divergent region between the repo's bytes and
+ * the live site's bytes, so a serve-time mutation NAMES ITSELF in the log.
+ *
+ * On 2026-08-04 the three HTML shells diverged for hours while every other
+ * asset matched — the signature of an injector rewriting HTML at serve time —
+ * and this report could only say `repo <hash> != live <hash>`, pushing the
+ * actual diagnosis out to Netlify API archaeology. The next injector should be
+ * readable straight off the failing run.
+ *
+ * Pure. Returns null when the buffers are identical; otherwise
+ * { at, repoBytes, liveBytes, repo, live } where the snippets start `context`
+ * bytes before the divergence, are escaped to a single printable line
+ * (\n, \r, \t literalised; other non-printables become '.'), and are capped
+ * at `cap` characters — a multi-megabyte body can never flood the log.
+ */
+export function firstDivergence(repoBuf, liveBuf, { context = 40, cap = 160 } = {}) {
+  const min = Math.min(repoBuf.length, liveBuf.length);
+  let at = 0;
+  while (at < min && repoBuf[at] === liveBuf[at]) at++;
+  if (at === repoBuf.length && at === liveBuf.length) return null;
+  const start = Math.max(0, at - context);
+  const printable = (buf) =>
+    buf
+      .toString('utf8')
+      .replace(/\\/g, '\\\\')
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t')
+      .replace(/[^\x20-\x7E]/g, '.')
+      .slice(0, cap);
+  return {
+    at,
+    repoBytes: repoBuf.length,
+    liveBytes: liveBuf.length,
+    repo: printable(repoBuf.subarray(start, at + cap)),
+    live: printable(liveBuf.subarray(start, at + cap)),
+  };
+}
+
 /** Root-level assets the site publishes, discovered from disk. */
 export function discoverServedAssets(root = REPO_ROOT) {
   return readdirSync(root, { withFileTypes: true })
@@ -185,15 +225,18 @@ export async function compare({ origin, graceSeconds = 86400, timeoutMs = 30000 
   const assets = discoverServedAssets();
   const results = [];
   for (const name of assets) {
-    const repoHash = sha256(readFileSync(path.join(REPO_ROOT, name)));
+    const repoBody = readFileSync(path.join(REPO_ROOT, name));
+    const repoHash = sha256(repoBody);
     const fetched = await fetchAsset(origin, name, timeoutMs);
     if (fetched.status === 'ok') {
       const liveHash = sha256(fetched.body);
+      const match = liveHash === repoHash;
       results.push({
         name,
-        status: liveHash === repoHash ? 'match' : 'differ',
+        status: match ? 'match' : 'differ',
         repoHash,
         liveHash,
+        excerpt: match ? null : firstDivergence(repoBody, fetched.body),
         changedAt: NaN,
       });
     } else {
@@ -242,6 +285,16 @@ async function main() {
           ? `repo ${r.repoHash.slice(0, 12)} != live ${r.liveHash.slice(0, 12)}`
           : r.detail || '';
     console.log(`  ${mark} ${r.name.padEnd(width)}  ${note}`);
+  }
+  /* Where bytes diverge, show WHICH bytes — the 2026-08-04 HTML drift sat
+     behind hash-only rows for hours while the injector's own markup would have
+     identified it in one line. */
+  for (const r of results) {
+    if (r.status !== 'differ' || !r.excerpt) continue;
+    const e = r.excerpt;
+    console.log(`\n  ${r.name}: first divergence at byte ${e.at} (repo ${e.repoBytes} B, live ${e.liveBytes} B)`);
+    console.log(`    repo: ${e.repo}`);
+    console.log(`    live: ${e.live}`);
   }
   console.log('');
   console.log(`verdict: ${decision.verdict.toUpperCase()} — ${decision.reason}`);

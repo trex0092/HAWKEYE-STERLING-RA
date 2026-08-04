@@ -327,6 +327,20 @@ auto-generated regulatory-watch digests (docs/research/auto/) folded into main f
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
 Verified at HEAD: 57 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(4 August, thirteenth pass — **deploy self-heal + self-identifying drift**. Same-day follow-through on
+register item 26's first half after four runner-shutdown kills ended production-deploy verifications as
+red with the deploy itself healthy: `netlify-production-deploy.yml` gains a `retry` job (`needs: deploy`,
+failure-only, push-triggered runs only) that re-dispatches the workflow once via `workflow_dispatch` —
+the same chaining pattern auto-release uses, because the workflow-lint zizmor gate keeps `workflow_run`
+chaining off the table by design (a first draft as a standalone `workflow_run` workflow was correctly
+rejected by that gate and never merged). The failed job keeps its red; a 3-runs-per-UTC-day cap goes red
+itself rather than looping the build hook. And the afternoon's HTML-drift diagnosis (three shells mutated
+at serve time, every other asset byte-identical) took Netlify API archaeology because `site-currency.mjs`
+reported hashes only — it now prints a bounded excerpt of the first divergent region per stale asset, so
+the next injector names itself in the failing log. Verification + automation additions only — no scored
+control changed.)*
+
+Verified at HEAD: 57 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
 *(4 August, twelfth pass — **the self-accounting cycle**. The August 2026 full-repo audit closed the
 estate's accounting gaps: a documentation map (`docs/README.md`), a data-provenance dictionary
 (`data/README.md`, incl. the retain-on-change semantics of `data/retention/`), four retroactive ADRs
