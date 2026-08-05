@@ -62,7 +62,10 @@ export function buildBatchReport(rows, meta) {
   A('');
   A('| Name | Result | Band | Score | Matched on |');
   A('| --- | --- | --- | --- | --- |');
-  const cell = (v) => String(v ?? '').replace(/\|/g, '\\|');
+  /* Escape backslashes BEFORE pipes: a value containing "\|" would otherwise
+     re-arm the pipe after escaping and garble the table row (CodeQL js/
+     incomplete-sanitization). */
+  const cell = (v) => String(v ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
   for (const r of rows) {
     const hits = (r.lists || []).map(h =>
       `${h.list} — "${h.hitName}" (${h.score}${h.confidence ? ` · ${h.confidence}` : ''}${h.mechanism ? ` · ${h.mechanism}` : ''})`).join('<br>');

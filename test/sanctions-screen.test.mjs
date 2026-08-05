@@ -665,6 +665,10 @@ const _batchRep = buildBatchReport(
 check('batch report: counts, pipe-escaping, clear rows, governance note',
   _batchRep.includes('1 of 2 name(s)') && _batchRep.includes('A\\|B')
   && _batchRep.includes('no list match') && _batchRep.includes('GOV-NOTE'));
+check('batch report: a pre-escaped backslash-pipe cannot re-arm the pipe (CodeQL)',
+  buildBatchReport([{ name: 'X\\|Y', band: 'low', topScore: 0, recommendation: 'clear', lists: [] }],
+    { date: '2026-08-05', threshold: 85, listsLoaded: 10, failures: [], governanceNote: '' })
+    .includes('X\\\\\\|Y'));
 check('batch report: failed lists are disclosed as reduced coverage',
   _batchRep.includes('Reduced coverage') && _batchRep.includes('UN Security Council — fetch failed'));
 
