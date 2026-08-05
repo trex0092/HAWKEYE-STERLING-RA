@@ -313,6 +313,13 @@ export function normalizeHit(h) {
   const hitName = h.hitName || h.matchedName || h.caption || h.entity || (h.list ? h.name : '') || '';
   const score = num(h.matchScore != null ? h.matchScore : (h.score != null ? h.score : h.confidence));
   const out = { list: String(list), hitName: String(hitName || ''), score };
+  /* Evidence labels from the matcher (mechanism: exact/fuzzy/short-entry/
+     near-exact-core/subset/phonetic; confidence: STRONG/MODERATE/WEAK[...]) —
+     carried through so the state, digest and case builders can render WHY a
+     hit fired. `confidence` is only taken as a label when it is non-numeric
+     (some external shapes use `confidence` as a score — handled above). */
+  if (h.mechanism) out.mechanism = String(h.mechanism);
+  if (typeof h.confidence === 'string' && num(h.confidence) === null) out.confidence = h.confidence;
   /* A phonetic-only hit must stay visibly WEAK all the way to the case board —
      the flag travels in the hitName suffix (state/alert/case builders all
      render hitName) AND as a structured field. */

@@ -512,6 +512,36 @@
    "reason": "cross",
    "subject": "Ozgur Anik",
    "listed": "Wagner Group PMC"
+  },
+  {
+   "id": "n086",
+   "reason": "single-shared-distinctive-token",
+   "subject": "Pearl Commodities DMCC",
+   "listed": "PEARL INVESTMENTS LIMITED"
+  },
+  {
+   "id": "n087",
+   "reason": "single-shared-distinctive-token",
+   "subject": "Sun General Trading LLC",
+   "listed": "SUN HOLDING GROUP"
+  },
+  {
+   "id": "n088",
+   "reason": "single-shared-distinctive-token",
+   "subject": "Falcon Trading FZE",
+   "listed": "FALCON INVESTMENTS FZCO"
+  },
+  {
+   "id": "n089",
+   "reason": "single-shared-distinctive-token",
+   "subject": "Orion Commodities LLC",
+   "listed": "ORION GENERAL TRADING"
+  },
+  {
+   "id": "n090",
+   "reason": "single-shared-distinctive-token",
+   "subject": "Crescent Investments Limited",
+   "listed": "CRESCENT COMMODITIES DMCC"
   }
  ]
 }
