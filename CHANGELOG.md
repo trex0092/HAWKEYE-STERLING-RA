@@ -10,6 +10,20 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Yente matching benchmark — experimental, shadow-only**
+  (`scripts/yente-bench.mjs` + dispatch-only `yente-bench.yml`): boots the
+  MIT-licensed open-source yente matching engine (the software behind the
+  OpenSanctions API) on the runner and scores it against the repo's own
+  frozen screening benchmark — the fixtures' `listed` names are indexed as a
+  custom yente dataset (license-clean: NO OpenSanctions data is downloaded;
+  the published database carries a non-commercial licence), every `subject`
+  name runs through `/match`, and the report (recall + false-positive rates
+  at 0.5/0.6/0.7, per-mechanism breakdown) lands as step summary + artifact
+  beside the committed baseline. A measurement instrument for the "adopt
+  identifier-aware matching software as a corroboration engine?" decision;
+  touching the live matcher would be a separate recall-monotone-governed
+  change. No screening state, cases, or Asana surface involved.
+
 - **Workflow-hardening ratchet** (`test/workflow-hardening.test.mjs`, CI-
   wired): the 2026-08-05 full-estate audit found every hardening deviation
   across all 57 workflows documented in-file; this guard freezes that state —
