@@ -211,6 +211,16 @@ jobs:
   retry:
     needs: deploy
     if: ${{ failure() && github.event_name == 'push' }}
+    # ACCEPTED RISK — OpenSSF Scorecard Token-Permissions (code-scanning alert
+    # #136, dismissed 2026-08-05): `gh workflow run` (the workflow_dispatch API)
+    # requires `actions: write`; GitHub offers no narrower "dispatch-only"
+    # scope, and a PAT/App token would be strictly worse (long-lived credential
+    # with the same power). Exposure is contained: the grant is job-level only
+    # (workflow default stays `contents: read`), the job runs no third-party
+    # code beyond SHA-pinned harden-runner, egress is blocked to
+    # github.com/api.github.com, its script consumes no untrusted input, it
+    # fires only on a push-triggered deploy failure, and the 3-runs/UTC-day cap
+    # below fails red rather than dispatch a fourth build.
     permissions:
       actions: write # count today's runs + dispatch this workflow once
     runs-on: ubuntu-latest

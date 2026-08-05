@@ -267,6 +267,52 @@ check('AM/PEP HIT note without a posted alert card claims neither the card nor a
 check('AM/PEP HIT note without diff info counts hits without claiming they are new',
   !amHitNoReg.includes('New adverse media hits') && amHitNoReg.includes('Adverse media hits:           1') && !amHitNoReg.includes('| NEW'));
 
+/* Module-state honesty: a switched-off module must never render ACTIVE with
+   NONE results — that reads as a clearance no lookup ever produced. */
+const amOff = buildAmPepNotes({ today: '2026-06-24', tomorrow: '2026-06-25', subjects: 325, amActive: false, pepActive: false });
+check('AM/PEP note renders OFF (not ACTIVE) for disabled modules',
+  amOff.includes('Adverse media module:         OFF (SCREEN_ADVERSE_MEDIA=0') &&
+  amOff.includes('PEP module:                   OFF (SCREEN_PEP=0') && !amOff.includes('ACTIVE'));
+check('AM/PEP note says NOT EVALUATED (never NONE) for a disabled module\'s results',
+  amOff.includes('New adverse media hits:       NOT EVALUATED (module off)') &&
+  amOff.includes('New PEP identifications:      NOT EVALUATED (module off)') && !amOff.includes('hits:       NONE'));
+check('AM/PEP CLEAR status is qualified when a module was off (no blanket clear)',
+  amOff.includes('STATUS: ✅ CLEAR (evaluated modules only — adverse media + PEP OFF, not cleared)'));
+check('AM/PEP CLEAR status stays unqualified when every module ran',
+  amClear.includes('STATUS: ✅ CLEAR') && !amClear.includes('evaluated modules only'));
+
+/* Human-action rows: on a hit day they are OPEN WORK, not "N/A". */
+check('AM/PEP HIT note marks MLRO action rows pending (never N/A)',
+  amHit.includes('C. ACTIONS (MLRO — human decisions, not automated)') &&
+  amHit.includes('EDD triggered:                pending MLRO review') && !amHit.includes('N/A'));
+check('AM/PEP CLEAR note marks action rows not-required (no findings)',
+  amClear.includes('EDD triggered:                not required (no new findings this run)'));
+check('AM/PEP HIT note tracks false-positive review as pending disposition (no placeholder)',
+  amHit.includes('False-positive review:        pending MLRO disposition') && !amHit.includes('[to be reviewed by MLRO]'));
+
+/* CHANGED tag: a standing match that escalated this run must not read
+   "previously reported". */
+const amChanged = buildAmPepNotes({ today: '2026-06-24', tomorrow: '2026-06-25', subjects: 325,
+  amHits: amResults.filter(r => r.lists.some(h => h.list.includes('Adverse media'))),
+  pepHits: amResults.filter(r => r.lists.some(h => h.list.includes('PEP'))),
+  newMatchKeys: ['a'], changedMatchKeys: ['b'] });
+check('AM/PEP note tags an escalated standing match CHANGED, not previously-reported',
+  /Beta FZE.*\| CHANGED \(escalated\/updated this run\)/.test(amChanged) && !/Beta FZE.*STANDING/.test(amChanged));
+check('AM/PEP note counts changed matches separately when diff info allows',
+  amChanged.includes('PEP identifications:          1 (0 new, 1 changed, 0 standing)'));
+
+/* Coverage honesty on the alert/report surfaces. */
+const covMeta = { screened: 42, loadedLists: ['OFAC SDN', 'UN Consolidated'], failures: ['EU FSF: HTTP 503'] };
+const covReport = buildScreenReport(d1.alerts, [], '2026-06-19', covMeta);
+check('report states the lists ACTUALLY loaded, not the configured scope as fact',
+  covReport.includes('against 2 loaded list(s): OFAC SDN · UN Consolidated') && covReport.includes('Configured scope:'));
+check('report names lists that did NOT load as unscreened',
+  covReport.includes('Not loaded this run (their designations were NOT screened): EU FSF: HTTP 503'));
+const covHtml = buildScreenHtml(d1.alerts, { today: '2026-06-19', loadedLists: ['OFAC SDN'], failures: ['UN: timeout'] });
+check('html alert separates loaded-this-run from configured scope',
+  covHtml.includes('Screened against (loaded this run):') && covHtml.includes('OFAC SDN')
+  && covHtml.includes('Configured scope:') && covHtml.includes('Not loaded this run'));
+
 /* ── threshold clamp (regression: SCREEN_MATCH_THRESHOLD=85 — screen.py's
    0-100 convention — became an effective cutoff of 8500 and silently cleared
    every fuzzy match; out-of-range values must fall back loudly) ── */

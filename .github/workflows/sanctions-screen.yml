@@ -173,6 +173,13 @@ jobs:
           ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
           # "Sanctions updates" section — the run's RESULTS surface (Asana, not GitHub)
           ASANA_SCREEN_RESULTS_SECTION_GID: ${{ vars.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203370612916' }}
+          # MIRROR the daily digest into the MLRO queue. This env was set only on
+          # the SCREEN step above, whose script consumes it for the (suppressed-
+          # by-default) alert card — the digest poster runs HERE, so the digest
+          # never reached the MLRO queue at all. Same values, both steps.
+          # Clear ASANA_MIRROR_PROJECT_GID to disable.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID || '1213914392047129' }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID || '1213914392047131' }}
         run: node scripts/screening-cases.mjs
 
       - name: Screening metrics (non-blocking observability)

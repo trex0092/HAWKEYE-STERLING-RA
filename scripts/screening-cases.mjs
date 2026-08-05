@@ -323,7 +323,11 @@ async function main() {
         ? [{ project: process.env.ASANA_MIRROR_PROJECT_GID,
              section: process.env.ASANA_MIRROR_SECTION_GID || undefined }]
         : [];
-      const url = await notifyAsana(resultsDigestTitle(results), '', { project: projectGid, section: sectionGid, html, assignee: assignee, mirror });
+      /* dedupPrefix: the digest title embeds match/screened counts, so a re-run
+         with different counts is still TODAY's digest — dedup on the stable
+         date-scoped prefix, not the exact title. */
+      const url = await notifyAsana(resultsDigestTitle(results), '', { project: projectGid, section: sectionGid, html, assignee: assignee, mirror,
+        dedupPrefix: '🛡️ Sanctions Screen — ' + today });
       console.log('screening-cases: daily results digest posted to Asana' + (url ? ' — ' + url : ''));
     } catch (e) {
       failed++;

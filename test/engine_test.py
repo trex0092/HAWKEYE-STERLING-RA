@@ -582,6 +582,18 @@ _narr = screen.build_unified_narrative(
 check("report: adverse-media errors surface as DEGRADED (not hardcoded OK)", "Adverse media DEGRADED" in _narr)
 check("report: a down core list surfaces as DEGRADED sanctions coverage", "SANCTIONS COVERAGE DEGRADED" in _narr and "UN" in _narr)
 check("report: lists-screened block renders on a zero-match run", "Lists screened:" in _narr)
+check("report: header makes no delivery-time promise (the 09:00 UAE SLA was never met)",
+      "delivered by" not in _narr)
+# The "queued N case(s)" claim must use the case opener's own predicates —
+# an identity-excluded sanctions hit raises no case, so it must not count.
+_pm_cp = [{"name": "X", "hits": [{"is_new": True, "identity_excluded": True, "score": 90}]},
+          {"name": "Y", "hits": [{"is_new": True, "score": 88}]},
+          {"name": "Z", "hits": [{"is_new": False, "score": 88}]}]
+_af_cp = [{"subject_name": "A", "articles": [{"is_new": True}]},
+          {"subject_name": "B", "articles": [{"is_new": False}]}]
+_pf_cp = [{"subject_name": "P", "is_new": True}, {"subject_name": "Q"}]
+check("case forecast counts only items the case opener will queue (identity-excluded skipped)",
+      screen.count_new_case_items(_pm_cp, _af_cp, _pf_cp) == 3)
 
 # ── parse robustness (EU ragged/None-aliases row must not zero the list) ──────
 print("screen.py — parse robustness")

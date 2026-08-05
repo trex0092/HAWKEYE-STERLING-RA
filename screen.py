@@ -4074,7 +4074,7 @@ def build_adverse_narrative(findings, stats, run_start, run_end):
 RUN PROVENANCE
   Report date:        {dt}
   Run window:         {start_uae} -> {end_uae} UAE  ({start_utc} -> {end_utc} UTC)
-  Cadence:            Daily - delivered by 09:00 UAE
+  Cadence:            Daily (scheduled 00:07 UTC; delivery time varies with run duration)
   Prepared by:        Compliance Automation - Hawkeye Sterling V2
   Workflow run:       {github_run_url()}
   Engine:             screen.py  (Google News RSS - no external paid feed)
@@ -4851,7 +4851,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     #    lead the report; everything here is a one-line snapshot. ──
     A(f"🛡️  DAILY SCREENING — {dt}")
     A(f"Subjects: {stats['subjects_total']}  ({stats['companies_screened']} companies + "
-      f"{stats['individuals_screened']} owners / directors / UBOs)  ·  delivered by 09:00 UAE")
+      f"{stats['individuals_screened']} owners / directors / UBOs)")
     A(f"Modules:  Sanctions {sanc_status}  ·  Adverse media {am_status}  ·  PEP {pep_status}")
     if delta:
         A(f"New since last run:  {delta.get('sanctions',0)} sanctions  ·  "
@@ -5212,6 +5212,17 @@ def create_case_subtask(parent_gid, name, notes, due_on):
             log(f"  case subtask refused at {budget}-byte budget — retrying at {CASE_NOTES_FLOOR}")
     log(f"  case subtask failed: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
     return False
+
+def count_new_case_items(possible_matches, adverse_findings, pep_findings):
+    """New items the case opener will actually queue — the SAME predicates as
+    open_mlro_cases (sanctions: is_new AND not identity_excluded; PEP/adverse:
+    is_new), so the report's "queued N" claim can never overcount the cases."""
+    new_s = sum(1 for m in possible_matches
+                if any(h.get("is_new") and not h.get("identity_excluded") for h in m["hits"]))
+    new_p = sum(1 for p in pep_findings if p.get("is_new"))
+    new_a = sum(1 for f in adverse_findings if any(a.get("is_new") for a in f["articles"]))
+    return new_s + new_p + new_a
+
 
 def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
                     state=None):
@@ -5699,10 +5710,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "ai_mode": _ai_mode_label()}
 
     # ── AGENTIC OPERATING MODEL: audit trail + QA / governance gate ──
-    new_s = sum(1 for m in possible_matches if any(h.get("is_new") for h in m["hits"]))
-    new_p = sum(1 for p in pep_findings if p.get("is_new"))
-    new_a = sum(1 for f in adverse_findings if any(a.get("is_new") for a in f["articles"]))
-    cases_proposed = min(new_s + new_p + new_a, CASE_SUBTASK_CAP)
+    # count_new_case_items shares open_mlro_cases' predicates — the previous
+    # inline count included identity-excluded hits the case opener skips, so
+    # the report over-promised the case count it "drafted".
+    cases_proposed = min(count_new_case_items(possible_matches, adverse_findings, pep_findings),
+                         CASE_SUBTASK_CAP)
     stats["agent_audit"] = agents.run_pipeline_audit(
         stats, possible_matches, adverse_findings, pep_findings,
         list_meta, cases_proposed, stats["ai_mode"])

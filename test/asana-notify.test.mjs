@@ -58,6 +58,24 @@ check('missing/garbage created_at is treated as not recent',
 check('empty/absent task list is safe',
   findRecentDuplicate([], 'A', NOW) === null && findRecentDuplicate(null, 'A', NOW) === null);
 
+/* ── dedupPrefix — count-bearing titles ── */
+const digestTasks = [
+  { name: '🛡️ Sanctions Screen — 2026-07-02 — 2 new match(es) · 325 screened', created_at: hoursAgo(2), permalink_url: 'https://t/9' }
+];
+check('dedupPrefix: a re-run with DIFFERENT counts still dedups on the stable date prefix', (() => {
+  const d = findRecentDuplicate(digestTasks, '🛡️ Sanctions Screen — 2026-07-02 — 3 new match(es) · 326 screened',
+    NOW, 6, '🛡️ Sanctions Screen — 2026-07-02');
+  return d && d.permalink_url === 'https://t/9';
+})());
+check('dedupPrefix: a different DAY\'s prefix never matches (daily digests still file daily)',
+  findRecentDuplicate(digestTasks, '🛡️ Sanctions Screen — 2026-07-03 — no new matches · 325 screened',
+    NOW, 6, '🛡️ Sanctions Screen — 2026-07-03') === null);
+check('dedupPrefix: outside the window the same-prefix card is not a duplicate',
+  findRecentDuplicate([{ name: '🛡️ Sanctions Screen — 2026-07-02 — x', created_at: hoursAgo(8) }],
+    '🛡️ Sanctions Screen — 2026-07-02 — y', NOW, 6, '🛡️ Sanctions Screen — 2026-07-02') === null);
+check('without dedupPrefix exact-match semantics are unchanged',
+  findRecentDuplicate(digestTasks, '🛡️ Sanctions Screen — 2026-07-02 — 3 new match(es) · 326 screened', NOW) === null);
+
 /* ── existing helpers still hold ── */
 check('esc escapes all five XML-sensitive characters',
   esc('<a href="x">&\'</a>') === '&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;');
@@ -139,17 +157,29 @@ check('a sectionless mirror still joins the project',
 {
   const ROOT2 = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const MON = '1213914392047129';
+  const mirrorRe = new RegExp(`ASANA_MIRROR_PROJECT_GID:\\s*\\$\\{\\{[^}]*${MON}`);
   for (const wf of ['regulatory-watch.yml', 'sanctions-watch.yml', 'sanctions-screen.yml']) {
     const y = readFileSync(join(ROOT2, '.github/workflows', wf), 'utf8');
     /* Match the ASSIGNMENT, not the bare identifier: the explanatory comment
        above it says "Clear ASANA_MIRROR_PROJECT_GID to disable", so an
        includes() on the name alone passes even with the env line deleted —
        caught by a negative control that failed to fail. */
-    const assigned = new RegExp(`ASANA_MIRROR_PROJECT_GID:\\s*\\$\\{\\{[^}]*${MON}`).test(y);
-    check(`${wf} mirrors its alert into the MLRO queue`, assigned);
+    check(`${wf} mirrors its alert into the MLRO queue`, mirrorRe.test(y));
     check(`${wf} still delivers to the #305 destination as well (additive)`,
       y.includes('1216203370612914'));
   }
+  /* STEP-SCOPED: the env must be assigned on the step that CONSUMES it. The
+     regression this closes: sanctions-screen.yml assigned the mirror env only
+     on the screen step while the digest poster (screening-cases.mjs) ran in a
+     different step with no mirror env — the whole-file regex above stayed
+     green while the daily digest never reached the MLRO queue. */
+  const stepBlock = (yaml, runLine) =>
+    yaml.split(/\n\s+- name: /).find(s => s.includes(runLine)) || '';
+  const yScreen = readFileSync(join(ROOT2, '.github/workflows', 'sanctions-screen.yml'), 'utf8');
+  check('sanctions-screen.yml assigns the mirror env on the DIGEST step (screening-cases.mjs — its consumer)',
+    mirrorRe.test(stepBlock(yScreen, 'scripts/screening-cases.mjs')));
+  check('sanctions-screen.yml assigns the mirror env on the alert step too (sanctions-screen.mjs consumes it when alerts are not suppressed)',
+    mirrorRe.test(stepBlock(yScreen, 'scripts/sanctions-screen.mjs')));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
