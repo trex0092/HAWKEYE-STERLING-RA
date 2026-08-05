@@ -10,6 +10,16 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Source-probe diagnostic** (`scripts/source-probe.mjs` + dispatch-only
+  `source-probe.yml`): fetches registry-configured sources (by id — never an
+  arbitrary URL) with realistic browser headers and reports status, headers,
+  a bounded control-byte-escaped body sample, JSON key paths, and sheet
+  header rows as a step summary + artifact. Exists to close the loop on the
+  five sources the first worldwide live run disabled on evidence (WAF
+  challenge vs field mapping vs layout — each needs the actual response,
+  observable only from a runner). Diagnostic only: no screening, no state,
+  no secrets.
+
 - **First live worldwide run: verdicts recorded, mirror retired.** The
   2026-08-05 verification run indexed **221,035 designated names from 20
   lists** and surfaced 47 new matches. Proven live: DFAT direct (11,068 —

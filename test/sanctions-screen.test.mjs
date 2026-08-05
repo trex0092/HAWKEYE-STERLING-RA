@@ -817,5 +817,31 @@ check('PEP list: dataset flattens to a matcher list + per-name office context ma
 check('PEP list: the list name rides the non-whitelistable PEP prefix',
   pep.PEP_LIST_NAME.startsWith('PEP ('));
 
+/* ── source probe (diagnostic instrument — pure functions) ── */
+const sp = await import('./../scripts/source-probe.mjs');
+const _spReg = [
+  { id: 'a', url: 'https://x.example/a', enabled: false },
+  { id: 'b', url: 'https://x.example/b', enabled: true },
+  { id: 'c', enabled: false },                       // no URL — never probeable
+  { id: 'd', url: 'ftp://x.example/d', enabled: false }]; // non-http — never probeable
+check('probe: all-disabled selects only disabled sources with http(s) URLs',
+  JSON.stringify(sp.probeTargets(_spReg, 'all-disabled').map(s => s.id)) === '["a"]');
+check('probe: by-id selects exactly that source, URL required',
+  sp.probeTargets(_spReg, 'b').length === 1 && sp.probeTargets(_spReg, 'c').length === 0
+  && sp.probeTargets(_spReg, 'nope').length === 0);
+check('probe: the real registry loads and the live disabled set is probeable',
+  sp.loadRegistry().length >= 40
+  && sp.probeTargets(sp.loadRegistry(), 'all-disabled').every(s => /^https?:/.test(s.url)));
+check('probe: body sample hex-escapes control bytes so WAF garbage cannot mangle the report',
+  sp.sampleBody(Buffer.from('ok' + String.fromCharCode(1) + 'x')) === 'ok\\x01x');
+check('probe: JSON reconnaissance yields the key paths a field mapping needs',
+  JSON.stringify(sp.jsonKeyPaths('{"value":[{"NomeDaPessoa":"X","Cpf":"1"}]}'))
+  === '["value[].NomeDaPessoa = X","value[].Cpf = 1"]'
+  && sp.jsonKeyPaths('not json') === null);
+const _spMd = sp.renderReport([{ id: 'a', name: 'A', url: 'https://x.example/a', outcome: 'fetched', status: 200, contentType: 'application/json', bytes: 12, jsonPaths: ['k = v'] }]);
+check('probe: report renders outcome, key paths, and the diagnostic-only footer',
+  _spMd.includes('## a — A') && _spMd.includes('http 200') && _spMd.includes('k = v')
+  && _spMd.includes('Diagnostic only'));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

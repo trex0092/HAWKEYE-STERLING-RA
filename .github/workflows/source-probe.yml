@@ -1,0 +1,57 @@
+name: Source probe (diagnostic)
+
+# Dispatch-only diagnostic for screening-list endpoints — the instrument that
+# turns "disabled with a guessed reason" into "disabled with the observed
+# response, or re-enabled with the right field mapping". Fetches ONLY sources
+# already configured in the registry (by id — the workflow input cannot aim
+# it at an arbitrary URL), with realistic browser headers, and publishes
+# status/headers/body-sample/JSON-key-paths/sheet-headers as a step summary
+# + artifact. Nothing is screened, no state is written, no secrets are in
+# the environment.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_id:
+        description: "Registry source id to probe, or 'all-disabled' for every disabled source with a URL"
+        required: false
+        default: 'all-disabled'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: audit  # Stays audit: the probe's targets are whichever registry sources the dispatch selects — a fixed allowlist would defeat the diagnostic; the audit log itself is part of the evidence
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Probe the selected source(s)
+        env:
+          SOURCE_ID: ${{ inputs.source_id }}
+        run: |
+          node scripts/source-probe.mjs "${SOURCE_ID:-all-disabled}" .probe
+          {
+            cat .probe/source-probe-report.md
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the probe report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: source-probe-report
+          path: .probe/source-probe-report.md
+          retention-days: 14
