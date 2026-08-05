@@ -78,28 +78,70 @@ export function planCaseActions(subjects, casesState, today) {
     seen.add(key);
     const cs = (casesState || {})[key];
     const active = s.lastSeen === today;
+    /* A case dispositioned false-positive EARLIER TODAY was just cleared by
+       the disposition executor — the registry demotes the subject from the
+       NEXT screen run onward, so without this guard the re-flag branch below
+       would immediately re-open the case the MLRO just closed. */
+    if (cs && cs.disposition && cs.clearedAt === today) continue;
     if (active && !cs) {
-      actions.push({ type: 'create', key, subject: s, dueOn: addDays(s.firstSeen || today, CASE_SLA_DAYS) });
+      /* whitelistedOnly rows are report-only: every remaining hit is an
+         analyst-cleared FP pair — annotated in the report, no fresh case. */
+      if (!s.whitelistedOnly) {
+        actions.push({ type: 'create', key, subject: s, dueOn: addDays(s.firstSeen || today, CASE_SLA_DAYS) });
+      }
     } else if (active && cs && cs.cleared) {
-      /* RE-FLAGGED after clearance → a fresh case. SLA restarts from the
-         re-flag day (today), and the executor REPLACES the cleared state
-         entry (newCaseStateEntry) so aging restarts cleanly and a later
-         clearance + third re-flag runs through this same branch again. */
-      actions.push({ type: 'create', key, subject: s, dueOn: addDays(today, CASE_SLA_DAYS),
-        priorCase: { taskGid: cs.taskGid || null, clearedAt: cs.clearedAt || null } });
+      if (!s.whitelistedOnly) {
+        /* RE-FLAGGED after clearance → a fresh case. SLA restarts from the
+           re-flag day (today), and the executor REPLACES the cleared state
+           entry (newCaseStateEntry) so aging restarts cleanly and a later
+           clearance + third re-flag runs through this same branch again. */
+        actions.push({ type: 'create', key, subject: s, dueOn: addDays(today, CASE_SLA_DAYS),
+          priorCase: { taskGid: cs.taskGid || null, clearedAt: cs.clearedAt || null } });
+      }
     } else if (active && cs && !cs.cleared) {
-      const age = ageInDays(s.firstSeen || cs.createdAt, today);
-      if (!cs.agingAlerted && age > CASE_SLA_DAYS) {
-        actions.push({ type: 'age', key, subject: s, caseGid: cs.taskGid, ageDays: age });
+      if (s.whitelistedOnly && !cs.escalated) {
+        /* The registry now covers every hit on this open case — close it with
+           its own audit note (distinct from the not-flagged auto-clear). */
+        actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid, reason: 'whitelist' });
+      } else {
+        const age = ageInDays(s.firstSeen || cs.createdAt, today);
+        if (!cs.agingAlerted && age > CASE_SLA_DAYS) {
+          actions.push({ type: 'age', key, subject: s, caseGid: cs.taskGid, ageDays: age });
+        }
       }
     } else if (!active && cs && !cs.cleared) {
-      actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid });
+      /* An escalated case is a human's: never auto-clear it, even when the
+         subject drops off the day's flags. */
+      if (!cs.escalated) actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid });
     }
   }
   for (const [key, cs] of Object.entries(casesState || {})) {
-    if (!seen.has(key) && !cs.cleared) actions.push({ type: 'clear', key, subject: null, caseGid: cs.taskGid });
+    if (!seen.has(key) && !cs.cleared && !cs.escalated) actions.push({ type: 'clear', key, subject: null, caseGid: cs.taskGid });
   }
   return actions;
+}
+
+/* Parse the MLRO's ticked disposition back out of a case task's notes. Only a
+   literal "[x]" tick counts; the untouched "[ ]" template parses as null.
+   Fail-safe precedence for a card with more than one tick: escalate (keeps
+   the case open) beats false-positive (clears it) beats investigating — a
+   conflicted card must never resolve to the clearance. */
+export function parseDisposition(notes) {
+  const t = String(notes || '').toLowerCase();
+  if (/\[\s*x\s*\]\s*escalate/.test(t)) return 'escalate';
+  if (/\[\s*x\s*\]\s*false\s*positive/.test(t)) return 'false-positive';
+  if (/\[\s*x\s*\]\s*under\s*investigation/.test(t)) return 'investigating';
+  return null;
+}
+
+/* Lists whose hits must never become cleared-FP registry pairs: enrichment
+   signals have their own lifecycle, MANUAL REVIEW is a local marker, and the
+   internal watchlist is corrected by editing the watchlist itself. */
+const NON_WHITELISTABLE_PREFIXES = ['Adverse media', 'PEP (', 'Interpol', 'MANUAL REVIEW', 'Internal —'];
+export function whitelistablePairs(hits) {
+  return (hits || []).filter(h => h && h.hitName && h.list
+    && !NON_WHITELISTABLE_PREFIXES.some(p => String(h.list).startsWith(p)))
+    .map(h => ({ hitName: h.hitName, list: h.list }));
 }
 
 /* The state entry recorded for a just-created case. A re-flag create REPLACES
@@ -136,10 +178,25 @@ export function caseHtml(key, s, runLink, priorCase) {
         + (x.confidence ? ' · ' + esc(x.confidence) : '')
         + (x.mechanism ? ' · via ' + esc(x.mechanism) : '')
         + (x.carriedForward ? ' · carried forward (list not re-verified this run)' : '')
+        + (x.whitelisted ? ' · ✅ CLEARED FP' + (x.clearedAt ? ' ' + esc(x.clearedAt) : '')
+          + (x.clearedVia ? ' (' + esc(x.clearedVia) + ')' : '') : '')
         + '</li>');
     }
   } else {
     h.push('<li><strong>Matched on:</strong> ' + esc((s.lists || []).join(', ') || 'see screening record') + '</li>');
+  }
+  /* Independent second opinion (OFAC-API) — corroboration or visible
+     disagreement; NEVER a clearance. Rendered exactly as recorded. */
+  if (s.secondOpinion && s.secondOpinion.provider) {
+    const so = s.secondOpinion;
+    h.push('<li><strong>Second opinion (' + esc(so.provider) + '):</strong> '
+      + (so.status === 'corroborated'
+        ? '⚠ corroborated — ' + esc(String(so.matchCount ?? '?')) + ' match(es)'
+          + (so.topScore != null ? ' · top score ' + esc(String(so.topScore)) : '')
+        : so.status === 'no-match'
+          ? 'no match returned — an independent engine’s view; it does NOT clear this case (identifiers decide)'
+          : 'unavailable (' + esc(so.error || 'lookup failed') + ') — a lost signal, not a clear')
+      + (so.checkedAt ? ' · checked ' + esc(so.checkedAt) : '') + '</li>');
   }
   h.push('<li><strong>First flagged:</strong> ' + esc(s.firstSeen || '?') + ' — SLA: review within ' + CASE_SLA_DAYS + ' days</li>');
   if (customerGid) h.push('<li><strong>Customer record:</strong> <a data-asana-gid="' + esc(customerGid) + '"/></li>');
@@ -152,6 +209,14 @@ export function caseHtml(key, s, runLink, priorCase) {
       + ' — review the prior disposition before clearing again.</li>');
   }
   h.push('</ul>');
+  /* Machine-read disposition: the case manager reads this block back from the
+     task notes on its next run (parseDisposition). Wording is load-bearing —
+     keep the three lines verbatim if you edit the card. */
+  h.push('<h2>Disposition (tick exactly one — the case manager reads it back)</h2>');
+  h.push('<p>[ ] false positive — clear this case and register the matched designated-name pair(s) above as cleared FPs '
+    + '(future identical hits are demoted with this clearance cited; a new or changed designated name re-opens normally)<br>'
+    + '[ ] escalate / freeze (TFS) — keep the case open; auto-clear is disabled until a human closes it<br>'
+    + '[ ] under investigation — keep working; normal lifecycle continues</p>');
   h.push('<h2>Lifecycle</h2>');
   h.push('<ol><li>Move to <strong>Under Review</strong> when work starts (manual).</li>'
     + '<li>Disposition: clear as false positive, or move to <strong>Escalated</strong> (manual — MLRO decision).</li>'
@@ -267,19 +332,63 @@ async function main() {
   }
 
   const casesState = readJson(CASES_FILE) || {};
-  const actions = planCaseActions(screen.subjects, casesState, today);
+
+  /* DISPOSITION READ-BACK — the analyst feedback loop. For every open case,
+     read the task notes and parse the ticked disposition block the card
+     carries. '[x] false positive' records the subject's current designated-
+     name pairs into the case state (evidence: the case gid + tick), which the
+     NEXT screen run loads as cleared-FP registry entries; '[x] escalate'
+     pins the case against every auto-clear. Read failures are logged and
+     skipped — a case we could not read simply keeps its current lifecycle. */
+  const dispositionActions = [];
+  const READ_CAP = Number(process.env.CASE_DISPOSITION_READ_CAP) || 60;
+  const openCases = Object.entries(casesState)
+    .filter(([, cs]) => cs && cs.taskGid && !cs.cleared && !cs.disposition && !cs.escalated);
+  if (openCases.length > READ_CAP) {
+    console.log('screening-cases: disposition read capped at ' + READ_CAP + ' of '
+      + openCases.length + ' open case(s) this run (CASE_DISPOSITION_READ_CAP)');
+  }
+  for (const [key, cs] of openCases.slice(0, READ_CAP)) {
+    let dis = null;
+    try {
+      const d = await asana('/tasks/' + cs.taskGid + '?opt_fields=notes');
+      dis = parseDisposition(d.data && d.data.notes);
+    } catch (e) {
+      console.warn('screening-cases: disposition read failed for ' + key + ': '
+        + String(e && e.message || e).slice(0, 120));
+      continue;
+    }
+    if (dis === 'false-positive') {
+      const subj = (screen.subjects || {})[key];
+      casesState[key] = { ...cs, cleared: true, clearedAt: today, clearedBy: 'disposition:false-positive',
+        disposition: { kind: 'false-positive', at: today, caseGid: cs.taskGid,
+          hits: whitelistablePairs(subj && subj.hits) } };
+      dispositionActions.push({ type: 'disposition-clear', key, caseGid: cs.taskGid });
+    } else if (dis === 'escalate') {
+      casesState[key] = { ...cs, escalated: true, escalatedAt: today };
+      dispositionActions.push({ type: 'disposition-escalate-ack', key, caseGid: cs.taskGid });
+    }
+    /* 'investigating' and null need no action — the normal lifecycle applies. */
+  }
+  if (dispositionActions.length) {
+    console.log('screening-cases: ' + dispositionActions.length + ' disposition(s) read back from case cards — '
+      + dispositionActions.map(a => a.type.replace('disposition-', '') + ':' + a.key).join(' '));
+  }
+
+  const actions = [...dispositionActions, ...planCaseActions(screen.subjects, casesState, today)];
   console.log('screening-cases: ' + actions.length + ' action(s) — '
-    + ['create', 'age', 'clear'].map(t => t + '=' + actions.filter(a => a.type === t).length).join(' '));
+    + ['create', 'age', 'clear', 'disposition-clear', 'disposition-escalate-ack']
+      .map(t => t + '=' + actions.filter(a => a.type === t).length).join(' '));
 
   const link = runUrl();
   let failed = 0;
-  let secNew, secCleared;
+  let secNew, secCleared, secEscalated;
   if (actions.length) {
     secNew = await ensureSection(projectGid, CASE_SECTIONS.new);
     secCleared = await ensureSection(projectGid, CASE_SECTIONS.cleared);
     /* Ensure the two human sections exist too, so the board reads as a flow. */
     await ensureSection(projectGid, CASE_SECTIONS.review);
-    await ensureSection(projectGid, CASE_SECTIONS.escalated);
+    secEscalated = await ensureSection(projectGid, CASE_SECTIONS.escalated);
   } else {
     console.log('screening-cases: all cases already in the right state.');
   }
@@ -315,13 +424,40 @@ async function main() {
           method: 'POST',
           body: JSON.stringify({ data: { task: a.caseGid } })
         });
+        const clearText = a.reason === 'whitelist'
+          ? '✅ AUTO-CLEARED (cleared-FP registry) — every hit on this case is a designated-name pair an analyst already dispositioned as a false positive. The ' + today + ' screen keeps the subject on the report, annotated and demoted; a NEW or CHANGED designated name re-opens a fresh case.'
+          : '✅ AUTO-CLEARED — the subject was not flagged by the ' + today + ' screening run. Moved to Cleared and completed. Reopen if a manual review is still owed.';
         await asana('/tasks/' + a.caseGid + '/stories', {
           method: 'POST',
-          body: JSON.stringify({ data: { text: '✅ AUTO-CLEARED — the subject was not flagged by the ' + today + ' screening run. Moved to Cleared and completed. Reopen if a manual review is still owed.' } })
+          body: JSON.stringify({ data: { text: clearText } })
         });
         await asana('/tasks/' + a.caseGid, { method: 'PUT', body: JSON.stringify({ data: { completed: true } }) });
-        casesState[a.key] = { ...casesState[a.key], cleared: true, clearedAt: today };
-        console.log('  auto-cleared case ' + a.key);
+        casesState[a.key] = { ...casesState[a.key], cleared: true, clearedAt: today,
+          ...(a.reason === 'whitelist' ? { clearedBy: 'cleared-FP registry' } : {}) };
+        console.log('  auto-cleared case ' + a.key + (a.reason === 'whitelist' ? ' (cleared-FP registry)' : ''));
+      } else if (a.type === 'disposition-clear') {
+        /* State already records the disposition (evidence: case gid + tick) —
+           this is the Asana-side acknowledgement: move, comment, complete. */
+        await asana('/sections/' + secCleared + '/addTask', {
+          method: 'POST',
+          body: JSON.stringify({ data: { task: a.caseGid } })
+        });
+        await asana('/tasks/' + a.caseGid + '/stories', {
+          method: 'POST',
+          body: JSON.stringify({ data: { text: '🏷️ DISPOSITIONED — FALSE POSITIVE (ticked on this card). Case cleared; the matched designated-name pair(s) join the cleared-FP registry from the next screening run: identical hits are demoted with this clearance cited, and a NEW or CHANGED designated name re-opens normally.' } })
+        });
+        await asana('/tasks/' + a.caseGid, { method: 'PUT', body: JSON.stringify({ data: { completed: true } }) });
+        console.log('  dispositioned FALSE POSITIVE — case ' + a.key + ' cleared, pairs registered');
+      } else if (a.type === 'disposition-escalate-ack') {
+        await asana('/sections/' + secEscalated + '/addTask', {
+          method: 'POST',
+          body: JSON.stringify({ data: { task: a.caseGid } })
+        });
+        await asana('/tasks/' + a.caseGid + '/stories', {
+          method: 'POST',
+          body: JSON.stringify({ data: { text: '🔺 ESCALATED (ticked on this card) — moved to Escalated; auto-clear is disabled for this case until a human closes it. TFS obligations (freeze / report without delay) are the MLRO’s call — see the sanctions decision tree.' } })
+        });
+        console.log('  dispositioned ESCALATE — case ' + a.key + ' pinned open, moved to Escalated');
       }
     } catch (e) {
       failed++;

@@ -206,8 +206,8 @@ KEYWORD_TYPOLOGY = [
     ("Terrorism / CFT", ["terror","terrorist financing","financing of terrorism","terror funding",
         "extremist","radicalis","radicaliz","militant","designated terrorist"]),
     ("Sanctions / Proliferation", ["sanction","embargo","proliferation","weapons of mass destruction",
-        "wmd","dual-use","nuclear","chemical weapons","biological weapons","arms trafficking",
-        "weapons smuggling","debarred","blacklisted"]),
+        "wmd","dual-use","export control","nuclear","chemical weapons","biological weapons",
+        "arms trafficking","weapons smuggling","debarred","blacklisted"]),
     ("Money Laundering", ["launder","money laundering"]),
     ("Fraud / Financial Crime", ["fraud","ponzi","pyramid scheme","insider trading","market manipulation",
         "accounting fraud","asset misappropriation","misuse of funds","embezzle","forgery","counterfeit",
@@ -358,8 +358,8 @@ ADVERSE_KEYWORDS = [
     "terrorism", "terrorist financing", "financing of terrorism", "terror funding",
     "extremist", "radicalis", "radicaliz", "militant",
     "proliferation financing", "weapons of mass destruction", "wmd", "dual-use",
-    "arms trafficking", "weapons smuggling", "nuclear", "chemical weapons",
-    "biological weapons", "debarred", "blacklisted",
+    "export control", "arms trafficking", "weapons smuggling", "nuclear",
+    "chemical weapons", "biological weapons", "debarred", "blacklisted",
     # Money laundering / financial crime
     "launder", "money laundering", "financial crime", "economic crime",
     "tax evasion", "tax fraud", "vat fraud", "ponzi", "pyramid scheme",
@@ -409,6 +409,12 @@ ADVERSE_KEYWORDS_AR = {
     "تهريب": "smuggl",
     "مخدرات": "narcotics",
     "تزوير": "forgery",
+    # CPF / proliferation financing (FATF R.7, UAE TFS) — canonicals chosen from
+    # ADVERSE_KEYWORDS so tier/typology bucketing works unchanged.
+    "تمويل الانتشار": "proliferation financing",
+    "أسلحة الدمار الشامل": "wmd",
+    "الاستخدام المزدوج": "dual-use",
+    "التهرب من العقوبات": "sanctions evasion",
 }
 
 # Multilingual risk-term dictionaries — one map per language, each native term
@@ -1373,11 +1379,18 @@ ADVERSE_MAX_RESULTS = _resolve_adverse_max(os.environ.get("ADVERSE_MAX_RESULTS",
 # coverage surfaces even when it isn't in the subject's top general-news headlines.
 RISK_QUERY = ("fraud OR sanctions OR \"money laundering\" OR arrest OR investigation OR "
               "court OR bribery OR corruption OR smuggling OR terrorism OR embezzlement OR "
-              "convicted OR indicted OR seized OR raid OR probe OR lawsuit OR charged")
+              "convicted OR indicted OR seized OR raid OR probe OR lawsuit OR charged OR "
+              # CPF (FATF R.7 / UAE TFS): the flag dictionaries always knew these
+              # terms, but the QUERY never asked for them — a PF-specific story
+              # only surfaced if it also tripped a generic term. Ask explicitly.
+              "proliferation OR \"export control\" OR \"dual-use\" OR \"sanctions evasion\"")
 # Arabic counterpart of RISK_QUERY for the AE:ar locale — Arabic-language wrongdoing
 # coverage that never uses the English terms (see ADVERSE_KEYWORDS_AR for mapping).
 AR_RISK_QUERY = " OR ".join('"' + t + '"' for t in (
-    "احتيال", "غسل الأموال", "عقوبات", "فساد", "رشوة", "اعتقال", "تهريب", "إرهاب"))
+    "احتيال", "غسل الأموال", "عقوبات", "فساد", "رشوة", "اعتقال", "تهريب", "إرهاب",
+    # CPF terms (proliferation financing / WMD) — mirrors the English query's
+    # PF cluster; both map to canonicals via ADVERSE_KEYWORDS_AR.
+    "تمويل الانتشار", "أسلحة الدمار الشامل"))
 
 # GDELT DOC 2.0 — a free, no-key GLOBAL news index (65+ languages, machine-
 # translated to English, worldwide print/broadcast/web). This is the "all news

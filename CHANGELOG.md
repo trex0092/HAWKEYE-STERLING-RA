@@ -10,6 +10,33 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Analyst feedback loop on the screening case board.** Case cards now carry
+  a machine-read disposition block: ticking `[x] false positive` clears the
+  case and registers the exact designated-name+list pairs in a **cleared-FP
+  registry** (case gid as evidence); identical future hits are DEMOTED with
+  the clearance cited — annotated on report and card, never removed — and
+  stop opening fresh cases, while a new or changed designated name re-opens
+  normally (pair-level identity = built-in re-confirm on list change).
+  `[x] escalate / freeze (TFS)` pins the case against every auto-clear and
+  moves it to Escalated. Curated entries live in
+  `data/screening-whitelist.json` (four-eyes PR procedure); kill switch
+  `SCREEN_WHITELIST=0`. Conflicted cards resolve fail-safe (escalate wins).
+- **OFAC-API second opinion on new matches (opt-in).** With repo var
+  `OFACAPI=1` + the `OFAC_API_KEY` secret, every new/changed sanctions match
+  (capped per run) gets an independent corroboration verdict from OFAC-API.com
+  rendered on its case card — corroborated / no-match / unavailable — strictly
+  additive: it can never downgrade, clear, or re-alert a hit, and a failed
+  lookup reads as a lost signal, never a clear. Third-party transfer: record
+  the processor in the third-party register before enabling.
+- **CPF / proliferation-financing terms now reach the news queries.** The
+  flag dictionaries always knew `proliferation financing` / `wmd` /
+  `dual-use`, but the targeted Google News query never asked for them — a
+  PF-specific story only surfaced if it also tripped a generic term. The
+  English query gains `proliferation`, `export control`, `dual-use`,
+  `sanctions evasion`; the Arabic query gains `تمويل الانتشار` and
+  `أسلحة الدمار الشامل`, with matching `ADVERSE_KEYWORDS_AR` canonicals and
+  an `export control` entry in the keyword set + Sanctions/Proliferation
+  typology (FATF R.7 / UAE TFS alignment).
 - **FraudLabs support signal on onboarding (opt-in, PDPL-gated).** A
   supplementary payment-fraud indicator on a newly onboarded customer's
   contact email (disposable/free/young-domain traits) — explicitly NOT a

@@ -100,6 +100,7 @@ jobs:
             www.dfat.gov.au:443
             data.opensanctions.org:443
             apigwext.worldbank.org:443
+            api.ofac-api.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # No credentials on disk (zizmor artipacked): the state push below
@@ -169,6 +170,16 @@ jobs:
           # Daily Screening digest. Set the vars to '0' to restore them.
           SCREEN_SUPPRESS_ALERTS: ${{ vars.SCREEN_SUPPRESS_ALERTS || '1' }}
           SCREEN_SKIP_AUDIT_TASK: ${{ vars.SCREEN_SKIP_AUDIT_TASK || '1' }}
+          # OFAC-API SECOND OPINION — independent corroboration attached to
+          # NEW/CHANGED matches only (capped, additive-only: it can never
+          # downgrade, clear, or re-alert a hit; a failed lookup is disclosed
+          # on the case card as a lost signal). Third-party transfer: record
+          # the processor in the third-party register, then set repo var
+          # OFACAPI=1 (the OFAC_API_KEY secret must also exist).
+          OFACAPI: ${{ vars.OFACAPI || '0' }}
+          OFAC_API_KEY: ${{ secrets.OFAC_API_KEY }}
+          # Cleared-FP registry kill switch (default on; empty registry = no-op)
+          SCREEN_WHITELIST: ${{ vars.SCREEN_WHITELIST || '1' }}
         run: node scripts/sanctions-screen.mjs
 
       - name: Manage screening case lifecycle + post the daily results digest to Asana

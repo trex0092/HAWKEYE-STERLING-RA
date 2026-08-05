@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, CASE_SECTIONS, buildResultsDigestHtml, resultsDigestTitle } from '../scripts/screening-cases.mjs';
+import { planCaseActions, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, CASE_SECTIONS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -209,6 +209,63 @@ check('digest: a clean day is affirmative, never silent', (() => {
 check('digest title states the outcome and volume',
   resultsDigestTitle(RESULTS) === '🛡️ Sanctions Screen — ' + TODAY + ' — 1 new match(es) · 778 screened'
   && resultsDigestTitle({ ...RESULTS, newMatches: 0 }).includes('no new matches'));
+
+/* ── Disposition read-back (analyst feedback loop) ── */
+check('parseDisposition: untouched template parses as null (no false trigger)',
+  parseDisposition('[ ] false positive — …\n[ ] escalate / freeze (TFS) — …\n[ ] under investigation — …') === null);
+check('parseDisposition: ticked false positive',
+  parseDisposition('bla\n[x] false positive — clear this case…') === 'false-positive');
+check('parseDisposition: ticked escalate (case-insensitive, spaced tick)',
+  parseDisposition('[ X ] Escalate / freeze (TFS)') === 'escalate');
+check('parseDisposition: conflicted card resolves fail-safe — escalate beats false positive',
+  parseDisposition('[x] false positive\n[x] escalate') === 'escalate');
+check('parseDisposition: ticked under investigation',
+  parseDisposition('[x] under investigation') === 'investigating');
+check('whitelistablePairs excludes enrichment/local/internal lists',
+  (() => { const p = whitelistablePairs([
+    { hitName: 'A', list: 'US OFAC — SDN list (CSV)' },
+    { hitName: 'B', list: 'Adverse media (Google News)' },
+    { hitName: 'C', list: 'PEP (Wikidata)' },
+    { hitName: 'D', list: 'MANUAL REVIEW' },
+    { hitName: 'E', list: 'Internal — Firm Watchlist' },
+    { hitName: '', list: 'UN Security Council — Consolidated list (XML)' }]);
+    return p.length === 1 && p[0].hitName === 'A'; })());
+
+/* ── Planner: whitelist + escalation guards ── */
+const _s = (extra) => ({ name: 'S', lastSeen: TODAY, firstSeen: TODAY, recommendation: 'review', band: 'medium', ...extra });
+check('planner: whitelistedOnly subject opens NO case',
+  planCaseActions({ k1: _s({ whitelistedOnly: true }) }, {}, TODAY).length === 0);
+check('planner: whitelistedOnly does not re-open a cleared case',
+  planCaseActions({ k1: _s({ whitelistedOnly: true }) }, { k1: { taskGid: 't', cleared: true, clearedAt: '2026-07-01' } }, TODAY).length === 0);
+check('planner: whitelistedOnly closes an OPEN case with the registry reason',
+  (() => { const a = planCaseActions({ k1: _s({ whitelistedOnly: true }) }, { k1: { taskGid: 't', cleared: false } }, TODAY);
+    return a.length === 1 && a[0].type === 'clear' && a[0].reason === 'whitelist'; })());
+check('planner: an escalated case is never auto-cleared — not by absence…',
+  planCaseActions({}, { k1: { taskGid: 't', cleared: false, escalated: true } }, TODAY).length === 0);
+check('planner: …and not by the whitelist either',
+  planCaseActions({ k1: _s({ whitelistedOnly: true }) }, { k1: { taskGid: 't', cleared: false, escalated: true } }, TODAY).length === 0);
+check('planner: a same-day disposition never re-opens the case it just closed',
+  planCaseActions({ k1: _s({}) }, { k1: { taskGid: 't', cleared: true, clearedAt: TODAY,
+    disposition: { kind: 'false-positive', at: TODAY } } }, TODAY).length === 0);
+check('planner: a PAST disposition does not block a genuine re-flag (fresh case)',
+  (() => { const a = planCaseActions({ k1: _s({}) }, { k1: { taskGid: 't', cleared: true, clearedAt: '2026-07-01',
+    disposition: { kind: 'false-positive', at: '2026-07-01' } } }, TODAY);
+    return a.length === 1 && a[0].type === 'create' && a[0].priorCase && a[0].priorCase.taskGid === 't'; })());
+
+/* ── Card renders the loop's surfaces ── */
+check('case card carries the machine-read disposition block',
+  (() => { const html = caseHtml('k1', _s({}), null, null);
+    return html.includes('[ ] false positive') && html.includes('[ ] escalate / freeze (TFS)')
+      && html.includes('[ ] under investigation') && parseDisposition(html) === null; })());
+check('case card renders a corroborated second opinion',
+  caseHtml('k1', _s({ secondOpinion: { provider: 'OFAC-API', status: 'corroborated', matchCount: 2, topScore: 92, checkedAt: TODAY } }), null, null)
+    .includes('Second opinion (OFAC-API):'));
+check('case card renders an unavailable second opinion as a LOST signal, not a clear',
+  caseHtml('k1', _s({ secondOpinion: { provider: 'OFAC-API', status: 'unavailable', error: 'http 500', checkedAt: TODAY } }), null, null)
+    .includes('a lost signal, not a clear'));
+check('case card annotates a whitelisted hit with its clearance',
+  caseHtml('k1', _s({ hits: [{ list: 'US OFAC — SDN list (CSV)', hitName: 'X', score: 90, whitelisted: true, clearedVia: 'case t1' }] }), null, null)
+    .includes('CLEARED FP'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
