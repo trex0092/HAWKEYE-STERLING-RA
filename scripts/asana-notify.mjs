@@ -188,6 +188,16 @@ export async function notifyAsana(name, notes, opts = {}) {
 /* Escape text for safe inclusion in Asana html_notes (XML-strict). */
 export function esc(s) {
   return String(s == null ? '' : s)
+    /* Asana's html_notes endpoint parses the payload as XML, and XML 1.0
+       forbids most control characters and unpaired surrogates OUTRIGHT —
+       entity-escaping cannot save them. Designated names arriving from
+       30+ national registers occasionally carry stray control bytes
+       (observed live 2026-08-05: four case creates 400'd with
+       xml_parsing_error), so strip the un-representable characters first,
+       then entity-escape the representable ones. */
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uFFFE\uFFFF]/g, '')
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+    .replace(/(^|[^\uD800-\uDBFF])([\uDC00-\uDFFF])/g, '$1')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

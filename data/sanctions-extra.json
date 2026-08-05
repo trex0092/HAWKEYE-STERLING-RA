@@ -94,8 +94,8 @@
    "url": "https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv",
    "type": "csv",
    "parser": "opensanctions",
-   "enabled": true,
-   "_note": "DFAT bot-gates its own regulation8_consolidated.xlsx (404 to automated fetches), so the fetchable daily path is the OpenSanctions mirror, on a host every screening workflow already allowlists. targets.simple.csv shape (comma CSV: name + ;-separated aliases), parsed by the dedicated opensanctions parser — NOT the eu parser: the EU webgate CSV is semicolon-delimited with WholeName columns, and reading a simple.csv through it yields zero names (observed 2026-08-01 once the egress block that had masked this source lifted). The direct au-dfat source and the curated fallback below stay configured (disabled) as alternatives.",
+   "enabled": false,
+   "_note": "RETIRED 2026-08-05: the direct DFAT Improved Consolidated List proved on its first live run (11,068 names — richer than this mirror's 10,981), so the mirror is disabled. That removes the last OpenSanctions-hosted feed from this registry (their data licence is non-commercial; the official file is the license-clean path). Kept configured as a documented fallback should DFAT ever bot-block the runner.",
    "minNames": 500
   },
   {
@@ -104,7 +104,7 @@
    "jurisdiction": "Global",
    "type": "xlsx",
    "parser": "dfat",
-   "_note": "Australia DFAT 'Improved Consolidated List' (.xlsx, parseDfatXlsx reader). RE-ENABLED 2026-08-05: the worldwide survey confirmed the new stable un-dated path (Australian_Sanctions_Consolidated_List.xlsx) two independent ways. Runs ALONGSIDE the OpenSanctions mirror for now (duplicate names dedupe at the index); once this direct source proves on a live run, retire the mirror — that removes the last OpenSanctions-hosted feed from THIS registry (their data licence is non-commercial; the official file is the license-clean path). If the runner is bot-blocked, this fails loudly and the mirror still covers.",
+   "_note": "Australia DFAT 'Improved Consolidated List' (.xlsx, parseDfatXlsx reader). RE-ENABLED 2026-08-05 and PROVEN the same day: first live run loaded 11,068 names from the stable un-dated path — richer than the OpenSanctions mirror it replaces (10,981), which is now retired above. The registry's DFAT coverage is license-clean official data. A future bot-block fails loudly; the mirror entry stays as the documented fallback switch.",
    "url": "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx",
    "enabled": true,
    "minNames": 1500
@@ -147,8 +147,8 @@
    "url": "https://www.competentauthority.gov.lk/resources/1373/Individuals_list.xlsx",
    "type": "xlsx",
    "parser": "xlsx",
-   "enabled": true,
-   "_note": "Sri Lanka's NATIONAL 1373 designations (not UN-relayed — genuinely additive). Stable un-dated XLSX path; the generic XLSX name-column reader applies. Added 2026-08-05; verify on the first live run.",
+   "enabled": false,
+   "_note": "Sri Lanka national 1373 designations (XLSX). DISABLED 2026-08-05 after the first live run: connection-level fetch failure from the Actions runner (host unreachable or datacenter-blocked). Curated path or periodic retry.",
    "minNames": 30
   },
   {
@@ -202,8 +202,8 @@
    "url": "https://nbctf.mod.gov.il/he/Announcements/Documents/NBCTF%20Israel%20designation%20Individuals_XL.xlsx",
    "type": "xlsx",
    "parser": "xlsx",
-   "enabled": true,
-   "_note": "Israel NBCTF terror-designation individuals (stable un-dated XLSX; an organisations file exists at a sibling path — add it once this one is proven on the runner). CAVEAT: the site fronts a WAF with scraping protection; if the runner is challenged this source will fail LOUDLY (disclosed degraded coverage) — disable with this note updated rather than letting it cry daily.",
+   "enabled": false,
+   "_note": "Israel NBCTF terror-designation individuals (stable un-dated XLSX). DISABLED 2026-08-05 after the first live run: the fetch succeeded but parsed 0 names — the WAF served a challenge page instead of the workbook (the scraping protection the survey warned about). Curated path per the EOCN doctrine, or revisit with a browser-headers fetch spike.",
    "minNames": 150
   },
   {
@@ -213,8 +213,8 @@
    "url": "https://pctc.pss.gov.sa/portal/pcct/slist/js/slistEN.xlsx",
    "type": "xlsx",
    "parser": "xlsx",
-   "enabled": true,
-   "_note": "Saudi Presidency of State Security national terrorism designations (English edition, stable un-dated XLSX). Added 2026-08-05; watch for header drift — the generic name-column reader degrades loudly on a layout change.",
+   "enabled": false,
+   "_note": "Saudi PCCT national terrorism list (English XLSX). DISABLED 2026-08-05 after the first live run: the workbook fetched but the generic name-column reader extracted only 7 rows (below the 100 floor) — the sheet layout differs from the header convention. Needs a workbook sample to map columns before re-enabling.",
    "minNames": 100
   },
   {
@@ -224,8 +224,8 @@
    "url": "https://portal.moi.gov.qa/wps/portal/NCTC/sanctionlist/unifiedsanctionlist/!ut/p/z1/jY_BDoIwAEM_aXUbIMdByLa4iZgRcBeyk1mi6MH4_RL16qS3Jq9tSjwZiZ_DM57DI97mcFn8yeeTLimnilPT1lygY5V2lllImZHhDWTKNJLvsJeFq9C1VLn8qCiwIX5NHj8ksC6fAHy6fiD-MyGsBuUwbVMvDaVyqmbA9lB8gdTFfyP3a9-PiPoFJNS7hg!!/dz/d5/L3dDZyEvUUZRSS9ZTlEh/p0/IZ7_I9242H42LOC4A0Q3BITM3M0G85=CZ6_I9242H42LOC4A0Q3BITM3M0GG5=NJgetSanctionList=/?lang=en&name=&qid=&passport=&listType=",
    "type": "json",
    "parser": "json",
-   "enabled": true,
-   "_note": "Qatar NCTC unified record (UN-mandated + national designations), keyless JSON GET. CAVEAT: WebSphere-portal URL shape — if the portal rotates the state segment or challenges datacenter IPs, this fails LOUDLY on the runner; disable with the note updated rather than letting it cry daily. The response reportedly mislabels its content type — the parser reads the body regardless.",
+   "enabled": false,
+   "_note": "Qatar NCTC unified record (keyless JSON GET). DISABLED 2026-08-05 after the first live run: fetch succeeded, 0 names parsed — the WebSphere portal returned a challenge/HTML body or a key shape the generic JSON walker does not know. Needs a payload sample from a runner before re-enabling.",
    "minNames": 200
   },
   {
@@ -286,8 +286,8 @@
    "url": "https://olinda.bcb.gov.br/olinda/servico/Gepad_QuadrosGeraisInternet/versao/v1/odata/QuadroGeralInabilitados?$format=json",
    "type": "json",
    "parser": "json",
-   "enabled": true,
-   "_note": "Banco Central do Brasil enforcement disqualifications (OData JSON, keyless). Same tier framing as the World Bank debarment feed: regulatory-integrity data, not financial sanctions — the list NAME carries the tier so a hit is read correctly. Portuguese name keys added to the generic JSON parser. Added 2026-08-05; verify keys against the live payload on the first run.",
+   "enabled": false,
+   "_note": "BCB disqualifications (OData JSON, keyless). DISABLED 2026-08-05 after the first live run: fetch succeeded, 0 names parsed — the OData field names differ from every key the generic JSON walker knows (Portuguese keys included). Needs a payload sample from a runner to map the name field, then re-enable.",
    "minNames": 150
   },
   {
@@ -297,9 +297,9 @@
    "url": "https://olinda.bcb.gov.br/olinda/servico/Gepad_QuadrosGeraisInternet/versao/v1/odata/QuadroGeralProibidos?$format=json",
    "type": "json",
    "parser": "json",
-   "enabled": true,
+   "enabled": false,
    "optional": true,
-   "_note": "Sibling of br-bcb-qgi (same OData service, one URL swap). `optional: true` — the list legitimately holds very few entries (1-50 observed), so a small or empty parse is a valid state, reported informationally, never degraded coverage.",
+   "_note": "Sibling of br-bcb-qgi (same OData service) — disabled with it 2026-08-05 pending the same field mapping.",
    "minNames": 1
   },
   {
@@ -369,9 +369,9 @@
    "jurisdiction": "South Africa",
    "url": "https://tfs.fic.gov.za/Pages/TFSListDownload?fileType=xml",
    "type": "xml",
-   "parser": "xml",
+   "parser": "un",
    "enabled": true,
-   "_note": "South Africa's consolidated TFS list (~708 individuals + ~253 entities) from the Financial Intelligence Centre — stable keyless XML download; high relevance for African gold-corridor counterparties. Generic XML extractor; added 2026-08-05, verify schema on the first live run.",
+   "_note": "South Africa's consolidated TFS list (~708 individuals + ~253 entities) from the Financial Intelligence Centre — stable keyless XML download; high relevance for African gold-corridor counterparties. First live run 2026-08-05: fetched but the GENERIC XML extractor found 0 names; the FIC file follows the UN consolidated-list schema, so the parser is now the dedicated UN extractor — the next run verifies. Degrades loudly either way.",
    "minNames": 400
   },
   {
