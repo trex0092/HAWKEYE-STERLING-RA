@@ -10,6 +10,12 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- README and CONTRIBUTING gained a **project-handbook navigation row** linking
+  the community/governance documents that GitHub's repo-overview tab bar does
+  not surface (`SUPPORT.md`, `GOVERNANCE.md`, `MAINTAINERS.md`, `CHANGELOG.md`,
+  `CITATION.cff`, `docs/README.md`) — those files exist but the tab bar shows
+  only README / Code of conduct / Contributing / License / Security.
+
 ## [3.8.0] — 2026-08-04
 
 ### The repo's accounting of itself became the deliverable (2026-08-04)
