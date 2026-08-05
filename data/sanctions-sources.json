@@ -9,6 +9,8 @@
       "type": "csv",
       "parser": "ofac",
       "noHeader": true,
+      "charset": "latin1",
+      "_charset_note": "The legacy OFAC SDN.CSV is latin-1 on the wire (screen.py decodes it latin-1 at parse_ofac; the WHATWG Response.text() the JS fetcher used decodes UTF-8 regardless of Content-Type, so 0xD1 'Ñ' became U+FFFD and normalizeName split the token — 'PEÑA' cleared against customer 'PENA'). Decoding latin-1 restores the accented tokens; strictly recall-widening.",
       "minNames": 9000
     },
     {
@@ -19,6 +21,7 @@
       "type": "csv",
       "parser": "ofacalt",
       "noHeader": true,
+      "charset": "latin1",
       "mergeInto": "ofac-sdn",
       "_note": "The SDN's weak/strong a.k.a. names live in this SEPARATE headerless file (ent_num, alt_num, alt_type, alt_name, remarks). The screen folds them into the primary OFAC SDN list (mergeInto) so an alias hit reads as the SDN designation it is — screening sdn.csv's primary names alone is a false-negative gap (a party operating under an SDN alias would screen clear; mirrors screen.py parse_ofac_alt). If this file fails to load, the primary SDN list still screens but is flagged partial: alias coverage missing, standing SDN matches carried forward, never cleared off reduced coverage. COVERAGE FLOOR: minNames is PROVISIONAL and deliberately well below the observed a.k.a. count — it exists to catch a truncated body or a column shift (which would yield hundreds, not thousands), not to police normal churn. Ratchet it toward ~50% of the observed baseline once runs have logged real counts, per the floors-only-rise convention.",
       "minNames": 5000

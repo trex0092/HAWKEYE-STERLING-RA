@@ -480,6 +480,74 @@ const un5 = diffState(mixedStanding(), [clearRow({ enrichmentIncomplete: false }
 check('omitting evaluatedSignals leaves behaviour unchanged (guard inactive)',
   un5.cleared.length === 1);
 
+/* ── hardening audit 2026-08-05: match-branch module-off + narrowed-coverage
+   carry-forward (findings 2/7 + 1/3/6), and the OFAC latin-1 decode (finding 4) ── */
+// Finding 2/7: a STILL-MATCHING subject (OFAC hit present) whose PEP MODULE was
+// off this run must not have its standing PEP evidence silently erased — the
+// clear-branch already guarded this, the match-branch did not.
+const mmPrior = diffState({ updated: null, subjects: {} }, [mixedPrior], '2026-07-25', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+const stillMatchPepOff = normalizeResult({ name: 'M Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+  lists: [{ list: 'OFAC SDN', matchScore: 96 }] }, { key: 'm', name: 'M Co' });
+const mmOff = diffState(mmPrior.nextState, [stillMatchPepOff], '2026-07-26', 0.85, ['OFAC SDN'],
+  ['Adverse media (Google News)', 'Interpol Red Notice']);   // PEP module not evaluated
+check('match-branch: a still-matching subject keeps its PEP evidence when the PEP module was off (finding 2/7)',
+  mmOff.alerts.length === 0 && mmOff.nextState.subjects.m.lists.sort().join() === 'OFAC SDN,PEP (Wikidata)');
+// Finding 2/7 band: an enrichment-driven prior band must not silently downgrade
+// when the module that drove it was off this run.
+const amBandPrior = diffState({ updated: null, subjects: {} },
+  [normalizeResult({ name: 'B Co', topScore: 90, band: 'high', recommendation: 'sanctions-match',
+    lists: [{ list: 'OFAC SDN', matchScore: 90 }, { list: 'Adverse media (Google News)', matchScore: 85 }] }, { key: 'b', name: 'B Co' })],
+  '2026-07-25', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+const amBandOff = diffState(amBandPrior.nextState,
+  [normalizeResult({ name: 'B Co', topScore: 90, band: 'medium', recommendation: 'sanctions-match',
+    lists: [{ list: 'OFAC SDN', matchScore: 90 }] }, { key: 'b', name: 'B Co' })],
+  '2026-07-26', 0.85, ['OFAC SDN'], ['PEP (Wikidata)']);   // adverse-media module off
+check('match-branch: a prior band driven up by an off-module signal is preserved, not downgraded',
+  amBandOff.nextState.subjects.b.band === 'high');
+
+// Findings 1/3/6: a standing adverse-media match must NOT clear on a NARROWED
+// (budget-rotated / disclosed-partial) sweep — the originating edition may not
+// have been queried; r.unverified names the signal that was not re-checked.
+const amStanding = () => ({ updated: null, subjects: { a: {
+  name: 'A Co', band: 'medium', topScore: 75, recommendation: 'review',
+  lists: ['Adverse media (Google News)'], signature: 'x', firstSeen: '2026-07-01', lastSeen: '2026-07-25' } } });
+const amClearNarrowed = Object.assign(
+  normalizeResult({ name: 'A Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] }, { key: 'a', name: 'A Co' }),
+  { unverified: ['Adverse media (Google News)'] });
+const an1 = diffState(amStanding(), [amClearNarrowed], '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('clear-branch: a standing adverse-media match is HELD on a narrowed/budget-rotated sweep (findings 1/3/6)',
+  an1.cleared.length === 0 && !!an1.nextState.subjects.a);
+// CONTROL: a FULL sweep that re-verified the story is gone must still clear it —
+// the guard preserves recall, it must not freeze adverse-media matches forever.
+const an2 = diffState(amStanding(),
+  [normalizeResult({ name: 'A Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] }, { key: 'a', name: 'A Co' })],
+  '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('clear-branch: a standing adverse-media match DOES clear once a full sweep re-verifies it gone',
+  an2.cleared.length === 1 && !an2.nextState.subjects.a);
+// Match-branch narrowed carry-forward: still-matching OFAC, adverse narrowed.
+const amMixStanding = diffState({ updated: null, subjects: {} },
+  [normalizeResult({ name: 'C Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+    lists: [{ list: 'OFAC SDN', matchScore: 96 }, { list: 'Adverse media (Google News)', matchScore: 85 }] }, { key: 'c', name: 'C Co' })],
+  '2026-07-25', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+const amMixNarrowed = Object.assign(
+  normalizeResult({ name: 'C Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+    lists: [{ list: 'OFAC SDN', matchScore: 96 }] }, { key: 'c', name: 'C Co' }),
+  { unverified: ['Adverse media (Google News)'] });
+const amMix = diffState(amMixStanding.nextState, [amMixNarrowed], '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('match-branch: a narrowed adverse-media sweep keeps the standing adverse hit, no spurious alert',
+  amMix.alerts.length === 0 && amMix.nextState.subjects.c.lists.includes('Adverse media (Google News)'));
+
+// Finding 4: OFAC SDN/alt must be decoded latin-1 (screen.py does; the JS
+// r.text() UTF-8 path mangled every ñ/accented designation into a split token).
+const _ofacSrc = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-sources.json'), 'utf8'));
+check('OFAC SDN + alt.csv declare charset latin1 so fetchListBody decodes them like screen.py (finding 4)',
+  _ofacSrc.sources.find(s => s.id === 'ofac-sdn').charset === 'latin1'
+  && _ofacSrc.sources.find(s => s.id === 'ofac-sdn-alt').charset === 'latin1');
+const _pena = Buffer.from('PEÑA', 'latin1');
+check('latin1 decode preserves the ñ token (→ pena); the old UTF-8 decode split it (finding 4)',
+  normalizeName(new TextDecoder('latin1').decode(_pena)) === normalizeName('PENA')
+  && normalizeName(new TextDecoder('utf-8').decode(_pena)) !== normalizeName('PENA'));
+
 /* ── wiring pins: red unscreened bail + retry/liveness contract ── */
 const screenSrc = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
 const screenYml = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');

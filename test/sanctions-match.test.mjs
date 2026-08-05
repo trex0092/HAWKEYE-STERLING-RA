@@ -589,5 +589,12 @@ check('Qatar NCTC JSON keys (fullNameEn/fullNameAr) screen both scripts',
   JSON.stringify(parseJsonList('{"content":[{"fullNameEn":"Adil Uthman","fullNameAr":"\u0639\u0627\u062f\u0644"}],"totalElements":864}'))
   === JSON.stringify(['Adil Uthman', '\u0639\u0627\u062f\u0644']));
 
+
+/* African-Latin hook letters — screen.py folds Ɖ→D / Ɔ→O; JS did not, so a
+   short designation spelled with Ɔ/Ɖ keyed apart from its ASCII customer
+   spelling and cleared (hardening audit 2026-08-05, recall-loss). */
+check('normalizeName folds Ɔ to o (Ɔla == Ola)', normalizeName('Ɔla') === normalizeName('Ola'));
+check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') === normalizeName('Damir'));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
