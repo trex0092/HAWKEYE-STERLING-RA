@@ -7,7 +7,8 @@ import {
   isMatch, diffState, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
-  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse
+  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
+  getByPath, fetchPaginatedJson
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
 import { readFileSync } from 'node:fs';
@@ -903,6 +904,47 @@ check('PEP classes: the core FATF categories stay REQUIRED, expansions are optio
   return coreRequired && optionalAdds && byKey.get('ombudsman').qid === 'Q169180'
     && pep.PEP_ROOT_CLASSES.every(c => /^Q\d+$/.test(c.qid));
 })());
+
+/* ── paginated JSON list reader (ADB debarment register: 10 rows/page, its own
+   next-link points at an unreachable internal host, so we page by size/offset) ── */
+check('getByPath walks a dotted path and tolerates a missing branch',
+  getByPath({ meta: { totalItems: 1533 } }, 'meta.totalItems') === 1533
+  && getByPath({ data: [1, 2] }, 'data').length === 2
+  && getByPath({}, 'a.b.c') === undefined);
+{
+  const realFetch = globalThis.fetch;
+  // Server caps the page at 10 rows regardless of the requested size (the ADB
+  // shape): the reader must still collect the full list by stepping offset by
+  // the ACTUAL rows returned, not the size hint.
+  const TOTAL = 23;
+  globalThis.fetch = async (u) => {
+    const off = Number(new URL(u).searchParams.get('offset'));
+    const rows = [];
+    for (let i = off; i < Math.min(off + 10, TOTAL); i++) rows.push({ id: String(i), attributes: { name: 'FIRM ' + i } });
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: TOTAL }, data: rows }) };
+  };
+  const pg = { sizeParam: 'size', offsetParam: 'offset', size: 250, totalPath: 'meta.totalItems', dataPath: 'data', maxPages: 30 };
+  const body = await fetchPaginatedJson('https://apim.example/x?a=1', {}, pg, undefined, 'adb-test');
+  const merged = JSON.parse(body);
+  check('fetchPaginatedJson collects EVERY page (offset steps by real page length, not the size hint)',
+    merged.data.length === TOTAL && merged.data[0].attributes.name === 'FIRM 0' && merged.data[22].attributes.name === 'FIRM 22');
+  // maxPages cap: a server that never reports exhaustion is bounded, not infinite.
+  let calls = 0;
+  globalThis.fetch = async (u) => {
+    calls++;
+    const off = Number(new URL(u).searchParams.get('offset'));
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 99999 }, data: [{ attributes: { name: 'X' + off } }] }) };
+  };
+  const capped = JSON.parse(await fetchPaginatedJson('https://apim.example/y', {}, { maxPages: 5, dataPath: 'data', totalPath: 'meta.totalItems' }, undefined, 'cap-test'));
+  check('fetchPaginatedJson is bounded by maxPages (never an infinite crawl)', capped.data.length === 5 && calls === 5);
+  globalThis.fetch = realFetch;
+}
+/* The ADB source stays DISABLED (pending a size-param probe) but must carry the
+   pagination config so the reader knows to page it once enabled. */
+const _adb = extraReg.find(s => s.id === 'adb-debarment');
+check('adb-debarment carries a size/offset pagination config (disabled pending probe)',
+  !!_adb && _adb.enabled === false && _adb.paginate && _adb.paginate.dataPath === 'data'
+  && _adb.paginate.totalPath === 'meta.totalItems' && Number(_adb.paginate.maxPages) > 0);
 
 /* ── source probe (diagnostic instrument — pure functions) ── */
 const sp = await import('./../scripts/source-probe.mjs');

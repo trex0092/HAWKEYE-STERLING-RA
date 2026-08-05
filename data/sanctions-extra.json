@@ -408,7 +408,8 @@
    "type": "json",
    "parser": "json",
    "enabled": false,
-   "_note": "ADB published debarment register (keyless JSON). DISABLED 2026-08-05 on live evidence: the endpoint fails at CONNECTION level from GitHub Actions runners (fetch failed — host unreachable/blocked from this datacenter, same class as Sri Lanka), while the survey reached it from a different cloud. ADB's 2010 Mutual-Enforcement cross-debarments already surface via the World Bank/IDB data path. Re-probe or curated; keep disabled until a reachable route is confirmed.",
+   "paginate": { "sizeParam": "size", "offsetParam": "offset", "size": 250, "totalPath": "meta.totalItems", "dataPath": "data", "maxPages": 30 },
+   "_note": "ADB published debarment register incl. the 2010 MDB Mutual-Enforcement cross-debarments (~1,533 firms/individuals; debarment/procurement-integrity tier). Source-probe 2026-08-05 (run 31030989375) CORRECTED the earlier 'connection-level failure' note: the runner reached apim.adb.org (http 200, application/json, meta.totalItems 1533; data[].attributes.name/otherName). BUT the API serves only 10 rows/page and its own links.next points at an unreachable internal host (rip-oai-…azurecontainerapps.io), so a paginated size/offset fetch (added here) is required. STILL DISABLED pending a size-param probe: confirm the runner sees the full ~1,533 via ?size=250&offset — enable once the paged fetch is proven (the offset advances by ACTUAL page length, so it collects the list even if the server caps the page; minNames 500 flags a partial).",
    "minNames": 500
   },
   {
