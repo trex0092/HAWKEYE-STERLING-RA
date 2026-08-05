@@ -83,6 +83,7 @@ jobs:
             api.gdeltproject.org:443
             www.wikidata.org:443
             query.wikidata.org:443
+            api.fraudlabspro.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # No credentials on disk (zizmor artipacked): the state push below
@@ -166,6 +167,15 @@ jobs:
           # Set repo variable LLM_TRIAGE=1 to re-enable once signed (no code change needed).
           LLM_TRIAGE: ${{ vars.LLM_TRIAGE || '0' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'claude-haiku-4-5-20251001' }}
+          # FraudLabs SUPPORT SIGNAL (payment-fraud indicator on the contact
+          # email — supplementary, never a screening verdict). Same PDPL gate
+          # shape as LLM_TRIAGE: enabling sends the customer's email to
+          # FraudLabs, so record the processor + transfer basis in the
+          # third-party register, then set repo variable FRAUDLABS=1 (the
+          # FRAUDLABS_API_KEY secret must also exist). Signal failure is
+          # disclosed, never fatal.
+          FRAUDLABS: ${{ vars.FRAUDLABS || '0' }}
+          FRAUDLABS_API_KEY: ${{ secrets.FRAUDLABS_API_KEY }}
         run: python screen.py
 
       - name: Commit delta-state (what has already been reported)

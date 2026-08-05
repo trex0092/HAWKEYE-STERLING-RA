@@ -3177,6 +3177,48 @@ check("stride guard: a 131-subject book still rotates day to day",
 check("offset guard: a 67-subject book still gets a distinct make-up start",
       screen.enrichment_rotation(67, 739_101, retry_pass=True) != screen.enrichment_rotation(67, 739_101))
 
+# ── FraudLabs support signal (opt-in, PDPL-gated, never a verdict) ────────────
+print("\nscreen.py — FraudLabs support signal")
+check("gate is OFF by default (no env, no key)", screen.FRAUDLABS is False)
+check("explicit Email: line wins",
+      screen.extract_customer_email("Country: AE\nEmail: kyc@dealer.example\nother@x.example")
+      == "kyc@dealer.example")
+check("falls back to first email-shaped token",
+      screen.extract_customer_email("contact person other@x.example later") == "other@x.example")
+check("no email in note → '' (signal idle, never invented)",
+      screen.extract_customer_email("Country: AE\nReg No: 123") == "")
+_req_mod = sys.modules["requests"]
+_orig_post = getattr(_req_mod, "post", None)
+try:
+    _req_mod.post = lambda *a, **k: None
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("no transport → available=False with reason (lost, not clear)",
+          s["available"] is False and "http" in s["error"])
+    class _R:
+        status_code = 200
+        def __init__(self, d): self._d = d
+        def json(self): return self._d
+    _req_mod.post = lambda *a, **k: _R({"fraudlabspro_score": 72, "fraudlabspro_status": "REVIEW",
+                                        "is_disposable_email": True, "is_free_email": False})
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("recognised response parses score/status/flags",
+          s["available"] and s["score"] == 72 and s["status"] == "REVIEW"
+          and s["flags"] == ["is_disposable_email"])
+    check("REVIEW status is material", screen.fraudlabs_material(s) is True)
+    _req_mod.post = lambda *a, **k: _R({"unexpected": "shape"})
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("unrecognised response shape → disclosed, not guessed",
+          s["available"] is False and "unrecognised" in s["error"])
+    check("unavailable signal is never material", screen.fraudlabs_material(s) is False)
+    check("low score, no flags → not material",
+          screen.fraudlabs_material({"available": True, "score": 12, "status": "APPROVE",
+                                     "flags": []}) is False)
+    check("disposable-email flag alone is material",
+          screen.fraudlabs_material({"available": True, "score": None, "status": "",
+                                     "flags": ["is_disposable_email"]}) is True)
+finally:
+    _req_mod.post = _orig_post
+
 # ── import-time pip self-install stays opt-in (supply-chain posture) ──────────
 # The dependency fallback in screen.py must never install anything as a side
 # effect of a bare import: the pip path has to sit behind HSRA_BOOTSTRAP_DEPS=1

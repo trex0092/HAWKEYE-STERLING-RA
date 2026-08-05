@@ -2976,6 +2976,95 @@ def _skipped_rows_note():
             f"screened by any net. Fix the record, then re-run.\n"
             f"                             {refs}{more}")
 
+# ── FRAUDLABS SUPPORT SIGNAL (onboarding only; OFF by default) ────────────────
+# A SUPPLEMENTARY payment-fraud indicator on a newly onboarded customer's
+# contact email — NOT part of the AML/CFT screen and never a screening
+# verdict: FraudLabs scores fraud-adjacent email traits (disposable / free /
+# young domain), which can inform the MLRO's onboarding judgement but must
+# not gate it. PDPL GATE (same shape as LLM_TRIAGE): enabling this sends the
+# customer's email address to FraudLabs (a cross-border transfer) — record
+# the processor and transfer basis in the third-party register BEFORE setting
+# the repo variable FRAUDLABS=1 alongside the FRAUDLABS_API_KEY secret.
+# A support signal that cannot be fetched is disclosed and skipped — it never
+# fails, blocks, or reds the run, and its absence is never read as "clear".
+FRAUDLABS_API_KEY      = os.environ.get("FRAUDLABS_API_KEY", "")
+FRAUDLABS              = os.environ.get("FRAUDLABS", "0") == "1" and bool(FRAUDLABS_API_KEY)
+FRAUDLABS_URL          = "https://api.fraudlabspro.com/v2/order/screen"
+FRAUDLABS_REVIEW_SCORE = int(os.environ.get("FRAUDLABS_REVIEW_SCORE", "60"))
+
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+def extract_customer_email(notes):
+    """Best-effort contact email from the KYC note: an explicit 'Email:' line
+    wins; else the first email-shaped token anywhere in the note. Returns ''
+    when the note carries none — the support signal is then idle for that
+    customer (disclosed in aggregate, never invented)."""
+    notes = notes or ""
+    m = re.search(r"Email\s*[:=]\s*(" + _EMAIL_RE.pattern + r")", notes, re.I)
+    if m:
+        return m.group(1)
+    m = _EMAIL_RE.search(notes)
+    return m.group(0) if m else ""
+
+def fraudlabs_email_signal(email):
+    """One FraudLabs screen call carrying ONLY the email. Tolerant of
+    transport failure and response-shape drift: anything unusable returns
+    available=False with the reason, which the caller disclosed as a LOST
+    support signal — never as a clear."""
+    try:
+        r = requests.post(FRAUDLABS_URL,
+                          data={"key": FRAUDLABS_API_KEY, "email": email, "format": "json"},
+                          timeout=20)
+    except Exception as e:
+        return {"available": False, "error": f"transport: {str(e)[:120]}"}
+    if r is None or getattr(r, "status_code", None) != 200:
+        return {"available": False, "error": f"http {getattr(r, 'status_code', 'none')}"}
+    try:
+        d = r.json()
+        if not isinstance(d, dict):
+            raise ValueError("non-object response")
+    except Exception as e:
+        return {"available": False, "error": f"parse: {str(e)[:120]}"}
+    score = d.get("fraudlabspro_score", d.get("score"))
+    status = str(d.get("fraudlabspro_status") or d.get("status") or "").upper()
+    if score is None and not status:
+        err = d.get("error_message") or d.get("error") or f"fields {sorted(d)[:5]}"
+        return {"available": False, "error": f"unrecognised response: {str(err)[:120]}"}
+    try:
+        score = int(score) if score is not None else None
+    except (TypeError, ValueError):
+        score = None
+    flags = sorted(k for k, v in d.items()
+                   if k.startswith("is_") and v in (True, 1, "Y", "true", "True"))
+    return {"available": True, "score": score, "status": status, "flags": flags}
+
+def fraudlabs_material(sig):
+    """Worth a card comment? REVIEW/REJECT status, a score at/above the review
+    threshold, or a disposable-email flag. Unavailable is never material —
+    it is disclosed as lost coverage, not treated as a finding."""
+    if not sig.get("available"):
+        return False
+    if sig.get("status") in ("REVIEW", "REJECT"):
+        return True
+    s = sig.get("score")
+    if isinstance(s, int) and s >= FRAUDLABS_REVIEW_SCORE:
+        return True
+    return bool({"is_disposable_email", "is_email_disposable"} & set(sig.get("flags") or []))
+
+def post_fraudlabs_signal_comment(customer_gid, email_domain, sig, run_time):
+    dt = run_time.strftime("%d %b %Y %H:%M GST")
+    lines = [f"🧩 SUPPORT SIGNAL (FraudLabs) — {dt}",
+             "Supplementary payment-fraud indicator on the contact email. NOT a "
+             "sanctions / PEP / adverse-media result and NOT a screening verdict.",
+             f"Email domain: {email_domain}",
+             f"Status: {sig.get('status') or '—'} · Score: "
+             f"{sig['score'] if sig.get('score') is not None else '—'}/100"]
+    if sig.get("flags"):
+        lines.append("Flags: " + ", ".join(sig["flags"][:6]))
+    lines.append("Weigh alongside the onboarding screen — MLRO judgement prevails.")
+    asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{customer_gid}/stories",
+                  json={"data": {"text": "\n".join(lines)}})
+
 def get_all_customers():
     customers = []
     CUSTOMER_ROWS_SKIPPED.clear()
@@ -3019,6 +3108,9 @@ def get_all_customers():
                 "entity_owners": entity_owners,
                 "kyc": kyc_data,
                 "country": kyc_data.get("country", ""),
+                # Contact email for the (opt-in) FraudLabs support signal —
+                # '' when the note carries none; nothing else consumes it.
+                "email": extract_customer_email(notes),
                 "has_assessment": len(notes.strip()) > 100,
             })
         next_page = data.get("next_page") or None
@@ -5924,6 +6016,28 @@ def run_onboarding(run_time):
         return
     all_lists, list_meta = load_all_lists()
     screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
+    # FraudLabs SUPPORT SIGNAL (opt-in, PDPL-gated — see the FRAUDLABS block).
+    # Runs after the screen so a signal failure can never disturb it; material
+    # results land as a clearly-labelled comment on the customer's card.
+    if FRAUDLABS:
+        fl_with = fl_material = fl_lost = 0
+        for c in fresh:
+            em = c.get("email") or ""
+            if not em:
+                continue
+            fl_with += 1
+            sig = fraudlabs_email_signal(em)
+            if not sig["available"]:
+                fl_lost += 1
+                log(f"  fraudlabs: signal unavailable for '{c['name']}' — {sig['error']}")
+                continue
+            if fraudlabs_material(sig):
+                fl_material += 1
+                post_fraudlabs_signal_comment(c["gid"], em.split("@", 1)[-1], sig, run_time)
+        log(f"  fraudlabs support signal: {fl_with}/{len(fresh)} onboarding customer(s) carry an "
+            f"email — {fl_material} material (commented on card), {fl_lost} unavailable (disclosed)")
+    elif os.environ.get("FRAUDLABS", "0") == "1":
+        log("  fraudlabs: FRAUDLABS=1 but FRAUDLABS_API_KEY is missing — support signal OFF")
     log("Onboarding run done.")
     # Same post-delivery gate chain as the daily run — an onboarding report
     # that never reached the MLRO queue, or an onboarding screen run against

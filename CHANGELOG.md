@@ -10,6 +10,15 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **FraudLabs support signal on onboarding (opt-in, PDPL-gated).** A
+  supplementary payment-fraud indicator on a newly onboarded customer's
+  contact email (disposable/free/young-domain traits) — explicitly NOT a
+  screening verdict and unable to block or red a run. OFF by default: enable
+  by recording the processor + transfer basis in the third-party register,
+  then setting repo variable `FRAUDLABS=1` with the `FRAUDLABS_API_KEY`
+  secret. Material results (REVIEW/REJECT, score ≥ 60, disposable email)
+  land as a clearly-labelled comment on the customer card; a signal that
+  cannot be fetched is disclosed as lost, never read as clear.
 - **Adverse-media/PEP coverage now spreads across the day.** The free news
   feeds rate-limit per egress IP, so a daily sweep could succeed with part of
   the book uncovered (5 Aug: GDELT and Google News circuits both opened
