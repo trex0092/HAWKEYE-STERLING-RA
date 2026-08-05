@@ -10,6 +10,15 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Workflow-hardening ratchet** (`test/workflow-hardening.test.mjs`, CI-
+  wired): the 2026-08-05 full-estate audit found every hardening deviation
+  across all 57 workflows documented in-file; this guard freezes that state —
+  every action SHA-pinned, harden-runner + `timeout-minutes` on every job,
+  `persist-credentials: false` on every checkout, top-level `permissions`
+  everywhere, no `write-all`, and every `egress-policy: audit` carrying its
+  written rationale. 356 checks; a future workflow or edit that regresses any
+  of it fails CI, and exceptions require a quoted in-file justification.
+
 - **Ad-hoc batch name screening** (`scripts/batch-screen.mjs`): screen any
   CSV/list of names (prospects, walk-ins, supplier shortlists) against the
   same lists and matcher as the daily control — no Asana, no state; exits red
