@@ -42,6 +42,8 @@ jobs:
         run: node test/app.test.js
       - name: Run brand guardrail (former entity name must never reappear)
         run: node test/brand-guard.test.mjs
+      - name: Run workflow-hardening ratchet (SHA pins, harden-runner, timeouts, egress rationale)
+        run: node test/workflow-hardening.test.mjs
       - name: Run scoring model-validation golden set
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
