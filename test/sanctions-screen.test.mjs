@@ -939,12 +939,14 @@ check('getByPath walks a dotted path and tolerates a missing branch',
   check('fetchPaginatedJson is bounded by maxPages (never an infinite crawl)', capped.data.length === 5 && calls === 5);
   globalThis.fetch = realFetch;
 }
-/* The ADB source stays DISABLED (pending a size-param probe) but must carry the
-   pagination config so the reader knows to page it once enabled. */
+/* The ADB source is ENABLED and read via the size/offset paginator; it carries a
+   coverage floor so a partial (size hint ignored, cap hit short of the register)
+   reports DEGRADED rather than a silent short list. */
 const _adb = extraReg.find(s => s.id === 'adb-debarment');
-check('adb-debarment carries a size/offset pagination config (disabled pending probe)',
-  !!_adb && _adb.enabled === false && _adb.paginate && _adb.paginate.dataPath === 'data'
-  && _adb.paginate.totalPath === 'meta.totalItems' && Number(_adb.paginate.maxPages) > 0);
+check('adb-debarment is enabled with a size/offset pagination config + coverage floor',
+  !!_adb && _adb.enabled === true && _adb.paginate && _adb.paginate.dataPath === 'data'
+  && _adb.paginate.totalPath === 'meta.totalItems' && Number(_adb.paginate.maxPages) > 0
+  && Number(_adb.minNames) >= 500);
 
 /* ── source probe (diagnostic instrument — pure functions) ── */
 const sp = await import('./../scripts/source-probe.mjs');

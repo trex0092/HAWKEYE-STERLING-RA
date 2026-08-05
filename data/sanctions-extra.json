@@ -407,9 +407,9 @@
    "url": "https://apim.adb.org/sanctions/lists/v1/published-list?sortField=Name&isAscending=true",
    "type": "json",
    "parser": "json",
-   "enabled": false,
+   "enabled": true,
    "paginate": { "sizeParam": "size", "offsetParam": "offset", "size": 250, "totalPath": "meta.totalItems", "dataPath": "data", "maxPages": 30 },
-   "_note": "ADB published debarment register incl. the 2010 MDB Mutual-Enforcement cross-debarments (~1,533 firms/individuals; debarment/procurement-integrity tier). Source-probe 2026-08-05 (run 31030989375) CORRECTED the earlier 'connection-level failure' note: the runner reached apim.adb.org (http 200, application/json, meta.totalItems 1533; data[].attributes.name/otherName). BUT the API serves only 10 rows/page and its own links.next points at an unreachable internal host (rip-oai-…azurecontainerapps.io), so a paginated size/offset fetch (added here) is required. STILL DISABLED pending a size-param probe: confirm the runner sees the full ~1,533 via ?size=250&offset — enable once the paged fetch is proven (the offset advances by ACTUAL page length, so it collects the list even if the server caps the page; minNames 500 flags a partial).",
+   "_note": "ADB published debarment register incl. the 2010 MDB Mutual-Enforcement cross-debarments (~1,533 firms/individuals; debarment/procurement-integrity tier). ENABLED 2026-08-05 on source-probe evidence (run 31030989375): the runner reached apim.adb.org (http 200, application/json, meta.totalItems 1533; data[].attributes.name). The API serves 10 rows/page and its own links.next points at an unreachable internal host (rip-oai-…azurecontainerapps.io), so it is read via the size/offset paginator (offset advances by ACTUAL page length, so it collects the full list whether or not the server honours the size=250 hint). Bounded at maxPages 30 and floored at minNames 500 — if the size hint is ignored and 30 pages of 10 fall short of the register, the run reports DEGRADED (loud, capped at 30 requests, never hammering), so the first live sweep confirms full coverage or flags a partial to widen the cap.",
    "minNames": 500
   },
   {
