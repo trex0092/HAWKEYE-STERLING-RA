@@ -399,6 +399,20 @@ export function matchSignature(r) {
    matches to alert on, the cleared matches (informational), and the next state.
    Subjects that errored this run carry their prior state forward untouched —
    never wiped, never silently cleared. */
+/* Per-hit evidence detail persisted with the state and shipped in the results
+   artifact: the matched designated name, score and the matcher's mechanism/
+   confidence labels — what an MLRO needs on the case card to adjudicate
+   without opening the run log. Capped at 12 (the engine's own lists cap). */
+export function hitDetail(lists) {
+  return (lists || []).slice(0, 12).filter(h => h && h.list).map(h => {
+    const d = { list: h.list, hitName: h.hitName || '', score: h.score ?? null };
+    if (h.mechanism) d.mechanism = h.mechanism;
+    if (h.confidence) d.confidence = h.confidence;
+    if (h.carriedForward) d.carriedForward = true;
+    return d;
+  });
+}
+
 export function diffState(prevState, results, today, threshold, screenedLists, evaluatedSignals) {
   const prev = (prevState && prevState.subjects) || {};
   const nextSubjects = { ...prev };
@@ -470,6 +484,16 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
       nextSubjects[r.key] = {
         name: r.name, jurisdiction: r.jurisdiction, band, topScore: r.topScore,
         recommendation, lists: lists.map(h => h.list).filter(Boolean),
+        /* Identity + evidence detail for the case board. `lists` (names only)
+           stays as-is — the signature, planner and every pre-migration record
+           depend on its shape; `hits` ADDS the matched designated name,
+           per-hit score and the matcher's mechanism/confidence labels, and
+           gid/entityType/parent/role let a legal-entity case link its customer
+           record (entity keys carry no gid segment, so caseTitle/caseHtml
+           rendered CASE-XXXXXX with no link for every company). Old state
+           records simply lack these fields — renderers fall back. */
+        gid: r.gid, entityType: r.entityType, parent: r.parent, role: r.role,
+        hits: hitDetail(lists),
         signature: sig, firstSeen, lastSeen: today
       };
       if (!prior || prior.signature !== sig) {
@@ -1403,7 +1427,10 @@ async function main() {
     alerts: alerts.map(a => ({
       key: a.key, name: a.name, jurisdiction: a.jurisdiction || '', band: a.band,
       topScore: a.topScore, recommendation: a.recommendation,
-      lists: (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean)
+      lists: (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean),
+      /* Evidence detail (matched designated name · score · mechanism ·
+         confidence) so the digest names WHAT matched, not just which list. */
+      hits: hitDetail((a.lists || []).filter(h => typeof h === 'object'))
     })),
     cleared: cleared.map(c => c.name)
   }, null, 2) + '\n');

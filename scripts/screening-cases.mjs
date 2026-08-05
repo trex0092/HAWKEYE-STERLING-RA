@@ -51,7 +51,11 @@ export function ageInDays(fromDay, today) {
 }
 
 export function caseTitle(key, s) {
-  const gidTail = (String(key).split('|')[2] || '').slice(-6);
+  /* UBO keys carry the customer gid as their third segment; LEGAL-ENTITY keys
+     have no '|' at all, so every company case used to be titled CASE-XXXXXX.
+     The state record now persists the subject's own gid — use it as the
+     fallback so entity cases get a real, stable case id too. */
+  const gidTail = (String(key).split('|')[2] || String((s && s.gid) || '')).slice(-6);
   return '🧾 CASE-' + (gidTail || 'XXXXXX') + ' — ' + (s.name || 'unknown subject') + ' — ' + (s.recommendation || 'review');
 }
 
@@ -109,14 +113,34 @@ export function newCaseStateEntry(gid, today, priorCase) {
 }
 
 export function caseHtml(key, s, runLink, priorCase) {
-  const customerGid = String(key).split('|')[2] || '';
+  /* Entity keys have no gid segment — fall back to the subject gid persisted
+     in the state record, so company cases link their customer record too. */
+  const customerGid = String(key).split('|')[2] || String((s && s.gid) || '');
   const h = ['<body>'];
   h.push('<h1>Screening case — ' + esc(s.name || 'unknown') + '</h1>');
   h.push('<strong>' + (s.recommendation === 'sanctions-match' ? '⛔ POTENTIAL SANCTIONS MATCH — immediate MLRO escalation path applies' : '⚠️ Screening flag — review required') + '</strong>');
   h.push('<ul>');
-  h.push('<li><strong>Subject:</strong> ' + esc(s.name || '') + (s.jurisdiction ? ' (' + esc(s.jurisdiction) + ')' : '') + '</li>');
+  h.push('<li><strong>Subject:</strong> ' + esc(s.name || '') + (s.jurisdiction ? ' (' + esc(s.jurisdiction) + ')' : '')
+    + (s.role || s.parent ? ' — ' + esc([s.role, s.parent ? 'of ' + s.parent : ''].filter(Boolean).join(' ')) : '') + '</li>');
   h.push('<li><strong>Recommendation:</strong> ' + esc(s.recommendation || 'review') + ' · band ' + esc(s.band || '?') + ' · score ' + esc(String(s.topScore ?? '?')) + '</li>');
-  h.push('<li><strong>Matched on:</strong> ' + esc((s.lists || []).join(', ') || 'see screening record') + '</li>');
+  /* Evidence rows: matched designated name · score · mechanism · confidence
+     when the state carries hit detail (post-migration records); the list-names
+     line for older records — the card must never say less than it used to. */
+  const hits = Array.isArray(s.hits) ? s.hits.filter(x => x && x.list) : [];
+  if (hits.length) {
+    h.push('<li><strong>Matched on:</strong></li>');
+    for (const x of hits) {
+      h.push('<li>· ' + esc(x.list)
+        + (x.hitName ? ' — “' + esc(x.hitName) + '”' : '')
+        + (x.score != null ? ' · score ' + esc(String(x.score)) : '')
+        + (x.confidence ? ' · ' + esc(x.confidence) : '')
+        + (x.mechanism ? ' · via ' + esc(x.mechanism) : '')
+        + (x.carriedForward ? ' · carried forward (list not re-verified this run)' : '')
+        + '</li>');
+    }
+  } else {
+    h.push('<li><strong>Matched on:</strong> ' + esc((s.lists || []).join(', ') || 'see screening record') + '</li>');
+  }
   h.push('<li><strong>First flagged:</strong> ' + esc(s.firstSeen || '?') + ' — SLA: review within ' + CASE_SLA_DAYS + ' days</li>');
   if (customerGid) h.push('<li><strong>Customer record:</strong> <a data-asana-gid="' + esc(customerGid) + '"/></li>');
   /* Re-flag provenance: a subject returning to the lists after a clearance is
@@ -162,11 +186,19 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
     for (const a of alerts) {
       const badge = BAND_BADGE[String(a.band || '').toLowerCase()] || '⚪';
       const caseGid = caseGidFor(a);
+      /* Prefer the evidence detail (matched designated name · score ·
+         confidence) over bare list names — "UK OFSI" alone forces the MLRO
+         into the run log to learn WHO matched. Older artifacts lack `hits`. */
+      const hits = Array.isArray(a.hits) ? a.hits.filter(x => x && x.list) : [];
+      const matchedOn = hits.length
+        ? hits.map(x => x.list + (x.hitName ? ': “' + x.hitName + '”' : '')
+            + (x.score != null ? ' (' + x.score + (x.confidence ? ' · ' + x.confidence : '') + ')' : '')).join(' · ')
+        : (a.lists || []).join(', ');
       h.push('<li>' + badge + ' <strong>' + esc(a.name || '') + '</strong>'
         + (a.jurisdiction ? ' (' + esc(a.jurisdiction) + ')' : '')
         + ' — ' + esc(String(a.band || '').toUpperCase()) + ' · score ' + esc(String(a.topScore ?? '?'))
         + ' · ' + esc(a.recommendation || 'review')
-        + ' — matched on: ' + esc((a.lists || []).join(', ') || 'see case')
+        + ' — matched on: ' + esc(matchedOn || 'see case')
         + (caseGid ? ' — <a data-asana-gid="' + esc(caseGid) + '"/>' : ' — case pending')
         + '</li>');
     }

@@ -4,7 +4,7 @@
    Usage: node test/sanctions-screen.test.mjs */
 import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
-  isMatch, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
+  isMatch, diffState, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip
 } from '../scripts/sanctions-screen.mjs';
@@ -153,6 +153,23 @@ const listed = normalizeResult({ name: 'A Co', topScore: 96, band: 'high', hitCo
 const d1 = diffState({ updated: null, subjects: {} }, [listed], '2026-06-19', 0.85);
 check('diffState flags a brand-new match', d1.alerts.length === 1 && d1.alerts[0].isNew === true && d1.alerts[0].name === 'A Co');
 check('diffState records the match with firstSeen + signature', d1.nextState.subjects.a && d1.nextState.subjects.a.firstSeen === '2026-06-19' && !!d1.nextState.subjects.a.signature);
+
+/* State record detail: `lists` stays the names-only array (signature/planner
+   compatibility, pre-migration records) while gid/entityType/hits ADD the
+   identity + evidence the case board was missing — entity cases titled
+   CASE-XXXXXX with no customer link, and no matched designated name anywhere. */
+check('diffState persists the subject gid/entityType and per-hit evidence detail',
+  d1.nextState.subjects.a.gid === '1'
+  && Array.isArray(d1.nextState.subjects.a.hits)
+  && d1.nextState.subjects.a.hits[0].list === 'OFAC SDN'
+  && d1.nextState.subjects.a.hits[0].score === 96
+  && JSON.stringify(d1.nextState.subjects.a.lists) === '["OFAC SDN"]');
+check('artifact hit detail (hitDetail) carries mechanism/confidence and drops junk rows',
+  (() => {
+    const d = hitDetail([{ list: 'OFAC SDN', hitName: 'ACME', score: 96, mechanism: 'fuzzy', confidence: 'STRONG' },
+                         { carriedForward: true }, null]);
+    return d.length === 1 && d[0].mechanism === 'fuzzy' && d[0].confidence === 'STRONG' && d[0].hitName === 'ACME';
+  })());
 
 const d2 = diffState(d1.nextState, [listed], '2026-06-20', 0.85);
 check('diffState does NOT re-alert a standing (same-signature) match', d2.alerts.length === 0);

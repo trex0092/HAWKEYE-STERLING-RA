@@ -22,6 +22,14 @@ check('addDays computes the SLA due date', addDays('2026-06-27', 5) === '2026-07
 check('ageInDays counts whole days, defensive on garbage', ageInDays('2026-06-27', TODAY) === 11 && ageInDays(null, TODAY) === 0);
 check('caseTitle is stable and carries the customer GID tail',
   caseTitle('john doe|ubo|1214107985842154', subj()) === '🧾 CASE-842154 — John Doe — sanctions-match');
+/* Entity keys have no gid segment — the state record's own gid must supply the
+   case id (every company case used to be titled CASE-XXXXXX). */
+check('caseTitle falls back to the subject gid for a legal-entity key',
+  caseTitle('amber international fzco', subj({ name: 'Amber International FZCO', gid: '1214107911223344' }))
+    === '🧾 CASE-223344 — Amber International FZCO — sanctions-match');
+check('caseTitle without any gid still renders (pre-migration record)',
+  caseTitle('amber international fzco', subj({ name: 'Amber International FZCO' }))
+    === '🧾 CASE-XXXXXX — Amber International FZCO — sanctions-match');
 check('the four lifecycle sections are defined', Object.keys(CASE_SECTIONS).length === 4 && CASE_SLA_DAYS === 5);
 
 /* ── planner ── */
@@ -143,6 +151,22 @@ check('re-flag case body references the prior case gid and its cleared date',
   && reflagHtml.includes('cleared 2026-07-01') && /^<body>[\s\S]*<\/body>$/.test(reflagHtml));
 check('a first-time case body carries no re-flag banner',
   !caseHtml(KEY, subj(), 'https://example/run').includes('RE-FLAGGED'));
+/* Evidence rows: the card names WHO matched (designated name · score ·
+   confidence · mechanism) when the state carries hit detail; a legal-entity
+   record links its customer record through its own gid. */
+const entHtml = caseHtml('amber international fzco',
+  subj({ name: 'Amber International FZCO', gid: '77112233',
+    hits: [{ list: 'UK OFSI', hitName: 'AMBER INTL FZCO', score: 91, mechanism: 'fuzzy', confidence: 'MODERATE' },
+           { list: 'EU FSF', carriedForward: true }] }), 'https://example/run');
+check('entity case body links the customer record via the persisted subject gid',
+  entHtml.includes('data-asana-gid="77112233"'));
+check('case body renders per-hit evidence: designated name, score, confidence, mechanism',
+  entHtml.includes('UK OFSI') && entHtml.includes('AMBER INTL FZCO') && entHtml.includes('score 91')
+  && entHtml.includes('MODERATE') && entHtml.includes('via fuzzy'));
+check('a carried-forward hit is labelled not-re-verified, never presented as fresh evidence',
+  entHtml.includes('carried forward (list not re-verified this run)'));
+check('a pre-migration record (no hits array) still renders the list names',
+  caseHtml(KEY, subj(), 'https://example/run').includes('UK OFSI'));
 
 /* ── daily results digest (the Asana results surface) ── */
 const RESULTS = {
@@ -159,6 +183,13 @@ check('digest: single <body> root with headline counts',
   /^<body>[\s\S]*<\/body>$/.test(digest) && digest.includes('778 subjects screened') && digest.includes('9 standing match(es)'));
 check('digest: match row links its lifecycle case and carries score/band/lists',
   digest.includes('data-asana-gid="case-gid-1"') && digest.includes('score 87') && digest.includes('UK OFSI'));
+check('digest: match row prefers hit evidence (designated name + score + confidence) when the artifact carries it', (() => {
+  const withHits = buildResultsDigestHtml({ ...RESULTS,
+    alerts: [{ ...RESULTS.alerts[0],
+      hits: [{ list: 'UK OFSI', hitName: 'DOE, John', score: 87, mechanism: 'fuzzy', confidence: 'MODERATE' }] }] },
+    a => (a.key === KEY ? 'case-gid-1' : null));
+  return withHits.includes('DOE, John') && withHits.includes('87 · MODERATE') && withHits.includes('UK OFSI');
+})());
 check('digest: coverage totals + failed list + degraded warning are loud',
   digest.includes('38405 designated names') && digest.includes('⚠️ UN consolidated could not be loaded')
   && digest.includes('DEGRADED'));
