@@ -352,6 +352,24 @@ GNEWS_LOCALES = [
     ("sw",    "TZ", "TZ:sw", "sw"),
     ("ta",    "IN", "IN:ta", "ta"),
     ("en-NG", "UG", "UG:en", "en"),
+    # High-risk-region editions (2026-08-05, edition-confirmed languages — mirrors adverse-media.mjs)
+    ("az", "AZ", "AZ:az", "az"),
+    ("kk", "KZ", "KZ:kk", "kk"),
+    ("ka", "GE", "GE:ka", "ka"),
+    ("hy", "AM", "AM:hy", "hy"),
+    ("ne", "NP", "NP:ne", "ne"),
+    ("si", "LK", "LK:si", "si"),
+    ("pa", "IN", "IN:pa", "pa"),
+    ("mr", "IN", "IN:mr", "mr"),
+    ("my", "MM", "MM:my", "my"),
+    ("km", "KH", "KH:km", "km"),
+    ("af", "ZA", "ZA:af", "af"),
+    ("sq", "AL", "AL:sq", "sq"),
+    ("hr", "HR", "HR:hr", "hr"),
+    ("sl", "SI", "SI:sl", "sl"),
+    ("lt", "LT", "LT:lt", "lt"),
+    ("lv", "LV", "LV:lv", "lv"),
+    ("et", "EE", "EE:et", "et"),
 ]
 # Derived URL templates ({query} is filled per-request via .format). The literal
 # {query} is preserved; hl/gl/ceid are baked in per locale.
@@ -663,10 +681,82 @@ LANG_KEYWORDS = {
         "பயங்கரவாதம்": "terrorism", "லஞ்சம்": "bribery", "ஊழல்": "corruption",
         "கையாடல்": "embezzle", "கைது": "arrest", "கடத்தல்": "smuggl",
     },
+    # ── High-risk-region languages (2026-08-05, adversarially-verified; mirrors
+    # adverse-media.mjs LANG_TERMS). Central Asia & Caucasus, South & SE Asia,
+    # Africa, Balkans & Baltics. Each native term maps to its English canonical. ──
+    "az": {  # Azerbaijani
+        "pul yuyulması": "money laundering", "çirkli pulların yuyulması": "money laundering", "fırıldaqçılıq": "fraud", "dələduzluq": "fraud", "sanksiyalar": "sanction", "terrorçuluq": "terrorism", "terrorçuluğun maliyyələşdirilməsi": "terrorist financing", "rüşvətxorluq": "bribery", "rüşvət": "bribery", "korrupsiya": "corruption", "mənimsəmə": "embezzle", "vəsaitlərin mənimsənilməsi": "embezzle", "həbs edildi": "arrest", "həbs olundu": "arrest", "məhkum edildi": "convict", "insan alveri": "human trafficking", "qaçaqmalçılıq": "smuggl",
+    },
+    "kk": {  # Kazakh
+        "ақшаны жылыстату": "money laundering", "ақша жылыстату": "money laundering", "алаяқтық": "fraud", "санкциялар": "sanction", "терроризм": "terrorism", "лаңкестік": "terrorism", "терроризмді қаржыландыру": "terrorist financing", "лаңкестікті қаржыландыру": "terrorist financing", "пара алу": "bribery", "парақорлық": "bribery", "сыбайлас жемқорлық": "corruption", "коррупция": "corruption", "қаражатты иемдену": "embezzle", "жымқыру": "embezzle", "қамауға алынды": "arrest", "сотталды": "convict", "кінәлі деп танылды": "convict", "адам саудасы": "human trafficking", "контрабанда": "smuggl",
+    },
+    "uz": {  # Uzbek
+        "pul yuvish": "money laundering", "jinoiy yo'l bilan olingan pullarni legallashtirish": "money laundering", "firibgarlik": "fraud", "sanksiyalar": "sanction", "terrorizm": "terrorism", "terrorizmni moliyalashtirish": "terrorist financing", "pora": "bribery", "poraxo'rlik": "bribery", "korrupsiya": "corruption", "mansab suiiste'moli": "corruption", "mablag'ni o'zlashtirish": "embezzle", "hibsga olindi": "arrest", "qamoqqa olindi": "arrest", "sudlandi": "convict", "aybdor deb topildi": "convict", "odam savdosi": "human trafficking", "kontrabanda": "smuggl",
+    },
+    "ka": {  # Georgian
+        "ფულის გათეთრება": "money laundering", "თაღლითობა": "fraud", "სანქციები": "sanction", "ტერორიზმი": "terrorism", "ტერორიზმის დაფინანსება": "terrorist financing", "ქრთამი": "bribery", "მექრთამეობა": "bribery", "კორუფცია": "corruption", "მითვისება": "embezzle", "გაფლანგვა": "embezzle", "დააკავეს": "arrest", "დაკავებულია": "arrest", "მსჯავრი დაედო": "convict", "გაასამართლეს": "convict", "ტრეფიკინგი": "human trafficking", "ადამიანით ვაჭრობა": "human trafficking", "კონტრაბანდა": "smuggl",
+    },
+    "hy": {  # Armenian
+        "փողերի լվացում": "money laundering", "դրամի լվացում": "money laundering", "խարդախություն": "fraud", "պատժամիջոցներ": "sanction", "սանկցիաներ": "sanction", "ահաբեկչություն": "terrorism", "ահաբեկչության ֆինանսավորում": "terrorist financing", "կաշառք": "bribery", "կաշառակերություն": "bribery", "կոռուպցիա": "corruption", "յուրացում": "embezzle", "ձերբակալվել է": "arrest", "ձերբակալվեց": "arrest", "դատապարտվել է": "convict", "մեղավոր ճանաչվեց": "convict", "թրաֆիքինգ": "human trafficking", "մարդկանց առևտուր": "human trafficking", "մաքսանենգություն": "smuggl",
+    },
+    "ne": {  # Nepali
+        "सम्पत्ति शुद्धीकरण": "money laundering", "ठगी": "fraud", "प्रतिबन्ध": "sanction", "आतंकवाद": "terrorism", "आतंकवादी वित्तपोषण": "terrorist financing", "घुस": "bribery", "भ्रष्टाचार": "corruption", "हिनामिना": "embezzle", "पक्राउ": "arrest", "दोषी ठहर": "convict", "तस्करी": "smuggl", "चोरी निकासी": "smuggl",
+    },
+    "si": {  # Sinhala
+        "මුදල් විශුද්ධිකරණය": "money laundering", "වංචාව": "fraud", "සම්බාධක": "sanction", "ත්‍රස්තවාදය": "terrorism", "ත්‍රස්තවාදී මූල්‍යකරණය": "terrorist financing", "අල්ලස": "bribery", "දූෂණය": "corruption", "අවභාවිතය": "embezzle", "අත්අඩංගුවට": "arrest", "වරදකරු": "convict", "ජාවාරම": "smuggl",
+    },
+    "pa": {  # Punjabi
+        "ਮਨੀ ਲਾਂਡਰਿੰਗ": "money laundering", "ਧੋਖਾਧੜੀ": "fraud", "ਪਾਬੰਦੀਆਂ": "sanction", "ਅੱਤਵਾਦ": "terrorism", "ਅੱਤਵਾਦੀ ਫੰਡਿੰਗ": "terrorist financing", "ਰਿਸ਼ਵਤ": "bribery", "ਭ੍ਰਿਸ਼ਟਾਚਾਰ": "corruption", "ਗਬਨ": "embezzle", "ਗ੍ਰਿਫਤਾਰ": "arrest", "ਦੋਸ਼ੀ": "convict", "ਤਸਕਰੀ": "smuggl", "ਸਮਗਲਿੰਗ": "smuggl",
+    },
+    "mr": {  # Marathi
+        "मनी लाँडरिंग": "money laundering", "फसवणूक": "fraud", "निर्बंध": "sanction", "दहशतवाद": "terrorism", "दहशतवादी अर्थपुरवठा": "terrorist financing", "लाच": "bribery", "भ्रष्टाचार": "corruption", "अपहार": "embezzle", "अटक": "arrest", "दोषी": "convict", "तस्करी": "smuggl", "चोरटी वाहतूक": "smuggl",
+    },
+    "my": {  # Burmese
+        "ငွေကြေးခဝါချမှု": "money laundering", "လိမ်လည်မှု": "fraud", "ပိတ်ဆို့အရေးယူမှု": "sanction", "အကြမ်းဖက်ဝါဒ": "terrorism", "အကြမ်းဖက်မှု": "terrorism", "အကြမ်းဖက်မှုကို ငွေကြေးထောက်ပံ့မှု": "terrorist financing", "လာဘ်ပေးလာဘ်ယူမှု": "bribery", "အဂတိလိုက်စားမှု": "corruption", "ငွေအလွဲသုံးစားမှု": "embezzle", "ဖမ်းဆီး": "arrest", "ပြစ်ဒဏ်ချမှတ်": "convict", "လူကုန်ကူးမှု": "human trafficking", "မှောင်ခိုကူးသန်းမှု": "smuggl", "မှောင်ခိုတင်သွင်းမှု": "smuggl",
+    },
+    "km": {  # Khmer
+        "ការសម្អាតប្រាក់": "money laundering", "ការក្លែងបន្លំ": "fraud", "ទណ្ឌកម្ម": "sanction", "ភេរវកម្ម": "terrorism", "ការផ្តល់ហិរញ្ញប្បទានដល់ភេរវកម្ម": "terrorist financing", "ការសូកប៉ាន់": "bribery", "សំណូក": "bribery", "អំពើពុករលួយ": "corruption", "ចាប់ខ្លួន": "arrest", "កាត់ទោស": "convict", "ការជួញដូរមនុស្ស": "human trafficking", "ការនាំចូលដោយខុសច្បាប់": "smuggl",
+    },
+    "lo": {  # Lao
+        "ການຟອກເງິນ": "money laundering", "ການສໍ້ໂກງ": "fraud", "ມາດຕະການຄວ່ຳບາດ": "sanction", "ການລົງໂທດ": "sanction", "ການກໍ່ການຮ້າຍ": "terrorism", "ການສະໜອງທຶນໃຫ້ການກໍ່ການຮ້າຍ": "terrorist financing", "ການໃຫ້ສິນບົນ": "bribery", "ການສໍ້ລາດບັງຫຼວງ": "corruption", "ການຍັກຍອກເງິນ": "embezzle", "ຖືກຈັບກຸມ": "arrest", "ຖືກຕັດສິນລົງໂທດ": "convict", "ການຄ້າມະນຸດ": "human trafficking", "ການລັກລອບຄ້າ": "smuggl", "ການລັກລອບຂົນສົ່ງ": "smuggl",
+    },
+    "ha": {  # Hausa
+        "halasta kuɗin haram": "money laundering", "zamba": "fraud", "takunkumi": "sanction", "ta'addanci": "terrorism", "tallafin ta'addanci": "terrorist financing", "cin hanci": "bribery", "cin hanci da rashawa": "corruption", "almubazzaranci": "embezzle", "an kama": "arrest", "an samu da laifi": "convict", "fataucin mutane": "human trafficking", "fasa-kwauri": "smuggl",
+    },
+    "so": {  # Somali
+        "dhaqidda lacagta": "money laundering", "khiyaano": "fraud", "cunaqabatayn": "sanction", "argagixiso": "terrorism", "maalgelinta argagixisada": "terrorist financing", "laaluush": "bribery", "musuqmaasuq": "corruption", "la xiray": "arrest", "xukun lagu riday": "convict", "ganacsiga dadka": "human trafficking", "tahriib": "smuggl",
+    },
+    "am": {  # Amharic
+        "ሕገ-ወጥ የገንዘብ ዝውውር": "money laundering", "ማጭበርበር": "fraud", "ማዕቀብ": "sanction", "ሽብርተኝነት": "terrorism", "ሽብርተኝነትን በገንዘብ መደገፍ": "terrorist financing", "ጉቦ": "bribery", "ሙስና": "corruption", "እምነት ማጉደል": "embezzle", "ታሰረ": "arrest", "ጥፋተኛ ተባለ": "convict", "ሕገ-ወጥ የሰዎች ዝውውር": "human trafficking", "ኮንትሮባንድ": "smuggl",
+    },
+    "af": {  # Afrikaans
+        "geldwassery": "money laundering", "bedrog": "fraud", "sanksies": "sanction", "terrorisme": "terrorism", "terreurfinansiering": "terrorist financing", "omkopery": "bribery", "korrupsie": "corruption", "verduistering": "embezzle", "gearresteer": "arrest", "skuldig bevind": "convict", "mensehandel": "human trafficking", "smokkelary": "smuggl",
+    },
+    "sq": {  # Albanian
+        "pastrim parash": "money laundering", "mashtrim": "fraud", "sanksione": "sanction", "terrorizëm": "terrorism", "financim i terrorizmit": "terrorist financing", "ryshfet": "bribery", "korrupsion": "corruption", "përvetësim": "embezzle", "arrestuar": "arrest", "dënuar": "convict", "trafikim": "human trafficking", "kontrabandë": "smuggl",
+    },
+    "hr": {  # Croatian
+        "pranje novca": "money laundering", "prijevara": "fraud", "sankcije": "sanction", "terorizam": "terrorism", "financiranje terorizma": "terrorist financing", "podmićivanje": "bribery", "korupcija": "corruption", "pronevjera": "embezzle", "uhićen": "arrest", "osuđen": "convict", "trgovina ljudima": "human trafficking", "krijumčarenje": "smuggl",
+    },
+    "sl": {  # Slovenian
+        "pranje denarja": "money laundering", "goljufija": "fraud", "sankcije": "sanction", "terorizem": "terrorism", "financiranje terorizma": "terrorist financing", "podkupovanje": "bribery", "korupcija": "corruption", "poneverba": "embezzle", "aretiran": "arrest", "obsojen": "convict", "trgovina z ljudmi": "human trafficking", "tihotapljenje": "smuggl",
+    },
+    "lt": {  # Lithuanian
+        "pinigų plovimas": "money laundering", "sukčiavimas": "fraud", "sankcijos": "sanction", "terorizmas": "terrorism", "terorizmo finansavimas": "terrorist financing", "kyšininkavimas": "bribery", "korupcija": "corruption", "pasisavinimas": "embezzle", "suimtas": "arrest", "nuteistas": "convict", "prekyba žmonėmis": "human trafficking", "kontrabanda": "smuggl",
+    },
+    "lv": {  # Latvian
+        "naudas atmazgāšana": "money laundering", "krāpšana": "fraud", "sankcijas": "sanction", "terorisms": "terrorism", "terorisma finansēšana": "terrorist financing", "kukuļošana": "bribery", "korupcija": "corruption", "piesavināšanās": "embezzle", "aizturēts": "arrest", "notiesāts": "convict", "cilvēku tirdzniecība": "human trafficking", "kontrabanda": "smuggl",
+    },
+    "et": {  # Estonian
+        "rahapesu": "money laundering", "pettus": "fraud", "sanktsioonid": "sanction", "terrorism": "terrorism", "terrorismi rahastamine": "terrorist financing", "altkäemaks": "bribery", "korruptsioon": "corruption", "omastamine": "embezzle", "vahistatud": "arrest", "süüdi mõistetud": "convict", "inimkaubandus": "human trafficking", "salakaubavedu": "smuggl",
+    },
+    "mk": {  # Macedonian
+        "перење пари": "money laundering", "измама": "fraud", "санкции": "sanction", "тероризам": "terrorism", "финансирање на тероризам": "terrorist financing", "поткуп": "bribery", "корупција": "corruption", "проневера": "embezzle", "уапсен": "arrest", "осуден": "convict", "трговија со луѓе": "human trafficking", "криумчарење": "smuggl",
+    },
 }
 
-# One merged native-term → English-canonical map across all 18 languages (Arabic
-# first, then the rest; first insertion wins on the odd shared spelling).
+# One merged native-term → English-canonical map across every native language
+# (Arabic first, then the rest; first insertion wins on the odd shared spelling).
 FOREIGN_KEYWORDS = dict(ADVERSE_KEYWORDS_AR)
 for _lang_map in LANG_KEYWORDS.values():
     for _term, _canon in _lang_map.items():
@@ -683,17 +773,25 @@ ADVERSE_LANG_COUNT = 2 + len(LANG_KEYWORDS)
 # must be matched by substring: Cyrillic, Arabic (+ supplement, covers fa/ur),
 # Devanagari, Hiragana/Katakana, CJK ideographs, Hangul.
 _NONLATIN_RE = re.compile(
-    "[Ͱ-Ͽ"   # Greek
-    "Ѐ-ӿ"    # Cyrillic
-    "֐-׿"    # Hebrew
-    "؀-ۿݐ-ݿ"  # Arabic (+ supplement — fa/ur)
-    "ऀ-ॿ"    # Devanagari (hi)
-    "ঀ-৿"    # Bengali
-    "஀-௿"    # Tamil
-    "฀-๿"    # Thai
-    "぀-ヿ"    # Hiragana/Katakana
-    "㐀-鿿"    # CJK ideographs
-    "가-힣]")  # Hangul
+    "[\u0370-\u03ff"   # Greek
+    "\u0400-\u04ff"    # Cyrillic
+    "\u0530-\u058f"    # Armenian (hy)
+    "\u0590-\u05ff"    # Hebrew
+    "\u0600-\u06ff\u0750-\u077f"  # Arabic (+ supplement — fa/ur)
+    "\u0900-\u097f"    # Devanagari (hi/ne/mr)
+    "\u0980-\u09ff"    # Bengali (bn)
+    "\u0a00-\u0a7f"    # Gurmukhi (pa)
+    "\u0b80-\u0bff"    # Tamil (ta)
+    "\u0d80-\u0dff"    # Sinhala (si)
+    "\u0e00-\u0e7f"    # Thai (th)
+    "\u0e80-\u0eff"    # Lao (lo)
+    "\u1000-\u109f"    # Myanmar (my)
+    "\u10a0-\u10ff"    # Georgian (ka)
+    "\u1200-\u137f"    # Ethiopic (am)
+    "\u1780-\u17ff"    # Khmer (km)
+    "\u3040-\u30ff"    # Hiragana/Katakana
+    "\u3400-\u9fff"    # CJK ideographs
+    "\uac00-\ud7a3]")  # Hangul
 
 # Arabic script (incl. Persian/Urdu supplement). Arabic press varies orthography
 # freely — diacritics (harakat), tatweel, and the alef/hamza/teh-marbuta forms —
@@ -724,8 +822,8 @@ def _latin_fold(s: str) -> str:
 
 def match_adverse_keywords(title: str) -> list:
     """All adverse keywords found in one headline: the English set (word-boundary,
-    case-insensitive) plus the 18-language multilingual set. Each non-English term
-    maps to its English canonical so typology bucketing and reporting stay uniform.
+    case-insensitive) plus the multilingual native-language set. Each non-English
+    term maps to its English canonical so typology bucketing and reporting stay uniform.
     Latin-script foreign terms match on \b word boundaries (lower-cased, with a
     diacritic-folded fallback for all-caps Turkish-style headlines); Arabic terms
     match on the Arabic-normalised headline; other non-Latin scripts match by
@@ -1647,7 +1745,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
       Pass 2 — exact name AND a material-risk-term cluster (en) to surface
                wrongdoing coverage that isn't in the general headlines.
       Pass 3 — targeted Arabic risk-term pass on the AE:ar edition.
-    Headlines are flagged against an 18-language multilingual red-flag set,
+    Headlines are flagged against a multilingual native-language red-flag set,
     bucketed by typology, deduplicated across outlets, and ranked recent-first.
     Self-throttling: every request waits for the run-global Google News gate
     (one shared send slot across ALL workers; failures back the shared interval

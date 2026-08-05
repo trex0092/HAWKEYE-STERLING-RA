@@ -958,6 +958,25 @@ _ml = [
 ]
 _ml_ok = all(exp in screen.match_adverse_keywords(t) for t, exp in _ml)
 check("worldwide multilingual flagging across Greek/Hebrew/Thai/Polish/Vietnamese/Bulgarian/Tamil", _ml_ok)
+# High-risk-region expansion (2026-08-05): Central Asia & Caucasus, South & SE
+# Asia, Africa, Balkans & Baltics — native ML/TF/sanction predicates flag.
+_ml2 = [
+    ("Нұрлан ақшаны жылыстату ісінде", "money laundering"),        # Kazakh
+    ("კომპანია ფულის გათეთრებაში", "money laundering"),            # Georgian
+    ("ընկերությունը մեղադրվում է փողերի լվացում գործում", "money laundering"),      # Armenian
+    ("Kompania akuzohet për pastrim parash", "money laundering"),  # Albanian
+    ("Tvrtka optužena za pranje novca", "money laundering"),       # Croatian
+    ("Pinigų plovimas: įmonė kaltinama", "money laundering"),        # Lithuanian
+    ("Shirkad lagu eedeeyay dhaqidda lacagta", "money laundering"),# Somali
+    ("ኩባንያ በሽብርተኝነት ተጠርጥሯል", "terrorism"),                        # Amharic
+    ("ကုမ္ပဏီ ငွေကြေးခဝါချမှု", "money laundering"),               # Burmese
+    ("ក្រុមហ៊ុន ការសម្អាតប្រាក់", "money laundering"),              # Khmer
+]
+check("high-risk-region multilingual flagging (Kazakh/Georgian/Armenian/Albanian/Croatian/Lithuanian/Somali/Amharic/Burmese/Khmer)",
+      all(exp in screen.match_adverse_keywords(t) for t, exp in _ml2))
+check("the worldwide expansion lifted the language + locale counts",
+      screen.ADVERSE_LANG_COUNT >= 55 and len(screen.GNEWS_LOCALES) >= 80
+      and all(k in screen.LANG_KEYWORDS for k in ("az", "kk", "ka", "hy", "sq", "hr", "lt", "so", "am", "my", "km")))
 # Foreign Latin terms are whole words, so both edges are anchored — a bare
 # prefix collided with unrelated English (regression: 'mito'chondria flagged
 # bribery via Serbian 'mito', 'preso'rted flagged arrest via Portuguese 'preso').
