@@ -349,8 +349,8 @@
    "url": "https://apim.adb.org/sanctions/lists/v1/published-list?sortField=Name&isAscending=true",
    "type": "json",
    "parser": "json",
-   "enabled": true,
-   "_note": "Asian Development Bank public debarment register (~1,200-1,800 entries incl. MDB cross-debarments) — keyless JSON. Debarment tier like the World Bank feed (the list name carries the tier). CAVEAT: the API paginates via links.next and the single-GET fetcher reads page one — if the first live run shows a sub-floor page-1 count, the list goes PARTIAL (disclosed, standing matches carried) until a pageSize parameter or pager lands. Never reads as full coverage while truncated.",
+   "enabled": false,
+   "_note": "ADB published debarment register (keyless JSON). DISABLED 2026-08-05 on live evidence: the endpoint fails at CONNECTION level from GitHub Actions runners (fetch failed — host unreachable/blocked from this datacenter, same class as Sri Lanka), while the survey reached it from a different cloud. ADB's 2010 Mutual-Enforcement cross-debarments already surface via the World Bank/IDB data path. Re-probe or curated; keep disabled until a reachable route is confirmed.",
    "minNames": 500
   },
   {
@@ -378,8 +378,8 @@
    "url": "https://tfs.fic.gov.za/Pages/TFSListDownload?fileType=xml",
    "type": "xml",
    "parser": "un",
-   "enabled": true,
-   "_note": "South Africa's consolidated TFS list (~708 individuals + ~253 entities) from the Financial Intelligence Centre — stable keyless XML download; high relevance for African gold-corridor counterparties. First live run 2026-08-05: fetched but the GENERIC XML extractor found 0 names; the FIC file follows the UN consolidated-list schema, so the parser is now the dedicated UN extractor — the next run verifies. Degrades loudly either way.",
+   "enabled": false,
+   "_note": "South Africa FIC Targeted Financial Sanctions list. DISABLED 2026-08-05 on probe evidence: the configured URL (?fileType=xml on /Pages/TFSListDownload) returns an HTML LANDING PAGE ('TFS list downloads'), not the XML file — the real download-handler URL must be read off that page (a browser/curated step; the runner can reach the host, so this is a URL-discovery task, not a reachability block). Re-probe candidate once the direct file URL is captured.",
    "minNames": 400
   },
   {

@@ -10,6 +10,16 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Live-run true-up: two non-parsing sources disabled on evidence.** The
+  first green run of the widened estate (25 lists, 226,636 names) left two
+  additive sources degrading loudly: `za-fic-tfs` (probe shows its
+  `?fileType=xml` URL returns an HTML *landing page*, not the XML file — a
+  URL-discovery task) and `adb-debarment` (fetch fails at connection level
+  from GitHub runners, same class as Sri Lanka). Both disabled with the
+  observed truth recorded and a re-probe path; the next daily screen runs
+  non-degraded. Nothing silently cleared — the run stayed green throughout
+  because degraded additive sources never red the run, they just disclose.
+
 - **Probe-evidence wave: five sources re-enabled, one confirmed dead.** The
   first source-probe run turned every guess into evidence, and the fixes
   land with it: **Israel NBCTF** re-enabled (real 87KB workbook; the XLSX
