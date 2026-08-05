@@ -2,6 +2,64 @@
  "_README": "Additional / curated sanctions lists loaded ONLY by scripts/sanctions-screen.mjs (not by the watcher's strict loader). A source may be remote (`url` + `parser`) or in-repo curated (`file`, parser 'curated'). Set `enabled:false` to keep a source configured but skipped. A remote source that fails or parses 0 names, or a curated list with no entries, degrades coverage (reported loudly) — never a silent all-clear.",
  "sources": [
   {
+   "id": "ar-repet-entidades",
+   "name": "Argentina — RePET Entidades (terror-linked entities)",
+   "jurisdiction": "Argentina",
+   "url": "https://repet.jus.gob.ar/xml/entidades.json",
+   "type": "json",
+   "parser": "json",
+   "enabled": false,
+   "_note": "Sibling of the loaded ar-repet personas.json (same /xml/ dir, keyless JSON). ~90 terror-linked entities; the generic JSON walker reads denominacion/nombre + aliases. Added 2026-08-05 (more-names verification, HIGH confidence) — DISABLED pending source-probe proof from a runner (sandbox egress blocks the host); enable once the probe confirms parseable names.",
+   "minNames": 20
+  },
+  {
+   "id": "idb-debarment",
+   "name": "IDB — Dataset of Sanctioned Firms & Individuals (MDB cross-debarment)",
+   "jurisdiction": "Global (MDB)",
+   "url": "https://mydata.iadb.org/api/views/vsju-qrtz/rows.csv?accessType=DOWNLOAD",
+   "type": "csv",
+   "parser": "socrata",
+   "enabled": false,
+   "_note": "Inter-American Development Bank debarment dataset incl. the 2010 MDB Mutual-Enforcement cross-debarments (World Bank/ADB/AfDB/EBRD) — a keyless Socrata rows.csv export (dataset id vsju-qrtz independently confirmed). ~1,500 firms/individuals. Debarment (procurement-integrity) tier, not financial sanctions. Added 2026-08-05 (HIGH confidence) — DISABLED pending source-probe: the exact name-column header is unconfirmed from the sandbox; the probe reveals the headers so parseSocrataCsv maps the right column before enabling.",
+   "minNames": 200
+  },
+  {
+   "id": "il-nbctf-orgs",
+   "name": "Israel — NBCTF Terror Organization Designations (XLSX)",
+   "jurisdiction": "Israel",
+   "url": "https://nbctf.mod.gov.il/he/Announcements/Documents/NBCTFIsrael%20-%20Terror%20Organization%20Designation%20List_XL.xlsx",
+   "type": "xlsx",
+   "parser": "xlsx",
+   "enabled": false,
+   "browserHeaders": true,
+   "_note": "Sibling of the loaded il-nbctf individuals file — the ORGANISATIONS list (~400 entities). The multi-sheet XLSX reader handles it. URL is a parallel-naming INFERENCE (different stem than the individuals file); if the .xlsx 404s the same-path XML (…List_XML.xml) is the documented fallback. Added 2026-08-05 (medium confidence) — DISABLED pending source-probe to confirm the exact URL from a runner.",
+   "minNames": 50
+  },
+  {
+   "id": "az-fms",
+   "name": "Azerbaijan — FMS Domestic Sanctions List (XML)",
+   "jurisdiction": "Azerbaijan",
+   "url": "http://hms.gov.az/en/olkedaxili-siyahi",
+   "type": "xml",
+   "parser": "xml",
+   "enabled": false,
+   "browserHeaders": true,
+   "_note": "Azerbaijan Financial Monitoring Service autonomous domestic designations (UN-consolidated XML schema). The configured URL is the landing page — the actual XML is linked from it and may need the direct file URL (plain-http host). Added 2026-08-05 (content high-confidence, URL unverified) — DISABLED pending source-probe to capture the real XML file URL from a runner.",
+   "minNames": 5
+  },
+  {
+   "id": "kg-fiu",
+   "name": "Kyrgyzstan — FIU National Sanctions List (XML)",
+   "jurisdiction": "Kyrgyzstan",
+   "url": "https://fiu.gov.kg/sked/9?language=ru",
+   "type": "xml",
+   "parser": "xml",
+   "enabled": false,
+   "browserHeaders": true,
+   "_note": "Kyrgyzstan State Financial Intelligence Service national list (autonomous designations beyond UN). The configured URL is the index page; the survey noted the XML filename rotates per update, so a stable direct-file fetch may not exist — the source-probe will show whether this returns XML or an index page needing link-discovery. Added 2026-08-05 — DISABLED pending probe evidence.",
+   "minNames": 20
+  },
+  {
    "id": "uae-eocn-local-terrorist",
    "name": "UAE EOCN — Local Terrorist List",
    "jurisdiction": "United Arab Emirates",
