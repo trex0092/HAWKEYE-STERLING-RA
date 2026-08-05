@@ -1178,7 +1178,9 @@ export function belowFloor(source, names) {
 /* Fetch + parse every enabled source into [{ id, name, names[] }]. A source that
    fails to fetch or yields zero names degrades coverage (reported, never a silent
    all-clear); a curated list with no entries degrades too. */
-async function loadSanctionsLists(cfg) {
+/* Exported for scripts/batch-screen.mjs (ad-hoc name screening) — same
+   loader, same coverage-honesty contract. */
+export async function loadSanctionsLists(cfg) {
   let sources;
   try { sources = loadSources(readFileSync(cfg.sourcesFile, 'utf8')).filter(s => s.enabled !== false); }
   catch (e) { return { lists: [], degraded: true, fetched: 0, total: 0, notes: ['sources file unreadable: ' + (e && e.message || e)] }; }

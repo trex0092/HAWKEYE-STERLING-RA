@@ -649,6 +649,29 @@ check('OFAC-API: unrecognised shape → unavailable, never a guess',
   parseOfacApiResponse({ totally: 'different' }).status === 'unavailable');
 check('OFAC-API: non-object → unavailable', parseOfacApiResponse(null).status === 'unavailable');
 
+/* ── Ad-hoc batch screening (scripts/batch-screen.mjs — pure parts) ── */
+const { parseNamesInput, buildBatchReport } = await import('./../scripts/batch-screen.mjs');
+check('batch: header-aware CSV takes the name column',
+  JSON.stringify(parseNamesInput('country,name\nAE,"ACME LLC"\nSG,Bravo')) === '["ACME LLC","Bravo"]');
+check('batch: plain one-per-line list works, blanks dropped',
+  JSON.stringify(parseNamesInput('ACME LLC\n\nBravo Trading\n')) === '["ACME LLC","Bravo Trading"]');
+check('batch: empty input yields no names', parseNamesInput('').length === 0);
+const _batchRep = buildBatchReport(
+  [{ name: 'A|B', band: 'high', topScore: 90, recommendation: 'sanctions-match',
+     lists: [{ list: 'US OFAC — SDN list (CSV)', hitName: 'A', score: 90 }] },
+   { name: 'Clean Co', band: 'low', topScore: 0, recommendation: 'clear', lists: [] }],
+  { date: '2026-08-05', threshold: 85, listsLoaded: 10,
+    failures: ['UN Security Council — fetch failed'], governanceNote: 'GOV-NOTE' });
+check('batch report: counts, pipe-escaping, clear rows, governance note',
+  _batchRep.includes('1 of 2 name(s)') && _batchRep.includes('A\\|B')
+  && _batchRep.includes('no list match') && _batchRep.includes('GOV-NOTE'));
+check('batch report: a pre-escaped backslash-pipe cannot re-arm the pipe (CodeQL)',
+  buildBatchReport([{ name: 'X\\|Y', band: 'low', topScore: 0, recommendation: 'clear', lists: [] }],
+    { date: '2026-08-05', threshold: 85, listsLoaded: 10, failures: [], governanceNote: '' })
+    .includes('X\\\\\\|Y'));
+check('batch report: failed lists are disclosed as reduced coverage',
+  _batchRep.includes('Reduced coverage') && _batchRep.includes('UN Security Council — fetch failed'));
+
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

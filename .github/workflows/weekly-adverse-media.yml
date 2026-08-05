@@ -159,6 +159,8 @@ jobs:
             api.gdeltproject.org:443
             www.wikidata.org:443
             query.wikidata.org:443
+            www.sec.gov:443
+            www.fca.org.uk:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # No credentials on disk (zizmor artipacked): the state push below
@@ -271,6 +273,12 @@ jobs:
           # FULL enrichment (no pointless trimming). Empty value disables.
           DELIVERY_TARGET_UTC: ${{ vars.DELIVERY_TARGET_UTC || '05:00' }}
           DELIVERY_RESERVE_MIN: ${{ vars.DELIVERY_RESERVE_MIN || '20' }}
+          # Follow-Ups reminder attestation: after the report is DELIVERED the
+          # engine comments proof on the externally-generated daily reminder
+          # card (dedup-key SYSTEM|daily-screening|<date>) and completes it on
+          # zero-finding days only; action days stay open for the analyst.
+          # Clear the var to disable.
+          FOLLOWUP_PROJECT_GID: ${{ vars.FOLLOWUP_PROJECT_GID || '1215884707932023' }}
           # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
           # its own assigned MLRO case subtask, not just the first 40. The full
           # findings list is always in the daily task body regardless of this cap.

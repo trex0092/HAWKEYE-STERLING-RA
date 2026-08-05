@@ -3252,6 +3252,51 @@ d = monitoring.makeup_decision("2026-08-05", path=_p)
 check("deadline-deferred subjects trigger the same-day make-up sweep",
       d["sweep"] is True and d["uncovered"] == 40 and "deferred" in d["reason"])
 
+# ── Regulator-bulletin net + identity cross-check ─────────────────────────────
+print("\nscreen.py — regulator bulletins & identity cross-check")
+check("significant tokens drop corporate boilerplate",
+      screen._sig_tokens("ACME Gold Trading L.L.C") == ["acme"]
+      and screen._sig_tokens("Bullion Street Gold Trading LLC") == ["bullion", "street"])
+_rb_items = [
+    {"title": "SEC charges Bullion Street operators", "source": "US SEC — Litigation Releases",
+     "date": "05 Aug 2026", "url": "u1", "text": "sec charges bullion street gold operators with fraud"},
+    {"title": "Unrelated action", "source": "US SEC", "date": "05 Aug 2026", "url": "u2",
+     "text": "unrelated enforcement matter"}]
+_rb_subj = [("COMPANY", "Bullion Street Gold Trading LLC", None, {}),
+            ("INDIVIDUAL", "Li Wei", None, {})]
+_rb = screen.screen_regulator_bulletins(_rb_subj, _rb_items)
+check("bulletin naming the subject → strong-tier Enforcement/Legal finding",
+      len(_rb.get("Bullion Street Gold Trading LLC", [])) == 1
+      and _rb["Bullion Street Gold Trading LLC"][0]["tier"] == "strong"
+      and _rb["Bullion Street Gold Trading LLC"][0]["regulator_bulletin"] is True)
+check("single-significant-token names are excluded from containment matching",
+      "Li Wei" not in _rb)
+check("absent config file → net not configured, never a crash",
+      screen.fetch_regulator_bulletins(path="/nonexistent.json") == ([], []))
+_ic_arts = [{"title": "Trader arrested in Dubai", "snippet": "linked to Marmara Gold Trading operations", "flagged": True},
+            {"title": "Man arrested abroad", "snippet": "no context at all", "flagged": True}]
+screen.annotate_identity_corroboration(_ic_arts, "Mahmoud Sultan",
+                                       "Marmara Gold Trading L.L.C", {"name": "Marmara Gold Trading L.L.C"})
+check("article mentioning the associated entity is identity-corroborated",
+      _ic_arts[0]["identity_corroborated"] is True and _ic_arts[0]["identity_context"])
+check("name-only article is labelled, NEVER suppressed (still flagged)",
+      _ic_arts[1]["identity_corroborated"] is False and _ic_arts[1]["flagged"] is True)
+
+# ── Follow-Ups card attestation (clean day completes, action day stays open) ──
+print("\nscreen.py — Follow-Ups attestation")
+check("gate is OFF by default (no FOLLOWUP_PROJECT_GID)", screen.FOLLOWUP_PROJECT_GID == "")
+check("clean day → complete", screen.followup_disposition({"sanctions": 0, "adverse": 0, "pep": 0}) == "complete")
+check("any finding → comment only, card stays open",
+      screen.followup_disposition({"sanctions": 0, "adverse": 2, "pep": 0}) == "comment"
+      and screen.followup_disposition({"sanctions": 1}) == "comment")
+check("missing delta counts as clean (zero findings), never as a block",
+      screen.followup_disposition({}) == "complete" and screen.followup_disposition(None) == "complete")
+_fc = screen.followup_comment_text("2026-08-05", {"sanctions": 1, "adverse": 0, "pep": 0}, "999")
+check("action-day comment demands the human acts and cites the report",
+      "require review" in _fc and "https://app.asana.com/0/0/999" in _fc)
+check("clean-day comment states the auto-completion as the attestation record",
+      "completed automatically" in screen.followup_comment_text("2026-08-05", {}, "999"))
+
 # ── TFS FFR/PNMR draft dossiers (draft-only, MLRO acts) ───────────────────────
 print("\ntfs_dossier.py — FFR/PNMR drafts")
 check("UN + EOCN list names are TFS; others are not",
@@ -3318,6 +3363,24 @@ try:
     check("an absent record can never render as a clean report", False)
 except ValueError:
     check("an absent record can never render as a clean report", True)
+_st_rec = _sr_state["subjects"]["acme llc"]
+check("statement: live hits → under-review wording, no determination asserted",
+      "under four-eyes review" in subject_report.screening_statement(_st_rec)
+      and "No determination has been made" in subject_report.screening_statement(_st_rec))
+check("statement: escalated case → MLRO act cited, no tipping-off",
+      "ESCALATE" in subject_report.screening_statement(_st_rec, {"escalated": True, "escalatedAt": "2026-08-04", "taskGid": "t9"})
+      and "no tipping-off" in subject_report.screening_statement(_st_rec, {"escalated": True}))
+_wl_rec = {"name": "X LLC", "lastSeen": "2026-08-05",
+           "hits": [{"list": "US OFAC — SDN list (CSV)", "hitName": "X", "score": 80, "whitelisted": True}]}
+check("statement: dispositioned FP (all hits whitelisted) → false-positive record cited",
+      "determined to be a false positive" in subject_report.screening_statement(
+          _wl_rec, {"disposition": {"kind": "false-positive", "at": "2026-08-02", "caseGid": "t1"}}))
+check("statement: every variant carries the regulatory basis",
+      all("Federal Decree-Law No. 10 of 2025" in subject_report.screening_statement(r, c)
+          for r, c in ((_st_rec, None), (_wl_rec, None))))
+check("the report renders the statement section",
+      "## Screening statement" in _sr_doc or "Screening statement" in subject_report.build_subject_report(
+          "acme llc", _st_rec, None, "2026-08-05", today="2026-08-05"))
 
 # ── import-time pip self-install stays opt-in (supply-chain posture) ──────────
 # The dependency fallback in screen.py must never install anything as a side

@@ -71,6 +71,56 @@ def _kv(label, value):
     return f"  {label:<24} {value}"
 
 
+SCREENING_SCOPE = (
+    "the UN Security Council Consolidated List, the UAE Local Terrorist List "
+    "(EOCN), US OFAC SDN and non-SDN lists, the EU and UK OFSI Consolidated "
+    "Lists, and the consolidated lists of Canada, Australia, France and "
+    "Switzerland; against worldwide adverse media, comprising international "
+    "and Arabic-language press across 38 languages via three independent news "
+    "sources; and against global PEP databases, including relatives and close "
+    "associates (1.2 million+ profiles)")
+
+
+def screening_statement(rec, case_entry=None, as_of=None):
+    """Regulator-grade screening statement for the subject's CURRENT state.
+    Pure text selection — it records, it never decides: the confirmed-match
+    variant renders only from an ESCALATED case (a human's recorded act), and
+    no variant ever asserts a clearance the file does not show."""
+    name = rec.get("name", "the subject")
+    when = as_of or rec.get("lastSeen") or "the most recent screening run"
+    base = (f"The subject {name} was screened on {when} against {SCREENING_SCOPE}. "
+            "Screening was performed by the firm's automated screening system under its "
+            "daily ongoing-monitoring cycle, in accordance with Federal Decree-Law No. 10 "
+            "of 2025 and Cabinet Resolution No. 74 of 2020. The subject remains under "
+            "daily re-screening for the duration of the business relationship.")
+    hits = [h for h in (rec.get("hits") or []) if isinstance(h, dict) and h.get("list")]
+    live = [h for h in hits if not h.get("whitelisted")]
+    d = (case_entry or {}).get("disposition") if isinstance(case_entry, dict) else None
+    if isinstance(case_entry, dict) and case_entry.get("escalated"):
+        return (base + " Review against the subject's identifiers led the MLRO to ESCALATE "
+                f"the matter on {case_entry.get('escalatedAt', 'the recorded date')} "
+                f"(case {case_entry.get('taskGid', '?')}). Targeted financial sanctions "
+                "obligations, where applicable, are the MLRO's recorded act — refer to the "
+                "case record and any FFR/PNMR dossier on file. The customer has not been "
+                "informed (no tipping-off — FDL 10/2025; CR 74/2020).")
+    if isinstance(d, dict) and d.get("kind") == "false-positive" and not live:
+        return (base + " A potential name similarity was identified and, following four-eyes "
+                f"review, was determined to be a false positive on {d.get('at', '?')} "
+                f"(case {d.get('caseGid', '?')}). The determination is recorded in the firm's "
+                "cleared-false-positive register; any future match against a new or amended "
+                "designation will be escalated afresh.")
+    if live:
+        top = max((h.get("score") or 0) for h in live)
+        lists = ", ".join(sorted({h["list"] for h in live}))
+        return (base + f" The screening identified a potential name similarity against: {lists} "
+                f"(highest similarity score {top}). The similarity is under four-eyes review for "
+                "disambiguation against the subject's identifiers (date of birth, nationality, "
+                "identification documents). No determination has been made by the system; the "
+                "MLRO's disposition will be recorded on this file.")
+    return (base + " No sanctions match, adverse media finding, or PEP association is "
+            "currently open against the subject on the screening record.")
+
+
 def build_subject_report(key, rec, case_entry=None, screen_updated=None, today=None):
     """Markdown per-subject screening report. Pure; raises on a missing record
     so an absent subject can never render as a clean report."""
@@ -95,6 +145,9 @@ def build_subject_report(key, rec, case_entry=None, screen_updated=None, today=N
               f"of {rec.get('parent')}" if rec.get("parent") else "") if x)))
     if rec.get("gid"):
         A(_kv("Customer record gid:", rec["gid"]))
+    A("")
+    A("## Screening statement")
+    A(screening_statement(rec, case_entry, as_of=screen_updated))
     A("")
     A("## Screening position")
     A(_kv("Report generated:", today))

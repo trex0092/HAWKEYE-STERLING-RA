@@ -2329,6 +2329,108 @@ def load_adverse_watchlist():
 # actually screened is not counted as covered by it.
 WATCHLIST_UNSCREENABLE = set()
 
+# Corporate boilerplate that must not count as identifying evidence when
+# matching subject names inside free text (bulletins, article snippets).
+_SIG_STOP = {"trading", "company", "limited", "jewellery", "jewelry", "gold",
+             "international", "global", "metals", "precious", "group",
+             "holding", "holdings", "general", "national"}
+
+def _sig_tokens(term):
+    """Significant (≥4-char, non-boilerplate) lowercase tokens of a name."""
+    return [t for t in re.findall(r"[a-z]{4,}", str(term or "").lower())
+            if t not in _SIG_STOP]
+
+
+# ── REGULATOR ENFORCEMENT-BULLETIN NET (4th adverse net; supplementary) ───────
+# Enforcement announcements name wrongdoers directly — a regulator bulletin
+# mentioning a subject IS an adverse finding, from a source class the news
+# sweep does not cover. ONE fetch per feed PER RUN (never per subject: no
+# per-IP rate-limit exposure), then subject names are scanned against the
+# items. A failed feed is DISCLOSED as reduced coverage, never silent and
+# never fatal; an absent config file simply means the net is not configured.
+REGULATOR_BULLETINS_FILE = os.environ.get("REGULATOR_BULLETINS_FILE",
+                                          "data/regulator-bulletins.json")
+
+def fetch_regulator_bulletins(path=None):
+    """→ (items, failures). items: {title, source, date, url, text-lowered}."""
+    try:
+        with open(path or REGULATOR_BULLETINS_FILE, encoding="utf-8") as f:
+            cfgd = json.load(f)
+    except Exception:
+        return [], []   # optional net — absent/unreadable config = not configured
+    items, failures = [], []
+    for s in cfgd.get("sources", []):
+        if not isinstance(s, dict) or not s.get("enabled", True) or not s.get("url"):
+            continue
+        try:
+            r = requests.get(s["url"], timeout=20,
+                             headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
+            if getattr(r, "status_code", None) != 200:
+                raise RuntimeError(f"http {getattr(r, 'status_code', 'none')}")
+            root = safe_xml_fromstring(r.content)
+            for item in root.findall(".//item")[:200]:
+                title = (item.findtext("title") or "").strip()
+                if not title:
+                    continue
+                desc = _strip_rss_description(item.findtext("description") or "")
+                items.append({"title": title, "source": s.get("name", "regulator bulletin"),
+                              "date": (item.findtext("pubDate") or "")[:16],
+                              "url": item.findtext("link") or "",
+                              "text": (title + " " + desc).lower()})
+        except Exception as e:
+            failures.append(f"{s.get('name', s.get('url', '?'))}: {str(e)[:80]}")
+    return items, failures
+
+def screen_regulator_bulletins(subjects_all, items):
+    """Subject name → bulletin findings that mention it. Requires ≥2
+    significant name tokens contained in the item text — single-token names
+    are too false-positive-prone for containment matching and remain covered
+    by the fuzzy matcher nets. Findings are strong-tier by construction."""
+    hits = {}
+    if not items:
+        return hits
+    for _t, subj_name, _p, _c in subjects_all:
+        sig = _sig_tokens(subj_name)
+        if len(sig) < 2:
+            continue
+        need = sig[:3]
+        for it in items:
+            if all(tok in it["text"] for tok in need):
+                hits.setdefault(subj_name, []).append({
+                    "title": it["title"], "source": it["source"], "date": it["date"],
+                    "ts": None, "url": it["url"], "snippet": "", "flagged": True,
+                    "keywords": ["regulatory enforcement bulletin"], "tier": "strong",
+                    "categories": ["Enforcement / Legal"], "regulator_bulletin": True})
+    return hits
+
+
+# ── IDENTITY CROSS-CHECK on adverse hits (display-only; demote-never-suppress)
+def annotate_identity_corroboration(articles, subj_name, parent, customer):
+    """Mark each adverse article as identity-corroborated (it also mentions
+    the subject's associated entity or recorded nationality) or name-only.
+    Absence of corroboration NEVER demotes or suppresses — the label tells
+    the analyst which disambiguation to run, it makes no determination."""
+    ctx = []
+    if parent:
+        ctx.append(("associated entity", parent))
+    ent = (customer or {}).get("name")
+    if ent and ent != subj_name:
+        ctx.append(("customer entity", ent))
+    for ind in (((customer or {}).get("kyc") or {}).get("individuals") or []):
+        if _norm_lower(ind.get("name", "")) == _norm_lower(subj_name) and ind.get("nationality"):
+            ctx.append(("nationality", ind["nationality"]))
+            break
+    terms = [(label, _sig_tokens(v)) for label, v in ctx]
+    terms = [(label, sig) for label, sig in terms if sig]
+    for a in (articles or []):
+        text = ((a.get("title") or "") + " " + (a.get("snippet") or "")).lower()
+        found = next((label for label, sig in terms
+                      if all(t in text for t in sig[:2])), None)
+        a["identity_corroborated"] = bool(found)
+        if found:
+            a["identity_context"] = found
+
+
 def screen_watchlist(subjects_all, entries, ids, today_iso):
     """One local pass of every DISTINCT subject name against the crime watchlist,
     using the same matcher + thresholds as sanctions screening. Returns
@@ -5132,6 +5234,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("   never conclusive. Source reliability: news = real-time but false-positive-prone;")
     A("   court/enforcement corroboration is strongest but can lag clearances — always")
     A("   confirm CURRENT status before an adverse decision.")
+    if stats.get("bulletin_failures"):
+        A(f"   Regulator-bulletin net: {len(stats['bulletin_failures'])} feed(s) failed this run — "
+          "coverage reduced: " + "; ".join(stats["bulletin_failures"][:3]))
     if am_blackout:
         A(f"   Status: DEGRADED this run — {am_blackout} subject(s) had ZERO adverse coverage "
           "(news feeds AND watchlist unavailable). Treat their 'no adverse media' as provisional; re-run.")
@@ -5165,7 +5270,11 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 nflag = " 🆕" if a.get("is_new") else ""
                 tr = a.get("triage") or {}
                 sev = f"  [{tr.get('severity','')} · relevance {tr.get('relevance','')}]" if tr else ""
-                A(f"   [!] {a['title']}{nflag}{sev}")
+                idc = (" · identity-corroborated (" + a.get("identity_context", "context") + ")"
+                       if a.get("identity_corroborated")
+                       else (" · name-only match — disambiguate against identifiers"
+                             if "identity_corroborated" in a else ""))
+                A(f"   [!] {a['title']}{nflag}{sev}{idc}")
                 if tr.get("injection_suspected"):
                     A("       ⚠ input flagged (possible prompt-injection) — classified deterministically, model not used")
                 cat = f"   {{{', '.join(a['categories'])}}}" if a.get("categories") else ""
@@ -5722,6 +5831,19 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     if wl_entries:
         log(f"  {WATCHLIST_LABEL}: {wl_meta['count']:,} names · "
             f"{len(wl_hits)} subject name(s) matched")
+    # 4th adverse net: regulator enforcement bulletins — one fetch per feed
+    # per run, findings merged into the watchlist channel (same shape/merge
+    # path); failed feeds are disclosed in §② and the run log, never silent.
+    rb_items, rb_failures = fetch_regulator_bulletins()
+    if rb_items or rb_failures:
+        rb_hits = screen_regulator_bulletins(subjects_all, rb_items)
+        for _k, _v in rb_hits.items():
+            wl_hits.setdefault(_k, []).extend(_v)
+        log(f"  regulator bulletins: {len(rb_items)} item(s) from configured feeds · "
+            f"{len(rb_hits)} subject name(s) mentioned"
+            + (f" · {len(rb_failures)} feed(s) FAILED (coverage reduced)" if rb_failures else ""))
+        for _f in rb_failures:
+            log(f"  COVERAGE: regulator-bulletin feed failed — {_f}")
     _t_watchlist = time.time()
 
     # SOURCE-COVERAGE DRIFT (R-09): a list that silently shrank is the most
@@ -5794,6 +5916,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         try:
             articles = search_adverse_media(subj_name, max_results=ADVERSE_MAX_RESULTS)
             r["adverse"] = [a for a in articles if a["flagged"]]
+            annotate_identity_corroboration(r["adverse"], subj_name, parent, c)
         except Exception as e:
             r["am_error"] = True; r["am_msg"] = str(e)[:120]
         if subj_type == "INDIVIDUAL":
@@ -6005,6 +6128,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "am_blackout": counts["am_blackout"], "am_skipped": counts.get("am_skipped", 0),
              "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
+             "bulletin_failures": rb_failures,
              "adverse_repeat": repeat_patterns,
              "related_parties": related, "injection_blocked": injection_blocked,
              "monitoring": run_monitor, "coverage": coverage_result,
@@ -6047,7 +6171,69 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         save_delta_state(state)
     else:
         log("Delta-state NOT persisted: Asana delivery failed — new matches will re-alert next run.")
+    # Follow-Ups attestation (opt-in): the externally-generated daily reminder
+    # card gets its bookkeeping done by the pipeline — proof comment always,
+    # auto-complete ONLY on a clean day. A failed/undelivered run never touches
+    # the card (an unclosed reminder on a red day is the signal). Auxiliary by
+    # doctrine: its own failure is logged, never fatal.
+    if parent_gid and mode in ("daily", "makeup"):
+        attest_followup_card(today, delta, parent_gid)
     return possible_matches, adverse_findings, pep_findings
+
+# ── FOLLOW-UPS CARD ATTESTATION (opt-in via FOLLOWUP_PROJECT_GID) ─────────────
+# An external notifier creates a daily "Daily sanctions/PEP screening" reminder
+# card (dedup-key: SYSTEM|daily-screening|YYYY-MM-DD) in the Follow Ups
+# project. The pipeline closes the loop: after the day's report is DELIVERED it
+# comments on the card with proof, and — only when there are ZERO new findings
+# — completes it. Action days leave the card open: reviewing the findings and
+# recording screening evidence on the affected assessments is a human act.
+FOLLOWUP_PROJECT_GID = os.environ.get("FOLLOWUP_PROJECT_GID", "")
+
+def followup_disposition(delta):
+    """'complete' on a clean day, 'comment' when findings need a human. Pure."""
+    clean = all(int((delta or {}).get(k, 0) or 0) == 0 for k in ("sanctions", "adverse", "pep"))
+    return "complete" if clean else "comment"
+
+def followup_comment_text(today, delta, report_gid):
+    d = delta or {}
+    clean = followup_disposition(delta) == "complete"
+    lines = [f"Daily AML/CFT screening completed and delivered for {today}.",
+             f"Report: https://app.asana.com/0/0/{report_gid}",
+             f"New findings: {d.get('sanctions', 0)} sanctions · {d.get('adverse', 0)} adverse media · {d.get('pep', 0)} PEP."]
+    if clean:
+        lines.append("No new findings — this reminder has been completed automatically "
+                     "with this comment as the attestation record.")
+    else:
+        lines.append("Findings require review: see the report and the screening case board. "
+                     "Record screening evidence on the affected customer assessments, then "
+                     "complete this task as the attestation record.")
+    return "\n".join(lines)
+
+def attest_followup_card(today, delta, report_gid):
+    if not FOLLOWUP_PROJECT_GID:
+        return
+    try:
+        r = asana_request("GET", f"https://app.asana.com/api/1.0/projects/{FOLLOWUP_PROJECT_GID}/tasks",
+                          params={"opt_fields": "name,notes,completed", "limit": 100})
+        if r is None or r.status_code not in (200, 201):
+            log(f"  follow-ups: card lookup failed (http {getattr(r, 'status_code', 'none')}) — attestation skipped (non-fatal)")
+            return
+        key = f"SYSTEM|daily-screening|{today}"
+        card = next((t for t in (r.json().get("data") or [])
+                     if key in (t.get("notes") or "") and not t.get("completed")), None)
+        if not card:
+            log("  follow-ups: no open reminder card for today — nothing to attest")
+            return
+        asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
+                      json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
+        if followup_disposition(delta) == "complete":
+            asana_request("PUT", f"https://app.asana.com/api/1.0/tasks/{card['gid']}",
+                          json={"data": {"completed": True}})
+            log("  follow-ups: clean day — reminder card attested and completed")
+        else:
+            log("  follow-ups: findings present — proof comment posted, card left open for the analyst")
+    except Exception as e:
+        log(f"  follow-ups: attestation failed ({str(e)[:100]}) — non-fatal, card untouched")
 
 def run_unified(run_time):
     if AM_COVERAGE_RETRY:

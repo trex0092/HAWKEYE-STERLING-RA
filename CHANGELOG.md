@@ -10,6 +10,29 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Ad-hoc batch name screening** (`scripts/batch-screen.mjs`): screen any
+  CSV/list of names (prospects, walk-ins, supplier shortlists) against the
+  same lists and matcher as the daily control — no Asana, no state; exits red
+  rather than reporting against unloaded lists; reduced coverage disclosed.
+- **Regulator enforcement-bulletin net** (4th adverse net, supplementary):
+  SEC/FCA enforcement feeds fetched once per run (`data/regulator-bulletins.json`),
+  subject names scanned against items (≥2 significant tokens); a regulator
+  naming a subject is a strong-tier Enforcement/Legal finding; failed feeds
+  disclosed in §② and the log, never silent, never fatal.
+- **Identity cross-check on adverse hits** (display-only, demote-never-
+  suppress): each flagged article is labelled *identity-corroborated* (also
+  mentions the subject's associated entity / recorded nationality) or
+  *name-only match — disambiguate*; absence of corroboration never demotes
+  or suppresses.
+- **Per-subject screening statements** in `subject_report.py`: regulator-grade
+  narrative auto-selected from the file's actual state (under review / false
+  positive with case cited / escalated with no-tipping-off), full list scope
+  and FDL 10/2025 · CR 74/2020 basis in every variant.
+- **Follow-Ups reminder attestation** (opt-out via `FOLLOWUP_PROJECT_GID`):
+  after the daily report is delivered the engine posts a proof comment on the
+  externally-generated reminder card and completes it on zero-finding days
+  only; action days stay open for the analyst; failed runs never touch it.
+
 - **09:00 UAE daily delivery target + professional report register.** The
   daily report now budgets itself against a delivery target (default
   `DELIVERY_TARGET_UTC=05:00` = 09:00 UAE): because GitHub delivers scheduled
