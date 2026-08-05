@@ -33,7 +33,7 @@
 
    Usage: node scripts/pep-worldwide.mjs harvest <outfile>
    Pure helpers are exported for the unit suite; only harvest() networks. */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const PEP_LIST_NAME = 'PEP (Worldwide — Wikidata)';
@@ -273,8 +273,11 @@ async function harvest(outfile) {
   }
 
   const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
+  /* Read-and-catch, no existence pre-check (CodeQL js/file-system-race):
+     an absent or unreadable previous artifact simply means first-harvest
+     semantics for the shrink gate. */
   let prev = null;
-  if (existsSync(outfile)) { try { prev = JSON.parse(readFileSync(outfile, 'utf8')); } catch { prev = null; } }
+  try { prev = JSON.parse(readFileSync(outfile, 'utf8')); } catch { prev = null; }
   const gate = datasetFloorOk(dataset, prev);
   if (!gate.ok) {
     console.error('pep-worldwide: REFUSING to write — ' + gate.reason + (prev ? ' (previous artifact kept)' : ''));
