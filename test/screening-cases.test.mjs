@@ -267,5 +267,51 @@ check('case card annotates a whitelisted hit with its clearance',
   caseHtml('k1', _s({ hits: [{ list: 'US OFAC — SDN list (CSV)', hitName: 'X', score: 90, whitelisted: true, clearedVia: 'case t1' }] }), null, null)
     .includes('CLEARED FP'));
 
+/* ── Asana html_notes XML contract ──────────────────────────────────────────
+   Asana parses html_notes as STRICT XML against a supported-tag subset; the
+   original disposition block's <p>…<br>…</p> 400'd EVERY live case create
+   (xml_parsing_error, observed twice 2026-08-05). This guard freezes the
+   contract: every tag balanced or self-closed, and every tag on Asana's
+   supported list — an unsupported tag fails here, not on the runner. */
+const ASANA_TAGS = new Set(['body', 'h1', 'h2', 'ol', 'ul', 'li', 'strong', 'em',
+  'u', 's', 'code', 'pre', 'blockquote', 'a', 'hr', 'table', 'tr', 'td']);
+function asanaXmlOk(html) {
+  const stack = [];
+  const re = /<(\/?)([a-zA-Z0-9]+)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>/g;
+  let m, last = 0;
+  while ((m = re.exec(html))) {
+    if (html.slice(last, m.index).includes('<')) return 'stray < outside a tag';
+    last = re.lastIndex;
+    const [, close, tag, , self] = m;
+    if (!ASANA_TAGS.has(tag.toLowerCase())) return 'unsupported tag <' + tag + '>';
+    if (self) continue;
+    if (close) {
+      if (stack.pop() !== tag.toLowerCase()) return 'mismatched </' + tag + '>';
+    } else if (tag.toLowerCase() === 'hr') { /* void allowed unclosed nowhere — require self-close */
+      return '<hr> must self-close';
+    } else stack.push(tag.toLowerCase());
+  }
+  if (html.slice(last).includes('<')) return 'stray < after last tag';
+  return stack.length ? 'unclosed <' + stack[stack.length - 1] + '>' : '';
+}
+const _fullCard = caseHtml('acme llc|ubo|123', _s({
+  hits: [
+    { list: 'US OFAC — SDN list (CSV)', hitName: 'A & B “Ltd”', score: 90, mechanism: 'fuzzy', confidence: 'strong', carriedForward: true },
+    { list: 'PEP (Worldwide — Wikidata)', hitName: 'X — Minister, Testland', score: 88, whitelisted: true, clearedAt: '2026-08-01', clearedVia: 'case t9' }],
+  secondOpinion: { provider: 'OFAC-API', status: 'corroborated', matchCount: 2, topScore: 97, checkedAt: '2026-08-05' },
+}), 'https://example/run?a=1&b=2', { taskGid: 't1', clearedAt: '2026-07-01' });
+check('case card is strict-XML clean for Asana (balanced, supported tags only): ' + (asanaXmlOk(_fullCard) || 'ok'),
+  asanaXmlOk(_fullCard) === '');
+check('case card carries no <br> and no <p> (the tags Asana 400s on)',
+  !/<br\b/i.test(_fullCard) && !/<p\b/i.test(_fullCard));
+check('disposition block survives as three verbatim machine-readable lines',
+  _fullCard.includes('[ ] false positive — clear this case')
+  && _fullCard.includes('[ ] escalate / freeze (TFS) — keep the case open')
+  && _fullCard.includes('[ ] under investigation — keep working'));
+const _digestXml = asanaXmlOk(buildResultsDigestHtml(
+  { date: '2026-08-05', screened: 2, newMatches: [{ name: 'A & B', band: 'high', topScore: 90, recommendation: 'sanctions-match', lists: ['US OFAC — SDN list (CSV)'] }], stillMatched: [], cleared: [], degraded: true, notes: ['EU list could not be loaded — coverage degraded'] },
+  () => 'case-gid-1'));
+check('digest html is strict-XML clean too: ' + (_digestXml || 'ok'), _digestXml === '');
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

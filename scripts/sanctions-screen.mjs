@@ -1114,10 +1114,29 @@ async function fetchListBody(source, timeoutMs = 60000) {
   const binary = /^(xlsx|dfat|ods)$/.test(String(source.parser || '').toLowerCase())
     || /^(xlsx|ods)$/.test(String(source.type || '').toLowerCase())
     || /\.(xlsx|ods)(\?|$)/i.test(parsed.href);
+  /* Per-source browser headers: several national endpoints answer the plain
+     screening UA with a challenge page or an empty body while serving the
+     real list to a browser-shaped request (2026-08-05 probe: BCB, NBCTF,
+     Qatar NCTC verified end-to-end WITH these headers). Opt-in per source —
+     the honest default identifies the fetcher. */
+  const headers = source.browserHeaders
+    ? {
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.9,*/*;q=0.8',
+      'accept-language': 'en-US,en;q=0.9',
+    }
+    : { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' };
   return withTimeout(async (signal) => {
-    const r = await fetch(parsed.href, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
+    const r = await fetch(parsed.href, { signal, redirect: 'follow', headers });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    return binary ? Buffer.from(await r.arrayBuffer()) : await r.text();
+    if (binary) return Buffer.from(await r.arrayBuffer());
+    /* Legacy registries still serve legacy encodings — Mexico SAT's 69-B CSV
+       is latin-1, and decoding it as UTF-8 corrupts every accented name
+       BEFORE matching (looks green, misses matches). Per-source opt-in. */
+    if (typeof source.charset === 'string' && source.charset) {
+      return new TextDecoder(source.charset).decode(await r.arrayBuffer());
+    }
+    return await r.text();
   }, timeoutMs);
 }
 
