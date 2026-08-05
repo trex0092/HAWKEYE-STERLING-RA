@@ -10,6 +10,20 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Adverse-media/PEP coverage now spreads across the day.** The free news
+  feeds rate-limit per egress IP, so a daily sweep could succeed with part of
+  the book uncovered (5 Aug: GDELT and Google News circuits both opened
+  mid-run). Two changes, engine + workflow: (1) the retry firings of
+  `weekly-adverse-media.yml` on an already-successful day now run as a
+  **coverage make-up pass** (`AM_COVERAGE_RETRY=1`) — the engine reads the
+  committed run-metrics counts (`monitoring.makeup_decision`, counts only, no
+  PII) and either exits in seconds or re-sweeps the full book from the fresh
+  runner's fresh IP, with delta-state suppressing already-reported findings
+  and a distinct "🛡️🔁 … (coverage make-up)" digest title; (2) the enrichment
+  order now **rotates daily** (`screen.enrichment_rotation`, prime stride,
+  extra offset on make-up passes) so a mid-run circuit trip no longer costs
+  the same tail of the book its news coverage every day — results are
+  restored to book order so nothing downstream changes.
 - README and CONTRIBUTING gained a **project-handbook navigation row** linking
   the community/governance documents that GitHub's repo-overview tab bar does
   not surface (`SUPPORT.md`, `GOVERNANCE.md`, `MAINTAINERS.md`, `CHANGELOG.md`,

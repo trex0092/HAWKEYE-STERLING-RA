@@ -70,6 +70,10 @@ if ASANA_TOKEN:
     os.environ["ASANA_TOKEN"] = ASANA_TOKEN
 TRIGGER_TYPE          = os.environ.get("TRIGGER_TYPE", "workflow_dispatch")
 RUN_MODE              = os.environ.get("RUN_MODE", "full_batch")  # full_batch | weekly_adverse
+# Same-day coverage make-up firing (the retry cron slots on a day that already
+# has a successful run): sweep ONLY if the earlier run lost news/PEP coverage
+# to per-IP rate limits — a fresh runner VM means a fresh egress IP.
+AM_COVERAGE_RETRY     = os.environ.get("AM_COVERAGE_RETRY", "0") == "1"
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
 ASANA_ONGOING_MON_GID = "1213914392047129"
@@ -5200,6 +5204,10 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     flag = "⚠️" if (n_s + n_a + n_p) > 0 else "✅"
     if mode == "onboarding":
         task_name = f"🆕 {flag} Onboarding Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
+    elif mode == "makeup":
+        # Same-day re-sweep that recovered coverage lost to rate limits — the
+        # distinct title tells the MLRO why the day has a second digest.
+        task_name = f"🛡️🔁 {flag} Daily Screening (coverage make-up) — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
     else:
         task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
     # Adaptive budget: open at the budget that delivered last run (learned via
@@ -5509,6 +5517,24 @@ def tally_enrichment(results, wl_hits, wl_loaded):
                                if any(a.get("watchlist") for a in f["articles"]))}
     return counts, adverse_findings, pep_findings
 
+def enrichment_rotation(n, today_ordinal, retry_pass=False):
+    """Deterministic daily start-offset for the enrichment order.
+
+    When a feed's circuit opens mid-run, every subject enriched after that
+    point loses news coverage — with a fixed order that is the SAME tail of
+    the book every day. A prime stride walks the start point far across the
+    book each day (a +1 shift would take years to move a tail subject clear
+    of a recurring mid-run trip); the retry offset puts a same-day make-up
+    sweep in different territory from the run that lost coverage. Pure and
+    deterministic so a re-run of the same firing enriches in the same order
+    (reproducible evidence).
+    """
+    if n <= 1:
+        return 0
+    stride = 131 if n % 131 else 137   # both prime — jointly degenerate only at n ≥ 17,947
+    offset = 67 if n % 67 else 71      # same guard for the make-up pass
+    return (today_ordinal * stride + (offset if retry_pass else 0)) % n
+
 def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     """Shared core: sanctions + adverse media + PEP over a set of customers, with
     delta classification, one Asana report and MLRO case subtasks. mode controls
@@ -5606,15 +5632,31 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         return r
 
     total = len(subjects_all)
+    # Rotate the ENRICHMENT ORDER only (the sanctions pass above already
+    # screened every subject): a mid-run circuit trip costs whoever comes
+    # after it, and rotation stops that being the same subjects every day.
+    # Results are restored to book order below, so nothing downstream — the
+    # tally, the delta fingerprints, the report — sees the rotation.
+    rot = enrichment_rotation(total, run_time.toordinal(), AM_COVERAGE_RETRY)
+    order = list(range(total))
+    order = order[rot:] + order[:rot]
+    if rot:
+        log(f"Enrichment order rotated: starting at subject {rot + 1}/{total}"
+            + (" (make-up offset)" if AM_COVERAGE_RETRY else " (daily rotation)"))
     log(f"Enriching {total} subjects with {SCREEN_CONCURRENCY} parallel workers...")
     done = 0
-    results = []
+    indexed = [None] * total
     with concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY) as ex:
-        for r in ex.map(_enrich, subjects_all):
+        for i, r in zip(order, ex.map(_enrich, (subjects_all[j] for j in order))):
             done += 1
-            results.append(r)
+            indexed[i] = r
             if done % 50 == 0 or done == total:
                 log(f"  enriched {done}/{total}")
+    if any(r is None for r in indexed):
+        # Degrade loudly: a hole here means the rotation bookkeeping dropped a
+        # subject — silently tallying the rest would report them as screened.
+        raise RuntimeError("enrichment rotation lost subject results — refusing to tally a partial book")
+    results = indexed
 
     # WORLDWIDE PEP + RCA NET — screened on EVERY run, over EVERY individual.
     # Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or a
@@ -5768,7 +5810,10 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 "flagged": len(possible_matches), "adverse": len(adverse_findings),
                 "pep": len(pep_findings)},
         timings=timings, llm_calls=dict(ai.LLM_CALLS),
-        persist=(mode == "daily"))
+        # A make-up sweep persists too: it is a full-book run, and its snapshot
+        # REPLACING today's degraded one (persist_run dedups by date) is exactly
+        # what stops the next retry firing from re-sweeping a recovered day.
+        persist=(mode in ("daily", "makeup")))
     for a in run_monitor.get("anomalies", []):
         log(f"RUNTIME ANOMALY: {a}")
     for s in run_monitor.get("sustained", []):
@@ -5831,10 +5876,24 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     return possible_matches, adverse_findings, pep_findings
 
 def run_unified(run_time):
+    if AM_COVERAGE_RETRY:
+        # Same-day make-up firing: today already has a successful run, so this
+        # firing exists only to win back coverage the earlier run lost to
+        # per-IP rate limits. Decide from the committed run-metrics counts
+        # (overlaid from the delta-state branch) BEFORE any list download or
+        # customer read — a clean morning means this exits in seconds.
+        decision = monitoring.makeup_decision(run_time.strftime("%Y-%m-%d"))
+        log(f"Coverage make-up check: {decision['reason']}")
+        if not decision["sweep"]:
+            log("Make-up firing done — nothing to re-sweep, no report posted.")
+            return
+        log("MAKE-UP SWEEP: re-screening the full book from this runner's fresh egress IP — "
+            "delta-state suppresses already-reported findings, so only recovered/new ones become cases")
     log("UNIFIED daily screening — sanctions + adverse media + PEP")
     all_lists, list_meta = load_all_lists()
     customers = get_all_customers()
-    screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily")
+    screen_subject_set(customers, all_lists, list_meta, run_time,
+                       mode="makeup" if AM_COVERAGE_RETRY else "daily")
     log("Unified run done.")
     enforce_delivery_gate()
     enforce_list_outage_gate()
