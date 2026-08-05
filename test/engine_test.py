@@ -3252,6 +3252,36 @@ d = monitoring.makeup_decision("2026-08-05", path=_p)
 check("deadline-deferred subjects trigger the same-day make-up sweep",
       d["sweep"] is True and d["uncovered"] == 40 and "deferred" in d["reason"])
 
+# ── Regulator-bulletin net + identity cross-check ─────────────────────────────
+print("\nscreen.py — regulator bulletins & identity cross-check")
+check("significant tokens drop corporate boilerplate",
+      screen._sig_tokens("ACME Gold Trading L.L.C") == ["acme"]
+      and screen._sig_tokens("Bullion Street Gold Trading LLC") == ["bullion", "street"])
+_rb_items = [
+    {"title": "SEC charges Bullion Street operators", "source": "US SEC — Litigation Releases",
+     "date": "05 Aug 2026", "url": "u1", "text": "sec charges bullion street gold operators with fraud"},
+    {"title": "Unrelated action", "source": "US SEC", "date": "05 Aug 2026", "url": "u2",
+     "text": "unrelated enforcement matter"}]
+_rb_subj = [("COMPANY", "Bullion Street Gold Trading LLC", None, {}),
+            ("INDIVIDUAL", "Li Wei", None, {})]
+_rb = screen.screen_regulator_bulletins(_rb_subj, _rb_items)
+check("bulletin naming the subject → strong-tier Enforcement/Legal finding",
+      len(_rb.get("Bullion Street Gold Trading LLC", [])) == 1
+      and _rb["Bullion Street Gold Trading LLC"][0]["tier"] == "strong"
+      and _rb["Bullion Street Gold Trading LLC"][0]["regulator_bulletin"] is True)
+check("single-significant-token names are excluded from containment matching",
+      "Li Wei" not in _rb)
+check("absent config file → net not configured, never a crash",
+      screen.fetch_regulator_bulletins(path="/nonexistent.json") == ([], []))
+_ic_arts = [{"title": "Trader arrested in Dubai", "snippet": "linked to Marmara Gold Trading operations", "flagged": True},
+            {"title": "Man arrested abroad", "snippet": "no context at all", "flagged": True}]
+screen.annotate_identity_corroboration(_ic_arts, "Mahmoud Sultan",
+                                       "Marmara Gold Trading L.L.C", {"name": "Marmara Gold Trading L.L.C"})
+check("article mentioning the associated entity is identity-corroborated",
+      _ic_arts[0]["identity_corroborated"] is True and _ic_arts[0]["identity_context"])
+check("name-only article is labelled, NEVER suppressed (still flagged)",
+      _ic_arts[1]["identity_corroborated"] is False and _ic_arts[1]["flagged"] is True)
+
 # ── Follow-Ups card attestation (clean day completes, action day stays open) ──
 print("\nscreen.py — Follow-Ups attestation")
 check("gate is OFF by default (no FOLLOWUP_PROJECT_GID)", screen.FOLLOWUP_PROJECT_GID == "")

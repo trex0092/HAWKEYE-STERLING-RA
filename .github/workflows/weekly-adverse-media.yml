@@ -159,6 +159,8 @@ jobs:
             api.gdeltproject.org:443
             www.wikidata.org:443
             query.wikidata.org:443
+            www.sec.gov:443
+            www.fca.org.uk:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # No credentials on disk (zizmor artipacked): the state push below
