@@ -729,6 +729,19 @@ const _odsXml = '<office:document-content>'
 check('ODS: Dutch name columns located by header, names joined across them',
   JSON.stringify(wm.parseOdsContent(_odsXml)) === '["Jansen Pieter","Stichting X"]');
 check('ODS: content with no header row yields 0 names', wm.parseOdsContent('<table:table-row><table:table-cell><text:p>x</text:p></table:table-cell></table:table-row>').length === 0);
+check('ODS: tag stripping removes inline spans and unterminated tags (CodeQL)',
+  JSON.stringify(wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Acme <text:span>Ltd</text:span> <script</text:p></table:table-cell></table:table-row>'))
+  === '["Acme Ltd"]');
+check('ODS: no "<" survives the fixpoint strip — "<scr<x>ipt>" cannot rebuild a tag (CodeQL)',
+  wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Acme<scr<x>ipt>Ltd</text:p></table:table-cell></table:table-row>')
+    .every(n => !n.includes('<')));
+check('ODS: entity unescaping is single-pass — a literal &amp;lt; never becomes < (CodeQL)',
+  JSON.stringify(wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Smith &amp;amp; Jones &amp;amp;lt;Ltd&amp;amp;gt;</text:p></table:table-cell></table:table-row>'
+      .replace(/&amp;amp;/g, '&amp;')))
+  === '["Smith & Jones &lt;Ltd&gt;"]');
 const fbi = await import('./../scripts/fbi-check.mjs');
 check('FBI: search URL encodes the subject against the public endpoint',
   fbi.fbiSearchUrl('Ali Al-Test') === 'https://api.fbi.gov/wanted/v1/list?pageSize=20&title=Ali%20Al-Test');

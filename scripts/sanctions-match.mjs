@@ -583,9 +583,18 @@ export function parseOdsContent(xml) {
     while ((cm = cellRe.exec(rm[1]))) {
       const attrs = cm[1] || '';
       const inner = cm[2] || '';
-      const ps = [...inner.matchAll(/<text:p[^>]*>([\s\S]*?)<\/text:p>/g)].map(p => p[1]
-        .replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"').replace(/&apos;/g, "'").trim());
+      const ps = [...inner.matchAll(/<text:p[^>]*>([\s\S]*?)<\/text:p>/g)].map(p => {
+        /* Tag-strip to a FIXPOINT (a single pass would let "<scr<x>ipt>"
+           reconstruct "<script>" — CodeQL js/incomplete-multi-character-
+           sanitization), with the closing ">" optional so an unterminated
+           "<script" fragment is dropped too. Then entities, with &amp;
+           unescaped LAST — first would turn a literal "&amp;lt;" into "<"
+           (double-unescape; same ordering discipline as batch-screen's cell()). */
+        let t = p[1];
+        for (let prev; prev !== t;) { prev = t; t = t.replace(/<[^>]*>?/g, ''); }
+        return t.replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim();
+      });
       const v = ps.join(' ').replace(/\s+/g, ' ').trim();
       const rep = /table:number-columns-repeated="(\d+)"/.exec(attrs);
       const times = Math.min(rep ? +rep[1] : 1, 200);   // repeated blanks pad to sheet width; cap so a 16k-repeat can't balloon
