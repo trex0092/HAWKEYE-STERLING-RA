@@ -3318,6 +3318,24 @@ try:
     check("an absent record can never render as a clean report", False)
 except ValueError:
     check("an absent record can never render as a clean report", True)
+_st_rec = _sr_state["subjects"]["acme llc"]
+check("statement: live hits → under-review wording, no determination asserted",
+      "under four-eyes review" in subject_report.screening_statement(_st_rec)
+      and "No determination has been made" in subject_report.screening_statement(_st_rec))
+check("statement: escalated case → MLRO act cited, no tipping-off",
+      "ESCALATE" in subject_report.screening_statement(_st_rec, {"escalated": True, "escalatedAt": "2026-08-04", "taskGid": "t9"})
+      and "no tipping-off" in subject_report.screening_statement(_st_rec, {"escalated": True}))
+_wl_rec = {"name": "X LLC", "lastSeen": "2026-08-05",
+           "hits": [{"list": "US OFAC — SDN list (CSV)", "hitName": "X", "score": 80, "whitelisted": True}]}
+check("statement: dispositioned FP (all hits whitelisted) → false-positive record cited",
+      "determined to be a false positive" in subject_report.screening_statement(
+          _wl_rec, {"disposition": {"kind": "false-positive", "at": "2026-08-02", "caseGid": "t1"}}))
+check("statement: every variant carries the regulatory basis",
+      all("Federal Decree-Law No. 10 of 2025" in subject_report.screening_statement(r, c)
+          for r, c in ((_st_rec, None), (_wl_rec, None))))
+check("the report renders the statement section",
+      "## Screening statement" in _sr_doc or "Screening statement" in subject_report.build_subject_report(
+          "acme llc", _st_rec, None, "2026-08-05", today="2026-08-05"))
 
 # ── import-time pip self-install stays opt-in (supply-chain posture) ──────────
 # The dependency fallback in screen.py must never install anything as a side
