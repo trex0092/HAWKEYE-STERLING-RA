@@ -39,6 +39,7 @@ import { checkAdverseMedia, budgetedLocales, activeLocales, ALL_TERMS, LOCALES, 
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 import { checkFbi } from './fbi-check.mjs';
+import { pepListFromDataset, PEP_LIST_NAME } from './pep-worldwide.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -180,7 +181,7 @@ const HIGH_BANDS = new Set(['critical', 'high', 'severe', 'elevated', 'red', 'am
 /* Enrichment signals (best-effort, network-bound) vs. the always-run local
    sanctions match. A standing match derived solely from these must NOT be cleared
    on a run where the lookup errored or was time-budget-skipped (see diffState). */
-const ENRICHMENT_LISTS = new Set(['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice', 'FBI Wanted']);
+const ENRICHMENT_LISTS = new Set(['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice', 'FBI Wanted', PEP_LIST_NAME]);
 /* Locally-derived pseudo-lists (no external list behind them, re-evaluated on
    every run): they must be exempt from the "originating list did not load this
    run" carry-forward, or a MANUAL REVIEW flag could never clear even after the
@@ -1368,6 +1369,20 @@ async function screenLocally(subjects, cfg) {
         band = strongerBand(band, fb.band); topScore = Math.max(topScore, fb.score);
       }
     }
+    /* Worldwide PEP list (Wikidata harvest, local index — instant, never
+       budget-gated). A PEP-list hit is a REVIEW-tier finding, never a
+       sanctions designation: band caps at medium and the recommendation
+       stays 'review' because hasSanctions reads only the sanctions match. */
+    if (cfg.pepIndex) {
+      const pw = screenName(s.name, cfg.pepIndex, thr, phonMode);
+      for (const h of pw.lists) {
+        const ctx = cfg.pepMeta && cfg.pepMeta.get(h.hitName);
+        const detail = ctx ? (h.hitName + ' — ' + [ctx.position, ctx.country].filter(Boolean).join(', ')
+          + (ctx.current ? '' : ' (former, within the PEP recency window)')) : h.hitName;
+        lists.push({ list: h.list, hitName: detail.slice(0, 180), score: h.score });
+      }
+      if (pw.lists.length) { band = strongerBand(band, 'medium'); topScore = Math.max(topScore, Math.min(pw.topScore, 89)); }
+    }
 
     /* screenName's recommendation distinguishes real designation hits
        ('sanctions-match') from a not-auto-screenable subject ('review', with
@@ -1500,6 +1515,27 @@ async function main() {
         + ' pair(s) (' + curated.length + ' curated + case dispositions); matching hits are DEMOTED with the clearance cited, never removed');
     }
   }
+  /* Worldwide PEP list (Wikidata harvest artifact, overlaid from the
+     pep-worldwide-state branch). Optional layer: absent file = layer off,
+     logged, never degraded sanctions coverage — but once loaded its name
+     enters evaluatedSignals so standing PEP-list matches are protected on
+     runs where the artifact is missing (never silently cleared). */
+  if (process.env.SCREEN_PEP_LIST !== '0') {
+    const pepFile = process.env.PEP_WORLDWIDE_FILE || 'data/pep-worldwide.json';
+    try {
+      const pep = pepListFromDataset(JSON.parse(readFileSync(pepFile, 'utf8')));
+      if (pep.count > 0 && pep.list.names.length) {
+        cfg.pepIndex = buildIndex([pep.list]);
+        cfg.pepMeta = pep.meta;
+        console.log('sanctions-screen: worldwide PEP list active — ' + pep.count + ' persons ('
+          + pep.list.names.length + ' names incl. multilingual aliases; harvested ' + (pep.harvested || 'unknown') + ')');
+      } else {
+        console.log('sanctions-screen: worldwide PEP list file present but empty — layer off this run');
+      }
+    } catch {
+      console.log('sanctions-screen: no worldwide PEP list artifact (' + pepFile + ') — harvest pending; the per-name Wikidata PEP signal still runs');
+    }
+  }
   const asanaToken = process.env.ASANA_ACCESS_TOKEN || '';
 
   if (!asanaToken) return bailUnscreened('ASANA_ACCESS_TOKEN not set — cannot read the Customer Database', today);
@@ -1541,6 +1577,7 @@ async function main() {
     cfg.pep ? 'PEP (Wikidata)' : null,
     cfg.interpol ? 'Interpol Red Notice' : null,
     cfg.fbi ? 'FBI Wanted' : null,
+    cfg.pepIndex ? PEP_LIST_NAME : null,
   ].filter(Boolean);
   const { alerts, cleared, notScreened, matchCount, nextState } =
     diffState(prevState, screen.results, today, cfg.threshold, screenedLists, evaluatedSignals);

@@ -40,6 +40,7 @@ export const CONTROLS = [
   { id: 'fatf-watchdog.yml',        name: 'FATF Watchdog (country lists)',                         cadence: 'daily',     maxAgeDays: 0 },
   { id: 'onboarding-screen.yml',    name: 'Onboarding Screen (6-hourly)',                          cadence: 'daily',     maxAgeDays: 0 },
   { id: 'advisor-eval.yml',         name: 'Advisor Guardrail Eval (weekly)',                       cadence: 'weekly',    maxAgeDays: 8 },
+  { id: 'pep-worldwide.yml',        name: 'PEP Worldwide Harvest (weekly)',                        cadence: 'weekly',    maxAgeDays: 8 },
   { id: 'advisor-bias-eval.yml',    name: 'Advisor Bias Eval (quarterly)',                         cadence: 'quarterly', maxAgeDays: 96 },
   { id: 'quarterly-review.yml',     name: 'Quarterly Screening Review',                            cadence: 'quarterly', maxAgeDays: 96 },
 ];

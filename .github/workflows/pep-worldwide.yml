@@ -1,0 +1,115 @@
+name: PEP Worldwide Harvest
+
+# Weekly harvest of the worldwide PEP list from Wikidata (CC0 — the one
+# free, license-clean, machine-readable worldwide source of who holds
+# PEP-grade public office). scripts/pep-worldwide.mjs partitions the query
+# space (root class → position batch) so no request approaches the WDQS 60s
+# kill, pulls every-language labels/aliases for the matcher's
+# transliteration nets, and REFUSES to overwrite the previous artifact when
+# a harvest comes back hollow (floor + shrink gates — an upstream outage
+# must never thin the screened list silently). The artifact commits to the
+# dedicated pep-worldwide-state branch (public-officials data, CC0 — no
+# subject PII, so no encryption); the daily sanctions screen overlays it
+# from there and screens every customer against it locally.
+#
+# Data lineage: Wikidata is crowd-maintained — a hit is a REVIEW-tier
+# "verify this person's office" signal for the MLRO, never an auto-decision,
+# and the daily screen caps PEP-list hits at band medium by construction.
+
+on:
+  schedule:
+    - cron: '17 2 * * 0'   # Sundays 02:17 UTC — artifact is ready for Monday's daily screens
+  workflow_dispatch:
+
+# contents: write — the harvest pushes the artifact to the
+# pep-worldwide-state data branch (branch protection keeps main closed).
+permissions:
+  contents: write
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240 # serial WDQS-polite harvest measures 1-3h; a hang past 4h must fail loudly
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          # Egress = GitHub (checkout + state push), node toolchain, and the
+          # two Wikimedia hosts the harvester talks to. Nothing else.
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            query.wikidata.org:443
+            www.wikidata.org:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # No credentials on disk (zizmor artipacked): the state push below
+          # authenticates with the ephemeral env token in the push URL.
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Overlay the previous artifact (shrink-gate baseline)
+        run: |
+          # The refuse-to-overwrite gate compares against the LAST committed
+          # harvest — fetch it so a hollow harvest cannot pass as "first run".
+          if git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
+            echo "previous artifact overlaid"
+          else
+            echo "no pep-worldwide-state branch yet — first harvest"
+          fi
+
+      - name: Harvest the worldwide PEP list from Wikidata
+        env:
+          PEP_RECENCY_MONTHS: ${{ vars.PEP_RECENCY_MONTHS }}
+          PEP_FLOOR: ${{ vars.PEP_FLOOR }}
+        run: node scripts/pep-worldwide.mjs harvest data/pep-worldwide.json
+
+      - name: Persist the artifact (pep-worldwide-state branch)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # Branch protection blocks direct pushes to main, so the artifact
+          # lives on its own data branch: rebuilt as <current HEAD> + one data
+          # commit, force-updated each harvest. Auth is the ephemeral env
+          # token in the push URL — the checkout persisted no credentials.
+          if [ -n "$(git status --porcelain data/pep-worldwide.json)" ]; then
+            git config user.name "pep-worldwide"
+            git config user.email "actions@github.com"
+            git add data/pep-worldwide.json
+            git commit -m "PEP worldwide harvest $(date -u +%F) [skip ci]"
+            pushed=
+            for attempt in 1 2 3 4 5; do
+              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/pep-worldwide-state && { pushed=1; break; }
+              echo "push failed (attempt $attempt) — retrying"
+              sleep $((attempt * 5))
+            done
+            [ -n "$pushed" ] || { echo "::error::artifact push to pep-worldwide-state failed after 5 attempts — harvest NOT persisted"; exit 1; }
+            echo "artifact persisted to pep-worldwide-state"
+          else
+            echo "artifact unchanged this week — nothing to push"
+          fi
+
+      - name: Harvest summary
+        run: |
+          node -e '
+            const d = JSON.parse(require("fs").readFileSync("data/pep-worldwide.json", "utf8"));
+            const L = ["# PEP worldwide harvest", "",
+              "Persons: **" + d.count + "** (harvested " + d.harvested + ")", "",
+              "| class | persons |", "| --- | --- |",
+              ...Object.entries(d.classes).map(([k, v]) => "| " + k + " | " + v + " |")];
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join("\n") + "\n");
+          '

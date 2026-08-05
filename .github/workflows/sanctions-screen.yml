@@ -150,6 +150,16 @@ jobs:
           else
             echo "no screen-state branch yet — using state from main"
           fi
+          # Worldwide PEP list artifact (weekly Wikidata harvest, CC0 —
+          # public-officials data, unencrypted). Absent branch = layer off,
+          # logged by the screen; standing PEP-list matches stay protected
+          # via evaluatedSignals, never silently cleared.
+          if git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
+            echo "worldwide PEP list overlaid from pep-worldwide-state"
+          else
+            echo "no pep-worldwide-state branch yet — worldwide PEP layer pending first harvest"
+          fi
 
       - name: Screen the customer base
         id: screen

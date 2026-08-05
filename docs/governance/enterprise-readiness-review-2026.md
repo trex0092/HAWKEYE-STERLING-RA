@@ -326,6 +326,17 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 59 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(5 August, second pass — **worldwide coverage expansion**. The 13-region source survey landed as
+data: twelve new machine-readable national/institutional sanctions lists screen daily (plus DFAT
+direct restored, beginning the OpenSanctions-mirror retirement), non-integrable sources became
+documented disabled stubs inside the registry itself, the regulator-bulletin net gained five
+enforcement feeds (DOJ/CFTC/OCC/DFSA/Europol), an opt-in FBI Wanted per-subject signal joined
+Interpol, and one workflow was added — the weekly `pep-worldwide.yml` Wikidata (CC0) harvest that
+builds a genuinely license-clean worldwide PEP list (floor + shrink gates; artifact on its own data
+branch; the daily screen consumes it as a review-tier local index, capped at band medium). Coverage
+additions and one scheduled harvest only — no scored control changed.)*
+
 Verified at HEAD: 58 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
 *(5 August — **yente matching benchmark (experimental instrument)**. One dispatch-only workflow
 (`yente-bench.yml`) boots the MIT-licensed yente matching engine (the software behind the

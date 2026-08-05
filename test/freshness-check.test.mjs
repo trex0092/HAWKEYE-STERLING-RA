@@ -173,6 +173,7 @@ const EXPECTED_CRONS = {
   'advisor-eval.yml':         ['9 8 * * 1'],
   'advisor-bias-eval.yml':    ['9 9 1 */3 *'],
   'quarterly-review.yml':     ['9 6 1 1,4,7,10 *'],
+  'pep-worldwide.yml':        ['17 2 * * 0'],
 };
 check('every monitored control has a pinned cron', CONTROLS.every(c => EXPECTED_CRONS[c.id]));
 for (const c of CONTROLS) {

@@ -10,6 +10,23 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Worldwide PEP list — free, license-clean** (`scripts/pep-worldwide.mjs`
+  + weekly `pep-worldwide.yml`): a real screenable worldwide PEP list
+  harvested from Wikidata (CC0 — the one free commercial-use-clean source),
+  replacing reliance on the weak per-name signal alone. Two-phase SPARQL
+  partition (position items per FATF-grade root class → holders per VALUES
+  batch at BestRank with a 24-month recency window) sidesteps the WDQS 60s
+  kill and the unreliable OFFSET paging; every-language labels/aliases feed
+  the matcher's transliteration nets; floor + shrink gates refuse a hollow
+  harvest so an upstream outage can never thin the screened list. The
+  artifact lives on the `pep-worldwide-state` branch; the daily screen
+  overlays and screens it as a LOCAL index — hits are review-tier `PEP
+  (Worldwide — Wikidata)` findings (band capped at medium, non-whitelistable
+  by prefix, never a sanctions recommendation), with office + country + a
+  former-holder marker in the hit detail, and the signal enters
+  `evaluatedSignals` so standing PEP-list matches survive artifact-less runs
+  uncleared.
+
 - **Worldwide sanctions coverage expansion** (13-region survey, every claim
   documented in-registry): twelve new machine-readable national/institutional
   lists screen daily — US Trade.gov Consolidated Screening List (eleven
