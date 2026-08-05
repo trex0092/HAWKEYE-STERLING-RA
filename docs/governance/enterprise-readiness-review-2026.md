@@ -326,6 +326,16 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 60 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(5 August, third pass — **source-probe diagnostic instrument**. One dispatch-only workflow
+(`source-probe.yml` + `scripts/source-probe.mjs`) that fetches sources already configured in the
+screening registry (by id — the input cannot aim it at an arbitrary URL) with realistic browser
+headers and publishes status/headers/body-sample/JSON-key-paths/sheet-headers as a step summary +
+artifact — the instrument that turns "disabled with a guessed reason" into "disabled with the
+observed response, or re-enabled with the right field mapping" for the five sources the first
+worldwide live run disabled on evidence. Diagnostic only: nothing screened, no state written, no
+secrets in the environment — no scored control changed.)*
+
 Verified at HEAD: 59 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
 *(5 August, second pass — **worldwide coverage expansion**. The 13-region source survey landed as
 data: twelve new machine-readable national/institutional sanctions lists screen daily (plus DFAT
