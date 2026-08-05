@@ -2,6 +2,64 @@
  "_README": "Additional / curated sanctions lists loaded ONLY by scripts/sanctions-screen.mjs (not by the watcher's strict loader). A source may be remote (`url` + `parser`) or in-repo curated (`file`, parser 'curated'). Set `enabled:false` to keep a source configured but skipped. A remote source that fails or parses 0 names, or a curated list with no entries, degrades coverage (reported loudly) — never a silent all-clear.",
  "sources": [
   {
+   "id": "ar-repet-entidades",
+   "name": "Argentina — RePET Entidades (terror-linked entities)",
+   "jurisdiction": "Argentina",
+   "url": "https://repet.jus.gob.ar/xml/entidades.json",
+   "type": "json",
+   "parser": "unjson",
+   "enabled": true,
+   "_note": "RePET entidades — terror-linked ENTITIES sibling of the loaded personas.json (same /xml/ dir, keyless JSON). ENABLED 2026-08-05 on source-probe evidence (run 31030989375): the runner fetched real JSON (http 200, 156KB). The feed is the UN-consolidated-list schema in JSON (FIRST_NAME holds the entity name; ENTITY_ALIAS[].ALIAS_NAME the a.k.a. names) — hence parser 'unjson' (concatenates the ordered UN name parts and captures ALIAS_NAME), NOT the generic 'json' walker which read only FIRST_NAME and dropped the aliases.",
+   "minNames": 20
+  },
+  {
+   "id": "idb-debarment",
+   "name": "IDB — Dataset of Sanctioned Firms & Individuals (MDB cross-debarment)",
+   "jurisdiction": "Global (MDB)",
+   "url": "https://mydata.iadb.org/api/views/vsju-qrtz/rows.csv?accessType=DOWNLOAD",
+   "type": "csv",
+   "parser": "socrata",
+   "enabled": false,
+   "_note": "Inter-American Development Bank debarment dataset (2010 MDB Mutual-Enforcement cross-debarments: World Bank/ADB/AfDB/EBRD), ~1,500 firms/individuals; debarment (procurement-integrity) tier, not financial sanctions. STILL DISABLED — source-probe 2026-08-05 (run 31030989375): the old Socrata rows.csv endpoint now returns the IDB Open Data CKAN portal HTML page (generator 'ckan 2.11.4', doi:10.60966/7pfpgt0f), not a CSV — the dataset migrated off Socrata. The real download is a CKAN datastore/resource URL not yet identified; re-probe with the CKAN resource dump URL before enabling. parser 'socrata' left unimplemented (no proven CSV to map).",
+   "minNames": 200
+  },
+  {
+   "id": "il-nbctf-orgs",
+   "name": "Israel — NBCTF Terror Organization Designations (XLSX)",
+   "jurisdiction": "Israel",
+   "url": "https://nbctf.mod.gov.il/he/Announcements/Documents/NBCTFIsrael%20-%20Terror%20Organization%20Designation%20List_XL.xlsx",
+   "type": "xlsx",
+   "parser": "xlsx",
+   "enabled": true,
+   "browserHeaders": true,
+   "_note": "Israel NBCTF ORGANISATIONS designation list — sibling of the loaded il-nbctf individuals file. ENABLED 2026-08-05 on source-probe evidence (run 31030989375): the runner fetched the real 323KB workbook (http 200, openxml). Header layout matches the individuals file (Hebrew captions row 0, English header row 1: 'Organization Name - Hebrew' + '… - aka' columns), which the XLSX reader's header-row scan handles; empty a.k.a. columns carry an all-dash '----' placeholder now skipped by the parser (never indexed as a name).",
+   "minNames": 50
+  },
+  {
+   "id": "az-fms",
+   "name": "Azerbaijan — FMS Domestic Sanctions List (XML)",
+   "jurisdiction": "Azerbaijan",
+   "url": "http://hms.gov.az/en/olkedaxili-siyahi",
+   "type": "xml",
+   "parser": "xml",
+   "enabled": false,
+   "browserHeaders": true,
+   "_note": "Azerbaijan State Security Service autonomous domestic designations. STILL DISABLED — source-probe 2026-08-05 (run 31030989375): http://hms.gov.az/en/olkedaxili-siyahi returns an HTML single-page app ('STATE SECURITY SERVICE / TARGETED FINANCIAL SANCTIONS'), not XML — the designations render client-side, no static XML at this URL. Enabling needs the JS app's underlying data endpoint (not discoverable from the sandbox); re-probe once that URL is found.",
+   "minNames": 5
+  },
+  {
+   "id": "kg-fiu",
+   "name": "Kyrgyzstan — FIU National Sanctions List (XML)",
+   "jurisdiction": "Kyrgyzstan",
+   "url": "https://fiu.gov.kg/sked/9?language=ru",
+   "type": "xml",
+   "parser": "xml",
+   "enabled": false,
+   "browserHeaders": true,
+   "_note": "Kyrgyzstan State Financial Intelligence Service national list (autonomous designations beyond UN). STILL DISABLED — source-probe 2026-08-05 (run 31030989375): https://fiu.gov.kg/sked/9?language=ru returns an HTML page (Yii app behind Cloudflare), not XML — the list is HTML-rendered, no static XML feed at this URL. Enabling needs either an HTML-table scraper or the app's data endpoint; re-probe once identified.",
+   "minNames": 20
+  },
+  {
    "id": "uae-eocn-local-terrorist",
    "name": "UAE EOCN — Local Terrorist List",
    "jurisdiction": "United Arab Emirates",
@@ -277,9 +335,9 @@
    "jurisdiction": "Argentina",
    "url": "https://repet.jus.gob.ar/xml/personas.json",
    "type": "json",
-   "parser": "json",
+   "parser": "unjson",
    "enabled": true,
-   "_note": "Argentina's national terrorism register (personas file; an entidades sibling exists at the same path pattern — add once this one is proven on the runner). Keyless JSON confirmed from the register's own docs. Spanish name keys (nombre/apellido) are covered by the generic JSON parser. Added 2026-08-05; verify on the first live run.",
+   "_note": "Argentina's national terrorism register (personas file). parser CORRECTED 2026-08-05 from 'json' to 'unjson' on source-probe evidence (run 31030989375, entidades sibling): the feed is the UN-consolidated-list schema in JSON, NOT the Spanish nombre/apellido keys the note assumed — records carry ordered UN name parts (FIRST_NAME/SECOND_NAME/THIRD_NAME/FOURTH_NAME/NAME) plus INDIVIDUAL_ALIAS[].ALIAS_NAME. The generic 'json' walker matched only FIRST_NAME, so it indexed a bare first name per individual and dropped every alias (a silent recall+precision loss); 'unjson' concatenates the parts and captures the aliases, mirroring screen.py's parse_un.",
    "minNames": 200
   },
   {
