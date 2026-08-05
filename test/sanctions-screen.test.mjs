@@ -766,5 +766,56 @@ check('CSL: SDN-source rows are dropped (already screened via the OFAC feeds)',
   wm.parseCslCsv('source,name,alt_names\n"Specially Designated Nationals (SDN) - Treasury Department",DUPE PERSON,\n"Entity List (EL) - Bureau of Industry and Security",REAL ENTITY,\n')
     .join('|') === 'REAL ENTITY');
 
+/* ── worldwide PEP list (Wikidata harvest — pure functions) ── */
+const pep = await import('./../scripts/pep-worldwide.mjs');
+check('PEP harvest: positions query walks P279* from the root class with English labels',
+  pep.positionsQuery('Q48352').includes('wdt:P279* wd:Q48352')
+  && pep.positionsQuery('Q48352').includes('wikibase:label'));
+const _hq = pep.holdersQuery(['Q11696', 'Q14212'], '2024-08-05T00:00:00Z');
+check('PEP harvest: holders query batches positions via VALUES at BestRank with the recency filter',
+  _hq.includes('VALUES ?pos { wd:Q11696 wd:Q14212 }') && _hq.includes('wikibase:BestRank')
+  && _hq.includes('pq:P582') && _hq.includes('"2024-08-05T00:00:00Z"^^xsd:dateTime')
+  && !/OFFSET/i.test(_hq));
+check('PEP harvest: SPARQL bindings parse to plain rows with QIDs reduced',
+  JSON.stringify(pep.parseSparqlBindings({ results: { bindings: [
+    { person: { type: 'uri', value: 'http://www.wikidata.org/entity/Q7747' }, end: { type: 'literal', value: '2024-05-07' } }] } }))
+  === '[{"person":"Q7747","end":"2024-05-07"}]');
+check('PEP harvest: an unrecognised SPARQL shape parses to [] (zero-guards take over)',
+  pep.parseSparqlBindings({ oops: true }).length === 0);
+const _ent = pep.namesFromEntity({
+  labels: { en: { value: 'Test Person' }, ar: { value: 'شخص اختبار' }, ru: { value: 'Тест Персон' } },
+  aliases: { en: [{ value: 'T. Person' }], ar: [{ value: 'اختبار' }] } });
+check('PEP harvest: every-language labels and aliases fold into the alias set, original scripts kept',
+  _ent.name === 'Test Person' && _ent.aliases.includes('شخص اختبار')
+  && _ent.aliases.includes('Тест Персон') && _ent.aliases.includes('T. Person')
+  && !_ent.aliases.includes('Test Person'));
+const _ds = pep.buildPepDataset({
+  harvestedAt: '2026-08-05T00:00:00Z',
+  holderRows: [
+    { person: 'Q1x', pos: 'P1', end: '', classKey: 'legislator' },
+    { person: 'Q1x', pos: 'P2', end: '', classKey: 'head-of-state' },
+    { person: 'Q2x', pos: 'P1', end: '2025-01-01', classKey: 'legislator' },
+    { person: 'Q3x', pos: 'P9', end: '', classKey: 'minister' }],
+  positions: new Map([['P1', { label: 'MP of Testland', country: 'Testland' }], ['P2', { label: 'President of Testland', country: 'Testland' }]]),
+  names: new Map([['Q1x', { name: 'Alpha Leader', aliases: ['A. Leader'] }], ['Q2x', { name: 'Beta Member', aliases: [] }]]),
+});
+check('PEP harvest: dedupe keeps the most senior class; unlabeled persons drop; counts per class',
+  _ds.count === 2 && _ds.classes['head-of-state'] === 1 && _ds.classes.legislator === 1
+  && _ds.entries.find(e => e.qid === 'Q1x').position === 'President of Testland'
+  && _ds.entries.find(e => e.qid === 'Q2x').current === false
+  && !_ds.entries.find(e => e.qid === 'Q3x'));
+check('PEP harvest: floor gate refuses a hollow harvest and a >40% shrink, passes a healthy one',
+  pep.datasetFloorOk({ count: 10 }, null, { floor: 5000 }).ok === false
+  && pep.datasetFloorOk({ count: 6000 }, { count: 12000 }, { floor: 5000, shrinkPct: 0.6 }).ok === false
+  && pep.datasetFloorOk({ count: 11000 }, { count: 12000 }, { floor: 5000, shrinkPct: 0.6 }).ok === true);
+const _plist = pep.pepListFromDataset(_ds);
+check('PEP list: dataset flattens to a matcher list + per-name office context map',
+  _plist.list.name === pep.PEP_LIST_NAME && _plist.list.names.includes('Alpha Leader')
+  && _plist.list.names.includes('A. Leader')
+  && _plist.meta.get('A. Leader').position === 'President of Testland'
+  && _plist.count === 2);
+check('PEP list: the list name rides the non-whitelistable PEP prefix',
+  pep.PEP_LIST_NAME.startsWith('PEP ('));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

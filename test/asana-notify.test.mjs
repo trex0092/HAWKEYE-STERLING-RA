@@ -79,6 +79,13 @@ check('without dedupPrefix exact-match semantics are unchanged',
 /* ── existing helpers still hold ── */
 check('esc escapes all five XML-sensitive characters',
   esc('<a href="x">&\'</a>') === '&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;');
+check('esc strips XML-invalid control characters escaping cannot save (Asana xml_parsing_error, observed live 2026-08-05)',
+  esc('A' + String.fromCharCode(0) + 'B' + String.fromCharCode(26) + 'C' + String.fromCharCode(11) + 'D') === 'ABCD'
+  && esc('tab\tand\nnewline stay') === 'tab\tand\nnewline stay');
+check('esc drops unpaired surrogates but keeps real astral pairs',
+  esc('X' + String.fromCharCode(0xD800) + 'Y') === 'XY'
+  && esc('X' + String.fromCharCode(0xDC00) + 'Y') === 'XY'
+  && esc('ok \u{1F6E1} shield') === 'ok \u{1F6E1} shield');
 check('buildHtmlBody renders the severity triage badge before the change text', (() => {
   const h = buildHtmlBody({ heading: 'x', summary: 's', changes: [{ name: 'FATF', url: 'https://u', status: 'changed', severity: 'HIGH', severityReason: 'new threshold', diff: { addedCount: 1, removedCount: 0, added: ['a new threshold applies to dealers now.'], removed: [] } }] });
   return h.includes('🔴 HIGH (new threshold) — content changed — 1 added / 0 removed') && h.includes('➕ added:');

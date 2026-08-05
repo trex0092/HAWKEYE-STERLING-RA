@@ -10,6 +10,42 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **First live worldwide run: verdicts recorded, mirror retired.** The
+  2026-08-05 verification run indexed **221,035 designated names from 20
+  lists** and surfaced 47 new matches. Proven live: DFAT direct (11,068 —
+  richer than the OpenSanctions mirror, which is now **retired**: the
+  registry's last OpenSanctions-hosted feed is gone), Netherlands ODS (118),
+  Trade.gov CSL (13,379), Belgium (6,376), Monaco (15,636), Argentina (471),
+  Brazil TCU (452), Latvia (13). Recorded as disabled-with-reason after
+  observing live behaviour: Israel (WAF challenge), Qatar (portal
+  challenge/shape), Sri Lanka (runner-unreachable), Saudi (sheet layout),
+  Brazil BCB ×2 (OData field names) — each note carries the observed
+  failure and the re-enable path; South Africa's FIC file switches to the
+  UN-schema parser (next run verifies).
+- **Asana card hardening (`esc`)**: XML-invalid control characters and
+  unpaired surrogates are now stripped before entity-escaping — four case
+  creates 400'd live (`xml_parsing_error`) when designated names from the
+  widened list set carried stray control bytes; escaping alone cannot
+  represent those characters in XML. Regression checks pin the behaviour
+  (tabs/newlines and astral emoji survive).
+
+- **Worldwide PEP list — free, license-clean** (`scripts/pep-worldwide.mjs`
+  + weekly `pep-worldwide.yml`): a real screenable worldwide PEP list
+  harvested from Wikidata (CC0 — the one free commercial-use-clean source),
+  replacing reliance on the weak per-name signal alone. Two-phase SPARQL
+  partition (position items per FATF-grade root class → holders per VALUES
+  batch at BestRank with a 24-month recency window) sidesteps the WDQS 60s
+  kill and the unreliable OFFSET paging; every-language labels/aliases feed
+  the matcher's transliteration nets; floor + shrink gates refuse a hollow
+  harvest so an upstream outage can never thin the screened list. The
+  artifact lives on the `pep-worldwide-state` branch; the daily screen
+  overlays and screens it as a LOCAL index — hits are review-tier `PEP
+  (Worldwide — Wikidata)` findings (band capped at medium, non-whitelistable
+  by prefix, never a sanctions recommendation), with office + country + a
+  former-holder marker in the hit detail, and the signal enters
+  `evaluatedSignals` so standing PEP-list matches survive artifact-less runs
+  uncleared.
+
 - **Worldwide sanctions coverage expansion** (13-region survey, every claim
   documented in-registry): twelve new machine-readable national/institutional
   lists screen daily — US Trade.gov Consolidated Screening List (eleven
