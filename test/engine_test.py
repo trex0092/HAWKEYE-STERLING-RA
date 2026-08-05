@@ -3177,6 +3177,20 @@ check("stride guard: a 131-subject book still rotates day to day",
 check("offset guard: a 67-subject book still gets a distinct make-up start",
       screen.enrichment_rotation(67, 739_101, retry_pass=True) != screen.enrichment_rotation(67, 739_101))
 
+# ── CPF / proliferation-financing coverage (query + flag + typology) ──────────
+print("\nscreen.py — CPF / proliferation-financing coverage")
+check("English PF headline flags on the new canonical",
+      "export control" in screen.adverse_keywords_for("Trader fined for export control violations"))
+check("PF canonicals bucket to Sanctions / Proliferation",
+      "Sanctions / Proliferation" in screen.typology_for(["export control"])
+      and "Sanctions / Proliferation" in screen.typology_for(["proliferation financing"]))
+check("Arabic proliferation-financing headline maps to its canonical",
+      "proliferation financing" in screen.adverse_keywords_for("تحقيق في تمويل الانتشار لشركة تجارية"))
+check("the English news QUERY now asks for PF terms (was flag-only)",
+      all(t in screen.RISK_QUERY for t in ("proliferation", "export control", "dual-use", "sanctions evasion")))
+check("the Arabic news QUERY carries the CPF terms",
+      "تمويل الانتشار" in screen.AR_RISK_QUERY and "أسلحة الدمار الشامل" in screen.AR_RISK_QUERY)
+
 # ── FraudLabs support signal (opt-in, PDPL-gated, never a verdict) ────────────
 print("\nscreen.py — FraudLabs support signal")
 check("gate is OFF by default (no env, no key)", screen.FRAUDLABS is False)

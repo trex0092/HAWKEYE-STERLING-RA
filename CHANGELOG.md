@@ -10,6 +10,15 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **CPF / proliferation-financing terms now reach the news queries.** The
+  flag dictionaries always knew `proliferation financing` / `wmd` /
+  `dual-use`, but the targeted Google News query never asked for them — a
+  PF-specific story only surfaced if it also tripped a generic term. The
+  English query gains `proliferation`, `export control`, `dual-use`,
+  `sanctions evasion`; the Arabic query gains `تمويل الانتشار` and
+  `أسلحة الدمار الشامل`, with matching `ADVERSE_KEYWORDS_AR` canonicals and
+  an `export control` entry in the keyword set + Sanctions/Proliferation
+  typology (FATF R.7 / UAE TFS alignment).
 - **FraudLabs support signal on onboarding (opt-in, PDPL-gated).** A
   supplementary payment-fraud indicator on a newly onboarded customer's
   contact email (disposable/free/young-domain traits) — explicitly NOT a
