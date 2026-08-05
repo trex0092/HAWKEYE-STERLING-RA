@@ -575,7 +575,11 @@ export function parseDfatXlsx(buf) {
     header.forEach((c, i) => { if (/name/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
     if (!nameCols.length) continue;
     for (let i = h + 1; i < rows.length; i++) {
-      for (const ci of nameCols) { const v = (rows[i][ci] || '').trim(); if (v && v !== '-') names.push(v); }
+      /* Skip an all-dash placeholder in any name column — the Israel NBCTF
+         organisations sheet fills empty a.k.a. columns with "----" (not a bare
+         "-"), which the old `!== '-'` guard let through as a bogus designated
+         name (2026-08-05 probe evidence). A run of dashes is never a name. */
+      for (const ci of nameCols) { const v = (rows[i][ci] || '').trim(); if (v && !/^-+$/.test(v)) names.push(v); }
     }
   }
   return names;
@@ -719,6 +723,49 @@ export function parseJsonList(body) {
   return [...new Set(out.filter(Boolean))];
 }
 
+/* UN-consolidated-list JSON (the shape Argentina's RePET republishes at
+   /xml/personas.json and /xml/entidades.json — the same schema as the UN XML,
+   in JSON). Each record carries the party name as ORDERED parts —
+   FIRST_NAME / SECOND_NAME / THIRD_NAME / FOURTH_NAME / NAME — that must be
+   CONCATENATED, plus designated a.k.a. names under INDIVIDUAL_ALIAS /
+   ENTITY_ALIAS as {…, ALIAS_NAME}. The generic JSON walker matched only
+   FIRST_NAME (JSON_FIRST) and so indexed a bare first name per individual and
+   dropped every alias — a silent recall AND precision loss on a live source.
+   This mirrors screen.py's parse_un name assembly exactly. Falls back to the
+   generic walker when a body carries no UN-structured record, so a non-UN feed
+   routed here can never parse to fewer names than the generic path would. */
+export function parseUnJson(body) {
+  let data;
+  try { data = typeof body === 'string' ? JSON.parse(body) : body; } catch { return []; }
+  const records = Array.isArray(data) ? data
+    : (data && typeof data === 'object' ? (data.records || data.results || data.data || data.items || []) : []);
+  const out = [];
+  let structured = 0;
+  for (const rec of (Array.isArray(records) ? records : [])) {
+    if (!rec || typeof rec !== 'object') continue;
+    let hit = false;
+    const parts = [];
+    for (const f of ['FIRST_NAME', 'SECOND_NAME', 'THIRD_NAME', 'FOURTH_NAME', 'NAME']) {
+      const v = rec[f];
+      if (typeof v === 'string' && v.trim()) parts.push(v.trim());
+    }
+    if (parts.length) { out.push(parts.join(' ').replace(/\s+/g, ' ').trim()); hit = true; }
+    for (const ac of ['INDIVIDUAL_ALIAS', 'ENTITY_ALIAS']) {
+      const arr = rec[ac];
+      if (Array.isArray(arr)) for (const a of arr) {
+        const an = a && typeof a === 'object' ? (a.ALIAS_NAME ?? a.alias_name ?? a.aliasName) : null;
+        if (typeof an === 'string' && an.trim()) { out.push(an.trim()); hit = true; }
+      }
+    }
+    if (hit) structured++;
+  }
+  /* No UN-structured record recognised → this isn't a UN-shaped feed; defer to
+     the generic walker rather than return empty (degrade to the old behaviour,
+     never below it). */
+  if (!structured) return parseJsonList(body);
+  return [...new Set(out.filter(Boolean))];
+}
+
 /* A curated / local list (e.g. the UAE EOCN Local Terrorist List kept in-repo).
    Accepts an array of strings, an array of {name, aliases[]} objects, or
    {entries:[…]} / {names:[…]}. */
@@ -754,6 +801,7 @@ export function parseList(source, body) {
   if (p === 'opensanctions') return parseOpenSanctionsCsv(body); // targets.simple.csv mirrors (comma CSV: name + ;-separated aliases)
   if (p === 'csl') return parseCslCsv(body);                     // Trade.gov Consolidated Screening List (comma CSV: name + ;-separated alt_names)
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
+  if (p === 'unjson') return parseUnJson(body);                 // UN-consolidated-list JSON (RePET personas/entidades: ordered name parts + ALIAS_NAME)
   if (p === 'json') return parseJsonList(body);
   if (p === 'curated' || source.type === 'curated') return parseCuratedList(body);
   if (p === 'mxsat') return parseSatCsv(body);                   // Mexico SAT 69-B (latin-1 CSV, live statuses only)

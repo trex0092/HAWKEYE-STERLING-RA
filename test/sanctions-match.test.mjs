@@ -5,7 +5,7 @@ import {
   parseEuCsv, parseOpenSanctionsCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName, nameVariants, translitCanonToken, indelRatio, tokenSetRatio, isTokenSubset,
   MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters, trigramsOf, fuzzyTokenMatches,
-  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseSatCsv, parseJsonList,
+  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseSatCsv, parseJsonList, parseUnJson,
   phoneticKey, phonTokens, phoneticProfile, phoneticPairMatch
 } from '../scripts/sanctions-match.mjs';
 import { deflateRawSync } from 'node:zlib';
@@ -204,6 +204,33 @@ check('parseJsonList does not invent names from a nameless payload', parseJsonLi
 check('parseJsonList tolerates a bare array of {name} and dedups', JSON.stringify(parseJsonList([{ name: 'X' }, { name: 'X' }, { name: 'Y' }])) === JSON.stringify(['X', 'Y']));
 check('parseList routes the json parser', parseList({ id: 'fr-dgt', parser: 'json' }, frJson).includes('ROSNEFT OIL COMPANY'));
 check('parseJsonList tolerates malformed JSON (returns [])', parseJsonList('{not json').length === 0);
+
+/* ── UN-consolidated-list JSON (Argentina RePET personas/entidades) ──
+   The generic walker matched only FIRST_NAME, so it indexed a bare first name
+   per individual and dropped every ALIAS_NAME — a silent recall+precision loss
+   on a live source. parseUnJson concatenates the ordered UN name parts and
+   captures the aliases, mirroring screen.py's parse_un (2026-08-05 probe). */
+const repetPersonas = JSON.stringify([
+  { DATAID: '2', FIRST_NAME: 'YUN', SECOND_NAME: 'HO-JIN', UN_LIST_TYPE: 'DPRK',
+    INDIVIDUAL_ALIAS: [{ QUALITY: 'Good', ALIAS_NAME: 'Yun Ho-chin' }] },
+]);
+const repetPer = parseUnJson(repetPersonas);
+check('parseUnJson concatenates ordered UN name parts (YUN HO-JIN, not bare YUN)',
+  repetPer.includes('YUN HO-JIN') && !repetPer.includes('YUN'));
+check('parseUnJson captures INDIVIDUAL_ALIAS[].ALIAS_NAME', repetPer.includes('Yun Ho-chin'));
+const repetEntidades = JSON.stringify([
+  { DATAID: '1', FIRST_NAME: 'ABDALLAH AZZAM BRIGADES (AAB)', UN_LIST_TYPE: 'Al-Qaida',
+    ENTITY_ALIAS: [{ QUALITY: 'a.k.a.', ALIAS_NAME: 'Abdullah Azzam Brigades' }] },
+]);
+const repetEnt = parseUnJson(repetEntidades);
+check('parseUnJson keeps the entity whole-name (FIRST_NAME) + ENTITY_ALIAS[].ALIAS_NAME',
+  repetEnt.includes('ABDALLAH AZZAM BRIGADES (AAB)') && repetEnt.includes('Abdullah Azzam Brigades'));
+check('parseList routes the unjson parser', parseList({ id: 'ar-repet', parser: 'unjson' }, repetPersonas).includes('YUN HO-JIN'));
+/* A non-UN JSON body routed to unjson must degrade to the generic walker, never
+   below it — so mis-routing a source can only lose the extra UN parts, not names. */
+check('parseUnJson falls back to the generic walker for non-UN JSON',
+  JSON.stringify(parseUnJson(frJson)) === JSON.stringify(parseJsonList(frJson)));
+check('parseUnJson tolerates malformed JSON (returns [])', parseUnJson('{not json').length === 0);
 
 /* ── curated list (strings + objects with aliases) ── */
 const cur = parseCuratedList({ entries: ['Foo Bar', { name: 'Baz Co', aliases: ['Baz Limited'] }] });
@@ -572,6 +599,23 @@ check('XLSX reader walks EVERY worksheet, not just sheet1 (Saudi PCCT shape)',
   ilNames.filter(n => n === 'AIMAN AL-ZAWAHIRI').length === 2);
 check('XLSX reader drops "-" placeholder cells',
   !ilNames.includes('-'));
+/* The Israel NBCTF ORGANISATIONS sheet fills empty a.k.a. columns with a run of
+   dashes ("----"), not a bare "-" — the old guard let those through as bogus
+   designated names (2026-08-05 probe evidence). */
+const DASH_SHARED = '<sst>' +
+  ['Organization Name - Hebrew', 'Organization Name - Hebrew - aka', 'ZEDPAY', '----']
+    .map(s => '<si><t>' + s + '</t></si>').join('') + '</sst>';
+const DASH_SHEET = '<worksheet><sheetData>' +
+  '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>' +
+  '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c></row>' +
+  '</sheetData></worksheet>';
+const dashXlsx = makeZip([
+  { name: 'xl/sharedStrings.xml', data: DASH_SHARED },
+  { name: 'xl/worksheets/sheet1.xml', data: DASH_SHEET },
+]);
+const dashNames = parseDfatXlsx(dashXlsx);
+check('XLSX reader drops an all-dash "----" placeholder, keeps the real name',
+  dashNames.includes('ZEDPAY') && !dashNames.some(n => /^-+$/.test(n)));
 const SAT = '"Informacion actualizada",,,\n' +
   'Listado completo de contribuyentes,,,\n' +
   'No,RFC,Nombre del Contribuyente,Situacion del contribuyente\n' +
