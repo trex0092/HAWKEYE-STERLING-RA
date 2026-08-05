@@ -74,6 +74,15 @@ RUN_MODE              = os.environ.get("RUN_MODE", "full_batch")  # full_batch |
 # has a successful run): sweep ONLY if the earlier run lost news/PEP coverage
 # to per-IP rate limits — a fresh runner VM means a fresh egress IP.
 AM_COVERAGE_RETRY     = os.environ.get("AM_COVERAGE_RETRY", "0") == "1"
+# Daily report delivery target: 09:00 UAE = 05:00 UTC. GitHub delivers this
+# repo's scheduled events 2-4h late (measured, hour-independent — see the
+# weekly-adverse-media.yml header), so the run cannot control its START; it
+# controls its FINISH: the enrichment phase budgets itself against the target
+# (enrichment_deadline_ts), trimmed subjects are disclosed as deadline-deferred
+# and recovered by the same-day make-up pass, and the report header states the
+# actual delivery time against the target. Empty DELIVERY_TARGET_UTC disables.
+DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "05:00")
+DELIVERY_RESERVE_MIN  = int(os.environ.get("DELIVERY_RESERVE_MIN", "20"))
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
 ASANA_ONGOING_MON_GID = "1213914392047129"
@@ -4969,17 +4978,36 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     am_status = ("DEGRADED" if am_blackout
                  else ("DEGRADED (news)" if am_errors_n else "OK"))
 
-    # ── Compact header — three result blocks (Sanctions · Adverse media · PEP)
-    #    lead the report; everything here is a one-line snapshot. ──
-    A(f"🛡️  DAILY SCREENING — {dt}")
-    A(f"Subjects: {stats['subjects_total']}  ({stats['companies_screened']} companies + "
-      f"{stats['individuals_screened']} owners / directors / UBOs)")
-    A(f"Modules:  Sanctions {sanc_status}  ·  Adverse media {am_status}  ·  PEP {pep_status}")
+    # ── Formal header — professional register, one-line snapshots. The
+    #    delivery line states the actual time against the daily 09:00 UAE
+    #    target: met or missed, always disclosed, never implied. ──
+    A(f"DAILY AML/CFT SCREENING REPORT — {dt}")
+    A("Prepared for the MLRO and Compliance function. Automated detection;")
+    A("every determination remains subject to human review (four-eyes).")
+    if DELIVERY_TARGET_UTC:
+        try:
+            _t_hh, _t_mm = (int(x) for x in DELIVERY_TARGET_UTC.split(":"))
+            _now_utc = datetime.datetime.utcnow()
+            _uae = _now_utc + datetime.timedelta(hours=4)
+            _target_uae = f"{(_t_hh + 4) % 24:02d}:{_t_mm:02d}"
+            _met = (_now_utc.hour, _now_utc.minute) <= (_t_hh, _t_mm)
+            A(f"Delivery: {_uae.strftime('%H:%M')} UAE — daily target {_target_uae} UAE "
+              + ("(within target)" if _met else "(after target — disclosed; see coverage notes)"))
+        except ValueError:
+            pass   # unparseable target = no delivery line, never a crash
+    A(f"Population screened: {stats['subjects_total']} subjects "
+      f"({stats['companies_screened']} legal entities; "
+      f"{stats['individuals_screened']} shareholders, directors and UBOs)")
+    A(f"Control status:  Sanctions {sanc_status}  ·  Adverse media {am_status}  ·  PEP {pep_status}")
     if delta:
-        A(f"New since last run:  {delta.get('sanctions',0)} sanctions  ·  "
-          f"{delta.get('adverse',0)} adverse  ·  {delta.get('pep',0)} PEP")
-    A(f"Totals:  {len(possible_matches)} sanctions match(es)  ·  "
-      f"{len(adverse_findings)} adverse subject(s)  ·  {len(pep_findings)} PEP")
+        A(f"New findings since the previous report:  {delta.get('sanctions',0)} sanctions  ·  "
+          f"{delta.get('adverse',0)} adverse media  ·  {delta.get('pep',0)} PEP")
+    A(f"Standing totals:  {len(possible_matches)} sanctions match(es)  ·  "
+      f"{len(adverse_findings)} adverse-media subject(s)  ·  {len(pep_findings)} PEP finding(s)")
+    if stats.get("am_skipped"):
+        A(f"Coverage note: {stats['am_skipped']} subject(s) had their news sweep deferred to "
+          "meet the delivery target — fully sanctions-screened, PEP-covered by the worldwide "
+          "net, and re-swept by the same-day make-up run (disclosed, never silent).")
     A("")
 
     A("━" * 70)
@@ -5306,15 +5334,18 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
                       rebuild=None):
     dt = run_time.strftime("%d %b %Y")
     n_s, n_a, n_p = len(possible_matches), len(adverse_findings), len(pep_findings)
-    flag = "⚠️" if (n_s + n_a + n_p) > 0 else "✅"
+    # Professional register: a words-not-emoji status marker, counts spelled
+    # out, the date last. "ACTION REQUIRED" is the scannable signal.
+    status = "ACTION REQUIRED — " if (n_s + n_a + n_p) > 0 else "No open findings — "
+    tallies = f"Sanctions {n_s} · Adverse Media {n_a} · PEP {n_p}"
     if mode == "onboarding":
-        task_name = f"🆕 {flag} Onboarding Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
+        task_name = f"Onboarding Screening Report — {status}{tallies} — {dt}"
     elif mode == "makeup":
         # Same-day re-sweep that recovered coverage lost to rate limits — the
-        # distinct title tells the MLRO why the day has a second digest.
-        task_name = f"🛡️🔁 {flag} Daily Screening (coverage make-up) — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
+        # distinct title tells the MLRO why the day has a second report.
+        task_name = f"Daily AML/CFT Screening Report (coverage make-up) — {status}{tallies} — {dt}"
     else:
-        task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
+        task_name = f"Daily AML/CFT Screening Report — {status}{tallies} — {dt}"
     # Adaptive budget: open at the budget that delivered last run (learned via
     # delta-state; weekly probe re-tests headroom), shrink on rejection. See
     # notes_budget_plan for the strategy; the plan always ends in the classic
@@ -5556,6 +5587,7 @@ def tally_enrichment(results, wl_hits, wl_loaded):
     """
     companies = individuals = 0
     am_errors = am_blackout = pep_errors = pep_mirror = subject_errors = 0
+    am_skipped = 0   # deadline-deferred (delivery target) — disclosed, recovered by make-up
     am_msgs = {}   # distinct news-sweep failure messages → subject count (report evidence)
     adverse_findings, pep_findings = [], []
     for r in results:
@@ -5564,6 +5596,8 @@ def tally_enrichment(results, wl_hits, wl_loaded):
         else:
             companies += 1   # corporate owners count with companies — legal persons
         subj_err = False
+        if r.get("am_skipped"):
+            am_skipped += 1
         if r["am_error"]:
             am_errors += 1
             if r.get("am_msg"):
@@ -5612,7 +5646,7 @@ def tally_enrichment(results, wl_hits, wl_loaded):
             subject_errors += 1
     counts = {"subjects": companies + individuals, "companies": companies,
               "individuals": individuals, "errors": subject_errors,
-              "am_errors": am_errors, "am_blackout": am_blackout,
+              "am_errors": am_errors, "am_blackout": am_blackout, "am_skipped": am_skipped,
               # Top failure messages (by subject count): the WHY behind am_errors.
               # Captured per subject as am_msg but previously never rendered —
               # the report said "news sweep lost" with no evidence of the cause.
@@ -5621,6 +5655,26 @@ def tally_enrichment(results, wl_hits, wl_loaded):
               "watchlist": sum(1 for f in adverse_findings
                                if any(a.get("watchlist") for a in f["articles"]))}
     return counts, adverse_findings, pep_findings
+
+def enrichment_deadline_ts(now_ts, target_hhmm, reserve_min):
+    """Epoch seconds by which per-subject news enrichment must STOP so the
+    report still delivers by today's target (the reserve covers the PEP net,
+    AI enrichment, report build and Asana delivery). Returns None — meaning
+    no deadline — when no target is configured OR the budgeted cutoff is
+    already past: a run that starts after the target can no longer make it,
+    so trimming coverage would cost recall for nothing; it delivers ASAP with
+    full enrichment instead. Pure and clock-injected for offline tests."""
+    if not target_hhmm:
+        return None
+    try:
+        hh, mm = (int(x) for x in str(target_hhmm).split(":"))
+    except (ValueError, AttributeError):
+        return None   # unparseable target = feature off, never a crash
+    day_start = datetime.datetime.utcfromtimestamp(now_ts).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    deadline_ts = (day_start - datetime.datetime(1970, 1, 1)).total_seconds() \
+        + hh * 3600 + mm * 60 - reserve_min * 60
+    return deadline_ts if deadline_ts > now_ts else None
 
 def enrichment_rotation(n, today_ordinal, retry_pass=False):
     """Deterministic daily start-offset for the enrichment order.
@@ -5720,10 +5774,23 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # network-bound sweep in PARALLEL (bounded pool) so a full book screens in
     # minutes, not hours. Each worker still paces its own requests for politeness.
 
+    # Delivery-deadline budget (daily/make-up runs only — onboarding batches
+    # are tiny): once continuing would push delivery past the daily target,
+    # remaining subjects skip news enrichment. Skipped ≠ errored: the trim is
+    # DISCLOSED as deadline-deferred, the worldwide PEP/RCA net still covers
+    # the skipped individuals below, and the same-day make-up pass re-sweeps
+    # them from a fresh runner. A run that starts after the target gets no
+    # deadline (None) and enriches in full — see enrichment_deadline_ts.
+    _deadline = (enrichment_deadline_ts(time.time(), DELIVERY_TARGET_UTC, DELIVERY_RESERVE_MIN)
+                 if mode in ("daily", "makeup") else None)
+
     def _enrich(subj):
         subj_type, subj_name, parent, c = subj
         r = {"type": subj_type, "name": subj_name, "parent": parent,
              "permalink": c.get("permalink", ""), "adverse": None, "pep": None, "am_error": False}
+        if _deadline and time.time() > _deadline:
+            r["am_skipped"] = True
+            return r
         try:
             articles = search_adverse_media(subj_name, max_results=ADVERSE_MAX_RESULTS)
             r["adverse"] = [a for a in articles if a["flagged"]]
@@ -5910,6 +5977,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         today,
         counts={"subjects": subjects_total, "errors": errors_total,
                 "am_errors": am_errors, "am_blackout": counts["am_blackout"],
+                "am_skipped": counts.get("am_skipped", 0),
                 "pep_errors": pep_errors, "pep_mirror": counts["pep_mirror"],
                 "watchlist": counts["watchlist"],
                 "flagged": len(possible_matches), "adverse": len(adverse_findings),
@@ -5934,7 +6002,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
              "am_error_msgs": counts.get("am_error_msgs", []),
              "adverse_evidence_error": adverse_evidence_error,
-             "am_blackout": counts["am_blackout"], "pep_mirror": counts["pep_mirror"],
+             "am_blackout": counts["am_blackout"], "am_skipped": counts.get("am_skipped", 0),
+             "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "adverse_repeat": repeat_patterns,
              "related_parties": related, "injection_blocked": injection_blocked,

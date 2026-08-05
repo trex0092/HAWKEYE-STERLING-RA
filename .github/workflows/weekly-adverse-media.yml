@@ -262,6 +262,15 @@ jobs:
           # is real, so raise them only for supervised off-schedule runs.
           ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
           SCREEN_CONCURRENCY: ${{ vars.SCREEN_CONCURRENCY || '8' }}
+          # DAILY DELIVERY TARGET: 09:00 UAE (05:00 UTC). GitHub's 2-4h schedule
+          # delay means the run can't control its start, so it controls its
+          # finish: news enrichment budgets itself against the target, trimmed
+          # subjects are disclosed as deadline-deferred (never silent, never
+          # counted clear) and the same-day make-up firings re-sweep them from
+          # a fresh runner. A run starting after the target delivers ASAP with
+          # FULL enrichment (no pointless trimming). Empty value disables.
+          DELIVERY_TARGET_UTC: ${{ vars.DELIVERY_TARGET_UTC || '05:00' }}
+          DELIVERY_RESERVE_MIN: ${{ vars.DELIVERY_RESERVE_MIN || '20' }}
           # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
           # its own assigned MLRO case subtask, not just the first 40. The full
           # findings list is always in the daily task body regardless of this cap.

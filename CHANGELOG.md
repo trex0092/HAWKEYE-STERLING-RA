@@ -10,6 +10,20 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **09:00 UAE daily delivery target + professional report register.** The
+  daily report now budgets itself against a delivery target (default
+  `DELIVERY_TARGET_UTC=05:00` = 09:00 UAE): because GitHub delivers scheduled
+  events 2-4h late (measured), the run controls its finish, not its start —
+  news enrichment stops when continuing would miss the target, deferred
+  subjects are disclosed in the report ("deadline-deferred", never silent,
+  never counted clear; PEP still covered by the worldwide net) and the
+  same-day make-up pass re-sweeps them; a run starting after the target
+  delivers ASAP with full enrichment. The report itself moves to a formal
+  register: "Daily AML/CFT Screening Report" title with a words-not-emoji
+  ACTION REQUIRED / No open findings marker, a formal header (prepared-for,
+  four-eyes statement, delivery time vs target, population, control status),
+  and matching onboarding/make-up variants.
+
 - **TFS FFR/PNMR draft dossiers** (`tfs_dossier.py`, str_dossier pattern —
   DRAFT ONLY, never files or freezes): a goAML-aligned Funds Freeze Report /
   Partial Name Match Report dossier for matches against the UN Consolidated
