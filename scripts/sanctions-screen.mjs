@@ -567,10 +567,30 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
          match" alert and (b) silently rewrite the standing record, dropping the
          PEP/media evidence over a mere lookup failure. Carry it forward; a later
          run with working enrichment updates it legitimately. */
-      if (r.enrichmentIncomplete && prior && Array.isArray(prior.lists)) {
+      if (prior && Array.isArray(prior.lists)) {
+        /* A prior enrichment signal is NOT re-verified this run when its lookup
+           errored / was budget-skipped (enrichmentIncomplete), its MODULE was
+           off this run (evaluated omits it — the same epistemic state the
+           clear-branch guards at ~632, previously missing on THIS still-match
+           branch, so flipping SCREEN_PEP=0 silently erased every standing PEP
+           from the book), OR its coverage was narrowed (unverified, e.g. a
+           budgeted adverse-media rotation that did not sweep the originating
+           edition). Carry it forward and keep the stronger prior band it drove;
+           recall-safe — only ADDS carry-forwards and only RAISES the band. */
+        const unv = Array.isArray(r.unverified) ? new Set(r.unverified) : null;
         const have = new Set(lists.map(h => h.list).filter(Boolean));
+        let carried = false;
         for (const l of prior.lists) {
-          if (ENRICHMENT_LISTS.has(l) && !have.has(l)) { lists = lists.concat([{ list: l, carriedForward: true }]); have.add(l); }
+          const notReverified = r.enrichmentIncomplete
+            || (evaluated && !evaluated.has(l))
+            || (unv && unv.has(l));
+          if (ENRICHMENT_LISTS.has(l) && !have.has(l) && notReverified) {
+            lists = lists.concat([{ list: l, carriedForward: true }]); have.add(l); carried = true;
+          }
+        }
+        if (carried && (BAND_RANK[prior.band] || 0) > (BAND_RANK[band] || 0)) {
+          band = prior.band;
+          recommendation = prior.recommendation || recommendation;
         }
       }
       const sig = matchSignature({ band, recommendation, lists });
@@ -630,6 +650,18 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
       // one run and auto-completed their cases.
       if (evaluated && Array.isArray(prior.lists)
           && prior.lists.some(l => ENRICHMENT_LISTS.has(l) && !evaluated.has(l))) {
+        carryForward(r.key);
+        continue;
+      }
+      // A prior enrichment signal whose coverage was NARROWED this run (a
+      // budgeted adverse-media rotation that did not sweep the originating
+      // edition, or a disclosed-partial sweep) was not actually re-checked —
+      // same epistemic state as errored, but the signal's module DID run so
+      // neither the enrichmentIncomplete nor the module-off guard fires. Carry
+      // the standing match forward; it clears only on a full-coverage re-sweep
+      // or an MLRO disposition, never off a rotation that never looked.
+      if (Array.isArray(r.unverified) && r.unverified.length && Array.isArray(prior.lists)
+          && prior.lists.some(l => ENRICHMENT_LISTS.has(l) && r.unverified.includes(l))) {
         carryForward(r.key);
         continue;
       }
@@ -1352,13 +1384,29 @@ async function screenLocally(subjects, cfg) {
     // run (errored or budget-skipped) so diffState won't silently clear a standing
     // enrichment-only match it couldn't re-verify.
     let enrichmentIncomplete = false;
+    /* Per-SIGNAL "not re-verified this run" set — finer than the coarse
+       enrichmentIncomplete flag. Adverse media sweeps a budgeted locale
+       rotation by default, so on a day its originating regional edition was
+       not swept a standing adverse-media hit was not actually re-checked;
+       flagging ONLY that signal carries its standing match forward without
+       freezing PEP/Interpol/FBI clears (which either ran or errored). */
+    const unverified = new Set();
     if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol || cfg.fbi)) { enrichSkipped++; enrichmentIncomplete = true; }
 
     if (cfg.adverseMedia && enrich) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (am.partial) amPartial++;   // narrowed coverage — disclosed, never silent
       if (am.errored) { amErrors++; enrichmentIncomplete = true; }
-      else if (am.hit) {
+      else {
+        /* A disclosed-partial sweep (a queried edition failed) OR a budgeted
+           sweep that did not cover the full matrix did NOT re-verify a standing
+           adverse-media match — the originating edition may not have been
+           queried. Mark the signal unverified so diffState carries a standing
+           adverse-media hit forward instead of clearing it off coverage that
+           never looked. Recall-safe: carry-forward only, never suppresses. */
+        if (am.partial || am.fullMatrix === false) unverified.add('Adverse media (Google News)');
+      }
+      if (!am.errored && am.hit) {
         lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : '') + (am.tier === 'weak' ? ' [weak-tier — generic terms only, corroboration needed]' : ''), score: am.score });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
@@ -1425,6 +1473,7 @@ async function screenLocally(subjects, cfg) {
     };
     const nr = normalizeResult(merged, s);
     nr.enrichmentIncomplete = enrichmentIncomplete;
+    if (unverified.size) nr.unverified = [...unverified];
     if (whitelistedOnly) nr.whitelistedOnly = true;
     heartbeat();
     return nr;

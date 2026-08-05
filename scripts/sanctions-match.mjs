@@ -44,6 +44,12 @@ export function normalizeName(s) {
     .replace(/ł/g, 'l').replace(/ø/g, 'o').replace(/[đð]/g, 'd')
     .replace(/þ/g, 'th').replace(/æ/g, 'ae').replace(/œ/g, 'oe')
     .replace(/ħ/g, 'h').replace(/ŧ/g, 't').replace(/ə/g, 'e').replace(/ŋ/g, 'ng')
+    /* African-Latin hook letters: screen.py folds Ɖ→D and Ɔ→O, JS did not, so a
+       short designation spelled with Ɔ/Ɖ (e.g. "Ɔla") keyed apart from its ASCII
+       customer spelling ("Ola") and cleared — a cross-engine false negative the
+       parity corpus never exercised. Lowercase forms suffice (JS folds after
+       lower-casing). Strictly widening. */
+    .replace(/ɖ/g, 'd').replace(/ɔ/g, 'o')
     /* Turkish dotless ı has no NFKD decomposition and is NOT folded by
        lowercasing, so "Kılıç" and "Kilic" normalized to different strings and
        an ı-spelled subject could sit a phantom 2 edits from its own name —

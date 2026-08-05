@@ -10,6 +10,37 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Screening hardening audit — seven confirmed silent-clear / recall-loss
+  holes closed.** An adversarial audit (6 finders across every screening
+  surface, each candidate verified against the actual guards) found and this
+  change fixes:
+  - **OFAC SDN + alt.csv now decode latin-1** (they are latin-1 on the wire;
+    `screen.py` always decoded them so, but the JS fetcher's `r.text()` forced
+    UTF-8 — mangling every ñ/accented designation into a split token so
+    "PEÑA" cleared against customer "PENA" on the *primary* list, invisibly to
+    the row-count floors and to matcher-parity). Strictly recall-widening.
+  - **`normalizeName` folds Ɖ→d / Ɔ→o** to match `screen.py`; a short
+    designation in those African-Latin letters keyed apart from its ASCII
+    spelling and cleared. Parity corpus pins it.
+  - **Standing enrichment matches are no longer silently cleared on
+    unverified coverage.** Three routes closed: (a) the diffState *match*
+    branch now carries a prior enrichment signal forward when its module was
+    off this run (e.g. `SCREEN_PEP=0` during a Wikidata outage — previously
+    it erased every standing PEP from the book on the still-matching path,
+    which the *clear* branch already guarded), preserving the stronger prior
+    band it drove; (b) a **narrowed adverse-media sweep** (the default is a
+    budgeted ≈8-of-70 locale rotation) now marks that signal unverified so a
+    standing adverse-media hit is held, not cleared, off a rotation that never
+    queried its originating edition — it clears only on a full-matrix sweep or
+    an MLRO disposition; (c) a disclosed-partial sweep likewise holds. All
+    carry-forward-only — recall is monotone-preserved; a genuine de-listing
+    still clears once fully re-verified (control tests included).
+  15 new regression checks across the matcher, parity and screen suites lock
+  every fix. (One further low-severity finding — a generic-XML source whose
+  count floor is too small to detect a corrupt-but-200 body, Latvia — is
+  documented for a dedicated schema-aware parser; its only recall-safe fix
+  forces permanent degraded status on a marginal list, a worse trade.)
+
 - **Live-run true-up: two non-parsing sources disabled on evidence.** The
   first green run of the widened estate (25 lists, 226,636 names) left two
   additive sources degrading loudly: `za-fic-tfs` (probe shows its

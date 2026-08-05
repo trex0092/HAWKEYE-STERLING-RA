@@ -616,6 +616,13 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const sourcesOk = okLocales.length + (gd !== null ? 1 : 0);
   const sourcesTotal = localeSet.length + 1; // + GDELT
   const failed = sourcesTotal - sourcesOk;
-  const out = { ...result, localesQueried: localeSet.length, sourcesOk, sourcesFailed: failed, itemsScanned: items.length };
+  /* Did this run sweep the FULL locale matrix? The default sweep is a budgeted
+     rotation (≈8 of 70+ editions/run), so a standing hit found on a non-core
+     regional edition is not re-queried most days — and would clear as "no
+     longer found" off coverage that never looked. fullMatrix lets the caller
+     mark such a standing adverse-media match unverified (carry forward), so it
+     only auto-clears on a full-matrix sweep or an MLRO disposition. */
+  const fullMatrix = localeSet.length >= LOCALES.length;
+  const out = { ...result, localesQueried: localeSet.length, fullMatrix, sourcesOk, sourcesFailed: failed, itemsScanned: items.length };
   return failed ? { ...out, partial: true } : out;
 }
