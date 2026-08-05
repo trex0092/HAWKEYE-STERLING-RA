@@ -326,6 +326,15 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+Verified at HEAD: 58 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(5 August — **yente matching benchmark (experimental instrument)**. One dispatch-only workflow
+(`yente-bench.yml`) boots the MIT-licensed yente matching engine (the software behind the
+OpenSanctions API) on the runner and scores it against the repo's own frozen screening-benchmark
+fixtures via `scripts/yente-bench.mjs` — no OpenSanctions data is downloaded (the published database
+carries a non-commercial licence; the indexed dataset is generated from our fixtures), no screening
+state, cases, or Asana surface is touched, and the report lands as a step summary + 30-day artifact.
+Measurement instrument only — no scored control changed.)*
+
 Verified at HEAD: 57 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
 *(4 August, thirteenth pass — **deploy self-heal + self-identifying drift**. Same-day follow-through on
 register item 26's first half after four runner-shutdown kills ended production-deploy verifications as

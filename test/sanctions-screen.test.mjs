@@ -672,6 +672,42 @@ check('batch report: a pre-escaped backslash-pipe cannot re-arm the pipe (CodeQL
 check('batch report: failed lists are disclosed as reduced coverage',
   _batchRep.includes('Reduced coverage') && _batchRep.includes('UN Security Council — fetch failed'));
 
+/* ── yente benchmark (experimental, shadow-only — pure functions) ── */
+const yb = await import('./../scripts/yente-bench.mjs');
+const _e1 = yb.ftmEntity('ACME Trading LLC', 'r001');
+check('yente: ftmEntity id is stable, prefixed, and seed-derived',
+  /^hb-[0-9a-f]{16}$/.test(_e1.id) && _e1.id === yb.ftmEntity('ACME Trading LLC', 'r001').id
+  && _e1.id !== yb.ftmEntity('ACME Trading LLC', 'r002').id);
+check('yente: ftmEntity carries name + sanction topic on LegalEntity',
+  _e1.schema === 'LegalEntity' && _e1.properties.name[0] === 'ACME Trading LLC'
+  && _e1.properties.topics[0] === 'sanction');
+check('yente: manifest declares the custom dataset and its container path',
+  yb.buildManifest('/data/hawkeye-bench.ftm.json').includes(`name: ${yb.DATASET}`)
+  && yb.buildManifest('/data/hawkeye-bench.ftm.json').includes('path: /data/hawkeye-bench.ftm.json')
+  && yb.buildManifest('/data/x').includes('self-generated'));
+check('yente: matchQuery wraps the subject as a LegalEntity name query',
+  JSON.stringify(yb.matchQuery('Bob')) === '{"schema":"LegalEntity","properties":{"name":["Bob"]}}');
+const _ybPairs = [
+  { subject: 'A', mechanism: 'exact' }, { subject: 'B', mechanism: 'alias' },
+  { subject: 'C', mechanism: 'alias' }];
+const _ybNegs = [{ subject: 'N1' }, { subject: 'N2' }];
+const _ybRes = new Map([['A', 0.9], ['B', 0.65], ['C', 0.4], ['N1', 0.75], ['N2', 0.1]]);
+const _ybEval = yb.evaluate(_ybPairs, _ybNegs, _ybRes, 0.6);
+check('yente: evaluate scores recall and false positives at the threshold',
+  _ybEval.recall.hits === 2 && _ybEval.recall.total === 3
+  && _ybEval.false_positives.fps === 1 && _ybEval.false_positives.total === 2);
+check('yente: evaluate breaks recall down by mechanism',
+  _ybEval.recall.by_mechanism.exact.hits === 1 && _ybEval.recall.by_mechanism.alias.hits === 1
+  && _ybEval.recall.by_mechanism.alias.total === 2);
+check('yente: a subject yente never scored counts as a miss, not a crash',
+  yb.evaluate([{ subject: 'ghost', mechanism: 'exact' }], [], new Map(), 0.5).recall.hits === 0);
+const _ybMd = yb.report([yb.evaluate(_ybPairs, _ybNegs, _ybRes, 0.5), _ybEval,
+  yb.evaluate(_ybPairs, _ybNegs, _ybRes, 0.7)]);
+check('yente: report renders the threshold table and per-mechanism recall',
+  _ybMd.includes('| 0.5 |') && _ybMd.includes('| 0.7 |') && _ybMd.includes('alias: 1/2')
+  && _ybMd.includes('no external data downloaded'));
+check('yente: report frames adoption as governed by the recall-monotone invariant',
+  _ybMd.includes('recall-monotone') && _ybMd.includes('baseline.json'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

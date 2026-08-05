@@ -1,0 +1,105 @@
+name: Yente matching benchmark
+
+# EXPERIMENTAL, shadow-only, dispatch-only — a measurement instrument, not a
+# control. Boots the open-source yente matching engine (MIT-licensed software;
+# the code behind the OpenSanctions API) on the runner and scores it against
+# this repo's OWN frozen screening benchmark
+# (test/fixtures/screening-benchmark). License-clean by construction: NO
+# OpenSanctions data is downloaded — the published database carries a
+# non-commercial licence — the indexed dataset is generated from our fixtures
+# by scripts/yente-bench.mjs. Nothing here touches screening state, cases, or
+# Asana; the output is a report (step summary + artifact) informing an
+# engineering decision on whether identifier-aware matching software adds
+# value as a corroboration engine. Adopting yente inside the live matcher
+# would be a separate change governed by the recall-monotone invariant.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  yente-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit  # Stays audit: first runs must map the registry/CDN endpoints behind docker.elastic.co and ghcr.io before a block list would be honest
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Generate the PII-free benchmark dataset
+        run: node scripts/yente-bench.mjs dataset .yente
+
+      - name: Boot Elasticsearch + yente
+        run: |
+          cat > .yente/compose.yml <<'EOF'
+          services:
+            index:
+              image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+              environment:
+                - discovery.type=single-node
+                - xpack.security.enabled=false
+                - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+              healthcheck:
+                test: ["CMD-SHELL", "curl --fail http://localhost:9200/_cluster/health || exit 1"]
+                interval: 5s
+                timeout: 5s
+                retries: 30
+            app:
+              image: ghcr.io/opensanctions/yente:5.5.0
+              depends_on:
+                index:
+                  condition: service_healthy
+              ports:
+                - "127.0.0.1:8000:8000"
+              environment:
+                YENTE_INDEX_TYPE: "elasticsearch"
+                YENTE_INDEX_URL: http://index:9200
+                YENTE_MANIFEST: /data/manifest.yml
+                YENTE_AUTO_REINDEX: "true"
+              volumes:
+                - "./:/data:ro"
+          EOF
+          docker compose -f .yente/compose.yml up -d
+
+      - name: Wait for the index to build (/readyz)
+        run: |
+          ready=
+          for attempt in $(seq 1 90); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8000/readyz; then ready=1; break; fi
+            echo "waiting for yente /readyz (attempt $attempt)"; sleep 2
+          done
+          if [ -z "$ready" ]; then
+            echo "::error::yente never became ready"
+            docker compose -f .yente/compose.yml logs
+            exit 1
+          fi
+
+      - name: Run the benchmark
+        run: |
+          node scripts/yente-bench.mjs run http://127.0.0.1:8000
+          {
+            cat yente-bench-report.md
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6
+        with:
+          name: yente-bench-report
+          path: yente-bench-report.md
+          retention-days: 30
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker compose -f .yente/compose.yml logs || true
