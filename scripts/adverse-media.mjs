@@ -137,7 +137,34 @@ export const LANG_TERMS = {
     'ufisadi', 'ubadhirifu', 'amekamatwa', 'magendo'],
   bn: ['জালিয়াতি', 'অর্থ পাচার', 'নিষেধাজ্ঞা', 'সন্ত্রাস', 'সন্ত্রাসে অর্থায়ন', 'ঘুষ', 'দুর্নীতি',
     'আত্মসাৎ', 'গ্রেপ্তার', 'পাচার'],
-  ta: ['மோசடி', 'பணமோசடி', 'தடைகள்', 'பயங்கரவாதம்', 'லஞ்சம்', 'ஊழல்', 'கையாடல்', 'கைது', 'கடத்தல்']
+  ta: ['மோசடி', 'பணமோசடி', 'தடைகள்', 'பயங்கரவாதம்', 'லஞ்சம்', 'ஊழல்', 'கையாடல்', 'கைது', 'கடத்தல்'],
+  // ── High-risk-region languages (2026-08-05, adversarially-verified native AML lexicons) ──
+  // Central Asia & Caucasus, South & SE Asia, Africa, Balkans & Baltics. Terms feed
+  // ALL_TERMS, so even the languages WITHOUT a Google News edition (uz, lo, ha, so, am,
+  // mk) improve scoring of GDELT's original-language titles.
+  az: ['pul yuyulması', 'çirkli pulların yuyulması', 'fırıldaqçılıq', 'dələduzluq', 'sanksiyalar', 'terrorçuluq', 'terrorçuluğun maliyyələşdirilməsi', 'rüşvətxorluq', 'rüşvət', 'korrupsiya', 'mənimsəmə', 'vəsaitlərin mənimsənilməsi', 'həbs edildi', 'həbs olundu', 'məhkum edildi', 'insan alveri', 'qanunsuz alver', 'qaçaqmalçılıq'],
+  kk: ['ақшаны жылыстату', 'ақша жылыстату', 'алаяқтық', 'санкциялар', 'терроризм', 'лаңкестік', 'терроризмді қаржыландыру', 'лаңкестікті қаржыландыру', 'пара алу', 'парақорлық', 'сыбайлас жемқорлық', 'коррупция', 'қаражатты иемдену', 'жымқыру', 'қамауға алынды', 'сотталды', 'кінәлі деп танылды', 'адам саудасы', 'контрабанда'],
+  uz: ['pul yuvish', 'jinoiy yo\'l bilan olingan pullarni legallashtirish', 'firibgarlik', 'sanksiyalar', 'terrorizm', 'terrorizmni moliyalashtirish', 'pora', 'poraxo\'rlik', 'korrupsiya', 'mansab suiiste\'moli', 'mablag\'ni o\'zlashtirish', 'hibsga olindi', 'qamoqqa olindi', 'sudlandi', 'aybdor deb topildi', 'odam savdosi', 'kontrabanda'],
+  ka: ['ფულის გათეთრება', 'თაღლითობა', 'სანქციები', 'ტერორიზმი', 'ტერორიზმის დაფინანსება', 'ქრთამი', 'მექრთამეობა', 'კორუფცია', 'მითვისება', 'გაფლანგვა', 'დააკავეს', 'დაკავებულია', 'მსჯავრი დაედო', 'გაასამართლეს', 'ტრეფიკინგი', 'ადამიანით ვაჭრობა', 'კონტრაბანდა'],
+  hy: ['փողերի լվացում', 'դրամի լվացում', 'խարդախություն', 'պատժամիջոցներ', 'սանկցիաներ', 'ահաբեկչություն', 'ահաբեկչության ֆինանսավորում', 'կաշառք', 'կաշառակերություն', 'կոռուպցիա', 'յուրացում', 'ձերբակալվել է', 'ձերբակալվեց', 'դատապարտվել է', 'մեղավոր ճանաչվեց', 'թրաֆիքինգ', 'մարդկանց առևտուր', 'մաքսանենգություն'],
+  ne: ['सम्पत्ति शुद्धीकरण', 'ठगी', 'प्रतिबन्ध', 'आतंकवाद', 'आतंकवादी वित्तपोषण', 'घुस', 'भ्रष्टाचार', 'हिनामिना', 'पक्राउ', 'दोषी ठहर', 'तस्करी', 'चोरी निकासी'],
+  si: ['මුදල් විශුද්ධිකරණය', 'වංචාව', 'සම්බාධක', 'ත්‍රස්තවාදය', 'ත්‍රස්තවාදී මූල්‍යකරණය', 'අල්ලස', 'දූෂණය', 'අවභාවිතය', 'අත්අඩංගුවට', 'වරදකරු', 'ජාවාරම'],
+  pa: ['ਮਨੀ ਲਾਂਡਰਿੰਗ', 'ਧੋਖਾਧੜੀ', 'ਪਾਬੰਦੀਆਂ', 'ਅੱਤਵਾਦ', 'ਅੱਤਵਾਦੀ ਫੰਡਿੰਗ', 'ਰਿਸ਼ਵਤ', 'ਭ੍ਰਿਸ਼ਟਾਚਾਰ', 'ਗਬਨ', 'ਗ੍ਰਿਫਤਾਰ', 'ਦੋਸ਼ੀ', 'ਤਸਕਰੀ', 'ਸਮਗਲਿੰਗ'],
+  mr: ['मनी लाँडरिंग', 'फसवणूक', 'निर्बंध', 'दहशतवाद', 'दहशतवादी अर्थपुरवठा', 'लाच', 'भ्रष्टाचार', 'अपहार', 'अटक', 'दोषी', 'तस्करी', 'चोरटी वाहतूक'],
+  my: ['ငွေကြေးခဝါချမှု', 'လိမ်လည်မှု', 'ပိတ်ဆို့အရေးယူမှု', 'အကြမ်းဖက်ဝါဒ', 'အကြမ်းဖက်မှု', 'အကြမ်းဖက်မှုကို ငွေကြေးထောက်ပံ့မှု', 'လာဘ်ပေးလာဘ်ယူမှု', 'အဂတိလိုက်စားမှု', 'ငွေအလွဲသုံးစားမှု', 'ဖမ်းဆီး', 'ပြစ်ဒဏ်ချမှတ်', 'လူကုန်ကူးမှု', 'မှောင်ခိုကူးသန်းမှု', 'မှောင်ခိုတင်သွင်းမှု'],
+  km: ['ការសម្អាតប្រាក់', 'ការក្លែងបន្លំ', 'ទណ្ឌកម្ម', 'ភេរវកម្ម', 'ការផ្តល់ហិរញ្ញប្បទានដល់ភេរវកម្ម', 'ការសូកប៉ាន់', 'សំណូក', 'អំពើពុករលួយ', 'ចាប់ខ្លួន', 'កាត់ទោស', 'ការជួញដូរមនុស្ស', 'ការនាំចូលដោយខុសច្បាប់'],
+  lo: ['ການຟອກເງິນ', 'ການສໍ້ໂກງ', 'ມາດຕະການຄວ່ຳບາດ', 'ການລົງໂທດ', 'ການກໍ່ການຮ້າຍ', 'ການສະໜອງທຶນໃຫ້ການກໍ່ການຮ້າຍ', 'ການໃຫ້ສິນບົນ', 'ການສໍ້ລາດບັງຫຼວງ', 'ການຍັກຍອກເງິນ', 'ຖືກຈັບກຸມ', 'ຖືກຕັດສິນລົງໂທດ', 'ການຄ້າມະນຸດ', 'ການລັກລອບຄ້າ', 'ການລັກລອບຂົນສົ່ງ'],
+  ha: ['halasta kuɗin haram', 'zamba', 'takunkumi', 'ta\'addanci', 'tallafin ta\'addanci', 'cin hanci', 'cin hanci da rashawa', 'almubazzaranci', 'an kama', 'an samu da laifi', 'fataucin mutane', 'fasa-kwauri'],
+  so: ['dhaqidda lacagta', 'khiyaano', 'cunaqabatayn', 'argagixiso', 'maalgelinta argagixisada', 'laaluush', 'musuqmaasuq', 'la xiray', 'xukun lagu riday', 'ganacsiga dadka', 'tahriib'],
+  am: ['ሕገ-ወጥ የገንዘብ ዝውውር', 'ማጭበርበር', 'ማዕቀብ', 'ሽብርተኝነት', 'ሽብርተኝነትን በገንዘብ መደገፍ', 'ጉቦ', 'ሙስና', 'እምነት ማጉደል', 'ታሰረ', 'ጥፋተኛ ተባለ', 'ሕገ-ወጥ የሰዎች ዝውውር', 'ኮንትሮባንድ'],
+  af: ['geldwassery', 'bedrog', 'sanksies', 'terrorisme', 'terreurfinansiering', 'omkopery', 'korrupsie', 'verduistering', 'gearresteer', 'skuldig bevind', 'mensehandel', 'smokkelary'],
+  sq: ['pastrim parash', 'mashtrim', 'sanksione', 'terrorizëm', 'financim i terrorizmit', 'ryshfet', 'korrupsion', 'përvetësim', 'arrestuar', 'dënuar', 'trafikim', 'kontrabandë'],
+  hr: ['pranje novca', 'prijevara', 'sankcije', 'terorizam', 'financiranje terorizma', 'podmićivanje', 'korupcija', 'pronevjera', 'uhićen', 'osuđen', 'trgovina ljudima', 'krijumčarenje'],
+  sl: ['pranje denarja', 'goljufija', 'sankcije', 'terorizem', 'financiranje terorizma', 'podkupovanje', 'korupcija', 'poneverba', 'aretiran', 'obsojen', 'trgovina z ljudmi', 'tihotapljenje'],
+  lt: ['pinigų plovimas', 'sukčiavimas', 'sankcijos', 'terorizmas', 'terorizmo finansavimas', 'kyšininkavimas', 'korupcija', 'pasisavinimas', 'suimtas', 'nuteistas', 'prekyba žmonėmis', 'kontrabanda'],
+  lv: ['naudas atmazgāšana', 'krāpšana', 'sankcijas', 'terorisms', 'terorisma finansēšana', 'kukuļošana', 'korupcija', 'piesavināšanās', 'aizturēts', 'notiesāts', 'cilvēku tirdzniecība', 'kontrabanda'],
+  et: ['rahapesu', 'pettus', 'sanktsioonid', 'terrorism', 'terrorismi rahastamine', 'altkäemaks', 'korruptsioon', 'omastamine', 'vahistatud', 'süüdi mõistetud', 'inimkaubandus', 'salakaubavedu'],
+  mk: ['перење пари', 'измама', 'санкции', 'тероризам', 'финансирање на тероризам', 'поткуп', 'корупција', 'проневера', 'уапсен', 'осуден', 'трговија со луѓе', 'криумчарење']
 };
 
 /* Union of every language's terms — the term set used when scoring the merged,
@@ -164,7 +191,31 @@ const STRONG_LIST = [
   'پولشویی', 'تروریسم', 'تأمین مالی تروریسم',
   'منی لانڈرنگ', 'دہشت گردی',
   'відмивання грошей', 'санкції', 'тероризм', 'фінансування тероризму',
-  'witwassen', 'sancties', 'terrorisme', 'terrorismefinanciering'
+  'witwassen', 'sancties', 'terrorisme', 'terrorismefinanciering',
+  // High-risk-region languages (2026-08-05): money laundering / sanctions / terrorism / TF predicates
+  'pul yuyulması', 'çirkli pulların yuyulması', 'sanksiyalar', 'terrorçuluq', 'terrorçuluğun maliyyələşdirilməsi',
+  'ақшаны жылыстату', 'ақша жылыстату', 'санкциялар', 'терроризм', 'лаңкестік', 'терроризмді қаржыландыру', 'лаңкестікті қаржыландыру',
+  'pul yuvish', 'jinoiy yo\'l bilan olingan pullarni legallashtirish', 'terrorizm', 'terrorizmni moliyalashtirish',
+  'ფულის გათეთრება', 'სანქციები', 'ტერორიზმი', 'ტერორიზმის დაფინანსება',
+  'փողերի լվացում', 'դրամի լվացում', 'պատժամիջոցներ', 'սանկցիաներ', 'ահաբեկչություն', 'ահաբեկչության ֆինանսավորում',
+  'सम्पत्ति शुद्धीकरण', 'प्रतिबन्ध', 'आतंकवाद', 'आतंकवादी वित्तपोषण',
+  'මුදල් විශුද්ධිකරණය', 'සම්බාධක', 'ත්‍රස්තවාදය', 'ත්‍රස්තවාදී මූල්‍යකරණය',
+  'ਮਨੀ ਲਾਂਡਰਿੰਗ', 'ਪਾਬੰਦੀਆਂ', 'ਅੱਤਵਾਦ', 'ਅੱਤਵਾਦੀ ਫੰਡਿੰਗ',
+  'मनी लाँडरिंग', 'निर्बंध', 'दहशतवाद', 'दहशतवादी अर्थपुरवठा',
+  'ငွေကြေးခဝါချမှု', 'ပိတ်ဆို့အရေးယူမှု', 'အကြမ်းဖက်ဝါဒ', 'အကြမ်းဖက်မှုကို ငွေကြေးထောက်ပံ့မှု',
+  'ការសម្អាតប្រាក់', 'ទណ្ឌកម្ម', 'ភេរវកម្ម', 'ការផ្តល់ហិរញ្ញប្បទានដល់ភេរវកម្ម',
+  'ການຟອກເງິນ', 'ມາດຕະການຄວ່ຳບາດ', 'ການກໍ່ການຮ້າຍ', 'ການສະໜອງທຶນໃຫ້ການກໍ່ການຮ້າຍ',
+  'halasta kuɗin haram', 'takunkumi', 'ta\'addanci', 'tallafin ta\'addanci',
+  'dhaqidda lacagta', 'cunaqabatayn', 'argagixiso', 'maalgelinta argagixisada',
+  'ሕገ-ወጥ የገንዘብ ዝውውር', 'ማዕቀብ', 'ሽብርተኝነት', 'ሽብርተኝነትን በገንዘብ መደገፍ',
+  'geldwassery', 'sanksies', 'terrorisme', 'terreurfinansiering',
+  'pastrim parash', 'sanksione', 'terrorizëm', 'financim i terrorizmit',
+  'pranje novca', 'sankcije', 'terorizam', 'financiranje terorizma',
+  'pranje denarja', 'terorizem',
+  'pinigų plovimas', 'sankcijos', 'terorizmas', 'terorizmo finansavimas',
+  'naudas atmazgāšana', 'sankcijas', 'terorisms', 'terorisma finansēšana',
+  'rahapesu', 'sanktsioonid', 'terrorism', 'terrorismi rahastamine',
+  'перење пари', 'санкции', 'тероризам', 'финансирање на тероризам'
 ];
 const STRONG_TERMS = new Set(STRONG_LIST);
 
@@ -258,7 +309,29 @@ export const LOCALES = [
   // More Latin America
   { id: 'es-CO', hl: 'es-419', gl: 'CO', ceid: 'CO:es-419', lang: 'es' },
   { id: 'es-CL', hl: 'es-419', gl: 'CL', ceid: 'CL:es-419', lang: 'es' },
-  { id: 'es-PE', hl: 'es-419', gl: 'PE', ceid: 'PE:es-419', lang: 'es' }
+  { id: 'es-PE', hl: 'es-419', gl: 'PE', ceid: 'PE:es-419', lang: 'es' },
+  // ── High-risk-region editions (2026-08-05, edition-confirmed languages) ──
+  // Central Asia & Caucasus
+  { id: 'az-AZ', hl: 'az', gl: 'AZ', ceid: 'AZ:az', lang: 'az' },
+  { id: 'kk-KZ', hl: 'kk', gl: 'KZ', ceid: 'KZ:kk', lang: 'kk' },
+  { id: 'ka-GE', hl: 'ka', gl: 'GE', ceid: 'GE:ka', lang: 'ka' },
+  { id: 'hy-AM', hl: 'hy', gl: 'AM', ceid: 'AM:hy', lang: 'hy' },
+  // South & Southeast Asia
+  { id: 'ne-NP', hl: 'ne', gl: 'NP', ceid: 'NP:ne', lang: 'ne' },
+  { id: 'si-LK', hl: 'si', gl: 'LK', ceid: 'LK:si', lang: 'si' },
+  { id: 'pa-IN', hl: 'pa', gl: 'IN', ceid: 'IN:pa', lang: 'pa' },
+  { id: 'mr-IN', hl: 'mr', gl: 'IN', ceid: 'IN:mr', lang: 'mr' },
+  { id: 'my-MM', hl: 'my', gl: 'MM', ceid: 'MM:my', lang: 'my' },
+  { id: 'km-KH', hl: 'km', gl: 'KH', ceid: 'KH:km', lang: 'km' },
+  // Africa
+  { id: 'af-ZA', hl: 'af', gl: 'ZA', ceid: 'ZA:af', lang: 'af' },
+  // Balkans & Baltics
+  { id: 'sq-AL', hl: 'sq', gl: 'AL', ceid: 'AL:sq', lang: 'sq' },
+  { id: 'hr-HR', hl: 'hr', gl: 'HR', ceid: 'HR:hr', lang: 'hr' },
+  { id: 'sl-SI', hl: 'sl', gl: 'SI', ceid: 'SI:sl', lang: 'sl' },
+  { id: 'lt-LT', hl: 'lt', gl: 'LT', ceid: 'LT:lt', lang: 'lt' },
+  { id: 'lv-LV', hl: 'lv', gl: 'LV', ceid: 'LV:lv', lang: 'lv' },
+  { id: 'et-EE', hl: 'et', gl: 'EE', ceid: 'EE:et', lang: 'et' }
 ];
 
 /* The locale set to sweep this run — all of LOCALES unless narrowed by the
@@ -356,11 +429,22 @@ export function adverseMediaUrlFor(name, loc) {
    and outlets that Google News RSS does not surface (it machine-translates, so
    English risk terms still reach non-English coverage). The worldwide backbone
    of the sweep; the per-locale Google News queries add regional depth. */
-export function gdeltUrl(name, terms = ['sanctions', 'sanctions evasion', 'money laundering', 'fraud', 'corruption', 'bribery', 'terrorism', 'terrorist financing', 'embezzlement', 'trafficking']) {
+export const GDELT_RISK_TERMS = [
+  'sanctions', 'sanctions evasion', 'money laundering', 'launder', 'fraud',
+  'corruption', 'bribery', 'embezzlement', 'terrorism', 'terrorist financing',
+  'proliferation financing', 'organized crime', 'cartel', 'trafficking',
+  'smuggling', 'narcotics', 'tax evasion', 'ponzi', 'indicted', 'convicted',
+  'arrested', 'investigation', 'raid', 'seized', 'asset freeze', 'blacklisted'
+];
+export function gdeltUrl(name, terms = GDELT_RISK_TERMS) {
   const q = '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
   const span = String(process.env.ADVERSE_MEDIA_TIMESPAN || '12m');
+  /* GDELT caps maxrecords at 250; default stays 75 (the tuned value that keeps
+     responses small enough not to trip GDELT's per-IP throttle on shared
+     runners) but is raisable without a code change for a deeper sweep. */
+  const maxRec = Math.max(1, Math.min(250, Number(process.env.ADVERSE_MEDIA_MAXRECORDS) || 75));
   return 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q)
-    + '&mode=artlist&format=json&maxrecords=75&sort=datedesc&timespan=' + encodeURIComponent(span);
+    + '&mode=artlist&format=json&maxrecords=' + maxRec + '&sort=datedesc&timespan=' + encodeURIComponent(span);
 }
 
 const RSS_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
