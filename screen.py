@@ -4990,6 +4990,12 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
           "narrowed, standing exposure is covered. (A subject the watchlist cannot match either — a "
           "name in non-Latin script, or under 4 matchable characters — is counted in the DEGRADED "
           "blackout figure above, not here.)")
+    # WHY the sweep failed, from the per-subject am_msg samples — previously
+    # captured but never rendered, so the MLRO saw a count with no cause.
+    if stats.get("am_error_msgs"):
+        A("   Why the news sweep failed (top messages, × subjects affected):")
+        for _msg, _n in stats["am_error_msgs"]:
+            A(f"     - {_msg}  ×{_n}")
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
@@ -5372,6 +5378,7 @@ def tally_enrichment(results, wl_hits, wl_loaded):
     """
     companies = individuals = 0
     am_errors = am_blackout = pep_errors = pep_mirror = subject_errors = 0
+    am_msgs = {}   # distinct news-sweep failure messages → subject count (report evidence)
     adverse_findings, pep_findings = [], []
     for r in results:
         if r["type"] == "INDIVIDUAL":
@@ -5381,6 +5388,8 @@ def tally_enrichment(results, wl_hits, wl_loaded):
         subj_err = False
         if r["am_error"]:
             am_errors += 1
+            if r.get("am_msg"):
+                am_msgs[r["am_msg"]] = am_msgs.get(r["am_msg"], 0) + 1
             # No net could screen this subject — actionable failure. The
             # watchlist counts as covering a subject only if it could actually
             # SCREEN it: a name the matcher cannot handle (non-Latin script, or
@@ -5426,6 +5435,10 @@ def tally_enrichment(results, wl_hits, wl_loaded):
     counts = {"subjects": companies + individuals, "companies": companies,
               "individuals": individuals, "errors": subject_errors,
               "am_errors": am_errors, "am_blackout": am_blackout,
+              # Top failure messages (by subject count): the WHY behind am_errors.
+              # Captured per subject as am_msg but previously never rendered —
+              # the report said "news sweep lost" with no evidence of the cause.
+              "am_error_msgs": sorted(am_msgs.items(), key=lambda kv: (-kv[1], kv[0]))[:3],
               "pep_errors": pep_errors, "pep_mirror": pep_mirror,
               "watchlist": sum(1 for f in adverse_findings
                                if any(a.get("watchlist") for a in f["articles"]))}
@@ -5700,6 +5713,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": subjects_total,
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
+             "am_error_msgs": counts.get("am_error_msgs", []),
              "am_blackout": counts["am_blackout"], "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "adverse_repeat": repeat_patterns,

@@ -151,6 +151,13 @@ jobs:
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID || '1213914392047131' }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
+          # Google News locales swept per subject (pinned core + daily rotation).
+          # 8 is the empirical per-IP ceiling from a GitHub runner — the Python
+          # engine's record (weekly-adverse-media.yml, ADVERSE_LOCALES note):
+          # 14 locales tripped the limiter and 805/838 subjects got ZERO
+          # adverse-media coverage; a small budget swept the full book clean.
+          # Same env name/semantics as the Python engine; 'all' = full matrix.
+          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
           SCREEN_PEP: ${{ vars.SCREEN_PEP }}
           SCREEN_INTERPOL: ${{ vars.SCREEN_INTERPOL }}
           # Ongoing Monitoring audit trail — the section is found/created by name

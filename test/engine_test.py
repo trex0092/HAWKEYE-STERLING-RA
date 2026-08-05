@@ -584,6 +584,31 @@ check("report: a down core list surfaces as DEGRADED sanctions coverage", "SANCT
 check("report: lists-screened block renders on a zero-match run", "Lists screened:" in _narr)
 check("report: header makes no delivery-time promise (the 09:00 UAE SLA was never met)",
       "delivered by" not in _narr)
+# §② must say WHY the news sweep failed, not just how many subjects lost it —
+# am_msg was captured per subject but never rendered anywhere.
+_narr_amerr = screen.build_unified_narrative(
+    [], [], [], [], _meta_deg,
+    {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5, "am_errors": 3,
+     "am_error_msgs": [("HTTP 429 rate-limited", 2), ("timed out after 20s", 1)],
+     "pep_errors": 0, "delta": {}},
+    _dt.datetime(2026, 7, 9))
+check("report: adverse feed failure causes are rendered with subject counts",
+      "Why the news sweep failed" in _narr_amerr and "HTTP 429 rate-limited  ×2" in _narr_amerr
+      and "timed out after 20s  ×1" in _narr_amerr)
+check("report: no failure-cause block when the sweep had no errors", "Why the news sweep failed" not in _narr)
+# tally_enrichment: distinct am_msg samples are tallied (top 3, by subject count).
+_tally_counts, _tf, _tp = screen.tally_enrichment(
+    [{"type": "ENTITY", "name": "A", "parent": "", "permalink": "", "adverse": None, "pep": None,
+      "am_error": True, "am_msg": "HTTP 429"},
+     {"type": "ENTITY", "name": "B", "parent": "", "permalink": "", "adverse": None, "pep": None,
+      "am_error": True, "am_msg": "HTTP 429"},
+     {"type": "ENTITY", "name": "C", "parent": "", "permalink": "", "adverse": None, "pep": None,
+      "am_error": True, "am_msg": "timeout"},
+     {"type": "ENTITY", "name": "D", "parent": "", "permalink": "", "adverse": [], "pep": None,
+      "am_error": False}],
+    wl_hits={}, wl_loaded=False)
+check("tally: am_error causes are sampled with counts, most-affected first",
+      _tally_counts["am_error_msgs"] == [("HTTP 429", 2), ("timeout", 1)])
 # The "queued N case(s)" claim must use the case opener's own predicates —
 # an identity-excluded sanctions hit raises no case, so it must not count.
 _pm_cp = [{"name": "X", "hits": [{"is_new": True, "identity_excluded": True, "score": 90}]},

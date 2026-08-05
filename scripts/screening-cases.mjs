@@ -182,12 +182,17 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
   for (const f of (r.failures || [])) h.push('<li>⚠️ ' + esc(f) + '</li>');
   h.push('</ul>');
   const en = r.enrichment || {};
-  if (en.amErrors || en.pepErrors || en.skipped) {
+  if (en.amErrors || en.amPartial || en.pepErrors || en.skipped) {
     h.push('<em>Enrichment (best-effort, does not weaken the sanctions result): '
       + (en.amErrors ? en.amErrors + ' adverse-media lookup(s) errored · ' : '')
+      + (en.amPartial ? en.amPartial + ' subject(s) had NARROWED adverse-media coverage (some news editions/GDELT did not answer) · ' : '')
       + (en.pepErrors ? en.pepErrors + ' PEP lookup(s) errored · ' : '')
       + (en.skipped ? en.skipped + ' subject(s) skipped enrichment at the time budget' : '')
       + '</em>');
+  }
+  if (en.amLocalesPerSubject) {
+    h.push('<em>Adverse-media sweep: ' + esc(String(en.amLocalesPerSubject))
+      + ' news edition(s) per subject this run (pinned core + daily rotation over the worldwide matrix) + GDELT global index.</em>');
   }
   h.push('<em>Detection is automatic. Do NOT freeze, decline or report on a match before MLRO review and a two-person (four-eyes) sign-off — UAE Federal Decree-Law No. 10 of 2025 Art. 16/18; FATF R.26.</em>');
   const link = runUrl();

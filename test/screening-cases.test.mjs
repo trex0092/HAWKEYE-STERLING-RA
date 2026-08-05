@@ -165,6 +165,12 @@ check('digest: coverage totals + failed list + degraded warning are loud',
 check('digest: enrichment shortfall and cleared count are reported, MLRO/four-eyes note present',
   digest.includes('644 subject(s) skipped enrichment') && digest.includes('2 previously recorded match(es)')
   && digest.includes('four-eyes'));
+check('digest: narrowed adverse-media coverage is disclosed, never silent', (() => {
+  const partial = buildResultsDigestHtml({ ...RESULTS,
+    enrichment: { amErrors: 0, amPartial: 12, pepErrors: 0, skipped: 0, amLocalesPerSubject: 8 } });
+  return partial.includes('12 subject(s) had NARROWED adverse-media coverage')
+    && partial.includes('Adverse-media sweep: 8 news edition(s) per subject');
+})());
 check('digest: a clean day is affirmative, never silent', (() => {
   const clean = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
   return clean.includes('every subject screened clean') && !clean.includes('DEGRADED');

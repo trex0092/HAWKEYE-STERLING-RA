@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
-import { checkAdverseMedia, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
+import { checkAdverseMedia, budgetedLocales, activeLocales, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 
@@ -1150,7 +1150,7 @@ async function screenLocally(subjects, cfg) {
      and report it, but it does NOT degrade the sanctions screen or weaken its
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
-  let amErrors = 0, pepErrors = 0, interpolErrors = 0, enrichSkipped = 0;
+  let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, enrichSkipped = 0;
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
      bound the whole enrichment phase by a wall-clock budget: once it elapses the
@@ -1200,6 +1200,7 @@ async function screenLocally(subjects, cfg) {
 
     if (cfg.adverseMedia && enrich) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (am.partial) amPartial++;   // narrowed coverage — disclosed, never silent
       if (am.errored) { amErrors++; enrichmentIncomplete = true; }
       else if (am.hit) {
         lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : '') + (am.tier === 'weak' ? ' [weak-tier — generic terms only, corroboration needed]' : ''), score: am.score });
@@ -1245,10 +1246,11 @@ async function screenLocally(subjects, cfg) {
   });
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
+  if (amPartial) console.log('sanctions-screen: adverse-media coverage was PARTIAL for ' + amPartial + ' subject(s) — some locales/GDELT did not answer (disclosed in the digest)');
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -1380,7 +1382,14 @@ async function main() {
     degraded: screen.degraded,
     lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({ name: L.name, count: (L.names || []).length })),
     failures: screen.notes || [],
-    enrichment: { amErrors: screen.amErrors || 0, pepErrors: screen.pepErrors || 0, skipped: screen.enrichSkipped || 0 },
+    enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0, pepErrors: screen.pepErrors || 0,
+      skipped: screen.enrichSkipped || 0,
+      /* per-subject adverse-media sweep breadth this run — the SAME resolution
+         checkAdverseMedia uses (explicit edition ids win over the budgeted
+         core+rotation sweep), so the digest's provenance matches the lookups */
+      amLocalesPerSubject: cfg.adverseMedia
+        ? (String(process.env.ADVERSE_MEDIA_LOCALES || '').trim() ? activeLocales() : budgetedLocales()).length
+        : 0 },
     /* Log-only challenger evidence (SCREEN_SHADOW_THRESHOLD) — kept OUT of
        alerts/matchCount/state; feeds the champion-challenger decision log. */
     shadow: screen.shadow || [],
