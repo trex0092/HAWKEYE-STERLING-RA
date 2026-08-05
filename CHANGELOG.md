@@ -10,6 +10,18 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Case-card XML contract fixed and frozen.** Both live runs' case creates
+  400'd (`xml_parsing_error`) on the machine-read Disposition block: Asana
+  parses `html_notes` as strict XML against a supported-tag subset, and the
+  block's `<p>…<br>…</p>` uses two tags Asana rejects (`<br>` unclosed AND
+  unsupported). The block is now a `<ul>` — wording verbatim, read-back
+  unchanged — and a new strict-XML guard in the cases suite validates the
+  full card and the daily digest against Asana's tag set (balanced or
+  self-closed, supported tags only), so this failure class cannot ship
+  again. Also recorded: CodeQL triage addendum for the two by-design
+  source-probe alerts (dismissal is the owner's act, §6 of the triage
+  record).
+
 - **Source-probe diagnostic** (`scripts/source-probe.mjs` + dispatch-only
   `source-probe.yml`): fetches registry-configured sources (by id — never an
   arbitrary URL) with realistic browser headers and reports status, headers,

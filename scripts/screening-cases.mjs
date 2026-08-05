@@ -213,10 +213,16 @@ export function caseHtml(key, s, runLink, priorCase) {
      task notes on its next run (parseDisposition). Wording is load-bearing —
      keep the three lines verbatim if you edit the card. */
   h.push('<h2>Disposition (tick exactly one — the case manager reads it back)</h2>');
-  h.push('<p>[ ] false positive — clear this case and register the matched designated-name pair(s) above as cleared FPs '
-    + '(future identical hits are demoted with this clearance cited; a new or changed designated name re-opens normally)<br>'
-    + '[ ] escalate / freeze (TFS) — keep the case open; auto-clear is disabled until a human closes it<br>'
-    + '[ ] under investigation — keep working; normal lifecycle continues</p>');
+  /* <ul>/<li> ONLY here: Asana parses html_notes as strict XML against its
+     supported-tag subset, and the original <p>…<br>…</p> form 400'd every
+     live create (xml_parsing_error — <br> is unclosed AND unsupported;
+     observed twice on 2026-08-05). The wording of each line stays verbatim:
+     parseDisposition reads the plain-text notes, where list items come back
+     as lines. */
+  h.push('<ul><li>[ ] false positive — clear this case and register the matched designated-name pair(s) above as cleared FPs '
+    + '(future identical hits are demoted with this clearance cited; a new or changed designated name re-opens normally)</li>'
+    + '<li>[ ] escalate / freeze (TFS) — keep the case open; auto-clear is disabled until a human closes it</li>'
+    + '<li>[ ] under investigation — keep working; normal lifecycle continues</li></ul>');
   h.push('<h2>Lifecycle</h2>');
   h.push('<ol><li>Move to <strong>Under Review</strong> when work starts (manual).</li>'
     + '<li>Disposition: clear as false positive, or move to <strong>Escalated</strong> (manual — MLRO decision).</li>'
