@@ -3252,6 +3252,21 @@ d = monitoring.makeup_decision("2026-08-05", path=_p)
 check("deadline-deferred subjects trigger the same-day make-up sweep",
       d["sweep"] is True and d["uncovered"] == 40 and "deferred" in d["reason"])
 
+# ── Follow-Ups card attestation (clean day completes, action day stays open) ──
+print("\nscreen.py — Follow-Ups attestation")
+check("gate is OFF by default (no FOLLOWUP_PROJECT_GID)", screen.FOLLOWUP_PROJECT_GID == "")
+check("clean day → complete", screen.followup_disposition({"sanctions": 0, "adverse": 0, "pep": 0}) == "complete")
+check("any finding → comment only, card stays open",
+      screen.followup_disposition({"sanctions": 0, "adverse": 2, "pep": 0}) == "comment"
+      and screen.followup_disposition({"sanctions": 1}) == "comment")
+check("missing delta counts as clean (zero findings), never as a block",
+      screen.followup_disposition({}) == "complete" and screen.followup_disposition(None) == "complete")
+_fc = screen.followup_comment_text("2026-08-05", {"sanctions": 1, "adverse": 0, "pep": 0}, "999")
+check("action-day comment demands the human acts and cites the report",
+      "require review" in _fc and "https://app.asana.com/0/0/999" in _fc)
+check("clean-day comment states the auto-completion as the attestation record",
+      "completed automatically" in screen.followup_comment_text("2026-08-05", {}, "999"))
+
 # ── TFS FFR/PNMR draft dossiers (draft-only, MLRO acts) ───────────────────────
 print("\ntfs_dossier.py — FFR/PNMR drafts")
 check("UN + EOCN list names are TFS; others are not",

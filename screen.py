@@ -6047,7 +6047,69 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         save_delta_state(state)
     else:
         log("Delta-state NOT persisted: Asana delivery failed — new matches will re-alert next run.")
+    # Follow-Ups attestation (opt-in): the externally-generated daily reminder
+    # card gets its bookkeeping done by the pipeline — proof comment always,
+    # auto-complete ONLY on a clean day. A failed/undelivered run never touches
+    # the card (an unclosed reminder on a red day is the signal). Auxiliary by
+    # doctrine: its own failure is logged, never fatal.
+    if parent_gid and mode in ("daily", "makeup"):
+        attest_followup_card(today, delta, parent_gid)
     return possible_matches, adverse_findings, pep_findings
+
+# ── FOLLOW-UPS CARD ATTESTATION (opt-in via FOLLOWUP_PROJECT_GID) ─────────────
+# An external notifier creates a daily "Daily sanctions/PEP screening" reminder
+# card (dedup-key: SYSTEM|daily-screening|YYYY-MM-DD) in the Follow Ups
+# project. The pipeline closes the loop: after the day's report is DELIVERED it
+# comments on the card with proof, and — only when there are ZERO new findings
+# — completes it. Action days leave the card open: reviewing the findings and
+# recording screening evidence on the affected assessments is a human act.
+FOLLOWUP_PROJECT_GID = os.environ.get("FOLLOWUP_PROJECT_GID", "")
+
+def followup_disposition(delta):
+    """'complete' on a clean day, 'comment' when findings need a human. Pure."""
+    clean = all(int((delta or {}).get(k, 0) or 0) == 0 for k in ("sanctions", "adverse", "pep"))
+    return "complete" if clean else "comment"
+
+def followup_comment_text(today, delta, report_gid):
+    d = delta or {}
+    clean = followup_disposition(delta) == "complete"
+    lines = [f"Daily AML/CFT screening completed and delivered for {today}.",
+             f"Report: https://app.asana.com/0/0/{report_gid}",
+             f"New findings: {d.get('sanctions', 0)} sanctions · {d.get('adverse', 0)} adverse media · {d.get('pep', 0)} PEP."]
+    if clean:
+        lines.append("No new findings — this reminder has been completed automatically "
+                     "with this comment as the attestation record.")
+    else:
+        lines.append("Findings require review: see the report and the screening case board. "
+                     "Record screening evidence on the affected customer assessments, then "
+                     "complete this task as the attestation record.")
+    return "\n".join(lines)
+
+def attest_followup_card(today, delta, report_gid):
+    if not FOLLOWUP_PROJECT_GID:
+        return
+    try:
+        r = asana_request("GET", f"https://app.asana.com/api/1.0/projects/{FOLLOWUP_PROJECT_GID}/tasks",
+                          params={"opt_fields": "name,notes,completed", "limit": 100})
+        if r is None or r.status_code not in (200, 201):
+            log(f"  follow-ups: card lookup failed (http {getattr(r, 'status_code', 'none')}) — attestation skipped (non-fatal)")
+            return
+        key = f"SYSTEM|daily-screening|{today}"
+        card = next((t for t in (r.json().get("data") or [])
+                     if key in (t.get("notes") or "") and not t.get("completed")), None)
+        if not card:
+            log("  follow-ups: no open reminder card for today — nothing to attest")
+            return
+        asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
+                      json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
+        if followup_disposition(delta) == "complete":
+            asana_request("PUT", f"https://app.asana.com/api/1.0/tasks/{card['gid']}",
+                          json={"data": {"completed": True}})
+            log("  follow-ups: clean day — reminder card attested and completed")
+        else:
+            log("  follow-ups: findings present — proof comment posted, card left open for the analyst")
+    except Exception as e:
+        log(f"  follow-ups: attestation failed ({str(e)[:100]}) — non-fatal, card untouched")
 
 def run_unified(run_time):
     if AM_COVERAGE_RETRY:
