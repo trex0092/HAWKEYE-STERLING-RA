@@ -10,6 +10,35 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **FraudLabs support signal on onboarding (opt-in, PDPL-gated).** A
+  supplementary payment-fraud indicator on a newly onboarded customer's
+  contact email (disposable/free/young-domain traits) — explicitly NOT a
+  screening verdict and unable to block or red a run. OFF by default: enable
+  by recording the processor + transfer basis in the third-party register,
+  then setting repo variable `FRAUDLABS=1` with the `FRAUDLABS_API_KEY`
+  secret. Material results (REVIEW/REJECT, score ≥ 60, disposable email)
+  land as a clearly-labelled comment on the customer card; a signal that
+  cannot be fetched is disclosed as lost, never read as clear.
+- **Adverse-media/PEP coverage now spreads across the day.** The free news
+  feeds rate-limit per egress IP, so a daily sweep could succeed with part of
+  the book uncovered (5 Aug: GDELT and Google News circuits both opened
+  mid-run). Two changes, engine + workflow: (1) the retry firings of
+  `weekly-adverse-media.yml` on an already-successful day now run as a
+  **coverage make-up pass** (`AM_COVERAGE_RETRY=1`) — the engine reads the
+  committed run-metrics counts (`monitoring.makeup_decision`, counts only, no
+  PII) and either exits in seconds or re-sweeps the full book from the fresh
+  runner's fresh IP, with delta-state suppressing already-reported findings
+  and a distinct "🛡️🔁 … (coverage make-up)" digest title; (2) the enrichment
+  order now **rotates daily** (`screen.enrichment_rotation`, prime stride,
+  extra offset on make-up passes) so a mid-run circuit trip no longer costs
+  the same tail of the book its news coverage every day — results are
+  restored to book order so nothing downstream changes.
+- README and CONTRIBUTING gained a **project-handbook navigation row** linking
+  the community/governance documents that GitHub's repo-overview tab bar does
+  not surface (`SUPPORT.md`, `GOVERNANCE.md`, `MAINTAINERS.md`, `CHANGELOG.md`,
+  `CITATION.cff`, `docs/README.md`) — those files exist but the tab bar shows
+  only README / Code of conduct / Contributing / License / Security.
+
 ## [3.8.0] — 2026-08-04
 
 ### The repo's accounting of itself became the deliverable (2026-08-04)

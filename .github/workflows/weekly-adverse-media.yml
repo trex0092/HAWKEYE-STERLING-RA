@@ -28,8 +28,8 @@ on:
     # at maxAgeDays 0, so a run landing on the previous UTC day would raise a
     # false "mandatory control missed its cadence" alarm. Left at 00:07.
     - cron: '7 0 * * *'    # 00:07 UTC = 04:07 UAE, daily (odd minute) — earliest same-UTC-day start; actual start ~03:30 UTC after GitHub's delay
-    - cron: '7 3 * * *'    # 03:07 UTC self-healing retry — the 24 & 25 Jul 00:07 runs died to runner-VM shutdowns mid-sweep and stayed red until someone manually re-ran hours later. This firing is a NO-OP (preflight skips the sweep) whenever today already has a successful run; it only screens when the mandatory daily control would otherwise be missing, and still delivers by ~08:30 UAE.
-    - cron: '7 6 * * *'    # 06:07 UTC last-chance retry — the first two slots are 3h apart, so a single 3-4h outage window (GitHub Actions or an upstream source) could still cost the whole day. Same NO-OP preflight; when it does have to screen, delivery lands ~11:30 UAE — late, but a late daily screening beats a missing one for a mandatory control.
+    - cron: '7 3 * * *'    # 03:07 UTC self-healing retry — the 24 & 25 Jul 00:07 runs died to runner-VM shutdowns mid-sweep and stayed red until someone manually re-ran hours later. On days when today already has a successful run this firing becomes a COVERAGE MAKE-UP pass (AM_COVERAGE_RETRY=1): the engine consults the committed run-metrics counts and exits in seconds if the earlier run had full news+PEP coverage, or re-sweeps the full book from this runner's FRESH egress IP if the free feeds' per-IP rate limits cost part of the book its coverage (5 Aug: both GDELT and Google News circuits opened mid-run). Delta-state suppresses already-reported findings, so a make-up sweep cases only what it recovers.
+    - cron: '7 6 * * *'    # 06:07 UTC last-chance retry — the first two slots are 3h apart, so a single 3-4h outage window (GitHub Actions or an upstream source) could still cost the whole day. Same make-up semantics; when it has to screen from scratch, delivery lands ~11:30 UAE — late, but a late daily screening beats a missing one for a mandatory control.
   workflow_dispatch:        # Manual trigger
 
 # Results are posted to Asana via the screen's own token. contents:write is used
@@ -49,12 +49,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Self-healing gate: the retry firing (03:07 UTC) must not double-screen or
-  # double-post to Asana on days when the 00:07 run succeeded. On schedule
-  # events this asks the Actions API whether today (UTC) already has a
-  # successful run of this workflow and skips the sweep if so; manual
-  # dispatches always screen. Skipped-job days still conclude "success", so
-  # the badge and freshness-check semantics are unchanged.
+  # Self-healing gate: the retry firings (03:07/06:07 UTC) must not blindly
+  # double-screen or double-post to Asana on days when the 00:07 run succeeded.
+  # On schedule events this asks the Actions API whether today (UTC) already
+  # has a successful run of this workflow. If not, the sweep runs as the day's
+  # screening. If so, the firing continues as a coverage MAKE-UP pass
+  # (makeup=true → AM_COVERAGE_RETRY=1): the engine decides from the committed
+  # run-metrics counts whether the earlier run lost news/PEP coverage to
+  # per-IP rate limits, and either exits in seconds or re-sweeps from this
+  # runner's fresh egress IP. Manual dispatches always screen. Either way the
+  # day concludes "success", so badge and freshness-check semantics are
+  # unchanged.
   preflight:
     permissions:
       actions: read
@@ -62,6 +67,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       run: ${{ steps.decide.outputs.run }}
+      makeup: ${{ steps.decide.outputs.makeup }}
     steps:
       - name: Harden the runner (egress block)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -80,6 +86,7 @@ jobs:
           set -u
           if [ "$EVENT" = "workflow_dispatch" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "makeup=false" >> "$GITHUB_OUTPUT"
             echo "manual dispatch — always screens"
             exit 0
           fi
@@ -89,15 +96,20 @@ jobs:
             | python3 -c 'import json,sys; print(json.load(sys.stdin).get("total_count", 0))')
           if [ "${n:-0}" -gt 0 ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "today (UTC $today) already has $n successful screening run(s) — retry firing is a no-op"
+            echo "makeup=true" >> "$GITHUB_OUTPUT"
+            echo "today (UTC $today) already has $n successful screening run(s) — continuing as a coverage make-up pass (re-sweeps only if that run lost news/PEP coverage)"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "makeup=false" >> "$GITHUB_OUTPUT"
             echo "no successful screening run yet today (UTC $today) — proceeding with the sweep"
           fi
 
   adverse-media:
     needs: preflight
-    if: needs.preflight.outputs.run == 'true'
+    # Runs for the day's screening (run=true) AND for the make-up pass
+    # (makeup=true) — in make-up mode the engine itself decides, from the
+    # overlaid run-metrics counts, whether to exit in seconds or re-sweep.
+    if: needs.preflight.outputs.run == 'true' || needs.preflight.outputs.makeup == 'true'
     # Write scopes live at job level (top level is read-only — least privilege).
     permissions:
       contents: write
@@ -228,6 +240,11 @@ jobs:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
           RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          # '1' only on a retry firing when today already succeeded: the engine
+          # then re-sweeps ONLY if that run lost news/PEP coverage (fresh
+          # runner = fresh egress IP wins back rate-limited coverage), else
+          # exits in seconds before any list download.
+          AM_COVERAGE_RETRY: ${{ needs.preflight.outputs.makeup == 'true' && '1' || '0' }}
           # Weaponised WORLDWIDE adverse-media sweep. Two layers, always on:
           #   1. GDELT global index — ONE request/subject, 65+ languages, worldwide
           #      print/broadcast/web (the real "all news around the world" net), now

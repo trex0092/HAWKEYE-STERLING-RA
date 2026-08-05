@@ -70,6 +70,10 @@ if ASANA_TOKEN:
     os.environ["ASANA_TOKEN"] = ASANA_TOKEN
 TRIGGER_TYPE          = os.environ.get("TRIGGER_TYPE", "workflow_dispatch")
 RUN_MODE              = os.environ.get("RUN_MODE", "full_batch")  # full_batch | weekly_adverse
+# Same-day coverage make-up firing (the retry cron slots on a day that already
+# has a successful run): sweep ONLY if the earlier run lost news/PEP coverage
+# to per-IP rate limits — a fresh runner VM means a fresh egress IP.
+AM_COVERAGE_RETRY     = os.environ.get("AM_COVERAGE_RETRY", "0") == "1"
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
 ASANA_ONGOING_MON_GID = "1213914392047129"
@@ -2972,6 +2976,95 @@ def _skipped_rows_note():
             f"screened by any net. Fix the record, then re-run.\n"
             f"                             {refs}{more}")
 
+# ── FRAUDLABS SUPPORT SIGNAL (onboarding only; OFF by default) ────────────────
+# A SUPPLEMENTARY payment-fraud indicator on a newly onboarded customer's
+# contact email — NOT part of the AML/CFT screen and never a screening
+# verdict: FraudLabs scores fraud-adjacent email traits (disposable / free /
+# young domain), which can inform the MLRO's onboarding judgement but must
+# not gate it. PDPL GATE (same shape as LLM_TRIAGE): enabling this sends the
+# customer's email address to FraudLabs (a cross-border transfer) — record
+# the processor and transfer basis in the third-party register BEFORE setting
+# the repo variable FRAUDLABS=1 alongside the FRAUDLABS_API_KEY secret.
+# A support signal that cannot be fetched is disclosed and skipped — it never
+# fails, blocks, or reds the run, and its absence is never read as "clear".
+FRAUDLABS_API_KEY      = os.environ.get("FRAUDLABS_API_KEY", "")
+FRAUDLABS              = os.environ.get("FRAUDLABS", "0") == "1" and bool(FRAUDLABS_API_KEY)
+FRAUDLABS_URL          = "https://api.fraudlabspro.com/v2/order/screen"
+FRAUDLABS_REVIEW_SCORE = int(os.environ.get("FRAUDLABS_REVIEW_SCORE", "60"))
+
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+def extract_customer_email(notes):
+    """Best-effort contact email from the KYC note: an explicit 'Email:' line
+    wins; else the first email-shaped token anywhere in the note. Returns ''
+    when the note carries none — the support signal is then idle for that
+    customer (disclosed in aggregate, never invented)."""
+    notes = notes or ""
+    m = re.search(r"Email\s*[:=]\s*(" + _EMAIL_RE.pattern + r")", notes, re.I)
+    if m:
+        return m.group(1)
+    m = _EMAIL_RE.search(notes)
+    return m.group(0) if m else ""
+
+def fraudlabs_email_signal(email):
+    """One FraudLabs screen call carrying ONLY the email. Tolerant of
+    transport failure and response-shape drift: anything unusable returns
+    available=False with the reason, which the caller disclosed as a LOST
+    support signal — never as a clear."""
+    try:
+        r = requests.post(FRAUDLABS_URL,
+                          data={"key": FRAUDLABS_API_KEY, "email": email, "format": "json"},
+                          timeout=20)
+    except Exception as e:
+        return {"available": False, "error": f"transport: {str(e)[:120]}"}
+    if r is None or getattr(r, "status_code", None) != 200:
+        return {"available": False, "error": f"http {getattr(r, 'status_code', 'none')}"}
+    try:
+        d = r.json()
+        if not isinstance(d, dict):
+            raise ValueError("non-object response")
+    except Exception as e:
+        return {"available": False, "error": f"parse: {str(e)[:120]}"}
+    score = d.get("fraudlabspro_score", d.get("score"))
+    status = str(d.get("fraudlabspro_status") or d.get("status") or "").upper()
+    if score is None and not status:
+        err = d.get("error_message") or d.get("error") or f"fields {sorted(d)[:5]}"
+        return {"available": False, "error": f"unrecognised response: {str(err)[:120]}"}
+    try:
+        score = int(score) if score is not None else None
+    except (TypeError, ValueError):
+        score = None
+    flags = sorted(k for k, v in d.items()
+                   if k.startswith("is_") and v in (True, 1, "Y", "true", "True"))
+    return {"available": True, "score": score, "status": status, "flags": flags}
+
+def fraudlabs_material(sig):
+    """Worth a card comment? REVIEW/REJECT status, a score at/above the review
+    threshold, or a disposable-email flag. Unavailable is never material —
+    it is disclosed as lost coverage, not treated as a finding."""
+    if not sig.get("available"):
+        return False
+    if sig.get("status") in ("REVIEW", "REJECT"):
+        return True
+    s = sig.get("score")
+    if isinstance(s, int) and s >= FRAUDLABS_REVIEW_SCORE:
+        return True
+    return bool({"is_disposable_email", "is_email_disposable"} & set(sig.get("flags") or []))
+
+def post_fraudlabs_signal_comment(customer_gid, email_domain, sig, run_time):
+    dt = run_time.strftime("%d %b %Y %H:%M GST")
+    lines = [f"🧩 SUPPORT SIGNAL (FraudLabs) — {dt}",
+             "Supplementary payment-fraud indicator on the contact email. NOT a "
+             "sanctions / PEP / adverse-media result and NOT a screening verdict.",
+             f"Email domain: {email_domain}",
+             f"Status: {sig.get('status') or '—'} · Score: "
+             f"{sig['score'] if sig.get('score') is not None else '—'}/100"]
+    if sig.get("flags"):
+        lines.append("Flags: " + ", ".join(sig["flags"][:6]))
+    lines.append("Weigh alongside the onboarding screen — MLRO judgement prevails.")
+    asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{customer_gid}/stories",
+                  json={"data": {"text": "\n".join(lines)}})
+
 def get_all_customers():
     customers = []
     CUSTOMER_ROWS_SKIPPED.clear()
@@ -3015,6 +3108,9 @@ def get_all_customers():
                 "entity_owners": entity_owners,
                 "kyc": kyc_data,
                 "country": kyc_data.get("country", ""),
+                # Contact email for the (opt-in) FraudLabs support signal —
+                # '' when the note carries none; nothing else consumes it.
+                "email": extract_customer_email(notes),
                 "has_assessment": len(notes.strip()) > 100,
             })
         next_page = data.get("next_page") or None
@@ -5200,6 +5296,10 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     flag = "⚠️" if (n_s + n_a + n_p) > 0 else "✅"
     if mode == "onboarding":
         task_name = f"🆕 {flag} Onboarding Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
+    elif mode == "makeup":
+        # Same-day re-sweep that recovered coverage lost to rate limits — the
+        # distinct title tells the MLRO why the day has a second digest.
+        task_name = f"🛡️🔁 {flag} Daily Screening (coverage make-up) — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
     else:
         task_name = f"🛡️ {flag} Daily Screening — Sanctions {n_s} · Adverse {n_a} · PEP {n_p} — {dt}"
     # Adaptive budget: open at the budget that delivered last run (learned via
@@ -5509,6 +5609,24 @@ def tally_enrichment(results, wl_hits, wl_loaded):
                                if any(a.get("watchlist") for a in f["articles"]))}
     return counts, adverse_findings, pep_findings
 
+def enrichment_rotation(n, today_ordinal, retry_pass=False):
+    """Deterministic daily start-offset for the enrichment order.
+
+    When a feed's circuit opens mid-run, every subject enriched after that
+    point loses news coverage — with a fixed order that is the SAME tail of
+    the book every day. A prime stride walks the start point far across the
+    book each day (a +1 shift would take years to move a tail subject clear
+    of a recurring mid-run trip); the retry offset puts a same-day make-up
+    sweep in different territory from the run that lost coverage. Pure and
+    deterministic so a re-run of the same firing enriches in the same order
+    (reproducible evidence).
+    """
+    if n <= 1:
+        return 0
+    stride = 131 if n % 131 else 137   # both prime — jointly degenerate only at n ≥ 17,947
+    offset = 67 if n % 67 else 71      # same guard for the make-up pass
+    return (today_ordinal * stride + (offset if retry_pass else 0)) % n
+
 def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     """Shared core: sanctions + adverse media + PEP over a set of customers, with
     delta classification, one Asana report and MLRO case subtasks. mode controls
@@ -5606,15 +5724,31 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         return r
 
     total = len(subjects_all)
+    # Rotate the ENRICHMENT ORDER only (the sanctions pass above already
+    # screened every subject): a mid-run circuit trip costs whoever comes
+    # after it, and rotation stops that being the same subjects every day.
+    # Results are restored to book order below, so nothing downstream — the
+    # tally, the delta fingerprints, the report — sees the rotation.
+    rot = enrichment_rotation(total, run_time.toordinal(), AM_COVERAGE_RETRY)
+    order = list(range(total))
+    order = order[rot:] + order[:rot]
+    if rot:
+        log(f"Enrichment order rotated: starting at subject {rot + 1}/{total}"
+            + (" (make-up offset)" if AM_COVERAGE_RETRY else " (daily rotation)"))
     log(f"Enriching {total} subjects with {SCREEN_CONCURRENCY} parallel workers...")
     done = 0
-    results = []
+    indexed = [None] * total
     with concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY) as ex:
-        for r in ex.map(_enrich, subjects_all):
+        for i, r in zip(order, ex.map(_enrich, (subjects_all[j] for j in order))):
             done += 1
-            results.append(r)
+            indexed[i] = r
             if done % 50 == 0 or done == total:
                 log(f"  enriched {done}/{total}")
+    if any(r is None for r in indexed):
+        # Degrade loudly: a hole here means the rotation bookkeeping dropped a
+        # subject — silently tallying the rest would report them as screened.
+        raise RuntimeError("enrichment rotation lost subject results — refusing to tally a partial book")
+    results = indexed
 
     # WORLDWIDE PEP + RCA NET — screened on EVERY run, over EVERY individual.
     # Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or a
@@ -5768,7 +5902,10 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 "flagged": len(possible_matches), "adverse": len(adverse_findings),
                 "pep": len(pep_findings)},
         timings=timings, llm_calls=dict(ai.LLM_CALLS),
-        persist=(mode == "daily"))
+        # A make-up sweep persists too: it is a full-book run, and its snapshot
+        # REPLACING today's degraded one (persist_run dedups by date) is exactly
+        # what stops the next retry firing from re-sweeping a recovered day.
+        persist=(mode in ("daily", "makeup")))
     for a in run_monitor.get("anomalies", []):
         log(f"RUNTIME ANOMALY: {a}")
     for s in run_monitor.get("sustained", []):
@@ -5831,10 +5968,24 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     return possible_matches, adverse_findings, pep_findings
 
 def run_unified(run_time):
+    if AM_COVERAGE_RETRY:
+        # Same-day make-up firing: today already has a successful run, so this
+        # firing exists only to win back coverage the earlier run lost to
+        # per-IP rate limits. Decide from the committed run-metrics counts
+        # (overlaid from the delta-state branch) BEFORE any list download or
+        # customer read — a clean morning means this exits in seconds.
+        decision = monitoring.makeup_decision(run_time.strftime("%Y-%m-%d"))
+        log(f"Coverage make-up check: {decision['reason']}")
+        if not decision["sweep"]:
+            log("Make-up firing done — nothing to re-sweep, no report posted.")
+            return
+        log("MAKE-UP SWEEP: re-screening the full book from this runner's fresh egress IP — "
+            "delta-state suppresses already-reported findings, so only recovered/new ones become cases")
     log("UNIFIED daily screening — sanctions + adverse media + PEP")
     all_lists, list_meta = load_all_lists()
     customers = get_all_customers()
-    screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily")
+    screen_subject_set(customers, all_lists, list_meta, run_time,
+                       mode="makeup" if AM_COVERAGE_RETRY else "daily")
     log("Unified run done.")
     enforce_delivery_gate()
     enforce_list_outage_gate()
@@ -5865,6 +6016,28 @@ def run_onboarding(run_time):
         return
     all_lists, list_meta = load_all_lists()
     screen_subject_set(fresh, all_lists, list_meta, run_time, mode="onboarding")
+    # FraudLabs SUPPORT SIGNAL (opt-in, PDPL-gated — see the FRAUDLABS block).
+    # Runs after the screen so a signal failure can never disturb it; material
+    # results land as a clearly-labelled comment on the customer's card.
+    if FRAUDLABS:
+        fl_with = fl_material = fl_lost = 0
+        for c in fresh:
+            em = c.get("email") or ""
+            if not em:
+                continue
+            fl_with += 1
+            sig = fraudlabs_email_signal(em)
+            if not sig["available"]:
+                fl_lost += 1
+                log(f"  fraudlabs: signal unavailable for '{c['name']}' — {sig['error']}")
+                continue
+            if fraudlabs_material(sig):
+                fl_material += 1
+                post_fraudlabs_signal_comment(c["gid"], em.split("@", 1)[-1], sig, run_time)
+        log(f"  fraudlabs support signal: {fl_with}/{len(fresh)} onboarding customer(s) carry an "
+            f"email — {fl_material} material (commented on card), {fl_lost} unavailable (disclosed)")
+    elif os.environ.get("FRAUDLABS", "0") == "1":
+        log("  fraudlabs: FRAUDLABS=1 but FRAUDLABS_API_KEY is missing — support signal OFF")
     log("Onboarding run done.")
     # Same post-delivery gate chain as the daily run — an onboarding report
     # that never reached the MLRO queue, or an onboarding screen run against

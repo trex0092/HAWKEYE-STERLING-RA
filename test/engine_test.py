@@ -3134,6 +3134,91 @@ finally:
     screen.create_case_subtask = _orig_create_case
     screen.CASE_SUBTASK_CAP = _orig_cap
 
+# ── coverage make-up decision + enrichment rotation (spread-across-the-day) ──
+print("\nmonitoring.py — coverage make-up decision")
+import tempfile
+_mkdir = tempfile.mkdtemp()
+_mk = lambda: os.path.join(_mkdir, f"metrics-{len(os.listdir(_mkdir))}.json")
+_p = _mk()   # no file at all — coverage unverifiable
+d = monitoring.makeup_decision("2026-08-05", path=_p)
+check("absent metrics file → sweep (degrade loudly, never silent all-clear)",
+      d["sweep"] is True and d["uncovered"] is None)
+_p = _mk(); json.dump([{"date": "2026-08-04", "counts": {"am_errors": 0}}], open(_p, "w"))
+check("yesterday-only history → sweep (no snapshot for today)",
+      monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
+_p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 0, "pep_errors": 0}}], open(_p, "w"))
+d = monitoring.makeup_decision("2026-08-05", path=_p)
+check("clean today → no sweep", d["sweep"] is False and d["uncovered"] == 0)
+_p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 110, "pep_errors": 0}}], open(_p, "w"))
+d = monitoring.makeup_decision("2026-08-05", path=_p)
+check("news coverage lost today → sweep with honest count",
+      d["sweep"] is True and d["uncovered"] == 110 and "news coverage" in d["reason"])
+_p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 0, "pep_errors": 3}}], open(_p, "w"))
+check("PEP-only loss also sweeps",
+      monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
+_p = _mk(); json.dump({"not": "a list"}, open(_p, "w"))
+check("malformed history → sweep, never a silent all-clear",
+      monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
+
+print("\nscreen.py — enrichment rotation")
+check("empty/singleton book never rotates",
+      screen.enrichment_rotation(0, 739_101) == 0 and screen.enrichment_rotation(1, 739_101) == 0)
+check("deterministic (same day, same book → same offset)",
+      screen.enrichment_rotation(858, 739_101) == screen.enrichment_rotation(858, 739_101))
+check("offset stays in range across book sizes and days",
+      all(0 <= screen.enrichment_rotation(n, day) < n
+          for n in (2, 67, 131, 858, 904) for day in (739_101, 739_102, 739_465)))
+check("consecutive days land far apart (prime stride, not +1)",
+      abs(screen.enrichment_rotation(858, 739_102) - screen.enrichment_rotation(858, 739_101)) not in (0, 1))
+check("same-day make-up pass starts in different territory",
+      screen.enrichment_rotation(858, 739_101, retry_pass=True) != screen.enrichment_rotation(858, 739_101))
+check("stride guard: a 131-subject book still rotates day to day",
+      screen.enrichment_rotation(131, 739_101) != screen.enrichment_rotation(131, 739_102))
+check("offset guard: a 67-subject book still gets a distinct make-up start",
+      screen.enrichment_rotation(67, 739_101, retry_pass=True) != screen.enrichment_rotation(67, 739_101))
+
+# ── FraudLabs support signal (opt-in, PDPL-gated, never a verdict) ────────────
+print("\nscreen.py — FraudLabs support signal")
+check("gate is OFF by default (no env, no key)", screen.FRAUDLABS is False)
+check("explicit Email: line wins",
+      screen.extract_customer_email("Country: AE\nEmail: kyc@dealer.example\nother@x.example")
+      == "kyc@dealer.example")
+check("falls back to first email-shaped token",
+      screen.extract_customer_email("contact person other@x.example later") == "other@x.example")
+check("no email in note → '' (signal idle, never invented)",
+      screen.extract_customer_email("Country: AE\nReg No: 123") == "")
+_req_mod = sys.modules["requests"]
+_orig_post = getattr(_req_mod, "post", None)
+try:
+    _req_mod.post = lambda *a, **k: None
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("no transport → available=False with reason (lost, not clear)",
+          s["available"] is False and "http" in s["error"])
+    class _R:
+        status_code = 200
+        def __init__(self, d): self._d = d
+        def json(self): return self._d
+    _req_mod.post = lambda *a, **k: _R({"fraudlabspro_score": 72, "fraudlabspro_status": "REVIEW",
+                                        "is_disposable_email": True, "is_free_email": False})
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("recognised response parses score/status/flags",
+          s["available"] and s["score"] == 72 and s["status"] == "REVIEW"
+          and s["flags"] == ["is_disposable_email"])
+    check("REVIEW status is material", screen.fraudlabs_material(s) is True)
+    _req_mod.post = lambda *a, **k: _R({"unexpected": "shape"})
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("unrecognised response shape → disclosed, not guessed",
+          s["available"] is False and "unrecognised" in s["error"])
+    check("unavailable signal is never material", screen.fraudlabs_material(s) is False)
+    check("low score, no flags → not material",
+          screen.fraudlabs_material({"available": True, "score": 12, "status": "APPROVE",
+                                     "flags": []}) is False)
+    check("disposable-email flag alone is material",
+          screen.fraudlabs_material({"available": True, "score": None, "status": "",
+                                     "flags": ["is_disposable_email"]}) is True)
+finally:
+    _req_mod.post = _orig_post
+
 # ── import-time pip self-install stays opt-in (supply-chain posture) ──────────
 # The dependency fallback in screen.py must never install anything as a side
 # effect of a bare import: the pip path has to sit behind HSRA_BOOTSTRAP_DEPS=1

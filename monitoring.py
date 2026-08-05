@@ -292,6 +292,39 @@ def monitor_run(today, counts, timings=None, llm_calls=None, path=None, persist=
     return {"snapshot": snap, **res}
 
 
+def makeup_decision(today, path=None):
+    """Should a same-day coverage MAKE-UP sweep run? Consulted by the retry
+    firings of the daily screening on days that already have a successful run:
+    the free news feeds rate-limit per IP, so a run can succeed with part of
+    the book uncovered (am_errors / pep_errors > 0) — a later firing on a
+    FRESH runner (fresh egress IP) can win that coverage back. Reads only the
+    committed run-metrics counts (no subject names, no PII) and degrades
+    loudly: an unreadable/absent snapshot means coverage cannot be verified,
+    so the answer is sweep, never a silent all-clear.
+
+    Returns {"sweep": bool, "uncovered": int|None, "reason": str}.
+    """
+    hist = _load(path or METRICS_STATE_PATH, [])
+    todays = ([h for h in hist if isinstance(h, dict) and h.get("date") == today]
+              if isinstance(hist, list) else [])
+    if not todays:
+        return {"sweep": True, "uncovered": None,
+                "reason": "no run-metrics snapshot for today — coverage cannot be verified, sweeping"}
+    counts = todays[-1].get("counts") or {}
+    am = int(counts.get("am_errors") or 0)
+    pep = int(counts.get("pep_errors") or 0)
+    if am or pep:
+        bits = []
+        if am:
+            bits.append(f"{am} subject(s) lost news coverage")
+        if pep:
+            bits.append(f"{pep} individual(s) lost PEP coverage")
+        return {"sweep": True, "uncovered": am + pep,
+                "reason": " and ".join(bits) + " in today's earlier run"}
+    return {"sweep": False, "uncovered": 0,
+            "reason": "today's earlier run had full news + PEP coverage — make-up sweep not needed"}
+
+
 # ── 2) SOURCE-COVERAGE DRIFT ──────────────────────────────────────────────────
 def check_source_coverage(list_meta, today, path=None):
     """Compare each list's current name count to its trailing median. Returns
