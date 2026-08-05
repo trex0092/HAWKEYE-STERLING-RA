@@ -56,6 +56,15 @@ export const PEP_ROOT_CLASSES = [
   { key: 'ambassador', label: 'Ambassador', qid: 'Q121998', optional: true },
   { key: 'supreme-court-judge', label: 'Supreme court judge', qid: 'Q589298', optional: true },
   { key: 'central-bank-governor', label: 'Central bank governor', qid: 'Q28598677', optional: true },
+  /* FATF senior government & judicial officials — prominent, one/few-per-country
+     roles (never flood-prone like a generic "mayor"/"CEO" class would). Added
+     optional so the harvest itself is the QID check: a wrong/empty QID logs
+     "zero holders — pending live verification" and the run stays green, exactly
+     as the trio above was introduced. ombudsman (Q169180) is cross-verified;
+     the prosecutor/auditor QIDs are best-effort pending the first live sweep. */
+  { key: 'ombudsman', label: 'Ombudsman', qid: 'Q169180', optional: true },
+  { key: 'prosecutor-general', label: 'Attorney/Prosecutor general', qid: 'Q1501926', optional: true },
+  { key: 'auditor-general', label: 'Auditor general (head of supreme audit institution)', qid: 'Q5785176', optional: true },
 ];
 
 export const RECENCY_MONTHS = Number(process.env.PEP_RECENCY_MONTHS) || 24;
