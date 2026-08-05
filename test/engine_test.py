@@ -41,6 +41,8 @@ kyc = _load("kyc")
 txn_monitor = _load("txn_monitor")
 monitoring = _load("monitoring")
 screen = _load("screen")
+tfs_dossier = _load("tfs_dossier")
+subject_report = _load("subject_report")
 
 _fail = []
 def check(name, cond):
@@ -3232,6 +3234,73 @@ try:
                                      "flags": ["is_disposable_email"]}) is True)
 finally:
     _req_mod.post = _orig_post
+
+# ── TFS FFR/PNMR draft dossiers (draft-only, MLRO acts) ───────────────────────
+print("\ntfs_dossier.py — FFR/PNMR drafts")
+check("UN + EOCN list names are TFS; others are not",
+      tfs_dossier.is_tfs_list("UN Security Council — Consolidated list (XML)")
+      and tfs_dossier.is_tfs_list("UAE EOCN — Local Terrorist List")
+      and not tfs_dossier.is_tfs_list("US OFAC — SDN list (CSV)"))
+check("confirmed + funds held → FFR covering the holdings",
+      tfs_dossier.recommend_report_kind("confirmed", True)[0] == "FFR")
+check("confirmed + nil holdings → FFR with nil declared",
+      "nil holdings" in tfs_dossier.recommend_report_kind("confirmed", False)[1])
+check("partial → PNMR with suspension",
+      tfs_dossier.recommend_report_kind("partial", False)[0] == "PNMR")
+check("a case whose only hits are non-TFS lists is rejected (ordinary alert path)",
+      any("no hit on a TFS list" in e for e in tfs_dossier.validate_tfs_case(
+          {"customer": {"name": "X"}, "match_status": "partial",
+           "hits": [{"list": "US OFAC — SDN list (CSV)", "matched_entry": "Y"}]})))
+check("funds.held without items is rejected (list what is held)",
+      any("funds.items is empty" in e for e in tfs_dossier.validate_tfs_case(
+          {"customer": {"name": "X"}, "match_status": "confirmed",
+           "hits": [{"list": "UAE EOCN — Local Terrorist List", "matched_entry": "Y"}],
+           "funds": {"held": True, "items": []}})))
+_tfs_doc = tfs_dossier.build_tfs_dossier(tfs_dossier.EXAMPLE_CASE, today="2026-08-05")
+check("dossier is stamped draft, urgent, and non-tipping",
+      "NOT A FILING" in _tfs_doc and "WITHOUT DELAY" in _tfs_doc.upper()
+      and "tip off" in _tfs_doc)
+check("sign-off fields stay blank (a named human's act)",
+      "Reviewed by: __________________" in _tfs_doc and "Filed goAML ref: __________" in _tfs_doc)
+check("the listed side carries list, matched name and list reference",
+      "Listed name matched:" in _tfs_doc and "List reference no.:" in _tfs_doc)
+
+# ── per-subject screening report (evidence record, sign-off blank) ────────────
+print("\nsubject_report.py — per-subject report")
+_sr_state = {"updated": "2026-08-05", "subjects": {
+    "acme llc": {"name": "ACME LLC", "jurisdiction": "UAE", "band": "high", "topScore": 90,
+                 "recommendation": "sanctions-match", "firstSeen": "2026-08-01", "lastSeen": "2026-08-05",
+                 "gid": "g1", "lists": ["US OFAC — SDN list (CSV)"],
+                 "hits": [{"list": "US OFAC — SDN list (CSV)", "hitName": "ACME L.L.C.", "score": 90,
+                           "mechanism": "fuzzy", "confidence": "STRONG"},
+                          {"list": "UK OFSI — Consolidated list of targets (CSV)", "hitName": "ACME",
+                           "score": 70, "whitelisted": True, "clearedAt": "2026-08-02", "clearedVia": "case t9"}],
+                 "secondOpinion": {"provider": "OFAC-API", "status": "corroborated",
+                                   "matchCount": 1, "topScore": 92, "checkedAt": "2026-08-05"}},
+    "acme gold llc": {"name": "ACME GOLD LLC", "band": "medium", "topScore": 40,
+                      "recommendation": "review", "firstSeen": "2026-08-03", "lastSeen": "2026-08-05"}}}
+check("exact name match wins over substring ambiguity",
+      subject_report.find_subject(_sr_state, name="acme llc")[0] == "acme llc")
+check("ambiguous substring returns nothing (CLI lists candidates instead)",
+      subject_report.find_subject(_sr_state, name="acme")[0] is None
+      and len(subject_report.candidates(_sr_state, "acme")) == 2)
+_sr_doc = subject_report.build_subject_report(
+    "acme llc", _sr_state["subjects"]["acme llc"],
+    case_entry={"taskGid": "t9", "createdAt": "2026-08-01", "cleared": False, "escalated": True,
+                "escalatedAt": "2026-08-04"},
+    screen_updated="2026-08-05", today="2026-08-05")
+check("report renders evidence labels, the cleared-FP annotation and the second opinion",
+      "via fuzzy" in _sr_doc and "CLEARED FP 2026-08-02 (case t9)" in _sr_doc
+      and "OFAC-API: corroborated" in _sr_doc)
+check("escalated lifecycle shows auto-clear disabled",
+      "ESCALATED" in _sr_doc and "auto-clear disabled" in _sr_doc)
+check("sign-off fields stay blank (four-eyes, named humans only)",
+      "Reviewed by (four-eyes): __________________" in _sr_doc)
+try:
+    subject_report.build_subject_report("k", {}, None, None)
+    check("an absent record can never render as a clean report", False)
+except ValueError:
+    check("an absent record can never render as a clean report", True)
 
 # ── import-time pip self-install stays opt-in (supply-chain posture) ──────────
 # The dependency fallback in screen.py must never install anything as a side

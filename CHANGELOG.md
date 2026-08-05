@@ -10,6 +10,21 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **TFS FFR/PNMR draft dossiers** (`tfs_dossier.py`, str_dossier pattern —
+  DRAFT ONLY, never files or freezes): a goAML-aligned Funds Freeze Report /
+  Partial Name Match Report dossier for matches against the UN Consolidated
+  or UAE Local Terrorist List (CR 74/2020 under FDL 10/2025), with a
+  report-kind recommendation the MLRO confirms against current EOCN guidance,
+  listed-person particulars, funds table (or nil holdings), the TFS
+  checklist, and blank sign-off fields. Non-TFS matches are rejected onto the
+  ordinary alert path.
+- **Per-subject screening report** (`subject_report.py`): a single-subject,
+  audit-ready evidence record rendered from the committed screening state —
+  every hit with mechanism/confidence/carried-forward/cleared-FP annotations,
+  the OFAC-API second opinion, and the case lifecycle — with blank
+  MLRO + four-eyes sign-off fields (named humans only). An absent or
+  unreadable state can never render as a clean report.
+
 - **Analyst feedback loop on the screening case board.** Case cards now carry
   a machine-read disposition block: ticking `[x] false positive` clears the
   case and registers the exact designated-name+list pairs in a **cleared-FP
