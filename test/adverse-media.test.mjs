@@ -2,7 +2,8 @@
    Usage: node test/adverse-media.test.mjs */
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
-  canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS } from '../scripts/adverse-media.mjs';
+  canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
+  GDELT_RISK_TERMS } from '../scripts/adverse-media.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -187,6 +188,40 @@ check('mapPool preserves order and runs every item under a concurrency bound',
 
 check('gdeltUrl broadened default terms still target the global artlist JSON',
   gdeltUrl('Acme Co').includes('maxrecords=75') && decodeURIComponent(gdeltUrl('Acme Co')).includes('terrorist financing'));
+
+/* ── GDELT term-set alignment (JS backbone widened to the Python comprehensive
+   set) + worldwide language expansion (2026-08-05, adversarially-verified) ── */
+check('GDELT query carries the full predicate-offence cluster incl. proliferation financing',
+  ['proliferation financing', 'organized crime', 'cartel', 'narcotics', 'smuggling', 'asset freeze', 'convicted', 'arrested']
+    .every(t => GDELT_RISK_TERMS.includes(t))
+  && GDELT_RISK_TERMS.length >= 26);
+check('gdeltUrl query includes the widened terms (GDELT translates → reaches every language)',
+  ['proliferation financing', 'organized crime', 'narcotics', 'asset freeze']
+    .every(t => decodeURIComponent(gdeltUrl('Acme Co')).includes(t)));
+check('gdeltUrl maxrecords is env-tunable and clamps to GDELT max 250', (() => {
+  const prev = process.env.ADVERSE_MEDIA_MAXRECORDS;
+  process.env.ADVERSE_MEDIA_MAXRECORDS = '9999';
+  const clamped = gdeltUrl('X').includes('maxrecords=250');
+  process.env.ADVERSE_MEDIA_MAXRECORDS = '';
+  const dflt = gdeltUrl('X').includes('maxrecords=75');
+  if (prev == null) delete process.env.ADVERSE_MEDIA_MAXRECORDS; else process.env.ADVERSE_MEDIA_MAXRECORDS = prev;
+  return clamped && dflt;
+})());
+check('LANG_TERMS gains the high-risk-region languages with native-script terms', (() => {
+  const added = ['az', 'kk', 'uz', 'ka', 'hy', 'ne', 'si', 'pa', 'mr', 'my', 'km', 'ha', 'so', 'am', 'af', 'sq', 'hr', 'sl', 'lt', 'lv', 'et', 'mk'];
+  return added.every(k => Array.isArray(LANG_TERMS[k]) && LANG_TERMS[k].length >= 8)
+    && LANG_TERMS.kk.includes('ақшаны жылыстату') && LANG_TERMS.ka.includes('ფულის გათეთრება')
+    && LANG_TERMS.hy.includes('փողերի լվացում') && LANG_TERMS.sq.includes('pastrim parash');
+})());
+check('LOCALES gains the edition-confirmed high-risk editions (still deduped by id)',
+  ['az-AZ', 'kk-KZ', 'ka-GE', 'hy-AM', 'my-MM', 'sq-AL', 'lt-LT'].every(id => LOCALES.some(l => l.id === id))
+  && LOCALES.length === new Set(LOCALES.map(l => l.id)).size);
+check('a native-language adverse headline scores a hit in a newly-added language (Kazakh)',
+  scoreAdverseMedia('Нурлан Бектас', [{ title: 'Нурлан Бектас ақшаны жылыстату ісі бойынша қамауға алынды', link: 'http://k/1' }], ALL_TERMS).hit === true);
+check('a strong native predicate (Georgian money laundering) escalates to high band',
+  scoreAdverseMedia('გიორგი', [{ title: 'გიორგი ფულის გათეთრება ბრალდებით დააკავეს', link: 'http://g/1' }], ALL_TERMS).band === 'high');
+check('a terms-only language with no Google News edition still scores via GDELT titles (Somali)',
+  scoreAdverseMedia('Cabdi Xasan', [{ title: 'Cabdi Xasan oo lagu xiray dhaqidda lacagta', link: 'http://so/1' }], ALL_TERMS).hit === true);
 
 /* ── Phase-4 hardening: description scanning, tiers, canonical dedup ──────── */
 const descRss = '<rss><channel><item><title>Acme Corp restructures Gulf operations</title>'
