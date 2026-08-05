@@ -92,6 +92,7 @@ jobs:
             ofsistorage.blob.core.windows.net:443
             news.google.com:443
             api.gdeltproject.org:443
+            www.bing.com:443
             www.wikidata.org:443
             ws-public.interpol.int:443
             www.international.gc.ca:443
@@ -158,6 +159,9 @@ jobs:
           # adverse-media coverage; a small budget swept the full book clean.
           # Same env name/semantics as the Python engine; 'all' = full matrix.
           ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
+          # Third global news backbone (independent rate-limit pool — worldwide
+          # recall needs three simultaneous refusals to go dark). '0' disables.
+          BING_NEWS: ${{ vars.BING_NEWS || '1' }}
           SCREEN_PEP: ${{ vars.SCREEN_PEP }}
           SCREEN_INTERPOL: ${{ vars.SCREEN_INTERPOL }}
           # Ongoing Monitoring audit trail — the section is found/created by name

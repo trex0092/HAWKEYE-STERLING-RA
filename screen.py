@@ -1349,6 +1349,62 @@ def adverse_rotation_cycle_days(budget=None, total=None):
         return 0        # 0 ⇒ never: the budget cannot reach beyond the core
     return -(-pool // room)   # ceil
 
+# ── Rotation coverage LEDGER — the worldwide claim, verified not assumed ─────
+# The rotation makes "worldwide" true over a stated cycle, but only if the runs
+# actually happen and Google News actually answers: a failed run silently
+# skipped its window and nothing noticed. The ledger stamps each market (ceid)
+# with its last successful sweep date in the delta-state, and the report alarms
+# LOUDLY when any market's age exceeds the stated cycle — coverage drift in the
+# worldwide sweep is now a red flag in §②, never an unstated stretch.
+ROTATION_LEDGER_KEY = "__meta_adverse_rotation__"  # reserved — never a fingerprint
+
+def update_rotation_ledger(state, run_time, swept_ok=True):
+    """Stamp the markets this run's rotation window swept (date, keyed by
+    ceid). A run whose Google News breaker opened — or whose news sweep was
+    lost for every subject — stamps NOTHING: a refused sweep is not coverage.
+    Always records when the ledger began (__started__), so never-swept markets
+    only alarm once a full cycle has genuinely had time to complete."""
+    led = state.get(ROTATION_LEDGER_KEY)
+    if not isinstance(led, dict):
+        led = {}
+    today = run_time.strftime("%Y-%m-%d")
+    led.setdefault("__started__", today)
+    if swept_ok:
+        for i in adverse_locale_indices(run_time):
+            led[GNEWS_LOCALES[i][2]] = today
+    state[ROTATION_LEDGER_KEY] = led
+    return led
+
+def _ledger_age_days(value, run_time):
+    try:
+        return run_time.date().toordinal() - datetime.date.fromisoformat(str(value)[:10]).toordinal()
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+def rotation_overdue_limit_days(grace_factor=2):
+    """Age beyond which a market counts as overdue: grace_factor × the stated
+    cycle, floored at cycle+2 so a one-day hiccup never alarms."""
+    cyc = adverse_rotation_cycle_days()
+    return max(cyc * grace_factor, cyc + 2)
+
+def rotation_overdue(ledger, run_time, grace_factor=2):
+    """Markets whose last successful sweep is older than the overdue limit —
+    or never swept at all once the ledger itself is older than that limit.
+    Returns [(ceid, age_days_or_None)] worst-first; None age = never swept."""
+    if not isinstance(ledger, dict):
+        return []
+    limit = rotation_overdue_limit_days(grace_factor)
+    started_age = _ledger_age_days(ledger.get("__started__"), run_time)
+    out = []
+    for _hl, _gl, ceid, _lang in GNEWS_LOCALES:
+        age = _ledger_age_days(ledger.get(ceid), run_time)
+        if age is None:
+            if started_age is not None and started_age > limit:
+                out.append((ceid, None))
+        elif age > limit:
+            out.append((ceid, age))
+    return sorted(out, key=lambda x: -(x[1] if x[1] is not None else 10**6))
+
 # Articles kept per subject after dedup/ranking. The old hard-coded 5 truncated
 # real coverage for any subject whose flagged bucket alone exceeded it; 8 is
 # the new default with the ceiling env-tunable (validated 1-20, loud reject).
@@ -5073,6 +5129,23 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
               f"{len(GNEWS_LOCALES)}-market matrix rotates, so every market is swept within {_cyc} run(s). "
               "GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
               "the rotation adds local-language press on top of it.")
+            # Ledger verdict: the rotation claim above, VERIFIED against the
+            # recorded sweep dates — overdue markets alarm loudly, a clean
+            # mature ledger states its evidence, a young ledger says so.
+            _ov = stats.get("rotation_overdue") or []
+            if _ov:
+                _worst = ", ".join(f"{c} ({'never swept' if a is None else f'{a}d ago'})" for c, a in _ov[:6])
+                A(f"   ⚠ ROTATION OVERDUE — {len(_ov)} market(s) missed their sweep window beyond the "
+                  f"{rotation_overdue_limit_days()}-day limit (worst: {_worst}{', …' if len(_ov) > 6 else ''}). "
+                  "Failed or refused runs stretched the cycle: local-language coverage for those markets is STALE "
+                  "until they are swept. GDELT's global index still ran on every subject — worldwide reach is "
+                  "narrowed, not dark.")
+            elif "rotation_overdue" in stats:
+                if stats.get("rotation_ledger_mature"):
+                    A("   Rotation ledger: VERIFIED — every market swept within its stated window (recorded sweep dates, not an assumption).")
+                else:
+                    A(f"   Rotation ledger: warming up — full-cycle verification available once the ledger is older than "
+                      f"{rotation_overdue_limit_days()} day(s); no market is overdue so far.")
         if stats.get("watchlist_loaded"):
             A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
               f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
@@ -5666,6 +5739,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     NOTES_BUDGET["stored"] = _clamp_notes_budget(state.get(NOTES_BUDGET_KEY))
     NOTES_BUDGET["learned"] = None
     delta = classify_deltas(possible_matches, adverse_findings, pep_findings, state, today)
+    # Worldwide-rotation ledger: stamp this run's swept markets (only if the
+    # news sweep genuinely ran — a breaker-open or all-subjects-lost run stamps
+    # nothing) and compute which markets are overdue for §②'s loud disclosure.
+    # Persisted with the delta-state on delivery, like everything else here.
+    rotation_ledger = update_rotation_ledger(
+        state, run_time,
+        swept_ok=(not _GNEWS_STATE["open"]) and counts["am_errors"] < counts["subjects"])
     # NOTE: state is persisted only AFTER the report is successfully delivered to
     # Asana (see end of function). Saving it here would let a failed post — which
     # the workflow commits anyway (`if: always()`) — permanently mark a brand-new
@@ -5784,6 +5864,10 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
              "am_error_msgs": counts.get("am_error_msgs", []),
              "adverse_evidence_error": adverse_evidence_error,
+             "rotation_overdue": rotation_overdue(rotation_ledger, run_time),
+             "rotation_ledger_mature":
+                 (_ledger_age_days(rotation_ledger.get("__started__"), run_time) or 0)
+                 > rotation_overdue_limit_days(),
              "am_blackout": counts["am_blackout"], "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "adverse_repeat": repeat_patterns,

@@ -223,8 +223,13 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
       + '</em>');
   }
   if (en.amLocalesPerSubject) {
+    const backbones = Array.isArray(en.amBackbones) && en.amBackbones.length
+      ? en.amBackbones.join(' + ') : 'GDELT global index';
     h.push('<em>Adverse-media sweep: ' + esc(String(en.amLocalesPerSubject))
-      + ' news edition(s) per subject this run (pinned core + daily rotation over the worldwide matrix) + GDELT global index.</em>');
+      + ' news edition(s) per subject this run (pinned core + daily rotation'
+      + (en.amMatrixTotal ? ' over the ' + esc(String(en.amMatrixTotal)) + '-edition worldwide matrix' : ' over the worldwide matrix')
+      + (en.amRotationCycleDays ? ' — every edition swept within ' + esc(String(en.amRotationCycleDays)) + ' run(s)' : '')
+      + ') + ' + esc(backbones) + ' on every subject, every run.</em>');
   }
   h.push('<em>Detection is automatic. Do NOT freeze, decline or report on a match before MLRO review and a two-person (four-eyes) sign-off — UAE Federal Decree-Law No. 10 of 2025 Art. 16/18; FATF R.26.</em>');
   const link = runUrl();

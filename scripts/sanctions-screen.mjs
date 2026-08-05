@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
-import { checkAdverseMedia, budgetedLocales, activeLocales, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
+import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 
@@ -1420,7 +1420,15 @@ async function main() {
          core+rotation sweep), so the digest's provenance matches the lookups */
       amLocalesPerSubject: cfg.adverseMedia
         ? (String(process.env.ADVERSE_MEDIA_LOCALES || '').trim() ? activeLocales() : budgetedLocales()).length
-        : 0 },
+        : 0,
+      /* worldwide posture: runs to sweep the FULL edition matrix at this
+         budget (0 ⇒ rotation cannot reach beyond the core), and whether the
+         independent global backbones ran alongside every subject's sweep */
+      amRotationCycleDays: cfg.adverseMedia ? rotationCycleDays() : 0,
+      amMatrixTotal: LOCALES.length,
+      amBackbones: cfg.adverseMedia
+        ? ['GDELT global index', ...(process.env.BING_NEWS !== '0' ? ['Bing News'] : [])]
+        : [] },
     /* Log-only challenger evidence (SCREEN_SHADOW_THRESHOLD) — kept OUT of
        alerts/matchCount/state; feeds the champion-challenger decision log. */
     shadow: screen.shadow || [],

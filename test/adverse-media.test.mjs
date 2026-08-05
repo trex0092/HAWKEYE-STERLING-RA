@@ -2,7 +2,8 @@
    Usage: node test/adverse-media.test.mjs */
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
-  canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS } from '../scripts/adverse-media.mjs';
+  canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
+  bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker } from '../scripts/adverse-media.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -187,6 +188,34 @@ check('mapPool preserves order and runs every item under a concurrency bound',
 
 check('gdeltUrl broadened default terms still target the global artlist JSON',
   gdeltUrl('Acme Co').includes('maxrecords=75') && decodeURIComponent(gdeltUrl('Acme Co')).includes('terrorist financing'));
+
+/* ── Bing News — the THIRD global backbone (independent rate-limit pool) ── */
+check('bingNewsUrl targets the Bing News RSS endpoint with quoted name + risk terms',
+  bingNewsUrl('Acme Co').startsWith('https://www.bing.com/news/search?q=')
+  && bingNewsUrl('Acme Co').includes('format=rss')
+  && decodeURIComponent(bingNewsUrl('Acme Co')).includes('"Acme Co"')
+  && decodeURIComponent(bingNewsUrl('Acme Co')).includes('money laundering'));
+
+/* ── Google News run-level breaker — refusals stop the hammering, loudly ── */
+check('breaker: refusal shapes accumulate and open at the threshold; success resets', (() => {
+  resetGnewsBreaker();
+  for (let i = 0; i < 24; i++) noteGnewsResult(false, 429);
+  const notOpenYet = !gnewsBreakerOpen();
+  noteGnewsResult(true, 200);                      // success resets the streak
+  for (let i = 0; i < 24; i++) noteGnewsResult(false, 429);
+  const stillClosed = !gnewsBreakerOpen();
+  noteGnewsResult(false, 0);                       // network failure counts
+  const nowOpen = gnewsBreakerOpen();
+  resetGnewsBreaker();
+  return notOpenYet && stillClosed && nowOpen && !gnewsBreakerOpen();
+})());
+check('breaker: a non-refusal failure (e.g. HTTP 500 parse path) never opens it', (() => {
+  resetGnewsBreaker();
+  for (let i = 0; i < 60; i++) noteGnewsResult(false, 500);
+  const closed = !gnewsBreakerOpen();
+  resetGnewsBreaker();
+  return closed;
+})());
 
 /* ── Phase-4 hardening: description scanning, tiers, canonical dedup ──────── */
 const descRss = '<rss><channel><item><title>Acme Corp restructures Gulf operations</title>'

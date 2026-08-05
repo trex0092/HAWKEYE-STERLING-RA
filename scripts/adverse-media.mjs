@@ -542,8 +542,9 @@ export function sourceTierFor(item) {
 }
 
 /* Fetch one source with a per-request timeout. Returns the parsed item array,
-   or null on any failure (so the caller can tell "no hits" from "couldn't ask").*/
-async function fetchSource(url, parse, accept, timeoutMs) {
+   or null on any failure (so the caller can tell "no hits" from "couldn't ask").
+   `note(ok, status)` — optional per-result observer (the Google News breaker). */
+async function fetchSource(url, parse, accept, timeoutMs, note) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -551,10 +552,48 @@ async function fetchSource(url, parse, accept, timeoutMs) {
       signal: ctrl.signal, redirect: 'follow',
       headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: accept }
     });
+    if (note) note(res.ok, res.status);
     if (!res.ok) return null;
     return parse(await res.text());
-  } catch { return null; }
+  } catch { if (note) note(false, 0); return null; }
   finally { clearTimeout(t); }
+}
+
+/* ── Google News run-level rate-limit BREAKER (screen.py _GNEWS_STATE parity) ──
+   The empirical failure shape: once Google's per-IP limiter trips, EVERY
+   further edition fetch in the run is refused, and hammering it only extends
+   the penalty — 805/838 subjects came back with zero coverage that way. When
+   GNEWS_BREAKER_AFTER consecutive refusals (429/403/503 or network) are seen,
+   the breaker opens for the REST OF THE RUN: remaining Google News fetches are
+   skipped (each still counted as a failed source, so every affected subject is
+   marked partial — disclosed, never a silent clear), while GDELT and Bing News
+   (independent rate-limit pools) keep the worldwide backbones up. */
+const GNEWS_BREAKER_AFTER = Math.max(1, Number(process.env.GNEWS_BREAKER_AFTER) || 25);
+const _gnews = { consecutive: 0, open: false };
+export function gnewsBreakerOpen() { return _gnews.open; }
+export function resetGnewsBreaker() { _gnews.consecutive = 0; _gnews.open = false; }
+export function noteGnewsResult(ok, status) {
+  if (ok) { _gnews.consecutive = 0; return; }
+  /* Only refusal shapes count — a parse quirk must not open the breaker. */
+  if (status === 429 || status === 403 || status === 503 || status === 0) {
+    _gnews.consecutive++;
+    if (!_gnews.open && _gnews.consecutive >= GNEWS_BREAKER_AFTER) {
+      _gnews.open = true;
+      console.error('adverse-media: Google News refused ' + _gnews.consecutive
+        + ' consecutive fetches — breaker OPEN for the rest of the run (affected subjects are marked partial; GDELT + Bing News backbones continue)');
+    }
+  }
+}
+
+/* ── Bing News RSS — independent THIRD news backbone (screen.py parity) ──────
+   Google News and GDELT meter shared runner IPs independently and have both
+   refused the same run before (the Python engine's 10-14 Jul record); Bing News
+   serves a free, no-key RSS endpoint on a THIRD rate-limit pool, so worldwide
+   headline recall needs three simultaneous refusals to go dark.
+   Kill-switch: BING_NEWS=0 (same env as the Python engine). */
+export function bingNewsUrl(name, terms = ADVERSE_TERMS) {
+  const q = '"' + String(name).trim() + '" (' + terms.map(t => '"' + t + '"').join(' OR ') + ')';
+  return 'https://www.bing.com/news/search?q=' + encodeURIComponent(q) + '&format=rss';
 }
 
 /* Run async `fn` over `items` with bounded concurrency, so a wide locale sweep
@@ -596,25 +635,34 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const explicitIds = String(process.env.ADVERSE_MEDIA_LOCALES || '').trim();
   const localeSet = locales || (explicitIds ? activeLocales() : budgetedLocales());
   const conc = Math.max(1, concurrency || Number(process.env.ADVERSE_MEDIA_CONCURRENCY) || 6);
+  const bingOn = process.env.BING_NEWS !== '0';
 
-  // GDELT (global) runs alongside the pooled per-locale Google News fetches.
+  // The three global backbones run together: GDELT (worldwide index, 65+
+  // languages) + Bing News (third rate-limit pool) alongside the pooled
+  // per-locale Google News fetches. A Google News fetch is skipped once the
+  // run-level breaker is open — skipped counts as failed (partial), never ok.
   const gdeltP = fetchSource(gdeltUrl(name), parseGdelt, 'application/json', timeoutMs);
+  const bingP = bingOn ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs) : Promise.resolve(null);
   const localeResults = await mapPool(localeSet, conc, loc =>
-    fetchSource(adverseMediaUrlFor(name, loc), parseRss, xmlAccept, timeoutMs)
+    (_gnews.open
+      ? Promise.resolve(null)
+      : fetchSource(adverseMediaUrlFor(name, loc), parseRss, xmlAccept, timeoutMs, noteGnewsResult))
       .then(items => ({ id: loc.id, items }))
   );
   const gd = await gdeltP;
+  const bgRaw = await bingP;
+  const bg = bgRaw === null ? null : bgRaw.map(i => ({ ...i, source: i.source || 'Bing News' }));
 
   const enUs = localeResults.find(r => r.id === 'en-US');
-  const backboneOk = (enUs && enUs.items !== null) || gd !== null;
-  if (!backboneOk) return { errored: true, error: 'global adverse-media backbones unreachable', localesQueried: localeSet.length };
+  const backboneOk = (enUs && enUs.items !== null) || gd !== null || (bingOn && bg !== null);
+  if (!backboneOk) return { errored: true, error: 'global adverse-media backbones unreachable (Google News en-US + GDELT' + (bingOn ? ' + Bing News' : '') + ')', localesQueried: localeSet.length };
 
   const okLocales = localeResults.filter(r => r.items !== null);
-  const items = dedupItems([...okLocales.flatMap(r => r.items), ...(gd || [])]);
+  const items = dedupItems([...okLocales.flatMap(r => r.items), ...(gd || []), ...(bg || [])]);
   const result = scoreAdverseMedia(name, items, ALL_TERMS);
 
-  const sourcesOk = okLocales.length + (gd !== null ? 1 : 0);
-  const sourcesTotal = localeSet.length + 1; // + GDELT
+  const sourcesOk = okLocales.length + (gd !== null ? 1 : 0) + (bingOn && bg !== null ? 1 : 0);
+  const sourcesTotal = localeSet.length + 1 + (bingOn ? 1 : 0); // + GDELT (+ Bing)
   const failed = sourcesTotal - sourcesOk;
   const out = { ...result, localesQueried: localeSet.length, sourcesOk, sourcesFailed: failed, itemsScanned: items.length };
   return failed ? { ...out, partial: true } : out;

@@ -609,6 +609,63 @@ _tally_counts, _tf, _tp = screen.tally_enrichment(
     wl_hits={}, wl_loaded=False)
 check("tally: am_error causes are sampled with counts, most-affected first",
       _tally_counts["am_error_msgs"] == [("HTTP 429", 2), ("timeout", 1)])
+
+# ── Worldwide-rotation ledger: the "every market within N runs" claim, verified ──
+print("screen.py — rotation coverage ledger")
+_led_state = {}
+_rt1 = _dt.datetime(2026, 8, 5)
+_led = screen.update_rotation_ledger(_led_state, _rt1)
+_swept_today = [screen.GNEWS_LOCALES[i][2] for i in screen.adverse_locale_indices(_rt1)]
+check("ledger stamps this run's swept markets with the run date and records its start",
+      all(_led.get(c) == "2026-08-05" for c in _swept_today) and _led["__started__"] == "2026-08-05"
+      and _led_state[screen.ROTATION_LEDGER_KEY] is _led)
+_led_refused = {}
+screen.update_rotation_ledger(_led_refused, _rt1, swept_ok=False)
+check("a refused sweep stamps NOTHING (a breaker-open run is not coverage) but starts the clock",
+      list(_led_refused[screen.ROTATION_LEDGER_KEY].keys()) == ["__started__"])
+check("reserved ledger key survives delta-state pruning",
+      (lambda s: (screen.prune_delta_state(s, _dt.date(2026, 8, 5)), screen.ROTATION_LEDGER_KEY in s)[1])(
+          {"stale|fp": "2020-01-01", screen.ROTATION_LEDGER_KEY: {"__started__": "2026-08-01"}}))
+_limit = screen.rotation_overdue_limit_days()
+check("overdue limit is 2x the stated cycle (floored at cycle+2)",
+      _limit == max(screen.adverse_rotation_cycle_days() * 2, screen.adverse_rotation_cycle_days() + 2))
+# Fresh ledger → nothing overdue; never-swept markets stay silent until the
+# ledger is old enough that a full cycle should have completed.
+check("young ledger: never-swept markets do not alarm yet",
+      screen.rotation_overdue({"__started__": "2026-08-05"}, _rt1) == [])
+_old_start = (_rt1 - _dt.timedelta(days=_limit + 3)).strftime("%Y-%m-%d")
+_stale_date = (_rt1 - _dt.timedelta(days=_limit + 1)).strftime("%Y-%m-%d")
+_mature_led = {"__started__": _old_start}
+for _hl_, _gl_, _ceid_, _lang_ in screen.GNEWS_LOCALES:
+    _mature_led[_ceid_] = "2026-08-05"
+_mature_led[screen.GNEWS_LOCALES[10][2]] = _stale_date      # one stale market
+_ov = screen.rotation_overdue(_mature_led, _rt1)
+check("mature ledger: a market beyond the limit is flagged with its age, fresh ones are not",
+      _ov == [(screen.GNEWS_LOCALES[10][2], _limit + 1)])
+del _mature_led[screen.GNEWS_LOCALES[11][2]]                 # and one never swept
+_ov2 = screen.rotation_overdue(_mature_led, _rt1)
+check("mature ledger: a never-swept market is flagged worst-first (age None)",
+      _ov2[0] == (screen.GNEWS_LOCALES[11][2], None) and (screen.GNEWS_LOCALES[10][2], _limit + 1) in _ov2)
+# §② renders the verdict: overdue alarms loudly; a clean mature ledger claims
+# VERIFIED; a young ledger says it is still warming up.
+_rot_finding = [{"subject_type": "ENTITY", "subject_name": "Rot Co", "parent": "", "permalink": "",
+                 "is_new": True,
+                 "articles": [{"title": "Rot Co probed for fraud", "source": "Reuters",
+                               "date": "2026-08-01", "url": "https://n/1", "categories": ["Fraud"],
+                               "is_new": True}]}]
+_rot_stats = {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5,
+              "am_errors": 0, "pep_errors": 0, "delta": {},
+              "rotation_overdue": [("MX:es-419", 51), ("KR:ko", None)], "rotation_ledger_mature": True}
+_narr_rot = screen.build_unified_narrative([], [], _rot_finding, [], _meta_deg, _rot_stats, _rt1)
+check("report: overdue rotation markets alarm loudly in §² with ages",
+      "ROTATION OVERDUE" in _narr_rot and "MX:es-419 (51d ago)" in _narr_rot and "KR:ko (never swept)" in _narr_rot
+      and "narrowed, not dark" in _narr_rot)
+_rot_ok = {**_rot_stats, "rotation_overdue": [], "rotation_ledger_mature": True}
+check("report: a clean MATURE ledger claims VERIFIED (evidence, not assumption)",
+      "Rotation ledger: VERIFIED" in screen.build_unified_narrative([], [], _rot_finding, [], _meta_deg, _rot_ok, _rt1))
+_rot_young = {**_rot_stats, "rotation_overdue": [], "rotation_ledger_mature": False}
+check("report: a young ledger says warming up, never claims verification",
+      "warming up" in screen.build_unified_narrative([], [], _rot_finding, [], _meta_deg, _rot_young, _rt1))
 # The "queued N case(s)" claim must use the case opener's own predicates —
 # an identity-excluded sanctions hit raises no case, so it must not count.
 _pm_cp = [{"name": "X", "hits": [{"is_new": True, "identity_excluded": True, "score": 90}]},

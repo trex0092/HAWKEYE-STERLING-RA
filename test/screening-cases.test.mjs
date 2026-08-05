@@ -202,6 +202,14 @@ check('digest: narrowed adverse-media coverage is disclosed, never silent', (() 
   return partial.includes('12 subject(s) had NARROWED adverse-media coverage')
     && partial.includes('Adverse-media sweep: 8 news edition(s) per subject');
 })());
+check('digest: worldwide posture states the matrix size, rotation cycle and global backbones', (() => {
+  const world = buildResultsDigestHtml({ ...RESULTS,
+    enrichment: { amLocalesPerSubject: 8, amRotationCycleDays: 22, amMatrixTotal: 70,
+      amBackbones: ['GDELT global index', 'Bing News'] } });
+  return world.includes('70-edition worldwide matrix')
+    && world.includes('every edition swept within 22 run(s)')
+    && world.includes('GDELT global index + Bing News on every subject, every run');
+})());
 check('digest: a clean day is affirmative, never silent', (() => {
   const clean = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
   return clean.includes('every subject screened clean') && !clean.includes('DEGRADED');
