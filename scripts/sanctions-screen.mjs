@@ -320,6 +320,14 @@ export function normalizeHit(h) {
      (some external shapes use `confidence` as a score — handled above). */
   if (h.mechanism) out.mechanism = String(h.mechanism);
   if (typeof h.confidence === 'string' && num(h.confidence) === null) out.confidence = h.confidence;
+  /* Cleared-FP annotation must survive this rebuild or the demotion (and its
+     audit trail) silently vanishes between the matcher and the state. */
+  if (h.whitelisted) {
+    out.whitelisted = true;
+    if (h.clearedAt) out.clearedAt = String(h.clearedAt);
+    if (h.clearedBy) out.clearedBy = String(h.clearedBy);
+    if (h.clearedVia) out.clearedVia = String(h.clearedVia);
+  }
   /* A phonetic-only hit must stay visibly WEAK all the way to the case board —
      the flag travels in the hitName suffix (state/alert/case builders all
      render hitName) AND as a structured field. */
@@ -409,8 +417,92 @@ export function hitDetail(lists) {
     if (h.mechanism) d.mechanism = h.mechanism;
     if (h.confidence) d.confidence = h.confidence;
     if (h.carriedForward) d.carriedForward = true;
+    if (h.whitelisted) {
+      d.whitelisted = true;
+      if (h.clearedAt) d.clearedAt = h.clearedAt;
+      if (h.clearedBy) d.clearedBy = h.clearedBy;
+      if (h.clearedVia) d.clearedVia = h.clearedVia;
+    }
     return d;
   });
+}
+
+/* ── CLEARED-FALSE-POSITIVE REGISTRY (whitelist — demote, NEVER suppress) ────
+   An analyst-cleared match pair must stop opening a fresh case every day, but
+   nothing may vanish from the record: whitelisted hits stay on the report and
+   the state, ANNOTATED with the clearance, and only the case-opening severity
+   is demoted. Identity is PAIR-level — subject key + the exact designated
+   name + list that was reviewed — so a NEW or CHANGED designated name against
+   the same subject reactivates normally (built-in re-confirm on list change).
+   Entries come from two evidence-backed sources: the curated registry file
+   (four-eyes PR procedure) and '[x] false positive' dispositions ticked on
+   case cards (recorded by screening-cases.mjs with the case gid as evidence).
+   Kill switch: SCREEN_WHITELIST=0 disables the registry entirely. */
+export function whitelistKey(subjectKey, hitName, list) {
+  /* normalizeName folds case/diacritics but turns dots into spaces ("L.L.C."
+     → "L L C" vs "LLC") — collapsing whitespace afterwards makes the pair key
+     survive list-side punctuation churn without loosening the name itself. */
+  const hn = normalizeName(String(hitName || '')).replace(/\s+/g, '');
+  return String(subjectKey) + '::' + hn + '|' + String(list || '');
+}
+
+export function buildWhitelistMap(curatedEntries, casesState) {
+  const map = new Map();
+  for (const e of (Array.isArray(curatedEntries) ? curatedEntries : [])) {
+    if (!e || !e.subject_key || !e.hit_name || !e.list) continue;
+    map.set(whitelistKey(e.subject_key, e.hit_name, e.list),
+      { clearedAt: e.cleared_at || '', clearedBy: e.cleared_by || '', clearedVia: 'registry file' });
+  }
+  for (const [key, cs] of Object.entries(casesState || {})) {
+    const d = cs && cs.disposition;
+    if (!d || d.kind !== 'false-positive' || !Array.isArray(d.hits)) continue;
+    for (const p of d.hits) {
+      if (!p || !p.hitName || !p.list) continue;
+      map.set(whitelistKey(key, p.hitName, p.list),
+        { clearedAt: d.at || '', clearedBy: 'MLRO disposition', clearedVia: 'case ' + (d.caseGid || '?') });
+    }
+  }
+  return map;
+}
+
+export function applyWhitelist(subjectKey, hits, wlMap) {
+  let annotated = 0;
+  for (const h of (hits || [])) {
+    if (!h || !h.list || !h.hitName) continue;
+    const wl = wlMap && wlMap.get(whitelistKey(subjectKey, h.hitName, h.list));
+    if (!wl) continue;
+    h.whitelisted = true;
+    if (wl.clearedAt) h.clearedAt = wl.clearedAt;
+    if (wl.clearedBy) h.clearedBy = wl.clearedBy;
+    if (wl.clearedVia) h.clearedVia = wl.clearedVia;
+    annotated++;
+  }
+  return annotated;
+}
+
+/* ── SECOND OPINION (OFAC-API.com) — independent corroboration, additive-only.
+   Shape-tolerant parser: the exact response schema cannot be verified from
+   the dev sandbox (egress-blocked), so anything unrecognisable is returned as
+   'unavailable' with the reason — a lost second opinion, never a clear. */
+export function parseOfacApiResponse(d) {
+  if (!d || typeof d !== 'object') return { status: 'unavailable', error: 'empty/non-object response' };
+  const err = d.errorMessage || (typeof d.error === 'string' ? d.error : null)
+    || (String(d.status || '').toLowerCase() === 'error' ? (d.message || 'error status') : null);
+  if (err) return { status: 'unavailable', error: String(err).slice(0, 120) };
+  const results = Array.isArray(d.results) ? d.results
+    : (Array.isArray(d.matches) ? d.matches : (Array.isArray(d.cases) ? d.cases : null));
+  if (!results) return { status: 'unavailable', error: 'unrecognised response shape: ' + Object.keys(d).slice(0, 5).join(',') };
+  const entry = results[0] || {};
+  const matches = Array.isArray(entry.matches) ? entry.matches : (Array.isArray(entry.results) ? entry.results : []);
+  const matchCount = Number(entry.matchCount != null ? entry.matchCount : matches.length) || 0;
+  let topScore = null;
+  for (const m of matches) {
+    const sc = num(m && (m.score != null ? m.score : m.matchScore));
+    if (sc != null) topScore = Math.max(topScore ?? 0, sc);
+  }
+  return matchCount > 0
+    ? { status: 'corroborated', matchCount, ...(topScore != null ? { topScore } : {}) }
+    : { status: 'no-match', matchCount: 0 };
 }
 
 export function diffState(prevState, results, today, threshold, screenedLists, evaluatedSignals) {
@@ -494,6 +586,9 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
            records simply lack these fields — renderers fall back. */
         gid: r.gid, entityType: r.entityType, parent: r.parent, role: r.role,
         hits: hitDetail(lists),
+        /* Report-only row: every hit is a cleared-FP pair — the case engine
+           opens no case; the report keeps the row, annotated. */
+        ...(r.whitelistedOnly ? { whitelistedOnly: true } : {}),
         signature: sig, firstSeen, lastSeen: today
       };
       if (!prior || prior.signature !== sig) {
@@ -1220,6 +1315,13 @@ async function screenLocally(subjects, cfg) {
       }
     }
     const lists = [...raw.lists];
+    /* Cleared-FP registry: annotate matcher hits whose exact subject+designated-
+       name+list pair an analyst already cleared. Runs BEFORE enrichment merges,
+       so enrichment findings (adverse media / PEP / Interpol) can never be
+       whitelisted away. Annotation only — severity is recomputed below. */
+    if (cfg.whitelistMap && cfg.whitelistMap.size && lists.length) {
+      applyWhitelist(s.key, lists, cfg.whitelistMap);
+    }
     let band = raw.lists.length ? raw.band : '';
     let topScore = raw.lists.length ? raw.topScore : 0;
     const enrich = Date.now() < enrichDeadline;
@@ -1260,18 +1362,25 @@ async function screenLocally(subjects, cfg) {
        ('sanctions-match') from a not-auto-screenable subject ('review', with
        the MANUAL REVIEW pseudo-list) — the latter must surface as a reviewable
        finding, never be promoted to a sanctions match nor demoted to clear. */
-    const hasSanctions = raw.recommendation === 'sanctions-match';
+    /* Every remaining hit cleared by the registry ⇒ demote the ROW (medium /
+       review — the weakOnly precedent), keep every hit visible + annotated,
+       and flag the record so the case engine opens no fresh case. A single
+       non-whitelisted hit (incl. any enrichment finding) restores full
+       severity — demote-never-suppress, pair-level only. */
+    const whitelistedOnly = lists.length > 0 && lists.every(h => h.whitelisted);
+    const hasSanctions = raw.recommendation === 'sanctions-match' && !whitelistedOnly;
     const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
     const merged = {
       name: s.name,
       topScore: lists.length ? topScore : raw.topScore,
-      band: lists.length ? band : 'low',
+      band: lists.length ? (whitelistedOnly ? 'medium' : band) : 'low',
       recommendation,
       hitCount: lists.length,
       lists
     };
     const nr = normalizeResult(merged, s);
     nr.enrichmentIncomplete = enrichmentIncomplete;
+    if (whitelistedOnly) nr.whitelistedOnly = true;
     heartbeat();
     return nr;
   });
@@ -1343,8 +1452,41 @@ async function main() {
        Sanctions matching is always run for every subject; once this elapses the
        remaining subjects skip enrichment so the job never approaches its timeout.
        Default 12 min leaves headroom under the 20-min job timeout. */
-    enrichBudgetMs: Number(process.env.SCREEN_ENRICH_BUDGET_MS) || 720000
+    enrichBudgetMs: Number(process.env.SCREEN_ENRICH_BUDGET_MS) || 720000,
+    /* Cleared-FP registry (whitelist): default ON — an empty registry is a
+       no-op, and the kill switch exists for incident response. */
+    whitelist: process.env.SCREEN_WHITELIST !== '0',
+    whitelistFile: process.env.SCREEN_WHITELIST_FILE || 'data/screening-whitelist.json',
+    casesStateFile: process.env.CASES_STATE_FILE || 'data/screening-cases-state.json',
+    /* OFAC-API second opinion: default OFF (opt-in — third-party transfer;
+       record the processor in the third-party register before enabling). */
+    secondOpinion: process.env.OFACAPI === '1' && !!process.env.OFAC_API_KEY,
+    secondOpinionCap: Number(process.env.OFACAPI_CAP) || 25,
+    secondOpinionTimeoutMs: Number(process.env.OFACAPI_TIMEOUT_MS) || 15000
   };
+  if (process.env.OFACAPI === '1' && !process.env.OFAC_API_KEY) {
+    console.warn('sanctions-screen: OFACAPI=1 but OFAC_API_KEY is missing — second opinion OFF');
+  }
+  /* Build the cleared-FP map from BOTH evidence-backed sources: the curated
+     registry file and the '[x] false positive' dispositions the case manager
+     recorded (screening-cases state, overlaid from the screen-state branch
+     before this step). Fail-soft: an unreadable file means an empty registry
+     (severity can only go UP from a registry failure, never down). */
+  if (cfg.whitelist) {
+    let curated = [];
+    try {
+      const wlf = JSON.parse(readFileSync(cfg.whitelistFile, 'utf8'));
+      curated = Array.isArray(wlf.entries) ? wlf.entries : [];
+    } catch { /* absent/unreadable registry file = empty registry */ }
+    let casesState = {};
+    try { casesState = JSON.parse(readFileSync(cfg.casesStateFile, 'utf8')) || {}; }
+    catch { /* no cases state yet */ }
+    cfg.whitelistMap = buildWhitelistMap(curated, casesState);
+    if (cfg.whitelistMap.size) {
+      console.log('sanctions-screen: cleared-FP registry active — ' + cfg.whitelistMap.size
+        + ' pair(s) (' + curated.length + ' curated + case dispositions); matching hits are DEMOTED with the clearance cited, never removed');
+    }
+  }
   const asanaToken = process.env.ASANA_ACCESS_TOKEN || '';
 
   if (!asanaToken) return bailUnscreened('ASANA_ACCESS_TOKEN not set — cannot read the Customer Database', today);
@@ -1392,6 +1534,47 @@ async function main() {
     console.log(`sanctions-screen: ${notScreened.length} standing match(es) left the screened population — `
       + 'cases HELD for manual disposition, not auto-cleared: '
       + notScreened.map(n => n.name || n.key).join(', '));
+  }
+
+  /* SECOND OPINION (OFAC-API) — independent corroboration on the NEW/CHANGED
+     matches only (bounded by OFACAPI_CAP, so a list-update day cannot burn the
+     plan). ADDITIVE-ONLY by design: the verdict is attached to the state
+     record (→ rendered on the case card), never merged into lists/band/
+     recommendation/signature — an external engine can corroborate or visibly
+     DISAGREE, but can never downgrade, clear, or re-alert a hit. A failed
+     lookup is disclosed on the card as a lost signal, never read as a clear. */
+  if (cfg.secondOpinion && alerts.length) {
+    let soOk = 0, soFail = 0;
+    for (const a of alerts.slice(0, cfg.secondOpinionCap)) {
+      const rec = nextState.subjects[a.key];
+      if (!rec) continue;
+      let parsed;
+      try {
+        const resp = await withTimeout((signal) => fetch('https://api.ofac-api.com/v4/screen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: process.env.OFAC_API_KEY,
+            minScore: 80,
+            sources: ['SDN', 'NONSDN', 'UN', 'UK', 'EU'],
+            cases: [{ name: a.name }]
+          }),
+          signal
+        }), cfg.secondOpinionTimeoutMs);
+        parsed = (resp && resp.ok) ? parseOfacApiResponse(await resp.json())
+          : { status: 'unavailable', error: 'http ' + (resp ? resp.status : 'no-response') };
+      } catch (e) {
+        parsed = { status: 'unavailable', error: String(e && e.message || e).slice(0, 120) };
+      }
+      rec.secondOpinion = { provider: 'OFAC-API', checkedAt: today, ...parsed };
+      if (parsed.status === 'unavailable') soFail++; else soOk++;
+    }
+    if (alerts.length > cfg.secondOpinionCap) {
+      console.log('sanctions-screen: second opinion capped at ' + cfg.secondOpinionCap + ' of '
+        + alerts.length + ' new/changed matches this run (OFACAPI_CAP)');
+    }
+    console.log('sanctions-screen: second opinion (OFAC-API) attached to ' + (soOk + soFail)
+      + ' case record(s) — ' + soOk + ' answered, ' + soFail + ' unavailable (disclosed on the card)');
   }
   /* What ACTUALLY loaded (with partial-alias flags) + what failed — feeds the
      coverage-honesty lines in the report/alert instead of the fixed scope claim. */

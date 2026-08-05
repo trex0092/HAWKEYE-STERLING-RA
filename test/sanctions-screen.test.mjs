@@ -6,7 +6,8 @@ import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
-  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip
+  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
+  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
 import { readFileSync } from 'node:fs';
@@ -608,6 +609,45 @@ check('a same-prefix date does not collide (9 Jul vs 19 Jul)',
 // Unrelated Ongoing-Monitoring cards on the same date must not dedupe either.
 check('an unrelated same-day OM card does not suppress the AM/PEP card',
   omCardToSkip(['Quarterly review — ' + _omDate], _omDate, true) === null);
+
+/* ── Cleared-FP registry (whitelist) — demote, never suppress ── */
+const _wlCurated = [{ subject_key: 'acme llc', hit_name: 'ACME L.L.C.', list: 'US OFAC — SDN list (CSV)',
+  cleared_by: 'MLRO', cleared_at: '2026-08-01', case_gid: '123', reason: 'different entity, disambiguated' }];
+const _wlCases = { 'bravo|ubo|999': { taskGid: 't1', disposition: { kind: 'false-positive', at: '2026-08-02', caseGid: 't1',
+  hits: [{ hitName: 'BRAVO TRADING', list: 'UK OFSI — Consolidated list of targets (CSV)' }] } } };
+const _wl = buildWhitelistMap(_wlCurated, _wlCases);
+check('whitelist map holds curated + disposition pairs', _wl.size === 2);
+check('whitelist key normalises the designated name (punctuation churn survives)',
+  whitelistKey('acme llc', 'ACME L.L.C.', 'US OFAC — SDN list (CSV)')
+  === whitelistKey('acme llc', 'ACME LLC', 'US OFAC — SDN list (CSV)'));
+const _wlHits = [
+  { list: 'US OFAC — SDN list (CSV)', hitName: 'ACME L.L.C.', score: 90 },
+  { list: 'UN Security Council — Consolidated list (XML)', hitName: 'OTHER NAME', score: 70 }];
+check('applyWhitelist annotates ONLY the cleared pair — the other hit is untouched',
+  applyWhitelist('acme llc', _wlHits, _wl) === 1
+  && _wlHits[0].whitelisted === true && _wlHits[0].clearedVia === 'registry file'
+  && !_wlHits[1].whitelisted);
+check('a disposition-sourced pair cites its case as evidence',
+  _wl.get(whitelistKey('bravo|ubo|999', 'BRAVO TRADING', 'UK OFSI — Consolidated list of targets (CSV)')).clearedVia === 'case t1');
+check('normalizeHit carries the whitelist annotation through the rebuild',
+  (() => { const h = normalizeHit({ list: 'L', hitName: 'N', score: 80, whitelisted: true, clearedVia: 'case t1' });
+    return h.whitelisted === true && h.clearedVia === 'case t1'; })());
+check('hitDetail persists the whitelist annotation into the state record',
+  (() => { const d = hitDetail([{ list: 'L', hitName: 'N', score: 80, whitelisted: true, clearedAt: '2026-08-01' }]);
+    return d[0].whitelisted === true && d[0].clearedAt === '2026-08-01'; })());
+
+/* ── OFAC-API second-opinion parser (shape-tolerant, unavailable ≠ clear) ── */
+check('OFAC-API: matches present → corroborated with count + top score',
+  (() => { const p = parseOfacApiResponse({ results: [{ name: 'X', matches: [{ score: 92 }, { score: 71 }] }] });
+    return p.status === 'corroborated' && p.matchCount === 2 && p.topScore === 92; })());
+check('OFAC-API: empty matches → no-match (never silently corroborated)',
+  parseOfacApiResponse({ results: [{ name: 'X', matches: [] }] }).status === 'no-match');
+check('OFAC-API: error payload → unavailable with the reason',
+  (() => { const p = parseOfacApiResponse({ errorMessage: 'invalid api key' });
+    return p.status === 'unavailable' && p.error.includes('invalid api key'); })());
+check('OFAC-API: unrecognised shape → unavailable, never a guess',
+  parseOfacApiResponse({ totally: 'different' }).status === 'unavailable');
+check('OFAC-API: non-object → unavailable', parseOfacApiResponse(null).status === 'unavailable');
 
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
