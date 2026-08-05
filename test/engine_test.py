@@ -582,6 +582,43 @@ _narr = screen.build_unified_narrative(
 check("report: adverse-media errors surface as DEGRADED (not hardcoded OK)", "Adverse media DEGRADED" in _narr)
 check("report: a down core list surfaces as DEGRADED sanctions coverage", "SANCTIONS COVERAGE DEGRADED" in _narr and "UN" in _narr)
 check("report: lists-screened block renders on a zero-match run", "Lists screened:" in _narr)
+check("report: header makes no delivery-time promise (the 09:00 UAE SLA was never met)",
+      "delivered by" not in _narr)
+# §② must say WHY the news sweep failed, not just how many subjects lost it —
+# am_msg was captured per subject but never rendered anywhere.
+_narr_amerr = screen.build_unified_narrative(
+    [], [], [], [], _meta_deg,
+    {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5, "am_errors": 3,
+     "am_error_msgs": [("HTTP 429 rate-limited", 2), ("timed out after 20s", 1)],
+     "pep_errors": 0, "delta": {}},
+    _dt.datetime(2026, 7, 9))
+check("report: adverse feed failure causes are rendered with subject counts",
+      "Why the news sweep failed" in _narr_amerr and "HTTP 429 rate-limited  ×2" in _narr_amerr
+      and "timed out after 20s  ×1" in _narr_amerr)
+check("report: no failure-cause block when the sweep had no errors", "Why the news sweep failed" not in _narr)
+# tally_enrichment: distinct am_msg samples are tallied (top 3, by subject count).
+_tally_counts, _tf, _tp = screen.tally_enrichment(
+    [{"type": "ENTITY", "name": "A", "parent": "", "permalink": "", "adverse": None, "pep": None,
+      "am_error": True, "am_msg": "HTTP 429"},
+     {"type": "ENTITY", "name": "B", "parent": "", "permalink": "", "adverse": None, "pep": None,
+      "am_error": True, "am_msg": "HTTP 429"},
+     {"type": "ENTITY", "name": "C", "parent": "", "permalink": "", "adverse": None, "pep": None,
+      "am_error": True, "am_msg": "timeout"},
+     {"type": "ENTITY", "name": "D", "parent": "", "permalink": "", "adverse": [], "pep": None,
+      "am_error": False}],
+    wl_hits={}, wl_loaded=False)
+check("tally: am_error causes are sampled with counts, most-affected first",
+      _tally_counts["am_error_msgs"] == [("HTTP 429", 2), ("timeout", 1)])
+# The "queued N case(s)" claim must use the case opener's own predicates —
+# an identity-excluded sanctions hit raises no case, so it must not count.
+_pm_cp = [{"name": "X", "hits": [{"is_new": True, "identity_excluded": True, "score": 90}]},
+          {"name": "Y", "hits": [{"is_new": True, "score": 88}]},
+          {"name": "Z", "hits": [{"is_new": False, "score": 88}]}]
+_af_cp = [{"subject_name": "A", "articles": [{"is_new": True}]},
+          {"subject_name": "B", "articles": [{"is_new": False}]}]
+_pf_cp = [{"subject_name": "P", "is_new": True}, {"subject_name": "Q"}]
+check("case forecast counts only items the case opener will queue (identity-excluded skipped)",
+      screen.count_new_case_items(_pm_cp, _af_cp, _pf_cp) == 3)
 
 # ── parse robustness (EU ragged/None-aliases row must not zero the list) ──────
 print("screen.py — parse robustness")
@@ -2791,6 +2828,105 @@ _mem = {m.get("project"): m.get("section") for m in _data.get("memberships", [])
 check("unified daily task lands in the Follow Ups delivery section",
       _mem.get(screen.ASANA_FOLLOWUPS_GID) == screen.ASANA_FOLLOWUPS_SECTION_GID
       and _mem.get(screen.ASANA_ONGOING_MON_GID) == screen.ASANA_SECTION_GID)
+# _mlro_queue_targets directly: dropping the Follow Ups queue must collapse the
+# multi-homing to the single Ongoing Monitoring membership, never an empty one.
+_orig_fu, _orig_fu_sec = screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID
+try:
+    screen.ASANA_FOLLOWUPS_GID = ""
+    _pj1, _mb1 = screen._mlro_queue_targets()
+finally:
+    screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID = _orig_fu, _orig_fu_sec
+check("queue targets without Follow Ups: one project, one sectioned membership",
+      _pj1 == [screen.ASANA_ONGOING_MON_GID]
+      and _mb1 == [{"project": screen.ASANA_ONGOING_MON_GID, "section": screen.ASANA_SECTION_GID}])
+
+# ── screen.py: section-aware narrative shrink (§② must survive delivery) ─────
+# Regression: cap_notes keeps head + tail, so an oversized report lost its
+# MIDDLE — which is exactly §② ADVERSE MEDIA (it sits after the unbounded §①
+# sanctions detail). The header still counted N adverse subjects while the body
+# carried none of them: the user-visible "adverse media is not showing".
+_big_matches = [{"name": f"Cust {i}", "permalink": f"https://app.asana.com/0/x/{i}",
+                 "hits": [{"subject_type": "ENTITY", "subject_name": f"Cust {i}",
+                           "list": "OFAC SDN", "matched_entry": f"ENTRY {i}-{j} SOMEWHERE FAR AWAY",
+                           "score": 90 - (j % 10), "confidence": "WEAK"} for j in range(25)]}
+                for i in range(80)]   # §① alone must exceed the notes budget — the regression shape
+_big_adverse = [{"subject_type": "ENTITY", "subject_name": f"Cust {i}", "parent": "",
+                 "permalink": "", "is_new": (i % 2 == 0),
+                 "articles": [{"title": f"Cust {i} probed for money laundering (story {j})",
+                               "source": "Reuters", "date": "2026-08-01",
+                               "url": f"https://news.example/{i}/{j}", "categories": ["Fraud"],
+                               "is_new": True} for j in range(4)]}
+                for i in range(12)]
+_big_pep = [{"subject_name": f"Person {i}", "parent": "", "permalink": "", "id": f"Q{i}",
+             "category": "PEP", "description": "minister", "source_url": "", "is_new": False}
+            for i in range(10)]
+_stats_big = {"subjects_total": 92, "companies_screened": 80, "individuals_screened": 12,
+              "am_errors": 0, "pep_errors": 0, "delta": {}}
+_full_narr = screen.build_unified_narrative(_big_matches, [], _big_adverse, _big_pep,
+                                            _meta_deg, _stats_big, _dt.datetime(2026, 8, 5))
+check("caps=None narrative is byte-identical to the no-arg call (default unchanged)",
+      _full_narr == screen.build_unified_narrative(_big_matches, [], _big_adverse, _big_pep,
+                                                   _meta_deg, _stats_big, _dt.datetime(2026, 8, 5),
+                                                   caps=None))
+check("synthetic run is genuinely oversized (the regression precondition)",
+      screen._asana_notes_size(_full_narr) > screen.ASANA_NOTES_MAX)
+_capped_narr = screen.build_unified_narrative(_big_matches, [], _big_adverse, _big_pep,
+                                              _meta_deg, _stats_big, _dt.datetime(2026, 8, 5),
+                                              caps={"candidates": 3, "articles": 1, "subjects": 5})
+check("capped narrative keeps every section header (depth shrinks, sections never vanish)",
+      all(s in _capped_narr for s in ("①  SANCTIONS", "②  ADVERSE MEDIA", "③  PEP",
+                                      "④  RELATED PARTIES", "RETENTION: retain 10 years")))
+check("capped narrative discloses each cut with accurate arithmetic",
+      "+22 more similar candidates" in _capped_narr        # 25 scored - 3 shown
+      and "+3 more article(s) for this subject" in _capped_narr   # 4 - 1
+      and "+7 more adverse subject(s)" in _capped_narr     # 12 - 5
+      and "+5 more PEP finding(s)" in _capped_narr)        # 10 - 5
+check("capped narrative still lists the top items of every section",
+      "[!] Cust 0 probed for money laundering" in _capped_narr and "Person 0" in _capped_narr)
+# End-to-end through the poster: with rebuild wired, §② reaches Asana intact;
+# without it (legacy), the cap_notes backstop truncates the middle away.
+_posted_shrink = []
+def _record_shrink(method, url, **kw):
+    _posted_shrink.append(kw.get("json"))
+    class _R:
+        status_code = 201
+        text = ""
+        @staticmethod
+        def json(): return {"data": {"gid": "1"}}
+    return _R()
+_orig_stored = screen.NOTES_BUDGET["stored"]
+screen.asana_request = _record_shrink
+try:
+    screen.NOTES_BUDGET["stored"] = None
+    screen.post_unified_task(_full_narr, _dt.datetime(2026, 8, 5), _big_matches, _big_adverse, _big_pep,
+                             rebuild=lambda caps: screen.build_unified_narrative(
+                                 _big_matches, [], _big_adverse, _big_pep, _meta_deg, _stats_big,
+                                 _dt.datetime(2026, 8, 5), caps=caps))
+    screen.post_unified_task(_full_narr, _dt.datetime(2026, 8, 5), _big_matches, _big_adverse, _big_pep)
+finally:
+    screen.asana_request = _orig_asana_request
+    screen.NOTES_BUDGET["stored"] = _orig_stored
+    screen.NOTES_BUDGET["learned"] = None
+_shrunk_notes = _posted_shrink[0]["data"]["notes"]
+_legacy_notes = _posted_shrink[1]["data"]["notes"]
+check("delivered notes fit the budget after the section-aware shrink",
+      screen._asana_notes_size(_shrunk_notes) <= screen.ASANA_NOTES_MAX)
+check("§② ADVERSE MEDIA reaches Asana with its findings when rebuild is wired",
+      "②  ADVERSE MEDIA" in _shrunk_notes and "[!] Cust 0 probed for money laundering" in _shrunk_notes
+      and "[body truncated" not in _shrunk_notes)
+check("delivered notes keep the sign-off tail and the task name carries the date",
+      "RETENTION: retain 10 years" in _shrunk_notes
+      and _posted_shrink[0]["data"]["name"].startswith("🛡️ ⚠️ Daily Screening")
+      and _posted_shrink[0]["data"]["due_on"] == "2026-08-05")
+check("CONTROL: without rebuild the old middle-truncation loses §②'s findings",
+      "[body truncated" in _legacy_notes and "[!] Cust 0 probed for money laundering" not in _legacy_notes)
+# The evidence-log failure must surface in §², not just the run log.
+_stats_evid = {**_stats_big, "adverse_evidence_error": "git push failed (exit 128)"}
+_narr_evid = screen.build_unified_narrative([], [], _big_adverse[:1], [], _meta_deg,
+                                            _stats_evid, _dt.datetime(2026, 8, 5))
+check("a failed adverse-evidence log is disclosed in §② (repeat signal NOT evaluated)",
+      "Repeat-pattern evidence log unavailable this run (git push failed (exit 128))" in _narr_evid
+      and "NOT evaluated" in _narr_evid)
 
 # ── screen.py: adaptive notes budget (learned across runs via delta-state) ───
 # 2026-07-17: even the numeric-entity worst case at 65,000 bytes was rejected

@@ -666,12 +666,33 @@ export function levenshtein(a, b) {
    file fixed the cause and gained screen.py a pair it had recorded as a
    residual miss. Do not re-widen this to a bare max() without re-running the
    benchmark on BOTH engines. */
-export function similarity(a, b) {
-  if (!a || !b) return 0;
-  if (a === b) return 100;
+export function matchScore(a, b) {
+  if (!a || !b) return { score: 0, full: 0, core: 0, hasCore: false };
+  if (a === b) return { score: 100, full: 100, core: 100, hasCore: true };
   const dist = levenshtein(a, b);
   const lev = (1 - dist / Math.max(a.length, b.length)) * 100;
   const ta = sigTokens(a), tb = sigTokens(b);
+  const ca = ta.join(' '), cb = tb.join(' ');
+  /* Both sides carry a distinctive core (boilerplate was actually stripped from
+     at least one of them) → screen.py match_score parity: the decisive score is
+     min(full, core) — a GENUINE min. The previous form min(max(lev,core,token),
+     core) collapsed to `core` alone, and the token component was ALSO computed
+     over sig tokens, so two corporates sharing one distinctive token ("Pearl
+     Commodities DMCC" vs "PEARL INVESTMENTS LIMITED") scored 100/critical.
+     `full` is whole-string, token-order-insensitive (max of raw Levenshtein and
+     the sorted-token InDel ratio — each ≥-bounds rapidfuzz token_sort_ratio's
+     components, keeping every Python hit reachable); `core` is the same over
+     the stopword-stripped cores. */
+  if (ca && cb && (ca !== a || cb !== b)) {
+    const fullSort = indelRatio(a.split(' ').sort().join(' '), b.split(' ').sort().join(' '));
+    const full = Math.max(lev, fullSort);
+    const coreLev = ca === cb ? 100 : (1 - levenshtein(ca, cb) / Math.max(ca.length, cb.length)) * 100;
+    const coreSort = ca === cb ? 100 : indelRatio(ta.slice().sort().join(' '), tb.slice().sort().join(' '));
+    const core = Math.max(coreLev, coreSort);
+    return { score: Math.min(full, core), full, core, hasCore: true };
+  }
+  /* No-core branch (pure person names — nothing to strip on either side, so
+     the core gate stays out of the way): unchanged jaccard/coverage blend. */
   const A = new Set(ta), B = new Set(tb);
   let token = 0;
   if (A.size && B.size) {
@@ -682,20 +703,12 @@ export function similarity(a, b) {
     const cover = inter / Math.min(A.size, B.size);
     token = (0.4 * jac + 0.6 * cover) * 100;
   }
-  /* Core-vs-core: the edit-distance ratio over the stopword-stripped cores when
-     BOTH sides have one (equivalent to scoring similarity(core, core) — the
-     token component is computed from the same sig-token sets either way). */
-  let core = 0;
-  const ca = ta.join(' '), cb = tb.join(' ');
-  if (ca && cb && (ca !== a || cb !== b)) {
-    core = ca === cb ? 100 : (1 - levenshtein(ca, cb) / Math.max(ca.length, cb.length)) * 100;
-  }
-  const best = Math.max(lev, core, token);
-  /* Core gate (screen.py min(full, core) parity) — only when BOTH sides have a
-     distinctive core to compare. A pure person-name has no boilerplate to
-     strip, so ca === a and the gate stays out of the way. */
-  if (ca && cb && (ca !== a || cb !== b)) return Math.min(best, core);
-  return best;
+  const best = Math.max(lev, token);
+  return { score: best, full: best, core: 0, hasCore: false };
+}
+
+export function similarity(a, b) {
+  return matchScore(a, b).score;
 }
 
 /* ── Subset (patronymic / extra-middle-name) recall gate — screen.py parity ──
@@ -708,6 +721,20 @@ export function similarity(a, b) {
    uses, same strict shorter-inside-longer shape) so the two engines agree. */
 export const TOKENSET_THRESHOLD = 93;   // token-set score an ANDed subset hit must clear (mirrors screen.py)
 const SUBSET_TOKEN_SIM = 88;            // per-token similarity for "closely matches" (mirrors screen.py)
+/* Near-exact bar for the short-entry and near-exact-core gates (mirrors
+   screen.py SHORT_ENTRY_THRESHOLD). Both gates exist for the same recall shape
+   the decisive min(full, core) cannot see: a customer named after a designation
+   plus legal-form boilerplate ("Hamas General Trading LLC" vs HAMAS scores
+   full 33 / core 100 → decisive 33). Until this port, the JS engine got that
+   recall from the collapse-to-core scoring defect instead — at a dishonest
+   100/critical; these gates keep the recall at the honest conservative score. */
+export const SHORT_ENTRY_THRESHOLD = 97;
+
+/* screen.py confidence_tier parity: the MLRO-facing strength label, from the
+   distinctive-core similarity. Phonetic-only hits carry their own label. */
+export function confidenceTier(core) {
+  return core >= 92 ? 'STRONG' : core >= 85 ? 'MODERATE' : 'WEAK';
+}
 
 /* Normalized InDel similarity, 0-100 — rapidfuzz `ratio` semantics (a
    substitution costs 2, i.e. delete+insert), so the 88/93 cutoffs above mean
@@ -1125,12 +1152,14 @@ export function screenName(name, index, threshold = 85, phonetic = '1') {
   const empty = { name, topScore: 0, band: 'low', recommendation: 'clear', hitCount: 0, lists: [] };
   if (!rawName || !index || !index.entries.length) return empty;
 
-  const byNorm = new Map();   // matched designated norm -> { list, hitName, score }
-  const addHit = (list, hitName, score, key, phoneticShape) => {
+  const byNorm = new Map();   // matched designated norm -> { list, hitName, score, mechanism, confidence }
+  const addHit = (list, hitName, score, key, meta = {}) => {
     const prev = byNorm.get(key);
     if (!prev || score > prev.score) {
-      const h = { list, hitName, score: Math.round(score) };
-      if (phoneticShape) { h.phonetic = true; h.phoneticShape = phoneticShape; }
+      const h = { list, hitName, score: Math.round(score),
+        mechanism: meta.mechanism || 'fuzzy',
+        confidence: meta.confidence || 'WEAK' };
+      if (meta.phoneticShape) { h.phonetic = true; h.phoneticShape = meta.phoneticShape; }
       byNorm.set(key, h);
     }
   };
@@ -1147,7 +1176,11 @@ export function screenName(name, index, threshold = 85, phonetic = '1') {
   let exactAny = false;
   for (const v of variants) {
     const ex = index.exact.get(v);
-    if (ex) { exactAny = true; for (const h of ex) addHit(h.list, h.hitName, 100, h.hitName + '|' + h.list); }
+    if (ex) {
+      exactAny = true;
+      for (const h of ex) addHit(h.list, h.hitName, 100, h.hitName + '|' + h.list,
+        { mechanism: 'exact', confidence: 'STRONG' });
+    }
   }
 
   /* A name that folds to nothing, or to no significant token (all tokens
@@ -1216,31 +1249,66 @@ export function screenName(name, index, threshold = 85, phonetic = '1') {
       for (const [i, c] of counts) if (c >= need) candIdx.add(i);
     }
   }
+  /* Deterministic variant order + (score, core, full) tie-break — screen.py
+     parity: on a score tie between transliteration variants the recorded core
+     (and therefore which gates fire) must not depend on iteration order. */
+  const sortedVariants = [...variants].sort();
   let best = exactAny ? 100 : 0;
   for (const i of candIdx) {
     const e = index.entries[i];
-    /* Best score across variants; the subset gate (screen.py parity) is only
-       probed while the pair is still below both bars — it can only ADD hits. */
-    let sc = 0, subset = false, tset = 0;
-    for (const v of variants) {
-      const s = similarity(v, e.norm);
-      if (s > sc) sc = s;
-      if (sc === 100) break;   // cannot improve; skip the remaining variants
-      if (sc < threshold && !(subset && tset >= TOKENSET_THRESHOLD)) {
-        if (isTokenSubset(v, e.norm)) {
-          subset = true;
+    /* Best (score, core, full) across variants; subset/tset accumulate. The
+       token-set ratio is probed only while below the fuzzy bar AND only when it
+       could decide a gate (a subset was found, or the cores are near-exact) —
+       the ANDed gates can only ADD hits (screen.py parity). */
+    let sc = 0, coreBest = 0, fullBest = 0, subset = false, tset = 0;
+    for (const v of sortedVariants) {
+      const m = matchScore(v, e.norm);
+      if (m.score > sc
+          || (m.score === sc && (m.core > coreBest || (m.core === coreBest && m.full > fullBest)))) {
+        sc = m.score; coreBest = m.core; fullBest = m.full;
+      }
+      if (sc < threshold && tset < TOKENSET_THRESHOLD) {
+        if (!subset && isTokenSubset(v, e.norm)) subset = true;
+        if (subset || m.core >= SHORT_ENTRY_THRESHOLD) {
           const r = tokenSetRatio(v, e.norm);
           if (r > tset) tset = r;
         }
       }
     }
     if (sc > best) best = sc;
-    if (sc >= threshold) addHit(e.list, e.hitName, sc, e.hitName + '|' + e.list);
+    const key = e.hitName + '|' + e.list;
+    /* Short designated names (HAMAS, IRISL, ANO …): fuzzy-matching a <6-char
+       string invites false positives, so require a NEAR-EXACT match on either
+       the decisive score or the distinctive core (the customer named after the
+       designation + boilerplate), recorded at the conservative decisive score
+       (screen.py short-entry gate parity). */
+    if (e.norm.length < 6) {
+      if (sc >= SHORT_ENTRY_THRESHOLD || coreBest >= SHORT_ENTRY_THRESHOLD) {
+        addHit(e.list, e.hitName, sc, key,
+          { mechanism: 'short-entry', confidence: confidenceTier(coreBest) });
+      }
+      continue;
+    }
+    if (sc >= threshold) {
+      addHit(e.list, e.hitName, sc, key,
+        { mechanism: 'fuzzy', confidence: confidenceTier(coreBest) });
+    }
+    /* NEAR-EXACT CORE (screen.py third-gate parity): the distinctive cores are
+       near-identical and only boilerplate differs — the strongest identity
+       signal short of string equality ("Al Qaeda General Trading" vs AL QAEDA),
+       recorded at the conservative decisive score. */
+    else if (coreBest >= SHORT_ENTRY_THRESHOLD && tset >= TOKENSET_THRESHOLD) {
+      addHit(e.list, e.hitName, sc, key,
+        { mechanism: 'near-exact-core', confidence: confidenceTier(coreBest) });
+    }
     /* Additive recall gate: a true token SUBSET (patronymic chain / extra
        middle names) with a high token-set score flags too — recorded at the
        conservative similarity score so it reads as a POSSIBLE match for MLRO
        disambiguation, never confirmed (mirrors screen.py's ANDed gate). */
-    else if (subset && tset >= TOKENSET_THRESHOLD) addHit(e.list, e.hitName, sc, e.hitName + '|' + e.list);
+    else if (subset && tset >= TOKENSET_THRESHOLD) {
+      addHit(e.list, e.hitName, sc, key,
+        { mechanism: 'subset', confidence: confidenceTier(coreBest) });
+    }
     /* Phonetic-only branch (screen.py parity): strictly additive — an elif
        that can never replace, lower or suppress a fuzzy or subset hit.
        Recorded at the conservative similarity score, tier WEAK. */
@@ -1256,7 +1324,8 @@ export function screenName(name, index, threshold = 85, phonetic = '1') {
           if (phonMode === 'shadow') {
             phoneticShadow.push({ list: e.list, hitName: e.hitName, score: Math.round(sc), shape: pm });
           } else {
-            addHit(e.list, e.hitName, sc, e.hitName + '|' + e.list, pm);
+            addHit(e.list, e.hitName, sc, key,
+              { mechanism: 'phonetic', confidence: 'WEAK (phonetic-only)', phoneticShape: pm });
           }
         }
       }
@@ -1284,6 +1353,21 @@ export function screenName(name, index, threshold = 85, phonetic = '1') {
     return out;
   }
   const topScore = lists[0].score;
+  /* Mechanism-aware banding. Subset and phonetic-only are RECALL gates that
+     fire at low real similarity ("Ahmed Hassan" inside every longer chain
+     sharing those two given names, "Karim Aziz" ~ "Kareem Azeez …") — real
+     leads for disambiguation, not designation matches. When they are ALL a
+     subject has, the row reads review/medium so the MLRO queue is not flooded
+     with critical/high alerts for weak evidence. Nothing is suppressed: the
+     hits, scores and mechanisms are all recorded, the row still counts as a
+     material match downstream, and any exact/fuzzy/short-entry/near-exact-core
+     hit keeps the full sanctions-match severity. */
+  const weakOnly = lists.every(h => h.mechanism === 'subset' || h.mechanism === 'phonetic');
+  if (weakOnly) {
+    const out = { name, topScore, band: 'medium', recommendation: 'review', hitCount: lists.length, lists };
+    if (phoneticShadow.length) out.phoneticShadow = phoneticShadow;
+    return out;
+  }
   const band = topScore >= 98 ? 'critical' : 'high';
   const out = { name, topScore, band, recommendation: 'sanctions-match', hitCount: lists.length, lists };
   if (phoneticShadow.length) out.phoneticShadow = phoneticShadow;

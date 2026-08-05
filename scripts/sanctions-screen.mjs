@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
-import { checkAdverseMedia, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
+import { checkAdverseMedia, budgetedLocales, activeLocales, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 
@@ -313,6 +313,13 @@ export function normalizeHit(h) {
   const hitName = h.hitName || h.matchedName || h.caption || h.entity || (h.list ? h.name : '') || '';
   const score = num(h.matchScore != null ? h.matchScore : (h.score != null ? h.score : h.confidence));
   const out = { list: String(list), hitName: String(hitName || ''), score };
+  /* Evidence labels from the matcher (mechanism: exact/fuzzy/short-entry/
+     near-exact-core/subset/phonetic; confidence: STRONG/MODERATE/WEAK[...]) —
+     carried through so the state, digest and case builders can render WHY a
+     hit fired. `confidence` is only taken as a label when it is non-numeric
+     (some external shapes use `confidence` as a score — handled above). */
+  if (h.mechanism) out.mechanism = String(h.mechanism);
+  if (typeof h.confidence === 'string' && num(h.confidence) === null) out.confidence = h.confidence;
   /* A phonetic-only hit must stay visibly WEAK all the way to the case board —
      the flag travels in the hitName suffix (state/alert/case builders all
      render hitName) AND as a structured field. */
@@ -392,6 +399,20 @@ export function matchSignature(r) {
    matches to alert on, the cleared matches (informational), and the next state.
    Subjects that errored this run carry their prior state forward untouched —
    never wiped, never silently cleared. */
+/* Per-hit evidence detail persisted with the state and shipped in the results
+   artifact: the matched designated name, score and the matcher's mechanism/
+   confidence labels — what an MLRO needs on the case card to adjudicate
+   without opening the run log. Capped at 12 (the engine's own lists cap). */
+export function hitDetail(lists) {
+  return (lists || []).slice(0, 12).filter(h => h && h.list).map(h => {
+    const d = { list: h.list, hitName: h.hitName || '', score: h.score ?? null };
+    if (h.mechanism) d.mechanism = h.mechanism;
+    if (h.confidence) d.confidence = h.confidence;
+    if (h.carriedForward) d.carriedForward = true;
+    return d;
+  });
+}
+
 export function diffState(prevState, results, today, threshold, screenedLists, evaluatedSignals) {
   const prev = (prevState && prevState.subjects) || {};
   const nextSubjects = { ...prev };
@@ -463,6 +484,16 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
       nextSubjects[r.key] = {
         name: r.name, jurisdiction: r.jurisdiction, band, topScore: r.topScore,
         recommendation, lists: lists.map(h => h.list).filter(Boolean),
+        /* Identity + evidence detail for the case board. `lists` (names only)
+           stays as-is — the signature, planner and every pre-migration record
+           depend on its shape; `hits` ADDS the matched designated name,
+           per-hit score and the matcher's mechanism/confidence labels, and
+           gid/entityType/parent/role let a legal-entity case link its customer
+           record (entity keys carry no gid segment, so caseTitle/caseHtml
+           rendered CASE-XXXXXX with no link for every company). Old state
+           records simply lack these fields — renderers fall back. */
+        gid: r.gid, entityType: r.entityType, parent: r.parent, role: r.role,
+        hits: hitDetail(lists),
         signature: sig, firstSeen, lastSeen: today
       };
       if (!prior || prior.signature !== sig) {
@@ -583,7 +614,15 @@ export function buildScreenReport(alerts, cleared, today, meta = {}) {
   lines.push('# Sanctions Screen — ' + today, '');
   const breakdown = (meta.entities != null && meta.individuals != null)
     ? ' (' + meta.entities + ' legal entities + ' + meta.individuals + ' principals/UBOs)' : '';
-  lines.push('Screened **' + (meta.screened != null ? meta.screened : '?') + '** subjects from the FULL Customer Database' + breakdown + ' against: ' + COVERAGE + '.', '');
+  /* Coverage honesty: when the runner supplies what actually loaded, say THAT.
+     The fixed COVERAGE string is the configured scope, not evidence — claiming
+     it unconditionally read as "all lists screened" on runs where one failed. */
+  const loaded = Array.isArray(meta.loadedLists) && meta.loadedLists.length ? meta.loadedLists : null;
+  lines.push('Screened **' + (meta.screened != null ? meta.screened : '?') + '** subjects from the FULL Customer Database' + breakdown
+    + ' against ' + (loaded ? loaded.length + ' loaded list(s): ' + loaded.join(' · ') : 'the configured scope: ' + COVERAGE) + '.', '');
+  if (loaded) lines.push('Configured scope: ' + COVERAGE + '.', '');
+  const notLoaded = Array.isArray(meta.failures) ? meta.failures.filter(Boolean) : [];
+  if (notLoaded.length) lines.push('> ⚠ Not loaded this run (their designations were NOT screened): ' + notLoaded.join(' · '), '');
   if (meta.degraded) lines.push('> ⚠ The screening engine reported **degraded** coverage on this run — treat any "no match" as provisional and re-run.', '');
   if (meta.errored) lines.push('> ⚠ **' + meta.errored + '** subject(s) could not be screened this run (engine error/timeout) — their prior status was kept, not cleared.', '');
 
@@ -607,7 +646,7 @@ export function buildScreenReport(alerts, cleared, today, meta = {}) {
 }
 
 /* Asana rich-text body (html_notes) for the alert card. */
-export function buildScreenHtml(alerts, { runLink, today, degraded } = {}) {
+export function buildScreenHtml(alerts, { runLink, today, degraded, loadedLists, failures } = {}) {
   const items = alerts.map(a => {
     const juris = a.jurisdiction ? ' (' + esc(a.jurisdiction) + ')' : '';
     const who = a.entityType === 'individual'
@@ -622,7 +661,13 @@ export function buildScreenHtml(alerts, { runLink, today, degraded } = {}) {
   if (degraded) parts.push('<em>⚠ Engine coverage was degraded this run — treat any non-match as provisional.</em>');
   if (items) parts.push('<ul>' + items + '</ul>');
   parts.push('<em>' + esc(GOVERNANCE_NOTE) + '</em>');
-  parts.push('<strong>Screened against:</strong> ' + esc(COVERAGE));
+  /* Same coverage honesty as the plain report: actual loaded lists when known,
+     the configured scope clearly labelled as scope either way. */
+  const loadedNow = Array.isArray(loadedLists) && loadedLists.length ? loadedLists : null;
+  const notLoadedNow = Array.isArray(failures) ? failures.filter(Boolean) : [];
+  if (loadedNow) parts.push('<strong>Screened against (loaded this run):</strong> ' + esc(loadedNow.join(' · ')));
+  if (notLoadedNow.length) parts.push('<em>⚠ Not loaded this run (designations NOT screened): ' + esc(notLoadedNow.join(' · ')) + '</em>');
+  parts.push('<strong>' + (loadedNow ? 'Configured scope:' : 'Screened against:') + '</strong> ' + esc(COVERAGE));
   if (runLink) parts.push('<a href="' + esc(runLink) + '">View the workflow run</a>');
   parts.push('</body>');
   return parts.join('');
@@ -662,24 +707,36 @@ function pepHitLine(r) {
   const h = (r.lists || []).find(x => x.list && x.list.includes('PEP')) || {};
   return '  ' + r.name + ' | Wikidata | ' + String(h.hitName || '').slice(0, 120) + (h.score != null ? ' | score ' + h.score : '');
 }
-/* Subject-level NEW/STANDING tag for a hit line, from the diff's new-match keys
-   (alerts with isNew — subject first flagged this run). Blank when the caller
-   could not supply that info. */
-function hitStatusTag(r, newKeys) {
+/* Subject-level NEW/CHANGED/STANDING tag for a hit line, from the diff's alert
+   keys. `newKeys` = subjects first flagged this run (isNew); `changedKeys` =
+   subjects whose standing match escalated/changed this run (in `alerts` but not
+   new) — without them a changed match was mislabelled "previously reported".
+   Blank when the caller could not supply diff info. */
+function hitStatusTag(r, newKeys, changedKeys) {
   if (!newKeys) return '';
-  return newKeys.has(r.key) ? ' | NEW' : ' | STANDING (previously reported)';
+  if (newKeys.has(r.key)) return ' | NEW';
+  if (changedKeys && changedKeys.has(r.key)) return ' | CHANGED (escalated/updated this run)';
+  return ' | STANDING (previously reported)';
 }
-/* " (N new, M standing)" breakdown for a hit-count line; '' without diff info. */
-function hitStatusCounts(hits, newKeys) {
+/* " (N new[, C changed], M standing)" breakdown; '' without diff info. */
+function hitStatusCounts(hits, newKeys, changedKeys) {
   if (!newKeys || !hits.length) return '';
   const fresh = hits.filter(r => newKeys.has(r.key)).length;
-  return ' (' + fresh + ' new, ' + (hits.length - fresh) + ' standing)';
+  const changed = changedKeys ? hits.filter(r => !newKeys.has(r.key) && changedKeys.has(r.key)).length : 0;
+  const standing = hits.length - fresh - changed;
+  return ' (' + fresh + ' new, ' + (changedKeys ? changed + ' changed, ' : '') + standing + ' standing)';
 }
 
-/* PART B — Adverse Media & PEP monitoring task body (CLEAR or HIT variant). */
-export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], pepHits = [], newMatchKeys = null, regUrl = '', amKeywordCount = AM_KEYWORD_COUNT } = {}) {
+/* PART B — Adverse Media & PEP monitoring task body (CLEAR or HIT variant).
+   `amActive`/`pepActive` are the run's ACTUAL module switches (cfg.adverseMedia /
+   cfg.pep): a disabled module must render OFF / NOT EVALUATED, never "ACTIVE"
+   with "NONE" results — that read as a clearance no lookup ever produced. */
+export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], pepHits = [], newMatchKeys = null,
+  changedMatchKeys = null, amActive = true, pepActive = true, regUrl = '', amKeywordCount = AM_KEYWORD_COUNT } = {}) {
   const hasHits = amHits.length > 0 || pepHits.length > 0;
   const newKeys = newMatchKeys ? new Set(newMatchKeys) : null;
+  const changedKeys = changedMatchKeys ? new Set(changedMatchKeys) : null;
+  const offNote = [amActive ? null : 'adverse media', pepActive ? null : 'PEP'].filter(Boolean).join(' + ');
   const L = [];
   L.push('ADVERSE MEDIA & PEP MONITORING REPORT');
   L.push('Date: ' + today + ' | Run: ' + (run || 'local'));
@@ -691,8 +748,12 @@ export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], p
   L.push('A. SCOPE');
   L.push(RULE);
   L.push('Subjects checked:             ' + (subjects != null ? subjects : '?'));
-  L.push('Adverse media module:         ACTIVE (worldwide — Google News RSS × ' + LOCALES.length + ' locales + GDELT, ' + amKeywordCount + ' keywords across ' + Object.keys(LANG_TERMS).length + ' languages)');
-  L.push('PEP module:                   ACTIVE (Wikidata — Tier 1/2/3 + family/associates)');
+  L.push('Adverse media module:         ' + (amActive
+    ? 'ACTIVE (worldwide — Google News RSS × ' + LOCALES.length + ' locales + GDELT, ' + amKeywordCount + ' keywords across ' + Object.keys(LANG_TERMS).length + ' languages)'
+    : 'OFF (SCREEN_ADVERSE_MEDIA=0 — not evaluated this run; no clearance implied)'));
+  L.push('PEP module:                   ' + (pepActive
+    ? 'ACTIVE (Wikidata — Tier 1/2/3 + family/associates)'
+    : 'OFF (SCREEN_PEP=0 — not evaluated this run; no clearance implied)'));
   L.push('');
   L.push('Risk categories (adverse media):');
   L.push('  ☑ Money laundering / financial crime');
@@ -713,32 +774,35 @@ export function buildAmPepNotes({ today, tomorrow, run, subjects, amHits = [], p
   L.push('B. RESULTS');
   L.push(RULE);
   if (!hasHits) {
-    L.push('New adverse media hits:       NONE');
-    L.push('New PEP identifications:      NONE');
-    L.push('PEP status changes:           NONE');
+    L.push('New adverse media hits:       ' + (amActive ? 'NONE' : 'NOT EVALUATED (module off)'));
+    L.push('New PEP identifications:      ' + (pepActive ? 'NONE' : 'NOT EVALUATED (module off)'));
+    L.push('PEP status changes:           ' + (pepActive ? 'NONE' : 'NOT EVALUATED (module off)'));
     L.push('False positives cleared:      NONE');
   } else {
-    L.push('Adverse media hits:           ' + amHits.length + hitStatusCounts(amHits, newKeys));
-    for (const r of amHits) L.push(amHitLine(r) + hitStatusTag(r, newKeys));
-    L.push('PEP identifications:          ' + pepHits.length + hitStatusCounts(pepHits, newKeys));
-    for (const r of pepHits) L.push(pepHitLine(r) + hitStatusTag(r, newKeys));
-    L.push('False positives cleared:      [to be reviewed by MLRO]');
+    L.push('Adverse media hits:           ' + (amActive || amHits.length ? amHits.length + hitStatusCounts(amHits, newKeys, changedKeys) : 'NOT EVALUATED (module off)'));
+    for (const r of amHits) L.push(amHitLine(r) + hitStatusTag(r, newKeys, changedKeys));
+    L.push('PEP identifications:          ' + (pepActive || pepHits.length ? pepHits.length + hitStatusCounts(pepHits, newKeys, changedKeys) : 'NOT EVALUATED (module off)'));
+    for (const r of pepHits) L.push(pepHitLine(r) + hitStatusTag(r, newKeys, changedKeys));
+    L.push('False-positive review:        pending MLRO disposition (tracked on the case board)');
   }
   L.push('');
   L.push('Sanctions screening result:   → see Daily Screening Report (same day)');
   L.push('');
   L.push(RULE);
-  L.push('C. ACTIONS TAKEN');
+  L.push('C. ACTIONS (MLRO — human decisions, not automated)');
   L.push(RULE);
-  L.push('EDD triggered:                N/A');
-  L.push('Risk rating upgraded:         N/A');
-  L.push('Senior management notified:   N/A');
-  L.push('STR consideration opened:     N/A');
-  L.push('Relationship paused/exited:   N/A');
+  /* These are HUMAN acts this script cannot take or verify. On a hit day they
+     are open work; "N/A" here read as "no action was needed" — a false clear. */
+  const actionState = hasHits ? 'pending MLRO review' : 'not required (no new findings this run)';
+  L.push('EDD triggered:                ' + actionState);
+  L.push('Risk rating upgraded:         ' + actionState);
+  L.push('Senior management notified:   ' + actionState);
+  L.push('STR consideration opened:     ' + actionState);
+  L.push('Relationship paused/exited:   ' + actionState);
   L.push('');
   L.push(RULE);
   if (!hasHits) {
-    L.push('STATUS: ✅ CLEAR');
+    L.push('STATUS: ✅ CLEAR' + (offNote ? ' (evaluated modules only — ' + offNote + ' OFF, not cleared)' : ''));
     L.push(RULE);
     L.push('Detection automatic. Action requires MLRO review.');
     L.push('Next run: ' + (tomorrow || ''));
@@ -922,7 +986,9 @@ async function postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, t
 
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const notes = buildAmPepNotes({ today, tomorrow, run: runUrl(), subjects: subjects.length, amHits, pepHits,
-      newMatchKeys: alerts.filter(a => a.isNew).map(a => a.key), regUrl });
+      newMatchKeys: alerts.filter(a => a.isNew).map(a => a.key),
+      changedMatchKeys: alerts.filter(a => !a.isNew).map(a => a.key),
+      amActive: cfg.adverseMedia, pepActive: cfg.pep, regUrl });
     const url = await createOmTask({ name, notes, projectGid, sectionGid }, token);
     console.log('sanctions-screen: AM/PEP task created — ' + name + (url ? ' — ' + url : ''));
     return { posted: true, url, name };
@@ -1115,7 +1181,7 @@ async function screenLocally(subjects, cfg) {
      and report it, but it does NOT degrade the sanctions screen or weaken its
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
-  let amErrors = 0, pepErrors = 0, interpolErrors = 0, enrichSkipped = 0;
+  let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, enrichSkipped = 0;
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
      bound the whole enrichment phase by a wall-clock budget: once it elapses the
@@ -1165,6 +1231,7 @@ async function screenLocally(subjects, cfg) {
 
     if (cfg.adverseMedia && enrich) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (am.partial) amPartial++;   // narrowed coverage — disclosed, never silent
       if (am.errored) { amErrors++; enrichmentIncomplete = true; }
       else if (am.hit) {
         lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : '') + (am.tier === 'weak' ? ' [weak-tier — generic terms only, corroboration needed]' : ''), score: am.score });
@@ -1210,10 +1277,11 @@ async function screenLocally(subjects, cfg) {
   });
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
+  if (amPartial) console.log('sanctions-screen: adverse-media coverage was PARTIAL for ' + amPartial + ' subject(s) — some locales/GDELT did not answer (disclosed in the digest)');
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -1325,7 +1393,12 @@ async function main() {
       + 'cases HELD for manual disposition, not auto-cleared: '
       + notScreened.map(n => n.name || n.key).join(', '));
   }
-  const meta = { screened: subjects.length, entities, individuals, degraded: screen.degraded, errored: screen.errored };
+  /* What ACTUALLY loaded (with partial-alias flags) + what failed — feeds the
+     coverage-honesty lines in the report/alert instead of the fixed scope claim. */
+  const loadedListNames = ((screen.coverage && screen.coverage.lists) || [])
+    .map(L => (L.name || '') + (L.partial ? ' (partial — alias file missing)' : '')).filter(Boolean);
+  const meta = { screened: subjects.length, entities, individuals, degraded: screen.degraded, errored: screen.errored,
+    loadedLists: loadedListNames, failures: screen.notes || [] };
   const report = buildScreenReport(alerts, cleared, today, meta);
   const changes = buildChangesArtifact(alerts, today);
 
@@ -1340,14 +1413,24 @@ async function main() {
     degraded: screen.degraded,
     lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({ name: L.name, count: (L.names || []).length })),
     failures: screen.notes || [],
-    enrichment: { amErrors: screen.amErrors || 0, pepErrors: screen.pepErrors || 0, skipped: screen.enrichSkipped || 0 },
+    enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0, pepErrors: screen.pepErrors || 0,
+      skipped: screen.enrichSkipped || 0,
+      /* per-subject adverse-media sweep breadth this run — the SAME resolution
+         checkAdverseMedia uses (explicit edition ids win over the budgeted
+         core+rotation sweep), so the digest's provenance matches the lookups */
+      amLocalesPerSubject: cfg.adverseMedia
+        ? (String(process.env.ADVERSE_MEDIA_LOCALES || '').trim() ? activeLocales() : budgetedLocales()).length
+        : 0 },
     /* Log-only challenger evidence (SCREEN_SHADOW_THRESHOLD) — kept OUT of
        alerts/matchCount/state; feeds the champion-challenger decision log. */
     shadow: screen.shadow || [],
     alerts: alerts.map(a => ({
       key: a.key, name: a.name, jurisdiction: a.jurisdiction || '', band: a.band,
       topScore: a.topScore, recommendation: a.recommendation,
-      lists: (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean)
+      lists: (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean),
+      /* Evidence detail (matched designated name · score · mechanism ·
+         confidence) so the digest names WHAT matched, not just which list. */
+      hits: hitDetail((a.lists || []).filter(h => typeof h === 'object'))
     })),
     cleared: cleared.map(c => c.name)
   }, null, 2) + '\n');
@@ -1368,11 +1451,19 @@ async function main() {
   if (alerts.length && suppressAlerts) console.log('sanctions-screen: ' + alerts.length + ' new match(es) — alert card suppressed (case engine mode); the case manager files them as lifecycle cases.');
   if (alerts.length && asanaEnabled() && !suppressAlerts) {
     try {
-      const html = buildScreenHtml(alerts, { runLink: runUrl(), today, degraded: screen.degraded });
+      const html = buildScreenHtml(alerts, { runLink: runUrl(), today, degraded: screen.degraded,
+        loadedLists: loadedListNames, failures: screen.notes || [] });
       const section = process.env.ASANA_SECTION_GID || undefined;
       /* match alerts are higher-severity than list-change notes — pull the review date in */
       const due = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
-      const url = await notifyAsana(title, report, { project: REG_PROJECT_GID, html, section, due });
+      /* MIRROR into the MLRO queue (see the workflow env comment). The env was
+         set on this step since #305's fix but never consumed here — the alert
+         reached only the #305 destination. Additive: one task, two memberships. */
+      const mirror = process.env.ASANA_MIRROR_PROJECT_GID
+        ? [{ project: process.env.ASANA_MIRROR_PROJECT_GID,
+             section: process.env.ASANA_MIRROR_SECTION_GID || undefined }]
+        : [];
+      const url = await notifyAsana(title, report, { project: REG_PROJECT_GID, html, section, due, mirror });
       asanaPosted = true;
       regUrl = url || '';
       console.log('sanctions-screen: Asana alert created' + (url ? ' — ' + url : ''));

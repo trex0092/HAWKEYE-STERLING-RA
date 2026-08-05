@@ -266,13 +266,19 @@ check('translitCanonToken folds group members to one representative',
   && translitCanonToken('zzz-ungrouped') === 'zzz-ungrouped');
 const vIdx = buildIndex([{ id: 'ofac', name: 'OFAC SDN', names: ['MUHAMMAD HUSSEIN'] }]);
 const vHit = screenName('Mohammed Husein Trading LLC', vIdx, 85);
-check('variant spelling reaches the candidate index and flags (was a silent clear)',
-  vHit.hitCount === 1 && vHit.topScore >= 85 && vHit.recommendation === 'sanctions-match');
+check('variant spelling reaches the candidate index and flags at its honest weak tier (was a silent clear, then an inflated 88)',
+  vHit.hitCount === 1 && vHit.recommendation === 'review' && vHit.band === 'medium'
+  && vHit.topScore < 85 && vHit.lists[0].list === 'OFAC SDN');
 check('a variant equal to a designated name is an exact 100 hit',
   screenName('Usama Ibn Laden', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['USAMA BIN LADEN'] }]), 85).topScore === 100);
-/* Core-vs-core scoring: corp boilerplate must not hide a one-letter typo. */
-check('similarity scores the stopword-stripped cores too (typo behind a corp suffix)',
-  similarity(normalizeName('Muhamad Hussein Trading LLC'), normalizeName('MUHAMMAD HUSSEIN')) >= 85);
+/* Decisive scoring is min(full, core) — screen.py match_score parity. The old
+   min(max(lev,core,token), core) collapsed to core alone, so ANY two corporates
+   sharing one distinctive token scored 100/critical (Pearl Commodities DMCC vs
+   PEARL INVESTMENTS LIMITED — the single-shared-distinctive-token FP class,
+   now pinned as hard negatives n086-n090). */
+check('similarity no longer collapses to the shared-core score (FP-1: distinct corporates stay below threshold)',
+  similarity(normalizeName('Pearl Commodities DMCC'), normalizeName('PEARL INVESTMENTS LIMITED')) < 85
+  && similarity(normalizeName('Muhamad Hussein Trading LLC'), normalizeName('MUHAMMAD HUSSEIN')) < 85);
 check('similarity is still low on unrelated names with distinct cores',
   similarity(normalizeName('Falcon Star Metals LLC'), normalizeName('Northern Route Logistics')) < 60);
 
@@ -288,19 +294,51 @@ check('isTokenSubset is symmetric by token count and needs ≥2 distinctive toke
   isTokenSubset('quds force', 'islamic revolutionary guard corps quds force')
   && isTokenSubset('islamic revolutionary guard corps quds force', 'quds force')
   && !isTokenSubset('sberbank', 'sberbank of russia'));
+/* Subset-only hits are real recall (they still hit, still count as material
+   matches downstream) but band review/medium at their conservative score —
+   a two-token name inside a longer chain is a lead for disambiguation, not a
+   designation match, and used to flood the queue as high-band alerts. */
 const irgcIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['ISLAMIC REVOLUTIONARY GUARD CORPS QUDS FORCE'] }]);
 const quds = screenName('Quds Force', irgcIdx, 85);
-check('subset gate flags the short spelling of a long designated chain (was a silent clear)',
-  quds.hitCount === 1 && quds.recommendation === 'sanctions-match');
+check('subset gate flags the short spelling of a long designated chain (was a silent clear) at review/medium',
+  quds.hitCount === 1 && quds.recommendation === 'review' && quds.band === 'medium'
+  && quds.lists[0].mechanism === 'subset');
 const qudsSup = screenName('Islamic Revolutionary Guard Corps Quds Force',
   buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['QUDS FORCE'] }]), 85);
 check('subset gate flags the superset direction too (KYC name on either side)',
-  qudsSup.hitCount === 1 && qudsSup.recommendation === 'sanctions-match');
+  qudsSup.hitCount === 1 && qudsSup.recommendation === 'review' && qudsSup.band === 'medium');
 const usama = screenName('Usama Bin Ladin', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['USAMA BIN MUHAMMAD BIN AWAD BIN LADIN'] }]), 85);
 check('subset gate flags the patronymic-chain case at its conservative score',
-  usama.hitCount === 1 && usama.topScore < 85 && usama.recommendation === 'sanctions-match');
+  usama.hitCount === 1 && usama.topScore < 85 && usama.recommendation === 'review');
 check('a single shared token can never subset-flag (Sberbank stays clear)',
   screenName('Sberbank', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['SBERBANK OF RUSSIA'] }]), 85).hitCount === 0);
+
+/* Short-entry + near-exact-core gates (screen.py parity): the recall the
+   min(full, core) control cannot see — a customer named after a designation
+   plus boilerplate. These are STRONG identity evidence (core near-identical),
+   so they keep full sanctions-match severity at the honest conservative score;
+   the JS engine used to reach these shapes only through the collapse defect,
+   at a dishonest 100/critical. */
+const hamas = screenName('Hamas General Trading LLC',
+  buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['HAMAS'] }]), 85);
+check('short-entry gate: designation+boilerplate flags sanctions-match/high at the conservative score',
+  hamas.hitCount === 1 && hamas.recommendation === 'sanctions-match' && hamas.band === 'high'
+  && hamas.topScore < 85 && hamas.lists[0].mechanism === 'short-entry' && hamas.lists[0].confidence === 'STRONG');
+check('short-entry gate still refuses a fuzzy-adjacent short entry (Hummus stays clear)',
+  screenName('Hummus Trading LLC', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['HAMAS'] }]), 85).hitCount === 0);
+const alq = screenName('Al Qaeda General Trading',
+  buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['AL QAEDA'] }]), 85);
+check('near-exact-core gate: single-token-core designation flags sanctions-match/high at the conservative score',
+  alq.hitCount === 1 && alq.recommendation === 'sanctions-match' && alq.band === 'high'
+  && alq.topScore < 85 && alq.lists[0].mechanism === 'near-exact-core' && alq.lists[0].confidence === 'STRONG');
+/* End-to-end FP-1 pin: the fixture class the collapse scored 100/critical. */
+check('single-shared-distinctive-token corporates screen CLEAR end-to-end',
+  screenName('Pearl Commodities DMCC',
+    buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['PEARL INVESTMENTS LIMITED'] }]), 85).hitCount === 0);
+check('every hit carries its mechanism and confidence (MLRO-facing evidence labels)',
+  hamas.lists[0].mechanism === 'short-entry' && quds.lists[0].confidence === 'WEAK'
+  && screenName('Usama Ibn Laden', buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['USAMA BIN LADEN'] }]), 85)
+       .lists[0].mechanism === 'exact');
 
 /* ── fuzzy candidate blocking (regression: a subject whose EVERY significant
    token carries an out-of-transliteration-group typo shared no exact token
@@ -328,9 +366,10 @@ check('a second every-token-typo subject flags through the same path',
    at its real conservative score (below 85 — never a confirmed-looking hit),
    and the fuzzy scorers themselves are untouched (kill-switch check below). */
 const mh = screenName('Muhamet Huseinn', fbIdx, 85);
-check('the pinned multi-edit residual now flags as a phonetic-only WEAK hit',
-  mh.hitCount === 1 && mh.recommendation === 'sanctions-match'
-  && mh.lists[0].phonetic === true && mh.lists[0].score < 85);
+check('the pinned multi-edit residual now flags as a phonetic-only WEAK hit (review/medium — never confirmed-looking)',
+  mh.hitCount === 1 && mh.recommendation === 'review' && mh.band === 'medium'
+  && mh.lists[0].phonetic === true && mh.lists[0].score < 85
+  && mh.lists[0].confidence === 'WEAK (phonetic-only)');
 check('MATCH_PHONETIC=0 restores the historical clear (fuzzy gates unchanged)',
   screenName('Muhamet Huseinn', fbIdx, 85, '0').hitCount === 0);
 const mhShadow = screenName('Muhamet Huseinn', fbIdx, 85, 'shadow');

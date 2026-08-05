@@ -936,6 +936,22 @@
    "listed": "Jaber Hussein Tawfik",
    "mechanism": "translit",
    "note": "Egyptian jim: Gaber joins the existing jaber/jabir group."
+  },
+  {
+   "id": "r133",
+   "group": "latin",
+   "subject": "Hamas General Trading LLC",
+   "listed": "HAMAS",
+   "mechanism": "short-entry",
+   "note": "Customer named after a short designation plus legal-form boilerplate. Pins the short-entry gate on BOTH engines at its honest conservative score — the JS engine used to reach this shape only through the collapse-to-core scoring defect (100/critical)."
+  },
+  {
+   "id": "r134",
+   "group": "latin",
+   "subject": "Al Qaeda General Trading",
+   "listed": "AL QAEDA",
+   "mechanism": "near-exact-core",
+   "note": "Long designation whose distinctive core is one token behind boilerplate. Pins the near-exact-core gate on BOTH engines (core 100, decisive 50) — same defect history as r133 on the JS side."
   }
  ]
 }

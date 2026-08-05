@@ -4,7 +4,7 @@
    Usage: node test/sanctions-screen.test.mjs */
 import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
-  isMatch, diffState, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
+  isMatch, diffState, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip
 } from '../scripts/sanctions-screen.mjs';
@@ -154,6 +154,23 @@ const d1 = diffState({ updated: null, subjects: {} }, [listed], '2026-06-19', 0.
 check('diffState flags a brand-new match', d1.alerts.length === 1 && d1.alerts[0].isNew === true && d1.alerts[0].name === 'A Co');
 check('diffState records the match with firstSeen + signature', d1.nextState.subjects.a && d1.nextState.subjects.a.firstSeen === '2026-06-19' && !!d1.nextState.subjects.a.signature);
 
+/* State record detail: `lists` stays the names-only array (signature/planner
+   compatibility, pre-migration records) while gid/entityType/hits ADD the
+   identity + evidence the case board was missing — entity cases titled
+   CASE-XXXXXX with no customer link, and no matched designated name anywhere. */
+check('diffState persists the subject gid/entityType and per-hit evidence detail',
+  d1.nextState.subjects.a.gid === '1'
+  && Array.isArray(d1.nextState.subjects.a.hits)
+  && d1.nextState.subjects.a.hits[0].list === 'OFAC SDN'
+  && d1.nextState.subjects.a.hits[0].score === 96
+  && JSON.stringify(d1.nextState.subjects.a.lists) === '["OFAC SDN"]');
+check('artifact hit detail (hitDetail) carries mechanism/confidence and drops junk rows',
+  (() => {
+    const d = hitDetail([{ list: 'OFAC SDN', hitName: 'ACME', score: 96, mechanism: 'fuzzy', confidence: 'STRONG' },
+                         { carriedForward: true }, null]);
+    return d.length === 1 && d[0].mechanism === 'fuzzy' && d[0].confidence === 'STRONG' && d[0].hitName === 'ACME';
+  })());
+
 const d2 = diffState(d1.nextState, [listed], '2026-06-20', 0.85);
 check('diffState does NOT re-alert a standing (same-signature) match', d2.alerts.length === 0);
 check('diffState preserves original firstSeen on a standing match', d2.nextState.subjects.a.firstSeen === '2026-06-19');
@@ -266,6 +283,52 @@ check('AM/PEP HIT note without a posted alert card claims neither the card nor a
   amHitNoReg.includes('STATUS: ⚠ REVIEW REQUIRED') && !amHitNoReg.includes('Regulations'));
 check('AM/PEP HIT note without diff info counts hits without claiming they are new',
   !amHitNoReg.includes('New adverse media hits') && amHitNoReg.includes('Adverse media hits:           1') && !amHitNoReg.includes('| NEW'));
+
+/* Module-state honesty: a switched-off module must never render ACTIVE with
+   NONE results — that reads as a clearance no lookup ever produced. */
+const amOff = buildAmPepNotes({ today: '2026-06-24', tomorrow: '2026-06-25', subjects: 325, amActive: false, pepActive: false });
+check('AM/PEP note renders OFF (not ACTIVE) for disabled modules',
+  amOff.includes('Adverse media module:         OFF (SCREEN_ADVERSE_MEDIA=0') &&
+  amOff.includes('PEP module:                   OFF (SCREEN_PEP=0') && !amOff.includes('ACTIVE'));
+check('AM/PEP note says NOT EVALUATED (never NONE) for a disabled module\'s results',
+  amOff.includes('New adverse media hits:       NOT EVALUATED (module off)') &&
+  amOff.includes('New PEP identifications:      NOT EVALUATED (module off)') && !amOff.includes('hits:       NONE'));
+check('AM/PEP CLEAR status is qualified when a module was off (no blanket clear)',
+  amOff.includes('STATUS: ✅ CLEAR (evaluated modules only — adverse media + PEP OFF, not cleared)'));
+check('AM/PEP CLEAR status stays unqualified when every module ran',
+  amClear.includes('STATUS: ✅ CLEAR') && !amClear.includes('evaluated modules only'));
+
+/* Human-action rows: on a hit day they are OPEN WORK, not "N/A". */
+check('AM/PEP HIT note marks MLRO action rows pending (never N/A)',
+  amHit.includes('C. ACTIONS (MLRO — human decisions, not automated)') &&
+  amHit.includes('EDD triggered:                pending MLRO review') && !amHit.includes('N/A'));
+check('AM/PEP CLEAR note marks action rows not-required (no findings)',
+  amClear.includes('EDD triggered:                not required (no new findings this run)'));
+check('AM/PEP HIT note tracks false-positive review as pending disposition (no placeholder)',
+  amHit.includes('False-positive review:        pending MLRO disposition') && !amHit.includes('[to be reviewed by MLRO]'));
+
+/* CHANGED tag: a standing match that escalated this run must not read
+   "previously reported". */
+const amChanged = buildAmPepNotes({ today: '2026-06-24', tomorrow: '2026-06-25', subjects: 325,
+  amHits: amResults.filter(r => r.lists.some(h => h.list.includes('Adverse media'))),
+  pepHits: amResults.filter(r => r.lists.some(h => h.list.includes('PEP'))),
+  newMatchKeys: ['a'], changedMatchKeys: ['b'] });
+check('AM/PEP note tags an escalated standing match CHANGED, not previously-reported',
+  /Beta FZE.*\| CHANGED \(escalated\/updated this run\)/.test(amChanged) && !/Beta FZE.*STANDING/.test(amChanged));
+check('AM/PEP note counts changed matches separately when diff info allows',
+  amChanged.includes('PEP identifications:          1 (0 new, 1 changed, 0 standing)'));
+
+/* Coverage honesty on the alert/report surfaces. */
+const covMeta = { screened: 42, loadedLists: ['OFAC SDN', 'UN Consolidated'], failures: ['EU FSF: HTTP 503'] };
+const covReport = buildScreenReport(d1.alerts, [], '2026-06-19', covMeta);
+check('report states the lists ACTUALLY loaded, not the configured scope as fact',
+  covReport.includes('against 2 loaded list(s): OFAC SDN · UN Consolidated') && covReport.includes('Configured scope:'));
+check('report names lists that did NOT load as unscreened',
+  covReport.includes('Not loaded this run (their designations were NOT screened): EU FSF: HTTP 503'));
+const covHtml = buildScreenHtml(d1.alerts, { today: '2026-06-19', loadedLists: ['OFAC SDN'], failures: ['UN: timeout'] });
+check('html alert separates loaded-this-run from configured scope',
+  covHtml.includes('Screened against (loaded this run):') && covHtml.includes('OFAC SDN')
+  && covHtml.includes('Configured scope:') && covHtml.includes('Not loaded this run'));
 
 /* ── threshold clamp (regression: SCREEN_MATCH_THRESHOLD=85 — screen.py's
    0-100 convention — became an effective cutoff of 8500 and silently cleared

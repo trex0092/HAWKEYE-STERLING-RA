@@ -2,7 +2,7 @@
    Usage: node test/adverse-media.test.mjs */
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
-  canonicalLink, sourceTierFor } from '../scripts/adverse-media.mjs';
+  canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS } from '../scripts/adverse-media.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -132,6 +132,51 @@ check('activeLocales honours the ADVERSE_MEDIA_LOCALES env override',
     const sel = activeLocales();
     delete process.env.ADVERSE_MEDIA_LOCALES;
     return sel.length === 3 && sel.every(l => ['en-US', 'ar-AE', 'zh-CN'].includes(l.id)) && activeLocales().length === LOCALES.length;
+  })());
+
+/* ── Per-run locale budget + rotation (screen.py parity) ──
+   The unbudgeted full-matrix sweep is the measured way to LOSE coverage (the
+   Python workflow records 14 locales tripping Google's per-IP limiter → 805/838
+   subjects with zero adverse coverage), so the default must be a small budget. */
+check('resolveLocaleBudget defaults to 8 on unset/junk and clamps to [1, total]',
+  resolveLocaleBudget(undefined, 70) === 8 && resolveLocaleBudget('soon', 70) === 8 &&
+  resolveLocaleBudget('0', 70) === 1 && resolveLocaleBudget('999', 70) === 70 && resolveLocaleBudget('12', 70) === 12);
+check('resolveLocaleBudget honours all/full/max/* as the whole matrix',
+  ['all', 'full', 'max', '*'].every(s => resolveLocaleBudget(s, 70) === 70));
+check('budgetedLocales sweeps exactly the budget with every core edition pinned',
+  (() => {
+    const day = new Date('2026-08-05T00:00:00Z');
+    const set = budgetedLocales(day, 8);
+    const ids = set.map(l => l.id);
+    return set.length === 8 && CORE_LOCALE_IDS.every(c => ids.includes(c));
+  })());
+check('budgetedLocales is deterministic within a day and rotates across days',
+  (() => {
+    const a1 = budgetedLocales(new Date('2026-08-05T01:00:00Z'), 8).map(l => l.id).join(',');
+    const a2 = budgetedLocales(new Date('2026-08-05T23:00:00Z'), 8).map(l => l.id).join(',');
+    const b = budgetedLocales(new Date('2026-08-06T01:00:00Z'), 8).map(l => l.id).join(',');
+    return a1 === a2 && a1 !== b;
+  })());
+check('budget rotation reaches EVERY edition within the stated cycle',
+  (() => {
+    const days = rotationCycleDays(8);
+    const seen = new Set();
+    for (let d = 0; d < days; d++) {
+      for (const l of budgetedLocales(new Date(Date.UTC(2026, 7, 1 + d)), 8)) seen.add(l.id);
+    }
+    return days > 0 && seen.size === LOCALES.length;
+  })());
+check('a budget at/below the core count never rotates (cycle 0 = disclosed as never)',
+  rotationCycleDays(5) === 0 && budgetedLocales(new Date('2026-08-05T00:00:00Z'), 5).length === 5);
+check('an explicit ADVERSE_MEDIA_LOCALES id-list is respected by activeLocales while the budget path stays capped',
+  (() => {
+    process.env.ADVERSE_MEDIA_LOCALES = 'en-US,zh-CN';
+    const explicit = activeLocales().length;
+    delete process.env.ADVERSE_MEDIA_LOCALES;
+    process.env.ADVERSE_LOCALES = '6';
+    const budgeted = budgetedLocales(new Date('2026-08-05T00:00:00Z')).length;
+    delete process.env.ADVERSE_LOCALES;
+    return explicit === 2 && budgeted === 6;
   })());
 
 check('dedupItems collapses the same story surfaced across editions (by link)',

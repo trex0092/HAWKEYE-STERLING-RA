@@ -81,11 +81,19 @@ export async function asana(path, opts = {}) {
    legitimately produce an identical title two days running ("Sanctions Watch —
    1 list change") — a wider window would silently suppress day two's real
    alert. Pure; unit-tested. */
-export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6) {
+export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6, dedupPrefix = null) {
   const cutoff = nowMs - windowHours * 3600000;
   const want = String(name).slice(0, 250);
-  return (tasks || []).find(t => String(t && t.name || '') === want
-    && (Date.parse((t && t.created_at) || '') || 0) >= cutoff) || null;
+  /* dedupPrefix: cards whose titles embed run-varying counts ("… — 2 new
+     match(es) · 325 screened") never string-match their re-run twin, so a
+     manual re-run double-posted the day's card. A caller that puts the STABLE
+     part of its title here (e.g. "🛡️ Sanctions Screen — 2026-08-05") dedups on
+     that prefix inside the window; exact-match behaviour is unchanged without it. */
+  return (tasks || []).find(t => {
+    const n = String(t && t.name || '');
+    const same = dedupPrefix ? n.startsWith(dedupPrefix) : n === want;
+    return same && (Date.parse((t && t.created_at) || '') || 0) >= cutoff;
+  }) || null;
 }
 
 /* Resolve a section GID by name within a project, creating it if absent —
@@ -150,9 +158,10 @@ export async function notifyAsana(name, notes, opts = {}) {
      Best-effort: if the check itself fails we still post (losing an alert is
      worse than a rare duplicate). */
   try {
-    const dup = findRecentDuplicate(await listProjectTasks(project), data.name, Date.now());
+    const dup = findRecentDuplicate(await listProjectTasks(project), data.name, Date.now(), 6, opts.dedupPrefix || null);
     if (dup) {
-      console.log('asana-notify: identical card already filed within 6h — skipping ("' + data.name + '")');
+      console.log('asana-notify: ' + (opts.dedupPrefix ? 'same-prefix card ("' + opts.dedupPrefix + '")' : 'identical card')
+        + ' already filed within 6h — skipping ("' + data.name + '")');
       return dup.permalink_url || null;
     }
   } catch (e) {

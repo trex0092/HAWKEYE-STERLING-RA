@@ -271,6 +271,63 @@ export function activeLocales() {
   return picked.length ? picked : LOCALES;
 }
 
+/* ── Per-run locale BUDGET + rotation (screen.py parity) ─────────────────────
+   Sweeping the full matrix per subject is the empirically-known way to get ZERO
+   coverage, not more: the Python engine's workflow records that 14 locales ×
+   16 workers tripped Google News' per-IP limiter and 805/838 subjects came back
+   with no adverse-media coverage at all, while a small budget swept the whole
+   book clean (weekly-adverse-media.yml, ADVERSE_LOCALES note). This side of the
+   codebase ran ALL locales (70+) per subject with no cap — the same failure
+   shape, silently. Port the Python fix: a budget (default 8 — the same default
+   the Python workflow pins), the same pinned core editions every run, and a
+   deterministic daily rotation over the remaining markets so every edition is
+   swept within a bounded number of days instead of never. */
+export const CORE_LOCALE_IDS = ['en-US', 'en-GB', 'en-AE', 'tr-TR', 'ar-AE'];
+
+/* Ports screen.py _resolve_locale_count: "all"/"full"/"max"/"*" ⇒ the whole
+   matrix; integers clamp to [1, total]; junk/unset ⇒ the safe default of 8. */
+export function resolveLocaleBudget(raw, total) {
+  const s = String(raw == null ? '' : raw).trim().toLowerCase();
+  if (['all', 'full', 'max', '*'].includes(s)) return total;
+  const n = Number.parseInt(s, 10);
+  if (Number.isFinite(n) && /^[+-]?\d+$/.test(s)) return Math.max(1, Math.min(total, n));
+  return Math.min(8, total);
+}
+
+/* The budgeted sweep for one run: the pinned core editions (the markets the
+   book actually trades with), then a rotating daily window over the rest of
+   the matrix. Deterministic in the UTC day, so a same-day re-run sweeps the
+   same markets (reproducible evidence). Budget: ADVERSE_LOCALES (count — the
+   same env name and semantics the Python engine uses). */
+export function budgetedLocales(now = new Date(), budget = null, pool = LOCALES) {
+  const total = pool.length;
+  if (!total) return [];
+  const b = Math.max(1, Math.min(total,
+    budget != null ? budget : resolveLocaleBudget(process.env.ADVERSE_LOCALES, total)));
+  const core = pool.filter(l => CORE_LOCALE_IDS.includes(l.id)).slice(0, b);
+  const rest = pool.filter(l => !CORE_LOCALE_IDS.includes(l.id));
+  const room = b - core.length;
+  if (room <= 0 || !rest.length) return core.length ? core : pool.slice(0, b);
+  const day = Math.floor(now.getTime() / 86400000);   // UTC day ordinal
+  const start = ((day * room) % rest.length + rest.length) % rest.length;
+  const picked = [];
+  for (let i = 0; i < Math.min(room, rest.length); i++) picked.push(rest[(start + i) % rest.length]);
+  return [...core, ...picked];
+}
+
+/* Runs to sweep every market once at this budget (0 ⇒ never: budget ≤ core). */
+export function rotationCycleDays(budget = null, pool = LOCALES) {
+  const total = pool.length;
+  const b = Math.max(1, Math.min(total,
+    budget != null ? budget : resolveLocaleBudget(process.env.ADVERSE_LOCALES, total)));
+  const coreN = Math.min(pool.filter(l => CORE_LOCALE_IDS.includes(l.id)).length, b);
+  const rest = total - coreN;
+  if (!rest) return 1;
+  const room = b - coreN;
+  if (room <= 0) return 0;
+  return Math.ceil(rest / room);
+}
+
 /* Build the Google News RSS search URL for a subject. The OR-joined risk terms
    keep it to a single request per locale. hl/gl/ceid pin English (US) results. */
 export function adverseMediaUrl(name, terms = ADVERSE_TERMS) {
@@ -532,7 +589,12 @@ export async function mapPool(items, limit, fn) {
    ADVERSE_MEDIA_CONCURRENCY, ADVERSE_MEDIA_TIMESPAN, opts.{concurrency,locales}. */
 export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, locales } = {}) {
   const xmlAccept = 'application/rss+xml, application/xml, text/xml';
-  const localeSet = locales || activeLocales();
+  /* Precedence: an explicit opts.locales wins; an explicit ADVERSE_MEDIA_LOCALES
+     id-list wins next (the operator chose exact editions); otherwise the
+     BUDGETED core+rotation sweep — never the raw full matrix, which is the
+     measured way to trip Google News' per-IP limiter and zero out coverage. */
+  const explicitIds = String(process.env.ADVERSE_MEDIA_LOCALES || '').trim();
+  const localeSet = locales || (explicitIds ? activeLocales() : budgetedLocales());
   const conc = Math.max(1, concurrency || Number(process.env.ADVERSE_MEDIA_CONCURRENCY) || 6);
 
   // GDELT (global) runs alongside the pooled per-locale Google News fetches.

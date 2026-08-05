@@ -122,8 +122,20 @@ for (let i = 0; i < 2000; i++) {
     (r.recommendation === 'clear' || r.recommendation === 'sanctions-match' || r.recommendation === 'review'));
   check('screenName: a clear result carries no hits and low band',
     r.recommendation !== 'clear' || (r.hitCount === 0 && r.band === 'low'));
-  check('screenName: a review result is exactly the MANUAL REVIEW marker (score 0, one pseudo-hit)',
-    r.recommendation !== 'review' || (r.hitCount === 1 && r.topScore === 0 && r.lists[0].list === 'MANUAL REVIEW'));
+  /* Two legitimate review shapes: the MANUAL REVIEW coverage marker (score 0,
+     one pseudo-hit), or REAL list hits that are ALL weak-mechanism
+     (subset/phonetic) — recorded evidence banded medium for disambiguation,
+     never a confirmed-looking sanctions match. */
+  check('screenName: a review result is the MANUAL REVIEW marker or all-weak-mechanism hits at medium band',
+    r.recommendation !== 'review'
+    || (r.hitCount === 1 && r.topScore === 0 && r.lists[0].list === 'MANUAL REVIEW')
+    || (r.band === 'medium' && r.hitCount >= 1
+        && r.lists.every(h => h.mechanism === 'subset' || h.mechanism === 'phonetic')));
+  check('screenName: critical band requires a near-exact top score',
+    r.band !== 'critical' || r.topScore >= 98);
+  check('screenName: weak-mechanism-only hits never band high/critical',
+    !(r.hitCount >= 1 && r.lists.every(h => h.mechanism === 'subset' || h.mechanism === 'phonetic'))
+    || (r.band === 'medium' && r.recommendation === 'review'));
   /* Unscreenable ⇒ never a silent clear: a non-empty raw name that folds to no
      significant token has no candidate path — it must route to MANUAL REVIEW
      (or be an exact designated-name hit), the property behind the "Yu Li" /

@@ -4074,7 +4074,7 @@ def build_adverse_narrative(findings, stats, run_start, run_end):
 RUN PROVENANCE
   Report date:        {dt}
   Run window:         {start_uae} -> {end_uae} UAE  ({start_utc} -> {end_utc} UTC)
-  Cadence:            Daily - delivered by 09:00 UAE
+  Cadence:            Daily (scheduled 00:07 UTC; delivery time varies with run duration)
   Prepared by:        Compliance Automation - Hawkeye Sterling V2
   Workflow run:       {github_run_url()}
   Engine:             screen.py  (Google News RSS - no external paid feed)
@@ -4809,7 +4809,20 @@ def _list_status_line(list_meta, key, label):
     return f"      {label}: {status}  ({m.get('count',0):,} names · {m.get('date','?')})"
 
 def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findings,
-                            list_meta, stats, run_time):
+                            list_meta, stats, run_time, caps=None):
+    """caps=None renders the full report (byte-identical to the historical
+    output). A caps dict {candidates, articles, subjects} tightens per-section
+    ITEM depth — candidates listed per §① subject, articles per §② finding,
+    findings per §②/§③ section — each cut disclosed with an accurate '+N more'
+    line. Section headers, module status lines, counts, list provenance and the
+    sign-off tail are never cut by caps: the shrink loses depth, not sections.
+    Used by post_unified_task's section-aware pre-shrink so an oversized body
+    no longer loses its MIDDLE (which was exactly §② ADVERSE MEDIA) to
+    cap_notes' head truncation while the header still counted the findings."""
+    caps = caps or {}
+    _cand_n = caps.get("candidates") if caps.get("candidates") is not None else 10
+    _arts_n = caps.get("articles")          # None ⇒ every article per finding
+    _subj_n = caps.get("subjects")          # None ⇒ every finding per section
     dt = run_time.strftime("%d %b %Y")
     confirmed = [m for m in possible_matches if any(h["score"] >= 100 for h in m["hits"])]
     potential = [m for m in possible_matches if all(h["score"] < 100 for h in m["hits"])]
@@ -4851,7 +4864,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     #    lead the report; everything here is a one-line snapshot. ──
     A(f"🛡️  DAILY SCREENING — {dt}")
     A(f"Subjects: {stats['subjects_total']}  ({stats['companies_screened']} companies + "
-      f"{stats['individuals_screened']} owners / directors / UBOs)  ·  delivered by 09:00 UAE")
+      f"{stats['individuals_screened']} owners / directors / UBOs)")
     A(f"Modules:  Sanctions {sanc_status}  ·  Adverse media {am_status}  ·  PEP {pep_status}")
     if delta:
         A(f"New since last run:  {delta.get('sanctions',0)} sanctions  ·  "
@@ -4912,7 +4925,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             # "this subject was not screened". Pin it outside the top-10.
             _unscreened = [h for h in _open_hits if h.get("unscreenable")]
             _scored = [h for h in _open_hits if not h.get("unscreenable")]
-            shown = _unscreened + sorted(_scored, key=lambda h: -h["score"])[:10]
+            shown = _unscreened + sorted(_scored, key=lambda h: -h["score"])[:_cand_n]
             for h in shown:
                 conf = f" · {h.get('confidence','')}" if h.get("confidence") else ""
                 nflag = " 🆕" if h.get("is_new") else ""
@@ -4928,16 +4941,17 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                     A(f"        Identity (R.10): {h['identity']}")
                 if h.get("cdd_gaps"):
                     A(f"        ⚠ CDD gaps: {'; '.join(h['cdd_gaps'])}")
-            if len(_scored) > 10:
-                A(f"   -> … +{len(_scored) - 10} more similar candidates (see run log)")
+            if len(_scored) > _cand_n:
+                A(f"   -> … +{len(_scored) - _cand_n} more similar candidates (see run log)")
             if _excluded:
+                _excl_n = min(5, _cand_n)
                 A(f"   EXCLUDED ON IDENTITY — {len(_excluded)} candidate(s) cannot be this customer "
                   "(DOB and nationality both known on both sides, both disagree).")
                 A("   Recorded, not suppressed — review and overrule here if the identity data is wrong:")
-                for h in sorted(_excluded, key=lambda h: -h["score"])[:5]:
+                for h in sorted(_excluded, key=lambda h: -h["score"])[:_excl_n]:
                     A(f"     · {h['list']}: \"{h['matched_entry']}\" {_pct(h['score'])} — {h['identity_excluded']}")
-                if len(_excluded) > 5:
-                    A(f"     · … +{len(_excluded) - 5} more (see run log)")
+                if len(_excluded) > _excl_n:
+                    A(f"     · … +{len(_excluded) - _excl_n} more (see run log)")
             if ctrl:
                 A("   NOTE: company flagged because an owner / director / UBO matches a designation —"
                   " apply OFAC/EU 50%/control aggregation; treat the entity as designated by extension pending review.")
@@ -4990,10 +5004,18 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
           "narrowed, standing exposure is covered. (A subject the watchlist cannot match either — a "
           "name in non-Latin script, or under 4 matchable characters — is counted in the DEGRADED "
           "blackout figure above, not here.)")
+    # WHY the sweep failed, from the per-subject am_msg samples — previously
+    # captured but never rendered, so the MLRO saw a count with no cause.
+    if stats.get("am_error_msgs"):
+        A("   Why the news sweep failed (top messages, × subjects affected):")
+        for _msg, _n in stats["am_error_msgs"]:
+            A(f"     - {_msg}  ×{_n}")
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
-        for f in sorted(adverse_findings, key=lambda f: (not f.get("is_new"), f["subject_name"])):
+        _af_sorted = sorted(adverse_findings, key=lambda f: (not f.get("is_new"), f["subject_name"]))
+        _af_shown = _af_sorted[:_subj_n] if _subj_n else _af_sorted
+        for f in _af_shown:
             who = f["subject_name"]
             if f["subject_type"] == "INDIVIDUAL" and f.get("parent"):
                 who = f"{who}  (owner / director — {f['parent']})"
@@ -5001,7 +5023,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             A(f"{who}   [{f['subject_type']}]{newtag}")
             if f.get("permalink"):
                 A(f"   Customer record: {f['permalink']}")
-            for a in f["articles"]:
+            _arts_shown = f["articles"][:_arts_n] if _arts_n else f["articles"]
+            for a in _arts_shown:
                 nflag = " 🆕" if a.get("is_new") else ""
                 tr = a.get("triage") or {}
                 sev = f"  [{tr.get('severity','')} · relevance {tr.get('relevance','')}]" if tr else ""
@@ -5015,7 +5038,13 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                     shown_src = ", ".join(extra[:4]) + (f" +{len(extra)-4} more" if len(extra) > 4 else "")
                     A(f"       Also reported by: {shown_src}")
                 A(f"       Link: {a.get('url','(no link)')}")
+            if len(f["articles"]) > len(_arts_shown):
+                A(f"   [!] … +{len(f['articles']) - len(_arts_shown)} more article(s) for this subject (see run log)")
             A("   MLRO Decision:  [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR")
+            A("")
+        if len(_af_sorted) > len(_af_shown):
+            A(f"   … +{len(_af_sorted) - len(_af_shown)} more adverse subject(s) — every one is in the run log; "
+              "none is cleared by this truncation.")
             A("")
         rep = stats.get("adverse_repeat") or {}
         if rep:
@@ -5023,6 +5052,13 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             for s_, n_ in sorted(rep.items()):
                 A(f"      {s_} — {n_} distinct stories — a pattern, not an isolated headline;")
                 A( "         EDD review required + assess STR grounds (tipping-off rules apply).")
+            A("")
+        # Degrade loudly: a failed evidence log silently killed this whole block
+        # before — the repeat signal simply vanished with no trace in the report.
+        if stats.get("adverse_evidence_error"):
+            A(f"   ⚠ Repeat-pattern evidence log unavailable this run ({stats['adverse_evidence_error']}) — "
+              f"the ≥3-stories/{REPEAT_WINDOW_DAYS}-day repeat signal was NOT evaluated. Do not read the "
+              "absence of a repeat-pattern block above as 'no pattern'.")
             A("")
         A(f"   Source: Google News RSS ({ADVERSE_LOCALES}/{len(GNEWS_LOCALES)} worldwide locales) + GDELT global index (65+ languages) · {len(ADVERSE_KEYWORDS)} EN + {len(FOREIGN_KEYWORDS)} multilingual ({ADVERSE_LANG_COUNT}-language) red-flag terms · duplicate stories merged · raw headlines, MLRO decides.")
         # Disclose WHICH markets ran and when the cycle completes. The per-run
@@ -5065,7 +5101,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("   No PEP matches identified." + ("  (provisional — see status above)" if pep_degraded else ""))
     else:
         A("")
-        for p in sorted(pep_findings, key=lambda p: (not p.get("is_new"), p["subject_name"])):
+        _pf_sorted = sorted(pep_findings, key=lambda p: (not p.get("is_new"), p["subject_name"]))
+        _pf_shown = _pf_sorted[:_subj_n] if _subj_n else _pf_sorted
+        for p in _pf_shown:
             who = p["subject_name"]
             if p.get("parent"):
                 who = f"{who}  (owner / director — {p['parent']})"
@@ -5078,6 +5116,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             if p.get("permalink"):
                 A(f"   Customer record: {p['permalink']}")
             A("   MLRO Decision:  [ ] not a PEP   [ ] confirmed PEP — EDD + senior-mgmt approval   [ ] investigate")
+            A("")
+        if len(_pf_sorted) > len(_pf_shown):
+            A(f"   … +{len(_pf_sorted) - len(_pf_shown)} more PEP finding(s) — every one is in the run log; "
+              "none is cleared by this truncation.")
             A("")
     A("")
 
@@ -5138,7 +5180,21 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("> RETENTION: retain 10 years — UAE FDL No. 10 of 2025 (AML/CFT/CPF; duty formerly FDL 26/2021 Art. 23); Cabinet Decision 74/2020.")
     return "\n".join(L)
 
-def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily"):
+# Section-aware pre-shrink rungs for the unified narrative. Each rung rebuilds
+# the report with tighter per-section ITEM caps so an oversized body loses depth
+# evenly across sections instead of losing whole middle sections to cap_notes'
+# head truncation — which is exactly how §② ADVERSE MEDIA vanished from
+# delivered reports while the header still counted its findings. cap_notes
+# stays as the final backstop, so the worst case equals the old behaviour.
+NARRATIVE_SHRINK_RUNGS = (
+    {"candidates": 10, "articles": 6, "subjects": None},
+    {"candidates": 6, "articles": 3, "subjects": 30},
+    {"candidates": 3, "articles": 1, "subjects": 15},
+    {"candidates": 1, "articles": 1, "subjects": 8},
+)
+
+def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
+                      rebuild=None):
     dt = run_time.strftime("%d %b %Y")
     n_s, n_a, n_p = len(possible_matches), len(adverse_findings), len(pep_findings)
     flag = "⚠️" if (n_s + n_a + n_p) > 0 else "✅"
@@ -5153,9 +5209,24 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     probe = run_time.toordinal() % 7 == 0  # deterministic weekly headroom re-test
     plan, last = notes_budget_plan(NOTES_BUDGET["stored"], probe), None
     for i, budget in enumerate(plan):
+        # Section-aware pre-shrink: rebuild at progressively tighter item caps
+        # until the body fits the budget; every section (incl. §② ADVERSE MEDIA)
+        # keeps its header, status and top items at every rung, and every cut is
+        # disclosed in-body with a '+N more' line. Only if even the deepest rung
+        # is oversize does cap_notes (the unchanged backstop) truncate.
+        body = narrative
+        if rebuild is not None and _asana_notes_size(body) > budget:
+            for rung in NARRATIVE_SHRINK_RUNGS:
+                body = rebuild(rung)
+                if _asana_notes_size(body) <= budget:
+                    log(f"  narrative pre-shrunk section-aware to fit the {budget}-byte budget (caps={rung})")
+                    break
+            else:
+                log(f"  narrative exceeds the {budget}-byte budget even at the deepest section caps — "
+                    "cap_notes backstop will truncate (marker in-body)")
         payload = {"data": {
             "name": task_name[:250],
-            "notes": cap_notes(narrative, budget),
+            "notes": cap_notes(body, budget),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
             "projects": _mlro_queue_targets()[0],
@@ -5212,6 +5283,17 @@ def create_case_subtask(parent_gid, name, notes, due_on):
             log(f"  case subtask refused at {budget}-byte budget — retrying at {CASE_NOTES_FLOOR}")
     log(f"  case subtask failed: {getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
     return False
+
+def count_new_case_items(possible_matches, adverse_findings, pep_findings):
+    """New items the case opener will actually queue — the SAME predicates as
+    open_mlro_cases (sanctions: is_new AND not identity_excluded; PEP/adverse:
+    is_new), so the report's "queued N" claim can never overcount the cases."""
+    new_s = sum(1 for m in possible_matches
+                if any(h.get("is_new") and not h.get("identity_excluded") for h in m["hits"]))
+    new_p = sum(1 for p in pep_findings if p.get("is_new"))
+    new_a = sum(1 for f in adverse_findings if any(a.get("is_new") for a in f["articles"]))
+    return new_s + new_p + new_a
+
 
 def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
                     state=None):
@@ -5361,6 +5443,7 @@ def tally_enrichment(results, wl_hits, wl_loaded):
     """
     companies = individuals = 0
     am_errors = am_blackout = pep_errors = pep_mirror = subject_errors = 0
+    am_msgs = {}   # distinct news-sweep failure messages → subject count (report evidence)
     adverse_findings, pep_findings = [], []
     for r in results:
         if r["type"] == "INDIVIDUAL":
@@ -5370,6 +5453,8 @@ def tally_enrichment(results, wl_hits, wl_loaded):
         subj_err = False
         if r["am_error"]:
             am_errors += 1
+            if r.get("am_msg"):
+                am_msgs[r["am_msg"]] = am_msgs.get(r["am_msg"], 0) + 1
             # No net could screen this subject — actionable failure. The
             # watchlist counts as covering a subject only if it could actually
             # SCREEN it: a name the matcher cannot handle (non-Latin script, or
@@ -5415,6 +5500,10 @@ def tally_enrichment(results, wl_hits, wl_loaded):
     counts = {"subjects": companies + individuals, "companies": companies,
               "individuals": individuals, "errors": subject_errors,
               "am_errors": am_errors, "am_blackout": am_blackout,
+              # Top failure messages (by subject count): the WHY behind am_errors.
+              # Captured per subject as am_msg but previously never rendered —
+              # the report said "news sweep lost" with no evidence of the cause.
+              "am_error_msgs": sorted(am_msgs.items(), key=lambda kv: (-kv[1], kv[0]))[:3],
               "pep_errors": pep_errors, "pep_mirror": pep_mirror,
               "watchlist": sum(1 for f in adverse_findings
                                if any(a.get("watchlist") for a in f["articles"]))}
@@ -5651,11 +5740,15 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # Evidence log (committed to git) + repeat-pattern signal: the same entity
     # flagged in ≥3 distinct stories inside 90 days is a PATTERN, not a headline.
     repeat_patterns = {}
+    adverse_evidence_error = None
     try:
         repeat_patterns = update_adverse_evidence(adverse_findings, run_time.strftime("%Y-%m-%d"))
         for s_, n_ in sorted(repeat_patterns.items()):
             log(f"REPEAT ADVERSE PATTERN: {s_} — {n_} distinct stories in {REPEAT_WINDOW_DAYS}d — escalate to MLRO")
     except Exception as e:
+        # Degrade loudly: the failure is carried into §② of the report (the
+        # repeat signal was NOT evaluated), not just this log line.
+        adverse_evidence_error = str(e)[:160]
         log(f"evidence log skipped ({e})")
     timings = {"watchlist": round(_t_watchlist - _t_start, 2),
                "sanctions": round(_t_sanctions - _t_watchlist, 2),
@@ -5689,6 +5782,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": subjects_total,
              "am_errors": am_errors, "pep_errors": pep_errors, "delta": delta,
+             "am_error_msgs": counts.get("am_error_msgs", []),
+             "adverse_evidence_error": adverse_evidence_error,
              "am_blackout": counts["am_blackout"], "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "adverse_repeat": repeat_patterns,
@@ -5699,10 +5794,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "ai_mode": _ai_mode_label()}
 
     # ── AGENTIC OPERATING MODEL: audit trail + QA / governance gate ──
-    new_s = sum(1 for m in possible_matches if any(h.get("is_new") for h in m["hits"]))
-    new_p = sum(1 for p in pep_findings if p.get("is_new"))
-    new_a = sum(1 for f in adverse_findings if any(a.get("is_new") for a in f["articles"]))
-    cases_proposed = min(new_s + new_p + new_a, CASE_SUBTASK_CAP)
+    # count_new_case_items shares open_mlro_cases' predicates — the previous
+    # inline count included identity-excluded hits the case opener skips, so
+    # the report over-promised the case count it "drafted".
+    cases_proposed = min(count_new_case_items(possible_matches, adverse_findings, pep_findings),
+                         CASE_SUBTASK_CAP)
     stats["agent_audit"] = agents.run_pipeline_audit(
         stats, possible_matches, adverse_findings, pep_findings,
         list_meta, cases_proposed, stats["ai_mode"])
@@ -5712,7 +5808,10 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     narrative = build_unified_narrative(possible_matches, clear, adverse_findings,
                                         pep_findings, list_meta, stats, run_time)
     parent_gid = post_unified_task(narrative, run_time, possible_matches,
-                                   adverse_findings, pep_findings, mode=mode)
+                                   adverse_findings, pep_findings, mode=mode,
+                                   rebuild=lambda caps: build_unified_narrative(
+                                       possible_matches, clear, adverse_findings,
+                                       pep_findings, list_meta, stats, run_time, caps=caps))
     # MLRO case subtasks for the NEW items only (keeps the case list actionable);
     # overflow/failed items ride the reserved backlog inside `state`.
     open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,

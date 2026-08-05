@@ -183,10 +183,12 @@ def run_pipeline_audit(stats, possible_matches, adverse_findings, pep_findings,
     log.record("PepAgent", "web.read", f"checked {inds} individuals vs Wikidata → {len(pep_findings)} PEP")
     log.record("RiskAgent", "compute", f"risk-rated {len(possible_matches)} flagged subject(s)")
     log.record("NetworkAgent", "compute", f"{len(stats.get('related_parties', []))} related-party cluster(s)")
-    log.record("CaseAgent", "propose", f"drafted {cases_proposed} MLRO case(s) — PROPOSED, not filed")
+    log.record("CaseAgent", "propose", f"queued {cases_proposed} NEW item(s) for MLRO casing — PROPOSED, not filed; created count in the run log")
     qa = qa_gate(possible_matches, adverse_findings, pep_findings, list_meta, stats)
     log.record("QAAgent", "audit", "PASSED" if qa["passed"] else f"{len(qa['issues'])} integrity issue(s)", ok=True)
-    log.record("DeliveryAgent", "asana.write", "post unified report to Ongoing Monitoring")
+    # This line is rendered INSIDE the report being posted, so it cannot claim a
+    # completed delivery — the post happens after, and a failed post re-alerts.
+    log.record("DeliveryAgent", "asana.write", "queue unified report for MLRO delivery (post follows; a failed post fails the run and re-alerts)")
 
     # Runtime credential scoping: issue only the secrets each agent is authorized
     # to use (values never logged). Plus a static policy self-test.

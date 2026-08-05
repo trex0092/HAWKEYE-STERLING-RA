@@ -43,7 +43,14 @@ export const BACKEND = 'js';
 function pairHits(subject, listed) {
   const idx = buildIndex([{ id: 'bench', name: 'BENCH', names: [listed] }]);
   const r = screenName(subject, idx);
-  return r.recommendation === 'sanctions-match';
+  /* A hit is a GENUINE LIST HIT — the exact definition test/benchmark_eval.py
+     uses for the Python engine (any hit whose list is not MANUAL REVIEW).
+     Weak-mechanism hits (subset/phonetic) now band review/medium instead of
+     sanctions-match, but they are still recorded list hits: counting only
+     `recommendation === 'sanctions-match'` here would misread the severity
+     recalibration as a recall loss. Verified equivalent on the pre-change
+     engine (identical 131/132 + 85/85 under both definitions). */
+  return (r.lists || []).some(h => h.list === 'BENCH');
 }
 
 export function runSanctions() {
