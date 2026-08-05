@@ -891,6 +891,18 @@ check('PEP harvest: batch-failure gate tolerates a few flaky WDQS batches, refus
   && pep.batchFailureOk(10, 100).ok === true);
 check('PEP harvest: holder batch size stays well under the WDQS 60s kill (≤ 100)',
   pep.HOLDER_BATCH <= 100);
+check('PEP classes: the core FATF categories stay REQUIRED, expansions are optional', (() => {
+  const byKey = new Map(pep.PEP_ROOT_CLASSES.map(c => [c.key, c]));
+  const core = ['head-of-state', 'head-of-government', 'minister', 'legislator', 'governor'];
+  const coreRequired = core.every(k => byKey.has(k) && !byKey.get(k).optional);
+  // Senior-official expansion present and OPTIONAL (a wrong/empty QID degrades
+  // loudly to zero-holders, never fails the harvest).
+  const expansions = ['ombudsman', 'prosecutor-general', 'auditor-general'];
+  const optionalAdds = expansions.every(k => byKey.has(k) && byKey.get(k).optional === true);
+  // ombudsman carries the cross-verified QID.
+  return coreRequired && optionalAdds && byKey.get('ombudsman').qid === 'Q169180'
+    && pep.PEP_ROOT_CLASSES.every(c => /^Q\d+$/.test(c.qid));
+})());
 
 /* ── source probe (diagnostic instrument — pure functions) ── */
 const sp = await import('./../scripts/source-probe.mjs');
