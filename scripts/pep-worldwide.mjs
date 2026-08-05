@@ -59,8 +59,16 @@ export const PEP_ROOT_CLASSES = [
 ];
 
 export const RECENCY_MONTHS = Number(process.env.PEP_RECENCY_MONTHS) || 24;
-export const HOLDER_BATCH = Number(process.env.PEP_HOLDER_BATCH) || 150;
+/* Positions per holders VALUES query. Smaller = each query returns fewer rows
+   and stays under the WDQS 60s hard kill (the 150 default timed out a late
+   batch and aborted a 62-minute harvest on 2026-08-05). */
+export const HOLDER_BATCH = Number(process.env.PEP_HOLDER_BATCH) || 60;
 export const LABEL_CHUNK = 50;
+/* A harvest that lost more than this fraction of its holder batches to WDQS
+   errors did not sweep enough of the graph to trust — fail loudly rather than
+   write a thin list. Below it, a few flaky batches are tolerated (the run
+   keeps what it got) and the floor/shrink gates still guard the write. */
+export const PEP_MAX_BATCH_FAIL_PCT = Number(process.env.PEP_MAX_BATCH_FAIL_PCT) || 0.1;
 /* Refuse-to-overwrite guards: an absolute floor plus a relative-shrink gate
    vs the previous artifact (a half-empty harvest is an outage upstream, not
    a mass global de-listing). */
@@ -166,6 +174,16 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names }) {
   return { v: 1, list: PEP_LIST_NAME, harvested: harvestedAt, count: entries.length, classes, entries };
 }
 
+/* Holder-batch failure gate: a harvest that lost too large a fraction of its
+   WDQS batches did not sweep enough of the graph to trust. Pure for tests. */
+export function batchFailureOk(failed, total, pct = PEP_MAX_BATCH_FAIL_PCT) {
+  if (!total) return { ok: true, reason: '' };
+  const rate = failed / total;
+  return rate > pct
+    ? { ok: false, reason: `${failed}/${total} holder batches failed (${Math.round(rate * 100)}% > ${Math.round(pct * 100)}% gate) — WDQS outage, not a trustworthy sweep` }
+    : { ok: true, reason: '' };
+}
+
 /* Refuse-to-overwrite guard. prev may be null (first harvest). */
 export function datasetFloorOk(dataset, prev, { floor = PEP_FLOOR, shrinkPct = PEP_SHRINK_PCT } = {}) {
   const n = dataset && dataset.count || 0;
@@ -196,12 +214,12 @@ export function pepListFromDataset(dataset) {
 
 /* ── network part (harvest CLI only) ───────────────────────────────────── */
 
-async function fetchJson(url, { tries = 5 } = {}) {
+async function fetchJson(url, { tries = 6 } = {}) {
   let lastErr;
   for (let i = 0; i < tries; i++) {
     try {
       const r = await fetch(url, { headers: { 'user-agent': UA, accept: 'application/sparql-results+json, application/json' } });
-      if (r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503) {
+      if (r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503 || r.status === 504) {
         const ra = Number(r.headers.get('retry-after')) || (2 ** i * 5);
         console.error(`  http ${r.status} — backing off ${ra}s`);
         await new Promise(res => setTimeout(res, ra * 1000));
@@ -218,6 +236,14 @@ async function fetchJson(url, { tries = 5 } = {}) {
   throw lastErr || new Error('fetch failed');
 }
 
+/* Non-throwing variant: returns null after exhausting retries so ONE flaky
+   WDQS response cannot abort a multi-thousand-query harvest. The caller counts
+   nulls and the batch-failure gate decides whether the sweep is trustworthy. */
+async function fetchJsonSafe(url) {
+  try { return await fetchJson(url); }
+  catch (e) { console.error('  batch failed after retries: ' + String(e && e.message || e).slice(0, 120)); return null; }
+}
+
 async function harvest(outfile) {
   const sinceIso = new Date(Date.now() - RECENCY_MONTHS * 30.44 * 86400000).toISOString().slice(0, 19) + 'Z';
   const harvestedAt = new Date().toISOString();
@@ -226,7 +252,11 @@ async function harvest(outfile) {
   const positions = new Map();       // posQid → { label, country, classKey }
   const posByClass = new Map();      // classKey → [posQid]
   for (const cls of PEP_ROOT_CLASSES) {
-    const rows = parseSparqlBindings(await fetchJson(sparqlUrl(positionsQuery(cls.qid))));
+    /* A required class whose P279* enumeration times out is a transient WDQS
+       failure, not "the class is empty" — retry hard, and only fail loudly if
+       it STILL yields nothing after retries. Optional classes tolerate zero. */
+    const pdata = await fetchJsonSafe(sparqlUrl(positionsQuery(cls.qid)));
+    const rows = pdata ? parseSparqlBindings(pdata) : [];
     const qids = [];
     for (const r of rows) {
       if (!r.pos || !/^Q\d+$/.test(r.pos)) continue;
@@ -236,39 +266,51 @@ async function harvest(outfile) {
     posByClass.set(cls.key, [...new Set(qids)]);
     console.log(`  ${cls.key}: ${posByClass.get(cls.key).length} position items`);
     if (!posByClass.get(cls.key).length && !cls.optional) {
-      console.error(`pep-worldwide: root class ${cls.key} (${cls.qid}) yielded ZERO position items — refusing a hollow harvest`);
+      console.error(`pep-worldwide: root class ${cls.key} (${cls.qid}) enumerated ZERO position items (query ${pdata ? 'returned empty' : 'failed after retries'}) — refusing a hollow harvest`);
       process.exit(1);
     }
   }
 
   const holderRows = [];
+  let batchTotal = 0, batchFailed = 0;
   for (const cls of PEP_ROOT_CLASSES) {
     const qids = posByClass.get(cls.key) || [];
     let classHolders = 0;
     for (let i = 0; i < qids.length; i += HOLDER_BATCH) {
       const batch = qids.slice(i, i + HOLDER_BATCH);
-      const rows = parseSparqlBindings(await fetchJson(sparqlUrl(holdersQuery(batch, sinceIso))));
-      for (const r of rows) {
+      batchTotal++;
+      const hdata = await fetchJsonSafe(sparqlUrl(holdersQuery(batch, sinceIso)));
+      if (hdata === null) { batchFailed++; continue; }   // flaky batch — counted, not fatal
+      for (const r of parseSparqlBindings(hdata)) {
         if (!r.person || !/^Q\d+$/.test(r.person)) continue;
         holderRows.push({ person: r.person, pos: r.pos, end: r.end || '', classKey: cls.key });
         classHolders++;
       }
       console.log(`  ${cls.key}: batch ${Math.floor(i / HOLDER_BATCH) + 1}/${Math.ceil(qids.length / HOLDER_BATCH)} — ${classHolders} holder rows so far`);
     }
-    if (!classHolders && !cls.optional) {
-      console.error(`pep-worldwide: root class ${cls.key} yielded ZERO holders — refusing a hollow harvest`);
+    // A required class that ended with zero holders AND lost batches is an
+    // outage, not an empty class; the batch-failure gate below catches it. Only
+    // fail here when the class truly enumerated holders-less with batches OK.
+    if (!classHolders && !cls.optional && batchFailed === 0) {
+      console.error(`pep-worldwide: root class ${cls.key} yielded ZERO holders on a clean sweep — refusing a hollow harvest`);
       process.exit(1);
     }
     if (!classHolders && cls.optional) console.log(`  ${cls.key}: zero holders (optional class — QID pending live verification)`);
   }
+  const bgate = batchFailureOk(batchFailed, batchTotal);
+  if (!bgate.ok) {
+    console.error('pep-worldwide: REFUSING to write — ' + bgate.reason + ' (previous artifact kept)');
+    process.exit(1);
+  }
+  if (batchFailed) console.log(`pep-worldwide: tolerated ${batchFailed}/${batchTotal} flaky holder batches (within the ${Math.round(PEP_MAX_BATCH_FAIL_PCT * 100)}% gate)`);
 
   const personQids = [...new Set(holderRows.map(r => r.person))];
   console.log(`pep-worldwide: ${holderRows.length} holder rows → ${personQids.length} distinct persons; fetching multilingual names`);
   const names = new Map();
   for (let i = 0; i < personQids.length; i += LABEL_CHUNK) {
     const chunk = personQids.slice(i, i + LABEL_CHUNK);
-    const data = await fetchJson(labelsUrl(chunk));
-    for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
+    const data = await fetchJsonSafe(labelsUrl(chunk));   // a lost label chunk just leaves those persons unnamed (dropped)
+    if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
     if ((i / LABEL_CHUNK) % 20 === 0) console.log(`  names: ${Math.min(i + LABEL_CHUNK, personQids.length)}/${personQids.length}`);
   }
 

@@ -10,6 +10,16 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **PEP harvest made fault-tolerant** (`scripts/pep-worldwide.mjs`): the first
+  live harvest crawled ~62 minutes of Wikidata then a single flaky WDQS
+  response threw and discarded the whole run. Now: holder batches are smaller
+  (60, well under the WDQS 60s kill), a batch that fails after retries is
+  counted and skipped rather than fatal, and a new failure-rate gate refuses
+  to write only when >10% of batches were lost (a real outage) — below that
+  the run keeps what it swept and the floor/shrink gates still guard the
+  write. Label chunks and position queries are likewise non-fatal per-unit.
+  A transient query hiccup no longer costs an hour's harvest.
+
 - **Screening hardening audit — seven confirmed silent-clear / recall-loss
   holes closed.** An adversarial audit (6 finders across every screening
   surface, each candidate verified against the actual guards) found and this

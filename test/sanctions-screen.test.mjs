@@ -884,6 +884,13 @@ check('PEP list: dataset flattens to a matcher list + per-name office context ma
   && _plist.count === 2);
 check('PEP list: the list name rides the non-whitelistable PEP prefix',
   pep.PEP_LIST_NAME.startsWith('PEP ('));
+check('PEP harvest: batch-failure gate tolerates a few flaky WDQS batches, refuses an outage',
+  pep.batchFailureOk(5, 100).ok === true
+  && pep.batchFailureOk(15, 100).ok === false
+  && pep.batchFailureOk(0, 0).ok === true
+  && pep.batchFailureOk(10, 100).ok === true);
+check('PEP harvest: holder batch size stays well under the WDQS 60s kill (≤ 100)',
+  pep.HOLDER_BATCH <= 100);
 
 /* ── source probe (diagnostic instrument — pure functions) ── */
 const sp = await import('./../scripts/source-probe.mjs');
