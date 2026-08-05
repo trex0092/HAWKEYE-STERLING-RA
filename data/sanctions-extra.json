@@ -408,8 +408,8 @@
    "type": "json",
    "parser": "json",
    "enabled": true,
-   "paginate": { "sizeParam": "size", "offsetParam": "offset", "size": 250, "totalPath": "meta.totalItems", "dataPath": "data", "maxPages": 30 },
-   "_note": "ADB published debarment register incl. the 2010 MDB Mutual-Enforcement cross-debarments (~1,533 firms/individuals; debarment/procurement-integrity tier). ENABLED 2026-08-05 on source-probe evidence (run 31030989375): the runner reached apim.adb.org (http 200, application/json, meta.totalItems 1533; data[].attributes.name). The API serves 10 rows/page and its own links.next points at an unreachable internal host (rip-oai-…azurecontainerapps.io), so it is read via the size/offset paginator (offset advances by ACTUAL page length, so it collects the full list whether or not the server honours the size=250 hint). Bounded at maxPages 30 and floored at minNames 500 — if the size hint is ignored and 30 pages of 10 fall short of the register, the run reports DEGRADED (loud, capped at 30 requests, never hammering), so the first live sweep confirms full coverage or flags a partial to widen the cap.",
+   "paginate": { "sizeParam": "size", "offsetParam": "offset", "size": 10, "totalPath": "meta.totalItems", "dataPath": "data", "maxPages": 170 },
+   "_note": "ADB published debarment register incl. the 2010 MDB Mutual-Enforcement cross-debarments (~1,533 firms/individuals; debarment/procurement-integrity tier). ENABLED 2026-08-05, read via the size/offset paginator. Live-tuned on two screen runs: run 31038800488 → egress-blocked (apim.adb.org added to the sanctions-screen allowlist, #412); run 31041253382 → HTTP 400 because size=250 exceeds the API's page-size limit (its own links.next uses size=10). So size is pinned to the API's accepted 10 and maxPages raised to 170 (≥153 pages of 10 covers 1,533); the offset advances by ACTUAL page length. Floored at minNames 500 — a short/failed fetch reports DEGRADED (loud), never a silent short list.",
    "minNames": 500
   },
   {

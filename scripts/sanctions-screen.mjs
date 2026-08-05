@@ -1205,7 +1205,13 @@ async function fetchListBody(source, timeoutMs = 60000) {
      size/offset on the public URL). Only sources that opt in via `paginate`
      take this path; every other source keeps the single-GET behaviour below. */
   if (source.paginate && !binary) {
-    return withTimeout((signal) => fetchPaginatedJson(parsed.href, headers, source.paginate, signal, source.id), timeoutMs);
+    /* A small-page API (ADB caps size at 10) needs many sequential requests, so
+       the paginated fetch gets a budget scaled to the page cap — ~1s/page,
+       floored at the normal timeout and capped at 3 min — instead of the
+       single-GET timeout that would abort a long crawl mid-list. */
+    const pages = Number(source.paginate.maxPages) || 30;
+    const pagTimeout = Math.min(180000, Math.max(timeoutMs, pages * 1000));
+    return withTimeout((signal) => fetchPaginatedJson(parsed.href, headers, source.paginate, signal, source.id), pagTimeout);
   }
   return withTimeout(async (signal) => {
     const r = await fetch(parsed.href, { signal, redirect: 'follow', headers });
