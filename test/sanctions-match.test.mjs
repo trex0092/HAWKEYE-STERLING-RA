@@ -5,7 +5,7 @@ import {
   parseEuCsv, parseOpenSanctionsCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName, nameVariants, translitCanonToken, indelRatio, tokenSetRatio, isTokenSubset,
   MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters, trigramsOf, fuzzyTokenMatches,
-  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseJsonList,
+  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseSatCsv, parseJsonList,
   phoneticKey, phonTokens, phoneticProfile, phoneticPairMatch
 } from '../scripts/sanctions-match.mjs';
 import { deflateRawSync } from 'node:zlib';
@@ -541,6 +541,53 @@ for (const [raw, want] of [
   check(`normalizeName folds ${raw} to ${want} (cross-engine key agreement)`,
     normalizeName(raw) === want);
 }
+
+
+/* ── probe-evidence wave (2026-08-05): multi-sheet XLSX, header-row scan,
+      Mexico SAT CSV, Qatar JSON keys ── */
+const IL_SHARED = '<sst>' +
+  ['\u05db\u05d5\u05ea\u05e8\u05d5\u05ea', 'Header', 'internal seq. id',
+   'Name of Individual - English', 'Name of Individual - Hebrew',
+   'AIMAN AL-ZAWAHIRI', '\u05d0\u05d9\u05de\u05df', '-']
+    .map(s => '<si><t>' + s + '</t></si>').join('') + '</sst>';
+const IL_SHEET = '<worksheet><sheetData>' +
+  '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>0</v></c></row>' +
+  '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c><c r="C2" t="s"><v>4</v></c></row>' +
+  '<row r="3"><c r="A3"><v>1</v></c><c r="B3" t="s"><v>5</v></c><c r="C3" t="s"><v>6</v></c></row>' +
+  '<row r="4"><c r="A4"><v>2</v></c><c r="B4" t="s"><v>7</v></c><c r="C4" t="s"><v>7</v></c></row>' +
+  '</sheetData></worksheet>';
+const SA_SHEET2 = '<worksheet><sheetData>' +
+  '<row r="1"><c r="A1" t="s"><v>2</v></c><c r="B1" t="s"><v>3</v></c></row>' +
+  '<row r="2"><c r="A2"><v>9</v></c><c r="B2" t="s"><v>5</v></c></row>' +
+  '</sheetData></worksheet>';
+const ilXlsx = makeZip([
+  { name: 'xl/sharedStrings.xml', data: IL_SHARED },
+  { name: 'xl/worksheets/sheet1.xml', data: IL_SHEET },
+  { name: 'xl/worksheets/sheet2.xml', data: SA_SHEET2 },
+]);
+const ilNames = parseDfatXlsx(ilXlsx);
+check('XLSX header-row SCAN finds row-1 English headers under a row-0 caption (Israel NBCTF shape)',
+  ilNames.includes('AIMAN AL-ZAWAHIRI') && ilNames.includes('\u05d0\u05d9\u05de\u05df'));
+check('XLSX reader walks EVERY worksheet, not just sheet1 (Saudi PCCT shape)',
+  ilNames.filter(n => n === 'AIMAN AL-ZAWAHIRI').length === 2);
+check('XLSX reader drops "-" placeholder cells',
+  !ilNames.includes('-'));
+const SAT = '"Informacion actualizada",,,\n' +
+  'Listado completo de contribuyentes,,,\n' +
+  'No,RFC,Nombre del Contribuyente,Situacion del contribuyente\n' +
+  '1,AAA1,"MILL UNO, S.A. DE C.V.",Definitivo\n' +
+  '2,AAA2,"MILL DOS, S.A.",Presunto\n' +
+  '3,AAA3,"CLEARED CO, S.A.",Desvirtuado\n' +
+  '4,AAA4,"COURT CO, S.A.",Sentencia Favorable\n';
+const satNames = parseSatCsv(SAT);
+check('SAT 69-B: header found after preamble; only live statuses screen (Presunto/Definitivo)',
+  satNames.length === 2 && satNames.includes('MILL UNO, S.A. DE C.V.') && satNames.includes('MILL DOS, S.A.')
+  && !satNames.some(n => /CLEARED|COURT/.test(n)));
+check('SAT 69-B: no header row parses 0 names (degrades, never guesses)',
+  parseSatCsv('a,b\n1,2\n').length === 0);
+check('Qatar NCTC JSON keys (fullNameEn/fullNameAr) screen both scripts',
+  JSON.stringify(parseJsonList('{"content":[{"fullNameEn":"Adil Uthman","fullNameAr":"\u0639\u0627\u062f\u0644"}],"totalElements":864}'))
+  === JSON.stringify(['Adil Uthman', '\u0639\u0627\u062f\u0644']));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

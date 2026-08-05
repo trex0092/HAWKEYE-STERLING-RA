@@ -148,7 +148,7 @@
    "type": "xlsx",
    "parser": "xlsx",
    "enabled": false,
-   "_note": "Sri Lanka national 1373 designations (XLSX). DISABLED 2026-08-05 after the first live run: connection-level fetch failure from the Actions runner (host unreachable or datacenter-blocked). Curated path or periodic retry.",
+   "_note": "Sri Lanka national 1373 designations (XLSX). DISABLED — probe evidence 2026-08-05: connection fails from GitHub runners even with browser headers (DNS resolves, TLS/connection dies). Curated path, or periodic re-probe via source-probe.yml.",
    "minNames": 30
   },
   {
@@ -202,9 +202,10 @@
    "url": "https://nbctf.mod.gov.il/he/Announcements/Documents/NBCTF%20Israel%20designation%20Individuals_XL.xlsx",
    "type": "xlsx",
    "parser": "xlsx",
-   "enabled": false,
-   "_note": "Israel NBCTF terror-designation individuals (stable un-dated XLSX). DISABLED 2026-08-05 after the first live run: the fetch succeeded but parsed 0 names — the WAF served a challenge page instead of the workbook (the scraping protection the survey warned about). Curated path per the EOCN doctrine, or revisit with a browser-headers fetch spike.",
-   "minNames": 150
+   "enabled": true,
+   "_note": "Israel NBCTF terror-designation individuals (stable un-dated XLSX). RE-ENABLED 2026-08-05 on probe evidence: the runner fetches the real 87KB workbook (http 200) — the earlier 0-parse was the HEADER LAYOUT (Hebrew captions on row 0, English header 'Name of Individual - English/Hebrew/Arabic' on row 1), which the XLSX reader's header-row scan now handles; name columns carry all three scripts into the transliteration nets. browserHeaders on for WAF safety.",
+   "minNames": 150,
+   "browserHeaders": true
   },
   {
    "id": "sa-pcct",
@@ -213,9 +214,10 @@
    "url": "https://pctc.pss.gov.sa/portal/pcct/slist/js/slistEN.xlsx",
    "type": "xlsx",
    "parser": "xlsx",
-   "enabled": false,
-   "_note": "Saudi PCCT national terrorism list (English XLSX). DISABLED 2026-08-05 after the first live run: the workbook fetched but the generic name-column reader extracted only 7 rows (below the 100 floor) — the sheet layout differs from the header convention. Needs a workbook sample to map columns before re-enabling.",
-   "minNames": 100
+   "enabled": true,
+   "_note": "Saudi PCCT national terrorism list (English XLSX). RE-ENABLED 2026-08-05 on probe evidence: the workbook keeps individuals/entities/vessels on SEPARATE TABS and sheet1 is vessels (the 7 sub-floor 'names' were ships) — the XLSX reader now walks every worksheet. Floor kept at 100 pending the first full-parse count; ratchet upward once observed.",
+   "minNames": 100,
+   "browserHeaders": true
   },
   {
    "id": "qa-nctc",
@@ -224,9 +226,10 @@
    "url": "https://portal.moi.gov.qa/wps/portal/NCTC/sanctionlist/unifiedsanctionlist/!ut/p/z1/jY_BDoIwAEM_aXUbIMdByLa4iZgRcBeyk1mi6MH4_RL16qS3Jq9tSjwZiZ_DM57DI97mcFn8yeeTLimnilPT1lygY5V2lllImZHhDWTKNJLvsJeFq9C1VLn8qCiwIX5NHj8ksC6fAHy6fiD-MyGsBuUwbVMvDaVyqmbA9lB8gdTFfyP3a9-PiPoFJNS7hg!!/dz/d5/L3dDZyEvUUZRSS9ZTlEh/p0/IZ7_I9242H42LOC4A0Q3BITM3M0G85=CZ6_I9242H42LOC4A0Q3BITM3M0GG5=NJgetSanctionList=/?lang=en&name=&qid=&passport=&listType=",
    "type": "json",
    "parser": "json",
-   "enabled": false,
-   "_note": "Qatar NCTC unified record (keyless JSON GET). DISABLED 2026-08-05 after the first live run: fetch succeeded, 0 names parsed — the WebSphere portal returned a challenge/HTML body or a key shape the generic JSON walker does not know. Needs a payload sample from a runner before re-enabling.",
-   "minNames": 200
+   "enabled": true,
+   "_note": "Qatar NCTC unified record. RE-ENABLED 2026-08-05 on probe evidence: the endpoint serves real JSON (864 designations, ~1.45MB) MISLABELED as text/html; keys are fullNameEn/fullNameAr (now known to the generic JSON walker — English + Arabic names both screen). Verified end-to-end with browser headers; the portal-state URL is the documented one and the probe re-verifies it on demand.",
+   "minNames": 200,
+   "browserHeaders": true
   },
   {
    "id": "hk-cedb",
@@ -266,7 +269,7 @@
    "type": "curated",
    "parser": "curated",
    "enabled": false,
-   "_note": "Documented fact from the 2026-08-05 survey: the portal answers 403 to GitHub Actions IPs specifically (works from other clouds) — a scheduled fetch from this repo's runners cannot work. Curated path or a future proxy decision (which would be a Board/architecture act, not a source entry)."
+   "_note": "Jordan AMLU national list. Probe evidence 2026-08-05: the runner CAN reach it (http 200 — the earlier '403 from Actions' note did not reproduce) but publication is a server-rendered HTML page (121KB, ASP.NET), not a machine-readable feed. Stays curated/disabled until an export endpoint is found; re-probe via source-probe.yml."
   },
   {
    "id": "ar-repet",
@@ -286,9 +289,10 @@
    "url": "https://olinda.bcb.gov.br/olinda/servico/Gepad_QuadrosGeraisInternet/versao/v1/odata/QuadroGeralInabilitados?$format=json",
    "type": "json",
    "parser": "json",
-   "enabled": false,
-   "_note": "BCB disqualifications (OData JSON, keyless). DISABLED 2026-08-05 after the first live run: fetch succeeded, 0 names parsed — the OData field names differ from every key the generic JSON walker knows (Portuguese keys included). Needs a payload sample from a runner to map the name field, then re-enable.",
-   "minNames": 150
+   "enabled": true,
+   "_note": "BCB disqualifications (OData JSON, keyless). RE-ENABLED 2026-08-05 on probe evidence: the payload is clean {value:[{Nome:...}]} and the walker parses it — the live 0-parse difference was the FETCH (plain screening UA vs the browser-shaped request the probe validated). browserHeaders on; enforcement tier as named.",
+   "minNames": 150,
+   "browserHeaders": true
   },
   {
    "id": "br-bcb-qgp",
@@ -297,10 +301,11 @@
    "url": "https://olinda.bcb.gov.br/olinda/servico/Gepad_QuadrosGeraisInternet/versao/v1/odata/QuadroGeralProibidos?$format=json",
    "type": "json",
    "parser": "json",
-   "enabled": false,
+   "enabled": true,
    "optional": true,
-   "_note": "Sibling of br-bcb-qgi (same OData service) — disabled with it 2026-08-05 pending the same field mapping.",
-   "minNames": 1
+   "_note": "Sibling of br-bcb-qgi (same OData service). RE-ENABLED with it 2026-08-05; probe shows 2 live entries — `optional: true` keeps a small/empty parse a valid state, never degraded coverage.",
+   "minNames": 1,
+   "browserHeaders": true
   },
   {
    "id": "br-tcu-inidoneos",
@@ -326,13 +331,16 @@
   },
   {
    "id": "mx-sat-69b",
-   "name": "Mexico — SAT Artículo 69-B (EFOS invoice-mill list)",
+   "name": "Mexico — SAT Art. 69-B EFOS list (tax-integrity signal, not sanctions)",
    "jurisdiction": "Mexico",
    "url": "http://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv",
    "type": "csv",
-   "parser": "eu",
-   "enabled": false,
-   "_note": "12-15k presumed/confirmed invoice-mill operators — a strong integrity signal for Mexican counterparties, but publication is latin-1-encoded CSV over plain http: the fetcher decodes UTF-8 only, so accented names would corrupt before matching. DISABLED until a charset-aware fetch lands (follow-up spike); enabling now would screen mojibake and miss real matches while looking green. Mexico's UIF blocked-persons list is credentialed + legally confidential — rejected outright."
+   "parser": "mxsat",
+   "enabled": true,
+   "_note": "Mexico SAT Art. 69-B EFOS list. ENABLED 2026-08-05 on probe evidence: 4.5MB latin-1 CSV, header row after two preamble rows, 'Nombre del Contribuyente' column. The fetcher decodes latin-1 per-source (UTF-8 decode corrupted accented names) and parseSatCsv screens ONLY live statuses (Presunto/Definitivo — a rebutted or court-cleared taxpayer never flags). TIER: tax-integrity signal for Mexican counterparties, not a financial-sanctions designation — the list name says so.",
+   "browserHeaders": true,
+   "charset": "latin1",
+   "minNames": 3000
   },
   {
    "id": "adb-debarment",

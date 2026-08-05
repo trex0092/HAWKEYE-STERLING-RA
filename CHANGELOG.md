@@ -10,6 +10,25 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Probe-evidence wave: five sources re-enabled, one confirmed dead.** The
+  first source-probe run turned every guess into evidence, and the fixes
+  land with it: **Israel NBCTF** re-enabled (real 87KB workbook; the XLSX
+  reader now SCANS for the header row — English headers sit under a Hebrew
+  caption row — and carries the English/Hebrew/Arabic name columns into the
+  transliteration nets); **Saudi PCCT** re-enabled (the reader now walks
+  EVERY worksheet — sheet 1 is vessels, the individuals/entities live on
+  other tabs); **Qatar NCTC** re-enabled (real JSON, 864 designations,
+  mislabeled content-type; `fullNameEn`/`fullNameAr` keys added and the
+  JSON walker now keeps EVERY whole-name key per record, so both scripts
+  screen); **Brazil BCB ×2** re-enabled (payload parses clean — the
+  difference was the fetch: per-source `browserHeaders` option added, used
+  by every endpoint the probe validated with browser-shaped requests);
+  **Mexico SAT 69-B** enabled (per-source `charset` decode for its latin-1
+  CSV + a dedicated parser that screens ONLY live statuses — a rebutted or
+  court-cleared taxpayer never flags; named as a tax-integrity signal, not
+  sanctions). Sri Lanka is confirmed unreachable from runners (probe
+  evidence recorded); Jordan is reachable but HTML-only (note corrected).
+
 - **Case-card XML contract fixed and frozen.** Both live runs' case creates
   400'd (`xml_parsing_error`) on the machine-read Disposition block: Asana
   parses `html_notes` as strict XML against a supported-tag subset, and the

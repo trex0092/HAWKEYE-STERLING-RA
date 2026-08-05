@@ -546,20 +546,56 @@ export function parseDfatXlsx(buf) {
   const files = unzipEntries(buf);
   if (!files.size) return [];
   const shared = parseSharedStrings(bufStr(files.get('xl/sharedStrings.xml')));
-  let sheetXml = bufStr(files.get('xl/worksheets/sheet1.xml'));
-  if (!sheetXml) for (const [k, v] of files) { if (/^xl\/worksheets\/.*\.xml$/i.test(k)) { sheetXml = bufStr(v); break; } }
-  const rows = parseSheetRows(sheetXml, shared);
-  if (!rows.length) return [];
-  let h = 0;
-  while (h < rows.length && !rows[h].some(c => c && c.trim())) h++;
-  const header = (rows[h] || []).map(c => String(c).toLowerCase().trim());
-  const nameCols = [];
-  header.forEach((c, i) => { if (/name/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
-  if (!nameCols.length) header.forEach((c, i) => { if (c === 'name') nameCols.push(i); });
-  if (!nameCols.length) return [];
+  /* EVERY worksheet, not just sheet1: the Saudi PCCT workbook keeps
+     individuals / entities / vessels on separate tabs, and reading only the
+     first yielded 7 vessel names below the coverage floor (2026-08-05 probe
+     evidence). Sheets without a name-bearing header contribute nothing. */
+  const sheetNames = [...files.keys()].filter(k => /^xl\/worksheets\/.*\.xml$/i.test(k)).sort();
+  const names = [];
+  for (const sn of sheetNames) {
+    const rows = parseSheetRows(bufStr(files.get(sn)), shared);
+    if (!rows.length) continue;
+    /* Header-row SCAN (first 8 rows), not first-non-empty: the Israel NBCTF
+       sheet puts Hebrew captions on row 0 and the English header ("Name of
+       Individual - English/Hebrew/Arabic") on row 1 — taking row 0 as the
+       header found no name column and parsed 0 (same probe evidence). */
+    let h = -1;
+    for (let i = 0; i < Math.min(rows.length, 8); i++) {
+      if (rows[i].some(c => /name/i.test(String(c)) && !/name\s*type/i.test(String(c)))) { h = i; break; }
+    }
+    if (h < 0) continue;
+    const header = rows[h].map(c => String(c).toLowerCase().trim());
+    const nameCols = [];
+    header.forEach((c, i) => { if (/name/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
+    if (!nameCols.length) continue;
+    for (let i = h + 1; i < rows.length; i++) {
+      for (const ci of nameCols) { const v = (rows[i][ci] || '').trim(); if (v && v !== '-') names.push(v); }
+    }
+  }
+  return names;
+}
+
+/* Mexico SAT Artículo 69-B (EFOS invoice-mill list): latin-1 comma CSV with
+   two preamble rows before the header. Only LIVE statuses screen — a taxpayer
+   who REBUTTED the presumption (Desvirtuado) or won in court (Sentencia
+   Favorable) must never flag; Presunto/Definitivo are the operative rows.
+   Tier framing lives in the registry entry: tax-integrity signal, not a
+   financial-sanctions designation. */
+export function parseSatCsv(body) {
+  const rows = parseDelimited(body, ',');
+  let h = -1, nameIdx = -1, sitIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 8); i++) {
+    const cells = rows[i].map(c => c.toLowerCase());
+    const n = cells.findIndex(c => /nombre del contribuyente|raz.n social/.test(c));
+    if (n >= 0) { h = i; nameIdx = n; sitIdx = cells.findIndex(c => /situaci.n/.test(c)); break; }
+  }
+  if (h < 0) return [];
   const names = [];
   for (let i = h + 1; i < rows.length; i++) {
-    for (const ci of nameCols) { const v = (rows[i][ci] || '').trim(); if (v) names.push(v); }
+    const sit = sitIdx >= 0 ? String(rows[i][sitIdx] || '').toLowerCase() : '';
+    if (sitIdx >= 0 && !/presunto|definitivo/.test(sit)) continue;
+    const v = (rows[i][nameIdx] || '').trim();
+    if (v) names.push(v);
   }
   return names;
 }
@@ -630,7 +666,7 @@ export function parseOdsList(buf) {
    names from the common name-bearing keys (and assemble first+last where a record
    splits them), plus aliases. Best-effort: returns [] if nothing recognisable, so
    the caller flags coverage degraded rather than inferring a false clear. */
-const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination|supp_name|firm_name|nome|nomepessoa|nome_pessoa|nomecompleto|nome_completo|razaosocial|razao_social|razonsocial|razon_social|denominacion|denominacao|nombrecompleto|nombre_completo)$/i;
+const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination|supp_name|firm_name|nome|nomepessoa|nome_pessoa|nomecompleto|nome_completo|razaosocial|razao_social|razonsocial|razon_social|denominacion|denominacao|nombrecompleto|nombre_completo|fullnameen|fullnamear)$/i;
 const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename|nombre|nombres)$/i;
 const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom|apellido|apellidos)$/i;
 const JSON_ALIAS = /^(alias|aliases|aka|akas|othernames|other_names|alternativenames|alternative_names|alternatename|alternative_spelling|autresnoms)$/i;
@@ -642,16 +678,25 @@ export function parseJsonList(body) {
     if (node == null || depth > 8) return;
     if (Array.isArray(node)) { for (const x of node) visit(x, depth + 1); return; }
     if (typeof node !== 'object') return;
-    let whole = '', first = '', last = '';
+    /* EVERY whole-name key on a record screens — Qatar's NCTC carries the
+       designation in fullNameEn AND fullNameAr, and keeping only the first
+       dropped the Arabic form the transliteration nets want (2026-08-05
+       probe evidence). Multiple wholes on one record are just aliases of
+       each other; the Set at the end dedupes. */
+    const wholes = [];
+    let first = '', last = '';
     for (const [k, v] of Object.entries(node)) {
       if (typeof v === 'string' && v.trim()) {
-        if (!whole && JSON_WHOLE.test(k)) whole = v.trim();
+        if (JSON_WHOLE.test(k)) wholes.push(v.trim());
         else if (!first && JSON_FIRST.test(k)) first = v.trim();
         else if (!last && JSON_LAST.test(k)) last = v.trim();
       }
     }
-    const assembled = (whole || [first, last].filter(Boolean).join(' ')).replace(/\s+/g, ' ').trim();
-    if (assembled) out.push(assembled);
+    for (const w of wholes) { const t = w.replace(/\s+/g, ' ').trim(); if (t) out.push(t); }
+    if (!wholes.length) {
+      const assembled = [first, last].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+      if (assembled) out.push(assembled);
+    }
     for (const [k, v] of Object.entries(node)) {
       if (JSON_ALIAS.test(k)) {
         if (typeof v === 'string') for (const piece of v.split(/[;/|]/)) { const t = piece.trim(); if (t) out.push(t); }
@@ -705,6 +750,7 @@ export function parseList(source, body) {
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
   if (p === 'json') return parseJsonList(body);
   if (p === 'curated' || source.type === 'curated') return parseCuratedList(body);
+  if (p === 'mxsat') return parseSatCsv(body);                   // Mexico SAT 69-B (latin-1 CSV, live statuses only)
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
   if (p === 'ods' || source.type === 'ods') return parseOdsList(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
