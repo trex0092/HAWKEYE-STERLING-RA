@@ -1127,6 +1127,48 @@ async function postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, t
   }
 }
 
+/* Dotted-path lookup ("meta.totalItems", "data") for the paginated JSON reader. */
+export function getByPath(obj, path) {
+  return String(path || '').split('.').filter(Boolean)
+    .reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+
+/* Fetch every page of a JSON list API that paginates by size/offset, merging the
+   rows under one key so the source's normal parser walks them unchanged. Opt-in
+   per source via `source.paginate`; sources without it are untouched. The offset
+   advances by the ACTUAL rows returned (not the requested size), so it collects
+   the full list whether the server honours the size hint or caps the page — and
+   a run that hits the page cap before the reported total logs LOUDLY and returns
+   what it has (the coverage floor then flags the partial). */
+export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = '') {
+  const sizeParam = pg.sizeParam || 'size';
+  const offsetParam = pg.offsetParam || 'offset';
+  const size = Math.max(1, Number(pg.size) || 200);
+  const dataPath = pg.dataPath || 'data';
+  const maxPages = Math.max(1, Number(pg.maxPages) || 30);
+  const all = [];
+  let offset = 0, total = null, page = 0;
+  for (; page < maxPages; page++) {
+    const u = new URL(url);
+    u.searchParams.set(sizeParam, String(size));
+    u.searchParams.set(offsetParam, String(offset));
+    const r = await fetch(u.href, { signal, redirect: 'follow', headers });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' (page ' + page + ')');
+    const json = JSON.parse(await r.text());
+    if (total == null && pg.totalPath) { const t = Number(getByPath(json, pg.totalPath)); if (Number.isFinite(t)) total = t; }
+    const rows = getByPath(json, dataPath);
+    const arr = Array.isArray(rows) ? rows : [];
+    if (!arr.length) break;                       // list exhausted
+    all.push(...arr);
+    offset += arr.length;                         // step by ACTUAL page length — robust to any server page size
+    if (Number.isFinite(total) && offset >= total) break;
+  }
+  if (page >= maxPages && (!Number.isFinite(total) || offset < total)) {
+    console.warn(`  ${sourceId || 'paginated source'}: pagination capped at ${maxPages} pages (${all.length}${Number.isFinite(total) ? ' of ' + total : ''} rows) — coverage PARTIAL, coverage floor will flag it`);
+  }
+  return JSON.stringify({ [dataPath]: all });
+}
+
 /* Fetch one consolidated list — a remote URL, or an in-repo curated file
    (source.file, e.g. the UAE EOCN list). Returns the raw body or throws. */
 async function fetchListBody(source, timeoutMs = 60000) {
@@ -1158,6 +1200,13 @@ async function fetchListBody(source, timeoutMs = 60000) {
       'accept-language': 'en-US,en;q=0.9',
     }
     : { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' };
+  /* Paginated JSON APIs (e.g. ADB's debarment register serves 10 rows/page and
+     its own `next` link points at an unreachable internal host, so we page by
+     size/offset on the public URL). Only sources that opt in via `paginate`
+     take this path; every other source keeps the single-GET behaviour below. */
+  if (source.paginate && !binary) {
+    return withTimeout((signal) => fetchPaginatedJson(parsed.href, headers, source.paginate, signal, source.id), timeoutMs);
+  }
   return withTimeout(async (signal) => {
     const r = await fetch(parsed.href, { signal, redirect: 'follow', headers });
     if (!r.ok) throw new Error('HTTP ' + r.status);
