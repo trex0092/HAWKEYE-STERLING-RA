@@ -63,7 +63,7 @@
    "type": "json",
    "parser": "json",
    "enabled": false,
-   "_note": "Ukraine NSDC State Register of Sanctions: no stable free machine-readable endpoint confirmed (the register site is API-gated / changes paths). Keep disabled until an endpoint is verified from a runner. Ukraine designations substantially overlap the EU/UK/US lists already screened daily."
+   "_note": "Ukraine NSDC State Register of Sanctions. 2026-08-05 survey verdict: api-drs.nsdc.gov.ua REQUIRES an API key granted only on written application (sanctions@rnbo.gov.ua) — rejected under the keyless doctrine, not merely unverified. Ukraine designations substantially overlap the EU/UK/US lists already screened daily; the ~15k register would be additive if Ukraine ever restores keyless access."
   },
   {
    "id": "ch-seco",
@@ -104,9 +104,10 @@
    "jurisdiction": "Global",
    "type": "xlsx",
    "parser": "dfat",
-   "enabled": false,
-   "_note": "Australia DFAT Consolidated List (.xlsx, parseDfatXlsx reader). DISABLED 2026-07-08: the legacy sites/default/files/regulation8_consolidated.xlsx path returns HTTP 404 (verified on two live runs) — DFAT launched an 'Improved Consolidated List' on 6 Nov 2025 and retired the old path; dfat.gov.au bot-blocks automated discovery of the new download URL. To re-enable: open https://www.dfat.gov.au/international-relations/security/sanctions/consolidated-list in a browser, copy the current .xlsx link here, and verify the header row still carries the name columns parseDfatXlsx expects. Curated fallback: populate data/dfat-curated-list.json and enable au-dfat-curated below instead — this remote source stays for the day a fetchable .xlsx URL is confirmed.",
-   "url": "https://www.dfat.gov.au/sites/default/files/regulation8_consolidated.xlsx"
+   "_note": "Australia DFAT 'Improved Consolidated List' (.xlsx, parseDfatXlsx reader). RE-ENABLED 2026-08-05: the worldwide survey confirmed the new stable un-dated path (Australian_Sanctions_Consolidated_List.xlsx) two independent ways. Runs ALONGSIDE the OpenSanctions mirror for now (duplicate names dedupe at the index); once this direct source proves on a live run, retire the mirror — that removes the last OpenSanctions-hosted feed from THIS registry (their data licence is non-commercial; the official file is the license-clean path). If the runner is bot-blocked, this fails loudly and the mirror still covers.",
+   "url": "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx",
+   "enabled": true,
+   "minNames": 1500
   },
   {
    "id": "au-dfat-curated",
@@ -127,6 +128,278 @@
    "parser": "json",
    "enabled": false,
    "_note": "World Bank listing of ineligible (debarred) firms & individuals. DISABLED 2026-07-08: the apigwext gateway now answers HTTP 401 (verified on two live runs) — the endpoint requires an API key, and this system takes no per-source account/key dependencies. Debarment is procurement-eligibility data, not financial sanctions, so daily coverage is not weakened. Re-enable only if the Bank restores keyless access or publishes a static file."
+  },
+  {
+   "id": "us-csl",
+   "name": "US Trade.gov — Consolidated Screening List (11 export-control + sanctions lists)",
+   "jurisdiction": "United States",
+   "url": "https://data.trade.gov/downloadable_consolidated_screening_list/v1/consolidated.csv",
+   "type": "csv",
+   "parser": "csl",
+   "enabled": true,
+   "_note": "Eleven US lists in one keyless bulk CSV — adds BIS Entity List / Denied Persons / Unverified and State Dept nonproliferation + statutorily-debarred parties the OFAC feeds do NOT carry (export-control axes directly relevant to precious-metals counterparties). US government work, public domain. parseCslCsv reads `name` + ';'-separated `alt_names`. Added 2026-08-05 from the worldwide-coverage survey; endpoint documented keyless — verify on the first live run (sandbox egress could not probe it).",
+   "minNames": 4000
+  },
+  {
+   "id": "lk-ca-1373",
+   "name": "Sri Lanka — Competent Authority UNSCR 1373 National Designations (individuals)",
+   "jurisdiction": "Sri Lanka",
+   "url": "https://www.competentauthority.gov.lk/resources/1373/Individuals_list.xlsx",
+   "type": "xlsx",
+   "parser": "xlsx",
+   "enabled": true,
+   "_note": "Sri Lanka's NATIONAL 1373 designations (not UN-relayed — genuinely additive). Stable un-dated XLSX path; the generic XLSX name-column reader applies. Added 2026-08-05; verify on the first live run.",
+   "minNames": 30
+  },
+  {
+   "id": "nl-terror",
+   "name": "Netherlands — National Sanctions List Terrorism (ODS)",
+   "jurisdiction": "Netherlands",
+   "url": "https://www.government.nl/site/binaries/site-content/collections/documents/2016/01/15/national-terrorism-list/eng-terrorismelijst.ods",
+   "type": "ods",
+   "parser": "ods",
+   "enabled": true,
+   "_note": "Dutch NATIONAL terrorism designations under the Sanctieregeling terrorisme (distinct from EU FSF). OpenDocument spreadsheet read by parseOdsList (same minimal ZIP reader as XLSX). Added 2026-08-05; verify on the first live run.",
+   "minNames": 50
+  },
+  {
+   "id": "be-fod",
+   "name": "Belgium — FOD Financiën consolidated financial sanctions (national additions)",
+   "jurisdiction": "Belgium",
+   "url": "https://sifi.minfin.fgov.be/public/api/consolidated-list",
+   "type": "csv",
+   "parser": "eu",
+   "enabled": true,
+   "_note": "Belgian Treasury consolidated list — the ~180-entry NATIONAL terrorism additions (Royal Decree 28-12-2006) are the increment over the EU FSF already screened; the EU-overlap simply dedupes at the index. Keyless public API. Parser assumption: FSF-style semicolon CSV with WholeName columns — the first live run verifies; a wrong assumption parses 0 names and discloses DEGRADED, never a silent all-clear.",
+   "minNames": 400
+  },
+  {
+   "id": "mc-gels",
+   "name": "Monaco — National Fund-Freezing List (Gel des fonds, JSON)",
+   "jurisdiction": "Monaco",
+   "url": "https://geldefonds.gouv.mc/directdownload/sanctions.json",
+   "type": "json",
+   "parser": "json",
+   "enabled": true,
+   "_note": "Monaco's national freeze register (mirrors UN/EU/France plus Monaco's own 1373 designations by Ministerial Decision). Direct keyless JSON; the generic JSON parser assembles French name keys (nom/prenom/nomComplet) like the France DGT source. Added 2026-08-05; verify on the first live run.",
+   "minNames": 500
+  },
+  {
+   "id": "lv-fid",
+   "name": "Latvia — FID National Sanctions List (XML)",
+   "jurisdiction": "Latvia",
+   "url": "https://sankcijas.fid.gov.lv/files/LV_national_v2.xml",
+   "type": "xml",
+   "parser": "xml",
+   "enabled": true,
+   "_note": "Latvia's small NATIONAL designation list (EU-FSF-style XML schema; generic XML extractor). Deliberately tiny floor — the list holds single-digit-to-dozens entries and a 0-name parse must still read as degraded, never as coverage.",
+   "minNames": 2
+  },
+  {
+   "id": "il-nbctf",
+   "name": "Israel — NBCTF Terror Designations (individuals, XLSX)",
+   "jurisdiction": "Israel",
+   "url": "https://nbctf.mod.gov.il/he/Announcements/Documents/NBCTF%20Israel%20designation%20Individuals_XL.xlsx",
+   "type": "xlsx",
+   "parser": "xlsx",
+   "enabled": true,
+   "_note": "Israel NBCTF terror-designation individuals (stable un-dated XLSX; an organisations file exists at a sibling path — add it once this one is proven on the runner). CAVEAT: the site fronts a WAF with scraping protection; if the runner is challenged this source will fail LOUDLY (disclosed degraded coverage) — disable with this note updated rather than letting it cry daily.",
+   "minNames": 150
+  },
+  {
+   "id": "sa-pcct",
+   "name": "Saudi Arabia — PCCT National Terrorism List (XLSX)",
+   "jurisdiction": "Saudi Arabia",
+   "url": "https://pctc.pss.gov.sa/portal/pcct/slist/js/slistEN.xlsx",
+   "type": "xlsx",
+   "parser": "xlsx",
+   "enabled": true,
+   "_note": "Saudi Presidency of State Security national terrorism designations (English edition, stable un-dated XLSX). Added 2026-08-05; watch for header drift — the generic name-column reader degrades loudly on a layout change.",
+   "minNames": 100
+  },
+  {
+   "id": "qa-nctc",
+   "name": "Qatar — NCTC Unified Sanction List (JSON)",
+   "jurisdiction": "Qatar",
+   "url": "https://portal.moi.gov.qa/wps/portal/NCTC/sanctionlist/unifiedsanctionlist/!ut/p/z1/jY_BDoIwAEM_aXUbIMdByLa4iZgRcBeyk1mi6MH4_RL16qS3Jq9tSjwZiZ_DM57DI97mcFn8yeeTLimnilPT1lygY5V2lllImZHhDWTKNJLvsJeFq9C1VLn8qCiwIX5NHj8ksC6fAHy6fiD-MyGsBuUwbVMvDaVyqmbA9lB8gdTFfyP3a9-PiPoFJNS7hg!!/dz/d5/L3dDZyEvUUZRSS9ZTlEh/p0/IZ7_I9242H42LOC4A0Q3BITM3M0G85=CZ6_I9242H42LOC4A0Q3BITM3M0GG5=NJgetSanctionList=/?lang=en&name=&qid=&passport=&listType=",
+   "type": "json",
+   "parser": "json",
+   "enabled": true,
+   "_note": "Qatar NCTC unified record (UN-mandated + national designations), keyless JSON GET. CAVEAT: WebSphere-portal URL shape — if the portal rotates the state segment or challenges datacenter IPs, this fails LOUDLY on the runner; disable with the note updated rather than letting it cry daily. The response reportedly mislabels its content type — the parser reads the body regardless.",
+   "minNames": 200
+  },
+  {
+   "id": "hk-cedb",
+   "name": "Hong Kong SAR — CEDB Targeted Financial Sanctions (UN-relayed XML)",
+   "jurisdiction": "Hong Kong SAR",
+   "url": "https://www.cedb.gov.hk/datagovhk/TFSlists/dprk.xml",
+   "type": "xml",
+   "parser": "xml",
+   "enabled": false,
+   "_note": "Machine-readable, but Hong Kong's TFS lists relay UNSC designations the un-consolidated source already screens daily — enabling would add fetch risk for ~zero recall. Kept configured for the day HK publishes autonomous designations."
+  },
+  {
+   "id": "tr-masak",
+   "name": "Turkey — MASAK asset-freeze lists (Law 6415/7262)",
+   "jurisdiction": "Turkey",
+   "url": "https://en.hmb.gov.tr/fcib-tf-current-list",
+   "type": "curated",
+   "parser": "curated",
+   "enabled": false,
+   "_note": "Turkey's national B/C/D category freezes (~1,600 beyond the UN mirror) publish as bot-protected HTML/attachment pages — no stable machine-readable endpoint (2026-08-05 survey). Curated path per the EOCN doctrine: populate a curated file from the official pages via the four-eyes SOP, or revisit if MASAK publishes a feed."
+  },
+  {
+   "id": "eg-mlcu",
+   "name": "Egypt — MLCU Domestic Terrorist Lists",
+   "jurisdiction": "Egypt",
+   "url": "https://mlcu.org.eg/ar/3125/",
+   "type": "curated",
+   "parser": "curated",
+   "enabled": false,
+   "_note": "Egypt's domestic lists (~3,500-7,000 persons — the largest national list in the MENA survey) publish as Arabic-schema XLSX behind bot protection; no keyless machine-readable path verified (2026-08-05). Too large to hand-curate; revisit with a dedicated fetch/parse spike if a stable endpoint is confirmed from the runner."
+  },
+  {
+   "id": "jo-amlu",
+   "name": "Jordan — AMLU National Sanctions List",
+   "jurisdiction": "Jordan",
+   "url": "https://sanctions.amlu.gov.jo/EN/List/National1_List",
+   "type": "curated",
+   "parser": "curated",
+   "enabled": false,
+   "_note": "Documented fact from the 2026-08-05 survey: the portal answers 403 to GitHub Actions IPs specifically (works from other clouds) — a scheduled fetch from this repo's runners cannot work. Curated path or a future proxy decision (which would be a Board/architecture act, not a source entry)."
+  },
+  {
+   "id": "ar-repet",
+   "name": "Argentina — RePET (Registro Público de Personas y Entidades vinculadas al terrorismo)",
+   "jurisdiction": "Argentina",
+   "url": "https://repet.jus.gob.ar/xml/personas.json",
+   "type": "json",
+   "parser": "json",
+   "enabled": true,
+   "_note": "Argentina's national terrorism register (personas file; an entidades sibling exists at the same path pattern — add once this one is proven on the runner). Keyless JSON confirmed from the register's own docs. Spanish name keys (nombre/apellido) are covered by the generic JSON parser. Added 2026-08-05; verify on the first live run.",
+   "minNames": 200
+  },
+  {
+   "id": "br-bcb-qgi",
+   "name": "Brazil — BCB Disqualified Persons (QGI, enforcement — not financial sanctions)",
+   "jurisdiction": "Brazil",
+   "url": "https://olinda.bcb.gov.br/olinda/servico/Gepad_QuadrosGeraisInternet/versao/v1/odata/QuadroGeralInabilitados?$format=json",
+   "type": "json",
+   "parser": "json",
+   "enabled": true,
+   "_note": "Banco Central do Brasil enforcement disqualifications (OData JSON, keyless). Same tier framing as the World Bank debarment feed: regulatory-integrity data, not financial sanctions — the list NAME carries the tier so a hit is read correctly. Portuguese name keys added to the generic JSON parser. Added 2026-08-05; verify keys against the live payload on the first run.",
+   "minNames": 150
+  },
+  {
+   "id": "br-bcb-qgp",
+   "name": "Brazil — BCB Prohibited Entities (QGP, enforcement — not financial sanctions)",
+   "jurisdiction": "Brazil",
+   "url": "https://olinda.bcb.gov.br/olinda/servico/Gepad_QuadrosGeraisInternet/versao/v1/odata/QuadroGeralProibidos?$format=json",
+   "type": "json",
+   "parser": "json",
+   "enabled": true,
+   "optional": true,
+   "_note": "Sibling of br-bcb-qgi (same OData service, one URL swap). `optional: true` — the list legitimately holds very few entries (1-50 observed), so a small or empty parse is a valid state, reported informationally, never degraded coverage.",
+   "minNames": 1
+  },
+  {
+   "id": "br-tcu-inidoneos",
+   "name": "Brazil — TCU Debarred Companies (Licitantes Inidôneos)",
+   "jurisdiction": "Brazil",
+   "url": "https://contas.tcu.gov.br/ords/condenacao/consulta/inidoneos?limit=10000",
+   "type": "json",
+   "parser": "json",
+   "enabled": true,
+   "_note": "Federal Court of Accounts debarment list (Oracle ORDS JSON, keyless; explicit limit=10000 defeats the ORDS 25-row default page — an unnoticed pagination default would silently under-screen). Debarment tier like the World Bank feed. Added 2026-08-05; verify keys + pagination on the first live run.",
+   "minNames": 50
+  },
+  {
+   "id": "br-tcu-inabilitados",
+   "name": "Brazil — TCU Disqualified Individuals (Inabilitados)",
+   "jurisdiction": "Brazil",
+   "url": "https://contas.tcu.gov.br/ords/condenacao/consulta/inabilitados?limit=10000",
+   "type": "json",
+   "parser": "json",
+   "enabled": true,
+   "_note": "Sibling of br-tcu-inidoneos: individuals disqualified from public office for corruption-adjacent findings — a PEP-adjacent integrity signal for Brazilian counterparties. Same ORDS shape + explicit limit. Added 2026-08-05; verify on the first live run.",
+   "minNames": 200
+  },
+  {
+   "id": "mx-sat-69b",
+   "name": "Mexico — SAT Artículo 69-B (EFOS invoice-mill list)",
+   "jurisdiction": "Mexico",
+   "url": "http://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv",
+   "type": "csv",
+   "parser": "eu",
+   "enabled": false,
+   "_note": "12-15k presumed/confirmed invoice-mill operators — a strong integrity signal for Mexican counterparties, but publication is latin-1-encoded CSV over plain http: the fetcher decodes UTF-8 only, so accented names would corrupt before matching. DISABLED until a charset-aware fetch lands (follow-up spike); enabling now would screen mojibake and miss real matches while looking green. Mexico's UIF blocked-persons list is credentialed + legally confidential — rejected outright."
+  },
+  {
+   "id": "adb-debarment",
+   "name": "ADB — Published Debarment & Suspension Register (cross-debarments incl.)",
+   "jurisdiction": "Global (MDB)",
+   "url": "https://apim.adb.org/sanctions/lists/v1/published-list?sortField=Name&isAscending=true",
+   "type": "json",
+   "parser": "json",
+   "enabled": true,
+   "_note": "Asian Development Bank public debarment register (~1,200-1,800 entries incl. MDB cross-debarments) — keyless JSON. Debarment tier like the World Bank feed (the list name carries the tier). CAVEAT: the API paginates via links.next and the single-GET fetcher reads page one — if the first live run shows a sub-floor page-1 count, the list goes PARTIAL (disclosed, standing matches carried) until a pageSize parameter or pager lands. Never reads as full coverage while truncated.",
+   "minNames": 500
+  },
+  {
+   "id": "mdb-debarment-cluster",
+   "name": "MDB debarments — EBRD (POST-only API) / IDB (Socrata export unconfirmed) / AfDB (export route unconfirmed) / World Bank (key-walled)",
+   "jurisdiction": "Global (MDB)",
+   "type": "curated",
+   "parser": "curated",
+   "enabled": false,
+   "_note": "2026-08-05 survey record: EBRD's ineligible-entities endpoint (www.ebrd.com/bin/ebrd_dxp/filterlistservlet) is a form-encoded POST — the single-GET fetcher cannot call it (a POST-capable source option is a small follow-up); IDB's Socrata export (mydata.iadb.org rows.csv) and AfDB's CSV export route are documented but their exact dataset paths were unverifiable from the sandbox — promote to live entries once confirmed from a runner; the World Bank's every machine-readable route requires an API key (re-confirmed — stays rejected under the keyless doctrine). ADB (enabled above) already carries the 2010 Mutual-Enforcement cross-debarments of the other MDBs, so the marginal gap while these stay stubs is the non-cross-debarred remainder."
+  },
+  {
+   "id": "nz-cluster",
+   "name": "New Zealand — Police designated entities (HTML) / MFAT Russia Sanctions Register (WAF-challenged XLSX)",
+   "jurisdiction": "New Zealand",
+   "type": "curated",
+   "parser": "curated",
+   "enabled": false,
+   "_note": "2026-08-05 survey: the Police UNSCR-1373 designations (~22 non-UN entries) publish as HTML tables with periodic dated attachments (curated path); MFAT's Russia Sanctions Register XLSX has a stable keyless URL but sits behind an Imperva JS challenge that a plain fetch cannot pass — test from a runner before promoting; if the challenge holds, it stays curated. Supersedes the older nz-terror stub above."
+  },
+  {
+   "id": "za-fic-tfs",
+   "name": "South Africa — FIC Targeted Financial Sanctions List (XML)",
+   "jurisdiction": "South Africa",
+   "url": "https://tfs.fic.gov.za/Pages/TFSListDownload?fileType=xml",
+   "type": "xml",
+   "parser": "xml",
+   "enabled": true,
+   "_note": "South Africa's consolidated TFS list (~708 individuals + ~253 entities) from the Financial Intelligence Centre — stable keyless XML download; high relevance for African gold-corridor counterparties. Generic XML extractor; added 2026-08-05, verify schema on the first live run.",
+   "minNames": 400
+  },
+  {
+   "id": "africa-curated-cluster",
+   "name": "Africa national lists — Nigeria NigSAC / Kenya FRC / Mauritius NSSEC / Morocco CNASNU / Tunisia CNLCT / Ghana FIC",
+   "jurisdiction": "Africa",
+   "type": "curated",
+   "parser": "curated",
+   "enabled": false,
+   "_note": "2026-08-05 survey record: Nigeria's domestic list (~31-50 entries) is HTML-only with per-entry detail pages; Kenya publishes dated XLSX filenames behind a landing page; Mauritius and Morocco publish PDFs/HTML; Tunisia is an HTML table on a plain-http origin; Ghana has no consolidated domestic list at all. All await official feeds or curated files via the four-eyes SOP. One documented stub, enabled:false — survey record, never counted as coverage."
+  },
+  {
+   "id": "cis-gated-cluster",
+   "name": "CIS national lists — Kazakhstan AFM (gated 2025) / Kyrgyzstan FIU (rotating filenames) / Azerbaijan FMS (link-discovery) / Georgia (gazette HTML) / Armenia (dated PDFs) / Moldova (UN-duplicate)",
+   "jurisdiction": "CIS / Caucasus",
+   "type": "curated",
+   "parser": "curated",
+   "enabled": false,
+   "_note": "2026-08-05 survey record: Kazakhstan's Web-SFM endpoint became key-gated ~Sep 2025 (rejected under the keyless doctrine); Kyrgyzstan's FIU XML rotates its filename each update and Azerbaijan's FMS XML sits behind an index page — both need HTML link-discovery the single-GET fetcher deliberately does not do (a future fetch feature, not a source entry); Georgia's Otkhozoria-Tatunashvili list (~33 names) and Armenia's national designations publish as gazette HTML / dated PDFs (curated path); Moldova's CAS-SIS list consolidates UN lists already screened. One documented stub, enabled:false — survey record, never counted as coverage."
+  },
+  {
+   "id": "asia-html-cluster",
+   "name": "Asia national lists — Japan MOF / Korea KoFIU / Taiwan MOJ / Singapore TSOFA / Indonesia DTTOT / Malaysia MOHA / Philippines AMLC / Thailand AMLO / India MHA / Pakistan NACTA / Bahrain / Oman / Kuwait",
+   "jurisdiction": "Asia-Pacific / GCC",
+   "type": "curated",
+   "parser": "curated",
+   "enabled": false,
+   "_note": "2026-08-05 worldwide survey verdict: these national lists publish only as HTML pages, PDFs, or dated-filename spreadsheets — no stable keyless machine-readable endpoint (details in the survey record; Japan MOF uses dated XLSX names, Singapore's TSOFA First Schedule is statute HTML, Indonesia's DTTOT is a page of dated attachments, Pakistan NACTA is HTML tables). Their UN-relayed content is already screened via un-consolidated; the national increments await either official feeds or curated files via the four-eyes SOP. One documented stub instead of thirteen: this entry is the survey's record, not screening coverage — enabled:false means it never counts as screened."
   }
  ]
 }

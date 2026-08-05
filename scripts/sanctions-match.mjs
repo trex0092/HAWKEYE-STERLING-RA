@@ -351,6 +351,40 @@ export function parseOpenSanctionsCsv(body) {
   return names;
 }
 
+/* US Trade.gov Consolidated Screening List bulk CSV (keyless download):
+   comma-delimited with a header row; eleven US lists in one feed (BIS Entity
+   List / Denied Persons / Unverified, State Dept nonproliferation + debarred,
+   OFAC re-included). The primary name sits in a `name` column and the
+   ';'-separated a.k.a. names in `alt_names` — NOT `aliases`, which is why the
+   OpenSanctions simple.csv parser would silently drop every alias here. */
+export function parseCslCsv(body) {
+  const rows = parseDelimited(body, ',');
+  if (rows.length < 2) return [];
+  const header = rows[0].map(c => c.trim().toLowerCase());
+  const nameIdx = header.indexOf('name');
+  const altIdx = header.findIndex(c => c === 'alt_names' || c === 'alt names' || c === 'alternate_names');
+  const srcIdx = header.indexOf('source');
+  if (nameIdx < 0) return [];
+  const names = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    /* The CSL bundles the full OFAC SDN block — already screened (with its
+       alias fold) via the dedicated OFAC sources. Dropping those rows here
+       keeps a hit attributed to its authoritative list, and keeps this
+       source's count meaning "the eleven NON-OFAC-SDN lists". */
+    if (srcIdx >= 0 && /specially designated nationals/i.test(r[srcIdx] || '')) continue;
+    const n = (r[nameIdx] || '').trim();
+    if (n) names.push(n);
+    if (altIdx >= 0) {
+      for (const piece of String(r[altIdx] || '').split(';')) {
+        const a = piece.trim();
+        if (a) names.push(a);
+      }
+    }
+  }
+  return names;
+}
+
 /* Best-effort generic sanctions XML (Canada SEMA, Switzerland SECO and similar):
    join given/last name tags, take whole/entity name tags, and split alias tags.
    Returns [] if nothing recognisable is found (caller flags coverage degraded). */
@@ -530,15 +564,66 @@ export function parseDfatXlsx(buf) {
   return names;
 }
 
+/* ── ODS reader — for lists published ONLY as .ods (OpenDocument) ─────────────
+   The Netherlands publishes its National Sanctions List Terrorism as an ODS
+   spreadsheet. An .ods is a ZIP whose content.xml holds the sheet; the same
+   minimal ZIP reader used for XLSX applies. parseOdsContent is the pure part
+   (unit-testable without constructing a ZIP): rows of <table:table-cell>
+   values, a header row located by name-bearing columns (Dutch or English),
+   names joined across those columns. Best-effort like every sibling parser. */
+export function parseOdsContent(xml) {
+  const text = String(xml || '');
+  const rows = [];
+  const rowRe = /<table:table-row[^>]*>([\s\S]*?)<\/table:table-row>/g;
+  const cellRe = /<table:table-cell([^>]*)(?:\/>|>([\s\S]*?)<\/table:table-cell>)/g;
+  let rm;
+  while ((rm = rowRe.exec(text)) && rows.length < 100000) {
+    const cells = [];
+    let cm;
+    while ((cm = cellRe.exec(rm[1]))) {
+      const attrs = cm[1] || '';
+      const inner = cm[2] || '';
+      const ps = [...inner.matchAll(/<text:p[^>]*>([\s\S]*?)<\/text:p>/g)].map(p => p[1]
+        .replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&apos;/g, "'").trim());
+      const v = ps.join(' ').replace(/\s+/g, ' ').trim();
+      const rep = /table:number-columns-repeated="(\d+)"/.exec(attrs);
+      const times = Math.min(rep ? +rep[1] : 1, 200);   // repeated blanks pad to sheet width; cap so a 16k-repeat can't balloon
+      for (let i = 0; i < times; i++) cells.push(v);
+    }
+    if (cells.some(c => c)) rows.push(cells);
+  }
+  if (!rows.length) return [];
+  let h = 0;
+  while (h < rows.length && !rows[h].some(c => /na(?:a)?m|name/i.test(c))) h++;
+  if (h >= rows.length) return [];
+  const nameCols = [];
+  rows[h].forEach((c, i) => { if (/na(?:a)?m|name/i.test(c) && !/type|kolom/i.test(c)) nameCols.push(i); });
+  if (!nameCols.length) return [];
+  const names = [];
+  for (let i = h + 1; i < rows.length; i++) {
+    const name = nameCols.map(ci => (rows[i][ci] || '').trim()).filter(Boolean)
+      .join(' ').replace(/\s+/g, ' ').trim();
+    if (name) names.push(name);
+  }
+  return names;
+}
+
+export function parseOdsList(buf) {
+  const files = unzipEntries(buf);
+  if (!files.size) return [];
+  return parseOdsContent(bufStr(files.get('content.xml')));
+}
+
 /* Generic JSON list parser — several national registers publish JSON rather than
    CSV/XML (France DGT "gels", Ukraine NSDC register, NZ data.govt.nz datastore).
    Each has its own shape, so we walk the payload and harvest plausible designated
    names from the common name-bearing keys (and assemble first+last where a record
    splits them), plus aliases. Best-effort: returns [] if nothing recognisable, so
    the caller flags coverage degraded rather than inferring a false clear. */
-const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination|supp_name|firm_name)$/i;
-const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename)$/i;
-const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom)$/i;
+const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination|supp_name|firm_name|nome|nomepessoa|nome_pessoa|nomecompleto|nome_completo|razaosocial|razao_social|razonsocial|razon_social|denominacion|denominacao|nombrecompleto|nombre_completo)$/i;
+const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename|nombre|nombres)$/i;
+const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom|apellido|apellidos)$/i;
 const JSON_ALIAS = /^(alias|aliases|aka|akas|othernames|other_names|alternativenames|alternative_names|alternatename|alternative_spelling|autresnoms)$/i;
 export function parseJsonList(body) {
   let data;
@@ -607,10 +692,12 @@ export function parseList(source, body) {
   if (p === 'un' || /^un[-_]/.test(id)) return parseUnXml(body);
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);
   if (p === 'opensanctions') return parseOpenSanctionsCsv(body); // targets.simple.csv mirrors (comma CSV: name + ;-separated aliases)
+  if (p === 'csl') return parseCslCsv(body);                     // Trade.gov Consolidated Screening List (comma CSV: name + ;-separated alt_names)
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
   if (p === 'json') return parseJsonList(body);
   if (p === 'curated' || source.type === 'curated') return parseCuratedList(body);
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
+  if (p === 'ods' || source.type === 'ods') return parseOdsList(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
   if (p === 'xml' || source.type === 'xml') return parseGenericXml(body);
   const xml = parseGenericXml(body);

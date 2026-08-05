@@ -4,6 +4,12 @@
   "sources": [
     { "name": "US SEC — Litigation Releases", "url": "https://www.sec.gov/rss/litigation/litreleases.xml", "enabled": true },
     { "name": "US SEC — Press Releases", "url": "https://www.sec.gov/rss/news/press.xml", "enabled": true },
-    { "name": "UK FCA — News & publications", "url": "https://www.fca.org.uk/news/rss.xml", "enabled": true }
-  ]
+    { "name": "UK FCA — News & publications", "url": "https://www.fca.org.uk/news/rss.xml", "enabled": true },
+    { "name": "US DOJ — Press Releases", "url": "https://www.justice.gov/feeds/justice-news.xml?type=press_release", "enabled": true },
+    { "name": "US CFTC — Enforcement Press Releases", "url": "https://www.cftc.gov/RSS/RSSENF/rssenf.xml", "enabled": true },
+    { "name": "US OCC — News Releases (incl. monthly enforcement actions)", "url": "https://www.occ.gov/rss/occ_news.xml", "enabled": true },
+    { "name": "UAE DFSA — News & media releases", "url": "https://www.dfsa.ae/rss", "enabled": true },
+    { "name": "Europol — Newsroom", "url": "https://www.europol.europa.eu/cms/api/rss/news", "enabled": true }
+  ],
+  "_survey_2026_08_05": "Worldwide enforcement-feed survey verdicts kept for the record: FinCEN, MAS, FATF (post-2023 site), VARA and OCC's EASearch database publish no RSS/JSON — HTML fingerprinting or curation would be a different net; Eurojust and UNODC advertise RSS but their exact feed URLs were unverifiable from the sandbox — candidates for a follow-up once confirmed from a runner. All five feeds added above are keyless and verify on the first live run (failures are disclosed in §2, never silent)."
 }

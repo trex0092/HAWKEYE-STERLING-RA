@@ -137,7 +137,7 @@ export function parseDisposition(notes) {
 /* Lists whose hits must never become cleared-FP registry pairs: enrichment
    signals have their own lifecycle, MANUAL REVIEW is a local marker, and the
    internal watchlist is corrected by editing the watchlist itself. */
-const NON_WHITELISTABLE_PREFIXES = ['Adverse media', 'PEP (', 'Interpol', 'MANUAL REVIEW', 'Internal —'];
+const NON_WHITELISTABLE_PREFIXES = ['Adverse media', 'PEP (', 'Interpol', 'FBI', 'MANUAL REVIEW', 'Internal —'];
 export function whitelistablePairs(hits) {
   return (hits || []).filter(h => h && h.hitName && h.list
     && !NON_WHITELISTABLE_PREFIXES.some(p => String(h.list).startsWith(p)))

@@ -38,6 +38,7 @@ import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } 
 import { checkAdverseMedia, budgetedLocales, activeLocales, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
+import { checkFbi } from './fbi-check.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -179,7 +180,7 @@ const HIGH_BANDS = new Set(['critical', 'high', 'severe', 'elevated', 'red', 'am
 /* Enrichment signals (best-effort, network-bound) vs. the always-run local
    sanctions match. A standing match derived solely from these must NOT be cleared
    on a run where the lookup errored or was time-budget-skipped (see diffState). */
-const ENRICHMENT_LISTS = new Set(['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice']);
+const ENRICHMENT_LISTS = new Set(['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice', 'FBI Wanted']);
 /* Locally-derived pseudo-lists (no external list behind them, re-evaluated on
    every run): they must be exempt from the "originating list did not load this
    run" carry-forward, or a MANUAL REVIEW flag could never clear even after the
@@ -1109,9 +1110,9 @@ async function fetchListBody(source, timeoutMs = 60000) {
   /* XLSX sources (e.g. Australia DFAT) are binary ZIP containers — read the raw
      bytes as a Buffer; reading them as text would corrupt the archive. Text lists
      (CSV/XML) stay on the string path the parsers expect. */
-  const binary = /^(xlsx|dfat)$/.test(String(source.parser || '').toLowerCase())
-    || String(source.type || '').toLowerCase() === 'xlsx'
-    || /\.xlsx(\?|$)/i.test(parsed.href);
+  const binary = /^(xlsx|dfat|ods)$/.test(String(source.parser || '').toLowerCase())
+    || /^(xlsx|ods)$/.test(String(source.type || '').toLowerCase())
+    || /\.(xlsx|ods)(\?|$)/i.test(parsed.href);
   return withTimeout(async (signal) => {
     const r = await fetch(parsed.href, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1278,7 +1279,7 @@ async function screenLocally(subjects, cfg) {
      and report it, but it does NOT degrade the sanctions screen or weaken its
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
-  let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, enrichSkipped = 0;
+  let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
      bound the whole enrichment phase by a wall-clock budget: once it elapses the
@@ -1331,7 +1332,7 @@ async function screenLocally(subjects, cfg) {
     // run (errored or budget-skipped) so diffState won't silently clear a standing
     // enrichment-only match it couldn't re-verify.
     let enrichmentIncomplete = false;
-    if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol)) { enrichSkipped++; enrichmentIncomplete = true; }
+    if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol || cfg.fbi)) { enrichSkipped++; enrichmentIncomplete = true; }
 
     if (cfg.adverseMedia && enrich) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
@@ -1357,6 +1358,14 @@ async function screenLocally(subjects, cfg) {
         const nats = (ip.match && ip.match.nationalities.length) ? ' [' + ip.match.nationalities.join(', ') + ']' : '';
         lists.push({ list: 'Interpol Red Notice', hitName: ((ip.match && ip.match.name || '') + nats).slice(0, 180), score: ip.score });
         band = strongerBand(band, ip.band); topScore = Math.max(topScore, ip.score);
+      }
+    }
+    if (cfg.fbi && enrich) {
+      const fb = await checkFbi(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (fb.errored) { fbiErrors++; enrichmentIncomplete = true; }
+      else if (fb.hit) {
+        lists.push({ list: 'FBI Wanted', hitName: ((fb.match && fb.match.title || '') + ' [' + (fb.match && fb.match.classification || 'wanted') + ']').slice(0, 180), score: fb.score });
+        band = strongerBand(band, fb.band); topScore = Math.max(topScore, fb.score);
       }
     }
 
@@ -1391,8 +1400,9 @@ async function screenLocally(subjects, cfg) {
   if (amPartial) console.log('sanctions-screen: adverse-media coverage was PARTIAL for ' + amPartial + ' subject(s) — some locales/GDELT did not answer (disclosed in the digest)');
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
+  if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -1447,6 +1457,7 @@ async function main() {
     adverseMedia: process.env.SCREEN_ADVERSE_MEDIA !== '0',   // default on
     pep: process.env.SCREEN_PEP !== '0',                      // default on
     interpol: process.env.SCREEN_INTERPOL === '1',            // default OFF (opt-in; verify the public API on the runner before enabling)
+    fbi: process.env.SCREEN_FBI === '1',                      // default OFF (opt-in; same contract as Interpol — verify on the runner before enabling)
     listTimeoutMs: Number(process.env.SCREEN_LIST_TIMEOUT_MS) || 60000,
     checkTimeoutMs: Number(process.env.SCREEN_CHECK_TIMEOUT_MS) || 12000,
     concurrency: Number(process.env.SCREEN_CONCURRENCY) || 8,
@@ -1529,6 +1540,7 @@ async function main() {
     cfg.adverseMedia ? 'Adverse media (Google News)' : null,
     cfg.pep ? 'PEP (Wikidata)' : null,
     cfg.interpol ? 'Interpol Red Notice' : null,
+    cfg.fbi ? 'FBI Wanted' : null,
   ].filter(Boolean);
   const { alerts, cleared, notScreened, matchCount, nextState } =
     diffState(prevState, screen.results, today, cfg.threshold, screenedLists, evaluatedSignals);
