@@ -29,6 +29,7 @@ name: Sanctions Screen
 #   SCREEN_ADVERSE_MEDIA          '0' to disable Google News adverse-media (default on)
 #   SCREEN_PEP                    '0' to disable the Wikidata PEP signal (default on)
 #   SCREEN_INTERPOL               '1' to ENABLE the Interpol Red Notice per-subject signal (default OFF; public subset only, supplementary — verify the public API on the runner before turning on)
+#   SCREEN_FBI                    '1' to ENABLE the FBI Wanted per-subject signal (default OFF; wanted posters only — missing-person/information posters are excluded by the module; verify on the runner before turning on)
 #   ASANA_OM_PROJECT_GID          daily audit task project (vars.ASANA_DELIVERY_PROJECT_GID -> HAWKEYE STERLING APP)
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
@@ -68,9 +69,12 @@ jobs:
           # designation lists (OFAC/UN/EU/UK, DFAT via its OpenSanctions mirror
           # on data.opensanctions.org — UAE EOCN is an in-repo file), the
           # adverse-media feeds (Google News RSS + GDELT), the Wikidata PEP
-          # signal, and Interpol (for when SCREEN_INTERPOL=1). Anything else —
-          # including an exfiltration attempt from a compromised dependency —
-          # is blocked and surfaces loudly.
+          # signal, Interpol (for when SCREEN_INTERPOL=1), FBI Wanted (for when
+          # SCREEN_FBI=1), and the worldwide national lists added 2026-08-05
+          # (Trade.gov CSL, Sri Lanka, HK CEDB — each fail-safe: a blocked or
+          # down source discloses DEGRADED coverage, never a silent all-clear).
+          # Anything else — including an exfiltration attempt from a
+          # compromised dependency — is blocked and surfaces loudly.
           egress-policy: block
           allowed-endpoints: >
             github.com:443
@@ -101,6 +105,20 @@ jobs:
             data.opensanctions.org:443
             apigwext.worldbank.org:443
             api.ofac-api.com:443
+            data.trade.gov:443
+            www.competentauthority.gov.lk:443
+            www.government.nl:443
+            sifi.minfin.fgov.be:443
+            geldefonds.gouv.mc:443
+            sankcijas.fid.gov.lv:443
+            nbctf.mod.gov.il:443
+            pctc.pss.gov.sa:443
+            portal.moi.gov.qa:443
+            api.fbi.gov:443
+            repet.jus.gob.ar:443
+            olinda.bcb.gov.br:443
+            contas.tcu.gov.br:443
+            tfs.fic.gov.za:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # No credentials on disk (zizmor artipacked): the state push below
@@ -161,6 +179,7 @@ jobs:
           ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
           SCREEN_PEP: ${{ vars.SCREEN_PEP }}
           SCREEN_INTERPOL: ${{ vars.SCREEN_INTERPOL }}
+          SCREEN_FBI: ${{ vars.SCREEN_FBI }}
           # Ongoing Monitoring audit trail — the section is found/created by name
           # at runtime, so the section GID var is an optional override.
           ASANA_OM_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}

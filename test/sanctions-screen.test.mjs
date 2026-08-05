@@ -709,5 +709,62 @@ check('yente: report renders the threshold table and per-mechanism recall',
 check('yente: report frames adoption as governed by the recall-monotone invariant',
   _ybMd.includes('recall-monotone') && _ybMd.includes('baseline.json'));
 
+/* ── worldwide expansion: CSL parser, ODS parser, FBI Wanted signal ── */
+const wm = await import('./../scripts/sanctions-match.mjs');
+const _csl = wm.parseCslCsv(
+  'source,entity_number,type,programs,name,title,addresses,alt_names\n'
+  + 'Entity List (EL) - Bureau of Industry and Security,,Entity,,ACME PRECISION CO LTD,,Somewhere,"ACME PRECISION; APC TRADING"\n'
+  + 'Denied Persons List (DPL) - Bureau of Industry and Security,,Individual,,John Q Denied,,,\n');
+check('CSL: primary names + ;-separated alt_names all screen',
+  _csl.includes('ACME PRECISION CO LTD') && _csl.includes('APC TRADING')
+  && _csl.includes('John Q Denied') && _csl.length === 4);
+check('CSL: a body with no name column parses 0 names (degrades, never guesses)',
+  wm.parseCslCsv('foo,bar\n1,2\n').length === 0);
+const _odsXml = '<office:document-content>'
+  + '<table:table-row><table:table-cell><text:p>Naam</text:p></table:table-cell><table:table-cell><text:p>Voornaam</text:p></table:table-cell></table:table-row>'
+  + '<table:table-row><table:table-cell><text:p>Jansen</text:p></table:table-cell><table:table-cell><text:p>Pieter</text:p></table:table-cell></table:table-row>'
+  + '<table:table-row><table:table-cell table:number-columns-repeated="2"/></table:table-row>'
+  + '<table:table-row><table:table-cell><text:p>Stichting X</text:p></table:table-cell><table:table-cell/></table:table-row>'
+  + '</office:document-content>';
+check('ODS: Dutch name columns located by header, names joined across them',
+  JSON.stringify(wm.parseOdsContent(_odsXml)) === '["Jansen Pieter","Stichting X"]');
+check('ODS: content with no header row yields 0 names', wm.parseOdsContent('<table:table-row><table:table-cell><text:p>x</text:p></table:table-cell></table:table-row>').length === 0);
+check('ODS: tag stripping removes inline spans and unterminated tags (CodeQL)',
+  JSON.stringify(wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Acme <text:span>Ltd</text:span> <script</text:p></table:table-cell></table:table-row>'))
+  === '["Acme Ltd"]');
+check('ODS: no "<" survives the fixpoint strip — "<scr<x>ipt>" cannot rebuild a tag (CodeQL)',
+  wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Acme<scr<x>ipt>Ltd</text:p></table:table-cell></table:table-row>')
+    .every(n => !n.includes('<')));
+check('ODS: entity unescaping is single-pass — a literal &amp;lt; never becomes < (CodeQL)',
+  JSON.stringify(wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Smith &amp;amp; Jones &amp;amp;lt;Ltd&amp;amp;gt;</text:p></table:table-cell></table:table-row>'
+      .replace(/&amp;amp;/g, '&amp;')))
+  === '["Smith & Jones &lt;Ltd&gt;"]');
+const fbi = await import('./../scripts/fbi-check.mjs');
+check('FBI: search URL encodes the subject against the public endpoint',
+  fbi.fbiSearchUrl('Ali Al-Test') === 'https://api.fbi.gov/wanted/v1/list?pageSize=20&title=Ali%20Al-Test');
+const _fbiHit = fbi.scoreFbi('John Dillinger', { items: [
+  { title: 'JOHN HERBERT DILLINGER', poster_classification: 'default', url: 'https://www.fbi.gov/x' },
+  { title: 'John Dillinger', poster_classification: 'missing' }] });
+check('FBI: a wanted poster matching all subject tokens is a high-band hit',
+  _fbiHit.hit && _fbiHit.band === 'high' && _fbiHit.score === 85 && _fbiHit.match.title === 'JOHN HERBERT DILLINGER');
+check('FBI: missing-person posters never count as adverse (excluded, tallied)',
+  _fbiHit.excluded === 1
+  && fbi.scoreFbi('Jane Doe', { items: [{ title: 'JANE DOE', poster_classification: 'missing' }] }).hit === false);
+check('FBI: alias matches count; unrelated namesakes do not',
+  fbi.scoreFbi('Rico Vasquez', { items: [{ title: 'ENRIQUE GARCIA', aliases: ['Rico Vasquez'], poster_classification: 'default' }] }).hit === true
+  && fbi.scoreFbi('Rico Vasquez', { items: [{ title: 'RICO ALVAREZ', poster_classification: 'default' }] }).hit === false);
+check('FBI: an unrecognized poster class is excluded until reviewed, never promoted',
+  fbi.scoreFbi('A B Test', { items: [{ title: 'A B TEST', poster_classification: 'brand-new-class' }] }).hit === false);
+check('FBI: victim/accomplice rows never screen as wanted subjects',
+  fbi.scoreFbi('Vic Timson', { items: [{ title: 'VIC TIMSON', poster_classification: 'default', person_classification: 'Victim' }] }).hit === false);
+check('FBI: a captured poster is history, not a live hit',
+  fbi.scoreFbi('Cap Turedman', { items: [{ title: 'CAP TUREDMAN', poster_classification: 'default', status: 'captured' }] }).hit === false);
+check('CSL: SDN-source rows are dropped (already screened via the OFAC feeds)',
+  wm.parseCslCsv('source,name,alt_names\n"Specially Designated Nationals (SDN) - Treasury Department",DUPE PERSON,\n"Entity List (EL) - Bureau of Industry and Security",REAL ENTITY,\n')
+    .join('|') === 'REAL ENTITY');
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

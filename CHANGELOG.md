@@ -10,6 +10,33 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Worldwide sanctions coverage expansion** (13-region survey, every claim
+  documented in-registry): twelve new machine-readable national/institutional
+  lists screen daily — US Trade.gov Consolidated Screening List (eleven
+  export-control + non-SDN lists; SDN block deduplicated to its authoritative
+  OFAC source), Sri Lanka 1373 designations, Netherlands national terrorism
+  list (new ODS reader), Belgium FOD consolidated, Monaco fund-freezing,
+  Latvia FID national, Israel NBCTF, Saudi PCCT, Qatar NCTC unified, Argentina
+  RePET, Brazil BCB/TCU enforcement + debarment (4 feeds), South Africa FIC
+  TFS, ADB debarment register — plus Australia DFAT's Improved Consolidated
+  List re-enabled DIRECT from dfat.gov.au (starts retiring the OpenSanctions
+  mirror; licence-clean path). Sources that publish only HTML/PDF or sit
+  behind keys/WAFs are recorded as documented disabled stubs (Turkey, Egypt,
+  Jordan, 13-country Asia cluster, CIS, Africa, NZ, EBRD/IDB/AfDB), so the
+  registry itself is the survey record: enabled means machine-verified path,
+  disabled means documented blocker — never fake coverage. Generic JSON
+  parser gains Spanish/Portuguese name keys; every new source carries a
+  coverage floor and the standard degrade-loudly contract.
+- **FBI Wanted enrichment signal** (`scripts/fbi-check.mjs`, opt-in via
+  `SCREEN_FBI=1` like Interpol): per-subject lookups against the free FBI
+  Wanted API; only active wanted posters of Main subjects count (missing-
+  person, victim/accomplice and captured posters are excluded by
+  construction); high-band "must verify", never an auto-decision.
+- **Regulator-bulletin net widened US+EU+UAE**: DOJ press releases, CFTC
+  enforcement, OCC news, DFSA media releases and Europol newsroom RSS join
+  SEC/FCA (all keyless RSS — no fetcher change); FinCEN/MAS/FATF/VARA have
+  no feeds (recorded in the config for the next surveyor).
+
 - **Yente matching benchmark — experimental, shadow-only**
   (`scripts/yente-bench.mjs` + dispatch-only `yente-bench.yml`): boots the
   MIT-licensed open-source yente matching engine (the software behind the
