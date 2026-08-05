@@ -311,12 +311,15 @@ def makeup_decision(today, path=None):
         return {"sweep": True, "uncovered": None,
                 "reason": "no run-metrics snapshot for today — coverage cannot be verified, sweeping"}
     counts = todays[-1].get("counts") or {}
-    am = int(counts.get("am_errors") or 0)
+    # Deadline-deferred subjects (delivery-target budget) count as uncovered
+    # exactly like rate-limited ones: the make-up pass is how they get their
+    # news sweep back the same day.
+    am = int(counts.get("am_errors") or 0) + int(counts.get("am_skipped") or 0)
     pep = int(counts.get("pep_errors") or 0)
     if am or pep:
         bits = []
         if am:
-            bits.append(f"{am} subject(s) lost news coverage")
+            bits.append(f"{am} subject(s) lost or deferred news coverage")
         if pep:
             bits.append(f"{pep} individual(s) lost PEP coverage")
         return {"sweep": True, "uncovered": am + pep,

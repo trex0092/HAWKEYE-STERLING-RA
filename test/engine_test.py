@@ -2918,7 +2918,7 @@ check("§② ADVERSE MEDIA reaches Asana with its findings when rebuild is wired
       and "[body truncated" not in _shrunk_notes)
 check("delivered notes keep the sign-off tail and the task name carries the date",
       "RETENTION: retain 10 years" in _shrunk_notes
-      and _posted_shrink[0]["data"]["name"].startswith("🛡️ ⚠️ Daily Screening")
+      and _posted_shrink[0]["data"]["name"].startswith("Daily AML/CFT Screening Report — ACTION REQUIRED")
       and _posted_shrink[0]["data"]["due_on"] == "2026-08-05")
 check("CONTROL: without rebuild the old middle-truncation loses §②'s findings",
       "[body truncated" in _legacy_notes and "[!] Cust 0 probed for money laundering" not in _legacy_notes)
@@ -3234,6 +3234,23 @@ try:
                                      "flags": ["is_disposable_email"]}) is True)
 finally:
     _req_mod.post = _orig_post
+
+# ── delivery-deadline budget (09:00 UAE target) ───────────────────────────────
+print("\nscreen.py — delivery-deadline budget")
+import calendar as _cal
+_mk_ts = lambda h, m: _cal.timegm((2026, 8, 5, h, m, 0, 0, 0, 0))
+check("run before the target gets a deadline = target minus reserve",
+      screen.enrichment_deadline_ts(_mk_ts(3, 30), "05:00", 20) == _mk_ts(4, 40))
+check("run after the budgeted cutoff gets NO deadline (deliver ASAP, full coverage)",
+      screen.enrichment_deadline_ts(_mk_ts(5, 30), "05:00", 20) is None
+      and screen.enrichment_deadline_ts(_mk_ts(4, 45), "05:00", 20) is None)
+check("no target / unparseable target = feature off, never a crash",
+      screen.enrichment_deadline_ts(_mk_ts(3, 0), "", 20) is None
+      and screen.enrichment_deadline_ts(_mk_ts(3, 0), "nonsense", 20) is None)
+_p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 0, "am_skipped": 40}}], open(_p, "w"))
+d = monitoring.makeup_decision("2026-08-05", path=_p)
+check("deadline-deferred subjects trigger the same-day make-up sweep",
+      d["sweep"] is True and d["uncovered"] == 40 and "deferred" in d["reason"])
 
 # ── TFS FFR/PNMR draft dossiers (draft-only, MLRO acts) ───────────────────────
 print("\ntfs_dossier.py — FFR/PNMR drafts")
