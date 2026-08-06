@@ -18,9 +18,9 @@
       "jurisdiction": "Global (MDB)",
       "url": "https://data.iadb.org/file/download/f5022f04-a3f1-4604-a099-5d562e3a0aa5",
       "type": "csv",
-      "parser": "socrata",
-      "enabled": false,
-      "_note": "Inter-American Development Bank sanctions dataset (2010 MDB Mutual-Enforcement cross-debarments), ~1,500 firms/individuals; debarment tier, not financial sanctions. Probe trail: /dataset/download/<id>/csv proved to be the dataset METADATA export (run 31070409925: columns author/citation/doi_publisher, 44KB), not the entity table. URL now points at the terminal candidate that same probe surfaced from BOTH the dataset page and the metadata row: the CKAN file endpoint /file/download/f5022f04-a3f1-4604-a099-5d562e3a0aa5 (resource cd0bd9ac-18c6-44bc-8592-9be468c2efd9; expected columns Title/Other Name/Entity/Nationality/Prohibited Practice/From/To). STILL DISABLED pending that file's header proof; wire the mapping + egress (data.iadb.org:443) and enable only after it parses.",
+      "parser": "idbcsv",
+      "enabled": true,
+      "_note": "Inter-American Development Bank 'Dataset of Sanctioned firms and individuals' (2010 MDB Mutual-Enforcement cross-debarments incl.), debarment (procurement-integrity) tier, not financial sanctions. ENABLED 2026-08-06 on probe proof (run 31070807037): the CKAN file endpoint serves text/csv (~156KB) with header Title/Entity/Nationality/Country/From/To/Prohibited Practice/Source/Tipo de sancion del BID/IDB Sanction Source/Other Name — parser 'idbcsv' indexes Title + Other Name. Discovery trail: Socrata rows.csv → CKAN dataset page → /dataset/download/csv (metadata export, not the table) → this /file/download/<id> resource. minNames 200 floors the ~1,400-row register.",
       "minNames": 200
     },
     {
