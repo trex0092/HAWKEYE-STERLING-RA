@@ -148,12 +148,14 @@ export function restoreCheckpoint(cp) {
   }
   const classHolders = {};
   for (const [k, v] of Object.entries(cp.classHolders || {})) classHolders[String(k)] = Number(v) || 0;
+  const classBatchFailed = {};
+  for (const [k, v] of Object.entries(cp.classBatchFailed || {})) classBatchFailed[String(k)] = Number(v) || 0;
   return {
     sinceIso: new Date(Date.parse(cp.sinceIso)).toISOString().slice(0, 19) + 'Z',
     harvestedAt: new Date(Date.parse(cp.harvestedAt)).toISOString(),
     resumeCount: (Number(cp.resumeCount) || 0) + 1,
     phase: cp.phase === 'labels' ? 'labels' : (cp.phase === 'positions' ? 'positions' : 'holders'),
-    positions, posByClass, holderRows, classHolders,
+    positions, posByClass, holderRows, classHolders, classBatchFailed,
     batchTotal: Number(cp.batchTotal) || 0,
     batchFailed: Number(cp.batchFailed) || 0,
     next: {
@@ -382,6 +384,7 @@ async function harvest(outfile) {
   const posByClass = st ? st.posByClass : new Map(); // classKey → [posQid]
   const holderRows = st ? st.holderRows : [];
   const classHolders = st ? st.classHolders : {};    // classKey → holder rows (across resumes)
+  const classBatchFailed = st ? st.classBatchFailed : {};   // classKey → lost batches (per-class zero-holders gate)
   let batchTotal = st ? st.batchTotal : 0;
   let batchFailed = st ? st.batchFailed : 0;
 
@@ -389,7 +392,7 @@ async function harvest(outfile) {
     writeFileSync(cpFile, JSON.stringify({
       v: 1, sinceIso, harvestedAt, resumeCount, phase,
       positions: [...positions], posByClass: [...posByClass],
-      holderRows, classHolders, batchTotal, batchFailed, ...extra,
+      holderRows, classHolders, classBatchFailed, batchTotal, batchFailed, ...extra,
     }));
     console.log(`pep-worldwide: time budget (${PEP_TIME_BUDGET_MIN} min) reached — checkpoint written (phase ${phase}, resume ${resumeCount}, ${holderRows.length} holder rows so far); exiting ${RESUME_EXIT_CODE} for the workflow to re-dispatch`);
     process.exit(RESUME_EXIT_CODE);
@@ -418,7 +421,15 @@ async function harvest(outfile) {
         if (!positions.has(r.pos)) positions.set(r.pos, { label: '', country: '', classKey: cls.key });
         qids.push(r.pos);
       }
-      posByClass.set(cls.key, [...new Set(qids)]);
+      /* A FAILED re-enumeration must never overwrite what a previous link
+         already banked: on resume the checkpoint's position list is the better
+         evidence, and blanking it would silently zero an already-enumerated
+         class (fatal for a required one, silent recall loss for an optional). */
+      if (pdata || !(posByClass.get(cls.key) || []).length) {
+        posByClass.set(cls.key, [...new Set(qids)]);
+      } else {
+        console.log(`  ${cls.key}: re-enumeration failed — keeping ${posByClass.get(cls.key).length} banked position items from the checkpoint`);
+      }
       console.log(`  ${cls.key}: ${posByClass.get(cls.key).length} position items`);
       if (!posByClass.get(cls.key).length && !cls.optional) {
         console.error(`pep-worldwide: root class ${cls.key} (${cls.qid}) enumerated ZERO position items (query ${pdata ? 'returned empty' : 'failed after retries'}) — refusing a hollow harvest`);
@@ -457,7 +468,11 @@ async function harvest(outfile) {
         const batch = qids.slice(i, i + HOLDER_BATCH);
         batchTotal++;
         const hdata = await fetchJsonSafe(sparqlUrl(holdersQuery(batch, sinceIso)));
-        if (hdata === null) { batchFailed++; continue; }   // flaky batch — counted, not fatal
+        if (hdata === null) {                              // flaky batch — counted, not fatal
+          batchFailed++;
+          classBatchFailed[cls.key] = (classBatchFailed[cls.key] || 0) + 1;
+          continue;
+        }
         for (const r of parseSparqlBindings(hdata)) {
           if (!r.person || !/^Q\d+$/.test(r.person)) continue;
           holderRows.push({ person: r.person, pos: r.pos, end: r.end || '', classKey: cls.key });
@@ -465,10 +480,12 @@ async function harvest(outfile) {
         }
         console.log(`  ${cls.key}: batch ${Math.floor(i / HOLDER_BATCH) + 1}/${Math.ceil(qids.length / HOLDER_BATCH)} — ${classHolders[cls.key] || 0} holder rows so far`);
       }
-      // A required class that ended with zero holders AND lost batches is an
-      // outage, not an empty class; the batch-failure gate below catches it. Only
-      // fail here when the class truly enumerated holders-less with batches OK.
-      if (!classHolders[cls.key] && !cls.optional && batchFailed === 0) {
+      // A required class that ended with zero holders AND lost batches OF ITS
+      // OWN is an outage, not an empty class; the batch-failure gate below
+      // catches it. Gating on the GLOBAL counter disarmed this guard entirely —
+      // one flaky batch anywhere earlier (or restored from a checkpoint) let a
+      // genuinely empty required class pass as screened coverage.
+      if (!classHolders[cls.key] && !cls.optional && !classBatchFailed[cls.key]) {
         console.error(`pep-worldwide: root class ${cls.key} yielded ZERO holders on a clean sweep — refusing a hollow harvest`);
         process.exit(1);
       }

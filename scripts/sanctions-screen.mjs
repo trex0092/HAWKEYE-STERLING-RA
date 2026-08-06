@@ -609,8 +609,13 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
         gid: r.gid, entityType: r.entityType, parent: r.parent, role: r.role,
         hits: hitDetail(lists),
         /* Report-only row: every hit is a cleared-FP pair — the case engine
-           opens no case; the report keeps the row, annotated. */
-        ...(r.whitelistedOnly ? { whitelistedOnly: true } : {}),
+           opens no case; the report keeps the row, annotated. RECOMPUTED after
+           the carry-forward merges above, never copied from r: the flag was
+           decided against THIS run's whitelisted hits, so a record that also
+           carries un-re-verified adverse-media/PEP evidence (carried entries
+           bear no `whitelisted` flag) would otherwise stay report-only and the
+           MLRO would never see a case for a live signal. */
+        ...(r.whitelistedOnly && lists.every(h => h && h.whitelisted) ? { whitelistedOnly: true } : {}),
         signature: sig, firstSeen, lastSeen: today
       };
       if (!prior || prior.signature !== sig) {
@@ -1146,6 +1151,7 @@ export function getByPath(obj, path) {
    hostile/buggy reported total. Hitting either bound short of the list logs
    LOUDLY and the coverage floor flags the partial. */
 export const PAGINATE_HARD_CAP = 2000;   // absolute runaway guard, not a coverage policy
+export const PAGINATE_EMPTY_RETRIES = 2; // a mid-crawl empty page is retried before it counts as exhaustion
 export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = '') {
   const sizeParam = pg.sizeParam || 'size';
   const offsetParam = pg.offsetParam || 'offset';
@@ -1153,7 +1159,7 @@ export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = ''
   const dataPath = pg.dataPath || 'data';
   const maxPages = Math.max(1, Number(pg.maxPages) || 30);
   const all = [];
-  let offset = 0, total = null, page = 0, cap = maxPages;
+  let offset = 0, total = null, page = 0, cap = maxPages, emptyTries = 0;
   for (; page < cap; page++) {
     const u = new URL(url);
     u.searchParams.set(sizeParam, String(size));
@@ -1164,7 +1170,20 @@ export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = ''
     if (total == null && pg.totalPath) { const t = Number(getByPath(json, pg.totalPath)); if (Number.isFinite(t)) total = t; }
     const rows = getByPath(json, dataPath);
     const arr = Array.isArray(rows) ? rows : [];
-    if (!arr.length) break;                       // list exhausted
+    if (!arr.length) {
+      /* An empty page BEFORE the server's own reported total is a mid-crawl
+         gateway blip (a throttled 200 with no rows), not exhaustion — retry the
+         same offset before believing it, or a flaky page silently truncates the
+         register. */
+      if (Number.isFinite(total) && offset < total && emptyTries < PAGINATE_EMPTY_RETRIES) {
+        emptyTries++;
+        page--;                                   // a retry is not a new page
+        await new Promise(res => setTimeout(res, 500 * emptyTries));
+        continue;
+      }
+      break;                                      // exhausted, or exhaustion is unknowable
+    }
+    emptyTries = 0;
     all.push(...arr);
     offset += arr.length;                         // step by ACTUAL page length — robust to any server page size
     if (Number.isFinite(total)) {
@@ -1174,8 +1193,18 @@ export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = ''
       cap = Math.min(PAGINATE_HARD_CAP, Math.max(cap, page + 1 + Math.ceil((total - offset) / arr.length)));
     }
   }
-  if (page >= cap && (!Number.isFinite(total) || offset < total)) {
-    console.warn(`  ${sourceId || 'paginated source'}: pagination capped at ${cap} pages (${all.length}${Number.isFinite(total) ? ' of ' + total : ''} rows) — coverage PARTIAL, coverage floor will flag it`);
+  /* Partiality is a FACT, never an inference left to the count floor. A crawl
+     that ends short of the server's own total THROWS, so loadSanctionsLists
+     takes its failure branch (note + degraded coverage) and diffState carries
+     standing matches forward — instead of a half-loaded register passing as a
+     clean load and clearing real matches whenever the partial still cleared
+     minNames. */
+  if (Number.isFinite(total) && offset < total) {
+    throw new Error('pagination stopped at ' + all.length + ' of ' + total + ' rows ('
+      + (page >= cap ? 'page cap ' + cap : 'empty page at offset ' + offset) + ') — partial list refused');
+  }
+  if (page >= cap && !Number.isFinite(total)) {
+    console.warn(`  ${sourceId || 'paginated source'}: pagination hit the ${cap}-page cap and the feed reports no total (${all.length} rows) — coverage may be PARTIAL, the coverage floor is the only gate`);
   }
   return JSON.stringify({ [dataPath]: all });
 }

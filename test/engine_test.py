@@ -990,6 +990,16 @@ check("ADVERSE_LOCALES accepts 'all' → full matrix",
       screen._resolve_locale_count("all", len(screen.GNEWS_LOCALES)) == len(screen.GNEWS_LOCALES)
       and screen._resolve_locale_count("5", 74) == 5 and screen._resolve_locale_count("bogus", 74) == 5)
 check("GDELT risk-term cluster is broad (global predicate coverage)", len(screen.GDELT_RISK_TERMS) >= 20)
+# parse_gdelt used to scan only articles[:max_results*3] (24 of the 250 now
+# fetched): an adverse headline ranked 25th or later was never keyword-scanned.
+_gd_deep = screen.parse_gdelt({"articles": (
+    [{"title": f"Neutral company update {i}", "domain": "x.com", "seendate": "20260801T000000Z"} for i in range(60)]
+    + [{"title": "Firm charged in money laundering probe", "domain": "reuters.com", "seendate": "20260801T000000Z"}])})
+check("GDELT: every fetched record is keyword-scanned — an adverse headline ranked 61st is still flagged",
+      any(a["flagged"] for a in _gd_deep))
+check("GDELT: flagged articles rank first so the parser's own bound never drops adverse evidence",
+      _gd_deep[0]["flagged"] is True)
+
 check("GDELT fetches at the API maximum page (250) — maximum worldwide recall (JS parity)",
       "maxrecords=250" in screen.GDELT_URL and screen._gdelt_maxrec() == 250)
 

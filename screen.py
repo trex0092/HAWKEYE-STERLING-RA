@@ -1631,7 +1631,13 @@ def parse_gdelt(payload, max_results: int = 8) -> list:
     """GDELT artlist JSON → the same article shape the Google News pass emits.
     Pure (no network) so it is unit-testable offline."""
     arts = []
-    for a in (payload or {}).get("articles", [])[: max_results * 3]:
+    # SCAN EVERY FETCHED RECORD. This used to read only articles[:max_results*3]
+    # (24 of the 250 GDELT now returns), so an adverse headline ranked 25th or
+    # later was never keyword-scanned — never flagged, never scored, invisible.
+    # Flagging is local regex work on a title; the cost of scanning all 250 is
+    # negligible next to the fetch, and the caller's merge already sorts
+    # flagged-first before applying its own display cap.
+    for a in (payload or {}).get("articles", []):
         title = (a.get("title") or "").strip()
         if not title:
             continue
@@ -1653,7 +1659,11 @@ def parse_gdelt(payload, max_results: int = 8) -> list:
             "keywords": matched,
             "categories": typology_for(matched),
         })
-    return arts
+    # Flagged first so this function's own bound can never drop adverse
+    # evidence in favour of neutral filler; every flagged article is kept.
+    flagged = [a for a in arts if a["flagged"]]
+    rest = [a for a in arts if not a["flagged"]]
+    return flagged + rest[: max(0, max_results * 3 - len(flagged))]
 
 def search_gdelt(name: str, max_results: int = 8) -> list:
     """Query GDELT for a subject + risk-term cluster. Raises on HTTP failure so
