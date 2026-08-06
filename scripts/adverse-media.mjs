@@ -52,6 +52,51 @@ export const WEAK_TERMS = new Set([
 ]);
 for (const t of WEAK_TERMS) ADVERSE_TERMS.push(t);
 
+/* ── Python-parity scoring terms (screen.py ADVERSE_KEYWORDS) ─────────────────
+   Every keyword the Python engine flags on must flag here too: both engines
+   screen the SAME customers daily, so a term only screen.py knows is a headline
+   the Python run reports and the JS digest silently drops — no list entry, no
+   band escalation, hit:false with nothing marked partial or errored. These had
+   no substring cover in ALL_TERMS ("cartel", "mafia", "bribe", "corrupt",
+   "debarred", "proliferation financing", "ransomware", "modern slavery",
+   "conflict minerals", "prison", …).
+
+   SCORING ONLY — deliberately NOT pushed into ADVERSE_TERMS, which is also
+   OR-joined into every Google News query: appending these takes the per-locale
+   query URL from ~1.5KB to ~3KB, and a query Google rejects returns zero items,
+   trading a scoring gap for a RETRIEVAL gap. Scoring is where the loss is:
+   gdeltUrl already ASKS for 'cartel' / 'proliferation financing' / 'raid' /
+   'seized' and nothing scored those items on arrival. Widening the term set can
+   only add matches to an item, never remove one. */
+export const PY_PARITY_TERMS = [
+  // Sanctions / proliferation / terrorism
+  'sanction', 'embargo', 'designated terrorist', 'extremist', 'radicalis',
+  'radicaliz', 'militant', 'proliferation financing', 'weapons of mass destruction',
+  'wmd', 'dual-use', 'export control', 'chemical weapons', 'biological weapons',
+  'debarred',
+  // Financial crime / corruption
+  'financial crime', 'economic crime', 'pyramid scheme', 'asset misappropriation',
+  'misuse of funds', 'bribe', 'corrupt', 'kleptocracy', 'state capture',
+  'abuse of power', 'identity theft', 'blackmail',
+  // Enforcement / legal status
+  'prosecute', 'litigate', 'felon', 'imprisonment', 'jail', 'prison', 'theft',
+  'murder', 'politic',
+  // Organised crime / cyber
+  'mafia', 'cartel', 'illicit', 'cybercrime', 'ransomware', 'darknet',
+  // ESG / minerals / human rights
+  'human rights', 'forced labour', 'forced labor', 'modern slavery',
+  'child labour', 'child labor', 'conflict minerals', 'blood diamond',
+  'environmental violation', 'toxic waste', 'land grabbing', 'indigenous rights',
+  'due diligence failure'
+];
+/* The generics among them are weak-tier in screen.py (KEYWORD_TIER_WEAK) — mirror
+   that tiering, or an ESG/"human rights" headline would arrive at tier 'normal'
+   here and 'weak' there. Added AFTER the push above so they widen SCORING only,
+   and only for terms that matched nothing before: no existing match is downgraded. */
+for (const t of ['politic', 'litigate', 'dual-use', 'human rights',
+  'environmental violation', 'toxic waste', 'land grabbing', 'indigenous rights',
+  'due diligence failure']) WEAK_TERMS.add(t);
+
 /* Arabic-language risk terms — for a UAE deployment, adverse media often breaks
    in Arabic press first. Querying these (against Arabic Google News) closes a
    recall gap English-only screening leaves open. Matching is Unicode-aware (see
@@ -169,7 +214,7 @@ export const LANG_TERMS = {
 
 /* Union of every language's terms — the term set used when scoring the merged,
    multi-locale item stream. */
-export const ALL_TERMS = [...new Set(Object.values(LANG_TERMS).flat())];
+export const ALL_TERMS = [...new Set([...Object.values(LANG_TERMS).flat(), ...PY_PARITY_TERMS])];
 
 /* "Strong" (escalating) predicates across languages: money laundering, sanctions
    (+ evasion), terrorism, terrorist financing. A hit on any of these → high band. */

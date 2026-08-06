@@ -267,5 +267,28 @@ check('sourceTierFor ranks known wires tier 1, regionals tier 2, unknowns tier 3
   && sourceTierFor({ link: 'https://blog.example.xyz/p' }) === 3
   && sourceTierFor({ source: 'Reuters' }) === 1);
 
+
+/* Cross-engine parity: screen.py's ADVERSE_KEYWORDS are the flagging contract —
+   both engines screen the same customers daily, and sanctions-screen.mjs only
+   pushes an adverse-media list entry / escalates the band on am.hit, so a term
+   only Python knows is a SILENT JS miss, not a loud one. Weak-tier generics must
+   stay weak (screen.py KEYWORD_TIER_WEAK) and a clean headline must still clear. */
+check('scoring covers the screen.py keyword classes the JS term set used to miss', (() => {
+  const s = t => scoreAdverseMedia('Al Noor Gold Trading', [{ title: 'Al Noor Gold Trading ' + t }], ALL_TERMS);
+  const pyOnly = [
+    'tied to cartel gold shipments', 'linked to a proliferation financing network',
+    'debarred by the World Bank over sourcing', 'boss jailed after theft and blackmail charges',
+    'linked to a mafia network in Dubai', 'hit by ransomware, darknet leak follows',
+    'accused of modern slavery and forced labour', 'refinery sourced conflict minerals',
+    'flagged in a dual-use export control probe', 'named in an arms embargo breach probe'
+  ];
+  return pyOnly.every(t => { const r = s(t); return r.hit === true && r.tier !== 'weak'; })
+    && s('publishes a human rights policy update').tier === 'weak'
+    && s('opens a new showroom in Deira').hit === false;
+})());
+check('parity terms widen SCORING only — the Google News query URL stays short (a rejected query returns zero items)',
+  adverseMediaUrl('Al Noor Gold Trading').length < 2000);
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
+

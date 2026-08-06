@@ -827,10 +827,11 @@ def match_adverse_keywords(title: str) -> list:
     Latin-script foreign terms match on \b word boundaries (lower-cased, with a
     diacritic-folded fallback for all-caps Turkish-style headlines); Arabic terms
     match on the Arabic-normalised headline; other non-Latin scripts match by
-    substring on the LOWER-CASED headline — Cyrillic and Greek are cased scripts,
-    and the dictionary terms are lowercase, so matching against the raw headline
-    would miss every capitalized or all-caps headline. Order preserved, no
-    duplicates."""
+    substring on the LOWER-CASED headline, then on the diacritic-folded headline
+    — Cyrillic and Greek are cased scripts and the dictionary terms are
+    lowercase, so the raw headline would miss every capitalized or all-caps
+    headline, and the lower-cased headline alone still misses the ё/е and
+    tonos variants. Order preserved, no duplicates."""
     raw = title or ""
     tl = raw.lower()
     raw_ar = _normalize_ar(raw)
@@ -842,6 +843,17 @@ def match_adverse_keywords(title: str) -> list:
             hit = _normalize_ar(term) in raw_ar
         elif _NONLATIN_RE.search(term):
             hit = term in tl
+            if not hit:
+                # The same folded fallback the Latin branch gets below: tl is
+                # only .lower()-ed, which reaches a capitalised headline but not
+                # a diacritic variant. Cyrillic ё/е alternate freely in Russian
+                # copy ('осуждён' is routinely printed 'осужден') and Greek
+                # all-caps headlines drop the tonos ('απάτη' → 'ΑΠΑΤΗ'), so the
+                # raw substring silently loses the hit. _latin_fold is
+                # script-agnostic despite the name (NFD, strip combining marks,
+                # case-fold) and also unifies Greek final sigma ς→σ. No \b
+                # anchors: word boundaries do not apply in these scripts.
+                hit = _latin_fold(term) in _latin_fold(raw)
         else:
             # Both edges anchored: unlike the English entries (deliberate stems —
             # 'launder', 'smuggl' — that need open-ended prefix matching), the
@@ -1813,7 +1825,16 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                                  headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
                 if r.status_code == 200:
                     root = safe_xml_fromstring(r.content)
-                    for item in root.findall(".//item")[:max_results]:
+                    # SCAN EVERY ITEM THIS FETCH RETURNED. This used to read
+                    # only [:max_results] — 8 of the ~100 a locale feed carries —
+                    # and the broad pass queries the NAME ONLY, so those 8 are the
+                    # subject's freshest GENERAL headlines: an adverse story
+                    # ranked 9th was never keyword-scanned, never flagged, never
+                    # scored, invisible. Same defect class as the GDELT path
+                    # (parse_gdelt); the JS engine caps nothing, so this also
+                    # brings the two corpora back into agreement.
+                    fetched = []
+                    for item in root.findall(".//item"):
                         title_el = item.find("title")
                         source_el = item.find("source")
                         pubdate_el = item.find("pubDate")
@@ -1830,7 +1851,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                         # below a neutral headline. Tags stripped, bounded.
                         desc = _strip_rss_description(item.findtext("description") or "")
                         matched = adverse_keywords_for(title, desc)
-                        articles.append({
+                        fetched.append({
                             "title": title,
                             "source": source,
                             "date": pub_date,
@@ -1842,6 +1863,16 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                             "tier": keyword_tier(matched),
                             "categories": typology_for(matched),
                         })
+                    # Flagged first, neutral filler bounded — parse_gdelt's tail
+                    # applied per fetch: EVERY adverse item this locale surfaced
+                    # is carried through (scanning deeper must never be undone by
+                    # a bound), while unflagged carry-through stays at the old
+                    # per-fetch volume so dedup_stories' O(n^2) token compare and
+                    # the ranking cost are unchanged even on a full sweep.
+                    fl = [a for a in fetched if a["flagged"]]
+                    articles.extend(fl)
+                    articles.extend([a for a in fetched if not a["flagged"]][
+                        : max(0, max_results - len(fl))])
                     ok = True
             except Exception as e:
                 ok = False
@@ -2798,6 +2829,87 @@ def _fold_ofac_aliases(primary_names, alt_data):
     if primary_names:
         primary_names |= parse_ofac_alt(alt_data)
     return primary_names
+
+def parse_ofac_consolidated(data):
+    """OFAC CONSOLIDATED (non-SDN) list — consolidated.xml.
+
+    OFAC's non-SDN programmes (SSI, FSE, NS-MBS, CAPTA, NS-PLC) are published in
+    their OWN file: a party designated there is on NO list this engine loaded, so
+    it screened CLEAR while the run headline named "OFAC". The JS engine has
+    screened it all along (data/sanctions-sources.json "ofac-consolidated",
+    parser "ofacxml"); this is the same parse on the Python side, so the two
+    engines see one corpus.
+
+    Shape mirrors scripts/sanctions-match.mjs parseOfacXml: <sdnEntry> blocks;
+    individuals carry <firstName> + <lastName>, entities and vessels carry the
+    whole name in <lastName>; every <aka> in <akaList> is a designated alias and
+    is screened like a primary name (an alias is the name the party actually
+    operates under). Tags are matched on their LOCAL name because the OFAC feed
+    carries a default XML namespace: a literal find("lastName") returns None
+    against it and would zero the whole list silently. Best-effort like every
+    sibling parser — a garbled body yields an empty set reported as unavailable,
+    never a raise."""
+    names = set()
+    if not data:
+        return names, "unavailable", ""
+    date_str = "live"
+    def _local(el):
+        return el.tag.split("}")[-1]
+    try:
+        root = safe_xml_fromstring(data)
+        for el in root.iter():
+            if _local(el) == "Publish_Date" and (el.text or "").strip():
+                date_str = el.text.strip()
+                break
+        for entry in root.iter():
+            if _local(entry) != "sdnEntry":
+                continue
+            first = last = ""
+            akas = []
+            for ch in entry:
+                tag = _local(ch)
+                if tag == "firstName" and (ch.text or "").strip():
+                    first = " ".join(ch.text.split())
+                elif tag == "lastName" and (ch.text or "").strip():
+                    last = " ".join(ch.text.split())
+                elif tag == "akaList":
+                    for aka in ch:
+                        parts = [" ".join((g.text or "").split()) for g in aka
+                                 if _local(g) in ("firstName", "lastName") and (g.text or "").strip()]
+                        if parts:
+                            akas.append(" ".join(parts))
+            primary = " ".join(p for p in (first, last) if p)
+            if primary:
+                names.add(primary)
+            # Aliases are added even when the primary is unparseable: the
+            # enclosing <sdnEntry> already scopes them to a real record, and an
+            # alias-only entry is still a designation (parseOfacXml does the
+            # same — the parity contract is name-for-name).
+            names.update(akas)
+    except Exception as e:
+        log(f"  OFAC Consolidated parse error: {e}")
+    if not names:
+        return names, "unavailable", ""
+    return names, date_str, sha256_of(data)
+
+def load_ofac_consolidated(all_lists, list_meta):
+    """Fetch, parse and register OFAC's CONSOLIDATED (non-SDN) list. Called from
+    BOTH list-building paths — the unified loader and the legacy main() —
+    because a source only one path loads is the recurring defect in this engine.
+
+    Supplementary tier, deliberately: this list has no coverage floor and no
+    second origin yet, so it must never be able to refuse a run or turn one red
+    on its own. An unreachable list still prints "not reached this run" in the
+    report's supplementary block, so the gap is disclosed rather than silent.
+    Purely additive to the screened corpus: names are added, never removed."""
+    names, date_str, digest = parse_ofac_consolidated(download(
+        "https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/consolidated.xml",
+        "OFAC Consolidated (non-SDN)"))
+    list_meta["ofac_cons"] = {"count": len(names), "date": date_str,
+                              "hash": digest, "tier": "supplementary"}
+    if names:
+        all_lists["OFAC Consolidated (non-SDN)"] = [(normalize(n), n) for n in names]
+    return names
 
 def parse_un(data):
     names = set()
@@ -5127,6 +5239,11 @@ def load_all_lists():
     count_unmatchable_entries(all_lists, list_meta)
     # ── Supplementary lists (best-effort): broaden coverage when reachable, but a
     # fetch miss is reported as "not reached", NOT as a degraded core control. ──
+    # OFAC's non-SDN programmes ship in a SEPARATE file, so a party listed there
+    # was on no list we loaded and screened clear — the JS engine has screened it
+    # since data/sanctions-sources.json gained "ofac-consolidated", so this also
+    # closes the engine-parity gap on the path that runs the daily screen.
+    load_ofac_consolidated(all_lists, list_meta)
     ca_data = download("https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml","Canada SEMA")
     ca_names, ca_date, ca_hash = parse_canada(ca_data)
     list_meta["canada"] = {"count":len(ca_names),"date":ca_date,"hash":ca_hash,"tier":"supplementary"}
@@ -5335,7 +5452,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("   Supplementary lists (best-effort — never affect core coverage):")
         for k in supp:
             m_ = supp[k]
-            label = {"canada": "Canada (SEMA)", "internal": "Internal Watchlist"}.get(k, k)
+            label = {"canada": "Canada (SEMA)", "internal": "Internal Watchlist",
+                     "ofac_cons": "OFAC Consolidated (non-SDN)"}.get(k, k)
             if m_.get("count", 0) > 0:
                 A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
             elif k == "internal":
@@ -6550,6 +6668,9 @@ def main():
         "UAE EOCN":         [(normalize(n),n) for n in eocn_names],
     }
     count_unmatchable_entries(all_lists, list_meta)
+    # OFAC non-SDN, same reasoning and same placement as the unified loader:
+    # after the all-empty guard and the floors, so it can only ADD names.
+    load_ofac_consolidated(all_lists, list_meta)
     # Internal firm watchlist (optional): added AFTER the all-empty guard and
     # the floors so firm-internal names can never satisfy a core-coverage
     # fail-safe on this path either; empty is a valid state.
