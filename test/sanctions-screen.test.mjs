@@ -1028,10 +1028,26 @@ check('probe: JSON reconnaissance yields the key paths a field mapping needs',
   JSON.stringify(sp.jsonKeyPaths('{"value":[{"NomeDaPessoa":"X","Cpf":"1"}]}'))
   === '["value[].NomeDaPessoa = X","value[].Cpf = 1"]'
   && sp.jsonKeyPaths('not json') === null);
-const _spMd = sp.renderReport([{ id: 'a', name: 'A', url: 'https://x.example/a', outcome: 'fetched', status: 200, contentType: 'application/json', bytes: 12, jsonPaths: ['k = v'] }]);
-check('probe: report renders outcome, key paths, and the diagnostic-only footer',
+const _spMd = sp.renderReport([{ id: 'a', name: 'A', url: 'https://x.example/a', outcome: 'fetched', status: 200, contentType: 'application/json', bytes: 12, jsonPaths: ['k = v'], links: ['https://x.example/list.xml'] }]);
+check('probe: report renders outcome, key paths, discovered links, and the diagnostic-only footer',
   _spMd.includes('## a — A') && _spMd.includes('http 200') && _spMd.includes('k = v')
+  && _spMd.includes('Data-file links discovered') && _spMd.includes('https://x.example/list.xml')
   && _spMd.includes('Diagnostic only'));
+check('probe: link discovery pulls data-file hrefs off an HTML landing page, absolutized', (() => {
+  const html = '<a href="/Content/TFSList.xml">XML</a> <a href="download.ashx?fileType=xlsx">XLSX</a> '
+    + '<a href="/about">About us</a> <img src="/logo.png">';
+  const links = sp.extractDataLinks(html, 'https://tfs.example.gov/Pages/TFSListDownload');
+  return links.includes('https://tfs.example.gov/Content/TFSList.xml')
+    && links.includes('https://tfs.example.gov/Pages/download.ashx?fileType=xlsx')
+    && !links.some(l => l.includes('/about') || l.includes('logo.png'));
+})());
+check('probe: link discovery surfaces CKAN resource URLs from raw JSON (escaped slashes too)', (() => {
+  const jsonBody = '{"result":{"results":[{"resources":[{"format":"CSV","url":"https:\\/\\/mydata.example.org\\/dataset\\/x\\/resource\\/abc\\/download\\/sanctioned.csv"}]}]}}';
+  const links = sp.extractDataLinks(jsonBody, 'https://mydata.example.org/api/3/action/package_search');
+  return links.includes('https://mydata.example.org/dataset/x/resource/abc/download/sanctioned.csv');
+})());
+check('probe: link discovery is bounded (never an unbounded report)',
+  sp.extractDataLinks(Array.from({ length: 200 }, (_, i) => '<a href="/f' + i + '.csv">x</a>').join(''), 'https://x.example/', { max: 40 }).length === 40);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
