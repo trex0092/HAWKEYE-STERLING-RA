@@ -35,6 +35,7 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             app.asana.com:443
+            *.githubapp.com:443
 
       - name: Verify direct GitHub -> Asana delivery into HAWKEYE STERLING APP
         env:

@@ -46,6 +46,7 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             api.github.com:443
+            *.githubapp.com:443
       - name: Delete verified squash-merged branches
         env:
           GH_TOKEN: ${{ github.token }}

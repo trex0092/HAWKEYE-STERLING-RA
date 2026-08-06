@@ -112,6 +112,7 @@ jobs:
             egmontgroup.org:443
             www.egmontgroup.org:443
             index.baselgovernance.org:443
+            *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # No credentials on disk (zizmor artipacked): the state push below

@@ -32,6 +32,7 @@ jobs:
             hawkeye-sterling-ra.netlify.app:443
             deploy-preview-177--hawkeye-sterling-ra.netlify.app:443
             app.asana.com:443
+            *.githubapp.com:443
       - name: DEEP TEST 1 — corrected build (deploy-preview-177) — proof task is KEPT
         env:
           ENDPOINT: https://deploy-preview-177--hawkeye-sterling-ra.netlify.app/.netlify/functions/asana-task

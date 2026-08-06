@@ -46,6 +46,7 @@ jobs:
             tuf-repo-cdn.sigstore.dev:443
             tuf-repo.github.com:443
             tmaproduction.blob.core.windows.net:443
+            *.githubapp.com:443
       - name: Verify the published image provenance
         env:
           GH_TOKEN: ${{ github.token }}

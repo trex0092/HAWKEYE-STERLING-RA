@@ -72,6 +72,7 @@ jobs:
             codeload.github.com:443
             objects.githubusercontent.com:443
             nodejs.org:443
+            *.githubapp.com:443
 
       - name: Trigger Netlify production build via build hook
         id: kick
