@@ -67,6 +67,34 @@ export function jsonKeyPaths(body, { maxPaths = 60, maxDepth = 5 } = {}) {
   return [...paths.entries()].map(([p, v]) => p + ' = ' + v);
 }
 
+/* Link discovery: the data-file URLs a landing page or API index points at.
+   Several sources publish the real file behind an HTML landing page (ZA FIC)
+   or a portal API (IDB's CKAN) — the probe's body sample is too small to show
+   the href, so this walks the WHOLE body for URL-shaped strings that look
+   like data files and absolutizes them against the fetched URL. Diagnostic
+   output only: discovered URLs go into the registry via PR, never fetched
+   automatically. */
+export function extractDataLinks(body, baseUrl, { max = 40 } = {}) {
+  const text = typeof body === 'string' ? body : Buffer.from(body || '').toString('utf8');
+  const found = new Set();
+  const DATAISH = /\.(xml|csv|xlsx|xls|ods|json|zip)(\?|"|'|\\|&|\s|$)|download|filetype=|datastore|\/resource\/|\/dump\//i;
+  // href/src attributes (HTML) + bare URL strings (JSON values, escaped or not)
+  const patterns = [
+    /(?:href|src)\s*=\s*["']([^"']+)["']/gi,
+    /https?:(?:\\\/\\\/|\/\/)(?:[^\s"'<>\\]|\\\/)+/gi,
+    /["']((?:\/|\.\.?\/)[^"'<>\s]*(?:\.(?:xml|csv|xlsx|xls|ods|json|zip)|[?&]fileType=[^"'<>\s]*)[^"'<>\s]*)["']/gi,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(text)) && found.size < max * 3) {
+      const raw = (m[1] || m[0]).replace(/\\\//g, '/').replace(/&amp;/g, '&');
+      if (!DATAISH.test(raw)) continue;
+      try { found.add(new URL(raw, baseUrl).href); } catch { /* not a resolvable URL — skip */ }
+    }
+  }
+  return [...found].slice(0, max);
+}
+
 /* XLSX/ODS reconnaissance: the header row(s) the sheet reader would see. */
 export async function sheetHeaders(buf) {
   try {
@@ -97,6 +125,7 @@ export function renderReport(results) {
     if (r.bytes != null) L.push('- bytes: ' + r.bytes);
     if (r.server) L.push('- server: ' + r.server);
     if (r.jsonPaths && r.jsonPaths.length) { L.push('', '### JSON key paths', '```', ...r.jsonPaths, '```'); }
+    if (r.links && r.links.length) { L.push('', '### Data-file links discovered', '```', ...r.links, '```'); }
     if (r.sheet && r.sheet.length) { L.push('', '### Sheet reconnaissance', '```', ...r.sheet, '```'); }
     if (r.sample) { L.push('', '### Body sample (bounded, control bytes escaped)', '```', r.sample, '```'); }
     L.push('');
@@ -131,6 +160,7 @@ async function probeOne(s, timeoutMs = 90000) {
       r.sheet = await sheetHeaders(buf);
     } else {
       r.jsonPaths = jsonKeyPaths(buf);
+      r.links = extractDataLinks(buf, s.url);
       r.sample = sampleBody(buf);
     }
   } catch (e) {
