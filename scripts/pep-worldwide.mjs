@@ -436,22 +436,6 @@ async function harvest(outfile) {
         process.exit(1);
       }
     }
-    /* Office labels via wbgetentities (chunked, hang-proofed) — kept OUT of
-       the SPARQL walk so the enumeration stays under the WDQS kill. A lost
-       chunk leaves those offices labeled by their QID (buildPepDataset falls
-       back to the position QID); PERSON-name recall is untouched either way. */
-    const posQids = [...positions.keys()];
-    for (let i = 0; i < posQids.length; i += LABEL_CHUNK) {
-      if (overBudget()) pause('positions', { next: { classIdx: 0, posIdx: 0 } });
-      const data = await fetchJsonSafe(labelsUrl(posQids.slice(i, i + LABEL_CHUNK)));
-      if (data) {
-        for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
-          const p = positions.get(qid);
-          if (p) p.label = namesFromEntity(ent).name || p.label;
-        }
-      }
-      if ((i / LABEL_CHUNK) % 40 === 0) console.log(`  office labels: ${Math.min(i + LABEL_CHUNK, posQids.length)}/${posQids.length}`);
-    }
   }
 
   /* Holders phase. Resume indices address the position ARRAY (posIdx), not
@@ -498,6 +482,28 @@ async function harvest(outfile) {
     process.exit(1);
   }
   if (batchFailed) console.log(`pep-worldwide: tolerated ${batchFailed}/${batchTotal} flaky holder batches (within the ${Math.round(PEP_MAX_BATCH_FAIL_PCT * 100)}% gate)`);
+
+  /* Office labels — AFTER holders and scoped to positions that actually have
+     one. Labelling every enumerated position cost 1,614 requests (80,677 QIDs)
+     and ate a whole 40-min budget at 25% done, for a field that is cosmetic:
+     buildPepDataset falls back to the position QID, and PERSON-name recall
+     never depends on it. Best-effort throughout — a lost chunk just leaves
+     those offices QID-labelled. */
+  if (!st || st.phase !== 'labels') {
+    const heldQids = [...new Set(holderRows.map(r => r.pos))].filter(q => positions.has(q));
+    console.log(`pep-worldwide: labelling ${heldQids.length} offices that have holders (of ${positions.size} enumerated)`);
+    for (let i = 0; i < heldQids.length; i += LABEL_CHUNK) {
+      if (overBudget()) pause('labels', { labelQids: [...new Set(holderRows.map(r => r.person))], names: [], next: { labelIdx: 0 } });
+      const data = await fetchJsonSafe(labelsUrl(heldQids.slice(i, i + LABEL_CHUNK)));
+      if (data) {
+        for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
+          const p = positions.get(qid);
+          if (p) p.label = namesFromEntity(ent).name || p.label;
+        }
+      }
+      if ((i / LABEL_CHUNK) % 40 === 0) console.log(`  office labels: ${Math.min(i + LABEL_CHUNK, heldQids.length)}/${heldQids.length}`);
+    }
+  }
 
   /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
   let personQids, names, labelStart;

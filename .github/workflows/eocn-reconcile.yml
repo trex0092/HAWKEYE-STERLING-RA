@@ -25,8 +25,10 @@ on:
     - cron: '37 4 * * 1,4'   # Mon & Thu 04:37 UTC — twice weekly keeps the review age well inside the 7-day gate when merged promptly
   workflow_dispatch:
 
+# Least privilege: read-only at top level; the prepare job below elevates the
+# one scope it needs (Scorecard Token-Permissions).
 permissions:
-  contents: write   # push the prepared eocn-reconcile branch (main stays protected)
+  contents: read
 
 concurrency:
   group: eocn-reconcile
@@ -34,6 +36,9 @@ concurrency:
 
 jobs:
   prepare:
+    # contents: write — push the prepared eocn-reconcile branch (main stays protected).
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
