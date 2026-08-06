@@ -109,7 +109,8 @@ export function checkpointPath(outfile) {
    been resumed past the cap without completing; re-dispatching again would
    loop forever instead of surfacing the underlying failure). */
 export function checkpointUsable(cp, { maxResumes = PEP_MAX_RESUMES, nowMs = Date.now() } = {}) {
-  if (!cp || cp.v !== 1 || !cp.sinceIso || !cp.harvestedAt || !cp.phase) {
+  if (!cp || cp.v !== 1 || !Number.isFinite(Date.parse(cp.sinceIso))
+    || !Number.isFinite(Date.parse(cp.harvestedAt)) || !cp.phase) {
     return { ok: false, fatal: false, reason: 'unrecognized checkpoint shape — starting fresh' };
   }
   const age = nowMs - Date.parse(cp.harvestedAt);
@@ -120,6 +121,50 @@ export function checkpointUsable(cp, { maxResumes = PEP_MAX_RESUMES, nowMs = Dat
     return { ok: false, fatal: true, reason: `already resumed ${cp.resumeCount} times without completing (max ${maxResumes}) — the harvest is not converging; investigate before re-dispatching` };
   }
   return { ok: true, fatal: false, reason: '' };
+}
+
+/* Rebuild harvest state from a checkpoint, REVALIDATING every value that can
+   reach a query URL. The checkpoint rides a repo branch, so a poisoned or
+   corrupted file must not be able to steer SPARQL/API requests: QIDs are
+   re-derived through their numeric part (invalid entries drop), timestamps
+   re-derive through Date.parse, counters and indices coerce to numbers.
+   (Also the CodeQL js/outbound-network-request-with-dynamic-url guard.) */
+const QID_RE = /^Q\d+$/;
+const cleanQid = q => (typeof q === 'string' && QID_RE.test(q)) ? 'Q' + String(Number(q.slice(1))) : null;
+export function restoreCheckpoint(cp) {
+  const positions = new Map();
+  for (const [q, p] of Array.isArray(cp.positions) ? cp.positions : []) {
+    const qid = cleanQid(q);
+    if (qid && p) positions.set(qid, { label: String(p.label || ''), country: String(p.country || ''), classKey: String(p.classKey || '') });
+  }
+  const posByClass = new Map();
+  for (const [k, arr] of Array.isArray(cp.posByClass) ? cp.posByClass : []) {
+    posByClass.set(String(k), (Array.isArray(arr) ? arr : []).map(cleanQid).filter(Boolean));
+  }
+  const holderRows = [];
+  for (const r of Array.isArray(cp.holderRows) ? cp.holderRows : []) {
+    const person = cleanQid(r && r.person), pos = cleanQid(r && r.pos);
+    if (person && pos) holderRows.push({ person, pos, end: String(r && r.end || ''), classKey: String(r && r.classKey || '') });
+  }
+  const classHolders = {};
+  for (const [k, v] of Object.entries(cp.classHolders || {})) classHolders[String(k)] = Number(v) || 0;
+  return {
+    sinceIso: new Date(Date.parse(cp.sinceIso)).toISOString().slice(0, 19) + 'Z',
+    harvestedAt: new Date(Date.parse(cp.harvestedAt)).toISOString(),
+    resumeCount: (Number(cp.resumeCount) || 0) + 1,
+    phase: cp.phase === 'labels' ? 'labels' : 'holders',
+    positions, posByClass, holderRows, classHolders,
+    batchTotal: Number(cp.batchTotal) || 0,
+    batchFailed: Number(cp.batchFailed) || 0,
+    next: {
+      classIdx: Number(cp.next && cp.next.classIdx) || 0,
+      posIdx: Number(cp.next && cp.next.posIdx) || 0,
+      labelIdx: Number(cp.next && cp.next.labelIdx) || 0,
+    },
+    labelQids: (Array.isArray(cp.labelQids) ? cp.labelQids : []).map(cleanQid).filter(Boolean),
+    names: new Map((Array.isArray(cp.names) ? cp.names : [])
+      .filter(e => Array.isArray(e) && cleanQid(e[0])).map(([q, n]) => [cleanQid(q), n])),
+  };
 }
 
 export function positionsQuery(rootQid) {
@@ -308,19 +353,20 @@ async function harvest(outfile) {
     }
     if (!use.ok) { console.log('pep-worldwide: ' + use.reason); cp = null; }
   }
+  const st = cp ? restoreCheckpoint(cp) : null;   // revalidated — cp is not used past here
 
   /* The recency window and harvest timestamp come from the ORIGINAL run so
      every resume filters the same graph slice. */
-  const sinceIso = cp ? cp.sinceIso : new Date(Date.now() - RECENCY_MONTHS * 30.44 * 86400000).toISOString().slice(0, 19) + 'Z';
-  const harvestedAt = cp ? cp.harvestedAt : new Date().toISOString();
-  const resumeCount = cp ? (cp.resumeCount || 0) + 1 : 0;
+  const sinceIso = st ? st.sinceIso : new Date(Date.now() - RECENCY_MONTHS * 30.44 * 86400000).toISOString().slice(0, 19) + 'Z';
+  const harvestedAt = st ? st.harvestedAt : new Date().toISOString();
+  const resumeCount = st ? st.resumeCount : 0;
 
-  const positions = new Map(cp ? cp.positions : []);   // posQid → { label, country, classKey }
-  const posByClass = new Map(cp ? cp.posByClass : []); // classKey → [posQid]
-  const holderRows = cp ? cp.holderRows : [];
-  const classHolders = cp ? cp.classHolders : {};      // classKey → holder rows (across resumes)
-  let batchTotal = cp ? cp.batchTotal : 0;
-  let batchFailed = cp ? cp.batchFailed : 0;
+  const positions = st ? st.positions : new Map();   // posQid → { label, country, classKey }
+  const posByClass = st ? st.posByClass : new Map(); // classKey → [posQid]
+  const holderRows = st ? st.holderRows : [];
+  const classHolders = st ? st.classHolders : {};    // classKey → holder rows (across resumes)
+  let batchTotal = st ? st.batchTotal : 0;
+  let batchFailed = st ? st.batchFailed : 0;
 
   const pause = (phase, extra) => {
     writeFileSync(cpFile, JSON.stringify({
@@ -332,13 +378,13 @@ async function harvest(outfile) {
     process.exit(RESUME_EXIT_CODE);
   };
 
-  if (cp) {
-    console.log(`pep-worldwide: RESUMING from checkpoint (resume ${resumeCount}/${PEP_MAX_RESUMES}, phase ${cp.phase}, ${holderRows.length} holder rows banked, window since ${sinceIso})`);
+  if (st) {
+    console.log(`pep-worldwide: RESUMING from checkpoint (resume ${resumeCount}/${PEP_MAX_RESUMES}, phase ${st.phase}, ${holderRows.length} holder rows banked, window since ${sinceIso})`);
   } else {
     console.log(`pep-worldwide: harvesting (recency window ${RECENCY_MONTHS} months → since ${sinceIso})`);
   }
 
-  if (!cp) {
+  if (!st) {
     for (const cls of PEP_ROOT_CLASSES) {
       /* A required class whose P279* enumeration times out is a transient WDQS
          failure, not "the class is empty" — retry hard, and only fail loudly if
@@ -363,9 +409,9 @@ async function harvest(outfile) {
   /* Holders phase. Resume indices address the position ARRAY (posIdx), not
      batch ordinals, so a changed HOLDER_BATCH between runs cannot skew the
      restart point. A labels-phase checkpoint skips this loop entirely. */
-  const startClass = cp && cp.phase === 'holders' ? cp.next.classIdx : 0;
-  const startPos = cp && cp.phase === 'holders' ? cp.next.posIdx : 0;
-  if (!cp || cp.phase === 'holders') {
+  const startClass = st && st.phase === 'holders' ? st.next.classIdx : 0;
+  const startPos = st && st.phase === 'holders' ? st.next.posIdx : 0;
+  if (!st || st.phase === 'holders') {
     for (let ci = startClass; ci < PEP_ROOT_CLASSES.length; ci++) {
       const cls = PEP_ROOT_CLASSES[ci];
       const qids = posByClass.get(cls.key) || [];
@@ -401,10 +447,10 @@ async function harvest(outfile) {
 
   /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
   let personQids, names, labelStart;
-  if (cp && cp.phase === 'labels') {
-    personQids = cp.labelQids;
-    names = new Map(cp.names);
-    labelStart = cp.next.labelIdx;
+  if (st && st.phase === 'labels') {
+    personQids = st.labelQids;
+    names = st.names;
+    labelStart = st.next.labelIdx;
     console.log(`pep-worldwide: resuming names at ${labelStart}/${personQids.length} (${names.size} banked)`);
   } else {
     personQids = [...new Set(holderRows.map(r => r.person))];
