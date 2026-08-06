@@ -61,6 +61,14 @@ jobs:
       && github.event.workflow_run.event != 'workflow_run'
     permissions:
       actions: write   # read run history + dispatch the resume
+    # Its OWN concurrency group. Inheriting the workflow-level one would put the
+    # watchdog in the same queue as the harvest it is trying to restart: it
+    # would sit pending behind an in-flight link, and a later run entering the
+    # group would cancel it as a superseded pending run — silently losing the
+    # restart. That is the exact failure this job exists to prevent.
+    concurrency:
+      group: "${{ github.workflow }}-watchdog"
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
