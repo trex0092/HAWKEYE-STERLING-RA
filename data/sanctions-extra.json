@@ -16,11 +16,11 @@
       "id": "idb-debarment",
       "name": "IDB — Dataset of Sanctioned Firms & Individuals (MDB cross-debarment)",
       "jurisdiction": "Global (MDB)",
-      "url": "https://mydata.iadb.org/api/3/action/package_search?q=sanctioned+firms+debarment&rows=10",
-      "type": "json",
+      "url": "https://mydata.iadb.org/api/views/vsju-qrtz/rows.csv?accessType=DOWNLOAD",
+      "type": "csv",
       "parser": "socrata",
       "enabled": false,
-      "_note": "Inter-American Development Bank debarment dataset (2010 MDB Mutual-Enforcement cross-debarments: World Bank/ADB/AfDB/EBRD), ~1,500 firms/individuals; debarment (procurement-integrity) tier, not financial sanctions. STILL DISABLED — the dataset migrated off Socrata to a CKAN portal (probe 2026-08-05, run 31030989375: rows.csv now returns the CKAN 2.11.4 portal HTML). URL retargeted 2026-08-06 at the CKAN package_search API purely as a PROBE DISCOVERY target: the probe's JSON/link reconnaissance should surface the dataset's resource download URL (result.results[].resources[].url). Wire that URL + parser and enable only after it proves from a runner.",
+      "_note": "Inter-American Development Bank debarment dataset (2010 MDB Mutual-Enforcement cross-debarments), ~1,500 firms/individuals; debarment tier, not financial sanctions. DISABLED — probe trail: the dataset migrated Socrata → CKAN (2026-08-05: rows.csv answers with the CKAN dataset page carrying doi:10.60966/7pfpgt0f); the standard CKAN API mount 404s (2026-08-06, run 31069175736: /api/3/action/package_search → nginx 404). URL reverted to the old Socrata route as a probe DISCOVERY target: it lands on the migrated dataset's page, and the probe's link extraction should surface the CKAN /resource/<id>/download/ CSV URL to wire. parser 'socrata' still unimplemented — map the proven CSV before enabling.",
       "minNames": 200
     },
     {
@@ -427,7 +427,7 @@
       "type": "html",
       "parser": "curated",
       "enabled": false,
-      "_note": "African Development Bank debarred-entities list (2010 MDB Mutual-Enforcement cross-debarments plus AfDB's own). DISABLED PROBE STUB 2026-08-06: the CSV export route was documented in the 2026-08-05 survey but the exact dataset path was unverifiable from the sandbox (egress-blocked). This URL is the public debarred-entities page — a probe DISCOVERY target for the link-extraction reconnaissance to surface the real CSV/XLSX export URL. Wire that URL + parser and enable only after it proves from a runner. If the page 404s, read the redirect/landing the probe reports and adjust.",
+      "_note": "African Development Bank debarred-entities list. DISABLED on probe evidence (2026-08-06, run 31069175736): www.afdb.org answers 403 with a Cloudflare JS challenge ('Just a moment...') — a keyless single-GET cannot pass, same class as NZ MFAT's Imperva gate. Curated path via the four-eyes SOP, or revisit if AfDB publishes the list on an unchallenged host. ADB (enabled above) already carries the 2010 Mutual-Enforcement cross-debarments, so the marginal gap is AfDB's own non-cross-debarred remainder.",
       "minNames": 100
     },
     {
@@ -452,11 +452,11 @@
       "id": "za-fic-tfs",
       "name": "South Africa — FIC Targeted Financial Sanctions List (XML)",
       "jurisdiction": "South Africa",
-      "url": "https://tfs.fic.gov.za/Pages/TFSListDownload?fileType=xml",
+      "url": "https://tfs.fic.gov.za/Pages/DownloadList",
       "type": "xml",
       "parser": "un",
       "enabled": false,
-      "_note": "South Africa FIC Targeted Financial Sanctions list. DISABLED 2026-08-05 on probe evidence: the configured URL (?fileType=xml on /Pages/TFSListDownload) returns an HTML LANDING PAGE ('TFS list downloads'), not the XML file — the real download-handler URL must be read off that page (a browser/curated step; the runner can reach the host, so this is a URL-discovery task, not a reachability block). Re-probe candidate once the direct file URL is captured.",
+      "_note": "South Africa FIC Targeted Financial Sanctions list. DISABLED — probe trail: ?fileType=xml returns an HTML landing page (2026-08-05), and link-discovery (2026-08-06, run 31069175736) shows that page's own 'xml' link is SELF-REFERENTIAL (the same ?fileType=xml URL) — the download is not a plain GET at that route. URL retargeted at the page's one unexplored route, /Pages/DownloadList, as a probe DISCOVERY target. If that also dead-ends in HTML, the handler likely needs a session/Referer two-step a single-GET fetcher deliberately does not do — curated path then. parser 'un' stays for the day a direct XML URL proves.",
       "minNames": 400
     },
     {
