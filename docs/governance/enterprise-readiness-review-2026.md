@@ -326,7 +326,14 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 60 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+Verified at HEAD: 61 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(6 August — **PEP chain watchdog**. One workflow (`pep-chain-watchdog.yml`, egress-blocked) that
+restarts a PEP harvest link whose GitHub-hosted runner died abnormally. The harvest's own
+time-budget pause cannot cover that case: a dead runner never reaches its re-dispatch step, so the
+chain stopped three times with banked work stranded on the state branch. The watchdog checks out
+nothing and executes no repository code — it reads the harvest's run history and POSTs a
+workflow_dispatch, bounded to two auto-restarts before failing red. Availability of an existing
+control only — nothing screened, no state written, no scored control changed.)*
 *(5 August, third pass — **source-probe diagnostic instrument**. One dispatch-only workflow
 (`source-probe.yml` + `scripts/source-probe.mjs`) that fetches sources already configured in the
 screening registry (by id — the input cannot aim it at an arbitrary URL) with realistic browser
