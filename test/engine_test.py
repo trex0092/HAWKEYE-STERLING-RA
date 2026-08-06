@@ -995,6 +995,27 @@ check("GDELT risk-term cluster is broad (global predicate coverage)", len(screen
 _gd_deep = screen.parse_gdelt({"articles": (
     [{"title": f"Neutral company update {i}", "domain": "x.com", "seendate": "20260801T000000Z"} for i in range(60)]
     + [{"title": "Firm charged in money laundering probe", "domain": "reuters.com", "seendate": "20260801T000000Z"}])})
+# OFAC's non-SDN programmes (SSI/FSE/NS-MBS/CAPTA/NS-PLC) ship in a SEPARATE
+# file the JS engine has always screened; a party listed only there was on no
+# list the Python engine loaded and screened CLEAR. Namespaced tags are matched
+# on their LOCAL name — a literal find("lastName") returns None against OFAC's
+# default namespace and would zero the whole list silently.
+_ofac_cons_xml = (
+    '<sdnList xmlns="http://tempuri.org/sdnList.xsd"><publshInformation>'
+    '<Publish_Date>08/06/2026</Publish_Date></publshInformation>'
+    '<sdnEntry><uid>1</uid><firstName>Ivan</firstName><lastName>Testov</lastName>'
+    '<akaList><aka><type>a.k.a.</type><lastName>TESTOV TRADING</lastName></aka></akaList>'
+    '</sdnEntry>'
+    '<sdnEntry><uid>2</uid><lastName>SSI Bank OJSC</lastName></sdnEntry></sdnList>')
+_oc_names, _oc_date, _oc_hash = screen.parse_ofac_consolidated(_ofac_cons_xml.encode())
+check("OFAC Consolidated (non-SDN) parses namespaced entries: person, entity and alias",
+      {"Ivan Testov", "TESTOV TRADING", "SSI Bank OJSC"} <= _oc_names and _oc_date == "08/06/2026")
+check("OFAC Consolidated: an unreachable or garbled body degrades to unavailable, never raises",
+      screen.parse_ofac_consolidated(b"")[1] == "unavailable"
+      and screen.parse_ofac_consolidated(b"<not-xml")[1] == "unavailable")
+check("OFAC Consolidated is loaded on BOTH list-building paths (a source only one path loads is the recurring defect)",
+      open("screen.py", encoding="utf-8").read().count("load_ofac_consolidated(all_lists, list_meta)") >= 2)
+
 # Non-Latin diacritic folding: tl is only .lower()-ed, so a Cyrillic ё/е variant
 # or an all-caps Greek headline that drops the tonos silently lost its hit.
 check("non-Latin keywords fold diacritics — Russian ё/е and Greek tonos variants still flag",
