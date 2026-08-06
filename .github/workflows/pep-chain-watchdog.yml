@@ -55,6 +55,7 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             api.github.com:443
+            *.githubapp.com:443
 
       - name: Restart the chain link (bounded by consecutive failures)
         env:

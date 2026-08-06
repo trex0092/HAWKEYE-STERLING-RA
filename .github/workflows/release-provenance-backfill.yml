@@ -37,6 +37,7 @@ jobs:
             uploads.github.com:443
             objects.githubusercontent.com:443
             release-assets.githubusercontent.com:443
+            *.githubapp.com:443
       - name: Copy each release's Sigstore bundle to the .intoto.jsonl name
         env:
           GH_TOKEN: ${{ github.token }}

@@ -67,8 +67,6 @@ jobs:
             api.anthropic.com:443
             sanctionslistservice.ofac.treas.gov:443
             wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
-            hosted-compute-watchdog-prod-iad-01.githubapp.com:443
-            hosted-compute-request-orchestrator-prod-iad-01.githubapp.com:443
             scsanctions.un.org:443
             unsolprodfiles.blob.core.windows.net:443
             umsanrp1dltx4dj3sxtt.blob.core.windows.net:443
@@ -84,6 +82,7 @@ jobs:
             www.wikidata.org:443
             query.wikidata.org:443
             api.fraudlabspro.com:443
+            *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # No credentials on disk (zizmor artipacked): the state push below
