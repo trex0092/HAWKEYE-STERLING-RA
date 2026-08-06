@@ -125,6 +125,7 @@ jobs:
             contas.tcu.gov.br:443
             tfs.fic.gov.za:443
             apim.adb.org:443
+            data.iadb.org:443
             omawww.sat.gob.mx:80
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

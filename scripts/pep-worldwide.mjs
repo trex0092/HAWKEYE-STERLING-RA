@@ -152,7 +152,7 @@ export function restoreCheckpoint(cp) {
     sinceIso: new Date(Date.parse(cp.sinceIso)).toISOString().slice(0, 19) + 'Z',
     harvestedAt: new Date(Date.parse(cp.harvestedAt)).toISOString(),
     resumeCount: (Number(cp.resumeCount) || 0) + 1,
-    phase: cp.phase === 'labels' ? 'labels' : 'holders',
+    phase: cp.phase === 'labels' ? 'labels' : (cp.phase === 'positions' ? 'positions' : 'holders'),
     positions, posByClass, holderRows, classHolders,
     batchTotal: Number(cp.batchTotal) || 0,
     batchFailed: Number(cp.batchFailed) || 0,
@@ -306,11 +306,21 @@ export function pepListFromDataset(dataset) {
 
 /* ── network part (harvest CLI only) ───────────────────────────────────── */
 
+/* Per-ATTEMPT hard timeout: chain link 1 of the checkpointed harvest died at
+   64 min with the budget pause never firing — the budget is only checked
+   BETWEEN requests, so a single hung socket (no timeout on fetch) stalls the
+   loop straight past the pause point until the runner dies. 90s covers the
+   WDQS 60s server-side kill with margin; a hung attempt becomes a retryable
+   error instead of an unbounded stall. */
+const ATTEMPT_TIMEOUT_MS = 90000;
+
 async function fetchJson(url, { tries = 6 } = {}) {
   let lastErr;
   for (let i = 0; i < tries; i++) {
+    const ctrl = new AbortController();
+    const kill = setTimeout(() => ctrl.abort(), ATTEMPT_TIMEOUT_MS);
     try {
-      const r = await fetch(url, { headers: { 'user-agent': UA, accept: 'application/sparql-results+json, application/json' } });
+      const r = await fetch(url, { signal: ctrl.signal, headers: { 'user-agent': UA, accept: 'application/sparql-results+json, application/json' } });
       if (r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503 || r.status === 504) {
         const ra = Number(r.headers.get('retry-after')) || (2 ** i * 5);
         console.error(`  http ${r.status} — backing off ${ra}s`);
@@ -323,6 +333,8 @@ async function fetchJson(url, { tries = 6 } = {}) {
     } catch (e) {
       lastErr = e;
       await new Promise(res => setTimeout(res, 2 ** i * 2000));
+    } finally {
+      clearTimeout(kill);
     }
   }
   throw lastErr || new Error('fetch failed');
@@ -384,8 +396,12 @@ async function harvest(outfile) {
     console.log(`pep-worldwide: harvesting (recency window ${RECENCY_MONTHS} months → since ${sinceIso})`);
   }
 
-  if (!st) {
+  if (!st || st.phase === 'positions') {
     for (const cls of PEP_ROOT_CLASSES) {
+      /* The positions phase is normally seconds per class, but a WDQS brownout
+         (retry backoffs stack up to minutes per class) could eat the whole
+         budget before the holders loop ever checks it — pause here too. */
+      if (overBudget()) pause('positions', { next: { classIdx: 0, posIdx: 0 } });
       /* A required class whose P279* enumeration times out is a transient WDQS
          failure, not "the class is empty" — retry hard, and only fail loudly if
          it STILL yields nothing after retries. Optional classes tolerate zero. */
@@ -411,7 +427,7 @@ async function harvest(outfile) {
      restart point. A labels-phase checkpoint skips this loop entirely. */
   const startClass = st && st.phase === 'holders' ? st.next.classIdx : 0;
   const startPos = st && st.phase === 'holders' ? st.next.posIdx : 0;
-  if (!st || st.phase === 'holders') {
+  if (!st || st.phase === 'positions' || st.phase === 'holders') {
     for (let ci = startClass; ci < PEP_ROOT_CLASSES.length; ci++) {
       const cls = PEP_ROOT_CLASSES[ci];
       const qids = posByClass.get(cls.key) || [];

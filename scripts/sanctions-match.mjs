@@ -391,6 +391,32 @@ export function parseCslCsv(body) {
   return names;
 }
 
+/* IDB Open Data "Dataset of Sanctioned firms and individuals" CSV (CKAN file
+   endpoint, keyless; proven live 2026-08-06 probe run 31070807037). Header:
+   Title,Entity,Nationality,Country,From,To,Prohibited Practice,Source,
+   Tipo de sancion del BID,IDB Sanction Source,Other Name — the sanctioned
+   party's name is `Title`, alternates in `Other Name`. Recall-monotone: every
+   row indexes (historical debarments included, like the ADB register). */
+export function parseIdbCsv(body) {
+  const rows = parseDelimited(body, ',');
+  if (rows.length < 2) return [];
+  const header = rows[0].map(c => c.trim().toLowerCase());
+  const nameIdx = header.indexOf('title');
+  const altIdx = header.indexOf('other name');
+  if (nameIdx < 0) return [];
+  const names = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const n = (r[nameIdx] || '').trim();
+    if (n) names.push(n);
+    if (altIdx >= 0) {
+      const a = (r[altIdx] || '').trim();
+      if (a) names.push(a);
+    }
+  }
+  return names;
+}
+
 /* Best-effort generic sanctions XML (Canada SEMA, Switzerland SECO and similar):
    join given/last name tags, take whole/entity name tags, and split alias tags.
    Returns [] if nothing recognisable is found (caller flags coverage degraded). */
@@ -800,6 +826,7 @@ export function parseList(source, body) {
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);
   if (p === 'opensanctions') return parseOpenSanctionsCsv(body); // targets.simple.csv mirrors (comma CSV: name + ;-separated aliases)
   if (p === 'csl') return parseCslCsv(body);                     // Trade.gov Consolidated Screening List (comma CSV: name + ;-separated alt_names)
+  if (p === 'idbcsv') return parseIdbCsv(body);                  // IDB sanctioned firms/individuals CSV (Title + Other Name columns)
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
   if (p === 'unjson') return parseUnJson(body);                 // UN-consolidated-list JSON (RePET personas/entidades: ordered name parts + ALIAS_NAME)
   if (p === 'json') return parseJsonList(body);

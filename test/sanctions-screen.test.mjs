@@ -10,7 +10,7 @@ import {
   whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
   getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay
 } from '../scripts/sanctions-screen.mjs';
-import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
+import { buildIndex, screenName, parseIdbCsv } from '../scripts/sanctions-match.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -922,6 +922,10 @@ check('PEP checkpoint: resume-count past the cap is FATAL — a non-converging h
   const u = pep.checkpointUsable({ ..._cpOk, resumeCount: pep.PEP_MAX_RESUMES });
   return u.ok === false && u.fatal === true;
 })());
+check('PEP checkpoint: a positions-phase pause restores as phase positions — resume re-enumerates, never sweeps a partial class list', (() => {
+  const st = pep.restoreCheckpoint({ v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z', resumeCount: 0, phase: 'positions', positions: [], posByClass: [], holderRows: [], classHolders: {}, batchTotal: 0, batchFailed: 0, next: { classIdx: 0, posIdx: 0 } });
+  return st.phase === 'positions' && st.posByClass.size === 0;
+})());
 check('PEP checkpoint: the time budget stays under the observed runner-death window; resumes are bounded',
   pep.PEP_TIME_BUDGET_MIN < 60 && pep.PEP_MAX_RESUMES >= 4 && pep.RESUME_EXIT_CODE === 75);
 check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned checkpoint cannot steer queries', (() => {
@@ -1006,6 +1010,24 @@ check('adb-debarment is enabled with a size/offset pagination config + coverage 
   !!_adb && _adb.enabled === true && _adb.paginate && _adb.paginate.dataPath === 'data'
   && _adb.paginate.totalPath === 'meta.totalItems' && Number(_adb.paginate.maxPages) > 0
   && Number(_adb.minNames) >= 500);
+
+/* ── IDB sanctioned firms/individuals CSV (probe-proven 2026-08-06: CKAN file
+   endpoint serves the entity table with Title + Other Name columns) ── */
+check('IDB CSV: Title + Other Name index, header skipped, BOM and quoted commas survive', (() => {
+  const csv = '﻿Title,Entity,Nationality,Country,From,To,Prohibited Practice,Source,Tipo de sancion del BID,IDB Sanction Source,Other Name\n'
+    + 'Juan Domingo Tablares Aliaga,Individual,Bolivia," Bolivia",2009-07-10T00:00,Ongoing," Fraud, Extortion",IDB,Debarment,SCOM,\n'
+    + 'Consultora Tecnodinámica S.R.L.,Firm,Paraguay," Paraguay",2009-02-09T00:00,Ongoing," Fraud",IDB,Debarment,SCOM,Tecnodinámica SRL\n';
+  const names = parseIdbCsv(csv);
+  return names.includes('Juan Domingo Tablares Aliaga')
+    && names.includes('Consultora Tecnodinámica S.R.L.') && names.includes('Tecnodinámica SRL')
+    && !names.some(n => /^Title$/i.test(n)) && names.length === 3;
+})());
+check('IDB CSV: a body without the Title column parses to [] (coverage floor takes over)',
+  parseIdbCsv('name,alias\nX,Y\n').length === 0 && parseIdbCsv('').length === 0);
+const _idb = extraReg.find(s => s.id === 'idb-debarment');
+check('idb-debarment is enabled on the probe-proven file endpoint with the idbcsv parser + floor',
+  !!_idb && _idb.enabled === true && _idb.parser === 'idbcsv'
+  && /data\.iadb\.org\/file\/download\//.test(_idb.url) && Number(_idb.minNames) >= 200);
 
 /* ── source probe (diagnostic instrument — pure functions) ── */
 const sp = await import('./../scripts/source-probe.mjs');
