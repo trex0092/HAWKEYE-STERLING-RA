@@ -827,10 +827,11 @@ def match_adverse_keywords(title: str) -> list:
     Latin-script foreign terms match on \b word boundaries (lower-cased, with a
     diacritic-folded fallback for all-caps Turkish-style headlines); Arabic terms
     match on the Arabic-normalised headline; other non-Latin scripts match by
-    substring on the LOWER-CASED headline — Cyrillic and Greek are cased scripts,
-    and the dictionary terms are lowercase, so matching against the raw headline
-    would miss every capitalized or all-caps headline. Order preserved, no
-    duplicates."""
+    substring on the LOWER-CASED headline, then on the diacritic-folded headline
+    — Cyrillic and Greek are cased scripts and the dictionary terms are
+    lowercase, so the raw headline would miss every capitalized or all-caps
+    headline, and the lower-cased headline alone still misses the ё/е and
+    tonos variants. Order preserved, no duplicates."""
     raw = title or ""
     tl = raw.lower()
     raw_ar = _normalize_ar(raw)
@@ -842,6 +843,17 @@ def match_adverse_keywords(title: str) -> list:
             hit = _normalize_ar(term) in raw_ar
         elif _NONLATIN_RE.search(term):
             hit = term in tl
+            if not hit:
+                # The same folded fallback the Latin branch gets below: tl is
+                # only .lower()-ed, which reaches a capitalised headline but not
+                # a diacritic variant. Cyrillic ё/е alternate freely in Russian
+                # copy ('осуждён' is routinely printed 'осужден') and Greek
+                # all-caps headlines drop the tonos ('απάτη' → 'ΑΠΑΤΗ'), so the
+                # raw substring silently loses the hit. _latin_fold is
+                # script-agnostic despite the name (NFD, strip combining marks,
+                # case-fold) and also unifies Greek final sigma ς→σ. No \b
+                # anchors: word boundaries do not apply in these scripts.
+                hit = _latin_fold(term) in _latin_fold(raw)
         else:
             # Both edges anchored: unlike the English entries (deliberate stems —
             # 'launder', 'smuggl' — that need open-ended prefix matching), the
@@ -1813,7 +1825,16 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                                  headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
                 if r.status_code == 200:
                     root = safe_xml_fromstring(r.content)
-                    for item in root.findall(".//item")[:max_results]:
+                    # SCAN EVERY ITEM THIS FETCH RETURNED. This used to read
+                    # only [:max_results] — 8 of the ~100 a locale feed carries —
+                    # and the broad pass queries the NAME ONLY, so those 8 are the
+                    # subject's freshest GENERAL headlines: an adverse story
+                    # ranked 9th was never keyword-scanned, never flagged, never
+                    # scored, invisible. Same defect class as the GDELT path
+                    # (parse_gdelt); the JS engine caps nothing, so this also
+                    # brings the two corpora back into agreement.
+                    fetched = []
+                    for item in root.findall(".//item"):
                         title_el = item.find("title")
                         source_el = item.find("source")
                         pubdate_el = item.find("pubDate")
@@ -1830,7 +1851,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                         # below a neutral headline. Tags stripped, bounded.
                         desc = _strip_rss_description(item.findtext("description") or "")
                         matched = adverse_keywords_for(title, desc)
-                        articles.append({
+                        fetched.append({
                             "title": title,
                             "source": source,
                             "date": pub_date,
@@ -1842,6 +1863,16 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                             "tier": keyword_tier(matched),
                             "categories": typology_for(matched),
                         })
+                    # Flagged first, neutral filler bounded — parse_gdelt's tail
+                    # applied per fetch: EVERY adverse item this locale surfaced
+                    # is carried through (scanning deeper must never be undone by
+                    # a bound), while unflagged carry-through stays at the old
+                    # per-fetch volume so dedup_stories' O(n^2) token compare and
+                    # the ranking cost are unchanged even on a full sweep.
+                    fl = [a for a in fetched if a["flagged"]]
+                    articles.extend(fl)
+                    articles.extend([a for a in fetched if not a["flagged"]][
+                        : max(0, max_results - len(fl))])
                     ok = True
             except Exception as e:
                 ok = False

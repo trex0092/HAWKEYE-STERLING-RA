@@ -995,6 +995,12 @@ check("GDELT risk-term cluster is broad (global predicate coverage)", len(screen
 _gd_deep = screen.parse_gdelt({"articles": (
     [{"title": f"Neutral company update {i}", "domain": "x.com", "seendate": "20260801T000000Z"} for i in range(60)]
     + [{"title": "Firm charged in money laundering probe", "domain": "reuters.com", "seendate": "20260801T000000Z"}])})
+# Non-Latin diacritic folding: tl is only .lower()-ed, so a Cyrillic ё/е variant
+# or an all-caps Greek headline that drops the tonos silently lost its hit.
+check("non-Latin keywords fold diacritics — Russian ё/е and Greek tonos variants still flag",
+      bool(screen.match_adverse_keywords("Компания осужден за отмывание денег"))
+      and bool(screen.match_adverse_keywords("ΑΠΑΤΗ ΣΤΗΝ ΕΤΑΙΡΕΙΑ")))
+
 check("GDELT: every fetched record is keyword-scanned — an adverse headline ranked 61st is still flagged",
       any(a["flagged"] for a in _gd_deep))
 check("GDELT: flagged articles rank first so the parser's own bound never drops adverse evidence",
