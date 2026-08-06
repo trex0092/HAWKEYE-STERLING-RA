@@ -167,7 +167,14 @@ jobs:
           node -e '
             const fs = require("fs");
             let cp = null, d = null;
-            try { cp = JSON.parse(fs.readFileSync("data/pep-worldwide-checkpoint.json", "utf8")); } catch { cp = null; }
+            // The checkpoint is gzipped (it carries hundreds of MB of harvest
+            // state uncompressed, and GitHub refuses a push over 100MB/file).
+            try {
+              const b = fs.readFileSync("data/pep-worldwide-checkpoint.json");
+              const t = (b[0] === 0x1f && b[1] === 0x8b)
+                ? require("zlib").gunzipSync(b).toString("utf8") : b.toString("utf8");
+              cp = JSON.parse(t);
+            } catch { cp = null; }
             try { d = JSON.parse(fs.readFileSync("data/pep-worldwide.json", "utf8")); } catch { d = null; }
             const L = cp
               ? ["# PEP worldwide harvest — paused at the time budget", "",
