@@ -73,11 +73,19 @@ jobs:
           # anywhere in that run of failures resets the count, so an unlucky
           # link is retried and a reproducibly broken one is not: at most two
           # auto-restarts, then the chain stops and says so.
+          #
+          # Only schedule/dispatch runs are harvest LINKS. A malformed workflow
+          # file also lands in this history as zero-duration "push" runs — that
+          # is GitHub rejecting the file, not a harvest that tried and failed.
+          # Counting those burns the cap on config noise: three such runs from
+          # one bad commit would have made the watchdog refuse its first real
+          # restart. Judge the harvest on runs that actually harvested.
           streak=$(node -e '
             const r = JSON.parse(require("fs").readFileSync("runs.json", "utf8")).workflow_runs || [];
+            const isLink = w => w.event === "schedule" || w.event === "workflow_dispatch";
             let n = 0;
             for (const w of r) {
-              if (w.status !== "completed") continue;
+              if (!isLink(w) || w.status !== "completed") continue;
               if (w.conclusion === "failure") { n++; continue; }
               break;
             }
