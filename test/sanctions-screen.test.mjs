@@ -837,9 +837,11 @@ check('CSL: SDN-source rows are dropped (already screened via the OFAC feeds)',
 
 /* ── worldwide PEP list (Wikidata harvest — pure functions) ── */
 const pep = await import('./../scripts/pep-worldwide.mjs');
-check('PEP harvest: positions query walks P279* from the root class with English labels',
+check('PEP harvest: positions query is a bare DISTINCT P279* walk — no label service, no OPTIONALs (the 2026-08-06 9MB truncation at the WDQS 60s kill)',
   pep.positionsQuery('Q48352').includes('wdt:P279* wd:Q48352')
-  && pep.positionsQuery('Q48352').includes('wikibase:label'));
+  && pep.positionsQuery('Q48352').includes('SELECT DISTINCT ?pos')
+  && !pep.positionsQuery('Q48352').includes('wikibase:label')
+  && !/OPTIONAL/i.test(pep.positionsQuery('Q48352')));
 const _hq = pep.holdersQuery(['Q11696', 'Q14212'], '2024-08-05T00:00:00Z');
 check('PEP harvest: holders query batches positions via VALUES at BestRank with the recency filter',
   _hq.includes('VALUES ?pos { wd:Q11696 wd:Q14212 }') && _hq.includes('wikibase:BestRank')
