@@ -20,6 +20,22 @@ on:
   schedule:
     - cron: '17 2 * * 0'   # Sundays 02:17 UTC — artifact is ready for Monday's daily screens
   workflow_dispatch:
+  # A GitHub-hosted runner can die abnormally mid-harvest (observed three times:
+  # the job ends "failure" with the harvest step still in_progress and the later
+  # steps never reached). The in-run re-dispatch cannot cover that — a dead
+  # runner does not execute its own recovery step, so the chain simply STOPPED
+  # with hours of banked work sitting on the state branch. This event fires from
+  # OUTSIDE the dead run and restarts the link.
+  #
+  # Safe use of workflow_run: the watchdog job checks out NOTHING and executes
+  # no repository code — it reads this workflow's own run history and POSTs a
+  # workflow_dispatch. The only trigger it can ever observe is THIS workflow,
+  # which is reachable solely by schedule and manual dispatch (both require
+  # write access), never from a pull request, so no untrusted input reaches the
+  # privileged context. Do NOT add a checkout to that job.
+  workflow_run:                     # zizmor: ignore[dangerous-triggers]
+    workflows: ["PEP Worldwide Harvest"]
+    types: [completed]
 
 # Least privilege: the workflow token is READ-ONLY at top level; the single
 # job below elevates only the two scopes it actually uses. A top-level write
@@ -32,7 +48,79 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Chain watchdog: restarts a link whose runner died abnormally. Runs only for
+  # the workflow_run event, and only for a FAILED run that was itself a
+  # schedule/dispatch link — never for another watchdog run, so the event cannot
+  # chain into itself. Bounded by CONSECUTIVE failures read back from the API: a
+  # harvest that is genuinely broken (rather than unlucky) stops the chain and
+  # fails RED instead of re-dispatching forever.
+  resume-after-abnormal-death:
+    if: >-
+      github.event_name == 'workflow_run'
+      && github.event.workflow_run.conclusion == 'failure'
+      && github.event.workflow_run.event != 'workflow_run'
+    permissions:
+      actions: write   # read run history + dispatch the resume
+    # Its OWN concurrency group. Inheriting the workflow-level one would put the
+    # watchdog in the same queue as the harvest it is trying to restart: it
+    # would sit pending behind an in-flight link, and a later run entering the
+    # group would cancel it as a superseded pending run — silently losing the
+    # restart. That is the exact failure this job exists to prevent.
+    concurrency:
+      group: "${{ github.workflow }}-watchdog"
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      - name: Restart the chain link (bounded by consecutive failures)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MAX_ABNORMAL: '3'
+          # Passed via env, never interpolated into the shell: a ref name is
+          # attacker-influencable text and `${{ }}` inside run: is a template
+          # injection (zizmor). The payload is built with JSON.stringify.
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          api() { curl -sSf -H "authorization: Bearer ${GITHUB_TOKEN}" -H "accept: application/vnd.github+json" "$@"; }
+          api "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pep-worldwide.yml/runs?per_page=20" > runs.json
+          # Count failures at the head of the history, ignoring watchdog runs —
+          # they are bookkeeping, not harvest links. A success anywhere in that
+          # run of failures resets the count, so an unlucky link is retried and
+          # a reproducibly broken one is not.
+          streak=$(node -e '
+            const r = JSON.parse(require("fs").readFileSync("runs.json", "utf8")).workflow_runs || [];
+            let n = 0;
+            for (const w of r) {
+              if (w.event === "workflow_run" || w.status !== "completed") continue;
+              if (w.conclusion === "failure") { n++; continue; }
+              break;
+            }
+            console.log(n);
+          ')
+          echo "consecutive failed harvest links: ${streak} (cap ${MAX_ABNORMAL})"
+          if [ "$streak" -ge "$MAX_ABNORMAL" ]; then
+            echo "::error::PEP harvest chain has failed ${streak} links in a row — NOT re-dispatching. The checkpoint on pep-worldwide-state is intact; investigate the harvest step log before resuming."
+            exit 1
+          fi
+          payload=$(node -e 'process.stdout.write(JSON.stringify({ ref: process.env.HEAD_BRANCH }))')
+          curl -sSf -X POST \
+            -H "authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pep-worldwide.yml/dispatches" \
+            -d "$payload"
+          echo "resume dispatched — the run resumes from the committed checkpoint"
+
   harvest:
+    if: github.event_name != 'workflow_run'
     # contents: write — the harvest pushes the artifact + checkpoint to the
     # pep-worldwide-state data branch (branch protection keeps main closed).
     # actions: write — a time-budget-paused run re-dispatches THIS workflow so
@@ -167,15 +255,17 @@ jobs:
           node -e '
             const fs = require("fs");
             let cp = null, d = null;
-            // The checkpoint is gzipped (it carries hundreds of MB of harvest
-            // state uncompressed, and GitHub refuses a push over 100MB/file).
-            try {
-              const b = fs.readFileSync("data/pep-worldwide-checkpoint.json");
+            // Both files are gzipped (uncompressed they carry hundreds of MB of
+            // harvest state / multilingual aliases, and GitHub refuses a push
+            // over 100MB/file). Read either format.
+            const readMaybeGz = (f) => {
+              const b = fs.readFileSync(f);
               const t = (b[0] === 0x1f && b[1] === 0x8b)
                 ? require("zlib").gunzipSync(b).toString("utf8") : b.toString("utf8");
-              cp = JSON.parse(t);
-            } catch { cp = null; }
-            try { d = JSON.parse(fs.readFileSync("data/pep-worldwide.json", "utf8")); } catch { d = null; }
+              return JSON.parse(t);
+            };
+            try { cp = readMaybeGz("data/pep-worldwide-checkpoint.json"); } catch { cp = null; }
+            try { d = readMaybeGz("data/pep-worldwide.json"); } catch { d = null; }
             const L = cp
               ? ["# PEP worldwide harvest — paused at the time budget", "",
                  "Phase **" + cp.phase + "**, resume " + cp.resumeCount + " — "
