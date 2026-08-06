@@ -167,12 +167,17 @@ export function restoreCheckpoint(cp) {
   };
 }
 
+/* QID-only on purpose: the original query joined the label SERVICE plus two
+   OPTIONAL country clauses onto the full P279* walk, and on 2026-08-06 the
+   head-of-government enumeration streamed ~9MB before WDQS's 60s kill cut the
+   connection mid-body (JSON truncated at position 8964448 on every retry) —
+   the same overweight query most plausibly underlies the earlier multi-hour
+   stalls. A bare DISTINCT walk is cheap and small; position labels come from
+   wbgetentities afterwards (the same hang-proof chunked path person labels
+   use), and the country context rides the label pass when available. */
 export function positionsQuery(rootQid) {
-  return 'SELECT ?pos ?posLabel ?countryLabel WHERE {\n'
+  return 'SELECT DISTINCT ?pos WHERE {\n'
     + `  ?pos wdt:P279* wd:${rootQid} .\n`
-    + '  OPTIONAL { ?pos wdt:P17 ?country }\n'
-    + '  OPTIONAL { ?pos wdt:P1001 ?country }\n'
-    + '  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }\n'
     + '}';
 }
 
@@ -410,7 +415,7 @@ async function harvest(outfile) {
       const qids = [];
       for (const r of rows) {
         if (!r.pos || !/^Q\d+$/.test(r.pos)) continue;
-        if (!positions.has(r.pos)) positions.set(r.pos, { label: r.posLabel || '', country: r.countryLabel || '', classKey: cls.key });
+        if (!positions.has(r.pos)) positions.set(r.pos, { label: '', country: '', classKey: cls.key });
         qids.push(r.pos);
       }
       posByClass.set(cls.key, [...new Set(qids)]);
@@ -419,6 +424,22 @@ async function harvest(outfile) {
         console.error(`pep-worldwide: root class ${cls.key} (${cls.qid}) enumerated ZERO position items (query ${pdata ? 'returned empty' : 'failed after retries'}) — refusing a hollow harvest`);
         process.exit(1);
       }
+    }
+    /* Office labels via wbgetentities (chunked, hang-proofed) — kept OUT of
+       the SPARQL walk so the enumeration stays under the WDQS kill. A lost
+       chunk leaves those offices labeled by their QID (buildPepDataset falls
+       back to the position QID); PERSON-name recall is untouched either way. */
+    const posQids = [...positions.keys()];
+    for (let i = 0; i < posQids.length; i += LABEL_CHUNK) {
+      if (overBudget()) pause('positions', { next: { classIdx: 0, posIdx: 0 } });
+      const data = await fetchJsonSafe(labelsUrl(posQids.slice(i, i + LABEL_CHUNK)));
+      if (data) {
+        for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
+          const p = positions.get(qid);
+          if (p) p.label = namesFromEntity(ent).name || p.label;
+        }
+      }
+      if ((i / LABEL_CHUNK) % 40 === 0) console.log(`  office labels: ${Math.min(i + LABEL_CHUNK, posQids.length)}/${posQids.length}`);
     }
   }
 
