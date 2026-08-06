@@ -8,7 +8,7 @@ import {
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
   whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
-  getByPath, fetchPaginatedJson
+  getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
 import { readFileSync } from 'node:fs';
@@ -964,15 +964,38 @@ check('getByPath walks a dotted path and tolerates a missing branch',
   const merged = JSON.parse(body);
   check('fetchPaginatedJson collects EVERY page (offset steps by real page length, not the size hint)',
     merged.data.length === TOTAL && merged.data[0].attributes.name === 'FIRM 0' && merged.data[22].attributes.name === 'FIRM 22');
-  // maxPages cap: a server that never reports exhaustion is bounded, not infinite.
+  // maxPages cap: a server that never reports exhaustion (NO total) is bounded.
   let calls = 0;
   globalThis.fetch = async (u) => {
     calls++;
     const off = Number(new URL(u).searchParams.get('offset'));
-    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 99999 }, data: [{ attributes: { name: 'X' + off } }] }) };
+    return { ok: true, text: async () => JSON.stringify({ data: [{ attributes: { name: 'X' + off } }] }) };
   };
   const capped = JSON.parse(await fetchPaginatedJson('https://apim.example/y', {}, { maxPages: 5, dataPath: 'data', totalPath: 'meta.totalItems' }, undefined, 'cap-test'));
-  check('fetchPaginatedJson is bounded by maxPages (never an infinite crawl)', capped.data.length === 5 && calls === 5);
+  check('fetchPaginatedJson bounds a feed that reports no total (never an infinite crawl)', capped.data.length === 5 && calls === 5);
+  // No truncation by configuration: a server-reported total AUTO-EXTENDS the
+  // crawl past maxPages — a register that grows never silently thins.
+  const GROWN = 60;
+  let calls2 = 0;
+  globalThis.fetch = async (u) => {
+    calls2++;
+    const off = Number(new URL(u).searchParams.get('offset'));
+    const rows = [];
+    for (let i = off; i < Math.min(off + 10, GROWN); i++) rows.push({ attributes: { name: 'G' + i } });
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: GROWN }, data: rows }) };
+  };
+  const grown = JSON.parse(await fetchPaginatedJson('https://apim.example/z', {}, { maxPages: 3, dataPath: 'data', totalPath: 'meta.totalItems', size: 10 }, undefined, 'grow-test'));
+  check('fetchPaginatedJson auto-extends past maxPages to the server-reported total (unlimited coverage)',
+    grown.data.length === GROWN && calls2 === 6);
+  // ...but a hostile/buggy total is still bounded by the absolute hard cap.
+  let calls3 = 0;
+  globalThis.fetch = async (u) => {
+    calls3++;
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 1e9 }, data: [{ attributes: { name: 'H' + calls3 } }] }) };
+  };
+  const hostile = JSON.parse(await fetchPaginatedJson('https://apim.example/h', {}, { maxPages: 5, dataPath: 'data', totalPath: 'meta.totalItems' }, undefined, 'hostile-test'));
+  check('fetchPaginatedJson hard-caps a hostile reported total (runaway guard, loudly partial)',
+    hostile.data.length === PAGINATE_HARD_CAP && calls3 === PAGINATE_HARD_CAP);
   globalThis.fetch = realFetch;
 }
 /* The ADB source is ENABLED and read via the size/offset paginator; it carries a

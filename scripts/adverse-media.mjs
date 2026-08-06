@@ -439,10 +439,12 @@ export const GDELT_RISK_TERMS = [
 export function gdeltUrl(name, terms = GDELT_RISK_TERMS) {
   const q = '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
   const span = String(process.env.ADVERSE_MEDIA_TIMESPAN || '12m');
-  /* GDELT caps maxrecords at 250; default stays 75 (the tuned value that keeps
-     responses small enough not to trip GDELT's per-IP throttle on shared
-     runners) but is raisable without a code change for a deeper sweep. */
-  const maxRec = Math.max(1, Math.min(250, Number(process.env.ADVERSE_MEDIA_MAXRECORDS) || 75));
+  /* GDELT caps maxrecords at 250 — fetch at the API maximum by default: the
+     screen's mandate is maximum worldwide recall, and this is one request per
+     subject either way (volume, not request rate). Scoring downstream gates
+     precision. ADVERSE_MEDIA_MAXRECORDS lowers it without a code change if a
+     shared runner ever trips GDELT's per-IP throttle. */
+  const maxRec = Math.max(1, Math.min(250, Number(process.env.ADVERSE_MEDIA_MAXRECORDS) || 250));
   return 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q)
     + '&mode=artlist&format=json&maxrecords=' + maxRec + '&sort=datedesc&timespan=' + encodeURIComponent(span);
 }
