@@ -43,6 +43,7 @@
    Usage: node scripts/pep-worldwide.mjs harvest <outfile>
    Pure helpers are exported for the unit suite; only harvest() networks. */
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { pathToFileURL } from 'node:url';
 
 export const PEP_LIST_NAME = 'PEP (Worldwide — Wikidata)';
@@ -101,6 +102,29 @@ export const RESUME_EXIT_CODE = 75;   // EX_TEMPFAIL — planned pause, not a fa
 
 export function checkpointPath(outfile) {
   return outfile.replace(/\.json$/i, '') + '-checkpoint.json';
+}
+
+/* The checkpoint is GZIPPED on disk. It holds every holder row and, in the
+   labels phase, every banked person's names in EVERY language — the first live
+   harvest reached 60MB of holder rows alone (~809k rows) and the names payload
+   projects to several hundred MB. GitHub REFUSES a push containing a file over
+   100MB, so an uncompressed checkpoint would take the whole chain down at the
+   exact moment it had the most work banked. JSON of this shape compresses
+   ~10-15x, which keeps the file far under the limit WITHOUT cutting harvest
+   scope (no recall is traded for it). zlib is stdlib — no runtime dependency.
+
+   Reads accept BOTH formats (gzip magic 1f 8b, else plain JSON) so a checkpoint
+   written before this change still resumes instead of being discarded as
+   "unrecognized" — losing hours of banked WDQS work. The path keeps its .json
+   name: the workflow's overlay/persist steps address it literally, and git
+   handles the binary content fine. */
+export function readCheckpoint(file) {
+  const buf = readFileSync(file);
+  const text = (buf[0] === 0x1f && buf[1] === 0x8b) ? gunzipSync(buf).toString('utf8') : buf.toString('utf8');
+  return JSON.parse(text);
+}
+export function writeCheckpoint(file, obj) {
+  writeFileSync(file, gzipSync(Buffer.from(JSON.stringify(obj), 'utf8')));
 }
 
 /* Can this checkpoint be resumed? Three outcomes: resume it (ok), silently
@@ -363,7 +387,7 @@ async function harvest(outfile) {
   /* Read-and-catch, no existence pre-check (CodeQL js/file-system-race):
      an absent or unreadable checkpoint simply means a fresh harvest. */
   let cp = null;
-  try { cp = JSON.parse(readFileSync(cpFile, 'utf8')); } catch { cp = null; }
+  try { cp = readCheckpoint(cpFile); } catch { cp = null; }
   if (cp) {
     const use = checkpointUsable(cp);
     if (use.fatal) {
@@ -389,7 +413,7 @@ async function harvest(outfile) {
   let batchFailed = st ? st.batchFailed : 0;
 
   const pause = (phase, extra) => {
-    writeFileSync(cpFile, JSON.stringify({
+    writeCheckpoint(cpFile, ({
       v: 1, sinceIso, harvestedAt, resumeCount, phase,
       positions: [...positions], posByClass: [...posByClass],
       holderRows, classHolders, classBatchFailed, batchTotal, batchFailed, ...extra,

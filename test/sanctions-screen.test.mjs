@@ -971,6 +971,28 @@ check('PEP checkpoint: resume-count past the cap is FATAL — a non-converging h
   const u = pep.checkpointUsable({ ..._cpOk, resumeCount: pep.PEP_MAX_RESUMES });
   return u.ok === false && u.fatal === true;
 })());
+/* The checkpoint is GZIPPED: the first live harvest banked 60MB of holder rows
+   (~809k) before the labels phase even began, and GitHub REFUSES a push with a
+   file over 100MB — an uncompressed checkpoint would kill the chain exactly when
+   it held the most work. Reads must still accept a plain-JSON checkpoint written
+   before the change, or hours of banked WDQS work are discarded as "unrecognized". */
+{
+  const { writeFileSync: _wf, readFileSync: _rf, unlinkSync: _ul } = await import('node:fs');
+  const { gzipSync } = await import('node:zlib');
+  const tmp = (await import('node:os')).tmpdir() + '/pep-cp-test.json';
+  const obj = { v: 1, phase: 'holders', holderRows: [{ person: 'Q1', pos: 'Q2', end: '', classKey: 'minister' }] };
+  pep.writeCheckpoint(tmp, obj);
+  const raw = _rf(tmp);
+  check('PEP checkpoint is written GZIPPED (a >100MB plain file cannot be pushed at all)',
+    raw[0] === 0x1f && raw[1] === 0x8b && raw.length < JSON.stringify(obj).length + 64);
+  check('PEP checkpoint round-trips through gzip', pep.readCheckpoint(tmp).holderRows[0].person === 'Q1');
+  _wf(tmp, JSON.stringify(obj), 'utf8');           // legacy plain-JSON checkpoint
+  check('PEP checkpoint still READS a pre-gzip checkpoint (banked work is never discarded on a format change)',
+    pep.readCheckpoint(tmp).phase === 'holders');
+  _wf(tmp, gzipSync(Buffer.from(JSON.stringify(obj))));
+  check('PEP checkpoint reads a gzip buffer written externally', pep.readCheckpoint(tmp).v === 1);
+  try { _ul(tmp); } catch { /* best-effort cleanup */ }
+}
 check('PEP checkpoint: per-class batch failures ride the checkpoint (the zero-holders guard gates on ITS OWN class, not the global counter)', (() => {
   const st = pep.restoreCheckpoint({ v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
     resumeCount: 0, phase: 'holders', positions: [], posByClass: [], holderRows: [],
