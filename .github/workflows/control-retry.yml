@@ -27,8 +27,9 @@ on:
     - cron: '7 10 * * *'   # second pass — catches a retry that itself died; still before freshness (~11:07)
   workflow_dispatch:
 
+# Least privilege: read-only at top level; the healer job below elevates the
+# one scope it needs (Scorecard Token-Permissions).
 permissions:
-  actions: write   # read run history + fire workflow_dispatch on the controls
   contents: read
 
 concurrency:
@@ -37,6 +38,10 @@ concurrency:
 
 jobs:
   heal:
+    # actions: write — read run history + fire workflow_dispatch on the controls.
+    permissions:
+      actions: write
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
