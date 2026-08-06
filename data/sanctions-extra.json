@@ -16,11 +16,11 @@
       "id": "idb-debarment",
       "name": "IDB — Dataset of Sanctioned Firms & Individuals (MDB cross-debarment)",
       "jurisdiction": "Global (MDB)",
-      "url": "https://data.iadb.org/dataset/download/3a873ab8-20cb-4e12-9826-9abcdac3f51a/csv",
+      "url": "https://data.iadb.org/file/download/f5022f04-a3f1-4604-a099-5d562e3a0aa5",
       "type": "csv",
       "parser": "socrata",
       "enabled": false,
-      "_note": "Inter-American Development Bank sanctions dataset (2010 MDB Mutual-Enforcement cross-debarments), ~1,500 firms/individuals; debarment tier, not financial sanctions. DISCOVERY 2026-08-06 (probe run 31069809001): the migrated CKAN dataset page exposes a direct CSV export — url now points at it. Column names evidenced from the resource page anchors: Title (name), Other Name (alias), Entity, Nationality, Country, Prohibited Practice, From, To, Source, IDB Sanction Source. STILL DISABLED pending the final proof: a targeted probe of the CSV itself to confirm the header row, then wire the column mapping (parser follow-up) and enable.",
+      "_note": "Inter-American Development Bank sanctions dataset (2010 MDB Mutual-Enforcement cross-debarments), ~1,500 firms/individuals; debarment tier, not financial sanctions. Probe trail: /dataset/download/<id>/csv proved to be the dataset METADATA export (run 31070409925: columns author/citation/doi_publisher, 44KB), not the entity table. URL now points at the terminal candidate that same probe surfaced from BOTH the dataset page and the metadata row: the CKAN file endpoint /file/download/f5022f04-a3f1-4604-a099-5d562e3a0aa5 (resource cd0bd9ac-18c6-44bc-8592-9be468c2efd9; expected columns Title/Other Name/Entity/Nationality/Prohibited Practice/From/To). STILL DISABLED pending that file's header proof; wire the mapping + egress (data.iadb.org:443) and enable only after it parses.",
       "minNames": 200
     },
     {
