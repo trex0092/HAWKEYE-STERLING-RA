@@ -1,0 +1,97 @@
+name: PEP Chain Watchdog
+
+# Restarts a PEP harvest link whose runner died abnormally.
+#
+# The harvest is time-budgeted: it pauses at ~40 min, commits a checkpoint, and
+# re-dispatches itself to resume. That covers a PLANNED pause. It does not cover
+# a GitHub-hosted runner dying mid-run — observed three times, each ending with
+# the job "failure", the harvest step still in_progress, and every later step
+# never reached. The re-dispatch is one of those steps, so it never fired and
+# the chain simply STOPPED with hours of banked WDQS work sitting unclaimed on
+# the state branch. A dead runner cannot run its own recovery step, so the
+# restart has to come from outside the dead run.
+#
+# This lives in its own file because a workflow may not listen to its own
+# workflow_run event ("cannot listen to itself" — GitHub rejects the file
+# outright, which also breaks workflow_dispatch on it).
+
+on:
+  # Safe use of workflow_run: this job checks out NOTHING and executes no
+  # repository code — it reads the harvest's run history and POSTs a
+  # workflow_dispatch. The only workflow it observes is the PEP harvest, which
+  # is reachable solely by schedule and manual dispatch (both require write
+  # access), never from a pull request, so no untrusted input reaches the
+  # privileged context. Do NOT add a checkout to this workflow.
+  workflow_run:                     # zizmor: ignore[dangerous-triggers]
+    workflows: ["PEP Worldwide Harvest"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+# Its OWN concurrency group, deliberately NOT the harvest's: sharing one would
+# queue the watchdog behind the very link it is trying to restart, and a later
+# run entering that group cancels a superseded pending run — silently losing
+# the restart. That is the exact failure this workflow exists to prevent.
+concurrency:
+  group: "pep-chain-watchdog"
+  cancel-in-progress: false
+
+jobs:
+  resume-after-abnormal-death:
+    # Only a FAILED harvest link needs rescuing. A budget pause exits 0 (the run
+    # dispatches its own successor), and a refused hollow harvest is a loud
+    # failure worth one retry in case the upstream outage was transient.
+    if: github.event.workflow_run.conclusion == 'failure'
+    permissions:
+      actions: write   # read run history + dispatch the resume
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      - name: Restart the chain link (bounded by consecutive failures)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MAX_ABNORMAL: '3'
+          # Passed via env, never interpolated into the shell: a ref name is
+          # attacker-influencable text and `${{ }}` inside run: is a template
+          # injection (zizmor). The payload is built with JSON.stringify.
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          curl -sSf -H "authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pep-worldwide.yml/runs?per_page=20" > runs.json
+          # Count failures at the head of the harvest's history. A success
+          # anywhere in that run of failures resets the count, so an unlucky
+          # link is retried and a reproducibly broken one is not: at most two
+          # auto-restarts, then the chain stops and says so.
+          streak=$(node -e '
+            const r = JSON.parse(require("fs").readFileSync("runs.json", "utf8")).workflow_runs || [];
+            let n = 0;
+            for (const w of r) {
+              if (w.status !== "completed") continue;
+              if (w.conclusion === "failure") { n++; continue; }
+              break;
+            }
+            console.log(n);
+          ')
+          echo "consecutive failed harvest links: ${streak} (cap ${MAX_ABNORMAL})"
+          if [ "$streak" -ge "$MAX_ABNORMAL" ]; then
+            echo "::error::PEP harvest chain has failed ${streak} links in a row — NOT re-dispatching. The checkpoint on pep-worldwide-state is intact; investigate the harvest step log before resuming."
+            exit 1
+          fi
+          payload=$(node -e 'process.stdout.write(JSON.stringify({ ref: process.env.HEAD_BRANCH }))')
+          curl -sSf -X POST \
+            -H "authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pep-worldwide.yml/dispatches" \
+            -d "$payload"
+          echo "resume dispatched — the run resumes from the committed checkpoint"
