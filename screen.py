@@ -1504,8 +1504,19 @@ AR_RISK_QUERY = " OR ".join('"' + t + '"' for t in (
 # around the world" feed; it runs once per subject and is the broadest single
 # source, so it carries a rich predicate-offence cluster. The independent SECOND
 # feed, so adverse coverage never depends on Google News alone.
+# maxrecords: the API maximum (250) by default — one request per subject either
+# way, so this is volume not request rate; the keyword flagger downstream gates
+# precision. ADVERSE_MEDIA_MAXRECORDS lowers it (JS engine parity).
+def _gdelt_maxrec() -> int:
+    try:
+        n = int(os.environ.get("ADVERSE_MEDIA_MAXRECORDS", "") or 250)
+    except ValueError:
+        n = 250
+    return max(1, min(250, n))
+
 GDELT_URL = ("https://api.gdeltproject.org/api/v2/doc/doc?query={query}"
-             "&mode=artlist&format=json&maxrecords=75&sort=datedesc&timespan=12m")
+             "&mode=artlist&format=json&maxrecords=%d"
+             "&sort=datedesc&timespan=12m" % _gdelt_maxrec())
 # Comprehensive predicate-offence cluster (GDELT ANDs the subject name with this
 # OR-set). Broad by design — the multilingual keyword flagger downstream decides
 # what is actually adverse; this only widens what GDELT returns to be scanned.

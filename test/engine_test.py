@@ -990,6 +990,8 @@ check("ADVERSE_LOCALES accepts 'all' → full matrix",
       screen._resolve_locale_count("all", len(screen.GNEWS_LOCALES)) == len(screen.GNEWS_LOCALES)
       and screen._resolve_locale_count("5", 74) == 5 and screen._resolve_locale_count("bogus", 74) == 5)
 check("GDELT risk-term cluster is broad (global predicate coverage)", len(screen.GDELT_RISK_TERMS) >= 20)
+check("GDELT fetches at the API maximum page (250) — maximum worldwide recall (JS parity)",
+      "maxrecords=250" in screen.GDELT_URL and screen._gdelt_maxrec() == 250)
 
 _gd = screen.parse_gdelt({"articles": [
     {"title": "X Trading fined for sanctions evasion", "domain": "example.com",

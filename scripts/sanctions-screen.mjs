@@ -1137,9 +1137,15 @@ export function getByPath(obj, path) {
    rows under one key so the source's normal parser walks them unchanged. Opt-in
    per source via `source.paginate`; sources without it are untouched. The offset
    advances by the ACTUAL rows returned (not the requested size), so it collects
-   the full list whether the server honours the size hint or caps the page — and
-   a run that hits the page cap before the reported total logs LOUDLY and returns
-   what it has (the coverage floor then flags the partial). */
+   the full list whether the server honours the size hint or caps the page.
+
+   No truncation by configuration: when the server reports a total, the crawl
+   AUTO-EXTENDS past the configured maxPages to fetch every row — a register
+   that grows never silently thins. maxPages bounds only feeds that report no
+   total (an unverifiable endless feed), and PAGINATE_HARD_CAP bounds even a
+   hostile/buggy reported total. Hitting either bound short of the list logs
+   LOUDLY and the coverage floor flags the partial. */
+export const PAGINATE_HARD_CAP = 2000;   // absolute runaway guard, not a coverage policy
 export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = '') {
   const sizeParam = pg.sizeParam || 'size';
   const offsetParam = pg.offsetParam || 'offset';
@@ -1147,8 +1153,8 @@ export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = ''
   const dataPath = pg.dataPath || 'data';
   const maxPages = Math.max(1, Number(pg.maxPages) || 30);
   const all = [];
-  let offset = 0, total = null, page = 0;
-  for (; page < maxPages; page++) {
+  let offset = 0, total = null, page = 0, cap = maxPages;
+  for (; page < cap; page++) {
     const u = new URL(url);
     u.searchParams.set(sizeParam, String(size));
     u.searchParams.set(offsetParam, String(offset));
@@ -1161,10 +1167,15 @@ export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = ''
     if (!arr.length) break;                       // list exhausted
     all.push(...arr);
     offset += arr.length;                         // step by ACTUAL page length — robust to any server page size
-    if (Number.isFinite(total) && offset >= total) break;
+    if (Number.isFinite(total)) {
+      if (offset >= total) break;
+      // Extend to what the reported total actually needs at the observed page
+      // size — the configured maxPages is a floor, never a truncation.
+      cap = Math.min(PAGINATE_HARD_CAP, Math.max(cap, page + 1 + Math.ceil((total - offset) / arr.length)));
+    }
   }
-  if (page >= maxPages && (!Number.isFinite(total) || offset < total)) {
-    console.warn(`  ${sourceId || 'paginated source'}: pagination capped at ${maxPages} pages (${all.length}${Number.isFinite(total) ? ' of ' + total : ''} rows) — coverage PARTIAL, coverage floor will flag it`);
+  if (page >= cap && (!Number.isFinite(total) || offset < total)) {
+    console.warn(`  ${sourceId || 'paginated source'}: pagination capped at ${cap} pages (${all.length}${Number.isFinite(total) ? ' of ' + total : ''} rows) — coverage PARTIAL, coverage floor will flag it`);
   }
   return JSON.stringify({ [dataPath]: all });
 }
@@ -1206,11 +1217,13 @@ async function fetchListBody(source, timeoutMs = 60000) {
      take this path; every other source keeps the single-GET behaviour below. */
   if (source.paginate && !binary) {
     /* A small-page API (ADB caps size at 10) needs many sequential requests, so
-       the paginated fetch gets a budget scaled to the page cap — ~1s/page,
-       floored at the normal timeout and capped at 3 min — instead of the
-       single-GET timeout that would abort a long crawl mid-list. */
+       the paginated fetch gets a budget scaled to the page cap — ~1.5s/page,
+       floored at the normal timeout and capped at 5 min — instead of the
+       single-GET timeout that would abort a long crawl mid-list. Headroom is
+       deliberate: the crawl auto-extends past maxPages when the server-reported
+       total demands it (a grown register must fetch fully, never truncate). */
     const pages = Number(source.paginate.maxPages) || 30;
-    const pagTimeout = Math.min(180000, Math.max(timeoutMs, pages * 1000));
+    const pagTimeout = Math.min(300000, Math.max(timeoutMs, pages * 1500));
     return withTimeout((signal) => fetchPaginatedJson(parsed.href, headers, source.paginate, signal, source.id), pagTimeout);
   }
   return withTimeout(async (signal) => {

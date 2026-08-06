@@ -187,7 +187,7 @@ check('mapPool preserves order and runs every item under a concurrency bound',
   (await mapPool([1, 2, 3, 4, 5], 2, async n => n * 2)).join(',') === '2,4,6,8,10');
 
 check('gdeltUrl broadened default terms still target the global artlist JSON',
-  gdeltUrl('Acme Co').includes('maxrecords=75') && decodeURIComponent(gdeltUrl('Acme Co')).includes('terrorist financing'));
+  gdeltUrl('Acme Co').includes('maxrecords=250') && decodeURIComponent(gdeltUrl('Acme Co')).includes('terrorist financing'));
 
 /* ── GDELT term-set alignment (JS backbone widened to the Python comprehensive
    set) + worldwide language expansion (2026-08-05, adversarially-verified) ── */
@@ -198,14 +198,16 @@ check('GDELT query carries the full predicate-offence cluster incl. proliferatio
 check('gdeltUrl query includes the widened terms (GDELT translates → reaches every language)',
   ['proliferation financing', 'organized crime', 'narcotics', 'asset freeze']
     .every(t => decodeURIComponent(gdeltUrl('Acme Co')).includes(t)));
-check('gdeltUrl maxrecords is env-tunable and clamps to GDELT max 250', (() => {
+check('gdeltUrl fetches at the GDELT API max (250) by default, env-tunable and clamped', (() => {
   const prev = process.env.ADVERSE_MEDIA_MAXRECORDS;
   process.env.ADVERSE_MEDIA_MAXRECORDS = '9999';
   const clamped = gdeltUrl('X').includes('maxrecords=250');
+  process.env.ADVERSE_MEDIA_MAXRECORDS = '40';
+  const tuned = gdeltUrl('X').includes('maxrecords=40');
   process.env.ADVERSE_MEDIA_MAXRECORDS = '';
-  const dflt = gdeltUrl('X').includes('maxrecords=75');
+  const dflt = gdeltUrl('X').includes('maxrecords=250');
   if (prev == null) delete process.env.ADVERSE_MEDIA_MAXRECORDS; else process.env.ADVERSE_MEDIA_MAXRECORDS = prev;
-  return clamped && dflt;
+  return clamped && tuned && dflt;
 })());
 check('LANG_TERMS gains the high-risk-region languages with native-script terms', (() => {
   const added = ['az', 'kk', 'uz', 'ka', 'hy', 'ne', 'si', 'pa', 'mr', 'my', 'km', 'ha', 'so', 'am', 'af', 'sq', 'hr', 'sl', 'lt', 'lv', 'et', 'mk'];
