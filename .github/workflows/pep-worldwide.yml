@@ -42,11 +42,16 @@ jobs:
       contents: write
       actions: write
     runs-on: ubuntu-latest
-    # Time-budgeted: the harvest pauses itself at ~40 min (PEP_TIME_BUDGET_MIN),
-    # commits a checkpoint, and re-dispatches to resume — GitHub-hosted runners
-    # repeatedly died abnormally 1-3h into the old monolithic run, so short runs
-    # sidestep the fragility window. A run past 75 min is a hang: fail loudly.
-    timeout-minutes: 75
+    # Time-budgeted: the harvest pauses at PEP_TIME_BUDGET_MIN, commits a
+    # checkpoint and re-dispatches to resume. The old 40-min budget and 75-min
+    # timeout were sized to duck runs dying at ~63 min — which was the runner
+    # being RECLAIMED because this workflow's egress block denied GitHub's
+    # hosted-compute watchdog, not the harvest hanging. With *.githubapp.com
+    # allowed there is no such ceiling, so the budget is now set above the work
+    # actually remaining (~40-50 min of concurrent label windows) and one link
+    # can finish. The timeout stays well clear of the budget so a genuine hang
+    # still fails loudly rather than being mistaken for a slow harvest.
+    timeout-minutes: 150
     steps:
       - name: Harden the runner (egress block)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -95,6 +100,9 @@ jobs:
           PEP_RECENCY_MONTHS: ${{ vars.PEP_RECENCY_MONTHS }}
           PEP_FLOOR: ${{ vars.PEP_FLOOR }}
           PEP_TIME_BUDGET_MIN: ${{ vars.PEP_TIME_BUDGET_MIN }}
+          # Label-fetch parallelism. Exposed so it can be dialled down from repo
+          # variables if Wikidata starts throttling, without a code change.
+          PEP_LABEL_CONCURRENCY: ${{ vars.PEP_LABEL_CONCURRENCY }}
         run: |
           # Exit 75 = time budget reached, checkpoint written: a PLANNED pause,
           # not a failure — the persist step commits the checkpoint and the

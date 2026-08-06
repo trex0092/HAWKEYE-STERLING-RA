@@ -106,10 +106,21 @@ export const PEP_MAX_BATCH_FAIL_PCT = Number(process.env.PEP_MAX_BATCH_FAIL_PCT)
    a mass global de-listing). */
 export const PEP_FLOOR = Number(process.env.PEP_FLOOR) || 5000;
 export const PEP_SHRINK_PCT = Number(process.env.PEP_SHRINK_PCT) || 0.6;
-/* Time-budget resumability. The budget stays UNDER the earliest observed
-   abnormal runner death (~62 min) so a run always pauses cleanly before the
-   fragility window; the resume cap bounds the re-dispatch loop. */
-export const PEP_TIME_BUDGET_MIN = Number(process.env.PEP_TIME_BUDGET_MIN) || 40;
+/* Time-budget resumability. The 40-min budget existed to duck an "abnormal
+   runner death" at ~62 min — which turned out not to be runner fragility at
+   all: harden-runner's egress block was denying GitHub's own hosted-compute
+   watchdog (hosted-compute-watchdog-prod-<region>.githubapp.com), and a runner
+   that cannot answer its watchdog gets reclaimed on a fixed timer. Three links
+   died at 62m49s / 63m43s / ~63m with their step frozen mid-flight and the logs
+   never uploaded — the signature of reclamation, not of a crash.
+
+   With the watchdog allowed (every egress-blocked workflow now permits
+   *.githubapp.com) that ceiling is gone, so the budget no longer has to hide
+   under it. The remaining labels work is ~1,600 concurrent windows — roughly
+   40-50 min — so a budget comfortably above that lets ONE link finish instead
+   of pausing and handing off. The pause still exists and still works; it is now
+   a safety net for a genuinely long harvest rather than the normal path. */
+export const PEP_TIME_BUDGET_MIN = Number(process.env.PEP_TIME_BUDGET_MIN) || 100;
 export const PEP_MAX_RESUMES = Number(process.env.PEP_MAX_RESUMES) || 12;
 export const RESUME_EXIT_CODE = 75;   // EX_TEMPFAIL — planned pause, not a failure
 

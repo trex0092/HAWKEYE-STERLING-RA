@@ -1038,8 +1038,21 @@ check('PEP checkpoint: a positions-phase pause restores as phase positions — r
   const st = pep.restoreCheckpoint({ v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z', resumeCount: 0, phase: 'positions', positions: [], posByClass: [], holderRows: [], classHolders: {}, batchTotal: 0, batchFailed: 0, next: { classIdx: 0, posIdx: 0 } });
   return st.phase === 'positions' && st.posByClass.size === 0;
 })());
-check('PEP checkpoint: the time budget stays under the observed runner-death window; resumes are bounded',
-  pep.PEP_TIME_BUDGET_MIN < 60 && pep.PEP_MAX_RESUMES >= 4 && pep.RESUME_EXIT_CODE === 75);
+/* The budget used to be asserted under 60 min to duck runs dying at ~63 min.
+   That was never runner fragility: the egress block was denying GitHub's
+   hosted-compute watchdog and the runner was being RECLAIMED on a fixed timer.
+   With *.githubapp.com allowed the ceiling is gone, so the invariant that
+   matters is the one that was always the real point — the budget must leave the
+   pause enough runway to write its checkpoint before the JOB TIMEOUT kills the
+   run, or a pause that fires is still lost work. Asserted against the workflow's
+   own timeout so the two can never drift apart silently. */
+check('PEP checkpoint: the time budget leaves the pause runway before the job timeout; resumes are bounded', (() => {
+  const wf = readFileSync(join(ROOT, '.github/workflows/pep-worldwide.yml'), 'utf8');
+  const timeout = Number((wf.match(/^\s*timeout-minutes:\s*(\d+)/m) || [])[1]);
+  return Number.isFinite(timeout)
+    && pep.PEP_TIME_BUDGET_MIN + 30 <= timeout       // ≥30 min of runway for the pause
+    && pep.PEP_MAX_RESUMES >= 4 && pep.RESUME_EXIT_CODE === 75;
+})());
 check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned checkpoint cannot steer queries', (() => {
   const st = pep.restoreCheckpoint({
     v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
