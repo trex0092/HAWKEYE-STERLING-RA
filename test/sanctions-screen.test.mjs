@@ -173,6 +173,31 @@ check('artifact hit detail (hitDetail) carries mechanism/confidence and drops ju
     return d.length === 1 && d[0].mechanism === 'fuzzy' && d[0].confidence === 'STRONG' && d[0].hitName === 'ACME';
   })());
 
+/* Report-only ("every hit is a cleared false positive") must be recomputed
+   AFTER carry-forward merges: a run whose sanctions hits are all whitelisted
+   but that carries un-re-verified adverse-media evidence is NOT report-only —
+   copying the flag closed the MLRO case on a live adverse signal. */
+check('diffState: carried-forward adverse evidence defeats whitelistedOnly (case opens for a live signal)', (() => {
+  const prior = diffState({ updated: null, subjects: {} },
+    [normalizeResult({ name: 'W Co', topScore: 92, band: 'high', recommendation: 'match',
+      lists: [{ list: 'OFAC SDN' }, { list: 'Adverse media (Google News)' }] }, { key: 'w', name: 'W Co' })],
+    '2026-06-19', 0.85);
+  const wlRun = normalizeResult({ name: 'W Co', topScore: 92, band: 'high', recommendation: 'match',
+    lists: [{ list: 'OFAC SDN', whitelisted: true }] }, { key: 'w', name: 'W Co' });
+  wlRun.whitelistedOnly = true;
+  wlRun.enrichmentIncomplete = true;            // adverse-media lookup could not re-verify
+  const next = diffState(prior.nextState, [wlRun], '2026-06-20', 0.85);
+  const rec = next.nextState.subjects.w;
+  return !!rec && rec.lists.includes('Adverse media (Google News)') && rec.whitelistedOnly !== true;
+})());
+check('diffState: a genuinely all-whitelisted run with nothing carried STAYS report-only', (() => {
+  const wlRun = normalizeResult({ name: 'V Co', topScore: 92, band: 'high', recommendation: 'match',
+    lists: [{ list: 'OFAC SDN', whitelisted: true }] }, { key: 'v', name: 'V Co' });
+  wlRun.whitelistedOnly = true;
+  const next = diffState({ updated: null, subjects: {} }, [wlRun], '2026-06-20', 0.85);
+  return next.nextState.subjects.v.whitelistedOnly === true;
+})());
+
 const d2 = diffState(d1.nextState, [listed], '2026-06-20', 0.85);
 check('diffState does NOT re-alert a standing (same-signature) match', d2.alerts.length === 0);
 check('diffState preserves original firstSeen on a standing match', d2.nextState.subjects.a.firstSeen === '2026-06-19');
@@ -797,6 +822,28 @@ const _odsXml = '<office:document-content>'
   + '</office:document-content>';
 check('ODS: Dutch name columns located by header, names joined across them',
   JSON.stringify(wm.parseOdsContent(_odsXml)) === '["Jansen Pieter","Stichting X"]');
+/* XLSX inline strings carry rich text as multiple <t> runs that CONCATENATE —
+   reading only the first run truncated a designated name mid-string. */
+check('XLSX: an inlineStr cell joins every rich-text run (no mid-name truncation)',
+  JSON.stringify(wm.parseSheetRows('<row r="1"><c r="A1" t="inlineStr"><is><r><t>ISLAMIC REVOLUTIONARY</t></r><r><t> GUARD CORPS</t></r></is></c></row>', []))
+  === '[["ISLAMIC REVOLUTIONARY GUARD CORPS"]]');
+check('ODS: a self-closed empty cell keeps its column (the greedy attr group ate the next cell)', (() => {
+  const xml = '<table:table-row><table:table-cell><text:p>Nr</text:p></table:table-cell>'
+    + '<table:table-cell><text:p>Naam</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell/><table:table-cell><text:p>Jansen Piet</text:p></table:table-cell></table:table-row>';
+  return JSON.stringify(wm.parseOdsContent(xml)) === '["Jansen Piet"]';
+})());
+/* Merged cells: <table:covered-table-cell> holds the grid positions under a
+   merge. Skipping them shifted later cells LEFT, so merged rows read their name
+   from the wrong column and vanished while the row count stayed above the floor. */
+check('ODS: covered (merged) cells hold their grid position — the name column does not shift', (() => {
+  const xml = '<table:table-row><table:table-cell><text:p>Nr</text:p></table:table-cell>'
+    + '<table:table-cell><text:p>Naam</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-covered-cell/><table:table-cell><text:p>De Vries Jan</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:covered-table-cell/><table:table-cell><text:p>Bakker Ali</text:p></table:table-cell></table:table-row>';
+  const names = wm.parseOdsContent(xml);
+  return names.includes('Bakker Ali');
+})());
 check('ODS: content with no header row yields 0 names', wm.parseOdsContent('<table:table-row><table:table-cell><text:p>x</text:p></table:table-cell></table:table-row>').length === 0);
 check('ODS: tag stripping removes inline spans and unterminated tags (CodeQL)',
   JSON.stringify(wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
@@ -924,6 +971,13 @@ check('PEP checkpoint: resume-count past the cap is FATAL — a non-converging h
   const u = pep.checkpointUsable({ ..._cpOk, resumeCount: pep.PEP_MAX_RESUMES });
   return u.ok === false && u.fatal === true;
 })());
+check('PEP checkpoint: per-class batch failures ride the checkpoint (the zero-holders guard gates on ITS OWN class, not the global counter)', (() => {
+  const st = pep.restoreCheckpoint({ v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
+    resumeCount: 0, phase: 'holders', positions: [], posByClass: [], holderRows: [],
+    classHolders: { minister: 5 }, classBatchFailed: { minister: '2' }, batchTotal: 9, batchFailed: 2,
+    next: { classIdx: 1, posIdx: 0 } });
+  return st.classBatchFailed.minister === 2 && st.batchFailed === 2;
+})());
 check('PEP checkpoint: a positions-phase pause restores as phase positions — resume re-enumerates, never sweeps a partial class list', (() => {
   const st = pep.restoreCheckpoint({ v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z', resumeCount: 0, phase: 'positions', positions: [], posByClass: [], holderRows: [], classHolders: {}, batchTotal: 0, batchFailed: 0, next: { classIdx: 0, posIdx: 0 } });
   return st.phase === 'positions' && st.posByClass.size === 0;
@@ -999,9 +1053,41 @@ check('getByPath walks a dotted path and tolerates a missing branch',
     calls3++;
     return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 1e9 }, data: [{ attributes: { name: 'H' + calls3 } }] }) };
   };
-  const hostile = JSON.parse(await fetchPaginatedJson('https://apim.example/h', {}, { maxPages: 5, dataPath: 'data', totalPath: 'meta.totalItems' }, undefined, 'hostile-test'));
-  check('fetchPaginatedJson hard-caps a hostile reported total (runaway guard, loudly partial)',
-    hostile.data.length === PAGINATE_HARD_CAP && calls3 === PAGINATE_HARD_CAP);
+  let hostileThrew = '';
+  try { await fetchPaginatedJson('https://apim.example/h', {}, { maxPages: 5, dataPath: 'data', totalPath: 'meta.totalItems' }, undefined, 'hostile-test'); }
+  catch (e) { hostileThrew = String(e && e.message || e); }
+  check('fetchPaginatedJson hard-caps a hostile reported total and THROWS (never a silent partial)',
+    calls3 === PAGINATE_HARD_CAP && /page cap/.test(hostileThrew) && /partial list refused/.test(hostileThrew));
+
+  /* A mid-crawl empty page short of the server's own total is a gateway blip:
+     retried, not believed. The ADB register served 500+ of 1,533 rows this way
+     and passed as a clean load because the partial still cleared minNames. */
+  let blipServed = false;
+  globalThis.fetch = async (u) => {
+    const off = Number(new URL(u).searchParams.get('offset'));
+    if (off === 20 && !blipServed) { blipServed = true; return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 30 }, data: [] }) }; }
+    const rows = [];
+    for (let i = off; i < Math.min(off + 10, 30); i++) rows.push({ attributes: { name: 'B' + i } });
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 30 }, data: rows }) };
+  };
+  const blip = JSON.parse(await fetchPaginatedJson('https://apim.example/b', {}, { maxPages: 30, dataPath: 'data', totalPath: 'meta.totalItems', size: 10 }, undefined, 'blip-test'));
+  check('fetchPaginatedJson retries a mid-crawl empty page instead of truncating the register',
+    blip.data.length === 30 && blipServed === true);
+
+  /* ...and when the blip never clears, the crawl REFUSES rather than returning
+     a partial that the count floor might wave through. */
+  globalThis.fetch = async (u) => {
+    const off = Number(new URL(u).searchParams.get('offset'));
+    if (off >= 20) return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 300 }, data: [] }) };
+    const rows = [];
+    for (let i = off; i < off + 10; i++) rows.push({ attributes: { name: 'P' + i } });
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 300 }, data: rows }) };
+  };
+  let partialThrew = '';
+  try { await fetchPaginatedJson('https://apim.example/p', {}, { maxPages: 30, dataPath: 'data', totalPath: 'meta.totalItems', size: 10 }, undefined, 'partial-test'); }
+  catch (e) { partialThrew = String(e && e.message || e); }
+  check('fetchPaginatedJson THROWS on a persistent short crawl — degrades loudly, never a clean-looking partial',
+    /stopped at 20 of 300 rows/.test(partialThrew) && /empty page/.test(partialThrew));
   globalThis.fetch = realFetch;
 }
 /* The ADB source is ENABLED and read via the size/offset paginator; it carries a

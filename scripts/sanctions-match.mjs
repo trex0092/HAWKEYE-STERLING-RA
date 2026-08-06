@@ -558,7 +558,17 @@ export function parseSheetRows(xml, shared = []) {
       const vM = /<v\b[^>]*>([\s\S]*?)<\/v>/i.exec(inner);
       let val = '';
       if (type === 's') val = vM ? (shared[+vM[1]] || '') : '';
-      else if (type === 'inlineStr') { const tM = /<t\b[^>]*>([\s\S]*?)<\/t>/i.exec(inner); val = tM ? decodeXml(tM[1]) : ''; }
+      /* Inline strings carry rich text the same way shared strings do: several
+         <r><t>…</t></r> runs that CONCATENATE into one value. Reading only the
+         first run truncated a designated name mid-string ("ISLAMIC
+         REVOLUTIONARY" for "ISLAMIC REVOLUTIONARY GUARD CORPS") and the count
+         floor never fires on a truncation — so join every run, exactly as
+         parseSharedStrings does. */
+      else if (type === 'inlineStr') {
+        const tRe = /<t\b[^>]*>([\s\S]*?)<\/t>/gi;
+        let tM; val = '';
+        while ((tM = tRe.exec(inner))) val += decodeXml(tM[1]);
+      }
       else val = vM ? decodeXml(vM[1]) : '';
       cells[col] = String(val).replace(/\s+/g, ' ').trim();
     }
@@ -647,14 +657,24 @@ export function parseOdsContent(xml) {
   const text = String(xml || '');
   const rows = [];
   const rowRe = /<table:table-row[^>]*>([\s\S]*?)<\/table:table-row>/g;
-  const cellRe = /<table:table-cell([^>]*)(?:\/>|>([\s\S]*?)<\/table:table-cell>)/g;
+  /* MERGED cells occupy their extra grid positions with <table:covered-table-cell>.
+     Matching only <table:table-cell> skipped those positions, shifting every
+     later cell in the row LEFT — a merged row then read its name out of the
+     wrong column and vanished from the index while the row count stayed above
+     the floor. Covered cells are matched too and contribute an empty value, so
+     column positions survive a merge. The attribute group is LAZY so it cannot
+     swallow a self-closing "/" and turn <table:table-cell/> into an open tag
+     that then eats the next cell's content (the greedy form did — every empty
+     self-closed cell shifted the row). */
+  const cellRe = /<table:(covered-table-cell|table-cell)([^>]*?)(?:\/>|>([\s\S]*?)<\/table:(?:covered-table-cell|table-cell)>)/g;
   let rm;
   while ((rm = rowRe.exec(text)) && rows.length < 100000) {
     const cells = [];
     let cm;
     while ((cm = cellRe.exec(rm[1]))) {
-      const attrs = cm[1] || '';
-      const inner = cm[2] || '';
+      const covered = cm[1] === 'covered-table-cell';
+      const attrs = cm[2] || '';
+      const inner = covered ? '' : (cm[3] || '');
       const ps = [...inner.matchAll(/<text:p[^>]*>([\s\S]*?)<\/text:p>/g)].map(p => {
         /* Tag-strip to a FIXPOINT (a single pass would let "<scr<x>ipt>"
            reconstruct "<script>" — CodeQL js/incomplete-multi-character-
