@@ -39,7 +39,7 @@ import { checkAdverseMedia, budgetedLocales, activeLocales, ALL_TERMS, LOCALES, 
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 import { checkFbi } from './fbi-check.mjs';
-import { pepListFromDataset, PEP_LIST_NAME } from './pep-worldwide.mjs';
+import { pepListFromDataset, readJsonMaybeGz, PEP_LIST_NAME } from './pep-worldwide.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -1714,7 +1714,9 @@ async function main() {
   if (process.env.SCREEN_PEP_LIST !== '0') {
     const pepFile = process.env.PEP_WORLDWIDE_FILE || 'data/pep-worldwide.json';
     try {
-      const pep = pepListFromDataset(JSON.parse(readFileSync(pepFile, 'utf8')));
+      /* gzip-or-plain: the artifact is compressed (~135MB of multilingual
+         aliases would otherwise breach GitHub's 100MB push limit). */
+      const pep = pepListFromDataset(readJsonMaybeGz(pepFile));
       if (pep.count > 0 && pep.list.names.length) {
         cfg.pepIndex = buildIndex([pep.list]);
         cfg.pepMeta = pep.meta;

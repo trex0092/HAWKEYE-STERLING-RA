@@ -993,6 +993,40 @@ check('PEP checkpoint: resume-count past the cap is FATAL — a non-converging h
   check('PEP checkpoint reads a gzip buffer written externally', pep.readCheckpoint(tmp).v === 1);
   try { _ul(tmp); } catch { /* best-effort cleanup */ }
 }
+
+/* The ARTIFACT hits the same 100MB wall as the checkpoint: measured on the first
+   live harvest (20,550 persons banked, 259 bytes of multilingual names each) the
+   finished dataset projects to ~135MB for the 422,231 people found holding
+   office. Compressing it is what keeps every alias — the alternative is cutting
+   aliases, which would lower recall. */
+{
+  const { writeFileSync: _wf, readFileSync: _rf, unlinkSync: _ul } = await import('node:fs');
+  const tmp = (await import('node:os')).tmpdir() + '/pep-artifact-test.json';
+  const ds = { v: 1, count: 1, harvested: '2026-08-06T00:00:00Z', classes: { minister: 1 },
+    entries: [{ qid: 'Q1', name: 'A Name', aliases: ['Алиас', '別名'], position: 'Minister', country: 'AE', current: true }] };
+  pep.writeJsonGz(tmp, ds);
+  const raw = _rf(tmp);
+  check('PEP artifact is written GZIPPED (a ~135MB plain artifact cannot be pushed at all)',
+    raw[0] === 0x1f && raw[1] === 0x8b);
+  check('PEP artifact round-trips through gzip with non-Latin aliases intact',
+    pep.readJsonMaybeGz(tmp).entries[0].aliases.join('|') === 'Алиас|別名');
+  _wf(tmp, JSON.stringify(ds), 'utf8');            // artifact written before this change
+  check('PEP artifact reader still accepts a plain-JSON artifact (a harvest already on the state branch keeps screening)',
+    pep.readJsonMaybeGz(tmp).count === 1);
+  check('PEP artifact reader feeds pepListFromDataset unchanged (the screen consumes either format)',
+    pep.pepListFromDataset(pep.readJsonMaybeGz(tmp)).list.names.length >= 3);
+  try { _ul(tmp); } catch { /* best-effort cleanup */ }
+}
+
+/* Label fetching is CONCURRENT or the harvest never finishes: 422,231 persons
+   at 50 per request is 8,445 round-trips, and a measured chain link banked 411
+   of them in its 40-min budget — ~13 more links against a 12-resume cap. The
+   window must be a whole multiple of the chunk so a pause mid-phase resumes on a
+   chunk boundary and re-fetches at most one window. */
+check('PEP labels: the fetch window is LABEL_CONCURRENCY whole chunks (resume lands on a chunk boundary)',
+  pep.LABEL_CONCURRENCY >= 2 && pep.LABEL_WINDOW === pep.LABEL_CHUNK * pep.LABEL_CONCURRENCY);
+check('PEP labels: wbgetentities requests still carry maxlag (the Wikimedia politeness contract that throttles US when the cluster is loaded)',
+  pep.labelsUrl(['Q1', 'Q2']).includes('maxlag=') && pep.labelsUrl(['Q1', 'Q2']).includes('props=labels%7Caliases'));
 check('PEP checkpoint: per-class batch failures ride the checkpoint (the zero-holders guard gates on ITS OWN class, not the global counter)', (() => {
   const st = pep.restoreCheckpoint({ v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
     resumeCount: 0, phase: 'holders', positions: [], posByClass: [], holderRows: [],

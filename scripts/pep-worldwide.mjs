@@ -83,6 +83,19 @@ export const RECENCY_MONTHS = Number(process.env.PEP_RECENCY_MONTHS) || 24;
    batch and aborted a 62-minute harvest on 2026-08-05). */
 export const HOLDER_BATCH = Number(process.env.PEP_HOLDER_BATCH) || 60;
 export const LABEL_CHUNK = 50;
+/* Label chunks are fetched CONCURRENTLY. The names phase is one wbgetentities
+   round-trip per 50 persons — 8,445 of them for the 422,231 people the first
+   live harvest found holding office — and a measured chain link banked only
+   411 of those chunks inside its 40-min budget. Sequentially that is ~13 more
+   links against a 12-resume cap: a harvest that provably never converges, and
+   the chain died of it three times. The requests are independent (results land
+   in a QID-keyed Map, order irrelevant), so a modest window turns the phase
+   from hours into minutes. maxlag=5 rides on every request — that is the
+   Wikimedia politeness contract, and it means the API throttles us when the
+   cluster is loaded instead of us guessing a safe rate; a 429 still lands in
+   fetchJson's retry-after backoff. */
+export const LABEL_CONCURRENCY = Number(process.env.PEP_LABEL_CONCURRENCY) || 5;
+export const LABEL_WINDOW = LABEL_CHUNK * LABEL_CONCURRENCY;
 /* A harvest that lost more than this fraction of its holder batches to WDQS
    errors did not sweep enough of the graph to trust — fail loudly rather than
    write a thin list. Below it, a few flaky batches are tolerated (the run
@@ -117,15 +130,23 @@ export function checkpointPath(outfile) {
    written before this change still resumes instead of being discarded as
    "unrecognized" — losing hours of banked WDQS work. The path keeps its .json
    name: the workflow's overlay/persist steps address it literally, and git
-   handles the binary content fine. */
-export function readCheckpoint(file) {
+   handles the binary content fine.
+
+   The ARTIFACT gets the same treatment for the same reason: measured against
+   the first live harvest (20,550 persons banked, 259 bytes of names each), the
+   finished dataset projects to ~135MB for 422k persons — over the same 100MB
+   push limit. Compressing it keeps every alias (recall is never traded for
+   file size); readJsonMaybeGz is what every consumer uses to read it. */
+export function readJsonMaybeGz(file) {
   const buf = readFileSync(file);
   const text = (buf[0] === 0x1f && buf[1] === 0x8b) ? gunzipSync(buf).toString('utf8') : buf.toString('utf8');
   return JSON.parse(text);
 }
-export function writeCheckpoint(file, obj) {
+export function writeJsonGz(file, obj) {
   writeFileSync(file, gzipSync(Buffer.from(JSON.stringify(obj), 'utf8')));
 }
+export const readCheckpoint = readJsonMaybeGz;
+export const writeCheckpoint = writeJsonGz;
 
 /* Can this checkpoint be resumed? Three outcomes: resume it (ok), silently
    start fresh (not ok, not fatal — unrecognized shape or a stale leftover
@@ -379,6 +400,18 @@ async function fetchJsonSafe(url) {
   catch (e) { console.error('  batch failed after retries: ' + String(e && e.message || e).slice(0, 120)); return null; }
 }
 
+/* One window of label chunks, in flight together. Returns the parsed responses
+   with nulls where a chunk exhausted its retries — the caller drops those
+   persons exactly as it did serially (an unlabelled entity is not screenable),
+   so concurrency changes the RATE and nothing about what counts as a hit. */
+async function fetchLabelWindow(qids, start) {
+  const jobs = [];
+  for (let off = start; off < Math.min(start + LABEL_WINDOW, qids.length); off += LABEL_CHUNK) {
+    jobs.push(fetchJsonSafe(labelsUrl(qids.slice(off, off + LABEL_CHUNK))));
+  }
+  return Promise.all(jobs);
+}
+
 async function harvest(outfile) {
   const cpFile = checkpointPath(outfile);
   const startedMs = Date.now();
@@ -516,16 +549,16 @@ async function harvest(outfile) {
   if (!st || st.phase !== 'labels') {
     const heldQids = [...new Set(holderRows.map(r => r.pos))].filter(q => positions.has(q));
     console.log(`pep-worldwide: labelling ${heldQids.length} offices that have holders (of ${positions.size} enumerated)`);
-    for (let i = 0; i < heldQids.length; i += LABEL_CHUNK) {
+    for (let i = 0; i < heldQids.length; i += LABEL_WINDOW) {
       if (overBudget()) pause('labels', { labelQids: [...new Set(holderRows.map(r => r.person))], names: [], next: { labelIdx: 0 } });
-      const data = await fetchJsonSafe(labelsUrl(heldQids.slice(i, i + LABEL_CHUNK)));
-      if (data) {
+      for (const data of await fetchLabelWindow(heldQids, i)) {
+        if (!data) continue;
         for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
           const p = positions.get(qid);
           if (p) p.label = namesFromEntity(ent).name || p.label;
         }
       }
-      if ((i / LABEL_CHUNK) % 40 === 0) console.log(`  office labels: ${Math.min(i + LABEL_CHUNK, heldQids.length)}/${heldQids.length}`);
+      if ((i / LABEL_WINDOW) % 8 === 0) console.log(`  office labels: ${Math.min(i + LABEL_WINDOW, heldQids.length)}/${heldQids.length}`);
     }
   }
 
@@ -542,12 +575,15 @@ async function harvest(outfile) {
     labelStart = 0;
     console.log(`pep-worldwide: ${holderRows.length} holder rows → ${personQids.length} distinct persons; fetching multilingual names`);
   }
-  for (let i = labelStart; i < personQids.length; i += LABEL_CHUNK) {
+  /* labelIdx advances only after a WHOLE window resolves, so a pause mid-window
+     re-fetches at most that window on resume — idempotent, since every result
+     is a Map set keyed by QID. */
+  for (let i = labelStart; i < personQids.length; i += LABEL_WINDOW) {
     if (overBudget()) pause('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
-    const chunk = personQids.slice(i, i + LABEL_CHUNK);
-    const data = await fetchJsonSafe(labelsUrl(chunk));   // a lost label chunk just leaves those persons unnamed (dropped)
-    if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
-    if ((i / LABEL_CHUNK) % 20 === 0) console.log(`  names: ${Math.min(i + LABEL_CHUNK, personQids.length)}/${personQids.length}`);
+    for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk just leaves those persons unnamed (dropped)
+      if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
+    }
+    if ((i / LABEL_WINDOW) % 4 === 0) console.log(`  names: ${Math.min(i + LABEL_WINDOW, personQids.length)}/${personQids.length}`);
   }
 
   const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
@@ -555,13 +591,13 @@ async function harvest(outfile) {
      an absent or unreadable previous artifact simply means first-harvest
      semantics for the shrink gate. */
   let prev = null;
-  try { prev = JSON.parse(readFileSync(outfile, 'utf8')); } catch { prev = null; }
+  try { prev = readJsonMaybeGz(outfile); } catch { prev = null; }
   const gate = datasetFloorOk(dataset, prev);
   if (!gate.ok) {
     console.error('pep-worldwide: REFUSING to write — ' + gate.reason + (prev ? ' (previous artifact kept)' : ''));
     process.exit(1);
   }
-  writeFileSync(outfile, JSON.stringify(dataset));
+  writeJsonGz(outfile, dataset);
   /* Harvest complete — the checkpoint (if any) is spent; clearing it here
      makes the persist step drop it from the state branch too. */
   try { unlinkSync(cpFile); console.log('pep-worldwide: checkpoint cleared'); } catch { /* none to clear */ }
