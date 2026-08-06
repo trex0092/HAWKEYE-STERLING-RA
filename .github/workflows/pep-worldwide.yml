@@ -123,7 +123,16 @@ jobs:
           if [ -n "$(git status --porcelain -- data/pep-worldwide.json data/pep-worldwide-checkpoint.json)" ]; then
             git config user.name "pep-worldwide"
             git config user.email "actions@github.com"
-            git add -A -- data/pep-worldwide.json data/pep-worldwide-checkpoint.json
+            # Stage each path only when it EXISTS or is tracked: on a first
+            # harvest that pauses at its budget the checkpoint exists but the
+            # artifact does not, and `git add` on a pathspec matching nothing
+            # is a fatal 128 — which is exactly how the first chain link died
+            # AFTER a clean pause, losing the checkpoint it had just written.
+            for f in data/pep-worldwide.json data/pep-worldwide-checkpoint.json; do
+              if [ -e "$f" ] || git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+                git add -A -- "$f"
+              fi
+            done
             git commit -m "PEP worldwide harvest $(date -u +%F) [skip ci]"
             pushed=
             for attempt in 1 2 3 4 5; do
