@@ -16,11 +16,11 @@
       "id": "idb-debarment",
       "name": "IDB — Dataset of Sanctioned Firms & Individuals (MDB cross-debarment)",
       "jurisdiction": "Global (MDB)",
-      "url": "https://mydata.iadb.org/api/views/vsju-qrtz/rows.csv?accessType=DOWNLOAD",
+      "url": "https://data.iadb.org/dataset/download/3a873ab8-20cb-4e12-9826-9abcdac3f51a/csv",
       "type": "csv",
       "parser": "socrata",
       "enabled": false,
-      "_note": "Inter-American Development Bank debarment dataset (2010 MDB Mutual-Enforcement cross-debarments), ~1,500 firms/individuals; debarment tier, not financial sanctions. DISABLED — probe trail: the dataset migrated Socrata → CKAN (2026-08-05: rows.csv answers with the CKAN dataset page carrying doi:10.60966/7pfpgt0f); the standard CKAN API mount 404s (2026-08-06, run 31069175736: /api/3/action/package_search → nginx 404). URL reverted to the old Socrata route as a probe DISCOVERY target: it lands on the migrated dataset's page, and the probe's link extraction should surface the CKAN /resource/<id>/download/ CSV URL to wire. parser 'socrata' still unimplemented — map the proven CSV before enabling.",
+      "_note": "Inter-American Development Bank sanctions dataset (2010 MDB Mutual-Enforcement cross-debarments), ~1,500 firms/individuals; debarment tier, not financial sanctions. DISCOVERY 2026-08-06 (probe run 31069809001): the migrated CKAN dataset page exposes a direct CSV export — url now points at it. Column names evidenced from the resource page anchors: Title (name), Other Name (alias), Entity, Nationality, Country, Prohibited Practice, From, To, Source, IDB Sanction Source. STILL DISABLED pending the final proof: a targeted probe of the CSV itself to confirm the header row, then wire the column mapping (parser follow-up) and enable.",
       "minNames": 200
     },
     {
@@ -456,7 +456,7 @@
       "type": "xml",
       "parser": "un",
       "enabled": false,
-      "_note": "South Africa FIC Targeted Financial Sanctions list. DISABLED — probe trail: ?fileType=xml returns an HTML landing page (2026-08-05), and link-discovery (2026-08-06, run 31069175736) shows that page's own 'xml' link is SELF-REFERENTIAL (the same ?fileType=xml URL) — the download is not a plain GET at that route. URL retargeted at the page's one unexplored route, /Pages/DownloadList, as a probe DISCOVERY target. If that also dead-ends in HTML, the handler likely needs a session/Referer two-step a single-GET fetcher deliberately does not do — curated path then. parser 'un' stays for the day a direct XML URL proves.",
+      "_note": "South Africa FIC TFS downloads. DISCOVERY RESOLVED 2026-08-06 (probe run 31069809001): /Pages/DownloadList links direct files on transfer.fic.gov.za — 'Consolidated United Nations Security Council Sanctions List' .xml/.xlsx/.pdf (public folder SE-MPQpJlUKmxgfA11NwZQ/Downloads). The filenames settle what the list IS: a UNSC consolidated MIRROR, already screened daily via un-consolidated — kept disabled per the hk-cedb doctrine (a pure UN relay adds fetch risk for ~zero recall). Direct XML URL recorded for the record: https://transfer.fic.gov.za/public/folder/SE-MPQpJlUKmxgfA11NwZQ/Downloads/Consolidated%20United%20Nations%20Security%20Council%20Sanctions%20List.xml . Re-visit only if FIC publishes DOMESTIC (s.26A/1373) designations as a machine-readable file.",
       "minNames": 400
     },
     {
