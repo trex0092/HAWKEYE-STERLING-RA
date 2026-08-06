@@ -1361,6 +1361,18 @@ export async function loadSanctionsLists(cfg) {
   return { lists, degraded: fetched < sources.length, fetched, total: sources.length, notes };
 }
 
+/* Enrichment fairness: rotate an array by a day-derived offset. The enrichment
+   phase processes subjects in order under a wall-clock budget, so a stable
+   order would starve the SAME tail subjects of adverse-media/PEP on every
+   budget-tripped run; a daily rotation makes any skipped slice a different
+   one each day. Pure for tests; callers restore report order afterwards. */
+export function rotateByDay(arr, day = Math.floor(Date.now() / 86400000)) {
+  const n = arr.length;
+  if (!n) return arr.slice();
+  const off = ((day % n) + n) % n;
+  return arr.map((_, i) => arr[(i + off) % n]);
+}
+
 /* Run an async fn over items with bounded concurrency (keeps the per-subject
    adverse-media / PEP lookups polite). */
 async function mapLimit(items, limit, fn) {
@@ -1423,7 +1435,11 @@ async function screenLocally(subjects, cfg) {
         + Math.round(mu.rss / 1048576) + 'MB heap ' + Math.round(mu.heapUsed / 1048576) + 'MB');
     }
   };
-  const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
+  /* Daily-rotated processing order (enrichment fairness — see rotateByDay);
+     results are re-sorted to the input order below so reports/state stay
+     stable regardless of the day's rotation. */
+  const rotatedSubjects = rotateByDay(subjects);
+  const results = await mapLimit(rotatedSubjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr, phonMode);   // { name, topScore, band, recommendation, hitCount, lists[] }
     const sbRow = shadowBandRow(raw, shadowThr, cfg.threshold);
     if (sbRow) {
@@ -1546,6 +1562,12 @@ async function screenLocally(subjects, cfg) {
     heartbeat();
     return nr;
   });
+  /* Restore the input order — the rotation exists only for enrichment fairness,
+     and every downstream consumer (reports, state diff) sees a stable order. */
+  {
+    const pos = new Map(subjects.map((s, i) => [s.key, i]));
+    results.sort((a, b) => (pos.get(a.key) ?? 0) - (pos.get(b.key) ?? 0));
+  }
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
   if (amPartial) console.log('sanctions-screen: adverse-media coverage was PARTIAL for ' + amPartial + ' subject(s) — some locales/GDELT did not answer (disclosed in the digest)');
@@ -1615,8 +1637,12 @@ async function main() {
     /* Wall-clock budget for the best-effort enrichment phase (adverse-media/PEP).
        Sanctions matching is always run for every subject; once this elapses the
        remaining subjects skip enrichment so the job never approaches its timeout.
-       Default 12 min leaves headroom under the 20-min job timeout. */
-    enrichBudgetMs: Number(process.env.SCREEN_ENRICH_BUDGET_MS) || 720000,
+       Default 90 min: sized so the FULL customer base (~858 subjects at ~5s each)
+       gets adverse-media/PEP every run — the 12-min default left the same ~720
+       tail subjects skipped daily. Headroom under the 120-min job timeout; the
+       per-subject request rate is unchanged (same concurrency, same budgeted
+       locale rotation), only the phase runs longer. */
+    enrichBudgetMs: Number(process.env.SCREEN_ENRICH_BUDGET_MS) || 5400000,
     /* Cleared-FP registry (whitelist): default ON — an empty registry is a
        no-op, and the kill switch exists for incident response. */
     whitelist: process.env.SCREEN_WHITELIST !== '0',

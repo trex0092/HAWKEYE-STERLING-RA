@@ -8,7 +8,7 @@ import {
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
   whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
-  getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP
+  getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
 import { readFileSync } from 'node:fs';
@@ -1048,6 +1048,19 @@ check('probe: link discovery surfaces CKAN resource URLs from raw JSON (escaped 
 })());
 check('probe: link discovery is bounded (never an unbounded report)',
   sp.extractDataLinks(Array.from({ length: 200 }, (_, i) => '<a href="/f' + i + '.csv">x</a>').join(''), 'https://x.example/', { max: 40 }).length === 40);
+
+/* ── enrichment fairness: daily rotation of the processing order — a budget-
+   tripped run must never starve the SAME tail subjects forever ── */
+check('rotateByDay: rotates by the day offset, preserves every element, and varies day to day', (() => {
+  const arr = ['a', 'b', 'c', 'd', 'e'];
+  const d0 = rotateByDay(arr, 0), d2 = rotateByDay(arr, 2), d7 = rotateByDay(arr, 7);
+  return d0.join('') === 'abcde'                       // day 0 = identity
+    && d2.join('') === 'cdeab'                          // shifted start
+    && d7.join('') === d2.join('')                      // modular (7 % 5 = 2)
+    && [...d2].sort().join('') === 'abcde'              // nothing lost or duplicated
+    && rotateByDay([], 3).length === 0
+    && rotateByDay(arr, -1).join('') === 'eabcd';       // negative-safe
+})());
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

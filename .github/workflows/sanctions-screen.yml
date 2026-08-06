@@ -58,7 +58,12 @@ jobs:
       contents: write
       issues: write
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # bound the daily re-screen; a hang must fail loudly, not stall the control
+    # Sized for FULL-BASE enrichment: sanctions matching is instant, but the
+    # adverse-media/PEP phase now runs to a 90-min budget so every subject gets
+    # worldwide-media coverage every run (the old 12-min budget skipped the same
+    # ~720 tail subjects daily). The digest lands ~75 min later than before as a
+    # consequence. A hang past the budget+wrap-up must still fail loudly.
+    timeout-minutes: 120
     steps:
       - name: Harden the runner (egress block)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
