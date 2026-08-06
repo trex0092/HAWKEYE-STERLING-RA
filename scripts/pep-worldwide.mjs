@@ -31,9 +31,18 @@
    previous artifact. The daily screen only ever reads the committed
    artifact — a broken harvest can never silently thin the screened list.
 
+   Resumable: GitHub-hosted runners repeatedly died abnormally 1-3h into
+   the serial WDQS-polite sweep (job frozen mid-step, logs gone), so the
+   harvest is time-budgeted — at PEP_TIME_BUDGET_MIN it writes a checkpoint
+   (positions, holder rows, label progress) and exits RESUME_EXIT_CODE; the
+   workflow commits the checkpoint to the state branch and re-dispatches
+   itself, and the next run resumes exactly where this one paused. Resumes
+   are bounded (PEP_MAX_RESUMES) — a harvest that cannot converge fails
+   loudly instead of dispatching forever.
+
    Usage: node scripts/pep-worldwide.mjs harvest <outfile>
    Pure helpers are exported for the unit suite; only harvest() networks. */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const PEP_LIST_NAME = 'PEP (Worldwide — Wikidata)';
@@ -83,6 +92,80 @@ export const PEP_MAX_BATCH_FAIL_PCT = Number(process.env.PEP_MAX_BATCH_FAIL_PCT)
    a mass global de-listing). */
 export const PEP_FLOOR = Number(process.env.PEP_FLOOR) || 5000;
 export const PEP_SHRINK_PCT = Number(process.env.PEP_SHRINK_PCT) || 0.6;
+/* Time-budget resumability. The budget stays UNDER the earliest observed
+   abnormal runner death (~62 min) so a run always pauses cleanly before the
+   fragility window; the resume cap bounds the re-dispatch loop. */
+export const PEP_TIME_BUDGET_MIN = Number(process.env.PEP_TIME_BUDGET_MIN) || 40;
+export const PEP_MAX_RESUMES = Number(process.env.PEP_MAX_RESUMES) || 12;
+export const RESUME_EXIT_CODE = 75;   // EX_TEMPFAIL — planned pause, not a failure
+
+export function checkpointPath(outfile) {
+  return outfile.replace(/\.json$/i, '') + '-checkpoint.json';
+}
+
+/* Can this checkpoint be resumed? Three outcomes: resume it (ok), silently
+   start fresh (not ok, not fatal — unrecognized shape or a stale leftover
+   from a previous weekly cycle), or REFUSE loudly (fatal — the harvest has
+   been resumed past the cap without completing; re-dispatching again would
+   loop forever instead of surfacing the underlying failure). */
+export function checkpointUsable(cp, { maxResumes = PEP_MAX_RESUMES, nowMs = Date.now() } = {}) {
+  if (!cp || cp.v !== 1 || !Number.isFinite(Date.parse(cp.sinceIso))
+    || !Number.isFinite(Date.parse(cp.harvestedAt)) || !cp.phase) {
+    return { ok: false, fatal: false, reason: 'unrecognized checkpoint shape — starting fresh' };
+  }
+  const age = nowMs - Date.parse(cp.harvestedAt);
+  if (!(age >= 0) || age > 7 * 86400000) {
+    return { ok: false, fatal: false, reason: 'checkpoint is stale (harvest began over 7 days ago) — starting fresh' };
+  }
+  if ((cp.resumeCount || 0) + 1 > maxResumes) {
+    return { ok: false, fatal: true, reason: `already resumed ${cp.resumeCount} times without completing (max ${maxResumes}) — the harvest is not converging; investigate before re-dispatching` };
+  }
+  return { ok: true, fatal: false, reason: '' };
+}
+
+/* Rebuild harvest state from a checkpoint, REVALIDATING every value that can
+   reach a query URL. The checkpoint rides a repo branch, so a poisoned or
+   corrupted file must not be able to steer SPARQL/API requests: QIDs are
+   re-derived through their numeric part (invalid entries drop), timestamps
+   re-derive through Date.parse, counters and indices coerce to numbers.
+   (Also the CodeQL js/outbound-network-request-with-dynamic-url guard.) */
+const QID_RE = /^Q\d+$/;
+const cleanQid = q => (typeof q === 'string' && QID_RE.test(q)) ? 'Q' + String(Number(q.slice(1))) : null;
+export function restoreCheckpoint(cp) {
+  const positions = new Map();
+  for (const [q, p] of Array.isArray(cp.positions) ? cp.positions : []) {
+    const qid = cleanQid(q);
+    if (qid && p) positions.set(qid, { label: String(p.label || ''), country: String(p.country || ''), classKey: String(p.classKey || '') });
+  }
+  const posByClass = new Map();
+  for (const [k, arr] of Array.isArray(cp.posByClass) ? cp.posByClass : []) {
+    posByClass.set(String(k), (Array.isArray(arr) ? arr : []).map(cleanQid).filter(Boolean));
+  }
+  const holderRows = [];
+  for (const r of Array.isArray(cp.holderRows) ? cp.holderRows : []) {
+    const person = cleanQid(r && r.person), pos = cleanQid(r && r.pos);
+    if (person && pos) holderRows.push({ person, pos, end: String(r && r.end || ''), classKey: String(r && r.classKey || '') });
+  }
+  const classHolders = {};
+  for (const [k, v] of Object.entries(cp.classHolders || {})) classHolders[String(k)] = Number(v) || 0;
+  return {
+    sinceIso: new Date(Date.parse(cp.sinceIso)).toISOString().slice(0, 19) + 'Z',
+    harvestedAt: new Date(Date.parse(cp.harvestedAt)).toISOString(),
+    resumeCount: (Number(cp.resumeCount) || 0) + 1,
+    phase: cp.phase === 'labels' ? 'labels' : 'holders',
+    positions, posByClass, holderRows, classHolders,
+    batchTotal: Number(cp.batchTotal) || 0,
+    batchFailed: Number(cp.batchFailed) || 0,
+    next: {
+      classIdx: Number(cp.next && cp.next.classIdx) || 0,
+      posIdx: Number(cp.next && cp.next.posIdx) || 0,
+      labelIdx: Number(cp.next && cp.next.labelIdx) || 0,
+    },
+    labelQids: (Array.isArray(cp.labelQids) ? cp.labelQids : []).map(cleanQid).filter(Boolean),
+    names: new Map((Array.isArray(cp.names) ? cp.names : [])
+      .filter(e => Array.isArray(e) && cleanQid(e[0])).map(([q, n]) => [cleanQid(q), n])),
+  };
+}
 
 export function positionsQuery(rootQid) {
   return 'SELECT ?pos ?posLabel ?countryLabel WHERE {\n'
@@ -254,57 +337,106 @@ async function fetchJsonSafe(url) {
 }
 
 async function harvest(outfile) {
-  const sinceIso = new Date(Date.now() - RECENCY_MONTHS * 30.44 * 86400000).toISOString().slice(0, 19) + 'Z';
-  const harvestedAt = new Date().toISOString();
-  console.log(`pep-worldwide: harvesting (recency window ${RECENCY_MONTHS} months → since ${sinceIso})`);
+  const cpFile = checkpointPath(outfile);
+  const startedMs = Date.now();
+  const overBudget = () => Date.now() - startedMs > PEP_TIME_BUDGET_MIN * 60000;
 
-  const positions = new Map();       // posQid → { label, country, classKey }
-  const posByClass = new Map();      // classKey → [posQid]
-  for (const cls of PEP_ROOT_CLASSES) {
-    /* A required class whose P279* enumeration times out is a transient WDQS
-       failure, not "the class is empty" — retry hard, and only fail loudly if
-       it STILL yields nothing after retries. Optional classes tolerate zero. */
-    const pdata = await fetchJsonSafe(sparqlUrl(positionsQuery(cls.qid)));
-    const rows = pdata ? parseSparqlBindings(pdata) : [];
-    const qids = [];
-    for (const r of rows) {
-      if (!r.pos || !/^Q\d+$/.test(r.pos)) continue;
-      if (!positions.has(r.pos)) positions.set(r.pos, { label: r.posLabel || '', country: r.countryLabel || '', classKey: cls.key });
-      qids.push(r.pos);
-    }
-    posByClass.set(cls.key, [...new Set(qids)]);
-    console.log(`  ${cls.key}: ${posByClass.get(cls.key).length} position items`);
-    if (!posByClass.get(cls.key).length && !cls.optional) {
-      console.error(`pep-worldwide: root class ${cls.key} (${cls.qid}) enumerated ZERO position items (query ${pdata ? 'returned empty' : 'failed after retries'}) — refusing a hollow harvest`);
+  /* Read-and-catch, no existence pre-check (CodeQL js/file-system-race):
+     an absent or unreadable checkpoint simply means a fresh harvest. */
+  let cp = null;
+  try { cp = JSON.parse(readFileSync(cpFile, 'utf8')); } catch { cp = null; }
+  if (cp) {
+    const use = checkpointUsable(cp);
+    if (use.fatal) {
+      console.error('pep-worldwide: REFUSING to resume — ' + use.reason);
       process.exit(1);
+    }
+    if (!use.ok) { console.log('pep-worldwide: ' + use.reason); cp = null; }
+  }
+  const st = cp ? restoreCheckpoint(cp) : null;   // revalidated — cp is not used past here
+
+  /* The recency window and harvest timestamp come from the ORIGINAL run so
+     every resume filters the same graph slice. */
+  const sinceIso = st ? st.sinceIso : new Date(Date.now() - RECENCY_MONTHS * 30.44 * 86400000).toISOString().slice(0, 19) + 'Z';
+  const harvestedAt = st ? st.harvestedAt : new Date().toISOString();
+  const resumeCount = st ? st.resumeCount : 0;
+
+  const positions = st ? st.positions : new Map();   // posQid → { label, country, classKey }
+  const posByClass = st ? st.posByClass : new Map(); // classKey → [posQid]
+  const holderRows = st ? st.holderRows : [];
+  const classHolders = st ? st.classHolders : {};    // classKey → holder rows (across resumes)
+  let batchTotal = st ? st.batchTotal : 0;
+  let batchFailed = st ? st.batchFailed : 0;
+
+  const pause = (phase, extra) => {
+    writeFileSync(cpFile, JSON.stringify({
+      v: 1, sinceIso, harvestedAt, resumeCount, phase,
+      positions: [...positions], posByClass: [...posByClass],
+      holderRows, classHolders, batchTotal, batchFailed, ...extra,
+    }));
+    console.log(`pep-worldwide: time budget (${PEP_TIME_BUDGET_MIN} min) reached — checkpoint written (phase ${phase}, resume ${resumeCount}, ${holderRows.length} holder rows so far); exiting ${RESUME_EXIT_CODE} for the workflow to re-dispatch`);
+    process.exit(RESUME_EXIT_CODE);
+  };
+
+  if (st) {
+    console.log(`pep-worldwide: RESUMING from checkpoint (resume ${resumeCount}/${PEP_MAX_RESUMES}, phase ${st.phase}, ${holderRows.length} holder rows banked, window since ${sinceIso})`);
+  } else {
+    console.log(`pep-worldwide: harvesting (recency window ${RECENCY_MONTHS} months → since ${sinceIso})`);
+  }
+
+  if (!st) {
+    for (const cls of PEP_ROOT_CLASSES) {
+      /* A required class whose P279* enumeration times out is a transient WDQS
+         failure, not "the class is empty" — retry hard, and only fail loudly if
+         it STILL yields nothing after retries. Optional classes tolerate zero. */
+      const pdata = await fetchJsonSafe(sparqlUrl(positionsQuery(cls.qid)));
+      const rows = pdata ? parseSparqlBindings(pdata) : [];
+      const qids = [];
+      for (const r of rows) {
+        if (!r.pos || !/^Q\d+$/.test(r.pos)) continue;
+        if (!positions.has(r.pos)) positions.set(r.pos, { label: r.posLabel || '', country: r.countryLabel || '', classKey: cls.key });
+        qids.push(r.pos);
+      }
+      posByClass.set(cls.key, [...new Set(qids)]);
+      console.log(`  ${cls.key}: ${posByClass.get(cls.key).length} position items`);
+      if (!posByClass.get(cls.key).length && !cls.optional) {
+        console.error(`pep-worldwide: root class ${cls.key} (${cls.qid}) enumerated ZERO position items (query ${pdata ? 'returned empty' : 'failed after retries'}) — refusing a hollow harvest`);
+        process.exit(1);
+      }
     }
   }
 
-  const holderRows = [];
-  let batchTotal = 0, batchFailed = 0;
-  for (const cls of PEP_ROOT_CLASSES) {
-    const qids = posByClass.get(cls.key) || [];
-    let classHolders = 0;
-    for (let i = 0; i < qids.length; i += HOLDER_BATCH) {
-      const batch = qids.slice(i, i + HOLDER_BATCH);
-      batchTotal++;
-      const hdata = await fetchJsonSafe(sparqlUrl(holdersQuery(batch, sinceIso)));
-      if (hdata === null) { batchFailed++; continue; }   // flaky batch — counted, not fatal
-      for (const r of parseSparqlBindings(hdata)) {
-        if (!r.person || !/^Q\d+$/.test(r.person)) continue;
-        holderRows.push({ person: r.person, pos: r.pos, end: r.end || '', classKey: cls.key });
-        classHolders++;
+  /* Holders phase. Resume indices address the position ARRAY (posIdx), not
+     batch ordinals, so a changed HOLDER_BATCH between runs cannot skew the
+     restart point. A labels-phase checkpoint skips this loop entirely. */
+  const startClass = st && st.phase === 'holders' ? st.next.classIdx : 0;
+  const startPos = st && st.phase === 'holders' ? st.next.posIdx : 0;
+  if (!st || st.phase === 'holders') {
+    for (let ci = startClass; ci < PEP_ROOT_CLASSES.length; ci++) {
+      const cls = PEP_ROOT_CLASSES[ci];
+      const qids = posByClass.get(cls.key) || [];
+      for (let i = ci === startClass ? startPos : 0; i < qids.length; i += HOLDER_BATCH) {
+        if (overBudget()) pause('holders', { next: { classIdx: ci, posIdx: i } });
+        const batch = qids.slice(i, i + HOLDER_BATCH);
+        batchTotal++;
+        const hdata = await fetchJsonSafe(sparqlUrl(holdersQuery(batch, sinceIso)));
+        if (hdata === null) { batchFailed++; continue; }   // flaky batch — counted, not fatal
+        for (const r of parseSparqlBindings(hdata)) {
+          if (!r.person || !/^Q\d+$/.test(r.person)) continue;
+          holderRows.push({ person: r.person, pos: r.pos, end: r.end || '', classKey: cls.key });
+          classHolders[cls.key] = (classHolders[cls.key] || 0) + 1;
+        }
+        console.log(`  ${cls.key}: batch ${Math.floor(i / HOLDER_BATCH) + 1}/${Math.ceil(qids.length / HOLDER_BATCH)} — ${classHolders[cls.key] || 0} holder rows so far`);
       }
-      console.log(`  ${cls.key}: batch ${Math.floor(i / HOLDER_BATCH) + 1}/${Math.ceil(qids.length / HOLDER_BATCH)} — ${classHolders} holder rows so far`);
+      // A required class that ended with zero holders AND lost batches is an
+      // outage, not an empty class; the batch-failure gate below catches it. Only
+      // fail here when the class truly enumerated holders-less with batches OK.
+      if (!classHolders[cls.key] && !cls.optional && batchFailed === 0) {
+        console.error(`pep-worldwide: root class ${cls.key} yielded ZERO holders on a clean sweep — refusing a hollow harvest`);
+        process.exit(1);
+      }
+      if (!classHolders[cls.key] && cls.optional) console.log(`  ${cls.key}: zero holders (optional class — QID pending live verification)`);
     }
-    // A required class that ended with zero holders AND lost batches is an
-    // outage, not an empty class; the batch-failure gate below catches it. Only
-    // fail here when the class truly enumerated holders-less with batches OK.
-    if (!classHolders && !cls.optional && batchFailed === 0) {
-      console.error(`pep-worldwide: root class ${cls.key} yielded ZERO holders on a clean sweep — refusing a hollow harvest`);
-      process.exit(1);
-    }
-    if (!classHolders && cls.optional) console.log(`  ${cls.key}: zero holders (optional class — QID pending live verification)`);
   }
   const bgate = batchFailureOk(batchFailed, batchTotal);
   if (!bgate.ok) {
@@ -313,10 +445,21 @@ async function harvest(outfile) {
   }
   if (batchFailed) console.log(`pep-worldwide: tolerated ${batchFailed}/${batchTotal} flaky holder batches (within the ${Math.round(PEP_MAX_BATCH_FAIL_PCT * 100)}% gate)`);
 
-  const personQids = [...new Set(holderRows.map(r => r.person))];
-  console.log(`pep-worldwide: ${holderRows.length} holder rows → ${personQids.length} distinct persons; fetching multilingual names`);
-  const names = new Map();
-  for (let i = 0; i < personQids.length; i += LABEL_CHUNK) {
+  /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
+  let personQids, names, labelStart;
+  if (st && st.phase === 'labels') {
+    personQids = st.labelQids;
+    names = st.names;
+    labelStart = st.next.labelIdx;
+    console.log(`pep-worldwide: resuming names at ${labelStart}/${personQids.length} (${names.size} banked)`);
+  } else {
+    personQids = [...new Set(holderRows.map(r => r.person))];
+    names = new Map();
+    labelStart = 0;
+    console.log(`pep-worldwide: ${holderRows.length} holder rows → ${personQids.length} distinct persons; fetching multilingual names`);
+  }
+  for (let i = labelStart; i < personQids.length; i += LABEL_CHUNK) {
+    if (overBudget()) pause('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
     const chunk = personQids.slice(i, i + LABEL_CHUNK);
     const data = await fetchJsonSafe(labelsUrl(chunk));   // a lost label chunk just leaves those persons unnamed (dropped)
     if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
@@ -335,6 +478,9 @@ async function harvest(outfile) {
     process.exit(1);
   }
   writeFileSync(outfile, JSON.stringify(dataset));
+  /* Harvest complete — the checkpoint (if any) is spent; clearing it here
+     makes the persist step drop it from the state branch too. */
+  try { unlinkSync(cpFile); console.log('pep-worldwide: checkpoint cleared'); } catch { /* none to clear */ }
   console.log(`pep-worldwide: wrote ${dataset.count} persons (${Object.entries(dataset.classes).map(([k, v]) => k + ':' + v).join(', ')}) → ${outfile}`);
   return 0;
 }

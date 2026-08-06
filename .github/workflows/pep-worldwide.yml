@@ -23,8 +23,12 @@ on:
 
 # contents: write — the harvest pushes the artifact to the
 # pep-worldwide-state data branch (branch protection keeps main closed).
+# actions: write — a time-budget-paused run re-dispatches THIS workflow so
+# the next run resumes from the committed checkpoint (workflow_dispatch is
+# the documented GITHUB_TOKEN exception that does trigger workflows).
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: "${{ github.workflow }}"
@@ -33,7 +37,11 @@ concurrency:
 jobs:
   harvest:
     runs-on: ubuntu-latest
-    timeout-minutes: 240 # serial WDQS-polite harvest measures 1-3h; a hang past 4h must fail loudly
+    # Time-budgeted: the harvest pauses itself at ~40 min (PEP_TIME_BUDGET_MIN),
+    # commits a checkpoint, and re-dispatches to resume — GitHub-hosted runners
+    # repeatedly died abnormally 1-3h into the old monolithic run, so short runs
+    # sidestep the fragility window. A run past 75 min is a hang: fail loudly.
+    timeout-minutes: 75
     steps:
       - name: Harden the runner (egress block)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -61,35 +69,56 @@ jobs:
         with:
           node-version: 22
 
-      - name: Overlay the previous artifact (shrink-gate baseline)
+      - name: Overlay the previous artifact + any checkpoint (resume baseline)
         run: |
           # The refuse-to-overwrite gate compares against the LAST committed
           # harvest — fetch it so a hollow harvest cannot pass as "first run".
+          # A checkpoint on the branch means the previous run paused at its
+          # time budget; overlaying it makes this run a RESUME, not a restart.
           if git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
             git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
-            echo "previous artifact overlaid"
+            git checkout FETCH_HEAD -- data/pep-worldwide-checkpoint.json 2>/dev/null || true
+            echo "previous state overlaid"
           else
             echo "no pep-worldwide-state branch yet — first harvest"
           fi
 
       - name: Harvest the worldwide PEP list from Wikidata
+        id: harvest
         env:
           PEP_RECENCY_MONTHS: ${{ vars.PEP_RECENCY_MONTHS }}
           PEP_FLOOR: ${{ vars.PEP_FLOOR }}
-        run: node scripts/pep-worldwide.mjs harvest data/pep-worldwide.json
+          PEP_TIME_BUDGET_MIN: ${{ vars.PEP_TIME_BUDGET_MIN }}
+        run: |
+          # Exit 75 = time budget reached, checkpoint written: a PLANNED pause,
+          # not a failure — the persist step commits the checkpoint and the
+          # re-dispatch step queues the resume run. Any other non-zero exit is
+          # a real failure and stays red.
+          code=0
+          node scripts/pep-worldwide.mjs harvest data/pep-worldwide.json || code=$?
+          if [ "$code" -eq 75 ]; then
+            echo "resume=1" >> "$GITHUB_OUTPUT"
+            echo "time budget reached — checkpoint written; a resume run will be dispatched"
+          elif [ "$code" -ne 0 ]; then
+            exit "$code"
+          fi
 
-      - name: Persist the artifact (pep-worldwide-state branch)
+      - name: Persist the artifact + checkpoint (pep-worldwide-state branch)
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # Branch protection blocks direct pushes to main, so the artifact
+          # Branch protection blocks direct pushes to main, so harvest state
           # lives on its own data branch: rebuilt as <current HEAD> + one data
-          # commit, force-updated each harvest. Auth is the ephemeral env
-          # token in the push URL — the checkout persisted no credentials.
-          if [ -n "$(git status --porcelain data/pep-worldwide.json)" ]; then
+          # commit, force-updated each run. A COMPLETE harvest commits the
+          # fresh artifact and drops the spent checkpoint; a budget-paused run
+          # commits the checkpoint alongside the previous artifact so the
+          # dispatched resume picks up exactly where this run stopped. Auth is
+          # the ephemeral env token in the push URL — the checkout persisted
+          # no credentials.
+          if [ -n "$(git status --porcelain -- data/pep-worldwide.json data/pep-worldwide-checkpoint.json)" ]; then
             git config user.name "pep-worldwide"
             git config user.email "actions@github.com"
-            git add data/pep-worldwide.json
+            git add -A -- data/pep-worldwide.json data/pep-worldwide-checkpoint.json
             git commit -m "PEP worldwide harvest $(date -u +%F) [skip ci]"
             pushed=
             for attempt in 1 2 3 4 5; do
@@ -97,19 +126,44 @@ jobs:
               echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 5))
             done
-            [ -n "$pushed" ] || { echo "::error::artifact push to pep-worldwide-state failed after 5 attempts — harvest NOT persisted"; exit 1; }
-            echo "artifact persisted to pep-worldwide-state"
+            [ -n "$pushed" ] || { echo "::error::state push to pep-worldwide-state failed after 5 attempts — harvest progress NOT persisted"; exit 1; }
+            echo "state persisted to pep-worldwide-state"
           else
             echo "artifact unchanged this week — nothing to push"
           fi
 
+      - name: Re-dispatch to resume (time-budget pause)
+        if: steps.harvest.outputs.resume == '1'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # The checkpoint is already on the state branch (persist ran first);
+          # concurrency (cancel-in-progress: false) queues the resume run until
+          # this one finishes. The script's resume cap bounds this loop — a
+          # non-converging harvest fails red instead of dispatching forever.
+          curl -sSf -X POST \
+            -H "authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pep-worldwide.yml/dispatches" \
+            -d "{\"ref\":\"${GITHUB_REF_NAME}\"}"
+          echo "resume run dispatched on ${GITHUB_REF_NAME}"
+
       - name: Harvest summary
         run: |
           node -e '
-            const d = JSON.parse(require("fs").readFileSync("data/pep-worldwide.json", "utf8"));
-            const L = ["# PEP worldwide harvest", "",
-              "Persons: **" + d.count + "** (harvested " + d.harvested + ")", "",
-              "| class | persons |", "| --- | --- |",
-              ...Object.entries(d.classes).map(([k, v]) => "| " + k + " | " + v + " |")];
-            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join("\n") + "\n");
+            const fs = require("fs");
+            let cp = null, d = null;
+            try { cp = JSON.parse(fs.readFileSync("data/pep-worldwide-checkpoint.json", "utf8")); } catch { cp = null; }
+            try { d = JSON.parse(fs.readFileSync("data/pep-worldwide.json", "utf8")); } catch { d = null; }
+            const L = cp
+              ? ["# PEP worldwide harvest — paused at the time budget", "",
+                 "Phase **" + cp.phase + "**, resume " + cp.resumeCount + " — "
+                 + cp.holderRows.length + " holder rows banked; a resume run has been dispatched."]
+              : d
+                ? ["# PEP worldwide harvest", "",
+                   "Persons: **" + d.count + "** (harvested " + d.harvested + ")", "",
+                   "| class | persons |", "| --- | --- |",
+                   ...Object.entries(d.classes).map(([k, v]) => "| " + k + " | " + v + " |")]
+                : ["# PEP worldwide harvest", "", "no artifact and no checkpoint — see the harvest step log"];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join("\n") + "\n");
           '

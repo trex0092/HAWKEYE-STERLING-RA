@@ -905,6 +905,42 @@ check('PEP classes: the core FATF categories stay REQUIRED, expansions are optio
     && pep.PEP_ROOT_CLASSES.every(c => /^Q\d+$/.test(c.qid));
 })());
 
+/* ── PEP harvest resumability (time-budget checkpoint — the monolithic 1-3h
+   run kept dying to abnormal runner terminations with zero salvage) ── */
+check('PEP checkpoint: path derives from the outfile, beside it',
+  pep.checkpointPath('data/pep-worldwide.json') === 'data/pep-worldwide-checkpoint.json');
+const _cpOk = { v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: new Date(Date.now() - 3600000).toISOString(), phase: 'holders', resumeCount: 2 };
+check('PEP checkpoint: a fresh checkpoint resumes; an unrecognized shape starts fresh (never fatal)',
+  pep.checkpointUsable(_cpOk).ok === true
+  && pep.checkpointUsable(null).ok === false && pep.checkpointUsable(null).fatal === false
+  && pep.checkpointUsable({ v: 99 }).ok === false && pep.checkpointUsable({ v: 99 }).fatal === false);
+check('PEP checkpoint: a stale checkpoint (previous weekly cycle) is discarded, not resumed', (() => {
+  const u = pep.checkpointUsable({ ..._cpOk, harvestedAt: new Date(Date.now() - 8 * 86400000).toISOString() });
+  return u.ok === false && u.fatal === false;
+})());
+check('PEP checkpoint: resume-count past the cap is FATAL — a non-converging harvest fails loudly, never loops', (() => {
+  const u = pep.checkpointUsable({ ..._cpOk, resumeCount: pep.PEP_MAX_RESUMES });
+  return u.ok === false && u.fatal === true;
+})());
+check('PEP checkpoint: the time budget stays under the observed runner-death window; resumes are bounded',
+  pep.PEP_TIME_BUDGET_MIN < 60 && pep.PEP_MAX_RESUMES >= 4 && pep.RESUME_EXIT_CODE === 75);
+check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned checkpoint cannot steer queries', (() => {
+  const st = pep.restoreCheckpoint({
+    v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
+    resumeCount: 1, phase: 'holders',
+    positions: [['Q5', { label: 'x', country: '', classKey: 'minister' }], ['evil} SERVICE <http://x>', { label: 'x' }]],
+    posByClass: [['minister', ['Q5', 'Q00042', 'evil} UNION {', null]]],
+    holderRows: [{ person: 'Q7', pos: 'Q5', end: '', classKey: 'minister' }, { person: 'Q7 UNION ?x ?y', pos: 'Q5' }],
+    classHolders: { minister: '3' }, batchTotal: '4', batchFailed: '0',
+    next: { classIdx: '1', posIdx: '60' }, labelQids: ['Q7', 'Q|8'], names: [['Q7', { name: 'A', aliases: [] }]],
+  });
+  return st.posByClass.get('minister').join(',') === 'Q5,Q42'   // QIDs re-derive numerically, injections drop
+    && st.holderRows.length === 1 && st.labelQids.join(',') === 'Q7'
+    && !st.positions.has('evil} SERVICE <http://x>')
+    && st.sinceIso === '2026-08-01T00:00:00Z' && st.resumeCount === 2
+    && st.next.classIdx === 1 && st.batchTotal === 4 && st.names.get('Q7').name === 'A';
+})());
+
 /* ── paginated JSON list reader (ADB debarment register: 10 rows/page, its own
    next-link points at an unreachable internal host, so we page by size/offset) ── */
 check('getByPath walks a dotted path and tolerates a missing branch',
