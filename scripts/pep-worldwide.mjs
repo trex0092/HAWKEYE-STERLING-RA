@@ -96,12 +96,12 @@ export const LABEL_CHUNK = 50;
    250-person window took ~30s (101 min banked 50,750 of 422,231 names), which
    puts the remaining phase at ~7 more links. The bottleneck is per-request
    latency on large multilingual payloads, not server-side rate limiting — no
-   429s were hit — so doubling the window halves the wall clock. maxlag=5 still
+   429s were hit — so widening the window shortens the wall clock. maxlag=5 still
    rides every request and a 429 still lands in fetchJson's retry-after backoff,
    so if Wikidata does start pushing back the harvest slows down instead of
    hammering; PEP_LABEL_CONCURRENCY dials it straight back from repo variables
    with no code change. */
-export const LABEL_CONCURRENCY = Number(process.env.PEP_LABEL_CONCURRENCY) || 10;
+export const LABEL_CONCURRENCY = Number(process.env.PEP_LABEL_CONCURRENCY) || 20;
 export const LABEL_WINDOW = LABEL_CHUNK * LABEL_CONCURRENCY;
 /* A harvest that lost more than this fraction of its holder batches to WDQS
    errors did not sweep enough of the graph to trust — fail loudly rather than
