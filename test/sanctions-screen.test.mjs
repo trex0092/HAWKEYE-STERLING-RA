@@ -1335,6 +1335,25 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   const secondCount = pep.readJsonMaybeGz(mono).count;
   check('PEP merge: a run that loses names to throttling never publishes FEWER people than the last',
     firstCount === M && lossy.length === M - 4000 && secondCount === M);
+
+  /* The ORDINARY harvest needs the same guarantee, and it is the path the
+     WEEKLY schedule uses. datasetFloorOk alone tolerates a drop to
+     PEP_SHRINK_PCT (0.6) of the last list — so a throttled scheduled run could
+     publish 40% fewer people entirely unattended and be waved through. Every
+     artifact write must therefore be able to restore names a lost chunk
+     dropped, which means every writeArtifact call has to hand it the rebuild. */
+  {
+    const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+    check('PEP harvest: the shrink gate alone is not the recall floor — 0.6 would allow losing 40%',
+      pep.PEP_SHRINK_PCT <= 0.9 && /const writeArtifact = \(dataset, rebuildWithCarried\)/.test(src));
+    const calls = src.match(/writeArtifact\([^)]*\)/g) || [];
+    check('PEP harvest: EVERY artifact write can restore names a lost chunk dropped',
+      calls.length >= 2 && calls.every(c => /writeArtifact\(\s*\w+\s*,/.test(c)));
+    check('PEP harvest: carried names are folded in only when the list would otherwise shrink',
+      /\(dataset\.count \|\| 0\) < \(prev\.count \|\| 0\)/.test(src)
+      /* never into the working map, or pendingLabels would stop fetching */
+      && /names: mergeShardNames\(\[\[\.\.\.names\], carried\]\)/.test(src));
+  }
   for (const f of [mono, cpM, T + 'm1.json', T + 'm2.json']) { try { _ul(f); } catch { /* best-effort */ } }
   for (const f of [out, s0, s1, stale, wrongSplit, dup, cpFile, cp2, half, outH, outE]) { try { _ul(f); } catch { /* best-effort */ } }
 }

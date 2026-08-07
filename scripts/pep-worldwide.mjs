@@ -601,9 +601,32 @@ async function harvest(outfile) {
      uses. Read-and-catch, no existence pre-check (CodeQL js/file-system-race):
      an absent or unreadable previous artifact simply means first-harvest
      semantics for the shrink gate. */
-  const writeArtifact = (dataset) => {
+  const writeArtifact = (dataset, rebuildWithCarried) => {
     let prev = null;
     try { prev = readJsonMaybeGz(outfile); } catch { prev = null; }
+    /* RECALL-MONOTONE, same rule the sharded merge follows. The shrink gate
+       alone is not enough: it tolerates a drop to PEP_SHRINK_PCT of the last
+       list, so a throttled link could publish 40% fewer people and be waved
+       through. That is not hypothetical in the other direction — two sharded
+       runs went 419,223 → 381,223 on 429s and the 9.1% loss sat inside
+       tolerance. A PEP absent from the list screens CLEAN, so a name once
+       published must survive a transient fetch failure.
+
+       The previous artifact's names are folded in ONLY when this dataset would
+       otherwise come out shorter, and only to build the artifact — never into
+       the working names map, which still drives pendingLabels, or the harvest
+       would think everyone was labelled and stop fetching. prev is already in
+       hand here and freed straight after, so nothing is held for the run. */
+    if (prev && rebuildWithCarried && (dataset.count || 0) < (prev.count || 0)
+      && Array.isArray(prev.entries)) {
+      const carried = prev.entries.filter(e => e && e.qid && e.name)
+        .map(e => [e.qid, { name: e.name, aliases: Array.isArray(e.aliases) ? e.aliases : [] }]);
+      const merged = rebuildWithCarried(carried);
+      if ((merged.count || 0) > (dataset.count || 0)) {
+        console.log(`pep-worldwide: carried ${merged.count - dataset.count} already-published names forward — the list never shrinks on a lost chunk`);
+        dataset = merged;
+      }
+    }
     const gate = datasetFloorOk(dataset, prev);
     if (!gate.ok) return { ...gate, hadPrev: !!prev };
     writeJsonGz(outfile, dataset);
@@ -620,6 +643,9 @@ async function harvest(outfile) {
      from replacing last week's complete list with its first few thousand. Set
      by the labels loop, because that is the only phase with names to write. */
   let shipPartial = null;
+  /* Companion to shipPartial: rebuilds the same dataset with extra names folded
+     in, so writeArtifact can restore anything a lost chunk dropped. */
+  let shipPartialWith = null;
 
   const writeCp = (phase, extra) => writeCheckpoint(cpFile, ({
     v: 1, sinceIso, harvestedAt, resumeCount, phase,
@@ -634,7 +660,7 @@ async function harvest(outfile) {
     if (!shipPartial) return;
     try {
       const d = shipPartial();
-      const g = writeArtifact(d);
+      const g = writeArtifact(d, shipPartialWith);
       console.log(g.ok
         ? `pep-worldwide: PARTIAL artifact published — ${d.count} of ${d.expected} persons (${Math.round(100 * d.count / d.expected)}%); the screen will flag it as partial coverage`
         : `pep-worldwide: partial artifact NOT published — ${g.reason}`);
@@ -941,6 +967,10 @@ async function harvest(outfile) {
     harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
     names, expected: expectedTotal,
   });
+  shipPartialWith = (carried) => buildPepDataset({
+    harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
+    names: mergeShardNames([[...names], carried]), expected: expectedTotal,
+  });
   if (names.size) shipPartialNow();
 
   /* The checkpoint is written to DISK here; the workflow's persist step commits
@@ -966,6 +996,10 @@ async function harvest(outfile) {
       harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
       names, expected: expectedTotal,
     });
+    shipPartialWith = (carried) => buildPepDataset({
+      harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
+      names: mergeShardNames([[...names], carried]), expected: expectedTotal,
+    });
     if (overBudget()) pause('labels', snapshot());
     for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk leaves those persons unnamed — the next resume retries them
       if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
@@ -990,7 +1024,10 @@ async function harvest(outfile) {
   }
 
   const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
-  const gate = writeArtifact(dataset);
+  const gate = writeArtifact(dataset, (carried) => buildPepDataset({
+    harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
+    names: mergeShardNames([[...names], carried]),
+  }));
   if (!gate.ok) {
     console.error('pep-worldwide: REFUSING to write — ' + gate.reason + (gate.hadPrev ? ' (previous artifact kept)' : ''));
     process.exit(1);
