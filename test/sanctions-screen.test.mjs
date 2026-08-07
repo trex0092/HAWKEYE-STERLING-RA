@@ -1053,6 +1053,32 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
     && pep.PEP_TIME_BUDGET_MIN + 30 <= timeout       // ≥30 min of runway for the pause
     && pep.PEP_MAX_RESUMES >= 4 && pep.RESUME_EXIT_CODE === 75;
 })());
+/* Sharding beats a per-client rate limit by using more clients — but only if the
+   partition is exact. A shard that skipped people, or two shards that both
+   claimed one, would publish a list quietly short of those PEPs, and a PEP
+   absent from the list screens CLEAN. These check the property directly. */
+{
+  const qids = Array.from({ length: 1000 }, (_, i) => 'Q' + i);
+  const slices = [0, 1, 2, 3, 4, 5, 6, 7].map(i => pep.shardOf(qids, i, 8));
+  const union = slices.flat();
+  check('PEP shard: every person lands in exactly one shard — nothing lost, nothing duplicated',
+    union.length === qids.length && new Set(union).size === qids.length
+    && [...new Set(union)].sort().join() === [...qids].sort().join());
+  check('PEP shard: the slices are evenly sized (no runner carries the whole backlog)',
+    slices.every(s => Math.abs(s.length - qids.length / 8) <= 1));
+  check('PEP shard: COUNT=1 is exactly the unsharded list (the weekly harvest is unchanged)',
+    pep.shardOf(qids, 0, 1).length === qids.length);
+  const merged = pep.mergeShardNames([
+    [['Q1', { name: 'A', aliases: [] }]],
+    [['Q2', { name: 'B', aliases: [] }]],
+    [['Q1', { name: 'A', aliases: [] }], ['Q3', { name: 'C', aliases: [] }]],
+  ]);
+  check('PEP shard: merging slices unions them and tolerates an overlapping re-run',
+    merged.size === 3 && merged.get('Q2').name === 'B' && merged.get('Q3').name === 'C');
+  check('PEP shard: a nameless entry never enters the merged map (unlabelled is not screenable)',
+    pep.mergeShardNames([[['Q9', { name: '', aliases: [] }]]]).size === 0);
+}
+
 /* Partial delivery. The harvest takes several links, and shipping nothing until
    the last one left the screen with no PEP layer at all for hours. A mid-harvest
    dataset is now published, flagged partial + expected, so consumers can say out

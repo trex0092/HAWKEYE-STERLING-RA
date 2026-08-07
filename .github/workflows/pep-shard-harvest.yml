@@ -1,0 +1,203 @@
+name: PEP Shard Harvest
+
+# Finishes the PEP label backlog FAST by running it on many runners at once.
+#
+# Why this exists: Wikidata rate-limits a client. A completed link's log carries
+# 64 HTTP 429s with backoff, so widening the request window inside ONE job
+# fights the limiter and has a ceiling. Each shard here runs on its own runner —
+# a separate client with its own rate budget — so N shards buy close to N times
+# the throughput, which more parallelism in a single job cannot.
+#
+# This is ADDITIVE and dispatch-only. pep-worldwide.yml keeps its weekly
+# schedule and its self-resuming chain untouched; if a sharded run goes wrong,
+# the ordinary chain is still grinding away and nothing is lost. Use this to
+# clear a large backlog, then let the weekly harvest carry on as normal.
+#
+# Shards never share a ref: each force-pushes ONLY its own pep-shard-<i> branch,
+# so concurrent writes cannot race or drop each other's work, and the single
+# merge job is the only writer of pep-worldwide-state. Plain git throughout —
+# no artifact upload/download action to pin or to open egress for.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pep-shard-harvest
+  cancel-in-progress: false
+
+jobs:
+  shard:
+    strategy:
+      # One failed shard must not cancel the rest — the merge step refuses to
+      # publish an incomplete set anyway, and the survivors' slices stay on
+      # their branches ready for a re-run of just the failures.
+      fail-fast: false
+      matrix:
+        index: [0, 1, 2, 3, 4, 5, 6, 7]
+    # Writes ONLY refs/heads/pep-shard-<index>, never the shared state branch.
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          # GitHub + node toolchain + the two Wikimedia hosts, plus the
+          # hosted-compute watchdog: a runner that cannot answer it gets
+          # reclaimed mid-run, which is what killed three earlier harvests.
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            query.wikidata.org:443
+            www.wikidata.org:443
+            *.githubapp.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Overlay the harvest checkpoint (the shard's read-only input)
+        run: |
+          # Every shard reads the SAME committed checkpoint: holder rows,
+          # positions and the full person list. Nothing is written back here.
+          if git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/pep-worldwide-checkpoint.json 2>/dev/null || true
+          fi
+          if [ ! -e data/pep-worldwide-checkpoint.json ]; then
+            echo "::error::no checkpoint on pep-worldwide-state — run the ordinary PEP Worldwide Harvest first so the holders phase is banked, then shard the label backlog"
+            exit 1
+          fi
+
+      - name: Harvest this shard's slice
+        env:
+          PEP_SHARD_COUNT: '8'
+          PEP_SHARD_INDEX: ${{ matrix.index }}
+          PEP_RECENCY_MONTHS: ${{ vars.PEP_RECENCY_MONTHS }}
+          PEP_LABEL_CONCURRENCY: ${{ vars.PEP_LABEL_CONCURRENCY }}
+          # Sized to finish inside the job timeout; the budget is a backstop, not
+          # the normal path, because a shard hands nothing to the merge until it
+          # completes its slice.
+          PEP_TIME_BUDGET_MIN: '140'
+        run: node scripts/pep-worldwide.mjs harvest data/pep-shard.json
+
+      - name: Publish this shard's slice (pep-shard-<index> branch)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SHARD: ${{ matrix.index }}
+        run: |
+          git config user.name "pep-worldwide"
+          git config user.email "actions@github.com"
+          git add -A -- data/pep-shard.json
+          git commit -m "PEP shard ${SHARD} $(date -u +%F) [skip ci]"
+          pushed=
+          for attempt in 1 2 3 4 5; do
+            git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/pep-shard-${SHARD}" && { pushed=1; break; }
+            echo "push failed (attempt $attempt) — retrying"
+            sleep $((attempt * 5))
+          done
+          [ -n "$pushed" ] || { echo "::error::shard ${SHARD} push failed after 5 attempts — its slice is NOT available to the merge"; exit 1; }
+
+  merge:
+    needs: shard
+    # The ONLY writer of pep-worldwide-state in this workflow — one job, one
+    # push, no race.
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            *.githubapp.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Collect the checkpoint and every shard slice
+        run: |
+          set -euo pipefail
+          git fetch origin pep-worldwide-state --depth=1
+          git checkout FETCH_HEAD -- data/pep-worldwide-checkpoint.json
+          git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
+          mkdir -p shards
+          for i in 0 1 2 3 4 5 6 7; do
+            # A missing shard branch is fatal HERE rather than silently merged
+            # around: the merge step would otherwise publish a list short of
+            # those people, and a PEP absent from the list screens CLEAN.
+            git fetch origin "pep-shard-${i}" --depth=1
+            git show FETCH_HEAD:data/pep-shard.json > "shards/pep-shard-${i}.json"
+            echo "collected shard ${i} ($(stat -c%s "shards/pep-shard-${i}.json") bytes)"
+          done
+
+      - name: Merge the shards into the artifact
+        run: |
+          node scripts/pep-worldwide.mjs merge-shards \
+            data/pep-worldwide.json data/pep-worldwide-checkpoint.json \
+            shards/pep-shard-0.json shards/pep-shard-1.json shards/pep-shard-2.json \
+            shards/pep-shard-3.json shards/pep-shard-4.json shards/pep-shard-5.json \
+            shards/pep-shard-6.json shards/pep-shard-7.json
+
+      - name: Persist the merged artifact (pep-worldwide-state branch)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$(git status --porcelain -- data/pep-worldwide.json data/pep-worldwide-checkpoint.json)" ]; then
+            git config user.name "pep-worldwide"
+            git config user.email "actions@github.com"
+            for f in data/pep-worldwide.json data/pep-worldwide-checkpoint.json; do
+              if [ -e "$f" ] || git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+                git add -A -- "$f"
+              fi
+            done
+            git commit -m "PEP worldwide harvest (sharded) $(date -u +%F) [skip ci]"
+            pushed=
+            for attempt in 1 2 3 4 5; do
+              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/pep-worldwide-state && { pushed=1; break; }
+              echo "push failed (attempt $attempt) — retrying"
+              sleep $((attempt * 5))
+            done
+            [ -n "$pushed" ] || { echo "::error::state push failed after 5 attempts — merged artifact NOT persisted"; exit 1; }
+            echo "merged artifact persisted to pep-worldwide-state"
+          else
+            echo "nothing changed — nothing to push"
+          fi
+
+      - name: Merge summary
+        run: |
+          node -e '
+            const fs = require("fs"), zlib = require("zlib");
+            const b = fs.readFileSync("data/pep-worldwide.json");
+            const d = JSON.parse((b[0] === 0x1f && b[1] === 0x8b) ? zlib.gunzipSync(b).toString("utf8") : b.toString("utf8"));
+            const L = ["# PEP worldwide harvest — sharded merge", "",
+              "Persons: **" + d.count + "**" + (d.partial ? " of " + d.expected + " — PARTIAL" : " — complete"), "",
+              "| class | persons |", "| --- | --- |",
+              ...Object.entries(d.classes).map(([k, v]) => "| " + k + " | " + v + " |")];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join("\n") + "\n");
+          '
