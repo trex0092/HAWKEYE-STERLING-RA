@@ -1103,6 +1103,43 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
       && new Set(sharded.flat()).size === 4);
   }
 
+  /* OFFICE CONTEXT. A PEP hit is a REVIEW-tier signal — the MLRO's job is to
+     verify the person's office — so an entry reading "Q15686806, country blank"
+     cannot be triaged without a manual lookup per hit. The live artifact had
+     68.6% raw-QID offices and no country at all: the label pass was gated on
+     `phase !== 'labels'` so the first budget pause switched it off permanently,
+     and the country pass never existed (wbgetentities is asked for
+     labels|aliases and returns no claims, so the comment promising "country
+     rides the label pass" was never true). */
+  {
+    const q = pep.officeContextQuery(['Q1', 'Q2']);
+    check('PEP offices: country is asked for over a VALUES list, never bolted onto the P279* walk',
+      q.includes('VALUES ?pos { wd:Q1 wd:Q2 }') && !q.includes('P279')
+      && q.includes('wdt:P17') && q.includes('wdt:P1001'));
+    const positions = new Map([
+      ['Q1', { label: '', country: '', classKey: 'minister' }],
+      ['Q2', { label: 'Mayor', country: '', classKey: 'minister' }],
+      ['Q3', { label: 'Envoy', country: 'Q30', classKey: 'minister' }],
+      ['Q4', { label: '', country: '', classKey: 'minister' }],   // enumerated, no holder
+    ]);
+    const rows = [{ pos: 'Q1' }, { pos: 'Q2' }, { pos: 'Q3' }];
+    check('PEP offices: only offices that actually have a holder are asked about',
+      !pep.pendingOffices(positions, rows, 'label').includes('Q4')
+      && !pep.pendingOffices(positions, rows, 'country').includes('Q4'));
+    check('PEP offices: the pass resumes on what is still missing, per field',
+      pep.pendingOffices(positions, rows, 'label').join() === 'Q1'
+      && pep.pendingOffices(positions, rows, 'country').sort().join() === 'Q1,Q2');
+    positions.get('Q1').label = 'Minister'; positions.get('Q1').country = 'Q878';
+    positions.get('Q2').country = 'Q878';
+    check('PEP offices: a completed pass leaves nothing pending (it converges instead of looping)',
+      pep.pendingOffices(positions, rows, 'label').length === 0
+      && pep.pendingOffices(positions, rows, 'country').length === 0);
+    const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+    check('PEP offices: the pass is NOT gated on the phase (that is what switched it off for good)',
+      !/if \(!st \|\| st\.phase !== 'labels'\) \{[\s\S]{0,200}offices/.test(src)
+      && /if \(PEP_SHARD_COUNT === 1\) \{[\s\S]{0,900}pendingOffices/.test(src));
+  }
+
   /* Concurrency is a cliff, not a slope. 5 and 10 each banked ~50,000 names per
      link; 20 collapsed to 773 HTTP 429s, Retry-After pinned at 59-60s and ZERO
      names in 53 minutes. The shipped default must stay inside the measured band

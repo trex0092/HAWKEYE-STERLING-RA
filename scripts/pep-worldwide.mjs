@@ -149,6 +149,21 @@ export function shardOf(qids, index = PEP_SHARD_INDEX, count = PEP_SHARD_COUNT) 
   return qids.filter((_, i) => i % count === index);
 }
 
+/* Offices still missing context, among those that actually have a holder. Same
+   drive-from-the-remainder rule as pendingLabels: a pass that was cut short by
+   a budget pause resumes on what is still missing rather than being skipped
+   wholesale or redone from the top. `want` selects the field — offices needing
+   a name, or offices needing a country. */
+export function pendingOffices(positions, holderRows, want = 'label') {
+  const held = new Set(holderRows.map(r => r.pos));
+  const out = [];
+  for (const q of held) {
+    const p = positions.get(q);
+    if (p && !p[want]) out.push(q);
+  }
+  return out;
+}
+
 /* Who this runner still has to label. The labels phase is driven by THIS, never
    by a saved position, and that is a recall guarantee rather than a tidiness
    one: a chunk whose retries all 429'd returns null and leaves its 50 people
@@ -318,6 +333,25 @@ export function restoreCheckpoint(cp) {
 export function positionsQuery(rootQid) {
   return 'SELECT DISTINCT ?pos WHERE {\n'
     + `  ?pos wdt:P279* wd:${rootQid} .\n`
+    + '}';
+}
+
+/* Country/jurisdiction for offices that HAVE holders. The comment above is why
+   this is a separate query rather than OPTIONAL clauses on the P279* walk: bolt
+   country onto the unbounded walk and WDQS dies at 60s. Scoped to a VALUES list
+   of known QIDs it is the same cheap, bounded shape as holdersQuery — one row
+   per office, no walk at all.
+
+   P17 (country) is the direct answer; P1001 (applies to jurisdiction) covers
+   offices modelled against a state or subdivision instead, which is most
+   legislative and ministerial seats. Either is enough to tell an MLRO which
+   country's officialdom a hit belongs to — without it a PEP hit reads
+   "Q15686806, country blank" and has to be looked up by hand before it can be
+   triaged at all. */
+export function officeContextQuery(posQids) {
+  return 'SELECT ?pos ?country WHERE {\n'
+    + '  VALUES ?pos { ' + posQids.map(q => 'wd:' + q).join(' ') + ' }\n'
+    + '  { ?pos wdt:P17 ?country } UNION { ?pos wdt:P1001 ?country }\n'
     + '}';
 }
 
@@ -727,25 +761,72 @@ async function harvest(outfile) {
   }
   if (batchFailed) console.log(`pep-worldwide: tolerated ${batchFailed}/${batchTotal} flaky holder batches (within the ${Math.round(PEP_MAX_BATCH_FAIL_PCT * 100)}% gate)`);
 
-  /* Office labels — AFTER holders and scoped to positions that actually have
-     one. Labelling every enumerated position cost 1,614 requests (80,677 QIDs)
-     and ate a whole 40-min budget at 25% done, for a field that is cosmetic:
-     buildPepDataset falls back to the position QID, and PERSON-name recall
-     never depends on it. Best-effort throughout — a lost chunk just leaves
-     those offices QID-labelled. */
-  if (!st || st.phase !== 'labels') {
-    const heldQids = [...new Set(holderRows.map(r => r.pos))].filter(q => positions.has(q));
-    console.log(`pep-worldwide: labelling ${heldQids.length} offices that have holders (of ${positions.size} enumerated)`);
-    for (let i = 0; i < heldQids.length; i += LABEL_WINDOW) {
-      if (overBudget()) pause('labels', { labelQids: [...new Set(holderRows.map(r => r.person))], names: [], next: { labelIdx: 0 } });
-      for (const data of await fetchLabelWindow(heldQids, i)) {
-        if (!data) continue;
-        for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
-          const p = positions.get(qid);
-          if (p) p.label = namesFromEntity(ent).name || p.label;
+  /* Office context — the name and country of the offices that actually have a
+     holder. Both were treated as cosmetic and both were wrong to skip.
+
+     The label pass was guarded on `phase !== 'labels'`, so the first budget
+     pause into the person-labels phase turned it off PERMANENTLY: it finished
+     22% of 59,204 held offices and no resume ever went back. The country pass
+     did not exist at all — the walk-scoped query that once carried it killed
+     WDQS, it was dropped to a bare P279* walk, and the comment's promise that
+     "country rides the label pass" was never true, because wbgetentities is
+     asked for labels|aliases and returns no claims. Result in the live
+     artifact: 68.6% of entries name their office as a raw QID and 100% carry
+     no country.
+
+     That is not cosmetic where it lands. A PEP hit is a REVIEW-tier signal —
+     the MLRO's job is to verify the person's office — and "Q15686806, country
+     blank" cannot be triaged without a manual lookup per hit. Name recall
+     genuinely does not depend on it, so this stays best-effort: a lost chunk
+     leaves those offices thin and the harvest carries on. But it now RUNS on
+     every resume, driven by what is still missing, so it converges instead of
+     being switched off by the first pause.
+
+     Shards skip it: they exist to split the person-name backlog, every shard
+     doing the same office work would be eight times the requests for one
+     result, and the merge takes positions from the checkpoint anyway. */
+  if (PEP_SHARD_COUNT === 1) {
+    /* Pausing mid-office hands the run to the labels phase with whatever names
+       are already banked — never an empty list. The old pause wrote names: []
+       unconditionally, so a pause here would have discarded every person name a
+       previous link had harvested. */
+    const officePause = () => pause('labels', {
+      labelQids: (st && st.phase === 'labels') ? st.labelQids : [...new Set(holderRows.map(r => r.person))],
+      names: (st && st.phase === 'labels') ? [...st.names] : [],
+      next: { labelIdx: 0 },
+    });
+
+    const needLabel = pendingOffices(positions, holderRows, 'label');
+    if (needLabel.length) {
+      console.log(`pep-worldwide: ${needLabel.length} offices with holders still unnamed (of ${new Set(holderRows.map(r => r.pos)).size} held, ${positions.size} enumerated)`);
+      for (let i = 0, win = 0; i < needLabel.length; i += LABEL_WINDOW, win++) {
+        if (overBudget()) officePause();
+        for (const data of await fetchLabelWindow(needLabel, i)) {
+          if (!data) continue;
+          for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
+            const p = positions.get(qid);
+            if (p) p.label = namesFromEntity(ent).name || p.label;
+          }
         }
+        if (win % 8 === 0) console.log(`  office names: ${Math.min(i + LABEL_WINDOW, needLabel.length)}/${needLabel.length}`);
       }
-      if ((i / LABEL_WINDOW) % 8 === 0) console.log(`  office labels: ${Math.min(i + LABEL_WINDOW, heldQids.length)}/${heldQids.length}`);
+    }
+
+    const needCountry = pendingOffices(positions, holderRows, 'country');
+    if (needCountry.length) {
+      console.log(`pep-worldwide: ${needCountry.length} offices with holders still have no country`);
+      for (let i = 0, win = 0; i < needCountry.length; i += HOLDER_BATCH, win++) {
+        if (overBudget()) officePause();
+        const rows = parseSparqlBindings(
+          await fetchJsonSafe(sparqlUrl(officeContextQuery(needCountry.slice(i, i + HOLDER_BATCH)))));
+        for (const r of rows) {
+          const p = positions.get(r.pos);
+          /* First answer wins: an office with both P17 and P1001 gets two rows,
+             and either is a truthful jurisdiction for the MLRO. */
+          if (p && !p.country && r.country) p.country = r.country;
+        }
+        if (win % 8 === 0) console.log(`  office countries: ${Math.min(i + HOLDER_BATCH, needCountry.length)}/${needCountry.length}`);
+      }
     }
   }
 
