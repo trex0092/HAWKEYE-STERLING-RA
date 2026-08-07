@@ -824,6 +824,18 @@ async function harvest(outfile) {
     const needCountry = pendingOffices(positions, holderRows, 'country');
     if (needCountry.length) {
       console.log(`pep-worldwide: ${needCountry.length} offices with holders still have no country`);
+      /* This pass is ~1,000 SERIAL WDQS queries, and a query WDQS rejects comes
+         back through fetchJsonSafe as null after six retries with backoff —
+         indistinguishable, one batch at a time, from an office that simply has
+         no country. A query this module has never run live is exactly where
+         that matters: unguarded, a malformed one would spend the entire time
+         budget failing quietly and the link would bank nothing. So give up
+         early and LOUDLY if the opening batches produce nothing at all, and let
+         the person-name phase have the budget instead. A genuine run answers on
+         the first batch — heads of state and legislatures nearly all carry
+         P17. */
+      const PROBE = 5;
+      let answered = 0;
       for (let i = 0, win = 0; i < needCountry.length; i += HOLDER_BATCH, win++) {
         if (overBudget()) officePause();
         const rows = parseSparqlBindings(
@@ -834,8 +846,13 @@ async function harvest(outfile) {
              both, and "United States" is the honest value for a field the MLRO
              reads as a country. An office with neither simply stays blank. */
           if (p && !p.country && (r.country || r.jurisdiction)) p.country = r.country || r.jurisdiction;
+          if (r.country || r.jurisdiction) answered++;
         }
-        if (win % 8 === 0) console.log(`  office countries: ${Math.min(i + HOLDER_BATCH, needCountry.length)}/${needCountry.length}`);
+        if (win + 1 === PROBE && answered === 0) {
+          console.error(`pep-worldwide: office-country pass ABANDONED — ${PROBE} batches (${PROBE * HOLDER_BATCH} offices) returned no country or jurisdiction at all. Either the query is being rejected or WDQS is not answering; offices keep their names and the artifact ships without country rather than spending the budget on it. Check the query against WDQS before re-running.`);
+          break;
+        }
+        if (win % 8 === 0) console.log(`  office countries: ${Math.min(i + HOLDER_BATCH, needCountry.length)}/${needCountry.length} (${answered} answered)`);
       }
     }
 

@@ -1153,6 +1153,15 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
        than the blank it replaced. */
     check('PEP offices: country QIDs are resolved to names before they reach the artifact',
       /countryQids[\s\S]{0,600}fetchLabelWindow\(countryQids[\s\S]{0,400}cnames\.has\(p\.country\)/.test(src));
+    /* ~1,000 SERIAL WDQS queries, where a rejected query returns null after six
+       retries with backoff — one batch at a time, indistinguishable from an
+       office that genuinely has no country. Unguarded, a malformed query would
+       spend the whole time budget failing quietly and the link would bank
+       nothing at all. */
+    check('PEP offices: the country pass gives up LOUDLY if its opening batches answer nothing',
+      /const PROBE = \d+;/.test(src)
+      && /win \+ 1 === PROBE && answered === 0/.test(src)
+      && /ABANDONED/.test(src));
   }
 
   /* Concurrency is a cliff, not a slope. 5 and 10 each banked ~50,000 names per
