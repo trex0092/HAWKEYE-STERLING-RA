@@ -463,15 +463,39 @@ async function harvest(outfile) {
   let batchTotal = st ? st.batchTotal : 0;
   let batchFailed = st ? st.batchFailed : 0;
 
+  const writeCp = (phase, extra) => writeCheckpoint(cpFile, ({
+    v: 1, sinceIso, harvestedAt, resumeCount, phase,
+    positions: [...positions], posByClass: [...posByClass],
+    holderRows, classHolders, classBatchFailed, batchTotal, batchFailed, ...extra,
+  }));
+
   const pause = (phase, extra) => {
-    writeCheckpoint(cpFile, ({
-      v: 1, sinceIso, harvestedAt, resumeCount, phase,
-      positions: [...positions], posByClass: [...posByClass],
-      holderRows, classHolders, classBatchFailed, batchTotal, batchFailed, ...extra,
-    }));
+    writeCp(phase, extra);
     console.log(`pep-worldwide: time budget (${PEP_TIME_BUDGET_MIN} min) reached — checkpoint written (phase ${phase}, resume ${resumeCount}, ${holderRows.length} holder rows so far); exiting ${RESUME_EXIT_CODE} for the workflow to re-dispatch`);
     process.exit(RESUME_EXIT_CODE);
   };
+
+  /* Bank progress when the RUN is killed, not just when the budget is reached.
+     A cancelled Actions job SIGTERMs the step, and until now that threw away
+     everything the link had harvested — two cancelled links lost 83 and 34
+     minutes of WDQS work that was already in memory. The phase loops keep this
+     pointing at a closure that serialises their current position, so an
+     interrupt writes exactly the checkpoint a budget pause would have, and the
+     workflow's persist step (which runs on cancellation too) commits it.
+     Cheap insurance: a signal that arrives before any loop sets it just exits. */
+  let bankProgress = null;
+  const onSignal = (sig) => {
+    if (!bankProgress) { console.log(`pep-worldwide: ${sig} before any harvest progress — nothing to bank`); process.exit(RESUME_EXIT_CODE); }
+    try {
+      bankProgress();
+      console.log(`pep-worldwide: ${sig} received — checkpoint written (${holderRows.length} holder rows banked); the next run resumes from it`);
+    } catch (e) {
+      console.error('pep-worldwide: could not bank progress on ' + sig + ': ' + (e && e.message || e));
+    }
+    process.exit(RESUME_EXIT_CODE);
+  };
+  process.on('SIGTERM', () => onSignal('SIGTERM'));
+  process.on('SIGINT', () => onSignal('SIGINT'));
 
   if (st) {
     console.log(`pep-worldwide: RESUMING from checkpoint (resume ${resumeCount}/${PEP_MAX_RESUMES}, phase ${st.phase}, ${holderRows.length} holder rows banked, window since ${sinceIso})`);
@@ -523,6 +547,7 @@ async function harvest(outfile) {
       const cls = PEP_ROOT_CLASSES[ci];
       const qids = posByClass.get(cls.key) || [];
       for (let i = ci === startClass ? startPos : 0; i < qids.length; i += HOLDER_BATCH) {
+        bankProgress = () => writeCp('holders', { next: { classIdx: ci, posIdx: i } });
         if (overBudget()) pause('holders', { next: { classIdx: ci, posIdx: i } });
         const batch = qids.slice(i, i + HOLDER_BATCH);
         batchTotal++;
@@ -597,6 +622,7 @@ async function harvest(outfile) {
      re-fetches at most that window on resume — idempotent, since every result
      is a Map set keyed by QID. */
   for (let i = labelStart; i < personQids.length; i += LABEL_WINDOW) {
+    bankProgress = () => writeCp('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
     if (overBudget()) pause('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
     for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk just leaves those persons unnamed (dropped)
       if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
