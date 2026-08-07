@@ -1043,6 +1043,36 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
     console.error(`pep-worldwide: REFUSING to merge — slices come from different runs (${runs.join(', ')}); a leftover branch from an earlier run is stale and merging it would publish a list short of the people its shard never finished`);
     return 1;
   }
+  /* Resolve any country left as a bare QID, HERE, where the artifact is
+     actually assembled. It used to happen only at the tail of the office pass —
+     stranded behind roughly a thousand serial WDQS queries that can pause at
+     the time budget, which is exactly what happened: two consecutive links
+     ended with 49,109 offices carrying "Q159" instead of "Russia". The
+     resolution itself is trivial — a couple of hundred distinct countries, a
+     few chunks — so it belongs at the point of assembly, where it always runs
+     and cannot be starved by the cost of the pass in front of it.
+
+     Best-effort: an unresolved QID stays as it is. A country the MLRO has to
+     look up is poor, but it is still more than the blank it replaced, and it
+     must never be a reason to fail publishing a finished list. */
+  const qidCountries = [...new Set([...st.positions.values()]
+    .map(p => p.country).filter(c => /^Q\d+$/.test(c)))];
+  if (qidCountries.length) {
+    console.log(`pep-worldwide: resolving ${qidCountries.length} country QIDs to names`);
+    const cnames = new Map();
+    for (let i = 0; i < qidCountries.length; i += LABEL_WINDOW) {
+      for (const data of await fetchLabelWindow(qidCountries, i)) {
+        if (!data) continue;
+        for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
+          const nm = namesFromEntity(ent).name;
+          if (nm) cnames.set(qid, nm);
+        }
+      }
+    }
+    for (const p of st.positions.values()) if (cnames.has(p.country)) p.country = cnames.get(p.country);
+    console.log(`  resolved ${cnames.size}/${qidCountries.length}`);
+  }
+
   const names = mergeShardNames([[...st.names], ...slices]);
   /* How many people the list OWES. labelQids is only present once the harvest
      reached the labels phase; a checkpoint paused earlier (in holders) has

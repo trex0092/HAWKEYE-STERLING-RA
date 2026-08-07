@@ -1167,6 +1167,18 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
        than the blank it replaced. */
     check('PEP offices: country QIDs are resolved to names before they reach the artifact',
       /countryQids[\s\S]{0,600}fetchLabelWindow\(countryQids[\s\S]{0,400}cnames\.has\(p\.country\)/.test(src));
+    /* And again at the point of ASSEMBLY. Resolution used to exist only at the
+       tail of the office pass, behind ~1,000 serial WDQS queries that can pause
+       at the time budget — which is what happened on two consecutive live
+       links, leaving 49,109 offices carrying "Q159" where "Russia" belongs. A
+       step that cheap must not be reachable only by finishing an expensive one. */
+    const mergeFn = src.slice(src.indexOf('export async function mergeShards'));
+    check('PEP merge: resolves QID countries itself, so a paused office pass cannot strand them',
+      /qidCountries[\s\S]{0,400}fetchLabelWindow\(qidCountries/.test(mergeFn)
+      && /cnames\.has\(p\.country\)/.test(mergeFn));
+    const shardYml = readFileSync(join(ROOT, '.github/workflows/pep-shard-harvest.yml'), 'utf8');
+    check('PEP merge: the merge job is allowed the one host that resolution needs',
+      /www\.wikidata\.org:443/.test(shardYml.slice(shardYml.indexOf('  merge:'))));
     /* ~1,000 SERIAL WDQS queries, where a rejected query returns null after six
        retries with backoff — one batch at a time, indistinguishable from an
        office that genuinely has no country. Unguarded, a malformed query would
