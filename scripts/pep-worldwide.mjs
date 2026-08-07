@@ -1073,7 +1073,27 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
     console.log(`  resolved ${cnames.size}/${qidCountries.length}`);
   }
 
-  const names = mergeShardNames([[...st.names], ...slices]);
+  /* RECALL-MONOTONE. A name that has already been published must never be lost
+     because a label chunk 429'd this time round. Two sharded runs over the same
+     backlog produced 419,223 then 381,223 people — 38,000 real PEPs dropped out
+     of a live screening list, and the shrink gate waved it through because 9.1%
+     sat inside its tolerance. A percentage gate bounds how much recall can
+     vanish; it does not stop recall vanishing.
+
+     The previous artifact therefore rides along as the LOWEST-priority name
+     source. mergeShardNames keeps the first non-empty entry per QID, so fresh
+     names always win and a previously-known name only fills a hole this run
+     failed to fetch. Everything else — office, country, class, the partial
+     flag — still comes from the current sweep, so a person who genuinely left
+     office still drops when the holder rows no longer carry them. */
+  let prevArtifact = null;
+  try { prevArtifact = readJsonMaybeGz(outfile); } catch { prevArtifact = null; }
+  const carried = (prevArtifact && Array.isArray(prevArtifact.entries))
+    ? prevArtifact.entries.filter(e => e && e.qid && e.name)
+      .map(e => [e.qid, { name: e.name, aliases: Array.isArray(e.aliases) ? e.aliases : [] }])
+    : [];
+  if (carried.length) console.log(`  carrying ${carried.length} already-published names forward as a floor`);
+  const names = mergeShardNames([[...st.names], ...slices, carried]);
   /* How many people the list OWES. labelQids is only present once the harvest
      reached the labels phase; a checkpoint paused earlier (in holders) has
      none, and taking the length blindly yields 0 — which makes buildPepDataset

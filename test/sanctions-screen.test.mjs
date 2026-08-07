@@ -1307,6 +1307,35 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   const outE = T + 'oute.json';
   check('PEP merge: REFUSES outright when the shortfall cannot be measured at all',
     await pep.mergeShards(outE, cp2, [half]) === 1 && !_ex(outE));
+
+  /* RECALL-MONOTONE. Two sharded runs over the same backlog published 419,223
+     then 381,223 people — 38,000 real PEPs dropped out of a live screening list
+     because their label chunks 429'd the second time, and the shrink gate waved
+     it through since 9.1% sat inside its tolerance. A percentage gate bounds how
+     much recall can vanish; it does not stop recall vanishing. A name once
+     published must survive a transient fetch failure. */
+  const mono = T + 'mono.json', cpM = T + 'cpm.json';
+  const writeCpM = () => pep.writeCheckpoint(cpM, {
+    v: 1, harvestedAt: '2026-01-01T00:00:00Z', sinceIso: '2020-01-01T00:00:00Z', phase: 'labels',
+    positions: [['Q100', { label: 'Minister', country: 'Ruritania', classKey: 'minister' }]], posByClass: [],
+    holderRows: many.map(p => ({ person: p, pos: 'Q100', end: '', classKey: 'minister' })),
+    classHolders: {}, classBatchFailed: {}, batchTotal: 1, batchFailed: 0,
+    labelQids: many, names: [], next: { labelIdx: 0 },
+  });
+  const sliceOf = (file, subset, run) => {
+    pep.writeJsonGz(file, { v: 1, shard: 0, of: 1, run, names: subset.map(q => [q, { name: 'P ' + q, aliases: [] }]) });
+    return file;
+  };
+  writeCpM();
+  await pep.mergeShards(mono, cpM, [sliceOf(T + 'm1.json', many, 'R1')]);
+  const firstCount = pep.readJsonMaybeGz(mono).count;
+  writeCpM();                                          // a complete merge clears it
+  const lossy = many.slice(0, M - 4000);               // the second run loses 4,000 to 429s
+  await pep.mergeShards(mono, cpM, [sliceOf(T + 'm2.json', lossy, 'R2')]);
+  const secondCount = pep.readJsonMaybeGz(mono).count;
+  check('PEP merge: a run that loses names to throttling never publishes FEWER people than the last',
+    firstCount === M && lossy.length === M - 4000 && secondCount === M);
+  for (const f of [mono, cpM, T + 'm1.json', T + 'm2.json']) { try { _ul(f); } catch { /* best-effort */ } }
   for (const f of [out, s0, s1, stale, wrongSplit, dup, cpFile, cp2, half, outH, outE]) { try { _ul(f); } catch { /* best-effort */ } }
 }
 
