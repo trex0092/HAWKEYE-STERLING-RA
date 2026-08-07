@@ -1722,6 +1722,17 @@ async function main() {
         cfg.pepMeta = pep.meta;
         console.log('sanctions-screen: worldwide PEP list active — ' + pep.count + ' persons ('
           + pep.list.names.length + ' names incl. multilingual aliases; harvested ' + (pep.harvested || 'unknown') + ')');
+        /* Degrade loudly: a mid-harvest artifact covers only part of the world's
+           office-holders, so a PEP not yet harvested yields NO hit. Absence of a
+           match is not evidence a subject is not a PEP, and the run log must say
+           so rather than let partial coverage read as a clean screen. */
+        if (pep.partial) {
+          console.log('sanctions-screen: ⚠ worldwide PEP list is PARTIAL — ' + pep.count + ' of '
+            + pep.expected + ' persons harvested (' + Math.round(100 * pep.count / pep.expected)
+            + '%). A PEP not yet harvested produces NO hit: absence of a PEP-list match is NOT'
+            + ' evidence the subject is not a PEP. Treat PEP-list clears as provisional until the'
+            + ' harvest completes; the per-name Wikidata PEP signal still runs on every subject.');
+        }
       } else {
         console.log('sanctions-screen: worldwide PEP list file present but empty — layer off this run');
       }

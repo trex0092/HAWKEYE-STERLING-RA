@@ -307,7 +307,7 @@ export function namesFromEntity(entity) {
    positions: Map(posQid → {label, country}); names: Map(personQid →
    {name, aliases}). Dedupe by person, first class in PEP_ROOT_CLASSES order
    wins the headline position (they're declared most-senior-first). */
-export function buildPepDataset({ harvestedAt, holderRows, positions, names }) {
+export function buildPepDataset({ harvestedAt, holderRows, positions, names, expected }) {
   const rank = new Map(PEP_ROOT_CLASSES.map((c, i) => [c.key, i]));
   const byPerson = new Map();
   for (const r of holderRows) {
@@ -333,7 +333,16 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names }) {
     });
   }
   entries.sort((a, b) => (a.qid < b.qid ? -1 : 1));
-  return { v: 1, list: PEP_LIST_NAME, harvested: harvestedAt, count: entries.length, classes, entries };
+  /* `expected` is how many people the harvest KNOWS it has to label. When the
+     dataset is written mid-harvest it carries fewer, and the shortfall is
+     recorded so every consumer can say so out loud: a PEP who has not been
+     harvested yet screens CLEAN, and silence must never be read as "not a PEP".
+     A complete harvest omits the flag entirely. */
+  const partial = Number.isFinite(expected) && expected > 0 && entries.length < expected;
+  return {
+    v: 1, list: PEP_LIST_NAME, harvested: harvestedAt, count: entries.length, classes, entries,
+    ...(partial ? { partial: true, expected } : {}),
+  };
 }
 
 /* Holder-batch failure gate: a harvest that lost too large a fraction of its
@@ -371,7 +380,14 @@ export function pepListFromDataset(dataset) {
       if (!meta.has(n)) meta.set(n, ctx);
     }
   }
-  return { list: { id: 'pep-worldwide', name: PEP_LIST_NAME, names }, meta, count: (dataset && dataset.count) || 0, harvested: (dataset && dataset.harvested) || '' };
+  return {
+    list: { id: 'pep-worldwide', name: PEP_LIST_NAME, names }, meta,
+    count: (dataset && dataset.count) || 0, harvested: (dataset && dataset.harvested) || '',
+    /* Carried through so the screen can say it out loud. A partial list means a
+       PEP who has not been harvested yet produces NO hit — absence of a match is
+       not evidence that a subject is not a PEP, and the run log has to say so. */
+    partial: !!(dataset && dataset.partial), expected: (dataset && dataset.expected) || 0,
+  };
 }
 
 /* ── network part (harvest CLI only) ───────────────────────────────────── */
@@ -463,14 +479,55 @@ async function harvest(outfile) {
   let batchTotal = st ? st.batchTotal : 0;
   let batchFailed = st ? st.batchFailed : 0;
 
+  /* Write the artifact through the SAME floor + shrink gates the final write
+     uses. Read-and-catch, no existence pre-check (CodeQL js/file-system-race):
+     an absent or unreadable previous artifact simply means first-harvest
+     semantics for the shrink gate. */
+  const writeArtifact = (dataset) => {
+    let prev = null;
+    try { prev = readJsonMaybeGz(outfile); } catch { prev = null; }
+    const gate = datasetFloorOk(dataset, prev);
+    if (!gate.ok) return { ...gate, hadPrev: !!prev };
+    writeJsonGz(outfile, dataset);
+    return { ok: true, hadPrev: !!prev };
+  };
+
+  /* Ship what we have. The harvest takes several links to label everyone, and
+     until now the artifact appeared only at the very end — so a chain that was
+     28% done delivered NOTHING to the daily screen. Each pause now also writes
+     the dataset built from the names banked so far, flagged partial, so the PEP
+     layer goes live early and improves link by link. The floor and shrink gates
+     still apply unchanged: a partial that is thinner than 60% of the artifact
+     already on the branch is REFUSED, which is exactly what stops a fresh cycle
+     from replacing last week's complete list with its first few thousand. Set
+     by the labels loop, because that is the only phase with names to write. */
+  let shipPartial = null;
+
   const writeCp = (phase, extra) => writeCheckpoint(cpFile, ({
     v: 1, sinceIso, harvestedAt, resumeCount, phase,
     positions: [...positions], posByClass: [...posByClass],
     holderRows, classHolders, classBatchFailed, batchTotal, batchFailed, ...extra,
   }));
 
+  /* Best-effort: a partial that fails the gates (too thin, or thinner than the
+     artifact already published) simply is not written — the harvest carries on
+     and the previous artifact stands. Never fatal; only the FINAL write is. */
+  const shipPartialNow = () => {
+    if (!shipPartial) return;
+    try {
+      const d = shipPartial();
+      const g = writeArtifact(d);
+      console.log(g.ok
+        ? `pep-worldwide: PARTIAL artifact published — ${d.count} of ${d.expected} persons (${Math.round(100 * d.count / d.expected)}%); the screen will flag it as partial coverage`
+        : `pep-worldwide: partial artifact NOT published — ${g.reason}`);
+    } catch (e) {
+      console.error('pep-worldwide: partial artifact write failed: ' + (e && e.message || e));
+    }
+  };
+
   const pause = (phase, extra) => {
     writeCp(phase, extra);
+    shipPartialNow();
     console.log(`pep-worldwide: time budget (${PEP_TIME_BUDGET_MIN} min) reached — checkpoint written (phase ${phase}, resume ${resumeCount}, ${holderRows.length} holder rows so far); exiting ${RESUME_EXIT_CODE} for the workflow to re-dispatch`);
     process.exit(RESUME_EXIT_CODE);
   };
@@ -488,6 +545,7 @@ async function harvest(outfile) {
     if (!bankProgress) { console.log(`pep-worldwide: ${sig} before any harvest progress — nothing to bank`); process.exit(RESUME_EXIT_CODE); }
     try {
       bankProgress();
+      shipPartialNow();
       console.log(`pep-worldwide: ${sig} received — checkpoint written (${holderRows.length} holder rows banked); the next run resumes from it`);
     } catch (e) {
       console.error('pep-worldwide: could not bank progress on ' + sig + ': ' + (e && e.message || e));
@@ -623,6 +681,10 @@ async function harvest(outfile) {
      is a Map set keyed by QID. */
   for (let i = labelStart; i < personQids.length; i += LABEL_WINDOW) {
     bankProgress = () => writeCp('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
+    shipPartial = () => buildPepDataset({
+      harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
+      names, expected: personQids.length,
+    });
     if (overBudget()) pause('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
     for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk just leaves those persons unnamed (dropped)
       if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
@@ -631,17 +693,11 @@ async function harvest(outfile) {
   }
 
   const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
-  /* Read-and-catch, no existence pre-check (CodeQL js/file-system-race):
-     an absent or unreadable previous artifact simply means first-harvest
-     semantics for the shrink gate. */
-  let prev = null;
-  try { prev = readJsonMaybeGz(outfile); } catch { prev = null; }
-  const gate = datasetFloorOk(dataset, prev);
+  const gate = writeArtifact(dataset);
   if (!gate.ok) {
-    console.error('pep-worldwide: REFUSING to write — ' + gate.reason + (prev ? ' (previous artifact kept)' : ''));
+    console.error('pep-worldwide: REFUSING to write — ' + gate.reason + (gate.hadPrev ? ' (previous artifact kept)' : ''));
     process.exit(1);
   }
-  writeJsonGz(outfile, dataset);
   /* Harvest complete — the checkpoint (if any) is spent; clearing it here
      makes the persist step drop it from the state branch too. */
   try { unlinkSync(cpFile); console.log('pep-worldwide: checkpoint cleared'); } catch { /* none to clear */ }

@@ -1053,6 +1053,28 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
     && pep.PEP_TIME_BUDGET_MIN + 30 <= timeout       // ≥30 min of runway for the pause
     && pep.PEP_MAX_RESUMES >= 4 && pep.RESUME_EXIT_CODE === 75;
 })());
+/* Partial delivery. The harvest takes several links, and shipping nothing until
+   the last one left the screen with no PEP layer at all for hours. A mid-harvest
+   dataset is now published, flagged partial + expected, so consumers can say out
+   loud that a not-yet-harvested PEP produces NO hit. A COMPLETE dataset must
+   carry no flag at all, or every consumer would warn forever. */
+{
+  const rows = Array.from({ length: 5 }, (_, i) => ({ person: 'Q' + i, pos: 'P1', end: '', classKey: 'minister' }));
+  const pos = new Map([['P1', { label: 'Minister', country: 'AE', classKey: 'minister' }]]);
+  const nm = new Map(rows.map(r => [r.person, { name: 'Name ' + r.person, aliases: [] }]));
+  const part = pep.buildPepDataset({ harvestedAt: 'T', holderRows: rows, positions: pos, names: nm, expected: 20 });
+  const full = pep.buildPepDataset({ harvestedAt: 'T', holderRows: rows, positions: pos, names: nm, expected: 5 });
+  check('PEP partial: a mid-harvest dataset is flagged partial and carries the expected total',
+    part.partial === true && part.expected === 20 && part.count === 5);
+  check('PEP partial: a COMPLETE dataset carries no partial flag (consumers must not warn forever)',
+    full.partial === undefined && full.expected === undefined);
+  check('PEP partial: the flag reaches the screen through pepListFromDataset (so it can degrade loudly)',
+    pep.pepListFromDataset(part).partial === true && pep.pepListFromDataset(part).expected === 20
+    && pep.pepListFromDataset(full).partial === false);
+  check('PEP partial: the shrink gate still refuses a thin partial over a fuller artifact (a fresh cycle cannot wipe last week)',
+    pep.datasetFloorOk(part, { count: 400 }).ok === false);
+}
+
 /* A cancelled Actions job SIGTERMs the harvest step. Until the signal handler
    existed that threw away everything the link had gathered — two cancelled links
    lost 83 and 34 minutes of WDQS work. Both halves have to hold: the script must
