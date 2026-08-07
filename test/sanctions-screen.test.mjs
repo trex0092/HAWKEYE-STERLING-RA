@@ -1116,6 +1116,16 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
     check('PEP offices: country is asked for over a VALUES list, never bolted onto the P279* walk',
       q.includes('VALUES ?pos { wd:Q1 wd:Q2 }') && !q.includes('P279')
       && q.includes('wdt:P17') && q.includes('wdt:P1001'));
+    /* Separate variables, not a UNION: an office carrying both (a US state
+       senator — country USA, jurisdiction California) would otherwise take
+       whichever row SPARQL emitted first, since union order is undefined, and
+       land a subdivision in a field the MLRO reads as a country. */
+    check('PEP offices: country and jurisdiction come back separately so P17 can be PREFERRED',
+      q.includes('?country ?jurisdiction') && !q.includes('UNION')
+      && /OPTIONAL \{ \?pos wdt:P17 \?country \}/.test(q)
+      && /OPTIONAL \{ \?pos wdt:P1001 \?jurisdiction \}/.test(q));
+    check('PEP offices: P1001 is only a fallback, never preferred over P17',
+      /r\.country \|\| r\.jurisdiction/.test(readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8')));
     const positions = new Map([
       ['Q1', { label: '', country: '', classKey: 'minister' }],
       ['Q2', { label: 'Mayor', country: '', classKey: 'minister' }],

@@ -345,13 +345,22 @@ export function positionsQuery(rootQid) {
    P17 (country) is the direct answer; P1001 (applies to jurisdiction) covers
    offices modelled against a state or subdivision instead, which is most
    legislative and ministerial seats. Either is enough to tell an MLRO which
-   country's officialdom a hit belongs to — without it a PEP hit reads
-   "Q15686806, country blank" and has to be looked up by hand before it can be
-   triaged at all. */
+   officialdom a hit belongs to — without it a PEP hit reads "Q15686806,
+   country blank" and has to be looked up by hand before it can be triaged at
+   all.
+
+   They come back in SEPARATE variables, not a UNION, because the caller has to
+   PREFER P17: an office carrying both (a US state senator: country USA,
+   jurisdiction California) would otherwise take whichever row SPARQL happened
+   to emit first — union order is not defined — and land a subdivision in a
+   field the MLRO reads as a country. OPTIONAL is safe here in a way it was not
+   on the P279* walk: the walk was unbounded, this is a fixed VALUES list, the
+   same shape holdersQuery already uses without trouble. */
 export function officeContextQuery(posQids) {
-  return 'SELECT ?pos ?country WHERE {\n'
+  return 'SELECT ?pos ?country ?jurisdiction WHERE {\n'
     + '  VALUES ?pos { ' + posQids.map(q => 'wd:' + q).join(' ') + ' }\n'
-    + '  { ?pos wdt:P17 ?country } UNION { ?pos wdt:P1001 ?country }\n'
+    + '  OPTIONAL { ?pos wdt:P17 ?country }\n'
+    + '  OPTIONAL { ?pos wdt:P1001 ?jurisdiction }\n'
     + '}';
 }
 
@@ -821,9 +830,10 @@ async function harvest(outfile) {
           await fetchJsonSafe(sparqlUrl(officeContextQuery(needCountry.slice(i, i + HOLDER_BATCH)))));
         for (const r of rows) {
           const p = positions.get(r.pos);
-          /* First answer wins: an office with both P17 and P1001 gets two rows,
-             and either is a truthful jurisdiction for the MLRO. */
-          if (p && !p.country && r.country) p.country = r.country;
+          /* P17 first, P1001 only as a fallback — a US state senator carries
+             both, and "United States" is the honest value for a field the MLRO
+             reads as a country. An office with neither simply stays blank. */
+          if (p && !p.country && (r.country || r.jurisdiction)) p.country = r.country || r.jurisdiction;
         }
         if (win % 8 === 0) console.log(`  office countries: ${Math.min(i + HOLDER_BATCH, needCountry.length)}/${needCountry.length}`);
       }
