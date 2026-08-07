@@ -114,10 +114,14 @@ export const LABEL_WINDOW = LABEL_CHUNK * LABEL_CONCURRENCY;
    changes for the ordinary weekly harvest.
 
    Shards deliberately do NOT push to the state branch — concurrent force-pushes
-   to one ref would race and silently drop work. Each emits its slice of names
-   as a workflow artifact and a separate merge step assembles the dataset. */
+   to one ref would race and silently drop work. Each writes its slice of names
+   to its own pep-shard-<i> branch and a separate merge step assembles the
+   dataset from all of them. PEP_SHARD_RUN stamps the slice with the run that
+   produced it so the merge can tell a fresh slice from a branch left behind by
+   an earlier, failed run. */
 export const PEP_SHARD_COUNT = Math.max(1, Number(process.env.PEP_SHARD_COUNT) || 1);
 export const PEP_SHARD_INDEX = Math.max(0, Number(process.env.PEP_SHARD_INDEX) || 0);
+export const PEP_SHARD_RUN = process.env.PEP_SHARD_RUN || '';
 
 /* The people this shard is responsible for. Every QID lands in exactly one
    shard and every shard sees the same list in the same order, so the union over
@@ -595,6 +599,17 @@ async function harvest(outfile) {
   if (st) {
     console.log(`pep-worldwide: RESUMING from checkpoint (resume ${resumeCount}/${PEP_MAX_RESUMES}, phase ${st.phase}, ${holderRows.length} holder rows banked, window since ${sinceIso})`);
   } else {
+    /* A SHARD with no checkpoint is a misconfiguration, not a fresh harvest.
+       Shards exist to split a banked label backlog; starting from zero means
+       each of them re-runs the whole positions and holders sweep, overruns its
+       budget and publishes nothing — an hour of eight runners spent to produce
+       no artifact. That happened once because the checkpoint is named after the
+       OUTFILE and the workflow staged it under the harvest's name. Fail in
+       seconds with the reason instead of failing silently in an hour. */
+    if (PEP_SHARD_COUNT > 1) {
+      console.error(`pep-worldwide: REFUSING to shard without a checkpoint — expected ${cpFile} (shards split a banked backlog; they do not sweep the graph from scratch). Stage the harvest checkpoint under that exact name.`);
+      process.exit(1);
+    }
     console.log(`pep-worldwide: harvesting (recency window ${RECENCY_MONTHS} months → since ${sinceIso})`);
   }
 
@@ -763,7 +778,7 @@ async function harvest(outfile) {
      own view would publish a list missing everyone else's people, which the
      shrink gate would then hold against the real one. */
   if (PEP_SHARD_COUNT > 1) {
-    writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, harvestedAt, names: [...names] });
+    writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, run: PEP_SHARD_RUN, harvestedAt, names: [...names] });
     console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`);
     return 0;
   }
@@ -789,10 +804,11 @@ async function harvest(outfile) {
    silently absent: a dataset quietly short of a shard's people would screen
    those PEPs as clean, which is precisely the silent-degradation this codebase
    refuses. The usual floor and shrink gates still guard the write on top. */
-async function mergeShards(outfile, cpFile, shardFiles) {
+export async function mergeShards(outfile, cpFile, shardFiles) {
   const cp = readJsonMaybeGz(cpFile);
   const st = restoreCheckpoint(cp);
   const slices = [];
+  const seen = new Map();
   for (const f of shardFiles) {
     let s = null;
     try { s = readJsonMaybeGz(f); } catch (e) { s = null; }
@@ -800,8 +816,26 @@ async function mergeShards(outfile, cpFile, shardFiles) {
       console.error(`pep-worldwide: REFUSING to merge — shard file ${f} is missing or unreadable; publishing without it would silently drop those people from the screened list`);
       return 1;
     }
-    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names`);
+    /* Each slice is collected off a long-lived pep-shard-<i> branch, so a shard
+       that failed this time leaves the PREVIOUS run's slice sitting there and
+       the merge would happily consume it — a stale, half-labelled slice merges
+       to a list quietly short of real PEPs, and a PEP absent from the list
+       screens CLEAN. Three cheap identity checks make that impossible:
+       every slice must come from THIS run, the set must be exactly 0..N-1 with
+       no repeats, and each must have been cut for the same shard count (a
+       slice from an 8-way split covers different people than a 16-way one). */
+    if (s.of !== shardFiles.length || !(s.shard >= 0 && s.shard < shardFiles.length) || seen.has(s.shard)) {
+      console.error(`pep-worldwide: REFUSING to merge — ${f} is shard ${s.shard}/${s.of} in a ${shardFiles.length}-way merge${seen.has(s.shard) ? ' (duplicate index)' : ''}; a slice cut for a different partition covers different people`);
+      return 1;
+    }
+    seen.set(s.shard, s.run || '');
+    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names${s.run ? ` (run ${s.run})` : ''}`);
     slices.push(s.names);
+  }
+  const runs = [...new Set(seen.values())];
+  if (runs.length > 1) {
+    console.error(`pep-worldwide: REFUSING to merge — slices come from different runs (${runs.join(', ')}); a leftover branch from an earlier run is stale and merging it would publish a list short of the people its shard never finished`);
+    return 1;
   }
   const names = mergeShardNames([[...st.names], ...slices]);
   const expected = st.labelQids.length;

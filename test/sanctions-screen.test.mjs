@@ -1077,6 +1077,71 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
     merged.size === 3 && merged.get('Q2').name === 'B' && merged.get('Q3').name === 'C');
   check('PEP shard: a nameless entry never enters the merged map (unlabelled is not screenable)',
     pep.mergeShardNames([[['Q9', { name: '', aliases: [] }]]]).size === 0);
+
+  /* The shard workflow's checkpoint filename is DERIVED, not written down: the
+     script names the checkpoint after the outfile. Staging it under any other
+     name means every shard finds nothing, restarts the whole graph sweep from
+     scratch, overruns its budget and publishes nothing — eight runners for an
+     hour, no artifact. That shipped once. These read the workflow and assert
+     the three numbers that have to agree still do. */
+  const shardWf = readFileSync(join(ROOT, '.github/workflows/pep-shard-harvest.yml'), 'utf8');
+  const outfile = (shardWf.match(/pep-worldwide\.mjs harvest (\S+)/) || [])[1];
+  const staged = (shardWf.match(/^\s*cp \S+ (\S+)$/m) || [])[1];
+  check('PEP shard: the workflow stages the checkpoint under the name the outfile derives',
+    Boolean(outfile) && staged === pep.checkpointPath(outfile));
+  const matrix = (shardWf.match(/index:\s*\[([^\]]+)\]/) || [])[1] || '';
+  const declared = Number((shardWf.match(/PEP_SHARD_COUNT:\s*'(\d+)'/) || [])[1]);
+  const collected = (shardWf.match(/for i in ([\d ]+); do/) || [])[1] || '';
+  check('PEP shard: matrix size, PEP_SHARD_COUNT and the merge collect loop all agree',
+    matrix.split(',').length === declared
+    && collected.trim().split(/\s+/).length === declared
+    && declared > 1);
+  check('PEP shard: each slice is stamped with the run that produced it',
+    /PEP_SHARD_RUN:\s*\$\{\{\s*github\.run_id/.test(shardWf));
+
+  /* Slices live on long-lived pep-shard-<i> branches, so a shard that fails
+     leaves the PREVIOUS run's slice in place for the merge to pick up. Merging
+     a stale, half-labelled slice publishes a list quietly short of real PEPs —
+     and a PEP absent from the list screens CLEAN. The merge must refuse. */
+  const { unlinkSync: _ul, existsSync: _ex } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const T = tmpdir() + '/pep-merge-';
+  const out = T + 'out.json', cpFile = T + 'cp.json';
+  /* Above the real 5000 floor, so the positive case exercises the SAME gate
+     production does rather than a relaxed one. */
+  const N = 6000;
+  const people = Array.from({ length: N }, (_, i) => 'Q' + (1000 + i));
+  const writeCp = () => pep.writeCheckpoint(cpFile, {
+    v: 1, harvestedAt: '2026-01-01T00:00:00Z', sinceIso: '2020-01-01T00:00:00Z', phase: 'labels',
+    positions: [['Q100', { label: 'Minister', country: 'AE', classKey: 'minister' }]], posByClass: [],
+    holderRows: people.map(p => ({ person: p, pos: 'Q100', end: '', classKey: 'minister' })),
+    classHolders: {}, classBatchFailed: {}, batchTotal: 1, batchFailed: 0,
+    labelQids: people, names: [], next: { labelIdx: 0 },
+  });
+  const sliceFor = (file, i, of, run) => {
+    pep.writeJsonGz(file, {
+      v: 1, shard: i, of, run,
+      names: pep.shardOf(people, i, 2).map(q => [q, { name: 'Person ' + q, aliases: [] }]),
+    });
+    return file;
+  };
+  writeCp();
+  const s0 = sliceFor(T + 's0.json', 0, 2, 'R1');
+  const stale = sliceFor(T + 's1-stale.json', 1, 2, 'R0');
+  check('PEP merge: REFUSES a slice left behind by an earlier run (stale branch, short list)',
+    await pep.mergeShards(out, cpFile, [s0, stale]) === 1 && !_ex(out));
+  const wrongSplit = sliceFor(T + 's1-split.json', 1, 4, 'R1');
+  check('PEP merge: REFUSES a slice cut for a different shard count (it covers different people)',
+    await pep.mergeShards(out, cpFile, [s0, wrongSplit]) === 1 && !_ex(out));
+  const dup = sliceFor(T + 's0-dup.json', 0, 2, 'R1');
+  check('PEP merge: REFUSES two slices claiming the same index (the other index is then unmerged)',
+    await pep.mergeShards(out, cpFile, [s0, dup]) === 1 && !_ex(out));
+  const s1 = sliceFor(T + 's1.json', 1, 2, 'R1');
+  const okCode = await pep.mergeShards(out, cpFile, [s0, s1]);
+  check('PEP merge: a matching, same-run set merges every person and clears the spent checkpoint',
+    okCode === 0 && _ex(out) && pep.readJsonMaybeGz(out).count === N
+    && !pep.readJsonMaybeGz(out).partial && !_ex(cpFile));
+  for (const f of [out, s0, s1, stale, wrongSplit, dup, cpFile]) { try { _ul(f); } catch { /* best-effort */ } }
 }
 
 /* Partial delivery. The harvest takes several links, and shipping nothing until
