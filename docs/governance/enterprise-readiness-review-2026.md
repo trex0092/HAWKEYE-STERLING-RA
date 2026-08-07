@@ -326,7 +326,16 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 61 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+Verified at HEAD: 62 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(7 August — **PEP shard harvest**. One dispatch-only workflow
+(`pep-shard-harvest.yml`, egress-blocked) that clears a PEP label backlog across
+eight runners at once. Wikidata rate-limits a client — a completed link's log
+carries 64 HTTP 429s — so parallelism inside one job has a ceiling that more
+clients do not. Additive: the weekly `pep-worldwide.yml` chain is untouched, each
+shard writes only its own branch, and a single merge job is the sole writer of
+the state branch and REFUSES to publish a set with any shard missing. Throughput
+only — no scored control changed, and the same floor/shrink gates guard the
+write.)*
 *(6 August — **PEP chain watchdog**. One workflow (`pep-chain-watchdog.yml`, egress-blocked) that
 restarts a PEP harvest link whose GitHub-hosted runner died abnormally. The harvest's own
 time-budget pause cannot cover that case: a dead runner never reaches its re-dispatch step, so the

@@ -93,16 +93,53 @@ export const LABEL_CHUNK = 50;
    from hours into minutes.
 
    Measured on the first link that completed cleanly: at concurrency 5 a
-   250-person window took ~30s (101 min banked 50,750 of 422,231 names), which
-   puts the remaining phase at ~7 more links. The bottleneck is per-request
-   latency on large multilingual payloads, not server-side rate limiting — no
-   429s were hit — so widening the window shortens the wall clock. maxlag=5 still
-   rides every request and a 429 still lands in fetchJson's retry-after backoff,
-   so if Wikidata does start pushing back the harvest slows down instead of
-   hammering; PEP_LABEL_CONCURRENCY dials it straight back from repo variables
-   with no code change. */
+   250-person window took ~30s (101 min banked 50,750 of 422,231 names).
+
+   That link's log ALSO shows 64 HTTP 429s with backoff — Wikidata rate-limits
+   this client, so widening the window inside ONE job fights the limiter rather
+   than the latency and has a ceiling. maxlag=5 rides every request and a 429
+   lands in fetchJson's retry-after backoff, so over-reach degrades into a
+   slower harvest rather than a failed one, and PEP_LABEL_CONCURRENCY dials it
+   back from repo variables with no code change. The lever that actually beats a
+   per-client limit is more CLIENTS — see PEP_SHARD_COUNT below. */
 export const LABEL_CONCURRENCY = Number(process.env.PEP_LABEL_CONCURRENCY) || 20;
 export const LABEL_WINDOW = LABEL_CHUNK * LABEL_CONCURRENCY;
+
+/* Sharding — the lever that beats a per-client rate limit, because each shard
+   runs on its OWN GitHub runner and is therefore its own client with its own
+   rate budget. Shard i labels the people whose position in the list is
+   congruent to i mod COUNT: a stable, gapless partition needing no coordination
+   between shards, so they never contend and none can miss or duplicate a
+   person. COUNT=1 (the default) is exactly the single-job behaviour, so nothing
+   changes for the ordinary weekly harvest.
+
+   Shards deliberately do NOT push to the state branch — concurrent force-pushes
+   to one ref would race and silently drop work. Each emits its slice of names
+   as a workflow artifact and a separate merge step assembles the dataset. */
+export const PEP_SHARD_COUNT = Math.max(1, Number(process.env.PEP_SHARD_COUNT) || 1);
+export const PEP_SHARD_INDEX = Math.max(0, Number(process.env.PEP_SHARD_INDEX) || 0);
+
+/* The people this shard is responsible for. Every QID lands in exactly one
+   shard and every shard sees the same list in the same order, so the union over
+   all shards is the input list with nothing lost and nothing counted twice. */
+export function shardOf(qids, index = PEP_SHARD_INDEX, count = PEP_SHARD_COUNT) {
+  if (count <= 1) return qids;
+  return qids.filter((_, i) => i % count === index);
+}
+
+/* Merge shard name-slices back into one map. Later shards never overwrite an
+   earlier shard's entry for the same QID — by construction they cannot collide,
+   and if a re-run ever did produce an overlap the first (already-verified)
+   value wins rather than a half-written one. */
+export function mergeShardNames(slices) {
+  const names = new Map();
+  for (const slice of slices) {
+    for (const [qid, nm] of slice || []) {
+      if (!names.has(qid) && nm && nm.name) names.set(qid, nm);
+    }
+  }
+  return names;
+}
 /* A harvest that lost more than this fraction of its holder batches to WDQS
    errors did not sweep enough of the graph to trust — fail loudly rather than
    write a thin list. Below it, a few flaky batches are tolerated (the run
@@ -676,6 +713,23 @@ async function harvest(outfile) {
     labelStart = 0;
     console.log(`pep-worldwide: ${holderRows.length} holder rows → ${personQids.length} distinct persons; fetching multilingual names`);
   }
+
+  /* Take only this shard's slice. Applied AFTER the resume branch so a shard
+     resumes against its own slice and its own labelIdx, and skipped entirely
+     when COUNT is 1 — the ordinary weekly harvest is byte-for-byte unchanged.
+     Whatever the shard has already banked for people OUTSIDE its slice (from a
+     checkpoint written before sharding) is kept, never discarded. */
+  if (PEP_SHARD_COUNT > 1) {
+    const all = personQids;
+    /* A shard drives its slice from ZERO, not from the checkpoint's labelIdx —
+       that index counts into the FULL list, so reusing it would make a shard
+       skip most of its own work. Instead it simply drops the people already
+       labelled in the checkpoint, which is the same "don't redo finished work"
+       guarantee expressed against the data rather than a position. */
+    personQids = shardOf(all).filter(q => !names.has(q));
+    labelStart = 0;
+    console.log(`pep-worldwide: SHARD ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} — ${personQids.length} unlabelled of ${shardOf(all).length} in this slice (${all.length} total); shards never push, the merge step assembles the dataset`);
+  }
   /* Publish what the checkpoint already carries, at STARTUP rather than waiting
      for this link's pause. A resumed link runs for its whole budget before it
      pauses, so without this the names banked by the PREVIOUS link sit unused for
@@ -703,6 +757,17 @@ async function harvest(outfile) {
     if ((i / LABEL_WINDOW) % 4 === 0) console.log(`  names: ${Math.min(i + LABEL_WINDOW, personQids.length)}/${personQids.length}`);
   }
 
+  /* A shard's job ends here: it emits the names it holds and writes NOTHING to
+     the artifact or the state branch. Assembling the dataset needs every
+     shard's slice, and only the merge step has them all — a shard writing its
+     own view would publish a list missing everyone else's people, which the
+     shrink gate would then hold against the real one. */
+  if (PEP_SHARD_COUNT > 1) {
+    writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, harvestedAt, names: [...names] });
+    console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`);
+    return 0;
+  }
+
   const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
   const gate = writeArtifact(dataset);
   if (!gate.ok) {
@@ -716,9 +781,53 @@ async function harvest(outfile) {
   return 0;
 }
 
+/* Assemble a sharded harvest: base checkpoint (holder rows, positions, the full
+   person list) + every shard's slice of names → the artifact. Runs once, on one
+   runner, so there is exactly one writer of the state branch and no race.
+
+   Fails LOUDLY on a missing shard rather than publishing a list with a slice
+   silently absent: a dataset quietly short of a shard's people would screen
+   those PEPs as clean, which is precisely the silent-degradation this codebase
+   refuses. The usual floor and shrink gates still guard the write on top. */
+async function mergeShards(outfile, cpFile, shardFiles) {
+  const cp = readJsonMaybeGz(cpFile);
+  const st = restoreCheckpoint(cp);
+  const slices = [];
+  for (const f of shardFiles) {
+    let s = null;
+    try { s = readJsonMaybeGz(f); } catch (e) { s = null; }
+    if (!s || !Array.isArray(s.names)) {
+      console.error(`pep-worldwide: REFUSING to merge — shard file ${f} is missing or unreadable; publishing without it would silently drop those people from the screened list`);
+      return 1;
+    }
+    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names`);
+    slices.push(s.names);
+  }
+  const names = mergeShardNames([[...st.names], ...slices]);
+  const expected = st.labelQids.length;
+  const dataset = buildPepDataset({
+    harvestedAt: st.harvestedAt, holderRows: st.holderRows, positions: st.positions, names,
+    expected,
+  });
+  let prev = null;
+  try { prev = readJsonMaybeGz(outfile); } catch { prev = null; }
+  const gate = datasetFloorOk(dataset, prev);
+  if (!gate.ok) {
+    console.error('pep-worldwide: REFUSING to write — ' + gate.reason + (prev ? ' (previous artifact kept)' : ''));
+    return 1;
+  }
+  writeJsonGz(outfile, dataset);
+  if (!dataset.partial) {
+    try { unlinkSync(cpFile); console.log('pep-worldwide: harvest COMPLETE — checkpoint cleared'); } catch { /* none to clear */ }
+  }
+  console.log(`pep-worldwide: merged ${slices.length} shards → ${dataset.count} of ${expected} persons${dataset.partial ? ' (PARTIAL)' : ' (complete)'} → ${outfile}`);
+  return 0;
+}
+
 async function main(argv) {
   if (argv[0] === 'harvest' && argv[1]) return harvest(argv[1]);
-  console.error('usage: pep-worldwide.mjs harvest <outfile>');
+  if (argv[0] === 'merge-shards' && argv.length >= 4) return mergeShards(argv[1], argv[2], argv.slice(3));
+  console.error('usage: pep-worldwide.mjs harvest <outfile>\n       pep-worldwide.mjs merge-shards <outfile> <checkpoint> <shard-file>...');
   return 2;
 }
 
