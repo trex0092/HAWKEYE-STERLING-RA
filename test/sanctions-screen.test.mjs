@@ -1138,6 +1138,11 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
     check('PEP offices: the pass is NOT gated on the phase (that is what switched it off for good)',
       !/if \(!st \|\| st\.phase !== 'labels'\) \{[\s\S]{0,200}offices/.test(src)
       && /if \(PEP_SHARD_COUNT === 1\) \{[\s\S]{0,900}pendingOffices/.test(src));
+    /* P17/P1001 answer with an ENTITY. Left as-is the artifact would carry
+       "Q30" where a country belongs, which on an MLRO's screen is barely better
+       than the blank it replaced. */
+    check('PEP offices: country QIDs are resolved to names before they reach the artifact',
+      /countryQids[\s\S]{0,600}fetchLabelWindow\(countryQids[\s\S]{0,400}cnames\.has\(p\.country\)/.test(src));
   }
 
   /* Concurrency is a cliff, not a slope. 5 and 10 each banked ~50,000 names per

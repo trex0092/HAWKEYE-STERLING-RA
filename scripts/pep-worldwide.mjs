@@ -828,6 +828,32 @@ async function harvest(outfile) {
         if (win % 8 === 0) console.log(`  office countries: ${Math.min(i + HOLDER_BATCH, needCountry.length)}/${needCountry.length}`);
       }
     }
+
+    /* P17/P1001 answer with an ENTITY, so what lands above is "Q30", not
+       "United States" — which on an MLRO's screen is barely better than the
+       blank it replaces. Resolve them to names. There are only ever a couple of
+       hundred distinct countries behind 59,204 offices, so this is a handful of
+       chunks on the same hang-proof path, and it runs against the whole
+       positions map (not just this link's slice) so countries banked by an
+       earlier link get named too. Best-effort like the rest: an unresolved QID
+       stays as it is rather than being blanked. */
+    const countryQids = [...new Set([...positions.values()].map(p => p.country).filter(c => /^Q\d+$/.test(c)))];
+    if (countryQids.length) {
+      console.log(`pep-worldwide: naming ${countryQids.length} distinct countries`);
+      const cnames = new Map();
+      for (let i = 0; i < countryQids.length; i += LABEL_WINDOW) {
+        if (overBudget()) officePause();
+        for (const data of await fetchLabelWindow(countryQids, i)) {
+          if (!data) continue;
+          for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
+            const nm = namesFromEntity(ent).name;
+            if (nm) cnames.set(qid, nm);
+          }
+        }
+      }
+      for (const p of positions.values()) if (cnames.has(p.country)) p.country = cnames.get(p.country);
+      console.log(`  resolved ${cnames.size}/${countryQids.length} country names`);
+    }
   }
 
   /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
