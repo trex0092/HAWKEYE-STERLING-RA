@@ -1145,9 +1145,23 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
       pep.pendingOffices(positions, rows, 'label').length === 0
       && pep.pendingOffices(positions, rows, 'country').length === 0);
     const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+    /* Read the office block itself rather than a fixed character window after
+       the guard — a distance-based match silently goes red the moment the block
+       grows, which tells you nothing about the invariant. */
+    const officeBlock = src.slice(src.indexOf('if (PEP_SHARD_COUNT === 1) {'), src.indexOf('/* Labels phase'));
     check('PEP offices: the pass is NOT gated on the phase (that is what switched it off for good)',
       !/if \(!st \|\| st\.phase !== 'labels'\) \{[\s\S]{0,200}offices/.test(src)
-      && /if \(PEP_SHARD_COUNT === 1\) \{[\s\S]{0,900}pendingOffices/.test(src));
+      && officeBlock.includes('pendingOffices'));
+    /* Every office loop banks on the same timer the person-labels loop uses.
+       Without it the whole pass lived only in memory until the budget pause, and
+       this pass can occupy an entire link on its own — the first live run spent
+       all 100 minutes on it and banked no person names at all, so an interrupted
+       link would have thrown away every office it had named. */
+    check('PEP offices: every office loop banks on the timer, not just at the pause',
+      (officeBlock.match(/officeTick\(\);/g) || []).length
+        === (officeBlock.match(/if \(overBudget\(\)\) officePause\(\);/g) || []).length
+      && (officeBlock.match(/officeTick\(\);/g) || []).length === 3
+      && src.indexOf('const BANK_EVERY_MS') < src.indexOf('if (PEP_SHARD_COUNT === 1) {'));
     /* P17/P1001 answer with an ENTITY. Left as-is the artifact would carry
        "Q30" where a country belongs, which on an MLRO's screen is barely better
        than the blank it replaced. */
