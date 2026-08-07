@@ -1053,6 +1053,25 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
     && pep.PEP_TIME_BUDGET_MIN + 30 <= timeout       // ≥30 min of runway for the pause
     && pep.PEP_MAX_RESUMES >= 4 && pep.RESUME_EXIT_CODE === 75;
 })());
+/* A cancelled Actions job SIGTERMs the harvest step. Until the signal handler
+   existed that threw away everything the link had gathered — two cancelled links
+   lost 83 and 34 minutes of WDQS work. Both halves have to hold: the script must
+   trap the signal and bank a checkpoint, AND the workflow's persist step must
+   still run when the job is cancelled, or the banked checkpoint never gets
+   committed. Guarded on success||cancelled, never always(): a hollow-harvest
+   refusal must not push. */
+check('PEP interrupt: the harvest traps SIGTERM/SIGINT and banks a checkpoint before exiting', (() => {
+  const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+  return /process\.on\('SIGTERM'/.test(src) && /process\.on\('SIGINT'/.test(src)
+    && /bankProgress\s*=\s*\(\)\s*=>\s*writeCp\('labels'/.test(src)
+    && /bankProgress\s*=\s*\(\)\s*=>\s*writeCp\('holders'/.test(src);
+})());
+check('PEP interrupt: the persist step still commits when the job is CANCELLED (else the banked checkpoint is lost)', (() => {
+  const wf = readFileSync(join(ROOT, '.github/workflows/pep-worldwide.yml'), 'utf8');
+  const persist = wf.slice(wf.indexOf('Persist the artifact + checkpoint'));
+  const gate = (persist.match(/^\s*if:\s*(.+)$/m) || [])[1] || '';
+  return /cancelled\(\)/.test(gate) && !/always\(\)/.test(gate);
+})());
 check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned checkpoint cannot steer queries', (() => {
   const st = pep.restoreCheckpoint({
     v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',

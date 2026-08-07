@@ -118,6 +118,14 @@ jobs:
           fi
 
       - name: Persist the artifact + checkpoint (pep-worldwide-state branch)
+        # Runs on CANCELLATION too. A cancelled job SIGTERMs the harvest, which
+        # banks its progress to a checkpoint on the way out; without this the
+        # commit never happened and the whole link was thrown away (two cancelled
+        # links lost 83 and 34 minutes of WDQS work). Guarded on success ||
+        # cancelled rather than always(): a genuine failure — a hollow harvest
+        # refusing to overwrite — must NOT push, and it writes no checkpoint
+        # anyway, so there would be nothing to commit.
+        if: success() || cancelled()
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
