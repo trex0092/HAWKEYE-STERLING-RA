@@ -676,6 +676,17 @@ async function harvest(outfile) {
     labelStart = 0;
     console.log(`pep-worldwide: ${holderRows.length} holder rows → ${personQids.length} distinct persons; fetching multilingual names`);
   }
+  /* Publish what the checkpoint already carries, at STARTUP rather than waiting
+     for this link's pause. A resumed link runs for its whole budget before it
+     pauses, so without this the names banked by the PREVIOUS link sit unused for
+     another hour and a half. Same gated write, so a partial too thin to publish
+     is still refused. */
+  shipPartial = () => buildPepDataset({
+    harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
+    names, expected: personQids.length,
+  });
+  if (names.size) shipPartialNow();
+
   /* labelIdx advances only after a WHOLE window resolves, so a pause mid-window
      re-fetches at most that window on resume — idempotent, since every result
      is a Map set keyed by QID. */
