@@ -1250,7 +1250,38 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   check('PEP merge: a matching, same-run set merges every person and clears the spent checkpoint',
     okCode === 0 && _ex(out) && pep.readJsonMaybeGz(out).count === N
     && !pep.readJsonMaybeGz(out).partial && !_ex(cpFile));
-  for (const f of [out, s0, s1, stale, wrongSplit, dup, cpFile]) { try { _ul(f); } catch { /* best-effort */ } }
+
+  /* The DENOMINATOR. `expected` came from labelQids alone, but a checkpoint
+     paused in the HOLDERS phase carries none — so expected was 0, partial
+     computed as false, and the merge published a list as COMPLETE however much
+     of the world was missing from it. The screen then prints no
+     partial-coverage warning and every unharvested PEP screens clean with
+     nothing saying so. Observed: "merged 4020 of 0 persons (complete)". */
+  const cp2 = T + 'cp-holders.json';
+  const holdersOnly = (extra) => pep.writeCheckpoint(cp2, {
+    v: 1, harvestedAt: '2026-01-01T00:00:00Z', sinceIso: '2020-01-01T00:00:00Z', phase: 'holders',
+    positions: [['Q100', { label: 'Minister', country: 'AE', classKey: 'minister' }]], posByClass: [],
+    classHolders: {}, classBatchFailed: {}, batchTotal: 1, batchFailed: 0,
+    names: [], next: { labelIdx: 0 }, ...extra,
+  });
+  /* Sized so the SHORT list still clears the 5000 floor — the point here is the
+     partial flag, not the floor gate, and a fixture under the floor would be
+     refused for the wrong reason. */
+  const M = 12000;
+  const many = Array.from({ length: M }, (_, i) => 'Q' + (1000 + i));
+  holdersOnly({ holderRows: many.map(p => ({ person: p, pos: 'Q100', end: '', classKey: 'minister' })) });
+  const half = T + 'half.json';
+  pep.writeJsonGz(half, { v: 1, shard: 0, of: 1, run: 'R2', names: many.slice(0, M / 2).map(q => [q, { name: 'P ' + q, aliases: [] }]) });
+  const outH = T + 'outh.json';
+  const codeH = await pep.mergeShards(outH, cp2, [half]);
+  const dH = _ex(outH) ? pep.readJsonMaybeGz(outH) : null;
+  check('PEP merge: with no labelQids the denominator falls back to the holder rows, so a short list is flagged PARTIAL',
+    codeH === 0 && dH && dH.count === M / 2 && dH.partial === true && dH.expected === M);
+  holdersOnly({ holderRows: [] });
+  const outE = T + 'oute.json';
+  check('PEP merge: REFUSES outright when the shortfall cannot be measured at all',
+    await pep.mergeShards(outE, cp2, [half]) === 1 && !_ex(outE));
+  for (const f of [out, s0, s1, stale, wrongSplit, dup, cpFile, cp2, half, outH, outE]) { try { _ul(f); } catch { /* best-effort */ } }
 }
 
 /* Partial delivery. The harvest takes several links, and shipping nothing until

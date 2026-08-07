@@ -1022,7 +1022,20 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
     return 1;
   }
   const names = mergeShardNames([[...st.names], ...slices]);
-  const expected = st.labelQids.length;
+  /* How many people the list OWES. labelQids is only present once the harvest
+     reached the labels phase; a checkpoint paused earlier (in holders) has
+     none, and taking the length blindly yields 0 — which makes buildPepDataset
+     compute partial = false and publish a list as COMPLETE however much of the
+     world is missing from it. The screen then issues no partial-coverage
+     warning, and every unharvested PEP screens clean with nothing saying so.
+     Fall back to the distinct people the holder rows already name, and refuse
+     outright if even that is unknown: a denominator we cannot establish is not
+     something to guess at on a screening list. */
+  const expected = st.labelQids.length || new Set(st.holderRows.map(r => r.person)).size;
+  if (!expected) {
+    console.error('pep-worldwide: REFUSING to merge — the checkpoint carries neither a label list nor holder rows, so there is no way to tell how many people the list owes. Publishing would mark an unknown shortfall COMPLETE and the screen would stop warning that a PEP it has never harvested screens clean.');
+    return 1;
+  }
   const dataset = buildPepDataset({
     harvestedAt: st.harvestedAt, holderRows: st.holderRows, positions: st.positions, names,
     expected,
