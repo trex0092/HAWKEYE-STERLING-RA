@@ -137,6 +137,29 @@ jobs:
           # dispatched resume picks up exactly where this run stopped. Auth is
           # the ephemeral env token in the push URL — the checkout persisted
           # no credentials.
+          # Re-read the branch before writing it. This push is a FORCE push of a
+          # tree assembled when the link STARTED, and the sharded harvest can
+          # publish the artifact while the link is still running — force-pushing
+          # a tree that predates it would DELETE a finished list and leave the
+          # screen with no PEP layer at all. Two rules, both about not undoing
+          # someone else's finished work:
+          #   * keep an artifact that appeared while we ran, when we have none;
+          #   * if that artifact is COMPLETE, our checkpoint is spent — drop it
+          #     instead of resurrecting a half-done harvest for the next run.
+          git fetch origin pep-worldwide-state --depth=1 2>/dev/null || true
+          if [ ! -e data/pep-worldwide.json ]; then
+            git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
+          fi
+          if [ -e data/pep-worldwide.json ] && node -e '
+            const fs = require("fs"), zlib = require("zlib");
+            const b = fs.readFileSync("data/pep-worldwide.json");
+            const d = JSON.parse((b[0] === 0x1f && b[1] === 0x8b) ? zlib.gunzipSync(b).toString("utf8") : b.toString("utf8"));
+            process.exit(d && d.count > 0 && !d.partial ? 0 : 1);
+          ' 2>/dev/null; then
+            echo "a COMPLETE artifact is already published — dropping this link's spent checkpoint"
+            rm -f data/pep-worldwide-checkpoint.json
+          fi
+
           if [ -n "$(git status --porcelain -- data/pep-worldwide.json data/pep-worldwide-checkpoint.json)" ]; then
             git config user.name "pep-worldwide"
             git config user.email "actions@github.com"
