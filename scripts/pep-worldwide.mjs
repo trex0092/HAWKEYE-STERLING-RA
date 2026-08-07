@@ -794,22 +794,43 @@ async function harvest(outfile) {
      Shards skip it: they exist to split the person-name backlog, every shard
      doing the same office work would be eight times the requests for one
      result, and the merge takes positions from the checkpoint anyway. */
+  /* One interval for every phase that banks, so an interruption costs at most
+     this much work wherever the link happened to be. */
+  const BANK_EVERY_MS = 5 * 60 * 1000;
+
   if (PEP_SHARD_COUNT === 1) {
     /* Pausing mid-office hands the run to the labels phase with whatever names
        are already banked — never an empty list. The old pause wrote names: []
        unconditionally, so a pause here would have discarded every person name a
        previous link had harvested. */
-    const officePause = () => pause('labels', {
+    const officeState = () => ({
       labelQids: (st && st.phase === 'labels') ? st.labelQids : [...new Set(holderRows.map(r => r.person))],
       names: (st && st.phase === 'labels') ? [...st.names] : [],
       next: { labelIdx: 0 },
     });
+    const officePause = () => pause('labels', officeState());
+    /* Bank office work on the same timer the person-labels loop uses. Without
+       this the whole pass lived only in memory until the budget pause: an
+       interrupted link threw away every office it had named, and this pass can
+       occupy an entire 100-minute link on its own — the first live run spent
+       all of one on it and banked no person names at all. A cancelled Actions
+       job never delivers a signal to node either (it kills the step's shell),
+       so a handler would not have saved it. Same 5-minute interval, same
+       reason: an interruption should cost one interval, not the link. */
+    let lastOfficeBank = Date.now();
+    const officeTick = () => {
+      if (Date.now() - lastOfficeBank < BANK_EVERY_MS) return;
+      writeCp('labels', officeState());
+      lastOfficeBank = Date.now();
+    };
+    bankProgress = () => writeCp('labels', officeState());
 
     const needLabel = pendingOffices(positions, holderRows, 'label');
     if (needLabel.length) {
       console.log(`pep-worldwide: ${needLabel.length} offices with holders still unnamed (of ${new Set(holderRows.map(r => r.pos)).size} held, ${positions.size} enumerated)`);
       for (let i = 0, win = 0; i < needLabel.length; i += LABEL_WINDOW, win++) {
         if (overBudget()) officePause();
+        officeTick();
         for (const data of await fetchLabelWindow(needLabel, i)) {
           if (!data) continue;
           for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
@@ -838,6 +859,7 @@ async function harvest(outfile) {
       let answered = 0;
       for (let i = 0, win = 0; i < needCountry.length; i += HOLDER_BATCH, win++) {
         if (overBudget()) officePause();
+        officeTick();
         const rows = parseSparqlBindings(
           await fetchJsonSafe(sparqlUrl(officeContextQuery(needCountry.slice(i, i + HOLDER_BATCH)))));
         for (const r of rows) {
@@ -870,6 +892,7 @@ async function harvest(outfile) {
       const cnames = new Map();
       for (let i = 0; i < countryQids.length; i += LABEL_WINDOW) {
         if (overBudget()) officePause();
+        officeTick();
         for (const data of await fetchLabelWindow(countryQids, i)) {
           if (!data) continue;
           for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
@@ -930,7 +953,6 @@ async function harvest(outfile) {
      started from. Banking on a timer makes a cancellation cost at most one
      interval instead of the whole link, and does not depend on a signal ever
      being delivered. */
-  const BANK_EVERY_MS = 5 * 60 * 1000;
   let lastBank = Date.now();
 
   /* Each iteration takes a WHOLE window, so an interrupt mid-window re-fetches
