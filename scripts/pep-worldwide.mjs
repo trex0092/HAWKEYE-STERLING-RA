@@ -97,12 +97,30 @@ export const LABEL_CHUNK = 50;
 
    That link's log ALSO shows 64 HTTP 429s with backoff — Wikidata rate-limits
    this client, so widening the window inside ONE job fights the limiter rather
-   than the latency and has a ceiling. maxlag=5 rides every request and a 429
-   lands in fetchJson's retry-after backoff, so over-reach degrades into a
-   slower harvest rather than a failed one, and PEP_LABEL_CONCURRENCY dials it
-   back from repo variables with no code change. The lever that actually beats a
-   per-client limit is more CLIENTS — see PEP_SHARD_COUNT below. */
-export const LABEL_CONCURRENCY = Number(process.env.PEP_LABEL_CONCURRENCY) || 20;
+   than the latency and has a ceiling.
+
+   The ceiling is a CLIFF, and the value below is where the measurements put it.
+   5 and 10 both banked ~50,000 names per link; on that "no gain, no harm"
+   reading the window was widened to 20, and 20 collapses. The 07:16 link's log
+   is unambiguous: 773 HTTP 429s, Retry-After pinned at 59-60s, every chunk
+   exhausting all six attempts, ~7,700 people requested and not one name banked
+   in 53 minutes. Twenty simultaneous requests per client is over the line
+   Wikimedia's API etiquette draws, and the limiter stops answering rather than
+   slowing down. Back to the value with evidence behind it. Raise this only
+   against a measured link, never on an absence of harm.
+
+   maxlag=5 rides every request and a 429 lands in fetchJson's retry-after
+   backoff, so ordinary throttling degrades into a slower harvest rather than a
+   failed one, and PEP_LABEL_CONCURRENCY dials it further back from repo
+   variables with no code change. The variable is clamped to the measured-safe
+   ceiling: it can only ever make the harvest politer, because the failure mode
+   in the other direction is a client that gets no answers at all, and no repo
+   setting should be able to reach it without the evidence a code change asks
+   for. The lever that actually beats a per-client limit is more CLIENTS — see
+   PEP_SHARD_COUNT below. */
+export const LABEL_CONCURRENCY_MAX = 10;
+export const LABEL_CONCURRENCY = Math.min(
+  LABEL_CONCURRENCY_MAX, Number(process.env.PEP_LABEL_CONCURRENCY) || 5);
 export const LABEL_WINDOW = LABEL_CHUNK * LABEL_CONCURRENCY;
 
 /* Sharding — the lever that beats a per-client rate limit, because each shard
@@ -129,6 +147,22 @@ export const PEP_SHARD_RUN = process.env.PEP_SHARD_RUN || '';
 export function shardOf(qids, index = PEP_SHARD_INDEX, count = PEP_SHARD_COUNT) {
   if (count <= 1) return qids;
   return qids.filter((_, i) => i % count === index);
+}
+
+/* Who this runner still has to label. The labels phase is driven by THIS, never
+   by a saved position, and that is a recall guarantee rather than a tidiness
+   one: a chunk whose retries all 429'd returns null and leaves its 50 people
+   unnamed, so a resume that marched past a saved index would never look at them
+   again and they would drop out of the PEP list permanently — screening clean
+   forever after. Driving from the remainder retries them for free (anyone
+   already named is skipped), which makes the phase monotone: a resume can only
+   ever ADD names.
+
+   The shard partition is taken off the FULL list before the filter, so every
+   shard computes the same partition regardless of what each has banked. */
+export function pendingLabels(allQids, names, { count = PEP_SHARD_COUNT, index = PEP_SHARD_INDEX } = {}) {
+  const mine = count > 1 ? shardOf(allQids, index, count) : allQids;
+  return mine.filter(q => !names.has(q));
 }
 
 /* Merge shard name-slices back into one map. Later shards never overwrite an
@@ -716,34 +750,30 @@ async function harvest(outfile) {
   }
 
   /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
-  let personQids, names, labelStart;
+  let allQids, names;
   if (st && st.phase === 'labels') {
-    personQids = st.labelQids;
+    allQids = st.labelQids;
     names = st.names;
-    labelStart = st.next.labelIdx;
-    console.log(`pep-worldwide: resuming names at ${labelStart}/${personQids.length} (${names.size} banked)`);
   } else {
-    personQids = [...new Set(holderRows.map(r => r.person))];
+    allQids = [...new Set(holderRows.map(r => r.person))];
     names = new Map();
-    labelStart = 0;
-    console.log(`pep-worldwide: ${holderRows.length} holder rows → ${personQids.length} distinct persons; fetching multilingual names`);
+    console.log(`pep-worldwide: ${holderRows.length} holder rows → ${allQids.length} distinct persons; fetching multilingual names`);
   }
+  /* How many people the harvest OWES, fixed for the whole run: the full person
+     list, never a slice or a remainder. Every partial write is measured against
+     it, so the shortfall a consumer sees is the real one. */
+  const expectedTotal = allQids.length;
 
-  /* Take only this shard's slice. Applied AFTER the resume branch so a shard
-     resumes against its own slice and its own labelIdx, and skipped entirely
-     when COUNT is 1 — the ordinary weekly harvest is byte-for-byte unchanged.
-     Whatever the shard has already banked for people OUTSIDE its slice (from a
-     checkpoint written before sharding) is kept, never discarded. */
+  /* Never a saved labelIdx — see pendingLabels: a resume that marched past a
+     throttled window would drop those people from the list for good. The 07:16
+     link met a hard throttle and every one of its ~7,700 people came back null;
+     this is what makes the next run retry them instead of forgetting them. */
+  const personQids = pendingLabels(allQids, names);
+  const labelStart = 0;
   if (PEP_SHARD_COUNT > 1) {
-    const all = personQids;
-    /* A shard drives its slice from ZERO, not from the checkpoint's labelIdx —
-       that index counts into the FULL list, so reusing it would make a shard
-       skip most of its own work. Instead it simply drops the people already
-       labelled in the checkpoint, which is the same "don't redo finished work"
-       guarantee expressed against the data rather than a position. */
-    personQids = shardOf(all).filter(q => !names.has(q));
-    labelStart = 0;
-    console.log(`pep-worldwide: SHARD ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} — ${personQids.length} unlabelled of ${shardOf(all).length} in this slice (${all.length} total); shards never push, the merge step assembles the dataset`);
+    console.log(`pep-worldwide: SHARD ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} — ${personQids.length} unlabelled of ${shardOf(allQids).length} in this slice (${expectedTotal} total); shards never push, the merge step assembles the dataset`);
+  } else if (st && st.phase === 'labels') {
+    console.log(`pep-worldwide: resuming names — ${personQids.length} still unlabelled of ${expectedTotal} (${names.size} banked)`);
   }
   /* Publish what the checkpoint already carries, at STARTUP rather than waiting
      for this link's pause. A resumed link runs for its whole budget before it
@@ -752,24 +782,44 @@ async function harvest(outfile) {
      is still refused. */
   shipPartial = () => buildPepDataset({
     harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
-    names, expected: personQids.length,
+    names, expected: expectedTotal,
   });
   if (names.size) shipPartialNow();
 
-  /* labelIdx advances only after a WHOLE window resolves, so a pause mid-window
-     re-fetches at most that window on resume — idempotent, since every result
-     is a Map set keyed by QID. */
-  for (let i = labelStart; i < personQids.length; i += LABEL_WINDOW) {
-    bankProgress = () => writeCp('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
+  /* The checkpoint is written to DISK here; the workflow's persist step commits
+     whatever is on disk when the job ends, including on cancellation. Banking
+     only at the budget pause (or from a signal handler) is not enough: a
+     cancelled Actions job kills the step's SHELL, and node keeps running as an
+     orphan until job cleanup reaps it — after persist has already committed. A
+     53-minute link was cancelled and its log ends "Terminate orphan process:
+     pid (2681) (node)" with the checkpoint byte-identical to the one it
+     started from. Banking on a timer makes a cancellation cost at most one
+     interval instead of the whole link, and does not depend on a signal ever
+     being delivered. */
+  const BANK_EVERY_MS = 5 * 60 * 1000;
+  let lastBank = Date.now();
+
+  /* Each iteration takes a WHOLE window, so an interrupt mid-window re-fetches
+     at most that window — idempotent, since every result is a Map set keyed by
+     QID. `i` indexes this run's remaining people, so it is progress within the
+     run, not a position any later run resumes from. */
+  for (let i = labelStart, win = 0; i < personQids.length; i += LABEL_WINDOW, win++) {
+    const snapshot = () => ({ labelQids: allQids, names: [...names], next: { labelIdx: i } });
+    bankProgress = () => writeCp('labels', snapshot());
     shipPartial = () => buildPepDataset({
       harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
-      names, expected: personQids.length,
+      names, expected: expectedTotal,
     });
-    if (overBudget()) pause('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
-    for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk just leaves those persons unnamed (dropped)
+    if (overBudget()) pause('labels', snapshot());
+    for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk leaves those persons unnamed — the next resume retries them
       if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
     }
-    if ((i / LABEL_WINDOW) % 4 === 0) console.log(`  names: ${Math.min(i + LABEL_WINDOW, personQids.length)}/${personQids.length}`);
+    if (win % 4 === 0) console.log(`  names: ${Math.min(i + LABEL_WINDOW, personQids.length)}/${personQids.length} this run (${names.size}/${expectedTotal} banked)`);
+    if (Date.now() - lastBank >= BANK_EVERY_MS) {
+      writeCp('labels', snapshot());
+      shipPartialNow();
+      lastBank = Date.now();
+    }
   }
 
   /* A shard's job ends here: it emits the names it holds and writes NOTHING to

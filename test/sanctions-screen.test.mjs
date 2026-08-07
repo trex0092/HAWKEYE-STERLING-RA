@@ -1078,6 +1078,54 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   check('PEP shard: a nameless entry never enters the merged map (unlabelled is not screenable)',
     pep.mergeShardNames([[['Q9', { name: '', aliases: [] }]]]).size === 0);
 
+  /* RECALL. The labels phase is driven by who is still unlabelled, never by a
+     saved position — a chunk whose retries all 429'd returns null and leaves
+     its 50 people unnamed, and a resume that marched past a saved index would
+     never ask for them again. They would drop out of the PEP list for good and
+     screen CLEAN forever after. Measured, not hypothetical: the 07:16 link met
+     a hard throttle and all ~7,700 people it requested came back null. */
+  {
+    const all = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6'];
+    const named = new Map([['Q2', { name: 'B', aliases: [] }], ['Q5', { name: 'E', aliases: [] }]]);
+    check('PEP labels: a resume asks for exactly the people still unlabelled',
+      pep.pendingLabels(all, named, { count: 1 }).join() === 'Q1,Q3,Q4,Q6');
+    check('PEP labels: people a throttled window left unnamed are asked for AGAIN, not skipped',
+      pep.pendingLabels(all, new Map(), { count: 1 }).join() === all.join());
+    check('PEP labels: a complete pass leaves nothing pending (the loop terminates)',
+      pep.pendingLabels(all, new Map(all.map(q => [q, { name: q, aliases: [] }])), { count: 1 }).length === 0);
+    /* Shards partition the FULL list before filtering, so the partition does
+       not depend on what each shard had already banked — otherwise the union
+       of the slices would stop being the input list and people would vanish
+       between shards. */
+    const sharded = [0, 1].map(i => pep.pendingLabels(all, named, { count: 2, index: i }));
+    check('PEP labels: sharded pending sets still union to every unlabelled person, no overlap',
+      sharded.flat().sort().join() === ['Q1', 'Q3', 'Q4', 'Q6'].sort().join()
+      && new Set(sharded.flat()).size === 4);
+  }
+
+  /* Concurrency is a cliff, not a slope. 5 and 10 each banked ~50,000 names per
+     link; 20 collapsed to 773 HTTP 429s, Retry-After pinned at 59-60s and ZERO
+     names in 53 minutes. The shipped default must stay inside the measured band
+     and no repo variable may raise it past the ceiling — the failure mode above
+     it is a client that gets no answers at all. */
+  check('PEP labels: the shipped concurrency stays inside the measured-safe band',
+    pep.LABEL_CONCURRENCY >= 1 && pep.LABEL_CONCURRENCY <= pep.LABEL_CONCURRENCY_MAX
+    && pep.LABEL_CONCURRENCY_MAX <= 10
+    && pep.LABEL_WINDOW === pep.LABEL_CHUNK * pep.LABEL_CONCURRENCY);
+  {
+    const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+    check('PEP labels: PEP_LABEL_CONCURRENCY is CLAMPED, so a repo variable can only dial it down',
+      /Math\.min\(\s*LABEL_CONCURRENCY_MAX,\s*Number\(process\.env\.PEP_LABEL_CONCURRENCY\)/.test(src));
+    /* A cancelled Actions job kills the step's SHELL; node keeps running as an
+       orphan until job cleanup, after the persist step has already committed.
+       So banking cannot depend on a signal arriving — a 53-minute link was
+       cancelled and its checkpoint came back byte-identical to the one it had
+       started from. Banking on a timer bounds the loss to one interval. */
+    check('PEP labels: progress is banked on a timer, not only at the pause or from a signal',
+      /BANK_EVERY_MS\s*=\s*\d+\s*\*\s*60\s*\*\s*1000/.test(src)
+      && /Date\.now\(\) - lastBank >= BANK_EVERY_MS/.test(src));
+  }
+
   /* The shard workflow's checkpoint filename is DERIVED, not written down: the
      script names the checkpoint after the outfile. Staging it under any other
      name means every shard finds nothing, restarts the whole graph sweep from
