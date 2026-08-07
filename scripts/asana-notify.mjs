@@ -167,8 +167,10 @@ export async function notifyAsana(name, notes, opts = {}) {
   } catch (e) {
     console.warn('asana-notify: duplicate check failed (' + (e && e.message || e) + ') — posting anyway');
   }
-  if (opts.html) data.html_notes = String(opts.html).slice(0, 60000);
-  else data.notes = String(notes).slice(0, 60000);
+  /* Byte-capped, tag-aware — a character slice let a multilingual digest weigh
+     65,424 bytes against Asana's 65,400 limit and lose the whole card. */
+  if (opts.html) data.html_notes = fitAsanaHtml(opts.html);
+  else data.notes = Buffer.from(String(notes), 'utf8').slice(0, 65000).toString('utf8').replace(/�+$/, '');
   if (opts.assignee !== null) data.assignee = opts.assignee || 'me';
   const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
   const gid = d.data && d.data.gid;
@@ -183,6 +185,58 @@ export async function notifyAsana(name, notes, opts = {}) {
     }
   }
   return d.data && d.data.permalink_url;
+}
+
+/* Asana rejects an html_notes body over 65,400 BYTES. The old cap sliced at
+   60,000 CHARACTERS, which is the same thing only for ASCII — and the daily
+   screening digest stopped being ASCII the day the worldwide PEP list started
+   contributing Arabic, Cyrillic and Han names to it. Those cost 2-3 bytes each,
+   so 60,000 characters weighed 65,424 bytes and Asana 400'd the whole card:
+
+     html_notes: Value is too large, 65424 > 65400 bytes
+
+   The MLRO got no digest at all on a run that found 88 new matches — the day
+   the card mattered most. Cap by byte length, and leave room for the notice.
+
+   Truncating is not just a substring: html_notes is parsed as STRICT XML, so a
+   cut through the middle of a tag, or one that orphans an open <ul>, 400s
+   exactly as hard as being too long. So cut back to a tag boundary, then close
+   whatever is still open, in reverse order. */
+export const ASANA_HTML_MAX_BYTES = Number(process.env.ASANA_HTML_MAX_BYTES) || 65000;
+const VOID_TAGS = new Set(['br', 'hr', 'img']);
+
+export function fitAsanaHtml(html, max = ASANA_HTML_MAX_BYTES) {
+  const s = String(html == null ? '' : html);
+  if (Buffer.byteLength(s, 'utf8') <= max) return s;
+  const notice = '<strong>⚠ TRUNCATED to fit Asana\'s size limit — findings below the cut are NOT in this card. '
+    + 'Treat it as incomplete and read the full report on the screening run.</strong>';
+  const budget = max - Buffer.byteLength(notice, 'utf8') - 32;   // 32: room for closers
+
+  /* Walk whole characters so a multi-byte sequence is never split. */
+  let cut = 0, bytes = 0;
+  for (const ch of s) {
+    const b = Buffer.byteLength(ch, 'utf8');
+    if (bytes + b > budget) break;
+    bytes += b; cut += ch.length;
+  }
+  /* Back up to the end of the last COMPLETE tag — anything after it is a
+     half-written element that would fail XML parsing. */
+  const lastClose = s.lastIndexOf('>', cut);
+  let kept = lastClose >= 0 ? s.slice(0, lastClose + 1) : '';
+
+  /* Close what is still open, innermost first. */
+  const open = [];
+  for (const m of kept.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*?(\/?)>/g)) {
+    const [, slash, name, selfClose] = m;
+    const tag = name.toLowerCase();
+    if (VOID_TAGS.has(tag) || selfClose) continue;
+    if (slash) { const i = open.lastIndexOf(tag); if (i >= 0) open.splice(i, 1); }
+    else open.push(tag);
+  }
+  const body = open.indexOf('body');
+  if (body >= 0) kept += notice;                 // notice belongs INSIDE <body>
+  for (let i = open.length - 1; i >= 0; i--) kept += '</' + open[i] + '>';
+  return body >= 0 ? kept : kept + notice;
 }
 
 /* Escape text for safe inclusion in Asana html_notes (XML-strict). */

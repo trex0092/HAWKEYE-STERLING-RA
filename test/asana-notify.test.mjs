@@ -2,7 +2,8 @@
    shared transient-failure policy (retry classification + backoff) and the
    re-run duplicate guard used by every monitoring delivery stream. */
 import {
-  isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana
+  isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana,
+  fitAsanaHtml, ASANA_HTML_MAX_BYTES
 } from '../scripts/asana-notify.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -187,6 +188,49 @@ check('a sectionless mirror still joins the project',
     mirrorRe.test(stepBlock(yScreen, 'scripts/screening-cases.mjs')));
   check('sanctions-screen.yml assigns the mirror env on the alert step too (sanctions-screen.mjs consumes it when alerts are not suppressed)',
     mirrorRe.test(stepBlock(yScreen, 'scripts/sanctions-screen.mjs')));
+}
+
+/* Asana rejects an html_notes body over 65,400 BYTES. The old cap sliced at
+   60,000 CHARACTERS — identical only for ASCII, and the daily screening digest
+   stopped being ASCII the day the worldwide PEP list began contributing Arabic,
+   Cyrillic and Han names. 60,000 of those characters weighed 65,424 bytes, so
+   Asana 400'd the entire card and the MLRO got NO digest on a run that found 88
+   new matches. Truncation also has to keep the XML well-formed: html_notes is
+   parsed strictly, and an orphaned <ul> 400s exactly as hard as being too big. */
+{
+  const bytes = (x) => Buffer.byteLength(x, 'utf8');
+  const multilingual = 'الرئيس فلاديمير بوتين · Президент · 中華人民共和國主席';
+  let big = '<body><h1>Daily sanctions screening</h1><ul>';
+  for (let i = 0; i < 3000; i++) big += '<li><strong>Subject ' + i + '</strong> — ' + multilingual + '</li>';
+  big += '</ul><em>footer</em></body>';
+  check('asana html: a multilingual body is far over the BYTE cap while under any character cap',
+    big.length < 300000 && bytes(big) > ASANA_HTML_MAX_BYTES && bytes(big) > big.length);
+  const fitted = fitAsanaHtml(big);
+  check('asana html: the fitted body is within Asana\'s byte limit',
+    bytes(fitted) <= ASANA_HTML_MAX_BYTES);
+  check('asana html: truncation is DISCLOSED, never a silent drop of findings',
+    /TRUNCATED/.test(fitted));
+  check('asana html: no character is split across the byte cut',
+    !fitted.includes('�'));
+  const wellFormed = (html) => {
+    const stack = [];
+    for (const m of html.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*?(\/?)>/g)) {
+      const [, slash, name, selfClose] = m;
+      if (selfClose) continue;
+      if (slash) { if (stack.pop() !== name.toLowerCase()) return false; }
+      else stack.push(name.toLowerCase());
+    }
+    return stack.length === 0;
+  };
+  check('asana html: every tag left open by the cut is closed — html_notes is strict XML',
+    wellFormed(fitted) && fitted.endsWith('</body>'));
+  const small = '<body><h1>Clean day</h1><em>no matches</em></body>';
+  check('asana html: a body under the cap is returned untouched',
+    fitAsanaHtml(small) === small && wellFormed(small));
+  check('asana html: the notify path caps by bytes, not characters',
+    /fitAsanaHtml\(opts\.html\)/.test(
+      readFileSync(join(resolve(dirname(fileURLToPath(import.meta.url)), '..'),
+        'scripts/asana-notify.mjs'), 'utf8')));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
