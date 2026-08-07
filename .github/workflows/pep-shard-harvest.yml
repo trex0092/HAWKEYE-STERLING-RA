@@ -145,12 +145,19 @@ jobs:
         with:
           disable-sudo: true
           egress-policy: block
+          # www.wikidata.org is here for ONE reason: the merge resolves any
+          # country still held as a bare QID into a name. That used to sit at
+          # the tail of the office pass, behind ~1,000 serial WDQS queries that
+          # can pause at the time budget — and did, twice — leaving offices
+          # labelled "Q159" instead of "Russia". It is a few chunks of work, so
+          # it belongs where the artifact is assembled.
           allowed-endpoints: >
             github.com:443
             api.github.com:443
             codeload.github.com:443
             objects.githubusercontent.com:443
             nodejs.org:443
+            www.wikidata.org:443
             *.githubapp.com:443
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
