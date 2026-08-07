@@ -80,18 +80,39 @@ jobs:
             echo "::error::no checkpoint on pep-worldwide-state — run the ordinary PEP Worldwide Harvest first so the holders phase is banked, then shard the label backlog"
             exit 1
           fi
+          # The script derives the checkpoint name from the OUTFILE, so a shard
+          # writing data/pep-shard.json looks for data/pep-shard-checkpoint.json
+          # and would otherwise find nothing — silently restarting the whole
+          # harvest (positions + holders + every person's labels) instead of
+          # resuming, which overruns the budget and publishes nothing at all.
+          cp data/pep-worldwide-checkpoint.json data/pep-shard-checkpoint.json
+          echo "checkpoint staged under the name this shard's outfile derives"
 
       - name: Harvest this shard's slice
         env:
           PEP_SHARD_COUNT: '8'
           PEP_SHARD_INDEX: ${{ matrix.index }}
+          # Stamped into the slice so the merge can reject a branch left behind
+          # by an earlier run instead of merging its half-finished names.
+          PEP_SHARD_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
           PEP_RECENCY_MONTHS: ${{ vars.PEP_RECENCY_MONTHS }}
           PEP_LABEL_CONCURRENCY: ${{ vars.PEP_LABEL_CONCURRENCY }}
           # Sized to finish inside the job timeout; the budget is a backstop, not
           # the normal path, because a shard hands nothing to the merge until it
           # completes its slice.
           PEP_TIME_BUDGET_MIN: '140'
-        run: node scripts/pep-worldwide.mjs harvest data/pep-shard.json
+        run: |
+          # Exit 75 is a PLANNED pause in the ordinary chain, which resumes from
+          # the checkpoint it just wrote. A shard has no next link: it publishes
+          # its slice only on completion, so a pause means this shard produced
+          # nothing usable. Fail with that sentence rather than an opaque 75.
+          code=0
+          node scripts/pep-worldwide.mjs harvest data/pep-shard.json || code=$?
+          if [ "$code" -eq 75 ]; then
+            echo "::error::shard ${{ matrix.index }} ran out of time budget before finishing its slice — it publishes nothing and the merge will refuse; raise PEP_TIME_BUDGET_MIN/timeout-minutes or split into more shards"
+            exit 1
+          fi
+          exit "$code"
 
       - name: Publish this shard's slice (pep-shard-<index> branch)
         env:

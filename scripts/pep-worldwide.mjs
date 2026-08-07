@@ -97,12 +97,30 @@ export const LABEL_CHUNK = 50;
 
    That link's log ALSO shows 64 HTTP 429s with backoff — Wikidata rate-limits
    this client, so widening the window inside ONE job fights the limiter rather
-   than the latency and has a ceiling. maxlag=5 rides every request and a 429
-   lands in fetchJson's retry-after backoff, so over-reach degrades into a
-   slower harvest rather than a failed one, and PEP_LABEL_CONCURRENCY dials it
-   back from repo variables with no code change. The lever that actually beats a
-   per-client limit is more CLIENTS — see PEP_SHARD_COUNT below. */
-export const LABEL_CONCURRENCY = Number(process.env.PEP_LABEL_CONCURRENCY) || 20;
+   than the latency and has a ceiling.
+
+   The ceiling is a CLIFF, and the value below is where the measurements put it.
+   5 and 10 both banked ~50,000 names per link; on that "no gain, no harm"
+   reading the window was widened to 20, and 20 collapses. The 07:16 link's log
+   is unambiguous: 773 HTTP 429s, Retry-After pinned at 59-60s, every chunk
+   exhausting all six attempts, ~7,700 people requested and not one name banked
+   in 53 minutes. Twenty simultaneous requests per client is over the line
+   Wikimedia's API etiquette draws, and the limiter stops answering rather than
+   slowing down. Back to the value with evidence behind it. Raise this only
+   against a measured link, never on an absence of harm.
+
+   maxlag=5 rides every request and a 429 lands in fetchJson's retry-after
+   backoff, so ordinary throttling degrades into a slower harvest rather than a
+   failed one, and PEP_LABEL_CONCURRENCY dials it further back from repo
+   variables with no code change. The variable is clamped to the measured-safe
+   ceiling: it can only ever make the harvest politer, because the failure mode
+   in the other direction is a client that gets no answers at all, and no repo
+   setting should be able to reach it without the evidence a code change asks
+   for. The lever that actually beats a per-client limit is more CLIENTS — see
+   PEP_SHARD_COUNT below. */
+export const LABEL_CONCURRENCY_MAX = 10;
+export const LABEL_CONCURRENCY = Math.min(
+  LABEL_CONCURRENCY_MAX, Number(process.env.PEP_LABEL_CONCURRENCY) || 5);
 export const LABEL_WINDOW = LABEL_CHUNK * LABEL_CONCURRENCY;
 
 /* Sharding — the lever that beats a per-client rate limit, because each shard
@@ -114,10 +132,14 @@ export const LABEL_WINDOW = LABEL_CHUNK * LABEL_CONCURRENCY;
    changes for the ordinary weekly harvest.
 
    Shards deliberately do NOT push to the state branch — concurrent force-pushes
-   to one ref would race and silently drop work. Each emits its slice of names
-   as a workflow artifact and a separate merge step assembles the dataset. */
+   to one ref would race and silently drop work. Each writes its slice of names
+   to its own pep-shard-<i> branch and a separate merge step assembles the
+   dataset from all of them. PEP_SHARD_RUN stamps the slice with the run that
+   produced it so the merge can tell a fresh slice from a branch left behind by
+   an earlier, failed run. */
 export const PEP_SHARD_COUNT = Math.max(1, Number(process.env.PEP_SHARD_COUNT) || 1);
 export const PEP_SHARD_INDEX = Math.max(0, Number(process.env.PEP_SHARD_INDEX) || 0);
+export const PEP_SHARD_RUN = process.env.PEP_SHARD_RUN || '';
 
 /* The people this shard is responsible for. Every QID lands in exactly one
    shard and every shard sees the same list in the same order, so the union over
@@ -125,6 +147,37 @@ export const PEP_SHARD_INDEX = Math.max(0, Number(process.env.PEP_SHARD_INDEX) |
 export function shardOf(qids, index = PEP_SHARD_INDEX, count = PEP_SHARD_COUNT) {
   if (count <= 1) return qids;
   return qids.filter((_, i) => i % count === index);
+}
+
+/* Offices still missing context, among those that actually have a holder. Same
+   drive-from-the-remainder rule as pendingLabels: a pass that was cut short by
+   a budget pause resumes on what is still missing rather than being skipped
+   wholesale or redone from the top. `want` selects the field — offices needing
+   a name, or offices needing a country. */
+export function pendingOffices(positions, holderRows, want = 'label') {
+  const held = new Set(holderRows.map(r => r.pos));
+  const out = [];
+  for (const q of held) {
+    const p = positions.get(q);
+    if (p && !p[want]) out.push(q);
+  }
+  return out;
+}
+
+/* Who this runner still has to label. The labels phase is driven by THIS, never
+   by a saved position, and that is a recall guarantee rather than a tidiness
+   one: a chunk whose retries all 429'd returns null and leaves its 50 people
+   unnamed, so a resume that marched past a saved index would never look at them
+   again and they would drop out of the PEP list permanently — screening clean
+   forever after. Driving from the remainder retries them for free (anyone
+   already named is skipped), which makes the phase monotone: a resume can only
+   ever ADD names.
+
+   The shard partition is taken off the FULL list before the filter, so every
+   shard computes the same partition regardless of what each has banked. */
+export function pendingLabels(allQids, names, { count = PEP_SHARD_COUNT, index = PEP_SHARD_INDEX } = {}) {
+  const mine = count > 1 ? shardOf(allQids, index, count) : allQids;
+  return mine.filter(q => !names.has(q));
 }
 
 /* Merge shard name-slices back into one map. Later shards never overwrite an
@@ -280,6 +333,34 @@ export function restoreCheckpoint(cp) {
 export function positionsQuery(rootQid) {
   return 'SELECT DISTINCT ?pos WHERE {\n'
     + `  ?pos wdt:P279* wd:${rootQid} .\n`
+    + '}';
+}
+
+/* Country/jurisdiction for offices that HAVE holders. The comment above is why
+   this is a separate query rather than OPTIONAL clauses on the P279* walk: bolt
+   country onto the unbounded walk and WDQS dies at 60s. Scoped to a VALUES list
+   of known QIDs it is the same cheap, bounded shape as holdersQuery — one row
+   per office, no walk at all.
+
+   P17 (country) is the direct answer; P1001 (applies to jurisdiction) covers
+   offices modelled against a state or subdivision instead, which is most
+   legislative and ministerial seats. Either is enough to tell an MLRO which
+   officialdom a hit belongs to — without it a PEP hit reads "Q15686806,
+   country blank" and has to be looked up by hand before it can be triaged at
+   all.
+
+   They come back in SEPARATE variables, not a UNION, because the caller has to
+   PREFER P17: an office carrying both (a US state senator: country USA,
+   jurisdiction California) would otherwise take whichever row SPARQL happened
+   to emit first — union order is not defined — and land a subdivision in a
+   field the MLRO reads as a country. OPTIONAL is safe here in a way it was not
+   on the P279* walk: the walk was unbounded, this is a fixed VALUES list, the
+   same shape holdersQuery already uses without trouble. */
+export function officeContextQuery(posQids) {
+  return 'SELECT ?pos ?country ?jurisdiction WHERE {\n'
+    + '  VALUES ?pos { ' + posQids.map(q => 'wd:' + q).join(' ') + ' }\n'
+    + '  OPTIONAL { ?pos wdt:P17 ?country }\n'
+    + '  OPTIONAL { ?pos wdt:P1001 ?jurisdiction }\n'
     + '}';
 }
 
@@ -595,6 +676,17 @@ async function harvest(outfile) {
   if (st) {
     console.log(`pep-worldwide: RESUMING from checkpoint (resume ${resumeCount}/${PEP_MAX_RESUMES}, phase ${st.phase}, ${holderRows.length} holder rows banked, window since ${sinceIso})`);
   } else {
+    /* A SHARD with no checkpoint is a misconfiguration, not a fresh harvest.
+       Shards exist to split a banked label backlog; starting from zero means
+       each of them re-runs the whole positions and holders sweep, overruns its
+       budget and publishes nothing — an hour of eight runners spent to produce
+       no artifact. That happened once because the checkpoint is named after the
+       OUTFILE and the workflow staged it under the harvest's name. Fail in
+       seconds with the reason instead of failing silently in an hour. */
+    if (PEP_SHARD_COUNT > 1) {
+      console.error(`pep-worldwide: REFUSING to shard without a checkpoint — expected ${cpFile} (shards split a banked backlog; they do not sweep the graph from scratch). Stage the harvest checkpoint under that exact name.`);
+      process.exit(1);
+    }
     console.log(`pep-worldwide: harvesting (recency window ${RECENCY_MONTHS} months → since ${sinceIso})`);
   }
 
@@ -678,57 +770,144 @@ async function harvest(outfile) {
   }
   if (batchFailed) console.log(`pep-worldwide: tolerated ${batchFailed}/${batchTotal} flaky holder batches (within the ${Math.round(PEP_MAX_BATCH_FAIL_PCT * 100)}% gate)`);
 
-  /* Office labels — AFTER holders and scoped to positions that actually have
-     one. Labelling every enumerated position cost 1,614 requests (80,677 QIDs)
-     and ate a whole 40-min budget at 25% done, for a field that is cosmetic:
-     buildPepDataset falls back to the position QID, and PERSON-name recall
-     never depends on it. Best-effort throughout — a lost chunk just leaves
-     those offices QID-labelled. */
-  if (!st || st.phase !== 'labels') {
-    const heldQids = [...new Set(holderRows.map(r => r.pos))].filter(q => positions.has(q));
-    console.log(`pep-worldwide: labelling ${heldQids.length} offices that have holders (of ${positions.size} enumerated)`);
-    for (let i = 0; i < heldQids.length; i += LABEL_WINDOW) {
-      if (overBudget()) pause('labels', { labelQids: [...new Set(holderRows.map(r => r.person))], names: [], next: { labelIdx: 0 } });
-      for (const data of await fetchLabelWindow(heldQids, i)) {
-        if (!data) continue;
-        for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
-          const p = positions.get(qid);
-          if (p) p.label = namesFromEntity(ent).name || p.label;
+  /* Office context — the name and country of the offices that actually have a
+     holder. Both were treated as cosmetic and both were wrong to skip.
+
+     The label pass was guarded on `phase !== 'labels'`, so the first budget
+     pause into the person-labels phase turned it off PERMANENTLY: it finished
+     22% of 59,204 held offices and no resume ever went back. The country pass
+     did not exist at all — the walk-scoped query that once carried it killed
+     WDQS, it was dropped to a bare P279* walk, and the comment's promise that
+     "country rides the label pass" was never true, because wbgetentities is
+     asked for labels|aliases and returns no claims. Result in the live
+     artifact: 68.6% of entries name their office as a raw QID and 100% carry
+     no country.
+
+     That is not cosmetic where it lands. A PEP hit is a REVIEW-tier signal —
+     the MLRO's job is to verify the person's office — and "Q15686806, country
+     blank" cannot be triaged without a manual lookup per hit. Name recall
+     genuinely does not depend on it, so this stays best-effort: a lost chunk
+     leaves those offices thin and the harvest carries on. But it now RUNS on
+     every resume, driven by what is still missing, so it converges instead of
+     being switched off by the first pause.
+
+     Shards skip it: they exist to split the person-name backlog, every shard
+     doing the same office work would be eight times the requests for one
+     result, and the merge takes positions from the checkpoint anyway. */
+  if (PEP_SHARD_COUNT === 1) {
+    /* Pausing mid-office hands the run to the labels phase with whatever names
+       are already banked — never an empty list. The old pause wrote names: []
+       unconditionally, so a pause here would have discarded every person name a
+       previous link had harvested. */
+    const officePause = () => pause('labels', {
+      labelQids: (st && st.phase === 'labels') ? st.labelQids : [...new Set(holderRows.map(r => r.person))],
+      names: (st && st.phase === 'labels') ? [...st.names] : [],
+      next: { labelIdx: 0 },
+    });
+
+    const needLabel = pendingOffices(positions, holderRows, 'label');
+    if (needLabel.length) {
+      console.log(`pep-worldwide: ${needLabel.length} offices with holders still unnamed (of ${new Set(holderRows.map(r => r.pos)).size} held, ${positions.size} enumerated)`);
+      for (let i = 0, win = 0; i < needLabel.length; i += LABEL_WINDOW, win++) {
+        if (overBudget()) officePause();
+        for (const data of await fetchLabelWindow(needLabel, i)) {
+          if (!data) continue;
+          for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
+            const p = positions.get(qid);
+            if (p) p.label = namesFromEntity(ent).name || p.label;
+          }
+        }
+        if (win % 8 === 0) console.log(`  office names: ${Math.min(i + LABEL_WINDOW, needLabel.length)}/${needLabel.length}`);
+      }
+    }
+
+    const needCountry = pendingOffices(positions, holderRows, 'country');
+    if (needCountry.length) {
+      console.log(`pep-worldwide: ${needCountry.length} offices with holders still have no country`);
+      /* This pass is ~1,000 SERIAL WDQS queries, and a query WDQS rejects comes
+         back through fetchJsonSafe as null after six retries with backoff —
+         indistinguishable, one batch at a time, from an office that simply has
+         no country. A query this module has never run live is exactly where
+         that matters: unguarded, a malformed one would spend the entire time
+         budget failing quietly and the link would bank nothing. So give up
+         early and LOUDLY if the opening batches produce nothing at all, and let
+         the person-name phase have the budget instead. A genuine run answers on
+         the first batch — heads of state and legislatures nearly all carry
+         P17. */
+      const PROBE = 5;
+      let answered = 0;
+      for (let i = 0, win = 0; i < needCountry.length; i += HOLDER_BATCH, win++) {
+        if (overBudget()) officePause();
+        const rows = parseSparqlBindings(
+          await fetchJsonSafe(sparqlUrl(officeContextQuery(needCountry.slice(i, i + HOLDER_BATCH)))));
+        for (const r of rows) {
+          const p = positions.get(r.pos);
+          /* P17 first, P1001 only as a fallback — a US state senator carries
+             both, and "United States" is the honest value for a field the MLRO
+             reads as a country. An office with neither simply stays blank. */
+          if (p && !p.country && (r.country || r.jurisdiction)) p.country = r.country || r.jurisdiction;
+          if (r.country || r.jurisdiction) answered++;
+        }
+        if (win + 1 === PROBE && answered === 0) {
+          console.error(`pep-worldwide: office-country pass ABANDONED — ${PROBE} batches (${PROBE * HOLDER_BATCH} offices) returned no country or jurisdiction at all. Either the query is being rejected or WDQS is not answering; offices keep their names and the artifact ships without country rather than spending the budget on it. Check the query against WDQS before re-running.`);
+          break;
+        }
+        if (win % 8 === 0) console.log(`  office countries: ${Math.min(i + HOLDER_BATCH, needCountry.length)}/${needCountry.length} (${answered} answered)`);
+      }
+    }
+
+    /* P17/P1001 answer with an ENTITY, so what lands above is "Q30", not
+       "United States" — which on an MLRO's screen is barely better than the
+       blank it replaces. Resolve them to names. There are only ever a couple of
+       hundred distinct countries behind 59,204 offices, so this is a handful of
+       chunks on the same hang-proof path, and it runs against the whole
+       positions map (not just this link's slice) so countries banked by an
+       earlier link get named too. Best-effort like the rest: an unresolved QID
+       stays as it is rather than being blanked. */
+    const countryQids = [...new Set([...positions.values()].map(p => p.country).filter(c => /^Q\d+$/.test(c)))];
+    if (countryQids.length) {
+      console.log(`pep-worldwide: naming ${countryQids.length} distinct countries`);
+      const cnames = new Map();
+      for (let i = 0; i < countryQids.length; i += LABEL_WINDOW) {
+        if (overBudget()) officePause();
+        for (const data of await fetchLabelWindow(countryQids, i)) {
+          if (!data) continue;
+          for (const [qid, ent] of Object.entries((data && data.entities) || {})) {
+            const nm = namesFromEntity(ent).name;
+            if (nm) cnames.set(qid, nm);
+          }
         }
       }
-      if ((i / LABEL_WINDOW) % 8 === 0) console.log(`  office labels: ${Math.min(i + LABEL_WINDOW, heldQids.length)}/${heldQids.length}`);
+      for (const p of positions.values()) if (cnames.has(p.country)) p.country = cnames.get(p.country);
+      console.log(`  resolved ${cnames.size}/${countryQids.length} country names`);
     }
   }
 
   /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
-  let personQids, names, labelStart;
+  let allQids, names;
   if (st && st.phase === 'labels') {
-    personQids = st.labelQids;
+    allQids = st.labelQids;
     names = st.names;
-    labelStart = st.next.labelIdx;
-    console.log(`pep-worldwide: resuming names at ${labelStart}/${personQids.length} (${names.size} banked)`);
   } else {
-    personQids = [...new Set(holderRows.map(r => r.person))];
+    allQids = [...new Set(holderRows.map(r => r.person))];
     names = new Map();
-    labelStart = 0;
-    console.log(`pep-worldwide: ${holderRows.length} holder rows → ${personQids.length} distinct persons; fetching multilingual names`);
+    console.log(`pep-worldwide: ${holderRows.length} holder rows → ${allQids.length} distinct persons; fetching multilingual names`);
   }
+  /* How many people the harvest OWES, fixed for the whole run: the full person
+     list, never a slice or a remainder. Every partial write is measured against
+     it, so the shortfall a consumer sees is the real one. */
+  const expectedTotal = allQids.length;
 
-  /* Take only this shard's slice. Applied AFTER the resume branch so a shard
-     resumes against its own slice and its own labelIdx, and skipped entirely
-     when COUNT is 1 — the ordinary weekly harvest is byte-for-byte unchanged.
-     Whatever the shard has already banked for people OUTSIDE its slice (from a
-     checkpoint written before sharding) is kept, never discarded. */
+  /* Never a saved labelIdx — see pendingLabels: a resume that marched past a
+     throttled window would drop those people from the list for good. The 07:16
+     link met a hard throttle and every one of its ~7,700 people came back null;
+     this is what makes the next run retry them instead of forgetting them. */
+  const personQids = pendingLabels(allQids, names);
+  const labelStart = 0;
   if (PEP_SHARD_COUNT > 1) {
-    const all = personQids;
-    /* A shard drives its slice from ZERO, not from the checkpoint's labelIdx —
-       that index counts into the FULL list, so reusing it would make a shard
-       skip most of its own work. Instead it simply drops the people already
-       labelled in the checkpoint, which is the same "don't redo finished work"
-       guarantee expressed against the data rather than a position. */
-    personQids = shardOf(all).filter(q => !names.has(q));
-    labelStart = 0;
-    console.log(`pep-worldwide: SHARD ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} — ${personQids.length} unlabelled of ${shardOf(all).length} in this slice (${all.length} total); shards never push, the merge step assembles the dataset`);
+    console.log(`pep-worldwide: SHARD ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} — ${personQids.length} unlabelled of ${shardOf(allQids).length} in this slice (${expectedTotal} total); shards never push, the merge step assembles the dataset`);
+  } else if (st && st.phase === 'labels') {
+    console.log(`pep-worldwide: resuming names — ${personQids.length} still unlabelled of ${expectedTotal} (${names.size} banked)`);
   }
   /* Publish what the checkpoint already carries, at STARTUP rather than waiting
      for this link's pause. A resumed link runs for its whole budget before it
@@ -737,24 +916,44 @@ async function harvest(outfile) {
      is still refused. */
   shipPartial = () => buildPepDataset({
     harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
-    names, expected: personQids.length,
+    names, expected: expectedTotal,
   });
   if (names.size) shipPartialNow();
 
-  /* labelIdx advances only after a WHOLE window resolves, so a pause mid-window
-     re-fetches at most that window on resume — idempotent, since every result
-     is a Map set keyed by QID. */
-  for (let i = labelStart; i < personQids.length; i += LABEL_WINDOW) {
-    bankProgress = () => writeCp('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
+  /* The checkpoint is written to DISK here; the workflow's persist step commits
+     whatever is on disk when the job ends, including on cancellation. Banking
+     only at the budget pause (or from a signal handler) is not enough: a
+     cancelled Actions job kills the step's SHELL, and node keeps running as an
+     orphan until job cleanup reaps it — after persist has already committed. A
+     53-minute link was cancelled and its log ends "Terminate orphan process:
+     pid (2681) (node)" with the checkpoint byte-identical to the one it
+     started from. Banking on a timer makes a cancellation cost at most one
+     interval instead of the whole link, and does not depend on a signal ever
+     being delivered. */
+  const BANK_EVERY_MS = 5 * 60 * 1000;
+  let lastBank = Date.now();
+
+  /* Each iteration takes a WHOLE window, so an interrupt mid-window re-fetches
+     at most that window — idempotent, since every result is a Map set keyed by
+     QID. `i` indexes this run's remaining people, so it is progress within the
+     run, not a position any later run resumes from. */
+  for (let i = labelStart, win = 0; i < personQids.length; i += LABEL_WINDOW, win++) {
+    const snapshot = () => ({ labelQids: allQids, names: [...names], next: { labelIdx: i } });
+    bankProgress = () => writeCp('labels', snapshot());
     shipPartial = () => buildPepDataset({
       harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
-      names, expected: personQids.length,
+      names, expected: expectedTotal,
     });
-    if (overBudget()) pause('labels', { labelQids: personQids, names: [...names], next: { labelIdx: i } });
-    for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk just leaves those persons unnamed (dropped)
+    if (overBudget()) pause('labels', snapshot());
+    for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk leaves those persons unnamed — the next resume retries them
       if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
     }
-    if ((i / LABEL_WINDOW) % 4 === 0) console.log(`  names: ${Math.min(i + LABEL_WINDOW, personQids.length)}/${personQids.length}`);
+    if (win % 4 === 0) console.log(`  names: ${Math.min(i + LABEL_WINDOW, personQids.length)}/${personQids.length} this run (${names.size}/${expectedTotal} banked)`);
+    if (Date.now() - lastBank >= BANK_EVERY_MS) {
+      writeCp('labels', snapshot());
+      shipPartialNow();
+      lastBank = Date.now();
+    }
   }
 
   /* A shard's job ends here: it emits the names it holds and writes NOTHING to
@@ -763,7 +962,7 @@ async function harvest(outfile) {
      own view would publish a list missing everyone else's people, which the
      shrink gate would then hold against the real one. */
   if (PEP_SHARD_COUNT > 1) {
-    writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, harvestedAt, names: [...names] });
+    writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, run: PEP_SHARD_RUN, harvestedAt, names: [...names] });
     console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`);
     return 0;
   }
@@ -789,10 +988,11 @@ async function harvest(outfile) {
    silently absent: a dataset quietly short of a shard's people would screen
    those PEPs as clean, which is precisely the silent-degradation this codebase
    refuses. The usual floor and shrink gates still guard the write on top. */
-async function mergeShards(outfile, cpFile, shardFiles) {
+export async function mergeShards(outfile, cpFile, shardFiles) {
   const cp = readJsonMaybeGz(cpFile);
   const st = restoreCheckpoint(cp);
   const slices = [];
+  const seen = new Map();
   for (const f of shardFiles) {
     let s = null;
     try { s = readJsonMaybeGz(f); } catch (e) { s = null; }
@@ -800,8 +1000,26 @@ async function mergeShards(outfile, cpFile, shardFiles) {
       console.error(`pep-worldwide: REFUSING to merge — shard file ${f} is missing or unreadable; publishing without it would silently drop those people from the screened list`);
       return 1;
     }
-    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names`);
+    /* Each slice is collected off a long-lived pep-shard-<i> branch, so a shard
+       that failed this time leaves the PREVIOUS run's slice sitting there and
+       the merge would happily consume it — a stale, half-labelled slice merges
+       to a list quietly short of real PEPs, and a PEP absent from the list
+       screens CLEAN. Three cheap identity checks make that impossible:
+       every slice must come from THIS run, the set must be exactly 0..N-1 with
+       no repeats, and each must have been cut for the same shard count (a
+       slice from an 8-way split covers different people than a 16-way one). */
+    if (s.of !== shardFiles.length || !(s.shard >= 0 && s.shard < shardFiles.length) || seen.has(s.shard)) {
+      console.error(`pep-worldwide: REFUSING to merge — ${f} is shard ${s.shard}/${s.of} in a ${shardFiles.length}-way merge${seen.has(s.shard) ? ' (duplicate index)' : ''}; a slice cut for a different partition covers different people`);
+      return 1;
+    }
+    seen.set(s.shard, s.run || '');
+    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names${s.run ? ` (run ${s.run})` : ''}`);
     slices.push(s.names);
+  }
+  const runs = [...new Set(seen.values())];
+  if (runs.length > 1) {
+    console.error(`pep-worldwide: REFUSING to merge — slices come from different runs (${runs.join(', ')}); a leftover branch from an earlier run is stale and merging it would publish a list short of the people its shard never finished`);
+    return 1;
   }
   const names = mergeShardNames([[...st.names], ...slices]);
   const expected = st.labelQids.length;
