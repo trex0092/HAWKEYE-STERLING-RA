@@ -45,6 +45,20 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # data.opensanctions.org serves Australia DFAT and Switzerland SECO, which
+      # the engine fetches live. Both became CORE-FLOORED lists on 2026-07-29
+      # and this allowlist was not extended, so the runner blocked them on every
+      # run since: two core lists loaded 0 names, sat below their 500 floors,
+      # and the coverage-floor gate turned the job red after delivering a
+      # DEGRADED screen. Every other engine workflow already allowed the host.
+      #
+      # NOTE: allowed-endpoints below is a YAML FOLDED scalar (`>`) — every line
+      # inside it is joined into one whitespace-separated string and each word
+      # is read as a domain. A `#` comment placed INSIDE the block is therefore
+      # not a comment: harden-runner registers every word of it as an endpoint,
+      # fails to resolve them, and REVERTS its own enforcement — silently
+      # turning the egress block off. Comments belong here, above the key.
+      # Both rules are enforced by test/workflow-hardening.test.mjs.
       - name: Harden the runner (egress block)
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
@@ -67,16 +81,6 @@ jobs:
             umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
             webgate.ec.europa.eu:443
             ofsistorage.blob.core.windows.net:443
-            # Australia DFAT and Switzerland SECO are fetched live by the engine
-            # from the OpenSanctions mirrors. Both were added as CORE-FLOORED
-            # lists on 2026-07-29 and this allowlist was never extended, so the
-            # runner blocked them at the network layer on EVERY run since: two
-            # core lists loaded 0 names, sat below their 500 floors, and the
-            # coverage-floor gate turned the job red after delivering a DEGRADED
-            # screen — every single day. Every other engine workflow already
-            # allows this host; only this one did not. Guarded now by
-            # test/workflow-hardening.test.mjs, which derives the required hosts
-            # from the engine's own download() calls.
             data.opensanctions.org:443
             app.asana.com:443
             *.githubapp.com:443

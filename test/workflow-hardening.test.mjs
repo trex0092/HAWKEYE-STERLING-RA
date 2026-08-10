@@ -132,16 +132,50 @@ for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
   }
   check(`resolved a source host for the floored lists that fetch one (${hostFor.size})`, hostFor.size >= 2);
 
+  /* The folded block runs from the `allowed-endpoints: >` line until the first
+     line indented no deeper than the key itself. Matching on a blank line
+     instead would swallow the steps that follow. */
+  const endpointBlock = (text) => {
+    const ls = text.split('\n');
+    const i = ls.findIndex(l => /^\s*allowed-endpoints:\s*>/.test(l));
+    if (i < 0) return null;
+    const indent = ls[i].match(/^\s*/)[0].length;
+    const out = [];
+    for (let j = i + 1; j < ls.length; j++) {
+      if (ls[j].trim() === '') break;
+      if (ls[j].match(/^\s*/)[0].length <= indent) break;
+      out.push(ls[j]);
+    }
+    return out.join('\n');
+  };
+
   for (const f of files) {
     const text = readFileSync(join(dir, f), 'utf8');
     if (!text.includes('FLOOR_GATE')) continue;          // does not enforce core floors
-    const allow = /allowed-endpoints:\s*>([\s\S]*?)\n\s*\n/.exec(text);
-    if (!allow) continue;                                 // audit mode — nothing to block
-    const allowed = allow[1];
+    const allowed = endpointBlock(text);
+    if (allowed === null) continue;                       // audit mode — nothing to block
     for (const [list, host] of hostFor) {
       check(`${f}: enforces the ${list} floor, so its host ${host} must be reachable`,
         allowed.includes(host + ':443'));
     }
+  }
+
+  /* An allowed-endpoints block is a YAML FOLDED scalar: every line is joined
+     into one whitespace-separated string and harden-runner reads each WORD as a
+     domain. A `#` comment inside it is not a comment — the action registers
+     every word of the prose as an endpoint, fails to resolve them, and REVERTS
+     its own enforcement, silently turning the egress block off. Observed live
+     on run 31364821216, where "Australia." and "SECO." appear in the parsed
+     endpoint map and the agent logs "Reverted changes". Comments go ABOVE the
+     key. Every entry must look like host:port and nothing else. */
+  for (const f of files) {
+    const text = readFileSync(join(dir, f), 'utf8');
+    const allowed = endpointBlock(text);
+    if (allowed === null) continue;
+    const bad = allowed.split(/\s+/).filter(Boolean)
+      .filter(tok => !/^(\*\.)?[a-z0-9][a-z0-9.-]*\.[a-z]{2,}:\d{2,5}$/i.test(tok));
+    check(`${f}: every allowed-endpoints entry is a bare host:port — a comment in a folded block disables the egress guard${bad.length ? ' (offending: ' + bad.slice(0, 4).join(' ') + ')' : ''}`,
+      bad.length === 0);
   }
 }
 
