@@ -93,6 +93,7 @@ Run at least quarterly, and after any period where the review-age alarm fired:
 | 2026-06-19 | MLRO | review (recorded retrospectively) | `lastReviewed` in the data file | 312 → 312 | n/a | baseline for this SOP | MLRO |
 | 2026-07 | MLRO | sample currency check (recorded in the compliance register, 2026-07-14) | register verification | 312 → 312 | 20 of 20 recent designations present; 17 of 17 delistings absent | none required; NOT a full reconciliation | MLRO |
 | 2026-07-16 | MLRO (mechanical comparison executed by compliance automation from the official publication supplied by the MLRO; the merge of the recording PR is the MLRO sign-off) | full reconciliation (§4, both directions) | official EOCN Local Terrorist List publication dated 13 Jul 2026 | 312 → 312 | 288 publication decision rows parsed: 261 active listings, 27 de-listings (رفع الإدراج rows). Every active designation matched into the file (0 missing); no de-listed party present in the file (0 stale). One file-side alias spelling had no exact publication match and is retained per §5 (curated file is authoritative for aliases). | none required; `lastReviewed` refreshed to 2026-07-16 | MLRO (PR merge) |
+| 2026-08-10 | MLRO (mechanical comparison executed by compliance automation from the official publication supplied by the MLRO; the merge of the recording PR is the MLRO sign-off) | full reconciliation (§4, both directions) | official EOCN publication supplied as `LS_130923_2026.pdf` (12 pages, PDF creation stamp 2026-05-12; carries designations through Cabinet Decision No. (63) of 2026). Also closes the 2026-08-01 mirror-derived entry, which was recorded as pending confirmation against the official publication | 619 → 619 | Parsed by section and by ROW ORDINAL, so coverage is measured against the publication's own numbering rather than a name sample: listed individuals 1–171, organisations 1–75, entities 1–65 = **311 listed parties, every ordinal present, no gaps**; de-listing sections: removed individuals 1–19, removed entities 1–8 = **27 de-listed**. Direction 1: all 311 listed parties matched into `entries`, including every alternate rendering carried in the same publication cell (individual #108 `HAZEM MOHSEN FARHAN + HAZEM MOHSEN AL FARHAN`; individual #121's three Khanfurah spellings) — **0 missing**. Direction 2: none of the 27 de-listed parties present — **0 stale**. Names compared through the engine's own `normalizeName`, so the check reflects what the matcher keys on. | none required; no entry added, changed or removed; `lastReviewed` refreshed to 2026-08-10 | MLRO (PR merge) |
 
 ## 8. Internal firm watchlist (same procedure, different list)
 
@@ -117,5 +118,6 @@ curated lists:
 
 ---
 
-*First full §4 reconciliation completed and recorded 2026-07-16. The next is
-due per the §1 triggers or the weekly review window, whichever comes first.*
+*First full §4 reconciliation completed and recorded 2026-07-16; most recent
+2026-08-10. The next is due per the §1 triggers or the weekly review window,
+whichever comes first.*
