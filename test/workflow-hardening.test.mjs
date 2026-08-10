@@ -100,5 +100,50 @@ for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
   check(`exception ${id} carries a quoted reason`, typeof reason === 'string' && reason.trim().length > 10);
 }
 
+/* ── 7. A core designation list may never be blocked by our own egress policy ──
+   Australia DFAT and Switzerland SECO were added as CORE-FLOORED lists on
+   2026-07-29; daily-sanctions-screen.yml's allowed-endpoints was not extended,
+   so harden-runner blocked their host on every run. Both lists loaded 0 names,
+   sat below their 500 floors, and the coverage-floor gate turned the job red
+   after delivering a DEGRADED screen — daily, for weeks. The screen was honest
+   about it (that part worked); nothing connected "this list has a floor" to
+   "this runner is allowed to reach it".
+
+   So derive it rather than list it: read the floored list names from the
+   screening runner, read the engine's own download(URL, "Label") calls to learn
+   each one's host, and require every workflow that ENFORCES those floors (it
+   sets FLOOR_GATE) to allow those hosts. A new core list with a new host is
+   covered the day it is added, without anyone remembering this rule. */
+{
+  const runner = readFileSync('scripts/daily-screen-run.py', 'utf8');
+  const engine = readFileSync('screen.py', 'utf8');
+
+  const floorBlock = /_floors\s*=\s*\{([\s\S]*?)\}/.exec(runner);
+  check('core-list floors are readable from the screening runner', Boolean(floorBlock));
+  const floored = new Set([...(floorBlock ? floorBlock[1] : '').matchAll(/"([^"]+)"\s*:/g)].map(m => m[1]));
+  check(`parsed the core-floored list names (${floored.size})`, floored.size >= 5);
+
+  /* download("https://host/path", "List Name") — the second argument is the
+     same label the floor table keys on. A list with no download call is a
+     locally maintained file (UAE EOCN) and needs no egress. */
+  const hostFor = new Map();
+  for (const m of engine.matchAll(/download\(\s*"https:\/\/([^/"]+)[^"]*"\s*,\s*"([^"]+)"/g)) {
+    if (floored.has(m[2])) hostFor.set(m[2], m[1]);
+  }
+  check(`resolved a source host for the floored lists that fetch one (${hostFor.size})`, hostFor.size >= 2);
+
+  for (const f of files) {
+    const text = readFileSync(join(dir, f), 'utf8');
+    if (!text.includes('FLOOR_GATE')) continue;          // does not enforce core floors
+    const allow = /allowed-endpoints:\s*>([\s\S]*?)\n\s*\n/.exec(text);
+    if (!allow) continue;                                 // audit mode — nothing to block
+    const allowed = allow[1];
+    for (const [list, host] of hostFor) {
+      check(`${f}: enforces the ${list} floor, so its host ${host} must be reachable`,
+        allowed.includes(host + ':443'));
+    }
+  }
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
