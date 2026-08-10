@@ -190,12 +190,13 @@ jobs:
             # hiccup would block every customer. Require the CSV header we
             # actually parse; anything else is treated as a failed download, so
             # it degrades this one list instead.
-            if head -c 4096 /tmp/au_dfat.csv | head -n 1 | grep -qE '(^|,)[Nn]ame(,|$)'; then
+            if head -c 4096 /tmp/au_dfat.csv | head -n 1 | grep -qE '(^|,)"?[Nn]ame"?(,|$)'; then
               echo "AU_HASH=$(sha256sum /tmp/au_dfat.csv | cut -d' ' -f1)" >> "$GITHUB_ENV"
             else
-              # Say WHAT arrived, not just that it was wrong: the first run of
-              # this guard rejected a gzip body (curl needs --compressed for
-              # this mirror) and the warning alone did not show that.
+              # Say WHAT arrived, not just that it was wrong. This paid for
+              # itself on its first run: the bytes showed the mirror quotes its
+              # CSV headers ("name", not name), which the check above missed —
+              # and disproved the gzip theory it was added to confirm.
               echo "::warning::Australia DFAT returned a 200 whose first line is not the CSV header we parse - treating as a failed download. First bytes: $(head -c 120 /tmp/au_dfat.csv | tr -c '[:print:]' '.')"
               rm -f /tmp/au_dfat.csv
             fi
@@ -215,12 +216,13 @@ jobs:
             # hiccup would block every customer. Require the CSV header we
             # actually parse; anything else is treated as a failed download, so
             # it degrades this one list instead.
-            if head -c 4096 /tmp/ch_seco.csv | head -n 1 | grep -qE '(^|,)[Nn]ame(,|$)'; then
+            if head -c 4096 /tmp/ch_seco.csv | head -n 1 | grep -qE '(^|,)"?[Nn]ame"?(,|$)'; then
               echo "CH_HASH=$(sha256sum /tmp/ch_seco.csv | cut -d' ' -f1)" >> "$GITHUB_ENV"
             else
-              # Say WHAT arrived, not just that it was wrong: the first run of
-              # this guard rejected a gzip body (curl needs --compressed for
-              # this mirror) and the warning alone did not show that.
+              # Say WHAT arrived, not just that it was wrong. This paid for
+              # itself on its first run: the bytes showed the mirror quotes its
+              # CSV headers ("name", not name), which the check above missed —
+              # and disproved the gzip theory it was added to confirm.
               echo "::warning::Switzerland SECO returned a 200 whose first line is not the CSV header we parse - treating as a failed download. First bytes: $(head -c 120 /tmp/ch_seco.csv | tr -c '[:print:]' '.')"
               rm -f /tmp/ch_seco.csv
             fi
