@@ -11,6 +11,8 @@ import {
   getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName, parseIdbCsv } from '../scripts/sanctions-match.mjs';
+const scr = await import('../scripts/sanctions-screen.mjs');
+const pep_classify = (h, o) => scr.classifyHit(h, o || {});
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -1586,6 +1588,47 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     && rotateByDay([], 3).length === 0
     && rotateByDay(arr, -1).join('') === 'eabcd';       // negative-safe
 })());
+
+/* ── Match classification C / P / F / N ──────────────────────────────────────
+   Structured adverse-media practice classifies every RESULT, not just the
+   subject. The load-bearing rule: automated screening can NEVER assign C.
+   "Confirmed" means verified to relate to THIS subject, and a name match is not
+   an identity match — Federal Decree-Law No. 10 of 2025 Art. 16/18 and FATF
+   R.26 put that on the MLRO under four-eyes. The machine suggests P or N; C
+   arrives only from a human. */
+{
+  const hit = { list: 'OFAC SDN', hitName: 'SOME NAME', score: 98 };
+  check('classify: no result is N',            pep_classify(null) === 'N');
+  check('classify: a live hit is P — automated screening NEVER self-certifies a Confirmed Match',
+    pep_classify(hit) === 'P'
+    && pep_classify({ ...hit, score: 100 }) === 'P');
+  check('classify: only a HUMAN escalate disposition yields C',
+    pep_classify(hit, { disposition: 'escalate' }) === 'C');
+  check('classify: a human false-positive, or a cited prior clearance, yields F',
+    pep_classify(hit, { disposition: 'false-positive' }) === 'F'
+    && pep_classify({ ...hit, whitelisted: true }) === 'F');
+  /* Highest severity wins, so one confirmed hit cannot be averaged away by a
+     page of false matches. */
+  check('classify: the overall decision is the HIGHEST severity present, not a tally',
+    scr.overallClassification([{ ...hit, whitelisted: true }, hit, { ...hit, whitelisted: true }]) === 'P'
+    && scr.overallClassification([hit, hit], { disposition: 'escalate' }) === 'C'
+    && scr.overallClassification([{ ...hit, whitelisted: true }]) === 'F'
+    && scr.overallClassification([]) === 'N');
+  check('classify: every class carries a recommended action for the reviewer',
+    ['C', 'P', 'F', 'N'].every(c => scr.MATCH_CLASSES[c].label && scr.MATCH_CLASSES[c].action));
+  /* An override with no reason is not a decision — it is an unexplained change
+     to a screening outcome, so it is refused and the suggestion stands. */
+  const ok = scr.parseClassificationOverride('[x] confirmed match\nrationale: DOB and passport match the SDN entry');
+  check('classify: an override is accepted only WITH a written rationale, which is captured',
+    ok && ok.code === 'C' && ok.accepted === true && /DOB and passport/.test(ok.rationale));
+  const bad = scr.parseClassificationOverride('[x] false match');
+  check('classify: an override with NO rationale is refused, not silently applied',
+    bad && bad.code === 'F' && bad.accepted === false && /no written rationale/.test(bad.reason));
+  check('classify: the untouched tick template parses as no override',
+    scr.parseClassificationOverride('[ ] confirmed match\n[ ] partial match\n[ ] false match') === null);
+  check('classify: an accepted override wins over the derived class',
+    pep_classify(hit, { override: 'F' }) === 'F' && pep_classify(null, { override: 'C' }) === 'C');
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

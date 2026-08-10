@@ -3,7 +3,13 @@
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
-  GDELT_RISK_TERMS } from '../scripts/adverse-media.mjs';
+  GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, GDELT_QUERY_MAX, gdeltTerms,
+  gdeltQueryString } from '../scripts/adverse-media.mjs';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+
+const ROOT2 = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -288,6 +294,51 @@ check('scoring covers the screen.py keyword classes the JS term set used to miss
 })());
 check('parity terms widen SCORING only — the Google News query URL stays short (a rejected query returns zero items)',
   adverseMediaUrl('Al Noor Gold Trading').length < 2000);
+
+/* ── GDELT retrieval breadth ─────────────────────────────────────────────────
+   PY_PARITY_TERMS were added SCORING-only and kept out of the Google News query
+   for a good reason: that query is already ~1.5KB per locale and one Google
+   rejects returns zero items. The reasoning does not transfer to GDELT — a
+   separate engine, one request per subject — which was still asking for only 26
+   terms. So an article about a subject's ransomware indictment or
+   modern-slavery prosecution scored perfectly IF something else surfaced it.
+   Nothing asked. These check the expansion is real and cannot backfire. */
+{
+  const name = 'Mohammed Abdullah Al-Rashid';
+  const wide = gdeltTerms(name);
+  check('gdelt: the query now asks for the typologies the scorer already knew',
+    wide.length > GDELT_RISK_TERMS.length + 30
+    && ['ransomware', 'kleptocracy', 'modern slavery', 'human trafficking', 'chemical weapons']
+      .every(t => wide.includes(t)));
+  check('gdelt: the proven base terms are never dropped to make room',
+    GDELT_RISK_TERMS.every(t => wide.includes(t)));
+  check('gdelt: the extras are the typology set, admitted on top of the base',
+    GDELT_EXTRA_TERMS.length >= 40
+    && GDELT_EXTRA_TERMS.every(t => !GDELT_RISK_TERMS.includes(t)));
+  check('gdelt: the built query stays inside the length cap',
+    gdeltQueryString(name, wide).length <= GDELT_QUERY_MAX);
+  /* A query GDELT rejects returns null from fetchSource, which costs the whole
+     worldwide backbone for that subject — strictly worse than asking narrowly.
+     A pathological subject name must therefore still yield a capped query with
+     the base set intact. */
+  const long = 'A'.repeat(400);
+  const wideLong = gdeltTerms(long);
+  check('gdelt: a pathological subject name caps the query instead of overrunning it',
+    gdeltQueryString(long, wideLong).length <= GDELT_QUERY_MAX
+    && GDELT_RISK_TERMS.every(t => wideLong.includes(t)));
+  check('gdelt: the fetch falls back to the base set if the wide query is rejected',
+    /GDELT rejected the/.test(readFileSync(join(ROOT2, 'scripts/adverse-media.mjs'), 'utf8')));
+  /* 'politic' is the one typology deliberately NOT retrieved: the query is
+     name-scoped and GDELT caps a subject at 250 records, so for any public
+     figure — and the PEP layer is 422,223 office-holders — it returns ordinary
+     political coverage that crowds real financial-crime reporting out of the
+     cap. Scoring keeps it; retrieval must not ask for it. */
+  check('gdelt: "politic" stays a SCORING signal and is never a retrieval term',
+    ALL_TERMS.includes('politic') && !wide.includes('politic'));
+  check('gdelt: every retrieval term is also a scoring term (retrieval can never outrun scoring)',
+    wide.every(t => ALL_TERMS.some(a => a.toLowerCase() === t.toLowerCase()
+      || t.toLowerCase().includes(a.toLowerCase()))));
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
