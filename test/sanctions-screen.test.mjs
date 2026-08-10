@@ -1630,5 +1630,55 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     pep_classify(hit, { override: 'F' }) === 'F' && pep_classify(null, { override: 'C' }) === 'C');
 }
 
+/* ── Asana pagination: a short read of the Customer Database is a FALSE
+   NEGATIVE, not a small inconvenience. Every unread customer screens as "no
+   match" because it was never screened. The page cap is a runaway guard, so
+   hitting it must fail the run (the caller turns a throw into an unscreened-run
+   bail) — never return a partial project as if it were the whole one. The one
+   exception is the dedup scan, where losing an alert is worse than a duplicate.
+   Driven through a stubbed fetch, so the real loop is what is under test. */
+{
+  const realFetch = globalThis.fetch;
+  const page = (n, more) => ({
+    ok: true, status: 200,
+    headers: { get: () => null },
+    json: async () => ({
+      data: Array.from({ length: n }, (_, i) => ({ gid: String(i), name: 'Customer ' + i, completed: false })),
+      next_page: more ? { offset: 'o' + Math.random() } : null
+    })
+  });
+  const stub = (pages) => { let i = 0; globalThis.fetch = async () => page(2, ++i < pages); };
+
+  stub(3);
+  const walked = await scr.asanaPaged('1', '/tasks', 'name', 't', 'test project');
+  check('asana paging: every page is read to the end (no next_page left behind)',
+    walked.length === 6);
+
+  /* More pages than the cap, and the API still says there is more. */
+  let threw = null;
+  globalThis.fetch = async () => page(2, true);
+  try { await scr.asanaPaged('1', '/tasks', 'name', 't', 'Customer Database'); }
+  catch (e) { threw = String(e && e.message || e); }
+  check('asana paging: exhausting the page cap THROWS — a partial customer list never screens as complete',
+    threw !== null && /INCOMPLETE/.test(threw) && /Customer Database/.test(threw));
+  check('asana paging: the failure names the knob that fixes it',
+    threw !== null && /ASANA_PAGE_CAP/.test(threw));
+
+  let soft = null, warned = '';
+  const realErr = console.error;
+  console.error = (m) => { warned += String(m); };
+  globalThis.fetch = async () => page(2, true);
+  try { soft = await scr.asanaPaged('1', '/tasks', 'name', 't', 'dedup scan', { soft: true }); }
+  finally { console.error = realErr; globalThis.fetch = realFetch; }
+  check('asana paging: the dedup scan degrades LOUDLY instead of throwing (a duplicate card beats no card)',
+    Array.isArray(soft) && soft.length === scr.ASANA_PAGE_CAP * 2 && /page cap/.test(warned) && /PARTIAL|partial/.test(warned));
+
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  check('asana paging: the section lookup paginates — an unpaged read creates a DUPLICATE column nobody watches',
+    /const sections = await asanaPaged\(projectGid, '\/sections'/.test(src));
+  check('asana paging: soft mode is used ONLY by the dedup scan',
+    (src.match(/soft: true/g) || []).length === 1 && /dedup scan[^\n]*\{ soft: true \}/.test(src));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
