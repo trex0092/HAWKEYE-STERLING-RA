@@ -281,26 +281,56 @@ export function fitAsanaHtml(html, max = ASANA_HTML_MAX_BYTES) {
   return body >= 0 ? kept : kept + notice;
 }
 
-/* Plain-text sibling of fitAsanaHtml, for the `notes` and `name` fields. Same
-   root cause — Asana measures BYTES, a JS slice counts UTF-16 characters, and
-   every screening card now carries multilingual names — but no markup to keep
-   well-formed, so it is a straight byte cut on whole characters. Truncation is
-   marked so a reader never mistakes a cut record for a complete one. */
+/* Plain-text sibling of fitAsanaHtml, for the `notes` and `name` fields.
+
+   MEASURED IN WORST-CASE RICH-TEXT SIZE, NOT UTF-8 BYTES. `notes` is not stored
+   as sent: Asana converts it to rich text and applies its limit to the CONVERTED
+   form, which escapes HTML specials (& → &amp;) and can numeric-entity-encode
+   every non-ASCII code point (م → &#1605;). A UTF-8 byte cap UNDER-COUNTS badly
+   on exactly the multilingual content this repo files — 32,500 Arabic characters
+   are 65,000 UTF-8 bytes but roughly 244,000 once converted, so a body that
+   passes a byte cap is still refused.
+
+   The Python engine learned this the hard way on 2026-07-16: capping by
+   characters, then by raw UTF-8 bytes, then by html.escape'd bytes, each still
+   returning "Rich text value is too large". It settled on numeric-entity
+   accounting (screen.py `_asana_notes_size`). This is that measure ported, so
+   both engines cap the same field by the same rule — the JS side shipped the
+   byte version earlier today and would have hit the identical wall.
+
+   fitAsanaHtml above keeps its UTF-8 byte cap, and that is not an
+   inconsistency: html_notes is counted as SENT, which is what the live
+   rejection reported ("Value is too large, 65424 > 65400 bytes").
+
+   Truncation is always marked so a cut record never reads as a complete one. */
+const ENTITY_COST = { '&': 5, '<': 4, '>': 4, '"': 6, "'": 6 };
+
+export function asanaTextSize(s) {
+  let total = 0;
+  for (const ch of String(s == null ? '' : s)) {
+    const named = ENTITY_COST[ch];
+    if (named !== undefined) { total += named; continue; }
+    const cp = ch.codePointAt(0);
+    total += cp < 0x80 ? 1 : 3 + String(cp).length;   // "&#" + digits + ";"
+  }
+  return total;
+}
+
 export const ASANA_NAME_MAX_BYTES = 250;
 const TEXT_NOTICE = ' … [TRUNCATED to fit Asana — see the workflow run for the full record]';
 
 export function fitAsanaText(text, max = ASANA_HTML_MAX_BYTES, notice = TEXT_NOTICE) {
   const s = String(text == null ? '' : text);
-  if (Buffer.byteLength(s, 'utf8') <= max) return s;
+  if (asanaTextSize(s) <= max) return s;
   /* A notice longer than the cap would make the result BIGGER than the input
      it replaced — degrade to a bare cut rather than blow the limit. */
-  const mark = Buffer.byteLength(notice, 'utf8') < max ? notice : '';
-  const budget = max - Buffer.byteLength(mark, 'utf8');
-  let cut = 0, bytes = 0;
+  const mark = asanaTextSize(notice) < max ? notice : '';
+  const budget = max - asanaTextSize(mark);
+  let cut = 0, size = 0;
   for (const ch of s) {
-    const b = Buffer.byteLength(ch, 'utf8');
-    if (bytes + b > budget) break;
-    bytes += b; cut += ch.length;
+    const c = asanaTextSize(ch);
+    if (size + c > budget) break;
+    size += c; cut += ch.length;
   }
   return s.slice(0, cut) + mark;
 }
