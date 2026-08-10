@@ -184,6 +184,45 @@ try:
 except Exception as e:
     print(f"UK parse error: {e}")
 
+# Australia DFAT + Switzerland SECO — OpenSanctions targets.simple.csv.
+#
+# These two became CORE-FLOORED lists on 2026-07-29 (floors of 500 each, below)
+# but no loader was ever written for THIS pipeline, which reads /tmp files that
+# the workflow downloads. The floor table demanded 500 names from each; the
+# loader could only ever supply 0; so every run since has reported a source
+# outage for both and turned the job red — while screening without two
+# designation lists that carry freeze duties. The gate was telling the truth
+# the whole time and the truth was worse than a flaky feed.
+#
+# One format serves both (same shape as the EU FSF mirror): a `name` column
+# plus `;`-separated `aliases`. A malformed row is skipped rather than
+# zeroing the list, matching parse_simple_csv in screen.py.
+for _lbl, _path, _prog in (
+    ("Australia DFAT", "/tmp/au_dfat.csv", "Australia DFAT Consolidated (Regulation 8)"),
+    ("Switzerland SECO", "/tmp/ch_seco.csv", "Switzerland SECO Consolidated"),
+):
+    try:
+        import csv as _csv_os
+        _before = len(sanctioned)
+        with open(_path, encoding="utf-8-sig", errors="replace") as _f:
+            for _row in _csv_os.DictReader(_f):
+                try:
+                    _cands = [(_row.get("name") or "").strip()]
+                    _cands += [a.strip() for a in (_row.get("aliases") or "").split(";")]
+                except Exception:
+                    continue          # one bad row never zeroes the list
+                for _c in _cands:
+                    if _c:
+                        sanctioned.append({"name": _c, "list": _lbl, "programme": _prog})
+        print(f"{_lbl}: {len(sanctioned)-_before} entries")
+    except FileNotFoundError:
+        # Download step failed or was skipped — classified as an OUTAGE below
+        # (source material not obtained), so the run screens DEGRADED and says
+        # so, rather than refusing as if the data were corrupt.
+        print(f"{_lbl}: source file absent — screening DEGRADED without it")
+    except Exception as e:
+        print(f"{_lbl} parse error: {e}")
+
 # UAE EOCN — maintained in-repo machine-readable list (bot-protected at source)
 uae_names = []
 try:
@@ -249,7 +288,8 @@ _floors = {"OFAC SDN": 1000, "UN Consolidated": 200, "EU FSF": 500, "UK OFSI": 1
            "Australia DFAT": 500, "Switzerland SECO": 500}
 _srcfile = {"OFAC SDN": "/tmp/ofac_sdn.xml", "UN Consolidated": "/tmp/un_consolidated.xml",
             "EU FSF": "/tmp/eu_sanctions.xml", "UK OFSI": "/tmp/uk_ofsi.csv",
-            "UAE EOCN": "data/eocn-local-terrorist-list.json"}
+            "UAE EOCN": "data/eocn-local-terrorist-list.json",
+            "Australia DFAT": "/tmp/au_dfat.csv", "Switzerland SECO": "/tmp/ch_seco.csv"}
 _by_list = {}
 for _s in sanctioned:
     _by_list[_s["list"]] = _by_list.get(_s["list"], 0) + 1
@@ -259,11 +299,12 @@ _obtained = {_l: os.path.exists(_p) and os.path.getsize(_p) > 0 for _l, _p in _s
 # extracted, so an empty/corrupt/absent local file degrades (like the
 # engine) instead of refusing the whole run.
 _obtained["UAE EOCN"] = _by_list.get("UAE EOCN", 0) > 0
-# AU/CH are downloaded live by the engine (no /tmp source file on this retired
-# manual path), so "obtained" is names-extracted — a fetch failure classifies as
-# an outage (screen DEGRADED, fail after delivery), never as a refusal.
-_obtained["Australia DFAT"] = _by_list.get("Australia DFAT", 0) > 0
-_obtained["Switzerland SECO"] = _by_list.get("Switzerland SECO", 0) > 0
+# AU/CH now have /tmp source files of their own (the workflow downloads them),
+# so the ordinary rule applies: bytes on disk = obtained, and a short parse is a
+# corruption REFUSAL rather than an outage. The previous comment here claimed
+# "downloaded live by the engine" — that was true of screen.py's own path, not
+# of this one, and this pipeline has no such fetch. The mismatch is why both
+# lists reported an outage on every run: nothing loaded them at all.
 _enforce = os.environ.get("LIST_FLOORS_ENFORCE", "1") == "1"
 _short = [_l for _l in _floors if _by_list.get(_l, 0) < _floors[_l]]
 _outages = [_l for _l in _short if not _obtained[_l]]

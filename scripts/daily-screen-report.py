@@ -348,6 +348,48 @@ elif unavailable:
 else:
     task_name = f"🔍 {date_iso} — Daily Sanctions Screening"
 
+# Same-day re-run guard. This workflow is manual-only now, so a re-dispatch is
+# ordinary — and three dispatches on 10 Aug 2026 filed three identical DEGRADED
+# cards, which is how this gap was found. Every other delivery stream in the
+# repo carries a duplicate guard (asana-notify's findRecentDuplicate,
+# sanctions-screen's omCardToSkip); this one never did.
+#
+# Direction-aware, matching omCardToSkip: an existing card for today is only a
+# reason to skip when today's run is NOT more severe. A REFUSED or DEGRADED run
+# must still post over an earlier clean card, because it says something the
+# earlier one did not. Best-effort: if the lookup itself fails we post anyway,
+# since losing a screening record is worse than a duplicate.
+_SEVERITY = {"🔍": 0, "⚠️": 1, "⛔": 2}
+_today_rank = _SEVERITY.get(task_name.split(" ", 1)[0], 0)
+try:
+    _existing, _offset, _pages = [], None, 0
+    while True:
+        _u = f"https://app.asana.com/api/1.0/projects/{project_gid}/tasks?opt_fields=name&limit=100"
+        if _offset:
+            _u += f"&offset={_offset}"
+        _lr = requests.get(_u, headers=headers, timeout=30)
+        if _lr.status_code != 200:
+            raise RuntimeError(f"HTTP {_lr.status_code}")
+        _j = _lr.json()
+        _existing += [str(t.get("name") or "") for t in (_j.get("data") or [])]
+        _offset = (_j.get("next_page") or {}).get("offset")
+        _pages += 1
+        if not _offset or _pages >= 50:
+            break
+    _same_day = [n for n in _existing
+                 if date_iso in n and "Daily Sanctions Screening" in n]
+    _worst = max((_SEVERITY.get(n.split(" ", 1)[0], 0) for n in _same_day), default=-1)
+    if _same_day and _worst >= _today_rank:
+        print(f"↩️  Already filed for {date_iso} at this severity or higher "
+              f"({_same_day[0]}) — skipping the duplicate card. "
+              "The screening itself ran and its result is in this log.")
+        raise SystemExit(0)
+except SystemExit:
+    raise
+except Exception as _e:
+    print(f"⚠️  Duplicate check failed ({_e}) — posting anyway "
+          "(a lost screening record is worse than a duplicate card)")
+
 payload = {
     "data": {
         "name": task_name,
