@@ -160,6 +160,32 @@ for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
     }
   }
 
+  /* A floored list with no loader is a permanent red run AND a permanent gap.
+     Australia DFAT and Switzerland SECO were added to _floors on 2026-07-29
+     and nothing in this pipeline ever fetched or parsed them: the floor
+     demanded 500 names, the loader could only ever supply 0, so every run
+     reported an outage and screened without two lists that carry freeze
+     duties. The gate was honest; nothing checked that the thing it gated on
+     could exist. Every floored list must name a source file, and every source
+     file under /tmp must be written by the workflow that enforces the floor. */
+  const srcBlock = /_srcfile\s*=\s*\{([\s\S]*?)\}/.exec(runner);
+  check('the source-file map is readable from the screening runner', Boolean(srcBlock));
+  const srcFor = new Map(
+    [...(srcBlock ? srcBlock[1] : '').matchAll(/"([^"]+)"\s*:\s*"([^"]+)"/g)].map(m => [m[1], m[2]]));
+  for (const list of floored) {
+    check(`floored list "${list}" names a source file (a floor with no loader is a permanent outage)`,
+      srcFor.has(list));
+  }
+  for (const f of files) {
+    const text = readFileSync(join(dir, f), 'utf8');
+    if (!text.includes('FLOOR_GATE')) continue;
+    for (const list of floored) {
+      const path = srcFor.get(list);
+      if (!path || !path.startsWith('/tmp/')) continue;   // in-repo file, nothing to download
+      check(`${f}: enforces the ${list} floor, so it must produce ${path}`, text.includes(path));
+    }
+  }
+
   /* An allowed-endpoints block is a YAML FOLDED scalar: every line is joined
      into one whitespace-separated string and harden-runner reads each WORD as a
      domain. A `#` comment inside it is not a comment — the action registers

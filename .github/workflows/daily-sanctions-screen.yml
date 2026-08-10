@@ -172,6 +172,57 @@ jobs:
             rm -f /tmp/uk_ofsi.csv
           fi
 
+      # Australia DFAT (Regulation 8) and Switzerland SECO, via the OpenSanctions
+      # mirrors — DFAT bot-gates its own .xlsx and SECO's XML is a different
+      # schema again. Both are CORE-FLOORED lists (500 each) in
+      # scripts/daily-screen-run.py and were added to that floor table on
+      # 2026-07-29 without anything here fetching them, so the run reported an
+      # outage for both every day while screening without either. Same
+      # download-or-degrade shape as the four lists above.
+      - name: Download Australia DFAT list
+        run: |
+          if curl -sfL \
+            "https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv" \
+            -o /tmp/au_dfat.csv; then
+            # A 200 is not proof the mirror served data. If it answers with an
+            # error page the file exists but parses to 0 names, which the floor
+            # gate reads as CORRUPTION and refuses the WHOLE screen — a mirror
+            # hiccup would block every customer. Require the CSV header we
+            # actually parse; anything else is treated as a failed download, so
+            # it degrades this one list instead.
+            if head -n 1 /tmp/au_dfat.csv | grep -qiE '(^|,)name(,|\$)'; then
+              echo "AU_HASH=$(sha256sum /tmp/au_dfat.csv | cut -d' ' -f1)" >> "$GITHUB_ENV"
+            else
+              echo "::warning::Australia DFAT returned a 200 without a CSV name column - treating as a failed download"
+              rm -f /tmp/au_dfat.csv
+            fi
+          else
+            echo "::warning::Australia DFAT download failed - this run screens DEGRADED without it"
+            rm -f /tmp/au_dfat.csv
+          fi
+
+      - name: Download Switzerland SECO list
+        run: |
+          if curl -sfL \
+            "https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv" \
+            -o /tmp/ch_seco.csv; then
+            # A 200 is not proof the mirror served data. If it answers with an
+            # error page the file exists but parses to 0 names, which the floor
+            # gate reads as CORRUPTION and refuses the WHOLE screen — a mirror
+            # hiccup would block every customer. Require the CSV header we
+            # actually parse; anything else is treated as a failed download, so
+            # it degrades this one list instead.
+            if head -n 1 /tmp/ch_seco.csv | grep -qiE '(^|,)name(,|\$)'; then
+              echo "CH_HASH=$(sha256sum /tmp/ch_seco.csv | cut -d' ' -f1)" >> "$GITHUB_ENV"
+            else
+              echo "::warning::Switzerland SECO returned a 200 without a CSV name column - treating as a failed download"
+              rm -f /tmp/ch_seco.csv
+            fi
+          else
+            echo "::warning::Switzerland SECO download failed - this run screens DEGRADED without it"
+            rm -f /tmp/ch_seco.csv
+          fi
+
       - name: Load UAE EOCN list (maintained in-repo)
         run: |
           # The UAE EOCN Local Terrorist List is published ONLY as a bot-protected
