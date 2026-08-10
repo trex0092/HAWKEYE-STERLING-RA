@@ -584,9 +584,19 @@ function decode(x) {
    "follows his arrest last week"), so it is captured, tag-stripped and bounded
    for scoring alongside the title. */
 export function parseRss(xml) {
+  /* NULL means "could not ask", [] means "asked, nothing found" — fetchSource
+     passes the distinction straight to checkAdverseMedia, which counts a null
+     locale as failed coverage instead of a clean sweep. A body with no feed
+     envelope at all is not an empty feed: Google News answers HTTP 200 with a
+     consent/interstitial page when it throttles a runner IP, and scoring that
+     as "no adverse media" cleared the subject on coverage that never ran. An
+     RSS endpoint always returns a document, so absence of the envelope — not
+     absence of items — is the failure signal. */
+  const s = String(xml == null ? '' : xml);
+  if (!/<(rss|feed|channel)\b/i.test(s)) return null;
   const items = [], re = /<item>([\s\S]*?)<\/item>/g;
   let m;
-  while ((m = re.exec(String(xml)))) {
+  while ((m = re.exec(s))) {
     const b = m[1];
     const tag = n => { const t = new RegExp('<' + n + '\\b[^>]*>([\\s\\S]*?)<\\/' + n + '>').exec(b); return t ? decode(t[1]).trim() : ''; };
     const title = tag('title');
@@ -675,11 +685,29 @@ function normalize(s) {
 }
 
 /* Parse a GDELT DOC 2.0 artlist JSON response → [{ title, link, source, date }],
-   the same item shape parseRss yields, so scoreAdverseMedia handles both. */
+   the same item shape parseRss yields, so scoreAdverseMedia handles both.
+
+   NULL means "could not ask", [] means "asked, nothing found" — and the caller
+   depends on the difference: `gd !== null` is what marks GDELT as a working
+   backbone, and a null makes the run partial (or errored, if Google News is
+   down too) so a standing adverse-media match is carried forward instead of
+   cleared. This used to return [] for ANY unparseable body, which is the
+   silent-false-clear this repo exists to prevent: GDELT answers HTTP 200 with
+   a plain-text complaint when a query is rejected and with an HTML error page
+   when it is overloaded, and both were being scored as a clean sweep of the
+   entire worldwide index.
+
+   A body that is empty or whitespace is the one benign case — GDELT returns it
+   for some zero-result queries — so that alone still means "nothing found". */
 export function parseGdelt(body) {
+  const raw = typeof body === 'string' ? body : null;
+  if (raw !== null && raw.trim() === '') return [];
   let json;
-  try { json = typeof body === 'string' ? JSON.parse(body) : body; } catch { return []; }
-  const arts = json && Array.isArray(json.articles) ? json.articles : [];
+  try { json = raw !== null ? JSON.parse(raw) : body; } catch { return null; }
+  /* Valid JSON without an `articles` array is an error envelope, not a result
+     set — GDELT's own zero-result shape is {"articles":[]}. */
+  if (!json || typeof json !== 'object' || !Array.isArray(json.articles)) return null;
+  const arts = json.articles;
   return arts.map(a => ({
     title: decode(String(a.title || '')),
     link: String(a.url || ''),

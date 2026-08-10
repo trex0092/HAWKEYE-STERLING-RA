@@ -1040,6 +1040,42 @@ check("GDELT parse emits the standard shape, flags risk, skips blank titles",
       len(_gd) == 2 and _gd[0]["flagged"] and not _gd[1]["flagged"]
       and _gd[0]["source"] == "example.com" and _gd[0]["ts"] and _gd[0]["date"] == "2026-06-30")
 
+# A 200 is not proof GDELT answered. It serves plain text when it rejects a
+# query and HTML when it is overloaded; r.json() raising on those is correct,
+# and the caller counts the raise as a GDELT failure. The trap is a 200 that IS
+# valid JSON but carries no articles list — read as an empty result set, that
+# is a clean sweep of the global index which never happened. JS parity:
+# parseGdelt returns null for the same bodies (test/adverse-media.test.mjs).
+import json as _json
+class _Resp:
+    def __init__(self, body, status=200):
+        self.status_code, self.content = status, body.encode()
+    def json(self):
+        return _json.loads(self.content.decode())
+
+_orig_gate, _orig_req_get = screen._GDELT_GATE.wait, screen.requests.get
+screen._GDELT_GATE.wait = lambda: None
+def _gdelt_reply(body, status=200):
+    screen.requests.get = lambda *_a, **_k: _Resp(body, status)
+    try:
+        return screen.search_gdelt("Subject"), None
+    except Exception as e:                                  # noqa: BLE001 — the point is that it raises
+        return None, str(e)
+
+_env_out, _env_err = _gdelt_reply('{"status":"error"}')
+check("GDELT: a 200 error envelope RAISES — never scored as zero adverse results",
+      _env_out is None and "articles" in (_env_err or ""))
+_html_out, _html_err = _gdelt_reply("<html><body>Service Unavailable</body></html>")
+check("GDELT: a 200 HTML error page raises rather than clearing the subject",
+      _html_out is None and _html_err)
+_zero_out, _zero_err = _gdelt_reply('{"articles":[]}')
+check("GDELT: a genuine zero-result reply still means zero results",
+      _zero_out == [] and _zero_err is None)
+_empty_out, _empty_err = _gdelt_reply("")
+check("GDELT: an empty body is GDELT's own zero-result shape, not a failure",
+      _empty_out == [] and _empty_err is None)
+screen._GDELT_GATE.wait, screen.requests.get = _orig_gate, _orig_req_get
+
 _ev = os.path.join(_tf.mkdtemp(), "evidence.json")
 def _find(title, day):
     return [{"subject_type": "COMPANY", "subject_name": "Acme DMCC", "parent": None,
@@ -1261,6 +1297,27 @@ check("bing parse emits the standard shape, flags risk, skips blank titles",
       and _bg[0]["source"] == "Example Wire" and _bg[0]["ts"]
       and _bg[0]["date"] == "2026-06-30" and _bg[0]["url"] == "https://ex/1")
 check("bing parse is safe on empty payloads", screen.parse_bing_news(b"") == [])
+
+# Well-formedness is not proof of an answer. A throttle interstitial that
+# happens to parse has no <item>, and the locale used to score as swept-and-
+# clean — a subject cleared on coverage that never ran. Absence of the feed
+# ENVELOPE is the failure signal; the callers' except turns the raise into a
+# counted degrade. JS parity: parseRss returns null for the same bodies.
+_screen_src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "screen.py"), encoding="utf-8").read()
+def _feed_refused(payload):
+    try:
+        screen.parse_bing_news(payload)
+        return False
+    except ValueError:
+        return True
+check("news feeds: a parseable non-feed document RAISES — never an empty result set",
+      _feed_refused(b"<html><body>Before you continue</body></html>")
+      and _feed_refused(b"<error><code>429</code></error>"))
+check("news feeds: a genuine but empty feed is still zero results, not a failure",
+      screen.parse_bing_news(b"<rss><channel><title>q</title></channel></rss>") == [])
+check("news feeds: the envelope guard is wired into BOTH news fetchers",
+      "require_feed_root(safe_xml_fromstring(data)" in _screen_src
+      and "require_feed_root(safe_xml_fromstring(r.content)" in _screen_src)
 
 # Third-net coverage semantics: Google News refused + GDELT down + Bing alive
 # ⇒ the subject IS covered — no am_error raise, Bing's articles are kept.
