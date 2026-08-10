@@ -22,7 +22,8 @@
    Pure planner exported for offline unit tests. */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { asana, asanaEnabled, ensureSection, esc, runUrl, notifyAsana } from './asana-notify.mjs';
+import { asana, asanaEnabled, ensureSection, esc, runUrl, notifyAsana,
+  fitAsanaHtml, fitAsanaName } from './asana-notify.mjs';
 
 export const SCREEN_STATE_FILE = 'data/sanctions-screen-state.json';
 export const CASES_FILE = 'data/screening-cases-state.json';
@@ -404,8 +405,11 @@ async function main() {
         const d = await asana('/tasks', {
           method: 'POST',
           body: JSON.stringify({ data: {
-            name: caseTitle(a.key, a.subject).slice(0, 250),
-            html_notes: caseHtml(a.key, a.subject, link, a.priorCase),
+            /* Byte-capped, not character-capped: a case title is a designated
+               name verbatim, and Asana measures bytes. The html body is
+               tag-aware capped for the same reason (no-op under the limit). */
+            name: fitAsanaName(caseTitle(a.key, a.subject)),
+            html_notes: fitAsanaHtml(caseHtml(a.key, a.subject, link, a.priorCase)),
             due_on: a.dueOn || addDays(today, CASE_SLA_DAYS),
             assignee,
             projects: [projectGid],

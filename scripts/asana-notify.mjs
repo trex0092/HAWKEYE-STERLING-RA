@@ -83,7 +83,11 @@ export async function asana(path, opts = {}) {
    alert. Pure; unit-tested. */
 export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6, dedupPrefix = null) {
   const cutoff = nowMs - windowHours * 3600000;
-  const want = String(name).slice(0, 250);
+  /* Compare against the title AS FILED — the same byte-cap the writer applies.
+     A character slice here would never match a byte-capped non-Latin title,
+     and the guard would silently stop deduping exactly on the multilingual
+     cards where a re-run double-posts. */
+  const want = fitAsanaName(name);
   /* dedupPrefix: cards whose titles embed run-varying counts ("… — 2 new
      match(es) · 325 screened") never string-match their re-run twin, so a
      manual re-run double-posted the day's card. A caller that puts the STABLE
@@ -100,25 +104,46 @@ export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6, dedupPr
    idempotent (an existing name is reused), shared by the schedulers that file
    under a named column. */
 export async function ensureSection(projectGid, name) {
-  const d = await asana('/projects/' + projectGid + '/sections?limit=100&opt_fields=name');
+  /* PAGINATED. A single limit=100 read stops at the 100th section, so a column
+     past that point reads as absent and this function creates a DUPLICATE of
+     it — the card then lands somewhere nobody watches, which is exactly the
+     failure the mirror logic below exists to undo. */
   const want = String(name).trim().toLowerCase();
-  const found = (d.data || []).find(sec => String(sec.name || '').trim().toLowerCase() === want);
-  if (found) return found.gid;
+  for (const sec of await asanaPages('/projects/' + projectGid + '/sections?limit=100&opt_fields=name', 'sections in project ' + projectGid)) {
+    if (String(sec.name || '').trim().toLowerCase() === want) return sec.gid;
+  }
   const created = await asana('/projects/' + projectGid + '/sections', { method: 'POST', body: JSON.stringify({ data: { name } }) });
   return created.data && created.data.gid;
 }
 
-/* All tasks in a project (name, created_at, permalink) — for the dedup guard. */
-export async function listProjectTasks(projectGid) {
+/* Walk every page of an Asana collection. The cap is a runaway guard — an API
+   that keeps handing back a next_page would otherwise loop forever — and it is
+   LOUD when hit: the callers here feed the duplicate guard, where a short read
+   risks a duplicate card and stopping risks no card at all, so they continue on
+   the partial. Nothing that decides coverage reads through this helper. */
+export const ASANA_PAGE_CAP = Number(process.env.ASANA_PAGE_CAP) || 500;
+
+async function asanaPages(base, what) {
   const out = [];
-  const base = '/projects/' + projectGid + '/tasks?limit=100&opt_fields=name,created_at,permalink_url';
-  let path = base;
+  let path = base, pages = 0;
   while (path) {
     const d = await asana(path);
     out.push(...(d.data || []));
     path = d.next_page ? base + '&offset=' + d.next_page.offset : null;
+    if (path && ++pages >= ASANA_PAGE_CAP) {
+      console.error('asana-notify: ' + what + ' — read ' + out.length + ' record(s) over ' + pages
+        + ' pages and Asana still reports more; the page cap (' + ASANA_PAGE_CAP
+        + ') was hit. Continuing on the PARTIAL read — raise ASANA_PAGE_CAP.');
+      break;
+    }
   }
   return out;
+}
+
+/* All tasks in a project (name, created_at, permalink) — for the dedup guard. */
+export async function listProjectTasks(projectGid) {
+  return asanaPages('/projects/' + projectGid + '/tasks?limit=100&opt_fields=name,created_at,permalink_url',
+    'task scan of project ' + projectGid);
 }
 
 /* Create one alert card in the Ongoing Monitoring project.
@@ -135,7 +160,9 @@ export async function notifyAsana(name, notes, opts = {}) {
   }
   const due = opts.due || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const data = {
-    name: String(name).slice(0, 250),
+    /* Byte-capped, not character-capped — see fitAsanaHtml's note. Alert titles
+       carry designated names verbatim, and those are routinely non-Latin. */
+    name: fitAsanaName(name),
     projects: [project],
     due_on: due
   };
@@ -170,7 +197,7 @@ export async function notifyAsana(name, notes, opts = {}) {
   /* Byte-capped, tag-aware — a character slice let a multilingual digest weigh
      65,424 bytes against Asana's 65,400 limit and lose the whole card. */
   if (opts.html) data.html_notes = fitAsanaHtml(opts.html);
-  else data.notes = Buffer.from(String(notes), 'utf8').slice(0, 65000).toString('utf8').replace(/�+$/, '');
+  else data.notes = fitAsanaText(notes);   // byte cut, and SAYS it was cut
   if (opts.assignee !== null) data.assignee = opts.assignee || 'me';
   const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
   const gid = d.data && d.data.gid;
@@ -219,10 +246,25 @@ export function fitAsanaHtml(html, max = ASANA_HTML_MAX_BYTES) {
     if (bytes + b > budget) break;
     bytes += b; cut += ch.length;
   }
-  /* Back up to the end of the last COMPLETE tag — anything after it is a
-     half-written element that would fail XML parsing. */
+  /* Where does the cut land? If it is inside TEXT (the last '<' is already
+     closed) we can keep the text right up to the cut — backing up to the tag
+     boundary there would throw away the whole node, and a body that is one
+     giant <code> block would come back all but empty. Only a cut that lands
+     INSIDE a tag has to retreat, because a half-written element fails XML.
+     Either way, never split a character entity: "&amp" without its ';' is as
+     fatal to the parser as a broken tag. */
   const lastClose = s.lastIndexOf('>', cut);
-  let kept = lastClose >= 0 ? s.slice(0, lastClose + 1) : '';
+  const lastOpen = s.lastIndexOf('<', cut);
+  let kept;
+  if (lastOpen <= lastClose) {
+    let end = cut;
+    const amp = s.lastIndexOf('&', end);
+    const semi = amp >= 0 ? s.indexOf(';', amp) : -1;
+    if (amp > lastClose && (semi < 0 || semi >= end)) end = amp;
+    kept = s.slice(0, end);
+  } else {
+    kept = lastClose >= 0 ? s.slice(0, lastClose + 1) : '';
+  }
 
   /* Close what is still open, innermost first. */
   const open = [];
@@ -237,6 +279,35 @@ export function fitAsanaHtml(html, max = ASANA_HTML_MAX_BYTES) {
   if (body >= 0) kept += notice;                 // notice belongs INSIDE <body>
   for (let i = open.length - 1; i >= 0; i--) kept += '</' + open[i] + '>';
   return body >= 0 ? kept : kept + notice;
+}
+
+/* Plain-text sibling of fitAsanaHtml, for the `notes` and `name` fields. Same
+   root cause — Asana measures BYTES, a JS slice counts UTF-16 characters, and
+   every screening card now carries multilingual names — but no markup to keep
+   well-formed, so it is a straight byte cut on whole characters. Truncation is
+   marked so a reader never mistakes a cut record for a complete one. */
+export const ASANA_NAME_MAX_BYTES = 250;
+const TEXT_NOTICE = ' … [TRUNCATED to fit Asana — see the workflow run for the full record]';
+
+export function fitAsanaText(text, max = ASANA_HTML_MAX_BYTES, notice = TEXT_NOTICE) {
+  const s = String(text == null ? '' : text);
+  if (Buffer.byteLength(s, 'utf8') <= max) return s;
+  /* A notice longer than the cap would make the result BIGGER than the input
+     it replaced — degrade to a bare cut rather than blow the limit. */
+  const mark = Buffer.byteLength(notice, 'utf8') < max ? notice : '';
+  const budget = max - Buffer.byteLength(mark, 'utf8');
+  let cut = 0, bytes = 0;
+  for (const ch of s) {
+    const b = Buffer.byteLength(ch, 'utf8');
+    if (bytes + b > budget) break;
+    bytes += b; cut += ch.length;
+  }
+  return s.slice(0, cut) + mark;
+}
+
+/* Task titles have their own, much smaller budget, so they get a short mark. */
+export function fitAsanaName(name, max = ASANA_NAME_MAX_BYTES) {
+  return fitAsanaText(name, max, ' …[cut]');
 }
 
 /* Escape text for safe inclusion in Asana html_notes (XML-strict). */

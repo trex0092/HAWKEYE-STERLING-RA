@@ -28,6 +28,16 @@ const rss = '<rss><channel>' +
   '</channel></rss>';
 const items = parseRss(rss);
 check('parseRss extracts items incl. CDATA titles', items.length === 2 && items[0].source === 'Reuters' && items[1].title === 'Unrelated Acme bakery wins award');
+/* Same coverage decision as parseGdelt: a locale that could not be asked must
+   not score as a locale that answered clean. Google News serves HTTP 200 with a
+   consent/interstitial page when it throttles a runner IP — no <item> tags, and
+   the old parser read that as "no adverse media about this subject". */
+check('parseRss: a consent/interstitial page is "could not ask" (null), not a clean locale',
+  parseRss('<!DOCTYPE html><html><body>Before you continue to Google</body></html>') === null
+  && parseRss('') === null && parseRss(null) === null);
+check('parseRss: a real feed with no matching stories still means zero results',
+  Array.isArray(parseRss('<rss><channel><title>q</title></channel></rss>'))
+  && parseRss('<rss><channel><title>q</title></channel></rss>').length === 0);
 
 const score = scoreAdverseMedia('Acme Co', items);
 check('scoreAdverseMedia flags a name+risk-term headline as a strong hit',
@@ -67,7 +77,22 @@ const gd = parseGdelt(JSON.stringify({ articles: [
 ] }));
 check('parseGdelt extracts articles (title/link/source/date), dropping empty titles',
   gd.length === 1 && gd[0].source === 'apnews.com' && gd[0].link === 'http://g/1');
-check('parseGdelt tolerates malformed JSON (returns [])', Array.isArray(parseGdelt('{not json')) && parseGdelt('{not json').length === 0);
+/* NULL vs [] is a coverage decision, not a parsing detail. checkAdverseMedia
+   reads `gd !== null` to decide whether the worldwide backbone answered at all;
+   an unparseable body returned as [] scored as "GDELT swept the global index
+   and found nothing" — a false clear. GDELT replies HTTP 200 with plain text
+   when it rejects a query and with an HTML page when it is overloaded, so this
+   is the ordinary failure mode, not an exotic one. */
+check('parseGdelt: malformed JSON is "could not ask" (null), NEVER a clean sweep',
+  parseGdelt('{not json') === null);
+check('parseGdelt: an HTML error page or plain-text complaint is null, not zero results',
+  parseGdelt('<html><body>Service Unavailable</body></html>') === null
+  && parseGdelt('Your query was rejected.') === null);
+check('parseGdelt: valid JSON with no articles array is an error envelope, not zero results',
+  parseGdelt('{"status":"error"}') === null && parseGdelt('[]') === null);
+check('parseGdelt: GDELT\'s real zero-result shapes still mean zero results',
+  Array.isArray(parseGdelt('{"articles":[]}')) && parseGdelt('{"articles":[]}').length === 0
+  && Array.isArray(parseGdelt('')) && Array.isArray(parseGdelt('   \n')));
 
 const gdScore = scoreAdverseMedia('Acme Co', gd);
 check('GDELT items score through the same scorer', gdScore.hit === true && gdScore.terms.includes('money laundering'));

@@ -1196,6 +1196,23 @@ def sha256_of(data: bytes) -> str:
 # this guard needs no new dependency.)
 XML_MAX_BYTES = int(os.environ.get("XML_MAX_BYTES", str(64 * 1024 * 1024)))
 
+def require_feed_root(root, what):
+    """Assert that a parsed document really is an RSS/Atom feed.
+
+    Well-formedness is not proof of an answer. Google News and Bing serve a
+    throttle interstitial or an error document on HTTP 200; when one of those
+    happens to parse (no DOCTYPE for the guard below to refuse), `.//item`
+    finds nothing and the locale scores as swept-and-clean — a subject cleared
+    on coverage that never ran. Absence of the feed ENVELOPE, not absence of
+    items, is the failure signal, so this raises and the caller's existing
+    except turns it into a counted, logged degrade. JS parity: parseRss returns
+    null for the same bodies. An empty but genuine feed is untouched."""
+    tag = str(getattr(root, "tag", "")).split("}")[-1].lower()
+    if tag in ("rss", "feed") or root.find(".//channel") is not None:
+        return root
+    raise ValueError(f"{what}: HTTP 200 but no RSS/Atom envelope (<{tag}>) — "
+                     "interstitial or error page, not an empty result set")
+
 def safe_xml_fromstring(data):
     """Parse untrusted XML with stdlib ElementTree after refusing DTDs/entities
     and oversize input. Returns the root Element; raises ValueError on rejection.
@@ -1689,7 +1706,18 @@ def search_gdelt(name: str, max_results: int = 8) -> list:
                      headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
     if r.status_code != 200:
         raise RuntimeError(f"GDELT HTTP {r.status_code}")
-    return parse_gdelt(r.json() if r.content else {}, max_results)
+    if not r.content or not r.content.strip():
+        return []                       # GDELT's empty reply to some zero-result queries
+    # A 200 is not proof GDELT answered. It replies HTTP 200 with plain text
+    # when it rejects a query and with an HTML page when it is overloaded, and
+    # r.json() raising there is CORRECT — the caller counts it as a GDELT
+    # failure and keeps the subject's standing coverage. The trap is a 200 that
+    # IS valid JSON but carries no articles list: an error envelope read as an
+    # empty result set is a clean sweep of the global index that never happened.
+    payload = r.json()
+    if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
+        raise RuntimeError("GDELT 200 without an articles list — error envelope, not zero results")
+    return parse_gdelt(payload, max_results)
 
 # ── Bing News RSS — independent THIRD news feed ──────────────────────────────
 # Google News and GDELT meter shared runner IPs independently, and 10-14 Jul
@@ -1721,7 +1749,7 @@ def parse_bing_news(data, max_results: int = 8) -> list:
     arts = []
     if not data:
         return arts
-    root = safe_xml_fromstring(data)
+    root = require_feed_root(safe_xml_fromstring(data), "Bing News")
     for item in root.iter("item"):
         try:
             title = (item.findtext("title") or "").strip()
@@ -1824,7 +1852,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                 r = requests.get(url, timeout=15,
                                  headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
                 if r.status_code == 200:
-                    root = safe_xml_fromstring(r.content)
+                    root = require_feed_root(safe_xml_fromstring(r.content), "Google News")
                     # SCAN EVERY ITEM THIS FETCH RETURNED. This used to read
                     # only [:max_results] — 8 of the ~100 a locale feed carries —
                     # and the broad pass queries the NAME ONLY, so those 8 are the

@@ -3,7 +3,8 @@
    re-run duplicate guard used by every monitoring delivery stream. */
 import {
   isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana,
-  fitAsanaHtml, ASANA_HTML_MAX_BYTES
+  fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
+  listProjectTasks, ASANA_PAGE_CAP
 } from '../scripts/asana-notify.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -48,11 +49,21 @@ check('REGRESSION: identical title 24h apart is NOT a duplicate — daily watche
   findRecentDuplicate(tasks, 'Regulatory Watch — 3 source changes', NOW) === null);
 check('different name is never a duplicate',
   findRecentDuplicate(tasks, 'FATF list change: Monaco', NOW) === null);
-check('name is compared after the same 250-char clip Asana receives', (() => {
+/* The comparator must apply the EXACT transform the writer applies, or an
+   over-long title never matches its own re-run. Pinning both to fitAsanaName
+   keeps them in step; a bare 250-CHARACTER clip on either side would drift the
+   moment a designated name is non-Latin (Asana counts bytes). */
+check('name is compared after the same clip Asana actually receives', (() => {
   const long = 'X'.repeat(300);
-  const clipped = [{ name: 'X'.repeat(250), created_at: hoursAgo(1), permalink_url: 'https://t/3' }];
-  const d = findRecentDuplicate(clipped, long, NOW);
+  const filed = [{ name: fitAsanaName(long), created_at: hoursAgo(1), permalink_url: 'https://t/3' }];
+  const d = findRecentDuplicate(filed, long, NOW);
   return d && d.permalink_url === 'https://t/3';
+})());
+check('a re-run of a non-Latin title dedups against the byte-capped card on file', (() => {
+  const long = 'إشعار عقوبات — ' + 'محمد بن عبد الله '.repeat(40);
+  const filed = [{ name: fitAsanaName(long), created_at: hoursAgo(1), permalink_url: 'https://t/4' }];
+  return Buffer.byteLength(fitAsanaName(long), 'utf8') <= ASANA_NAME_MAX_BYTES
+    && (findRecentDuplicate(filed, long, NOW) || {}).permalink_url === 'https://t/4';
 })());
 check('missing/garbage created_at is treated as not recent',
   findRecentDuplicate([{ name: 'A' }, { name: 'A', created_at: 'yesterday-ish' }], 'A', NOW) === null);
@@ -231,6 +242,112 @@ check('a sectionless mirror still joins the project',
     /fitAsanaHtml\(opts\.html\)/.test(
       readFileSync(join(resolve(dirname(fileURLToPath(import.meta.url)), '..'),
         'scripts/asana-notify.mjs'), 'utf8')));
+
+  /* A body that is one huge text node (the reconciliation card wraps its whole
+     report in a single <code>) must not come back empty: backing up to the tag
+     boundary there would discard every line of the drift report. */
+  let oneNode = '<body><h2>Drift</h2><code>';
+  for (let i = 0; i < 4000; i++) oneNode += 'row ' + i + ' — ' + multilingual + '\n';
+  oneNode += '</code></body>';
+  const fittedNode = fitAsanaHtml(oneNode);
+  check('asana html: a cut inside a giant text node keeps the text, not just the tag',
+    bytes(fittedNode) <= ASANA_HTML_MAX_BYTES && wellFormed(fittedNode)
+      && fittedNode.includes('row 100 ') && bytes(fittedNode) > ASANA_HTML_MAX_BYTES * 0.9);
+  /* …and never mid-entity: "&amp" without its ';' fails XML as hard as a
+     broken tag. Sized so the cut lands inside the escaped ampersand run. */
+  const ents = '<body><code>' + '&amp;'.repeat(40000) + '</code></body>';
+  const fittedEnt = fitAsanaHtml(ents);
+  check('asana html: the cut never splits a character entity',
+    bytes(fittedEnt) <= ASANA_HTML_MAX_BYTES
+      && !/&[a-z]*$/i.test(fittedEnt.replace(/<\/?[a-zA-Z][^>]*>|⚠[^<]*/g, ''))
+      && (fittedEnt.match(/&/g) || []).length === (fittedEnt.match(/&amp;/g) || []).length);
+}
+
+/* Same byte-vs-character bug, same blast radius, in the PLAIN-TEXT fields.
+   `notes` and `name` are measured in bytes by Asana too, and every card the
+   engine files now carries designated names verbatim — Arabic, Cyrillic, Han.
+   Three call sites used to slice characters: notifyAsana's title, the daily
+   Adverse Media & PEP audit card, and the screening-case title. */
+{
+  const bytes = (x) => Buffer.byteLength(x, 'utf8');
+  const arabic = 'الرئيس فلاديمير بوتين محمد بن راشد آل مكتوم ';
+  const bigText = arabic.repeat(1000);
+  check('asana text: the fixture is over the BYTE cap while under any character cap',
+    bigText.length < ASANA_HTML_MAX_BYTES && bytes(bigText) > ASANA_HTML_MAX_BYTES);
+  const fittedText = fitAsanaText(bigText);
+  check('asana text: the fitted notes are within Asana\'s byte limit',
+    bytes(fittedText) <= ASANA_HTML_MAX_BYTES);
+  check('asana text: truncation is DISCLOSED, never a silent drop',
+    /TRUNCATED/.test(fittedText));
+  check('asana text: no character is split across the byte cut',
+    !fittedText.includes('�'));
+  check('asana text: content under the cap is returned untouched',
+    fitAsanaText('Adverse Media & PEP — CLEAR') === 'Adverse Media & PEP — CLEAR');
+  check('asana text: null/undefined degrade to empty, never "null"',
+    fitAsanaText(null) === '' && fitAsanaText(undefined) === '');
+
+  const longName = fitAsanaName('⚠ Sanctions HIT — ' + arabic.repeat(20));
+  check('asana name: a non-Latin title is capped by BYTES at the name limit',
+    bytes(longName) <= ASANA_NAME_MAX_BYTES && !longName.includes('�'));
+  check('asana name: a truncated title still says it was cut',
+    /\[cut\]$/.test(longName));
+  check('asana name: a short title is untouched',
+    fitAsanaName('Adverse Media & PEP — CLEAR — 10 Aug 2026') === 'Adverse Media & PEP — CLEAR — 10 Aug 2026');
+  /* A notice longer than the cap would make the output BIGGER than the cut it
+     replaced — the fit must degrade to a bare cut rather than blow the limit. */
+  check('asana text: an absurdly small cap still yields a compliant payload',
+    bytes(fitAsanaText(bigText, 20)) <= 20 && bytes(fitAsanaName('x'.repeat(500), 8)) <= 8);
+
+  /* Wiring — the fix has to be AT the call sites, not merely available. */
+  const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const src = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const notify = src('scripts/asana-notify.mjs');
+  const screen = src('scripts/sanctions-screen.mjs');
+  const cases = src('scripts/screening-cases.mjs');
+  check('wiring: notifyAsana caps its title and plain notes by bytes',
+    /name:\s*fitAsanaName\(name\)/.test(notify) && /data\.notes = fitAsanaText\(notes\)/.test(notify));
+  check('wiring: the Adverse Media & PEP audit card caps by bytes',
+    /name:\s*fitAsanaName\(name\),\s*notes:\s*fitAsanaText\(notes\)/.test(screen));
+  check('wiring: the screening-case card caps title and body by bytes',
+    /name:\s*fitAsanaName\(caseTitle\(/.test(cases) && /html_notes:\s*fitAsanaHtml\(caseHtml\(/.test(cases));
+  /* The regression that started all this: a character slice on an Asana field.
+     Any new one is a bug waiting for the next multilingual card. */
+  for (const [file, text] of [['scripts/asana-notify.mjs', notify],
+    ['scripts/sanctions-screen.mjs', screen], ['scripts/screening-cases.mjs', cases]]) {
+    const offenders = [...text.matchAll(/(name|notes|html_notes)\s*:\s*[^,\n]*\.slice\(0, *\d{3,}\)/g)];
+    check('no Asana field is character-sliced in ' + file + ' (bytes are what Asana counts)',
+      offenders.length === 0);
+  }
+}
+
+/* Paging here feeds the duplicate guard and the section lookup. Neither may
+   loop forever on an API that keeps promising another page, and neither may go
+   quiet when it stops early: a short task scan re-posts a card, and a section
+   lookup that stops at page one creates a DUPLICATE column that nobody is
+   watching — the same way the law-change queue was lost in #305. */
+{
+  const realFetch = globalThis.fetch, realErr = console.error;
+  const src = readFileSync(join(resolve(dirname(fileURLToPath(import.meta.url)), '..'),
+    'scripts/asana-notify.mjs'), 'utf8');
+  check('asana paging: the section lookup walks pages instead of reading only the first 100',
+    /for \(const sec of await asanaPages\('\/projects\/' \+ projectGid \+ '\/sections/.test(src));
+
+  let calls = 0, warned = '';
+  globalThis.fetch = async () => { calls++; return {
+    ok: true, status: 200, headers: { get: () => null },
+    json: async () => ({ data: [{ gid: String(calls), name: 'Card ' + calls, created_at: '2026-08-10T00:00:00Z' }],
+      next_page: { offset: 'o' + calls } })   // never stops offering more
+  }; };
+  console.error = (m) => { warned += String(m); };
+  let listed;
+  try { listed = await listProjectTasks('123'); }
+  finally { globalThis.fetch = realFetch; console.error = realErr; }
+  check('asana paging: an endless next_page terminates at the cap instead of hanging the run',
+    Array.isArray(listed) && listed.length === ASANA_PAGE_CAP);
+  check('asana paging: stopping early is reported, never silent',
+    /page cap/.test(warned) && /PARTIAL/.test(warned) && /ASANA_PAGE_CAP/.test(warned));
+  check('asana paging: the duplicate guard compares against the title AS FILED (byte-capped)',
+    /const want = fitAsanaName\(name\)/.test(src));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

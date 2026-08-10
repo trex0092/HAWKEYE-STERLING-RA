@@ -32,7 +32,8 @@
    from the pure logic below so test/sanctions-screen.test.mjs runs fully offline. */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
+import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
+  fitAsanaText, fitAsanaName } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
 import { checkAdverseMedia, budgetedLocales, activeLocales, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
@@ -1044,19 +1045,41 @@ async function asanaGet(url, token, timeoutMs = 30000) {
   }
 }
 
-async function fetchAsanaSubjects(projectGid, token) {
-  const tasks = [];
+/* Walk every page of an Asana collection. The page cap is a runaway guard, NOT
+   a size limit: exhausting it means the project is bigger than we read, and a
+   short read of the Customer Database is a silent false negative — the unread
+   tail screens as "no match" because it was never screened at all. So the cap
+   THROWS. Callers turn that into an unscreened-run bail, which is red and
+   visible; a quietly truncated customer list is neither. */
+export const ASANA_PAGE_CAP = Number(process.env.ASANA_PAGE_CAP) || 500;
+
+export async function asanaPaged(projectGid, path, optFields, token, what, { soft = false } = {}) {
+  const out = [];
   let offset = null, pages = 0;
-  do {
-    const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + '/tasks');
-    u.searchParams.set('opt_fields', 'name,completed,notes');
+  for (;;) {
+    const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + path);
+    u.searchParams.set('opt_fields', optFields);
     u.searchParams.set('limit', '100');
     if (offset) u.searchParams.set('offset', offset);
     const json = await asanaGet(u, token);
-    for (const t of (json.data || [])) tasks.push(t);
+    for (const t of (json.data || [])) out.push(t);
     offset = json.next_page && json.next_page.offset;
-  } while (offset && ++pages < 500);
-  return parseSubjects(tasks);
+    if (!offset) return out;
+    if (++pages >= ASANA_PAGE_CAP) {
+      const msg = what + ': read ' + out.length + ' record(s) over ' + pages
+        + ' pages and Asana still reports more — the page cap (' + ASANA_PAGE_CAP
+        + ') was hit, so this read is INCOMPLETE. Raise ASANA_PAGE_CAP.';
+      /* `soft` is for the dedup scan ONLY, where a short read risks a duplicate
+         card and a hard failure risks no card at all — and losing an alert is
+         worse than a rare duplicate. Every other caller gets the throw. */
+      if (soft) { console.error('sanctions-screen: ' + msg + ' Continuing on the partial read — a duplicate card is possible.'); return out; }
+      throw new Error(msg + ' Refusing to treat a partial project as the whole of it.');
+    }
+  }
+}
+
+async function fetchAsanaSubjects(projectGid, token) {
+  return parseSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
 }
 
 /* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
@@ -1087,12 +1110,13 @@ async function asanaPost(path, body, token, timeoutMs = 30000) {
    the daily run self-provision the Ongoing Monitoring sections — no manual setup,
    idempotent (a name that already exists is reused). */
 async function ensureSection(projectGid, name, token) {
-  const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + '/sections');
-  u.searchParams.set('opt_fields', 'name');
-  u.searchParams.set('limit', '100');
-  const json = await asanaGet(u, token);
+  /* PAGINATED. A single limit=100 read stops at the 100th section, so an
+     existing column past that point reads as absent and this function creates
+     a DUPLICATE of it — cards then land in a new column nobody watches, which
+     is how #305 was lost the first time. */
+  const sections = await asanaPaged(projectGid, '/sections', 'name', token, 'Asana sections in project ' + projectGid);
   const want = String(name).trim().toLowerCase();
-  const found = (json.data || []).find(s => String(s.name || '').trim().toLowerCase() === want);
+  const found = sections.find(s => String(s.name || '').trim().toLowerCase() === want);
   if (found) return found.gid;
   const created = await asanaPost('/projects/' + projectGid + '/sections', { name }, token);
   return created.data && created.data.gid;
@@ -1100,18 +1124,8 @@ async function ensureSection(projectGid, name, token) {
 
 /* All task names in a project (paginated) — used for same-day dedup. */
 async function fetchTaskNames(projectGid, token) {
-  const names = [];
-  let offset = null, pages = 0;
-  do {
-    const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + '/tasks');
-    u.searchParams.set('opt_fields', 'name');
-    u.searchParams.set('limit', '100');
-    if (offset) u.searchParams.set('offset', offset);
-    const json = await asanaGet(u, token);
-    for (const t of (json.data || [])) names.push(String(t.name || ''));
-    offset = json.next_page && json.next_page.offset;
-  } while (offset && ++pages < 500);
-  return names;
+  const tasks = await asanaPaged(projectGid, '/tasks', 'name', token, 'Asana project ' + projectGid + ' (dedup scan)', { soft: true });
+  return tasks.map(t => String(t.name || ''));
 }
 
 /* Same-day dedup for the Adverse Media / PEP card — DIRECTION-AWARE.
@@ -1143,7 +1157,10 @@ export function omCardToSkip(names, dateStr, hasHits) {
 /* Create a task in the Ongoing Monitoring project and file it under its section.
    Returns the task permalink (or null). Filing under the section is non-fatal. */
 async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
-  const data = { name: String(name).slice(0, 250), notes: String(notes).slice(0, 60000), projects: [projectGid] };
+  /* Byte-capped, not character-capped. Asana measures BYTES; the 60,000-CHAR
+     cut here was the same bug that lost the screening digest — this card now
+     carries multilingual PEP names too, and those cost 2-3 bytes each. */
+  const data = { name: fitAsanaName(name), notes: fitAsanaText(notes), projects: [projectGid] };
   if (due) data.due_on = due;
   if (OM_ASSIGNEE) data.assignee = OM_ASSIGNEE;
   const d = await asanaPost('/tasks', data, token);
