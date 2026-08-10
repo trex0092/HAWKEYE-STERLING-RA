@@ -409,6 +409,69 @@ export function matchSignature(r) {
    matches to alert on, the cleared matches (informational), and the next state.
    Subjects that errored this run carry their prior state forward untouched —
    never wiped, never silently cleared. */
+/* ── Match classification: C / P / F / N ────────────────────────────────────
+   Structured adverse-media practice classifies every RESULT, not just the
+   subject: Confirmed / Partial / False / No match, with the subject's overall
+   decision taken as the highest severity present.
+
+   The load-bearing rule here is that automated screening can NEVER assign C.
+   "Confirmed" means the result has been verified to relate to THIS subject, and
+   a name match is not an identity match — UAE Federal Decree-Law No. 10 of 2025
+   Art. 16/18 and FATF R.26 put that determination on the MLRO under four-eyes,
+   which is why the daily screen already caps PEP-list hits at band medium and
+   never auto-decides. So the machine suggests P (something to verify) or N
+   (nothing found), and C arrives only from a human: an MLRO escalate
+   disposition, or an explicit override with a written rationale.
+
+   F is symmetrical: it comes from a human false-positive disposition, or from
+   the cleared-FP registry, which is itself a prior human clearance being cited.
+   Nothing is ever downgraded to F automatically on score alone. */
+export const MATCH_CLASSES = {
+  C: { code: 'C', label: 'Confirmed Match', rank: 3,
+    action: 'Escalate. Consider Enhanced Due Diligence. File SAR/STR if reasonable grounds for suspicion exist.' },
+  P: { code: 'P', label: 'Partial Match', rank: 2,
+    action: 'Conduct further verification. Consider Enhanced Due Diligence. Escalate to the Compliance Officer.' },
+  F: { code: 'F', label: 'False Match', rank: 1,
+    action: 'Document the reason for the false-match classification. No escalation required for this result.' },
+  N: { code: 'N', label: 'No Match', rank: 0,
+    action: 'Document and proceed. Retain the record as evidence that screening was conducted.' },
+};
+
+/* Classify ONE result. `disposition` is the MLRO's ticked case outcome
+   (parseDisposition in screening-cases.mjs) when one exists for this subject. */
+export function classifyHit(hit, { disposition = null, override = null } = {}) {
+  if (override && MATCH_CLASSES[override]) return MATCH_CLASSES[override].code;
+  if (disposition === 'escalate') return 'C';          // human confirmed
+  if (disposition === 'false-positive') return 'F';    // human cleared
+  if (hit && hit.whitelisted) return 'F';              // prior human clearance, cited
+  return hit ? 'P' : 'N';                              // never auto-C
+}
+
+/* The subject's overall decision: the HIGHEST severity across every result, so
+   one confirmed hit cannot be averaged away by a page of false matches. */
+export function overallClassification(hits, opts = {}) {
+  const codes = (hits || []).map(h => classifyHit(h, opts));
+  if (!codes.length) return 'N';
+  return codes.reduce((a, b) => (MATCH_CLASSES[b].rank > MATCH_CLASSES[a].rank ? b : a), 'N');
+}
+
+/* Read a screener's override back off the case card. The suggested decision is
+   always overridable, but ONLY with a written rationale — an override with no
+   reason is not a decision, it is an unexplained change to a screening outcome,
+   so it is refused and the suggestion stands. Mirrors parseDisposition: a
+   literal [x] tick, untouched [ ] template parses as null. */
+export function parseClassificationOverride(notes) {
+  const t = String(notes || '');
+  const m = t.match(/\[\s*x\s*\]\s*(confirmed|partial|false|no)\s*match\b[^\n]*/i);
+  if (!m) return null;
+  const code = { confirmed: 'C', partial: 'P', false: 'F', no: 'N' }[m[1].toLowerCase()];
+  const rationale = (t.match(/rationale\s*:\s*([^\n]+)/i) || [])[1];
+  const reason = String(rationale || '').trim();
+  if (!reason) return { code, rationale: '', accepted: false,
+    reason: 'override ignored — no written rationale supplied' };
+  return { code, rationale: reason.slice(0, 500), accepted: true, reason: '' };
+}
+
 /* Per-hit evidence detail persisted with the state and shipped in the results
    artifact: the matched designated name, score and the matcher's mechanism/
    confidence labels — what an MLRO needs on the case card to adjudicate

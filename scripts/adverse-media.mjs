@@ -83,6 +83,12 @@ export const PY_PARITY_TERMS = [
   'murder', 'politic',
   // Organised crime / cyber
   'mafia', 'cartel', 'illicit', 'cybercrime', 'ransomware', 'darknet',
+  /* Terms the GDELT query has ASKED FOR all along with nothing to score them —
+     the exact defect PY_PARITY_TERMS was created to fix, left half-closed. An
+     item retrieved because it mentioned a raid or an asset freeze arrived and
+     scored zero on the very words that surfaced it. Found by the invariant that
+     every retrieval term must also be a scoring term. */
+  'investigation', 'raid', 'seized', 'asset freeze', 'prosecution',
   // ESG / minerals / human rights
   'human rights', 'forced labour', 'forced labor', 'modern slavery',
   'child labour', 'child labor', 'conflict minerals', 'blood diamond',
@@ -481,8 +487,77 @@ export const GDELT_RISK_TERMS = [
   'smuggling', 'narcotics', 'tax evasion', 'ponzi', 'indicted', 'convicted',
   'arrested', 'investigation', 'raid', 'seized', 'asset freeze', 'blacklisted'
 ];
-export function gdeltUrl(name, terms = GDELT_RISK_TERMS) {
-  const q = '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
+/* Typologies the SCORER has always known but the RETRIEVAL query never asked
+   for. PY_PARITY_TERMS were added scoring-only and deliberately kept out of the
+   Google News query, because that query is already ~1.5KB per locale and one
+   Google rejects returns zero items — trading a scoring gap for a retrieval gap
+   is a bad trade. That reasoning is sound for Google News and does NOT transfer
+   to GDELT: GDELT is a separate engine, one request per subject, and its query
+   carried only 26 terms. So an article about a subject's ransomware indictment,
+   kleptocracy allegations or modern-slavery prosecution could be scored
+   perfectly — if something else happened to surface it. Nothing asked.
+
+   These are the typology terms worth RETRIEVING on, drawn from the FATF-shaped
+   categories the scorer already recognises. Kept to terms specific enough to be
+   evidence of the typology rather than generic newswire vocabulary. */
+export const GDELT_EXTRA_TERMS = [
+  // Financial crime
+  'financial crime', 'economic crime', 'wire fraud', 'accounting fraud',
+  'asset misappropriation', 'identity theft', 'pyramid scheme', 'insider trading',
+  'market manipulation', 'counterfeiting', 'kickback', 'forgery', 'extortion',
+  // Terrorist financing / proliferation
+  'designated terrorist', 'extremist', 'radicalisation', 'militant',
+  'weapons of mass destruction', 'chemical weapons', 'biological weapons',
+  'arms trafficking', 'weapons smuggling', 'dual-use', 'export control',
+  // Corruption / organised crime
+  'kleptocracy', 'state capture', 'abuse of power', 'misuse of funds',
+  'conflict of interest', 'mafia', 'human trafficking', 'drug trafficking',
+  'people smuggling', 'forced labour', 'modern slavery', 'wildlife trafficking',
+  // Cyber
+  'cybercrime', 'ransomware', 'darknet',
+  // Legal / enforcement status
+  'prosecuted', 'prosecution', 'imprisonment', 'blackmail', 'debarred',
+  'regulatory breach', 'litigation', 'felon', 'jail', 'murder', 'theft',
+  // Stems of typologies already asked for in a longer form: GDELT matches whole
+  // words, so "corruption" does not retrieve an article that only says
+  // "corrupt".
+  'corrupt', 'bribe', 'wmd', 'litigate', 'prosecute',
+];
+
+/* DELIBERATELY NOT RETRIEVED: 'politic'. The scorer keeps it as a weak-tier
+   signal, which is right — but as a GDELT retrieval term it is the one entry on
+   the typology list that would do harm. The query is name-scoped and GDELT caps
+   a subject at 250 records, so for any public figure — and the PEP layer this
+   screen now carries is 422,223 office-holders — "politic" returns ordinary
+   political coverage that crowds genuine financial-crime reporting out of the
+   cap. That trades real recall for noise, which is the opposite of the point.
+   Scoring keeps it; retrieval does not ask for it. */
+
+/* A GDELT query that the API rejects returns null from fetchSource, which costs
+   the ENTIRE worldwide backbone for that subject — strictly worse than asking
+   for fewer terms. So the extras are admitted only while the built query stays
+   under a conservative length, and checkAdverseMedia falls back to the proven
+   base set if the wide query fails. Expansion can add recall; it must never be
+   able to subtract it. */
+export const GDELT_QUERY_MAX = Number(process.env.GDELT_QUERY_MAX) || 1600;
+
+export function gdeltTerms(name, extra = GDELT_EXTRA_TERMS, max = GDELT_QUERY_MAX) {
+  const out = [...GDELT_RISK_TERMS];
+  const len = (ts) => gdeltQueryString(name, ts).length;
+  for (const t of extra) {
+    if (out.includes(t)) continue;
+    out.push(t);
+    if (len(out) > max) { out.pop(); break; }
+  }
+  return out;
+}
+
+export function gdeltQueryString(name, terms) {
+  return '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
+}
+
+export function gdeltUrl(name, terms = gdeltTerms(name)) {
+  const q = gdeltQueryString(name, terms);
   const span = String(process.env.ADVERSE_MEDIA_TIMESPAN || '12m');
   /* GDELT caps maxrecords at 250 — fetch at the API maximum by default: the
      screen's mandate is maximum worldwide recall, and this is one request per
@@ -728,8 +803,19 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const localeSet = locales || (explicitIds ? activeLocales() : budgetedLocales());
   const conc = Math.max(1, concurrency || Number(process.env.ADVERSE_MEDIA_CONCURRENCY) || 6);
 
-  // GDELT (global) runs alongside the pooled per-locale Google News fetches.
-  const gdeltP = fetchSource(gdeltUrl(name), parseGdelt, 'application/json', timeoutMs);
+  /* GDELT (global) runs alongside the pooled per-locale Google News fetches.
+     The wide query asks for the typology terms the scorer knows; if GDELT
+     rejects it we lose the whole worldwide backbone for this subject, which is
+     worse than asking narrowly. So a failed wide query retries once on the
+     proven base set and says so — the expansion can only ever add recall. */
+  const wide = gdeltTerms(name);
+  const gdeltP = fetchSource(gdeltUrl(name, wide), parseGdelt, 'application/json', timeoutMs)
+    .then(r => {
+      if (r !== null || wide.length <= GDELT_RISK_TERMS.length) return r;
+      console.warn('adverse-media: GDELT rejected the ' + wide.length + '-term query — retrying on the '
+        + GDELT_RISK_TERMS.length + '-term base set (retrieval breadth reduced for this subject, not lost)');
+      return fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt, 'application/json', timeoutMs);
+    });
   const localeResults = await mapPool(localeSet, conc, loc =>
     fetchSource(adverseMediaUrlFor(name, loc), parseRss, xmlAccept, timeoutMs)
       .then(items => ({ id: loc.id, items }))
