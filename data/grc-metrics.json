@@ -55,7 +55,7 @@
     "obligationsWithoutOwner": 0,
     "obligationsWithoutWatchSource": 1,
     "openActionsWithoutTargetDate": 17,
-    "residualAboveAppetite": 1,
+    "residualAboveAppetite": 2,
     "risksWithoutAppetitePosition": 0
   },
   "kris": [
@@ -220,7 +220,7 @@
       "appetite_ref": "RA-08",
       "owner": "MLRO (with Internal Audit)",
       "escalation_sla": "Reported at the next quarterly management review; a CRITICAL or HIGH finding open past its verification escalates to the MLRO within five business days.",
-      "value": 1,
+      "value": 2,
       "threshold": {
         "operator": "<=",
         "value": 0
@@ -233,7 +233,7 @@
   ],
   "appetite_scoring": {
     "basis": "Every row of docs/aims/ai-risk-register.md scored against the residual_ceiling of the appetite position that claims it in data/risk-appetite.json. A ceiling is the highest residual the firm carries in that domain without a dated treatment plan; see residual_ceiling_basis for how the ceilings are derived from the methodology bands.",
-    "risks_scored": 20,
+    "risks_scored": 21,
     "above_appetite": [
       {
         "risk": "R-03",
@@ -242,6 +242,15 @@
         "position": "ZERO",
         "ceiling": 6,
         "owner": "MLRO",
+        "dated_treatment": false
+      },
+      {
+        "risk": "R-21",
+        "residual": 12,
+        "appetite": "RA-04",
+        "position": "ZERO",
+        "ceiling": 6,
+        "owner": "MLRO / DPO",
         "dated_treatment": false
       }
     ],
