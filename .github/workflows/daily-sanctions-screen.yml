@@ -67,6 +67,17 @@ jobs:
             umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
             webgate.ec.europa.eu:443
             ofsistorage.blob.core.windows.net:443
+            # Australia DFAT and Switzerland SECO are fetched live by the engine
+            # from the OpenSanctions mirrors. Both were added as CORE-FLOORED
+            # lists on 2026-07-29 and this allowlist was never extended, so the
+            # runner blocked them at the network layer on EVERY run since: two
+            # core lists loaded 0 names, sat below their 500 floors, and the
+            # coverage-floor gate turned the job red after delivering a DEGRADED
+            # screen — every single day. Every other engine workflow already
+            # allows this host; only this one did not. Guarded now by
+            # test/workflow-hardening.test.mjs, which derives the required hosts
+            # from the engine's own download() calls.
+            data.opensanctions.org:443
             app.asana.com:443
             *.githubapp.com:443
 
