@@ -181,7 +181,7 @@ jobs:
       # download-or-degrade shape as the four lists above.
       - name: Download Australia DFAT list
         run: |
-          if curl -sfL \
+          if curl -sfL --compressed \
             "https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv" \
             -o /tmp/au_dfat.csv; then
             # A 200 is not proof the mirror served data. If it answers with an
@@ -190,10 +190,13 @@ jobs:
             # hiccup would block every customer. Require the CSV header we
             # actually parse; anything else is treated as a failed download, so
             # it degrades this one list instead.
-            if head -n 1 /tmp/au_dfat.csv | grep -qiE '(^|,)name(,|\$)'; then
+            if head -c 4096 /tmp/au_dfat.csv | head -n 1 | grep -qE '(^|,)[Nn]ame(,|$)'; then
               echo "AU_HASH=$(sha256sum /tmp/au_dfat.csv | cut -d' ' -f1)" >> "$GITHUB_ENV"
             else
-              echo "::warning::Australia DFAT returned a 200 without a CSV name column - treating as a failed download"
+              # Say WHAT arrived, not just that it was wrong: the first run of
+              # this guard rejected a gzip body (curl needs --compressed for
+              # this mirror) and the warning alone did not show that.
+              echo "::warning::Australia DFAT returned a 200 whose first line is not the CSV header we parse - treating as a failed download. First bytes: $(head -c 120 /tmp/au_dfat.csv | tr -c '[:print:]' '.')"
               rm -f /tmp/au_dfat.csv
             fi
           else
@@ -203,7 +206,7 @@ jobs:
 
       - name: Download Switzerland SECO list
         run: |
-          if curl -sfL \
+          if curl -sfL --compressed \
             "https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv" \
             -o /tmp/ch_seco.csv; then
             # A 200 is not proof the mirror served data. If it answers with an
@@ -212,10 +215,13 @@ jobs:
             # hiccup would block every customer. Require the CSV header we
             # actually parse; anything else is treated as a failed download, so
             # it degrades this one list instead.
-            if head -n 1 /tmp/ch_seco.csv | grep -qiE '(^|,)name(,|\$)'; then
+            if head -c 4096 /tmp/ch_seco.csv | head -n 1 | grep -qE '(^|,)[Nn]ame(,|$)'; then
               echo "CH_HASH=$(sha256sum /tmp/ch_seco.csv | cut -d' ' -f1)" >> "$GITHUB_ENV"
             else
-              echo "::warning::Switzerland SECO returned a 200 without a CSV name column - treating as a failed download"
+              # Say WHAT arrived, not just that it was wrong: the first run of
+              # this guard rejected a gzip body (curl needs --compressed for
+              # this mirror) and the warning alone did not show that.
+              echo "::warning::Switzerland SECO returned a 200 whose first line is not the CSV header we parse - treating as a failed download. First bytes: $(head -c 120 /tmp/ch_seco.csv | tr -c '[:print:]' '.')"
               rm -f /tmp/ch_seco.csv
             fi
           else
