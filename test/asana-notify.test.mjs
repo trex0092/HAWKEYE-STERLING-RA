@@ -4,7 +4,7 @@
 import {
   isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
-  listProjectTasks, ASANA_PAGE_CAP
+  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize
 } from '../scripts/asana-notify.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -281,6 +281,28 @@ check('a sectionless mirror still joins the project',
     /TRUNCATED/.test(fittedText));
   check('asana text: no character is split across the byte cut',
     !fittedText.includes('�'));
+  /* `notes` is NOT stored as sent. Asana converts it to rich text and limits the
+     CONVERTED form, which numeric-entity-encodes non-ASCII (م → &#1605;), so a
+     UTF-8 byte cap under-counts multilingual content by ~3x and the card is
+     refused anyway. screen.py hit exactly this on 2026-07-16 and settled on
+     numeric-entity accounting; the JS side shipped the byte version first and
+     would have walked into the same wall. These pin the ported measure. */
+  check('asana size: non-ASCII costs its numeric-entity form, not its UTF-8 bytes',
+    asanaTextSize('محمد') === 28 && bytes('محمد') === 8);
+  check('asana size: HTML specials cost their named entity',
+    asanaTextSize('&') === 5 && asanaTextSize('<') === 4 && asanaTextSize("'") === 6);
+  check('asana size: ASCII is one apiece, so English bodies are unchanged',
+    asanaTextSize('Adverse Media CLEAR') === 19);
+  {
+    const arabicBody = 'محمد بن راشد '.repeat(2600);
+    check('asana text: a body the OLD byte cap would have passed is ~3x over the real limit',
+      bytes(arabicBody) <= ASANA_HTML_MAX_BYTES
+      && asanaTextSize(arabicBody) > ASANA_HTML_MAX_BYTES * 2.5);
+    const fittedAr = fitAsanaText(arabicBody);
+    check('asana text: the fit is measured in rich-text size, so it actually fits',
+      asanaTextSize(fittedAr) <= ASANA_HTML_MAX_BYTES
+      && /TRUNCATED/.test(fittedAr) && !fittedAr.includes('\uFFFD'));
+  }
   check('asana text: content under the cap is returned untouched',
     fitAsanaText('Adverse Media & PEP — CLEAR') === 'Adverse Media & PEP — CLEAR');
   check('asana text: null/undefined degrade to empty, never "null"',
