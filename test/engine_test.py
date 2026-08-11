@@ -3614,6 +3614,20 @@ check("GITHUB_TOKEN is not exposed to the screening step itself",
       "GITHUB_TOKEN" not in _wf.split("Run unified daily screening")[1]
                                 .split("Stop the progress heartbeat")[0])
 
+# THE SAFETY PROPERTY AT THE WORKFLOW LEVEL. `run:` executes under `bash -e`,
+# so a heartbeat step that cannot start would fail the step, fail the job, and
+# stop the day's screening — a mandatory AML control brought down by its own
+# diagnostic. Both heartbeat steps must therefore be continue-on-error, and
+# the sweep itself must NOT be (its exit code is the control's verdict).
+check("the heartbeat start step cannot fail the screening job",
+      "continue-on-error: true" in _hb)
+check("the heartbeat stop step cannot fail the screening job either",
+      "continue-on-error: true" in _wf.split("Stop the progress heartbeat")[1]
+                                       .split("Commit delta-state")[0])
+check("the screening step itself is NOT continue-on-error — its exit code is the verdict",
+      "continue-on-error" not in _wf.split("Run unified daily screening")[1]
+                                     .split("Stop the progress heartbeat")[0])
+
 # ── ai.py: the LLM circuit breaker ───────────────────────────────────────────
 # A degraded Anthropic endpoint costs llm_complete's FULL 30s timeout on every
 # call, and the triage loop calls it once per adverse article and per flagged
