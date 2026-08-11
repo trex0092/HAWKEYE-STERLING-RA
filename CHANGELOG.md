@@ -10,6 +10,26 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **The two US SEC enforcement feeds have been 403-ing on every run, and now
+  say why** (`screen.py`, `data/regulator-bulletins.json`). `US SEC —
+  Litigation Releases` and `US SEC — Press Releases` have failed on every
+  daily run since at least 9 Aug with a bare `http 403`, silently costing the
+  adverse-media net its US enforcement and litigation coverage. The connection
+  succeeds — `www.sec.gov` is on the runner allowlist — so this is SEC actively
+  refusing, and their automated-access policy requires a User-Agent that
+  declares the caller and a contact point; the fetch was sending a
+  browser-shaped `Mozilla/5.0`. Feeds may now carry a per-source `ua`, and only
+  the two SEC entries do: **six of the eight feeds work with the current
+  default, and changing it globally could push a working feed into 403 — a
+  recall regression, which this repo forbids.** The contact address is not
+  committed: a source's `ua` carries a `{contact}` token substituted from the
+  `REGULATOR_UA_CONTACT` repo variable, and with it unset the placeholder is
+  stripped rather than sent literally and the 403 is reported *with its likely
+  cause* instead of as a bare status code. **Unverified against SEC itself** —
+  the sandbox's egress proxy blocks `sec.gov`, so the first live run is the
+  test; if 403s persist with a contact configured, the cause is something else
+  and the diagnostic will say so. 7 checks in `test/engine_test.py`.
+
 - **A sweep that dies with the runner now leaves evidence** (`screen.py`,
   `.github/workflows/weekly-adverse-media.yml`). Five times between 6 and 11
   Aug 2026 — on the daily screening and on `sanctions-screen`, 58–64 minutes in
