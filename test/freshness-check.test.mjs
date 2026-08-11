@@ -77,6 +77,38 @@ check('an in-progress-today control is not flagged stale', staleControls(onePend
 const pendingElsewhere = allFresh.map((s, i) => i === 1 ? { ...s, lastSuccessDay: null, pendingToday: false } : s);
 check('a control neither successful nor running today is still stale', staleControls(pendingElsewhere, today).length === 1);
 
+/* THE MID-RUN PASS IS CONDITIONAL. Regression cover for a silent-clear hole:
+   pendingToday was read from the single most recent run, so a control that had
+   already failed several times today read as merely "mid-run" and was dropped
+   from the alarm entirely. With the daily screen firing 3x/day at ~64 min a
+   run is very often in flight at both 09:09 and 12:09, so a control could fail
+   all day behind a green freshness check. Once ANY run has finished
+   unsuccessfully today, an in-flight retry no longer buys silence. */
+const pendingAfterFailure = allFresh.map((s, i) => i === 1
+  ? { ...s, lastSuccessDay: '2026-06-24', pendingToday: true, failedToday: true } : s);
+r = staleControls(pendingAfterFailure, today);
+check('a control that already FAILED today is flagged even with a retry in flight',
+  r.length === 1 && r[0].id === CONTROLS[1].id);
+check('and the flagged row records both that it failed and that it is retrying',
+  r[0].failedToday === true && r[0].pendingToday === true);
+const failedNotRetrying = allFresh.map((s, i) => i === 1
+  ? { ...s, lastSuccessDay: '2026-06-24', pendingToday: false, failedToday: true } : s);
+check('a control that failed today with nothing in flight is still flagged',
+  staleControls(failedNotRetrying, today).length === 1);
+// A control with a success IN WINDOW is never dragged in by an unrelated
+// failed run today (a re-run, a manual dispatch) — success in window wins.
+const freshDespiteFailure = allFresh.map((s, i) => i === 1
+  ? { ...s, lastSuccessDay: today, pendingToday: true, failedToday: true } : s);
+check('a control that already succeeded in-window today is not flagged',
+  staleControls(freshDespiteFailure, today).length === 0);
+
+// The report must say WHICH of the three shapes each stale control is.
+const shapeReport = buildReport(staleControls(pendingAfterFailure, today), today, CONTROLS.length);
+check('the alarm report distinguishes "failed, retry in flight" from "did not run"',
+  /FAILED — retry in flight/.test(shapeReport));
+check('the alarm report marks a never-fired control as "no run"',
+  /no run/.test(buildReport(staleControls(pendingElsewhere, today), today, CONTROLS.length)));
+
 // a failed API query is UNKNOWN, never "stale/never ran" - the old behavior
 // (caught error, lastSuccessDay left null) reported a transient GitHub API
 // error as a control with no successful run on record, a false claim.
