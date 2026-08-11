@@ -278,12 +278,45 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          # ONE publish, shared by the loop below and by the stop step, so the
+          # terminal state uses exactly the same path as every interim one.
+          cat > /tmp/hawkeye-publish.sh <<'PUBLISH'
+          #!/usr/bin/env bash
+          # Publish data/run-progress.json to the screen-progress branch.
+          # READ-ONLY against the workspace: the file is read by absolute path and
+          # the commit is built in a throwaway repo, so this never touches the
+          # checkout's index, config or HEAD while screen.py is working in it.
+          # An orphan commit, force-pushed: the branch is a SNAPSHOT of the
+          # current run, never a history, and can never entangle with the
+          # delivered-finding history that screen-delta-state carries.
+          src="$GITHUB_WORKSPACE/data/run-progress.json"
+          [ -f "$src" ] || exit 0
+          now="$(cat "$src" 2>/dev/null)" || exit 0
+          [ -n "$now" ] || exit 0
+          tmp="$(mktemp -d)" || exit 1
+          (
+            cd "$tmp" || exit 1
+            git init -q . || exit 1
+            git config user.name  "screen-progress"
+            git config user.email "actions@github.com"
+            mkdir -p data
+            printf '%s' "$now" > data/run-progress.json
+            git add -f data/run-progress.json
+            git commit -q -m "chore(screen): run ${GITHUB_RUN_ID:-unknown} progress [skip ci]"
+            git push -q --force \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+              HEAD:refs/heads/screen-progress
+          ) >/dev/null 2>&1
+          rc=$?
+          rm -rf "$tmp" || true
+          exit $rc
+          PUBLISH
+          chmod +x /tmp/hawkeye-publish.sh
+
           cat > /tmp/hawkeye-heartbeat.sh <<'HEARTBEAT'
           #!/usr/bin/env bash
-          # Publish data/run-progress.json for as long as the sweep runs.
-          # READ-ONLY against the workspace: the file is read by absolute path and
-          # every commit is built in a throwaway repo, so this never touches the
-          # checkout's index, config or HEAD while screen.py is working in it.
+          # Republish while the sweep runs, but only when the phase actually moved
+          # — an unchanged file is not worth a push.
           src="$GITHUB_WORKSPACE/data/run-progress.json"
           last=""
           while true; do
@@ -292,27 +325,9 @@ jobs:
             now="$(cat "$src" 2>/dev/null)" || continue
             [ -n "$now" ] || continue
             [ "$now" = "$last" ] && continue     # nothing moved; don't spend a push
-            tmp="$(mktemp -d)" || continue
-            # An orphan commit each time: one file, no history, no relationship to
-            # main or to the state branch. The cheapest possible thing to
-            # force-push, and impossible to entangle with the delivered-finding
-            # history that screen-delta-state carries.
-            if (
-              cd "$tmp" || exit 1
-              git init -q . || exit 1
-              git config user.name  "screen-progress"
-              git config user.email "actions@github.com"
-              mkdir -p data
-              printf '%s' "$now" > data/run-progress.json
-              git add -f data/run-progress.json
-              git commit -q -m "chore(screen): run ${GITHUB_RUN_ID:-unknown} progress [skip ci]"
-              git push -q --force \
-                "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-                HEAD:refs/heads/screen-progress
-            ) >/dev/null 2>&1; then
+            if /tmp/hawkeye-publish.sh; then
               last="$now"                        # only on a confirmed push
             fi
-            rm -rf "$tmp" || true
           done
           HEARTBEAT
           chmod +x /tmp/hawkeye-heartbeat.sh
@@ -388,9 +403,23 @@ jobs:
         # a diagnostic must never turn a delivered screening into a red one.
         if: always()
         continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -f /tmp/hawkeye-heartbeat.pid ]; then
             kill "$(cat /tmp/hawkeye-heartbeat.pid)" 2>/dev/null || true
+          fi
+          # FINAL PUBLISH — without this the branch keeps whatever phase happened
+          # to be current at the last 90s tick, and the terminal phases (done /
+          # delivered, or the phase a failure stopped at) are written locally and
+          # then thrown away with the VM. The first production run proved the
+          # cost: a sweep that SUCCEEDED at 10:58:01 left the branch reading
+          # "ai-triage-start", indistinguishable from a death in the AI phase —
+          # which is exactly the question this file exists to answer. The
+          # terminal state is the single most valuable thing it can carry, and
+          # it was the one state that never got published.
+          if [ -f /tmp/hawkeye-publish.sh ]; then
+            /tmp/hawkeye-publish.sh || echo "final progress publish failed (non-fatal)"
           fi
           echo "heartbeat stopped"
 

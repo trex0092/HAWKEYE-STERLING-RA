@@ -37,8 +37,26 @@ bump merged to `main`.
   *start* would fail the step, fail the job, and stop the day's screening,
   making a mandatory AML control depend on its own diagnostic; the sweep step
   itself deliberately is not, because its exit code is the control's verdict.
-  15 checks in `test/engine_test.py`, and the push mechanics were exercised
-  against a local bare repo.
+  The stop step publishes the FINAL state through the same code path as every
+  interim one — without that, the terminal phases are written locally and die
+  with the VM, and the first production run proved the cost: a sweep that
+  SUCCEEDED at 10:58:01 left the branch reading `ai-triage-start`,
+  indistinguishable from a death in the AI phase, which is the exact question
+  the file exists to answer. 19 checks in `test/engine_test.py`; push mechanics
+  and the terminal publish both exercised against a local bare repo.
+
+- **Correction to the LLM circuit-breaker entry below.** That change was
+  described as addressing the ~17-minute AI phase. Production measurement on
+  2026-08-11 (run 31479768870, the first with phase instrumentation) shows it
+  does **not**: `Delta:` 10:41:54 → `AI: risk-rated` 10:57:56 = **16m02s**,
+  against 16m44s and 17m29s on the two preceding days, with **no** circuit trip
+  in the log. The Anthropic calls are succeeding, slowly — not timing out. The
+  "~33 calls of pure timeout" in that entry was inferred from wall-clock, never
+  measured, and was wrong. The breaker still bounds a genuine outage (where the
+  cost would otherwise be unbounded) and the degraded-run disclosure stands,
+  but the latency itself is unaddressed: the triage loop is SEQUENTIAL, one
+  call per adverse article and per flagged subject. Fixing it needs a phase
+  budget or a concurrent triage pass, not a breaker.
 
 - **Freshness Check: the today-signals move into the tested pure layer**
   (`scripts/freshness-check.mjs`). This file's contract is that the decision
