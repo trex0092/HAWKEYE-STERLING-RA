@@ -326,7 +326,13 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 62 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+Verified at HEAD: 62 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
+*(11 August — **sharded screening design**. One curated document
+(`docs/architecture/sharded-screening-design.md`), explicitly marked NOT YET
+BUILT: a design-only record of how the adverse-media coverage collapse would be
+fixed by sharding, and of the merge hazards found while scoping it. No workflow
+added, no code, no scored control changed.)*
+
 *(7 August — **PEP shard harvest**. One dispatch-only workflow
 (`pep-shard-harvest.yml`, egress-blocked) that clears a PEP label backlog across
 eight runners at once. Wikidata rate-limits a client — a completed link's log
@@ -559,6 +565,12 @@ Verified at HEAD on 25 July (earlier): 53 workflows · 143 markdown documents un
 production-deploy lever (build hook) and the read-only Netlify probe — plus the daily screening's
 self-healing 03:07 UTC retry firing inside the existing workflow. Tooling only — no scored control
 changed.)*
+
+Verified at HEAD on 11 August: 62 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
+*(Adds docs/architecture/sharded-screening-design.md — a design-only record for
+sharded screening, explicitly marked NOT YET BUILT. No control changed, nothing
+scored; it exists so the hazards found while scoping the work are not
+rediscovered the hard way.)*
 
 Verified at HEAD on 24 July: 51 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
 (Evening sync of the same day added the 24 July regulatory-watch digest — one auto doc.)
