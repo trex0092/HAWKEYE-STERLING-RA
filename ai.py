@@ -570,6 +570,15 @@ def governance_footer():
                 "no generated facts). All sanctions/PEP/links remain deterministic & source-verified")
     else:
         mode = "DETERMINISTIC — every item traces to a real source; no generated text, no assumptions"
+    # A tripped breaker means part (or all) of this run never reached the model.
+    # Claiming "AI-ASSISTED" on the strength of the CONFIGURATION, when the run
+    # actually fell back, is the silent-green this estate forbids — the mode
+    # line must describe what happened, not what was switched on.
+    if _LLM_STATE["open"] and not _llm_in_reports():
+        mode += (f" — DEGRADED THIS RUN: the model went unreachable and the AI circuit "
+                 f"OPENED after {LLM_BREAKER_AFTER} consecutive failures; "
+                 f"{LLM_CALLS.get('skipped', 0)} call(s) were skipped and those items carry "
+                 f"DETERMINISTIC triage only (severity floors intact, no finding dropped)")
     return (f"DATA INTEGRITY: {mode}. Human-in-the-loop: MLRO decides & files. "
             "Every finding carries its raw evidence (list entry / article link / Wikidata). "
             "Governance: UAE AI Ethics Principles + PDPL; see docs/AI-GOVERNANCE.md.")

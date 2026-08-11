@@ -3646,6 +3646,14 @@ check("the report discloses the open AI circuit and the skipped count",
 check("a run that never tripped the breaker carries no circuit warning",
       "AI circuit OPEN" not in _mon_section({"attempted": 5, "ok": 5, "failed": 0, "skipped": 0}))
 
+# The DATA INTEGRITY line must describe what the run DID, not what was switched
+# on: claiming "AI-ASSISTED" while the run actually fell back is silent-green.
+check("the governance footer declares the run degraded when the circuit tripped",
+      "DEGRADED THIS RUN" in ai.governance_footer())
+ai._LLM_STATE["open"] = False
+check("and makes no degraded claim on a healthy run",
+      "DEGRADED THIS RUN" not in ai.governance_footer())
+
 _req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
 os.environ.pop("ANTHROPIC_API_KEY", None)
 _reset_llm()
