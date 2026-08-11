@@ -3037,6 +3037,45 @@ check("delivered notes keep the sign-off tail and the task name carries the date
       and _posted_shrink[0]["data"]["due_on"] == "2026-08-05")
 check("CONTROL: without rebuild the old middle-truncation loses §②'s findings",
       "[body truncated" in _legacy_notes and "[!] Cust 0 probed for money laundering" not in _legacy_notes)
+# REAL-SHAPE REGRESSION (observed live 2026-08-10). The synthetic fixture above
+# is ASCII, and ASCII costs 1 byte per character in Asana's worst-case rich-text
+# accounting. Production names are Turkish and Arabic, which cost 7-8 each, so
+# §① was ~4x more expensive per subject than the fixture implied and overflowed
+# even at the deepest rung. cap_notes then head-truncated and BOTH §② ADVERSE
+# MEDIA and §③ PEP were deleted from the delivered card while the header still
+# read "145 adverse-media subject(s)". The shrink chain capped depth INSIDE §①
+# subjects and the item counts of §②/§③, but never the NUMBER of §① subjects —
+# it shrank the victims, not the cause. These pin the `matches` cap.
+_ar_matches = [{"name": f"شركة الذهب {i} KIYMETLİ MADENLER TİCARET ANONİM ŞİRKETİ",
+                "permalink": f"https://app.asana.com/0/x/{i}",
+                "risk": {"rating": "HIGH", "factors": ["Inherent sector risk: precious metals / DPMS",
+                                                       "Potential sanctions match (3)"],
+                         "edd": "Enhanced Due Diligence + senior sign-off; review every 6 months"},
+                "hits": [{"subject_type": "ENTITY",
+                          "subject_name": f"شركة الذهب {i}",
+                          "list": "UN Consolidated",
+                          "matched_entry": f"مُدرج {i}-{j} ANONİM ŞİRKETİ",
+                          "score": 90 - (j % 8), "confidence": "WEAK"} for j in range(12)]}
+               for i in range(45)]          # production's population, production's alphabet
+_ar_narr = screen.build_unified_narrative(_ar_matches, [], _big_adverse, _big_pep,
+                                          _meta_deg, _stats_big, _dt.datetime(2026, 8, 10))
+check("real-shape fixture is oversized the way production was",
+      screen._asana_notes_size(_ar_narr) > screen.ASANA_NOTES_MAX)
+check("non-Latin names really do cost multiples of their character count",
+      screen._asana_notes_size("شركة الذهب") > 4 * len("شركة الذهب"))
+_ar_deep = screen.build_unified_narrative(_ar_matches, [], _big_adverse, _big_pep,
+                                          _meta_deg, _stats_big, _dt.datetime(2026, 8, 10),
+                                          caps=screen.NARRATIVE_SHRINK_RUNGS[-1])
+check("deepest rung now bounds §① too, so the body fits without the head-truncation backstop",
+      screen._asana_notes_size(_ar_deep) <= screen.ASANA_NOTES_MAX)
+check("§② ADVERSE MEDIA and §③ PEP survive the real-shape shrink with their findings",
+      "②  ADVERSE MEDIA" in _ar_deep and "③  PEP" in _ar_deep
+      and "[!] Cust 0 probed for money laundering" in _ar_deep and "Person 0" in _ar_deep)
+check("the §① cut is disclosed with accurate arithmetic, not silent",
+      f"+{45 - screen.NARRATIVE_SHRINK_RUNGS[-1]['matches']} further sanctions subject(s)" in _ar_deep)
+check("an uncapped rung still itemises every sanctions subject (default unchanged)",
+      "further sanctions subject(s)" not in _ar_narr)
+
 # The evidence-log failure must surface in §², not just the run log.
 _stats_evid = {**_stats_big, "adverse_evidence_error": "git push failed (exit 128)"}
 _narr_evid = screen.build_unified_narrative([], [], _big_adverse[:1], [], _meta_deg,

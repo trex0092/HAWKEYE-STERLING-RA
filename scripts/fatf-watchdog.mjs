@@ -184,6 +184,35 @@ export function diffLists(prev, curr) {
   };
 }
 
+/* The capture date behind a source label, re-emitted as a string THIS process
+   generated rather than the bytes the archive sent. `data/fatf-state.json` is
+   force-pushed to the fatf-state branch, so no network-shaped text is persisted
+   into it verbatim: the 14-digit stamp is converted to NUMBERS and a fresh ISO
+   date is built from them, which bounds an archive response to influencing
+   WHICH valid date gets written and never WHAT gets written. Anything that is
+   not a plausible stamp becomes 'unknown' — a bookkeeping breadcrumb is never
+   worth widening what a third party can put in a committed file.
+   (CodeQL js/http-to-file-access, alert 151.) */
+export function snapshotDate(source) {
+  const m = /(\d{4})(\d{2})(\d{2})\d{6}/.exec(String(source == null ? '' : source));
+  if (!m) return 'unknown';
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (!(y >= 1996 && y <= 2999) || !(mo >= 1 && mo <= 12) || !(d >= 1 && d <= 31)) return 'unknown';
+  return new Date(Date.UTC(y, mo - 1, d)).toISOString().slice(0, 10);
+}
+
+/* True when two list states name exactly the same jurisdictions on both lists.
+   Order-insensitive: the page's ordering is not part of the designation, and a
+   reshuffle must not read as a move. Used for STALE-capture corroboration — see
+   the `stale` branch in main() for why an equality test is safe there and a diff
+   is not. A missing/garbled side is never "identical". */
+export function listsIdentical(a, b) {
+  const same = (x, y) => Array.isArray(x) && Array.isArray(y)
+    && x.length === y.length
+    && [...x].sort().join('|') === [...y].sort().join('|');
+  return !!a && !!b && same(a.black, b.black) && same(a.grey, b.grey);
+}
+
 export function buildAlert(diff, baseline, affected, today) {
   const score = name => {
     const c = baseline.find(x => x.name === name);
@@ -214,16 +243,37 @@ export function snapshotAgeDays(ts, now = Date.now()) {
   return (now - Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) / 86400000;
 }
 
+/* Newest capture timestamps in a Wayback CDX response. CDX returns a header row
+   followed by [timestamp, statuscode] rows, oldest first. The availability API
+   is served from a cache that can lag the crawl by days, so CDX is queried as a
+   SECOND opinion on the same archive: a different endpoint, a different failure
+   mode, and it regularly knows about a capture `available?` has not yet learned.
+   Anything unparseable yields [] — a bad response must never look like a hit. */
+export function parseCdxTimestamps(json) {
+  if (!Array.isArray(json)) return [];
+  const out = [];
+  for (const row of json) {
+    if (!Array.isArray(row)) continue;
+    const ts = String(row[0] || '');
+    if (!/^\d{14}$/.test(ts)) continue;            /* skips the header row too */
+    const status = String(row[1] == null ? '200' : row[1]);
+    if (status !== '200') continue;                /* a captured 403/5xx is not the page */
+    out.push(ts);
+  }
+  return out.sort().reverse();
+}
+
 /* The only authoritative source is the official FATF page. It 403s our
    datacenter runner directly, so when that fails we (2) ask archive.org to fetch
-   the live page *now* (Save Page Now) and (3) failing that, take archive.org's
-   most recent existing capture — but only if it is fresh. Every source is
-   FATF's own HTML; the only thing we refuse is STALE data, because diffing the
-   saved state against a pre-plenary capture would raise reversed/false alerts.
-   When no fresh authoritative capture is reachable (e.g. archive.org is briefly
-   down) the caller SKIPS the run cleanly rather than alerting, persisting, or
-   failing red. Alerts still tell the officer to verify on fatf-gafi.org.
-   Returns { html, source } on success, or null when nothing fresh is reachable. */
+   the live page *now* (Save Page Now) and (3) failing that, take the most recent
+   existing capture — asking BOTH the availability API and the CDX index, because
+   the former is cache-backed and lags. Every source is FATF's own HTML.
+   A capture past SNAPSHOT_STALE_DAYS is still returned, flagged `stale: true`.
+   It is never diffed as current (a pre-plenary capture would raise reversed and
+   false alerts) — the caller may only use it to CORROBORATE that the stored
+   lists are unchanged, which no stale capture can get wrong in the dangerous
+   direction. Alerts still tell the officer to verify on fatf-gafi.org.
+   Returns { html, source, stale, ageDays }, or null when nothing is reachable. */
 async function fetchFatfSegments() {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
@@ -234,7 +284,7 @@ async function fetchFatfSegments() {
   try {
     const r = await fetch(FATF_URL, { headers, redirect: 'follow' });
     console.log('fatf-gafi.org direct: ' + r.status);
-    if (r.ok) return { html: await r.text(), source: 'fatf-gafi.org (live)' };
+    if (r.ok) return { html: await r.text(), source: 'fatf-gafi.org (live)', stale: false, ageDays: 0 };
   } catch (e) { console.log('fatf direct error: ' + e.message); }
   /* 2. The same official page, captured fresh via archive.org Save Page Now.
         archive.org reaches fatf-gafi.org even though our runner is 403'd, and the
@@ -250,7 +300,8 @@ async function fetchFatfSegments() {
         const ts = (/\/web\/(\d{14})\//.exec(r.url || '') || [])[1] || '';
         const age = snapshotAgeDays(ts);
         if (ts && age <= SNAPSHOT_STALE_DAYS) {
-          return { html: await r.text(), source: 'fatf-gafi.org via archive.org Save Page Now ' + ts };
+          return { html: await r.text(), source: 'fatf-gafi.org via archive.org Save Page Now ' + ts,
+                   stale: false, ageDays: age };
         }
         console.log('Save Page Now did not yield a fresh timestamped capture (ts=' + (ts || 'none') + ') — not trusting it');
         break; /* a clean 200 without a fresh capture won't improve on retry */
@@ -259,27 +310,46 @@ async function fetchFatfSegments() {
     } catch (e) { console.log('save-page-now error (attempt ' + attempt + '): ' + e.message); }
     if (attempt < 3) await new Promise(res => setTimeout(res, attempt * 8000)); /* 8s, then 16s */
   }
-  /* 3. archive.org's most recent existing capture of the official page, via the
-        availability API — used only when it is fresh (a recent crawl), so it is
-        an authoritative current capture and never a pre-plenary one. */
+  /* 3. The most recent EXISTING capture of the official page. Two independent
+        endpoints are asked and the newer answer wins: the availability API is
+        cache-backed and has been observed lagging the crawl, while the CDX index
+        reads the crawl directly. Before this, a lag in `available?` alone was
+        enough to blind the watchdog — one endpoint, one point of failure. */
+  const candidates = [];
   try {
     const av = await fetch('https://archive.org/wayback/available?url=' + encodeURIComponent(FATF_URL), { headers });
     console.log('wayback availability API: ' + av.status);
     if (av.ok) {
-      const closest = (await av.json())?.archived_snapshots?.closest;
-      const ts = closest && closest.timestamp;
-      const age = snapshotAgeDays(ts);
-      console.log('latest existing snapshot: ' + (ts || 'none') + (ts ? ' (' + Math.round(age) + 'd old)' : ''));
-      if (closest && closest.url && ts && age <= SNAPSHOT_STALE_DAYS) {
-        const s = await fetch(closest.url.replace(/^http:/, 'https:'), { headers, redirect: 'follow' });
-        console.log('fetch snapshot ' + ts + ': ' + s.status);
-        if (s.ok) return { html: await s.text(), source: 'fatf-gafi.org via web.archive.org snapshot ' + ts };
-      }
+      const ts = (await av.json())?.archived_snapshots?.closest?.timestamp;
+      if (/^\d{14}$/.test(String(ts || ''))) candidates.push(String(ts));
     }
   } catch (e) { console.log('wayback availability error: ' + e.message); }
-  /* No fresh authoritative capture reachable. Signal a clean skip — do NOT diff
-     against stale or third-party data (it would raise reversed/false alerts) and
-     do NOT fail red over a transient archive outage. */
+  try {
+    const cdxUrl = 'https://web.archive.org/cdx/search/cdx?output=json&fl=timestamp,statuscode'
+      + '&filter=statuscode:200&limit=-5&url=' + encodeURIComponent(FATF_URL);
+    const cd = await fetch(cdxUrl, { headers });
+    console.log('wayback CDX index: ' + cd.status);
+    if (cd.ok) candidates.push(...parseCdxTimestamps(await cd.json()));
+  } catch (e) { console.log('wayback CDX error: ' + e.message); }
+  const ts = candidates.sort().reverse()[0];
+  if (ts) {
+    const age = snapshotAgeDays(ts);
+    console.log('newest existing snapshot: ' + ts + ' (' + Math.round(age) + 'd old)'
+      + (age > SNAPSHOT_STALE_DAYS ? ' — past the ' + SNAPSHOT_STALE_DAYS + 'd freshness bar' : ''));
+    try {
+      const s = await fetch('https://web.archive.org/web/' + ts + '/' + FATF_URL, { headers, redirect: 'follow' });
+      console.log('fetch snapshot ' + ts + ': ' + s.status);
+      if (s.ok) {
+        return { html: await s.text(), source: 'fatf-gafi.org via web.archive.org snapshot ' + ts,
+                 stale: age > SNAPSHOT_STALE_DAYS, ageDays: age };
+      }
+    } catch (e) { console.log('snapshot fetch error: ' + e.message); }
+  } else {
+    console.log('no existing snapshot found by either endpoint');
+  }
+  /* Nothing authoritative reachable at all. Signal a clean skip — do NOT diff
+     against third-party data (it would raise reversed/false alerts) and do NOT
+     fail red over a transient archive outage. */
   return null;
 }
 
@@ -390,8 +460,8 @@ export async function main(mode) {
        so list discrepancies can be traced to source content vs parsing. */
     const baseline = loadBaseline(readFileSync('app.js', 'utf8'));
     const fetched = await fetchFatfSegments();
-    if (!fetched) { console.log('no fresh authoritative FATF capture reachable — nothing to probe. Verify manually on ' + FATF_URL); return; }
-    console.log('source: ' + fetched.source);
+    if (!fetched) { console.log('no authoritative FATF capture reachable — nothing to probe. Verify manually on ' + FATF_URL); return; }
+    console.log('source: ' + fetched.source + (fetched.stale ? ' — STALE (' + Math.round(fetched.ageDays) + 'd old)' : ''));
     const current = classifyCountries(fetched.html, baseline);
     console.log('black: ' + current.black.join(', '));
     console.log('grey (' + current.grey.length + '): ' + current.grey.join(', '));
@@ -439,12 +509,15 @@ export async function main(mode) {
 
   const baseline = loadBaseline(readFileSync('app.js', 'utf8'));
   const fetched = await fetchFatfSegments();
-  if (!fetched) {
-    /* No fresh authoritative capture this run (e.g. archive.org briefly down).
-       Skip cleanly: never diff against stale data, never fail red. BUT count
-       consecutive skips — a source that stays unreachable run after run means the
-       FATF list is going UNMONITORED, which must be surfaced, not silently green. */
-    console.log('no fresh authoritative FATF capture reachable this run — skipping (state unchanged). Verify manually on ' + FATF_URL);
+
+  /* Record a monitoring gap: this run did not verify the FATF lists. Skip
+     cleanly — never diff against stale data, never fail red — BUT count
+     consecutive skips, because a source that stays unverified run after run
+     means the list is going UNMONITORED, which must be surfaced, not silently
+     green. `why` names the specific failure so the alert is diagnosable. */
+  const recordGap = async (why) => {
+    console.log('FATF lists NOT verified this run — skipping (state unchanged): ' + why
+      + '. Verify manually on ' + FATF_URL);
     try {
       /* read-and-catch (no existsSync pre-check) — avoids a TOCTOU race between
          the check and the read; a missing/garbled file simply starts a fresh {}. */
@@ -457,14 +530,59 @@ export async function main(mode) {
       if (st.skipStreak >= FATF_SKIP_ALERT && REG_PROJECT_GID) {
         const url = await createTask(
           '⚠ FATF monitoring GAP — list source unreachable ' + st.skipStreak + ' consecutive run(s)',
-          'The FATF black/grey-list watchdog could not reach an authoritative capture (direct + archive) for '
-          + st.skipStreak + ' consecutive runs. FATF list moves may be UNDETECTED. Verify manually on ' + FATF_URL
-          + ' and check the source endpoints.', undefined, REG_PROJECT_GID, REG_FATF_SECTION_GID);
+          'The FATF black/grey-list watchdog could not verify the lists against an authoritative capture for '
+          + st.skipStreak + ' consecutive runs. FATF list moves may be UNDETECTED.\n\nThis run: ' + why
+          + '\n\nVerify manually on ' + FATF_URL + ' and check the source endpoints.',
+          undefined, REG_PROJECT_GID, REG_FATF_SECTION_GID);
         console.log('FATF monitoring-gap alert filed (skipStreak=' + st.skipStreak + '): ' + url);
       }
     } catch (e) { console.error('FATF skip-streak bookkeeping failed: ' + e.message); }
+  };
+
+  if (!fetched) { await recordGap('no capture reachable at all (direct 403 + archive down)'); return; }
+
+  /* A capture past the freshness bar cannot be DIFFED as current — it might
+     pre-date a plenary and so report a real move in reverse. But it can still be
+     compared for EQUALITY, and that direction is safe: if a capture taken before
+     now already shows exactly the lists we hold, then either nothing has moved,
+     or something moved after the capture and we are no better off than skipping.
+     A stale capture can therefore confirm coverage but never manufacture a
+     change. Before this, the whole capture was discarded and the run counted as
+     a gap — so a fortnight of archive.org 520s read as "FATF UNMONITORED" while
+     a perfectly good capture sat one request away, agreeing with our state. */
+  if (fetched.stale) {
+    const age = Math.round(fetched.ageDays);
+    let prevState = null;
+    try { prevState = JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch { prevState = null; }
+    if (!prevState || !Array.isArray(prevState.black)) {
+      await recordGap('only a stale capture (' + age + 'd old) and no stored list state to corroborate it against');
+      return;
+    }
+    let staleLists;
+    try {
+      staleLists = classifyCountries(fetched.html, baseline);
+      assertPlausible(staleLists);   /* a garbled capture must not "corroborate" anything */
+    } catch (e) {
+      await recordGap('only a stale capture (' + age + 'd old) and it did not parse: ' + e.message);
+      return;
+    }
+    if (!listsIdentical(prevState, staleLists)) {
+      await recordGap('only a stale capture (' + age + 'd old) and it DIFFERS from stored state — '
+        + 'cannot tell a real list move from a pre-plenary artefact, so not alerting off it. Check FATF now');
+      return;
+    }
+    console.log('no fresh capture, but the newest archived one (' + age + 'd old) matches stored state exactly — '
+      + 'coverage corroborated, lists unchanged. Not a monitoring gap; state left as-is.');
+    try {
+      const st = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+      st.skipStreak = 0;
+      st.lastCorroborated = new Date().toISOString().slice(0, 10);
+      st.lastCorroboratedSnapshot = snapshotDate(fetched.source);
+      writeFileSync(STATE_FILE, JSON.stringify(st, null, 2) + '\n');
+    } catch (e) { console.error('FATF corroboration bookkeeping failed: ' + e.message); }
     return;
   }
+
   console.log('list source: ' + fetched.source);
   const source = fetched.source;
   /* Source reachable again → clear any accumulated skip-streak so a later gap
