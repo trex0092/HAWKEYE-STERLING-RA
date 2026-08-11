@@ -3610,6 +3610,21 @@ check("the heartbeat pushes its own branch, never the delivered-finding history"
       and "refs/heads/screen-delta-state" not in _hb)
 check("the heartbeat never writes in the workspace checkout mid-sweep",
       "mktemp -d" in _hb and "git init" in _hb)
+
+# THE TERMINAL STATE MUST BE PUBLISHED. The loop only pushes on its 90s tick,
+# so the last phases are written locally and die with the VM. On the first
+# production run (2026-08-11) that left a sweep which SUCCEEDED at 10:58:01
+# reading as "ai-triage-start" on the branch — indistinguishable from a death
+# in the AI phase, i.e. the exact question this file exists to answer.
+_stop = _wf.split("Stop the progress heartbeat")[1].split("Commit delta-state")[0]
+check("the stop step publishes the FINAL progress state",
+      "hawkeye-publish.sh" in _stop)
+check("the stop step kills the loop before that final publish",
+      _stop.index("kill") < _stop.index("hawkeye-publish.sh"))
+check("the final publish cannot fail the job either",
+      "|| echo" in _stop and "continue-on-error: true" in _stop)
+check("interim and final publishes share one code path",
+      _hb.count("hawkeye-publish.sh") >= 2)
 check("GITHUB_TOKEN is not exposed to the screening step itself",
       "GITHUB_TOKEN" not in _wf.split("Run unified daily screening")[1]
                                 .split("Stop the progress heartbeat")[0])
