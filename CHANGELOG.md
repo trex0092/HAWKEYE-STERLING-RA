@@ -10,6 +10,21 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Freshness Check: the today-signals move into the tested pure layer**
+  (`scripts/freshness-check.mjs`). This file's contract is that the decision
+  logic is offline-tested and only the runner block touches the network, but
+  the two signals that decide whether a mandatory control may stay silent —
+  is a run in flight, has one already failed — were computed inside the
+  `fetch` that fed them, where no test could reach. Extracted as the exported
+  pure `summariseTodayRuns(runs, today)` and regression-tested against the
+  **real recorded Actions-API payloads** from the 2026-08-11 incident (two
+  runs dead from lost runners, a third mid-sweep): the closest thing to an
+  integration test that stays offline, pinning the exact production shape the
+  old `per_page=1` read got wrong. Also pinned: a prior day's runs never leak
+  into today's verdict, `skipped` is not a failure (a no-op make-up firing did
+  not fail to screen) while `timed_out` and `cancelled` are, and a
+  missing/empty run list is tolerated. 9 further checks (132 in that suite).
+
 - **Freshness Check: a control that already failed today can no longer hide
   behind its own retry** (`scripts/freshness-check.mjs`). The alarm skipped any
   control with a run in flight, so as not to red a long screen that is simply

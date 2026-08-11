@@ -98,6 +98,29 @@ export function isStale(lastSuccessDay, today, maxAgeDays) {
   return age > (maxAgeDays || 0);
 }
 
+/* A workflow run that has not reached a conclusion yet. */
+const ACTIVE_STATUSES = ['queued', 'in_progress', 'requested', 'waiting', 'pending'];
+
+/* Pure decision: what has a workflow done TODAY, given its recent runs as the
+   Actions API returns them? Lives here, beside the other pure decisions, rather
+   than inside the fetch that feeds it — this file's contract is that the
+   decision logic is offline-tested and only the runner block touches the
+   network, and the two signals below decide whether a mandatory control is
+   allowed to stay silent. They are regression-tested against real recorded
+   API payloads from the 2026-08-11 incident.
+     pending — a run is still executing, so today is an open question.
+     failed  — a run has already FINISHED unsuccessfully, so it is not.
+   `cancelled` and `timed_out` count as failures: neither produced a screening.
+   `skipped` does not — a no-op make-up firing is not a failure. */
+export function summariseTodayRuns(runs, today) {
+  const todays = (runs || []).filter(r => utcDay(r.run_started_at || r.created_at) === today);
+  return {
+    pending: todays.some(r => ACTIVE_STATUSES.includes(r.status)),
+    failed: todays.some(r => r.status === 'completed'
+                             && r.conclusion && r.conclusion !== 'success' && r.conclusion !== 'skipped'),
+  };
+}
+
 /* Pure decision: given each control's last successful-run day, return the
    controls whose latest success falls outside the control's cadence window
    (never ran, ran but failed, or last succeeded too long ago). A control with
@@ -190,17 +213,13 @@ async function lastSuccessDay(repo, token, workflowId) {
   return run ? utcDay(run.run_started_at || run.created_at) : null;
 }
 
-const ACTIVE_STATUSES = ['queued', 'in_progress', 'requested', 'waiting', 'pending'];
-
-/* What this workflow has done TODAY: is a run still executing, and has any run
-   already finished unsuccessfully?
-   Both answers come from ONE call. The previous version asked only "is the
+/* Fetch this workflow's recent runs and hand them to summariseTodayRuns.
+   Both signals come from ONE call. The previous version asked only "is the
    single most recent run active?" (per_page=1), which is why a control could
    fail repeatedly all day and still read as merely mid-run — the failures sat
    just below the window this query looked at. Widening the page costs nothing
    and is strictly more evidence; a control firing at most a handful of times a
-   day (the busiest here is onboarding-screen at 6-hourly) fits well inside 20.
-   Cancelled and timed_out count as failures: neither produced a screening. */
+   day (the busiest here is onboarding-screen at 6-hourly) fits well inside 20. */
 async function todayRuns(repo, token, workflowId, today) {
   const url = `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs`
     + `?per_page=20`;
@@ -214,13 +233,7 @@ async function todayRuns(repo, token, workflowId, today) {
   });
   if (!res.ok) throw new Error(`GitHub API ${res.status} for ${workflowId}`);
   const data = await res.json();
-  const runs = (data.workflow_runs || [])
-    .filter(r => utcDay(r.run_started_at || r.created_at) === today);
-  return {
-    pending: runs.some(r => ACTIVE_STATUSES.includes(r.status)),
-    failed: runs.some(r => r.status === 'completed'
-                           && r.conclusion && r.conclusion !== 'success' && r.conclusion !== 'skipped'),
-  };
+  return summariseTodayRuns(data.workflow_runs, today);
 }
 
 async function main() {
