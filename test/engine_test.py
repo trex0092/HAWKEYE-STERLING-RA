@@ -3551,6 +3551,105 @@ check("the ungated branch raises with the exact install command",
       "raise ImportError" in _fallback
       and "pip install -r ci/requirements.txt" in _fallback)
 
+# ── ai.py: the LLM circuit breaker ───────────────────────────────────────────
+# A degraded Anthropic endpoint costs llm_complete's FULL 30s timeout on every
+# call, and the triage loop calls it once per adverse article and per flagged
+# subject in the LAST phase of the daily sweep. Unbounded, that is the 2026-08-10
+# run's 16m44s AI phase for a workload that cost ~2m the day before. These checks
+# pin the bound AND the degrade: the model may be skipped, a finding may not.
+print("\nai.py — LLM circuit breaker")
+
+class _Resp:
+    def __init__(self, status, text="ok"):
+        self.status_code, self._text = status, text
+    def json(self):
+        return {"content": [{"type": "text", "text": self._text}]}
+
+def _boom(*a, **k):
+    raise RuntimeError("connection reset by peer")
+
+_saved = (_req.post, ai.AI_ENABLED, ai.LLM_TRIAGE)
+os.environ["ANTHROPIC_API_KEY"] = "test-key"
+ai.AI_ENABLED = True
+
+def _reset_llm():
+    ai._LLM_STATE.update(consecutive_failures=0, open=False)
+    for _k in ai.LLM_CALLS:
+        ai.LLM_CALLS[_k] = 0
+
+# Consecutive hard failures trip the breaker, and it then stops paying the timeout.
+_reset_llm()
+_hits = {"n": 0}
+def _always_502(*a, **k):
+    _hits["n"] += 1
+    return _Resp(502)
+_req.post = _always_502
+for _ in range(ai.LLM_BREAKER_AFTER + 4):
+    ai.llm_complete("x")
+check("AI circuit opens after LLM_BREAKER_AFTER consecutive failures", ai.llm_circuit_open())
+check("once open, not one further HTTP call is made", _hits["n"] == ai.LLM_BREAKER_AFTER)
+check("refused calls count as skipped, never as attempted or failed",
+      ai.LLM_CALLS["skipped"] == 4
+      and ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER
+      and ai.LLM_CALLS["attempted"] == ai.LLM_BREAKER_AFTER)
+
+# A transport error (the timeout case that actually cost the 16m44s) counts too.
+_reset_llm()
+_req.post = _boom
+for _ in range(ai.LLM_BREAKER_AFTER):
+    ai.llm_complete("x")
+check("a transport error advances the breaker exactly like a non-200", ai.llm_circuit_open())
+
+# An INTERMITTENT failure must never trip it: any 200 proves the endpoint is up.
+_reset_llm()
+_seq = {"n": 0}
+def _flaky(*a, **k):
+    _seq["n"] += 1
+    return _Resp(500) if _seq["n"] % 3 else _Resp(200, "fine")
+_req.post = _flaky
+for _ in range(30):
+    ai.llm_complete("x")
+check("an intermittent failure never trips the breaker — a 200 re-arms it",
+      not ai.llm_circuit_open())
+check("the healthy calls in that run still returned their text", ai.LLM_CALLS["ok"] == 10)
+
+# THE DEGRADE CONTRACT: with the circuit open, triage keeps its deterministic
+# severity floor. Sharpening is lost; the finding is not.
+_reset_llm()
+ai._LLM_STATE["open"] = True
+ai.LLM_TRIAGE = True
+_req.post = _boom          # would raise if the breaker let the call through
+_art = {"title": "ACME TRADING LLC named in laundering probe", "source": "Reuters",
+        "date": "2026-08-01", "categories": [], "flagged": True}
+_t = ai.triage_adverse("ACME TRADING LLC", _art)
+check("triage keeps its deterministic floor with the circuit open", _t["severity"] == "LOW")
+check("and labels the result as NOT AI-sharpened", _t["ai"] is False)
+check("the skipped triage call is still counted for disclosure", ai.LLM_CALLS["skipped"] == 1)
+
+# A CRITICAL article stays CRITICAL — the breaker must not become a downgrade path.
+_crit = {"title": "Sanctions evasion network exposed", "source": "Reuters",
+         "date": "2026-08-01", "categories": ["Sanctions / Proliferation"], "flagged": True}
+check("a CRITICAL typology survives the open circuit undowngraded",
+      ai.triage_adverse("ACME TRADING LLC", _crit)["severity"] == "CRITICAL")
+
+# monitoring.py must SAY the circuit tripped — a silent skip would read as a
+# full-strength AI pass that merely made fewer calls.
+def _mon_section(llm_calls):
+    return monitoring.build_monitoring_section(
+        {"snapshot": {"total_seconds": 10, "counts": {"subjects": 5, "errors": 0},
+                      "error_rate": 0.0, "llm_calls": llm_calls},
+         "anomalies": [], "baseline": {}}, {})
+
+_mon = _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 12})
+check("the report discloses the open AI circuit and the skipped count",
+      "AI circuit OPEN" in _mon and "12 model call(s) skipped" in _mon)
+check("a run that never tripped the breaker carries no circuit warning",
+      "AI circuit OPEN" not in _mon_section({"attempted": 5, "ok": 5, "failed": 0, "skipped": 0}))
+
+_req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
+os.environ.pop("ANTHROPIC_API_KEY", None)
+_reset_llm()
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
