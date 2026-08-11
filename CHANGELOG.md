@@ -32,8 +32,13 @@ bump merged to `main`.
   branch, never `screen-delta-state`, so the delivered-finding history keeps
   exactly one writer and the progress branch stays permanently at one commit;
   and it is started in its own step so `GITHUB_TOKEN` is never in the screening
-  step's environment. 11 checks in `test/engine_test.py`, and the push
-  mechanics were exercised against a local bare repo.
+  step's environment. Both heartbeat steps are `continue-on-error` — `run:`
+  executes under `bash -e`, so without it a heartbeat that merely failed to
+  *start* would fail the step, fail the job, and stop the day's screening,
+  making a mandatory AML control depend on its own diagnostic; the sweep step
+  itself deliberately is not, because its exit code is the control's verdict.
+  15 checks in `test/engine_test.py`, and the push mechanics were exercised
+  against a local bare repo.
 
 - **Freshness Check: the today-signals move into the tested pure layer**
   (`scripts/freshness-check.mjs`). This file's contract is that the decision

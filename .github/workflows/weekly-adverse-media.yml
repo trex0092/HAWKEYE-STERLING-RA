@@ -267,6 +267,14 @@ jobs:
       # Entirely best-effort: every command is `|| true` and the loop is killed
       # unconditionally afterwards. A forensics aid may never fail the control.
       - name: Start the progress heartbeat (crash forensics)
+        # continue-on-error — the ONE line that makes the rest of this safe.
+        # GitHub runs `run:` under `bash -e`, so without it a heartbeat that
+        # cannot start (unwritable /tmp, a chmod refusal, anything) would fail
+        # the step, fail the job, and stop the day's screening from running at
+        # all. That would make a mandatory AML control depend on a diagnostic —
+        # exactly backwards. A forensics aid that cannot start is a lost
+        # breadcrumb; it must never be a missed screening.
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -376,7 +384,10 @@ jobs:
         # always() — the heartbeat must not outlive the sweep on a failed run
         # either. If the runner was lost this never executes, which is exactly
         # the case the heartbeat exists for: its last push is then the record.
+        # continue-on-error for the same reason as the start step: tearing down
+        # a diagnostic must never turn a delivered screening into a red one.
         if: always()
+        continue-on-error: true
         run: |
           if [ -f /tmp/hawkeye-heartbeat.pid ]; then
             kill "$(cat /tmp/hawkeye-heartbeat.pid)" 2>/dev/null || true
