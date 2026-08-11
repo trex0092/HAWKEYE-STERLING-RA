@@ -6345,6 +6345,10 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     related = ai.related_parties(customers)
     mode_lbl = ("LLM" if ai.llm_available() and ai.LLM_TRIAGE else
                 "LLM-standby (triage off)" if ai.llm_available() else "deterministic")
+    # Computed AFTER the triage loop above, so the breaker's verdict is known:
+    # say "LLM" only if the model actually answered for the whole pass.
+    if ai.llm_circuit_open():
+        mode_lbl += f" → DEGRADED (AI circuit OPEN, {ai.LLM_CALLS.get('skipped', 0)} call(s) skipped)"
     log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
         f"mode={mode_lbl}")
 

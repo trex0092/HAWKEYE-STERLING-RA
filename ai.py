@@ -103,13 +103,58 @@ def llm_available() -> bool:
     return AI_ENABLED
 
 # Usage telemetry (presence-only counts; no prompt/response content retained).
-# Read by monitoring.py to track LLM call volume & failures per run.
-LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0}
+# Read by monitoring.py to track LLM call volume & failures per run. `skipped`
+# counts calls the circuit breaker below refused to make.
+LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0, "skipped": 0}
+
+# LLM circuit breaker — the mirror of the GDELT / Google News / Bing / Wikidata
+# guards in screen.py, and for the same reason. A degraded Anthropic endpoint
+# does not fail fast: it costs the FULL per-request timeout below, every call,
+# with nothing to stop paying it. The triage loop calls this once per adverse
+# article and once per flagged subject, sequentially, in the LAST phase of the
+# daily sweep — so the bill lands after ~40 minutes of enrichment, when the run
+# still has to build the narrative and deliver to Asana.
+#
+# Measured on the 2026-08-10 production run: the AI phase took 16m44s for a
+# 45-flagged / 57-cluster workload that cost ~2m the day before on the same
+# code path — ~33 calls' worth of pure timeout, unbounded and undisclosed. This
+# is the exact shape of the 12 Jul GDELT incident the breaker pattern was
+# introduced for ("838 subjects burned a 20-second timeout each").
+#
+# After this many CONSECUTIVE hard failures (transport error or non-200) the
+# model is declared unavailable for the REST OF THE RUN with one loud line. The
+# degrade is DEFINED, not a guess: every caller already computes its answer
+# deterministically first and only lets the model SHARPEN it — triage_adverse
+# floors severity from the typology buckets (and may never downgrade), and
+# alert_summary writes its own prose. Skipping the model therefore costs
+# sharpening, never a finding. Any HTTP 200 proves the endpoint is up and
+# resets the count; the breaker re-arms fresh on the next run.
+LLM_BREAKER_AFTER = int(os.environ.get("LLM_BREAKER_AFTER", "5"))
+_LLM_STATE = {"consecutive_failures": 0, "open": False}
+
+def llm_circuit_open() -> bool:
+    """True once the run has given up on the model (see LLM_BREAKER_AFTER)."""
+    return _LLM_STATE["open"]
+
+def _llm_failure():
+    """One hard failure: advance the run-level breaker, trip it loudly at the
+    threshold. Unlocked on purpose — same as _GDELT_STATE; the counter is
+    monotonic and a benign race only shifts the trip by a call or two."""
+    LLM_CALLS["failed"] += 1
+    _LLM_STATE["consecutive_failures"] += 1
+    if _LLM_STATE["consecutive_failures"] >= LLM_BREAKER_AFTER and not _LLM_STATE["open"]:
+        _LLM_STATE["open"] = True
+        print(f"  LLM unreachable ({LLM_BREAKER_AFTER} calls in a row) — AI circuit OPEN, "
+              "skipping the model for the rest of the run; deterministic triage and "
+              "summaries stand (sharpening lost, no finding lost)", flush=True)
 
 def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
     """Single-shot completion. Returns text, or None on any failure / no key.
     Never raises — the caller always has a deterministic fallback."""
     if not AI_ENABLED:
+        return None
+    if _LLM_STATE["open"]:
+        LLM_CALLS["skipped"] += 1
         return None
     LLM_CALLS["attempted"] += 1
     try:
@@ -122,8 +167,12 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
                   "system": system or "You are an AML/CFT analyst assistant. Be precise, factual, and never decide — only support the MLRO.",
                   "messages": [{"role": "user", "content": prompt}]})
         if r.status_code != 200:
-            LLM_CALLS["failed"] += 1
+            _llm_failure()
             return None
+        # A 200 is proof the endpoint is up, so it re-arms the breaker even when
+        # the body carries no usable text — that is a content miss, not an
+        # outage, and must not accumulate toward "unreachable".
+        _LLM_STATE["consecutive_failures"] = 0
         data = r.json()
         parts = data.get("content", []) or []
         text = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
@@ -133,7 +182,7 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
             LLM_CALLS["failed"] += 1
         return text or None
     except Exception:
-        LLM_CALLS["failed"] += 1
+        _llm_failure()
         return None
 
 # ── TRANSLITERATION (Arabic / Turkish name variants for better recall) ────────
@@ -521,6 +570,15 @@ def governance_footer():
                 "no generated facts). All sanctions/PEP/links remain deterministic & source-verified")
     else:
         mode = "DETERMINISTIC — every item traces to a real source; no generated text, no assumptions"
+    # A tripped breaker means part (or all) of this run never reached the model.
+    # Claiming "AI-ASSISTED" on the strength of the CONFIGURATION, when the run
+    # actually fell back, is the silent-green this estate forbids — the mode
+    # line must describe what happened, not what was switched on.
+    if _LLM_STATE["open"] and not _llm_in_reports():
+        mode += (f" — DEGRADED THIS RUN: the model went unreachable and the AI circuit "
+                 f"OPENED after {LLM_BREAKER_AFTER} consecutive failures; "
+                 f"{LLM_CALLS.get('skipped', 0)} call(s) were skipped and those items carry "
+                 f"DETERMINISTIC triage only (severity floors intact, no finding dropped)")
     return (f"DATA INTEGRITY: {mode}. Human-in-the-loop: MLRO decides & files. "
             "Every finding carries its raw evidence (list entry / article link / Wikidata). "
             "Governance: UAE AI Ethics Principles + PDPL; see docs/AI-GOVERNANCE.md.")

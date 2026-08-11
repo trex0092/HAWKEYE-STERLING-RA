@@ -10,6 +10,28 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **The LLM path gets the circuit breaker every other feed already had**
+  (`ai.py`, `monitoring.py`). Google News, GDELT, Bing News and Wikidata each
+  trip a run-level breaker after N consecutive failures; the Anthropic call was
+  the one external dependency with none. It does not fail fast — a degraded
+  endpoint costs `llm_complete`'s full 30s timeout on *every* call, and the
+  triage loop calls it once per adverse article and per flagged subject,
+  sequentially, in the LAST phase of the daily sweep. Measured on the
+  2026-08-10 production run: the AI phase took **16m44s** for a 45-flagged /
+  57-cluster workload that cost ~2m the day before on the same code path —
+  ~33 calls of pure timeout, unbounded and undisclosed, landing after ~40
+  minutes of enrichment while the run still had to build the narrative and
+  deliver to Asana. Now five consecutive hard failures (transport error or
+  non-200) declare the model unavailable for the rest of the run with one loud
+  line; any HTTP 200 re-arms it, so an intermittent failure never trips it.
+  The degrade is defined, not a guess: every caller computes deterministically
+  first and lets the model only *sharpen* — `triage_adverse` keeps its typology
+  severity floor (and may never downgrade), `alert_summary` writes its own
+  prose. Skipping the model costs sharpening, never a finding. The skipped
+  count is carried in the run metrics and disclosed in the report's monitoring
+  block, so a tripped circuit can never read as a full-strength AI pass that
+  merely made fewer calls. 12 checks in `test/engine_test.py`.
+
 - **PEP harvest made fault-tolerant** (`scripts/pep-worldwide.mjs`): the first
   live harvest crawled ~62 minutes of Wikidata then a single flaky WDQS
   response threw and discarded the whole run. Now: holder batches are smaller
