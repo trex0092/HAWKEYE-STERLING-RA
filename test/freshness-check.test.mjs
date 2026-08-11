@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { staleControls, unknownControls, isStale, daysBetween, utcDay, buildReport, CONTROLS, EXEMPT } from '../scripts/freshness-check.mjs';
+import { staleControls, unknownControls, isStale, daysBetween, utcDay, buildReport, summariseTodayRuns, CONTROLS, EXEMPT } from '../scripts/freshness-check.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -101,6 +101,45 @@ const freshDespiteFailure = allFresh.map((s, i) => i === 1
   ? { ...s, lastSuccessDay: today, pendingToday: true, failedToday: true } : s);
 check('a control that already succeeded in-window today is not flagged',
   staleControls(freshDespiteFailure, today).length === 0);
+
+/* ── summariseTodayRuns, against REAL recorded API payloads ─────────────────
+   These are the actual Actions-API run objects for the Daily Screening
+   workflow on 2026-08-11, the day this hole was found: two runs dead from
+   lost runners and a third mid-sweep. Replaying them is the closest thing to
+   an integration test that stays offline, and it pins the exact production
+   shape the old per_page=1 read got wrong. */
+const REAL_0811 = [
+  { id: 31468597213, status: 'in_progress', conclusion: null,      run_started_at: '2026-08-11T07:21:08Z', created_at: '2026-08-11T07:21:08Z' },
+  { id: 31458943581, status: 'completed',   conclusion: 'failure', run_started_at: '2026-08-11T04:35:16Z', created_at: '2026-08-11T04:35:16Z' },
+  { id: 31452192472, status: 'completed',   conclusion: 'failure', run_started_at: '2026-08-11T02:22:53Z', created_at: '2026-08-11T02:22:53Z' },
+  { id: 31372580943, status: 'completed',   conclusion: 'success', run_started_at: '2026-08-10T09:00:13Z', created_at: '2026-08-10T09:00:13Z' },
+  { id: 31368009913, status: 'completed',   conclusion: 'cancelled', run_started_at: '2026-08-10T07:57:56Z', created_at: '2026-08-10T07:57:56Z' },
+];
+const real = summariseTodayRuns(REAL_0811, '2026-08-11');
+check('real 2026-08-11 payload: a run is seen in flight', real.pending === true);
+check('real 2026-08-11 payload: the two dead runs ARE seen as failures today',
+  real.failed === true);
+// The whole point: this combination must NOT be suppressed.
+const realStatus = CONTROLS.map(c => c.id === 'weekly-adverse-media.yml'
+  ? { ...c, lastSuccessDay: '2026-08-10', pendingToday: real.pending, failedToday: real.failed }
+  : { ...c, lastSuccessDay: '2026-08-11' });
+check('real 2026-08-11 payload: the screening control is FLAGGED, not silenced',
+  staleControls(realStatus, '2026-08-11').some(s => s.id === 'weekly-adverse-media.yml'));
+// Yesterday's runs must not leak into today's verdict.
+const yday = summariseTodayRuns(REAL_0811, '2026-08-10');
+check('a prior day\'s cancelled run counts as that day\'s failure, not today\'s',
+  yday.failed === true && yday.pending === false);
+check('a day with no runs at all reports neither pending nor failed',
+  (d => d.pending === false && d.failed === false)(summariseTodayRuns(REAL_0811, '2026-06-01')));
+check('summariseTodayRuns tolerates a missing/empty run list',
+  (d => d.pending === false && d.failed === false)(summariseTodayRuns(undefined, today)));
+// skipped is not a failure: a no-op make-up firing did not fail to screen.
+check('a skipped run today is not counted as a failure',
+  summariseTodayRuns([{ status: 'completed', conclusion: 'skipped', created_at: today + 'T01:00:00Z' }], today).failed === false);
+check('a timed_out run today IS counted as a failure',
+  summariseTodayRuns([{ status: 'completed', conclusion: 'timed_out', created_at: today + 'T01:00:00Z' }], today).failed === true);
+check('a queued run today counts as pending',
+  summariseTodayRuns([{ status: 'queued', conclusion: null, created_at: today + 'T01:00:00Z' }], today).pending === true);
 
 // The report must say WHICH of the three shapes each stale control is.
 const shapeReport = buildReport(staleControls(pendingAfterFailure, today), today, CONTROLS.length);
