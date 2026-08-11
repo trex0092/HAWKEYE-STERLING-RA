@@ -5307,6 +5307,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     _cand_n = caps.get("candidates") if caps.get("candidates") is not None else 10
     _arts_n = caps.get("articles")          # None ⇒ every article per finding
     _subj_n = caps.get("subjects")          # None ⇒ every finding per section
+    _match_n = caps.get("matches")          # None ⇒ every §① sanctions subject
     dt = run_time.strftime("%d %b %Y")
     confirmed = [m for m in possible_matches if any(h["score"] >= 100 for h in m["hits"])]
     potential = [m for m in possible_matches if all(h["score"] < 100 for h in m["hits"])]
@@ -5387,6 +5388,17 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     else:
         # NEW subjects first, then standing — most actionable at the top.
         ordered = sorted(confirmed + potential, key=lambda m: (not m.get("is_new"), m["name"]))
+        # §① is the only section the shrink chain used to leave UNBOUNDED. With a
+        # large standing population it consumed the whole budget on its own, and
+        # cap_notes' head truncation then deleted §② ADVERSE MEDIA and §③ PEP
+        # outright — while the header kept counting their findings. Observed
+        # live 2026-08-10: 45 standing sanctions matches, 33 rendered, cut
+        # mid-subject at 50,175 chars, zero adverse-media or PEP detail
+        # delivered. The ordering above puts CONFIRMED and NEW first, so a cut
+        # here drops the least actionable rows, and the count is disclosed.
+        _sanc_total = len(ordered)
+        if _match_n is not None:
+            ordered = ordered[:_match_n]
         for m in ordered:
             tag = ("CONFIRMED HIT" if m in confirmed
                    else ("HIGH" if any(h["score"] >= 92 for h in m["hits"]) else "POTENTIAL"))
@@ -5459,6 +5471,11 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A("   NOTE: company flagged because an owner / director / UBO matches a designation —"
                   " apply OFAC/EU 50%/control aggregation; treat the entity as designated by extension pending review.")
             A("   MLRO Decision:  [ ] false positive   [ ] escalate / freeze   [ ] investigate")
+            A("")
+        if _match_n is not None and _sanc_total > _match_n:
+            A(f"   … +{_sanc_total - _match_n} further sanctions subject(s) not itemised in this card "
+              "(report too large for Asana) — CONFIRMED and NEW are listed first, the remainder are "
+              "STANDING potentials. Full list in the workflow run log.")
             A("")
     # ALWAYS render list provenance — including on a zero-match run, so a clean
     # result can never hide that a core list was down (a "clear" against a list
@@ -5698,10 +5715,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
 # delivered reports while the header still counted its findings. cap_notes
 # stays as the final backstop, so the worst case equals the old behaviour.
 NARRATIVE_SHRINK_RUNGS = (
-    {"candidates": 10, "articles": 6, "subjects": None},
-    {"candidates": 6, "articles": 3, "subjects": 30},
-    {"candidates": 3, "articles": 1, "subjects": 15},
-    {"candidates": 1, "articles": 1, "subjects": 8},
+    {"candidates": 10, "articles": 6, "subjects": None, "matches": None},
+    {"candidates": 6, "articles": 3, "subjects": 30, "matches": 30},
+    {"candidates": 3, "articles": 1, "subjects": 15, "matches": 15},
+    {"candidates": 1, "articles": 1, "subjects": 8, "matches": 8},
 )
 
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
