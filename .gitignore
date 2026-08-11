@@ -37,3 +37,6 @@ __pycache__/
 # Generated CycloneDX SBOM (built in CI, attached to releases)
 sbom.cdx.json
 weekly-summary.md
+
+# Screening run progress (per-run crash forensics; pushed to the screen-progress branch, never to main)
+data/run-progress.json

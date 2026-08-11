@@ -1266,6 +1266,64 @@ def now_uae():
 def log(msg):
     print(f"[{datetime.datetime.utcnow().strftime('%H:%M:%S')}] {msg}", flush=True)
 
+# ── RUN PROGRESS — forensics for a sweep that dies without a trace ───────────
+# When a GitHub runner is LOST mid-sweep the whole VM disappears: the step is
+# left "in_progress" with no conclusion, NO post-step runs (not even one marked
+# `if: always()`), and the logs are never uploaded — the job ends with no
+# evidence whatsoever. That happened five times between 6 and 11 Aug 2026, on
+# this sweep and on sanctions-screen, at 58-64 minutes in, and every
+# investigation dead-ended on a 404 for the logs. Runtime was ruled out: a
+# 120m54s run of this same workflow had succeeded on 10 Jul, and the 10 Aug
+# success ran 64m31s — LONGER than the three ~64m failures.
+#
+# This file is the evidence that survives, because the workflow pushes it to a
+# data branch WHILE the sweep is still running. It records which phase the run
+# reached and how long every finished phase took, so the next death says where
+# it died instead of nothing at all.
+#
+# Three rules, because a forensics aid must never endanger the control it
+# watches: it is LOCAL (no network on this path), it is CHEAP (one small atomic
+# write per phase transition, not per subject), and it CANNOT RAISE.
+PROGRESS_PATH = os.environ.get("RUN_PROGRESS_PATH", "data/run-progress.json")
+_PROGRESS = {"started": None, "phases": []}
+
+def progress(phase, **detail):
+    """Record that the run has reached `phase`. Best-effort; never raises."""
+    try:
+        now = time.time()
+        if _PROGRESS["started"] is None:
+            _PROGRESS["started"] = now
+        began = _PROGRESS["started"]
+        entry = {"phase": phase,
+                 "at_utc": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                 "elapsed_s": round(now - began, 1)}
+        if detail:
+            entry["detail"] = detail
+        # One row per phase: a repeating phase (enrichment ticking every 50
+        # subjects) updates in place, so the file stays small and the timeline
+        # stays readable as a list of "how far did each stage get".
+        for i, p in enumerate(_PROGRESS["phases"]):
+            if p["phase"] == phase:
+                _PROGRESS["phases"][i] = entry
+                break
+        else:
+            _PROGRESS["phases"].append(entry)
+        _atomic_write_text(PROGRESS_PATH, json.dumps({
+            "run_id": os.environ.get("GITHUB_RUN_ID", ""),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+            "started_utc": datetime.datetime.utcfromtimestamp(began)
+                                    .strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "updated_utc": entry["at_utc"],
+            "elapsed_s": entry["elapsed_s"],
+            "current_phase": phase,
+            "phases": _PROGRESS["phases"],
+        }, indent=1) + "\n")
+    except Exception:
+        # Deliberately swallowed. If the forensics file cannot be written the
+        # run must carry on screening — losing the breadcrumb is a diagnostic
+        # loss, failing the sweep over it would be a compliance one.
+        pass
+
 # ── ASANA TRANSPORT (honours 429 rate-limit; retries transient errors) ────────
 ASANA_NOTES_MAX = 65000    # opening budget in worst-case rich-text bytes — see _asana_notes_size
 ASANA_NOTES_FLOOR = 12000  # shrink-chain floor: keeps the summary + sign-off intact
@@ -3501,6 +3559,7 @@ def get_all_customers():
             break
         params["offset"] = next_page["offset"]
     log(f"Loaded {len(customers)} customers")
+    progress("customers-loaded", customers=len(customers))
     # Fail-safe: 0 customers is never a legitimate state (the Customer Database is
     # never empty). A 200-with-empty-data — wrong ASANA_CUSTOMER_DB_GID, project
     # emptied, or a token scoped away — must NOT be screened as an all-clear. Abort
@@ -5772,6 +5831,11 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
             gid = r.json()["data"]["gid"]
             NOTES_BUDGET["learned"] = budget  # persisted with the delta-state on delivery
             log(f"OK Unified daily task created: {gid}")
+            # The report is in the MLRO's hands from here. A death recorded
+            # after this marker cost the run its state persistence and its
+            # follow-up attestation, but NOT the day's screening — a materially
+            # different incident from one that died before it.
+            progress("delivered", task_gid=gid)
             return gid
         last = r
         body = (getattr(r, "text", "") or "").lower()
@@ -6170,6 +6234,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     possible_matches, clear = screen_customers(customers, all_lists)
     _t_sanctions = time.time()
     log(f"Sanctions: {len(possible_matches)} flagged · {len(clear)} clear")
+    progress("sanctions-done", flagged=len(possible_matches), clear=len(clear))
     for m in possible_matches:
         if any(h["score"] >= 100 for h in m["hits"]):
             post_confirmed_hit_comment(m["gid"], m["hits"], run_time)
@@ -6221,6 +6286,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         log(f"Enrichment order rotated: starting at subject {rot + 1}/{total}"
             + (" (make-up offset)" if AM_COVERAGE_RETRY else " (daily rotation)"))
     log(f"Enriching {total} subjects with {SCREEN_CONCURRENCY} parallel workers...")
+    progress("enrichment-start", subjects=total, workers=SCREEN_CONCURRENCY)
     done = 0
     indexed = [None] * total
     with concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY) as ex:
@@ -6229,6 +6295,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             indexed[i] = r
             if done % 50 == 0 or done == total:
                 log(f"  enriched {done}/{total}")
+                progress("enrichment", done=done, total=total)
     if any(r is None for r in indexed):
         # Degrade loudly: a hole here means the rotation bookkeeping dropped a
         # subject — silently tallying the rest would report them as screened.
@@ -6291,6 +6358,10 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # match as "already seen", so it would never become an MLRO case. Fail-safe:
     # if delivery fails, leave the on-disk state untouched so the match re-alerts.
     log(f"Delta: {delta['sanctions']} new sanctions · {delta['adverse']} new adverse · {delta['pep']} new PEP")
+    # The AI phase begins here. It is the one that burned 16m44s (10 Aug) and
+    # 17m29s (11 Aug) on model timeouts, so a death recorded at this marker
+    # points straight at it rather than at the sweep generally.
+    progress("ai-triage-start", flagged=len(possible_matches))
 
     # ── AI ENRICHMENT (decision-support; deterministic unless an LLM key is set) ──
     # Per flagged customer: a Low/Med/High risk rating (explainable factors) and a
@@ -6351,6 +6422,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         mode_lbl += f" → DEGRADED (AI circuit OPEN, {ai.LLM_CALLS.get('skipped', 0)} call(s) skipped)"
     log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
         f"mode={mode_lbl}")
+    progress("ai-triage-done", flagged=len(possible_matches), clusters=len(related))
 
     _t_ai = time.time()
     # ── OPERATIONAL MONITORING (latency · usage · anomaly) ──
@@ -6540,6 +6612,7 @@ def run_unified(run_time):
     customers = get_all_customers()
     screen_subject_set(customers, all_lists, list_meta, run_time,
                        mode="makeup" if AM_COVERAGE_RETRY else "daily")
+    progress("done")
     log("Unified run done.")
     enforce_delivery_gate()
     enforce_list_outage_gate()

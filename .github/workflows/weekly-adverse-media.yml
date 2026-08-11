@@ -243,6 +243,77 @@ jobs:
           fi
           echo "state_ready=1" >> "$GITHUB_OUTPUT"
 
+      # ── Crash forensics for a runner that vanishes mid-sweep ──────────────
+      # Five times between 6 and 11 Aug 2026 (here and on sanctions-screen, at
+      # 58-64 min in) the runner was LOST: the step stayed "in_progress" with no
+      # conclusion, no post-step ran — not even the `if: always()` one below —
+      # and the logs were never uploaded, so every investigation hit a 404. The
+      # sweep's own runtime was ruled out (a 120m54s run succeeded on 10 Jul,
+      # and 10 Aug succeeded at 64m31s — longer than the three ~64m failures).
+      #
+      # screen.py writes data/run-progress.json locally at each phase boundary;
+      # this loop pushes it to a data branch WHILE the sweep runs, so the last
+      # push before the VM dies tells us the phase it died in. Nothing else can:
+      # an artifact upload is a step, and steps do not run when the runner is
+      # gone.
+      #
+      # Started as its own step and BACKGROUNDED, deliberately: a process
+      # launched here outlives the step and keeps running through the sweep,
+      # which keeps GITHUB_TOKEN out of the screening step's environment
+      # entirely. It force-pushes a dedicated `screen-progress` branch, never
+      # screen-delta-state — the delivered-finding history has exactly one
+      # writer and this must not become a second.
+      #
+      # Entirely best-effort: every command is `|| true` and the loop is killed
+      # unconditionally afterwards. A forensics aid may never fail the control.
+      - name: Start the progress heartbeat (crash forensics)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cat > /tmp/hawkeye-heartbeat.sh <<'HEARTBEAT'
+          #!/usr/bin/env bash
+          # Publish data/run-progress.json for as long as the sweep runs.
+          # READ-ONLY against the workspace: the file is read by absolute path and
+          # every commit is built in a throwaway repo, so this never touches the
+          # checkout's index, config or HEAD while screen.py is working in it.
+          src="$GITHUB_WORKSPACE/data/run-progress.json"
+          last=""
+          while true; do
+            sleep 90
+            [ -f "$src" ] || continue
+            now="$(cat "$src" 2>/dev/null)" || continue
+            [ -n "$now" ] || continue
+            [ "$now" = "$last" ] && continue     # nothing moved; don't spend a push
+            tmp="$(mktemp -d)" || continue
+            # An orphan commit each time: one file, no history, no relationship to
+            # main or to the state branch. The cheapest possible thing to
+            # force-push, and impossible to entangle with the delivered-finding
+            # history that screen-delta-state carries.
+            if (
+              cd "$tmp" || exit 1
+              git init -q . || exit 1
+              git config user.name  "screen-progress"
+              git config user.email "actions@github.com"
+              mkdir -p data
+              printf '%s' "$now" > data/run-progress.json
+              git add -f data/run-progress.json
+              git commit -q -m "chore(screen): run ${GITHUB_RUN_ID:-unknown} progress [skip ci]"
+              git push -q --force \
+                "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+                HEAD:refs/heads/screen-progress
+            ) >/dev/null 2>&1; then
+              last="$now"                        # only on a confirmed push
+            fi
+            rm -rf "$tmp" || true
+          done
+          HEARTBEAT
+          chmod +x /tmp/hawkeye-heartbeat.sh
+          # Output redirected to a file, not inherited: a background process
+          # holding the runner's stdout can stall the job at "Complete job".
+          nohup /tmp/hawkeye-heartbeat.sh >/tmp/hawkeye-heartbeat.log 2>&1 &
+          echo "$!" > /tmp/hawkeye-heartbeat.pid
+          echo "progress heartbeat started (pid $(cat /tmp/hawkeye-heartbeat.pid))"
+
       - name: Run unified daily screening (sanctions + adverse media + PEP)
         env:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
@@ -300,6 +371,17 @@ jobs:
           LLM_TRIAGE: ${{ vars.LLM_TRIAGE || '0' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'claude-haiku-4-5-20251001' }}
         run: python screen.py
+
+      - name: Stop the progress heartbeat
+        # always() — the heartbeat must not outlive the sweep on a failed run
+        # either. If the runner was lost this never executes, which is exactly
+        # the case the heartbeat exists for: its last push is then the record.
+        if: always()
+        run: |
+          if [ -f /tmp/hawkeye-heartbeat.pid ]; then
+            kill "$(cat /tmp/hawkeye-heartbeat.pid)" 2>/dev/null || true
+          fi
+          echo "heartbeat stopped"
 
       - name: Commit delta-state (what has already been reported)
         # always() so a degraded/failed screening still persists what it DID

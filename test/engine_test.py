@@ -3551,6 +3551,69 @@ check("the ungated branch raises with the exact install command",
       "raise ImportError" in _fallback
       and "pip install -r ci/requirements.txt" in _fallback)
 
+# ── screen.py: run-progress forensics ────────────────────────────────────────
+# The breadcrumb that survives a lost runner. Its whole value is that it is
+# written BEFORE the death, so these checks pin the two properties that make it
+# usable — the timeline is complete and readable, and writing it can never take
+# the sweep down with it.
+print("\nscreen.py — run progress (crash forensics)")
+import tempfile
+_pdir = tempfile.mkdtemp()
+_ppath = os.path.join(_pdir, "run-progress.json")
+_saved_ppath = screen.PROGRESS_PATH
+screen.PROGRESS_PATH = _ppath
+screen._PROGRESS.update(started=None, phases=[])
+
+screen.progress("sanctions-done", flagged=45, clear=311)
+screen.progress("enrichment", done=50, total=904)
+screen.progress("enrichment", done=904, total=904)     # same phase ticks again
+screen.progress("ai-triage-start", flagged=45)
+_pj = json.load(open(_ppath, encoding="utf-8"))
+
+check("progress writes the file and names the phase the run is in",
+      _pj["current_phase"] == "ai-triage-start")
+check("a repeating phase updates in place instead of appending a row",
+      [p["phase"] for p in _pj["phases"]] == ["sanctions-done", "enrichment", "ai-triage-start"])
+check("the repeated phase keeps its LATEST detail, not its first",
+      [p for p in _pj["phases"] if p["phase"] == "enrichment"][0]["detail"]["done"] == 904)
+check("every phase carries an elapsed time, so the timeline is readable",
+      all(isinstance(p["elapsed_s"], float) or isinstance(p["elapsed_s"], int)
+          for p in _pj["phases"]))
+check("elapsed time is monotonic across phases",
+      [p["elapsed_s"] for p in _pj["phases"]] == sorted(p["elapsed_s"] for p in _pj["phases"]))
+check("the run is identified so a pushed file maps to its job",
+      "run_id" in _pj and "started_utc" in _pj and "updated_utc" in _pj)
+
+# THE SAFETY PROPERTY: a forensics aid must never be able to fail the control
+# it watches. An unwritable path is swallowed, and the sweep carries on.
+screen.PROGRESS_PATH = _pdir          # a directory, so the write cannot succeed
+_raised = False
+try:
+    screen.progress("should-not-raise")
+except Exception:
+    _raised = True
+check("an unwritable progress path never raises into the sweep", _raised is False)
+screen.PROGRESS_PATH = _saved_ppath
+screen._PROGRESS.update(started=None, phases=[])
+
+# The workflow must actually push it, and must not push it to the branch that
+# carries the delivered-finding history (single writer — see the workflow).
+_wf = open(os.path.join(ROOT, ".github/workflows/weekly-adverse-media.yml"), encoding="utf-8").read()
+check("the workflow starts a progress heartbeat before the sweep",
+      _wf.index("Start the progress heartbeat") < _wf.index("Run unified daily screening"))
+check("the heartbeat stops after the sweep, on failure too",
+      "Stop the progress heartbeat" in _wf
+      and _wf.index("Stop the progress heartbeat") > _wf.index("Run unified daily screening"))
+_hb = _wf.split("Start the progress heartbeat")[1].split("Run unified daily screening")[0]
+check("the heartbeat pushes its own branch, never the delivered-finding history",
+      "refs/heads/screen-progress" in _hb
+      and "refs/heads/screen-delta-state" not in _hb)
+check("the heartbeat never writes in the workspace checkout mid-sweep",
+      "mktemp -d" in _hb and "git init" in _hb)
+check("GITHUB_TOKEN is not exposed to the screening step itself",
+      "GITHUB_TOKEN" not in _wf.split("Run unified daily screening")[1]
+                                .split("Stop the progress heartbeat")[0])
+
 # ── ai.py: the LLM circuit breaker ───────────────────────────────────────────
 # A degraded Anthropic endpoint costs llm_complete's FULL 30s timeout on every
 # call, and the triage loop calls it once per adverse article and per flagged
