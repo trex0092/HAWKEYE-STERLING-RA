@@ -65,6 +65,8 @@ jobs:
         run: node test/changelog.test.mjs
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
+      - name: Run trading daily report unit tests
+        run: node test/trading-daily-report.test.mjs
       - name: Run daily-brief unit tests
         run: node test/daily-brief.test.mjs
       - name: Run governance-report unit tests
