@@ -2587,6 +2587,37 @@ def _sig_tokens(term):
 REGULATOR_BULLETINS_FILE = os.environ.get("REGULATOR_BULLETINS_FILE",
                                           "data/regulator-bulletins.json")
 
+# PER-SOURCE User-Agent. Most of these feeds serve a generic browser UA
+# happily, but some regulators refuse one: SEC.gov's automated-access policy
+# requires a UA that DECLARES the caller and a contact point, and answers a
+# browser-shaped UA with 403. Both SEC feeds have failed that way on every run
+# since at least 9 Aug ("regulator-bulletin feed failed — US SEC — Litigation
+# Releases: http 403"), losing US enforcement and litigation coverage daily.
+#
+# Deliberately per-source rather than global: six of the eight feeds work with
+# the current default, and swapping the UA for all of them could just as easily
+# push a WORKING feed into 403 — a recall regression, which this repo forbids.
+# A source opts in by carrying its own "ua" in data/regulator-bulletins.json.
+#
+# The contact point is NOT in the tree. A source's ua may contain {contact},
+# substituted from REGULATOR_UA_CONTACT; leaving that unset keeps the placeholder
+# out of the request and says so loudly, rather than sending a UA that reads as
+# a literal "{contact}".
+REGULATOR_UA_DEFAULT = "Mozilla/5.0 (compliance screening)"
+REGULATOR_UA_CONTACT = os.environ.get("REGULATOR_UA_CONTACT", "").strip()
+
+def _regulator_ua(source):
+    """→ (user_agent, unconfigured) for one feed. `unconfigured` is True when the
+    feed asked for a contact point that has not been provisioned."""
+    ua = (source.get("ua") or "").strip() or REGULATOR_UA_DEFAULT
+    if "{contact}" not in ua:
+        return ua, False
+    if REGULATOR_UA_CONTACT:
+        return ua.replace("{contact}", REGULATOR_UA_CONTACT), False
+    # No contact provisioned: strip the placeholder rather than send it raw.
+    cleaned = re.sub(r"[;,]?\s*\{contact\}", "", ua).replace("( ", "(").strip()
+    return (cleaned or REGULATOR_UA_DEFAULT), True
+
 def fetch_regulator_bulletins(path=None):
     """→ (items, failures). items: {title, source, date, url, text-lowered}."""
     try:
@@ -2598,11 +2629,20 @@ def fetch_regulator_bulletins(path=None):
     for s in cfgd.get("sources", []):
         if not isinstance(s, dict) or not s.get("enabled", True) or not s.get("url"):
             continue
+        ua, ua_unconfigured = _regulator_ua(s)
         try:
-            r = requests.get(s["url"], timeout=20,
-                             headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
-            if getattr(r, "status_code", None) != 200:
-                raise RuntimeError(f"http {getattr(r, 'status_code', 'none')}")
+            r = requests.get(s["url"], timeout=20, headers={"User-Agent": ua})
+            code = getattr(r, "status_code", None)
+            if code != 200:
+                # A 403 on a feed that asked for a contact point is almost
+                # certainly the missing contact, not an outage. Say which,
+                # because "http 403" alone sent three days of investigation
+                # nowhere.
+                if code == 403 and ua_unconfigured:
+                    raise RuntimeError(
+                        "http 403 — this feed requires a declared contact point; "
+                        "set the REGULATOR_UA_CONTACT env/repo variable")
+                raise RuntimeError(f"http {code if code is not None else 'none'}")
             root = safe_xml_fromstring(r.content)
             for item in root.findall(".//item")[:200]:
                 title = (item.findtext("title") or "").strip()

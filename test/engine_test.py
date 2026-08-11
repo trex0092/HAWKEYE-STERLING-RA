@@ -3427,6 +3427,38 @@ check("single-significant-token names are excluded from containment matching",
       "Li Wei" not in _rb)
 check("absent config file → net not configured, never a crash",
       screen.fetch_regulator_bulletins(path="/nonexistent.json") == ([], []))
+
+# PER-SOURCE User-Agent. Both SEC feeds have returned 403 on every run since at
+# least 9 Aug; SEC.gov refuses a caller that does not declare itself and a
+# contact point. The override is per-source ON PURPOSE — six of the eight feeds
+# work with the default UA, and changing it globally could push a WORKING feed
+# into 403, which would be a recall regression.
+_saved_contact = screen.REGULATOR_UA_CONTACT
+screen.REGULATOR_UA_CONTACT = ""
+_ua_plain, _unconf = screen._regulator_ua({"name": "x"})
+check("a source with no ua override keeps the default User-Agent",
+      _ua_plain == screen.REGULATOR_UA_DEFAULT and _unconf is False)
+_ua_ph, _unconf = screen._regulator_ua({"ua": "Hawkeye/3.0 (+https://example.test; {contact})"})
+check("an unprovisioned contact is STRIPPED, never sent as a literal placeholder",
+      "{contact}" not in _ua_ph and _unconf is True)
+check("and the stripped UA still identifies the caller",
+      "Hawkeye/3.0" in _ua_ph)
+screen.REGULATOR_UA_CONTACT = "aml@example.test"
+_ua_ok, _unconf = screen._regulator_ua({"ua": "Hawkeye/3.0 (+https://example.test; {contact})"})
+check("a provisioned contact is substituted into the User-Agent",
+      _ua_ok == "Hawkeye/3.0 (+https://example.test; aml@example.test)" and _unconf is False)
+screen.REGULATOR_UA_CONTACT = _saved_contact
+
+# The shipped config must carry the override on the SEC feeds and ONLY those,
+# and must not commit a contact address.
+_rbcfg = json.load(open(os.path.join(ROOT, "data/regulator-bulletins.json"), encoding="utf-8"))
+_with_ua = [s["name"] for s in _rbcfg["sources"] if s.get("ua")]
+check("both SEC feeds carry a declared-caller User-Agent",
+      sum(1 for n in _with_ua if "SEC" in n) == 2)
+check("no other feed's User-Agent was changed", len(_with_ua) == 2)
+check("the committed config carries a placeholder, never a real contact address",
+      all("{contact}" in s["ua"] and "@" not in s["ua"].split("{contact}")[0]
+          for s in _rbcfg["sources"] if s.get("ua")))
 _ic_arts = [{"title": "Trader arrested in Dubai", "snippet": "linked to Marmara Gold Trading operations", "flagged": True},
             {"title": "Man arrested abroad", "snippet": "no context at all", "flagged": True}]
 screen.annotate_identity_corroboration(_ic_arts, "Mahmoud Sultan",
