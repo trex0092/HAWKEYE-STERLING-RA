@@ -10,6 +10,31 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **A sweep that dies with the runner now leaves evidence** (`screen.py`,
+  `.github/workflows/weekly-adverse-media.yml`). Five times between 6 and 11
+  Aug 2026 — on the daily screening and on `sanctions-screen`, 58–64 minutes in
+  — the GitHub runner was **lost**: the step stayed `in_progress` with no
+  conclusion, no post-step ran (not even the `if: always()` one), and the logs
+  were never uploaded, so every investigation dead-ended on a 404. Runtime was
+  ruled out: a 120m54s run of this same workflow succeeded on 10 Jul, and the
+  10 Aug success ran 64m31s — *longer* than the three ~64m failures.
+  `screen.py` now records each phase boundary to `data/run-progress.json`
+  (phase, wall-clock elapsed, counts), and a backgrounded heartbeat publishes
+  it to a dedicated `screen-progress` branch **while the sweep is still
+  running** — the only way to capture anything, since an artifact upload is a
+  step and steps do not run when the runner is gone. The next death will name
+  the phase it died in; the AI phase, which burned 16m44s and 17m29s on the two
+  preceding days, has its own marker either side.
+  Built so it cannot endanger what it watches: the writer is local, cheap and
+  **cannot raise**; the heartbeat is read-only against the workspace (every
+  commit is built in a throwaway repo, so the checkout's index, config and HEAD
+  are never touched mid-sweep); it force-pushes **orphan** commits to its own
+  branch, never `screen-delta-state`, so the delivered-finding history keeps
+  exactly one writer and the progress branch stays permanently at one commit;
+  and it is started in its own step so `GITHUB_TOKEN` is never in the screening
+  step's environment. 11 checks in `test/engine_test.py`, and the push
+  mechanics were exercised against a local bare repo.
+
 - **Freshness Check: the today-signals move into the tested pure layer**
   (`scripts/freshness-check.mjs`). This file's contract is that the decision
   logic is offline-tested and only the runner block touches the network, but
