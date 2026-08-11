@@ -22,7 +22,7 @@ DESIGN RULES (governance-first):
 
 No third-party dependencies (uses requests, already required by the engine).
 """
-import os, re, json, unicodedata
+import os, re, json, unicodedata, threading
 
 # ── LLM GATEWAY (opt-in, gated on ANTHROPIC_API_KEY) ──────────────────────────
 AI_MODEL      = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
@@ -129,21 +129,41 @@ LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0, "skipped": 0}
 # alert_summary writes its own prose. Skipping the model therefore costs
 # sharpening, never a finding. Any HTTP 200 proves the endpoint is up and
 # resets the count; the breaker re-arms fresh on the next run.
+# WHAT COUNTS AS A BREAKER FAILURE — only an UNREACHABLE endpoint.
+# The breaker exists to stop paying the 30s timeout, over and over, for a model
+# that is not answering. An HTTP reply of ANY status costs nothing by
+# comparison: it arrives in milliseconds. So a reply — 429, 500, 529, anything
+# — proves the endpoint is reachable and RESETS the count; only a transport
+# error or a timeout advances it.
+#
+# This is not a technicality. The triage pass runs concurrently, and concurrency
+# earns 429s: under the old rule a short burst of rate-limit replies would have
+# tripped the breaker and disabled AI triage for the whole run, costing
+# sharpening on every remaining article while saving no time at all, because
+# those replies were already fast. Throttling is not an outage.
 LLM_BREAKER_AFTER = int(os.environ.get("LLM_BREAKER_AFTER", "5"))
 _LLM_STATE = {"consecutive_failures": 0, "open": False}
+# The triage pass is threaded, so the counters below are shared mutable state.
+# `+=` is not atomic and these numbers are REPORTED — an undercount would
+# understate how degraded a run was, which is the kind of quiet inaccuracy this
+# estate exists to avoid. The lock costs nothing next to a network call.
+_LLM_LOCK = threading.Lock()
 
 def llm_circuit_open() -> bool:
     """True once the run has given up on the model (see LLM_BREAKER_AFTER)."""
     return _LLM_STATE["open"]
 
-def _llm_failure():
-    """One hard failure: advance the run-level breaker, trip it loudly at the
-    threshold. Unlocked on purpose — same as _GDELT_STATE; the counter is
-    monotonic and a benign race only shifts the trip by a call or two."""
-    LLM_CALLS["failed"] += 1
-    _LLM_STATE["consecutive_failures"] += 1
-    if _LLM_STATE["consecutive_failures"] >= LLM_BREAKER_AFTER and not _LLM_STATE["open"]:
-        _LLM_STATE["open"] = True
+def _llm_unreachable():
+    """One transport-level failure: advance the run-level breaker and trip it
+    loudly at the threshold."""
+    trip = False
+    with _LLM_LOCK:
+        LLM_CALLS["failed"] += 1
+        _LLM_STATE["consecutive_failures"] += 1
+        if _LLM_STATE["consecutive_failures"] >= LLM_BREAKER_AFTER and not _LLM_STATE["open"]:
+            _LLM_STATE["open"] = True
+            trip = True
+    if trip:
         print(f"  LLM unreachable ({LLM_BREAKER_AFTER} calls in a row) — AI circuit OPEN, "
               "skipping the model for the rest of the run; deterministic triage and "
               "summaries stand (sharpening lost, no finding lost)", flush=True)
@@ -154,9 +174,11 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
     if not AI_ENABLED:
         return None
     if _LLM_STATE["open"]:
-        LLM_CALLS["skipped"] += 1
+        with _LLM_LOCK:
+            LLM_CALLS["skipped"] += 1
         return None
-    LLM_CALLS["attempted"] += 1
+    with _LLM_LOCK:
+        LLM_CALLS["attempted"] += 1
     try:
         import requests
         r = requests.post(_AI_ENDPOINT, timeout=30,
@@ -166,23 +188,23 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
             json={"model": AI_MODEL, "max_tokens": max_tokens,
                   "system": system or "You are an AML/CFT analyst assistant. Be precise, factual, and never decide — only support the MLRO.",
                   "messages": [{"role": "user", "content": prompt}]})
-        if r.status_code != 200:
-            _llm_failure()
-            return None
-        # A 200 is proof the endpoint is up, so it re-arms the breaker even when
-        # the body carries no usable text — that is a content miss, not an
-        # outage, and must not accumulate toward "unreachable".
+        # ANY reply re-arms the breaker: it proves the endpoint is reachable and
+        # it arrived fast, which is the only cost the breaker defends against.
         _LLM_STATE["consecutive_failures"] = 0
+        if r.status_code != 200:
+            with _LLM_LOCK:
+                LLM_CALLS["failed"] += 1
+            return None
         data = r.json()
         parts = data.get("content", []) or []
         text = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
-        if text:
-            LLM_CALLS["ok"] += 1
-        else:
-            LLM_CALLS["failed"] += 1
+        with _LLM_LOCK:
+            LLM_CALLS["ok" if text else "failed"] += 1
         return text or None
     except Exception:
-        _llm_failure()
+        # Transport error or timeout — the expensive case, and the only one the
+        # breaker is for.
+        _llm_unreachable()
         return None
 
 # ── TRANSLITERATION (Arabic / Turkish name variants for better recall) ────────

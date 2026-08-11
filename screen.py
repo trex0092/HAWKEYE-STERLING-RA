@@ -18,6 +18,11 @@ import concurrent.futures
 # network-bound, so a bounded thread pool cuts wall-clock from hours to minutes
 # without raising the per-host request RATE much (each worker still paces itself).
 SCREEN_CONCURRENCY = int(os.environ.get("SCREEN_CONCURRENCY", "8"))
+# Workers for the AI adverse-triage fan-out (see the triage pass in the unified
+# run). Separate from SCREEN_CONCURRENCY and lower by default: that one is sized
+# against free news feeds' per-IP patience, this one against a paid API's rate
+# limit, and the two have no reason to move together.
+AI_TRIAGE_CONCURRENCY = int(os.environ.get("AI_TRIAGE_CONCURRENCY", "4"))
 import ai      # AI layer — risk rating, adverse triage, summaries, transliteration, governance
 import agents  # Agentic operating model — identity/authorization, audit trail, QA gate
 import kyc      # KYC/identity layer — FATF R.10 (CDD) + R.25 (legal arrangements)
@@ -6411,10 +6416,43 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     injection_blocked = 0
     for f in adverse_findings:
         adv_by_link.setdefault(f.get("permalink", ""), []).extend(f.get("articles", []))
-        for a in f["articles"]:
-            a["triage"] = ai.triage_adverse(f["subject_name"], a)
-            if a["triage"].get("injection_suspected"):
-                injection_blocked += 1
+
+    # AI TRIAGE — the run's last phase, and until now its slowest per unit of
+    # work. Measured on 2026-08-11 (run 31479768870): 16m02s, against 16m44s and
+    # 17m29s on the two preceding days. The model was not failing — no circuit
+    # trip appears in any of those logs — it was answering slowly, ~10s a call,
+    # and this loop asked one article at a time. Sixteen minutes of a 64-minute
+    # sweep spent waiting in series, at the very end, with the report and the
+    # Asana delivery still to come.
+    #
+    # Each article is independent: triage_adverse reads one headline and writes
+    # one dict, touching nothing shared but the LLM counters (locked in ai.py).
+    # So this is a fan-out, exactly like the enrichment pass above, and it turns
+    # N x latency into N/workers x latency.
+    #
+    # Concurrency is deliberately lower than SCREEN_CONCURRENCY: the ceiling
+    # here is a paid API's rate limit, not a free feed's patience. A 429 is
+    # handled where it belongs — ai.py no longer counts replies toward the
+    # breaker, so throttling costs a retry-less skip, never the whole run's
+    # triage.
+    _triage_work = [(f["subject_name"], a) for f in adverse_findings for a in f["articles"]]
+    if _triage_work:
+        _workers = max(1, min(AI_TRIAGE_CONCURRENCY, len(_triage_work)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_workers) as _tex:
+            _futs = {_tex.submit(ai.triage_adverse, _n, _a): _a for _n, _a in _triage_work}
+            for _fut in concurrent.futures.as_completed(_futs):
+                _art = _futs[_fut]
+                try:
+                    _art["triage"] = _fut.result()
+                except Exception as e:
+                    # triage_adverse is documented never to raise; if it ever
+                    # does, the article must still carry a triage verdict or the
+                    # renderer sees a hole. Deterministic-only, and loud.
+                    log(f"  WARN triage failed for an article ({e}) — deterministic verdict stands")
+                    _art["triage"] = {"severity": "LOW", "relevance": "LOW",
+                                      "confidence": "LOW", "ai": False}
+    injection_blocked = sum(1 for _n, _a in _triage_work
+                            if (_a.get("triage") or {}).get("injection_suspected"))
     pep_links = {p.get("permalink", "") for p in pep_findings}
     jtable = kyc.load_jurisdiction_risk()   # FATF R.10 jurisdiction-risk (maintained list)
     for m in possible_matches:

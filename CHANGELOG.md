@@ -10,6 +10,29 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **The AI triage pass fans out; sixteen minutes of the daily sweep were spent
+  waiting in series** (`screen.py`, `ai.py`). Production measurement on
+  2026-08-11 (run 31479768870): `Delta:` 10:41:54 → `AI: risk-rated` 10:57:56 =
+  **16m02s**, against 16m44s and 17m29s on the two preceding days. The model was
+  never failing — no circuit trip appears in any of those logs — it was
+  answering at roughly ten seconds a call, and the loop asked for one article at
+  a time. That is a quarter of a 64-minute sweep, at the very end, with the
+  narrative and the Asana delivery still to come. Each article is independent
+  (`triage_adverse` reads one headline and writes one dict), so the loop is now
+  a bounded fan-out over `AI_TRIAGE_CONCURRENCY` (default 4, separate from
+  `SCREEN_CONCURRENCY` — that one is sized against free feeds' per-IP patience,
+  this against a paid API's rate limit).
+  Two supporting changes make that safe. **A reply is no longer an outage:** the
+  breaker exists to stop paying the 30s timeout, and an HTTP reply of any status
+  arrives in milliseconds, so replies now re-arm it and only transport errors
+  advance it — without which a burst of 429s earned by the new concurrency would
+  have disabled triage for a whole run while saving no time at all. And the
+  call counters are **lock-protected**, because they are reported and a lost
+  increment would understate how degraded a run was. Expected ~16m → ~4m;
+  **unverified until the next live sweep.** 11 checks in `test/engine_test.py`,
+  including exact counting under 8 concurrent threads; the prompt-injection
+  red-team still passes unchanged.
+
 - **The two US SEC enforcement feeds have been 403-ing on every run, and now
   say why** (`screen.py`, `data/regulator-bulletins.json`). `US SEC —
   Litigation Releases` and `US SEC — Press Releases` have failed on every

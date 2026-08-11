@@ -3701,41 +3701,76 @@ def _reset_llm():
     for _k in ai.LLM_CALLS:
         ai.LLM_CALLS[_k] = 0
 
-# Consecutive hard failures trip the breaker, and it then stops paying the timeout.
+# Consecutive UNREACHABLE calls trip the breaker, and it then stops paying the
+# timeout. Only transport errors qualify — see below for why replies do not.
 _reset_llm()
 _hits = {"n": 0}
-def _always_502(*a, **k):
+def _always_dead(*a, **k):
     _hits["n"] += 1
-    return _Resp(502)
-_req.post = _always_502
+    raise RuntimeError("connection timed out")
+_req.post = _always_dead
 for _ in range(ai.LLM_BREAKER_AFTER + 4):
     ai.llm_complete("x")
-check("AI circuit opens after LLM_BREAKER_AFTER consecutive failures", ai.llm_circuit_open())
+check("AI circuit opens after LLM_BREAKER_AFTER consecutive unreachable calls",
+      ai.llm_circuit_open())
 check("once open, not one further HTTP call is made", _hits["n"] == ai.LLM_BREAKER_AFTER)
 check("refused calls count as skipped, never as attempted or failed",
       ai.LLM_CALLS["skipped"] == 4
       and ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER
       and ai.LLM_CALLS["attempted"] == ai.LLM_BREAKER_AFTER)
 
-# A transport error (the timeout case that actually cost the 16m44s) counts too.
+# A REPLY IS NOT AN OUTAGE — the rule the concurrent triage pass depends on.
+# The breaker exists to stop paying the 30s timeout; an HTTP reply of any status
+# arrives in milliseconds and costs nothing, so it must not accumulate toward
+# "unreachable". Concurrency earns 429s, and tripping on a burst of them would
+# disable triage for the whole run while saving no time whatsoever.
 _reset_llm()
-_req.post = _boom
-for _ in range(ai.LLM_BREAKER_AFTER):
+_req.post = lambda *a, **k: _Resp(429)
+for _ in range(ai.LLM_BREAKER_AFTER * 3):
     ai.llm_complete("x")
-check("a transport error advances the breaker exactly like a non-200", ai.llm_circuit_open())
+check("a burst of 429s never trips the breaker — throttling is not an outage",
+      not ai.llm_circuit_open())
+check("but those 429s are still counted as failed, for disclosure",
+      ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER * 3)
+_reset_llm()
+_req.post = lambda *a, **k: _Resp(500)
+for _ in range(ai.LLM_BREAKER_AFTER * 2):
+    ai.llm_complete("x")
+check("a fast 500 likewise does not trip it (reachable, and cheap)",
+      not ai.llm_circuit_open())
 
-# An INTERMITTENT failure must never trip it: any 200 proves the endpoint is up.
+# An INTERMITTENT outage must never trip it: a reply in between re-arms.
 _reset_llm()
 _seq = {"n": 0}
 def _flaky(*a, **k):
     _seq["n"] += 1
-    return _Resp(500) if _seq["n"] % 3 else _Resp(200, "fine")
+    if _seq["n"] % 3:
+        raise RuntimeError("connection reset by peer")
+    return _Resp(200, "fine")
 _req.post = _flaky
 for _ in range(30):
     ai.llm_complete("x")
-check("an intermittent failure never trips the breaker — a 200 re-arms it",
+check("an intermittent outage never trips the breaker — a reply re-arms it",
       not ai.llm_circuit_open())
 check("the healthy calls in that run still returned their text", ai.LLM_CALLS["ok"] == 10)
+
+# THREAD SAFETY. The triage pass is now a fan-out, so the counters are shared.
+# `+=` is not atomic and these numbers are reported — an undercount would
+# understate how degraded a run was.
+_reset_llm()
+_req.post = lambda *a, **k: _Resp(200, "fine")
+import threading as _th
+_threads = [_th.Thread(target=lambda: [ai.llm_complete("x") for _ in range(40)])
+            for _ in range(8)]
+for _t in _threads: _t.start()
+for _t in _threads: _t.join()
+check("concurrent calls count exactly, with no lost increments",
+      ai.LLM_CALLS["ok"] == 320 and ai.LLM_CALLS["attempted"] == 320)
+
+# The triage fan-out is bounded, and separately from the news-feed fan-out.
+check("AI triage concurrency is a bounded, separate knob from SCREEN_CONCURRENCY",
+      isinstance(screen.AI_TRIAGE_CONCURRENCY, int)
+      and 1 <= screen.AI_TRIAGE_CONCURRENCY <= screen.SCREEN_CONCURRENCY)
 
 # THE DEGRADE CONTRACT: with the circuit open, triage keeps its deterministic
 # severity floor. Sharpening is lost; the finding is not.
