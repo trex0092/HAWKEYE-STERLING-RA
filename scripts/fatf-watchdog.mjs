@@ -184,6 +184,23 @@ export function diffLists(prev, curr) {
   };
 }
 
+/* The capture date behind a source label, re-emitted as a string THIS process
+   generated rather than the bytes the archive sent. `data/fatf-state.json` is
+   force-pushed to the fatf-state branch, so no network-shaped text is persisted
+   into it verbatim: the 14-digit stamp is converted to NUMBERS and a fresh ISO
+   date is built from them, which bounds an archive response to influencing
+   WHICH valid date gets written and never WHAT gets written. Anything that is
+   not a plausible stamp becomes 'unknown' — a bookkeeping breadcrumb is never
+   worth widening what a third party can put in a committed file.
+   (CodeQL js/http-to-file-access, alert 151.) */
+export function snapshotDate(source) {
+  const m = /(\d{4})(\d{2})(\d{2})\d{6}/.exec(String(source == null ? '' : source));
+  if (!m) return 'unknown';
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (!(y >= 1996 && y <= 2999) || !(mo >= 1 && mo <= 12) || !(d >= 1 && d <= 31)) return 'unknown';
+  return new Date(Date.UTC(y, mo - 1, d)).toISOString().slice(0, 10);
+}
+
 /* True when two list states name exactly the same jurisdictions on both lists.
    Order-insensitive: the page's ordering is not part of the designation, and a
    reshuffle must not read as a move. Used for STALE-capture corroboration — see
@@ -560,7 +577,7 @@ export async function main(mode) {
       const st = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
       st.skipStreak = 0;
       st.lastCorroborated = new Date().toISOString().slice(0, 10);
-      st.lastCorroboratedSnapshot = fetched.source;
+      st.lastCorroboratedSnapshot = snapshotDate(fetched.source);
       writeFileSync(STATE_FILE, JSON.stringify(st, null, 2) + '\n');
     } catch (e) { console.error('FATF corroboration bookkeeping failed: ' + e.message); }
     return;

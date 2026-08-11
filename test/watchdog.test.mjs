@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical, snapshotDate } from '../scripts/fatf-watchdog.mjs';
 
 function throws(fn) { try { fn(); return false; } catch { return true; } }
 
@@ -145,6 +145,22 @@ check('a stale capture with an extra black jurisdiction does NOT corroborate',
 check('a missing or list-less state never counts as identical',
   !listsIdentical(null, held) && !listsIdentical(held, null)
   && !listsIdentical({ skipStreak: 3 }, held));
+
+/* The corroboration breadcrumb goes into a state file that is force-pushed to a
+   data branch, so what lands there must be generated here, not echoed from the
+   archive's bytes (CodeQL js/http-to-file-access). Only a plausible 14-digit
+   stamp survives, and it comes back as a date this process built. */
+check('a source label yields the capture date, rebuilt not echoed',
+  snapshotDate('fatf-gafi.org via web.archive.org snapshot 20260731091550') === '2026-07-31');
+check('an implausible stamp is not persisted',
+  snapshotDate('snapshot 20261399091550') === 'unknown'
+  && snapshotDate('snapshot 18000101000000') === 'unknown');
+check('a label carrying no stamp, or none at all, persists nothing network-shaped',
+  snapshotDate('fatf-gafi.org (live)') === 'unknown'
+  && snapshotDate('') === 'unknown' && snapshotDate(null) === 'unknown'
+  && snapshotDate(undefined) === 'unknown');
+check('injected text around a stamp cannot reach the file',
+  snapshotDate('20260731091550","x":"\n../../evil') === '2026-07-31');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
