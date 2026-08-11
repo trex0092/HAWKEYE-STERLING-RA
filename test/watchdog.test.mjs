@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical, snapshotDate } from '../scripts/fatf-watchdog.mjs';
 
 function throws(fn) { try { fn(); return false; } catch { return true; } }
 
@@ -114,6 +114,53 @@ check('black/grey overlap is rejected',
   throws(() => assertPlausible({ black: ['Myanmar'], grey: ['Myanmar', 'Angola', 'Bolivia', 'Monaco', 'Nepal'] })));
 check('empty/tiny grey list is rejected',
   throws(() => assertPlausible({ black: ['Myanmar'], grey: ['Angola'] })));
+
+/* CDX index — the second opinion on archive.org. The availability API is
+   cache-backed and was observed lagging the crawl by 10+ days (run 31369056569),
+   which alone blinded the watchdog; CDX reads the crawl. Its response is a
+   header row plus [timestamp, statuscode] rows, oldest first. */
+const cdx = [['timestamp', 'statuscode'], ['20260731091550', '200'], ['20260806120000', '200'], ['20260808000000', '404']];
+check('CDX timestamps come back newest-first, 200s only, header row dropped',
+  parseCdxTimestamps(cdx).join(',') === '20260806120000,20260731091550');
+check('a captured non-200 is not treated as the page',
+  !parseCdxTimestamps([['20260808000000', '503']]).length);
+check('a garbled CDX response yields no candidates, never a false hit',
+  !parseCdxTimestamps(null).length && !parseCdxTimestamps({ error: 'x' }).length
+  && !parseCdxTimestamps([['not-a-timestamp', '200'], 'junk', 42]).length);
+
+/* Stale-capture corroboration. A capture past the freshness bar may not be
+   DIFFED as current — it could pre-date a plenary and report a real move in
+   reverse — but comparing it for EQUALITY is safe in the only direction that
+   matters: it can confirm the stored lists are unchanged, and can never
+   manufacture a change. Ordering is not part of a designation. */
+const held = { black: ['Islamic Republic of Iran', 'Myanmar', 'North Korea'],
+  grey: ['Angola', 'Bolivia', 'Bulgaria', 'Monaco', 'Nepal', 'Yemen'], updated: '2026-06-20' };
+check('a stale capture naming the same lists corroborates coverage',
+  listsIdentical(held, { black: ['Myanmar', 'North Korea', 'Islamic Republic of Iran'],
+    grey: ['Yemen', 'Monaco', 'Angola', 'Nepal', 'Bulgaria', 'Bolivia'] }));
+check('a stale capture missing a grey jurisdiction does NOT corroborate',
+  !listsIdentical(held, { black: held.black, grey: held.grey.slice(1) }));
+check('a stale capture with an extra black jurisdiction does NOT corroborate',
+  !listsIdentical(held, { black: [...held.black, 'Angola'], grey: held.grey }));
+check('a missing or list-less state never counts as identical',
+  !listsIdentical(null, held) && !listsIdentical(held, null)
+  && !listsIdentical({ skipStreak: 3 }, held));
+
+/* The corroboration breadcrumb goes into a state file that is force-pushed to a
+   data branch, so what lands there must be generated here, not echoed from the
+   archive's bytes (CodeQL js/http-to-file-access). Only a plausible 14-digit
+   stamp survives, and it comes back as a date this process built. */
+check('a source label yields the capture date, rebuilt not echoed',
+  snapshotDate('fatf-gafi.org via web.archive.org snapshot 20260731091550') === '2026-07-31');
+check('an implausible stamp is not persisted',
+  snapshotDate('snapshot 20261399091550') === 'unknown'
+  && snapshotDate('snapshot 18000101000000') === 'unknown');
+check('a label carrying no stamp, or none at all, persists nothing network-shaped',
+  snapshotDate('fatf-gafi.org (live)') === 'unknown'
+  && snapshotDate('') === 'unknown' && snapshotDate(null) === 'unknown'
+  && snapshotDate(undefined) === 'unknown');
+check('injected text around a stamp cannot reach the file',
+  snapshotDate('20260731091550","x":"\n../../evil') === '2026-07-31');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
