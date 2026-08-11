@@ -10,6 +10,26 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Freshness Check: a control that already failed today can no longer hide
+  behind its own retry** (`scripts/freshness-check.mjs`). The alarm skipped any
+  control with a run in flight, so as not to red a long screen that is simply
+  mid-sweep — but `pendingToday` was read from the **single most recent run**
+  (`per_page=1`), so the failures sitting just below that one run were never
+  looked at. A mandatory control could therefore fail every firing of the day
+  and still be dropped from the alarm entirely, because a retry happened to be
+  running when the check fired. The window is not narrow: the daily screening
+  fires three times a day at ~64 minutes each, so the 09:09 **and** 12:09
+  firings can both land mid-sweep. Now one call (widened to 20 runs, no extra
+  round-trip) answers both questions — is anything running, and has anything
+  already finished unsuccessfully today — and the mid-run pass applies only
+  while the day is still an open question. Once a run has finished
+  unsuccessfully, an in-flight retry no longer buys silence. A day that heals
+  reports green at the next firing; a day that does not is loud the whole way
+  through. The alarm table gains a `Today` column so the three shapes that
+  reach it — never fired, failed, failed-and-retrying — are told apart rather
+  than collapsed into one row. Cancelled and timed-out count as failures:
+  neither produced a screening. 6 checks in `test/freshness-check.test.mjs`.
+
 - **The LLM path gets the circuit breaker every other feed already had**
   (`ai.py`, `monitoring.py`). Google News, GDELT, Bing News and Wikidata each
   trip a run-level breaker after N consecutive failures; the Anthropic call was
