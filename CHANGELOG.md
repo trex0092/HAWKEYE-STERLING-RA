@@ -10,6 +10,44 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **The daily screening was being killed at 64 minutes by our own egress
+  allowlist** (`.github/workflows/weekly-adverse-media.yml`,
+  `test/workflow-hardening.test.mjs`). A GitHub-hosted runner heartbeats to
+  `hosted-compute-watchdog-prod-<shard>.githubapp.com`, and a runner that cannot
+  answer is reclaimed on a fixed timer — the job dies mid-step with no
+  conclusion, no post-step (not even the `if: always()` one) and no uploaded
+  logs, which is why five investigations since 6 Aug all hit a 404 on the very
+  logs that would have explained it. The `adverse-media` job's allowlist pinned
+  the shard **literally**, as `...-prod-iad-01`, so the sweep survived only on
+  the days GitHub happened to place it on that shard. The evidence is a timer,
+  not a workload ceiling: runs 31452192472, 31458943581 and 31557541298 died
+  64m02s, 64m00s and 64m01s after job start — three failures inside a
+  two-second band, which no workload-dependent limit produces. The obvious
+  counter-hypothesis, that the sweep simply takes about an hour, is refuted by
+  the control group: run 31468597213 **succeeded** on 11 Aug with a 65m08s job
+  whose screening step alone ran 64m49s — longer than the entire lifetime of
+  each of the three failed jobs — and a 120m54s sweep succeeded on 10 Jul. Same
+  workflow, same config; the only variable is whether the heartbeat could be
+  answered. A reclaim is unmistakable in the API too: the step stays
+  `in_progress` with no conclusion and every post-step stays `pending`, which a
+  normally-failing step never does (the 10 Aug run, which failed on the EOCN
+  review-age gate, closed its step and ran every post-step as usual).
+  The crash-forensics heartbeat added for exactly this
+  confirmed the shape: run 31557541298 published `sanctions-done` (45 flagged /
+  311 clear) and `enrichment-start` (904 subjects) at 9m32s, then nothing for
+  the 54 minutes until the VM was taken. The allowlist now carries
+  `*.githubapp.com:443`, which is what the other 50 workflows in the estate use,
+  what fixed the identical ~63-minute deaths on `pep-worldwide`, and what fixed
+  the same losses on `sanctions-screen` on 11 Aug — green every run since. This
+  job was the one left behind.
+  Guarded in both directions so it cannot come back (§8 of the hardening
+  ratchet): **no** egress block anywhere may name a `hosted-compute-*` host
+  literally, because the shard suffix is GitHub's to rotate and never ours to
+  pin; and **every** job whose `timeout-minutes` exceeds the 60-minute reclaim
+  window must allow the wildcard. The guard derives the job list from the
+  workflows themselves, so a new long-running control is covered the day it is
+  added rather than the day it first dies.
+
 - **The AI triage pass fans out; sixteen minutes of the daily sweep were spent
   waiting in series** (`screen.py`, `ai.py`). Production measurement on
   2026-08-11 (run 31479768870): `Delta:` 10:41:54 → `AI: risk-rated` 10:57:56 =

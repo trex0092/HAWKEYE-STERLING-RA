@@ -12,6 +12,9 @@
      5. a top-level `permissions:` block exists and `write-all` appears nowhere
      6. every actions/checkout sets `persist-credentials: false` — or the
         file::job is listed in DOCUMENTED_EXCEPTIONS
+     7. every workflow enforcing a core-list floor can reach that list's host
+     8. no egress block pins a hosted-compute shard, and every job that can
+        outlive the runner-reclaim timer can answer the hosted-compute watchdog
 
    Adding an exception here is a reviewed act: quote the workflow's own
    comment as the reason, the same way the screening benchmark allowlists a
@@ -203,6 +206,82 @@ for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
     check(`${f}: every allowed-endpoints entry is a bare host:port — a comment in a folded block disables the egress guard${bad.length ? ' (offending: ' + bad.slice(0, 4).join(' ') + ')' : ''}`,
       bad.length === 0);
   }
+}
+
+/* ── 8. A long job must be able to answer the hosted-compute watchdog ──
+   A GitHub-hosted runner heartbeats to
+   hosted-compute-watchdog-prod-<shard>.githubapp.com. A runner that cannot
+   answer is RECLAIMED on a fixed timer: the job dies mid-step with no
+   conclusion, no post-step (not even `if: always()`) and no uploaded logs, so
+   every post-mortem hits a 404 on the very logs that would explain it.
+
+   The daily screening sweep lost this way repeatedly in Aug 2026 because its
+   egress block pinned the shard LITERALLY — `...-prod-iad-01` — so the sweep
+   survived only on the days GitHub happened to place it on iad-01. Three
+   consecutive failures died 64m00s, 64m01s and 64m02s after job start: a fixed
+   reclaim timer, not a workload ceiling. The same signature had already been
+   diagnosed and fixed once on pep-worldwide; nothing stopped one job from
+   keeping the broken form, and a mandatory AML control went red for days.
+
+   Two invariants, because the shard suffix is GitHub's to rotate and never
+   ours to pin:
+     a. NO egress block anywhere may name a hosted-compute host literally.
+     b. Any job that can run past the reclaim window must allow the wildcard.
+   Short jobs are exempt from (b) — they finish long before the timer — but
+   never from (a), which is a latent bug at any duration. */
+{
+  /* Per-job line scan, matching this suite's zero-dependency style: a job
+     header is the two-space-indented key under `jobs:`; an allowed-endpoints
+     folded block belongs to the job whose header last opened. */
+  const jobsOf = (text) => {
+    const out = [];
+    let cur = null, blk = null, blkIndent = 0, inJobs = false;
+    const closeBlock = () => { if (blk && cur) cur.allowed.push(blk.join(' ')); blk = null; };
+    for (const l of text.split('\n')) {
+      if (/^jobs:\s*$/.test(l)) { inJobs = true; continue; }
+      if (inJobs && /^ {2}[A-Za-z0-9_-]+:\s*$/.test(l)) {
+        closeBlock();
+        cur = { name: l.trim().slice(0, -1), timeout: null, allowed: [] };
+        out.push(cur);
+        continue;
+      }
+      if (blk !== null) {
+        if (l.trim() === '' || l.match(/^\s*/)[0].length <= blkIndent) closeBlock();
+        else { blk.push(l.trim()); continue; }
+      }
+      const t = l.match(/^\s*timeout-minutes:\s*(\d+)/);
+      if (t && cur) cur.timeout = Number(t[1]);
+      if (/^\s*allowed-endpoints:\s*>/.test(l)) { blkIndent = l.match(/^\s*/)[0].length; blk = []; }
+    }
+    closeBlock();
+    return out;
+  };
+
+  /* The observed reclaim window was 58-64 min across five losses. 60 is the
+     threshold rather than 64 so a job cannot sit just under the fastest
+     observed kill and call itself safe. */
+  const RECLAIM_MIN = 60;
+  const WILDCARD = '*.githubapp.com:443';
+  const pinnedAll = [];
+  let guarded = 0;
+
+  for (const f of files) {
+    for (const job of jobsOf(readFileSync(join(dir, f), 'utf8'))) {
+      const eps = job.allowed.join(' ').split(/\s+/).filter(Boolean);
+      for (const e of eps) {
+        if (/^hosted-compute-[^\s]*\.githubapp\.com:\d+$/.test(e)) pinnedAll.push(`${f}::${job.name} ${e}`);
+      }
+      if (!eps.length) continue;                       // no egress block — nothing to reach past
+      if (!(job.timeout > RECLAIM_MIN)) continue;      // finishes before the timer can fire
+      guarded++;
+      check(`${f}::${job.name}: may run ${job.timeout}m, so it must allow ${WILDCARD} or be reclaimed mid-sweep`,
+        eps.includes(WILDCARD));
+    }
+  }
+
+  check(`checked every job that can outlive the reclaim window (${guarded})`, guarded >= 1);
+  check(`no egress block pins a hosted-compute shard — the suffix rotates, so a pin is a reclaim bug${pinnedAll.length ? ' (offending: ' + pinnedAll.slice(0, 4).join(', ') + ')' : ''}`,
+    pinnedAll.length === 0);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
