@@ -11,4 +11,4 @@ pdfplumber==0.11.10
 requests==2.34.2
 lxml==6.1.1
 unicodedata2==17.0.1
-hypothesis==6.165.2   # property-based tests (test/fuzz_properties.py) — dev/test only
+hypothesis==6.165.9   # property-based tests (test/fuzz_properties.py) — dev/test only
