@@ -70,6 +70,9 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | `hawkeye_name_variants` | Expand a name into the transliteration-equivalent spellings the matcher screens under (Mohammed/Muhammad, Abdul/Abdel, bin/ibn …) — makes fuzzy-match recall transparent. |
 | `hawkeye_adverse_media_scan` | Deterministically scan a headline for the adverse-media keyword taxonomy (fraud, laundering, sanctions, corruption, terrorism …); no model, so it never invents an allegation. |
 | `hawkeye_assemble_str_dossier` | Assemble a **DRAFT** goAML-aligned STR dossier from a case object; rejects an incomplete case with the exact missing fields. Draft only — the MLRO verifies and files. |
+| `hawkeye_assemble_tfs_dossier` | Assemble a **DRAFT** FFR/PNMR dossier for a Targeted Financial Sanctions list hit (UN Consolidated List / UAE Local Terrorist List); recommends the report kind, never files or freezes. The TFS counterpart of `hawkeye_assemble_str_dossier`. |
+| `hawkeye_compute_risk_rating` | Compute a LOW/MEDIUM/HIGH customer risk rating (FATF R.10) from already-known hits/PEP/adverse-media/CDD-gap findings, with contributing factors and the EDD requirement. Deterministic; does not itself screen anything. |
+| `hawkeye_related_parties` | Surface hidden links across a book of customers: a shared owner/UBO across two or more customers, or a UBO who is also a customer entity. Pure graph analysis, no model. |
 
 ## Resources (read-only reference data)
 
