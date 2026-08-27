@@ -10,6 +10,29 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **MCP tool coverage extended to the TFS dossier, risk-rating and
+  related-party engine functions** (`mcp_tools.py`, `mcp_server.py`,
+  `test/mcp_tools_test.py`, `docs/mcp-server.md`). Three engine capabilities
+  had no MCP exposure even though the app already used them:
+  `tfs_dossier.build_tfs_dossier` (the FFR/PNMR counterpart of the
+  already-exposed `hawkeye_assemble_str_dossier`), `ai.compute_risk_rating`
+  (the FATF R.10 LOW/MEDIUM/HIGH scoring logic), and `ai.related_parties`
+  (shared-UBO / related-customer detection). Added as
+  `hawkeye_assemble_tfs_dossier`, `hawkeye_compute_risk_rating` and
+  `hawkeye_related_parties`, following the same design rules as every other
+  tool in this file: deterministic, offline, decision-support only, arguments
+  validated at the boundary. `ai.triage_adverse` was deliberately **not**
+  wrapped as a tool — it calls the LLM when a key is configured, which would
+  break the "no model call" guarantee every other tool makes; it stays
+  reachable only through the existing `adverse_media_triage` prompt template.
+  Also corrected `hawkeye_monitor_transactions`'s description, which named six
+  of the seven rules `txn_monitor._RULES` actually runs and omitted rapid
+  pass-through/layering (`rule_rapid_passthrough`, alert rule `PASSTHROUGH`) —
+  the rule was always executing, only the tool's own description was stale.
+  12 tools total now (was 9); all pass `test/mcp_tools_test.py` and were
+  smoke-tested live over stdio against the real engine modules (not just the
+  test's stubs).
+
 - **The AI triage pass fans out; sixteen minutes of the daily sweep were spent
   waiting in series** (`screen.py`, `ai.py`). Production measurement on
   2026-08-11 (run 31479768870): `Delta:` 10:41:54 → `AI: risk-rated` 10:57:56 =
