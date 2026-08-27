@@ -3,8 +3,9 @@
 HAWKEYE STERLING — MCP TOOL LAYER  (mcp_tools.py)
 ====================================================================
 Pure, deterministic wrappers that expose the existing screening engine
-(screen.py, kyc.py, txn_monitor.py) to a Model Context Protocol (MCP) server
-(mcp_server.py). This module holds NO protocol code and imports NO third-party
+(screen.py, kyc.py, txn_monitor.py, ai.py, str_dossier.py, tfs_dossier.py) to a
+Model Context Protocol (MCP) server (mcp_server.py). This module holds NO
+protocol code and imports NO third-party
 package — it is the testable business layer; mcp_server.py is the thin stdio
 JSON-RPC transport around it.
 
@@ -31,6 +32,7 @@ import kyc
 import txn_monitor
 import ai
 import str_dossier
+import tfs_dossier
 
 # ── input caps (defence in depth on untrusted MCP arguments) ──────────────────
 MAX_NAME_LEN = 512
@@ -38,6 +40,9 @@ MAX_WATCHLIST = 5000
 MAX_TXNS = 5000
 MAX_NOTES_LEN = 200_000
 MAX_NATIONALITIES = 50
+MAX_CUSTOMERS = 5000
+MAX_HITS = 500
+MAX_ARTICLES = 500
 
 
 def _req_str(value, field, cap=MAX_NAME_LEN):
@@ -146,9 +151,11 @@ def screen_internal_watchlist(name, path=None):
 def monitor_transactions(transactions, jurisdiction_table=None):
     """Run the FATF R.16 transaction-monitoring rule-set over ONE customer's
     transactions: cash-threshold (AED 55,000 DPMSR), structuring/smurfing,
-    velocity spikes, round-amount cash, high-risk counterparty geography, and
-    the CDD trigger (AED 15,000). Returns every alert with its rule, severity
-    and evidence. A rule that errors is COUNTED (never a silent all-clear).
+    velocity spikes, round-amount cash, high-risk counterparty geography, the
+    CDD trigger (AED 15,000), and rapid pass-through/layering (funds in then
+    out within ~72h at a similar amount, rule "PASSTHROUGH"). Returns every
+    alert with its rule, severity and evidence. A rule that errors is COUNTED
+    (never a silent all-clear).
 
     transactions: list of {customer, date 'YYYY-MM-DD', amount, direction
     'in'|'out', method, counterparty?, counterparty_country?}.
@@ -301,6 +308,142 @@ def assemble_str_dossier(case):
     }
 
 
+# ── TOOL: assemble_tfs_dossier ────────────────────────────────────────────────
+def assemble_tfs_dossier(case):
+    """Assemble a DRAFT Funds Freeze Report (FFR) or Partial Name Match Report
+    (PNMR) dossier for a match against a Targeted Financial Sanctions list (the
+    UN Security Council Consolidated List or the UAE Local Terrorist List),
+    under UAE Cabinet Resolution No. 74 of 2020 (applied under Federal
+    Decree-Law No. 10 of 2025). DRAFT ONLY: it never files or freezes anything
+    — the MLRO confirms every particular against the current EOCN guidance and
+    acts through goAML. Rejects an incomplete case with the exact missing
+    fields so the caller can complete it. This is the TFS counterpart of
+    assemble_str_dossier — use this one for a TFS list hit, that one for a
+    suspicious-transaction report.
+
+    case: {customer:{name,...}, match_status:"confirmed"|"partial",
+    hits:[{list, matched_entry|hitName, score?, mechanism?, confidence?,
+    listed_ref?}, ...] (>=1 must be on a TFS list), subject?, funds?, actions?,
+    prepared_by?}.
+    """
+    if not isinstance(case, dict):
+        raise ValueError("'case' must be an object")
+    errors = tfs_dossier.validate_tfs_case(case)
+    if errors:
+        raise ValueError("case is incomplete: " + "; ".join(errors))
+    dossier = tfs_dossier.build_tfs_dossier(case)
+    funds_held = bool((case.get("funds") or {}).get("held"))
+    kind, rationale = tfs_dossier.recommend_report_kind(case["match_status"], funds_held)
+    return {
+        "draft": True,
+        "customer": (case.get("customer") or {}).get("name", ""),
+        "match_status": case.get("match_status", ""),
+        "recommended_report_kind": kind,  # "FFR" | "PNMR" — recommendation only
+        "recommendation_rationale": rationale,
+        "dossier_markdown": dossier,
+        "note": "DRAFT ONLY — not filed, nothing frozen. The MLRO confirms the instrument and "
+                "every particular against current EOCN guidance, then acts through goAML "
+                "without delay, without tipping off the customer.",
+    }
+
+
+# ── TOOL: compute_risk_rating ─────────────────────────────────────────────────
+def compute_risk_rating(sanctions_hits=None, is_control=False, pep=False, adverse_articles=None,
+                        sector_high_risk=True, jurisdiction_high_risk=False,
+                        jurisdiction_grey=False, cdd_gaps=0):
+    """Compute a customer's LOW/MEDIUM/HIGH risk rating (FATF R.10 risk-based
+    approach) from already-known screening findings, with the contributing
+    factors and the resulting EDD requirement. Deterministic and fully
+    explainable — no model, no network; the same inputs always give the same
+    rating. This is the same scoring logic the app uses when a customer is
+    reviewed; it does not itself screen or fetch anything — supply the hits/
+    flags from hawkeye_screen_name, hawkeye_jurisdiction_risk, etc. first.
+
+    sanctions_hits: list of hit objects (each may carry 'score', 0-100; a
+    100/'unscreenable' hit is treated as needing manual review, never LOW).
+    is_control: true if a designated owner/UBO under the 50%/control rule.
+    pep: true if a PEP/RCA/SOE match was found.
+    adverse_articles: list of article objects (each may carry a 'triage'
+    object with 'severity', or a bare 'categories' list).
+    sector_high_risk/jurisdiction_high_risk/jurisdiction_grey: inherent-risk
+    flags (defaults assume the DPMS sector baseline; set jurisdiction_* from
+    hawkeye_jurisdiction_risk's 'tier').
+    cdd_gaps: count of open CDD/identity-verification gaps (e.g. from
+    hawkeye_analyze_kyc_note's 'total_cdd_gaps').
+    """
+    hits = sanctions_hits if sanctions_hits is not None else []
+    if not isinstance(hits, list):
+        raise ValueError("'sanctions_hits' must be an array of hit objects")
+    if len(hits) > MAX_HITS:
+        raise ValueError(f"'sanctions_hits' exceeds the {MAX_HITS}-item limit")
+    for i, h in enumerate(hits):
+        if not isinstance(h, dict):
+            raise ValueError(f"sanctions_hits[{i}] must be an object, got {type(h).__name__}")
+
+    articles = adverse_articles if adverse_articles is not None else []
+    if not isinstance(articles, list):
+        raise ValueError("'adverse_articles' must be an array of article objects")
+    if len(articles) > MAX_ARTICLES:
+        raise ValueError(f"'adverse_articles' exceeds the {MAX_ARTICLES}-item limit")
+    for i, a in enumerate(articles):
+        if not isinstance(a, dict):
+            raise ValueError(f"adverse_articles[{i}] must be an object, got {type(a).__name__}")
+
+    for field, value in (("is_control", is_control), ("pep", pep),
+                        ("sector_high_risk", sector_high_risk),
+                        ("jurisdiction_high_risk", jurisdiction_high_risk),
+                        ("jurisdiction_grey", jurisdiction_grey)):
+        if not isinstance(value, bool):
+            raise ValueError(f"'{field}' must be a boolean, got {type(value).__name__}")
+
+    if not isinstance(cdd_gaps, int) or isinstance(cdd_gaps, bool) or cdd_gaps < 0:
+        raise ValueError("'cdd_gaps' must be a non-negative integer")
+
+    result = ai.compute_risk_rating(
+        sanctions_hits=hits, is_control=is_control, pep=pep, adverse_articles=articles,
+        sector_high_risk=sector_high_risk, jurisdiction_high_risk=jurisdiction_high_risk,
+        jurisdiction_grey=jurisdiction_grey, cdd_gaps=cdd_gaps,
+    )
+    return {
+        "rating": result["rating"],
+        "score": result["score"],
+        "factors": result["factors"],
+        "edd_requirement": result["edd"],
+        "note": "decision-support only; an MLRO confirms the rating and applies the EDD requirement.",
+    }
+
+
+# ── TOOL: related_parties ─────────────────────────────────────────────────────
+def related_parties(customers):
+    """Surface hidden links across a book of customers: a person who is an
+    owner/UBO of more than one customer, or whose name equals another
+    customer's name. Pure graph analysis over the supplied data — no model, no
+    network, fully auditable. Useful for spotting undisclosed related parties
+    or a UBO layering funds across several entities.
+
+    customers: list of {name: str, individuals: [str, ...]?} — 'individuals'
+    are the names of that customer's owners/UBOs/directors.
+    """
+    if not isinstance(customers, list):
+        raise ValueError("'customers' must be an array of customer objects")
+    if len(customers) > MAX_CUSTOMERS:
+        raise ValueError(f"'customers' exceeds the {MAX_CUSTOMERS}-item limit")
+    for i, c in enumerate(customers):
+        if not isinstance(c, dict):
+            raise ValueError(f"customers[{i}] must be an object, got {type(c).__name__}")
+        if "individuals" in c and c["individuals"] is not None and not isinstance(c["individuals"], list):
+            raise ValueError(f"customers[{i}].individuals must be an array of strings")
+
+    clusters = ai.related_parties(customers)
+    return {
+        "customer_count": len(customers),
+        "cluster_count": len(clusters),
+        "clusters": clusters,
+        "clean": len(clusters) == 0,
+        "note": "decision-support only; a shared link is not itself a finding — an MLRO investigates each cluster.",
+    }
+
+
 # ── registry: the single source of truth the server builds its tool list from ──
 # name -> (callable, human description, JSON-Schema inputSchema).
 TOOLS = {
@@ -411,6 +554,61 @@ TOOLS = {
             "type": "object",
             "properties": {"case": {"type": "object", "description": "The case object (customer, risk, hits, …)."}},
             "required": ["case"],
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_assemble_tfs_dossier": (
+        assemble_tfs_dossier,
+        assemble_tfs_dossier.__doc__,
+        {
+            "type": "object",
+            "properties": {
+                "case": {
+                    "type": "object",
+                    "description": "The TFS case object (customer, match_status, hits, subject?, funds?, actions?, prepared_by?).",
+                }
+            },
+            "required": ["case"],
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_compute_risk_rating": (
+        compute_risk_rating,
+        compute_risk_rating.__doc__,
+        {
+            "type": "object",
+            "properties": {
+                "sanctions_hits": {
+                    "type": "array", "items": {"type": "object"},
+                    "description": "Sanctions/watchlist hit objects (each may carry a 0-100 'score').",
+                },
+                "is_control": {"type": "boolean", "description": "Designated owner/UBO under the 50%/control rule."},
+                "pep": {"type": "boolean", "description": "A PEP/RCA/SOE match was found."},
+                "adverse_articles": {
+                    "type": "array", "items": {"type": "object"},
+                    "description": "Adverse-media article objects (each may carry 'triage.severity' or 'categories').",
+                },
+                "sector_high_risk": {"type": "boolean", "description": "Inherent sector risk (default true for DPMS)."},
+                "jurisdiction_high_risk": {"type": "boolean", "description": "FATF call-for-action jurisdiction nexus."},
+                "jurisdiction_grey": {"type": "boolean", "description": "FATF increased-monitoring (grey-list) nexus."},
+                "cdd_gaps": {"type": "integer", "description": "Count of open CDD/identity-verification gaps."},
+            },
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_related_parties": (
+        related_parties,
+        related_parties.__doc__,
+        {
+            "type": "object",
+            "properties": {
+                "customers": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Customer objects: {name, individuals: [owner/UBO/director names]?}.",
+                }
+            },
+            "required": ["customers"],
             "additionalProperties": False,
         },
     ),
