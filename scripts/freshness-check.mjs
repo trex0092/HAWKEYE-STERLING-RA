@@ -62,6 +62,7 @@ export const EXEMPT = {
   'dependabot-autorebase.yml': 'repo-hygiene sweep that asks Dependabot to rebase auto-merge-armed PRs stranded behind main; a missed firing only delays a bump until the next sweep or push-to-main, and a stalled bump stays owner-visible on the open-PR list — no ingestion/eval duty',
   'eocn-reconcile.yml': 'prepares the weekly EOCN review branch + files the sign-off task; the review duty itself is enforced by the daily screening review-age gate (exit 3 past 7 days), which is what this alarm monitors',
   'dast-zap.yml': 'security scan of the deployed site',
+  'fortify.yml': 'third-party SAST/SCA scanner (Fortify) requiring live FoD/SSC account credentials that are not currently configured in this repo; not a compliance-screening control with a regulatory ingestion/eval duty, so a failed or missing run has no freshness window to enforce',
   'freshness-check.yml': 'this alarm itself',
   'function-health.yml': 'site operations probe; self-alerting',
   'governance-report.yml': 'reports ON control state; the controls it reads are monitored individually',
