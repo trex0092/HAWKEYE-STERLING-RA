@@ -326,7 +326,7 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 62 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
+Verified at HEAD: 63 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
 *(11 August — **sharded screening design**. One curated document
 (`docs/architecture/sharded-screening-design.md`), explicitly marked NOT YET
 BUILT: a design-only record of how the adverse-media coverage collapse would be
