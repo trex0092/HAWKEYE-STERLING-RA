@@ -26,10 +26,16 @@ on:
     - cron: '27 0 * * 5'
   workflow_dispatch:
 
+# Least privilege at the top level; the job widens to what Fortify's action
+# needs (security-events: write to upload SARIF, actions: read).
+permissions:
+  contents: read
+
 jobs:
   Fortify-AST-Scan:
     # Use the appropriate runner for building your source code. Ensure dev tools required to build your code are present and configured appropriately (MSBuild, Python, etc).
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       actions: read
       contents: read
@@ -37,9 +43,20 @@ jobs:
       # pull-requests: write     # Required if DO_PR_COMMENT is set to true
 
     steps:
+      - name: Harden the runner (egress audit)
+        # Stays audit: Fortify on Demand / SSC / ScanCentral endpoints are
+        # configured per-deployment via secrets/vars (FOD_URL, SSC_URL), so a
+        # fixed allow-list can't be enumerated here.
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
       # Check out source code
       - name: Check Out Source Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       # Perform SAST and/or SCA scan via Fortify on Demand/Fortify Hosted/ScanCentral SAST/Debricked. Based on
       # configuration, the Fortify GitHub Action can optionally set up the application version/release, generate
