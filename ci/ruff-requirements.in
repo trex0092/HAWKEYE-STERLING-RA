@@ -1,3 +1,3 @@
 # ruff pin for the Python lint job in .github/workflows/lint.yml — hash-locked.
 # Regenerate: pip-compile --generate-hashes --output-file=ci/ruff-requirements.txt ci/ruff-requirements.in
-ruff>=0.16.4
+ruff>=0.16.5
