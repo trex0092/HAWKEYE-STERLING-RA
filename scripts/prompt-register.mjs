@@ -31,11 +31,16 @@ export function loadRegister(root = ROOT) {
    so the fingerprint covers the whole declaration exactly as it reads on disk. */
 export function extractRegion(src, region) {
   if (!region || !region.from || !region.to) return { ok: false, reason: 'row has no region anchors' };
-  const start = src.indexOf(region.from);
+  /* Git may materialise a CRLF worktree on Windows even though the tracked
+     blobs and the register's literal anchors use LF. Resolve anchors against a
+     canonical representation, just as fingerprint() already does, otherwise
+     an LF anchor such as "\n\n" reports a false missing prompt region. */
+  const canonical = String(src).replace(/\r\n/g, '\n');
+  const start = canonical.indexOf(region.from);
   if (start === -1) return { ok: false, reason: 'start anchor not found: ' + JSON.stringify(region.from) };
-  const end = src.indexOf(region.to, start + region.from.length);
+  const end = canonical.indexOf(region.to, start + region.from.length);
   if (end === -1) return { ok: false, reason: 'end anchor not found after start: ' + JSON.stringify(region.to) };
-  return { ok: true, text: src.slice(start, end + region.to.length) };
+  return { ok: true, text: canonical.slice(start, end + region.to.length) };
 }
 
 /* Line endings are normalised so a checkout on a different platform cannot
