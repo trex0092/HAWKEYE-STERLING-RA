@@ -1,0 +1,36 @@
+{
+ "run_id": "34036684083",
+ "run_attempt": "1",
+ "started_utc": "2026-09-06T13:38:52Z",
+ "updated_utc": "2026-09-06T13:48:19Z",
+ "elapsed_s": 567.0,
+ "current_phase": "enrichment-start",
+ "phases": [
+  {
+   "phase": "customers-loaded",
+   "at_utc": "2026-09-06T13:38:52Z",
+   "elapsed_s": 0.0,
+   "detail": {
+    "customers": 336
+   }
+  },
+  {
+   "phase": "sanctions-done",
+   "at_utc": "2026-09-06T13:48:19Z",
+   "elapsed_s": 567.0,
+   "detail": {
+    "flagged": 48,
+    "clear": 308
+   }
+  },
+  {
+   "phase": "enrichment-start",
+   "at_utc": "2026-09-06T13:48:19Z",
+   "elapsed_s": 567.0,
+   "detail": {
+    "subjects": 952,
+    "workers": 8
+   }
+  }
+ ]
+}
