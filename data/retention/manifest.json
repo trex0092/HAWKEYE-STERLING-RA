@@ -110,5 +110,145 @@
     "bytes": 1883,
     "updated": "2026-07-24",
     "recordedAt": "2026-07-24T07:39:23.209Z"
+  },
+  {
+    "file": "sanctions-state-2026-07-25.json",
+    "sha256": "19da247282ce4518296dce4de60d2cc76c61e9c9f929a27f66324fd916de28e8",
+    "bytes": 1883,
+    "updated": "2026-07-25",
+    "recordedAt": "2026-07-25T07:25:12.549Z"
+  },
+  {
+    "file": "sanctions-state-2026-07-27.json",
+    "sha256": "f8a1d65a2cf2718952deba7e5b639eaa31b48279ceaf1e6ae67fee10cf16c82e",
+    "bytes": 2183,
+    "updated": "2026-07-27",
+    "recordedAt": "2026-07-27T08:41:29.300Z"
+  },
+  {
+    "file": "sanctions-state-2026-07-28.json",
+    "sha256": "c0d49ae6b5c686791f324ed65d60a5c87e689b4cd4322f2ebe6e709d74f90e39",
+    "bytes": 2269,
+    "updated": "2026-07-28",
+    "recordedAt": "2026-07-28T07:45:12.628Z"
+  },
+  {
+    "file": "sanctions-state-2026-07-29.json",
+    "sha256": "d8706979f5a318b867339384e00c1325bb0594cd81de69173aaccf387eee33fa",
+    "bytes": 2269,
+    "updated": "2026-07-29",
+    "recordedAt": "2026-07-29T07:50:12.123Z"
+  },
+  {
+    "file": "sanctions-state-2026-07-30.json",
+    "sha256": "6ba4c94985a724ec64f6e20635b29da900ec555f12ca45239a2325ef771c0acc",
+    "bytes": 2269,
+    "updated": "2026-07-30",
+    "recordedAt": "2026-07-30T07:40:38.510Z"
+  },
+  {
+    "file": "sanctions-state-2026-07-31.json",
+    "sha256": "c36d27c5dbb8a3d5e40d16d8289a187f7c2c707f185ae44b69ac39d7b3eacef7",
+    "bytes": 2422,
+    "updated": "2026-07-31",
+    "recordedAt": "2026-07-31T08:06:40.279Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-01.json",
+    "sha256": "e9a0171e0e5351c5c4eb8a7ef34f584341eb08287bb190795913b7566a2d7f0a",
+    "bytes": 2269,
+    "updated": "2026-08-01",
+    "recordedAt": "2026-08-01T07:35:33.176Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-03.json",
+    "sha256": "88dc888442a30b318454a16f17b0d665fcbee03759762b6b69611bfbfc3b4950",
+    "bytes": 2269,
+    "updated": "2026-08-03",
+    "recordedAt": "2026-08-03T08:38:38.350Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-06.json",
+    "sha256": "ffc301cce9cab4bbcb0a11b469d77d1c7b587b3dd9c7fdeaa359ea4d7dfa69ba",
+    "bytes": 2269,
+    "updated": "2026-08-06",
+    "recordedAt": "2026-08-06T07:46:41.180Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-07.json",
+    "sha256": "a9215e6085bfd5adf54ba76ab2d7dacf24053d534d6d19f768ae518ba3636ac3",
+    "bytes": 2269,
+    "updated": "2026-08-07",
+    "recordedAt": "2026-08-07T06:13:56.448Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-08.json",
+    "sha256": "302880312b08dbe2003ece889b4f4726abc9ca8d21c84813f44e2e46bf5e8941",
+    "bytes": 2269,
+    "updated": "2026-08-08",
+    "recordedAt": "2026-08-08T05:51:53.117Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-14.json",
+    "sha256": "60763f27a27b0186d1eeaf629afaa76355f6a7ee38ccf546289ca8eab29abb7b",
+    "bytes": 2269,
+    "updated": "2026-08-14",
+    "recordedAt": "2026-08-14T06:22:37.080Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-15.json",
+    "sha256": "6e7ce6996c1e11cbc40a05776ddf603bb501f30d651fc900c458970cb3b53f4d",
+    "bytes": 2269,
+    "updated": "2026-08-15",
+    "recordedAt": "2026-08-15T05:35:20.008Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-19.json",
+    "sha256": "6c4d0c7a89e46ef8086cbbbfa528e80683257c00923eae3d0a9d07250d792f19",
+    "bytes": 2269,
+    "updated": "2026-08-19",
+    "recordedAt": "2026-08-19T05:39:14.413Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-21.json",
+    "sha256": "9fa6b010823519d7c72a704b06aeb4205ea76a9a4cf09bbf2a2a320e97f17be0",
+    "bytes": 2269,
+    "updated": "2026-08-21",
+    "recordedAt": "2026-08-21T05:41:34.632Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-25.json",
+    "sha256": "c3c1f3dced6f78298b05622db7a967a49b7371f77937c7df210b48325afaf7ce",
+    "bytes": 2269,
+    "updated": "2026-08-25",
+    "recordedAt": "2026-08-25T05:40:44.195Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-27.json",
+    "sha256": "3fc64380d821b6d24ab505f9e59b8ab97c60e02b3630838724ea8a5c85b347aa",
+    "bytes": 2269,
+    "updated": "2026-08-27",
+    "recordedAt": "2026-08-27T16:24:01.092Z"
+  },
+  {
+    "file": "sanctions-state-2026-08-28.json",
+    "sha256": "49cb3ef0965570fcad78412404271a35fc8808fa94d3b3cf2c5d133cdaed5220",
+    "bytes": 2269,
+    "updated": "2026-08-28",
+    "recordedAt": "2026-08-28T17:22:02.365Z"
+  },
+  {
+    "file": "sanctions-state-2026-09-04.json",
+    "sha256": "2e1c726d13015eb129fe93ec85195aaf9cd88f54d106991db6c8a2a03f9c3d47",
+    "bytes": 2269,
+    "updated": "2026-09-04",
+    "recordedAt": "2026-09-04T09:31:54.220Z"
+  },
+  {
+    "file": "sanctions-state-2026-09-05.json",
+    "sha256": "76dae1fdaf5cd087e17235e9ecce376cd2618c6d3afda800e72a0a0c656d1200",
+    "bytes": 2320,
+    "updated": "2026-09-05",
+    "recordedAt": "2026-09-05T08:58:48.516Z"
   }
 ]

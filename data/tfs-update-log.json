@@ -142,10 +142,16 @@
       "detectedAt": "2026-07-24T07:39:16.735Z",
       "prevCount": 19170,
       "newCount": 19242,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30076180913,
+        "startedAt": "2026-07-24T07:39:20Z"
+      },
+      "status": "complete",
       "chainPrev": "6cb376144d05df6da834054f1bf8f6d12e1f0d734adf1f21ef9047b5e701ae8d",
-      "chainHash": "27c2db1772f3358d1bb4cdd1f053dcf868f3dd116e503747ea72a682e2873123"
+      "chainHash": "27c2db1772f3358d1bb4cdd1f053dcf868f3dd116e503747ea72a682e2873123",
+      "latencyHours": 0,
+      "resolutionHash": "762dc9af3055a6b827f1e5dff9d9daef9a74894aadc6edd2f1ccc8c1b750776b"
     },
     {
       "id": "ofac-consolidated",
@@ -155,10 +161,16 @@
       "detectedAt": "2026-07-24T07:39:16.735Z",
       "prevCount": 442,
       "newCount": null,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30076180913,
+        "startedAt": "2026-07-24T07:39:20Z"
+      },
+      "status": "complete",
       "chainPrev": "27c2db1772f3358d1bb4cdd1f053dcf868f3dd116e503747ea72a682e2873123",
-      "chainHash": "a68b5b600b67a7236094ee1b3de685e3ca96600c3bcd9d8d3e2f9784c51ef897"
+      "chainHash": "a68b5b600b67a7236094ee1b3de685e3ca96600c3bcd9d8d3e2f9784c51ef897",
+      "latencyHours": 0,
+      "resolutionHash": "622003a0926666d9f12d8caaa9c0c39092b142e34f38a812d31f7b106a5b5771"
     },
     {
       "id": "un-consolidated",
@@ -168,10 +180,866 @@
       "detectedAt": "2026-07-24T07:39:16.735Z",
       "prevCount": 1010,
       "newCount": 1011,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30076180913,
+        "startedAt": "2026-07-24T07:39:20Z"
+      },
+      "status": "complete",
       "chainPrev": "a68b5b600b67a7236094ee1b3de685e3ca96600c3bcd9d8d3e2f9784c51ef897",
-      "chainHash": "a6d057e602ddbcc3ba27c3f25df4fea76621bc9fb879d14909dc63d1b91d9a6f"
+      "chainHash": "a6d057e602ddbcc3ba27c3f25df4fea76621bc9fb879d14909dc63d1b91d9a6f",
+      "latencyHours": 0,
+      "resolutionHash": "7b8116ac5d06c580142026af53f82bc7e4ca5e111addd9e427b7551698a9e160"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-25T07:25:05.772Z",
+      "prevCount": 19242,
+      "newCount": 19255,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30149266798,
+        "startedAt": "2026-07-25T07:25:09Z"
+      },
+      "status": "complete",
+      "chainPrev": "a6d057e602ddbcc3ba27c3f25df4fea76621bc9fb879d14909dc63d1b91d9a6f",
+      "chainHash": "194ca2d0eadeb1eca869cbcd0718ae0c56497837adceb8f71a70307cff1bb506",
+      "latencyHours": 0,
+      "resolutionHash": "6efc244e4b13d07455ce6cb3e5b6cfc57fe1f07a48d4a80f25be2e1bb54b408f"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-25T07:25:05.772Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30149266798,
+        "startedAt": "2026-07-25T07:25:09Z"
+      },
+      "status": "complete",
+      "chainPrev": "194ca2d0eadeb1eca869cbcd0718ae0c56497837adceb8f71a70307cff1bb506",
+      "chainHash": "c6ffb3b51f9d0a7c7066ac6c1c5f06f2e7c835bbbd41cd9f07c84f3b8ec580d7",
+      "latencyHours": 0,
+      "resolutionHash": "cfeb11ae73bddc5979a08c2e0cdb2b159760b1e5c57634782797587f524806bf"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "first snapshot",
+      "publicationDate": null,
+      "detectedAt": "2026-07-27T08:41:25.629Z",
+      "prevCount": null,
+      "newCount": 20351,
+      "rescreen": null,
+      "status": "baseline",
+      "chainPrev": "c6ffb3b51f9d0a7c7066ac6c1c5f06f2e7c835bbbd41cd9f07c84f3b8ec580d7",
+      "chainHash": "ff4e107a345c22e977f7f223bcca72f47f05875a52bafea2ae8af090fc741d75",
+      "resolutionHash": "35454aae86ca7a174da0c5fd2d1826357c5cc2ca6a54baa7a2872fd53936c97d"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-28T07:45:05.509Z",
+      "prevCount": 19255,
+      "newCount": 19158,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30339608620,
+        "startedAt": "2026-07-28T07:45:09Z"
+      },
+      "status": "complete",
+      "chainPrev": "ff4e107a345c22e977f7f223bcca72f47f05875a52bafea2ae8af090fc741d75",
+      "chainHash": "9e88848bdb0df61cc155380097a200e67d0beafd2184dbd3c8f4529224fd1702",
+      "latencyHours": 0,
+      "resolutionHash": "7594183a6c9190ef0cf10bae4791c36ea4f9a2b6f258a401eba90aebdbab0426"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-28T07:45:05.509Z",
+      "prevCount": 20351,
+      "newCount": 20160,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30339608620,
+        "startedAt": "2026-07-28T07:45:09Z"
+      },
+      "status": "complete",
+      "chainPrev": "9e88848bdb0df61cc155380097a200e67d0beafd2184dbd3c8f4529224fd1702",
+      "chainHash": "fb036b151022b704ba630b88d6f14a2dd1907871df53028bbd056d19051608ab",
+      "latencyHours": 0,
+      "resolutionHash": "193ddcb5d8b15b4b5d9daac052809c4a9f8856023625c70b766a8b209dadd09b"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-28T07:45:05.509Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30339608620,
+        "startedAt": "2026-07-28T07:45:09Z"
+      },
+      "status": "complete",
+      "chainPrev": "fb036b151022b704ba630b88d6f14a2dd1907871df53028bbd056d19051608ab",
+      "chainHash": "cf7364ccad0d0d057ec95cb79d33d95cd426556da25c4836411c70f446f5b36c",
+      "latencyHours": 0,
+      "resolutionHash": "c49b64b7e9703b13705aef4e8753a5ddc1ca78f1f20cdb138ded63ba8a1d3621"
+    },
+    {
+      "id": "eu-fsf",
+      "list": "EU — Consolidated financial sanctions list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-29T07:50:04.878Z",
+      "prevCount": 42474,
+      "newCount": 42474,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30433124703,
+        "startedAt": "2026-07-29T07:50:09Z"
+      },
+      "status": "complete",
+      "chainPrev": "cf7364ccad0d0d057ec95cb79d33d95cd426556da25c4836411c70f446f5b36c",
+      "chainHash": "e676a9a515c6cb5be64e223bfbacbfbbc1e346b5d0053d25b32bbd86d8873868",
+      "latencyHours": 0,
+      "resolutionHash": "2c2d3c51d3b5389cb59ca84624a9137fccf1b34e4592c1f5cf40373dc603c10a"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-30T07:40:30.337Z",
+      "prevCount": 19158,
+      "newCount": 19176,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30523718981,
+        "startedAt": "2026-07-30T07:40:35Z"
+      },
+      "status": "complete",
+      "chainPrev": "e676a9a515c6cb5be64e223bfbacbfbbc1e346b5d0053d25b32bbd86d8873868",
+      "chainHash": "2446a3c151af789f80e9075cd270ae34bd5551962911aa0d70253335da841f2d",
+      "latencyHours": 0,
+      "resolutionHash": "5194f459f330cbd29cf13ab7ff8de75c6ee3bca5982519b838312566ea41abd2"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-30T07:40:30.337Z",
+      "prevCount": 20160,
+      "newCount": 20164,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30523718981,
+        "startedAt": "2026-07-30T07:40:35Z"
+      },
+      "status": "complete",
+      "chainPrev": "2446a3c151af789f80e9075cd270ae34bd5551962911aa0d70253335da841f2d",
+      "chainHash": "bfe66d50cda69d1e1ff514273ad3f1c76c690dfd038f19c3ea8167c4d0614521",
+      "latencyHours": 0,
+      "resolutionHash": "618ad286b98d70fc520482320fd6547721e9f81c923b8f52a5035e6164fab1c2"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-07-30T07:40:30.337Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30523718981,
+        "startedAt": "2026-07-30T07:40:35Z"
+      },
+      "status": "complete",
+      "chainPrev": "bfe66d50cda69d1e1ff514273ad3f1c76c690dfd038f19c3ea8167c4d0614521",
+      "chainHash": "1577a82abdc06ac3509124a2c2232cc85a676ce1661c2ba104bda5c033d5263b",
+      "latencyHours": 0,
+      "resolutionHash": "f3ac1b5829b31c18ca07d4913294aaaff5e54dd221ea04d6074fb6d507626385"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-07-31",
+      "detectedAt": "2026-07-31T08:06:31.822Z",
+      "prevCount": 1011,
+      "newCount": 1011,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30615144240,
+        "startedAt": "2026-07-31T08:06:37Z"
+      },
+      "status": "complete",
+      "chainPrev": "1577a82abdc06ac3509124a2c2232cc85a676ce1661c2ba104bda5c033d5263b",
+      "chainHash": "c082b07af6144f457cf65590fb0417e4fb64b0b7315baa7c23c1493df9a32440",
+      "latencyHours": 0,
+      "resolutionHash": "762bcffdbe4e61bdcd78fd55f2085f7bebdfa9f45591ef3aa3c9e96a1e827565"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-01T07:35:25.402Z",
+      "prevCount": 19176,
+      "newCount": 19182,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30690504811,
+        "startedAt": "2026-08-01T07:49:37Z"
+      },
+      "status": "complete",
+      "chainPrev": "c082b07af6144f457cf65590fb0417e4fb64b0b7315baa7c23c1493df9a32440",
+      "chainHash": "f79777dc2716cf5034c14a874a05738a97d69c0b97c344678c1450e96834dc68",
+      "latencyHours": 0.2,
+      "resolutionHash": "00ff40e3ffd70e58b4f63028f05c4f91daf81172b761168b0922e7ac75c907d0"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-01T07:35:25.402Z",
+      "prevCount": 20164,
+      "newCount": 20170,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30690504811,
+        "startedAt": "2026-08-01T07:49:37Z"
+      },
+      "status": "complete",
+      "chainPrev": "f79777dc2716cf5034c14a874a05738a97d69c0b97c344678c1450e96834dc68",
+      "chainHash": "357ec5cf3c422813b8252774b1d507f48f16ee7561d886f62384831670f471dd",
+      "latencyHours": 0.2,
+      "resolutionHash": "581264dd69113d24c263737ffa4d67fad395fa9b1772537462df3200e7807f8d"
+    },
+    {
+      "id": "eu-fsf",
+      "list": "EU — Consolidated financial sanctions list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-01T07:35:25.402Z",
+      "prevCount": 42474,
+      "newCount": 43874,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30690504811,
+        "startedAt": "2026-08-01T07:49:37Z"
+      },
+      "status": "complete",
+      "chainPrev": "357ec5cf3c422813b8252774b1d507f48f16ee7561d886f62384831670f471dd",
+      "chainHash": "c98a7f14bbd82de8cb5dd070e215d4ddf44152c4c77b9ba4f62005ecc56bfc4b",
+      "latencyHours": 0.2,
+      "resolutionHash": "6a59fa81e58033463a7ac85162ad0fb19989f67e33a331f440fb86605e45fc63"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-08-03",
+      "detectedAt": "2026-08-03T08:38:31.159Z",
+      "prevCount": 1011,
+      "newCount": 1011,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 30798861393,
+        "startedAt": "2026-08-03T08:49:06Z"
+      },
+      "status": "complete",
+      "chainPrev": "c98a7f14bbd82de8cb5dd070e215d4ddf44152c4c77b9ba4f62005ecc56bfc4b",
+      "chainHash": "c45427875608c6ae08b52ecbb02de283c0945bcfd2b6495c10a0c851085e2b8f",
+      "latencyHours": 0.2,
+      "resolutionHash": "c27c4be1fc08741b045c6251b715bb31c5fa54fefbf65463a16ef425ceb4640c"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-06T07:46:34.682Z",
+      "prevCount": 19182,
+      "newCount": 19179,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31082224178,
+        "startedAt": "2026-08-06T07:46:38Z"
+      },
+      "status": "complete",
+      "chainPrev": "c45427875608c6ae08b52ecbb02de283c0945bcfd2b6495c10a0c851085e2b8f",
+      "chainHash": "bb5a9bbb85a5bdef1eaeafa662ab9139bdf13a5d3566df96be17ace1cc454a0d",
+      "latencyHours": 0,
+      "resolutionHash": "f1010e220c60c606729c961fa0905aedb905b461229c896c18e7f088cedad1b7"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-06T07:46:34.682Z",
+      "prevCount": 20170,
+      "newCount": 20168,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31082224178,
+        "startedAt": "2026-08-06T07:46:38Z"
+      },
+      "status": "complete",
+      "chainPrev": "bb5a9bbb85a5bdef1eaeafa662ab9139bdf13a5d3566df96be17ace1cc454a0d",
+      "chainHash": "f77afed8b63a29c4d02d040058d37b2750d332e33c8f6f332301998497dc437b",
+      "latencyHours": 0,
+      "resolutionHash": "7476c09d1cd4ec8c74f6360e9628df9a3f091d00d952b914972a9de82d13434b"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-06T07:46:34.682Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31082224178,
+        "startedAt": "2026-08-06T07:46:38Z"
+      },
+      "status": "complete",
+      "chainPrev": "f77afed8b63a29c4d02d040058d37b2750d332e33c8f6f332301998497dc437b",
+      "chainHash": "435c16079cc598d6052d8919819b52651720c38bc7dc54b1882255ac256a1c76",
+      "latencyHours": 0,
+      "resolutionHash": "c41101a744b0cbdf93d13cfeb89a6a03262381dfac0f7835c26151f74a59c82c"
+    },
+    {
+      "id": "eu-fsf",
+      "list": "EU — Consolidated financial sanctions list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-06T07:46:34.682Z",
+      "prevCount": 43874,
+      "newCount": 43851,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31082224178,
+        "startedAt": "2026-08-06T07:46:38Z"
+      },
+      "status": "complete",
+      "chainPrev": "435c16079cc598d6052d8919819b52651720c38bc7dc54b1882255ac256a1c76",
+      "chainHash": "30f16cfb796db76b945bf6f9ead5a25479bf22e6b6c2304de00c046cf088d4aa",
+      "latencyHours": 0,
+      "resolutionHash": "2f1fb5c2a45cda1d0bd0eab1e84fd2b61760584f0419fb93bff689d17172df18"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-07T06:13:48.178Z",
+      "prevCount": 19179,
+      "newCount": 19190,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31153218268,
+        "startedAt": "2026-08-07T06:13:52Z"
+      },
+      "status": "complete",
+      "chainPrev": "30f16cfb796db76b945bf6f9ead5a25479bf22e6b6c2304de00c046cf088d4aa",
+      "chainHash": "37faeb5947bcfb525563c3e25260c54e9c095629022a2538514dd227866171a0",
+      "latencyHours": 0,
+      "resolutionHash": "881eaa61d405e3921656ae81d361d3d60eac4e2e0dbd045c363a94b38c1e86a5"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-07T06:13:48.178Z",
+      "prevCount": 20168,
+      "newCount": 20178,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31153218268,
+        "startedAt": "2026-08-07T06:13:52Z"
+      },
+      "status": "complete",
+      "chainPrev": "37faeb5947bcfb525563c3e25260c54e9c095629022a2538514dd227866171a0",
+      "chainHash": "7f5d7242e3eaa59b0fc65dc0ad635c5c2831e06fad31d238c6e6840a9b0eeb00",
+      "latencyHours": 0,
+      "resolutionHash": "387d4a787db60712a4347570aa94236bc2de7f32c558b8e6494ec2e24545a1ac"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-08T05:51:46.004Z",
+      "prevCount": 19190,
+      "newCount": 19200,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31242630420,
+        "startedAt": "2026-08-08T05:51:49Z"
+      },
+      "status": "complete",
+      "chainPrev": "7f5d7242e3eaa59b0fc65dc0ad635c5c2831e06fad31d238c6e6840a9b0eeb00",
+      "chainHash": "e9d5468cc839e6aab024624fe65e94ddab091bfae1f9d94869977d37d4d86ed9",
+      "latencyHours": 0,
+      "resolutionHash": "43fb72c79894a76924caf60587fe8a23afe843608e3b635cb9652b490753a9ab"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-08T05:51:46.004Z",
+      "prevCount": 20178,
+      "newCount": 20184,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31242630420,
+        "startedAt": "2026-08-08T05:51:49Z"
+      },
+      "status": "complete",
+      "chainPrev": "e9d5468cc839e6aab024624fe65e94ddab091bfae1f9d94869977d37d4d86ed9",
+      "chainHash": "8caac495434f58f6439ce57154c938406477dbb3f92b46bf8b0dd0848bf2526c",
+      "latencyHours": 0,
+      "resolutionHash": "b09d5784eb394cfc9b83974a9badc7b065a6d955c3e0f220cd4ac1825b663cc4"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-08T05:51:46.004Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31242630420,
+        "startedAt": "2026-08-08T05:51:49Z"
+      },
+      "status": "complete",
+      "chainPrev": "8caac495434f58f6439ce57154c938406477dbb3f92b46bf8b0dd0848bf2526c",
+      "chainHash": "81354b3af273ec5df4338abc602da6adc178bbe1e3d7fcdb5d959a72a5a0b63b",
+      "latencyHours": 0,
+      "resolutionHash": "595b5cc5d961117decb87a353fccc7be57b8f1957182a058509fd747782e2de7"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-08-13",
+      "detectedAt": "2026-08-14T06:22:28.871Z",
+      "prevCount": 1011,
+      "newCount": 1011,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31776062015,
+        "startedAt": "2026-08-14T06:22:32Z"
+      },
+      "status": "complete",
+      "chainPrev": "81354b3af273ec5df4338abc602da6adc178bbe1e3d7fcdb5d959a72a5a0b63b",
+      "chainHash": "cd4eb68daed1b928c754eb42f4b0117f5d2a2f85c9eb23e6738dcf79d087c5c5",
+      "latencyHours": 0,
+      "resolutionHash": "0f22ff5829f25edb08dc72e404d589311953ae0836fc83fa3efe2a98c582d35d"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-08-14",
+      "detectedAt": "2026-08-15T05:35:07.025Z",
+      "prevCount": 1011,
+      "newCount": 1011,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 31867311415,
+        "startedAt": "2026-08-15T05:35:12Z"
+      },
+      "status": "complete",
+      "chainPrev": "cd4eb68daed1b928c754eb42f4b0117f5d2a2f85c9eb23e6738dcf79d087c5c5",
+      "chainHash": "4b201c59be9bb1aa7d66d23c4874556c5c6c489d8cd942100e706370dcc75438",
+      "latencyHours": 0,
+      "resolutionHash": "bccefe77993c113727d61f73dde2a59d0a85bbac26799c54a9acc63996929b1d"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-19T05:39:06.358Z",
+      "prevCount": 19200,
+      "newCount": 19203,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32220227117,
+        "startedAt": "2026-08-19T05:39:10Z"
+      },
+      "status": "complete",
+      "chainPrev": "4b201c59be9bb1aa7d66d23c4874556c5c6c489d8cd942100e706370dcc75438",
+      "chainHash": "5a85a5e3e907b72a11121a600548cf6541b0d606725e87cf5afebacf09fa15b8",
+      "latencyHours": 0,
+      "resolutionHash": "d054ce3a84b7582d27ea72e049067e0ecae192aee1beb4e1f069916c47a50b52"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-19T05:39:06.358Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32220227117,
+        "startedAt": "2026-08-19T05:39:10Z"
+      },
+      "status": "complete",
+      "chainPrev": "5a85a5e3e907b72a11121a600548cf6541b0d606725e87cf5afebacf09fa15b8",
+      "chainHash": "4945a438458910401e7cb857ec78d419e2c4f709c1a30f629656c0a659fc2253",
+      "latencyHours": 0,
+      "resolutionHash": "505845f3ed86561a49c7f1f7bdaa9f64c072c337001a10823ac0dc408917b3a8"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-08-18",
+      "detectedAt": "2026-08-19T05:39:06.358Z",
+      "prevCount": 1011,
+      "newCount": 1011,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32220227117,
+        "startedAt": "2026-08-19T05:39:10Z"
+      },
+      "status": "complete",
+      "chainPrev": "4945a438458910401e7cb857ec78d419e2c4f709c1a30f629656c0a659fc2253",
+      "chainHash": "2c1877c55a699372d219f087488c7d717fd6d949a648d710a36ebc9786a04b5b",
+      "latencyHours": 0,
+      "resolutionHash": "23188e1decadf7963d024510c72cb2e381ac3884a0e56a009e93845920400d9d"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-21T05:41:26.736Z",
+      "prevCount": 19203,
+      "newCount": 19250,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32451477853,
+        "startedAt": "2026-08-21T05:41:30Z"
+      },
+      "status": "complete",
+      "chainPrev": "2c1877c55a699372d219f087488c7d717fd6d949a648d710a36ebc9786a04b5b",
+      "chainHash": "3d13e31b3c5cd2548238c6c979c7af8a6abd2afaa4d7761ada90eb36a8d57bbc",
+      "latencyHours": 0,
+      "resolutionHash": "410f117507722c27213a27218a09472a86dc05ffe85e87281a65fa2d27fc7b65"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-21T05:41:26.736Z",
+      "prevCount": 20184,
+      "newCount": 20195,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32451477853,
+        "startedAt": "2026-08-21T05:41:30Z"
+      },
+      "status": "complete",
+      "chainPrev": "3d13e31b3c5cd2548238c6c979c7af8a6abd2afaa4d7761ada90eb36a8d57bbc",
+      "chainHash": "54d0d4b0ac1e9346aeeb11bb4c06099866ef6ac17155c07ff3ec26e97388b567",
+      "latencyHours": 0,
+      "resolutionHash": "350e1c8f9bdb9c7badb5ab2ce28d81c7b9058e40e14be403675813cbe3fd359a"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-21T05:41:26.736Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32451477853,
+        "startedAt": "2026-08-21T05:41:30Z"
+      },
+      "status": "complete",
+      "chainPrev": "54d0d4b0ac1e9346aeeb11bb4c06099866ef6ac17155c07ff3ec26e97388b567",
+      "chainHash": "80efae6a398346fa59c62fd49c8412835c66cfcdee649c2f088c7d33206f36e9",
+      "latencyHours": 0,
+      "resolutionHash": "05f83099120a7484b02192faaa231eea30adc0bdc038fc52bcf98c74213e967c"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-25T05:40:34.149Z",
+      "prevCount": 19250,
+      "newCount": 19315,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32813776125,
+        "startedAt": "2026-08-25T05:40:39Z"
+      },
+      "status": "complete",
+      "chainPrev": "80efae6a398346fa59c62fd49c8412835c66cfcdee649c2f088c7d33206f36e9",
+      "chainHash": "67872c437e1ffb5d29f6832fc53a99ff461dd16428581718097f87328f28c63c",
+      "latencyHours": 0,
+      "resolutionHash": "ef84fbeca668c24e9b9950472b170d7d4aa12965be194641d1a3e9fac3120c7f"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-25T05:40:34.149Z",
+      "prevCount": 20195,
+      "newCount": 20145,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32813776125,
+        "startedAt": "2026-08-25T05:40:39Z"
+      },
+      "status": "complete",
+      "chainPrev": "67872c437e1ffb5d29f6832fc53a99ff461dd16428581718097f87328f28c63c",
+      "chainHash": "9c43b8e3cd34100320385071e7ed53b79a5dc34891c8273c1ce483929ea4b706",
+      "latencyHours": 0,
+      "resolutionHash": "cd68275f31ba58c1e67a7b5fcf8d01601bdf3a0655c29829d37a841cf3025afd"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-25T05:40:34.149Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 32813776125,
+        "startedAt": "2026-08-25T05:40:39Z"
+      },
+      "status": "complete",
+      "chainPrev": "9c43b8e3cd34100320385071e7ed53b79a5dc34891c8273c1ce483929ea4b706",
+      "chainHash": "36abeed79a4dac5e98135bf7f8b676e0d96c1413dd597c963838cfd71697b349",
+      "latencyHours": 0,
+      "resolutionHash": "37e844ede13b81b235ef94e76a467f2cec902b5fc76dbf482bc96627f01f0e32"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-27T16:23:50.494Z",
+      "prevCount": 19315,
+      "newCount": 19320,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33093002275,
+        "startedAt": "2026-08-27T16:23:55Z"
+      },
+      "status": "complete",
+      "chainPrev": "36abeed79a4dac5e98135bf7f8b676e0d96c1413dd597c963838cfd71697b349",
+      "chainHash": "8f5c987267b87bfcbc74d884e0d60dc5445d1411e5f23fee3c2339a76c9cc1af",
+      "latencyHours": 0,
+      "resolutionHash": "b43e98a6e862b21df218574d294b13abbd3bf27d26cbe6f4637e98c027b57053"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-27T16:23:50.494Z",
+      "prevCount": 20145,
+      "newCount": 20148,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33093002275,
+        "startedAt": "2026-08-27T16:23:55Z"
+      },
+      "status": "complete",
+      "chainPrev": "8f5c987267b87bfcbc74d884e0d60dc5445d1411e5f23fee3c2339a76c9cc1af",
+      "chainHash": "21f17ac3ddcc72ae62b33a920a33b32de7e422c82244e7383aa95cee9ab4ff3c",
+      "latencyHours": 0,
+      "resolutionHash": "50019f09a7b764869c67b47f664e59a7aaabefa265c21c8f99a1660e206f9765"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-08-28T17:21:51.141Z",
+      "prevCount": 19320,
+      "newCount": 19322,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33194331703,
+        "startedAt": "2026-08-28T17:21:56Z"
+      },
+      "status": "complete",
+      "chainPrev": "21f17ac3ddcc72ae62b33a920a33b32de7e422c82244e7383aa95cee9ab4ff3c",
+      "chainHash": "2276cc532989a86c2d921bf9581dad6b30fb65035767fd5aaa2344b0f77886bb",
+      "latencyHours": 0,
+      "resolutionHash": "3016086705d6532280f1f3d453145bb1ee6715d4aad49bb1e68ff860e49e2314"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-08-27",
+      "detectedAt": "2026-08-28T17:21:51.141Z",
+      "prevCount": 1011,
+      "newCount": 1011,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33194331703,
+        "startedAt": "2026-08-28T17:21:56Z"
+      },
+      "status": "complete",
+      "chainPrev": "2276cc532989a86c2d921bf9581dad6b30fb65035767fd5aaa2344b0f77886bb",
+      "chainHash": "fdad49c32eb03f63a700a4d4491c5264322cf035074452fcc3103e5213b065b2",
+      "latencyHours": 0,
+      "resolutionHash": "770abddcf5721d627a19cd45b3ebe3f97966b09d848f7e4a1691e5d8786ae505"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-09-04T09:31:44.309Z",
+      "prevCount": 19322,
+      "newCount": 19327,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33858796310,
+        "startedAt": "2026-09-04T09:31:49Z"
+      },
+      "status": "complete",
+      "chainPrev": "fdad49c32eb03f63a700a4d4491c5264322cf035074452fcc3103e5213b065b2",
+      "chainHash": "6481c2a62ca9641734e94d554bcd4f3de9436b571f328ef15667d725aa97e20c",
+      "latencyHours": 0,
+      "resolutionHash": "73800f458e9405129d98f45cc0b06a20e6b866c4032bfa8fd7427d6351ad79b6"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-09-04T09:31:44.309Z",
+      "prevCount": 20148,
+      "newCount": 20145,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33858796310,
+        "startedAt": "2026-09-04T09:31:49Z"
+      },
+      "status": "complete",
+      "chainPrev": "6481c2a62ca9641734e94d554bcd4f3de9436b571f328ef15667d725aa97e20c",
+      "chainHash": "65cf0920b1bc3ed49300bf12d4f9a76b931809d5beb8425cc6b2bffd89962c03",
+      "latencyHours": 0,
+      "resolutionHash": "bc4451d780d6451b96e25cbd55a57a5335f6b3ebde2a9c700641b169c6e54500"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-09-05T08:58:40.625Z",
+      "prevCount": 19327,
+      "newCount": 19330,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33956718747,
+        "startedAt": "2026-09-05T08:58:44Z"
+      },
+      "status": "complete",
+      "chainPrev": "65cf0920b1bc3ed49300bf12d4f9a76b931809d5beb8425cc6b2bffd89962c03",
+      "chainHash": "e851ee6e37e7e6c3dba10076f3738ac1f248f937ee83a1bece6776bd9d0df118",
+      "latencyHours": 0,
+      "resolutionHash": "8efe20c6da64ac2d4eebda778c187432562ca45a2293b628596d75459bfe6181"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-09-05T08:58:40.625Z",
+      "prevCount": 20145,
+      "newCount": 20146,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33956718747,
+        "startedAt": "2026-09-05T08:58:44Z"
+      },
+      "status": "complete",
+      "chainPrev": "e851ee6e37e7e6c3dba10076f3738ac1f248f937ee83a1bece6776bd9d0df118",
+      "chainHash": "7779cef409d491d923f07a95ae0a421b72c9166f4b95331be97f9606570d6ade",
+      "latencyHours": 0,
+      "resolutionHash": "f043cb1c28ac1d82ddeec36365698d23ade40e78755d093daab799f7d3661e76"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-09-05T08:58:40.625Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33956718747,
+        "startedAt": "2026-09-05T08:58:44Z"
+      },
+      "status": "complete",
+      "chainPrev": "7779cef409d491d923f07a95ae0a421b72c9166f4b95331be97f9606570d6ade",
+      "chainHash": "f37d59b2ea49afb50581f691075887e54e0bec71553b175179f7dd237e25d0d5",
+      "latencyHours": 0,
+      "resolutionHash": "ee2a2ae125bab402944b975aa00d00d66148293a9b6b05a369035fa035c2a479"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-09-04",
+      "detectedAt": "2026-09-05T08:58:40.625Z",
+      "prevCount": 1011,
+      "newCount": 1011,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 33956718747,
+        "startedAt": "2026-09-05T08:58:44Z"
+      },
+      "status": "complete",
+      "chainPrev": "f37d59b2ea49afb50581f691075887e54e0bec71553b175179f7dd237e25d0d5",
+      "chainHash": "7caf9ccd9a219eaebb032a0239eb50387a10bce13eac30d6bcf06bcb9fa951de",
+      "latencyHours": 0,
+      "resolutionHash": "1c0870c53467b774bc1cdcfd91bfc455b99f7d0815f246a9e5e14c786918cbef"
     }
   ]
 }
