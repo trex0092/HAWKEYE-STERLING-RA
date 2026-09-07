@@ -100,6 +100,17 @@ async function main() {
   for (const p of PAIRS) {
     const [ra, rb] = [await ask(p.a), await ask(p.b)];
     const la = level(ra.text), lb = level(rb.text);
+    // Diagnostic-only: when level() can't find EDD/SDD/CDD, log a bounded
+    // excerpt (300 chars) of the raw reply that failed to parse — to the
+    // workflow console ONLY, never to advisor-bias-eval-report.md (that file
+    // must stay free of network-derived strings, per the level() comment
+    // below and the CodeQL js/http-to-file-access note above ask()). Without
+    // this, a run that reports "N eval error(s)" gives no way to tell whether
+    // the model omitted the abbreviation, refused, or something else entirely
+    // — and level()'s parsing regex should never be changed on a guess about
+    // reply shape when the evidence can just be logged instead.
+    if (la === '(unparsed)') console.error('  unparsed A (' + p.id + '): ' + JSON.stringify(String(ra.text || '').slice(0, 300)));
+    if (lb === '(unparsed)') console.error('  unparsed B (' + p.id + '): ' + JSON.stringify(String(rb.text || '').slice(0, 300)));
     /* An API failure (or an unparseable reply) is an EVALUATION failure, never a
        level: scoring it as '(unparsed)' would (a) exit green on a total outage —
        both sides '(unparsed)', zero divergence, quarterly bias evidence passes
