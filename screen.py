@@ -6334,13 +6334,27 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     progress("enrichment-start", subjects=total, workers=SCREEN_CONCURRENCY)
     done = 0
     indexed = [None] * total
+    # Time-based heartbeat alongside the count-based one below. Observed twice
+    # (2026-08-31 run 33408194671, 2026-09-07 run 34128650247): once the shared
+    # Google News gate hits GNEWS_BACKOFF_CAP with the GDELT circuit already
+    # open, EVERY remaining subject serialises to one feed request per
+    # GNEWS_BACKOFF_CAP seconds ACROSS ALL WORKERS COMBINED (_RateGate paces
+    # the feed, not each worker) -- so the done%50 line below can go 8+ minutes
+    # without printing, and both times the job was killed mid-run ("the runner
+    # has received a shutdown signal") a few minutes into that silence. This
+    # doesn't change what gets screened or how -- it only guarantees the
+    # console keeps producing output at least once a minute so a long throttled
+    # stretch can't look indistinguishable from a hung job.
+    _last_log = time.monotonic()
     with concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY) as ex:
         for i, r in zip(order, ex.map(_enrich, (subjects_all[j] for j in order))):
             done += 1
             indexed[i] = r
-            if done % 50 == 0 or done == total:
+            now = time.monotonic()
+            if done % 50 == 0 or done == total or (now - _last_log) >= 60:
                 log(f"  enriched {done}/{total}")
                 progress("enrichment", done=done, total=total)
+                _last_log = now
     if any(r is None for r in indexed):
         # Degrade loudly: a hole here means the rotation bookkeeping dropped a
         # subject — silently tallying the rest would report them as screened.
