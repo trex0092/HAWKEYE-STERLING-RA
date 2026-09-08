@@ -38,14 +38,30 @@
    the job's timeout instead of failing fast). The project this reads from
    accumulates tasks daily and pagination is uncapped in practice, so this
    check gets the same explicit deadline rather than trusting the job-level
-   timeout-minutes to be the only backstop. */
+   timeout-minutes to be the only backstop.
+
+   The matching logic is exported and unit-tested offline
+   (test/delivery-watchdog.test.mjs), same split as advisor-bias-eval.mjs's
+   level(): the network call runs only as main. */
 import { listProjectTasks } from './asana-notify.mjs';
 
 // "Sanctions/Media/PEP - Monitoring" -- where DeliveryAgent files the report
 // (see screen.py's Asana delivery step; the same task is mirrored into
 // "Follow Ups" too, but this project is the stable, dedicated home to read).
-const PROJECT_GID = process.env.SCREENING_PROJECT_GID || '1213914392047129';
-const TITLE_PREFIX = 'Daily AML/CFT Screening Report';
+export const PROJECT_GID = process.env.SCREENING_PROJECT_GID || '1213914392047129';
+export const TITLE_PREFIX = 'Daily AML/CFT Screening Report';
+
+/* Pure: which tasks are a screening report filed on `today` (UTC date
+   string, e.g. "2026-09-08")? Split out so this can be unit-tested without
+   a live Asana project -- the exact same reasoning advisor-bias-eval.mjs
+   gives for exporting level() rather than only testing it via main(). */
+export function findTodaysReports(tasks, today, titlePrefix = TITLE_PREFIX) {
+  return (tasks || []).filter(t => {
+    const name = String((t && t.name) || '');
+    if (!name.startsWith(titlePrefix)) return false;
+    return String((t && t.created_at) || '').slice(0, 10) === today;
+  });
+}
 
 const DEADLINE_MS = 90000; // same bound as asana-alert.mjs, same rationale
 
@@ -73,11 +89,7 @@ async function main() {
     clearTimeout(timer);
   }
 
-  const todays = tasks.filter(t => {
-    const name = String((t && t.name) || '');
-    if (!name.startsWith(TITLE_PREFIX)) return false;
-    return String((t && t.created_at) || '').slice(0, 10) === today;
-  });
+  const todays = findTodaysReports(tasks, today);
 
   if (todays.length) {
     console.log('delivery-watchdog: OK -- ' + todays.length + ' report(s) filed today (' + today + '): '
@@ -91,4 +103,7 @@ async function main() {
   process.exitCode = 1;
 }
 
-await main();
+import { pathToFileURL } from 'node:url';
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}
