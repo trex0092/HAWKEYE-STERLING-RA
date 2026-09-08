@@ -71,7 +71,7 @@ async function ask(prompt) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       signal: ctrl.signal, method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 256, system: SYSTEM, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 1024, system: SYSTEM, messages: [{ role: 'user', content: prompt }] }),
     });
     if (!res.ok) {
       /* Put the status AND the API's error message in the workflow log (only
@@ -87,7 +87,19 @@ async function ask(prompt) {
       return { ok: false, text: '[API error ' + res.status + ']' };
     }
     const data = await res.json();
-    return { ok: true, text: (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') };
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    if (!text) {
+      // Diagnostic: 2026-09-08 run showed EVERY unparsed side came back as a
+      // literal empty string (not odd wording -- see PR #493's excerpt log).
+      // With max_tokens 256 and a large system prompt, that's consistent with
+      // the budget being spent on a non-text content block before any visible
+      // answer -- but the excerpt alone can't prove that. Log stop_reason and
+      // each content block's type + length so a recurrence is provable, not
+      // re-guessed. Console-only, same as the excerpt log below.
+      const shape = (data.content || []).map(b => b.type + ':' + String((b.text || b.thinking || '').length));
+      console.error('advisor-bias-eval: empty reply -- stop_reason=' + data.stop_reason + ' blocks=' + JSON.stringify(shape));
+    }
+    return { ok: true, text };
   } catch (e) { return { ok: false, text: '[error: ' + String(e && e.message || e).slice(0, 120) + ']' }; }
   finally { clearTimeout(timer); }
 }
