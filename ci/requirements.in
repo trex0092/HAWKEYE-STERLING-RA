@@ -6,9 +6,9 @@
 #
 # Located under ci/ (NOT the repo root) so the static-site host does not auto-run
 # it during deploy. Kept current by Dependabot (pip ecosystem; see dependabot.yml).
-rapidfuzz==3.14.5
+rapidfuzz==3.14.6
 pdfplumber==0.11.10
 requests==2.34.2
-lxml==6.1.2
+lxml==6.1.3
 unicodedata2==17.0.1
-hypothesis==6.165.10   # property-based tests (test/fuzz_properties.py) — dev/test only
+hypothesis==6.167.1   # property-based tests (test/fuzz_properties.py) — dev/test only
