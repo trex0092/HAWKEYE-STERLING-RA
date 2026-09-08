@@ -31,7 +31,14 @@
    look identical to an ordinary day.
 
    Runs once, late in the UTC day (see the workflow's cron comment) so every
-   scheduled run and both self-healing retry passes have had their chance. */
+   scheduled run and both self-healing retry passes have had their chance.
+
+   DEADLINE: modeled on asana-alert.mjs's own bound (hardened 2026-08-02
+   after this exact class of issue -- a stalled Asana call silently eating
+   the job's timeout instead of failing fast). The project this reads from
+   accumulates tasks daily and pagination is uncapped in practice, so this
+   check gets the same explicit deadline rather than trusting the job-level
+   timeout-minutes to be the only backstop. */
 import { listProjectTasks } from './asana-notify.mjs';
 
 // "Sanctions/Media/PEP - Monitoring" -- where DeliveryAgent files the report
@@ -40,6 +47,8 @@ import { listProjectTasks } from './asana-notify.mjs';
 const PROJECT_GID = process.env.SCREENING_PROJECT_GID || '1213914392047129';
 const TITLE_PREFIX = 'Daily AML/CFT Screening Report';
 
+const DEADLINE_MS = 90000; // same bound as asana-alert.mjs, same rationale
+
 async function main() {
   if (!process.env.ASANA_ACCESS_TOKEN) {
     console.error('delivery-watchdog: ASANA_ACCESS_TOKEN missing -- cannot verify delivery; treating as a failure (an unread day is not a delivered day).');
@@ -47,12 +56,21 @@ async function main() {
   }
 
   const today = new Date().toISOString().slice(0, 10); // UTC date, matching Asana's created_at
+  let timer;
+  // clearTimeout in the finally below is required, not cosmetic: an
+  // uncleared timer keeps Node alive until it fires, so a FAST successful
+  // check would otherwise still hang for the full deadline before exiting.
+  const timedOut = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('exceeded ' + DEADLINE_MS + 'ms deadline')), DEADLINE_MS);
+  });
   let tasks;
   try {
-    tasks = await listProjectTasks(PROJECT_GID);
+    tasks = await Promise.race([listProjectTasks(PROJECT_GID), timedOut]);
   } catch (e) {
     console.error('delivery-watchdog: could not read Asana project ' + PROJECT_GID + ' (' + String(e && e.message || e).slice(0, 200) + ') -- delivery is UNVERIFIABLE, which is not the same as delivered.');
     process.exit(2);
+  } finally {
+    clearTimeout(timer);
   }
 
   const todays = tasks.filter(t => {
