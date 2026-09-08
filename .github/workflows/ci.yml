@@ -73,6 +73,8 @@ jobs:
         run: node test/governance-report.test.mjs
       - name: Run board-figure drift guard (committed figures match the live estate)
         run: node test/board-figures.test.mjs
+      - name: Run delivery-watchdog unit tests
+        run: node test/delivery-watchdog.test.mjs
       - name: Run weekly-summary unit tests
         run: node test/weekly-summary.test.mjs
       - name: Run screening-cases unit tests
