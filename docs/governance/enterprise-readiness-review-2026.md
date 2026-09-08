@@ -326,7 +326,13 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
-Verified at HEAD: 63 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
+*Estate re-verification · 8 September 2026 — one workflow added: Delivery Watchdog (#500), a daily
+probe that checks whether the sanctions/PEP/adverse-media report was actually filed in Asana,
+independent of the underlying screening run's exit code (which the EOCN review gate can fail even
+after a fully successful delivery). Self-alerting to Asana on a missing report; no ingestion/eval
+duty of its own. Coverage addition only — no scored control changed.*
+
+Verified at HEAD: 64 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
 *(11 August — **sharded screening design**. One curated document
 (`docs/architecture/sharded-screening-design.md`), explicitly marked NOT YET
 BUILT: a design-only record of how the adverse-media coverage collapse would be
