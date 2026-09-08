@@ -57,7 +57,7 @@ jobs:
     timeout-minutes: 25 # headroom for the ~18-min publish-verify poll (slow Free-tier CDN propagation)
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           # Build hooks live on api.netlify.com; the publish check reads the
@@ -228,7 +228,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
