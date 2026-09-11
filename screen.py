@@ -11,7 +11,11 @@ Modes:
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time, html
 import threading
 import functools
-import xml.etree.ElementTree as ET
+# The one call site (safe_xml_fromstring, below) refuses any DTD/ENTITY
+# declaration before ET.fromstring ever runs, which is the same protection
+# defusedxml provides for billion-laughs/XXE; see the XML_MAX_BYTES comment
+# near that function for why defusedxml itself was not added as a dependency.
+import xml.etree.ElementTree as ET  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml
 import concurrent.futures
 
 # How many subjects to enrich (adverse media + PEP) in parallel. The sweep is
