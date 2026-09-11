@@ -332,6 +332,13 @@ independent of the underlying screening run's exit code (which the EOCN review g
 after a fully successful delivery). Self-alerting to Asana on a missing report; no ingestion/eval
 duty of its own. Coverage addition only — no scored control changed.*
 
+Verified at HEAD: 65 workflows · 185 markdown documents under docs/ (152 excluding docs/research/auto).
+*(11 September — **Bandit added as an advisory Python security lint** (`bandit.yml`, hash-locked
+via a new `ci/bandit-requirements.in`/`.txt` pair), plus a workflow-consolidation-and-Git-LFS
+follow-up analysis (`docs/workflow-consolidation-and-lfs-followups.md`) covering the 65-file
+`.github/workflows/` estate and a runbook for moving committed screenshot/docx binaries to Git
+LFS. One workflow added, one curated document added; no scored control changed.)*
+
 Verified at HEAD: 64 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
 *(11 August — **sharded screening design**. One curated document
 (`docs/architecture/sharded-screening-design.md`), explicitly marked NOT YET
