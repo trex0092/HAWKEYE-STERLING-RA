@@ -1,0 +1,3 @@
+# bandit pin for the Python security-lint job in .github/workflows/bandit.yml — hash-locked.
+# Regenerate: pip-compile --generate-hashes --output-file=ci/bandit-requirements.txt ci/bandit-requirements.in
+bandit>=1.9.4
