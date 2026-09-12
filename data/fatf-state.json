@@ -29,6 +29,8 @@
     "Yemen"
   ],
   "updated": "2026-06-20",
-  "skipStreak": 0,
-  "lastSkip": "2026-07-19"
+  "skipStreak": 1,
+  "lastSkip": "2026-09-12",
+  "lastCorroborated": "2026-09-11",
+  "lastCorroboratedSnapshot": "2026-08-30"
 }
