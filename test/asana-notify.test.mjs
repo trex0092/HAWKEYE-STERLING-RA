@@ -168,22 +168,31 @@ check('a sectionless mirror still joins the project',
   noSec.projects.includes(MON) && (noSec.memberships || []).some(m => m.project === MON && !('section' in m)));
 
 
-/* Every ALERT stream that lands in the app project must also reach the queue
-   the MLRO works from. Asserted by inspecting the workflows, because the bug
-   was never in the code — notifyAsana did the right thing with what it was
-   given; the workflows simply never gave it a mirror, and the step names/
-   comments claimed otherwise. */
+/* Every ALERT stream that lands in the app project must ALSO be ABLE to reach
+   a second MLRO queue via ASANA_MIRROR_PROJECT_GID, opt-in through a repo
+   variable. Asserted by inspecting the workflows, because the original #305
+   bug was never in the code — notifyAsana did the right thing with what it
+   was given; the workflows simply never gave it a mirror, and the step
+   names/comments claimed otherwise.
+
+   #518 (2026-09-15) retired the hardcoded fallback project GID
+   ('1213914392047129', "Sanctions/Media/PEP - Monitoring") after that Asana
+   project was merged into HAWKEYE STERLING APP and deleted -- mirroring into
+   the SAME project the primary destination already targets is a no-op, so
+   the mirror is disabled (empty) by default now and only fires when a repo
+   variable points it at a genuinely separate queue. This section therefore
+   checks that the ASSIGNMENT ITSELF is still wired to every consuming step
+   (the actual #305 regression), not what its default value resolves to. */
 {
   const ROOT2 = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const MON = '1213914392047129';
-  const mirrorRe = new RegExp(`ASANA_MIRROR_PROJECT_GID:\\s*\\$\\{\\{[^}]*${MON}`);
+  const mirrorRe = /ASANA_MIRROR_PROJECT_GID:\s*\$\{\{/;
   for (const wf of ['regulatory-watch.yml', 'sanctions-watch.yml', 'sanctions-screen.yml']) {
     const y = readFileSync(join(ROOT2, '.github/workflows', wf), 'utf8');
     /* Match the ASSIGNMENT, not the bare identifier: the explanatory comment
        above it says "Clear ASANA_MIRROR_PROJECT_GID to disable", so an
        includes() on the name alone passes even with the env line deleted —
        caught by a negative control that failed to fail. */
-    check(`${wf} mirrors its alert into the MLRO queue`, mirrorRe.test(y));
+    check(`${wf} still wires ASANA_MIRROR_PROJECT_GID through to Asana (opt-in; no live default since #518)`, mirrorRe.test(y));
     check(`${wf} still delivers to the #305 destination as well (additive)`,
       y.includes('1216203370612914'));
   }
