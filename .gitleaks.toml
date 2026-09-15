@@ -32,12 +32,13 @@ regexes = [
   # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
   '''1216203370612914''',  # HAWKEYE STERLING APP project (RA delivery target)
   '''1216203370612916''',  # section: Assessment Report (pipeline report delivery target)
-  '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log)
-  '''1213914392047131''',  # section: Daily Sanctions Screening (screen.py + daily-sanctions-screen.yml)
+  '''1218452114962158''',  # section: Screening Daily Report (screen.py ASANA_SECTION_GID, since #518)
+  '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log) -- RETIRED as a live default by #518, kept only so git history still scans clean
+  '''1213914392047131''',  # section: Daily Sanctions Screening (screen.py + daily-sanctions-screen.yml) -- RETIRED as a live default by #518, kept only so git history still scans clean
   '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default; also quoted in the scripts/daily-screen-report.py provenance footer)
   '''1216139945846994''',  # HR – Employees project (second screening population, ASANA_EMPLOYEE_DB_GID / ASANA_EMPLOYEE_PROJECT_GID default)
-  '''1215884707932023''',  # Follow Ups project (second MLRO delivery queue, ASANA_FOLLOWUPS_GID default)
-  '''1215884707932047''',  # section: Subject (Follow Ups delivery section, ASANA_FOLLOWUPS_SECTION_GID default)
+  '''1215884707932023''',  # Follow Ups project (second MLRO delivery queue, ASANA_FOLLOWUPS_GID default) -- RETIRED as a live default by #518, kept only so git history still scans clean
+  '''1215884707932047''',  # section: Subject (Follow Ups delivery section, ASANA_FOLLOWUPS_SECTION_GID default) -- RETIRED as a live default by #518, kept only so git history still scans clean
   '''1215653768729951''',  # Risk Assessments - Madison LLC (former RA default)
   '''1215844297069727''',  # Regulations / Governance / Sanctions (merged into Ongoing Monitoring, then removed)
   # Section GIDs in the Ongoing Monitoring project (public identifiers), used by the
