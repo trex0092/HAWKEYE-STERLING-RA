@@ -1,1 +1,112 @@
-PLACEHOLDER_5
+/* Delivery watchdog — did TODAY's Daily AML/CFT Screening Report actually
+   reach Asana, independent of whether the run that produced it exited 0?
+
+   WHY THIS EXISTS, AND WHY FRESHNESS CHECK DOES NOT ALREADY COVER IT
+   -------------------------------------------------------------------
+   screen.py's EOCN review gate (enforce_eocn_review_gate) deliberately
+   sys.exit(3)s AFTER a fully successful screening + delivery, so the
+   weekly-adverse-media.yml run conclusion is "failure" on a day that
+   delivered fine. Freshness Check asks the Actions API for a SUCCESSFUL run
+   inside the cadence window -- which the EOCN gate makes permanently false
+   regardless of delivery, for as long as the EOCN review stays overdue. That
+   is already known and intentionally left as-is pending the EOCN
+   reconciliation. This watchdog checks the actual deliverable instead of the
+   exit code: did a "Daily AML/CFT Screening Report" task get FILED in Asana
+   today? That signal is independent of the gate, and of which attempt
+   (scheduled or a control-retry.yml self-healing pass) produced it.
+
+   CONTEXT (2026-09-08 sample)
+   ----------------------------
+   The run that files this report was killed mid-flight ("the runner has
+   received a shutdown signal") on 12 of 18 recent attempts (67%). Cause not
+   identified: job timeout (350min, not close), step timeout (none exists),
+   console silence (ruled out directly -- a heartbeat-instrumented run was
+   still killed), a public GitHub incident (no record at any failure
+   timestamp), and harden-runner egress volume (a longer, heavier run
+   completed with a clean egress audit) were all checked and ruled out.
+   Every sampled day still delivered, via the self-healing retry passes. This
+   watchdog exists for the day that doesn't -- a killed run alone produces no
+   distinct alert beyond the red badges that are already expected daily
+   because of the EOCN gate, so without this check a true delivery gap would
+   look identical to an ordinary day.
+
+   Runs once, late in the UTC day (see the workflow's cron comment) so every
+   scheduled run and both self-healing retry passes have had their chance.
+
+   DEADLINE: modeled on asana-alert.mjs's own bound (hardened 2026-08-02
+   after this exact class of issue -- a stalled Asana call silently eating
+   the job's timeout instead of failing fast). The project this reads from
+   accumulates tasks daily and pagination is uncapped in practice, so this
+   check gets the same explicit deadline rather than trusting the job-level
+   timeout-minutes to be the only backstop.
+
+   The matching logic is exported and unit-tested offline
+   (test/delivery-watchdog.test.mjs), same split as advisor-bias-eval.mjs's
+   level(): the network call runs only as main. */
+import { listProjectTasks } from './asana-notify.mjs';
+
+// HAWKEYE STERLING APP -- where screen.py now files the daily report (see
+// screen.py's ASANA_ONGOING_MON_GID). RETIRED 2026-09-15: this used to read
+// the separate "Sanctions/Media/PEP - Monitoring" project (old value
+// '1213914392047129'), which was merged into HAWKEYE STERLING APP -- the
+// watchdog is repointed here so it reads the report's actual current home
+// instead of a deleted project (which would always show as "never delivered").
+export const PROJECT_GID = process.env.SCREENING_PROJECT_GID || '1216203370612914';
+export const TITLE_PREFIX = 'Daily AML/CFT Screening Report';
+
+/* Pure: which tasks are a screening report filed on `today` (UTC date
+   string, e.g. "2026-09-08")? Split out so this can be unit-tested without
+   a live Asana project -- the exact same reasoning advisor-bias-eval.mjs
+   gives for exporting level() rather than only testing it via main(). */
+export function findTodaysReports(tasks, today, titlePrefix = TITLE_PREFIX) {
+  return (tasks || []).filter(t => {
+    const name = String((t && t.name) || '');
+    if (!name.startsWith(titlePrefix)) return false;
+    return String((t && t.created_at) || '').slice(0, 10) === today;
+  });
+}
+
+const DEADLINE_MS = 90000; // same bound as asana-alert.mjs, same rationale
+
+async function main() {
+  if (!process.env.ASANA_ACCESS_TOKEN) {
+    console.error('delivery-watchdog: ASANA_ACCESS_TOKEN missing -- cannot verify delivery; treating as a failure (an unread day is not a delivered day).');
+    process.exit(2);
+  }
+
+  const today = new Date().toISOString().slice(0, 10); // UTC date, matching Asana's created_at
+  let timer;
+  // clearTimeout in the finally below is required, not cosmetic: an
+  // uncleared timer keeps Node alive until it fires, so a FAST successful
+  // check would otherwise still hang for the full deadline before exiting.
+  const timedOut = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('exceeded ' + DEADLINE_MS + 'ms deadline')), DEADLINE_MS);
+  });
+  let tasks;
+  try {
+    tasks = await Promise.race([listProjectTasks(PROJECT_GID), timedOut]);
+  } catch (e) {
+    console.error('delivery-watchdog: could not read Asana project ' + PROJECT_GID + ' (' + String(e && e.message || e).slice(0, 200) + ') -- delivery is UNVERIFIABLE, which is not the same as delivered.');
+    process.exit(2);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const todays = findTodaysReports(tasks, today);
+
+  if (todays.length) {
+    console.log('delivery-watchdog: OK -- ' + todays.length + ' report(s) filed today (' + today + '): '
+      + todays.map(t => t.permalink_url || t.name).join(', '));
+    return;
+  }
+
+  console.error('delivery-watchdog: NO "' + TITLE_PREFIX + '" task found for today (' + today
+    + ') in project ' + PROJECT_GID + ' -- the daily sanctions/PEP/adverse-media screening has NOT '
+    + 'been evidenced as delivered.');
+  process.exitCode = 1;
+}
+
+import { pathToFileURL } from 'node:url';
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

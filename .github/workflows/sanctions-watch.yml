@@ -1,1 +1,205 @@
-PLACEHOLDER_1
+name: Sanctions Watch
+
+# Daily check of the major consolidated designation lists (OFAC SDN + non-SDN,
+# UN Security Council, UK OFSI, EU FSF) defined in data/sanctions-sources.json.
+# On any change it creates a task in the "Ongoing Monitoring"
+# Asana project, commits the refreshed fingerprint state to main, and falls back
+# to a labelled GitHub issue if Asana delivery fails. Country black/grey list
+# moves are handled by the FATF Watchdog.
+#
+# Needs the ASANA_ACCESS_TOKEN repository secret to route alerts to Asana.
+# First run: dispatch with mode = seed to record the baseline quietly.
+
+on:
+  schedule:
+    - cron: '7 5 * * *'   # 05:07 UTC daily (odd minute)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check (compare + alert on change) | seed (record baseline)'
+        default: 'check'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sanctions-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    # Write scopes live at job level (top level is read-only — least privilege).
+    # actions:write serves two duties: the TFS timeline log READS screening-run
+    # history to resolve each detected list change to its re-screen evidence,
+    # and on a content change the watch DISPATCHES the case-engine screen
+    # immediately (TFS without-delay duty) instead of waiting for its cron.
+    permissions:
+      contents: write
+      issues: write
+      actions: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # a hung list fetch must surface as a failure, not a silent hang on a mandatory-daily control
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            www.treasury.gov:443
+            sanctionslistservice.ofac.treas.gov:443
+            wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
+            scsanctions.un.org:443
+            unsolprodfiles.blob.core.windows.net:443
+            umsanrp1dltx4dj3sxtt.blob.core.windows.net:443
+            umsaszjsdz5c04wqdhbq.blob.core.windows.net:443
+            umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
+            webgate.ec.europa.eu:443
+            ofsistorage.blob.core.windows.net:443
+            app.asana.com:443
+            *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # No credentials on disk (zizmor artipacked): the state push below
+          # authenticates with an ephemeral env token, and the overlay fetch
+          # is anonymous (public repo).
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Overlay latest list state (lives on the sanctions-watch-state branch)
+        run: |
+          # Branch protection blocks direct pushes to main (GH006), so the
+          # fingerprint state lives on a dedicated data branch. Without the
+          # overlay every run re-alerts the same list changes.
+          if git fetch origin sanctions-watch-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/sanctions-state.json 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/retention 2>/dev/null || true
+            git checkout FETCH_HEAD -- data/tfs-update-log.json 2>/dev/null || true
+            echo "state overlaid from sanctions-watch-state"
+          else
+            echo "no sanctions-watch-state branch yet — using state from main"
+          fi
+
+      - name: Verify TFS evidence-log integrity (tamper-evident chain)
+        # Proves data/tfs-update-log.json was not edited, truncated or
+        # reordered since the watcher last sealed it. Runs BEFORE the watch so
+        # a tampered evidence log turns the mandatory-daily control red and
+        # nothing new is stacked on top of it. Offline; no fetches.
+        run: node scripts/sanctions-watch.mjs verify-log
+
+      - name: Run sanctions watch
+        id: watch
+        env:
+          MODE: ${{ inputs.mode || 'check' }}
+          # Read-only: the TFS timeline log queries screening-run history
+          # (actions:read) to record publication → ingestion → re-screen timing.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/sanctions-watch.mjs "$MODE"
+
+      - name: Trigger an immediate re-screen (TFS without-delay duty)
+        # A designation-list CONTENT change re-screens the live customer base
+        # NOW instead of waiting for the case engine's 05:37 cron. The
+        # dispatched run is a normal sanctions-screen.yml run, so the TFS
+        # timeline log resolves it as the re-screen evidence automatically on
+        # the next watch run, with the shortened latency on the record.
+        # content_changes counts new/changed lists only: persistent-error
+        # alerts never dispatch (a dead URL has no new data to screen), and
+        # seed mode never dispatches (the baseline is not a designation event).
+        # continue-on-error: the scheduled screen is the backstop; a failed
+        # dispatch surfaces in the TFS latency evidence, not as a dead watch.
+        continue-on-error: true
+        if: steps.watch.outputs.content_changes != '' && steps.watch.outputs.content_changes != '0' && (inputs.mode || 'check') != 'seed'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.actions.createWorkflowDispatch({
+              owner, repo, workflow_id: 'sanctions-screen.yml', ref: 'main',
+            });
+            core.notice('Dispatched sanctions-screen.yml: immediate re-screen after a designation-list content change.');
+
+      - name: Notify Asana — Ongoing Monitoring project
+        id: asana
+        continue-on-error: true
+        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
+          # "Sanctions updates" section of the Ongoing Monitoring project
+          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
+          # MIRROR (RETIRED 2026-09-15): the separate "Sanctions/Media/PEP -
+          # Monitoring" project (1213914392047129, section 1213914392047131) was
+          # merged into HAWKEYE STERLING APP, so mirroring here would just re-add
+          # the SAME project the alert above already targets. Both vars below
+          # default to empty (disabled) via the original "Clear
+          # ASANA_MIRROR_PROJECT_GID to disable" escape hatch, until/unless a
+          # genuinely separate MLRO queue exists again.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
+          # Step output crosses into the shell via env (never inline ${{ }} in run:),
+          # so a hostile character in a generated title can never become shell syntax.
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
+        run: node scripts/watch-notify.mjs "$PR_TITLE" sanctions-watch-report.md sanctions-watch-changes.json
+
+      - name: Retain dated snapshot + integrity manifest
+        if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        run: node scripts/retain-state.mjs
+
+      - name: Persist refreshed fingerprint state (sanctions-watch-state branch)
+        # Commit on state_dirty (any error / count change), not only on a list
+        # change — otherwise a per-source error streak resets every run and a dead
+        # URL can never reach the alert threshold.
+        if: steps.watch.outputs.state_dirty == 'true' || steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
+        env:
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$(git status --porcelain data/ 2>/dev/null)" ]; then
+            git config user.name "sanctions-watch"
+            git config user.email "actions@github.com"
+            git add data/sanctions-state.json data/retention data/tfs-update-log.json
+            git commit -m "$PR_TITLE [skip ci]"
+            # Persist on the sanctions-watch-state branch (main is protected):
+            # rebuilt as <current main> + one data commit, force-updated.
+            # Auth is the ephemeral env token in the push URL — the checkout
+            # persists no credentials, so nothing lands in .git/config.
+            pushed=
+            for attempt in 1 2 3 4 5; do
+              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/sanctions-watch-state && { pushed=1; break; }
+              echo "push failed (attempt $attempt) — retrying"
+              sleep $((attempt * 3))
+            done
+            [ -n "$pushed" ] || { echo "::error::state push to sanctions-watch-state failed after 5 attempts — state NOT persisted"; exit 1; }
+          else
+            echo "state unchanged"
+          fi
+
+      - name: Fallback to a GitHub issue if Asana delivery failed
+        if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.asana.outcome == 'failure'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('sanctions-watch-report.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const body = report + [
+              '', '---',
+              '> This change could not be delivered to the Asana "Ongoing Monitoring" project',
+              '> (no `ASANA_ACCESS_TOKEN` repository secret, or the Asana API call failed), so this issue was opened instead.',
+              '> Set the `ASANA_ACCESS_TOKEN` secret to route future changes to Asana automatically.',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner, repo,
+              title: process.env.PR_TITLE || 'Sanctions Watch - changes detected',
+              body,
+              labels: ['sanctions-watch'],
+            });

@@ -1,1 +1,482 @@
-PLACEHOLDER_3
+# ============================================================
+# HAWKEYE STERLING — DAILY ADVERSE MEDIA SCREENING
+# GitHub Actions Workflow — Hawkeye Sterling V2
+# ============================================================
+# Scheduled 00:07 UTC daily. GitHub delivers this repo's scheduled events 2-4h
+# late (measured, hour-independent — see the schedule block), so the ~4-4.5h
+# sweep actually starts ~03:30 UTC and lands in Asana around 12:00 UAE. An
+# earlier revision of this header promised "before ~09:00 UAE"; that was never
+# achieved and the claim is removed rather than restated.
+# Screens ALL companies AND their associated individuals
+# (shareholders / UBOs / directors) via Google News RSS.
+# Posts one audit-grade summary task in Ongoing Monitoring.
+# ============================================================
+
+name: Daily Screening (Sanctions + Adverse Media + PEP)
+
+on:
+  schedule:
+    # MEASURED SCHEDULING DELAY — read before re-timing this.
+    # GitHub delivers this repo's scheduled events 2-4h late, every day, and the
+    # delay is NOT specific to the midnight hour: over 16 days the 00:07 slot
+    # started 03:20-03:58 UTC, and Regulatory Watch's 06:19 slot started
+    # 08:24-10:10 (2h05m-3h51m late) across the same period. So the sweep begins
+    # ~03:30 UTC and, at ~4-4.5h, delivers around 12:00 UAE — NOT the ~08:30 an
+    # earlier revision of this comment claimed. That promise was never met.
+    # Moving the slot does not fix it (the delay is hour-independent) and moving
+    # it before 00:00 UTC is actively unsafe: freshness-check pins this control
+    # at maxAgeDays 0, so a run landing on the previous UTC day would raise a
+    # false "mandatory control missed its cadence" alarm. Left at 00:07.
+    - cron: '7 0 * * *'    # 00:07 UTC = 04:07 UAE, daily (odd minute) — earliest same-UTC-day start; actual start ~03:30 UTC after GitHub's delay
+    - cron: '7 3 * * *'    # 03:07 UTC self-healing retry — the 24 & 25 Jul 00:07 runs died to runner-VM shutdowns mid-sweep and stayed red until someone manually re-ran hours later. On days when today already has a successful run this firing becomes a COVERAGE MAKE-UP pass (AM_COVERAGE_RETRY=1): the engine consults the committed run-metrics counts and exits in seconds if the earlier run had full news+PEP coverage, or re-sweeps the full book from this runner's FRESH egress IP if the free feeds' per-IP rate limits cost part of the book its coverage (5 Aug: both GDELT and Google News circuits opened mid-run). Delta-state suppresses already-reported findings, so a make-up sweep cases only what it recovers.
+    - cron: '7 6 * * *'    # 06:07 UTC last-chance retry — the first two slots are 3h apart, so a single 3-4h outage window (GitHub Actions or an upstream source) could still cost the whole day. Same make-up semantics; when it has to screen from scratch, delivery lands ~11:30 UAE — late, but a late daily screening beats a missing one for a mandatory control.
+  workflow_dispatch:        # Manual trigger
+
+# Results are posted to Asana via the screen's own token. contents:write is used
+# only to commit the delta-state file (what has already been reported) so the
+# next run flags just what is NEW.
+permissions:
+  contents: read
+
+# A multi-hour sweep must never have a manual run overlap the daily schedule.
+# Single-writer group SHARED with onboarding-screen.yml: both workflows
+# force-push the screen-delta-state branch (rebuilt as <main> + one data
+# commit), so two concurrent runs could drop each other's just-persisted
+# run-metrics/delta files — the exact inputs anomaly-watch reads. Concurrency
+# groups are repo-wide across workflows; sharing one serialises the writers.
+concurrency:
+  group: screen-state
+  cancel-in-progress: false
+
+jobs:
+  # Self-healing gate: the retry firings (03:07/06:07 UTC) must not blindly
+  # double-screen or double-post to Asana on days when the 00:07 run succeeded.
+  # On schedule events this asks the Actions API whether today (UTC) already
+  # has a successful run of this workflow. If not, the sweep runs as the day's
+  # screening. If so, the firing continues as a coverage MAKE-UP pass
+  # (makeup=true → AM_COVERAGE_RETRY=1): the engine decides from the committed
+  # run-metrics counts whether the earlier run lost news/PEP coverage to
+  # per-IP rate limits, and either exits in seconds or re-sweeps from this
+  # runner's fresh egress IP. Manual dispatches always screen. Either way the
+  # day concludes "success", so badge and freshness-check semantics are
+  # unchanged.
+  preflight:
+    permissions:
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      makeup: ${{ steps.decide.outputs.makeup }}
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            *.githubapp.com:443
+      - name: Skip if today's screening already succeeded
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -u
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "makeup=false" >> "$GITHUB_OUTPUT"
+            echo "manual dispatch — always screens"
+            exit 0
+          fi
+          today="$(date -u +%Y-%m-%d)"
+          n=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/actions/workflows/weekly-adverse-media.yml/runs?status=success&created=%3E%3D${today}&per_page=1" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("total_count", 0))')
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "makeup=true" >> "$GITHUB_OUTPUT"
+            echo "today (UTC $today) already has $n successful screening run(s) — continuing as a coverage make-up pass (re-sweeps only if that run lost news/PEP coverage)"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "makeup=false" >> "$GITHUB_OUTPUT"
+            echo "no successful screening run yet today (UTC $today) — proceeding with the sweep"
+          fi
+
+  adverse-media:
+    needs: preflight
+    # Runs for the day's screening (run=true) AND for the make-up pass
+    # (makeup=true) — in make-up mode the engine itself decides, from the
+    # overlaid run-metrics counts, whether to exit in seconds or re-sweep.
+    if: needs.preflight.outputs.run == 'true' || needs.preflight.outputs.makeup == 'true'
+    # Write scopes live at job level (top level is read-only — least privilege).
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 350    # companies + ~2x individuals × 3 locales — daily full-coverage sweep needs headroom (GitHub job cap is 360)
+
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          # This job holds contents:write and fetches external content while handling
+          # customer data — block egress to a fixed allowlist so it cannot exfiltrate.
+          # Hosts = the sanctions sources + Google-News RSS + Wikidata (PEP) that
+          # screen.py contacts, Asana, Anthropic (LLM triage, when enabled), and the
+          # GitHub/PyPI infra for checkout + pip. A missed host fails LOUD (the
+          # empty-list guard reds the job; adverse/PEP degrade, never a silent clear).
+          # OFAC and UN serve their files via 302 to presigned storage URLs, so their
+          # storage backends (S3 / Azure blob) are allowlisted next to the primaries —
+          # without them both core lists are refused at connect time and screening
+          # silently runs DEGRADED (as it did 09–12 Jul).
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+            app.asana.com:443
+            api.anthropic.com:443
+            sanctionslistservice.ofac.treas.gov:443
+            wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
+            hosted-compute-watchdog-prod-iad-01.githubapp.com:443
+            hosted-compute-request-orchestrator-prod-iad-01.githubapp.com:443
+            scsanctions.un.org:443
+            unsolprodfiles.blob.core.windows.net:443
+            umsanrp1dltx4dj3sxtt.blob.core.windows.net:443
+            umsaszjsdz5c04wqdhbq.blob.core.windows.net:443
+            umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
+            ofsistorage.blob.core.windows.net:443
+            webgate.ec.europa.eu:443
+            data.opensanctions.org:443
+            www.international.gc.ca:443
+            news.google.com:443
+            www.bing.com:443
+            api.gdeltproject.org:443
+            www.wikidata.org:443
+            query.wikidata.org:443
+            www.sec.gov:443
+            www.fca.org.uk:443
+            www.justice.gov:443
+            www.cftc.gov:443
+            www.occ.gov:443
+            www.dfsa.ae:443
+            www.europol.europa.eu:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No credentials on disk (zizmor artipacked): the state push below
+          # authenticates with an ephemeral env token, and the overlay fetch
+          # is anonymous (public repo).
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --quiet --require-hashes -r ci/requirements.txt
+
+      - name: Overlay latest delta-state (lives on the screen-delta-state branch)
+        id: overlay
+        env:
+          STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
+        run: |
+          # Branch protection blocks direct pushes to main (GH006 — the old
+          # main-push below failed silently since 7 Jul), so the delta-state
+          # lives on a dedicated data branch. Without the overlay every run
+          # re-reports findings already delivered. With STATE_ENCRYPTION_KEY
+          # set the branch carries <file>.enc instead of subject-data
+          # plaintext (P30): decrypt restores the working files; an .enc with
+          # no key fails loudly rather than running with amnesia.
+          #
+          # AMNESIA GUARD: `git fetch` exits 128 for BOTH "no such branch" and
+          # "could not reach origin", so a bare `if git fetch` treated a
+          # transient network flake as a cold start — the run then diffed
+          # against main's frozen copy AND the commit step below force-pushed
+          # <main> + one commit, permanently discarding every prior run's
+          # delivered-finding history. `git ls-remote --exit-code` is the only
+          # signal that separates the two: 2 = ref genuinely absent, anything
+          # else = transport error. A cold start is fine; an unreachable origin
+          # must stop the run rather than silently re-report the whole book.
+          #
+          # `&& rc=0 || rc=$?` — GitHub runs this block as `bash -e`, where a
+          # BARE failing command aborts the step before `rc=$?` can be read, so
+          # a legitimate cold start (rc=2) would kill the run. The `||` puts it
+          # in a condition context, which set -e exempts.
+          branch_exists=
+          for attempt in 1 2 3; do
+            git ls-remote --exit-code --heads origin screen-delta-state >/dev/null 2>&1 && rc=0 || rc=$?
+            [ "$rc" -eq 0 ] && { branch_exists=1; break; }
+            [ "$rc" -eq 2 ] && { branch_exists=0; break; }
+            echo "ls-remote for screen-delta-state failed (attempt $attempt, rc=$rc) — retrying"
+            sleep $((attempt * 3))
+          done
+          if [ -z "$branch_exists" ]; then
+            echo "::error::cannot reach origin to determine whether screen-delta-state exists — refusing to run: proceeding would diff against stale state and force-push over the delivered-finding history"
+            exit 1
+          fi
+
+          if [ "$branch_exists" = 1 ]; then
+            fetched=
+            for attempt in 1 2 3; do
+              git fetch origin screen-delta-state --depth=1 && { fetched=1; break; }
+              echo "delta-state fetch failed (attempt $attempt) — retrying"
+              sleep $((attempt * 3))
+            done
+            if [ -z "$fetched" ]; then
+              echo "::error::screen-delta-state exists but could not be fetched — refusing to run with state amnesia (the commit step force-pushes, so this run would destroy the accumulated delta-state)"
+              exit 1
+            fi
+            for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
+              git checkout FETCH_HEAD -- "$f" 2>/dev/null || true
+              git checkout FETCH_HEAD -- "$f.enc" 2>/dev/null || true
+            done
+            node scripts/state-crypto.mjs decrypt data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json
+            echo "delta-state overlaid from screen-delta-state"
+          else
+            echo "no screen-delta-state branch yet — using state from main"
+          fi
+          echo "state_ready=1" >> "$GITHUB_OUTPUT"
+
+      # ── Crash forensics for a runner that vanishes mid-sweep ──────────────
+      # Five times between 6 and 11 Aug 2026 (here and on sanctions-screen, at
+      # 58-64 min in) the runner was LOST: the step stayed "in_progress" with no
+      # conclusion, no post-step ran — not even the `if: always()` one below —
+      # and the logs were never uploaded, so every investigation hit a 404. The
+      # sweep's own runtime was ruled out (a 120m54s run succeeded on 10 Jul,
+      # and 10 Aug succeeded at 64m31s — longer than the three ~64m failures).
+      #
+      # screen.py writes data/run-progress.json locally at each phase boundary;
+      # this loop pushes it to a data branch WHILE the sweep runs, so the last
+      # push before the VM dies tells us the phase it died in. Nothing else can:
+      # an artifact upload is a step, and steps do not run when the runner is
+      # gone.
+      #
+      # Started as its own step and BACKGROUNDED, deliberately: a process
+      # launched here outlives the step and keeps running through the sweep,
+      # which keeps GITHUB_TOKEN out of the screening step's environment
+      # entirely. It force-pushes a dedicated `screen-progress` branch, never
+      # screen-delta-state — the delivered-finding history has exactly one
+      # writer and this must not become a second.
+      #
+      # Entirely best-effort: every command is `|| true` and the loop is killed
+      # unconditionally afterwards. A forensics aid may never fail the control.
+      - name: Start the progress heartbeat (crash forensics)
+        # continue-on-error — the ONE line that makes the rest of this safe.
+        # GitHub runs `run:` under `bash -e`, so without it a heartbeat that
+        # cannot start (unwritable /tmp, a chmod refusal, anything) would fail
+        # the step, fail the job, and stop the day's screening from running at
+        # all. That would make a mandatory AML control depend on a diagnostic —
+        # exactly backwards. A forensics aid that cannot start is a lost
+        # breadcrumb; it must never be a missed screening.
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # ONE publish, shared by the loop below and by the stop step, so the
+          # terminal state uses exactly the same path as every interim one.
+          cat > /tmp/hawkeye-publish.sh <<'PUBLISH'
+          #!/usr/bin/env bash
+          # Publish data/run-progress.json to the screen-progress branch.
+          # READ-ONLY against the workspace: the file is read by absolute path and
+          # the commit is built in a throwaway repo, so this never touches the
+          # checkout's index, config or HEAD while screen.py is working in it.
+          # An orphan commit, force-pushed: the branch is a SNAPSHOT of the
+          # current run, never a history, and can never entangle with the
+          # delivered-finding history that screen-delta-state carries.
+          src="$GITHUB_WORKSPACE/data/run-progress.json"
+          [ -f "$src" ] || exit 0
+          now="$(cat "$src" 2>/dev/null)" || exit 0
+          [ -n "$now" ] || exit 0
+          tmp="$(mktemp -d)" || exit 1
+          (
+            cd "$tmp" || exit 1
+            git init -q . || exit 1
+            git config user.name  "screen-progress"
+            git config user.email "actions@github.com"
+            mkdir -p data
+            printf '%s' "$now" > data/run-progress.json
+            git add -f data/run-progress.json
+            git commit -q -m "chore(screen): run ${GITHUB_RUN_ID:-unknown} progress [skip ci]"
+            git push -q --force \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+              HEAD:refs/heads/screen-progress
+          ) >/dev/null 2>&1
+          rc=$?
+          rm -rf "$tmp" || true
+          exit $rc
+          PUBLISH
+          chmod +x /tmp/hawkeye-publish.sh
+
+          cat > /tmp/hawkeye-heartbeat.sh <<'HEARTBEAT'
+          #!/usr/bin/env bash
+          # Republish while the sweep runs, but only when the phase actually moved
+          # — an unchanged file is not worth a push.
+          src="$GITHUB_WORKSPACE/data/run-progress.json"
+          last=""
+          while true; do
+            sleep 90
+            [ -f "$src" ] || continue
+            now="$(cat "$src" 2>/dev/null)" || continue
+            [ -n "$now" ] || continue
+            [ "$now" = "$last" ] && continue     # nothing moved; don't spend a push
+            if /tmp/hawkeye-publish.sh; then
+              last="$now"                        # only on a confirmed push
+            fi
+          done
+          HEARTBEAT
+          chmod +x /tmp/hawkeye-heartbeat.sh
+          # Output redirected to a file, not inherited: a background process
+          # holding the runner's stdout can stall the job at "Complete job".
+          nohup /tmp/hawkeye-heartbeat.sh >/tmp/hawkeye-heartbeat.log 2>&1 &
+          echo "$!" > /tmp/hawkeye-heartbeat.pid
+          echo "progress heartbeat started (pid $(cat /tmp/hawkeye-heartbeat.pid))"
+
+      - name: Run unified daily screening (sanctions + adverse media + PEP)
+        env:
+          ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
+          TRIGGER_TYPE: schedule
+          # Contact point for regulator feeds that refuse an anonymous caller.
+          # SEC.gov's automated-access policy wants the requester declared with a
+          # contact address; both SEC feeds have 403'd on every run since at
+          # least 9 Aug without one. Substituted into the {contact} token of a
+          # source's "ua" in data/regulator-bulletins.json, so no address is
+          # committed. Unset = those feeds keep failing, but the failure now
+          # names the reason instead of a bare 403.
+          REGULATOR_UA_CONTACT: ${{ vars.REGULATOR_UA_CONTACT }}
+          RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          # '1' only on a retry firing when today already succeeded: the engine
+          # then re-sweeps ONLY if that run lost news/PEP coverage (fresh
+          # runner = fresh egress IP wins back rate-limited coverage), else
+          # exits in seconds before any list download.
+          AM_COVERAGE_RETRY: ${{ needs.preflight.outputs.makeup == 'true' && '1' || '0' }}
+          # Weaponised WORLDWIDE adverse-media sweep. Two layers, always on:
+          #   1. GDELT global index — ONE request/subject, 65+ languages, worldwide
+          #      print/broadcast/web (the real "all news around the world" net), now
+          #      with a 26-term predicate cluster + 75 records.
+          #   2. Google News across the worldwide locale matrix, scored against the
+          #      36-language red-flag dictionaries.
+          # ADVERSE_LOCALES caps how many of the 74 Google-News locales are swept per
+          # subject. The defaults are the EMPIRICAL per-IP ceiling for Google News
+          # from a GitHub runner: at 14 locales × 16 workers (10–12 Jul) the limiter
+          # tripped and 805/838 subjects got ZERO adverse-media coverage (raised as
+          # am_errors and a sustained anomaly); at 5 × 8 the full book swept clean.
+          # GDELT keeps worldwide coverage regardless. Raising the repo vars for a
+          # manual deep sweep risks re-tripping the limiter — the engine now
+          # early-exits throttled subjects and degrades LOUDLY, but the recall loss
+          # is real, so raise them only for supervised off-schedule runs.
+          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
+          SCREEN_CONCURRENCY: ${{ vars.SCREEN_CONCURRENCY || '8' }}
+          # DAILY DELIVERY TARGET: 09:00 UAE (05:00 UTC). GitHub's 2-4h schedule
+          # delay means the run can't control its start, so it controls its
+          # finish: news enrichment budgets itself against the target, trimmed
+          # subjects are disclosed as deadline-deferred (never silent, never
+          # counted clear) and the same-day make-up firings re-sweep them from
+          # a fresh runner. A run starting after the target delivers ASAP with
+          # FULL enrichment (no pointless trimming). Empty value disables.
+          DELIVERY_TARGET_UTC: ${{ vars.DELIVERY_TARGET_UTC || '05:00' }}
+          DELIVERY_RESERVE_MIN: ${{ vars.DELIVERY_RESERVE_MIN || '20' }}
+          # Follow-Ups reminder attestation: after the report is DELIVERED the
+          # engine comments proof on the externally-generated daily reminder
+          # card (dedup-key SYSTEM|daily-screening|<date>) and completes it on
+          # zero-finding days only; action days stay open for the analyst.
+          # Clear the var to disable.
+          FOLLOWUP_PROJECT_GID: ${{ vars.FOLLOWUP_PROJECT_GID }}  # RETIRED 2026-09-15: Follow Ups project merged into HAWKEYE STERLING APP
+          # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
+          # its own assigned MLRO case subtask, not just the first 40. The full
+          # findings list is always in the daily task body regardless of this cap.
+          CASE_SUBTASK_CAP: ${{ vars.CASE_SUBTASK_CAP || '200' }}
+          # AI layer: key enables GROUNDED triage only (classifies real headlines, cannot invent
+          # facts). Generative report prose stays OFF unless REPORT_ALLOW_LLM=1 is also set.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # PDPL GATE: triage sends a subject name + headline to Anthropic (a cross-border
+          # transfer). It is held OFF until the Anthropic DPA is executed and the transfer
+          # basis recorded (see third-party-register.md / pdpl-data-processing-assessment.md).
+          # Re-enable WITHOUT a code change by setting the repo variable LLM_TRIAGE=1 once the
+          # DPA is signed. Default '0' = no customer-data egress.
+          LLM_TRIAGE: ${{ vars.LLM_TRIAGE || '0' }}
+          AI_MODEL: ${{ vars.AI_MODEL || 'claude-haiku-4-5-20251001' }}
+        run: python screen.py
+
+      - name: Stop the progress heartbeat
+        # always() — the heartbeat must not outlive the sweep on a failed run
+        # either. If the runner was lost this never executes, which is exactly
+        # the case the heartbeat exists for: its last push is then the record.
+        # continue-on-error for the same reason as the start step: tearing down
+        # a diagnostic must never turn a delivered screening into a red one.
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f /tmp/hawkeye-heartbeat.pid ]; then
+            kill "$(cat /tmp/hawkeye-heartbeat.pid)" 2>/dev/null || true
+          fi
+          # FINAL PUBLISH — without this the branch keeps whatever phase happened
+          # to be current at the last 90s tick, and the terminal phases (done /
+          # delivered, or the phase a failure stopped at) are written locally and
+          # then thrown away with the VM. The first production run proved the
+          # cost: a sweep that SUCCEEDED at 10:58:01 left the branch reading
+          # "ai-triage-start", indistinguishable from a death in the AI phase —
+          # which is exactly the question this file exists to answer. The
+          # terminal state is the single most valuable thing it can carry, and
+          # it was the one state that never got published.
+          if [ -f /tmp/hawkeye-publish.sh ]; then
+            /tmp/hawkeye-publish.sh || echo "final progress publish failed (non-fatal)"
+          fi
+          echo "heartbeat stopped"
+
+      - name: Commit delta-state (what has already been reported)
+        # always() so a degraded/failed screening still persists what it DID
+        # deliver — but never when the overlay could not establish the prior
+        # state: this push is a --force, and pushing state built on an unknown
+        # baseline overwrites the delivered-finding history it failed to read.
+        if: always() && steps.overlay.outputs.state_ready == '1'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
+        run: |
+          # Stage only the state files that exist: a degraded/early-exit run
+          # doesn't write the optional ones, and a hard `git add` of a missing
+          # path fatals (exit 128) instead of persisting the rest. With
+          # STATE_ENCRYPTION_KEY set, the commit carries only <file>.enc: the
+          # plaintext working files are restored to their main-branch content
+          # so CURRENT subject data never lands on the public branch (P30,
+          # encrypt-forward).
+          state_files=()
+          for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
+            [ -f "$f" ] && state_files+=("$f")
+          done
+          if [ "${#state_files[@]}" -gt 0 ] && [ -n "$(git status --porcelain -- "${state_files[@]}")" ]; then
+            git config user.name "daily-screening"
+            git config user.email "actions@github.com"
+            if [ -n "$STATE_ENCRYPTION_KEY" ]; then
+              node scripts/state-crypto.mjs encrypt "${state_files[@]}"
+              for f in "${state_files[@]}"; do
+                [ -f "$f.enc" ] && git add "$f.enc"
+                git checkout HEAD -- "$f" 2>/dev/null || true
+              done
+            else
+              echo "::warning::delta-state persisted in PLAINTEXT (subject data) - set the STATE_ENCRYPTION_KEY secret to encrypt state commits (P30)"
+              git add -- "${state_files[@]}"
+            fi
+            git commit -m "chore(screen): update delta-state [skip ci]"
+            # Persist on the screen-delta-state branch (main is protected):
+            # rebuilt as <current main> + one data commit, force-updated.
+            # Auth is the ephemeral env token in the push URL — the checkout
+            # persists no credentials, so nothing lands in .git/config.
+            pushed=
+            for attempt in 1 2 3 4 5; do
+              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/screen-delta-state && { pushed=1; break; }
+              echo "push failed (attempt $attempt) — retrying"
+              sleep $((attempt * 3))
+            done
+            [ -n "$pushed" ] || { echo "::error::state push to screen-delta-state failed after 5 attempts — state NOT persisted"; exit 1; }
+          else
+            echo "delta-state unchanged"
+          fi
