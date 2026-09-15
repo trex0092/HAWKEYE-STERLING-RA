@@ -1,0 +1,70 @@
+{
+  "updated": "2026-08-03",
+  "sources": {
+    "ofac-sdn": {
+      "hash": "469768cb08b256ac5ee29848321143e32e6fd7d1e425dd65e054d6c81f08ced6",
+      "bytes": 5442481,
+      "checkedAt": "2026-08-03",
+      "changedAt": "2026-08-01",
+      "contentAsOf": "2026-08-03",
+      "status": 200,
+      "prevHash": "0f5b65250d2cbcd58e1c314095b992351eab5be6254cf6f88783fe5d126ed1c8",
+      "count": 19182,
+      "errStreak": 0
+    },
+    "ofac-sdn-alt": {
+      "hash": "ee88ab18d2ad56149845b4bb659c6e9445d99cf70f70ad3f1f673011d03413e1",
+      "bytes": 1021993,
+      "checkedAt": "2026-08-03",
+      "changedAt": "2026-08-01",
+      "contentAsOf": "2026-08-03",
+      "status": 200,
+      "prevHash": "f5473bdd69e6e98cb98fa7d007822dd74abc08ffad8a65b27726858b18299348",
+      "count": 20170,
+      "errStreak": 0
+    },
+    "ofac-consolidated": {
+      "hash": "29c9f6c69329fd086328e9047eb91c7e24aec7c37985784d25d0bcaa01f9e106",
+      "bytes": 346999,
+      "checkedAt": "2026-08-03",
+      "changedAt": "2026-07-30",
+      "contentAsOf": "2026-08-03",
+      "status": 200,
+      "prevHash": "47e6185e393ade6a954a8ea6667d915fb45112fb2eb7bd22ddd6313c622c841f",
+      "count": 442,
+      "errStreak": 0
+    },
+    "un-consolidated": {
+      "hash": "59e4f90e1dd11687ecdf4cb03948700f97c56fae117e8d87233a4e4803adeedc",
+      "bytes": 601207,
+      "checkedAt": "2026-08-03",
+      "changedAt": "2026-08-03",
+      "contentAsOf": "2026-08-03",
+      "status": 200,
+      "prevHash": "4ca0b3675e5fbfb3bd754f773a67168d356070a699b4f4dbf7a96c76309b6ebc",
+      "count": 1011,
+      "errStreak": 0
+    },
+    "uk-ofsi": {
+      "hash": "7a1df99a31bd06dbe4ad3e47f43c3ef98eea53bc6cdce3f8f0e05ac900080b70",
+      "bytes": 15708355,
+      "checkedAt": "2026-08-03",
+      "changedAt": "2026-06-16",
+      "contentAsOf": "2026-08-03",
+      "status": 200,
+      "count": 19762,
+      "errStreak": 0
+    },
+    "eu-fsf": {
+      "hash": "a22104a09660a70a4a661239ee49bb39fda21f758c3fe8667698affedd861c11",
+      "bytes": 21312246,
+      "checkedAt": "2026-08-03",
+      "changedAt": "2026-08-01",
+      "contentAsOf": "2026-08-03",
+      "status": 200,
+      "prevHash": "71deed505fbccd0461d7ca04fb1105c17d4a154f46552856e8e2161abd7f12c3",
+      "count": 43874,
+      "errStreak": 0
+    }
+  }
+}
