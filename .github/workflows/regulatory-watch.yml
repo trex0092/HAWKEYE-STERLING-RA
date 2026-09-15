@@ -171,14 +171,17 @@ jobs:
           # reroute went unnoticed. Names verified against the live API.
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
-          # MIRROR: the card is ALSO filed in the queue the MLRO actually works —
-          # project 1213914392047129 = "Sanctions/Media/PEP - Monitoring",
-          # section 1216203873114460 = "Regulatory changes" (the destination
-          # every Regulatory Watch card used until #305 merged on 22 Jul 2026).
-          # One task, two memberships — additive, nothing is moved away from the
-          # #305 destination. Clear ASANA_MIRROR_PROJECT_GID to disable.
-          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_LAWCHANGE_PROJECT_GID || '1213914392047129' }}
-          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_LAWCHANGE_SECTION_GID || '1216203873114460' }}
+          # MIRROR (RETIRED 2026-09-15): the old "Sanctions/Media/PEP -
+          # Monitoring" project (1213914392047129) and its "Regulatory changes"
+          # section (1216203873114460) were both retired when that project was
+          # merged into HAWKEYE STERLING APP (which now has its own live
+          # "Regulatory changes" section, gid 1218451992088222) — mirroring here
+          # would just re-add the SAME project the card above already targets.
+          # Both vars below default to empty (disabled) via the original "Clear
+          # ASANA_MIRROR_PROJECT_GID to disable" escape hatch, until/unless a
+          # genuinely separate MLRO queue exists again.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_LAWCHANGE_PROJECT_GID }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_LAWCHANGE_SECTION_GID }}
           # Step output crosses into the shell via env (never inline ${{ }} in run:),
           # so a hostile character in a generated title can never become shell syntax.
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}

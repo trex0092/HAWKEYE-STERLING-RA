@@ -386,7 +386,7 @@ jobs:
           # card (dedup-key SYSTEM|daily-screening|<date>) and completes it on
           # zero-finding days only; action days stay open for the analyst.
           # Clear the var to disable.
-          FOLLOWUP_PROJECT_GID: ${{ vars.FOLLOWUP_PROJECT_GID || '1215884707932023' }}
+          FOLLOWUP_PROJECT_GID: ${{ vars.FOLLOWUP_PROJECT_GID }}  # RETIRED 2026-09-15: Follow Ups project merged into HAWKEYE STERLING APP
           # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
           # its own assigned MLRO case subtask, not just the first 40. The full
           # findings list is always in the daily task body regardless of this cap.
