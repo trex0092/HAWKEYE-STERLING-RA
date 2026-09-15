@@ -27,7 +27,7 @@
     "@playwright/test": "1.61.1",
     "axe-core": "4.13.0",
     "eslint": "10.10.0",
-    "fast-check": "4.9.0",
+    "fast-check": "4.10.0",
     "htmlhint": "1.9.2"
   }
 }
