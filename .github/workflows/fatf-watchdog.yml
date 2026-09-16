@@ -77,10 +77,13 @@ jobs:
           MODE: ${{ inputs.mode || 'check' }}
           # ADDED 2026-09-16: scripts/fatf-watchdog.mjs reads
           # ASANA_FATF_SECTION_GID (falling back to "Assessment Report",
-          # 1216203370612916, when unset), but this step never set it even
-          # though the repo variable was already configured with the correct
-          # value (1216203873114461, the real "FATF list moves" section).
-          ASANA_FATF_SECTION_GID: ${{ vars.ASANA_FATF_SECTION_GID || '1216203873114461' }}
+          # 1216203370612916, when unset), but this step never set it. The
+          # repo variable existed but held a STALE value (1216203873114461)
+          # from an earlier Asana reorganization that no longer existed --
+          # corrected in the same pass, both here and in the repo variable
+          # itself. The real "FATF list moves" section, 1218451989290544, was
+          # verified directly against the live Asana API.
+          ASANA_FATF_SECTION_GID: ${{ vars.ASANA_FATF_SECTION_GID || '1218451989290544' }}
         run: node scripts/fatf-watchdog.mjs "$MODE"
       - name: Monthly review digest
         # Idempotent monthly digest — self-skips once this month's "Reviews due"

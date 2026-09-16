@@ -170,12 +170,16 @@ jobs:
           # ASANA_DELIVERY_SECTION_GID and silently fall through to "Assessment
           # Report" (1216203370612916) -- a comment here once called that the
           # "Regulatory changes" section; it was neither, and that mislabel is
-          # why the reroute went unnoticed. ASANA_REG_SECTION_GID was already
-          # configured with the correct value (1216203873114460, the real
-          # "Regulatory changes" section, verified against the live API) as a
-          # repo variable; it just was never read here.
+          # why the reroute went unnoticed. ASANA_REG_SECTION_GID existed as a
+          # repo variable, but a first attempt to wire it up here (same day)
+          # copied its then-current value without checking it against the
+          # live API -- that value (1216203873114460) turned out to be STALE
+          # from an earlier Asana reorganization and no longer existed either.
+          # Corrected in a follow-up pass, in both the literal below and the
+          # repo variable itself: the real "Regulatory changes" section is
+          # 1218451992088222, verified directly against the live Asana API.
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1216203873114460' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1218451992088222' }}
           # MIRROR (RETIRED 2026-09-15): the old "Sanctions/Media/PEP -
           # Monitoring" project (1213914392047129) and its "Regulatory changes"
           # section (1216203873114460) were both retired when that project was
