@@ -2919,10 +2919,19 @@ finally:
 check("legacy daily post failure arms the delivery gate (no more green no-delivery)",
       _armed_daily)
 
-# The UNIFIED poster must multi-home into every MLRO queue. The 2026-07-29
-# proof run delivered to Ongoing Monitoring only: _mlro_queue_targets() existed
-# and both LEGACY posters used it, but the unified path — the one the daily
-# workflow actually takes — still hardcoded a single queue. Pin the payload.
+# The UNIFIED poster must multi-home into every CONFIGURED MLRO queue. The
+# 2026-07-29 proof run delivered to Ongoing Monitoring only: _mlro_queue_targets()
+# existed and both LEGACY posters used it, but the unified path (the one the
+# daily workflow actually takes) still hardcoded a single queue. Pin the payload.
+#
+# #518 (2026-09-15) retired ASANA_FOLLOWUPS_GID's default (the separate "Follow
+# Ups" project was merged into HAWKEYE STERLING APP and deleted, same as
+# ASANA_ONGOING_MON_GID's old target), so it is now EMPTY unless a repo secret/
+# var configures a genuinely separate queue again (exercised by the
+# "queue targets without Follow Ups" check right below this one). This test's
+# job is unchanged: prove post_unified_task actually RESPECTS a configured
+# second queue end to end rather than hardcoding a single one, so it configures
+# one explicitly instead of relying on what used to be the default.
 _posted = []
 def _record_post(method, url, **kw):
     _posted.append(kw.get("json"))
@@ -2933,17 +2942,21 @@ def _record_post(method, url, **kw):
         def json(): return {"data": {"gid": "1"}}
     return _R()
 screen.asana_request = _record_post
+_orig_fu2, _orig_fu_sec2 = screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID
 try:
+    screen.ASANA_FOLLOWUPS_GID = "9999999999999991"
+    screen.ASANA_FOLLOWUPS_SECTION_GID = "9999999999999992"
     screen.post_unified_task("narrative", _dt.datetime(2026, 7, 29, 9, 0), [], [], [])
 finally:
     screen.asana_request = _orig_asana_request
+    screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID = _orig_fu2, _orig_fu_sec2
 _data = (_posted[0] or {}).get("data", {}) if _posted else {}
-check("unified daily task is multi-homed into BOTH MLRO queues (projects)",
+check("unified daily task is multi-homed into BOTH MLRO queues when a second one is configured (projects)",
       set(_data.get("projects", [])) ==
-      {screen.ASANA_ONGOING_MON_GID, screen.ASANA_FOLLOWUPS_GID})
+      {screen.ASANA_ONGOING_MON_GID, "9999999999999991"})
 _mem = {m.get("project"): m.get("section") for m in _data.get("memberships", [])}
-check("unified daily task lands in the Follow Ups delivery section",
-      _mem.get(screen.ASANA_FOLLOWUPS_GID) == screen.ASANA_FOLLOWUPS_SECTION_GID
+check("unified daily task lands in the configured second queue's delivery section",
+      _mem.get("9999999999999991") == "9999999999999992"
       and _mem.get(screen.ASANA_ONGOING_MON_GID) == screen.ASANA_SECTION_GID)
 # _mlro_queue_targets directly: dropping the Follow Ups queue must collapse the
 # multi-homing to the single Ongoing Monitoring membership, never an empty one.

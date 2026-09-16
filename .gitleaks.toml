@@ -53,6 +53,8 @@ regexes = [
   # fixture subject names are fictional).
   '''1214107985842154''',  # customer-record test fixture GID
   '''1214107921925846''',  # customer-record test fixture GID
+  '''9999999999999991''',  # test/engine_test.py fixture: fake second-queue project GID (not a real Asana object)
+  '''9999999999999992''',  # test/engine_test.py fixture: fake second-queue section GID (not a real Asana object)
   # Former Reg/Gov/Sanctions section GIDs (kept so history still scans clean).
   '''1215844241216116''',  # former section: Regulatory changes
   '''1215857714525481''',  # former section: Sanctions updates
