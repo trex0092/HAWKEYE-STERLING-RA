@@ -48,8 +48,18 @@ export function level(text) {
   // "EDD is not needed; CDD applies" used to fall through to the
   // first-mentioned fallback and be misread as EDD — the exact misreading
   // this function exists to prevent.
-  const tt = t.replace(/\b(?:EDD|SDD|CDD)\b[^.;]*?\bNOT\b[^.;]*/g, ' ')
-              .replace(/\bNOT\b[^.;]*?\b(?:EDD|SDD|CDD)\b/g, ' ');
+  // The intervening span must not cross a markdown paragraph break (a blank
+  // line): a genuine negation ("EDD is not needed; CDD applies") sits inside
+  // one clause/paragraph, but Advisor replies routinely follow the actual
+  // recommendation with a SEPARATE disclaimer paragraph (e.g. "Rationale
+  // (factual basis only, not a final disposition):") whose own unrelated
+  // "not" used to be read as negating the recommendation just stated,
+  // because nothing between them was a period or semicolon. NOT_PARA_BREAK
+  // matches any character that is not the start of a blank-line break, so
+  // the scan stops there the same way it already stops at . or ;.
+  const NOT_PARA_BREAK = '(?:(?!\\n[ \\t]*\\n)[^.;])';
+  const tt = t.replace(new RegExp('\\b(?:EDD|SDD|CDD)\\b' + NOT_PARA_BREAK + '*?\\bNOT\\b' + NOT_PARA_BREAK + '*', 'g'), ' ')
+              .replace(new RegExp('\\bNOT\\b' + NOT_PARA_BREAK + '*?\\b(?:EDD|SDD|CDD)\\b', 'g'), ' ');
   // Prefer an explicitly phrased recommendation ("recommend EDD", "apply CDD",
   // "diligence level: SDD") over the most-severe token mentioned. Return the
   // canonical literal, not the regex capture: the capture is a slice of the
