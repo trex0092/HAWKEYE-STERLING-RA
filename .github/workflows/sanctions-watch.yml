@@ -132,8 +132,13 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          # "Sanctions updates" section of the Ongoing Monitoring project
-          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
+          # "Sanctions updates" section (1216203873114462). Repointed
+          # 2026-09-16: this was reading the generic, never-set
+          # ASANA_DELIVERY_SECTION_GID and silently falling through to a
+          # DIFFERENT section ("Assessment Report", 1216203370612916) --
+          # ASANA_SANCTIONS_SECTION_GID was already configured with the
+          # correct value as a repo variable, it just was never read here.
+          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1216203873114462' }}
           # MIRROR (RETIRED 2026-09-15): the separate "Sanctions/Media/PEP -
           # Monitoring" project (1213914392047129, section 1213914392047131) was
           # merged into HAWKEYE STERLING APP, so mirroring here would just re-add

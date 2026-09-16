@@ -166,11 +166,16 @@ jobs:
           # PRIMARY (unchanged, per #305 "Route every pipeline Asana delivery to
           # HAWKEYE STERLING APP"): project 1216203370612914 = HAWKEYE STERLING
           # APP, section 1216203370612916 = "Assessment Report". The old comment
-          # here called these "the Regulatory changes section of the Ongoing
-          # Monitoring project" — they are neither, and that mislabel is why the
-          # reroute went unnoticed. Names verified against the live API.
+          # FIXED 2026-09-16: this used to read the generic, never-set
+          # ASANA_DELIVERY_SECTION_GID and silently fall through to "Assessment
+          # Report" (1216203370612916) -- a comment here once called that the
+          # "Regulatory changes" section; it was neither, and that mislabel is
+          # why the reroute went unnoticed. ASANA_REG_SECTION_GID was already
+          # configured with the correct value (1216203873114460, the real
+          # "Regulatory changes" section, verified against the live API) as a
+          # repo variable; it just was never read here.
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1216203873114460' }}
           # MIRROR (RETIRED 2026-09-15): the old "Sanctions/Media/PEP -
           # Monitoring" project (1213914392047129) and its "Regulatory changes"
           # section (1216203873114460) were both retired when that project was
