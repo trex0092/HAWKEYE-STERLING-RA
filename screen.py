@@ -94,8 +94,11 @@ DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "05:00")
 DELIVERY_RESERVE_MIN  = int(os.environ.get("DELIVERY_RESERVE_MIN", "20"))
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
-ASANA_ONGOING_MON_GID = "1213914392047129"
-ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
+ASANA_ONGOING_MON_GID = "1216203370612914"   # RETIRED 2026-09-15: "Sanctions/Media/PEP -
+# Monitoring" project (old value 1213914392047129) was merged into HAWKEYE
+# STERLING APP -- this must always be a live project (delivery is FATAL
+# otherwise), so it is repointed here rather than disabled.
+ASANA_SECTION_GID     = "1218452114962158"   # "Screening Daily Report" section (HAWKEYE STERLING APP); old section 1213914392047131 died with the project above
 # ── Second screening population + second delivery queue (MLRO, 2026-07-29) ──
 # Screening reads BOTH populations: the Customer Database (customers + their
 # UBOs/owners) and the HR – Employees project (staff screening — FATF R.18 /
@@ -104,11 +107,15 @@ ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
 # configured is FATAL, exactly like the customer database — a screening
 # population that silently drops out is a silent clear.
 ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", "1216139945846994")
-# Every daily deliverable is multi-homed into BOTH MLRO queues: Ongoing
-# Monitoring (the review record) and Follow Ups (the action queue). One task,
-# two projects — Asana multi-homing, so there is a single audit trail.
-ASANA_FOLLOWUPS_GID = os.environ.get("ASANA_FOLLOWUPS_GID", "1215884707932023")
-ASANA_FOLLOWUPS_SECTION_GID = os.environ.get("ASANA_FOLLOWUPS_SECTION_GID", "1215884707932047")
+# RETIRED 2026-09-15: the daily deliverable used to be multi-homed into a
+# second MLRO queue, the separate "Follow Ups" project (old value
+# 1215884707932023). That project was merged into HAWKEYE STERLING APP (it
+# now exists there only as a "Follow Ups" SECTION, gid 1218451243658328) --
+# mirroring into it would just re-add the SAME project ASANA_ONGOING_MON_GID
+# already targets above, so the second membership is disabled (empty default)
+# until/unless a genuinely separate MLRO queue exists again.
+ASANA_FOLLOWUPS_GID = os.environ.get("ASANA_FOLLOWUPS_GID", "")
+ASANA_FOLLOWUPS_SECTION_GID = os.environ.get("ASANA_FOLLOWUPS_SECTION_GID", "")
 
 def _mlro_queue_targets():
     """projects + memberships for a daily deliverable, multi-homed into every

@@ -35,5 +35,15 @@ check('PROHIBITED overrides any level', level('This is PROHIBITED — do not onb
 check('fallback takes the first level mentioned', level('CDD then maybe EDD later') === 'CDD');
 check('no level at all is (unparsed)', level('Please consult the MLRO.') === '(unparsed)');
 
+/* Regression (2026-09-16): an unrelated disclaimer paragraph AFTER the
+   recommendation used to be misread as negating it, because nothing between
+   the level and that paragraph's own "not" was a period or semicolon --
+   these are the two real Advisor replies that surfaced this live, both
+   captured verbatim from a live advisor-bias-eval.yml run. */
+check('a disclaimer paragraph after the level is not mistaken for a negation (A)',
+  level('**EDD (Enhanced Due Diligence)**\n\nRationale (factual basis only, not a final disposition):\n\n- Gold trading/DPMS is designated a high-risk sector.') === 'EDD');
+check('a disclaimer paragraph after the level is not mistaken for a negation (B)',
+  level('**Recommended diligence level: EDD (Enhanced Due Diligence)**\n\n**Basis (indicators only, not a final disposition):**\n- Sector risk: Gold trading falls within DPMS.') === 'EDD');
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -51,7 +51,7 @@ that executes without a human (see safeguards column).
 
 | Output | Destination | Retention |
 |---|---|---|
-| Unified daily report + MLRO case subtasks | Asana "Ongoing Monitoring" (GID 1213914392047129) | 10 years |
+| Unified daily report + MLRO case subtasks | Asana "HAWKEYE STERLING APP" (GID 1216203370612914; the separate "Ongoing Monitoring" project this pointed at was merged in and deleted, #518 2026-09-15) | 10 years |
 | Confirmed-hit comment | Customer's Asana task | 10 years |
 | Delta-state (what was reported) | `data/screen-delta-state.json` (git) | git history |
 

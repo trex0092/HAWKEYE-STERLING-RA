@@ -45,10 +45,13 @@
    level(): the network call runs only as main. */
 import { listProjectTasks } from './asana-notify.mjs';
 
-// "Sanctions/Media/PEP - Monitoring" -- where DeliveryAgent files the report
-// (see screen.py's Asana delivery step; the same task is mirrored into
-// "Follow Ups" too, but this project is the stable, dedicated home to read).
-export const PROJECT_GID = process.env.SCREENING_PROJECT_GID || '1213914392047129';
+// HAWKEYE STERLING APP -- where screen.py now files the daily report (see
+// screen.py's ASANA_ONGOING_MON_GID). RETIRED 2026-09-15: this used to read
+// the separate "Sanctions/Media/PEP - Monitoring" project (old value
+// '1213914392047129'), which was merged into HAWKEYE STERLING APP -- the
+// watchdog is repointed here so it reads the report's actual current home
+// instead of a deleted project (which would always show as "never delivered").
+export const PROJECT_GID = process.env.SCREENING_PROJECT_GID || '1216203370612914';
 export const TITLE_PREFIX = 'Daily AML/CFT Screening Report';
 
 /* Pure: which tasks are a screening report filed on `today` (UTC date

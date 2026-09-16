@@ -42,8 +42,10 @@ Asana project  "RISK ASSESSMENTS"  (default GID 1216203370612914)
 
 Separately, the regulatory/sanctions watchers post to a **different** project via
 [`scripts/asana-notify.mjs`](../scripts/asana-notify.mjs)
-(`ASANA_REG_PROJECT_GID`, default `1213914392047129` — Ongoing Monitoring, after the
-Regulations/Governance/Sanctions project was merged into it) — not in scope here.
+(`ASANA_REG_PROJECT_GID`, default `1216203370612914` — HAWKEYE STERLING APP; the
+Regulations/Governance/Sanctions project was merged into it, and later "Ongoing
+Monitoring"/"Sanctions/Media/PEP - Monitoring" was merged in and deleted too,
+#518 2026-09-15) — not in scope here.
 
 ### Key facts
 

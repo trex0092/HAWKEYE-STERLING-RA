@@ -90,8 +90,14 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          # "AI & Platform Governance" section of the Ongoing Monitoring project
-          ASANA_WEEKLY_SECTION_GID: ${{ vars.ASANA_WEEKLY_SECTION_GID || '1216229252787647' }}
+          # "AI & Platform Governance" section, gid 1216782693874840. FIXED
+          # 2026-09-16: the literal fallback here (1216229252787647) no longer
+          # existed in the live project -- likely stale from an earlier Asana
+          # reorganization. There was no repo variable of this name set, so
+          # this had been silently posting to no section at all. Created the
+          # ASANA_WEEKLY_SECTION_GID repo variable and corrected the literal,
+          # both verified against the live Asana API.
+          ASANA_WEEKLY_SECTION_GID: ${{ vars.ASANA_WEEKLY_SECTION_GID || '1216782693874840' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Don't fail the run if Asana is unreachable; the issue fallback covers it.
         continue-on-error: true
