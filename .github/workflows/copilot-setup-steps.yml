@@ -1,21 +1,41 @@
-- name: Claude AutoFix
-  # You may pin to the exact commit or the version.
-  # uses: enriconunes/claude-autofix-action@86cc82d4d18e33e99106982f12b5e2a502d5ab97
-  uses: enriconunes/claude-autofix-action@v2.1.2
-  with:
-    # Anthropic API key (ANTHROPIC_API_KEY)
-    anthropic-api-key: 
-    # Maximum number of fixes per run
-    max-fixes: # optional, default is 5
-    # Python version to use
-    python-version: # optional, default is 3.11
-    # Automatically create a Pull Request with the fixes (true/false)
-    create-pr: # optional, default is true
-    # Test framework: pytest | vitest | jest
-    test-framework: # optional, default is pytest
-    # Source language: python | typescript | javascript
-    language: # optional, default is python
-    # Append failing test info to logs/error_history.jsonl in main (true/false). Does not consume Claude tokens.
-    enable-error-log: # optional, default is false
-    # Post a Claude-powered insight comment on the PR based on the author's error history (true/false). Requires enable-error-log on previous runs to have data. Consumes Claude tokens.
-    enable-insights: # optional, default is false
+name: Claude AutoFix
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened, labeled]
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  claude-autofix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Claude AutoFix
+        uses: enriconunes/claude-autofix-action@86cc82d4d18e33e99106982f12b5e2a502d5ab97 # v2.1.2
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          max-fixes: 5
+          python-version: "3.11"
+          create-pr: true
+          test-framework: pytest
+          language: python
+          enable-error-log: false
+          enable-insights: false
