@@ -91,13 +91,23 @@ check('sharedTokenOk: feature off ⇒ true for arbitrary events', () => {
   }), RUNS);
 });
 
-check('sharedTokenOk: token mode — no-Origin path requires an exact match; Origin path passes', () => {
+check('sharedTokenOk: token mode — no-Origin and unrecognized-Origin paths require an exact match; the canonical origin passes', () => {
+  const CANONICAL = 'https://hawkeye-sterling-ra.netlify.app';
   try {
     fc.assert(fc.property(
       fc.string({ minLength: 1, maxLength: 40 }), fc.string({ maxLength: 40 }),
-      (token, provided) => {
+      fc.string({ maxLength: 40 }).filter((s) => s !== CANONICAL),
+      (token, provided, arbitraryOrigin) => {
         process.env.APP_SHARED_TOKEN = token; delete process.env.APP_STRICT_TOKEN;
-        if (sharedTokenOk({ headers: { origin: 'https://any.example' } }) !== true) return false;
+        delete process.env.ALLOWED_ORIGINS; delete process.env.URL;
+        // The canonical site origin is always in the allow-list (hardcoded in
+        // _auth.js's allowedOrigins()), so it passes without a token.
+        if (sharedTokenOk({ headers: { origin: CANONICAL } }) !== true) return false;
+        // An arbitrary Origin value NOT on the allow-list must still present
+        // the token -- this is the exact fix in 'Validate allowed origins in
+        // Netlify function authentication': previously ANY Origin header,
+        // forged or not, bypassed the token requirement.
+        if (sharedTokenOk({ headers: { origin: arbitraryOrigin } }) !== false) return false;
         if (sharedTokenOk({ headers: {} }) !== false) return false;                       // no origin, no token
         return sharedTokenOk({ headers: { 'x-app-token': provided } }) === (provided === token);
       }
