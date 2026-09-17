@@ -33,6 +33,9 @@ regexes = [
   '''1216203370612914''',  # HAWKEYE STERLING APP project (RA delivery target)
   '''1216203370612916''',  # section: Assessment Report (pipeline report delivery target)
   '''1218452114962158''',  # section: Screening Daily Report (screen.py ASANA_SECTION_GID, since #518)
+  '''1216782693874840''',  # section: AI & Platform Governance (weekly-summary.yml + advisor-eval.yml since #528)
+  '''1218451992088222''',  # section: Regulatory changes (regulatory-watch.yml, since #525 -- missed at the time)
+  '''1218451989290544''',  # section: FATF list moves (fatf-watchdog.yml, since #525 -- missed at the time)
   '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log) -- RETIRED as a live default by #518, kept only so git history still scans clean
   '''1213914392047131''',  # section: Daily Sanctions Screening (screen.py + daily-sanctions-screen.yml) -- RETIRED as a live default by #518, kept only so git history still scans clean
   '''1214107620220121''',  # Customer Database project (screen.py ASANA_CUSTOMER_DB_GID default; also quoted in the scripts/daily-screen-report.py provenance footer)
