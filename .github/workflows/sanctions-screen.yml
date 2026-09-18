@@ -174,6 +174,7 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
+          ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID }}
           # "Sanctions updates" section, gid 1218451960830318. Repointed
           # 2026-09-16: same fix as sanctions-watch.yml -- this was reading
           # the generic, never-set ASANA_DELIVERY_SECTION_GID and silently
