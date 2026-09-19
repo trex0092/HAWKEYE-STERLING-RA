@@ -97,6 +97,8 @@ jobs:
         run: node test/state-crypto.test.mjs
       - name: Run sanctions-screen unit tests
         run: node test/sanctions-screen.test.mjs
+      - name: Run employee-screening-wiring regression test
+        run: node test/employee-screening-wiring.test.mjs
       - name: Run sanctions matcher unit tests
         run: node test/sanctions-match.test.mjs
       - name: Run sanctions matcher property/fuzz tests
