@@ -4,7 +4,8 @@ import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, sco
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, GDELT_QUERY_MAX, gdeltTerms,
-  gdeltQueryString } from '../scripts/adverse-media.mjs';
+  gdeltQueryString, GDELT_BREAKER_AFTER, gdeltBreakerState, resetGdeltBreaker,
+  gdeltBreakerRecordSuccess, gdeltBreakerRecordFailure } from '../scripts/adverse-media.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -364,6 +365,41 @@ check('parity terms widen SCORING only — the Google News query URL stays short
     wide.every(t => ALL_TERMS.some(a => a.toLowerCase() === t.toLowerCase()
       || t.toLowerCase().includes(a.toLowerCase()))));
 }
+
+/* ── GDELT circuit breaker (2026-09-19: ported from screen.py's
+   GDELT_BREAKER_AFTER after the JS engine's own run logs showed the exact
+   throttling pattern screen.py's breaker already exists to stop -- dozens of
+   "GDELT rejected" lines in a single run, some of them reproduced directly
+   against the live API even on the smallest 26-term base query, i.e. a
+   429/hard-down feed, not a too-long query. Pure state-transition logic
+   only; no network. ── */
+resetGdeltBreaker();
+check('gdelt breaker: starts closed with a zero counter',
+  gdeltBreakerState.open === false && gdeltBreakerState.consecutiveFailures === 0);
+
+resetGdeltBreaker();
+for (let i = 0; i < GDELT_BREAKER_AFTER - 1; i++) gdeltBreakerRecordFailure();
+check('gdelt breaker: stays closed one failure short of the threshold',
+  gdeltBreakerState.open === false && gdeltBreakerState.consecutiveFailures === GDELT_BREAKER_AFTER - 1);
+
+gdeltBreakerRecordFailure();
+check('gdelt breaker: opens on the Nth CONSECUTIVE failure (default 5, screen.py parity)',
+  gdeltBreakerState.open === true && gdeltBreakerState.consecutiveFailures === GDELT_BREAKER_AFTER);
+
+resetGdeltBreaker();
+for (let i = 0; i < GDELT_BREAKER_AFTER - 1; i++) gdeltBreakerRecordFailure();
+gdeltBreakerRecordSuccess();
+check('gdelt breaker: a success resets the counter before the breaker trips',
+  gdeltBreakerState.open === false && gdeltBreakerState.consecutiveFailures === 0);
+
+resetGdeltBreaker();
+for (let i = 0; i < GDELT_BREAKER_AFTER + 3; i++) gdeltBreakerRecordFailure();
+const openedAt = gdeltBreakerState.consecutiveFailures;
+gdeltBreakerRecordSuccess();
+check('gdelt breaker: once OPEN, a later success does not silently re-close it '
+  + '(only resetGdeltBreaker, called once per fresh run/process, may)',
+  gdeltBreakerState.open === true && openedAt > GDELT_BREAKER_AFTER);
+resetGdeltBreaker();
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
