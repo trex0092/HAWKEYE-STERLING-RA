@@ -427,14 +427,14 @@ export function parseGenericXml(body) {
   while ((m = recordRe.exec(s))) {
     matched = true;
     const block = m[2];
-    const given = firstTag(block, 'GivenName') || firstTag(block, 'givenName') || firstTag(block, 'FirstName') || firstTag(block, 'firstName');
-    const last = firstTag(block, 'LastName') || firstTag(block, 'lastName') || firstTag(block, 'Surname');
+    const given = firstTag(block, 'GivenName') || firstTag(block, 'givenName') || firstTag(block, 'FirstName') || firstTag(block, 'firstName') || firstTag(block, 'GivenName-Prenom');
+    const last = firstTag(block, 'LastName') || firstTag(block, 'lastName') || firstTag(block, 'Surname') || firstTag(block, 'LastName-NomDeFamille');
     const whole = firstTag(block, 'Entity') || firstTag(block, 'entity') || firstTag(block, 'WholeName')
-      || firstTag(block, 'wholeName') || firstTag(block, 'Name') || firstTag(block, 'name');
+      || firstTag(block, 'wholeName') || firstTag(block, 'Name') || firstTag(block, 'name') || firstTag(block, 'EntityOrShip-EntiteOuNavire');
     const combined = [given, last].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
     if (combined) names.push(combined);
     if (whole && whole !== combined) names.push(whole);
-    for (const t of ['Aliases', 'aliases', 'Alias', 'alias', 'AKA', 'aka']) {
+    for (const t of ['Aliases', 'aliases', 'Alias', 'alias', 'AKA', 'aka', 'Aliases-Alias']) {
       for (const a of allTags(block, t)) for (const piece of a.split(/[\/;|]/)) { const v = piece.trim(); if (v) names.push(v); }
     }
   }
