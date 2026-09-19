@@ -1532,7 +1532,10 @@ check('IDB CSV: a body without the Title column parses to [] (coverage floor tak
 const _idb = extraReg.find(s => s.id === 'idb-debarment');
 check('idb-debarment is enabled on the probe-proven file endpoint with the idbcsv parser + floor',
   !!_idb && _idb.enabled === true && _idb.parser === 'idbcsv'
-  && /data\.iadb\.org\/file\/download\//.test(_idb.url) && Number(_idb.minNames) >= 200);
+  // Repointed 2026-09-19: IADB migrated the CKAN path from singular /file/download/
+  // to plural /files/download/ (same resource UUID). Old path confirmed 404 live;
+  // new path confirmed HTTP 200 with the correct CSV schema before this test changed.
+  && /data\.iadb\.org\/files\/download\//.test(_idb.url) && Number(_idb.minNames) >= 200);
 
 /* ── source probe (diagnostic instrument — pure functions) ── */
 const sp = await import('./../scripts/source-probe.mjs');
