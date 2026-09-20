@@ -1,14 +1,20 @@
 # AML Regulators & FIUs — Global Reference Directory
 
-Prepared: 07/07/2026. Audience: analysts and the MLRO — quick orientation when a
-counterparty, bank, or shipment touches another jurisdiction (who supervises AML
-there, and which FIU receives reports).
+Prepared: 07/07/2026. Updated: 20/09/2026 (added Germany, France, Saudi Arabia).
+Audience: analysts and the MLRO - quick orientation when a counterparty, bank, or
+shipment touches another jurisdiction (who supervises AML there, and which FIU
+receives reports).
 
 **Provenance:** compiled from an industry reference infographic ("AML Regulators
 Around the World", Khurram Ibrahim, LinkedIn) supplied to the compliance function,
-cross-checked against the names already used in this repository's watched sources.
-Reference material only — mandates shift; verify the current authority before
-relying on it in a filing. Not legal advice.
+plus a second, similarly-structured reference list supplied to the function on
+2026-09-20, cross-checked against the names already used in this repository's
+watched sources. The three rows added from that second source (Germany, France,
+Saudi Arabia) were spot-checked against each country's own regulator (BaFin,
+SAMA's rulebook, and general knowledge of Tracfin/FIU Deutschland); the rest of
+this file's pre-existing content was not re-verified for this update. Reference
+material only - mandates shift; verify the current authority before relying on
+it in a filing. Not legal advice.
 
 ## How the global system fits together
 **FATF** (standard setter, 40 Recommendations) → **national authorities**
@@ -33,6 +39,8 @@ relying on it in a filing. Not legal advice.
 | **United States** | OCC, Federal Reserve, SEC, CFTC; DOJ & IRS-CI enforce | **FinCEN** |
 | **United Kingdom** | FCA; OPBAS (professional-body oversight); HMRC (incl. DPMS-equivalents); SFO enforces | **NCA** |
 | **European Union** | EBA guidelines; national competent authorities; **AMLA** (operational from mid-2026, direct supervision of select high-risk entities) | national FIUs |
+| **Germany** | BaFin | FIU Deutschland (Zentralstelle für Finanztransaktionsuntersuchungen) |
+| **France** | ACPR (banks/insurers); AMF (markets) | Tracfin |
 | **India** | RBI, SEBI, IRDAI; ED enforces | FIU-IND |
 | **Singapore** | MAS (integrated); CAD enforces | STRO |
 | **Hong Kong** | HKMA, SFC | JFIU |
@@ -46,6 +54,7 @@ relying on it in a filing. Not legal advice.
 | **Brazil** | Central Bank; CVM | COAF |
 | **Malaysia** | BNM; SC | BNM FIU dept |
 | **Turkey** | CBRT, SPK | **MASAK** |
+| **Saudi Arabia** | SAMA (Saudi Central Bank) | SAFIU |
 | Russia · Indonesia · Philippines · Vietnam · Thailand · Mexico | — | Rosfinmonitoring · PPATK · AMLC · SBV · AMLO · UIF |
 
 ## Networks & standard-adjacent bodies
