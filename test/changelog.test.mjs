@@ -26,8 +26,8 @@ check('app.js declares APP_VERSION', !!appVer);
    section on a bump" rule CONTRIBUTING states. Now the estate's declared
    version must have its own non-empty section, so a bump PR that forgets the
    changelog fails here instead of shipping sectionless again. */
-const verHeadRe = new RegExp('^##\\s*\\[' + appVer.replace(/\./g, '\\.') + '\\]\\s*—\\s*\\d{4}-\\d{2}-\\d{2}', 'm');
-check('the current APP_VERSION has its own dated section (## [' + appVer + '] — YYYY-MM-DD)', verHeadRe.test(cl));
+const verHeadRe = new RegExp('^##\\s*\\[' + appVer.replace(/\./g, '\\.') + '\\]\\s*-\\s*\\d{4}-\\d{2}-\\d{2}', 'm');
+check('the current APP_VERSION has its own dated section (## [' + appVer + '] - YYYY-MM-DD)', verHeadRe.test(cl));
 const verBody = ((cl.split(verHeadRe)[1] || '').split(/\n##\s+/)[0] || '');
 check('the [' + appVer + '] section is not empty', /(^|\n)\s*[-*#]\s*\S|\n\S/.test(verBody) && verBody.trim().length > 40);
 
