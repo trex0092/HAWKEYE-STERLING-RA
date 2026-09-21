@@ -110,6 +110,12 @@ export async function enrichScreeningResults(results, {
         Authorization: 'Bearer ' + apiKey,
         'Content-Type': 'application/json'
       },
+      // codeql[js/file-access-to-http]: reviewed 2026-09-21, intended design, not a leak.
+      // screeningEvidence() (above) already curates/clips this data before it gets here
+      // (name/jurisdiction/hits length-capped, no secrets or credentials), the destination
+      // is the fixed OPENAI_RESPONSES_URL literal (not attacker-controllable), the feature
+      // is opt-in (returns enabled:false above if OPENAI_API_KEY is unset), and store:false
+      // is set explicitly. See this file's header comment for the documented data flow.
       body: JSON.stringify({
         model,
         store: false,
