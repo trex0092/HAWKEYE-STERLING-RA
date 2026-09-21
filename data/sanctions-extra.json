@@ -244,13 +244,13 @@
     },
     {
       "id": "lv-fid",
-      "name": "Latvia — FID National Sanctions List (XML)",
+      "name": "Latvia — FID National Sanctions List (static snapshot)",
       "jurisdiction": "Latvia",
-      "url": "https://sankcijas.fid.gov.lv/files/LV_national_v2.xml",
+      "url": "https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/main/data/lv-fid-snapshot.xml",
       "type": "xml",
       "parser": "xml",
       "enabled": true,
-      "_note": "Latvia's small NATIONAL designation list (EU-FSF-style XML schema; generic XML extractor). Deliberately tiny floor — the list holds single-digit-to-dozens entries and a 0-name parse must still read as degraded, never as coverage. FLAGGED 2026-09-19: this URL now returns the site's HTML shell (Cookiebot/consent script), not XML — every path probed on this domain returns the identical HTML, consistent with the site having moved to a JS single-page app that loads data via a backend API rather than a static file. No replacement endpoint found from a text-only probe; needs someone to inspect the live site (browser devtools/network tab) to find the real data endpoint. Left enabled so the degraded-coverage disclosure keeps firing rather than going silent.",
+      "_note": "RESOLVED 2026-09-21, but not the same way as every other source in this file: the live URL (sankcijas.fid.gov.lv/files/LV_national_v2.xml) is confirmed dead -- FID redesigned their site, the old flat XML path 302s to the homepage, and the new site serves this file only via a JavaScript-triggered download button with no href in the page source, so it cannot be fetched by a script the way every other source here is. This entry instead points at data/lv-fid-snapshot.xml, a byte-exact copy of the file the site's own download button produced, committed into this repo and fetched from here via raw.githubusercontent.com (added to the sanctions-screen.yml egress allowlist for this). Manually verified 2026-09-21: 3 entities, all North Korea-program designations, PublishDate 2018-03-29 in the file itself -- this is Latvia's small NATIONAL-only list (distinct from the much larger EU/UN lists already covered elsewhere in this registry) and genuinely appears not to have changed since 2018. This is a DATED SNAPSHOT, not a live feed: it will not pick up a future change on its own. Re-verify by repeating the manual download every few months (or sooner if FID Latvia designates someone new) and replacing data/lv-fid-snapshot.xml. Deliberately tiny floor unchanged -- a 0-name parse must still read as degraded, never as coverage.",
       "minNames": 2
     },
     {
