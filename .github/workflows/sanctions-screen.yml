@@ -86,6 +86,7 @@ jobs:
             api.github.com:443
             codeload.github.com:443
             objects.githubusercontent.com:443
+            raw.githubusercontent.com:443
             nodejs.org:443
             app.asana.com:443
             sanctionslistservice.ofac.treas.gov:443
