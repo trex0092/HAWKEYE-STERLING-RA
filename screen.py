@@ -130,6 +130,14 @@ def _mlro_queue_targets():
         memberships.append(m)
     return projects, memberships
 ASANA_ASSIGNEE_GID    = "1213645083721304"   # default case/OM assignee (MLRO)
+# Case subtasks are created with only a `parent`, and Asana does not put a
+# subtask on any project board by itself: every case created since at least
+# 27 Aug 2026 had ZERO project/section membership and was invisible on the
+# case board. They are now attached, after creation, to this section of the
+# monitoring project ("Screening Cases - New"). Set the variable empty to
+# disable the attach (cases then stay board-less, as before).
+ASANA_CASES_NEW_SECTION_GID = os.environ.get("ASANA_CASES_NEW_SECTION_GID", "1216908203079873")
+CASE_BOARD_ATTACH = {"attached": 0, "failed": 0}
 
 # ── Match thresholds — env-tunable, ONE-WAY (challenger runs more sensitive
 # only, per docs/governance/champion-challenger-thresholds.md). A value ABOVE
@@ -1872,6 +1880,35 @@ def search_bing_news(name: str, max_results: int = 8) -> list:
         raise RuntimeError(f"Bing News HTTP {r.status_code}")
     return parse_bing_news(r.content, max_results)
 
+# Per-run news-feed coverage. The report used to say GDELT "runs on EVERY
+# subject every run regardless" even on runs where its circuit opened after 5
+# subjects (21 Sep 2026: HTTP 429), and never said how many subjects were
+# covered by one feed only. Counted here, per news-swept subject, and rendered
+# in section 2 of the report.
+_FEED_COVERAGE = {"subjects": 0, "gnews": 0, "gdelt": 0, "bing": 0, "single": 0, "none": 0}
+_FEED_COVERAGE_LOCK = threading.Lock()
+
+def _record_feed_coverage(gn_ok, gdelt_ok, bing_ok):
+    n = int(bool(gn_ok)) + int(bool(gdelt_ok)) + int(bool(bing_ok))
+    with _FEED_COVERAGE_LOCK:
+        _FEED_COVERAGE["subjects"] += 1
+        _FEED_COVERAGE["gnews"] += int(bool(gn_ok))
+        _FEED_COVERAGE["gdelt"] += int(bool(gdelt_ok))
+        _FEED_COVERAGE["bing"] += int(bool(bing_ok))
+        if n == 1:
+            _FEED_COVERAGE["single"] += 1
+        elif n == 0:
+            _FEED_COVERAGE["none"] += 1
+
+def feed_coverage_snapshot():
+    with _FEED_COVERAGE_LOCK:
+        return dict(_FEED_COVERAGE)
+
+def reset_feed_coverage():
+    with _FEED_COVERAGE_LOCK:
+        for k in _FEED_COVERAGE:
+            _FEED_COVERAGE[k] = 0
+
 def search_adverse_media(name: str, max_results: int = None) -> list:
     """
     Deep adverse-media search via Google News RSS.
@@ -2074,6 +2111,8 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                         "skipping Bing News for the rest of the run; Google News/GDELT coverage stands")
             else:
                 log(f"  Bing News unavailable for this subject ({str(e)[:80]}) — other feeds stand")
+
+    _record_feed_coverage(attempts > 0 and failures < attempts, gdelt_ok, bing_ok)
 
     # Degrade loudly: if EVERY Google-News fetch failed (or its breaker skipped
     # the feed entirely) AND GDELT failed AND Bing News failed, we have ZERO
@@ -5649,6 +5688,19 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("   Why the news sweep failed (top messages, × subjects affected):")
         for _msg, _n in stats["am_error_msgs"]:
             A(f"     - {_msg}  ×{_n}")
+    # News feed coverage is disclosed on EVERY run, including a zero-finding
+    # one: it is what tells the MLRO how much weight a "no adverse media" carries.
+    _fc = stats.get("news_feed_coverage") or {}
+    _fc_n = int(_fc.get("subjects", 0) or 0)
+    if _fc_n:
+        A(f"   News feed coverage this run ({_fc_n} subject(s) news-swept): "
+          f"Google News {_fc.get('gnews', 0)} · GDELT {_fc.get('gdelt', 0)} · "
+          f"Bing News {_fc.get('bing', 0)} · reached by ONE feed only: {_fc.get('single', 0)} · "
+          f"reached by NO feed: {_fc.get('none', 0)}.")
+        if _fc.get("single", 0) or _fc.get("none", 0):
+            A("   Read 'no adverse media' as PROVISIONAL for subjects reached by one feed or none: "
+              "a single feed has narrower recall than the full sweep, and the watchlist is not news.")
+    _gdelt_full = (not _fc_n) or int(_fc.get("gdelt", 0) or 0) >= _fc_n
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
@@ -5714,8 +5766,11 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             _cyc = adverse_rotation_cycle_days()
             A(f"   Worldwide rotation: this run swept {_mkts}. The {ADVERSE_CORE_LOCALES} core editions run every day; the rest of the "
               f"{len(GNEWS_LOCALES)}-market matrix rotates, so every market is swept within {_cyc} run(s). "
-              "GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
-              "the rotation adds local-language press on top of it.")
+              + ("GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
+                 "the rotation adds local-language press on top of it."
+                 if _gdelt_full else
+                 f"GDELT's global index reached only {_fc.get('gdelt', 0)} of {_fc_n} subject(s) this run "
+                 "(feed rate-limited the runner), so worldwide reach was NOT complete on that layer."))
         if stats.get("watchlist_loaded"):
             A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
               f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
@@ -5903,6 +5958,35 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     UNIFIED_DELIVERY_FAILED["failed"] = True
     return None
 
+def _new_task_gid(resp):
+    """gid of the task an Asana create returned, or "" when the body is not
+    readable (never raises: attaching a case to the board is best-effort)."""
+    try:
+        return str(((resp.json() or {}).get("data") or {}).get("gid") or "")
+    except Exception:
+        return ""
+
+def attach_case_to_board(task_gid):
+    """Put a just-created case subtask on the MLRO case board.
+
+    A failure is LOUD (log line + GitHub ::warning:: annotation + counter) but
+    never fails the case itself: the case exists and is assigned, it just is
+    not visible on the board until someone re-attaches it."""
+    if not ASANA_CASES_NEW_SECTION_GID:
+        return False
+    ok = False
+    if task_gid:
+        r = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{task_gid}/addProject",
+                          json={"data": {"project": ASANA_ONGOING_MON_GID,
+                                         "section": ASANA_CASES_NEW_SECTION_GID}})
+        ok = r is not None and getattr(r, "status_code", None) in (200, 201)
+    CASE_BOARD_ATTACH["attached" if ok else "failed"] += 1
+    if not ok:
+        log(f"  case subtask {task_gid or '(gid unreadable)'} was created but NOT attached to the case board")
+        print("::warning::MLRO case subtask created but not attached to the case board "
+              "(no project/section membership); re-attach it by hand", flush=True)
+    return ok
+
 def create_case_subtask(parent_gid, name, notes, due_on):
     """One trackable MLRO case per NEW hit — assigned, with a disposition to set.
 
@@ -5929,6 +6013,7 @@ def create_case_subtask(parent_gid, name, notes, due_on):
         }}
         r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
         if r is not None and r.status_code in (200, 201):
+            attach_case_to_board(_new_task_gid(r))
             return True
         # Only a size/validation refusal is worth re-bidding smaller; an auth,
         # rate-limit or network failure fails identically at any budget.
@@ -6067,7 +6152,19 @@ def _ai_mode_label():
     credential is issuable and the PDPL line must say the key is present)."""
     if not ai.llm_available():
         return "deterministic"
-    return "AI-assisted triage" if ai.LLM_TRIAGE else "deterministic (LLM standby — triage off)"
+    if not ai.LLM_TRIAGE:
+        return "deterministic (LLM standby — triage off)"
+    # Triage is ON, but "on" is not "working": 21 Sep 2026 the report said
+    # AI-assisted triage while 557 of 557 calls failed (an HTTP reply, even an
+    # error, deliberately does not open the circuit breaker in ai.py). Say what
+    # the run actually got. Still != "deterministic" so the credential contract
+    # in agents.py is unchanged.
+    _att, _ok = ai.LLM_CALLS.get("attempted", 0), ai.LLM_CALLS.get("ok", 0)
+    if _att > 0 and _ok == 0:
+        return f"deterministic (LLM UNAVAILABLE: 0 of {_att} calls succeeded)"
+    if _att > 0 and _ok < _att:
+        return f"AI-assisted triage (DEGRADED: {_ok} of {_att} calls succeeded)"
+    return "AI-assisted triage"
 
 def tally_enrichment(results, wl_hits, wl_loaded):
     """Pure tally of the enrichment pass → (counts, adverse_findings, pep_findings).
@@ -6523,6 +6620,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # say "LLM" only if the model actually answered for the whole pass.
     if ai.llm_circuit_open():
         mode_lbl += f" → DEGRADED (AI circuit OPEN, {ai.LLM_CALLS.get('skipped', 0)} call(s) skipped)"
+    elif ai.LLM_CALLS.get("attempted", 0) > 0 and ai.LLM_CALLS.get("ok", 0) == 0:
+        mode_lbl += f" → DEGRADED (0 of {ai.LLM_CALLS['attempted']} LLM calls succeeded; deterministic triage stands)"
     log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
         f"mode={mode_lbl}")
     progress("ai-triage-done", flagged=len(possible_matches), clusters=len(related))
@@ -6587,6 +6686,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "am_error_msgs": counts.get("am_error_msgs", []),
              "adverse_evidence_error": adverse_evidence_error,
              "am_blackout": counts["am_blackout"], "am_skipped": counts.get("am_skipped", 0),
+             "news_feed_coverage": feed_coverage_snapshot(),
              "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "bulletin_failures": rb_failures,

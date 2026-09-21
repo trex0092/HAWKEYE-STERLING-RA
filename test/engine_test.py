@@ -2386,6 +2386,8 @@ class _CaseResp:
     @staticmethod
     def json(): return {"data": {"gid": "1"}}
 def _rec_case(method, url, **kw):
+    if "/addProject" in url:      # board attach after a create: not a case itself
+        return _CaseResp()
     _case_names.append(((kw.get("json") or {}).get("data") or {}).get("name", ""))
     return _CaseResp()
 _mk_match = lambda excl: [{"name": "Acme", "permalink": "p", "gid": "g", "hits": [
@@ -3823,12 +3825,167 @@ check("a run that never tripped the breaker carries no circuit warning",
 check("the governance footer declares the run degraded when the circuit tripped",
       "DEGRADED THIS RUN" in ai.governance_footer())
 ai._LLM_STATE["open"] = False
+for _k in ai.LLM_CALLS:
+    ai.LLM_CALLS[_k] = 0      # a healthy run starts from fresh counters
 check("and makes no degraded claim on a healthy run",
       "DEGRADED THIS RUN" not in ai.governance_footer())
 
 _req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
 os.environ.pop("ANTHROPIC_API_KEY", None)
 _reset_llm()
+
+# ── 21 Sep 2026 engine fixes: case-board attach, honest news-feed coverage, honest AI mode ──
+# (1) Case subtasks were created with only a `parent`, so Asana gave them ZERO
+# project/section membership and they never showed on the case board.
+_cb_calls = []
+def _cb_stub(create_status=201, create_gid="777", attach_status=200):
+    _cb_calls.clear()
+    def _req(method, url, **kw):
+        _cb_calls.append((method, url, (kw.get("json") or {}).get("data") or {}))
+        if url.endswith("/addProject"):
+            return types.SimpleNamespace(status_code=attach_status, text="stub")
+        _resp = types.SimpleNamespace(status_code=create_status, text="stub")
+        _resp.json = (lambda: {"data": {"gid": create_gid}}) if create_gid is not None else (lambda: (_ for _ in ()).throw(ValueError("no body")))
+        return _resp
+    return _req
+_cb_orig_req = screen.asana_request
+_cb_orig_sec = screen.ASANA_CASES_NEW_SECTION_GID
+try:
+    screen.ASANA_CASES_NEW_SECTION_GID = "9999999999999901"
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub()
+    _cb_ok = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    _cb_attach = [c for c in _cb_calls if c[1].endswith("/addProject")]
+    check("case subtask: created OK", _cb_ok is True)
+    check("case subtask: attached to the board via addProject on the NEW task gid",
+          len(_cb_attach) == 1 and _cb_attach[0][1].endswith("/tasks/777/addProject"))
+    check("case subtask: attach targets the monitoring project and the New-cases section",
+          _cb_attach[0][2].get("project") == screen.ASANA_ONGOING_MON_GID
+          and _cb_attach[0][2].get("section") == "9999999999999901")
+    check("case subtask: attach is counted", screen.CASE_BOARD_ATTACH["attached"] == 1)
+
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub(attach_status=500)
+    _cb_ok2 = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: a failed attach never fails the case itself", _cb_ok2 is True)
+    check("case subtask: a failed attach is counted (loud), not swallowed",
+          screen.CASE_BOARD_ATTACH["failed"] == 1 and screen.CASE_BOARD_ATTACH["attached"] == 0)
+
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub(create_gid=None)
+    screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: an unreadable create response is counted as a failed attach, no blind call",
+          screen.CASE_BOARD_ATTACH["failed"] == 1
+          and not [c for c in _cb_calls if c[1].endswith("/addProject")])
+
+    screen.ASANA_CASES_NEW_SECTION_GID = ""
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub()
+    screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: an empty section setting disables the attach",
+          not [c for c in _cb_calls if c[1].endswith("/addProject")]
+          and screen.CASE_BOARD_ATTACH == {"attached": 0, "failed": 0})
+finally:
+    screen.asana_request = _cb_orig_req
+    screen.ASANA_CASES_NEW_SECTION_GID = _cb_orig_sec
+
+# (2) The report claimed GDELT "runs on EVERY subject every run regardless" on a
+# run where its circuit opened after 5 subjects. Coverage is now counted per
+# subject and rendered; the claim is only made when it is true.
+class _FcResp:
+    status_code = 200
+    content = _RSS_OK
+_fc_saved = (screen.requests.get, screen.search_gdelt, screen.search_bing_news)
+try:
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen.requests.get = lambda *_a, **_k: _FcResp()
+    screen.search_gdelt = lambda *_a, **_k: []           # reachable, nothing found
+    screen.search_bing_news = lambda *_a, **_k: []
+    screen.search_adverse_media("Feed Cov One")
+    _fc1 = screen.feed_coverage_snapshot()
+    check("feed coverage: a subject reached by all three feeds is counted on each",
+          _fc1 == {"subjects": 1, "gnews": 1, "gdelt": 1, "bing": 1, "single": 0, "none": 0})
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen._GNEWS_STATE["open"] = True                    # Google News circuit open
+    screen.search_gdelt = _gdelt_down                     # GDELT rate-limited
+    screen.search_adverse_media("Feed Cov Two")
+    _fc2 = screen.feed_coverage_snapshot()
+    check("feed coverage: Bing alone is recorded as a SINGLE-feed subject",
+          _fc2["subjects"] == 1 and _fc2["bing"] == 1 and _fc2["gnews"] == 0
+          and _fc2["gdelt"] == 0 and _fc2["single"] == 1 and _fc2["none"] == 0)
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen._GNEWS_STATE["open"] = True
+    screen.search_bing_news = _bing_down
+    _raised2 = ""
+    try:
+        screen.search_adverse_media("Feed Cov Three")
+    except RuntimeError as e:
+        _raised2 = str(e)
+    _fc3 = screen.feed_coverage_snapshot()
+    check("feed coverage: a subject no feed reached is counted AND still raises loudly",
+          _fc3["none"] == 1 and _fc3["subjects"] == 1 and "circuit open" in _raised2)
+finally:
+    screen.requests.get, screen.search_gdelt, screen.search_bing_news = _fc_saved
+    _reset_breaker(); screen.reset_feed_coverage()
+
+_fc_stats = lambda cov: {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5,
+                         "am_errors": 0, "pep_errors": 0, "delta": {}, "news_feed_coverage": cov,
+                         "watchlist_loaded": True, "watchlist_findings": 1}
+_fc_find = [{"subject_type": "ENTITY", "subject_name": "Acme", "parent": "", "permalink": "",
+             "articles": [{"title": "t", "source": "s", "date": "d", "url": "u", "categories": []}]}]
+_fc_meta = {"ofac": {"count": 17000, "date": "2026-07-08"}}
+_fc_partial = screen.build_unified_narrative(
+    [], [], _fc_find, [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 3, "gdelt": 3, "bing": 10, "single": 7, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: news feed coverage line is rendered with per-feed subject counts",
+      "News feed coverage this run (10 subject(s) news-swept): Google News 3 · GDELT 3 · Bing News 10" in _fc_partial
+      and "reached by ONE feed only: 7" in _fc_partial)
+check("report: a partial GDELT run does NOT claim GDELT covers every subject",
+      "runs on EVERY subject" not in _fc_partial
+      and "GDELT's global index reached only 3 of 10 subject(s)" in _fc_partial)
+check("report: single-feed subjects carry a provisional warning", "PROVISIONAL" in _fc_partial)
+_fc_full = screen.build_unified_narrative(
+    [], [], _fc_find, [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 10, "gdelt": 10, "bing": 10, "single": 0, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: the every-subject GDELT claim is kept only when it is true",
+      "runs on EVERY subject" in _fc_full and "PROVISIONAL" not in _fc_full)
+_fc_zero = screen.build_unified_narrative(
+    [], [], [], [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 3, "gdelt": 3, "bing": 10, "single": 7, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: coverage is disclosed even on a zero-adverse-finding run",
+      "News feed coverage this run" in _fc_zero)
+
+# (3) "AI-assisted triage" was reported while 557 of 557 model calls failed:
+# an HTTP error reply deliberately does not open the breaker, so nothing said so.
+_am_saved = (screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE, dict(screen.ai.LLM_CALLS), screen.ai._LLM_STATE["open"])
+try:
+    screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE, screen.ai._LLM_STATE["open"] = True, True, False
+    screen.ai.LLM_CALLS.update(attempted=5, ok=0, failed=5, skipped=0)
+    _lbl0 = screen._ai_mode_label()
+    check("AI mode: 0 of N calls succeeded is labelled UNAVAILABLE, not AI-assisted",
+          _lbl0.startswith("deterministic (LLM UNAVAILABLE") and "0 of 5" in _lbl0)
+    check("AI mode: the unavailable label is still != 'deterministic' (credential contract intact)",
+          _lbl0 != "deterministic")
+    check("AI mode: the governance footer declares the all-failed run degraded",
+          "DEGRADED THIS RUN: 0 of 5 model calls succeeded" in screen.ai.governance_footer())
+    check("AI mode: the monitoring block warns when no call succeeded",
+          "0 of 5 model calls succeeded" in _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 0}))
+    screen.ai.LLM_CALLS.update(attempted=5, ok=3, failed=2, skipped=0)
+    check("AI mode: partial success is labelled DEGRADED with the ratio",
+          "DEGRADED: 3 of 5" in screen._ai_mode_label())
+    screen.ai.LLM_CALLS.update(attempted=5, ok=5, failed=0, skipped=0)
+    check("AI mode: a fully successful pass is plain AI-assisted triage",
+          screen._ai_mode_label() == "AI-assisted triage"
+          and "DEGRADED THIS RUN" not in screen.ai.governance_footer())
+    screen.ai.LLM_CALLS.update(attempted=0, ok=0, failed=0, skipped=0)
+    check("AI mode: no calls attempted yet is not called degraded",
+          screen._ai_mode_label() == "AI-assisted triage")
+finally:
+    screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE = _am_saved[0], _am_saved[1]
+    screen.ai.LLM_CALLS.update(_am_saved[2]); screen.ai._LLM_STATE["open"] = _am_saved[3]
 
 print()
 if _fail:

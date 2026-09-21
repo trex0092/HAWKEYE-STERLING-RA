@@ -10,6 +10,30 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Screening engine: MLRO case subtasks now land on the case board; the
+  report states real news-feed coverage and real AI status** (`screen.py`,
+  `ai.py`, `monitoring.py`, `test/engine_test.py`). Three defects observed in
+  the 21 Sep 2026 production runs (35562296246, 35573394675):
+  (1) `create_case_subtask` created cases with only a `parent`, and Asana does
+  not put a subtask on a project board by itself, so every case had no
+  project/section membership and was invisible on the case board. It now calls
+  `addProject` (monitoring project, "Screening Cases - New" section, override
+  `ASANA_CASES_NEW_SECTION_GID`, empty disables). A failed attach is loud (log
+  line, `::warning::` annotation, counter) and never fails the case itself.
+  (2) Section 2 said GDELT "runs on EVERY subject every run regardless" on runs
+  where the GDELT circuit had opened after 5 subjects (HTTP 429) and Google
+  News after ~30. The engine now counts, per news-swept subject, which feeds
+  reached it and prints `News feed coverage this run`, with a PROVISIONAL note
+  for subjects reached by one feed or none; the every-subject GDELT claim is
+  made only when it is true. Status semantics (`OK` / `DEGRADED (news)`) are
+  unchanged.
+  (3) The report said "AI-assisted triage" while 557 of 557 model calls failed
+  (an HTTP error reply deliberately does not open the AI circuit breaker). The
+  AI mode label, governance footer and monitoring block now say when no call,
+  or only some calls, succeeded. The label stays distinct from plain
+  `deterministic`, so the credential contract in `agents.py` is unchanged.
+  Recall-monotone: no matcher, list, threshold or finding logic changed.
+
 - **MCP tool coverage extended to the TFS dossier, risk-rating and
   related-party engine functions** (`mcp_tools.py`, `mcp_server.py`,
   `test/mcp_tools_test.py`, `docs/mcp-server.md`). Three engine capabilities
