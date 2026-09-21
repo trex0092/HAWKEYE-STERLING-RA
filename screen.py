@@ -4566,8 +4566,8 @@ LISTS SCREENED
 {list_line("eu","EU Financial Sanctions — OpenSanctions / EU FSF",
            "https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv")}
 
-{list_line("uk","UK OFSI Consolidated List — HM Treasury",
-           "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv")}
+{list_line("uk","UK Sanctions List -- FCDO / OFSI (the OFSI Consolidated List closed 28 Jan 2026)",
+           "https://www.gov.uk/government/publications/the-uk-sanctions-list")}
 
 {list_line("eocn","UAE EOCN — Local Terrorist List",
            "Maintained in-repo — data/eocn-local-terrorist-list.json")}
@@ -5064,6 +5064,83 @@ def _mirror_fallback(names, dataset, label):
     log(f"  {label}: official endpoint unavailable — screened via OpenSanctions mirror")
     return mirror_names, "live (OpenSanctions mirror)", sha256_of(data)
 
+# ── UK: the OFSI Consolidated List (ConList.csv) CLOSED on 28 Jan 2026 (GOV.UK:
+# "The UK Sanctions List is now the only source for all UK sanctions
+# designations"). The engine kept loading it: on 21 Sep 2026 the file still
+# carried "Last Updated 03/06/2026" (Last-Modified 3 Jun 2026), so every UK
+# designation after that date went unscreened while the report read `OK`. Its
+# OpenSanctions mirror (gb_hmt_sanctions) is also gone (header-only CSV), so the
+# old fallback ladder could not rescue it. The UK Sanctions List is now the
+# PRIMARY, via the OpenSanctions gb_fcdo_sanctions mirror (same host and
+# targets.simple.csv shape as EU / AU / CH, already egress-allowed); the retired
+# ConList is kept only as a last-resort fallback and its stale date is flagged
+# by stale_core_lists below, never presented as current.
+UK_SANCTIONS_LIST_URL = "https://data.opensanctions.org/datasets/latest/gb_fcdo_sanctions/targets.simple.csv"
+UK_CONLIST_URL = "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv"
+
+def load_uk_list():
+    """(names, date, hash, fetched) for the UK core list: UK Sanctions List
+    first, the retired OFSI ConList only if that yields nothing."""
+    data = download(UK_SANCTIONS_LIST_URL, "UK Sanctions List (OpenSanctions gb_fcdo_sanctions)")
+    names = parse_simple_csv(data, "UK Sanctions List")
+    if names:
+        return names, "live (UK Sanctions List)", sha256_of(data), True
+    log("  UK Sanctions List mirror unavailable -- falling back to the RETIRED OFSI ConList "
+        "(closed 28 Jan 2026; its own date will be flagged as stale)")
+    con = download(UK_CONLIST_URL, "UK OFSI (retired ConList)")
+    names, date, h = parse_uk(con)
+    return names, date, h, bool(con)
+
+# Staleness of a core list. Only a date the list itself declares counts; a
+# provenance string such as "live" or "unavailable" carries no claim.
+LIST_MAX_AGE_DAYS = int(os.environ.get("LIST_MAX_AGE_DAYS", "30"))   # 0 disables
+
+def list_age_days(date_str, today=None, dayfirst=False):
+    """Age in days of a list date string, or None when it is not a real date
+    (or is an ambiguous dd/mm vs mm/dd slash date and dayfirst is not asserted)."""
+    if not date_str:
+        return None
+    ds = str(date_str).strip()
+    d = None
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", ds)
+    try:
+        if m:
+            d = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        else:
+            m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", ds)
+            if m:
+                a, b, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                if a > 12:
+                    d = datetime.date(y, b, a)
+                elif b > 12:
+                    d = datetime.date(y, a, b)
+                elif dayfirst:
+                    d = datetime.date(y, b, a)
+    except ValueError:
+        return None
+    if d is None:
+        return None
+    if today is None:
+        today = datetime.date.today()
+    elif isinstance(today, datetime.datetime):
+        today = today.date()
+    return (today - d).days
+
+def stale_core_lists(list_meta, today=None, max_age=None):
+    """[(key, age_days)] for core lists whose declared date is older than the
+    limit. EOCN is excluded (it has its own review-age gate)."""
+    limit = LIST_MAX_AGE_DAYS if max_age is None else max_age
+    out = []
+    if not limit or limit < 0:
+        return out
+    for k, m in (list_meta or {}).items():
+        if k == "eocn" or m.get("tier", "core") != "core" or not m.get("count", 0):
+            continue
+        age = list_age_days(m.get("date"), today, dayfirst=(k == "uk"))
+        if age is not None and age > limit:
+            out.append((k, age))
+    return sorted(out)
+
 # EU FSF is the one core list whose PRIMARY is the OpenSanctions host (webgate's
 # exports drift formats; the mirror's simple shape is what every parser here
 # shares) — so its fallback runs the OTHER way: official webgate XML, with the
@@ -5309,7 +5386,6 @@ def load_all_lists():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
-    uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
     # AU + CH core lists via the OpenSanctions mirrors (same host, same
     # targets.simple.csv shape as the EU list): DFAT bot-gates its .xlsx and
@@ -5340,13 +5416,8 @@ def load_all_lists():
     if fb:
         un_names, un_date, un_hash = fb
         un_fetched = True
-    uk_fetched = bool(uk_data)
     eu_fetched = bool(eu_data)
-    uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
-    fb = _mirror_fallback(uk_names, "gb_hmt_sanctions", "UK OFSI")
-    if fb:
-        uk_names, uk_date, uk_hash = fb
-        uk_fetched = True
+    uk_names,   uk_date,   uk_hash,   uk_fetched = load_uk_list()
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
     fb = _eu_official_fallback(eu_names)
     if fb:
@@ -5441,9 +5512,13 @@ def load_all_lists():
         all_lists["Internal Watchlist"] = [(normalize(n),n) for n in iw_names]
     return all_lists, list_meta
 
-def _list_status_line(list_meta, key, label):
+def _list_status_line(list_meta, key, label, today=None):
     m = list_meta.get(key, {})
     status = "OK" if m.get("count", 0) > 0 else "UNAVAILABLE"
+    if status == "OK" and key != "eocn" and LIST_MAX_AGE_DAYS > 0:
+        _age = list_age_days(m.get("date"), today, dayfirst=(key == "uk"))
+        if _age is not None and _age > LIST_MAX_AGE_DAYS:
+            status = f"STALE ({_age}d old)"
     return f"      {label}: {status}  ({m.get('count',0):,} names · {m.get('date','?')})"
 
 def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findings,
@@ -5493,7 +5568,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
 
     delta = stats.get("delta", {})
     supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
+    _stale = stale_core_lists(list_meta, run_time)
     sanc_status = "OK" if sanc_ok else ("DEGRADED" if any(core_loaded) else "FAILED")
+    if sanc_ok and _stale:
+        sanc_status = "DEGRADED (stale: " + ", ".join(f"{k.upper()} {a}d" for k, a in _stale) + ")"
     pep_status = ("DEGRADED" if pep_degraded
                   else ("OK (worldwide PEP/RCA net)" if pep_mirror else "OK"))
     am_status = ("DEGRADED" if am_blackout
@@ -5635,13 +5713,17 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     # result can never hide that a core list was down (a "clear" against a list
     # that never loaded is not clear). Any core list at 0 names is flagged.
     A("   Lists screened:")
-    A(_list_status_line(list_meta, "ofac", "OFAC SDN"))
-    A(_list_status_line(list_meta, "un",   "UN Consolidated"))
-    A(_list_status_line(list_meta, "eu",   "EU FSF"))
-    A(_list_status_line(list_meta, "uk",   "UK OFSI"))
-    A(_list_status_line(list_meta, "au",   "Australia DFAT"))
-    A(_list_status_line(list_meta, "ch",   "Switzerland SECO"))
-    A(_list_status_line(list_meta, "eocn", "UAE EOCN"))
+    A(_list_status_line(list_meta, "ofac", "OFAC SDN", run_time))
+    A(_list_status_line(list_meta, "un",   "UN Consolidated", run_time))
+    A(_list_status_line(list_meta, "eu",   "EU FSF", run_time))
+    A(_list_status_line(list_meta, "uk",   "UK Sanctions List", run_time))
+    A(_list_status_line(list_meta, "au",   "Australia DFAT", run_time))
+    A(_list_status_line(list_meta, "ch",   "Switzerland SECO", run_time))
+    A(_list_status_line(list_meta, "eocn", "UAE EOCN", run_time))
+    if _stale:
+        A("   ⚠ SANCTIONS LIST STALE -- " + "; ".join(f"{k.upper()} last updated {list_meta[k].get('date')} ({a} days ago)" for k, a in _stale)
+          + f" (limit {LIST_MAX_AGE_DAYS}d). Designations published since then are NOT screened; "
+          "treat 'clear' against that list as PROVISIONAL until its source refreshes.")
     if not sanc_ok:
         _down = [lbl for k, lbl in (("ofac","OFAC"),("un","UN"),("uk","UK OFSI"),("eu","EU FSF"))
                  if list_meta.get(k, {}).get("count", 0) == 0]
@@ -6308,6 +6390,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     the task title only ('daily' vs 'onboarding')."""
     _t_start = time.time()
     today = run_time.strftime("%Y-%m-%d")
+    for _k, _a in stale_core_lists(list_meta, run_time):
+        print(f"::warning::sanctions list {_k.upper()} is STALE: last updated {list_meta[_k].get('date')} "
+              f"({_a} days ago, limit {LIST_MAX_AGE_DAYS}d) - designations since then are not screened", flush=True)
 
     # Subject set first — the watchlist pass below screens it before the
     # network-bound enrichment starts.
@@ -6917,7 +7002,6 @@ def main():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
-    uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
     au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
     ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
@@ -6926,7 +7010,7 @@ def main():
     # be the one place a single-origin outage still bites. Fetched flags track
     # "source material obtained" (primary bytes OR a fallback that answered).
     ofac_fetched, un_fetched = bool(ofac_data), bool(un_data)
-    uk_fetched,   eu_fetched = bool(uk_data),   bool(eu_data)
+    eu_fetched = bool(eu_data)
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
     # Fallback BEFORE the alias fold, or an alias-only load defeats the mirror
     # (same trap load_all_lists documents at its own fold).
@@ -6941,11 +7025,7 @@ def main():
     if fb:
         un_names, un_date, un_hash = fb
         un_fetched = True
-    uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
-    fb = _mirror_fallback(uk_names, "gb_hmt_sanctions", "UK OFSI")
-    if fb:
-        uk_names, uk_date, uk_hash = fb
-        uk_fetched = True
+    uk_names,   uk_date,   uk_hash,   uk_fetched = load_uk_list()
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
     fb = _eu_official_fallback(eu_names)
     if fb:
