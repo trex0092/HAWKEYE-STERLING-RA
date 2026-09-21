@@ -1,0 +1,2885 @@
+{
+  "_README": "Red-flag catalogue: 480 indicators in 30 categories, transcribed from the compliance red-flags document. Each entry is an alert for review, not an automatic conclusion. 'no' is the number from the source document and must not be renumbered. No severity, typology mapping or detection method is assigned; those are owner decisions. Separate from RED_FLAGS_HIGH in netlify/functions/brain-soul.js and not read by any engine yet.",
+  "flags": [
+    {
+      "id": "rfc_001",
+      "no": 1,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer refuses to provide identification documents."
+    },
+    {
+      "id": "rfc_002",
+      "no": 2,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer is reluctant to provide identification."
+    },
+    {
+      "id": "rfc_003",
+      "no": 3,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer refuses or delays Source of Funds documentation."
+    },
+    {
+      "id": "rfc_004",
+      "no": 4,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer refuses or delays Source of Wealth information."
+    },
+    {
+      "id": "rfc_005",
+      "no": 5,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer refuses to disclose beneficial ownership."
+    },
+    {
+      "id": "rfc_006",
+      "no": 6,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer fails to provide UBO information after a formal request."
+    },
+    {
+      "id": "rfc_007",
+      "no": 7,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer provides incomplete KYC information."
+    },
+    {
+      "id": "rfc_008",
+      "no": 8,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer provides inconsistent KYC information."
+    },
+    {
+      "id": "rfc_009",
+      "no": 9,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer provides information that cannot be independently verified."
+    },
+    {
+      "id": "rfc_010",
+      "no": 10,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer repeatedly avoids updating expired or outdated KYC documents."
+    },
+    {
+      "id": "rfc_011",
+      "no": 11,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer is evasive when asked routine compliance questions."
+    },
+    {
+      "id": "rfc_012",
+      "no": 12,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer appears nervous when compliance requirements are discussed."
+    },
+    {
+      "id": "rfc_013",
+      "no": 13,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer appears unusually concerned about AML procedures."
+    },
+    {
+      "id": "rfc_014",
+      "no": 14,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer asks about reporting thresholds."
+    },
+    {
+      "id": "rfc_015",
+      "no": 15,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer asks what amount will trigger regulatory reporting."
+    },
+    {
+      "id": "rfc_016",
+      "no": 16,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer asks about detection limits."
+    },
+    {
+      "id": "rfc_017",
+      "no": 17,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer asks how transactions are monitored."
+    },
+    {
+      "id": "rfc_018",
+      "no": 18,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer asks how to avoid being flagged."
+    },
+    {
+      "id": "rfc_019",
+      "no": 19,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer attempts to bypass screening, controls, or verification."
+    },
+    {
+      "id": "rfc_020",
+      "no": 20,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer attempts to influence a screening result."
+    },
+    {
+      "id": "rfc_021",
+      "no": 21,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer attempts to interfere with compliance verification."
+    },
+    {
+      "id": "rfc_022",
+      "no": 22,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer suddenly cancels a transaction when additional information is requested."
+    },
+    {
+      "id": "rfc_023",
+      "no": 23,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer avoids face to face contact without an apparent legitimate reason."
+    },
+    {
+      "id": "rfc_024",
+      "no": 24,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer uses inconsistent names across transactions."
+    },
+    {
+      "id": "rfc_025",
+      "no": 25,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer uses different identification documents on separate transactions."
+    },
+    {
+      "id": "rfc_026",
+      "no": 26,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer uses different addresses without reasonable explanation."
+    },
+    {
+      "id": "rfc_027",
+      "no": 27,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer provides an address that cannot be located."
+    },
+    {
+      "id": "rfc_028",
+      "no": 28,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer's address conflicts with other information supplied."
+    },
+    {
+      "id": "rfc_029",
+      "no": 29,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Registered office appears non operational."
+    },
+    {
+      "id": "rfc_030",
+      "no": 30,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer actually operates from a different address without clear justification."
+    },
+    {
+      "id": "rfc_031",
+      "no": 31,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer or company cannot be located on expected government or commercial registers."
+    },
+    {
+      "id": "rfc_032",
+      "no": 32,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer uses generic email domains such as Gmail, Yahoo, or Outlook instead of an expected corporate domain, where inconsistent with the business profile."
+    },
+    {
+      "id": "rfc_033",
+      "no": 33,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer is accompanied by another person who appears to control or direct the transaction."
+    },
+    {
+      "id": "rfc_034",
+      "no": 34,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer appears uninterested in transaction details."
+    },
+    {
+      "id": "rfc_035",
+      "no": 35,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer appears uninterested in payment terms."
+    },
+    {
+      "id": "rfc_036",
+      "no": 36,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer appears unaware of its own business structure."
+    },
+    {
+      "id": "rfc_037",
+      "no": 37,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer appears unaware of transactions supposedly being conducted by its company."
+    },
+    {
+      "id": "rfc_038",
+      "no": 38,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Directors appear not to exercise real activity or control over the company."
+    },
+    {
+      "id": "rfc_039",
+      "no": 39,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Shareholders appear inactive or disconnected from the business."
+    },
+    {
+      "id": "rfc_040",
+      "no": 40,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Nominal directors appear to lack the expected knowledge of the company or its business."
+    },
+    {
+      "id": "rfc_041",
+      "no": 41,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Multiple apparently unrelated companies use the same correspondence address or flexi desk."
+    },
+    {
+      "id": "rfc_042",
+      "no": 42,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer fails to cooperate with Enhanced Due Diligence."
+    },
+    {
+      "id": "rfc_043",
+      "no": 43,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer refuses requests for supporting documentation."
+    },
+    {
+      "id": "rfc_044",
+      "no": 44,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer gives conflicting explanations of the purpose of the business relationship."
+    },
+    {
+      "id": "rfc_045",
+      "no": 45,
+      "category": "CUSTOMER BEHAVIOUR AND COOPERATION RED FLAGS",
+      "indicator": "Customer gives conflicting explanations concerning beneficial ownership."
+    },
+    {
+      "id": "rfc_046",
+      "no": 46,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "New customer conducts an unusually large transaction immediately after onboarding."
+    },
+    {
+      "id": "rfc_047",
+      "no": 47,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Transaction value is disproportionate to the customer's known financial standing."
+    },
+    {
+      "id": "rfc_048",
+      "no": 48,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Transaction volume is inconsistent with the customer's business."
+    },
+    {
+      "id": "rfc_049",
+      "no": 49,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Precious metal activity does not correspond with the customer's stated business activity."
+    },
+    {
+      "id": "rfc_050",
+      "no": 50,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Customer profile does not support the quantity of gold being purchased or sold."
+    },
+    {
+      "id": "rfc_051",
+      "no": 51,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Customer's transaction frequency materially exceeds expected activity."
+    },
+    {
+      "id": "rfc_052",
+      "no": 52,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Sudden significant increase in transaction volume without explanation."
+    },
+    {
+      "id": "rfc_053",
+      "no": 53,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Sudden significant increase in transaction value without explanation."
+    },
+    {
+      "id": "rfc_054",
+      "no": 54,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Sudden change in the nature of transactions without commercial justification."
+    },
+    {
+      "id": "rfc_055",
+      "no": 55,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Business activity declared during onboarding differs from observed activity."
+    },
+    {
+      "id": "rfc_056",
+      "no": 56,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Newly established company conducts substantial precious metal transactions without credible commercial history."
+    },
+    {
+      "id": "rfc_057",
+      "no": 57,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Newly formed legal entities are introduced into transactions without an evident commercial purpose."
+    },
+    {
+      "id": "rfc_058",
+      "no": 58,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Customer operates in a business sector inconsistent with the nature of the gold trade being conducted."
+    },
+    {
+      "id": "rfc_059",
+      "no": 59,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Customer's apparent financial resources are inconsistent with transaction size."
+    },
+    {
+      "id": "rfc_060",
+      "no": 60,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Supplier's shipment volume exceeds its known production capacity."
+    },
+    {
+      "id": "rfc_061",
+      "no": 61,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Supplier's trading volume exceeds its known or documented trading capacity."
+    },
+    {
+      "id": "rfc_062",
+      "no": 62,
+      "category": "CUSTOMER PROFILE AND BUSINESS MODEL RED FLAGS",
+      "indicator": "Frequency of shipments is inconsistent with the supplier's historic capacity or activity."
+    },
+    {
+      "id": "rfc_063",
+      "no": 63,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Multiple transactions just below AED 55,000."
+    },
+    {
+      "id": "rfc_064",
+      "no": 64,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Repeated gold purchases just below AED 55,000."
+    },
+    {
+      "id": "rfc_065",
+      "no": 65,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Several cash transactions in one day, individually below AED 55,000."
+    },
+    {
+      "id": "rfc_066",
+      "no": 66,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Several transactions over a short period that collectively appear designed to avoid the threshold."
+    },
+    {
+      "id": "rfc_067",
+      "no": 67,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "One intended purchase is divided into several smaller transactions."
+    },
+    {
+      "id": "rfc_068",
+      "no": 68,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Multiple related persons appear to conduct separate transactions that are economically connected."
+    },
+    {
+      "id": "rfc_069",
+      "no": 69,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Family members, representatives, or associated entities conduct linked transactions."
+    },
+    {
+      "id": "rfc_070",
+      "no": 70,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Transactions are deliberately fragmented without economic justification."
+    },
+    {
+      "id": "rfc_071",
+      "no": 71,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Cash-based activity is heavily fragmented."
+    },
+    {
+      "id": "rfc_072",
+      "no": 72,
+      "category": "STRUCTURING AND THRESHOLD AVOIDANCE",
+      "indicator": "Customer explicitly asks how to remain below reporting thresholds."
+    },
+    {
+      "id": "rfc_073",
+      "no": 73,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Customer insists on cash when bank settlement would ordinarily be expected."
+    },
+    {
+      "id": "rfc_074",
+      "no": 74,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Customer prefers cash despite safer or more conventional payment methods being available."
+    },
+    {
+      "id": "rfc_075",
+      "no": 75,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Large cash payment with no clearly established Source of Funds."
+    },
+    {
+      "id": "rfc_076",
+      "no": 76,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Frequent small gold purchases using cash."
+    },
+    {
+      "id": "rfc_077",
+      "no": 77,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Unexplained increase in cash activity."
+    },
+    {
+      "id": "rfc_078",
+      "no": 78,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Cash transactions inconsistent with the customer's normal profile."
+    },
+    {
+      "id": "rfc_079",
+      "no": 79,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Cash based transactions are repeatedly fragmented."
+    },
+    {
+      "id": "rfc_080",
+      "no": 80,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Customer attempts to use cash to purchase precious metals at unusual prices."
+    },
+    {
+      "id": "rfc_081",
+      "no": 81,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Supplier suddenly asks for cash contrary to normal contractual terms."
+    },
+    {
+      "id": "rfc_082",
+      "no": 82,
+      "category": "CASH RELATED RED FLAGS",
+      "indicator": "Cash intensive behaviour lacks credible commercial justification."
+    },
+    {
+      "id": "rfc_083",
+      "no": 83,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Payment is made by an unrelated third party."
+    },
+    {
+      "id": "rfc_084",
+      "no": 84,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Payment is requested to an unrelated third party."
+    },
+    {
+      "id": "rfc_085",
+      "no": 85,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Customer uses another company's bank account to purchase gold."
+    },
+    {
+      "id": "rfc_086",
+      "no": 86,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Customer uses an individual's bank account for a corporate transaction."
+    },
+    {
+      "id": "rfc_087",
+      "no": 87,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Payment originates from a person with no contractual role."
+    },
+    {
+      "id": "rfc_088",
+      "no": 88,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Supplier requests payment into an account not held in its name."
+    },
+    {
+      "id": "rfc_089",
+      "no": 89,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Third party is introduced without a clear commercial or legal connection."
+    },
+    {
+      "id": "rfc_090",
+      "no": 90,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Customer insists on involving unnecessary intermediaries."
+    },
+    {
+      "id": "rfc_091",
+      "no": 91,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Multiple third parties are used in the payment chain without commercial justification."
+    },
+    {
+      "id": "rfc_092",
+      "no": 92,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Payment instructions frequently change between unrelated accounts."
+    },
+    {
+      "id": "rfc_093",
+      "no": 93,
+      "category": "THIRD PARTY PAYMENT RED FLAGS",
+      "indicator": "Beneficiary bank details differ from contractual documentation without explanation."
+    },
+    {
+      "id": "rfc_094",
+      "no": 94,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Customer frequently changes bank accounts."
+    },
+    {
+      "id": "rfc_095",
+      "no": 95,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Same bank account is used for apparently unrelated businesses."
+    },
+    {
+      "id": "rfc_096",
+      "no": 96,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Payments are routed through offshore accounts without a clear business purpose."
+    },
+    {
+      "id": "rfc_097",
+      "no": 97,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Customer proposes fiduciary or trust accounts without a credible reason."
+    },
+    {
+      "id": "rfc_098",
+      "no": 98,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Payment method differs materially from the agreed contract."
+    },
+    {
+      "id": "rfc_099",
+      "no": 99,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Payment method differs from the firm's accepted payment arrangements."
+    },
+    {
+      "id": "rfc_100",
+      "no": 100,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Settlement route is unnecessarily complicated."
+    },
+    {
+      "id": "rfc_101",
+      "no": 101,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Funds originate from a country unrelated to either party or the transaction."
+    },
+    {
+      "id": "rfc_102",
+      "no": 102,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Funds are remitted to a jurisdiction unrelated to the underlying trade."
+    },
+    {
+      "id": "rfc_103",
+      "no": 103,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Payment path changes shortly before settlement."
+    },
+    {
+      "id": "rfc_104",
+      "no": 104,
+      "category": "BANK ACCOUNT AND SETTLEMENT RED FLAGS",
+      "indicator": "Multiple payment channels are used for one transaction without commercial necessity."
+    },
+    {
+      "id": "rfc_105",
+      "no": 105,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Customer proposes unnecessary virtual currency settlement."
+    },
+    {
+      "id": "rfc_106",
+      "no": 106,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Customer proposes prepaid cards."
+    },
+    {
+      "id": "rfc_107",
+      "no": 107,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Customer proposes E wallets without a clear business rationale."
+    },
+    {
+      "id": "rfc_108",
+      "no": 108,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Customer proposes PayPal or similar consumer payment methods for high value bullion activity."
+    },
+    {
+      "id": "rfc_109",
+      "no": 109,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Customer proposes multiple payment technologies solely to complicate settlement."
+    },
+    {
+      "id": "rfc_110",
+      "no": 110,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Customer uses unregulated payment channels."
+    },
+    {
+      "id": "rfc_111",
+      "no": 111,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Customer uses virtual assets in circumstances inconsistent with the business relationship."
+    },
+    {
+      "id": "rfc_112",
+      "no": 112,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Customer uses privacy enhancing payment technologies."
+    },
+    {
+      "id": "rfc_113",
+      "no": 113,
+      "category": "ALTERNATIVE PAYMENT AND VIRTUAL ASSET RED FLAGS",
+      "indicator": "Use of mixers, tumblers, or other mechanisms intended to obscure the source or destination of virtual assets."
+    },
+    {
+      "id": "rfc_114",
+      "no": 114,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Precious metals are sold significantly below normal market value."
+    },
+    {
+      "id": "rfc_115",
+      "no": 115,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Precious metals are purchased significantly above normal market value."
+    },
+    {
+      "id": "rfc_116",
+      "no": 116,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Unusually high premiums over prevailing market rates."
+    },
+    {
+      "id": "rfc_117",
+      "no": 117,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Unusually large discounts to prevailing market rates."
+    },
+    {
+      "id": "rfc_118",
+      "no": 118,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Transaction value is more than 10 percent above current market value without written explanation."
+    },
+    {
+      "id": "rfc_119",
+      "no": 119,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Transaction value is more than 10 percent below current market value without written explanation."
+    },
+    {
+      "id": "rfc_120",
+      "no": 120,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Metal pricing appears manipulated."
+    },
+    {
+      "id": "rfc_121",
+      "no": 121,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Customer appears indifferent to obtaining a commercially reasonable price."
+    },
+    {
+      "id": "rfc_122",
+      "no": 122,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Transaction produces little or no economic margin without an evident business reason."
+    },
+    {
+      "id": "rfc_123",
+      "no": 123,
+      "category": "PRICING RED FLAGS",
+      "indicator": "Pricing differs materially from weight, purity, assay, and market price."
+    },
+    {
+      "id": "rfc_124",
+      "no": 124,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Invoice is vague."
+    },
+    {
+      "id": "rfc_125",
+      "no": 125,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Invoice is incomplete."
+    },
+    {
+      "id": "rfc_126",
+      "no": 126,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Invoice description does not match the goods."
+    },
+    {
+      "id": "rfc_127",
+      "no": 127,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Invoice weight does not match shipment weight."
+    },
+    {
+      "id": "rfc_128",
+      "no": 128,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Invoice purity does not match assay results."
+    },
+    {
+      "id": "rfc_129",
+      "no": 129,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Invoice value does not correspond to quantity or purity."
+    },
+    {
+      "id": "rfc_130",
+      "no": 130,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Invoice contains unusual structures."
+    },
+    {
+      "id": "rfc_131",
+      "no": 131,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Multiple invoices are used unnecessarily for one commercial transaction."
+    },
+    {
+      "id": "rfc_132",
+      "no": 132,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Under invoicing."
+    },
+    {
+      "id": "rfc_133",
+      "no": 133,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Over invoicing."
+    },
+    {
+      "id": "rfc_134",
+      "no": 134,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "False certificate of origin."
+    },
+    {
+      "id": "rfc_135",
+      "no": 135,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Origin certificate cannot be independently verified."
+    },
+    {
+      "id": "rfc_136",
+      "no": 136,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Origin documents appear altered."
+    },
+    {
+      "id": "rfc_137",
+      "no": 137,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Origin documents appear falsified."
+    },
+    {
+      "id": "rfc_138",
+      "no": 138,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Supporting documents contain unexplained inconsistencies."
+    },
+    {
+      "id": "rfc_139",
+      "no": 139,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Shipment documents do not match invoices."
+    },
+    {
+      "id": "rfc_140",
+      "no": 140,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Customs documentation does not match shipment information."
+    },
+    {
+      "id": "rfc_141",
+      "no": 141,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Export documents are missing."
+    },
+    {
+      "id": "rfc_142",
+      "no": 142,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Customs declarations are missing."
+    },
+    {
+      "id": "rfc_143",
+      "no": 143,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Chain of custody documents are incomplete."
+    },
+    {
+      "id": "rfc_144",
+      "no": 144,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Chain of custody documents conflict with the declared origin."
+    },
+    {
+      "id": "rfc_145",
+      "no": 145,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Material lacks proper title or ownership documentation."
+    },
+    {
+      "id": "rfc_146",
+      "no": 146,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Material is unregistered."
+    },
+    {
+      "id": "rfc_147",
+      "no": 147,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Material is undocumented."
+    },
+    {
+      "id": "rfc_148",
+      "no": 148,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Physical goods cannot be reconciled to the paperwork."
+    },
+    {
+      "id": "rfc_149",
+      "no": 149,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Assay result is inconsistent with documentation."
+    },
+    {
+      "id": "rfc_150",
+      "no": 150,
+      "category": "INVOICE AND TRADE DOCUMENTATION RED FLAGS",
+      "indicator": "Weight or purity materially differs from declarations."
+    },
+    {
+      "id": "rfc_151",
+      "no": 151,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Transaction is supported by paperwork but there is no evidence of physical delivery."
+    },
+    {
+      "id": "rfc_152",
+      "no": 152,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Phantom shipment."
+    },
+    {
+      "id": "rfc_153",
+      "no": 153,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Goods purportedly move but transport records cannot substantiate the movement."
+    },
+    {
+      "id": "rfc_154",
+      "no": 154,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Declared quantity cannot be reconciled against received material."
+    },
+    {
+      "id": "rfc_155",
+      "no": 155,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Customer repeatedly trades essentially the same quantity of gold without material transformation."
+    },
+    {
+      "id": "rfc_156",
+      "no": 156,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Repeated re refining of apparently the same material."
+    },
+    {
+      "id": "rfc_157",
+      "no": 157,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Scrap volumes exceed what the customer's business could reasonably generate."
+    },
+    {
+      "id": "rfc_158",
+      "no": 158,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Refining activity is inconsistent with the customer's business profile."
+    },
+    {
+      "id": "rfc_159",
+      "no": 159,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Assay documents for refining material are missing."
+    },
+    {
+      "id": "rfc_160",
+      "no": 160,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Assay documents appear altered."
+    },
+    {
+      "id": "rfc_161",
+      "no": 161,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Goods apparently circulate between parties without a genuine economic change in ownership."
+    },
+    {
+      "id": "rfc_162",
+      "no": 162,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Same parcel of gold is bought and immediately resold."
+    },
+    {
+      "id": "rfc_163",
+      "no": 163,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Substantially identical quantity and grade is repeatedly bought and sold."
+    },
+    {
+      "id": "rfc_164",
+      "no": 164,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Back-to-back transactions occur with little or no commercial margin."
+    },
+    {
+      "id": "rfc_165",
+      "no": 165,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "No meaningful change in form, location, ownership, or economic risk occurs between purchase and resale."
+    },
+    {
+      "id": "rfc_166",
+      "no": 166,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Gold repeatedly moves between connected counterparties."
+    },
+    {
+      "id": "rfc_167",
+      "no": 167,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Funds circulate through the same group of entities."
+    },
+    {
+      "id": "rfc_168",
+      "no": 168,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Gold or funds return to the original party or an associated party."
+    },
+    {
+      "id": "rfc_169",
+      "no": 169,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Transactions form a closed loop with no genuine commercial purpose."
+    },
+    {
+      "id": "rfc_170",
+      "no": 170,
+      "category": "PHANTOM TRADE AND PHYSICAL GOODS RED FLAGS",
+      "indicator": "Apparent ownership changes while ultimate beneficial control remains the same."
+    },
+    {
+      "id": "rfc_171",
+      "no": 171,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Shipment documents conflict with the declared origin."
+    },
+    {
+      "id": "rfc_172",
+      "no": 172,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Shipment route conflicts with the stated destination."
+    },
+    {
+      "id": "rfc_173",
+      "no": 173,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Sudden change of trade route without explanation."
+    },
+    {
+      "id": "rfc_174",
+      "no": 174,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Sudden change of delivery instructions."
+    },
+    {
+      "id": "rfc_175",
+      "no": 175,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Sudden change of shipment method."
+    },
+    {
+      "id": "rfc_176",
+      "no": 176,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Circuitous shipping route."
+    },
+    {
+      "id": "rfc_177",
+      "no": 177,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Use of unrelated transit jurisdictions."
+    },
+    {
+      "id": "rfc_178",
+      "no": 178,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Routing through countries with no obvious connection to buyer or seller."
+    },
+    {
+      "id": "rfc_179",
+      "no": 179,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Routing through high-risk jurisdictions."
+    },
+    {
+      "id": "rfc_180",
+      "no": 180,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Routing through CAHRAs."
+    },
+    {
+      "id": "rfc_181",
+      "no": 181,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Use of unusual freight forwarders."
+    },
+    {
+      "id": "rfc_182",
+      "no": 182,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Use of transport providers with no logical relationship to the trade."
+    },
+    {
+      "id": "rfc_183",
+      "no": 183,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Transportation route cannot be verified."
+    },
+    {
+      "id": "rfc_184",
+      "no": 184,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Material is routed through unexpected locations."
+    },
+    {
+      "id": "rfc_185",
+      "no": 185,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Origin country has no known mining capacity."
+    },
+    {
+      "id": "rfc_186",
+      "no": 186,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Origin country has negligible mining or refining capacity inconsistent with stated supply."
+    },
+    {
+      "id": "rfc_187",
+      "no": 187,
+      "category": "SHIPPING AND LOGISTICS RED FLAGS",
+      "indicator": "Declared route appears designed to obscure true origin or destination."
+    },
+    {
+      "id": "rfc_188",
+      "no": 188,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Corporate structure is unnecessarily complex."
+    },
+    {
+      "id": "rfc_189",
+      "no": 189,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Multiple ownership layers make the UBO difficult to identify."
+    },
+    {
+      "id": "rfc_190",
+      "no": 190,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Ownership structure lacks an evident commercial rationale."
+    },
+    {
+      "id": "rfc_191",
+      "no": 191,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Shell companies are used."
+    },
+    {
+      "id": "rfc_192",
+      "no": 192,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Nominee shareholders are used."
+    },
+    {
+      "id": "rfc_193",
+      "no": 193,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Nominee directors are used."
+    },
+    {
+      "id": "rfc_194",
+      "no": 194,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Beneficial ownership is obscured."
+    },
+    {
+      "id": "rfc_195",
+      "no": 195,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Frequent unexplained changes in beneficial ownership."
+    },
+    {
+      "id": "rfc_196",
+      "no": 196,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Frequent unexplained changes of directors."
+    },
+    {
+      "id": "rfc_197",
+      "no": 197,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Frequent unexplained changes in company structure."
+    },
+    {
+      "id": "rfc_198",
+      "no": 198,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "UBO refuses to confirm status."
+    },
+    {
+      "id": "rfc_199",
+      "no": 199,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "UBO information conflicts with corporate documents."
+    },
+    {
+      "id": "rfc_200",
+      "no": 200,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Effective control appears different from legal share ownership."
+    },
+    {
+      "id": "rfc_201",
+      "no": 201,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Company is registered in a secrecy jurisdiction."
+    },
+    {
+      "id": "rfc_202",
+      "no": 202,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Entity is established in a jurisdiction with weak ownership transparency."
+    },
+    {
+      "id": "rfc_203",
+      "no": 203,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Several unrelated companies share the same address."
+    },
+    {
+      "id": "rfc_204",
+      "no": 204,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Directors appear to be figureheads."
+    },
+    {
+      "id": "rfc_205",
+      "no": 205,
+      "category": "CORPORATE OWNERSHIP AND UBO RED FLAGS",
+      "indicator": "Ownership, management, or control abruptly changes immediately before or after significant transactions."
+    },
+    {
+      "id": "rfc_206",
+      "no": 206,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Customer has credible adverse media relating to financial crime."
+    },
+    {
+      "id": "rfc_207",
+      "no": 207,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Shareholder has credible adverse media relating to financial crime."
+    },
+    {
+      "id": "rfc_208",
+      "no": 208,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Supplier is subject to credible negative media concerning criminal networks."
+    },
+    {
+      "id": "rfc_209",
+      "no": 209,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Customer is under criminal investigation."
+    },
+    {
+      "id": "rfc_210",
+      "no": 210,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Counterparty is linked to persons under investigation for financial crimes."
+    },
+    {
+      "id": "rfc_211",
+      "no": 211,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Customer is associated with suspected money laundering."
+    },
+    {
+      "id": "rfc_212",
+      "no": 212,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Customer is associated with terrorist financing."
+    },
+    {
+      "id": "rfc_213",
+      "no": 213,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Customer is associated with organized criminal activity."
+    },
+    {
+      "id": "rfc_214",
+      "no": 214,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Supplier has a material history of fraud."
+    },
+    {
+      "id": "rfc_215",
+      "no": 215,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Supplier or customer has a material bribery or corruption history."
+    },
+    {
+      "id": "rfc_216",
+      "no": 216,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Counterparty is linked to tax evasion."
+    },
+    {
+      "id": "rfc_217",
+      "no": 217,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Counterparty is linked to smuggling."
+    },
+    {
+      "id": "rfc_218",
+      "no": 218,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Counterparty has documented involvement in illegal mining."
+    },
+    {
+      "id": "rfc_219",
+      "no": 219,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Counterparty is linked to trafficking or other predicate offences."
+    },
+    {
+      "id": "rfc_220",
+      "no": 220,
+      "category": "ADVERSE INFORMATION AND CRIMINALITY RED FLAGS",
+      "indicator": "Supplier has a serious history of regulatory non compliance that is inconsistent with the firm's risk appetite."
+    },
+    {
+      "id": "rfc_221",
+      "no": 221,
+      "category": "PEP AND INFLUENCE RED FLAGS",
+      "indicator": "Customer is a Politically Exposed Person."
+    },
+    {
+      "id": "rfc_222",
+      "no": 222,
+      "category": "PEP AND INFLUENCE RED FLAGS",
+      "indicator": "UBO is a PEP."
+    },
+    {
+      "id": "rfc_223",
+      "no": 223,
+      "category": "PEP AND INFLUENCE RED FLAGS",
+      "indicator": "Customer is a family member of a PEP."
+    },
+    {
+      "id": "rfc_224",
+      "no": 224,
+      "category": "PEP AND INFLUENCE RED FLAGS",
+      "indicator": "Customer is a close associate of a PEP."
+    },
+    {
+      "id": "rfc_225",
+      "no": 225,
+      "category": "PEP AND INFLUENCE RED FLAGS",
+      "indicator": "Customer has unexplained professional connections to a PEP."
+    },
+    {
+      "id": "rfc_226",
+      "no": 226,
+      "category": "PEP AND INFLUENCE RED FLAGS",
+      "indicator": "A public official appears to influence the transaction."
+    },
+    {
+      "id": "rfc_227",
+      "no": 227,
+      "category": "PEP AND INFLUENCE RED FLAGS",
+      "indicator": "Commercial arrangements involving a PEP lack economic rationale."
+    },
+    {
+      "id": "rfc_228",
+      "no": 228,
+      "category": "PEP AND INFLUENCE RED FLAGS",
+      "indicator": "PEP related wealth or transaction activity is inconsistent with known legitimate income or business activity."
+    },
+    {
+      "id": "rfc_229",
+      "no": 229,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Customer is located in a high-risk jurisdiction."
+    },
+    {
+      "id": "rfc_230",
+      "no": 230,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Supplier operates in a high-risk jurisdiction."
+    },
+    {
+      "id": "rfc_231",
+      "no": 231,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Funds originate from a high-risk jurisdiction."
+    },
+    {
+      "id": "rfc_232",
+      "no": 232,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Funds are sent to a high-risk jurisdiction."
+    },
+    {
+      "id": "rfc_233",
+      "no": 233,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Gold originates from a high-risk jurisdiction."
+    },
+    {
+      "id": "rfc_234",
+      "no": 234,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Transactions pass through jurisdictions unrelated to the trade."
+    },
+    {
+      "id": "rfc_235",
+      "no": 235,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Customer has links to countries with weak AML controls."
+    },
+    {
+      "id": "rfc_236",
+      "no": 236,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Counterparty is linked to jurisdictions with high corruption exposure."
+    },
+    {
+      "id": "rfc_237",
+      "no": 237,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Counterparty is located in a tax haven jurisdiction without a valid business rationale."
+    },
+    {
+      "id": "rfc_238",
+      "no": 238,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Trade is routed through a FATF high risk or increased monitoring jurisdiction."
+    },
+    {
+      "id": "rfc_239",
+      "no": 239,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Trade involves conflict affected and high-risk areas."
+    },
+    {
+      "id": "rfc_240",
+      "no": 240,
+      "category": "GEOGRAPHIC RISK RED FLAGS",
+      "indicator": "Customer operates in a high-risk trade corridor."
+    },
+    {
+      "id": "rfc_241",
+      "no": 241,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Customer appears on an applicable sanctions list."
+    },
+    {
+      "id": "rfc_242",
+      "no": 242,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Supplier appears on an applicable sanctions list."
+    },
+    {
+      "id": "rfc_243",
+      "no": 243,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "UBO appears on a sanctions list."
+    },
+    {
+      "id": "rfc_244",
+      "no": 244,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Director or shareholder appears on a sanctions list."
+    },
+    {
+      "id": "rfc_245",
+      "no": 245,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Customer is owned by a designated person."
+    },
+    {
+      "id": "rfc_246",
+      "no": 246,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Customer is controlled by a designated person."
+    },
+    {
+      "id": "rfc_247",
+      "no": 247,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Counterparty acts on behalf of a sanctioned person."
+    },
+    {
+      "id": "rfc_248",
+      "no": 248,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Supplier is linked indirectly to a sanctioned entity."
+    },
+    {
+      "id": "rfc_249",
+      "no": 249,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Vessel used in the supply chain has sanctions exposure."
+    },
+    {
+      "id": "rfc_250",
+      "no": 250,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Jurisdiction is subject to relevant sanctions or embargoes."
+    },
+    {
+      "id": "rfc_251",
+      "no": 251,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Customer attempts to circumvent sanctions screening."
+    },
+    {
+      "id": "rfc_252",
+      "no": 252,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Customer requests transactions be structured to avoid a sanctions nexus."
+    },
+    {
+      "id": "rfc_253",
+      "no": 253,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Existing customer produces a positive result during re-screening after previously screening clear."
+    },
+    {
+      "id": "rfc_254",
+      "no": 254,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Partial name match cannot be satisfactorily resolved."
+    },
+    {
+      "id": "rfc_255",
+      "no": 255,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Identifying data appears to have been altered to avoid a sanctions match."
+    },
+    {
+      "id": "rfc_256",
+      "no": 256,
+      "category": "SANCTIONS RED FLAGS",
+      "indicator": "Use of intermediaries appears designed to distance the actual sanctioned party from the transaction."
+    },
+    {
+      "id": "rfc_257",
+      "no": 257,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Customer has links to conflict zones."
+    },
+    {
+      "id": "rfc_258",
+      "no": 258,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Customer uses unregulated money transfer channels."
+    },
+    {
+      "id": "rfc_259",
+      "no": 259,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Customer uses intermediaries without a clear commercial purpose."
+    },
+    {
+      "id": "rfc_260",
+      "no": 260,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Unusual transfer of precious metals occurs through a high-risk corridor."
+    },
+    {
+      "id": "rfc_261",
+      "no": 261,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Customer or counterparty has links to persons or entities associated with terrorism."
+    },
+    {
+      "id": "rfc_262",
+      "no": 262,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Transaction involves jurisdictions or routes associated with terrorist financing risks."
+    },
+    {
+      "id": "rfc_263",
+      "no": 263,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Gold or funds are moved in a manner inconsistent with economic purpose."
+    },
+    {
+      "id": "rfc_264",
+      "no": 264,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Charities, donations, or similar arrangements appear to be used to obscure the ultimate beneficiary."
+    },
+    {
+      "id": "rfc_265",
+      "no": 265,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Legitimate business revenue appears potentially diverted to prohibited organizations."
+    },
+    {
+      "id": "rfc_266",
+      "no": 266,
+      "category": "TERRORIST FINANCING RED FLAGS",
+      "indicator": "Transaction is associated with a sanctioned terrorist person, organization, or controlled entity."
+    },
+    {
+      "id": "rfc_267",
+      "no": 267,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Customer deals in sensitive goods without a legitimate purpose."
+    },
+    {
+      "id": "rfc_268",
+      "no": 268,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Customer makes unusual requests involving dual use goods."
+    },
+    {
+      "id": "rfc_269",
+      "no": 269,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Transaction passes through a jurisdiction associated with PF risk."
+    },
+    {
+      "id": "rfc_270",
+      "no": 270,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Transaction passes through an embargoed jurisdiction."
+    },
+    {
+      "id": "rfc_271",
+      "no": 271,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Customer attempts to conceal the end user."
+    },
+    {
+      "id": "rfc_272",
+      "no": 272,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Customer attempts to conceal the final destination."
+    },
+    {
+      "id": "rfc_273",
+      "no": 273,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Customer attempts to conceal the intended purpose of goods."
+    },
+    {
+      "id": "rfc_274",
+      "no": 274,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Counterparty has links to controlled or restricted goods."
+    },
+    {
+      "id": "rfc_275",
+      "no": 275,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Counterparty has unclear ownership combined with dual use goods exposure."
+    },
+    {
+      "id": "rfc_276",
+      "no": 276,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Unexplained trade involving jurisdictions subject to proliferation related UN restrictions."
+    },
+    {
+      "id": "rfc_277",
+      "no": 277,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Trade routes appear deliberately designed to obscure a proliferation sensitive nexus."
+    },
+    {
+      "id": "rfc_278",
+      "no": 278,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Customer activity does not align with its normal business but involves sensitive goods or jurisdictions."
+    },
+    {
+      "id": "rfc_279",
+      "no": 279,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Transaction involves an entity designated under PF related sanctions."
+    },
+    {
+      "id": "rfc_280",
+      "no": 280,
+      "category": "PROLIFERATION FINANCING RED FLAGS",
+      "indicator": "Customer provides misleading end use or end user information."
+    },
+    {
+      "id": "rfc_281",
+      "no": 281,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Gold originates from a location with no credible mining activity."
+    },
+    {
+      "id": "rfc_282",
+      "no": 282,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Gold volume exceeds known production capacity of the stated mine."
+    },
+    {
+      "id": "rfc_283",
+      "no": 283,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Material originates from an unknown source."
+    },
+    {
+      "id": "rfc_284",
+      "no": 284,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Material originates from an unapproved source."
+    },
+    {
+      "id": "rfc_285",
+      "no": 285,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Origin cannot be independently verified."
+    },
+    {
+      "id": "rfc_286",
+      "no": 286,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Supplier cannot produce mining licences or concessions."
+    },
+    {
+      "id": "rfc_287",
+      "no": 287,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Mining site cannot be verified."
+    },
+    {
+      "id": "rfc_288",
+      "no": 288,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Mining operation appears unlicensed."
+    },
+    {
+      "id": "rfc_289",
+      "no": 289,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Material appears to come from illegal mining."
+    },
+    {
+      "id": "rfc_290",
+      "no": 290,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Supplier cannot demonstrate lawful ownership of material."
+    },
+    {
+      "id": "rfc_291",
+      "no": 291,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Supplier cannot demonstrate legitimate export rights."
+    },
+    {
+      "id": "rfc_292",
+      "no": 292,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Origin differs between documents."
+    },
+    {
+      "id": "rfc_293",
+      "no": 293,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "True mine or source is obscured by intermediaries."
+    },
+    {
+      "id": "rfc_294",
+      "no": 294,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Gold is declared as recycled despite indicators suggesting mined origin, or vice versa."
+    },
+    {
+      "id": "rfc_295",
+      "no": 295,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Supplier's claimed source changes repeatedly without justification."
+    },
+    {
+      "id": "rfc_296",
+      "no": 296,
+      "category": "GOLD ORIGIN AND MINING RED FLAGS",
+      "indicator": "Supplier's production or trading capacity does not support actual shipments."
+    },
+    {
+      "id": "rfc_297",
+      "no": 297,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Gold originates from a conflict zone."
+    },
+    {
+      "id": "rfc_298",
+      "no": 298,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Gold passes through a conflict affected or high-risk area that was not disclosed."
+    },
+    {
+      "id": "rfc_299",
+      "no": 299,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Supplier is linked to armed groups."
+    },
+    {
+      "id": "rfc_300",
+      "no": 300,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Non state armed groups control mine sites."
+    },
+    {
+      "id": "rfc_301",
+      "no": 301,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Armed groups control transportation routes."
+    },
+    {
+      "id": "rfc_302",
+      "no": 302,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Armed groups control points where metals are traded."
+    },
+    {
+      "id": "rfc_303",
+      "no": 303,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Armed groups control refining points."
+    },
+    {
+      "id": "rfc_304",
+      "no": 304,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Illegal taxation occurs at mine sites."
+    },
+    {
+      "id": "rfc_305",
+      "no": 305,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Illegal taxation occurs along transport routes."
+    },
+    {
+      "id": "rfc_306",
+      "no": 306,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Illegal taxation or extortion affects traders or exporters."
+    },
+    {
+      "id": "rfc_307",
+      "no": 307,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Supplier fails to disclose CAHRA exposure."
+    },
+    {
+      "id": "rfc_308",
+      "no": 308,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Unexpected route through a CAHRA."
+    },
+    {
+      "id": "rfc_309",
+      "no": 309,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Supplier suddenly changes source to a CAHRA."
+    },
+    {
+      "id": "rfc_310",
+      "no": 310,
+      "category": "RESPONSIBLE SOURCING AND CAHRA RED FLAGS",
+      "indicator": "Material's chain of custody contains unexplained gaps in a high-risk region."
+    },
+    {
+      "id": "rfc_311",
+      "no": 311,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Forced labour."
+    },
+    {
+      "id": "rfc_312",
+      "no": 312,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Child labour."
+    },
+    {
+      "id": "rfc_313",
+      "no": 313,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Worst forms of child labour."
+    },
+    {
+      "id": "rfc_314",
+      "no": 314,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Human trafficking."
+    },
+    {
+      "id": "rfc_315",
+      "no": 315,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Slavery or slavery like practices."
+    },
+    {
+      "id": "rfc_316",
+      "no": 316,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Physical abuse of workers."
+    },
+    {
+      "id": "rfc_317",
+      "no": 317,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Psychological abuse."
+    },
+    {
+      "id": "rfc_318",
+      "no": 318,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Torture."
+    },
+    {
+      "id": "rfc_319",
+      "no": 319,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Cruel, inhuman, or degrading treatment."
+    },
+    {
+      "id": "rfc_320",
+      "no": 320,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Sexual violence."
+    },
+    {
+      "id": "rfc_321",
+      "no": 321,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Crimes against humanity."
+    },
+    {
+      "id": "rfc_322",
+      "no": 322,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Genocide."
+    },
+    {
+      "id": "rfc_323",
+      "no": 323,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Unlawful detention."
+    },
+    {
+      "id": "rfc_324",
+      "no": 324,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Intimidation of workers or communities."
+    },
+    {
+      "id": "rfc_325",
+      "no": 325,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Suppression of freedom of association."
+    },
+    {
+      "id": "rfc_326",
+      "no": 326,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Suppression of legitimate worker organization."
+    },
+    {
+      "id": "rfc_327",
+      "no": 327,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Serious discrimination."
+    },
+    {
+      "id": "rfc_328",
+      "no": 328,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Violence against women."
+    },
+    {
+      "id": "rfc_329",
+      "no": 329,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Exploitation of Indigenous peoples."
+    },
+    {
+      "id": "rfc_330",
+      "no": 330,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Displacement of Indigenous peoples without appropriate consent."
+    },
+    {
+      "id": "rfc_331",
+      "no": 331,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Mining on Indigenous lands contrary to the firm's sourcing requirements."
+    },
+    {
+      "id": "rfc_332",
+      "no": 332,
+      "category": "HUMAN RIGHTS RED FLAGS LINKED TO SOURCING",
+      "indicator": "Serious community allegations supported by credible evidence concerning human rights abuse."
+    },
+    {
+      "id": "rfc_333",
+      "no": 333,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Material originates from a World Heritage Site."
+    },
+    {
+      "id": "rfc_334",
+      "no": 334,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Material originates from a government protected area."
+    },
+    {
+      "id": "rfc_335",
+      "no": 335,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Supplier conducts illegal extraction in protected areas."
+    },
+    {
+      "id": "rfc_336",
+      "no": 336,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Deforestation linked to mining."
+    },
+    {
+      "id": "rfc_337",
+      "no": 337,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Water pollution."
+    },
+    {
+      "id": "rfc_338",
+      "no": 338,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Air pollution."
+    },
+    {
+      "id": "rfc_339",
+      "no": 339,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Soil contamination."
+    },
+    {
+      "id": "rfc_340",
+      "no": 340,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Destruction of biodiversity."
+    },
+    {
+      "id": "rfc_341",
+      "no": 341,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Habitat destruction."
+    },
+    {
+      "id": "rfc_342",
+      "no": 342,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Serious landscape modification."
+    },
+    {
+      "id": "rfc_343",
+      "no": 343,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Harm to cultural heritage."
+    },
+    {
+      "id": "rfc_344",
+      "no": 344,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Serious impact on public or private infrastructure."
+    },
+    {
+      "id": "rfc_345",
+      "no": 345,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Improper waste disposal."
+    },
+    {
+      "id": "rfc_346",
+      "no": 346,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Unsafe handling of mercury."
+    },
+    {
+      "id": "rfc_347",
+      "no": 347,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Unsafe handling of cyanide."
+    },
+    {
+      "id": "rfc_348",
+      "no": 348,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Environmental permits cannot be produced."
+    },
+    {
+      "id": "rfc_349",
+      "no": 349,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Environmental licence is expired, inconsistent, or unverifiable."
+    },
+    {
+      "id": "rfc_350",
+      "no": 350,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Credible reports show serious environmental misconduct."
+    },
+    {
+      "id": "rfc_351",
+      "no": 351,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Supplier conceals environmental violations."
+    },
+    {
+      "id": "rfc_352",
+      "no": 352,
+      "category": "ENVIRONMENTAL AND PROTECTED AREA RED FLAGS",
+      "indicator": "Environmental impacts materially conflict with information supplied during due diligence."
+    },
+    {
+      "id": "rfc_353",
+      "no": 353,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Cash or unrecorded payments."
+    },
+    {
+      "id": "rfc_354",
+      "no": 354,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Secret commissions."
+    },
+    {
+      "id": "rfc_355",
+      "no": 355,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Kickbacks."
+    },
+    {
+      "id": "rfc_356",
+      "no": 356,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Facilitation payments."
+    },
+    {
+      "id": "rfc_357",
+      "no": 357,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Payment offered to obtain preferential treatment."
+    },
+    {
+      "id": "rfc_358",
+      "no": 358,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Benefit offered to influence a commercial decision."
+    },
+    {
+      "id": "rfc_359",
+      "no": 359,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Bribery involving a public official."
+    },
+    {
+      "id": "rfc_360",
+      "no": 360,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Bid rigging."
+    },
+    {
+      "id": "rfc_361",
+      "no": 361,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Procurement manipulation."
+    },
+    {
+      "id": "rfc_362",
+      "no": 362,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Improper gift or hospitality."
+    },
+    {
+      "id": "rfc_363",
+      "no": 363,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Excessive hospitality."
+    },
+    {
+      "id": "rfc_364",
+      "no": 364,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Cash equivalent gift."
+    },
+    {
+      "id": "rfc_365",
+      "no": 365,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Gift during tendering or bidding."
+    },
+    {
+      "id": "rfc_366",
+      "no": 366,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Gift to a government official."
+    },
+    {
+      "id": "rfc_367",
+      "no": 367,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Charitable donation appears linked to obtaining a business advantage."
+    },
+    {
+      "id": "rfc_368",
+      "no": 368,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Travel sponsorship has no genuine business purpose."
+    },
+    {
+      "id": "rfc_369",
+      "no": 369,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Undisclosed personal benefit."
+    },
+    {
+      "id": "rfc_370",
+      "no": 370,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Conflict of interest is concealed."
+    },
+    {
+      "id": "rfc_371",
+      "no": 371,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Nepotism or favoritism affects a business decision."
+    },
+    {
+      "id": "rfc_372",
+      "no": 372,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Extortion or coercion."
+    },
+    {
+      "id": "rfc_373",
+      "no": 373,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Abuse of authority."
+    },
+    {
+      "id": "rfc_374",
+      "no": 374,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Misuse of inside information."
+    },
+    {
+      "id": "rfc_375",
+      "no": 375,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Information is manipulated or falsified to hide a bribe."
+    },
+    {
+      "id": "rfc_376",
+      "no": 376,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Intermediary with unclear role is paid an unusual commission."
+    },
+    {
+      "id": "rfc_377",
+      "no": 377,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Employee or third party requests an off-book payment."
+    },
+    {
+      "id": "rfc_378",
+      "no": 378,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Repeat gifts or hospitality appear designed to create influence."
+    },
+    {
+      "id": "rfc_379",
+      "no": 379,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Government facing transaction involves unusual payments or intermediaries."
+    },
+    {
+      "id": "rfc_380",
+      "no": 380,
+      "category": "CORRUPTION AND BRIBERY RED FLAGS",
+      "indicator": "Counterparty asks that a payment description be disguised."
+    },
+    {
+      "id": "rfc_381",
+      "no": 381,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Forged identity documents."
+    },
+    {
+      "id": "rfc_382",
+      "no": 382,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Altered identity documents."
+    },
+    {
+      "id": "rfc_383",
+      "no": 383,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "False corporate documents."
+    },
+    {
+      "id": "rfc_384",
+      "no": 384,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Falsified licences."
+    },
+    {
+      "id": "rfc_385",
+      "no": 385,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Altered trade licence."
+    },
+    {
+      "id": "rfc_386",
+      "no": 386,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "False certificate of origin."
+    },
+    {
+      "id": "rfc_387",
+      "no": 387,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Falsified invoice."
+    },
+    {
+      "id": "rfc_388",
+      "no": 388,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Manipulated assay."
+    },
+    {
+      "id": "rfc_389",
+      "no": 389,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Falsified customs documentation."
+    },
+    {
+      "id": "rfc_390",
+      "no": 390,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Fraudulent production records."
+    },
+    {
+      "id": "rfc_391",
+      "no": 391,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Fraudulent tax documentation."
+    },
+    {
+      "id": "rfc_392",
+      "no": 392,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Falsified beneficial ownership records."
+    },
+    {
+      "id": "rfc_393",
+      "no": 393,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Documents contain inconsistent fonts, dates, numbers, or issuing details requiring verification."
+    },
+    {
+      "id": "rfc_394",
+      "no": 394,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Details differ across documents that should correspond."
+    },
+    {
+      "id": "rfc_395",
+      "no": 395,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Supplier refuses independent verification of records."
+    },
+    {
+      "id": "rfc_396",
+      "no": 396,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Attempt to conceal or destroy information."
+    },
+    {
+      "id": "rfc_397",
+      "no": 397,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Falsification of company records."
+    },
+    {
+      "id": "rfc_398",
+      "no": 398,
+      "category": "FRAUD AND DOCUMENT INTEGRITY RED FLAGS",
+      "indicator": "Attempt to obstruct an investigation."
+    },
+    {
+      "id": "rfc_399",
+      "no": 399,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Scrap volume is inconsistent with stated business activity."
+    },
+    {
+      "id": "rfc_400",
+      "no": 400,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Customer generates quantities of recycled gold inconsistent with its normal operations."
+    },
+    {
+      "id": "rfc_401",
+      "no": 401,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Same material appears repeatedly for re-refining."
+    },
+    {
+      "id": "rfc_402",
+      "no": 402,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Refining frequency has no apparent economic rationale."
+    },
+    {
+      "id": "rfc_403",
+      "no": 403,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Assay documentation is missing."
+    },
+    {
+      "id": "rfc_404",
+      "no": 404,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Assay documentation appears altered."
+    },
+    {
+      "id": "rfc_405",
+      "no": 405,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Source of scrap cannot be established."
+    },
+    {
+      "id": "rfc_406",
+      "no": 406,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Recycled gold appears to have been deliberately misclassified."
+    },
+    {
+      "id": "rfc_407",
+      "no": 407,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Chain of custody for recycled material is incomplete."
+    },
+    {
+      "id": "rfc_408",
+      "no": 408,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Customer cannot identify previous owner or commercial source where that information should reasonably exist."
+    },
+    {
+      "id": "rfc_409",
+      "no": 409,
+      "category": "RECYCLED GOLD AND REFINING RED FLAGS",
+      "indicator": "Refining activity appears designed to transform or disguise traceability of the material."
+    },
+    {
+      "id": "rfc_410",
+      "no": 410,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in bank account."
+    },
+    {
+      "id": "rfc_411",
+      "no": 411,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in ownership."
+    },
+    {
+      "id": "rfc_412",
+      "no": 412,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in directors."
+    },
+    {
+      "id": "rfc_413",
+      "no": 413,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in shareholder composition."
+    },
+    {
+      "id": "rfc_414",
+      "no": 414,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in operating location."
+    },
+    {
+      "id": "rfc_415",
+      "no": 415,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in gold source."
+    },
+    {
+      "id": "rfc_416",
+      "no": 416,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in shipping route."
+    },
+    {
+      "id": "rfc_417",
+      "no": 417,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in payment method."
+    },
+    {
+      "id": "rfc_418",
+      "no": 418,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in destination."
+    },
+    {
+      "id": "rfc_419",
+      "no": 419,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in transaction volume."
+    },
+    {
+      "id": "rfc_420",
+      "no": 420,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in transaction frequency."
+    },
+    {
+      "id": "rfc_421",
+      "no": 421,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in transaction value."
+    },
+    {
+      "id": "rfc_422",
+      "no": 422,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden change in business model."
+    },
+    {
+      "id": "rfc_423",
+      "no": 423,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden appearance of new intermediaries."
+    },
+    {
+      "id": "rfc_424",
+      "no": 424,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Sudden adverse media or sanctions information."
+    },
+    {
+      "id": "rfc_425",
+      "no": 425,
+      "category": "SUDDEN CHANGE RED FLAGS",
+      "indicator": "Change occurs immediately before a significant transaction without credible explanation."
+    },
+    {
+      "id": "rfc_426",
+      "no": 426,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Broker or intermediary has no clear economic function."
+    },
+    {
+      "id": "rfc_427",
+      "no": 427,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Intermediary cannot explain its role."
+    },
+    {
+      "id": "rfc_428",
+      "no": 428,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Unrelated intermediary directs payment."
+    },
+    {
+      "id": "rfc_429",
+      "no": 429,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Unrelated intermediary controls shipment instructions."
+    },
+    {
+      "id": "rfc_430",
+      "no": 430,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Multiple layers of agents obscure supplier and buyer."
+    },
+    {
+      "id": "rfc_431",
+      "no": 431,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Intermediary is in a high-risk jurisdiction unrelated to the goods."
+    },
+    {
+      "id": "rfc_432",
+      "no": 432,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Commission paid to intermediary is disproportionate."
+    },
+    {
+      "id": "rfc_433",
+      "no": 433,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Intermediary appears connected to the UBO but that relationship is undisclosed."
+    },
+    {
+      "id": "rfc_434",
+      "no": 434,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Intermediary is introduced immediately before completion of a transaction."
+    },
+    {
+      "id": "rfc_435",
+      "no": 435,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Customer insists the firm communicate only through an intermediary despite no apparent need."
+    },
+    {
+      "id": "rfc_436",
+      "no": 436,
+      "category": "SUSPICIOUS INTERMEDIARIES",
+      "indicator": "Intermediary is used to conceal end user or destination."
+    },
+    {
+      "id": "rfc_437",
+      "no": 437,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Suspected tax evasion."
+    },
+    {
+      "id": "rfc_438",
+      "no": 438,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Undeclared transportation of precious metals."
+    },
+    {
+      "id": "rfc_439",
+      "no": 439,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Smuggling indicators."
+    },
+    {
+      "id": "rfc_440",
+      "no": 440,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Export licence cannot be verified."
+    },
+    {
+      "id": "rfc_441",
+      "no": 441,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Import licence cannot be verified."
+    },
+    {
+      "id": "rfc_442",
+      "no": 442,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Customs paperwork conflicts with commercial invoices."
+    },
+    {
+      "id": "rfc_443",
+      "no": 443,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Declared customs value materially differs from commercial value."
+    },
+    {
+      "id": "rfc_444",
+      "no": 444,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "False description of metal, weight, or purity."
+    },
+    {
+      "id": "rfc_445",
+      "no": 445,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Country of origin is misrepresented."
+    },
+    {
+      "id": "rfc_446",
+      "no": 446,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Transaction route appears designed to evade customs scrutiny."
+    },
+    {
+      "id": "rfc_447",
+      "no": 447,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Taxes or royalties appear materially inconsistent with production."
+    },
+    {
+      "id": "rfc_448",
+      "no": 448,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Supplier cannot evidence payment of required royalties or government fees."
+    },
+    {
+      "id": "rfc_449",
+      "no": 449,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Cross border movement is inconsistent with declared trade route."
+    },
+    {
+      "id": "rfc_450",
+      "no": 450,
+      "category": "TAX, CUSTOMS, AND CROSS BORDER RED FLAGS",
+      "indicator": "Material is carried across borders outside established logistics arrangements without adequate explanation."
+    },
+    {
+      "id": "rfc_451",
+      "no": 451,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Employee manipulates due diligence findings."
+    },
+    {
+      "id": "rfc_452",
+      "no": 452,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Employee suppresses a compliance alert."
+    },
+    {
+      "id": "rfc_453",
+      "no": 453,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Employee fails to escalate an obvious red flag."
+    },
+    {
+      "id": "rfc_454",
+      "no": 454,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Employee attempts to override compliance without authority."
+    },
+    {
+      "id": "rfc_455",
+      "no": 455,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Employee accepts a secret commission or kickback."
+    },
+    {
+      "id": "rfc_456",
+      "no": 456,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Employee has an undisclosed relationship with a supplier or customer."
+    },
+    {
+      "id": "rfc_457",
+      "no": 457,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Employee repeatedly favors one counterparty without objective business justification."
+    },
+    {
+      "id": "rfc_458",
+      "no": 458,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Unauthorized access to customer or compliance information."
+    },
+    {
+      "id": "rfc_459",
+      "no": 459,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Unauthorized alteration of records."
+    },
+    {
+      "id": "rfc_460",
+      "no": 460,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Theft or misuse of precious metals."
+    },
+    {
+      "id": "rfc_461",
+      "no": 461,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Mishandling customer property."
+    },
+    {
+      "id": "rfc_462",
+      "no": 462,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Attempt to obstruct a compliance review."
+    },
+    {
+      "id": "rfc_463",
+      "no": 463,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Attempt to conceal information from Compliance."
+    },
+    {
+      "id": "rfc_464",
+      "no": 464,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Staff member tips off a customer about an investigation or possible STR or SAR."
+    },
+    {
+      "id": "rfc_465",
+      "no": 465,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Staff member requests that suspicious activity not be documented."
+    },
+    {
+      "id": "rfc_466",
+      "no": 466,
+      "category": "INTERNAL EMPLOYEE AND WHISTLEBLOWING RED FLAGS",
+      "indicator": "Staff member processes a transaction despite an active compliance hold."
+    },
+    {
+      "id": "rfc_467",
+      "no": 467,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "New company, high value gold purchases, third party payment, and offshore bank account."
+    },
+    {
+      "id": "rfc_468",
+      "no": 468,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Complex UBO structure, personal email, flexi desk address, and reluctance to provide ownership records."
+    },
+    {
+      "id": "rfc_469",
+      "no": 469,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Cash transaction below AED 55,000 repeated several times in a short period."
+    },
+    {
+      "id": "rfc_470",
+      "no": 470,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Supplier claims gold originated in one country, but shipping documents show transit through a CAHRA and assay or customs documents do not reconcile."
+    },
+    {
+      "id": "rfc_471",
+      "no": 471,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Customer from an unrelated jurisdiction pays for another entity's purchase."
+    },
+    {
+      "id": "rfc_472",
+      "no": 472,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Supplier's claimed production capacity is far below actual shipment volume."
+    },
+    {
+      "id": "rfc_473",
+      "no": 473,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Gold is bought and rapidly resold at little or no margin through related companies."
+    },
+    {
+      "id": "rfc_474",
+      "no": 474,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Transaction is routed through several entities and ultimately returns funds to the original group."
+    },
+    {
+      "id": "rfc_475",
+      "no": 475,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "UBO changes immediately before a major transaction."
+    },
+    {
+      "id": "rfc_476",
+      "no": 476,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Customer cancels the transaction immediately after SOF, SOW, or UBO questions are raised."
+    },
+    {
+      "id": "rfc_477",
+      "no": 477,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Supplier previously screened clear, later appears in sanctions re screening, and requests changed payment instructions."
+    },
+    {
+      "id": "rfc_478",
+      "no": 478,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Dual use or sensitive goods exposure combined with concealed end user and high risk routing."
+    },
+    {
+      "id": "rfc_479",
+      "no": 479,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "Adverse media involving illegal mining combined with unverifiable origin records."
+    },
+    {
+      "id": "rfc_480",
+      "no": 480,
+      "category": "COMPOSITE RED FLAGS REQUIRING PARTICULAR ATTENTION",
+      "indicator": "PEP connection combined with opaque beneficial ownership, unexplained wealth, and unusual high value precious metal activity."
+    }
+  ]
+}
