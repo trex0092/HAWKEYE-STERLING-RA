@@ -30,6 +30,7 @@ Actions from the URLs in `sanctions-sources.json`.
 | `risk-appetite.json` | Appetite positions, ceilings, KRIs (guard: `test/grc-metrics.test.mjs`) |
 | `compliance-calendar.json` | Dated compliance duties, filed as lead-time Asana reminders weekly |
 | `ai-assets.json` · `prompt-assets.json` · `tool-surfaces.json` | AI-surface, prompt and tool/connector inventories (agentic-governance layers 1–2; guard: `test/ai-assets.test.js`) |
+| `red-flags.json` | Red-flag catalogue: 480 indicators in 30 categories, hand-kept. Reference data only: no severity or typology assigned, no CI guard, not read by any engine yet |
 
 ## State (workflow-committed; staleness alarms)
 
