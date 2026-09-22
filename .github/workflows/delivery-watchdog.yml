@@ -1,0 +1,74 @@
+name: Delivery Watchdog
+
+# Checks whether TODAY's Daily AML/CFT Screening Report was actually filed in
+# Asana -- independent of whether the weekly-adverse-media.yml run that
+# produced it exited 0. screen.py's EOCN review gate deliberately fails the
+# run's exit code even after a fully successful delivery (see
+# enforce_eocn_review_gate in screen.py), so Freshness Check's "successful run
+# inside cadence window" signal stays red regardless of delivery for as long
+# as the EOCN review stays overdue -- expected and already tracked separately.
+# This watchdog checks the actual deliverable instead of the exit code, so a
+# day where delivery genuinely did not happen is distinguishable from the
+# already-expected daily EOCN-gate noise.
+#
+# Context (2026-09-08 sample): the run that files this report was killed
+# mid-flight on 12 of 18 recent attempts (67%), cause not identified (job/step
+# timeout, console silence, harden-runner egress volume, and a public GitHub
+# incident were all checked and ruled out). Every sampled day still delivered
+# via the self-healing retry passes (control-retry.yml) -- this watchdog
+# exists for the day that doesn't.
+#
+# Needs the ASANA_ACCESS_TOKEN repository secret to read the project.
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # 18:00 UTC -- after the scheduled run (~04:xx UTC) and both self-healing retry passes (07:37 / 10:07 UTC), same UTC day
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: delivery-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+            *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Verify today's screening report was filed in Asana
+        id: watchdog
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+        run: node scripts/delivery-watchdog.mjs
+
+      - name: Alert in Asana on missing delivery
+        if: failure()
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "NO DAILY SCREENING REPORT FILED TODAY -- mandatory sanctions/PEP/adverse-media obligation not evidenced as delivered" \
+            "The Delivery Watchdog found no 'Daily AML/CFT Screening Report' task created today in the screening project. This means today's mandatory sanctions/PEP/adverse-media screening has NOT been evidenced as delivered to the MLRO -- the underlying run (weekly-adverse-media.yml) may have been killed on every attempt today, or Asana delivery itself failed. Check the run history and consider a manual workflow_dispatch of Daily Screening: $RUN_URL"

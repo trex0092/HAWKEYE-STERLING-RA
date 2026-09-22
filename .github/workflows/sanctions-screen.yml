@@ -66,7 +66,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           # Allowlist derived from the job's actual fetches: runner/toolchain
@@ -86,6 +86,7 @@ jobs:
             api.github.com:443
             codeload.github.com:443
             objects.githubusercontent.com:443
+            raw.githubusercontent.com:443
             nodejs.org:443
             app.asana.com:443
             sanctionslistservice.ofac.treas.gov:443
@@ -113,7 +114,6 @@ jobs:
             www.government.nl:443
             sifi.minfin.fgov.be:443
             geldefonds.gouv.mc:443
-            sankcijas.fid.gov.lv:443
             nbctf.mod.gov.il:443
             pctc.pss.gov.sa:443
             portal.moi.gov.qa:443
@@ -174,17 +174,23 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
-          # "Sanctions updates" section of the Ongoing Monitoring project
-          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
-          # MIRROR: also file this alert in the queue the MLRO works from —
-          # project 1213914392047129 "Sanctions/Media/PEP - Monitoring",
-          # section 1213914392047131 "Daily Sanctions Screening". #305 routed
-          # every pipeline card to the app project, so these alerts were being
-          # created correctly into a queue nobody watches for them. One task,
-          # two memberships — additive; the #305 destination is unchanged.
-          # Clear ASANA_MIRROR_PROJECT_GID to disable.
-          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID || '1213914392047129' }}
-          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID || '1213914392047131' }}
+          ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID }}
+          # "Sanctions updates" section, gid 1218451960830318. Repointed
+          # 2026-09-16: same fix as sanctions-watch.yml -- this was reading
+          # the generic, never-set ASANA_DELIVERY_SECTION_GID and silently
+          # falling through to "Assessment Report" (1216203370612916). The
+          # repo variable also held a stale value from an earlier Asana
+          # reorganization, corrected in the same pass.
+          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1218451960830318' }}
+          # MIRROR (RETIRED 2026-09-15): the separate "Sanctions/Media/PEP -
+          # Monitoring" project (1213914392047129, section 1213914392047131) was
+          # merged into HAWKEYE STERLING APP, so mirroring here would just re-add
+          # the SAME project the digest above already targets. Both vars below
+          # default to empty (disabled) via the original "Clear
+          # ASANA_MIRROR_PROJECT_GID to disable" escape hatch, until/unless a
+          # genuinely separate MLRO queue exists again.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           # Google News locales swept per subject (pinned core + daily rotation).
@@ -225,15 +231,18 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_CASES_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
-          # "Sanctions updates" section — the run's RESULTS surface (Asana, not GitHub)
-          ASANA_SCREEN_RESULTS_SECTION_GID: ${{ vars.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203370612916' }}
-          # MIRROR the daily digest into the MLRO queue. This env was set only on
-          # the SCREEN step above, whose script consumes it for the (suppressed-
-          # by-default) alert card — the digest poster runs HERE, so the digest
-          # never reached the MLRO queue at all. Same values, both steps.
-          # Clear ASANA_MIRROR_PROJECT_GID to disable.
-          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID || '1213914392047129' }}
-          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID || '1213914392047131' }}
+          # "Sanctions updates" section — the run's RESULTS surface (Asana, not
+          # GitHub). Repointed 2026-09-16: this literal fallback pointed at
+          # "Assessment Report" (1216203370612916), not "Sanctions updates",
+          # even though the step comment already said "Sanctions updates".
+          # The real section is 1218451960830318, verified against the live
+          # Asana API.
+          ASANA_SCREEN_RESULTS_SECTION_GID: ${{ vars.ASANA_SCREEN_RESULTS_SECTION_GID || '1218451960830318' }}
+          # MIRROR (RETIRED 2026-09-15, see the screen step above for why): both
+          # vars now default to empty (disabled) since their destination project
+          # was merged into HAWKEYE STERLING APP.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
         run: node scripts/screening-cases.mjs
 
       - name: Screening metrics (non-blocking observability)

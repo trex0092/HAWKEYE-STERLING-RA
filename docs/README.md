@@ -34,6 +34,7 @@ is the way in. Repo-level governance lives at the root:
 | [`app-setup-runbook.md`](app-setup-runbook.md) | Stand up a second operator environment from zero |
 | [`regulatory-watch.md`](regulatory-watch.md) | The regulatory-watch sources and how the watcher works |
 | [`asana-integration-audit.md`](asana-integration-audit.md) | The Asana integration, audited end to end |
+| [`workflow-consolidation-and-lfs-followups.md`](workflow-consolidation-and-lfs-followups.md) | `.github/workflows/` sprawl analysis + a Git LFS migration runbook |
 | [`i18n-ar-legal-review.md`](i18n-ar-legal-review.md) | The Arabic legal-text decision (long-form prose stays English) |
 | [`fraud-f3-mapping.md`](fraud-f3-mapping.md) | Fraud typology mapping |
 | [`cybersecurity-skills.md`](cybersecurity-skills.md) | The Claude Code cybersecurity-skills plugin registration |

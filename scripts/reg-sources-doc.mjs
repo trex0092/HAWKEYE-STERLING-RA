@@ -39,7 +39,12 @@ export function buildSection(sources) {
 const sources = loadSources(readFileSync(SOURCES_PATH(), 'utf8'));
 function SOURCES_PATH() { return new URL('../data/reg-sources.json', import.meta.url); }
 
-const doc = readFileSync(DOC, 'utf8');
+/* Compare canonical LF text so a Windows CRLF checkout does not make an
+   unchanged generated section look stale. Preserve the checkout's newline
+   convention if regeneration really is needed. */
+const rawDoc = readFileSync(DOC, 'utf8');
+const newline = rawDoc.includes('\r\n') ? '\r\n' : '\n';
+const doc = rawDoc.replace(/\r\n/g, '\n');
 const b = doc.indexOf(BEGIN), e = doc.indexOf(END);
 if (b === -1 || e === -1 || e < b) { console.error('Markers ' + BEGIN + ' / ' + END + ' not found in ' + DOC); process.exit(2); }
 const next = doc.slice(0, b) + buildSection(sources) + doc.slice(e + END.length);
@@ -49,6 +54,9 @@ if (check) {
   if (next !== doc) { console.error('STALE: ' + DOC + ' is out of sync with data/reg-sources.json. Run: node scripts/reg-sources-doc.mjs'); process.exit(1); }
   console.log('reg-sources-doc: ' + DOC + ' is in sync (' + sources.length + ' sources).');
 } else {
-  if (next !== doc) { writeFileSync(DOC, next); console.log('reg-sources-doc: regenerated table in ' + DOC + ' (' + sources.length + ' sources).'); }
+  if (next !== doc) {
+    writeFileSync(DOC, newline === '\n' ? next : next.replace(/\n/g, newline));
+    console.log('reg-sources-doc: regenerated table in ' + DOC + ' (' + sources.length + ' sources).');
+  }
   else console.log('reg-sources-doc: no change (' + sources.length + ' sources).');
 }

@@ -22,7 +22,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json, os
-import xml.etree.ElementTree as ET
 
 # The weak inline matcher this step used to carry (token_sort top-3,
 # break on first hit, no core/subset/short-entry gates, no
@@ -48,8 +47,8 @@ sanctioned = []   # list of dicts: {name, list, programme}
 
 # OFAC SDN
 try:
-    tree = ET.parse("/tmp/ofac_sdn.xml")
-    root = tree.getroot()
+    with open("/tmp/ofac_sdn.xml", "rb") as f:
+        root = engine.safe_xml_fromstring(f.read())
     ns = {"ns": root.tag.split("}")[0].lstrip("{")} if "}" in root.tag else {}
     prefix = f"{{{ns['ns']}}}" if ns else ""
     for entry in root.iter(f"{prefix}sdnEntry"):
@@ -95,8 +94,8 @@ except Exception as e:
 
 # UN Consolidated
 try:
-    tree = ET.parse("/tmp/un_consolidated.xml")
-    root = tree.getroot()
+    with open("/tmp/un_consolidated.xml", "rb") as f:
+        root = engine.safe_xml_fromstring(f.read())
     before = len(sanctioned)
     for ind in root.iter("INDIVIDUAL"):
         parts = []
@@ -122,8 +121,8 @@ except Exception as e:
 # element-text parse (root.iter("sanctionEntity") + name_el.text) silently
 # returned 0 EU entries on the real feed — a sanctions-coverage gap.
 try:
-    tree = ET.parse("/tmp/eu_sanctions.xml")
-    root = tree.getroot()
+    with open("/tmp/eu_sanctions.xml", "rb") as f:
+        root = engine.safe_xml_fromstring(f.read())
     before = len(sanctioned)
     seen_eu = set()
     for subject in root.iter():

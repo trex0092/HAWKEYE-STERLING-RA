@@ -569,6 +569,38 @@ export function gdeltUrl(name, terms = gdeltTerms(name)) {
     + '&mode=artlist&format=json&maxrecords=' + maxRec + '&sort=datedesc&timespan=' + encodeURIComponent(span);
 }
 
+/* Run-level GDELT circuit breaker, ported from screen.py's GDELT_BREAKER_AFTER
+   (test/engine_test.py already proves this exact pattern there; this mirrors
+   it here rather than inventing a second design). GDELT throttles busy
+   shared IPs (GitHub-hosted runners) and, once it does, stays down for the
+   rest of the run: every subsequent subject would otherwise burn a full
+   fetchSource timeout (default 20s, x2 when the wide query also has to
+   retry on the base set) waiting on a feed that is not coming back. After
+   this many CONSECUTIVE hard failures (wide query AND its base-set retry
+   both failed) the feed is declared down for the REST OF THE RUN with one
+   loud log line; each subject's coverage then stands on the Google News
+   locale sweep, same as the Python engine. A success resets the counter.
+   This is module-level in-memory state: it re-arms fresh on the next
+   process invocation, because each scheduled workflow run is a fresh
+   `node` process. */
+export const GDELT_BREAKER_AFTER = Number(process.env.GDELT_BREAKER_AFTER) || 5;
+export const gdeltBreakerState = { consecutiveFailures: 0, open: false };
+export function resetGdeltBreaker() {
+  gdeltBreakerState.consecutiveFailures = 0;
+  gdeltBreakerState.open = false;
+}
+export function gdeltBreakerRecordSuccess() {
+  gdeltBreakerState.consecutiveFailures = 0;
+}
+export function gdeltBreakerRecordFailure() {
+  gdeltBreakerState.consecutiveFailures++;
+  if (gdeltBreakerState.consecutiveFailures >= GDELT_BREAKER_AFTER && !gdeltBreakerState.open) {
+    gdeltBreakerState.open = true;
+    console.warn('adverse-media: GDELT down (' + GDELT_BREAKER_AFTER + ' subjects in a row) — circuit OPEN, '
+      + 'skipping GDELT for the rest of the run; Google News coverage stands');
+  }
+}
+
 const RSS_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 function decode(x) {
   const cp = n => { try { return String.fromCodePoint(n); } catch { return ''; } };
@@ -837,13 +869,20 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
      worse than asking narrowly. So a failed wide query retries once on the
      proven base set and says so — the expansion can only ever add recall. */
   const wide = gdeltTerms(name);
-  const gdeltP = fetchSource(gdeltUrl(name, wide), parseGdelt, 'application/json', timeoutMs)
-    .then(r => {
-      if (r !== null || wide.length <= GDELT_RISK_TERMS.length) return r;
-      console.warn('adverse-media: GDELT rejected the ' + wide.length + '-term query — retrying on the '
-        + GDELT_RISK_TERMS.length + '-term base set (retrieval breadth reduced for this subject, not lost)');
-      return fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt, 'application/json', timeoutMs);
-    });
+  const gdeltP = gdeltBreakerState.open
+    ? Promise.resolve(null)
+    : fetchSource(gdeltUrl(name, wide), parseGdelt, 'application/json', timeoutMs)
+        .then(r => {
+          if (r !== null || wide.length <= GDELT_RISK_TERMS.length) return r;
+          console.warn('adverse-media: GDELT rejected the ' + wide.length + '-term query — retrying on the '
+            + GDELT_RISK_TERMS.length + '-term base set (retrieval breadth reduced for this subject, not lost)');
+          return fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt, 'application/json', timeoutMs);
+        })
+        .then(r => {
+          if (r !== null) { gdeltBreakerRecordSuccess(); return r; }
+          gdeltBreakerRecordFailure();
+          return null;
+        });
   const localeResults = await mapPool(localeSet, conc, loc =>
     fetchSource(adverseMediaUrlFor(name, loc), parseRss, xmlAccept, timeoutMs)
       .then(items => ({ id: loc.id, items }))

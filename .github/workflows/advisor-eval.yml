@@ -46,7 +46,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -81,7 +81,15 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
+          # Repointed 2026-09-17 to "AI & Platform Governance" (1216782693874840),
+          # the same section weekly-summary.yml already uses for AI/Advisor
+          # governance content. Unlike the sanctions/regulatory/FATF fixes, there
+          # was no pre-existing repo variable proving this is the intended
+          # destination for advisor-eval specifically -- this is the best-supported
+          # inference (an Advisor guardrail failure is AI/Advisor governance
+          # content), not confirmed intent. Reuses ASANA_WEEKLY_SECTION_GID rather
+          # than adding a new variable for the same physical section.
+          ASANA_SECTION_GID: ${{ vars.ASANA_WEEKLY_SECTION_GID || '1216782693874840' }}
         # Title must not claim a regression when the eval could not run (e.g. the
         # API returned 400s on a billing lapse) — the report's Result line is the
         # discriminator, written by scripts/advisor-eval.mjs.

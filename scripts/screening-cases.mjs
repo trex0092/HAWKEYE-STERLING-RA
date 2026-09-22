@@ -24,6 +24,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { asana, asanaEnabled, ensureSection, esc, runUrl, notifyAsana,
   fitAsanaHtml, fitAsanaName } from './asana-notify.mjs';
+import { enrichScreeningResults } from './openai-screening-enrichment.mjs';
 
 export const SCREEN_STATE_FILE = 'data/sanctions-screen-state.json';
 export const CASES_FILE = 'data/screening-cases-state.json';
@@ -298,6 +299,14 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
     h.push('<em>Adverse-media sweep: ' + esc(String(en.amLocalesPerSubject))
       + ' news edition(s) per subject this run (pinned core + daily rotation over the worldwide matrix) + GDELT global index.</em>');
   }
+  const ai = r.ai_enrichment || null;
+  if (ai && ai.text) {
+    h.push('<h2>AI enhancement — analyst assistance only</h2>');
+    h.push('<ul>' + String(ai.text).split(/\r?\n/).filter(Boolean).map(line => '<li>' + esc(line) + '</li>').join('') + '</ul>');
+    h.push('<em>AI enhancement is additive only. The original sanctions, PEP, adverse-media evidence, scores and case status above remain the authoritative screening output.</em>');
+  } else if (ai && ai.enabled && ai.error) {
+    h.push('<em>AI enhancement unavailable this run: ' + esc(ai.error) + '. Original screening output is unaffected.</em>');
+  }
   h.push('<em>Detection is automatic. Do NOT freeze, decline or report on a match before MLRO review and a two-person (four-eyes) sign-off — UAE Federal Decree-Law No. 10 of 2025 Art. 16/18; FATF R.26.</em>');
   const link = runUrl();
   if (link) h.push('<a href="' + esc(link) + '">View the screening run</a>');
@@ -498,7 +507,14 @@ async function main() {
   const results = readJson(RESULTS_FILE);
   if (results && results.date === today) {
     try {
-      const html = buildResultsDigestHtml(results, a => (casesState[a.key] || {}).taskGid || null);
+      /* Optional, fail-open enrichment. This never mutates the screening state,
+         match decisions, scores, case lifecycle, or results artifact on disk.
+         It only appends analyst-assistance text to the Asana digest. */
+      const ai = await enrichScreeningResults(results);
+      const digestResults = { ...results, ai_enrichment: ai };
+      if (ai.text) console.log('screening-cases: OpenAI analyst enhancement appended (' + (ai.model || 'configured model') + ')');
+      else if (ai.enabled && ai.error) console.warn('screening-cases: OpenAI enhancement unavailable — ' + ai.error + '; original digest will still post');
+      const html = buildResultsDigestHtml(digestResults, a => (casesState[a.key] || {}).taskGid || null);
       const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203370612916';
       /* Mirror the daily case digest into the queue the MLRO actually works
          (see the MIRROR note in asana-notify). One task, two memberships. */

@@ -35,21 +35,23 @@ Netlify Functions  (token in ASANA_ACCESS_TOKEN, server-side)
   └─ risk-backup.js   ── mirror of the risk-data score overrides
   │  Asana REST v1.0
   ▼
-Asana project  "RISK ASSESSMENTS"  (default GID 1216203370612914)
+Asana project  "HAWKEYE STERLING APP"  (default GID 1216203370612914)
      sections: LOW RISK (CDD) · MEDIUM RISK (SDD) · HIGH RISK (EDD) ·
                PROHIBITED (DO NOT ONBOARD) · ACTIVITY LOG (housekeeping mirrors)
 ```
 
 Separately, the regulatory/sanctions watchers post to a **different** project via
 [`scripts/asana-notify.mjs`](../scripts/asana-notify.mjs)
-(`ASANA_REG_PROJECT_GID`, default `1213914392047129` — Ongoing Monitoring, after the
-Regulations/Governance/Sanctions project was merged into it) — not in scope here.
+(`ASANA_REG_PROJECT_GID`, default `1216203370612914` — HAWKEYE STERLING APP; the
+Regulations/Governance/Sanctions project was merged into it, and later "Ongoing
+Monitoring"/"Sanctions/Media/PEP - Monitoring" was merged in and deleted too,
+#518 2026-09-15) — not in scope here.
 
 ### Key facts
 
 | Item | Value | Source |
 |------|-------|--------|
-| Delivery target project | `ASANA_PROJECT_GID` → default `1216203370612914` (RISK ASSESSMENTS) | `asana-task.js:8` |
+| Delivery target project | `ASANA_PROJECT_GID` → default `1216203370612914` (HAWKEYE STERLING APP) | `asana-task.js:8` |
 | Token | `ASANA_ACCESS_TOKEN` (server-side only) | `asana-task.js:45` |
 | Assignee | `ASANA_ASSIGNEE` → default `me` | `asana-task.js:114` |
 | Allowed origins | same-origin + `PRIMARY_ORIGIN` + `ALLOWED_ORIGINS` | `asana-task.js:195` |
@@ -59,7 +61,7 @@ Regulations/Governance/Sanctions project was merged into it) — not in scope he
 | Field mapping | task **name** + **notes** (plain text) + risk-band **section**; **no Asana custom fields** are used | `app.js` `asanaPayload()` |
 
 The plan's memory of an "00 · Hawkeye Inbox" triage hub does **not** match the
-current source: this app delivers directly into the single **RISK ASSESSMENTS**
+current source: this app delivers directly into the single **HAWKEYE STERLING APP**
 project, filed into a section by risk band. Confirm the live GID against
 `ASANA_PROJECT_GID` in the Netlify UI (see runbook).
 
@@ -132,7 +134,7 @@ MCP tools, or manually). It finds **drift** between the app and Asana.
 1. **From the app** — Console → **Export (tokenised)** for the Activity Log, and
    the Assessment Register (Console → Refresh from Asana pulls the mirror). Use
    the **tokenised** export so PII never leaves the browser for the audit.
-2. **From Asana** — list tasks in the RISK ASSESSMENTS project
+2. **From Asana** — list tasks in the HAWKEYE STERLING APP project
    (`ASANA_PROJECT_GID`), fields `name, permalink_url, completed, due_on,
    memberships.section`.
 
@@ -178,12 +180,12 @@ tracked like every other Hawkeye Sterling control.
 ### Netlify / Asana spot-checks (verify live)
 
 1. Netlify → site **hawkeye-sterling-ra** → **Environment variables**: confirm
-   `ASANA_ACCESS_TOKEN` is set and `ASANA_PROJECT_GID` points at RISK ASSESSMENTS
+   `ASANA_ACCESS_TOKEN` is set and `ASANA_PROJECT_GID` points at HAWKEYE STERLING APP
    (`1216203370612914` unless overridden). If `ASANA_PROJECT_GID` is unset the
    functions log a warning and fall back to the hardcoded default.
 2. Netlify → **Functions** logs for `asana-task` / `asana-mirror`: look for `401`
    (token), `429` (rate limit), and the new explicit error strings.
-3. Asana → RISK ASSESSMENTS: confirm one task per reference and that band
+3. Asana → HAWKEYE STERLING APP: confirm one task per reference and that band
    sections exist (they are auto-created on demand).
 
 ---

@@ -601,6 +601,13 @@ def governance_footer():
                  f"OPENED after {LLM_BREAKER_AFTER} consecutive failures; "
                  f"{LLM_CALLS.get('skipped', 0)} call(s) were skipped and those items carry "
                  f"DETERMINISTIC triage only (severity floors intact, no finding dropped)")
+    # The breaker only counts an UNREACHABLE endpoint, so a run where every call
+    # got an HTTP error reply (e.g. a usage cap: 557 of 557 failed on 21 Sep
+    # 2026) never trips it and would still read "AI-ASSISTED". Say what happened.
+    elif (LLM_TRIAGE and not _llm_in_reports()
+          and LLM_CALLS.get("attempted", 0) > 0 and LLM_CALLS.get("ok", 0) == 0):
+        mode += (f" (DEGRADED THIS RUN: 0 of {LLM_CALLS['attempted']} model calls succeeded, so every item "
+                 "carries DETERMINISTIC triage only; severity floors intact, no finding dropped)")
     return (f"DATA INTEGRITY: {mode}. Human-in-the-loop: MLRO decides & files. "
             "Every finding carries its raw evidence (list entry / article link / Wikidata). "
             "Governance: UAE AI Ethics Principles + PDPL; see docs/AI-GOVERNANCE.md.")

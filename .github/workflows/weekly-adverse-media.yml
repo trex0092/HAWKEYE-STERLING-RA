@@ -70,7 +70,7 @@ jobs:
       makeup: ${{ steps.decide.outputs.makeup }}
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -119,7 +119,7 @@ jobs:
 
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           # This job holds contents:write and fetches external content while handling
@@ -362,6 +362,11 @@ jobs:
         env:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
+          # HR - Employees screening population (MLRO-directed 2026-07-29,
+          # see screen.py). Never forwarded here before, so screen.py always
+          # fell back to its own hardcoded default (1216139945846994), which
+          # does not exist in Asana, and that FATAL guard aborted the run.
+          ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID }}
           # Contact point for regulator feeds that refuse an anonymous caller.
           # SEC.gov's automated-access policy wants the requester declared with a
           # contact address; both SEC feeds have 403'd on every run since at
@@ -407,7 +412,7 @@ jobs:
           # card (dedup-key SYSTEM|daily-screening|<date>) and completes it on
           # zero-finding days only; action days stay open for the analyst.
           # Clear the var to disable.
-          FOLLOWUP_PROJECT_GID: ${{ vars.FOLLOWUP_PROJECT_GID || '1215884707932023' }}
+          FOLLOWUP_PROJECT_GID: ${{ vars.FOLLOWUP_PROJECT_GID }}  # RETIRED 2026-09-15: Follow Ups project merged into HAWKEYE STERLING APP
           # Deliver EVERY new finding (sanctions + adverse media + PEP) to Asana as
           # its own assigned MLRO case subtask, not just the first 40. The full
           # findings list is always in the daily task body regardless of this cap.

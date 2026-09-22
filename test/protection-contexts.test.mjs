@@ -25,7 +25,7 @@ const stripComment = (s) => s.replace(/\s+#.*$/, '');
 
 /* 1. Required contexts from settings.yml (lines under `contexts:` at its
    indentation, until a shallower/equal-indent non-list line). */
-const settings = readFileSync(join(ROOT, '.github/settings.yml'), 'utf8').split('\n');
+const settings = readFileSync(join(ROOT, '.github/settings.yml'), 'utf8').split(/\r?\n/);
 const contexts = [];
 {
   let inBlock = false, listIndent = -1;
@@ -52,7 +52,7 @@ const workflows = readdirSync(wfDir).filter((f) => /\.ya?ml$/.test(f));
 const checkNames = new Map(); // check name -> workflow file
 const wfRequiredJobs = new Map(); // workflow file -> [required check names]
 for (const wf of workflows) {
-  const lines = readFileSync(join(wfDir, wf), 'utf8').split('\n');
+  const lines = readFileSync(join(wfDir, wf), 'utf8').split(/\r?\n/);
   let inJobs = false, currentJob = null, jobNamed = false;
   const names = [];
   for (const raw of lines) {
@@ -86,7 +86,7 @@ for (const ctx of contexts) {
    NOT path-filtered. Only the pull_request sub-block is inspected — push may
    keep its paths filter (nothing gates on push). */
 for (const [wf, req] of wfRequiredJobs) {
-  const lines = readFileSync(join(wfDir, wf), 'utf8').split('\n');
+  const lines = readFileSync(join(wfDir, wf), 'utf8').split(/\r?\n/);
   // slice the top-level `on:` block
   const onStart = lines.findIndex((l) => /^(on|"on"|'on'):\s*$/.test(stripComment(l)));
   check(`${wf} (required: ${req.join(', ')}) has an on: block`, onStart !== -1);
@@ -119,7 +119,7 @@ for (const wf of workflows) {
   const body = readFileSync(join(wfDir, wf), 'utf8');
   if (body.includes('gh release create')) {
     check(`${wf} creates releases inside the protected release environment`,
-      /^\s{4}environment:\s*release\s*$/m.test(body.split('\n').map(stripComment).join('\n')));
+      /^\s{4}environment:\s*release\s*$/m.test(body.split(/\r?\n/).map(stripComment).join('\n')));
   }
 }
 

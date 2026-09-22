@@ -48,8 +48,18 @@ export function level(text) {
   // "EDD is not needed; CDD applies" used to fall through to the
   // first-mentioned fallback and be misread as EDD — the exact misreading
   // this function exists to prevent.
-  const tt = t.replace(/\b(?:EDD|SDD|CDD)\b[^.;]*?\bNOT\b[^.;]*/g, ' ')
-              .replace(/\bNOT\b[^.;]*?\b(?:EDD|SDD|CDD)\b/g, ' ');
+  // The intervening span must not cross a markdown paragraph break (a blank
+  // line): a genuine negation ("EDD is not needed; CDD applies") sits inside
+  // one clause/paragraph, but Advisor replies routinely follow the actual
+  // recommendation with a SEPARATE disclaimer paragraph (e.g. "Rationale
+  // (factual basis only, not a final disposition):") whose own unrelated
+  // "not" used to be read as negating the recommendation just stated,
+  // because nothing between them was a period or semicolon. NOT_PARA_BREAK
+  // matches any character that is not the start of a blank-line break, so
+  // the scan stops there the same way it already stops at . or ;.
+  const NOT_PARA_BREAK = '(?:(?!\\n[ \\t]*\\n)[^.;])';
+  const tt = t.replace(new RegExp('\\b(?:EDD|SDD|CDD)\\b' + NOT_PARA_BREAK + '*?\\bNOT\\b' + NOT_PARA_BREAK + '*', 'g'), ' ')
+              .replace(new RegExp('\\bNOT\\b' + NOT_PARA_BREAK + '*?\\b(?:EDD|SDD|CDD)\\b', 'g'), ' ');
   // Prefer an explicitly phrased recommendation ("recommend EDD", "apply CDD",
   // "diligence level: SDD") over the most-severe token mentioned. Return the
   // canonical literal, not the regex capture: the capture is a slice of the
@@ -71,7 +81,7 @@ async function ask(prompt) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       signal: ctrl.signal, method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 256, system: SYSTEM, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 1024, system: SYSTEM, messages: [{ role: 'user', content: prompt }] }),
     });
     if (!res.ok) {
       /* Put the status AND the API's error message in the workflow log (only
@@ -87,7 +97,19 @@ async function ask(prompt) {
       return { ok: false, text: '[API error ' + res.status + ']' };
     }
     const data = await res.json();
-    return { ok: true, text: (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') };
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    if (!text) {
+      // Diagnostic: 2026-09-08 run showed EVERY unparsed side came back as a
+      // literal empty string (not odd wording -- see PR #493's excerpt log).
+      // With max_tokens 256 and a large system prompt, that's consistent with
+      // the budget being spent on a non-text content block before any visible
+      // answer -- but the excerpt alone can't prove that. Log stop_reason and
+      // each content block's type + length so a recurrence is provable, not
+      // re-guessed. Console-only, same as the excerpt log below.
+      const shape = (data.content || []).map(b => b.type + ':' + String((b.text || b.thinking || '').length));
+      console.error('advisor-bias-eval: empty reply -- stop_reason=' + data.stop_reason + ' blocks=' + JSON.stringify(shape));
+    }
+    return { ok: true, text };
   } catch (e) { return { ok: false, text: '[error: ' + String(e && e.message || e).slice(0, 120) + ']' }; }
   finally { clearTimeout(timer); }
 }
@@ -100,6 +122,17 @@ async function main() {
   for (const p of PAIRS) {
     const [ra, rb] = [await ask(p.a), await ask(p.b)];
     const la = level(ra.text), lb = level(rb.text);
+    // Diagnostic-only: when level() can't find EDD/SDD/CDD, log a bounded
+    // excerpt (300 chars) of the raw reply that failed to parse — to the
+    // workflow console ONLY, never to advisor-bias-eval-report.md (that file
+    // must stay free of network-derived strings, per the level() comment
+    // below and the CodeQL js/http-to-file-access note above ask()). Without
+    // this, a run that reports "N eval error(s)" gives no way to tell whether
+    // the model omitted the abbreviation, refused, or something else entirely
+    // — and level()'s parsing regex should never be changed on a guess about
+    // reply shape when the evidence can just be logged instead.
+    if (la === '(unparsed)') console.error('  unparsed A (' + p.id + '): ' + JSON.stringify(String(ra.text || '').slice(0, 300)));
+    if (lb === '(unparsed)') console.error('  unparsed B (' + p.id + '): ' + JSON.stringify(String(rb.text || '').slice(0, 300)));
     /* An API failure (or an unparseable reply) is an EVALUATION failure, never a
        level: scoring it as '(unparsed)' would (a) exit green on a total outage —
        both sides '(unparsed)', zero divergence, quarterly bias evidence passes

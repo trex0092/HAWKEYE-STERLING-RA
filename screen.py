@@ -11,7 +11,11 @@ Modes:
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time, html
 import threading
 import functools
-import xml.etree.ElementTree as ET
+# The one call site (safe_xml_fromstring, below) refuses any DTD/ENTITY
+# declaration before ET.fromstring ever runs, which is the same protection
+# defusedxml provides for billion-laughs/XXE; see the XML_MAX_BYTES comment
+# near that function for why defusedxml itself was not added as a dependency.
+import xml.etree.ElementTree as ET  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml
 import concurrent.futures
 
 # How many subjects to enrich (adverse media + PEP) in parallel. The sweep is
@@ -90,8 +94,11 @@ DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "05:00")
 DELIVERY_RESERVE_MIN  = int(os.environ.get("DELIVERY_RESERVE_MIN", "20"))
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
-ASANA_ONGOING_MON_GID = "1213914392047129"
-ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
+ASANA_ONGOING_MON_GID = "1216203370612914"   # RETIRED 2026-09-15: "Sanctions/Media/PEP -
+# Monitoring" project (old value 1213914392047129) was merged into HAWKEYE
+# STERLING APP -- this must always be a live project (delivery is FATAL
+# otherwise), so it is repointed here rather than disabled.
+ASANA_SECTION_GID     = "1218452114962158"   # "Screening Daily Report" section (HAWKEYE STERLING APP); old section 1213914392047131 died with the project above
 # ── Second screening population + second delivery queue (MLRO, 2026-07-29) ──
 # Screening reads BOTH populations: the Customer Database (customers + their
 # UBOs/owners) and the HR – Employees project (staff screening — FATF R.18 /
@@ -100,11 +107,15 @@ ASANA_SECTION_GID     = "1213914392047131"   # Daily Sanctions Screening section
 # configured is FATAL, exactly like the customer database — a screening
 # population that silently drops out is a silent clear.
 ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", "1216139945846994")
-# Every daily deliverable is multi-homed into BOTH MLRO queues: Ongoing
-# Monitoring (the review record) and Follow Ups (the action queue). One task,
-# two projects — Asana multi-homing, so there is a single audit trail.
-ASANA_FOLLOWUPS_GID = os.environ.get("ASANA_FOLLOWUPS_GID", "1215884707932023")
-ASANA_FOLLOWUPS_SECTION_GID = os.environ.get("ASANA_FOLLOWUPS_SECTION_GID", "1215884707932047")
+# RETIRED 2026-09-15: the daily deliverable used to be multi-homed into a
+# second MLRO queue, the separate "Follow Ups" project (old value
+# 1215884707932023). That project was merged into HAWKEYE STERLING APP (it
+# now exists there only as a "Follow Ups" SECTION, gid 1218451243658328) --
+# mirroring into it would just re-add the SAME project ASANA_ONGOING_MON_GID
+# already targets above, so the second membership is disabled (empty default)
+# until/unless a genuinely separate MLRO queue exists again.
+ASANA_FOLLOWUPS_GID = os.environ.get("ASANA_FOLLOWUPS_GID", "")
+ASANA_FOLLOWUPS_SECTION_GID = os.environ.get("ASANA_FOLLOWUPS_SECTION_GID", "")
 
 def _mlro_queue_targets():
     """projects + memberships for a daily deliverable, multi-homed into every
@@ -119,6 +130,14 @@ def _mlro_queue_targets():
         memberships.append(m)
     return projects, memberships
 ASANA_ASSIGNEE_GID    = "1213645083721304"   # default case/OM assignee (MLRO)
+# Case subtasks are created with only a `parent`, and Asana does not put a
+# subtask on any project board by itself: every case created since at least
+# 27 Aug 2026 had ZERO project/section membership and was invisible on the
+# case board. They are now attached, after creation, to this section of the
+# monitoring project ("Screening Cases - New"). Set the variable empty to
+# disable the attach (cases then stay board-less, as before).
+ASANA_CASES_NEW_SECTION_GID = os.environ.get("ASANA_CASES_NEW_SECTION_GID", "1216908203079873")
+CASE_BOARD_ATTACH = {"attached": 0, "failed": 0}
 
 # ── Match thresholds — env-tunable, ONE-WAY (challenger runs more sensitive
 # only, per docs/governance/champion-challenger-thresholds.md). A value ABOVE
@@ -1861,6 +1880,35 @@ def search_bing_news(name: str, max_results: int = 8) -> list:
         raise RuntimeError(f"Bing News HTTP {r.status_code}")
     return parse_bing_news(r.content, max_results)
 
+# Per-run news-feed coverage. The report used to say GDELT "runs on EVERY
+# subject every run regardless" even on runs where its circuit opened after 5
+# subjects (21 Sep 2026: HTTP 429), and never said how many subjects were
+# covered by one feed only. Counted here, per news-swept subject, and rendered
+# in section 2 of the report.
+_FEED_COVERAGE = {"subjects": 0, "gnews": 0, "gdelt": 0, "bing": 0, "single": 0, "none": 0}
+_FEED_COVERAGE_LOCK = threading.Lock()
+
+def _record_feed_coverage(gn_ok, gdelt_ok, bing_ok):
+    n = int(bool(gn_ok)) + int(bool(gdelt_ok)) + int(bool(bing_ok))
+    with _FEED_COVERAGE_LOCK:
+        _FEED_COVERAGE["subjects"] += 1
+        _FEED_COVERAGE["gnews"] += int(bool(gn_ok))
+        _FEED_COVERAGE["gdelt"] += int(bool(gdelt_ok))
+        _FEED_COVERAGE["bing"] += int(bool(bing_ok))
+        if n == 1:
+            _FEED_COVERAGE["single"] += 1
+        elif n == 0:
+            _FEED_COVERAGE["none"] += 1
+
+def feed_coverage_snapshot():
+    with _FEED_COVERAGE_LOCK:
+        return dict(_FEED_COVERAGE)
+
+def reset_feed_coverage():
+    with _FEED_COVERAGE_LOCK:
+        for k in _FEED_COVERAGE:
+            _FEED_COVERAGE[k] = 0
+
 def search_adverse_media(name: str, max_results: int = None) -> list:
     """
     Deep adverse-media search via Google News RSS.
@@ -2063,6 +2111,8 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                         "skipping Bing News for the rest of the run; Google News/GDELT coverage stands")
             else:
                 log(f"  Bing News unavailable for this subject ({str(e)[:80]}) — other feeds stand")
+
+    _record_feed_coverage(attempts > 0 and failures < attempts, gdelt_ok, bing_ok)
 
     # Degrade loudly: if EVERY Google-News fetch failed (or its breaker skipped
     # the feed entirely) AND GDELT failed AND Bing News failed, we have ZERO
@@ -2808,11 +2858,14 @@ def download(url, label):
 LIST_ENTRY_ATTRS = {}
 _OFAC_ENT_ATTRS = {}   # ent_num -> (dobs, nationalities), links alt.csv aliases
 
-def _note_entry_attrs(name, dobs=None, nationalities=None):
+def _note_entry_attrs(name, dobs=None, nationalities=None, sources=None):
     key = normalize(name or "")
-    if not key or not (dobs or nationalities):
+    if not key or not (dobs or nationalities or sources):
         return
     slot = LIST_ENTRY_ATTRS.setdefault(key, {"dob": set(), "nationality": set()})
+    for src in sources or ():
+        src = str(src).strip()
+        if src: slot.setdefault("source", set()).add(src)
     for d in dobs or ():
         d = str(d).strip()
         if d: slot["dob"].add(d)
@@ -2830,6 +2883,8 @@ def match_context_for(matched_entry):
         bits.append("list DOB: " + " / ".join(sorted(a["dob"])[:3]))
     if a["nationality"]:
         bits.append("list nationality: " + ", ".join(sorted(a["nationality"])[:3]))
+    if a.get("source"):
+        bits.append("source list: " + " / ".join(sorted(a["source"])[:3]))
     return "; ".join(bits)
 
 # ── IDENTITY-BASED EXCLUSION (false-positive demotion, never suppression) ────
@@ -3041,6 +3096,91 @@ def load_ofac_consolidated(all_lists, list_meta):
     if names:
         all_lists["OFAC Consolidated (non-SDN)"] = [(normalize(n), n) for n in names]
     return names
+
+# -- WORLDWIDE NATIONAL SANCTIONS NET (supplementary) --------------------------
+# The core lists above are ten. The report and the daily task therefore said
+# "sanctions" while ~80 further national lists (Ukraine NSDC, France, Belgium,
+# Japan METI, Turkiye MASAK, Pakistan NACTA, Iraq, New Zealand, Poland, Israel,
+# Qatar, Saudi Arabia, India MHA, ...) were only reached by the separate JS
+# engine, if at all. OpenSanctions publishes one consolidated `sanctions`
+# collection (same host and targets.simple.csv shape the EU/AU/CH/UK lists use).
+# Screened here as a SUPPLEMENTARY list: best-effort, never floors, never
+# affects core coverage, and never able to turn a run red. Rows whose ONLY
+# sources are lists already screened above are skipped, and any name already
+# present in another loaded list is dropped, so it adds coverage, not duplicate
+# hits. Each entry carries its source list(s) as decision-support context.
+# Kill-switch: WORLDWIDE_SANCTIONS=0.
+WORLDWIDE_SANCTIONS = os.environ.get("WORLDWIDE_SANCTIONS", "1") == "1"
+WORLDWIDE_SANCTIONS_URL = "https://data.opensanctions.org/datasets/latest/sanctions/targets.simple.csv"
+WORLDWIDE_LABEL = "OpenSanctions worldwide sanctions (other national lists)"
+# `dataset` titles of sources this engine already screens as core/supplementary.
+_WW_COVERED = frozenset({
+    "US OFAC Specially Designated Nationals (SDN) List",
+    "US OFAC Consolidated (non-SDN) List",
+    "UN Security Council Consolidated Sanctions",
+    "EU Financial Sanctions Files (FSF)",
+    "UK FCDO Sanctions List",
+    "Australian Sanctions Consolidated List",
+    "Swiss SECO Sanctions/Embargoes",
+    "Canadian Consolidated Autonomous Sanctions List",
+    "United Arab Emirates Local Terrorist List",
+})
+
+def parse_worldwide_sanctions(data, covered_keys=()):
+    """OpenSanctions `sanctions` targets.simple.csv -> (entries, sources, n_sources).
+    entries: [(normalized, display name)] for names not in covered_keys, from rows
+    with at least one source list not in _WW_COVERED. sources: normalized ->
+    set of source-list titles. n_sources: distinct extra source lists seen."""
+    entries, sources, seen = {}, {}, set()
+    if not data:
+        return [], {}, 0
+    try:
+        csv.field_size_limit(10 ** 8)
+        reader = csv.DictReader(io.StringIO(data.decode("utf-8")))
+        for row in reader:
+            try:
+                extra = [d.strip() for d in (row.get("dataset") or "").split(";")
+                         if d.strip() and d.strip() not in _WW_COVERED]
+                if not extra:
+                    continue
+                seen.update(extra)
+                names = [(row.get("name") or "").strip()]
+                names += [a.strip() for a in (row.get("aliases") or "").split(";")]
+                for n in names:
+                    if not n:
+                        continue
+                    k = normalize(n)
+                    if not k or k in covered_keys:
+                        continue
+                    entries.setdefault(k, n)
+                    sources.setdefault(k, set()).update(extra)
+            except Exception:
+                continue   # one malformed row never zeroes the whole list
+    except Exception as e:
+        log(f"  worldwide sanctions parse error: {e}")
+    return [(k, n) for k, n in entries.items()], sources, len(seen)
+
+def load_worldwide_sanctions(all_lists, list_meta):
+    """Register the worldwide national-sanctions net. Called from BOTH list-building
+    paths (a source only one path loads is this engine's recurring defect).
+    Supplementary tier: an unreachable list prints "not reached" in the report's
+    supplementary block and can never refuse or redden a run. Purely additive."""
+    if not WORLDWIDE_SANCTIONS:
+        list_meta["worldwide"] = {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+        return 0
+    data = download(WORLDWIDE_SANCTIONS_URL, WORLDWIDE_LABEL)
+    covered = {k for lst in all_lists.values() for k, _ in lst}
+    entries, sources, n_src = parse_worldwide_sanctions(data, covered)
+    list_meta["worldwide"] = {"count": len(entries), "date": "live (OpenSanctions)" if entries else "unavailable",
+                              "hash": sha256_of(data) if data else "", "tier": "supplementary",
+                              "sources": n_src}
+    if entries:
+        all_lists[WORLDWIDE_LABEL] = entries
+        for k, srcs in sources.items():
+            slot = LIST_ENTRY_ATTRS.setdefault(k, {"dob": set(), "nationality": set()})
+            slot.setdefault("source", set()).update(srcs)
+        log(f"  {WORLDWIDE_LABEL}: {len(entries):,} additional names from {n_src} national source list(s)")
+    return len(entries)
 
 def parse_un(data):
     names = set()
@@ -4516,8 +4656,8 @@ LISTS SCREENED
 {list_line("eu","EU Financial Sanctions — OpenSanctions / EU FSF",
            "https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv")}
 
-{list_line("uk","UK OFSI Consolidated List — HM Treasury",
-           "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv")}
+{list_line("uk","UK Sanctions List -- FCDO / OFSI (the OFSI Consolidated List closed 28 Jan 2026)",
+           "https://www.gov.uk/government/publications/the-uk-sanctions-list")}
 
 {list_line("eocn","UAE EOCN — Local Terrorist List",
            "Maintained in-repo — data/eocn-local-terrorist-list.json")}
@@ -5014,6 +5154,83 @@ def _mirror_fallback(names, dataset, label):
     log(f"  {label}: official endpoint unavailable — screened via OpenSanctions mirror")
     return mirror_names, "live (OpenSanctions mirror)", sha256_of(data)
 
+# ── UK: the OFSI Consolidated List (ConList.csv) CLOSED on 28 Jan 2026 (GOV.UK:
+# "The UK Sanctions List is now the only source for all UK sanctions
+# designations"). The engine kept loading it: on 21 Sep 2026 the file still
+# carried "Last Updated 03/06/2026" (Last-Modified 3 Jun 2026), so every UK
+# designation after that date went unscreened while the report read `OK`. Its
+# OpenSanctions mirror (gb_hmt_sanctions) is also gone (header-only CSV), so the
+# old fallback ladder could not rescue it. The UK Sanctions List is now the
+# PRIMARY, via the OpenSanctions gb_fcdo_sanctions mirror (same host and
+# targets.simple.csv shape as EU / AU / CH, already egress-allowed); the retired
+# ConList is kept only as a last-resort fallback and its stale date is flagged
+# by stale_core_lists below, never presented as current.
+UK_SANCTIONS_LIST_URL = "https://data.opensanctions.org/datasets/latest/gb_fcdo_sanctions/targets.simple.csv"
+UK_CONLIST_URL = "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv"
+
+def load_uk_list():
+    """(names, date, hash, fetched) for the UK core list: UK Sanctions List
+    first, the retired OFSI ConList only if that yields nothing."""
+    data = download(UK_SANCTIONS_LIST_URL, "UK Sanctions List (OpenSanctions gb_fcdo_sanctions)")
+    names = parse_simple_csv(data, "UK Sanctions List")
+    if names:
+        return names, "live (UK Sanctions List)", sha256_of(data), True
+    log("  UK Sanctions List mirror unavailable -- falling back to the RETIRED OFSI ConList "
+        "(closed 28 Jan 2026; its own date will be flagged as stale)")
+    con = download(UK_CONLIST_URL, "UK OFSI (retired ConList)")
+    names, date, h = parse_uk(con)
+    return names, date, h, bool(con)
+
+# Staleness of a core list. Only a date the list itself declares counts; a
+# provenance string such as "live" or "unavailable" carries no claim.
+LIST_MAX_AGE_DAYS = int(os.environ.get("LIST_MAX_AGE_DAYS", "30"))   # 0 disables
+
+def list_age_days(date_str, today=None, dayfirst=False):
+    """Age in days of a list date string, or None when it is not a real date
+    (or is an ambiguous dd/mm vs mm/dd slash date and dayfirst is not asserted)."""
+    if not date_str:
+        return None
+    ds = str(date_str).strip()
+    d = None
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", ds)
+    try:
+        if m:
+            d = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        else:
+            m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", ds)
+            if m:
+                a, b, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                if a > 12:
+                    d = datetime.date(y, b, a)
+                elif b > 12:
+                    d = datetime.date(y, a, b)
+                elif dayfirst:
+                    d = datetime.date(y, b, a)
+    except ValueError:
+        return None
+    if d is None:
+        return None
+    if today is None:
+        today = datetime.date.today()
+    elif isinstance(today, datetime.datetime):
+        today = today.date()
+    return (today - d).days
+
+def stale_core_lists(list_meta, today=None, max_age=None):
+    """[(key, age_days)] for core lists whose declared date is older than the
+    limit. EOCN is excluded (it has its own review-age gate)."""
+    limit = LIST_MAX_AGE_DAYS if max_age is None else max_age
+    out = []
+    if not limit or limit < 0:
+        return out
+    for k, m in (list_meta or {}).items():
+        if k == "eocn" or m.get("tier", "core") != "core" or not m.get("count", 0):
+            continue
+        age = list_age_days(m.get("date"), today, dayfirst=(k == "uk"))
+        if age is not None and age > limit:
+            out.append((k, age))
+    return sorted(out)
+
 # EU FSF is the one core list whose PRIMARY is the OpenSanctions host (webgate's
 # exports drift formats; the mirror's simple shape is what every parser here
 # shares) — so its fallback runs the OTHER way: official webgate XML, with the
@@ -5259,7 +5476,6 @@ def load_all_lists():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
-    uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
     # AU + CH core lists via the OpenSanctions mirrors (same host, same
     # targets.simple.csv shape as the EU list): DFAT bot-gates its .xlsx and
@@ -5290,13 +5506,8 @@ def load_all_lists():
     if fb:
         un_names, un_date, un_hash = fb
         un_fetched = True
-    uk_fetched = bool(uk_data)
     eu_fetched = bool(eu_data)
-    uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
-    fb = _mirror_fallback(uk_names, "gb_hmt_sanctions", "UK OFSI")
-    if fb:
-        uk_names, uk_date, uk_hash = fb
-        uk_fetched = True
+    uk_names,   uk_date,   uk_hash,   uk_fetched = load_uk_list()
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
     fb = _eu_official_fallback(eu_names)
     if fb:
@@ -5376,6 +5587,7 @@ def load_all_lists():
     # since data/sanctions-sources.json gained "ofac-consolidated", so this also
     # closes the engine-parity gap on the path that runs the daily screen.
     load_ofac_consolidated(all_lists, list_meta)
+    load_worldwide_sanctions(all_lists, list_meta)
     ca_data = download("https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml","Canada SEMA")
     ca_names, ca_date, ca_hash = parse_canada(ca_data)
     list_meta["canada"] = {"count":len(ca_names),"date":ca_date,"hash":ca_hash,"tier":"supplementary"}
@@ -5391,9 +5603,13 @@ def load_all_lists():
         all_lists["Internal Watchlist"] = [(normalize(n),n) for n in iw_names]
     return all_lists, list_meta
 
-def _list_status_line(list_meta, key, label):
+def _list_status_line(list_meta, key, label, today=None):
     m = list_meta.get(key, {})
     status = "OK" if m.get("count", 0) > 0 else "UNAVAILABLE"
+    if status == "OK" and key != "eocn" and LIST_MAX_AGE_DAYS > 0:
+        _age = list_age_days(m.get("date"), today, dayfirst=(key == "uk"))
+        if _age is not None and _age > LIST_MAX_AGE_DAYS:
+            status = f"STALE ({_age}d old)"
     return f"      {label}: {status}  ({m.get('count',0):,} names · {m.get('date','?')})"
 
 def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findings,
@@ -5443,7 +5659,10 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
 
     delta = stats.get("delta", {})
     supp = {k: v for k, v in list_meta.items() if v.get("tier") == "supplementary"}
+    _stale = stale_core_lists(list_meta, run_time)
     sanc_status = "OK" if sanc_ok else ("DEGRADED" if any(core_loaded) else "FAILED")
+    if sanc_ok and _stale:
+        sanc_status = "DEGRADED (stale: " + ", ".join(f"{k.upper()} {a}d" for k, a in _stale) + ")"
     pep_status = ("DEGRADED" if pep_degraded
                   else ("OK (worldwide PEP/RCA net)" if pep_mirror else "OK"))
     am_status = ("DEGRADED" if am_blackout
@@ -5585,13 +5804,17 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     # result can never hide that a core list was down (a "clear" against a list
     # that never loaded is not clear). Any core list at 0 names is flagged.
     A("   Lists screened:")
-    A(_list_status_line(list_meta, "ofac", "OFAC SDN"))
-    A(_list_status_line(list_meta, "un",   "UN Consolidated"))
-    A(_list_status_line(list_meta, "eu",   "EU FSF"))
-    A(_list_status_line(list_meta, "uk",   "UK OFSI"))
-    A(_list_status_line(list_meta, "au",   "Australia DFAT"))
-    A(_list_status_line(list_meta, "ch",   "Switzerland SECO"))
-    A(_list_status_line(list_meta, "eocn", "UAE EOCN"))
+    A(_list_status_line(list_meta, "ofac", "OFAC SDN", run_time))
+    A(_list_status_line(list_meta, "un",   "UN Consolidated", run_time))
+    A(_list_status_line(list_meta, "eu",   "EU FSF", run_time))
+    A(_list_status_line(list_meta, "uk",   "UK Sanctions List", run_time))
+    A(_list_status_line(list_meta, "au",   "Australia DFAT", run_time))
+    A(_list_status_line(list_meta, "ch",   "Switzerland SECO", run_time))
+    A(_list_status_line(list_meta, "eocn", "UAE EOCN", run_time))
+    if _stale:
+        A("   ⚠ SANCTIONS LIST STALE -- " + "; ".join(f"{k.upper()} last updated {list_meta[k].get('date')} ({a} days ago)" for k, a in _stale)
+          + f" (limit {LIST_MAX_AGE_DAYS}d). Designations published since then are NOT screened; "
+          "treat 'clear' against that list as PROVISIONAL until its source refreshes.")
     if not sanc_ok:
         _down = [lbl for k, lbl in (("ofac","OFAC"),("un","UN"),("uk","UK OFSI"),("eu","EU FSF"))
                  if list_meta.get(k, {}).get("count", 0) == 0]
@@ -5602,9 +5825,15 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         for k in supp:
             m_ = supp[k]
             label = {"canada": "Canada (SEMA)", "internal": "Internal Watchlist",
-                     "ofac_cons": "OFAC Consolidated (non-SDN)"}.get(k, k)
-            if m_.get("count", 0) > 0:
+                     "ofac_cons": "OFAC Consolidated (non-SDN)",
+                     "worldwide": WORLDWIDE_LABEL}.get(k, k)
+            if m_.get("count", 0) > 0 and k == "worldwide":
+                A(f"      {label}: screened  ({m_['count']:,} additional names across "
+                  f"{m_.get('sources', 0)} national source lists · {m_.get('date','?')})")
+            elif m_.get("count", 0) > 0:
                 A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
+            elif k == "worldwide" and m_.get("date") == "disabled":
+                A(f"      {label}: DISABLED (WORLDWIDE_SANCTIONS=0) - only the core lists above were screened")
             elif k == "internal":
                 # Optional firm list: empty means "no internal designations",
                 # a valid state — not an unreached source.
@@ -5638,6 +5867,19 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("   Why the news sweep failed (top messages, × subjects affected):")
         for _msg, _n in stats["am_error_msgs"]:
             A(f"     - {_msg}  ×{_n}")
+    # News feed coverage is disclosed on EVERY run, including a zero-finding
+    # one: it is what tells the MLRO how much weight a "no adverse media" carries.
+    _fc = stats.get("news_feed_coverage") or {}
+    _fc_n = int(_fc.get("subjects", 0) or 0)
+    if _fc_n:
+        A(f"   News feed coverage this run ({_fc_n} subject(s) news-swept): "
+          f"Google News {_fc.get('gnews', 0)} · GDELT {_fc.get('gdelt', 0)} · "
+          f"Bing News {_fc.get('bing', 0)} · reached by ONE feed only: {_fc.get('single', 0)} · "
+          f"reached by NO feed: {_fc.get('none', 0)}.")
+        if _fc.get("single", 0) or _fc.get("none", 0):
+            A("   Read 'no adverse media' as PROVISIONAL for subjects reached by one feed or none: "
+              "a single feed has narrower recall than the full sweep, and the watchlist is not news.")
+    _gdelt_full = (not _fc_n) or int(_fc.get("gdelt", 0) or 0) >= _fc_n
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
     else:
@@ -5703,8 +5945,11 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             _cyc = adverse_rotation_cycle_days()
             A(f"   Worldwide rotation: this run swept {_mkts}. The {ADVERSE_CORE_LOCALES} core editions run every day; the rest of the "
               f"{len(GNEWS_LOCALES)}-market matrix rotates, so every market is swept within {_cyc} run(s). "
-              "GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
-              "the rotation adds local-language press on top of it.")
+              + ("GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
+                 "the rotation adds local-language press on top of it."
+                 if _gdelt_full else
+                 f"GDELT's global index reached only {_fc.get('gdelt', 0)} of {_fc_n} subject(s) this run "
+                 "(feed rate-limited the runner), so worldwide reach was NOT complete on that layer."))
         if stats.get("watchlist_loaded"):
             A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
               f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
@@ -5892,6 +6137,35 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     UNIFIED_DELIVERY_FAILED["failed"] = True
     return None
 
+def _new_task_gid(resp):
+    """gid of the task an Asana create returned, or "" when the body is not
+    readable (never raises: attaching a case to the board is best-effort)."""
+    try:
+        return str(((resp.json() or {}).get("data") or {}).get("gid") or "")
+    except Exception:
+        return ""
+
+def attach_case_to_board(task_gid):
+    """Put a just-created case subtask on the MLRO case board.
+
+    A failure is LOUD (log line + GitHub ::warning:: annotation + counter) but
+    never fails the case itself: the case exists and is assigned, it just is
+    not visible on the board until someone re-attaches it."""
+    if not ASANA_CASES_NEW_SECTION_GID:
+        return False
+    ok = False
+    if task_gid:
+        r = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{task_gid}/addProject",
+                          json={"data": {"project": ASANA_ONGOING_MON_GID,
+                                         "section": ASANA_CASES_NEW_SECTION_GID}})
+        ok = r is not None and getattr(r, "status_code", None) in (200, 201)
+    CASE_BOARD_ATTACH["attached" if ok else "failed"] += 1
+    if not ok:
+        log(f"  case subtask {task_gid or '(gid unreadable)'} was created but NOT attached to the case board")
+        print("::warning::MLRO case subtask created but not attached to the case board "
+              "(no project/section membership); re-attach it by hand", flush=True)
+    return ok
+
 def create_case_subtask(parent_gid, name, notes, due_on):
     """One trackable MLRO case per NEW hit — assigned, with a disposition to set.
 
@@ -5918,6 +6192,7 @@ def create_case_subtask(parent_gid, name, notes, due_on):
         }}
         r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
         if r is not None and r.status_code in (200, 201):
+            attach_case_to_board(_new_task_gid(r))
             return True
         # Only a size/validation refusal is worth re-bidding smaller; an auth,
         # rate-limit or network failure fails identically at any budget.
@@ -6056,7 +6331,19 @@ def _ai_mode_label():
     credential is issuable and the PDPL line must say the key is present)."""
     if not ai.llm_available():
         return "deterministic"
-    return "AI-assisted triage" if ai.LLM_TRIAGE else "deterministic (LLM standby — triage off)"
+    if not ai.LLM_TRIAGE:
+        return "deterministic (LLM standby — triage off)"
+    # Triage is ON, but "on" is not "working": 21 Sep 2026 the report said
+    # AI-assisted triage while 557 of 557 calls failed (an HTTP reply, even an
+    # error, deliberately does not open the circuit breaker in ai.py). Say what
+    # the run actually got. Still != "deterministic" so the credential contract
+    # in agents.py is unchanged.
+    _att, _ok = ai.LLM_CALLS.get("attempted", 0), ai.LLM_CALLS.get("ok", 0)
+    if _att > 0 and _ok == 0:
+        return f"deterministic (LLM UNAVAILABLE: 0 of {_att} calls succeeded)"
+    if _att > 0 and _ok < _att:
+        return f"AI-assisted triage (DEGRADED: {_ok} of {_att} calls succeeded)"
+    return "AI-assisted triage"
 
 def tally_enrichment(results, wl_hits, wl_loaded):
     """Pure tally of the enrichment pass → (counts, adverse_findings, pep_findings).
@@ -6200,6 +6487,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     the task title only ('daily' vs 'onboarding')."""
     _t_start = time.time()
     today = run_time.strftime("%Y-%m-%d")
+    for _k, _a in stale_core_lists(list_meta, run_time):
+        print(f"::warning::sanctions list {_k.upper()} is STALE: last updated {list_meta[_k].get('date')} "
+              f"({_a} days ago, limit {LIST_MAX_AGE_DAYS}d) - designations since then are not screened", flush=True)
 
     # Subject set first — the watchlist pass below screens it before the
     # network-bound enrichment starts.
@@ -6334,13 +6624,27 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     progress("enrichment-start", subjects=total, workers=SCREEN_CONCURRENCY)
     done = 0
     indexed = [None] * total
+    # Time-based heartbeat alongside the count-based one below. Observed twice
+    # (2026-08-31 run 33408194671, 2026-09-07 run 34128650247): once the shared
+    # Google News gate hits GNEWS_BACKOFF_CAP with the GDELT circuit already
+    # open, EVERY remaining subject serialises to one feed request per
+    # GNEWS_BACKOFF_CAP seconds ACROSS ALL WORKERS COMBINED (_RateGate paces
+    # the feed, not each worker) -- so the done%50 line below can go 8+ minutes
+    # without printing, and both times the job was killed mid-run ("the runner
+    # has received a shutdown signal") a few minutes into that silence. This
+    # doesn't change what gets screened or how -- it only guarantees the
+    # console keeps producing output at least once a minute so a long throttled
+    # stretch can't look indistinguishable from a hung job.
+    _last_log = time.monotonic()
     with concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY) as ex:
         for i, r in zip(order, ex.map(_enrich, (subjects_all[j] for j in order))):
             done += 1
             indexed[i] = r
-            if done % 50 == 0 or done == total:
+            now = time.monotonic()
+            if done % 50 == 0 or done == total or (now - _last_log) >= 60:
                 log(f"  enriched {done}/{total}")
                 progress("enrichment", done=done, total=total)
+                _last_log = now
     if any(r is None for r in indexed):
         # Degrade loudly: a hole here means the rotation bookkeeping dropped a
         # subject — silently tallying the rest would report them as screened.
@@ -6498,6 +6802,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # say "LLM" only if the model actually answered for the whole pass.
     if ai.llm_circuit_open():
         mode_lbl += f" → DEGRADED (AI circuit OPEN, {ai.LLM_CALLS.get('skipped', 0)} call(s) skipped)"
+    elif ai.LLM_CALLS.get("attempted", 0) > 0 and ai.LLM_CALLS.get("ok", 0) == 0:
+        mode_lbl += f" → DEGRADED (0 of {ai.LLM_CALLS['attempted']} LLM calls succeeded; deterministic triage stands)"
     log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
         f"mode={mode_lbl}")
     progress("ai-triage-done", flagged=len(possible_matches), clusters=len(related))
@@ -6562,6 +6868,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "am_error_msgs": counts.get("am_error_msgs", []),
              "adverse_evidence_error": adverse_evidence_error,
              "am_blackout": counts["am_blackout"], "am_skipped": counts.get("am_skipped", 0),
+             "news_feed_coverage": feed_coverage_snapshot(),
              "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "bulletin_failures": rb_failures,
@@ -6792,7 +7099,6 @@ def main():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
-    uk_data   = download("https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv","UK OFSI")
     eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
     au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
     ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
@@ -6801,7 +7107,7 @@ def main():
     # be the one place a single-origin outage still bites. Fetched flags track
     # "source material obtained" (primary bytes OR a fallback that answered).
     ofac_fetched, un_fetched = bool(ofac_data), bool(un_data)
-    uk_fetched,   eu_fetched = bool(uk_data),   bool(eu_data)
+    eu_fetched = bool(eu_data)
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
     # Fallback BEFORE the alias fold, or an alias-only load defeats the mirror
     # (same trap load_all_lists documents at its own fold).
@@ -6816,11 +7122,7 @@ def main():
     if fb:
         un_names, un_date, un_hash = fb
         un_fetched = True
-    uk_names,   uk_date,   uk_hash   = parse_uk(uk_data)
-    fb = _mirror_fallback(uk_names, "gb_hmt_sanctions", "UK OFSI")
-    if fb:
-        uk_names, uk_date, uk_hash = fb
-        uk_fetched = True
+    uk_names,   uk_date,   uk_hash,   uk_fetched = load_uk_list()
     eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
     fb = _eu_official_fallback(eu_names)
     if fb:
@@ -6871,6 +7173,7 @@ def main():
     # OFAC non-SDN, same reasoning and same placement as the unified loader:
     # after the all-empty guard and the floors, so it can only ADD names.
     load_ofac_consolidated(all_lists, list_meta)
+    load_worldwide_sanctions(all_lists, list_meta)
     # Internal firm watchlist (optional): added AFTER the all-empty guard and
     # the floors so firm-internal names can never satisfy a core-coverage
     # fail-safe on this path either; empty is a valid state.

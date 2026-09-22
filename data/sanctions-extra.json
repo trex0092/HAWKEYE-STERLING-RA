@@ -16,11 +16,11 @@
       "id": "idb-debarment",
       "name": "IDB — Dataset of Sanctioned Firms & Individuals (MDB cross-debarment)",
       "jurisdiction": "Global (MDB)",
-      "url": "https://data.iadb.org/file/download/f5022f04-a3f1-4604-a099-5d562e3a0aa5",
+      "url": "https://data.iadb.org/files/download/f5022f04-a3f1-4604-a099-5d562e3a0aa5",
       "type": "csv",
       "parser": "idbcsv",
       "enabled": true,
-      "_note": "Inter-American Development Bank 'Dataset of Sanctioned firms and individuals' (2010 MDB Mutual-Enforcement cross-debarments incl.), debarment (procurement-integrity) tier, not financial sanctions. ENABLED 2026-08-06 on probe proof (run 31070807037): the CKAN file endpoint serves text/csv (~156KB) with header Title/Entity/Nationality/Country/From/To/Prohibited Practice/Source/Tipo de sancion del BID/IDB Sanction Source/Other Name — parser 'idbcsv' indexes Title + Other Name. Discovery trail: Socrata rows.csv → CKAN dataset page → /dataset/download/csv (metadata export, not the table) → this /file/download/<id> resource. minNames 200 floors the ~1,400-row register.",
+      "_note": "Inter-American Development Bank 'Dataset of Sanctioned firms and individuals' (2010 MDB Mutual-Enforcement cross-debarments incl.), debarment (procurement-integrity) tier, not financial sanctions. ENABLED 2026-08-06 on probe proof (run 31070807037): the CKAN file endpoint serves text/csv (~156KB) with header Title/Entity/Nationality/Country/From/To/Prohibited Practice/Source/Tipo de sancion del BID/IDB Sanction Source/Other Name — parser 'idbcsv' indexes Title + Other Name. Discovery trail: Socrata rows.csv → CKAN dataset page → /dataset/download/csv (metadata export, not the table) → this /files/download/<id> resource (repointed 2026-09-19: IADB migrated the CKAN path from singular /file/download/ to plural /files/download/, same resource id, confirmed 404 on the old path and HTTP 200 on the new one against the live site). minNames 200 floors the ~1,400-row register.",
       "minNames": 200
     },
     {
@@ -244,13 +244,13 @@
     },
     {
       "id": "lv-fid",
-      "name": "Latvia — FID National Sanctions List (XML)",
+      "name": "Latvia — FID National Sanctions List (static snapshot)",
       "jurisdiction": "Latvia",
-      "url": "https://sankcijas.fid.gov.lv/files/LV_national_v2.xml",
+      "url": "https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/main/data/lv-fid-snapshot.xml",
       "type": "xml",
       "parser": "xml",
       "enabled": true,
-      "_note": "Latvia's small NATIONAL designation list (EU-FSF-style XML schema; generic XML extractor). Deliberately tiny floor — the list holds single-digit-to-dozens entries and a 0-name parse must still read as degraded, never as coverage.",
+      "_note": "RESOLVED 2026-09-21, but not the same way as every other source in this file: the live URL (sankcijas.fid.gov.lv/files/LV_national_v2.xml) is confirmed dead -- FID redesigned their site, the old flat XML path 302s to the homepage, and the new site serves this file only via a JavaScript-triggered download button with no href in the page source, so it cannot be fetched by a script the way every other source here is. This entry instead points at data/lv-fid-snapshot.xml, a byte-exact copy of the file the site's own download button produced, committed into this repo and fetched from here via raw.githubusercontent.com (added to the sanctions-screen.yml egress allowlist for this). Manually verified 2026-09-21: 3 entities, all North Korea-program designations, PublishDate 2018-03-29 in the file itself -- this is Latvia's small NATIONAL-only list (distinct from the much larger EU/UN lists already covered elsewhere in this registry) and genuinely appears not to have changed since 2018. This is a DATED SNAPSHOT, not a live feed: it will not pick up a future change on its own. Re-verify by repeating the manual download every few months (or sooner if FID Latvia designates someone new) and replacing data/lv-fid-snapshot.xml. Deliberately tiny floor unchanged -- a 0-name parse must still read as degraded, never as coverage.",
       "minNames": 2
     },
     {
@@ -373,7 +373,7 @@
       "type": "json",
       "parser": "json",
       "enabled": true,
-      "_note": "Federal Court of Accounts debarment list (Oracle ORDS JSON, keyless; explicit limit=10000 defeats the ORDS 25-row default page — an unnoticed pagination default would silently under-screen). Debarment tier like the World Bank feed. Added 2026-08-05; verify keys + pagination on the first live run.",
+      "_note": "Federal Court of Accounts debarment list (Oracle ORDS JSON, keyless; explicit limit=10000 defeats the ORDS 25-row default page — an unnoticed pagination default would silently under-screen). Debarment tier like the World Bank feed. Added 2026-08-05; verify keys + pagination on the first live run. Re-verified live 2026-09-19: HTTP 200, real JSON records.",
       "minNames": 50
     },
     {
@@ -384,7 +384,7 @@
       "type": "json",
       "parser": "json",
       "enabled": true,
-      "_note": "Sibling of br-tcu-inidoneos: individuals disqualified from public office for corruption-adjacent findings — a PEP-adjacent integrity signal for Brazilian counterparties. Same ORDS shape + explicit limit. Added 2026-08-05; verify on the first live run.",
+      "_note": "Sibling of br-tcu-inidoneos: individuals disqualified from public office for corruption-adjacent findings — a PEP-adjacent integrity signal for Brazilian counterparties. Same ORDS shape + explicit limit. Added 2026-08-05; verify on the first live run. Re-verified live 2026-09-19: HTTP 200, real JSON records.",
       "minNames": 200
     },
     {
