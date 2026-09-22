@@ -10,6 +10,26 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **JS sanctions engine: UK sanctions now screened against the current UK
+  Sanctions List, official source** (`data/sanctions-sources.json`). Same
+  defect as the Python engine's already-merged fix, in the separate JS
+  "Daily Sanctions Screening" workflow's registry: `uk-ofsi` pointed at
+  `ofsistorage.blob.core.windows.net/.../ConList.csv`, the OFSI Consolidated
+  List that closed 28 Jan 2026 (GOV.UK) -- the file kept returning HTTP 200
+  with a frozen body ("Last Updated,03/06/2026" observed as late as 21 Sep
+  2026), so the screen kept reading OK against 110-day-stale data. Now points
+  at `sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv`, the OFFICIAL
+  current file (not an OpenSanctions mirror -- license-clean, matching the
+  au-dfat / au-dfat-opensanctions precedent of preferring an official feed
+  once proven live). Same OFSI-family export shape (Report Date banner, then
+  Unique ID / OFSI Group ID / Name 1..Name 6 columns) as the retired file, so
+  parser `ofsi` (`parseOfsiCsv`) needed no code change. Verified live 21 Sep
+  2026: Report Date 21-Sep-2026, 58,335 name-joins parsed (well above the
+  9000 `minNames` floor); cross-checked against `screen.py`'s `parse_uk` on
+  the identical file (15,520 unique names). `node test/sanctions-watch.test.mjs`:
+  49/49 pass. Full `npm test`: 81/82 (the one failure, `property-fuzz.test.js`,
+  is the same pre-existing, unrelated MODULE_NOT_FOUND on `main`).
+
 - **Screening engine: UK sanctions now screened against the UK Sanctions List,
   and a stale core list is reported as stale** (`screen.py`,
   `test/engine_test.py`). The OFSI Consolidated List closed on 28 Jan 2026
