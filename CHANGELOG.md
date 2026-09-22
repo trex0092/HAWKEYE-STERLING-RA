@@ -10,29 +10,25 @@ bump merged to `main`.
 
 ## [Unreleased]
 
-- **Screening engine: sanctions now include a worldwide national-sanctions net
-  (~80 further national lists), supplementary tier** (`screen.py`,
-  `test/engine_test.py`). The 10 core lists (OFAC, UN, EU, UK, Australia,
-  Switzerland, UAE EOCN, OFAC Consolidated) left ~80 further national lists --
-  Ukraine NSDC, France, Belgium, Japan METI, Turkiye MASAK, Pakistan NACTA,
-  Iraq, New Zealand, Poland, Israel, Qatar, Saudi Arabia, India MHA, and more
-  -- reached only by the separate JS engine, if at all. `load_worldwide_sanctions()`
-  (both load paths) screens the OpenSanctions `sanctions` collection (93 source
-  datasets), adding only names whose sources are NOT already covered by a list
-  this engine screens, and dropping any name already present in another loaded
-  list. Supplementary tier: best-effort, never floors, never able to fail or
-  redden a run. Each entry's source list(s) are recorded as match-context
-  (annotation only, never changes a score). Kill-switch: `WORLDWIDE_SANCTIONS=0`.
-  Measured 21 Sep 2026 against the REAL 336-customer / 20-employee book (856
-  distinct subject names, using `screen_name` -- the engine's own matcher, not
-  an approximation): the worldwide net surfaces 26 subjects with a NEW
-  potential match that the core lists alone did not raise (raw matcher output,
-  pre-adjudication; several are low-score common-name noise, a handful score
-  74-89, e.g. "Gul Shair"/Pakistan NACTA 88.9, "Ibrahim Soyhan"/Singapore 88.9,
-  "Mehmet Maras"/Netherlands 88.0). A further 45 subjects that already had a
-  core-list match also picked up additional worldwide-net context, not a new
-  flag. Every one of these needs MLRO review before any conclusion; this PR
-  changes coverage, not adjudication.
+- **JS sanctions engine: UK sanctions now screened against the current UK
+  Sanctions List, official source** (`data/sanctions-sources.json`). Same
+  defect as the Python engine's already-merged fix, in the separate JS
+  "Daily Sanctions Screening" workflow's registry: `uk-ofsi` pointed at
+  `ofsistorage.blob.core.windows.net/.../ConList.csv`, the OFSI Consolidated
+  List that closed 28 Jan 2026 (GOV.UK) -- the file kept returning HTTP 200
+  with a frozen body ("Last Updated,03/06/2026" observed as late as 21 Sep
+  2026), so the screen kept reading OK against 110-day-stale data. Now points
+  at `sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv`, the OFFICIAL
+  current file (not an OpenSanctions mirror -- license-clean, matching the
+  au-dfat / au-dfat-opensanctions precedent of preferring an official feed
+  once proven live). Same OFSI-family export shape (Report Date banner, then
+  Unique ID / OFSI Group ID / Name 1..Name 6 columns) as the retired file, so
+  parser `ofsi` (`parseOfsiCsv`) needed no code change. Verified live 21 Sep
+  2026: Report Date 21-Sep-2026, 58,335 name-joins parsed (well above the
+  9000 `minNames` floor); cross-checked against `screen.py`'s `parse_uk` on
+  the identical file (15,520 unique names). `node test/sanctions-watch.test.mjs`:
+  49/49 pass. Full `npm test`: 81/82 (the one failure, `property-fuzz.test.js`,
+  is the same pre-existing, unrelated MODULE_NOT_FOUND on `main`).
 
 - **Screening engine: UK sanctions now screened against the UK Sanctions List,
   and a stale core list is reported as stale** (`screen.py`,
