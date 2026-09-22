@@ -4133,7 +4133,6 @@ try:
 finally:
     screen.download, screen.WORLDWIDE_SANCTIONS = _ww_saved
 
-import inspect as _inspect2
 for _pname, _psrc in (("daily", _inspect.getsource(screen.load_all_lists)), ("legacy", _inspect.getsource(screen.main))):
     check(f"{_pname} path loads the worldwide sanctions net", "load_worldwide_sanctions(all_lists, list_meta)" in _psrc)
 
