@@ -2858,11 +2858,14 @@ def download(url, label):
 LIST_ENTRY_ATTRS = {}
 _OFAC_ENT_ATTRS = {}   # ent_num -> (dobs, nationalities), links alt.csv aliases
 
-def _note_entry_attrs(name, dobs=None, nationalities=None):
+def _note_entry_attrs(name, dobs=None, nationalities=None, sources=None):
     key = normalize(name or "")
-    if not key or not (dobs or nationalities):
+    if not key or not (dobs or nationalities or sources):
         return
     slot = LIST_ENTRY_ATTRS.setdefault(key, {"dob": set(), "nationality": set()})
+    for src in sources or ():
+        src = str(src).strip()
+        if src: slot.setdefault("source", set()).add(src)
     for d in dobs or ():
         d = str(d).strip()
         if d: slot["dob"].add(d)
@@ -2880,6 +2883,8 @@ def match_context_for(matched_entry):
         bits.append("list DOB: " + " / ".join(sorted(a["dob"])[:3]))
     if a["nationality"]:
         bits.append("list nationality: " + ", ".join(sorted(a["nationality"])[:3]))
+    if a.get("source"):
+        bits.append("source list: " + " / ".join(sorted(a["source"])[:3]))
     return "; ".join(bits)
 
 # ── IDENTITY-BASED EXCLUSION (false-positive demotion, never suppression) ────
@@ -3091,6 +3096,91 @@ def load_ofac_consolidated(all_lists, list_meta):
     if names:
         all_lists["OFAC Consolidated (non-SDN)"] = [(normalize(n), n) for n in names]
     return names
+
+# -- WORLDWIDE NATIONAL SANCTIONS NET (supplementary) --------------------------
+# The core lists above are ten. The report and the daily task therefore said
+# "sanctions" while ~80 further national lists (Ukraine NSDC, France, Belgium,
+# Japan METI, Turkiye MASAK, Pakistan NACTA, Iraq, New Zealand, Poland, Israel,
+# Qatar, Saudi Arabia, India MHA, ...) were only reached by the separate JS
+# engine, if at all. OpenSanctions publishes one consolidated `sanctions`
+# collection (same host and targets.simple.csv shape the EU/AU/CH/UK lists use).
+# Screened here as a SUPPLEMENTARY list: best-effort, never floors, never
+# affects core coverage, and never able to turn a run red. Rows whose ONLY
+# sources are lists already screened above are skipped, and any name already
+# present in another loaded list is dropped, so it adds coverage, not duplicate
+# hits. Each entry carries its source list(s) as decision-support context.
+# Kill-switch: WORLDWIDE_SANCTIONS=0.
+WORLDWIDE_SANCTIONS = os.environ.get("WORLDWIDE_SANCTIONS", "1") == "1"
+WORLDWIDE_SANCTIONS_URL = "https://data.opensanctions.org/datasets/latest/sanctions/targets.simple.csv"
+WORLDWIDE_LABEL = "OpenSanctions worldwide sanctions (other national lists)"
+# `dataset` titles of sources this engine already screens as core/supplementary.
+_WW_COVERED = frozenset({
+    "US OFAC Specially Designated Nationals (SDN) List",
+    "US OFAC Consolidated (non-SDN) List",
+    "UN Security Council Consolidated Sanctions",
+    "EU Financial Sanctions Files (FSF)",
+    "UK FCDO Sanctions List",
+    "Australian Sanctions Consolidated List",
+    "Swiss SECO Sanctions/Embargoes",
+    "Canadian Consolidated Autonomous Sanctions List",
+    "United Arab Emirates Local Terrorist List",
+})
+
+def parse_worldwide_sanctions(data, covered_keys=()):
+    """OpenSanctions `sanctions` targets.simple.csv -> (entries, sources, n_sources).
+    entries: [(normalized, display name)] for names not in covered_keys, from rows
+    with at least one source list not in _WW_COVERED. sources: normalized ->
+    set of source-list titles. n_sources: distinct extra source lists seen."""
+    entries, sources, seen = {}, {}, set()
+    if not data:
+        return [], {}, 0
+    try:
+        csv.field_size_limit(10 ** 8)
+        reader = csv.DictReader(io.StringIO(data.decode("utf-8")))
+        for row in reader:
+            try:
+                extra = [d.strip() for d in (row.get("dataset") or "").split(";")
+                         if d.strip() and d.strip() not in _WW_COVERED]
+                if not extra:
+                    continue
+                seen.update(extra)
+                names = [(row.get("name") or "").strip()]
+                names += [a.strip() for a in (row.get("aliases") or "").split(";")]
+                for n in names:
+                    if not n:
+                        continue
+                    k = normalize(n)
+                    if not k or k in covered_keys:
+                        continue
+                    entries.setdefault(k, n)
+                    sources.setdefault(k, set()).update(extra)
+            except Exception:
+                continue   # one malformed row never zeroes the whole list
+    except Exception as e:
+        log(f"  worldwide sanctions parse error: {e}")
+    return [(k, n) for k, n in entries.items()], sources, len(seen)
+
+def load_worldwide_sanctions(all_lists, list_meta):
+    """Register the worldwide national-sanctions net. Called from BOTH list-building
+    paths (a source only one path loads is this engine's recurring defect).
+    Supplementary tier: an unreachable list prints "not reached" in the report's
+    supplementary block and can never refuse or redden a run. Purely additive."""
+    if not WORLDWIDE_SANCTIONS:
+        list_meta["worldwide"] = {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+        return 0
+    data = download(WORLDWIDE_SANCTIONS_URL, WORLDWIDE_LABEL)
+    covered = {k for lst in all_lists.values() for k, _ in lst}
+    entries, sources, n_src = parse_worldwide_sanctions(data, covered)
+    list_meta["worldwide"] = {"count": len(entries), "date": "live (OpenSanctions)" if entries else "unavailable",
+                              "hash": sha256_of(data) if data else "", "tier": "supplementary",
+                              "sources": n_src}
+    if entries:
+        all_lists[WORLDWIDE_LABEL] = entries
+        for k, srcs in sources.items():
+            slot = LIST_ENTRY_ATTRS.setdefault(k, {"dob": set(), "nationality": set()})
+            slot.setdefault("source", set()).update(srcs)
+        log(f"  {WORLDWIDE_LABEL}: {len(entries):,} additional names from {n_src} national source list(s)")
+    return len(entries)
 
 def parse_un(data):
     names = set()
@@ -5497,6 +5587,7 @@ def load_all_lists():
     # since data/sanctions-sources.json gained "ofac-consolidated", so this also
     # closes the engine-parity gap on the path that runs the daily screen.
     load_ofac_consolidated(all_lists, list_meta)
+    load_worldwide_sanctions(all_lists, list_meta)
     ca_data = download("https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml","Canada SEMA")
     ca_names, ca_date, ca_hash = parse_canada(ca_data)
     list_meta["canada"] = {"count":len(ca_names),"date":ca_date,"hash":ca_hash,"tier":"supplementary"}
@@ -5734,9 +5825,15 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         for k in supp:
             m_ = supp[k]
             label = {"canada": "Canada (SEMA)", "internal": "Internal Watchlist",
-                     "ofac_cons": "OFAC Consolidated (non-SDN)"}.get(k, k)
-            if m_.get("count", 0) > 0:
+                     "ofac_cons": "OFAC Consolidated (non-SDN)",
+                     "worldwide": WORLDWIDE_LABEL}.get(k, k)
+            if m_.get("count", 0) > 0 and k == "worldwide":
+                A(f"      {label}: screened  ({m_['count']:,} additional names across "
+                  f"{m_.get('sources', 0)} national source lists · {m_.get('date','?')})")
+            elif m_.get("count", 0) > 0:
                 A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
+            elif k == "worldwide" and m_.get("date") == "disabled":
+                A(f"      {label}: DISABLED (WORLDWIDE_SANCTIONS=0) - only the core lists above were screened")
             elif k == "internal":
                 # Optional firm list: empty means "no internal designations",
                 # a valid state — not an unreached source.
@@ -7076,6 +7173,7 @@ def main():
     # OFAC non-SDN, same reasoning and same placement as the unified loader:
     # after the all-empty guard and the floors, so it can only ADD names.
     load_ofac_consolidated(all_lists, list_meta)
+    load_worldwide_sanctions(all_lists, list_meta)
     # Internal firm watchlist (optional): added AFTER the all-empty guard and
     # the floors so firm-internal names can never satisfy a core-coverage
     # fail-safe on this path either; empty is a valid state.

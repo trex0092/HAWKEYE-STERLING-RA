@@ -4077,6 +4077,78 @@ _dn_src = _inspect.getsource(screen.build_daily_narrative)
 check("report: the daily narrative's UK provenance line points at the UK Sanctions List, not the closed OFSI list",
       "the-uk-sanctions-list" in _dn_src and "ofsistorage" not in _dn_src)
 
+# ── Worldwide national-sanctions net: ~80 further national lists (Ukraine NSDC, ──
+# France, Belgium, Japan METI, Turkiye MASAK, Pakistan NACTA, Qatar, Saudi Arabia,
+# India MHA, ...) were only ever reached by the separate JS engine, if at all.
+_WW_CSV = (b'"id","schema","name","aliases","dataset"\n'
+           b'"w1","Person","NEW DESIGNEE ONE","ALIAS ONE","Ukraine NSDC State Register of Sanctions"\n'
+           b'"w2","Person","ALREADY COVERED PERSON","","US OFAC Specially Designated Nationals (SDN) List"\n'
+           b'"w3","Organization","BOTH SOURCES CO","","France;UK FCDO Sanctions List"\n'
+           b'"w4","Person","NO EXTRA SOURCE","","US OFAC Specially Designated Nationals (SDN) List;UN Security Council Consolidated Sanctions"\n')
+_entries, _sources, _n_src = screen.parse_worldwide_sanctions(_WW_CSV)
+check("worldwide sanctions: a name whose ONLY source is already-covered core lists is dropped",
+      "NO EXTRA SOURCE" not in dict(_entries))
+check("worldwide sanctions: a name with ANY uncovered source is kept, even alongside a covered one",
+      "BOTH SOURCES CO" in dict(_entries) and "France" in _sources[screen.normalize("BOTH SOURCES CO")])
+check("worldwide sanctions: primary name and alias both added",
+      {"NEW DESIGNEE ONE", "ALIAS ONE"}.issubset(set(dict(_entries).values())))
+check("worldwide sanctions: distinct extra source lists counted correctly", _n_src == 2)
+check("worldwide sanctions: a name already in the caller's covered-key set is excluded",
+      "ALREADY COVERED PERSON" not in
+      dict(screen.parse_worldwide_sanctions(_WW_CSV, covered_keys={screen.normalize("ALREADY COVERED PERSON")})[0]).values())
+check("worldwide sanctions: no data -> empty, no crash", screen.parse_worldwide_sanctions(None) == ([], {}, 0))
+_bad_ww = b'"id","schema","name","aliases","dataset"\n"bad row missing fields\n"g","P","GOOD ONE","","Iraq"\n'
+check("worldwide sanctions: one malformed row never zeroes the whole list",
+      any(n == "GOOD ONE" for _, n in screen.parse_worldwide_sanctions(_bad_ww)[0]))
+
+_ww_saved = (screen.download, screen.WORLDWIDE_SANCTIONS)
+try:
+    screen.WORLDWIDE_SANCTIONS = True
+    _al, _lm = {"EU FSF": [(screen.normalize("ALREADY COVERED PERSON"), "ALREADY COVERED PERSON")]}, {}
+    screen.download = lambda url, label: _WW_CSV
+    _n_added = screen.load_worldwide_sanctions(_al, _lm)
+    check("load_worldwide_sanctions: registers a new supplementary list entry",
+          _lm["worldwide"]["tier"] == "supplementary" and _lm["worldwide"]["count"] == _n_added > 0)
+    check("load_worldwide_sanctions: adds a new all_lists source without touching existing ones",
+          screen.WORLDWIDE_LABEL in _al and "EU FSF" in _al)
+    check("load_worldwide_sanctions: an already-loaded name is excluded even via this path",
+          "ALREADY COVERED PERSON" not in dict(_al[screen.WORLDWIDE_LABEL]).values())
+    check("load_worldwide_sanctions: source lists are recorded as match-context (annotation only)",
+          "Ukraine NSDC" in screen.match_context_for("NEW DESIGNEE ONE"))
+
+    screen.WORLDWIDE_SANCTIONS = False
+    _al2, _lm2 = {}, {}
+    screen.load_worldwide_sanctions(_al2, _lm2)
+    check("load_worldwide_sanctions: WORLDWIDE_SANCTIONS=0 disables it and adds nothing",
+          _lm2["worldwide"] == {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+          and screen.WORLDWIDE_LABEL not in _al2)
+
+    screen.WORLDWIDE_SANCTIONS = True
+    screen.download = lambda url, label: None
+    _al3, _lm3 = {}, {}
+    screen.load_worldwide_sanctions(_al3, _lm3)
+    check("load_worldwide_sanctions: source unreachable -> unavailable, never fails the run",
+          _lm3["worldwide"]["count"] == 0 and _lm3["worldwide"]["date"] == "unavailable"
+          and screen.WORLDWIDE_LABEL not in _al3)
+finally:
+    screen.download, screen.WORLDWIDE_SANCTIONS = _ww_saved
+
+import inspect as _inspect2
+for _pname, _psrc in (("daily", _inspect.getsource(screen.load_all_lists)), ("legacy", _inspect.getsource(screen.main))):
+    check(f"{_pname} path loads the worldwide sanctions net", "load_worldwide_sanctions(all_lists, list_meta)" in _psrc)
+
+_meta_ww = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},
+               uk={"count": 19663, "date": "live (UK Sanctions List)"}, eu={"count": 5000, "date": "live"},
+               eocn={"count": 629, "date": "2026-09-17"},
+               worldwide={"count": 102998, "date": "live (OpenSanctions)", "tier": "supplementary", "sources": 84})
+_n_ww = screen.build_unified_narrative([], [], [], [], _meta_ww, _st(), _run_dt)
+check("report: the worldwide sanctions net is disclosed with its name and additional-name count",
+      "OpenSanctions worldwide sanctions" in _n_ww and "102,998 additional names across 84 national source lists" in _n_ww)
+_meta_ww_off = {**_meta_ww, "worldwide": {"count": 0, "date": "disabled", "tier": "supplementary"}}
+_n_ww_off = screen.build_unified_narrative([], [], [], [], _meta_ww_off, _st(), _run_dt)
+check("report: a disabled worldwide net says so explicitly, not silently absent",
+      "DISABLED (WORLDWIDE_SANCTIONS=0)" in _n_ww_off)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
