@@ -10,97 +10,43 @@ bump merged to `main`.
 
 ## [Unreleased]
 
-- **JS sanctions engine: UK sanctions now screened against the current UK
-  Sanctions List, official source** (`data/sanctions-sources.json`). Same
-  defect as the Python engine's already-merged fix, in the separate JS
-  "Daily Sanctions Screening" workflow's registry: `uk-ofsi` pointed at
-  `ofsistorage.blob.core.windows.net/.../ConList.csv`, the OFSI Consolidated
-  List that closed 28 Jan 2026 (GOV.UK) -- the file kept returning HTTP 200
-  with a frozen body ("Last Updated,03/06/2026" observed as late as 21 Sep
-  2026), so the screen kept reading OK against 110-day-stale data. Now points
-  at `sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv`, the OFFICIAL
-  current file (not an OpenSanctions mirror -- license-clean, matching the
-  au-dfat / au-dfat-opensanctions precedent of preferring an official feed
-  once proven live). Same OFSI-family export shape (Report Date banner, then
-  Unique ID / OFSI Group ID / Name 1..Name 6 columns) as the retired file, so
-  parser `ofsi` (`parseOfsiCsv`) needed no code change. Verified live 21 Sep
-  2026: Report Date 21-Sep-2026, 58,335 name-joins parsed (well above the
-  9000 `minNames` floor); cross-checked against `screen.py`'s `parse_uk` on
-  the identical file (15,520 unique names). `node test/sanctions-watch.test.mjs`:
-  49/49 pass. Full `npm test`: 81/82 (the one failure, `property-fuzz.test.js`,
-  is the same pre-existing, unrelated MODULE_NOT_FOUND on `main`).
-
-- **Screening engine: UK sanctions now screened against the UK Sanctions List,
-  and a stale core list is reported as stale** (`screen.py`,
-  `test/engine_test.py`). The OFSI Consolidated List closed on 28 Jan 2026
-  (GOV.UK); the engine kept loading `ConList.csv`, which on 21 Sep 2026 still
-  said "Last Updated 03/06/2026" while the report read `OK`, and its
-  OpenSanctions fallback (`gb_hmt_sanctions`) is a header-only file. Measured on
-  21 Sep 2026 against the official UK Sanctions List file: 156 designations
-  dated after 3 Jun 2026 (634 since 28 Jan) that ConList cannot contain.
-  (1) New `load_uk_list()`: the UK Sanctions List via the OpenSanctions
-  `gb_fcdo_sanctions` mirror is the primary (same host and file shape as EU,
-  AU and CH, already egress-allowed); the retired ConList is only a last-resort
-  fallback. Both load paths use it. Internal list label stays `UK OFSI`, so
-  hit attribution is unchanged.
-  (2) New `stale_core_lists()` / `list_age_days()`: any core list whose own
-  declared date is older than `LIST_MAX_AGE_DAYS` (default 30, 0 disables) is
-  shown as `STALE (Nd old)`, the Sanctions banner becomes `DEGRADED (stale: ...)`,
-  section 1 says designations since then are NOT screened, and a `::warning::`
-  annotation is emitted. Provenance strings such as `live` make no age claim and
-  an ambiguous dd/mm vs mm/dd date is never guessed. EOCN keeps its own review
-  gate. Exit codes are unchanged (banner and annotation only).
-  One-time effect: standing UK matches re-key once because the matched entry
-  text now comes from the new list (the conservative outcome, as documented at
-  `classify_deltas`). Not changed here: the JS engine
-  (`data/sanctions-sources.json` `uk-ofsi`) still points at the closed list.
-
-- **Screening engine: MLRO case subtasks now land on the case board; the
-  report states real news-feed coverage and real AI status** (`screen.py`,
-  `ai.py`, `monitoring.py`, `test/engine_test.py`). Three defects observed in
-  the 21 Sep 2026 production runs (35562296246, 35573394675):
-  (1) `create_case_subtask` created cases with only a `parent`, and Asana does
-  not put a subtask on a project board by itself, so every case had no
-  project/section membership and was invisible on the case board. It now calls
-  `addProject` (monitoring project, "Screening Cases - New" section, override
-  `ASANA_CASES_NEW_SECTION_GID`, empty disables). A failed attach is loud (log
-  line, `::warning::` annotation, counter) and never fails the case itself.
-  (2) Section 2 said GDELT "runs on EVERY subject every run regardless" on runs
-  where the GDELT circuit had opened after 5 subjects (HTTP 429) and Google
-  News after ~30. The engine now counts, per news-swept subject, which feeds
-  reached it and prints `News feed coverage this run`, with a PROVISIONAL note
-  for subjects reached by one feed or none; the every-subject GDELT claim is
-  made only when it is true. Status semantics (`OK` / `DEGRADED (news)`) are
-  unchanged.
-  (3) The report said "AI-assisted triage" while 557 of 557 model calls failed
-  (an HTTP error reply deliberately does not open the AI circuit breaker). The
-  AI mode label, governance footer and monitoring block now say when no call,
-  or only some calls, succeeded. The label stays distinct from plain
-  `deterministic`, so the credential contract in `agents.py` is unchanged.
-  Recall-monotone: no matcher, list, threshold or finding logic changed.
-
-- **MCP tool coverage extended to the TFS dossier, risk-rating and
-  related-party engine functions** (`mcp_tools.py`, `mcp_server.py`,
-  `test/mcp_tools_test.py`, `docs/mcp-server.md`). Three engine capabilities
-  had no MCP exposure even though the app already used them:
-  `tfs_dossier.build_tfs_dossier` (the FFR/PNMR counterpart of the
-  already-exposed `hawkeye_assemble_str_dossier`), `ai.compute_risk_rating`
-  (the FATF R.10 LOW/MEDIUM/HIGH scoring logic), and `ai.related_parties`
-  (shared-UBO / related-customer detection). Added as
-  `hawkeye_assemble_tfs_dossier`, `hawkeye_compute_risk_rating` and
-  `hawkeye_related_parties`, following the same design rules as every other
-  tool in this file: deterministic, offline, decision-support only, arguments
-  validated at the boundary. `ai.triage_adverse` was deliberately **not**
-  wrapped as a tool - it calls the LLM when a key is configured, which would
-  break the "no model call" guarantee every other tool makes; it stays
-  reachable only through the existing `adverse_media_triage` prompt template.
-  Also corrected `hawkeye_monitor_transactions`'s description, which named six
-  of the seven rules `txn_monitor._RULES` actually runs and omitted rapid
-  pass-through/layering (`rule_rapid_passthrough`, alert rule `PASSTHROUGH`) -
-  the rule was always executing, only the tool's own description was stale.
-  12 tools total now (was 9); all pass `test/mcp_tools_test.py` and were
-  smoke-tested live over stdio against the real engine modules (not just the
-  test's stubs).
+- **The daily screening was being killed at 64 minutes by our own egress
+  allowlist** (`.github/workflows/weekly-adverse-media.yml`,
+  `test/workflow-hardening.test.mjs`). A GitHub-hosted runner heartbeats to
+  `hosted-compute-watchdog-prod-<shard>.githubapp.com`, and a runner that cannot
+  answer is reclaimed on a fixed timer — the job dies mid-step with no
+  conclusion, no post-step (not even the `if: always()` one) and no uploaded
+  logs, which is why five investigations since 6 Aug all hit a 404 on the very
+  logs that would have explained it. The `adverse-media` job's allowlist pinned
+  the shard **literally**, as `...-prod-iad-01`, so the sweep survived only on
+  the days GitHub happened to place it on that shard. The evidence is a timer,
+  not a workload ceiling: runs 31452192472, 31458943581 and 31557541298 died
+  64m02s, 64m00s and 64m01s after job start — three failures inside a
+  two-second band, which no workload-dependent limit produces. The obvious
+  counter-hypothesis, that the sweep simply takes about an hour, is refuted by
+  the control group: run 31468597213 **succeeded** on 11 Aug with a 65m08s job
+  whose screening step alone ran 64m49s — longer than the entire lifetime of
+  each of the three failed jobs — and a 120m54s sweep succeeded on 10 Jul. Same
+  workflow, same config; the only variable is whether the heartbeat could be
+  answered. A reclaim is unmistakable in the API too: the step stays
+  `in_progress` with no conclusion and every post-step stays `pending`, which a
+  normally-failing step never does (the 10 Aug run, which failed on the EOCN
+  review-age gate, closed its step and ran every post-step as usual).
+  The crash-forensics heartbeat added for exactly this
+  confirmed the shape: run 31557541298 published `sanctions-done` (45 flagged /
+  311 clear) and `enrichment-start` (904 subjects) at 9m32s, then nothing for
+  the 54 minutes until the VM was taken. The allowlist now carries
+  `*.githubapp.com:443`, which is what the other 50 workflows in the estate use,
+  what fixed the identical ~63-minute deaths on `pep-worldwide`, and what fixed
+  the same losses on `sanctions-screen` on 11 Aug — green every run since. This
+  job was the one left behind.
+  Guarded in both directions so it cannot come back (§8 of the hardening
+  ratchet): **no** egress block anywhere may name a `hosted-compute-*` host
+  literally, because the shard suffix is GitHub's to rotate and never ours to
+  pin; and **every** job whose `timeout-minutes` exceeds the 60-minute reclaim
+  window must allow the wildcard. The guard derives the job list from the
+  workflows themselves, so a new long-running control is covered the day it is
+  added rather than the day it first dies.
 
 - **The AI triage pass fans out; sixteen minutes of the daily sweep were spent
   waiting in series** (`screen.py`, `ai.py`). Production measurement on

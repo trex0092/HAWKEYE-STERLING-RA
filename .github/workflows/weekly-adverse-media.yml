@@ -132,6 +132,28 @@ jobs:
           # storage backends (S3 / Azure blob) are allowlisted next to the primaries —
           # without them both core lists are refused at connect time and screening
           # silently runs DEGRADED (as it did 09–12 Jul).
+          #
+          # *.githubapp.com is the HOSTED-COMPUTE WATCHDOG, and it is why this job
+          # kept dying at 64 minutes. A hosted runner heartbeats to
+          # hosted-compute-watchdog-prod-<shard>.githubapp.com; a runner that cannot
+          # answer is RECLAIMED on a fixed timer, killing the job mid-step with no
+          # conclusion, no post-step and no uploaded logs (every investigation hit a
+          # 404 — see the crash-forensics note below). This block used to pin the
+          # shard literally, as `...-prod-iad-01`, so the sweep survived only on the
+          # days GitHub happened to place it on iad-01 and was reclaimed on every
+          # other day. The three August failures died 64m00s, 64m01s and 64m02s after
+          # job start — a three-failure spread of two seconds is a timer, and a
+          # blocked heartbeat is reclaimed at a fixed grace from job start. It is NOT
+          # the sweep simply taking an hour: run 31468597213 SUCCEEDED the day before
+          # with a 65m08s job whose screening step alone ran 64m49s — longer than the
+          # entire lifetime of each of the three failed jobs. Same workflow, same
+          # config; the difference is only whether the heartbeat was answerable. A
+          # reclaimed job is also unmistakable in the API: the step stays
+          # "in_progress" with no conclusion and every post-step stays "pending",
+          # which a normally-failing step never does. The shard suffix is
+          # GitHub's to rotate and is never ours to pin, so the wildcard is the only
+          # correct form; it is what the other 50 workflows in this estate use, and
+          # what fixed the identical ~63-min deaths on pep-worldwide.
           egress-policy: block
           allowed-endpoints: >
             github.com:443
@@ -144,8 +166,7 @@ jobs:
             api.anthropic.com:443
             sanctionslistservice.ofac.treas.gov:443
             wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
-            hosted-compute-watchdog-prod-iad-01.githubapp.com:443
-            hosted-compute-request-orchestrator-prod-iad-01.githubapp.com:443
+            *.githubapp.com:443
             scsanctions.un.org:443
             unsolprodfiles.blob.core.windows.net:443
             umsanrp1dltx4dj3sxtt.blob.core.windows.net:443
