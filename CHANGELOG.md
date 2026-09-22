@@ -10,6 +10,30 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Screening engine: sanctions now include a worldwide national-sanctions net
+  (~80 further national lists), supplementary tier** (`screen.py`,
+  `test/engine_test.py`). The 10 core lists (OFAC, UN, EU, UK, Australia,
+  Switzerland, UAE EOCN, OFAC Consolidated) left ~80 further national lists --
+  Ukraine NSDC, France, Belgium, Japan METI, Turkiye MASAK, Pakistan NACTA,
+  Iraq, New Zealand, Poland, Israel, Qatar, Saudi Arabia, India MHA, and more
+  -- reached only by the separate JS engine, if at all. `load_worldwide_sanctions()`
+  (both load paths) screens the OpenSanctions `sanctions` collection (93 source
+  datasets), adding only names whose sources are NOT already covered by a list
+  this engine screens, and dropping any name already present in another loaded
+  list. Supplementary tier: best-effort, never floors, never able to fail or
+  redden a run. Each entry's source list(s) are recorded as match-context
+  (annotation only, never changes a score). Kill-switch: `WORLDWIDE_SANCTIONS=0`.
+  Measured 21 Sep 2026 against the REAL 336-customer / 20-employee book (856
+  distinct subject names, using `screen_name` -- the engine's own matcher, not
+  an approximation): the worldwide net surfaces 26 subjects with a NEW
+  potential match that the core lists alone did not raise (raw matcher output,
+  pre-adjudication; several are low-score common-name noise, a handful score
+  74-89, e.g. "Gul Shair"/Pakistan NACTA 88.9, "Ibrahim Soyhan"/Singapore 88.9,
+  "Mehmet Maras"/Netherlands 88.0). A further 45 subjects that already had a
+  core-list match also picked up additional worldwide-net context, not a new
+  flag. Every one of these needs MLRO review before any conclusion; this PR
+  changes coverage, not adjudication.
+
 - **Screening engine: UK sanctions now screened against the UK Sanctions List,
   and a stale core list is reported as stale** (`screen.py`,
   `test/engine_test.py`). The OFSI Consolidated List closed on 28 Jan 2026
