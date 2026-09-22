@@ -8,9 +8,10 @@ name: Control Retry (self-healing dispatcher)
 # gained its own 03:07 UTC retry; this dispatcher generalises the pattern to
 # EVERY daily control without touching each workflow: for each control with no
 # successful run today (UTC) and no run currently queued/in progress, it fires
-# one workflow_dispatch. Two passes (07:37 and 10:07 UTC) both land before the
-# Freshness Check firing (~11:07 UTC in practice), so a transient morning death
-# is healed the same day.
+# one workflow_dispatch. Originally two passes (07:37 and 10:07 UTC); widened 2026-09-22 to twelve
+# staggered passes (06:07-11:37 UTC, see the `on:` block below for why) so a
+# scheduler-wide outage can't take out every healing attempt in the same day
+# it takes out the controls being healed.
 #
 # Deliberately narrow, so it can never mask a real failure:
 #   - a control that fails DETERMINISTICALLY (e.g. the EOCN review-age gate)
@@ -23,8 +24,15 @@ name: Control Retry (self-healing dispatcher)
 
 on:
   schedule:
-    - cron: '37 7 * * *'   # first healing pass — after every daily control's own schedule
-    - cron: '7 10 * * *'   # second pass — catches a retry that itself died; still before freshness (~11:07)
+    # 2026-09-22: the two-pass design (07:37, 10:07) assumed GitHub's scheduler
+    # would land at least one of two firings. On 2026-09-22 it landed NEITHER —
+    # the same morning that 4 of the daily controls' own schedules were also
+    # skipped — so the dispatcher meant to heal a scheduler miss was itself
+    # silently skipped by the same failure mode, and nothing healed until a
+    # human (via chat) manually re-dispatched every affected control. Widened
+    # to a dozen staggered passes so a scheduler-wide outage has to eat nearly
+    # every slot in a 6-hour window, not just 2, to leave a day unhealed.
+    - cron: '7,37 6-11 * * *'   # every ~30 min, 06:07-11:37 UTC — all land before Freshness Check's 12:09 pass
   workflow_dispatch:
 
 # Least privilege: read-only at top level; the healer job below elevates the
