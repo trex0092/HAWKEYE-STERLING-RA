@@ -1474,7 +1474,8 @@ _src_legacy = _inspect.getsource(screen.main)
 for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
     check(f"{_pname} path wires the OFAC mirror fallback", "us_ofac_sdn" in _psrc)
     check(f"{_pname} path wires the UN mirror fallback", "un_sc_sanctions" in _psrc)
-    check(f"{_pname} path wires the UK mirror fallback", "gb_hmt_sanctions" in _psrc)
+    check(f"{_pname} path loads the UK list via load_uk_list (UK Sanctions List first)",
+          "load_uk_list()" in _psrc and "gb_hmt_sanctions" not in _psrc)
     check(f"{_pname} path wires the EU official-XML fallback", "_eu_official_fallback" in _psrc)
     check(f"{_pname} path folds OFAC aliases only when the mirror did not serve",
           "_fold_ofac_aliases" in _psrc
@@ -2386,6 +2387,8 @@ class _CaseResp:
     @staticmethod
     def json(): return {"data": {"gid": "1"}}
 def _rec_case(method, url, **kw):
+    if "/addProject" in url:      # board attach after a create: not a case itself
+        return _CaseResp()
     _case_names.append(((kw.get("json") or {}).get("data") or {}).get("name", ""))
     return _CaseResp()
 _mk_match = lambda excl: [{"name": "Acme", "permalink": "p", "gid": "g", "hits": [
@@ -3823,12 +3826,256 @@ check("a run that never tripped the breaker carries no circuit warning",
 check("the governance footer declares the run degraded when the circuit tripped",
       "DEGRADED THIS RUN" in ai.governance_footer())
 ai._LLM_STATE["open"] = False
+for _k in ai.LLM_CALLS:
+    ai.LLM_CALLS[_k] = 0      # a healthy run starts from fresh counters
 check("and makes no degraded claim on a healthy run",
       "DEGRADED THIS RUN" not in ai.governance_footer())
 
 _req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
 os.environ.pop("ANTHROPIC_API_KEY", None)
 _reset_llm()
+
+# ── 21 Sep 2026 engine fixes: case-board attach, honest news-feed coverage, honest AI mode ──
+# (1) Case subtasks were created with only a `parent`, so Asana gave them ZERO
+# project/section membership and they never showed on the case board.
+_cb_calls = []
+def _cb_stub(create_status=201, create_gid="777", attach_status=200):
+    _cb_calls.clear()
+    def _req(method, url, **kw):
+        _cb_calls.append((method, url, (kw.get("json") or {}).get("data") or {}))
+        if url.endswith("/addProject"):
+            return types.SimpleNamespace(status_code=attach_status, text="stub")
+        _resp = types.SimpleNamespace(status_code=create_status, text="stub")
+        _resp.json = (lambda: {"data": {"gid": create_gid}}) if create_gid is not None else (lambda: (_ for _ in ()).throw(ValueError("no body")))
+        return _resp
+    return _req
+_cb_orig_req = screen.asana_request
+_cb_orig_sec = screen.ASANA_CASES_NEW_SECTION_GID
+try:
+    screen.ASANA_CASES_NEW_SECTION_GID = "9999999999999901"
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub()
+    _cb_ok = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    _cb_attach = [c for c in _cb_calls if c[1].endswith("/addProject")]
+    check("case subtask: created OK", _cb_ok is True)
+    check("case subtask: attached to the board via addProject on the NEW task gid",
+          len(_cb_attach) == 1 and _cb_attach[0][1].endswith("/tasks/777/addProject"))
+    check("case subtask: attach targets the monitoring project and the New-cases section",
+          _cb_attach[0][2].get("project") == screen.ASANA_ONGOING_MON_GID
+          and _cb_attach[0][2].get("section") == "9999999999999901")
+    check("case subtask: attach is counted", screen.CASE_BOARD_ATTACH["attached"] == 1)
+
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub(attach_status=500)
+    _cb_ok2 = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: a failed attach never fails the case itself", _cb_ok2 is True)
+    check("case subtask: a failed attach is counted (loud), not swallowed",
+          screen.CASE_BOARD_ATTACH["failed"] == 1 and screen.CASE_BOARD_ATTACH["attached"] == 0)
+
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub(create_gid=None)
+    screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: an unreadable create response is counted as a failed attach, no blind call",
+          screen.CASE_BOARD_ATTACH["failed"] == 1
+          and not [c for c in _cb_calls if c[1].endswith("/addProject")])
+
+    screen.ASANA_CASES_NEW_SECTION_GID = ""
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub()
+    screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: an empty section setting disables the attach",
+          not [c for c in _cb_calls if c[1].endswith("/addProject")]
+          and screen.CASE_BOARD_ATTACH == {"attached": 0, "failed": 0})
+finally:
+    screen.asana_request = _cb_orig_req
+    screen.ASANA_CASES_NEW_SECTION_GID = _cb_orig_sec
+
+# (2) The report claimed GDELT "runs on EVERY subject every run regardless" on a
+# run where its circuit opened after 5 subjects. Coverage is now counted per
+# subject and rendered; the claim is only made when it is true.
+class _FcResp:
+    status_code = 200
+    content = _RSS_OK
+_fc_saved = (screen.requests.get, screen.search_gdelt, screen.search_bing_news)
+try:
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen.requests.get = lambda *_a, **_k: _FcResp()
+    screen.search_gdelt = lambda *_a, **_k: []           # reachable, nothing found
+    screen.search_bing_news = lambda *_a, **_k: []
+    screen.search_adverse_media("Feed Cov One")
+    _fc1 = screen.feed_coverage_snapshot()
+    check("feed coverage: a subject reached by all three feeds is counted on each",
+          _fc1 == {"subjects": 1, "gnews": 1, "gdelt": 1, "bing": 1, "single": 0, "none": 0})
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen._GNEWS_STATE["open"] = True                    # Google News circuit open
+    screen.search_gdelt = _gdelt_down                     # GDELT rate-limited
+    screen.search_adverse_media("Feed Cov Two")
+    _fc2 = screen.feed_coverage_snapshot()
+    check("feed coverage: Bing alone is recorded as a SINGLE-feed subject",
+          _fc2["subjects"] == 1 and _fc2["bing"] == 1 and _fc2["gnews"] == 0
+          and _fc2["gdelt"] == 0 and _fc2["single"] == 1 and _fc2["none"] == 0)
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen._GNEWS_STATE["open"] = True
+    screen.search_bing_news = _bing_down
+    _raised2 = ""
+    try:
+        screen.search_adverse_media("Feed Cov Three")
+    except RuntimeError as e:
+        _raised2 = str(e)
+    _fc3 = screen.feed_coverage_snapshot()
+    check("feed coverage: a subject no feed reached is counted AND still raises loudly",
+          _fc3["none"] == 1 and _fc3["subjects"] == 1 and "circuit open" in _raised2)
+finally:
+    screen.requests.get, screen.search_gdelt, screen.search_bing_news = _fc_saved
+    _reset_breaker(); screen.reset_feed_coverage()
+
+_fc_stats = lambda cov: {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5,
+                         "am_errors": 0, "pep_errors": 0, "delta": {}, "news_feed_coverage": cov,
+                         "watchlist_loaded": True, "watchlist_findings": 1}
+_fc_find = [{"subject_type": "ENTITY", "subject_name": "Acme", "parent": "", "permalink": "",
+             "articles": [{"title": "t", "source": "s", "date": "d", "url": "u", "categories": []}]}]
+_fc_meta = {"ofac": {"count": 17000, "date": "2026-07-08"}}
+_fc_partial = screen.build_unified_narrative(
+    [], [], _fc_find, [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 3, "gdelt": 3, "bing": 10, "single": 7, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: news feed coverage line is rendered with per-feed subject counts",
+      "News feed coverage this run (10 subject(s) news-swept): Google News 3 · GDELT 3 · Bing News 10" in _fc_partial
+      and "reached by ONE feed only: 7" in _fc_partial)
+check("report: a partial GDELT run does NOT claim GDELT covers every subject",
+      "runs on EVERY subject" not in _fc_partial
+      and "GDELT's global index reached only 3 of 10 subject(s)" in _fc_partial)
+check("report: single-feed subjects carry a provisional warning", "PROVISIONAL" in _fc_partial)
+_fc_full = screen.build_unified_narrative(
+    [], [], _fc_find, [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 10, "gdelt": 10, "bing": 10, "single": 0, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: the every-subject GDELT claim is kept only when it is true",
+      "runs on EVERY subject" in _fc_full and "PROVISIONAL" not in _fc_full)
+_fc_zero = screen.build_unified_narrative(
+    [], [], [], [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 3, "gdelt": 3, "bing": 10, "single": 7, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: coverage is disclosed even on a zero-adverse-finding run",
+      "News feed coverage this run" in _fc_zero)
+
+# (3) "AI-assisted triage" was reported while 557 of 557 model calls failed:
+# an HTTP error reply deliberately does not open the breaker, so nothing said so.
+_am_saved = (screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE, dict(screen.ai.LLM_CALLS), screen.ai._LLM_STATE["open"])
+try:
+    screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE, screen.ai._LLM_STATE["open"] = True, True, False
+    screen.ai.LLM_CALLS.update(attempted=5, ok=0, failed=5, skipped=0)
+    _lbl0 = screen._ai_mode_label()
+    check("AI mode: 0 of N calls succeeded is labelled UNAVAILABLE, not AI-assisted",
+          _lbl0.startswith("deterministic (LLM UNAVAILABLE") and "0 of 5" in _lbl0)
+    check("AI mode: the unavailable label is still != 'deterministic' (credential contract intact)",
+          _lbl0 != "deterministic")
+    check("AI mode: the governance footer declares the all-failed run degraded",
+          "DEGRADED THIS RUN: 0 of 5 model calls succeeded" in screen.ai.governance_footer())
+    check("AI mode: the monitoring block warns when no call succeeded",
+          "0 of 5 model calls succeeded" in _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 0}))
+    screen.ai.LLM_CALLS.update(attempted=5, ok=3, failed=2, skipped=0)
+    check("AI mode: partial success is labelled DEGRADED with the ratio",
+          "DEGRADED: 3 of 5" in screen._ai_mode_label())
+    screen.ai.LLM_CALLS.update(attempted=5, ok=5, failed=0, skipped=0)
+    check("AI mode: a fully successful pass is plain AI-assisted triage",
+          screen._ai_mode_label() == "AI-assisted triage"
+          and "DEGRADED THIS RUN" not in screen.ai.governance_footer())
+    screen.ai.LLM_CALLS.update(attempted=0, ok=0, failed=0, skipped=0)
+    check("AI mode: no calls attempted yet is not called degraded",
+          screen._ai_mode_label() == "AI-assisted triage")
+finally:
+    screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE = _am_saved[0], _am_saved[1]
+    screen.ai.LLM_CALLS.update(_am_saved[2]); screen.ai._LLM_STATE["open"] = _am_saved[3]
+
+# ── UK Sanctions List: the OFSI ConList closed 28 Jan 2026 and was still loaded ──
+# 21 Sep 2026: ConList.csv said "Last Updated 03/06/2026", the report said OK, and
+# the gb_hmt_sanctions mirror was a header-only file. The UK Sanctions List is now
+# the primary and any core list past LIST_MAX_AGE_DAYS is reported as STALE.
+_ad = screen.list_age_days
+_today = _dt.date(2026, 9, 21)
+check("list age: ISO date", _ad("2026-09-19", _today) == 2)
+check("list age: dd/mm/yyyy when dayfirst is asserted (OFSI format)", _ad("03/06/2026", _today, dayfirst=True) == 110)
+check("list age: an ambiguous slash date is NOT guessed", _ad("03/06/2026", _today) is None)
+check("list age: an unambiguous mm/dd/yyyy date is read (OFAC non-SDN style)", _ad("09/14/2026", _today) == 7)
+check("list age: an unambiguous dd/mm/yyyy date is read without dayfirst", _ad("13/06/2026", _today) == 100)
+check("list age: provenance strings and blanks make no claim",
+      _ad("live", _today) is None and _ad("", _today) is None and _ad(None, _today) is None
+      and _ad("live (UK Sanctions List)", _today) is None and _ad("99/99/2026", _today) is None)
+check("list age: a datetime is accepted as today", _ad("2026-09-19", _dt.datetime(2026, 9, 21, 5, 0)) == 2)
+
+_sm = lambda **kw: {k: dict(v) for k, v in kw.items()}
+_meta_stale = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},
+                  uk={"count": 13765, "date": "03/06/2026"}, eu={"count": 5000, "date": "live"},
+                  eocn={"count": 629, "date": "2020-01-01"},
+                  extra={"count": 5, "date": "2020-01-01", "tier": "supplementary"},
+                  gone={"count": 0, "date": "2020-01-01"})
+check("stale_core_lists flags the 110-day-old UK list and nothing else",
+      screen.stale_core_lists(_meta_stale, _today) == [("uk", 110)])
+check("stale_core_lists: EOCN (own review gate), supplementary and empty lists are excluded",
+      all(k not in ("eocn", "extra", "gone") for k, _ in screen.stale_core_lists(_meta_stale, _today)))
+check("stale_core_lists: a limit of 0 disables it", screen.stale_core_lists(_meta_stale, _today, max_age=0) == [])
+check("stale_core_lists: respects the configured limit",
+      screen.stale_core_lists(_meta_stale, _today, max_age=200) == [])
+
+_fcdo_csv = (b'"id","schema","name","aliases"\n'
+             b'"a1","Person","EXAMPLE DESIGNEE ONE","E. DESIGNEE;DESIGNEE EXAMPLE"\n'
+             b'"a2","Organization","EXAMPLE HOLDINGS LLC",""\n')
+_uk_calls = []
+_orig_dl_uk, _orig_parse_uk = screen.download, screen.parse_uk
+try:
+    def _dl_ok(url, label):
+        _uk_calls.append(url); return _fcdo_csv if "gb_fcdo_sanctions" in url else b"CONLIST"
+    screen.download = _dl_ok
+    _n, _d, _h, _f = screen.load_uk_list()
+    check("UK: the UK Sanctions List mirror is the primary and carries names + aliases",
+          _n == {"EXAMPLE DESIGNEE ONE", "E. DESIGNEE", "DESIGNEE EXAMPLE", "EXAMPLE HOLDINGS LLC"} and _f is True)
+    check("UK: the retired ConList is NOT fetched when the primary loaded",
+          len(_uk_calls) == 1 and "gb_fcdo_sanctions" in _uk_calls[0])
+    check("UK: provenance names the UK Sanctions List (no stale-date claim)",
+          _d.startswith("live (UK Sanctions List") and screen.list_age_days(_d) is None)
+
+    _uk_calls.clear()
+    def _dl_mirror_empty(url, label):
+        _uk_calls.append(url)
+        return b'"id","schema","name","aliases"\n' if "gb_fcdo_sanctions" in url else b"CONLIST-BYTES"
+    screen.download = _dl_mirror_empty
+    screen.parse_uk = lambda data: ({"OLD DESIGNEE"}, "03/06/2026", "hash")
+    _n2, _d2, _h2, _f2 = screen.load_uk_list()
+    check("UK: an empty primary falls back to the retired ConList", _n2 == {"OLD DESIGNEE"} and _f2 is True
+          and len(_uk_calls) == 2 and "ConList.csv" in _uk_calls[1])
+    check("UK: the fallback keeps ConList's own date, which the staleness check then flags",
+          _d2 == "03/06/2026"
+          and screen.stale_core_lists({"uk": {"count": 1, "date": _d2}}, _today) == [("uk", 110)])
+
+    screen.download = lambda url, label: None
+    screen.parse_uk = _orig_parse_uk
+    _n3, _d3, _h3, _f3 = screen.load_uk_list()
+    check("UK: both sources down -> empty and not fetched (the outage gate takes over)",
+          not _n3 and _f3 is False)
+finally:
+    screen.download, screen.parse_uk = _orig_dl_uk, _orig_parse_uk
+
+_run_dt = _dt.datetime(2026, 9, 21, 5, 0)
+_meta_fresh = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},
+                  uk={"count": 19663, "date": "live (UK Sanctions List)"}, eu={"count": 5000, "date": "live"},
+                  eocn={"count": 629, "date": "2026-09-17"})
+_meta_uk_stale = {**_meta_fresh, "uk": {"count": 13765, "date": "03/06/2026"}}
+_st = lambda: {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5,
+               "am_errors": 0, "pep_errors": 0, "delta": {}}
+_n_fresh = screen.build_unified_narrative([], [], [], [], _meta_fresh, _st(), _run_dt)
+_n_stale = screen.build_unified_narrative([], [], [], [], _meta_uk_stale, _st(), _run_dt)
+check("report: a fresh UK list reads OK with no stale warning",
+      "Sanctions OK" in _n_fresh and "SANCTIONS LIST STALE" not in _n_fresh and "STALE (" not in _n_fresh)
+check("report: a stale UK list downgrades the Sanctions banner and names the list and age",
+      "Sanctions DEGRADED (stale: UK 110d)" in _n_stale)
+check("report: the UK status line says STALE with its age, not OK",
+      "UK Sanctions List: STALE (110d old)" in _n_stale)
+check("report: the explicit warning says designations since then are NOT screened",
+      "SANCTIONS LIST STALE" in _n_stale and "03/06/2026" in _n_stale and "NOT screened" in _n_stale)
+_dn_src = _inspect.getsource(screen.build_daily_narrative)
+check("report: the daily narrative's UK provenance line points at the UK Sanctions List, not the closed OFSI list",
+      "the-uk-sanctions-list" in _dn_src and "ofsistorage" not in _dn_src)
 
 print()
 if _fail:
