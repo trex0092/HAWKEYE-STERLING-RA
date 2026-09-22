@@ -10,6 +10,55 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Screening engine: UK sanctions now screened against the UK Sanctions List,
+  and a stale core list is reported as stale** (`screen.py`,
+  `test/engine_test.py`). The OFSI Consolidated List closed on 28 Jan 2026
+  (GOV.UK); the engine kept loading `ConList.csv`, which on 21 Sep 2026 still
+  said "Last Updated 03/06/2026" while the report read `OK`, and its
+  OpenSanctions fallback (`gb_hmt_sanctions`) is a header-only file. Measured on
+  21 Sep 2026 against the official UK Sanctions List file: 156 designations
+  dated after 3 Jun 2026 (634 since 28 Jan) that ConList cannot contain.
+  (1) New `load_uk_list()`: the UK Sanctions List via the OpenSanctions
+  `gb_fcdo_sanctions` mirror is the primary (same host and file shape as EU,
+  AU and CH, already egress-allowed); the retired ConList is only a last-resort
+  fallback. Both load paths use it. Internal list label stays `UK OFSI`, so
+  hit attribution is unchanged.
+  (2) New `stale_core_lists()` / `list_age_days()`: any core list whose own
+  declared date is older than `LIST_MAX_AGE_DAYS` (default 30, 0 disables) is
+  shown as `STALE (Nd old)`, the Sanctions banner becomes `DEGRADED (stale: ...)`,
+  section 1 says designations since then are NOT screened, and a `::warning::`
+  annotation is emitted. Provenance strings such as `live` make no age claim and
+  an ambiguous dd/mm vs mm/dd date is never guessed. EOCN keeps its own review
+  gate. Exit codes are unchanged (banner and annotation only).
+  One-time effect: standing UK matches re-key once because the matched entry
+  text now comes from the new list (the conservative outcome, as documented at
+  `classify_deltas`). Not changed here: the JS engine
+  (`data/sanctions-sources.json` `uk-ofsi`) still points at the closed list.
+
+- **Screening engine: MLRO case subtasks now land on the case board; the
+  report states real news-feed coverage and real AI status** (`screen.py`,
+  `ai.py`, `monitoring.py`, `test/engine_test.py`). Three defects observed in
+  the 21 Sep 2026 production runs (35562296246, 35573394675):
+  (1) `create_case_subtask` created cases with only a `parent`, and Asana does
+  not put a subtask on a project board by itself, so every case had no
+  project/section membership and was invisible on the case board. It now calls
+  `addProject` (monitoring project, "Screening Cases - New" section, override
+  `ASANA_CASES_NEW_SECTION_GID`, empty disables). A failed attach is loud (log
+  line, `::warning::` annotation, counter) and never fails the case itself.
+  (2) Section 2 said GDELT "runs on EVERY subject every run regardless" on runs
+  where the GDELT circuit had opened after 5 subjects (HTTP 429) and Google
+  News after ~30. The engine now counts, per news-swept subject, which feeds
+  reached it and prints `News feed coverage this run`, with a PROVISIONAL note
+  for subjects reached by one feed or none; the every-subject GDELT claim is
+  made only when it is true. Status semantics (`OK` / `DEGRADED (news)`) are
+  unchanged.
+  (3) The report said "AI-assisted triage" while 557 of 557 model calls failed
+  (an HTTP error reply deliberately does not open the AI circuit breaker). The
+  AI mode label, governance footer and monitoring block now say when no call,
+  or only some calls, succeeded. The label stays distinct from plain
+  `deterministic`, so the credential contract in `agents.py` is unchanged.
+  Recall-monotone: no matcher, list, threshold or finding logic changed.
+
 - **MCP tool coverage extended to the TFS dossier, risk-rating and
   related-party engine functions** (`mcp_tools.py`, `mcp_server.py`,
   `test/mcp_tools_test.py`, `docs/mcp-server.md`). Three engine capabilities
