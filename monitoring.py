@@ -385,6 +385,9 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
         # affected items carry deterministic triage only. Reporting the call
         # counts while staying silent about the ones never made would read as
         # a full-strength AI pass that simply made fewer calls.
+        if llm.get("attempted", 0) > 0 and llm.get("ok", 0) == 0 and not llm.get("skipped"):
+            L.append(f"      WARNING: 0 of {llm['attempted']} model calls succeeded; every item carries "
+                     "DETERMINISTIC triage/summaries only (severity floors intact, no finding dropped)")
         if llm.get("skipped"):
             L.append(f"      ⚠ AI circuit OPEN — {llm['skipped']} model call(s) skipped after "
                      "repeated failures; those items carry DETERMINISTIC triage/summaries only "
