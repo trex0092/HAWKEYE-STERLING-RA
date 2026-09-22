@@ -37,7 +37,7 @@ export function encryptText(plaintext, secret) {
   if (!secret) throw new Error('STATE_ENCRYPTION_KEY is empty');
   const salt = randomBytes(16);
   const nonce = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', deriveKey(secret, salt), nonce);
+  const cipher = createCipheriv('aes-256-gcm', deriveKey(secret, salt), nonce, { authTagLength: 16 });
   const ct = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final(), cipher.getAuthTag()]);
   return [MAGIC, salt.toString('base64'), nonce.toString('base64'), ct.toString('base64')].join('.');
 }
@@ -53,7 +53,7 @@ export function decryptText(payload, secret) {
   if (blob.length < 16) throw new Error('payload too short');
   const ct = blob.subarray(0, blob.length - 16);
   const tag = blob.subarray(blob.length - 16);
-  const decipher = createDecipheriv('aes-256-gcm', deriveKey(secret, salt), nonce);
+  const decipher = createDecipheriv('aes-256-gcm', deriveKey(secret, salt), nonce, { authTagLength: 16 });
   decipher.setAuthTag(tag);
   // GCM authenticates: a wrong key or any ciphertext tamper throws here.
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');

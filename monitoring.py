@@ -292,6 +292,42 @@ def monitor_run(today, counts, timings=None, llm_calls=None, path=None, persist=
     return {"snapshot": snap, **res}
 
 
+def makeup_decision(today, path=None):
+    """Should a same-day coverage MAKE-UP sweep run? Consulted by the retry
+    firings of the daily screening on days that already have a successful run:
+    the free news feeds rate-limit per IP, so a run can succeed with part of
+    the book uncovered (am_errors / pep_errors > 0) — a later firing on a
+    FRESH runner (fresh egress IP) can win that coverage back. Reads only the
+    committed run-metrics counts (no subject names, no PII) and degrades
+    loudly: an unreadable/absent snapshot means coverage cannot be verified,
+    so the answer is sweep, never a silent all-clear.
+
+    Returns {"sweep": bool, "uncovered": int|None, "reason": str}.
+    """
+    hist = _load(path or METRICS_STATE_PATH, [])
+    todays = ([h for h in hist if isinstance(h, dict) and h.get("date") == today]
+              if isinstance(hist, list) else [])
+    if not todays:
+        return {"sweep": True, "uncovered": None,
+                "reason": "no run-metrics snapshot for today — coverage cannot be verified, sweeping"}
+    counts = todays[-1].get("counts") or {}
+    # Deadline-deferred subjects (delivery-target budget) count as uncovered
+    # exactly like rate-limited ones: the make-up pass is how they get their
+    # news sweep back the same day.
+    am = int(counts.get("am_errors") or 0) + int(counts.get("am_skipped") or 0)
+    pep = int(counts.get("pep_errors") or 0)
+    if am or pep:
+        bits = []
+        if am:
+            bits.append(f"{am} subject(s) lost or deferred news coverage")
+        if pep:
+            bits.append(f"{pep} individual(s) lost PEP coverage")
+        return {"sweep": True, "uncovered": am + pep,
+                "reason": " and ".join(bits) + " in today's earlier run"}
+    return {"sweep": False, "uncovered": 0,
+            "reason": "today's earlier run had full news + PEP coverage — make-up sweep not needed"}
+
+
 # ── 2) SOURCE-COVERAGE DRIFT ──────────────────────────────────────────────────
 def check_source_coverage(list_meta, today, path=None):
     """Compare each list's current name count to its trailing median. Returns
@@ -345,6 +381,17 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
     if llm:
         L.append(f"   LLM usage: {llm.get('attempted',0)} call(s) · "
                  f"{llm.get('ok',0)} ok · {llm.get('failed',0)} failed")
+        # A tripped AI circuit is a COVERAGE statement, not a footnote: the
+        # affected items carry deterministic triage only. Reporting the call
+        # counts while staying silent about the ones never made would read as
+        # a full-strength AI pass that simply made fewer calls.
+        if llm.get("attempted", 0) > 0 and llm.get("ok", 0) == 0 and not llm.get("skipped"):
+            L.append(f"      WARNING: 0 of {llm['attempted']} model calls succeeded; every item carries "
+                     "DETERMINISTIC triage/summaries only (severity floors intact, no finding dropped)")
+        if llm.get("skipped"):
+            L.append(f"      ⚠ AI circuit OPEN — {llm['skipped']} model call(s) skipped after "
+                     "repeated failures; those items carry DETERMINISTIC triage/summaries only "
+                     "(severity floors intact, no finding dropped)")
     if base.get("history_runs"):
         L.append(f"   Baseline: {base['history_runs']} prior run(s); "
                  f"median runtime {(_fmt(base.get('median_total_seconds')))}, "

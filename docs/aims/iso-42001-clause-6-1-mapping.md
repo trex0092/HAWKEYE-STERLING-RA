@@ -19,7 +19,7 @@ routinely offered as though it answered both.
 
 | Clause | The question it asks | Subject of the harm | Canonical artefact |
 |---|---|---|---|
-| **6.1.2** AI risk assessment | What could go wrong, how likely, how bad, what is left after controls? | **The organisation** — licence, regulatory exposure, reputation, cost | [AI Risk Register](ai-risk-register.md) (R-01…R-20) |
+| **6.1.2** AI risk assessment | What could go wrong, how likely, how bad, what is left after controls? | **The organisation** — licence, regulatory exposure, reputation, cost | [AI Risk Register](ai-risk-register.md) (R-01…R-21) |
 | **6.1.3** AI risk treatment | Which Annex A controls apply, which do not, and why? | The control set | [Statement of Applicability](statement-of-applicability.md) · [ISO 42001 SoA 2026](../governance/iso-42001-soa-2026.md) |
 | **6.1.4** AI system impact assessment | What are the consequences **for individuals and for groups of individuals**, including unfair or discriminatory outcomes? | **People** — customers, UBOs, staff, the public | [Stakeholder Impact Assessment](../governance/stakeholder-impact-assessment-2026.md) (canonical) · [AI Impact Assessment](ai-impact-assessment.md) (system view) |
 
@@ -77,6 +77,7 @@ is missing from this table or if the table cites a risk that no longer exists.
 | R-18 | Lack of explainability | **A.8.2 (information to interested parties)** · A.9.4 | **Yes — primary.** An unexplainable adverse outcome is one that cannot be contested |
 | R-19 | Unauthorized AI access | A.4.4 · A.10.2–A.10.4 | Yes — unauthorised access to screening data is a harm to its subjects |
 | R-20 | AI incident response gap | **A.8.3** · A.6.2.8 | Yes — a slow response extends whatever harm is underway |
+| R-21 | Shadow AI — confidential data into an unapproved public AI tool | **A.9.2 (responsible use)** · A.4.4 · A.10.2–A.10.4 | **Yes — primary.** The data disclosed is the customer's, to a processor they were never told about and the firm has no contract with |
 
 **Reading the last column.** *Primary* means the risk's dominant consequence is
 to a person rather than to the firm, so its treatment must be judged against the
@@ -97,7 +98,7 @@ evidence?"*
 | A.3.2 AI roles & responsibilities | R-17 | ✅ |
 | A.4.2 Resource documentation | R-11 | ✅ |
 | A.4.3 Data resources | R-09 | ✅ |
-| A.4.4 Tooling resources | R-07, R-12, R-15, R-17, R-19 | ✅ |
+| A.4.4 Tooling resources | R-07, R-12, R-15, R-17, R-19, R-21 | ✅ |
 | A.5.2 AI system impact assessment | (process-level) | ✅ [`ai-impact-assessment.md`](ai-impact-assessment.md) · [`dpia-2026.md`](../governance/dpia-2026.md) |
 | A.5.4 Assessing impacts on individuals | R-04, R-05 | 🟡 SIA ratified 2026-07-02 and cross-script parity is a hard CI gate; the **bias-review cycle** is what remains |
 | A.6.2.2 AI system requirements | R-01, R-13 | ✅ |
@@ -107,10 +108,10 @@ evidence?"*
 | A.7.2–A.7.6 Data for AI systems | R-03, R-05, R-06 | ✅ |
 | A.8.2 Information to interested parties | R-18 | ✅ |
 | A.8.3 Reporting of concerns | R-08, R-14, R-20 | ✅ |
-| A.9.2 Responsible use of AI systems | R-01, R-04, R-10 | 🟡 AUP in force; acknowledgement records are open-actions item 7 |
+| A.9.2 Responsible use of AI systems | R-01, R-04, R-10, R-21 | 🟡 AUP in force (extended 2026-08 to third-party AI tools); acknowledgement records are open-actions item 7, and R-21 has no technical enforcement behind the policy |
 | A.9.3 Objectives for responsible use | R-10, R-16 | ✅ |
 | A.9.4 Intended use documented | R-13, R-18 | ✅ |
-| A.10.2–A.10.4 Third parties & customers | R-06, R-07, R-11, R-15, R-19 | ✅ |
+| A.10.2–A.10.4 Third parties & customers | R-06, R-07, R-11, R-15, R-19, R-21 | ✅ |
 
 **Excluded as not applicable:** controls that assume model *training or
 fine-tuning* by this firm. An external model is consumed read-only; there is no

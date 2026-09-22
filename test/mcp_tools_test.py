@@ -46,7 +46,7 @@ def expect_valueerror(name, fn):
     except Exception as e:
         print(f"  FAIL {name} (raised {type(e).__name__}, expected ValueError)"); _fail.append(name)
 
-# ── mcp_tools.normalize_name ──────────────────────────────────────────────────
+# ── mcp_tools.normalize_name ─────────────────────────────────────────────────────────────────
 print("mcp_tools — normalize_name")
 n = mcp_tools.normalize_name("Muḥammad Al-Zawari")
 check("normalize returns an uppercased latinised form", n["normalized"] == n["normalized"].upper() and "MUHAMMAD" in n["normalized"])
@@ -71,7 +71,7 @@ expect_valueerror("screen_name rejects a non-string watchlist entry", lambda: mc
 expect_valueerror("screen_name rejects an oversized watchlist",
                   lambda: mcp_tools.screen_name("X Co", ["n"] * (mcp_tools.MAX_WATCHLIST + 1)))
 
-# ── mcp_tools.monitor_transactions (FATF R.16 boundaries) ─────────────────────
+# ── mcp_tools.monitor_transactions (FATF R.16 boundaries) ───────────────────────
 print("mcp_tools — monitor_transactions")
 def _tx(*amts, method="cash"):
     return [{"customer": "C", "date": f"2026-01-{i+1:02d}", "amount": a, "direction": "in", "method": method}
@@ -89,7 +89,7 @@ check("monitor reports no rule errors on clean input", mcp_tools.monitor_transac
 expect_valueerror("monitor rejects a non-list", lambda: mcp_tools.monitor_transactions("nope"))
 expect_valueerror("monitor rejects a non-object transaction", lambda: mcp_tools.monitor_transactions([1, 2]))
 
-# ── mcp_tools.analyze_kyc_note (CDD gaps, privacy masking) ─────────────────────
+# ── mcp_tools.analyze_kyc_note (CDD gaps, privacy masking) ───────────────────────
 print("mcp_tools — analyze_kyc_note")
 note = ("SECTION 4 — IDENTIFICATIONS\n"
         "Individual 1 — Shareholder & Director\n"
@@ -101,21 +101,21 @@ check("kyc masks the ID number (last 3 only)", kres["individuals"][0]["id_masked
 check("kyc flags missing DOB / proof-of-address as CDD gaps", kres["total_cdd_gaps"] >= 2 and kres["cdd_complete"] is False)
 expect_valueerror("kyc rejects a non-string note", lambda: mcp_tools.analyze_kyc_note(None))
 
-# ── mcp_tools.jurisdiction_risk ───────────────────────────────────────────────
+# ── mcp_tools.jurisdiction_risk ─────────────────────────────────────────────────────
 print("mcp_tools — jurisdiction_risk")
 jr = mcp_tools.jurisdiction_risk(country="Iran")
 check("jurisdiction_risk returns a shape with tier + list_available", "tier" in jr and "list_available" in jr)
 expect_valueerror("jurisdiction_risk needs at least one input", lambda: mcp_tools.jurisdiction_risk("", []))
 expect_valueerror("jurisdiction_risk rejects non-string nationality", lambda: mcp_tools.jurisdiction_risk("UAE", [1]))
 
-# ── mcp_tools.name_variants ───────────────────────────────────────────────────
+# ── mcp_tools.name_variants ────────────────────────────────────────────────────────────
 print("mcp_tools — name_variants")
 nv = mcp_tools.name_variants("Mohammed Al Rashid")
 check("name_variants includes the name itself and reports a count", nv["count"] == len(nv["variants"]) and nv["count"] >= 1)
 check("name_variants returns a list of strings", all(isinstance(v, str) for v in nv["variants"]))
 expect_valueerror("name_variants rejects a non-string", lambda: mcp_tools.name_variants(None))
 
-# ── mcp_tools.adverse_media_scan ──────────────────────────────────────────────
+# ── mcp_tools.adverse_media_scan ───────────────────────────────────────────────────
 print("mcp_tools — adverse_media_scan")
 am = mcp_tools.adverse_media_scan("Trader charged in money laundering and fraud scheme")
 check("adverse_media_scan flags a clearly adverse headline", am["flagged"] is True and am["keyword_count"] >= 1)
@@ -123,7 +123,7 @@ clean_am = mcp_tools.adverse_media_scan("Company opens a new office in Dubai")
 check("adverse_media_scan does not flag a benign headline", clean_am["flagged"] is False)
 expect_valueerror("adverse_media_scan rejects a non-string", lambda: mcp_tools.adverse_media_scan(42))
 
-# ── mcp_tools.assemble_str_dossier ────────────────────────────────────────────
+# ── mcp_tools.assemble_str_dossier ────────────────────────────────────────────────
 print("mcp_tools — assemble_str_dossier")
 _valid_case = {
     "customer": {"name": "EXAMPLE TRADING FZE"},
@@ -141,7 +141,58 @@ try:
 except ValueError as e:
     check("assemble_str_dossier rejects an incomplete case with the missing fields", "incomplete" in str(e) and "hits" in str(e))
 
-# ── mcp_tools.call_tool dispatch ──────────────────────────────────────────────
+# ── mcp_tools.assemble_tfs_dossier ────────────────────────────────────────────────
+print("mcp_tools — assemble_tfs_dossier")
+_valid_tfs_case = {
+    "customer": {"name": "EXAMPLE TRADING FZE"},
+    "match_status": "confirmed",
+    "hits": [{"list": "UN Security Council — Consolidated list (XML)",
+              "matched_entry": "EXAMPLE PERSON", "score": 97}],
+    "funds": {"held": True, "items": [{"type": "trade receivable", "value": "60000", "currency": "AED"}]},
+}
+tz = mcp_tools.assemble_tfs_dossier(_valid_tfs_case)
+check("assemble_tfs_dossier returns a DRAFT-marked markdown dossier", tz["draft"] is True
+      and isinstance(tz["dossier_markdown"], str) and "DRAFT" in tz["dossier_markdown"].upper())
+check("assemble_tfs_dossier carries the customer + recommends FFR for a confirmed match with funds held",
+      tz["customer"] == "EXAMPLE TRADING FZE" and tz["recommended_report_kind"] == "FFR")
+check("assemble_tfs_dossier recommends PNMR for a partial match",
+      mcp_tools.assemble_tfs_dossier({**_valid_tfs_case, "match_status": "partial"})["recommended_report_kind"] == "PNMR")
+expect_valueerror("assemble_tfs_dossier rejects a non-object case", lambda: mcp_tools.assemble_tfs_dossier("nope"))
+try:
+    mcp_tools.assemble_tfs_dossier({"customer": {"name": "X"}, "match_status": "confirmed",
+                                    "hits": [{"list": "Some Local List", "matched_entry": "y"}]})
+    check("assemble_tfs_dossier rejects a case with no hit on a TFS list", False)
+except ValueError as e:
+    check("assemble_tfs_dossier rejects a case with no hit on a TFS list", "incomplete" in str(e) and "TFS list" in str(e))
+
+# ── mcp_tools.compute_risk_rating ─────────────────────────────────────────────────
+print("mcp_tools — compute_risk_rating")
+low = mcp_tools.compute_risk_rating()
+check("compute_risk_rating with no findings still rates LOW/MEDIUM/HIGH and lists sector-risk factor",
+      low["rating"] in ("LOW", "MEDIUM", "HIGH") and any("sector" in f.lower() for f in low["factors"]))
+high = mcp_tools.compute_risk_rating(sanctions_hits=[{"score": 97}], is_control=True, pep=True)
+check("compute_risk_rating rates HIGH on a confirmed hit + control linkage", high["rating"] == "HIGH")
+check("compute_risk_rating returns an EDD requirement string", isinstance(high["edd_requirement"], str) and high["edd_requirement"])
+expect_valueerror("compute_risk_rating rejects a non-list sanctions_hits", lambda: mcp_tools.compute_risk_rating(sanctions_hits="nope"))
+expect_valueerror("compute_risk_rating rejects a non-object hit", lambda: mcp_tools.compute_risk_rating(sanctions_hits=[1]))
+expect_valueerror("compute_risk_rating rejects a non-boolean pep", lambda: mcp_tools.compute_risk_rating(pep="yes"))
+expect_valueerror("compute_risk_rating rejects a negative cdd_gaps", lambda: mcp_tools.compute_risk_rating(cdd_gaps=-1))
+
+# ── mcp_tools.related_parties ──────────────────────────────────────────────────────
+print("mcp_tools — related_parties")
+shared = mcp_tools.related_parties([
+    {"name": "ACME FZE", "individuals": ["John Smith"]},
+    {"name": "BETA TRADING LLC", "individuals": ["John Smith"]},
+])
+check("related_parties flags a UBO shared across two customers", shared["cluster_count"] >= 1 and shared["clean"] is False)
+none_ = mcp_tools.related_parties([{"name": "SOLO FZE", "individuals": ["Jane Doe"]}])
+check("related_parties is clean for a single unrelated customer", none_["clean"] is True and none_["cluster_count"] == 0)
+expect_valueerror("related_parties rejects a non-list", lambda: mcp_tools.related_parties("nope"))
+expect_valueerror("related_parties rejects a non-object customer", lambda: mcp_tools.related_parties([1]))
+expect_valueerror("related_parties rejects a non-list individuals field",
+                  lambda: mcp_tools.related_parties([{"name": "X", "individuals": "not-a-list"}]))
+
+# ── mcp_tools.call_tool dispatch ───────────────────────────────────────────────────
 print("mcp_tools — dispatch")
 check("call_tool dispatches a known tool", mcp_tools.call_tool("hawkeye_normalize_name", {"name": "Test"})["normalized"] == "TEST")
 try:
@@ -166,6 +217,10 @@ _valid_args = {
     "hawkeye_name_variants": {"name": "Mohammed Abdul Rahman"},
     "hawkeye_adverse_media_scan": {"headline": "Firm fined for fraud"},
     "hawkeye_assemble_str_dossier": {"case": {"customer": {"name": "X FZE"}, "risk": {"rating": "HIGH", "factors": ["f"]}, "hits": [{"list": "UN", "matched_entry": "y", "score": 90}]}},
+    "hawkeye_assemble_tfs_dossier": {"case": {"customer": {"name": "X FZE"}, "match_status": "partial",
+                                              "hits": [{"list": "UN Security Council — Consolidated list (XML)", "matched_entry": "y", "score": 90}]}},
+    "hawkeye_compute_risk_rating": {"sanctions_hits": [{"score": 90}], "pep": True},
+    "hawkeye_related_parties": {"customers": [{"name": "X FZE", "individuals": ["Jane Doe"]}]},
 }
 check("_valid_args covers every registered tool", set(_valid_args) == set(mcp_tools.TOOLS))
 for _tname, _targs in _valid_args.items():
@@ -175,7 +230,7 @@ for _tname, _targs in _valid_args.items():
     except Exception as _e:
         check(f"{_tname} output is JSON-serialisable ({type(_e).__name__}: {_e})", False)
 
-# ── mcp_server — JSON-RPC 2.0 protocol ────────────────────────────────────────
+# ── mcp_server — JSON-RPC 2.0 protocol ──────────────────────────────────────────────
 print("mcp_server — protocol")
 def rpc(method, params=None, req_id=1, notification=False):
     msg = {"jsonrpc": "2.0", "method": method}
@@ -230,7 +285,7 @@ check("unknown method → JSON-RPC -32601", rpc("no/such/method")["error"]["code
 check("a notification (no id) yields no response", rpc("notifications/initialized", notification=True) is None)
 check("non-2.0 message is rejected", mcp_server.dispatch({"id": 1, "method": "ping"})["error"]["code"] == mcp_server.INVALID_REQUEST)
 
-# ── mcp_server.serve — end-to-end stdio framing ───────────────────────────────
+# ── mcp_server.serve — end-to-end stdio framing ───────────────────────────────────
 print("mcp_server — stdio framing")
 stdin = io.StringIO(
     json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}}) + "\n"
@@ -249,7 +304,7 @@ check("serve emitted a -32700 parse-error frame for bad JSON", any(f.get("error"
 check("serve did NOT reply to the notification", not any(f.get("id") is None and "result" in f for f in frames))
 check("serve ran the tools/call (id 2) and normalised", any(f.get("id") == 2 and f["result"]["structuredContent"]["normalized"] == "ACME" for f in frames))
 
-# ── audit trail — MCP tool calls join the shared AgentLog ─────────────────────
+# ── audit trail — MCP tool calls join the shared AgentLog ───────────────────────
 # Every other engine entry point records to agents.AgentLog; until 2026-08-04
 # a tool call arriving over MCP left no trace in the trail the rest of the
 # system treats as mandatory. These pin the wiring: every outcome path writes

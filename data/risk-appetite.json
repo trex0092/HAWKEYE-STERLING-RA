@@ -73,7 +73,7 @@
       "kris": ["KRI-04"],
       "owner": "MLRO / DPO",
       "residual_ceiling": 6,
-      "risks": ["R-06"],
+      "risks": ["R-06", "R-21"],
       "escalation_sla": "Same business day to the MLRO and the DPO; the affected path is gated OFF before the escalation, not after it."
     },
     {

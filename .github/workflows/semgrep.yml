@@ -29,7 +29,7 @@ jobs:
         # — the registry serving the p/javascript + p/security-audit rulesets
         # used by the advisory step (which is continue-on-error, so a missing
         # endpoint there would degrade silently: keep semgrep.dev listed).
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -41,6 +41,7 @@ jobs:
             pypi.org:443
             files.pythonhosted.org:443
             semgrep.dev:443
+            *.githubapp.com:443
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

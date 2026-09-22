@@ -36,7 +36,7 @@ jobs:
         # Egress = GitHub (checkout) + GHCR and its blob storage for the
         # pinned base image. Nothing else — the build is COPY-only and the
         # assertions run against localhost.
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -45,6 +45,7 @@ jobs:
             api.github.com:443
             ghcr.io:443
             pkg-containers.githubusercontent.com:443
+            *.githubapp.com:443
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

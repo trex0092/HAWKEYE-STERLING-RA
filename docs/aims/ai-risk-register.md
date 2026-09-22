@@ -41,13 +41,14 @@ Inherent = before controls; Residual = with the controls in the row operating.
 | R-18 | **Lack of explainability** — an output or score cannot be explained or justified to an examiner | 3 | 3 | 🟡 9 Medium | Deterministic rule engine with per-hit reason evidence (raw evidence always shown beside conclusions); [explainability statement](../governance/explainability-statement-2026.md); model cards; per-response audit line; charter P9 "no score without methodology" CI-enforced (weekly eval + offline tests) | 1 | 3 | 🟢 3 Low | Accept · MLRO · annual |
 | R-19 | **Unauthorized AI access** — an unauthorized party invokes the AI system or reads its data | 3 | 4 | 🟡 12 Medium | Key-gated LLM path + `ADVISOR_ENABLED` kill switch; `APP_SHARED_TOKEN` gate on the data relays; RBAC completion gate; repository hardening (2FA, branch protection, least-privilege tokens — [checklist](../governance/github-repository-hardening.md)); function logging | 1 | 4 | 🟢 4 Low | Mitigate; periodic access review · firm · quarterly |
 | R-20 | **AI incident response gap** — an AI incident is not detected or responded to in time | 3 | 4 | 🟡 12 Medium | [AI incident runbook](../governance/ai-incident-runbook.md) + [postmortem template](../governance/incident-postmortem-template.md); runtime anomaly alarms with sustained-anomaly auto-escalation to a GitHub issue; freshness/degrade-loudly alerts; Asana alert routing | 2 | 4 | 🟡 8 Medium | **Mitigate: annual tabletop drill of the runbook** · MLRO · annual |
+| R-21 | **Shadow AI** — an operator pastes customer or CDD data into a public AI tool (ChatGPT, Gemini, Copilot, an AI feature inside another product) outside this system. *Business impact: personal data disclosed to a processor with no DPA and no confirmed transfer basis — PDPL breach notification, regulatory exposure, loss of confidentiality over CDD and screening material, and an STR's existence potentially disclosed (tipping-off).* | 4 | 4 | 🔴 16 High | [AUP §Third-party AI tools](../governance/ai-acceptable-use-policy.md) — unapproved by default, approved list is the [AI asset register](../governance/ai-asset-register.md), MLRO decision + DPA to add one; the Advisor exists as the sanctioned path so no task requires an unapproved tool; in-app AUP acknowledgement gate; no-egress default keeps the system itself off that path (R-06); awareness training | 3 | 4 | 🟡 12 Medium | **Mitigate: this is policy-only — there is NO technical enforcement** (no managed devices, no DLP). Residual stays Medium until the firm records periodic operator attestation against the approved-tool list · firm/MLRO · annual |
 
 ## Heat-map summary (residual position)
 
 | Impact ↓ / Likelihood → | 1 Rare | 2 Unlikely | 3 Possible |
 |---|---|---|---|
 | **5 Severe** | R-06, R-07 | R-03 | — |
-| **4 Major** | R-01, R-02, R-05, R-08, R-10, R-14, R-19 | R-16, R-20 | R-13, R-17 |
+| **4 Major** | R-01, R-02, R-05, R-08, R-10, R-14, R-19 | R-16, R-20 | R-13, R-17, R-21 |
 | **3 Moderate** | R-11, R-12, R-18 | R-09, R-15 | — |
 | **2 Minor** | — | R-04 | — |
 
@@ -56,9 +57,12 @@ Inherent = before controls; Residual = with the controls in the row operating.
 ## Top residual risks (for management attention)
 1. **R-13 (Medium 12)** — transaction-monitoring engine built but **inactive** pending a firm-provided feed.
 2. **R-17 (Medium 12)** — single-operator key-person dependency; closed by a BCP drill + a second trained operator.
-3. **R-03 (Medium 10)** — residual false-negative risk inherent to any screening; held down by recall design + four-eyes.
-4. **R-16 (Medium 8)** — regulatory drift; held down by the Regulatory Watch + quarterly review cadence.
-5. **R-20 (Medium 8)** — incident-response capability documented but **undrilled**; closed by the first tabletop exercise.
+3. **R-21 (Medium 12)** — shadow AI: the only row whose controls are **policy-only**. Every other
+   residual on this register is held down by something that runs; this one is held down by operator
+   discipline, and the register says so rather than scoring a document as an operating control.
+4. **R-03 (Medium 10)** — residual false-negative risk inherent to any screening; held down by recall design + four-eyes.
+5. **R-16 (Medium 8)** — regulatory drift; held down by the Regulatory Watch + quarterly review cadence.
+6. **R-20 (Medium 8)** — incident-response capability documented but **undrilled**; closed by the first tabletop exercise.
 
 All other residuals are **Low**, reduced by the hardening passes (formal bias test,
 PDPL assessment, runtime + coverage + adverse-media monitoring, delivery retry/dedup,
@@ -92,6 +96,7 @@ registers, mapped to this register's rows — coverage is complete:
 | AI-R08 | Third-party AI risk | Vendor manager | R-15 (+ R-06 vendor/DPA controls) |
 | AI-R09 | Regulatory non-compliance | Compliance | R-16 |
 | AI-R10 | AI incident response | AI governance lead | R-20 |
+| AI-R11 | Shadow AI — staff use of unsanctioned public AI tools on confidential data | Compliance / MLRO | R-21 |
 
 ## Auditor checkpoints
 

@@ -32,12 +32,15 @@
    from the pure logic below so test/sanctions-screen.test.mjs runs fully offline. */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs } from './asana-notify.mjs';
+import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
+  fitAsanaText, fitAsanaName } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
 import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
+import { checkFbi } from './fbi-check.mjs';
+import { pepListFromDataset, readJsonMaybeGz, PEP_LIST_NAME } from './pep-worldwide.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -179,7 +182,7 @@ const HIGH_BANDS = new Set(['critical', 'high', 'severe', 'elevated', 'red', 'am
 /* Enrichment signals (best-effort, network-bound) vs. the always-run local
    sanctions match. A standing match derived solely from these must NOT be cleared
    on a run where the lookup errored or was time-budget-skipped (see diffState). */
-const ENRICHMENT_LISTS = new Set(['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice']);
+const ENRICHMENT_LISTS = new Set(['Adverse media (Google News)', 'PEP (Wikidata)', 'Interpol Red Notice', 'FBI Wanted', PEP_LIST_NAME]);
 /* Locally-derived pseudo-lists (no external list behind them, re-evaluated on
    every run): they must be exempt from the "originating list did not load this
    run" carry-forward, or a MANUAL REVIEW flag could never clear even after the
@@ -320,6 +323,14 @@ export function normalizeHit(h) {
      (some external shapes use `confidence` as a score — handled above). */
   if (h.mechanism) out.mechanism = String(h.mechanism);
   if (typeof h.confidence === 'string' && num(h.confidence) === null) out.confidence = h.confidence;
+  /* Cleared-FP annotation must survive this rebuild or the demotion (and its
+     audit trail) silently vanishes between the matcher and the state. */
+  if (h.whitelisted) {
+    out.whitelisted = true;
+    if (h.clearedAt) out.clearedAt = String(h.clearedAt);
+    if (h.clearedBy) out.clearedBy = String(h.clearedBy);
+    if (h.clearedVia) out.clearedVia = String(h.clearedVia);
+  }
   /* A phonetic-only hit must stay visibly WEAK all the way to the case board —
      the flag travels in the hitName suffix (state/alert/case builders all
      render hitName) AND as a structured field. */
@@ -399,6 +410,69 @@ export function matchSignature(r) {
    matches to alert on, the cleared matches (informational), and the next state.
    Subjects that errored this run carry their prior state forward untouched —
    never wiped, never silently cleared. */
+/* ── Match classification: C / P / F / N ────────────────────────────────────
+   Structured adverse-media practice classifies every RESULT, not just the
+   subject: Confirmed / Partial / False / No match, with the subject's overall
+   decision taken as the highest severity present.
+
+   The load-bearing rule here is that automated screening can NEVER assign C.
+   "Confirmed" means the result has been verified to relate to THIS subject, and
+   a name match is not an identity match — UAE Federal Decree-Law No. 10 of 2025
+   Art. 16/18 and FATF R.26 put that determination on the MLRO under four-eyes,
+   which is why the daily screen already caps PEP-list hits at band medium and
+   never auto-decides. So the machine suggests P (something to verify) or N
+   (nothing found), and C arrives only from a human: an MLRO escalate
+   disposition, or an explicit override with a written rationale.
+
+   F is symmetrical: it comes from a human false-positive disposition, or from
+   the cleared-FP registry, which is itself a prior human clearance being cited.
+   Nothing is ever downgraded to F automatically on score alone. */
+export const MATCH_CLASSES = {
+  C: { code: 'C', label: 'Confirmed Match', rank: 3,
+    action: 'Escalate. Consider Enhanced Due Diligence. File SAR/STR if reasonable grounds for suspicion exist.' },
+  P: { code: 'P', label: 'Partial Match', rank: 2,
+    action: 'Conduct further verification. Consider Enhanced Due Diligence. Escalate to the Compliance Officer.' },
+  F: { code: 'F', label: 'False Match', rank: 1,
+    action: 'Document the reason for the false-match classification. No escalation required for this result.' },
+  N: { code: 'N', label: 'No Match', rank: 0,
+    action: 'Document and proceed. Retain the record as evidence that screening was conducted.' },
+};
+
+/* Classify ONE result. `disposition` is the MLRO's ticked case outcome
+   (parseDisposition in screening-cases.mjs) when one exists for this subject. */
+export function classifyHit(hit, { disposition = null, override = null } = {}) {
+  if (override && MATCH_CLASSES[override]) return MATCH_CLASSES[override].code;
+  if (disposition === 'escalate') return 'C';          // human confirmed
+  if (disposition === 'false-positive') return 'F';    // human cleared
+  if (hit && hit.whitelisted) return 'F';              // prior human clearance, cited
+  return hit ? 'P' : 'N';                              // never auto-C
+}
+
+/* The subject's overall decision: the HIGHEST severity across every result, so
+   one confirmed hit cannot be averaged away by a page of false matches. */
+export function overallClassification(hits, opts = {}) {
+  const codes = (hits || []).map(h => classifyHit(h, opts));
+  if (!codes.length) return 'N';
+  return codes.reduce((a, b) => (MATCH_CLASSES[b].rank > MATCH_CLASSES[a].rank ? b : a), 'N');
+}
+
+/* Read a screener's override back off the case card. The suggested decision is
+   always overridable, but ONLY with a written rationale — an override with no
+   reason is not a decision, it is an unexplained change to a screening outcome,
+   so it is refused and the suggestion stands. Mirrors parseDisposition: a
+   literal [x] tick, untouched [ ] template parses as null. */
+export function parseClassificationOverride(notes) {
+  const t = String(notes || '');
+  const m = t.match(/\[\s*x\s*\]\s*(confirmed|partial|false|no)\s*match\b[^\n]*/i);
+  if (!m) return null;
+  const code = { confirmed: 'C', partial: 'P', false: 'F', no: 'N' }[m[1].toLowerCase()];
+  const rationale = (t.match(/rationale\s*:\s*([^\n]+)/i) || [])[1];
+  const reason = String(rationale || '').trim();
+  if (!reason) return { code, rationale: '', accepted: false,
+    reason: 'override ignored — no written rationale supplied' };
+  return { code, rationale: reason.slice(0, 500), accepted: true, reason: '' };
+}
+
 /* Per-hit evidence detail persisted with the state and shipped in the results
    artifact: the matched designated name, score and the matcher's mechanism/
    confidence labels — what an MLRO needs on the case card to adjudicate
@@ -409,8 +483,92 @@ export function hitDetail(lists) {
     if (h.mechanism) d.mechanism = h.mechanism;
     if (h.confidence) d.confidence = h.confidence;
     if (h.carriedForward) d.carriedForward = true;
+    if (h.whitelisted) {
+      d.whitelisted = true;
+      if (h.clearedAt) d.clearedAt = h.clearedAt;
+      if (h.clearedBy) d.clearedBy = h.clearedBy;
+      if (h.clearedVia) d.clearedVia = h.clearedVia;
+    }
     return d;
   });
+}
+
+/* ── CLEARED-FALSE-POSITIVE REGISTRY (whitelist — demote, NEVER suppress) ────
+   An analyst-cleared match pair must stop opening a fresh case every day, but
+   nothing may vanish from the record: whitelisted hits stay on the report and
+   the state, ANNOTATED with the clearance, and only the case-opening severity
+   is demoted. Identity is PAIR-level — subject key + the exact designated
+   name + list that was reviewed — so a NEW or CHANGED designated name against
+   the same subject reactivates normally (built-in re-confirm on list change).
+   Entries come from two evidence-backed sources: the curated registry file
+   (four-eyes PR procedure) and '[x] false positive' dispositions ticked on
+   case cards (recorded by screening-cases.mjs with the case gid as evidence).
+   Kill switch: SCREEN_WHITELIST=0 disables the registry entirely. */
+export function whitelistKey(subjectKey, hitName, list) {
+  /* normalizeName folds case/diacritics but turns dots into spaces ("L.L.C."
+     → "L L C" vs "LLC") — collapsing whitespace afterwards makes the pair key
+     survive list-side punctuation churn without loosening the name itself. */
+  const hn = normalizeName(String(hitName || '')).replace(/\s+/g, '');
+  return String(subjectKey) + '::' + hn + '|' + String(list || '');
+}
+
+export function buildWhitelistMap(curatedEntries, casesState) {
+  const map = new Map();
+  for (const e of (Array.isArray(curatedEntries) ? curatedEntries : [])) {
+    if (!e || !e.subject_key || !e.hit_name || !e.list) continue;
+    map.set(whitelistKey(e.subject_key, e.hit_name, e.list),
+      { clearedAt: e.cleared_at || '', clearedBy: e.cleared_by || '', clearedVia: 'registry file' });
+  }
+  for (const [key, cs] of Object.entries(casesState || {})) {
+    const d = cs && cs.disposition;
+    if (!d || d.kind !== 'false-positive' || !Array.isArray(d.hits)) continue;
+    for (const p of d.hits) {
+      if (!p || !p.hitName || !p.list) continue;
+      map.set(whitelistKey(key, p.hitName, p.list),
+        { clearedAt: d.at || '', clearedBy: 'MLRO disposition', clearedVia: 'case ' + (d.caseGid || '?') });
+    }
+  }
+  return map;
+}
+
+export function applyWhitelist(subjectKey, hits, wlMap) {
+  let annotated = 0;
+  for (const h of (hits || [])) {
+    if (!h || !h.list || !h.hitName) continue;
+    const wl = wlMap && wlMap.get(whitelistKey(subjectKey, h.hitName, h.list));
+    if (!wl) continue;
+    h.whitelisted = true;
+    if (wl.clearedAt) h.clearedAt = wl.clearedAt;
+    if (wl.clearedBy) h.clearedBy = wl.clearedBy;
+    if (wl.clearedVia) h.clearedVia = wl.clearedVia;
+    annotated++;
+  }
+  return annotated;
+}
+
+/* ── SECOND OPINION (OFAC-API.com) — independent corroboration, additive-only.
+   Shape-tolerant parser: the exact response schema cannot be verified from
+   the dev sandbox (egress-blocked), so anything unrecognisable is returned as
+   'unavailable' with the reason — a lost second opinion, never a clear. */
+export function parseOfacApiResponse(d) {
+  if (!d || typeof d !== 'object') return { status: 'unavailable', error: 'empty/non-object response' };
+  const err = d.errorMessage || (typeof d.error === 'string' ? d.error : null)
+    || (String(d.status || '').toLowerCase() === 'error' ? (d.message || 'error status') : null);
+  if (err) return { status: 'unavailable', error: String(err).slice(0, 120) };
+  const results = Array.isArray(d.results) ? d.results
+    : (Array.isArray(d.matches) ? d.matches : (Array.isArray(d.cases) ? d.cases : null));
+  if (!results) return { status: 'unavailable', error: 'unrecognised response shape: ' + Object.keys(d).slice(0, 5).join(',') };
+  const entry = results[0] || {};
+  const matches = Array.isArray(entry.matches) ? entry.matches : (Array.isArray(entry.results) ? entry.results : []);
+  const matchCount = Number(entry.matchCount != null ? entry.matchCount : matches.length) || 0;
+  let topScore = null;
+  for (const m of matches) {
+    const sc = num(m && (m.score != null ? m.score : m.matchScore));
+    if (sc != null) topScore = Math.max(topScore ?? 0, sc);
+  }
+  return matchCount > 0
+    ? { status: 'corroborated', matchCount, ...(topScore != null ? { topScore } : {}) }
+    : { status: 'no-match', matchCount: 0 };
 }
 
 export function diffState(prevState, results, today, threshold, screenedLists, evaluatedSignals) {
@@ -473,10 +631,30 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
          match" alert and (b) silently rewrite the standing record, dropping the
          PEP/media evidence over a mere lookup failure. Carry it forward; a later
          run with working enrichment updates it legitimately. */
-      if (r.enrichmentIncomplete && prior && Array.isArray(prior.lists)) {
+      if (prior && Array.isArray(prior.lists)) {
+        /* A prior enrichment signal is NOT re-verified this run when its lookup
+           errored / was budget-skipped (enrichmentIncomplete), its MODULE was
+           off this run (evaluated omits it — the same epistemic state the
+           clear-branch guards at ~632, previously missing on THIS still-match
+           branch, so flipping SCREEN_PEP=0 silently erased every standing PEP
+           from the book), OR its coverage was narrowed (unverified, e.g. a
+           budgeted adverse-media rotation that did not sweep the originating
+           edition). Carry it forward and keep the stronger prior band it drove;
+           recall-safe — only ADDS carry-forwards and only RAISES the band. */
+        const unv = Array.isArray(r.unverified) ? new Set(r.unverified) : null;
         const have = new Set(lists.map(h => h.list).filter(Boolean));
+        let carried = false;
         for (const l of prior.lists) {
-          if (ENRICHMENT_LISTS.has(l) && !have.has(l)) { lists = lists.concat([{ list: l, carriedForward: true }]); have.add(l); }
+          const notReverified = r.enrichmentIncomplete
+            || (evaluated && !evaluated.has(l))
+            || (unv && unv.has(l));
+          if (ENRICHMENT_LISTS.has(l) && !have.has(l) && notReverified) {
+            lists = lists.concat([{ list: l, carriedForward: true }]); have.add(l); carried = true;
+          }
+        }
+        if (carried && (BAND_RANK[prior.band] || 0) > (BAND_RANK[band] || 0)) {
+          band = prior.band;
+          recommendation = prior.recommendation || recommendation;
         }
       }
       const sig = matchSignature({ band, recommendation, lists });
@@ -494,6 +672,14 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
            records simply lack these fields — renderers fall back. */
         gid: r.gid, entityType: r.entityType, parent: r.parent, role: r.role,
         hits: hitDetail(lists),
+        /* Report-only row: every hit is a cleared-FP pair — the case engine
+           opens no case; the report keeps the row, annotated. RECOMPUTED after
+           the carry-forward merges above, never copied from r: the flag was
+           decided against THIS run's whitelisted hits, so a record that also
+           carries un-re-verified adverse-media/PEP evidence (carried entries
+           bear no `whitelisted` flag) would otherwise stay report-only and the
+           MLRO would never see a case for a live signal. */
+        ...(r.whitelistedOnly && lists.every(h => h && h.whitelisted) ? { whitelistedOnly: true } : {}),
         signature: sig, firstSeen, lastSeen: today
       };
       if (!prior || prior.signature !== sig) {
@@ -533,6 +719,18 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
       // one run and auto-completed their cases.
       if (evaluated && Array.isArray(prior.lists)
           && prior.lists.some(l => ENRICHMENT_LISTS.has(l) && !evaluated.has(l))) {
+        carryForward(r.key);
+        continue;
+      }
+      // A prior enrichment signal whose coverage was NARROWED this run (a
+      // budgeted adverse-media rotation that did not sweep the originating
+      // edition, or a disclosed-partial sweep) was not actually re-checked —
+      // same epistemic state as errored, but the signal's module DID run so
+      // neither the enrichmentIncomplete nor the module-off guard fires. Carry
+      // the standing match forward; it clears only on a full-coverage re-sweep
+      // or an MLRO disposition, never off a rotation that never looked.
+      if (Array.isArray(r.unverified) && r.unverified.length && Array.isArray(prior.lists)
+          && prior.lists.some(l => ENRICHMENT_LISTS.has(l) && r.unverified.includes(l))) {
         carryForward(r.key);
         continue;
       }
@@ -847,19 +1045,41 @@ async function asanaGet(url, token, timeoutMs = 30000) {
   }
 }
 
-async function fetchAsanaSubjects(projectGid, token) {
-  const tasks = [];
+/* Walk every page of an Asana collection. The page cap is a runaway guard, NOT
+   a size limit: exhausting it means the project is bigger than we read, and a
+   short read of the Customer Database is a silent false negative — the unread
+   tail screens as "no match" because it was never screened at all. So the cap
+   THROWS. Callers turn that into an unscreened-run bail, which is red and
+   visible; a quietly truncated customer list is neither. */
+export const ASANA_PAGE_CAP = Number(process.env.ASANA_PAGE_CAP) || 500;
+
+export async function asanaPaged(projectGid, path, optFields, token, what, { soft = false } = {}) {
+  const out = [];
   let offset = null, pages = 0;
-  do {
-    const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + '/tasks');
-    u.searchParams.set('opt_fields', 'name,completed,notes');
+  for (;;) {
+    const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + path);
+    u.searchParams.set('opt_fields', optFields);
     u.searchParams.set('limit', '100');
     if (offset) u.searchParams.set('offset', offset);
     const json = await asanaGet(u, token);
-    for (const t of (json.data || [])) tasks.push(t);
+    for (const t of (json.data || [])) out.push(t);
     offset = json.next_page && json.next_page.offset;
-  } while (offset && ++pages < 500);
-  return parseSubjects(tasks);
+    if (!offset) return out;
+    if (++pages >= ASANA_PAGE_CAP) {
+      const msg = what + ': read ' + out.length + ' record(s) over ' + pages
+        + ' pages and Asana still reports more — the page cap (' + ASANA_PAGE_CAP
+        + ') was hit, so this read is INCOMPLETE. Raise ASANA_PAGE_CAP.';
+      /* `soft` is for the dedup scan ONLY, where a short read risks a duplicate
+         card and a hard failure risks no card at all — and losing an alert is
+         worse than a rare duplicate. Every other caller gets the throw. */
+      if (soft) { console.error('sanctions-screen: ' + msg + ' Continuing on the partial read — a duplicate card is possible.'); return out; }
+      throw new Error(msg + ' Refusing to treat a partial project as the whole of it.');
+    }
+  }
+}
+
+async function fetchAsanaSubjects(projectGid, token) {
+  return parseSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
 }
 
 /* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
@@ -890,12 +1110,13 @@ async function asanaPost(path, body, token, timeoutMs = 30000) {
    the daily run self-provision the Ongoing Monitoring sections — no manual setup,
    idempotent (a name that already exists is reused). */
 async function ensureSection(projectGid, name, token) {
-  const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + '/sections');
-  u.searchParams.set('opt_fields', 'name');
-  u.searchParams.set('limit', '100');
-  const json = await asanaGet(u, token);
+  /* PAGINATED. A single limit=100 read stops at the 100th section, so an
+     existing column past that point reads as absent and this function creates
+     a DUPLICATE of it — cards then land in a new column nobody watches, which
+     is how #305 was lost the first time. */
+  const sections = await asanaPaged(projectGid, '/sections', 'name', token, 'Asana sections in project ' + projectGid);
   const want = String(name).trim().toLowerCase();
-  const found = (json.data || []).find(s => String(s.name || '').trim().toLowerCase() === want);
+  const found = sections.find(s => String(s.name || '').trim().toLowerCase() === want);
   if (found) return found.gid;
   const created = await asanaPost('/projects/' + projectGid + '/sections', { name }, token);
   return created.data && created.data.gid;
@@ -903,18 +1124,8 @@ async function ensureSection(projectGid, name, token) {
 
 /* All task names in a project (paginated) — used for same-day dedup. */
 async function fetchTaskNames(projectGid, token) {
-  const names = [];
-  let offset = null, pages = 0;
-  do {
-    const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + '/tasks');
-    u.searchParams.set('opt_fields', 'name');
-    u.searchParams.set('limit', '100');
-    if (offset) u.searchParams.set('offset', offset);
-    const json = await asanaGet(u, token);
-    for (const t of (json.data || [])) names.push(String(t.name || ''));
-    offset = json.next_page && json.next_page.offset;
-  } while (offset && ++pages < 500);
-  return names;
+  const tasks = await asanaPaged(projectGid, '/tasks', 'name', token, 'Asana project ' + projectGid + ' (dedup scan)', { soft: true });
+  return tasks.map(t => String(t.name || ''));
 }
 
 /* Same-day dedup for the Adverse Media / PEP card — DIRECTION-AWARE.
@@ -946,7 +1157,10 @@ export function omCardToSkip(names, dateStr, hasHits) {
 /* Create a task in the Ongoing Monitoring project and file it under its section.
    Returns the task permalink (or null). Filing under the section is non-fatal. */
 async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
-  const data = { name: String(name).slice(0, 250), notes: String(notes).slice(0, 60000), projects: [projectGid] };
+  /* Byte-capped, not character-capped. Asana measures BYTES; the 60,000-CHAR
+     cut here was the same bug that lost the screening digest — this card now
+     carries multilingual PEP names too, and those cost 2-3 bytes each. */
+  const data = { name: fitAsanaName(name), notes: fitAsanaText(notes), projects: [projectGid] };
   if (due) data.due_on = due;
   if (OM_ASSIGNEE) data.assignee = OM_ASSIGNEE;
   const d = await asanaPost('/tasks', data, token);
@@ -998,6 +1212,83 @@ async function postOngoingMonitoringTask(subjects, screen, alerts, today, cfg, t
   }
 }
 
+/* Dotted-path lookup ("meta.totalItems", "data") for the paginated JSON reader. */
+export function getByPath(obj, path) {
+  return String(path || '').split('.').filter(Boolean)
+    .reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+
+/* Fetch every page of a JSON list API that paginates by size/offset, merging the
+   rows under one key so the source's normal parser walks them unchanged. Opt-in
+   per source via `source.paginate`; sources without it are untouched. The offset
+   advances by the ACTUAL rows returned (not the requested size), so it collects
+   the full list whether the server honours the size hint or caps the page.
+
+   No truncation by configuration: when the server reports a total, the crawl
+   AUTO-EXTENDS past the configured maxPages to fetch every row — a register
+   that grows never silently thins. maxPages bounds only feeds that report no
+   total (an unverifiable endless feed), and PAGINATE_HARD_CAP bounds even a
+   hostile/buggy reported total. Hitting either bound short of the list logs
+   LOUDLY and the coverage floor flags the partial. */
+export const PAGINATE_HARD_CAP = 2000;   // absolute runaway guard, not a coverage policy
+export const PAGINATE_EMPTY_RETRIES = 2; // a mid-crawl empty page is retried before it counts as exhaustion
+export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = '') {
+  const sizeParam = pg.sizeParam || 'size';
+  const offsetParam = pg.offsetParam || 'offset';
+  const size = Math.max(1, Number(pg.size) || 200);
+  const dataPath = pg.dataPath || 'data';
+  const maxPages = Math.max(1, Number(pg.maxPages) || 30);
+  const all = [];
+  let offset = 0, total = null, page = 0, cap = maxPages, emptyTries = 0;
+  for (; page < cap; page++) {
+    const u = new URL(url);
+    u.searchParams.set(sizeParam, String(size));
+    u.searchParams.set(offsetParam, String(offset));
+    const r = await fetch(u.href, { signal, redirect: 'follow', headers });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' (page ' + page + ')');
+    const json = JSON.parse(await r.text());
+    if (total == null && pg.totalPath) { const t = Number(getByPath(json, pg.totalPath)); if (Number.isFinite(t)) total = t; }
+    const rows = getByPath(json, dataPath);
+    const arr = Array.isArray(rows) ? rows : [];
+    if (!arr.length) {
+      /* An empty page BEFORE the server's own reported total is a mid-crawl
+         gateway blip (a throttled 200 with no rows), not exhaustion — retry the
+         same offset before believing it, or a flaky page silently truncates the
+         register. */
+      if (Number.isFinite(total) && offset < total && emptyTries < PAGINATE_EMPTY_RETRIES) {
+        emptyTries++;
+        page--;                                   // a retry is not a new page
+        await new Promise(res => setTimeout(res, 500 * emptyTries));
+        continue;
+      }
+      break;                                      // exhausted, or exhaustion is unknowable
+    }
+    emptyTries = 0;
+    all.push(...arr);
+    offset += arr.length;                         // step by ACTUAL page length — robust to any server page size
+    if (Number.isFinite(total)) {
+      if (offset >= total) break;
+      // Extend to what the reported total actually needs at the observed page
+      // size — the configured maxPages is a floor, never a truncation.
+      cap = Math.min(PAGINATE_HARD_CAP, Math.max(cap, page + 1 + Math.ceil((total - offset) / arr.length)));
+    }
+  }
+  /* Partiality is a FACT, never an inference left to the count floor. A crawl
+     that ends short of the server's own total THROWS, so loadSanctionsLists
+     takes its failure branch (note + degraded coverage) and diffState carries
+     standing matches forward — instead of a half-loaded register passing as a
+     clean load and clearing real matches whenever the partial still cleared
+     minNames. */
+  if (Number.isFinite(total) && offset < total) {
+    throw new Error('pagination stopped at ' + all.length + ' of ' + total + ' rows ('
+      + (page >= cap ? 'page cap ' + cap : 'empty page at offset ' + offset) + ') — partial list refused');
+  }
+  if (page >= cap && !Number.isFinite(total)) {
+    console.warn(`  ${sourceId || 'paginated source'}: pagination hit the ${cap}-page cap and the feed reports no total (${all.length} rows) — coverage may be PARTIAL, the coverage floor is the only gate`);
+  }
+  return JSON.stringify({ [dataPath]: all });
+}
+
 /* Fetch one consolidated list — a remote URL, or an in-repo curated file
    (source.file, e.g. the UAE EOCN list). Returns the raw body or throws. */
 async function fetchListBody(source, timeoutMs = 60000) {
@@ -1014,13 +1305,47 @@ async function fetchListBody(source, timeoutMs = 60000) {
   /* XLSX sources (e.g. Australia DFAT) are binary ZIP containers — read the raw
      bytes as a Buffer; reading them as text would corrupt the archive. Text lists
      (CSV/XML) stay on the string path the parsers expect. */
-  const binary = /^(xlsx|dfat)$/.test(String(source.parser || '').toLowerCase())
-    || String(source.type || '').toLowerCase() === 'xlsx'
-    || /\.xlsx(\?|$)/i.test(parsed.href);
+  const binary = /^(xlsx|dfat|ods)$/.test(String(source.parser || '').toLowerCase())
+    || /^(xlsx|ods)$/.test(String(source.type || '').toLowerCase())
+    || /\.(xlsx|ods)(\?|$)/i.test(parsed.href);
+  /* Per-source browser headers: several national endpoints answer the plain
+     screening UA with a challenge page or an empty body while serving the
+     real list to a browser-shaped request (2026-08-05 probe: BCB, NBCTF,
+     Qatar NCTC verified end-to-end WITH these headers). Opt-in per source —
+     the honest default identifies the fetcher. */
+  const headers = source.browserHeaders
+    ? {
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.9,*/*;q=0.8',
+      'accept-language': 'en-US,en;q=0.9',
+    }
+    : { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' };
+  /* Paginated JSON APIs (e.g. ADB's debarment register serves 10 rows/page and
+     its own `next` link points at an unreachable internal host, so we page by
+     size/offset on the public URL). Only sources that opt in via `paginate`
+     take this path; every other source keeps the single-GET behaviour below. */
+  if (source.paginate && !binary) {
+    /* A small-page API (ADB caps size at 10) needs many sequential requests, so
+       the paginated fetch gets a budget scaled to the page cap — ~1.5s/page,
+       floored at the normal timeout and capped at 5 min — instead of the
+       single-GET timeout that would abort a long crawl mid-list. Headroom is
+       deliberate: the crawl auto-extends past maxPages when the server-reported
+       total demands it (a grown register must fetch fully, never truncate). */
+    const pages = Number(source.paginate.maxPages) || 30;
+    const pagTimeout = Math.min(300000, Math.max(timeoutMs, pages * 1500));
+    return withTimeout((signal) => fetchPaginatedJson(parsed.href, headers, source.paginate, signal, source.id), pagTimeout);
+  }
   return withTimeout(async (signal) => {
-    const r = await fetch(parsed.href, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
+    const r = await fetch(parsed.href, { signal, redirect: 'follow', headers });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    return binary ? Buffer.from(await r.arrayBuffer()) : await r.text();
+    if (binary) return Buffer.from(await r.arrayBuffer());
+    /* Legacy registries still serve legacy encodings — Mexico SAT's 69-B CSV
+       is latin-1, and decoding it as UTF-8 corrupts every accented name
+       BEFORE matching (looks green, misses matches). Per-source opt-in. */
+    if (typeof source.charset === 'string' && source.charset) {
+      return new TextDecoder(source.charset).decode(await r.arrayBuffer());
+    }
+    return await r.text();
   }, timeoutMs);
 }
 
@@ -1083,7 +1408,9 @@ export function belowFloor(source, names) {
 /* Fetch + parse every enabled source into [{ id, name, names[] }]. A source that
    fails to fetch or yields zero names degrades coverage (reported, never a silent
    all-clear); a curated list with no entries degrades too. */
-async function loadSanctionsLists(cfg) {
+/* Exported for scripts/batch-screen.mjs (ad-hoc name screening) — same
+   loader, same coverage-honesty contract. */
+export async function loadSanctionsLists(cfg) {
   let sources;
   try { sources = loadSources(readFileSync(cfg.sourcesFile, 'utf8')).filter(s => s.enabled !== false); }
   catch (e) { return { lists: [], degraded: true, fetched: 0, total: 0, notes: ['sources file unreadable: ' + (e && e.message || e)] }; }
@@ -1143,6 +1470,18 @@ async function loadSanctionsLists(cfg) {
   return { lists, degraded: fetched < sources.length, fetched, total: sources.length, notes };
 }
 
+/* Enrichment fairness: rotate an array by a day-derived offset. The enrichment
+   phase processes subjects in order under a wall-clock budget, so a stable
+   order would starve the SAME tail subjects of adverse-media/PEP on every
+   budget-tripped run; a daily rotation makes any skipped slice a different
+   one each day. Pure for tests; callers restore report order afterwards. */
+export function rotateByDay(arr, day = Math.floor(Date.now() / 86400000)) {
+  const n = arr.length;
+  if (!n) return arr.slice();
+  const off = ((day % n) + n) % n;
+  return arr.map((_, i) => arr[(i + off) % n]);
+}
+
 /* Run an async fn over items with bounded concurrency (keeps the per-subject
    adverse-media / PEP lookups polite). */
 async function mapLimit(items, limit, fn) {
@@ -1181,7 +1520,7 @@ async function screenLocally(subjects, cfg) {
      and report it, but it does NOT degrade the sanctions screen or weaken its
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
-  let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, enrichSkipped = 0;
+  let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
      bound the whole enrichment phase by a wall-clock budget: once it elapses the
@@ -1205,7 +1544,11 @@ async function screenLocally(subjects, cfg) {
         + Math.round(mu.rss / 1048576) + 'MB heap ' + Math.round(mu.heapUsed / 1048576) + 'MB');
     }
   };
-  const results = await mapLimit(subjects, cfg.concurrency, async (s) => {
+  /* Daily-rotated processing order (enrichment fairness — see rotateByDay);
+     results are re-sorted to the input order below so reports/state stay
+     stable regardless of the day's rotation. */
+  const rotatedSubjects = rotateByDay(subjects);
+  const results = await mapLimit(rotatedSubjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr, phonMode);   // { name, topScore, band, recommendation, hitCount, lists[] }
     const sbRow = shadowBandRow(raw, shadowThr, cfg.threshold);
     if (sbRow) {
@@ -1220,6 +1563,13 @@ async function screenLocally(subjects, cfg) {
       }
     }
     const lists = [...raw.lists];
+    /* Cleared-FP registry: annotate matcher hits whose exact subject+designated-
+       name+list pair an analyst already cleared. Runs BEFORE enrichment merges,
+       so enrichment findings (adverse media / PEP / Interpol) can never be
+       whitelisted away. Annotation only — severity is recomputed below. */
+    if (cfg.whitelistMap && cfg.whitelistMap.size && lists.length) {
+      applyWhitelist(s.key, lists, cfg.whitelistMap);
+    }
     let band = raw.lists.length ? raw.band : '';
     let topScore = raw.lists.length ? raw.topScore : 0;
     const enrich = Date.now() < enrichDeadline;
@@ -1227,13 +1577,29 @@ async function screenLocally(subjects, cfg) {
     // run (errored or budget-skipped) so diffState won't silently clear a standing
     // enrichment-only match it couldn't re-verify.
     let enrichmentIncomplete = false;
-    if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol)) { enrichSkipped++; enrichmentIncomplete = true; }
+    /* Per-SIGNAL "not re-verified this run" set — finer than the coarse
+       enrichmentIncomplete flag. Adverse media sweeps a budgeted locale
+       rotation by default, so on a day its originating regional edition was
+       not swept a standing adverse-media hit was not actually re-checked;
+       flagging ONLY that signal carries its standing match forward without
+       freezing PEP/Interpol/FBI clears (which either ran or errored). */
+    const unverified = new Set();
+    if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol || cfg.fbi)) { enrichSkipped++; enrichmentIncomplete = true; }
 
     if (cfg.adverseMedia && enrich) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (am.partial) amPartial++;   // narrowed coverage — disclosed, never silent
       if (am.errored) { amErrors++; enrichmentIncomplete = true; }
-      else if (am.hit) {
+      else {
+        /* A disclosed-partial sweep (a queried edition failed) OR a budgeted
+           sweep that did not cover the full matrix did NOT re-verify a standing
+           adverse-media match — the originating edition may not have been
+           queried. Mark the signal unverified so diffState carries a standing
+           adverse-media hit forward instead of clearing it off coverage that
+           never looked. Recall-safe: carry-forward only, never suppresses. */
+        if (am.partial || am.fullMatrix === false) unverified.add('Adverse media (Google News)');
+      }
+      if (!am.errored && am.hit) {
         lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : '') + (am.tier === 'weak' ? ' [weak-tier — generic terms only, corroboration needed]' : ''), score: am.score });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
@@ -1255,33 +1621,70 @@ async function screenLocally(subjects, cfg) {
         band = strongerBand(band, ip.band); topScore = Math.max(topScore, ip.score);
       }
     }
+    if (cfg.fbi && enrich) {
+      const fb = await checkFbi(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (fb.errored) { fbiErrors++; enrichmentIncomplete = true; }
+      else if (fb.hit) {
+        lists.push({ list: 'FBI Wanted', hitName: ((fb.match && fb.match.title || '') + ' [' + (fb.match && fb.match.classification || 'wanted') + ']').slice(0, 180), score: fb.score });
+        band = strongerBand(band, fb.band); topScore = Math.max(topScore, fb.score);
+      }
+    }
+    /* Worldwide PEP list (Wikidata harvest, local index — instant, never
+       budget-gated). A PEP-list hit is a REVIEW-tier finding, never a
+       sanctions designation: band caps at medium and the recommendation
+       stays 'review' because hasSanctions reads only the sanctions match. */
+    if (cfg.pepIndex) {
+      const pw = screenName(s.name, cfg.pepIndex, thr, phonMode);
+      for (const h of pw.lists) {
+        const ctx = cfg.pepMeta && cfg.pepMeta.get(h.hitName);
+        const detail = ctx ? (h.hitName + ' — ' + [ctx.position, ctx.country].filter(Boolean).join(', ')
+          + (ctx.current ? '' : ' (former, within the PEP recency window)')) : h.hitName;
+        lists.push({ list: h.list, hitName: detail.slice(0, 180), score: h.score });
+      }
+      if (pw.lists.length) { band = strongerBand(band, 'medium'); topScore = Math.max(topScore, Math.min(pw.topScore, 89)); }
+    }
 
     /* screenName's recommendation distinguishes real designation hits
        ('sanctions-match') from a not-auto-screenable subject ('review', with
        the MANUAL REVIEW pseudo-list) — the latter must surface as a reviewable
        finding, never be promoted to a sanctions match nor demoted to clear. */
-    const hasSanctions = raw.recommendation === 'sanctions-match';
+    /* Every remaining hit cleared by the registry ⇒ demote the ROW (medium /
+       review — the weakOnly precedent), keep every hit visible + annotated,
+       and flag the record so the case engine opens no fresh case. A single
+       non-whitelisted hit (incl. any enrichment finding) restores full
+       severity — demote-never-suppress, pair-level only. */
+    const whitelistedOnly = lists.length > 0 && lists.every(h => h.whitelisted);
+    const hasSanctions = raw.recommendation === 'sanctions-match' && !whitelistedOnly;
     const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
     const merged = {
       name: s.name,
       topScore: lists.length ? topScore : raw.topScore,
-      band: lists.length ? band : 'low',
+      band: lists.length ? (whitelistedOnly ? 'medium' : band) : 'low',
       recommendation,
       hitCount: lists.length,
       lists
     };
     const nr = normalizeResult(merged, s);
     nr.enrichmentIncomplete = enrichmentIncomplete;
+    if (unverified.size) nr.unverified = [...unverified];
+    if (whitelistedOnly) nr.whitelistedOnly = true;
     heartbeat();
     return nr;
   });
+  /* Restore the input order — the rotation exists only for enrichment fairness,
+     and every downstream consumer (reports, state diff) sees a stable order. */
+  {
+    const pos = new Map(subjects.map((s, i) => [s.key, i]));
+    results.sort((a, b) => (pos.get(a.key) ?? 0) - (pos.get(b.key) ?? 0));
+  }
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
   if (amPartial) console.log('sanctions-screen: adverse-media coverage was PARTIAL for ' + amPartial + ' subject(s) — some locales/GDELT did not answer (disclosed in the digest)');
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
+  if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, pepErrors, interpolErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -1336,15 +1739,87 @@ async function main() {
     adverseMedia: process.env.SCREEN_ADVERSE_MEDIA !== '0',   // default on
     pep: process.env.SCREEN_PEP !== '0',                      // default on
     interpol: process.env.SCREEN_INTERPOL === '1',            // default OFF (opt-in; verify the public API on the runner before enabling)
+    fbi: process.env.SCREEN_FBI === '1',                      // default OFF (opt-in; same contract as Interpol — verify on the runner before enabling)
     listTimeoutMs: Number(process.env.SCREEN_LIST_TIMEOUT_MS) || 60000,
     checkTimeoutMs: Number(process.env.SCREEN_CHECK_TIMEOUT_MS) || 12000,
     concurrency: Number(process.env.SCREEN_CONCURRENCY) || 8,
     /* Wall-clock budget for the best-effort enrichment phase (adverse-media/PEP).
        Sanctions matching is always run for every subject; once this elapses the
        remaining subjects skip enrichment so the job never approaches its timeout.
-       Default 12 min leaves headroom under the 20-min job timeout. */
-    enrichBudgetMs: Number(process.env.SCREEN_ENRICH_BUDGET_MS) || 720000
+       Default 90 min: sized so the FULL customer base (~858 subjects at ~5s each)
+       gets adverse-media/PEP every run — the 12-min default left the same ~720
+       tail subjects skipped daily. Headroom under the 120-min job timeout; the
+       per-subject request rate is unchanged (same concurrency, same budgeted
+       locale rotation), only the phase runs longer. */
+    enrichBudgetMs: Number(process.env.SCREEN_ENRICH_BUDGET_MS) || 5400000,
+    /* Cleared-FP registry (whitelist): default ON — an empty registry is a
+       no-op, and the kill switch exists for incident response. */
+    whitelist: process.env.SCREEN_WHITELIST !== '0',
+    whitelistFile: process.env.SCREEN_WHITELIST_FILE || 'data/screening-whitelist.json',
+    casesStateFile: process.env.CASES_STATE_FILE || 'data/screening-cases-state.json',
+    /* OFAC-API second opinion: default OFF (opt-in — third-party transfer;
+       record the processor in the third-party register before enabling). */
+    secondOpinion: process.env.OFACAPI === '1' && !!process.env.OFAC_API_KEY,
+    secondOpinionCap: Number(process.env.OFACAPI_CAP) || 25,
+    secondOpinionTimeoutMs: Number(process.env.OFACAPI_TIMEOUT_MS) || 15000
   };
+  if (process.env.OFACAPI === '1' && !process.env.OFAC_API_KEY) {
+    console.warn('sanctions-screen: OFACAPI=1 but OFAC_API_KEY is missing — second opinion OFF');
+  }
+  /* Build the cleared-FP map from BOTH evidence-backed sources: the curated
+     registry file and the '[x] false positive' dispositions the case manager
+     recorded (screening-cases state, overlaid from the screen-state branch
+     before this step). Fail-soft: an unreadable file means an empty registry
+     (severity can only go UP from a registry failure, never down). */
+  if (cfg.whitelist) {
+    let curated = [];
+    try {
+      const wlf = JSON.parse(readFileSync(cfg.whitelistFile, 'utf8'));
+      curated = Array.isArray(wlf.entries) ? wlf.entries : [];
+    } catch { /* absent/unreadable registry file = empty registry */ }
+    let casesState = {};
+    try { casesState = JSON.parse(readFileSync(cfg.casesStateFile, 'utf8')) || {}; }
+    catch { /* no cases state yet */ }
+    cfg.whitelistMap = buildWhitelistMap(curated, casesState);
+    if (cfg.whitelistMap.size) {
+      console.log('sanctions-screen: cleared-FP registry active — ' + cfg.whitelistMap.size
+        + ' pair(s) (' + curated.length + ' curated + case dispositions); matching hits are DEMOTED with the clearance cited, never removed');
+    }
+  }
+  /* Worldwide PEP list (Wikidata harvest artifact, overlaid from the
+     pep-worldwide-state branch). Optional layer: absent file = layer off,
+     logged, never degraded sanctions coverage — but once loaded its name
+     enters evaluatedSignals so standing PEP-list matches are protected on
+     runs where the artifact is missing (never silently cleared). */
+  if (process.env.SCREEN_PEP_LIST !== '0') {
+    const pepFile = process.env.PEP_WORLDWIDE_FILE || 'data/pep-worldwide.json';
+    try {
+      /* gzip-or-plain: the artifact is compressed (~135MB of multilingual
+         aliases would otherwise breach GitHub's 100MB push limit). */
+      const pep = pepListFromDataset(readJsonMaybeGz(pepFile));
+      if (pep.count > 0 && pep.list.names.length) {
+        cfg.pepIndex = buildIndex([pep.list]);
+        cfg.pepMeta = pep.meta;
+        console.log('sanctions-screen: worldwide PEP list active — ' + pep.count + ' persons ('
+          + pep.list.names.length + ' names incl. multilingual aliases; harvested ' + (pep.harvested || 'unknown') + ')');
+        /* Degrade loudly: a mid-harvest artifact covers only part of the world's
+           office-holders, so a PEP not yet harvested yields NO hit. Absence of a
+           match is not evidence a subject is not a PEP, and the run log must say
+           so rather than let partial coverage read as a clean screen. */
+        if (pep.partial) {
+          console.log('sanctions-screen: ⚠ worldwide PEP list is PARTIAL — ' + pep.count + ' of '
+            + pep.expected + ' persons harvested (' + Math.round(100 * pep.count / pep.expected)
+            + '%). A PEP not yet harvested produces NO hit: absence of a PEP-list match is NOT'
+            + ' evidence the subject is not a PEP. Treat PEP-list clears as provisional until the'
+            + ' harvest completes; the per-name Wikidata PEP signal still runs on every subject.');
+        }
+      } else {
+        console.log('sanctions-screen: worldwide PEP list file present but empty — layer off this run');
+      }
+    } catch {
+      console.log('sanctions-screen: no worldwide PEP list artifact (' + pepFile + ') — harvest pending; the per-name Wikidata PEP signal still runs');
+    }
+  }
   const asanaToken = process.env.ASANA_ACCESS_TOKEN || '';
 
   if (!asanaToken) return bailUnscreened('ASANA_ACCESS_TOKEN not set — cannot read the Customer Database', today);
@@ -1385,6 +1860,8 @@ async function main() {
     cfg.adverseMedia ? 'Adverse media (Google News)' : null,
     cfg.pep ? 'PEP (Wikidata)' : null,
     cfg.interpol ? 'Interpol Red Notice' : null,
+    cfg.fbi ? 'FBI Wanted' : null,
+    cfg.pepIndex ? PEP_LIST_NAME : null,
   ].filter(Boolean);
   const { alerts, cleared, notScreened, matchCount, nextState } =
     diffState(prevState, screen.results, today, cfg.threshold, screenedLists, evaluatedSignals);
@@ -1392,6 +1869,47 @@ async function main() {
     console.log(`sanctions-screen: ${notScreened.length} standing match(es) left the screened population — `
       + 'cases HELD for manual disposition, not auto-cleared: '
       + notScreened.map(n => n.name || n.key).join(', '));
+  }
+
+  /* SECOND OPINION (OFAC-API) — independent corroboration on the NEW/CHANGED
+     matches only (bounded by OFACAPI_CAP, so a list-update day cannot burn the
+     plan). ADDITIVE-ONLY by design: the verdict is attached to the state
+     record (→ rendered on the case card), never merged into lists/band/
+     recommendation/signature — an external engine can corroborate or visibly
+     DISAGREE, but can never downgrade, clear, or re-alert a hit. A failed
+     lookup is disclosed on the card as a lost signal, never read as a clear. */
+  if (cfg.secondOpinion && alerts.length) {
+    let soOk = 0, soFail = 0;
+    for (const a of alerts.slice(0, cfg.secondOpinionCap)) {
+      const rec = nextState.subjects[a.key];
+      if (!rec) continue;
+      let parsed;
+      try {
+        const resp = await withTimeout((signal) => fetch('https://api.ofac-api.com/v4/screen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: process.env.OFAC_API_KEY,
+            minScore: 80,
+            sources: ['SDN', 'NONSDN', 'UN', 'UK', 'EU'],
+            cases: [{ name: a.name }]
+          }),
+          signal
+        }), cfg.secondOpinionTimeoutMs);
+        parsed = (resp && resp.ok) ? parseOfacApiResponse(await resp.json())
+          : { status: 'unavailable', error: 'http ' + (resp ? resp.status : 'no-response') };
+      } catch (e) {
+        parsed = { status: 'unavailable', error: String(e && e.message || e).slice(0, 120) };
+      }
+      rec.secondOpinion = { provider: 'OFAC-API', checkedAt: today, ...parsed };
+      if (parsed.status === 'unavailable') soFail++; else soOk++;
+    }
+    if (alerts.length > cfg.secondOpinionCap) {
+      console.log('sanctions-screen: second opinion capped at ' + cfg.secondOpinionCap + ' of '
+        + alerts.length + ' new/changed matches this run (OFACAPI_CAP)');
+    }
+    console.log('sanctions-screen: second opinion (OFAC-API) attached to ' + (soOk + soFail)
+      + ' case record(s) — ' + soOk + ' answered, ' + soFail + ' unavailable (disclosed on the card)');
   }
   /* What ACTUALLY loaded (with partial-alias flags) + what failed — feeds the
      coverage-honesty lines in the report/alert instead of the fixed scope claim. */

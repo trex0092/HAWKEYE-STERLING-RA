@@ -22,7 +22,7 @@ jobs:
       - name: Harden the runner (egress block)
         # Tests run fully offline; the only egress is the toolchain download
         # (setup-node from nodejs.org, setup-python from the github release mirror).
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -32,6 +32,7 @@ jobs:
             codeload.github.com:443
             objects.githubusercontent.com:443
             nodejs.org:443
+            *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -42,6 +43,8 @@ jobs:
         run: node test/app.test.js
       - name: Run brand guardrail (former entity name must never reappear)
         run: node test/brand-guard.test.mjs
+      - name: Run workflow-hardening ratchet (SHA pins, harden-runner, timeouts, egress rationale)
+        run: node test/workflow-hardening.test.mjs
       - name: Run scoring model-validation golden set
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
@@ -62,12 +65,16 @@ jobs:
         run: node test/changelog.test.mjs
       - name: Run FATF watchdog unit tests
         run: node test/watchdog.test.mjs
+      - name: Run trading daily report unit tests
+        run: node test/trading-daily-report.test.mjs
       - name: Run daily-brief unit tests
         run: node test/daily-brief.test.mjs
       - name: Run governance-report unit tests
         run: node test/governance-report.test.mjs
       - name: Run board-figure drift guard (committed figures match the live estate)
         run: node test/board-figures.test.mjs
+      - name: Run delivery-watchdog unit tests
+        run: node test/delivery-watchdog.test.mjs
       - name: Run weekly-summary unit tests
         run: node test/weekly-summary.test.mjs
       - name: Run screening-cases unit tests
@@ -90,6 +97,8 @@ jobs:
         run: node test/state-crypto.test.mjs
       - name: Run sanctions-screen unit tests
         run: node test/sanctions-screen.test.mjs
+      - name: Run employee-screening-wiring regression test
+        run: node test/employee-screening-wiring.test.mjs
       - name: Run sanctions matcher unit tests
         run: node test/sanctions-match.test.mjs
       - name: Run sanctions matcher property/fuzz tests
@@ -281,7 +290,7 @@ jobs:
         # (checkout), nodejs.org for setup-node on a toolchain-cache miss,
         # PyPI for the hash-locked hypothesis install, and the npm registry
         # for the lockfile-pinned fast-check toolchain.
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block

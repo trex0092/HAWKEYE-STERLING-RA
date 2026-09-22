@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 15 # bound external list fetches
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -47,6 +47,7 @@ jobs:
             www.fatf-gafi.org:443
             web.archive.org:443
             archive.org:443
+            *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # No credentials on disk (zizmor artipacked): the state push below
@@ -74,6 +75,15 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           MODE: ${{ inputs.mode || 'check' }}
+          # ADDED 2026-09-16: scripts/fatf-watchdog.mjs reads
+          # ASANA_FATF_SECTION_GID (falling back to "Assessment Report",
+          # 1216203370612916, when unset), but this step never set it. The
+          # repo variable existed but held a STALE value (1216203873114461)
+          # from an earlier Asana reorganization that no longer existed --
+          # corrected in the same pass, both here and in the repo variable
+          # itself. The real "FATF list moves" section, 1218451989290544, was
+          # verified directly against the live Asana API.
+          ASANA_FATF_SECTION_GID: ${{ vars.ASANA_FATF_SECTION_GID || '1218451989290544' }}
         run: node scripts/fatf-watchdog.mjs "$MODE"
       - name: Monthly review digest
         # Idempotent monthly digest — self-skips once this month's "Reviews due"

@@ -41,6 +41,8 @@ kyc = _load("kyc")
 txn_monitor = _load("txn_monitor")
 monitoring = _load("monitoring")
 screen = _load("screen")
+tfs_dossier = _load("tfs_dossier")
+subject_report = _load("subject_report")
 
 _fail = []
 def check(name, cond):
@@ -1013,6 +1015,25 @@ _ml = [
 ]
 _ml_ok = all(exp in screen.match_adverse_keywords(t) for t, exp in _ml)
 check("worldwide multilingual flagging across Greek/Hebrew/Thai/Polish/Vietnamese/Bulgarian/Tamil", _ml_ok)
+# High-risk-region expansion (2026-08-05): Central Asia & Caucasus, South & SE
+# Asia, Africa, Balkans & Baltics — native ML/TF/sanction predicates flag.
+_ml2 = [
+    ("Нұрлан ақшаны жылыстату ісінде", "money laundering"),        # Kazakh
+    ("კომპანია ფულის გათეთრებაში", "money laundering"),            # Georgian
+    ("ընկերությունը մեղադրվում է փողերի լվացում գործում", "money laundering"),      # Armenian
+    ("Kompania akuzohet për pastrim parash", "money laundering"),  # Albanian
+    ("Tvrtka optužena za pranje novca", "money laundering"),       # Croatian
+    ("Pinigų plovimas: įmonė kaltinama", "money laundering"),        # Lithuanian
+    ("Shirkad lagu eedeeyay dhaqidda lacagta", "money laundering"),# Somali
+    ("ኩባንያ በሽብርተኝነት ተጠርጥሯል", "terrorism"),                        # Amharic
+    ("ကုမ္ပဏီ ငွေကြေးခဝါချမှု", "money laundering"),               # Burmese
+    ("ក្រុមហ៊ុន ការសម្អាតប្រាក់", "money laundering"),              # Khmer
+]
+check("high-risk-region multilingual flagging (Kazakh/Georgian/Armenian/Albanian/Croatian/Lithuanian/Somali/Amharic/Burmese/Khmer)",
+      all(exp in screen.match_adverse_keywords(t) for t, exp in _ml2))
+check("the worldwide expansion lifted the language + locale counts",
+      screen.ADVERSE_LANG_COUNT >= 55 and len(screen.GNEWS_LOCALES) >= 80
+      and all(k in screen.LANG_KEYWORDS for k in ("az", "kk", "ka", "hy", "sq", "hr", "lt", "so", "am", "my", "km")))
 # Foreign Latin terms are whole words, so both edges are anchored — a bare
 # prefix collided with unrelated English (regression: 'mito'chondria flagged
 # bribery via Serbian 'mito', 'preso'rted flagged arrest via Portuguese 'preso').
@@ -1026,6 +1047,45 @@ check("ADVERSE_LOCALES accepts 'all' → full matrix",
       screen._resolve_locale_count("all", len(screen.GNEWS_LOCALES)) == len(screen.GNEWS_LOCALES)
       and screen._resolve_locale_count("5", 74) == 5 and screen._resolve_locale_count("bogus", 74) == 5)
 check("GDELT risk-term cluster is broad (global predicate coverage)", len(screen.GDELT_RISK_TERMS) >= 20)
+# parse_gdelt used to scan only articles[:max_results*3] (24 of the 250 now
+# fetched): an adverse headline ranked 25th or later was never keyword-scanned.
+_gd_deep = screen.parse_gdelt({"articles": (
+    [{"title": f"Neutral company update {i}", "domain": "x.com", "seendate": "20260801T000000Z"} for i in range(60)]
+    + [{"title": "Firm charged in money laundering probe", "domain": "reuters.com", "seendate": "20260801T000000Z"}])})
+# OFAC's non-SDN programmes (SSI/FSE/NS-MBS/CAPTA/NS-PLC) ship in a SEPARATE
+# file the JS engine has always screened; a party listed only there was on no
+# list the Python engine loaded and screened CLEAR. Namespaced tags are matched
+# on their LOCAL name — a literal find("lastName") returns None against OFAC's
+# default namespace and would zero the whole list silently.
+_ofac_cons_xml = (
+    '<sdnList xmlns="http://tempuri.org/sdnList.xsd"><publshInformation>'
+    '<Publish_Date>08/06/2026</Publish_Date></publshInformation>'
+    '<sdnEntry><uid>1</uid><firstName>Ivan</firstName><lastName>Testov</lastName>'
+    '<akaList><aka><type>a.k.a.</type><lastName>TESTOV TRADING</lastName></aka></akaList>'
+    '</sdnEntry>'
+    '<sdnEntry><uid>2</uid><lastName>SSI Bank OJSC</lastName></sdnEntry></sdnList>')
+_oc_names, _oc_date, _oc_hash = screen.parse_ofac_consolidated(_ofac_cons_xml.encode())
+check("OFAC Consolidated (non-SDN) parses namespaced entries: person, entity and alias",
+      {"Ivan Testov", "TESTOV TRADING", "SSI Bank OJSC"} <= _oc_names and _oc_date == "08/06/2026")
+check("OFAC Consolidated: an unreachable or garbled body degrades to unavailable, never raises",
+      screen.parse_ofac_consolidated(b"")[1] == "unavailable"
+      and screen.parse_ofac_consolidated(b"<not-xml")[1] == "unavailable")
+check("OFAC Consolidated is loaded on BOTH list-building paths (a source only one path loads is the recurring defect)",
+      open("screen.py", encoding="utf-8").read().count("load_ofac_consolidated(all_lists, list_meta)") >= 2)
+
+# Non-Latin diacritic folding: tl is only .lower()-ed, so a Cyrillic ё/е variant
+# or an all-caps Greek headline that drops the tonos silently lost its hit.
+check("non-Latin keywords fold diacritics — Russian ё/е and Greek tonos variants still flag",
+      bool(screen.match_adverse_keywords("Компания осужден за отмывание денег"))
+      and bool(screen.match_adverse_keywords("ΑΠΑΤΗ ΣΤΗΝ ΕΤΑΙΡΕΙΑ")))
+
+check("GDELT: every fetched record is keyword-scanned — an adverse headline ranked 61st is still flagged",
+      any(a["flagged"] for a in _gd_deep))
+check("GDELT: flagged articles rank first so the parser's own bound never drops adverse evidence",
+      _gd_deep[0]["flagged"] is True)
+
+check("GDELT fetches at the API maximum page (250) — maximum worldwide recall (JS parity)",
+      "maxrecords=250" in screen.GDELT_URL and screen._gdelt_maxrec() == 250)
 
 _gd = screen.parse_gdelt({"articles": [
     {"title": "X Trading fined for sanctions evasion", "domain": "example.com",
@@ -1036,6 +1096,42 @@ _gd = screen.parse_gdelt({"articles": [
 check("GDELT parse emits the standard shape, flags risk, skips blank titles",
       len(_gd) == 2 and _gd[0]["flagged"] and not _gd[1]["flagged"]
       and _gd[0]["source"] == "example.com" and _gd[0]["ts"] and _gd[0]["date"] == "2026-06-30")
+
+# A 200 is not proof GDELT answered. It serves plain text when it rejects a
+# query and HTML when it is overloaded; r.json() raising on those is correct,
+# and the caller counts the raise as a GDELT failure. The trap is a 200 that IS
+# valid JSON but carries no articles list — read as an empty result set, that
+# is a clean sweep of the global index which never happened. JS parity:
+# parseGdelt returns null for the same bodies (test/adverse-media.test.mjs).
+import json as _json
+class _Resp:
+    def __init__(self, body, status=200):
+        self.status_code, self.content = status, body.encode()
+    def json(self):
+        return _json.loads(self.content.decode())
+
+_orig_gate, _orig_req_get = screen._GDELT_GATE.wait, screen.requests.get
+screen._GDELT_GATE.wait = lambda: None
+def _gdelt_reply(body, status=200):
+    screen.requests.get = lambda *_a, **_k: _Resp(body, status)
+    try:
+        return screen.search_gdelt("Subject"), None
+    except Exception as e:                                  # noqa: BLE001 — the point is that it raises
+        return None, str(e)
+
+_env_out, _env_err = _gdelt_reply('{"status":"error"}')
+check("GDELT: a 200 error envelope RAISES — never scored as zero adverse results",
+      _env_out is None and "articles" in (_env_err or ""))
+_html_out, _html_err = _gdelt_reply("<html><body>Service Unavailable</body></html>")
+check("GDELT: a 200 HTML error page raises rather than clearing the subject",
+      _html_out is None and _html_err)
+_zero_out, _zero_err = _gdelt_reply('{"articles":[]}')
+check("GDELT: a genuine zero-result reply still means zero results",
+      _zero_out == [] and _zero_err is None)
+_empty_out, _empty_err = _gdelt_reply("")
+check("GDELT: an empty body is GDELT's own zero-result shape, not a failure",
+      _empty_out == [] and _empty_err is None)
+screen._GDELT_GATE.wait, screen.requests.get = _orig_gate, _orig_req_get
 
 _ev = os.path.join(_tf.mkdtemp(), "evidence.json")
 def _find(title, day):
@@ -1259,6 +1355,27 @@ check("bing parse emits the standard shape, flags risk, skips blank titles",
       and _bg[0]["date"] == "2026-06-30" and _bg[0]["url"] == "https://ex/1")
 check("bing parse is safe on empty payloads", screen.parse_bing_news(b"") == [])
 
+# Well-formedness is not proof of an answer. A throttle interstitial that
+# happens to parse has no <item>, and the locale used to score as swept-and-
+# clean — a subject cleared on coverage that never ran. Absence of the feed
+# ENVELOPE is the failure signal; the callers' except turns the raise into a
+# counted degrade. JS parity: parseRss returns null for the same bodies.
+_screen_src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "screen.py"), encoding="utf-8").read()
+def _feed_refused(payload):
+    try:
+        screen.parse_bing_news(payload)
+        return False
+    except ValueError:
+        return True
+check("news feeds: a parseable non-feed document RAISES — never an empty result set",
+      _feed_refused(b"<html><body>Before you continue</body></html>")
+      and _feed_refused(b"<error><code>429</code></error>"))
+check("news feeds: a genuine but empty feed is still zero results, not a failure",
+      screen.parse_bing_news(b"<rss><channel><title>q</title></channel></rss>") == [])
+check("news feeds: the envelope guard is wired into BOTH news fetchers",
+      "require_feed_root(safe_xml_fromstring(data)" in _screen_src
+      and "require_feed_root(safe_xml_fromstring(r.content)" in _screen_src)
+
 # Third-net coverage semantics: Google News refused + GDELT down + Bing alive
 # ⇒ the subject IS covered — no am_error raise, Bing's articles are kept.
 _reset_breaker()
@@ -1414,7 +1531,8 @@ _src_legacy = _inspect.getsource(screen.main)
 for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
     check(f"{_pname} path wires the OFAC mirror fallback", "us_ofac_sdn" in _psrc)
     check(f"{_pname} path wires the UN mirror fallback", "un_sc_sanctions" in _psrc)
-    check(f"{_pname} path wires the UK mirror fallback", "gb_hmt_sanctions" in _psrc)
+    check(f"{_pname} path loads the UK list via load_uk_list (UK Sanctions List first)",
+          "load_uk_list()" in _psrc and "gb_hmt_sanctions" not in _psrc)
     check(f"{_pname} path wires the EU official-XML fallback", "_eu_official_fallback" in _psrc)
     check(f"{_pname} path folds OFAC aliases only when the mirror did not serve",
           "_fold_ofac_aliases" in _psrc
@@ -2326,6 +2444,8 @@ class _CaseResp:
     @staticmethod
     def json(): return {"data": {"gid": "1"}}
 def _rec_case(method, url, **kw):
+    if "/addProject" in url:      # board attach after a create: not a case itself
+        return _CaseResp()
     _case_names.append(((kw.get("json") or {}).get("data") or {}).get("name", ""))
     return _CaseResp()
 _mk_match = lambda excl: [{"name": "Acme", "permalink": "p", "gid": "g", "hits": [
@@ -2859,10 +2979,19 @@ finally:
 check("legacy daily post failure arms the delivery gate (no more green no-delivery)",
       _armed_daily)
 
-# The UNIFIED poster must multi-home into every MLRO queue. The 2026-07-29
-# proof run delivered to Ongoing Monitoring only: _mlro_queue_targets() existed
-# and both LEGACY posters used it, but the unified path — the one the daily
-# workflow actually takes — still hardcoded a single queue. Pin the payload.
+# The UNIFIED poster must multi-home into every CONFIGURED MLRO queue. The
+# 2026-07-29 proof run delivered to Ongoing Monitoring only: _mlro_queue_targets()
+# existed and both LEGACY posters used it, but the unified path (the one the
+# daily workflow actually takes) still hardcoded a single queue. Pin the payload.
+#
+# #518 (2026-09-15) retired ASANA_FOLLOWUPS_GID's default (the separate "Follow
+# Ups" project was merged into HAWKEYE STERLING APP and deleted, same as
+# ASANA_ONGOING_MON_GID's old target), so it is now EMPTY unless a repo secret/
+# var configures a genuinely separate queue again (exercised by the
+# "queue targets without Follow Ups" check right below this one). This test's
+# job is unchanged: prove post_unified_task actually RESPECTS a configured
+# second queue end to end rather than hardcoding a single one, so it configures
+# one explicitly instead of relying on what used to be the default.
 _posted = []
 def _record_post(method, url, **kw):
     _posted.append(kw.get("json"))
@@ -2873,17 +3002,21 @@ def _record_post(method, url, **kw):
         def json(): return {"data": {"gid": "1"}}
     return _R()
 screen.asana_request = _record_post
+_orig_fu2, _orig_fu_sec2 = screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID
 try:
+    screen.ASANA_FOLLOWUPS_GID = "9999999999999991"
+    screen.ASANA_FOLLOWUPS_SECTION_GID = "9999999999999992"
     screen.post_unified_task("narrative", _dt.datetime(2026, 7, 29, 9, 0), [], [], [])
 finally:
     screen.asana_request = _orig_asana_request
+    screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID = _orig_fu2, _orig_fu_sec2
 _data = (_posted[0] or {}).get("data", {}) if _posted else {}
-check("unified daily task is multi-homed into BOTH MLRO queues (projects)",
+check("unified daily task is multi-homed into BOTH MLRO queues when a second one is configured (projects)",
       set(_data.get("projects", [])) ==
-      {screen.ASANA_ONGOING_MON_GID, screen.ASANA_FOLLOWUPS_GID})
+      {screen.ASANA_ONGOING_MON_GID, "9999999999999991"})
 _mem = {m.get("project"): m.get("section") for m in _data.get("memberships", [])}
-check("unified daily task lands in the Follow Ups delivery section",
-      _mem.get(screen.ASANA_FOLLOWUPS_GID) == screen.ASANA_FOLLOWUPS_SECTION_GID
+check("unified daily task lands in the configured second queue's delivery section",
+      _mem.get("9999999999999991") == "9999999999999992"
       and _mem.get(screen.ASANA_ONGOING_MON_GID) == screen.ASANA_SECTION_GID)
 # _mlro_queue_targets directly: dropping the Follow Ups queue must collapse the
 # multi-homing to the single Ongoing Monitoring membership, never an empty one.
@@ -2973,10 +3106,49 @@ check("§② ADVERSE MEDIA reaches Asana with its findings when rebuild is wired
       and "[body truncated" not in _shrunk_notes)
 check("delivered notes keep the sign-off tail and the task name carries the date",
       "RETENTION: retain 10 years" in _shrunk_notes
-      and _posted_shrink[0]["data"]["name"].startswith("🛡️ ⚠️ Daily Screening")
+      and _posted_shrink[0]["data"]["name"].startswith("Daily AML/CFT Screening Report — ACTION REQUIRED")
       and _posted_shrink[0]["data"]["due_on"] == "2026-08-05")
 check("CONTROL: without rebuild the old middle-truncation loses §②'s findings",
       "[body truncated" in _legacy_notes and "[!] Cust 0 probed for money laundering" not in _legacy_notes)
+# REAL-SHAPE REGRESSION (observed live 2026-08-10). The synthetic fixture above
+# is ASCII, and ASCII costs 1 byte per character in Asana's worst-case rich-text
+# accounting. Production names are Turkish and Arabic, which cost 7-8 each, so
+# §① was ~4x more expensive per subject than the fixture implied and overflowed
+# even at the deepest rung. cap_notes then head-truncated and BOTH §② ADVERSE
+# MEDIA and §③ PEP were deleted from the delivered card while the header still
+# read "145 adverse-media subject(s)". The shrink chain capped depth INSIDE §①
+# subjects and the item counts of §②/§③, but never the NUMBER of §① subjects —
+# it shrank the victims, not the cause. These pin the `matches` cap.
+_ar_matches = [{"name": f"شركة الذهب {i} KIYMETLİ MADENLER TİCARET ANONİM ŞİRKETİ",
+                "permalink": f"https://app.asana.com/0/x/{i}",
+                "risk": {"rating": "HIGH", "factors": ["Inherent sector risk: precious metals / DPMS",
+                                                       "Potential sanctions match (3)"],
+                         "edd": "Enhanced Due Diligence + senior sign-off; review every 6 months"},
+                "hits": [{"subject_type": "ENTITY",
+                          "subject_name": f"شركة الذهب {i}",
+                          "list": "UN Consolidated",
+                          "matched_entry": f"مُدرج {i}-{j} ANONİM ŞİRKETİ",
+                          "score": 90 - (j % 8), "confidence": "WEAK"} for j in range(12)]}
+               for i in range(45)]          # production's population, production's alphabet
+_ar_narr = screen.build_unified_narrative(_ar_matches, [], _big_adverse, _big_pep,
+                                          _meta_deg, _stats_big, _dt.datetime(2026, 8, 10))
+check("real-shape fixture is oversized the way production was",
+      screen._asana_notes_size(_ar_narr) > screen.ASANA_NOTES_MAX)
+check("non-Latin names really do cost multiples of their character count",
+      screen._asana_notes_size("شركة الذهب") > 4 * len("شركة الذهب"))
+_ar_deep = screen.build_unified_narrative(_ar_matches, [], _big_adverse, _big_pep,
+                                          _meta_deg, _stats_big, _dt.datetime(2026, 8, 10),
+                                          caps=screen.NARRATIVE_SHRINK_RUNGS[-1])
+check("deepest rung now bounds §① too, so the body fits without the head-truncation backstop",
+      screen._asana_notes_size(_ar_deep) <= screen.ASANA_NOTES_MAX)
+check("§② ADVERSE MEDIA and §③ PEP survive the real-shape shrink with their findings",
+      "②  ADVERSE MEDIA" in _ar_deep and "③  PEP" in _ar_deep
+      and "[!] Cust 0 probed for money laundering" in _ar_deep and "Person 0" in _ar_deep)
+check("the §① cut is disclosed with accurate arithmetic, not silent",
+      f"+{45 - screen.NARRATIVE_SHRINK_RUNGS[-1]['matches']} further sanctions subject(s)" in _ar_deep)
+check("an uncapped rung still itemises every sanctions subject (default unchanged)",
+      "further sanctions subject(s)" not in _ar_narr)
+
 # The evidence-log failure must surface in §², not just the run log.
 _stats_evid = {**_stats_big, "adverse_evidence_error": "git push failed (exit 128)"}
 _narr_evid = screen.build_unified_narrative([], [], _big_adverse[:1], [], _meta_deg,
@@ -3191,6 +3363,284 @@ finally:
     screen.create_case_subtask = _orig_create_case
     screen.CASE_SUBTASK_CAP = _orig_cap
 
+# ── coverage make-up decision + enrichment rotation (spread-across-the-day) ──
+print("\nmonitoring.py — coverage make-up decision")
+import tempfile
+_mkdir = tempfile.mkdtemp()
+_mk = lambda: os.path.join(_mkdir, f"metrics-{len(os.listdir(_mkdir))}.json")
+_p = _mk()   # no file at all — coverage unverifiable
+d = monitoring.makeup_decision("2026-08-05", path=_p)
+check("absent metrics file → sweep (degrade loudly, never silent all-clear)",
+      d["sweep"] is True and d["uncovered"] is None)
+_p = _mk(); json.dump([{"date": "2026-08-04", "counts": {"am_errors": 0}}], open(_p, "w"))
+check("yesterday-only history → sweep (no snapshot for today)",
+      monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
+_p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 0, "pep_errors": 0}}], open(_p, "w"))
+d = monitoring.makeup_decision("2026-08-05", path=_p)
+check("clean today → no sweep", d["sweep"] is False and d["uncovered"] == 0)
+_p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 110, "pep_errors": 0}}], open(_p, "w"))
+d = monitoring.makeup_decision("2026-08-05", path=_p)
+check("news coverage lost today → sweep with honest count",
+      d["sweep"] is True and d["uncovered"] == 110 and "news coverage" in d["reason"])
+_p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 0, "pep_errors": 3}}], open(_p, "w"))
+check("PEP-only loss also sweeps",
+      monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
+_p = _mk(); json.dump({"not": "a list"}, open(_p, "w"))
+check("malformed history → sweep, never a silent all-clear",
+      monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
+
+print("\nscreen.py — enrichment rotation")
+check("empty/singleton book never rotates",
+      screen.enrichment_rotation(0, 739_101) == 0 and screen.enrichment_rotation(1, 739_101) == 0)
+check("deterministic (same day, same book → same offset)",
+      screen.enrichment_rotation(858, 739_101) == screen.enrichment_rotation(858, 739_101))
+check("offset stays in range across book sizes and days",
+      all(0 <= screen.enrichment_rotation(n, day) < n
+          for n in (2, 67, 131, 858, 904) for day in (739_101, 739_102, 739_465)))
+check("consecutive days land far apart (prime stride, not +1)",
+      abs(screen.enrichment_rotation(858, 739_102) - screen.enrichment_rotation(858, 739_101)) not in (0, 1))
+check("same-day make-up pass starts in different territory",
+      screen.enrichment_rotation(858, 739_101, retry_pass=True) != screen.enrichment_rotation(858, 739_101))
+check("stride guard: a 131-subject book still rotates day to day",
+      screen.enrichment_rotation(131, 739_101) != screen.enrichment_rotation(131, 739_102))
+check("offset guard: a 67-subject book still gets a distinct make-up start",
+      screen.enrichment_rotation(67, 739_101, retry_pass=True) != screen.enrichment_rotation(67, 739_101))
+
+# ── CPF / proliferation-financing coverage (query + flag + typology) ──────────
+print("\nscreen.py — CPF / proliferation-financing coverage")
+check("English PF headline flags on the new canonical",
+      "export control" in screen.adverse_keywords_for("Trader fined for export control violations"))
+check("PF canonicals bucket to Sanctions / Proliferation",
+      "Sanctions / Proliferation" in screen.typology_for(["export control"])
+      and "Sanctions / Proliferation" in screen.typology_for(["proliferation financing"]))
+check("Arabic proliferation-financing headline maps to its canonical",
+      "proliferation financing" in screen.adverse_keywords_for("تحقيق في تمويل الانتشار لشركة تجارية"))
+check("the English news QUERY now asks for PF terms (was flag-only)",
+      all(t in screen.RISK_QUERY for t in ("proliferation", "export control", "dual-use", "sanctions evasion")))
+check("the Arabic news QUERY carries the CPF terms",
+      "تمويل الانتشار" in screen.AR_RISK_QUERY and "أسلحة الدمار الشامل" in screen.AR_RISK_QUERY)
+
+# ── FraudLabs support signal (opt-in, PDPL-gated, never a verdict) ────────────
+print("\nscreen.py — FraudLabs support signal")
+check("gate is OFF by default (no env, no key)", screen.FRAUDLABS is False)
+check("explicit Email: line wins",
+      screen.extract_customer_email("Country: AE\nEmail: kyc@dealer.example\nother@x.example")
+      == "kyc@dealer.example")
+check("falls back to first email-shaped token",
+      screen.extract_customer_email("contact person other@x.example later") == "other@x.example")
+check("no email in note → '' (signal idle, never invented)",
+      screen.extract_customer_email("Country: AE\nReg No: 123") == "")
+_req_mod = sys.modules["requests"]
+_orig_post = getattr(_req_mod, "post", None)
+try:
+    _req_mod.post = lambda *a, **k: None
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("no transport → available=False with reason (lost, not clear)",
+          s["available"] is False and "http" in s["error"])
+    class _R:
+        status_code = 200
+        def __init__(self, d): self._d = d
+        def json(self): return self._d
+    _req_mod.post = lambda *a, **k: _R({"fraudlabspro_score": 72, "fraudlabspro_status": "REVIEW",
+                                        "is_disposable_email": True, "is_free_email": False})
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("recognised response parses score/status/flags",
+          s["available"] and s["score"] == 72 and s["status"] == "REVIEW"
+          and s["flags"] == ["is_disposable_email"])
+    check("REVIEW status is material", screen.fraudlabs_material(s) is True)
+    _req_mod.post = lambda *a, **k: _R({"unexpected": "shape"})
+    s = screen.fraudlabs_email_signal("x@y.example")
+    check("unrecognised response shape → disclosed, not guessed",
+          s["available"] is False and "unrecognised" in s["error"])
+    check("unavailable signal is never material", screen.fraudlabs_material(s) is False)
+    check("low score, no flags → not material",
+          screen.fraudlabs_material({"available": True, "score": 12, "status": "APPROVE",
+                                     "flags": []}) is False)
+    check("disposable-email flag alone is material",
+          screen.fraudlabs_material({"available": True, "score": None, "status": "",
+                                     "flags": ["is_disposable_email"]}) is True)
+finally:
+    _req_mod.post = _orig_post
+
+# ── delivery-deadline budget (09:00 UAE target) ───────────────────────────────
+print("\nscreen.py — delivery-deadline budget")
+import calendar as _cal
+_mk_ts = lambda h, m: _cal.timegm((2026, 8, 5, h, m, 0, 0, 0, 0))
+check("run before the target gets a deadline = target minus reserve",
+      screen.enrichment_deadline_ts(_mk_ts(3, 30), "05:00", 20) == _mk_ts(4, 40))
+check("run after the budgeted cutoff gets NO deadline (deliver ASAP, full coverage)",
+      screen.enrichment_deadline_ts(_mk_ts(5, 30), "05:00", 20) is None
+      and screen.enrichment_deadline_ts(_mk_ts(4, 45), "05:00", 20) is None)
+check("no target / unparseable target = feature off, never a crash",
+      screen.enrichment_deadline_ts(_mk_ts(3, 0), "", 20) is None
+      and screen.enrichment_deadline_ts(_mk_ts(3, 0), "nonsense", 20) is None)
+_p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 0, "am_skipped": 40}}], open(_p, "w"))
+d = monitoring.makeup_decision("2026-08-05", path=_p)
+check("deadline-deferred subjects trigger the same-day make-up sweep",
+      d["sweep"] is True and d["uncovered"] == 40 and "deferred" in d["reason"])
+
+# ── Regulator-bulletin net + identity cross-check ─────────────────────────────
+print("\nscreen.py — regulator bulletins & identity cross-check")
+check("significant tokens drop corporate boilerplate",
+      screen._sig_tokens("ACME Gold Trading L.L.C") == ["acme"]
+      and screen._sig_tokens("Bullion Street Gold Trading LLC") == ["bullion", "street"])
+_rb_items = [
+    {"title": "SEC charges Bullion Street operators", "source": "US SEC — Litigation Releases",
+     "date": "05 Aug 2026", "url": "u1", "text": "sec charges bullion street gold operators with fraud"},
+    {"title": "Unrelated action", "source": "US SEC", "date": "05 Aug 2026", "url": "u2",
+     "text": "unrelated enforcement matter"}]
+_rb_subj = [("COMPANY", "Bullion Street Gold Trading LLC", None, {}),
+            ("INDIVIDUAL", "Li Wei", None, {})]
+_rb = screen.screen_regulator_bulletins(_rb_subj, _rb_items)
+check("bulletin naming the subject → strong-tier Enforcement/Legal finding",
+      len(_rb.get("Bullion Street Gold Trading LLC", [])) == 1
+      and _rb["Bullion Street Gold Trading LLC"][0]["tier"] == "strong"
+      and _rb["Bullion Street Gold Trading LLC"][0]["regulator_bulletin"] is True)
+check("single-significant-token names are excluded from containment matching",
+      "Li Wei" not in _rb)
+check("absent config file → net not configured, never a crash",
+      screen.fetch_regulator_bulletins(path="/nonexistent.json") == ([], []))
+
+# PER-SOURCE User-Agent. Both SEC feeds have returned 403 on every run since at
+# least 9 Aug; SEC.gov refuses a caller that does not declare itself and a
+# contact point. The override is per-source ON PURPOSE — six of the eight feeds
+# work with the default UA, and changing it globally could push a WORKING feed
+# into 403, which would be a recall regression.
+_saved_contact = screen.REGULATOR_UA_CONTACT
+screen.REGULATOR_UA_CONTACT = ""
+_ua_plain, _unconf = screen._regulator_ua({"name": "x"})
+check("a source with no ua override keeps the default User-Agent",
+      _ua_plain == screen.REGULATOR_UA_DEFAULT and _unconf is False)
+_ua_ph, _unconf = screen._regulator_ua({"ua": "Hawkeye/3.0 (+https://example.test; {contact})"})
+check("an unprovisioned contact is STRIPPED, never sent as a literal placeholder",
+      "{contact}" not in _ua_ph and _unconf is True)
+check("and the stripped UA still identifies the caller",
+      "Hawkeye/3.0" in _ua_ph)
+screen.REGULATOR_UA_CONTACT = "aml@example.test"
+_ua_ok, _unconf = screen._regulator_ua({"ua": "Hawkeye/3.0 (+https://example.test; {contact})"})
+check("a provisioned contact is substituted into the User-Agent",
+      _ua_ok == "Hawkeye/3.0 (+https://example.test; aml@example.test)" and _unconf is False)
+screen.REGULATOR_UA_CONTACT = _saved_contact
+
+# The shipped config must carry the override on the SEC feeds and ONLY those,
+# and must not commit a contact address.
+_rbcfg = json.load(open(os.path.join(ROOT, "data/regulator-bulletins.json"), encoding="utf-8"))
+_with_ua = [s["name"] for s in _rbcfg["sources"] if s.get("ua")]
+check("both SEC feeds carry a declared-caller User-Agent",
+      sum(1 for n in _with_ua if "SEC" in n) == 2)
+check("no other feed's User-Agent was changed", len(_with_ua) == 2)
+check("the committed config carries a placeholder, never a real contact address",
+      all("{contact}" in s["ua"] and "@" not in s["ua"].split("{contact}")[0]
+          for s in _rbcfg["sources"] if s.get("ua")))
+_ic_arts = [{"title": "Trader arrested in Dubai", "snippet": "linked to Marmara Gold Trading operations", "flagged": True},
+            {"title": "Man arrested abroad", "snippet": "no context at all", "flagged": True}]
+screen.annotate_identity_corroboration(_ic_arts, "Mahmoud Sultan",
+                                       "Marmara Gold Trading L.L.C", {"name": "Marmara Gold Trading L.L.C"})
+check("article mentioning the associated entity is identity-corroborated",
+      _ic_arts[0]["identity_corroborated"] is True and _ic_arts[0]["identity_context"])
+check("name-only article is labelled, NEVER suppressed (still flagged)",
+      _ic_arts[1]["identity_corroborated"] is False and _ic_arts[1]["flagged"] is True)
+
+# ── Follow-Ups card attestation (clean day completes, action day stays open) ──
+print("\nscreen.py — Follow-Ups attestation")
+check("gate is OFF by default (no FOLLOWUP_PROJECT_GID)", screen.FOLLOWUP_PROJECT_GID == "")
+check("clean day → complete", screen.followup_disposition({"sanctions": 0, "adverse": 0, "pep": 0}) == "complete")
+check("any finding → comment only, card stays open",
+      screen.followup_disposition({"sanctions": 0, "adverse": 2, "pep": 0}) == "comment"
+      and screen.followup_disposition({"sanctions": 1}) == "comment")
+check("missing delta counts as clean (zero findings), never as a block",
+      screen.followup_disposition({}) == "complete" and screen.followup_disposition(None) == "complete")
+_fc = screen.followup_comment_text("2026-08-05", {"sanctions": 1, "adverse": 0, "pep": 0}, "999")
+check("action-day comment demands the human acts and cites the report",
+      "require review" in _fc and "https://app.asana.com/0/0/999" in _fc)
+check("clean-day comment states the auto-completion as the attestation record",
+      "completed automatically" in screen.followup_comment_text("2026-08-05", {}, "999"))
+
+# ── TFS FFR/PNMR draft dossiers (draft-only, MLRO acts) ───────────────────────
+print("\ntfs_dossier.py — FFR/PNMR drafts")
+check("UN + EOCN list names are TFS; others are not",
+      tfs_dossier.is_tfs_list("UN Security Council — Consolidated list (XML)")
+      and tfs_dossier.is_tfs_list("UAE EOCN — Local Terrorist List")
+      and not tfs_dossier.is_tfs_list("US OFAC — SDN list (CSV)"))
+check("confirmed + funds held → FFR covering the holdings",
+      tfs_dossier.recommend_report_kind("confirmed", True)[0] == "FFR")
+check("confirmed + nil holdings → FFR with nil declared",
+      "nil holdings" in tfs_dossier.recommend_report_kind("confirmed", False)[1])
+check("partial → PNMR with suspension",
+      tfs_dossier.recommend_report_kind("partial", False)[0] == "PNMR")
+check("a case whose only hits are non-TFS lists is rejected (ordinary alert path)",
+      any("no hit on a TFS list" in e for e in tfs_dossier.validate_tfs_case(
+          {"customer": {"name": "X"}, "match_status": "partial",
+           "hits": [{"list": "US OFAC — SDN list (CSV)", "matched_entry": "Y"}]})))
+check("funds.held without items is rejected (list what is held)",
+      any("funds.items is empty" in e for e in tfs_dossier.validate_tfs_case(
+          {"customer": {"name": "X"}, "match_status": "confirmed",
+           "hits": [{"list": "UAE EOCN — Local Terrorist List", "matched_entry": "Y"}],
+           "funds": {"held": True, "items": []}})))
+_tfs_doc = tfs_dossier.build_tfs_dossier(tfs_dossier.EXAMPLE_CASE, today="2026-08-05")
+check("dossier is stamped draft, urgent, and non-tipping",
+      "NOT A FILING" in _tfs_doc and "WITHOUT DELAY" in _tfs_doc.upper()
+      and "tip off" in _tfs_doc)
+check("sign-off fields stay blank (a named human's act)",
+      "Reviewed by: __________________" in _tfs_doc and "Filed goAML ref: __________" in _tfs_doc)
+check("the listed side carries list, matched name and list reference",
+      "Listed name matched:" in _tfs_doc and "List reference no.:" in _tfs_doc)
+
+# ── per-subject screening report (evidence record, sign-off blank) ────────────
+print("\nsubject_report.py — per-subject report")
+_sr_state = {"updated": "2026-08-05", "subjects": {
+    "acme llc": {"name": "ACME LLC", "jurisdiction": "UAE", "band": "high", "topScore": 90,
+                 "recommendation": "sanctions-match", "firstSeen": "2026-08-01", "lastSeen": "2026-08-05",
+                 "gid": "g1", "lists": ["US OFAC — SDN list (CSV)"],
+                 "hits": [{"list": "US OFAC — SDN list (CSV)", "hitName": "ACME L.L.C.", "score": 90,
+                           "mechanism": "fuzzy", "confidence": "STRONG"},
+                          {"list": "UK OFSI — Consolidated list of targets (CSV)", "hitName": "ACME",
+                           "score": 70, "whitelisted": True, "clearedAt": "2026-08-02", "clearedVia": "case t9"}],
+                 "secondOpinion": {"provider": "OFAC-API", "status": "corroborated",
+                                   "matchCount": 1, "topScore": 92, "checkedAt": "2026-08-05"}},
+    "acme gold llc": {"name": "ACME GOLD LLC", "band": "medium", "topScore": 40,
+                      "recommendation": "review", "firstSeen": "2026-08-03", "lastSeen": "2026-08-05"}}}
+check("exact name match wins over substring ambiguity",
+      subject_report.find_subject(_sr_state, name="acme llc")[0] == "acme llc")
+check("ambiguous substring returns nothing (CLI lists candidates instead)",
+      subject_report.find_subject(_sr_state, name="acme")[0] is None
+      and len(subject_report.candidates(_sr_state, "acme")) == 2)
+_sr_doc = subject_report.build_subject_report(
+    "acme llc", _sr_state["subjects"]["acme llc"],
+    case_entry={"taskGid": "t9", "createdAt": "2026-08-01", "cleared": False, "escalated": True,
+                "escalatedAt": "2026-08-04"},
+    screen_updated="2026-08-05", today="2026-08-05")
+check("report renders evidence labels, the cleared-FP annotation and the second opinion",
+      "via fuzzy" in _sr_doc and "CLEARED FP 2026-08-02 (case t9)" in _sr_doc
+      and "OFAC-API: corroborated" in _sr_doc)
+check("escalated lifecycle shows auto-clear disabled",
+      "ESCALATED" in _sr_doc and "auto-clear disabled" in _sr_doc)
+check("sign-off fields stay blank (four-eyes, named humans only)",
+      "Reviewed by (four-eyes): __________________" in _sr_doc)
+try:
+    subject_report.build_subject_report("k", {}, None, None)
+    check("an absent record can never render as a clean report", False)
+except ValueError:
+    check("an absent record can never render as a clean report", True)
+_st_rec = _sr_state["subjects"]["acme llc"]
+check("statement: live hits → under-review wording, no determination asserted",
+      "under four-eyes review" in subject_report.screening_statement(_st_rec)
+      and "No determination has been made" in subject_report.screening_statement(_st_rec))
+check("statement: escalated case → MLRO act cited, no tipping-off",
+      "ESCALATE" in subject_report.screening_statement(_st_rec, {"escalated": True, "escalatedAt": "2026-08-04", "taskGid": "t9"})
+      and "no tipping-off" in subject_report.screening_statement(_st_rec, {"escalated": True}))
+_wl_rec = {"name": "X LLC", "lastSeen": "2026-08-05",
+           "hits": [{"list": "US OFAC — SDN list (CSV)", "hitName": "X", "score": 80, "whitelisted": True}]}
+check("statement: dispositioned FP (all hits whitelisted) → false-positive record cited",
+      "determined to be a false positive" in subject_report.screening_statement(
+          _wl_rec, {"disposition": {"kind": "false-positive", "at": "2026-08-02", "caseGid": "t1"}}))
+check("statement: every variant carries the regulatory basis",
+      all("Federal Decree-Law No. 10 of 2025" in subject_report.screening_statement(r, c)
+          for r, c in ((_st_rec, None), (_wl_rec, None))))
+check("the report renders the statement section",
+      "## Screening statement" in _sr_doc or "Screening statement" in subject_report.build_subject_report(
+          "acme llc", _st_rec, None, "2026-08-05", today="2026-08-05"))
+
 # ── import-time pip self-install stays opt-in (supply-chain posture) ──────────
 # The dependency fallback in screen.py must never install anything as a side
 # effect of a bare import: the pip path has to sit behind HSRA_BOOTSTRAP_DEPS=1
@@ -3205,6 +3655,555 @@ check("the pip fallback is gated behind HSRA_BOOTSTRAP_DEPS=1",
 check("the ungated branch raises with the exact install command",
       "raise ImportError" in _fallback
       and "pip install -r ci/requirements.txt" in _fallback)
+
+# ── screen.py: run-progress forensics ────────────────────────────────────────
+# The breadcrumb that survives a lost runner. Its whole value is that it is
+# written BEFORE the death, so these checks pin the two properties that make it
+# usable — the timeline is complete and readable, and writing it can never take
+# the sweep down with it.
+print("\nscreen.py — run progress (crash forensics)")
+import tempfile
+_pdir = tempfile.mkdtemp()
+_ppath = os.path.join(_pdir, "run-progress.json")
+_saved_ppath = screen.PROGRESS_PATH
+screen.PROGRESS_PATH = _ppath
+screen._PROGRESS.update(started=None, phases=[])
+
+screen.progress("sanctions-done", flagged=45, clear=311)
+screen.progress("enrichment", done=50, total=904)
+screen.progress("enrichment", done=904, total=904)     # same phase ticks again
+screen.progress("ai-triage-start", flagged=45)
+_pj = json.load(open(_ppath, encoding="utf-8"))
+
+check("progress writes the file and names the phase the run is in",
+      _pj["current_phase"] == "ai-triage-start")
+check("a repeating phase updates in place instead of appending a row",
+      [p["phase"] for p in _pj["phases"]] == ["sanctions-done", "enrichment", "ai-triage-start"])
+check("the repeated phase keeps its LATEST detail, not its first",
+      [p for p in _pj["phases"] if p["phase"] == "enrichment"][0]["detail"]["done"] == 904)
+check("every phase carries an elapsed time, so the timeline is readable",
+      all(isinstance(p["elapsed_s"], float) or isinstance(p["elapsed_s"], int)
+          for p in _pj["phases"]))
+check("elapsed time is monotonic across phases",
+      [p["elapsed_s"] for p in _pj["phases"]] == sorted(p["elapsed_s"] for p in _pj["phases"]))
+check("the run is identified so a pushed file maps to its job",
+      "run_id" in _pj and "started_utc" in _pj and "updated_utc" in _pj)
+
+# THE SAFETY PROPERTY: a forensics aid must never be able to fail the control
+# it watches. An unwritable path is swallowed, and the sweep carries on.
+screen.PROGRESS_PATH = _pdir          # a directory, so the write cannot succeed
+_raised = False
+try:
+    screen.progress("should-not-raise")
+except Exception:
+    _raised = True
+check("an unwritable progress path never raises into the sweep", _raised is False)
+screen.PROGRESS_PATH = _saved_ppath
+screen._PROGRESS.update(started=None, phases=[])
+
+# The workflow must actually push it, and must not push it to the branch that
+# carries the delivered-finding history (single writer — see the workflow).
+_wf = open(os.path.join(ROOT, ".github/workflows/weekly-adverse-media.yml"), encoding="utf-8").read()
+check("the workflow starts a progress heartbeat before the sweep",
+      _wf.index("Start the progress heartbeat") < _wf.index("Run unified daily screening"))
+check("the heartbeat stops after the sweep, on failure too",
+      "Stop the progress heartbeat" in _wf
+      and _wf.index("Stop the progress heartbeat") > _wf.index("Run unified daily screening"))
+_hb = _wf.split("Start the progress heartbeat")[1].split("Run unified daily screening")[0]
+check("the heartbeat pushes its own branch, never the delivered-finding history",
+      "refs/heads/screen-progress" in _hb
+      and "refs/heads/screen-delta-state" not in _hb)
+check("the heartbeat never writes in the workspace checkout mid-sweep",
+      "mktemp -d" in _hb and "git init" in _hb)
+
+# THE TERMINAL STATE MUST BE PUBLISHED. The loop only pushes on its 90s tick,
+# so the last phases are written locally and die with the VM. On the first
+# production run (2026-08-11) that left a sweep which SUCCEEDED at 10:58:01
+# reading as "ai-triage-start" on the branch — indistinguishable from a death
+# in the AI phase, i.e. the exact question this file exists to answer.
+_stop = _wf.split("Stop the progress heartbeat")[1].split("Commit delta-state")[0]
+check("the stop step publishes the FINAL progress state",
+      "hawkeye-publish.sh" in _stop)
+check("the stop step kills the loop before that final publish",
+      _stop.index("kill") < _stop.index("hawkeye-publish.sh"))
+check("the final publish cannot fail the job either",
+      "|| echo" in _stop and "continue-on-error: true" in _stop)
+check("interim and final publishes share one code path",
+      _hb.count("hawkeye-publish.sh") >= 2)
+check("GITHUB_TOKEN is not exposed to the screening step itself",
+      "GITHUB_TOKEN" not in _wf.split("Run unified daily screening")[1]
+                                .split("Stop the progress heartbeat")[0])
+
+# THE SAFETY PROPERTY AT THE WORKFLOW LEVEL. `run:` executes under `bash -e`,
+# so a heartbeat step that cannot start would fail the step, fail the job, and
+# stop the day's screening — a mandatory AML control brought down by its own
+# diagnostic. Both heartbeat steps must therefore be continue-on-error, and
+# the sweep itself must NOT be (its exit code is the control's verdict).
+check("the heartbeat start step cannot fail the screening job",
+      "continue-on-error: true" in _hb)
+check("the heartbeat stop step cannot fail the screening job either",
+      "continue-on-error: true" in _wf.split("Stop the progress heartbeat")[1]
+                                       .split("Commit delta-state")[0])
+check("the screening step itself is NOT continue-on-error — its exit code is the verdict",
+      "continue-on-error" not in _wf.split("Run unified daily screening")[1]
+                                     .split("Stop the progress heartbeat")[0])
+
+# ── ai.py: the LLM circuit breaker ───────────────────────────────────────────
+# A degraded Anthropic endpoint costs llm_complete's FULL 30s timeout on every
+# call, and the triage loop calls it once per adverse article and per flagged
+# subject in the LAST phase of the daily sweep. Unbounded, that is the 2026-08-10
+# run's 16m44s AI phase for a workload that cost ~2m the day before. These checks
+# pin the bound AND the degrade: the model may be skipped, a finding may not.
+print("\nai.py — LLM circuit breaker")
+
+class _Resp:
+    def __init__(self, status, text="ok"):
+        self.status_code, self._text = status, text
+    def json(self):
+        return {"content": [{"type": "text", "text": self._text}]}
+
+def _boom(*a, **k):
+    raise RuntimeError("connection reset by peer")
+
+_saved = (_req.post, ai.AI_ENABLED, ai.LLM_TRIAGE)
+os.environ["ANTHROPIC_API_KEY"] = "test-key"
+ai.AI_ENABLED = True
+
+def _reset_llm():
+    ai._LLM_STATE.update(consecutive_failures=0, open=False)
+    for _k in ai.LLM_CALLS:
+        ai.LLM_CALLS[_k] = 0
+
+# Consecutive UNREACHABLE calls trip the breaker, and it then stops paying the
+# timeout. Only transport errors qualify — see below for why replies do not.
+_reset_llm()
+_hits = {"n": 0}
+def _always_dead(*a, **k):
+    _hits["n"] += 1
+    raise RuntimeError("connection timed out")
+_req.post = _always_dead
+for _ in range(ai.LLM_BREAKER_AFTER + 4):
+    ai.llm_complete("x")
+check("AI circuit opens after LLM_BREAKER_AFTER consecutive unreachable calls",
+      ai.llm_circuit_open())
+check("once open, not one further HTTP call is made", _hits["n"] == ai.LLM_BREAKER_AFTER)
+check("refused calls count as skipped, never as attempted or failed",
+      ai.LLM_CALLS["skipped"] == 4
+      and ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER
+      and ai.LLM_CALLS["attempted"] == ai.LLM_BREAKER_AFTER)
+
+# A REPLY IS NOT AN OUTAGE — the rule the concurrent triage pass depends on.
+# The breaker exists to stop paying the 30s timeout; an HTTP reply of any status
+# arrives in milliseconds and costs nothing, so it must not accumulate toward
+# "unreachable". Concurrency earns 429s, and tripping on a burst of them would
+# disable triage for the whole run while saving no time whatsoever.
+_reset_llm()
+_req.post = lambda *a, **k: _Resp(429)
+for _ in range(ai.LLM_BREAKER_AFTER * 3):
+    ai.llm_complete("x")
+check("a burst of 429s never trips the breaker — throttling is not an outage",
+      not ai.llm_circuit_open())
+check("but those 429s are still counted as failed, for disclosure",
+      ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER * 3)
+_reset_llm()
+_req.post = lambda *a, **k: _Resp(500)
+for _ in range(ai.LLM_BREAKER_AFTER * 2):
+    ai.llm_complete("x")
+check("a fast 500 likewise does not trip it (reachable, and cheap)",
+      not ai.llm_circuit_open())
+
+# An INTERMITTENT outage must never trip it: a reply in between re-arms.
+_reset_llm()
+_seq = {"n": 0}
+def _flaky(*a, **k):
+    _seq["n"] += 1
+    if _seq["n"] % 3:
+        raise RuntimeError("connection reset by peer")
+    return _Resp(200, "fine")
+_req.post = _flaky
+for _ in range(30):
+    ai.llm_complete("x")
+check("an intermittent outage never trips the breaker — a reply re-arms it",
+      not ai.llm_circuit_open())
+check("the healthy calls in that run still returned their text", ai.LLM_CALLS["ok"] == 10)
+
+# THREAD SAFETY. The triage pass is now a fan-out, so the counters are shared.
+# `+=` is not atomic and these numbers are reported — an undercount would
+# understate how degraded a run was.
+_reset_llm()
+_req.post = lambda *a, **k: _Resp(200, "fine")
+import threading as _th
+_threads = [_th.Thread(target=lambda: [ai.llm_complete("x") for _ in range(40)])
+            for _ in range(8)]
+for _t in _threads: _t.start()
+for _t in _threads: _t.join()
+check("concurrent calls count exactly, with no lost increments",
+      ai.LLM_CALLS["ok"] == 320 and ai.LLM_CALLS["attempted"] == 320)
+
+# The triage fan-out is bounded, and separately from the news-feed fan-out.
+check("AI triage concurrency is a bounded, separate knob from SCREEN_CONCURRENCY",
+      isinstance(screen.AI_TRIAGE_CONCURRENCY, int)
+      and 1 <= screen.AI_TRIAGE_CONCURRENCY <= screen.SCREEN_CONCURRENCY)
+
+# THE DEGRADE CONTRACT: with the circuit open, triage keeps its deterministic
+# severity floor. Sharpening is lost; the finding is not.
+_reset_llm()
+ai._LLM_STATE["open"] = True
+ai.LLM_TRIAGE = True
+_req.post = _boom          # would raise if the breaker let the call through
+_art = {"title": "ACME TRADING LLC named in laundering probe", "source": "Reuters",
+        "date": "2026-08-01", "categories": [], "flagged": True}
+_t = ai.triage_adverse("ACME TRADING LLC", _art)
+check("triage keeps its deterministic floor with the circuit open", _t["severity"] == "LOW")
+check("and labels the result as NOT AI-sharpened", _t["ai"] is False)
+check("the skipped triage call is still counted for disclosure", ai.LLM_CALLS["skipped"] == 1)
+
+# A CRITICAL article stays CRITICAL — the breaker must not become a downgrade path.
+_crit = {"title": "Sanctions evasion network exposed", "source": "Reuters",
+         "date": "2026-08-01", "categories": ["Sanctions / Proliferation"], "flagged": True}
+check("a CRITICAL typology survives the open circuit undowngraded",
+      ai.triage_adverse("ACME TRADING LLC", _crit)["severity"] == "CRITICAL")
+
+# monitoring.py must SAY the circuit tripped — a silent skip would read as a
+# full-strength AI pass that merely made fewer calls.
+def _mon_section(llm_calls):
+    return monitoring.build_monitoring_section(
+        {"snapshot": {"total_seconds": 10, "counts": {"subjects": 5, "errors": 0},
+                      "error_rate": 0.0, "llm_calls": llm_calls},
+         "anomalies": [], "baseline": {}}, {})
+
+_mon = _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 12})
+check("the report discloses the open AI circuit and the skipped count",
+      "AI circuit OPEN" in _mon and "12 model call(s) skipped" in _mon)
+check("a run that never tripped the breaker carries no circuit warning",
+      "AI circuit OPEN" not in _mon_section({"attempted": 5, "ok": 5, "failed": 0, "skipped": 0}))
+
+# The DATA INTEGRITY line must describe what the run DID, not what was switched
+# on: claiming "AI-ASSISTED" while the run actually fell back is silent-green.
+check("the governance footer declares the run degraded when the circuit tripped",
+      "DEGRADED THIS RUN" in ai.governance_footer())
+ai._LLM_STATE["open"] = False
+for _k in ai.LLM_CALLS:
+    ai.LLM_CALLS[_k] = 0      # a healthy run starts from fresh counters
+check("and makes no degraded claim on a healthy run",
+      "DEGRADED THIS RUN" not in ai.governance_footer())
+
+_req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
+os.environ.pop("ANTHROPIC_API_KEY", None)
+_reset_llm()
+
+# ── 21 Sep 2026 engine fixes: case-board attach, honest news-feed coverage, honest AI mode ──
+# (1) Case subtasks were created with only a `parent`, so Asana gave them ZERO
+# project/section membership and they never showed on the case board.
+_cb_calls = []
+def _cb_stub(create_status=201, create_gid="777", attach_status=200):
+    _cb_calls.clear()
+    def _req(method, url, **kw):
+        _cb_calls.append((method, url, (kw.get("json") or {}).get("data") or {}))
+        if url.endswith("/addProject"):
+            return types.SimpleNamespace(status_code=attach_status, text="stub")
+        _resp = types.SimpleNamespace(status_code=create_status, text="stub")
+        _resp.json = (lambda: {"data": {"gid": create_gid}}) if create_gid is not None else (lambda: (_ for _ in ()).throw(ValueError("no body")))
+        return _resp
+    return _req
+_cb_orig_req = screen.asana_request
+_cb_orig_sec = screen.ASANA_CASES_NEW_SECTION_GID
+try:
+    screen.ASANA_CASES_NEW_SECTION_GID = "9999999999999901"
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub()
+    _cb_ok = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    _cb_attach = [c for c in _cb_calls if c[1].endswith("/addProject")]
+    check("case subtask: created OK", _cb_ok is True)
+    check("case subtask: attached to the board via addProject on the NEW task gid",
+          len(_cb_attach) == 1 and _cb_attach[0][1].endswith("/tasks/777/addProject"))
+    check("case subtask: attach targets the monitoring project and the New-cases section",
+          _cb_attach[0][2].get("project") == screen.ASANA_ONGOING_MON_GID
+          and _cb_attach[0][2].get("section") == "9999999999999901")
+    check("case subtask: attach is counted", screen.CASE_BOARD_ATTACH["attached"] == 1)
+
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub(attach_status=500)
+    _cb_ok2 = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: a failed attach never fails the case itself", _cb_ok2 is True)
+    check("case subtask: a failed attach is counted (loud), not swallowed",
+          screen.CASE_BOARD_ATTACH["failed"] == 1 and screen.CASE_BOARD_ATTACH["attached"] == 0)
+
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub(create_gid=None)
+    screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: an unreadable create response is counted as a failed attach, no blind call",
+          screen.CASE_BOARD_ATTACH["failed"] == 1
+          and not [c for c in _cb_calls if c[1].endswith("/addProject")])
+
+    screen.ASANA_CASES_NEW_SECTION_GID = ""
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub()
+    screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
+    check("case subtask: an empty section setting disables the attach",
+          not [c for c in _cb_calls if c[1].endswith("/addProject")]
+          and screen.CASE_BOARD_ATTACH == {"attached": 0, "failed": 0})
+finally:
+    screen.asana_request = _cb_orig_req
+    screen.ASANA_CASES_NEW_SECTION_GID = _cb_orig_sec
+
+# (2) The report claimed GDELT "runs on EVERY subject every run regardless" on a
+# run where its circuit opened after 5 subjects. Coverage is now counted per
+# subject and rendered; the claim is only made when it is true.
+class _FcResp:
+    status_code = 200
+    content = _RSS_OK
+_fc_saved = (screen.requests.get, screen.search_gdelt, screen.search_bing_news)
+try:
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen.requests.get = lambda *_a, **_k: _FcResp()
+    screen.search_gdelt = lambda *_a, **_k: []           # reachable, nothing found
+    screen.search_bing_news = lambda *_a, **_k: []
+    screen.search_adverse_media("Feed Cov One")
+    _fc1 = screen.feed_coverage_snapshot()
+    check("feed coverage: a subject reached by all three feeds is counted on each",
+          _fc1 == {"subjects": 1, "gnews": 1, "gdelt": 1, "bing": 1, "single": 0, "none": 0})
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen._GNEWS_STATE["open"] = True                    # Google News circuit open
+    screen.search_gdelt = _gdelt_down                     # GDELT rate-limited
+    screen.search_adverse_media("Feed Cov Two")
+    _fc2 = screen.feed_coverage_snapshot()
+    check("feed coverage: Bing alone is recorded as a SINGLE-feed subject",
+          _fc2["subjects"] == 1 and _fc2["bing"] == 1 and _fc2["gnews"] == 0
+          and _fc2["gdelt"] == 0 and _fc2["single"] == 1 and _fc2["none"] == 0)
+    _reset_breaker(); screen.reset_feed_coverage()
+    screen._GNEWS_STATE["open"] = True
+    screen.search_bing_news = _bing_down
+    _raised2 = ""
+    try:
+        screen.search_adverse_media("Feed Cov Three")
+    except RuntimeError as e:
+        _raised2 = str(e)
+    _fc3 = screen.feed_coverage_snapshot()
+    check("feed coverage: a subject no feed reached is counted AND still raises loudly",
+          _fc3["none"] == 1 and _fc3["subjects"] == 1 and "circuit open" in _raised2)
+finally:
+    screen.requests.get, screen.search_gdelt, screen.search_bing_news = _fc_saved
+    _reset_breaker(); screen.reset_feed_coverage()
+
+_fc_stats = lambda cov: {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5,
+                         "am_errors": 0, "pep_errors": 0, "delta": {}, "news_feed_coverage": cov,
+                         "watchlist_loaded": True, "watchlist_findings": 1}
+_fc_find = [{"subject_type": "ENTITY", "subject_name": "Acme", "parent": "", "permalink": "",
+             "articles": [{"title": "t", "source": "s", "date": "d", "url": "u", "categories": []}]}]
+_fc_meta = {"ofac": {"count": 17000, "date": "2026-07-08"}}
+_fc_partial = screen.build_unified_narrative(
+    [], [], _fc_find, [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 3, "gdelt": 3, "bing": 10, "single": 7, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: news feed coverage line is rendered with per-feed subject counts",
+      "News feed coverage this run (10 subject(s) news-swept): Google News 3 · GDELT 3 · Bing News 10" in _fc_partial
+      and "reached by ONE feed only: 7" in _fc_partial)
+check("report: a partial GDELT run does NOT claim GDELT covers every subject",
+      "runs on EVERY subject" not in _fc_partial
+      and "GDELT's global index reached only 3 of 10 subject(s)" in _fc_partial)
+check("report: single-feed subjects carry a provisional warning", "PROVISIONAL" in _fc_partial)
+_fc_full = screen.build_unified_narrative(
+    [], [], _fc_find, [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 10, "gdelt": 10, "bing": 10, "single": 0, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: the every-subject GDELT claim is kept only when it is true",
+      "runs on EVERY subject" in _fc_full and "PROVISIONAL" not in _fc_full)
+_fc_zero = screen.build_unified_narrative(
+    [], [], [], [], _fc_meta,
+    _fc_stats({"subjects": 10, "gnews": 3, "gdelt": 3, "bing": 10, "single": 7, "none": 0}),
+    _dt.datetime(2026, 7, 9))
+check("report: coverage is disclosed even on a zero-adverse-finding run",
+      "News feed coverage this run" in _fc_zero)
+
+# (3) "AI-assisted triage" was reported while 557 of 557 model calls failed:
+# an HTTP error reply deliberately does not open the breaker, so nothing said so.
+_am_saved = (screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE, dict(screen.ai.LLM_CALLS), screen.ai._LLM_STATE["open"])
+try:
+    screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE, screen.ai._LLM_STATE["open"] = True, True, False
+    screen.ai.LLM_CALLS.update(attempted=5, ok=0, failed=5, skipped=0)
+    _lbl0 = screen._ai_mode_label()
+    check("AI mode: 0 of N calls succeeded is labelled UNAVAILABLE, not AI-assisted",
+          _lbl0.startswith("deterministic (LLM UNAVAILABLE") and "0 of 5" in _lbl0)
+    check("AI mode: the unavailable label is still != 'deterministic' (credential contract intact)",
+          _lbl0 != "deterministic")
+    check("AI mode: the governance footer declares the all-failed run degraded",
+          "DEGRADED THIS RUN: 0 of 5 model calls succeeded" in screen.ai.governance_footer())
+    check("AI mode: the monitoring block warns when no call succeeded",
+          "0 of 5 model calls succeeded" in _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 0}))
+    screen.ai.LLM_CALLS.update(attempted=5, ok=3, failed=2, skipped=0)
+    check("AI mode: partial success is labelled DEGRADED with the ratio",
+          "DEGRADED: 3 of 5" in screen._ai_mode_label())
+    screen.ai.LLM_CALLS.update(attempted=5, ok=5, failed=0, skipped=0)
+    check("AI mode: a fully successful pass is plain AI-assisted triage",
+          screen._ai_mode_label() == "AI-assisted triage"
+          and "DEGRADED THIS RUN" not in screen.ai.governance_footer())
+    screen.ai.LLM_CALLS.update(attempted=0, ok=0, failed=0, skipped=0)
+    check("AI mode: no calls attempted yet is not called degraded",
+          screen._ai_mode_label() == "AI-assisted triage")
+finally:
+    screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE = _am_saved[0], _am_saved[1]
+    screen.ai.LLM_CALLS.update(_am_saved[2]); screen.ai._LLM_STATE["open"] = _am_saved[3]
+
+# ── UK Sanctions List: the OFSI ConList closed 28 Jan 2026 and was still loaded ──
+# 21 Sep 2026: ConList.csv said "Last Updated 03/06/2026", the report said OK, and
+# the gb_hmt_sanctions mirror was a header-only file. The UK Sanctions List is now
+# the primary and any core list past LIST_MAX_AGE_DAYS is reported as STALE.
+_ad = screen.list_age_days
+_today = _dt.date(2026, 9, 21)
+check("list age: ISO date", _ad("2026-09-19", _today) == 2)
+check("list age: dd/mm/yyyy when dayfirst is asserted (OFSI format)", _ad("03/06/2026", _today, dayfirst=True) == 110)
+check("list age: an ambiguous slash date is NOT guessed", _ad("03/06/2026", _today) is None)
+check("list age: an unambiguous mm/dd/yyyy date is read (OFAC non-SDN style)", _ad("09/14/2026", _today) == 7)
+check("list age: an unambiguous dd/mm/yyyy date is read without dayfirst", _ad("13/06/2026", _today) == 100)
+check("list age: provenance strings and blanks make no claim",
+      _ad("live", _today) is None and _ad("", _today) is None and _ad(None, _today) is None
+      and _ad("live (UK Sanctions List)", _today) is None and _ad("99/99/2026", _today) is None)
+check("list age: a datetime is accepted as today", _ad("2026-09-19", _dt.datetime(2026, 9, 21, 5, 0)) == 2)
+
+_sm = lambda **kw: {k: dict(v) for k, v in kw.items()}
+_meta_stale = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},
+                  uk={"count": 13765, "date": "03/06/2026"}, eu={"count": 5000, "date": "live"},
+                  eocn={"count": 629, "date": "2020-01-01"},
+                  extra={"count": 5, "date": "2020-01-01", "tier": "supplementary"},
+                  gone={"count": 0, "date": "2020-01-01"})
+check("stale_core_lists flags the 110-day-old UK list and nothing else",
+      screen.stale_core_lists(_meta_stale, _today) == [("uk", 110)])
+check("stale_core_lists: EOCN (own review gate), supplementary and empty lists are excluded",
+      all(k not in ("eocn", "extra", "gone") for k, _ in screen.stale_core_lists(_meta_stale, _today)))
+check("stale_core_lists: a limit of 0 disables it", screen.stale_core_lists(_meta_stale, _today, max_age=0) == [])
+check("stale_core_lists: respects the configured limit",
+      screen.stale_core_lists(_meta_stale, _today, max_age=200) == [])
+
+_fcdo_csv = (b'"id","schema","name","aliases"\n'
+             b'"a1","Person","EXAMPLE DESIGNEE ONE","E. DESIGNEE;DESIGNEE EXAMPLE"\n'
+             b'"a2","Organization","EXAMPLE HOLDINGS LLC",""\n')
+_uk_calls = []
+_orig_dl_uk, _orig_parse_uk = screen.download, screen.parse_uk
+try:
+    def _dl_ok(url, label):
+        _uk_calls.append(url); return _fcdo_csv if "gb_fcdo_sanctions" in url else b"CONLIST"
+    screen.download = _dl_ok
+    _n, _d, _h, _f = screen.load_uk_list()
+    check("UK: the UK Sanctions List mirror is the primary and carries names + aliases",
+          _n == {"EXAMPLE DESIGNEE ONE", "E. DESIGNEE", "DESIGNEE EXAMPLE", "EXAMPLE HOLDINGS LLC"} and _f is True)
+    check("UK: the retired ConList is NOT fetched when the primary loaded",
+          len(_uk_calls) == 1 and "gb_fcdo_sanctions" in _uk_calls[0])
+    check("UK: provenance names the UK Sanctions List (no stale-date claim)",
+          _d.startswith("live (UK Sanctions List") and screen.list_age_days(_d) is None)
+
+    _uk_calls.clear()
+    def _dl_mirror_empty(url, label):
+        _uk_calls.append(url)
+        return b'"id","schema","name","aliases"\n' if "gb_fcdo_sanctions" in url else b"CONLIST-BYTES"
+    screen.download = _dl_mirror_empty
+    screen.parse_uk = lambda data: ({"OLD DESIGNEE"}, "03/06/2026", "hash")
+    _n2, _d2, _h2, _f2 = screen.load_uk_list()
+    check("UK: an empty primary falls back to the retired ConList", _n2 == {"OLD DESIGNEE"} and _f2 is True
+          and len(_uk_calls) == 2 and "ConList.csv" in _uk_calls[1])
+    check("UK: the fallback keeps ConList's own date, which the staleness check then flags",
+          _d2 == "03/06/2026"
+          and screen.stale_core_lists({"uk": {"count": 1, "date": _d2}}, _today) == [("uk", 110)])
+
+    screen.download = lambda url, label: None
+    screen.parse_uk = _orig_parse_uk
+    _n3, _d3, _h3, _f3 = screen.load_uk_list()
+    check("UK: both sources down -> empty and not fetched (the outage gate takes over)",
+          not _n3 and _f3 is False)
+finally:
+    screen.download, screen.parse_uk = _orig_dl_uk, _orig_parse_uk
+
+_run_dt = _dt.datetime(2026, 9, 21, 5, 0)
+_meta_fresh = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},
+                  uk={"count": 19663, "date": "live (UK Sanctions List)"}, eu={"count": 5000, "date": "live"},
+                  eocn={"count": 629, "date": "2026-09-17"})
+_meta_uk_stale = {**_meta_fresh, "uk": {"count": 13765, "date": "03/06/2026"}}
+_st = lambda: {"subjects_total": 10, "companies_screened": 5, "individuals_screened": 5,
+               "am_errors": 0, "pep_errors": 0, "delta": {}}
+_n_fresh = screen.build_unified_narrative([], [], [], [], _meta_fresh, _st(), _run_dt)
+_n_stale = screen.build_unified_narrative([], [], [], [], _meta_uk_stale, _st(), _run_dt)
+check("report: a fresh UK list reads OK with no stale warning",
+      "Sanctions OK" in _n_fresh and "SANCTIONS LIST STALE" not in _n_fresh and "STALE (" not in _n_fresh)
+check("report: a stale UK list downgrades the Sanctions banner and names the list and age",
+      "Sanctions DEGRADED (stale: UK 110d)" in _n_stale)
+check("report: the UK status line says STALE with its age, not OK",
+      "UK Sanctions List: STALE (110d old)" in _n_stale)
+check("report: the explicit warning says designations since then are NOT screened",
+      "SANCTIONS LIST STALE" in _n_stale and "03/06/2026" in _n_stale and "NOT screened" in _n_stale)
+_dn_src = _inspect.getsource(screen.build_daily_narrative)
+check("report: the daily narrative's UK provenance line points at the UK Sanctions List, not the closed OFSI list",
+      "the-uk-sanctions-list" in _dn_src and "ofsistorage" not in _dn_src)
+
+# ── Worldwide national-sanctions net: ~80 further national lists (Ukraine NSDC, ──
+# France, Belgium, Japan METI, Turkiye MASAK, Pakistan NACTA, Qatar, Saudi Arabia,
+# India MHA, ...) were only ever reached by the separate JS engine, if at all.
+_WW_CSV = (b'"id","schema","name","aliases","dataset"\n'
+           b'"w1","Person","NEW DESIGNEE ONE","ALIAS ONE","Ukraine NSDC State Register of Sanctions"\n'
+           b'"w2","Person","ALREADY COVERED PERSON","","US OFAC Specially Designated Nationals (SDN) List"\n'
+           b'"w3","Organization","BOTH SOURCES CO","","France;UK FCDO Sanctions List"\n'
+           b'"w4","Person","NO EXTRA SOURCE","","US OFAC Specially Designated Nationals (SDN) List;UN Security Council Consolidated Sanctions"\n')
+_entries, _sources, _n_src = screen.parse_worldwide_sanctions(_WW_CSV)
+check("worldwide sanctions: a name whose ONLY source is already-covered core lists is dropped",
+      "NO EXTRA SOURCE" not in dict(_entries))
+check("worldwide sanctions: a name with ANY uncovered source is kept, even alongside a covered one",
+      "BOTH SOURCES CO" in dict(_entries) and "France" in _sources[screen.normalize("BOTH SOURCES CO")])
+check("worldwide sanctions: primary name and alias both added",
+      {"NEW DESIGNEE ONE", "ALIAS ONE"}.issubset(set(dict(_entries).values())))
+check("worldwide sanctions: distinct extra source lists counted correctly", _n_src == 2)
+check("worldwide sanctions: a name already in the caller's covered-key set is excluded",
+      "ALREADY COVERED PERSON" not in
+      dict(screen.parse_worldwide_sanctions(_WW_CSV, covered_keys={screen.normalize("ALREADY COVERED PERSON")})[0]).values())
+check("worldwide sanctions: no data -> empty, no crash", screen.parse_worldwide_sanctions(None) == ([], {}, 0))
+_bad_ww = b'"id","schema","name","aliases","dataset"\n"bad row missing fields\n"g","P","GOOD ONE","","Iraq"\n'
+check("worldwide sanctions: one malformed row never zeroes the whole list",
+      any(n == "GOOD ONE" for _, n in screen.parse_worldwide_sanctions(_bad_ww)[0]))
+
+_ww_saved = (screen.download, screen.WORLDWIDE_SANCTIONS)
+try:
+    screen.WORLDWIDE_SANCTIONS = True
+    _al, _lm = {"EU FSF": [(screen.normalize("ALREADY COVERED PERSON"), "ALREADY COVERED PERSON")]}, {}
+    screen.download = lambda url, label: _WW_CSV
+    _n_added = screen.load_worldwide_sanctions(_al, _lm)
+    check("load_worldwide_sanctions: registers a new supplementary list entry",
+          _lm["worldwide"]["tier"] == "supplementary" and _lm["worldwide"]["count"] == _n_added > 0)
+    check("load_worldwide_sanctions: adds a new all_lists source without touching existing ones",
+          screen.WORLDWIDE_LABEL in _al and "EU FSF" in _al)
+    check("load_worldwide_sanctions: an already-loaded name is excluded even via this path",
+          "ALREADY COVERED PERSON" not in dict(_al[screen.WORLDWIDE_LABEL]).values())
+    check("load_worldwide_sanctions: source lists are recorded as match-context (annotation only)",
+          "Ukraine NSDC" in screen.match_context_for("NEW DESIGNEE ONE"))
+
+    screen.WORLDWIDE_SANCTIONS = False
+    _al2, _lm2 = {}, {}
+    screen.load_worldwide_sanctions(_al2, _lm2)
+    check("load_worldwide_sanctions: WORLDWIDE_SANCTIONS=0 disables it and adds nothing",
+          _lm2["worldwide"] == {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+          and screen.WORLDWIDE_LABEL not in _al2)
+
+    screen.WORLDWIDE_SANCTIONS = True
+    screen.download = lambda url, label: None
+    _al3, _lm3 = {}, {}
+    screen.load_worldwide_sanctions(_al3, _lm3)
+    check("load_worldwide_sanctions: source unreachable -> unavailable, never fails the run",
+          _lm3["worldwide"]["count"] == 0 and _lm3["worldwide"]["date"] == "unavailable"
+          and screen.WORLDWIDE_LABEL not in _al3)
+finally:
+    screen.download, screen.WORLDWIDE_SANCTIONS = _ww_saved
+
+for _pname, _psrc in (("daily", _inspect.getsource(screen.load_all_lists)), ("legacy", _inspect.getsource(screen.main))):
+    check(f"{_pname} path loads the worldwide sanctions net", "load_worldwide_sanctions(all_lists, list_meta)" in _psrc)
+
+_meta_ww = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},
+               uk={"count": 19663, "date": "live (UK Sanctions List)"}, eu={"count": 5000, "date": "live"},
+               eocn={"count": 629, "date": "2026-09-17"},
+               worldwide={"count": 102998, "date": "live (OpenSanctions)", "tier": "supplementary", "sources": 84})
+_n_ww = screen.build_unified_narrative([], [], [], [], _meta_ww, _st(), _run_dt)
+check("report: the worldwide sanctions net is disclosed with its name and additional-name count",
+      "OpenSanctions worldwide sanctions" in _n_ww and "102,998 additional names across 84 national source lists" in _n_ww)
+_meta_ww_off = {**_meta_ww, "worldwide": {"count": 0, "date": "disabled", "tier": "supplementary"}}
+_n_ww_off = screen.build_unified_narrative([], [], [], [], _meta_ww_off, _st(), _run_dt)
+check("report: a disabled worldwide net says so explicitly, not silently absent",
+      "DISABLED (WORLDWIDE_SANCTIONS=0)" in _n_ww_off)
 
 print()
 if _fail:

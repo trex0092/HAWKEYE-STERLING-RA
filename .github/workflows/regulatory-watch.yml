@@ -46,7 +46,7 @@ jobs:
     timeout-minutes: 20 # bound external regulator-source fetches
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           # contents:write job fetching external content — block egress to the fixed
@@ -112,6 +112,7 @@ jobs:
             egmontgroup.org:443
             www.egmontgroup.org:443
             index.baselgovernance.org:443
+            *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # No credentials on disk (zizmor artipacked): the state push below
@@ -165,19 +166,31 @@ jobs:
           # PRIMARY (unchanged, per #305 "Route every pipeline Asana delivery to
           # HAWKEYE STERLING APP"): project 1216203370612914 = HAWKEYE STERLING
           # APP, section 1216203370612916 = "Assessment Report". The old comment
-          # here called these "the Regulatory changes section of the Ongoing
-          # Monitoring project" — they are neither, and that mislabel is why the
-          # reroute went unnoticed. Names verified against the live API.
+          # FIXED 2026-09-16: this used to read the generic, never-set
+          # ASANA_DELIVERY_SECTION_GID and silently fall through to "Assessment
+          # Report" (1216203370612916) -- a comment here once called that the
+          # "Regulatory changes" section; it was neither, and that mislabel is
+          # why the reroute went unnoticed. ASANA_REG_SECTION_GID existed as a
+          # repo variable, but a first attempt to wire it up here (same day)
+          # copied its then-current value without checking it against the
+          # live API -- that value (1216203873114460) turned out to be STALE
+          # from an earlier Asana reorganization and no longer existed either.
+          # Corrected in a follow-up pass, in both the literal below and the
+          # repo variable itself: the real "Regulatory changes" section is
+          # 1218451992088222, verified directly against the live Asana API.
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
-          # MIRROR: the card is ALSO filed in the queue the MLRO actually works —
-          # project 1213914392047129 = "Sanctions/Media/PEP - Monitoring",
-          # section 1216203873114460 = "Regulatory changes" (the destination
-          # every Regulatory Watch card used until #305 merged on 22 Jul 2026).
-          # One task, two memberships — additive, nothing is moved away from the
-          # #305 destination. Clear ASANA_MIRROR_PROJECT_GID to disable.
-          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_LAWCHANGE_PROJECT_GID || '1213914392047129' }}
-          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_LAWCHANGE_SECTION_GID || '1216203873114460' }}
+          ASANA_SECTION_GID: ${{ vars.ASANA_REG_SECTION_GID || '1218451992088222' }}
+          # MIRROR (RETIRED 2026-09-15): the old "Sanctions/Media/PEP -
+          # Monitoring" project (1213914392047129) and its "Regulatory changes"
+          # section (1216203873114460) were both retired when that project was
+          # merged into HAWKEYE STERLING APP (which now has its own live
+          # "Regulatory changes" section, gid 1218451992088222) — mirroring here
+          # would just re-add the SAME project the card above already targets.
+          # Both vars below default to empty (disabled) via the original "Clear
+          # ASANA_MIRROR_PROJECT_GID to disable" escape hatch, until/unless a
+          # genuinely separate MLRO queue exists again.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_LAWCHANGE_PROJECT_GID }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_LAWCHANGE_SECTION_GID }}
           # Step output crosses into the shell via env (never inline ${{ }} in run:),
           # so a hostile character in a generated title can never become shell syntax.
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}

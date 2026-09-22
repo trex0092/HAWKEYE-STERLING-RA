@@ -326,6 +326,71 @@ drafts added with the Data Office breach-clock pin (#316), taking the curated se
 auto-generated regulatory-watch digests (docs/research/auto/) folded into main from the
 reg-watch-state branch. Curated additions and auto docs only — no scored control changed.*
 
+*Estate re-verification · 8 September 2026 — one workflow added: Delivery Watchdog (#500), a daily
+probe that checks whether the sanctions/PEP/adverse-media report was actually filed in Asana,
+independent of the underlying screening run's exit code (which the EOCN review gate can fail even
+after a fully successful delivery). Self-alerting to Asana on a missing report; no ingestion/eval
+duty of its own. Coverage addition only — no scored control changed.*
+
+Verified at HEAD: 65 workflows · 185 markdown documents under docs/ (152 excluding docs/research/auto).
+*(11 September — **Bandit added as an advisory Python security lint** (`bandit.yml`, hash-locked
+via a new `ci/bandit-requirements.in`/`.txt` pair), plus a workflow-consolidation-and-Git-LFS
+follow-up analysis (`docs/workflow-consolidation-and-lfs-followups.md`) covering the 65-file
+`.github/workflows/` estate and a runbook for moving committed screenshot/docx binaries to Git
+LFS. One workflow added, one curated document added; no scored control changed.)*
+
+Verified at HEAD: 64 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
+*(11 August — **sharded screening design**. One curated document
+(`docs/architecture/sharded-screening-design.md`), explicitly marked NOT YET
+BUILT: a design-only record of how the adverse-media coverage collapse would be
+fixed by sharding, and of the merge hazards found while scoping it. No workflow
+added, no code, no scored control changed.)*
+
+*(7 August — **PEP shard harvest**. One dispatch-only workflow
+(`pep-shard-harvest.yml`, egress-blocked) that clears a PEP label backlog across
+eight runners at once. Wikidata rate-limits a client — a completed link's log
+carries 64 HTTP 429s — so parallelism inside one job has a ceiling that more
+clients do not. Additive: the weekly `pep-worldwide.yml` chain is untouched, each
+shard writes only its own branch, and a single merge job is the sole writer of
+the state branch and REFUSES to publish a set with any shard missing. Throughput
+only — no scored control changed, and the same floor/shrink gates guard the
+write.)*
+*(6 August — **PEP chain watchdog**. One workflow (`pep-chain-watchdog.yml`, egress-blocked) that
+restarts a PEP harvest link whose GitHub-hosted runner died abnormally. The harvest's own
+time-budget pause cannot cover that case: a dead runner never reaches its re-dispatch step, so the
+chain stopped three times with banked work stranded on the state branch. The watchdog checks out
+nothing and executes no repository code — it reads the harvest's run history and POSTs a
+workflow_dispatch, bounded to two auto-restarts before failing red. Availability of an existing
+control only — nothing screened, no state written, no scored control changed.)*
+*(5 August, third pass — **source-probe diagnostic instrument**. One dispatch-only workflow
+(`source-probe.yml` + `scripts/source-probe.mjs`) that fetches sources already configured in the
+screening registry (by id — the input cannot aim it at an arbitrary URL) with realistic browser
+headers and publishes status/headers/body-sample/JSON-key-paths/sheet-headers as a step summary +
+artifact — the instrument that turns "disabled with a guessed reason" into "disabled with the
+observed response, or re-enabled with the right field mapping" for the five sources the first
+worldwide live run disabled on evidence. Diagnostic only: nothing screened, no state written, no
+secrets in the environment — no scored control changed.)*
+
+Verified at HEAD: 59 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(5 August, second pass — **worldwide coverage expansion**. The 13-region source survey landed as
+data: twelve new machine-readable national/institutional sanctions lists screen daily (plus DFAT
+direct restored, beginning the OpenSanctions-mirror retirement), non-integrable sources became
+documented disabled stubs inside the registry itself, the regulator-bulletin net gained five
+enforcement feeds (DOJ/CFTC/OCC/DFSA/Europol), an opt-in FBI Wanted per-subject signal joined
+Interpol, and one workflow was added — the weekly `pep-worldwide.yml` Wikidata (CC0) harvest that
+builds a genuinely license-clean worldwide PEP list (floor + shrink gates; artifact on its own data
+branch; the daily screen consumes it as a review-tier local index, capped at band medium). Coverage
+additions and one scheduled harvest only — no scored control changed.)*
+
+Verified at HEAD: 58 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
+*(5 August — **yente matching benchmark (experimental instrument)**. One dispatch-only workflow
+(`yente-bench.yml`) boots the MIT-licensed yente matching engine (the software behind the
+OpenSanctions API) on the runner and scores it against the repo's own frozen screening-benchmark
+fixtures via `scripts/yente-bench.mjs` — no OpenSanctions data is downloaded (the published database
+carries a non-commercial licence; the indexed dataset is generated from our fixtures), no screening
+state, cases, or Asana surface is touched, and the report lands as a step summary + 30-day artifact.
+Measurement instrument only — no scored control changed.)*
+
 Verified at HEAD: 57 workflows · 183 markdown documents under docs/ (150 excluding docs/research/auto).
 *(4 August, thirteenth pass — **deploy self-heal + self-identifying drift**. Same-day follow-through on
 register item 26's first half after four runner-shutdown kills ended production-deploy verifications as
@@ -513,6 +578,12 @@ Verified at HEAD on 25 July (earlier): 53 workflows · 143 markdown documents un
 production-deploy lever (build hook) and the read-only Netlify probe — plus the daily screening's
 self-healing 03:07 UTC retry firing inside the existing workflow. Tooling only — no scored control
 changed.)*
+
+Verified at HEAD on 11 August: 62 workflows · 184 markdown documents under docs/ (151 excluding docs/research/auto).
+*(Adds docs/architecture/sharded-screening-design.md — a design-only record for
+sharded screening, explicitly marked NOT YET BUILT. No control changed, nothing
+scored; it exists so the hazards found while scoping the work are not
+rediscovered the hard way.)*
 
 Verified at HEAD on 24 July: 51 workflows · 143 markdown documents under docs/ (110 excluding docs/research/auto).
 (Evening sync of the same day added the 24 July regulatory-watch digest — one auto doc.)

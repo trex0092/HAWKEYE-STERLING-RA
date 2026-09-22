@@ -43,7 +43,11 @@
     "Hummus Trading LLC",
     "Weiß Trading",
     "Weiss Trading",
-    "Straßburg Handels GmbH"
+    "Straßburg Handels GmbH",
+    "Ɔla",
+    "Ola",
+    "Ɖamir",
+    "Damir"
   ],
   "names_note": "Grouped: Turkish-i regression class; diacritic Latin that MUST fold to A-Z; short/two-letter token class (the sigTokens regression); transliteration-variant class; lost-script class (Cyrillic/Arabic/CJK/Greek and unfoldable Latin) which both engines must FLAG rather than silently clear; and degenerate inputs (blank, symbols, digits, single char).",
   "pairs": [
@@ -121,6 +125,16 @@
       "subject": "Калашников Концерн",
       "why": "Cyrillic corporate designation against its Latin rendering — the shape that dominates current Russia-related OFAC/EU/UK listings.",
       "listed": "KALASHNIKOV KONTSERN"
+    },
+    {
+      "subject": "Ɔla",
+      "listed": "OLA",
+      "why": "African-Latin hook letter Ɔ must fold to O in BOTH engines (JS false negative before the ɔ fold added 2026-08-05)"
+    },
+    {
+      "subject": "Ɖamir",
+      "listed": "DAMIR",
+      "why": "African-Latin Ɖ must fold to D in both engines"
     }
   ],
   "pairs_note": "Every pair is a TRUE match that both engines must reach. The invariant is engine-to-engine agreement on reachability, not score equality: rapidfuzz and the JS Levenshtein legitimately differ by a point or two (measured: 93 vs 94 on Muhammad Alfayed), so the test asserts both engines HIT, never that they score the same."

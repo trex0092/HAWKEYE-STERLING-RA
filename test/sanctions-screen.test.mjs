@@ -6,9 +6,13 @@ import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
-  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip
+  formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
+  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
+  getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay
 } from '../scripts/sanctions-screen.mjs';
-import { buildIndex, screenName } from '../scripts/sanctions-match.mjs';
+import { buildIndex, screenName, parseIdbCsv } from '../scripts/sanctions-match.mjs';
+const scr = await import('../scripts/sanctions-screen.mjs');
+const pep_classify = (h, o) => scr.classifyHit(h, o || {});
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -170,6 +174,31 @@ check('artifact hit detail (hitDetail) carries mechanism/confidence and drops ju
                          { carriedForward: true }, null]);
     return d.length === 1 && d[0].mechanism === 'fuzzy' && d[0].confidence === 'STRONG' && d[0].hitName === 'ACME';
   })());
+
+/* Report-only ("every hit is a cleared false positive") must be recomputed
+   AFTER carry-forward merges: a run whose sanctions hits are all whitelisted
+   but that carries un-re-verified adverse-media evidence is NOT report-only —
+   copying the flag closed the MLRO case on a live adverse signal. */
+check('diffState: carried-forward adverse evidence defeats whitelistedOnly (case opens for a live signal)', (() => {
+  const prior = diffState({ updated: null, subjects: {} },
+    [normalizeResult({ name: 'W Co', topScore: 92, band: 'high', recommendation: 'match',
+      lists: [{ list: 'OFAC SDN' }, { list: 'Adverse media (Google News)' }] }, { key: 'w', name: 'W Co' })],
+    '2026-06-19', 0.85);
+  const wlRun = normalizeResult({ name: 'W Co', topScore: 92, band: 'high', recommendation: 'match',
+    lists: [{ list: 'OFAC SDN', whitelisted: true }] }, { key: 'w', name: 'W Co' });
+  wlRun.whitelistedOnly = true;
+  wlRun.enrichmentIncomplete = true;            // adverse-media lookup could not re-verify
+  const next = diffState(prior.nextState, [wlRun], '2026-06-20', 0.85);
+  const rec = next.nextState.subjects.w;
+  return !!rec && rec.lists.includes('Adverse media (Google News)') && rec.whitelistedOnly !== true;
+})());
+check('diffState: a genuinely all-whitelisted run with nothing carried STAYS report-only', (() => {
+  const wlRun = normalizeResult({ name: 'V Co', topScore: 92, band: 'high', recommendation: 'match',
+    lists: [{ list: 'OFAC SDN', whitelisted: true }] }, { key: 'v', name: 'V Co' });
+  wlRun.whitelistedOnly = true;
+  const next = diffState({ updated: null, subjects: {} }, [wlRun], '2026-06-20', 0.85);
+  return next.nextState.subjects.v.whitelistedOnly === true;
+})());
 
 const d2 = diffState(d1.nextState, [listed], '2026-06-20', 0.85);
 check('diffState does NOT re-alert a standing (same-signature) match', d2.alerts.length === 0);
@@ -479,6 +508,74 @@ const un5 = diffState(mixedStanding(), [clearRow({ enrichmentIncomplete: false }
 check('omitting evaluatedSignals leaves behaviour unchanged (guard inactive)',
   un5.cleared.length === 1);
 
+/* ── hardening audit 2026-08-05: match-branch module-off + narrowed-coverage
+   carry-forward (findings 2/7 + 1/3/6), and the OFAC latin-1 decode (finding 4) ── */
+// Finding 2/7: a STILL-MATCHING subject (OFAC hit present) whose PEP MODULE was
+// off this run must not have its standing PEP evidence silently erased — the
+// clear-branch already guarded this, the match-branch did not.
+const mmPrior = diffState({ updated: null, subjects: {} }, [mixedPrior], '2026-07-25', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+const stillMatchPepOff = normalizeResult({ name: 'M Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+  lists: [{ list: 'OFAC SDN', matchScore: 96 }] }, { key: 'm', name: 'M Co' });
+const mmOff = diffState(mmPrior.nextState, [stillMatchPepOff], '2026-07-26', 0.85, ['OFAC SDN'],
+  ['Adverse media (Google News)', 'Interpol Red Notice']);   // PEP module not evaluated
+check('match-branch: a still-matching subject keeps its PEP evidence when the PEP module was off (finding 2/7)',
+  mmOff.alerts.length === 0 && mmOff.nextState.subjects.m.lists.sort().join() === 'OFAC SDN,PEP (Wikidata)');
+// Finding 2/7 band: an enrichment-driven prior band must not silently downgrade
+// when the module that drove it was off this run.
+const amBandPrior = diffState({ updated: null, subjects: {} },
+  [normalizeResult({ name: 'B Co', topScore: 90, band: 'high', recommendation: 'sanctions-match',
+    lists: [{ list: 'OFAC SDN', matchScore: 90 }, { list: 'Adverse media (Google News)', matchScore: 85 }] }, { key: 'b', name: 'B Co' })],
+  '2026-07-25', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+const amBandOff = diffState(amBandPrior.nextState,
+  [normalizeResult({ name: 'B Co', topScore: 90, band: 'medium', recommendation: 'sanctions-match',
+    lists: [{ list: 'OFAC SDN', matchScore: 90 }] }, { key: 'b', name: 'B Co' })],
+  '2026-07-26', 0.85, ['OFAC SDN'], ['PEP (Wikidata)']);   // adverse-media module off
+check('match-branch: a prior band driven up by an off-module signal is preserved, not downgraded',
+  amBandOff.nextState.subjects.b.band === 'high');
+
+// Findings 1/3/6: a standing adverse-media match must NOT clear on a NARROWED
+// (budget-rotated / disclosed-partial) sweep — the originating edition may not
+// have been queried; r.unverified names the signal that was not re-checked.
+const amStanding = () => ({ updated: null, subjects: { a: {
+  name: 'A Co', band: 'medium', topScore: 75, recommendation: 'review',
+  lists: ['Adverse media (Google News)'], signature: 'x', firstSeen: '2026-07-01', lastSeen: '2026-07-25' } } });
+const amClearNarrowed = Object.assign(
+  normalizeResult({ name: 'A Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] }, { key: 'a', name: 'A Co' }),
+  { unverified: ['Adverse media (Google News)'] });
+const an1 = diffState(amStanding(), [amClearNarrowed], '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('clear-branch: a standing adverse-media match is HELD on a narrowed/budget-rotated sweep (findings 1/3/6)',
+  an1.cleared.length === 0 && !!an1.nextState.subjects.a);
+// CONTROL: a FULL sweep that re-verified the story is gone must still clear it —
+// the guard preserves recall, it must not freeze adverse-media matches forever.
+const an2 = diffState(amStanding(),
+  [normalizeResult({ name: 'A Co', topScore: 0, band: 'low', recommendation: 'clear', lists: [] }, { key: 'a', name: 'A Co' })],
+  '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('clear-branch: a standing adverse-media match DOES clear once a full sweep re-verifies it gone',
+  an2.cleared.length === 1 && !an2.nextState.subjects.a);
+// Match-branch narrowed carry-forward: still-matching OFAC, adverse narrowed.
+const amMixStanding = diffState({ updated: null, subjects: {} },
+  [normalizeResult({ name: 'C Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+    lists: [{ list: 'OFAC SDN', matchScore: 96 }, { list: 'Adverse media (Google News)', matchScore: 85 }] }, { key: 'c', name: 'C Co' })],
+  '2026-07-25', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+const amMixNarrowed = Object.assign(
+  normalizeResult({ name: 'C Co', topScore: 96, band: 'high', recommendation: 'sanctions-match',
+    lists: [{ list: 'OFAC SDN', matchScore: 96 }] }, { key: 'c', name: 'C Co' }),
+  { unverified: ['Adverse media (Google News)'] });
+const amMix = diffState(amMixStanding.nextState, [amMixNarrowed], '2026-07-26', 0.85, ['OFAC SDN'], ALL_SIGNALS);
+check('match-branch: a narrowed adverse-media sweep keeps the standing adverse hit, no spurious alert',
+  amMix.alerts.length === 0 && amMix.nextState.subjects.c.lists.includes('Adverse media (Google News)'));
+
+// Finding 4: OFAC SDN/alt must be decoded latin-1 (screen.py does; the JS
+// r.text() UTF-8 path mangled every ñ/accented designation into a split token).
+const _ofacSrc = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-sources.json'), 'utf8'));
+check('OFAC SDN + alt.csv declare charset latin1 so fetchListBody decodes them like screen.py (finding 4)',
+  _ofacSrc.sources.find(s => s.id === 'ofac-sdn').charset === 'latin1'
+  && _ofacSrc.sources.find(s => s.id === 'ofac-sdn-alt').charset === 'latin1');
+const _pena = Buffer.from('PEÑA', 'latin1');
+check('latin1 decode preserves the ñ token (→ pena); the old UTF-8 decode split it (finding 4)',
+  normalizeName(new TextDecoder('latin1').decode(_pena)) === normalizeName('PENA')
+  && normalizeName(new TextDecoder('utf-8').decode(_pena)) !== normalizeName('PENA'));
+
 /* ── wiring pins: red unscreened bail + retry/liveness contract ── */
 const screenSrc = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
 const screenYml = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');
@@ -609,6 +706,982 @@ check('a same-prefix date does not collide (9 Jul vs 19 Jul)',
 check('an unrelated same-day OM card does not suppress the AM/PEP card',
   omCardToSkip(['Quarterly review — ' + _omDate], _omDate, true) === null);
 
+/* ── Cleared-FP registry (whitelist) — demote, never suppress ── */
+const _wlCurated = [{ subject_key: 'acme llc', hit_name: 'ACME L.L.C.', list: 'US OFAC — SDN list (CSV)',
+  cleared_by: 'MLRO', cleared_at: '2026-08-01', case_gid: '123', reason: 'different entity, disambiguated' }];
+const _wlCases = { 'bravo|ubo|999': { taskGid: 't1', disposition: { kind: 'false-positive', at: '2026-08-02', caseGid: 't1',
+  hits: [{ hitName: 'BRAVO TRADING', list: 'UK OFSI — Consolidated list of targets (CSV)' }] } } };
+const _wl = buildWhitelistMap(_wlCurated, _wlCases);
+check('whitelist map holds curated + disposition pairs', _wl.size === 2);
+check('whitelist key normalises the designated name (punctuation churn survives)',
+  whitelistKey('acme llc', 'ACME L.L.C.', 'US OFAC — SDN list (CSV)')
+  === whitelistKey('acme llc', 'ACME LLC', 'US OFAC — SDN list (CSV)'));
+const _wlHits = [
+  { list: 'US OFAC — SDN list (CSV)', hitName: 'ACME L.L.C.', score: 90 },
+  { list: 'UN Security Council — Consolidated list (XML)', hitName: 'OTHER NAME', score: 70 }];
+check('applyWhitelist annotates ONLY the cleared pair — the other hit is untouched',
+  applyWhitelist('acme llc', _wlHits, _wl) === 1
+  && _wlHits[0].whitelisted === true && _wlHits[0].clearedVia === 'registry file'
+  && !_wlHits[1].whitelisted);
+check('a disposition-sourced pair cites its case as evidence',
+  _wl.get(whitelistKey('bravo|ubo|999', 'BRAVO TRADING', 'UK OFSI — Consolidated list of targets (CSV)')).clearedVia === 'case t1');
+check('normalizeHit carries the whitelist annotation through the rebuild',
+  (() => { const h = normalizeHit({ list: 'L', hitName: 'N', score: 80, whitelisted: true, clearedVia: 'case t1' });
+    return h.whitelisted === true && h.clearedVia === 'case t1'; })());
+check('hitDetail persists the whitelist annotation into the state record',
+  (() => { const d = hitDetail([{ list: 'L', hitName: 'N', score: 80, whitelisted: true, clearedAt: '2026-08-01' }]);
+    return d[0].whitelisted === true && d[0].clearedAt === '2026-08-01'; })());
+
+/* ── OFAC-API second-opinion parser (shape-tolerant, unavailable ≠ clear) ── */
+check('OFAC-API: matches present → corroborated with count + top score',
+  (() => { const p = parseOfacApiResponse({ results: [{ name: 'X', matches: [{ score: 92 }, { score: 71 }] }] });
+    return p.status === 'corroborated' && p.matchCount === 2 && p.topScore === 92; })());
+check('OFAC-API: empty matches → no-match (never silently corroborated)',
+  parseOfacApiResponse({ results: [{ name: 'X', matches: [] }] }).status === 'no-match');
+check('OFAC-API: error payload → unavailable with the reason',
+  (() => { const p = parseOfacApiResponse({ errorMessage: 'invalid api key' });
+    return p.status === 'unavailable' && p.error.includes('invalid api key'); })());
+check('OFAC-API: unrecognised shape → unavailable, never a guess',
+  parseOfacApiResponse({ totally: 'different' }).status === 'unavailable');
+check('OFAC-API: non-object → unavailable', parseOfacApiResponse(null).status === 'unavailable');
+
+/* ── Ad-hoc batch screening (scripts/batch-screen.mjs — pure parts) ── */
+const { parseNamesInput, buildBatchReport } = await import('./../scripts/batch-screen.mjs');
+check('batch: header-aware CSV takes the name column',
+  JSON.stringify(parseNamesInput('country,name\nAE,"ACME LLC"\nSG,Bravo')) === '["ACME LLC","Bravo"]');
+check('batch: plain one-per-line list works, blanks dropped',
+  JSON.stringify(parseNamesInput('ACME LLC\n\nBravo Trading\n')) === '["ACME LLC","Bravo Trading"]');
+check('batch: empty input yields no names', parseNamesInput('').length === 0);
+const _batchRep = buildBatchReport(
+  [{ name: 'A|B', band: 'high', topScore: 90, recommendation: 'sanctions-match',
+     lists: [{ list: 'US OFAC — SDN list (CSV)', hitName: 'A', score: 90 }] },
+   { name: 'Clean Co', band: 'low', topScore: 0, recommendation: 'clear', lists: [] }],
+  { date: '2026-08-05', threshold: 85, listsLoaded: 10,
+    failures: ['UN Security Council — fetch failed'], governanceNote: 'GOV-NOTE' });
+check('batch report: counts, pipe-escaping, clear rows, governance note',
+  _batchRep.includes('1 of 2 name(s)') && _batchRep.includes('A\\|B')
+  && _batchRep.includes('no list match') && _batchRep.includes('GOV-NOTE'));
+check('batch report: a pre-escaped backslash-pipe cannot re-arm the pipe (CodeQL)',
+  buildBatchReport([{ name: 'X\\|Y', band: 'low', topScore: 0, recommendation: 'clear', lists: [] }],
+    { date: '2026-08-05', threshold: 85, listsLoaded: 10, failures: [], governanceNote: '' })
+    .includes('X\\\\\\|Y'));
+check('batch report: failed lists are disclosed as reduced coverage',
+  _batchRep.includes('Reduced coverage') && _batchRep.includes('UN Security Council — fetch failed'));
+
+/* ── yente benchmark (experimental, shadow-only — pure functions) ── */
+const yb = await import('./../scripts/yente-bench.mjs');
+const _e1 = yb.ftmEntity('ACME Trading LLC', 'r001');
+check('yente: ftmEntity id is stable, prefixed, and seed-derived',
+  /^hb-[0-9a-f]{16}$/.test(_e1.id) && _e1.id === yb.ftmEntity('ACME Trading LLC', 'r001').id
+  && _e1.id !== yb.ftmEntity('ACME Trading LLC', 'r002').id);
+check('yente: ftmEntity carries name + sanction topic on LegalEntity',
+  _e1.schema === 'LegalEntity' && _e1.properties.name[0] === 'ACME Trading LLC'
+  && _e1.properties.topics[0] === 'sanction');
+check('yente: manifest declares the custom dataset and its container path',
+  yb.buildManifest('/data/hawkeye-bench.ftm.json').includes(`name: ${yb.DATASET}`)
+  && yb.buildManifest('/data/hawkeye-bench.ftm.json').includes('path: /data/hawkeye-bench.ftm.json')
+  && yb.buildManifest('/data/x').includes('self-generated'));
+check('yente: matchQuery wraps the subject as a LegalEntity name query',
+  JSON.stringify(yb.matchQuery('Bob')) === '{"schema":"LegalEntity","properties":{"name":["Bob"]}}');
+const _ybPairs = [
+  { subject: 'A', mechanism: 'exact' }, { subject: 'B', mechanism: 'alias' },
+  { subject: 'C', mechanism: 'alias' }];
+const _ybNegs = [{ subject: 'N1' }, { subject: 'N2' }];
+const _ybRes = new Map([['A', 0.9], ['B', 0.65], ['C', 0.4], ['N1', 0.75], ['N2', 0.1]]);
+const _ybEval = yb.evaluate(_ybPairs, _ybNegs, _ybRes, 0.6);
+check('yente: evaluate scores recall and false positives at the threshold',
+  _ybEval.recall.hits === 2 && _ybEval.recall.total === 3
+  && _ybEval.false_positives.fps === 1 && _ybEval.false_positives.total === 2);
+check('yente: evaluate breaks recall down by mechanism',
+  _ybEval.recall.by_mechanism.exact.hits === 1 && _ybEval.recall.by_mechanism.alias.hits === 1
+  && _ybEval.recall.by_mechanism.alias.total === 2);
+check('yente: a subject yente never scored counts as a miss, not a crash',
+  yb.evaluate([{ subject: 'ghost', mechanism: 'exact' }], [], new Map(), 0.5).recall.hits === 0);
+const _ybMd = yb.report([yb.evaluate(_ybPairs, _ybNegs, _ybRes, 0.5), _ybEval,
+  yb.evaluate(_ybPairs, _ybNegs, _ybRes, 0.7)]);
+check('yente: report renders the threshold table and per-mechanism recall',
+  _ybMd.includes('| 0.5 |') && _ybMd.includes('| 0.7 |') && _ybMd.includes('alias: 1/2')
+  && _ybMd.includes('no external data downloaded'));
+check('yente: report frames adoption as governed by the recall-monotone invariant',
+  _ybMd.includes('recall-monotone') && _ybMd.includes('baseline.json'));
+
+/* ── worldwide expansion: CSL parser, ODS parser, FBI Wanted signal ── */
+const wm = await import('./../scripts/sanctions-match.mjs');
+const _csl = wm.parseCslCsv(
+  'source,entity_number,type,programs,name,title,addresses,alt_names\n'
+  + 'Entity List (EL) - Bureau of Industry and Security,,Entity,,ACME PRECISION CO LTD,,Somewhere,"ACME PRECISION; APC TRADING"\n'
+  + 'Denied Persons List (DPL) - Bureau of Industry and Security,,Individual,,John Q Denied,,,\n');
+check('CSL: primary names + ;-separated alt_names all screen',
+  _csl.includes('ACME PRECISION CO LTD') && _csl.includes('APC TRADING')
+  && _csl.includes('John Q Denied') && _csl.length === 4);
+check('CSL: a body with no name column parses 0 names (degrades, never guesses)',
+  wm.parseCslCsv('foo,bar\n1,2\n').length === 0);
+const _odsXml = '<office:document-content>'
+  + '<table:table-row><table:table-cell><text:p>Naam</text:p></table:table-cell><table:table-cell><text:p>Voornaam</text:p></table:table-cell></table:table-row>'
+  + '<table:table-row><table:table-cell><text:p>Jansen</text:p></table:table-cell><table:table-cell><text:p>Pieter</text:p></table:table-cell></table:table-row>'
+  + '<table:table-row><table:table-cell table:number-columns-repeated="2"/></table:table-row>'
+  + '<table:table-row><table:table-cell><text:p>Stichting X</text:p></table:table-cell><table:table-cell/></table:table-row>'
+  + '</office:document-content>';
+check('ODS: Dutch name columns located by header, names joined across them',
+  JSON.stringify(wm.parseOdsContent(_odsXml)) === '["Jansen Pieter","Stichting X"]');
+/* XLSX inline strings carry rich text as multiple <t> runs that CONCATENATE —
+   reading only the first run truncated a designated name mid-string. */
+check('XLSX: an inlineStr cell joins every rich-text run (no mid-name truncation)',
+  JSON.stringify(wm.parseSheetRows('<row r="1"><c r="A1" t="inlineStr"><is><r><t>ISLAMIC REVOLUTIONARY</t></r><r><t> GUARD CORPS</t></r></is></c></row>', []))
+  === '[["ISLAMIC REVOLUTIONARY GUARD CORPS"]]');
+check('ODS: a self-closed empty cell keeps its column (the greedy attr group ate the next cell)', (() => {
+  const xml = '<table:table-row><table:table-cell><text:p>Nr</text:p></table:table-cell>'
+    + '<table:table-cell><text:p>Naam</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell/><table:table-cell><text:p>Jansen Piet</text:p></table:table-cell></table:table-row>';
+  return JSON.stringify(wm.parseOdsContent(xml)) === '["Jansen Piet"]';
+})());
+/* Merged cells: <table:covered-table-cell> holds the grid positions under a
+   merge. Skipping them shifted later cells LEFT, so merged rows read their name
+   from the wrong column and vanished while the row count stayed above the floor. */
+check('ODS: covered (merged) cells hold their grid position — the name column does not shift', (() => {
+  const xml = '<table:table-row><table:table-cell><text:p>Nr</text:p></table:table-cell>'
+    + '<table:table-cell><text:p>Naam</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-covered-cell/><table:table-cell><text:p>De Vries Jan</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:covered-table-cell/><table:table-cell><text:p>Bakker Ali</text:p></table:table-cell></table:table-row>';
+  const names = wm.parseOdsContent(xml);
+  return names.includes('Bakker Ali');
+})());
+check('ODS: content with no header row yields 0 names', wm.parseOdsContent('<table:table-row><table:table-cell><text:p>x</text:p></table:table-cell></table:table-row>').length === 0);
+check('ODS: tag stripping removes inline spans and unterminated tags (CodeQL)',
+  JSON.stringify(wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Acme <text:span>Ltd</text:span> <script</text:p></table:table-cell></table:table-row>'))
+  === '["Acme Ltd"]');
+check('ODS: no "<" survives the fixpoint strip — "<scr<x>ipt>" cannot rebuild a tag (CodeQL)',
+  wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Acme<scr<x>ipt>Ltd</text:p></table:table-cell></table:table-row>')
+    .every(n => !n.includes('<')));
+check('ODS: entity unescaping is single-pass — a literal &amp;lt; never becomes < (CodeQL)',
+  JSON.stringify(wm.parseOdsContent('<table:table-row><table:table-cell><text:p>Name</text:p></table:table-cell></table:table-row>'
+    + '<table:table-row><table:table-cell><text:p>Smith &amp;amp; Jones &amp;amp;lt;Ltd&amp;amp;gt;</text:p></table:table-cell></table:table-row>'
+      .replace(/&amp;amp;/g, '&amp;')))
+  === '["Smith & Jones &lt;Ltd&gt;"]');
+const fbi = await import('./../scripts/fbi-check.mjs');
+check('FBI: search URL encodes the subject against the public endpoint',
+  fbi.fbiSearchUrl('Ali Al-Test') === 'https://api.fbi.gov/wanted/v1/list?pageSize=20&title=Ali%20Al-Test');
+const _fbiHit = fbi.scoreFbi('John Dillinger', { items: [
+  { title: 'JOHN HERBERT DILLINGER', poster_classification: 'default', url: 'https://www.fbi.gov/x' },
+  { title: 'John Dillinger', poster_classification: 'missing' }] });
+check('FBI: a wanted poster matching all subject tokens is a high-band hit',
+  _fbiHit.hit && _fbiHit.band === 'high' && _fbiHit.score === 85 && _fbiHit.match.title === 'JOHN HERBERT DILLINGER');
+check('FBI: missing-person posters never count as adverse (excluded, tallied)',
+  _fbiHit.excluded === 1
+  && fbi.scoreFbi('Jane Doe', { items: [{ title: 'JANE DOE', poster_classification: 'missing' }] }).hit === false);
+check('FBI: alias matches count; unrelated namesakes do not',
+  fbi.scoreFbi('Rico Vasquez', { items: [{ title: 'ENRIQUE GARCIA', aliases: ['Rico Vasquez'], poster_classification: 'default' }] }).hit === true
+  && fbi.scoreFbi('Rico Vasquez', { items: [{ title: 'RICO ALVAREZ', poster_classification: 'default' }] }).hit === false);
+check('FBI: an unrecognized poster class is excluded until reviewed, never promoted',
+  fbi.scoreFbi('A B Test', { items: [{ title: 'A B TEST', poster_classification: 'brand-new-class' }] }).hit === false);
+check('FBI: victim/accomplice rows never screen as wanted subjects',
+  fbi.scoreFbi('Vic Timson', { items: [{ title: 'VIC TIMSON', poster_classification: 'default', person_classification: 'Victim' }] }).hit === false);
+check('FBI: a captured poster is history, not a live hit',
+  fbi.scoreFbi('Cap Turedman', { items: [{ title: 'CAP TUREDMAN', poster_classification: 'default', status: 'captured' }] }).hit === false);
+check('CSL: SDN-source rows are dropped (already screened via the OFAC feeds)',
+  wm.parseCslCsv('source,name,alt_names\n"Specially Designated Nationals (SDN) - Treasury Department",DUPE PERSON,\n"Entity List (EL) - Bureau of Industry and Security",REAL ENTITY,\n')
+    .join('|') === 'REAL ENTITY');
+
+/* ── worldwide PEP list (Wikidata harvest — pure functions) ── */
+const pep = await import('./../scripts/pep-worldwide.mjs');
+check('PEP harvest: positions query is a bare DISTINCT P279* walk — no label service, no OPTIONALs (the 2026-08-06 9MB truncation at the WDQS 60s kill)',
+  pep.positionsQuery('Q48352').includes('wdt:P279* wd:Q48352')
+  && pep.positionsQuery('Q48352').includes('SELECT DISTINCT ?pos')
+  && !pep.positionsQuery('Q48352').includes('wikibase:label')
+  && !/OPTIONAL/i.test(pep.positionsQuery('Q48352')));
+const _hq = pep.holdersQuery(['Q11696', 'Q14212'], '2024-08-05T00:00:00Z');
+check('PEP harvest: holders query batches positions via VALUES at BestRank with the recency filter',
+  _hq.includes('VALUES ?pos { wd:Q11696 wd:Q14212 }') && _hq.includes('wikibase:BestRank')
+  && _hq.includes('pq:P582') && _hq.includes('"2024-08-05T00:00:00Z"^^xsd:dateTime')
+  && !/OFFSET/i.test(_hq));
+check('PEP harvest: SPARQL bindings parse to plain rows with QIDs reduced',
+  JSON.stringify(pep.parseSparqlBindings({ results: { bindings: [
+    { person: { type: 'uri', value: 'http://www.wikidata.org/entity/Q7747' }, end: { type: 'literal', value: '2024-05-07' } }] } }))
+  === '[{"person":"Q7747","end":"2024-05-07"}]');
+check('PEP harvest: an unrecognised SPARQL shape parses to [] (zero-guards take over)',
+  pep.parseSparqlBindings({ oops: true }).length === 0);
+const _ent = pep.namesFromEntity({
+  labels: { en: { value: 'Test Person' }, ar: { value: 'شخص اختبار' }, ru: { value: 'Тест Персон' } },
+  aliases: { en: [{ value: 'T. Person' }], ar: [{ value: 'اختبار' }] } });
+check('PEP harvest: every-language labels and aliases fold into the alias set, original scripts kept',
+  _ent.name === 'Test Person' && _ent.aliases.includes('شخص اختبار')
+  && _ent.aliases.includes('Тест Персон') && _ent.aliases.includes('T. Person')
+  && !_ent.aliases.includes('Test Person'));
+const _ds = pep.buildPepDataset({
+  harvestedAt: '2026-08-05T00:00:00Z',
+  holderRows: [
+    { person: 'Q1x', pos: 'P1', end: '', classKey: 'legislator' },
+    { person: 'Q1x', pos: 'P2', end: '', classKey: 'head-of-state' },
+    { person: 'Q2x', pos: 'P1', end: '2025-01-01', classKey: 'legislator' },
+    { person: 'Q3x', pos: 'P9', end: '', classKey: 'minister' }],
+  positions: new Map([['P1', { label: 'MP of Testland', country: 'Testland' }], ['P2', { label: 'President of Testland', country: 'Testland' }]]),
+  names: new Map([['Q1x', { name: 'Alpha Leader', aliases: ['A. Leader'] }], ['Q2x', { name: 'Beta Member', aliases: [] }]]),
+});
+check('PEP harvest: dedupe keeps the most senior class; unlabeled persons drop; counts per class',
+  _ds.count === 2 && _ds.classes['head-of-state'] === 1 && _ds.classes.legislator === 1
+  && _ds.entries.find(e => e.qid === 'Q1x').position === 'President of Testland'
+  && _ds.entries.find(e => e.qid === 'Q2x').current === false
+  && !_ds.entries.find(e => e.qid === 'Q3x'));
+check('PEP harvest: floor gate refuses a hollow harvest and a >40% shrink, passes a healthy one',
+  pep.datasetFloorOk({ count: 10 }, null, { floor: 5000 }).ok === false
+  && pep.datasetFloorOk({ count: 6000 }, { count: 12000 }, { floor: 5000, shrinkPct: 0.6 }).ok === false
+  && pep.datasetFloorOk({ count: 11000 }, { count: 12000 }, { floor: 5000, shrinkPct: 0.6 }).ok === true);
+const _plist = pep.pepListFromDataset(_ds);
+check('PEP list: dataset flattens to a matcher list + per-name office context map',
+  _plist.list.name === pep.PEP_LIST_NAME && _plist.list.names.includes('Alpha Leader')
+  && _plist.list.names.includes('A. Leader')
+  && _plist.meta.get('A. Leader').position === 'President of Testland'
+  && _plist.count === 2);
+check('PEP list: the list name rides the non-whitelistable PEP prefix',
+  pep.PEP_LIST_NAME.startsWith('PEP ('));
+check('PEP harvest: batch-failure gate tolerates a few flaky WDQS batches, refuses an outage',
+  pep.batchFailureOk(5, 100).ok === true
+  && pep.batchFailureOk(15, 100).ok === false
+  && pep.batchFailureOk(0, 0).ok === true
+  && pep.batchFailureOk(10, 100).ok === true);
+check('PEP harvest: holder batch size stays well under the WDQS 60s kill (≤ 100)',
+  pep.HOLDER_BATCH <= 100);
+check('PEP classes: the core FATF categories stay REQUIRED, expansions are optional', (() => {
+  const byKey = new Map(pep.PEP_ROOT_CLASSES.map(c => [c.key, c]));
+  const core = ['head-of-state', 'head-of-government', 'minister', 'legislator', 'governor'];
+  const coreRequired = core.every(k => byKey.has(k) && !byKey.get(k).optional);
+  // Senior-official expansion present and OPTIONAL (a wrong/empty QID degrades
+  // loudly to zero-holders, never fails the harvest).
+  const expansions = ['ombudsman', 'prosecutor-general', 'auditor-general'];
+  const optionalAdds = expansions.every(k => byKey.has(k) && byKey.get(k).optional === true);
+  // ombudsman carries the cross-verified QID.
+  return coreRequired && optionalAdds && byKey.get('ombudsman').qid === 'Q169180'
+    && pep.PEP_ROOT_CLASSES.every(c => /^Q\d+$/.test(c.qid));
+})());
+
+/* ── PEP harvest resumability (time-budget checkpoint — the monolithic 1-3h
+   run kept dying to abnormal runner terminations with zero salvage) ── */
+check('PEP checkpoint: path derives from the outfile, beside it',
+  pep.checkpointPath('data/pep-worldwide.json') === 'data/pep-worldwide-checkpoint.json');
+const _cpOk = { v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: new Date(Date.now() - 3600000).toISOString(), phase: 'holders', resumeCount: 2 };
+check('PEP checkpoint: a fresh checkpoint resumes; an unrecognized shape starts fresh (never fatal)',
+  pep.checkpointUsable(_cpOk).ok === true
+  && pep.checkpointUsable(null).ok === false && pep.checkpointUsable(null).fatal === false
+  && pep.checkpointUsable({ v: 99 }).ok === false && pep.checkpointUsable({ v: 99 }).fatal === false);
+check('PEP checkpoint: a stale checkpoint (previous weekly cycle) is discarded, not resumed', (() => {
+  const u = pep.checkpointUsable({ ..._cpOk, harvestedAt: new Date(Date.now() - 8 * 86400000).toISOString() });
+  return u.ok === false && u.fatal === false;
+})());
+check('PEP checkpoint: resume-count past the cap is FATAL — a non-converging harvest fails loudly, never loops', (() => {
+  const u = pep.checkpointUsable({ ..._cpOk, resumeCount: pep.PEP_MAX_RESUMES });
+  return u.ok === false && u.fatal === true;
+})());
+/* The checkpoint is GZIPPED: the first live harvest banked 60MB of holder rows
+   (~809k) before the labels phase even began, and GitHub REFUSES a push with a
+   file over 100MB — an uncompressed checkpoint would kill the chain exactly when
+   it held the most work. Reads must still accept a plain-JSON checkpoint written
+   before the change, or hours of banked WDQS work are discarded as "unrecognized". */
+{
+  const { writeFileSync: _wf, readFileSync: _rf, unlinkSync: _ul } = await import('node:fs');
+  const { gzipSync } = await import('node:zlib');
+  const tmp = (await import('node:os')).tmpdir() + '/pep-cp-test.json';
+  const obj = { v: 1, phase: 'holders', holderRows: [{ person: 'Q1', pos: 'Q2', end: '', classKey: 'minister' }] };
+  pep.writeCheckpoint(tmp, obj);
+  const raw = _rf(tmp);
+  check('PEP checkpoint is written GZIPPED (a >100MB plain file cannot be pushed at all)',
+    raw[0] === 0x1f && raw[1] === 0x8b && raw.length < JSON.stringify(obj).length + 64);
+  check('PEP checkpoint round-trips through gzip', pep.readCheckpoint(tmp).holderRows[0].person === 'Q1');
+  _wf(tmp, JSON.stringify(obj), 'utf8');           // legacy plain-JSON checkpoint
+  check('PEP checkpoint still READS a pre-gzip checkpoint (banked work is never discarded on a format change)',
+    pep.readCheckpoint(tmp).phase === 'holders');
+  _wf(tmp, gzipSync(Buffer.from(JSON.stringify(obj))));
+  check('PEP checkpoint reads a gzip buffer written externally', pep.readCheckpoint(tmp).v === 1);
+  try { _ul(tmp); } catch { /* best-effort cleanup */ }
+}
+
+/* The ARTIFACT hits the same 100MB wall as the checkpoint: measured on the first
+   live harvest (20,550 persons banked, 259 bytes of multilingual names each) the
+   finished dataset projects to ~135MB for the 422,231 people found holding
+   office. Compressing it is what keeps every alias — the alternative is cutting
+   aliases, which would lower recall. */
+{
+  const { writeFileSync: _wf, readFileSync: _rf, unlinkSync: _ul } = await import('node:fs');
+  const tmp = (await import('node:os')).tmpdir() + '/pep-artifact-test.json';
+  const ds = { v: 1, count: 1, harvested: '2026-08-06T00:00:00Z', classes: { minister: 1 },
+    entries: [{ qid: 'Q1', name: 'A Name', aliases: ['Алиас', '別名'], position: 'Minister', country: 'AE', current: true }] };
+  pep.writeJsonGz(tmp, ds);
+  const raw = _rf(tmp);
+  check('PEP artifact is written GZIPPED (a ~135MB plain artifact cannot be pushed at all)',
+    raw[0] === 0x1f && raw[1] === 0x8b);
+  check('PEP artifact round-trips through gzip with non-Latin aliases intact',
+    pep.readJsonMaybeGz(tmp).entries[0].aliases.join('|') === 'Алиас|別名');
+  _wf(tmp, JSON.stringify(ds), 'utf8');            // artifact written before this change
+  check('PEP artifact reader still accepts a plain-JSON artifact (a harvest already on the state branch keeps screening)',
+    pep.readJsonMaybeGz(tmp).count === 1);
+  check('PEP artifact reader feeds pepListFromDataset unchanged (the screen consumes either format)',
+    pep.pepListFromDataset(pep.readJsonMaybeGz(tmp)).list.names.length >= 3);
+  try { _ul(tmp); } catch { /* best-effort cleanup */ }
+}
+
+/* Label fetching is CONCURRENT or the harvest never finishes: 422,231 persons
+   at 50 per request is 8,445 round-trips, and a measured chain link banked 411
+   of them in its 40-min budget — ~13 more links against a 12-resume cap. The
+   window must be a whole multiple of the chunk so a pause mid-phase resumes on a
+   chunk boundary and re-fetches at most one window. */
+check('PEP labels: the fetch window is LABEL_CONCURRENCY whole chunks (resume lands on a chunk boundary)',
+  pep.LABEL_CONCURRENCY >= 2 && pep.LABEL_WINDOW === pep.LABEL_CHUNK * pep.LABEL_CONCURRENCY);
+check('PEP labels: wbgetentities requests still carry maxlag (the Wikimedia politeness contract that throttles US when the cluster is loaded)',
+  pep.labelsUrl(['Q1', 'Q2']).includes('maxlag=') && pep.labelsUrl(['Q1', 'Q2']).includes('props=labels%7Caliases'));
+check('PEP checkpoint: per-class batch failures ride the checkpoint (the zero-holders guard gates on ITS OWN class, not the global counter)', (() => {
+  const st = pep.restoreCheckpoint({ v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
+    resumeCount: 0, phase: 'holders', positions: [], posByClass: [], holderRows: [],
+    classHolders: { minister: 5 }, classBatchFailed: { minister: '2' }, batchTotal: 9, batchFailed: 2,
+    next: { classIdx: 1, posIdx: 0 } });
+  return st.classBatchFailed.minister === 2 && st.batchFailed === 2;
+})());
+check('PEP checkpoint: a positions-phase pause restores as phase positions — resume re-enumerates, never sweeps a partial class list', (() => {
+  const st = pep.restoreCheckpoint({ v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z', resumeCount: 0, phase: 'positions', positions: [], posByClass: [], holderRows: [], classHolders: {}, batchTotal: 0, batchFailed: 0, next: { classIdx: 0, posIdx: 0 } });
+  return st.phase === 'positions' && st.posByClass.size === 0;
+})());
+/* The budget used to be asserted under 60 min to duck runs dying at ~63 min.
+   That was never runner fragility: the egress block was denying GitHub's
+   hosted-compute watchdog and the runner was being RECLAIMED on a fixed timer.
+   With *.githubapp.com allowed the ceiling is gone, so the invariant that
+   matters is the one that was always the real point — the budget must leave the
+   pause enough runway to write its checkpoint before the JOB TIMEOUT kills the
+   run, or a pause that fires is still lost work. Asserted against the workflow's
+   own timeout so the two can never drift apart silently. */
+check('PEP checkpoint: the time budget leaves the pause runway before the job timeout; resumes are bounded', (() => {
+  const wf = readFileSync(join(ROOT, '.github/workflows/pep-worldwide.yml'), 'utf8');
+  const timeout = Number((wf.match(/^\s*timeout-minutes:\s*(\d+)/m) || [])[1]);
+  return Number.isFinite(timeout)
+    && pep.PEP_TIME_BUDGET_MIN + 30 <= timeout       // ≥30 min of runway for the pause
+    && pep.PEP_MAX_RESUMES >= 4 && pep.RESUME_EXIT_CODE === 75;
+})());
+/* Sharding beats a per-client rate limit by using more clients — but only if the
+   partition is exact. A shard that skipped people, or two shards that both
+   claimed one, would publish a list quietly short of those PEPs, and a PEP
+   absent from the list screens CLEAN. These check the property directly. */
+{
+  const qids = Array.from({ length: 1000 }, (_, i) => 'Q' + i);
+  const slices = [0, 1, 2, 3, 4, 5, 6, 7].map(i => pep.shardOf(qids, i, 8));
+  const union = slices.flat();
+  check('PEP shard: every person lands in exactly one shard — nothing lost, nothing duplicated',
+    union.length === qids.length && new Set(union).size === qids.length
+    && [...new Set(union)].sort().join() === [...qids].sort().join());
+  check('PEP shard: the slices are evenly sized (no runner carries the whole backlog)',
+    slices.every(s => Math.abs(s.length - qids.length / 8) <= 1));
+  check('PEP shard: COUNT=1 is exactly the unsharded list (the weekly harvest is unchanged)',
+    pep.shardOf(qids, 0, 1).length === qids.length);
+  const merged = pep.mergeShardNames([
+    [['Q1', { name: 'A', aliases: [] }]],
+    [['Q2', { name: 'B', aliases: [] }]],
+    [['Q1', { name: 'A', aliases: [] }], ['Q3', { name: 'C', aliases: [] }]],
+  ]);
+  check('PEP shard: merging slices unions them and tolerates an overlapping re-run',
+    merged.size === 3 && merged.get('Q2').name === 'B' && merged.get('Q3').name === 'C');
+  check('PEP shard: a nameless entry never enters the merged map (unlabelled is not screenable)',
+    pep.mergeShardNames([[['Q9', { name: '', aliases: [] }]]]).size === 0);
+
+  /* RECALL. The labels phase is driven by who is still unlabelled, never by a
+     saved position — a chunk whose retries all 429'd returns null and leaves
+     its 50 people unnamed, and a resume that marched past a saved index would
+     never ask for them again. They would drop out of the PEP list for good and
+     screen CLEAN forever after. Measured, not hypothetical: the 07:16 link met
+     a hard throttle and all ~7,700 people it requested came back null. */
+  {
+    const all = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6'];
+    const named = new Map([['Q2', { name: 'B', aliases: [] }], ['Q5', { name: 'E', aliases: [] }]]);
+    check('PEP labels: a resume asks for exactly the people still unlabelled',
+      pep.pendingLabels(all, named, { count: 1 }).join() === 'Q1,Q3,Q4,Q6');
+    check('PEP labels: people a throttled window left unnamed are asked for AGAIN, not skipped',
+      pep.pendingLabels(all, new Map(), { count: 1 }).join() === all.join());
+    check('PEP labels: a complete pass leaves nothing pending (the loop terminates)',
+      pep.pendingLabels(all, new Map(all.map(q => [q, { name: q, aliases: [] }])), { count: 1 }).length === 0);
+    /* Shards partition the FULL list before filtering, so the partition does
+       not depend on what each shard had already banked — otherwise the union
+       of the slices would stop being the input list and people would vanish
+       between shards. */
+    const sharded = [0, 1].map(i => pep.pendingLabels(all, named, { count: 2, index: i }));
+    check('PEP labels: sharded pending sets still union to every unlabelled person, no overlap',
+      sharded.flat().sort().join() === ['Q1', 'Q3', 'Q4', 'Q6'].sort().join()
+      && new Set(sharded.flat()).size === 4);
+  }
+
+  /* OFFICE CONTEXT. A PEP hit is a REVIEW-tier signal — the MLRO's job is to
+     verify the person's office — so an entry reading "Q15686806, country blank"
+     cannot be triaged without a manual lookup per hit. The live artifact had
+     68.6% raw-QID offices and no country at all: the label pass was gated on
+     `phase !== 'labels'` so the first budget pause switched it off permanently,
+     and the country pass never existed (wbgetentities is asked for
+     labels|aliases and returns no claims, so the comment promising "country
+     rides the label pass" was never true). */
+  {
+    const q = pep.officeContextQuery(['Q1', 'Q2']);
+    check('PEP offices: country is asked for over a VALUES list, never bolted onto the P279* walk',
+      q.includes('VALUES ?pos { wd:Q1 wd:Q2 }') && !q.includes('P279')
+      && q.includes('wdt:P17') && q.includes('wdt:P1001'));
+    /* Separate variables, not a UNION: an office carrying both (a US state
+       senator — country USA, jurisdiction California) would otherwise take
+       whichever row SPARQL emitted first, since union order is undefined, and
+       land a subdivision in a field the MLRO reads as a country. */
+    check('PEP offices: country and jurisdiction come back separately so P17 can be PREFERRED',
+      q.includes('?country ?jurisdiction') && !q.includes('UNION')
+      && /OPTIONAL \{ \?pos wdt:P17 \?country \}/.test(q)
+      && /OPTIONAL \{ \?pos wdt:P1001 \?jurisdiction \}/.test(q));
+    check('PEP offices: P1001 is only a fallback, never preferred over P17',
+      /r\.country \|\| r\.jurisdiction/.test(readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8')));
+    const positions = new Map([
+      ['Q1', { label: '', country: '', classKey: 'minister' }],
+      ['Q2', { label: 'Mayor', country: '', classKey: 'minister' }],
+      ['Q3', { label: 'Envoy', country: 'Q30', classKey: 'minister' }],
+      ['Q4', { label: '', country: '', classKey: 'minister' }],   // enumerated, no holder
+    ]);
+    const rows = [{ pos: 'Q1' }, { pos: 'Q2' }, { pos: 'Q3' }];
+    check('PEP offices: only offices that actually have a holder are asked about',
+      !pep.pendingOffices(positions, rows, 'label').includes('Q4')
+      && !pep.pendingOffices(positions, rows, 'country').includes('Q4'));
+    check('PEP offices: the pass resumes on what is still missing, per field',
+      pep.pendingOffices(positions, rows, 'label').join() === 'Q1'
+      && pep.pendingOffices(positions, rows, 'country').sort().join() === 'Q1,Q2');
+    positions.get('Q1').label = 'Minister'; positions.get('Q1').country = 'Q878';
+    positions.get('Q2').country = 'Q878';
+    check('PEP offices: a completed pass leaves nothing pending (it converges instead of looping)',
+      pep.pendingOffices(positions, rows, 'label').length === 0
+      && pep.pendingOffices(positions, rows, 'country').length === 0);
+    const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+    /* Read the office block itself rather than a fixed character window after
+       the guard — a distance-based match silently goes red the moment the block
+       grows, which tells you nothing about the invariant. */
+    const officeBlock = src.slice(src.indexOf('if (PEP_SHARD_COUNT === 1) {'), src.indexOf('/* Labels phase'));
+    check('PEP offices: the pass is NOT gated on the phase (that is what switched it off for good)',
+      !/if \(!st \|\| st\.phase !== 'labels'\) \{[\s\S]{0,200}offices/.test(src)
+      && officeBlock.includes('pendingOffices'));
+    /* Every office loop banks on the same timer the person-labels loop uses.
+       Without it the whole pass lived only in memory until the budget pause, and
+       this pass can occupy an entire link on its own — the first live run spent
+       all 100 minutes on it and banked no person names at all, so an interrupted
+       link would have thrown away every office it had named. */
+    check('PEP offices: every office loop banks on the timer, not just at the pause',
+      (officeBlock.match(/officeTick\(\);/g) || []).length
+        === (officeBlock.match(/if \(overBudget\(\)\) officePause\(\);/g) || []).length
+      && (officeBlock.match(/officeTick\(\);/g) || []).length === 3
+      && src.indexOf('const BANK_EVERY_MS') < src.indexOf('if (PEP_SHARD_COUNT === 1) {'));
+    /* P17/P1001 answer with an ENTITY. Left as-is the artifact would carry
+       "Q30" where a country belongs, which on an MLRO's screen is barely better
+       than the blank it replaced. */
+    check('PEP offices: country QIDs are resolved to names before they reach the artifact',
+      /countryQids[\s\S]{0,600}fetchLabelWindow\(countryQids[\s\S]{0,400}cnames\.has\(p\.country\)/.test(src));
+    /* And again at the point of ASSEMBLY. Resolution used to exist only at the
+       tail of the office pass, behind ~1,000 serial WDQS queries that can pause
+       at the time budget — which is what happened on two consecutive live
+       links, leaving 49,109 offices carrying "Q159" where "Russia" belongs. A
+       step that cheap must not be reachable only by finishing an expensive one. */
+    const mergeFn = src.slice(src.indexOf('export async function mergeShards'));
+    check('PEP merge: resolves QID countries itself, so a paused office pass cannot strand them',
+      /qidCountries[\s\S]{0,400}fetchLabelWindow\(qidCountries/.test(mergeFn)
+      && /cnames\.has\(p\.country\)/.test(mergeFn));
+    const shardYml = readFileSync(join(ROOT, '.github/workflows/pep-shard-harvest.yml'), 'utf8');
+    check('PEP merge: the merge job is allowed the one host that resolution needs',
+      /www\.wikidata\.org:443/.test(shardYml.slice(shardYml.indexOf('  merge:'))));
+    /* ~1,000 SERIAL WDQS queries, where a rejected query returns null after six
+       retries with backoff — one batch at a time, indistinguishable from an
+       office that genuinely has no country. Unguarded, a malformed query would
+       spend the whole time budget failing quietly and the link would bank
+       nothing at all. */
+    check('PEP offices: the country pass gives up LOUDLY if its opening batches answer nothing',
+      /const PROBE = \d+;/.test(src)
+      && /win \+ 1 === PROBE && answered === 0/.test(src)
+      && /ABANDONED/.test(src));
+  }
+
+  /* Concurrency is a cliff, not a slope. 5 and 10 each banked ~50,000 names per
+     link; 20 collapsed to 773 HTTP 429s, Retry-After pinned at 59-60s and ZERO
+     names in 53 minutes. The shipped default must stay inside the measured band
+     and no repo variable may raise it past the ceiling — the failure mode above
+     it is a client that gets no answers at all. */
+  check('PEP labels: the shipped concurrency stays inside the measured-safe band',
+    pep.LABEL_CONCURRENCY >= 1 && pep.LABEL_CONCURRENCY <= pep.LABEL_CONCURRENCY_MAX
+    && pep.LABEL_CONCURRENCY_MAX <= 10
+    && pep.LABEL_WINDOW === pep.LABEL_CHUNK * pep.LABEL_CONCURRENCY);
+  {
+    const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+    check('PEP labels: PEP_LABEL_CONCURRENCY is CLAMPED, so a repo variable can only dial it down',
+      /Math\.min\(\s*LABEL_CONCURRENCY_MAX,\s*Number\(process\.env\.PEP_LABEL_CONCURRENCY\)/.test(src));
+    /* A cancelled Actions job kills the step's SHELL; node keeps running as an
+       orphan until job cleanup, after the persist step has already committed.
+       So banking cannot depend on a signal arriving — a 53-minute link was
+       cancelled and its checkpoint came back byte-identical to the one it had
+       started from. Banking on a timer bounds the loss to one interval. */
+    check('PEP labels: progress is banked on a timer, not only at the pause or from a signal',
+      /BANK_EVERY_MS\s*=\s*\d+\s*\*\s*60\s*\*\s*1000/.test(src)
+      && /Date\.now\(\) - lastBank >= BANK_EVERY_MS/.test(src));
+  }
+
+  /* The shard workflow's checkpoint filename is DERIVED, not written down: the
+     script names the checkpoint after the outfile. Staging it under any other
+     name means every shard finds nothing, restarts the whole graph sweep from
+     scratch, overruns its budget and publishes nothing — eight runners for an
+     hour, no artifact. That shipped once. These read the workflow and assert
+     the three numbers that have to agree still do. */
+  const shardWf = readFileSync(join(ROOT, '.github/workflows/pep-shard-harvest.yml'), 'utf8');
+  const outfile = (shardWf.match(/pep-worldwide\.mjs harvest (\S+)/) || [])[1];
+  const staged = (shardWf.match(/^\s*cp \S+ (\S+)$/m) || [])[1];
+  check('PEP shard: the workflow stages the checkpoint under the name the outfile derives',
+    Boolean(outfile) && staged === pep.checkpointPath(outfile));
+  const matrix = (shardWf.match(/index:\s*\[([^\]]+)\]/) || [])[1] || '';
+  const declared = Number((shardWf.match(/PEP_SHARD_COUNT:\s*'(\d+)'/) || [])[1]);
+  const collected = (shardWf.match(/for i in ([\d ]+); do/) || [])[1] || '';
+  check('PEP shard: matrix size, PEP_SHARD_COUNT and the merge collect loop all agree',
+    matrix.split(',').length === declared
+    && collected.trim().split(/\s+/).length === declared
+    && declared > 1);
+  check('PEP shard: each slice is stamped with the run that produced it',
+    /PEP_SHARD_RUN:\s*\$\{\{\s*github\.run_id/.test(shardWf));
+
+  /* Slices live on long-lived pep-shard-<i> branches, so a shard that fails
+     leaves the PREVIOUS run's slice in place for the merge to pick up. Merging
+     a stale, half-labelled slice publishes a list quietly short of real PEPs —
+     and a PEP absent from the list screens CLEAN. The merge must refuse. */
+  const { unlinkSync: _ul, existsSync: _ex } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const T = tmpdir() + '/pep-merge-';
+  const out = T + 'out.json', cpFile = T + 'cp.json';
+  /* Above the real 5000 floor, so the positive case exercises the SAME gate
+     production does rather than a relaxed one. */
+  const N = 6000;
+  const people = Array.from({ length: N }, (_, i) => 'Q' + (1000 + i));
+  const writeCp = () => pep.writeCheckpoint(cpFile, {
+    v: 1, harvestedAt: '2026-01-01T00:00:00Z', sinceIso: '2020-01-01T00:00:00Z', phase: 'labels',
+    positions: [['Q100', { label: 'Minister', country: 'AE', classKey: 'minister' }]], posByClass: [],
+    holderRows: people.map(p => ({ person: p, pos: 'Q100', end: '', classKey: 'minister' })),
+    classHolders: {}, classBatchFailed: {}, batchTotal: 1, batchFailed: 0,
+    labelQids: people, names: [], next: { labelIdx: 0 },
+  });
+  const sliceFor = (file, i, of, run) => {
+    pep.writeJsonGz(file, {
+      v: 1, shard: i, of, run,
+      names: pep.shardOf(people, i, 2).map(q => [q, { name: 'Person ' + q, aliases: [] }]),
+    });
+    return file;
+  };
+  writeCp();
+  const s0 = sliceFor(T + 's0.json', 0, 2, 'R1');
+  const stale = sliceFor(T + 's1-stale.json', 1, 2, 'R0');
+  check('PEP merge: REFUSES a slice left behind by an earlier run (stale branch, short list)',
+    await pep.mergeShards(out, cpFile, [s0, stale]) === 1 && !_ex(out));
+  const wrongSplit = sliceFor(T + 's1-split.json', 1, 4, 'R1');
+  check('PEP merge: REFUSES a slice cut for a different shard count (it covers different people)',
+    await pep.mergeShards(out, cpFile, [s0, wrongSplit]) === 1 && !_ex(out));
+  const dup = sliceFor(T + 's0-dup.json', 0, 2, 'R1');
+  check('PEP merge: REFUSES two slices claiming the same index (the other index is then unmerged)',
+    await pep.mergeShards(out, cpFile, [s0, dup]) === 1 && !_ex(out));
+  const s1 = sliceFor(T + 's1.json', 1, 2, 'R1');
+  const okCode = await pep.mergeShards(out, cpFile, [s0, s1]);
+  check('PEP merge: a matching, same-run set merges every person and clears the spent checkpoint',
+    okCode === 0 && _ex(out) && pep.readJsonMaybeGz(out).count === N
+    && !pep.readJsonMaybeGz(out).partial && !_ex(cpFile));
+
+  /* The DENOMINATOR. `expected` came from labelQids alone, but a checkpoint
+     paused in the HOLDERS phase carries none — so expected was 0, partial
+     computed as false, and the merge published a list as COMPLETE however much
+     of the world was missing from it. The screen then prints no
+     partial-coverage warning and every unharvested PEP screens clean with
+     nothing saying so. Observed: "merged 4020 of 0 persons (complete)". */
+  const cp2 = T + 'cp-holders.json';
+  const holdersOnly = (extra) => pep.writeCheckpoint(cp2, {
+    v: 1, harvestedAt: '2026-01-01T00:00:00Z', sinceIso: '2020-01-01T00:00:00Z', phase: 'holders',
+    positions: [['Q100', { label: 'Minister', country: 'AE', classKey: 'minister' }]], posByClass: [],
+    classHolders: {}, classBatchFailed: {}, batchTotal: 1, batchFailed: 0,
+    names: [], next: { labelIdx: 0 }, ...extra,
+  });
+  /* Sized so the SHORT list still clears the 5000 floor — the point here is the
+     partial flag, not the floor gate, and a fixture under the floor would be
+     refused for the wrong reason. */
+  const M = 12000;
+  const many = Array.from({ length: M }, (_, i) => 'Q' + (1000 + i));
+  holdersOnly({ holderRows: many.map(p => ({ person: p, pos: 'Q100', end: '', classKey: 'minister' })) });
+  const half = T + 'half.json';
+  pep.writeJsonGz(half, { v: 1, shard: 0, of: 1, run: 'R2', names: many.slice(0, M / 2).map(q => [q, { name: 'P ' + q, aliases: [] }]) });
+  const outH = T + 'outh.json';
+  const codeH = await pep.mergeShards(outH, cp2, [half]);
+  const dH = _ex(outH) ? pep.readJsonMaybeGz(outH) : null;
+  check('PEP merge: with no labelQids the denominator falls back to the holder rows, so a short list is flagged PARTIAL',
+    codeH === 0 && dH && dH.count === M / 2 && dH.partial === true && dH.expected === M);
+  holdersOnly({ holderRows: [] });
+  const outE = T + 'oute.json';
+  check('PEP merge: REFUSES outright when the shortfall cannot be measured at all',
+    await pep.mergeShards(outE, cp2, [half]) === 1 && !_ex(outE));
+
+  /* RECALL-MONOTONE. Two sharded runs over the same backlog published 419,223
+     then 381,223 people — 38,000 real PEPs dropped out of a live screening list
+     because their label chunks 429'd the second time, and the shrink gate waved
+     it through since 9.1% sat inside its tolerance. A percentage gate bounds how
+     much recall can vanish; it does not stop recall vanishing. A name once
+     published must survive a transient fetch failure. */
+  const mono = T + 'mono.json', cpM = T + 'cpm.json';
+  const writeCpM = () => pep.writeCheckpoint(cpM, {
+    v: 1, harvestedAt: '2026-01-01T00:00:00Z', sinceIso: '2020-01-01T00:00:00Z', phase: 'labels',
+    positions: [['Q100', { label: 'Minister', country: 'Ruritania', classKey: 'minister' }]], posByClass: [],
+    holderRows: many.map(p => ({ person: p, pos: 'Q100', end: '', classKey: 'minister' })),
+    classHolders: {}, classBatchFailed: {}, batchTotal: 1, batchFailed: 0,
+    labelQids: many, names: [], next: { labelIdx: 0 },
+  });
+  const sliceOf = (file, subset, run) => {
+    pep.writeJsonGz(file, { v: 1, shard: 0, of: 1, run, names: subset.map(q => [q, { name: 'P ' + q, aliases: [] }]) });
+    return file;
+  };
+  writeCpM();
+  await pep.mergeShards(mono, cpM, [sliceOf(T + 'm1.json', many, 'R1')]);
+  const firstCount = pep.readJsonMaybeGz(mono).count;
+  writeCpM();                                          // a complete merge clears it
+  const lossy = many.slice(0, M - 4000);               // the second run loses 4,000 to 429s
+  await pep.mergeShards(mono, cpM, [sliceOf(T + 'm2.json', lossy, 'R2')]);
+  const secondCount = pep.readJsonMaybeGz(mono).count;
+  check('PEP merge: a run that loses names to throttling never publishes FEWER people than the last',
+    firstCount === M && lossy.length === M - 4000 && secondCount === M);
+
+  /* The ORDINARY harvest needs the same guarantee, and it is the path the
+     WEEKLY schedule uses. datasetFloorOk alone tolerates a drop to
+     PEP_SHRINK_PCT (0.6) of the last list — so a throttled scheduled run could
+     publish 40% fewer people entirely unattended and be waved through. Every
+     artifact write must therefore be able to restore names a lost chunk
+     dropped, which means every writeArtifact call has to hand it the rebuild. */
+  {
+    const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+    check('PEP harvest: the shrink gate alone is not the recall floor — 0.6 would allow losing 40%',
+      pep.PEP_SHRINK_PCT <= 0.9 && /const writeArtifact = \(dataset, rebuildWithCarried\)/.test(src));
+    const calls = src.match(/writeArtifact\([^)]*\)/g) || [];
+    check('PEP harvest: EVERY artifact write can restore names a lost chunk dropped',
+      calls.length >= 2 && calls.every(c => /writeArtifact\(\s*\w+\s*,/.test(c)));
+    check('PEP harvest: carried names are folded in only when the list would otherwise shrink',
+      /\(dataset\.count \|\| 0\) < \(prev\.count \|\| 0\)/.test(src)
+      /* never into the working map, or pendingLabels would stop fetching */
+      && /names: mergeShardNames\(\[\[\.\.\.names\], carried\]\)/.test(src));
+  }
+  for (const f of [mono, cpM, T + 'm1.json', T + 'm2.json']) { try { _ul(f); } catch { /* best-effort */ } }
+  for (const f of [out, s0, s1, stale, wrongSplit, dup, cpFile, cp2, half, outH, outE]) { try { _ul(f); } catch { /* best-effort */ } }
+}
+
+/* Partial delivery. The harvest takes several links, and shipping nothing until
+   the last one left the screen with no PEP layer at all for hours. A mid-harvest
+   dataset is now published, flagged partial + expected, so consumers can say out
+   loud that a not-yet-harvested PEP produces NO hit. A COMPLETE dataset must
+   carry no flag at all, or every consumer would warn forever. */
+{
+  const rows = Array.from({ length: 5 }, (_, i) => ({ person: 'Q' + i, pos: 'P1', end: '', classKey: 'minister' }));
+  const pos = new Map([['P1', { label: 'Minister', country: 'AE', classKey: 'minister' }]]);
+  const nm = new Map(rows.map(r => [r.person, { name: 'Name ' + r.person, aliases: [] }]));
+  const part = pep.buildPepDataset({ harvestedAt: 'T', holderRows: rows, positions: pos, names: nm, expected: 20 });
+  const full = pep.buildPepDataset({ harvestedAt: 'T', holderRows: rows, positions: pos, names: nm, expected: 5 });
+  check('PEP partial: a mid-harvest dataset is flagged partial and carries the expected total',
+    part.partial === true && part.expected === 20 && part.count === 5);
+  check('PEP partial: a COMPLETE dataset carries no partial flag (consumers must not warn forever)',
+    full.partial === undefined && full.expected === undefined);
+  check('PEP partial: the flag reaches the screen through pepListFromDataset (so it can degrade loudly)',
+    pep.pepListFromDataset(part).partial === true && pep.pepListFromDataset(part).expected === 20
+    && pep.pepListFromDataset(full).partial === false);
+  check('PEP partial: the shrink gate still refuses a thin partial over a fuller artifact (a fresh cycle cannot wipe last week)',
+    pep.datasetFloorOk(part, { count: 400 }).ok === false);
+}
+
+/* A cancelled Actions job SIGTERMs the harvest step. Until the signal handler
+   existed that threw away everything the link had gathered — two cancelled links
+   lost 83 and 34 minutes of WDQS work. Both halves have to hold: the script must
+   trap the signal and bank a checkpoint, AND the workflow's persist step must
+   still run when the job is cancelled, or the banked checkpoint never gets
+   committed. Guarded on success||cancelled, never always(): a hollow-harvest
+   refusal must not push. */
+check('PEP interrupt: the harvest traps SIGTERM/SIGINT and banks a checkpoint before exiting', (() => {
+  const src = readFileSync(join(ROOT, 'scripts/pep-worldwide.mjs'), 'utf8');
+  return /process\.on\('SIGTERM'/.test(src) && /process\.on\('SIGINT'/.test(src)
+    && /bankProgress\s*=\s*\(\)\s*=>\s*writeCp\('labels'/.test(src)
+    && /bankProgress\s*=\s*\(\)\s*=>\s*writeCp\('holders'/.test(src);
+})());
+check('PEP interrupt: the persist step still commits when the job is CANCELLED (else the banked checkpoint is lost)', (() => {
+  const wf = readFileSync(join(ROOT, '.github/workflows/pep-worldwide.yml'), 'utf8');
+  const persist = wf.slice(wf.indexOf('Persist the artifact + checkpoint'));
+  const gate = (persist.match(/^\s*if:\s*(.+)$/m) || [])[1] || '';
+  return /cancelled\(\)/.test(gate) && !/always\(\)/.test(gate);
+})());
+check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned checkpoint cannot steer queries', (() => {
+  const st = pep.restoreCheckpoint({
+    v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
+    resumeCount: 1, phase: 'holders',
+    positions: [['Q5', { label: 'x', country: '', classKey: 'minister' }], ['evil} SERVICE <http://x>', { label: 'x' }]],
+    posByClass: [['minister', ['Q5', 'Q00042', 'evil} UNION {', null]]],
+    holderRows: [{ person: 'Q7', pos: 'Q5', end: '', classKey: 'minister' }, { person: 'Q7 UNION ?x ?y', pos: 'Q5' }],
+    classHolders: { minister: '3' }, batchTotal: '4', batchFailed: '0',
+    next: { classIdx: '1', posIdx: '60' }, labelQids: ['Q7', 'Q|8'], names: [['Q7', { name: 'A', aliases: [] }]],
+  });
+  return st.posByClass.get('minister').join(',') === 'Q5,Q42'   // QIDs re-derive numerically, injections drop
+    && st.holderRows.length === 1 && st.labelQids.join(',') === 'Q7'
+    && !st.positions.has('evil} SERVICE <http://x>')
+    && st.sinceIso === '2026-08-01T00:00:00Z' && st.resumeCount === 2
+    && st.next.classIdx === 1 && st.batchTotal === 4 && st.names.get('Q7').name === 'A';
+})());
+
+/* ── paginated JSON list reader (ADB debarment register: 10 rows/page, its own
+   next-link points at an unreachable internal host, so we page by size/offset) ── */
+check('getByPath walks a dotted path and tolerates a missing branch',
+  getByPath({ meta: { totalItems: 1533 } }, 'meta.totalItems') === 1533
+  && getByPath({ data: [1, 2] }, 'data').length === 2
+  && getByPath({}, 'a.b.c') === undefined);
+{
+  const realFetch = globalThis.fetch;
+  // Server caps the page at 10 rows regardless of the requested size (the ADB
+  // shape): the reader must still collect the full list by stepping offset by
+  // the ACTUAL rows returned, not the size hint.
+  const TOTAL = 23;
+  globalThis.fetch = async (u) => {
+    const off = Number(new URL(u).searchParams.get('offset'));
+    const rows = [];
+    for (let i = off; i < Math.min(off + 10, TOTAL); i++) rows.push({ id: String(i), attributes: { name: 'FIRM ' + i } });
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: TOTAL }, data: rows }) };
+  };
+  const pg = { sizeParam: 'size', offsetParam: 'offset', size: 250, totalPath: 'meta.totalItems', dataPath: 'data', maxPages: 30 };
+  const body = await fetchPaginatedJson('https://apim.example/x?a=1', {}, pg, undefined, 'adb-test');
+  const merged = JSON.parse(body);
+  check('fetchPaginatedJson collects EVERY page (offset steps by real page length, not the size hint)',
+    merged.data.length === TOTAL && merged.data[0].attributes.name === 'FIRM 0' && merged.data[22].attributes.name === 'FIRM 22');
+  // maxPages cap: a server that never reports exhaustion (NO total) is bounded.
+  let calls = 0;
+  globalThis.fetch = async (u) => {
+    calls++;
+    const off = Number(new URL(u).searchParams.get('offset'));
+    return { ok: true, text: async () => JSON.stringify({ data: [{ attributes: { name: 'X' + off } }] }) };
+  };
+  const capped = JSON.parse(await fetchPaginatedJson('https://apim.example/y', {}, { maxPages: 5, dataPath: 'data', totalPath: 'meta.totalItems' }, undefined, 'cap-test'));
+  check('fetchPaginatedJson bounds a feed that reports no total (never an infinite crawl)', capped.data.length === 5 && calls === 5);
+  // No truncation by configuration: a server-reported total AUTO-EXTENDS the
+  // crawl past maxPages — a register that grows never silently thins.
+  const GROWN = 60;
+  let calls2 = 0;
+  globalThis.fetch = async (u) => {
+    calls2++;
+    const off = Number(new URL(u).searchParams.get('offset'));
+    const rows = [];
+    for (let i = off; i < Math.min(off + 10, GROWN); i++) rows.push({ attributes: { name: 'G' + i } });
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: GROWN }, data: rows }) };
+  };
+  const grown = JSON.parse(await fetchPaginatedJson('https://apim.example/z', {}, { maxPages: 3, dataPath: 'data', totalPath: 'meta.totalItems', size: 10 }, undefined, 'grow-test'));
+  check('fetchPaginatedJson auto-extends past maxPages to the server-reported total (unlimited coverage)',
+    grown.data.length === GROWN && calls2 === 6);
+  // ...but a hostile/buggy total is still bounded by the absolute hard cap.
+  let calls3 = 0;
+  globalThis.fetch = async (u) => {
+    calls3++;
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 1e9 }, data: [{ attributes: { name: 'H' + calls3 } }] }) };
+  };
+  let hostileThrew = '';
+  try { await fetchPaginatedJson('https://apim.example/h', {}, { maxPages: 5, dataPath: 'data', totalPath: 'meta.totalItems' }, undefined, 'hostile-test'); }
+  catch (e) { hostileThrew = String(e && e.message || e); }
+  check('fetchPaginatedJson hard-caps a hostile reported total and THROWS (never a silent partial)',
+    calls3 === PAGINATE_HARD_CAP && /page cap/.test(hostileThrew) && /partial list refused/.test(hostileThrew));
+
+  /* A mid-crawl empty page short of the server's own total is a gateway blip:
+     retried, not believed. The ADB register served 500+ of 1,533 rows this way
+     and passed as a clean load because the partial still cleared minNames. */
+  let blipServed = false;
+  globalThis.fetch = async (u) => {
+    const off = Number(new URL(u).searchParams.get('offset'));
+    if (off === 20 && !blipServed) { blipServed = true; return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 30 }, data: [] }) }; }
+    const rows = [];
+    for (let i = off; i < Math.min(off + 10, 30); i++) rows.push({ attributes: { name: 'B' + i } });
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 30 }, data: rows }) };
+  };
+  const blip = JSON.parse(await fetchPaginatedJson('https://apim.example/b', {}, { maxPages: 30, dataPath: 'data', totalPath: 'meta.totalItems', size: 10 }, undefined, 'blip-test'));
+  check('fetchPaginatedJson retries a mid-crawl empty page instead of truncating the register',
+    blip.data.length === 30 && blipServed === true);
+
+  /* ...and when the blip never clears, the crawl REFUSES rather than returning
+     a partial that the count floor might wave through. */
+  globalThis.fetch = async (u) => {
+    const off = Number(new URL(u).searchParams.get('offset'));
+    if (off >= 20) return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 300 }, data: [] }) };
+    const rows = [];
+    for (let i = off; i < off + 10; i++) rows.push({ attributes: { name: 'P' + i } });
+    return { ok: true, text: async () => JSON.stringify({ meta: { totalItems: 300 }, data: rows }) };
+  };
+  let partialThrew = '';
+  try { await fetchPaginatedJson('https://apim.example/p', {}, { maxPages: 30, dataPath: 'data', totalPath: 'meta.totalItems', size: 10 }, undefined, 'partial-test'); }
+  catch (e) { partialThrew = String(e && e.message || e); }
+  check('fetchPaginatedJson THROWS on a persistent short crawl — degrades loudly, never a clean-looking partial',
+    /stopped at 20 of 300 rows/.test(partialThrew) && /empty page/.test(partialThrew));
+  globalThis.fetch = realFetch;
+}
+/* The ADB source is ENABLED and read via the size/offset paginator; it carries a
+   coverage floor so a partial (size hint ignored, cap hit short of the register)
+   reports DEGRADED rather than a silent short list. */
+const _adb = extraReg.find(s => s.id === 'adb-debarment');
+check('adb-debarment is enabled with a size/offset pagination config + coverage floor',
+  !!_adb && _adb.enabled === true && _adb.paginate && _adb.paginate.dataPath === 'data'
+  && _adb.paginate.totalPath === 'meta.totalItems' && Number(_adb.paginate.maxPages) > 0
+  && Number(_adb.minNames) >= 500);
+
+/* ── IDB sanctioned firms/individuals CSV (probe-proven 2026-08-06: CKAN file
+   endpoint serves the entity table with Title + Other Name columns) ── */
+check('IDB CSV: Title + Other Name index, header skipped, BOM and quoted commas survive', (() => {
+  const csv = '﻿Title,Entity,Nationality,Country,From,To,Prohibited Practice,Source,Tipo de sancion del BID,IDB Sanction Source,Other Name\n'
+    + 'Juan Domingo Tablares Aliaga,Individual,Bolivia," Bolivia",2009-07-10T00:00,Ongoing," Fraud, Extortion",IDB,Debarment,SCOM,\n'
+    + 'Consultora Tecnodinámica S.R.L.,Firm,Paraguay," Paraguay",2009-02-09T00:00,Ongoing," Fraud",IDB,Debarment,SCOM,Tecnodinámica SRL\n';
+  const names = parseIdbCsv(csv);
+  return names.includes('Juan Domingo Tablares Aliaga')
+    && names.includes('Consultora Tecnodinámica S.R.L.') && names.includes('Tecnodinámica SRL')
+    && !names.some(n => /^Title$/i.test(n)) && names.length === 3;
+})());
+check('IDB CSV: a body without the Title column parses to [] (coverage floor takes over)',
+  parseIdbCsv('name,alias\nX,Y\n').length === 0 && parseIdbCsv('').length === 0);
+const _idb = extraReg.find(s => s.id === 'idb-debarment');
+check('idb-debarment is enabled on the probe-proven file endpoint with the idbcsv parser + floor',
+  !!_idb && _idb.enabled === true && _idb.parser === 'idbcsv'
+  // Repointed 2026-09-19: IADB migrated the CKAN path from singular /file/download/
+  // to plural /files/download/ (same resource UUID). Old path confirmed 404 live;
+  // new path confirmed HTTP 200 with the correct CSV schema before this test changed.
+  && /data\.iadb\.org\/files\/download\//.test(_idb.url) && Number(_idb.minNames) >= 200);
+
+/* ── source probe (diagnostic instrument — pure functions) ── */
+const sp = await import('./../scripts/source-probe.mjs');
+const _spReg = [
+  { id: 'a', url: 'https://x.example/a', enabled: false },
+  { id: 'b', url: 'https://x.example/b', enabled: true },
+  { id: 'c', enabled: false },                       // no URL — never probeable
+  { id: 'd', url: 'ftp://x.example/d', enabled: false }]; // non-http — never probeable
+check('probe: all-disabled selects only disabled sources with http(s) URLs',
+  JSON.stringify(sp.probeTargets(_spReg, 'all-disabled').map(s => s.id)) === '["a"]');
+check('probe: by-id selects exactly that source, URL required',
+  sp.probeTargets(_spReg, 'b').length === 1 && sp.probeTargets(_spReg, 'c').length === 0
+  && sp.probeTargets(_spReg, 'nope').length === 0);
+check('probe: the real registry loads and the live disabled set is probeable',
+  sp.loadRegistry().length >= 40
+  && sp.probeTargets(sp.loadRegistry(), 'all-disabled').every(s => /^https?:/.test(s.url)));
+check('probe: body sample hex-escapes control bytes so WAF garbage cannot mangle the report',
+  sp.sampleBody(Buffer.from('ok' + String.fromCharCode(1) + 'x')) === 'ok\\x01x');
+check('probe: JSON reconnaissance yields the key paths a field mapping needs',
+  JSON.stringify(sp.jsonKeyPaths('{"value":[{"NomeDaPessoa":"X","Cpf":"1"}]}'))
+  === '["value[].NomeDaPessoa = X","value[].Cpf = 1"]'
+  && sp.jsonKeyPaths('not json') === null);
+const _spMd = sp.renderReport([{ id: 'a', name: 'A', url: 'https://x.example/a', outcome: 'fetched', status: 200, contentType: 'application/json', bytes: 12, jsonPaths: ['k = v'], links: ['https://x.example/list.xml'] }]);
+check('probe: report renders outcome, key paths, discovered links, and the diagnostic-only footer',
+  _spMd.includes('## a — A') && _spMd.includes('http 200') && _spMd.includes('k = v')
+  && _spMd.includes('Data-file links discovered') && _spMd.includes('https://x.example/list.xml')
+  && _spMd.includes('Diagnostic only'));
+check('probe: link discovery pulls data-file hrefs off an HTML landing page, absolutized', (() => {
+  const html = '<a href="/Content/TFSList.xml">XML</a> <a href="download.ashx?fileType=xlsx">XLSX</a> '
+    + '<a href="/about">About us</a> <img src="/logo.png">';
+  const links = sp.extractDataLinks(html, 'https://tfs.example.gov/Pages/TFSListDownload');
+  return links.includes('https://tfs.example.gov/Content/TFSList.xml')
+    && links.includes('https://tfs.example.gov/Pages/download.ashx?fileType=xlsx')
+    && !links.some(l => l.includes('/about') || l.includes('logo.png'));
+})());
+check('probe: link discovery surfaces CKAN resource URLs from raw JSON (escaped slashes too)', (() => {
+  const jsonBody = '{"result":{"results":[{"resources":[{"format":"CSV","url":"https:\\/\\/mydata.example.org\\/dataset\\/x\\/resource\\/abc\\/download\\/sanctioned.csv"}]}]}}';
+  const links = sp.extractDataLinks(jsonBody, 'https://mydata.example.org/api/3/action/package_search');
+  return links.includes('https://mydata.example.org/dataset/x/resource/abc/download/sanctioned.csv');
+})());
+check('probe: link discovery is bounded (never an unbounded report)',
+  sp.extractDataLinks(Array.from({ length: 200 }, (_, i) => '<a href="/f' + i + '.csv">x</a>').join(''), 'https://x.example/', { max: 40 }).length === 40);
+
+/* ── enrichment fairness: daily rotation of the processing order — a budget-
+   tripped run must never starve the SAME tail subjects forever ── */
+check('rotateByDay: rotates by the day offset, preserves every element, and varies day to day', (() => {
+  const arr = ['a', 'b', 'c', 'd', 'e'];
+  const d0 = rotateByDay(arr, 0), d2 = rotateByDay(arr, 2), d7 = rotateByDay(arr, 7);
+  return d0.join('') === 'abcde'                       // day 0 = identity
+    && d2.join('') === 'cdeab'                          // shifted start
+    && d7.join('') === d2.join('')                      // modular (7 % 5 = 2)
+    && [...d2].sort().join('') === 'abcde'              // nothing lost or duplicated
+    && rotateByDay([], 3).length === 0
+    && rotateByDay(arr, -1).join('') === 'eabcd';       // negative-safe
+})());
+
+/* ── Match classification C / P / F / N ──────────────────────────────────────
+   Structured adverse-media practice classifies every RESULT, not just the
+   subject. The load-bearing rule: automated screening can NEVER assign C.
+   "Confirmed" means verified to relate to THIS subject, and a name match is not
+   an identity match — Federal Decree-Law No. 10 of 2025 Art. 16/18 and FATF
+   R.26 put that on the MLRO under four-eyes. The machine suggests P or N; C
+   arrives only from a human. */
+{
+  const hit = { list: 'OFAC SDN', hitName: 'SOME NAME', score: 98 };
+  check('classify: no result is N',            pep_classify(null) === 'N');
+  check('classify: a live hit is P — automated screening NEVER self-certifies a Confirmed Match',
+    pep_classify(hit) === 'P'
+    && pep_classify({ ...hit, score: 100 }) === 'P');
+  check('classify: only a HUMAN escalate disposition yields C',
+    pep_classify(hit, { disposition: 'escalate' }) === 'C');
+  check('classify: a human false-positive, or a cited prior clearance, yields F',
+    pep_classify(hit, { disposition: 'false-positive' }) === 'F'
+    && pep_classify({ ...hit, whitelisted: true }) === 'F');
+  /* Highest severity wins, so one confirmed hit cannot be averaged away by a
+     page of false matches. */
+  check('classify: the overall decision is the HIGHEST severity present, not a tally',
+    scr.overallClassification([{ ...hit, whitelisted: true }, hit, { ...hit, whitelisted: true }]) === 'P'
+    && scr.overallClassification([hit, hit], { disposition: 'escalate' }) === 'C'
+    && scr.overallClassification([{ ...hit, whitelisted: true }]) === 'F'
+    && scr.overallClassification([]) === 'N');
+  check('classify: every class carries a recommended action for the reviewer',
+    ['C', 'P', 'F', 'N'].every(c => scr.MATCH_CLASSES[c].label && scr.MATCH_CLASSES[c].action));
+  /* An override with no reason is not a decision — it is an unexplained change
+     to a screening outcome, so it is refused and the suggestion stands. */
+  const ok = scr.parseClassificationOverride('[x] confirmed match\nrationale: DOB and passport match the SDN entry');
+  check('classify: an override is accepted only WITH a written rationale, which is captured',
+    ok && ok.code === 'C' && ok.accepted === true && /DOB and passport/.test(ok.rationale));
+  const bad = scr.parseClassificationOverride('[x] false match');
+  check('classify: an override with NO rationale is refused, not silently applied',
+    bad && bad.code === 'F' && bad.accepted === false && /no written rationale/.test(bad.reason));
+  check('classify: the untouched tick template parses as no override',
+    scr.parseClassificationOverride('[ ] confirmed match\n[ ] partial match\n[ ] false match') === null);
+  check('classify: an accepted override wins over the derived class',
+    pep_classify(hit, { override: 'F' }) === 'F' && pep_classify(null, { override: 'C' }) === 'C');
+}
+
+/* ── Asana pagination: a short read of the Customer Database is a FALSE
+   NEGATIVE, not a small inconvenience. Every unread customer screens as "no
+   match" because it was never screened. The page cap is a runaway guard, so
+   hitting it must fail the run (the caller turns a throw into an unscreened-run
+   bail) — never return a partial project as if it were the whole one. The one
+   exception is the dedup scan, where losing an alert is worse than a duplicate.
+   Driven through a stubbed fetch, so the real loop is what is under test. */
+{
+  const realFetch = globalThis.fetch;
+  const page = (n, more) => ({
+    ok: true, status: 200,
+    headers: { get: () => null },
+    json: async () => ({
+      data: Array.from({ length: n }, (_, i) => ({ gid: String(i), name: 'Customer ' + i, completed: false })),
+      next_page: more ? { offset: 'o' + Math.random() } : null
+    })
+  });
+  const stub = (pages) => { let i = 0; globalThis.fetch = async () => page(2, ++i < pages); };
+
+  stub(3);
+  const walked = await scr.asanaPaged('1', '/tasks', 'name', 't', 'test project');
+  check('asana paging: every page is read to the end (no next_page left behind)',
+    walked.length === 6);
+
+  /* More pages than the cap, and the API still says there is more. */
+  let threw = null;
+  globalThis.fetch = async () => page(2, true);
+  try { await scr.asanaPaged('1', '/tasks', 'name', 't', 'Customer Database'); }
+  catch (e) { threw = String(e && e.message || e); }
+  check('asana paging: exhausting the page cap THROWS — a partial customer list never screens as complete',
+    threw !== null && /INCOMPLETE/.test(threw) && /Customer Database/.test(threw));
+  check('asana paging: the failure names the knob that fixes it',
+    threw !== null && /ASANA_PAGE_CAP/.test(threw));
+
+  let soft = null, warned = '';
+  const realErr = console.error;
+  console.error = (m) => { warned += String(m); };
+  globalThis.fetch = async () => page(2, true);
+  try { soft = await scr.asanaPaged('1', '/tasks', 'name', 't', 'dedup scan', { soft: true }); }
+  finally { console.error = realErr; globalThis.fetch = realFetch; }
+  check('asana paging: the dedup scan degrades LOUDLY instead of throwing (a duplicate card beats no card)',
+    Array.isArray(soft) && soft.length === scr.ASANA_PAGE_CAP * 2 && /page cap/.test(warned) && /PARTIAL|partial/.test(warned));
+
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  check('asana paging: the section lookup paginates — an unpaged read creates a DUPLICATE column nobody watches',
+    /const sections = await asanaPaged\(projectGid, '\/sections'/.test(src));
+  check('asana paging: soft mode is used ONLY by the dedup scan',
+    (src.match(/soft: true/g) || []).length === 1 && /dedup scan[^\n]*\{ soft: true \}/.test(src));
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

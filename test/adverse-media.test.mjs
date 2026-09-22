@@ -22,6 +22,16 @@ const rss = '<rss><channel>' +
   '</channel></rss>';
 const items = parseRss(rss);
 check('parseRss extracts items incl. CDATA titles', items.length === 2 && items[0].source === 'Reuters' && items[1].title === 'Unrelated Acme bakery wins award');
+/* Same coverage decision as parseGdelt: a locale that could not be asked must
+   not score as a locale that answered clean. Google News serves HTTP 200 with a
+   consent/interstitial page when it throttles a runner IP — no <item> tags, and
+   the old parser read that as "no adverse media about this subject". */
+check('parseRss: a consent/interstitial page is "could not ask" (null), not a clean locale',
+  parseRss('<!DOCTYPE html><html><body>Before you continue to Google</body></html>') === null
+  && parseRss('') === null && parseRss(null) === null);
+check('parseRss: a real feed with no matching stories still means zero results',
+  Array.isArray(parseRss('<rss><channel><title>q</title></channel></rss>'))
+  && parseRss('<rss><channel><title>q</title></channel></rss>').length === 0);
 
 const score = scoreAdverseMedia('Acme Co', items);
 check('scoreAdverseMedia flags a name+risk-term headline as a strong hit',
@@ -61,7 +71,22 @@ const gd = parseGdelt(JSON.stringify({ articles: [
 ] }));
 check('parseGdelt extracts articles (title/link/source/date), dropping empty titles',
   gd.length === 1 && gd[0].source === 'apnews.com' && gd[0].link === 'http://g/1');
-check('parseGdelt tolerates malformed JSON (returns [])', Array.isArray(parseGdelt('{not json')) && parseGdelt('{not json').length === 0);
+/* NULL vs [] is a coverage decision, not a parsing detail. checkAdverseMedia
+   reads `gd !== null` to decide whether the worldwide backbone answered at all;
+   an unparseable body returned as [] scored as "GDELT swept the global index
+   and found nothing" — a false clear. GDELT replies HTTP 200 with plain text
+   when it rejects a query and with an HTML page when it is overloaded, so this
+   is the ordinary failure mode, not an exotic one. */
+check('parseGdelt: malformed JSON is "could not ask" (null), NEVER a clean sweep',
+  parseGdelt('{not json') === null);
+check('parseGdelt: an HTML error page or plain-text complaint is null, not zero results',
+  parseGdelt('<html><body>Service Unavailable</body></html>') === null
+  && parseGdelt('Your query was rejected.') === null);
+check('parseGdelt: valid JSON with no articles array is an error envelope, not zero results',
+  parseGdelt('{"status":"error"}') === null && parseGdelt('[]') === null);
+check('parseGdelt: GDELT\'s real zero-result shapes still mean zero results',
+  Array.isArray(parseGdelt('{"articles":[]}')) && parseGdelt('{"articles":[]}').length === 0
+  && Array.isArray(parseGdelt('')) && Array.isArray(parseGdelt('   \n')));
 
 const gdScore = scoreAdverseMedia('Acme Co', gd);
 check('GDELT items score through the same scorer', gdScore.hit === true && gdScore.terms.includes('money laundering'));
@@ -187,7 +212,43 @@ check('mapPool preserves order and runs every item under a concurrency bound',
   (await mapPool([1, 2, 3, 4, 5], 2, async n => n * 2)).join(',') === '2,4,6,8,10');
 
 check('gdeltUrl broadened default terms still target the global artlist JSON',
-  gdeltUrl('Acme Co').includes('maxrecords=75') && decodeURIComponent(gdeltUrl('Acme Co')).includes('terrorist financing'));
+  gdeltUrl('Acme Co').includes('maxrecords=250') && decodeURIComponent(gdeltUrl('Acme Co')).includes('terrorist financing'));
+
+/* ── GDELT term-set alignment (JS backbone widened to the Python comprehensive
+   set) + worldwide language expansion (2026-08-05, adversarially-verified) ── */
+check('GDELT query carries the full predicate-offence cluster incl. proliferation financing',
+  ['proliferation financing', 'organized crime', 'cartel', 'narcotics', 'smuggling', 'asset freeze', 'convicted', 'arrested']
+    .every(t => GDELT_RISK_TERMS.includes(t))
+  && GDELT_RISK_TERMS.length >= 26);
+check('gdeltUrl query includes the widened terms (GDELT translates → reaches every language)',
+  ['proliferation financing', 'organized crime', 'narcotics', 'asset freeze']
+    .every(t => decodeURIComponent(gdeltUrl('Acme Co')).includes(t)));
+check('gdeltUrl fetches at the GDELT API max (250) by default, env-tunable and clamped', (() => {
+  const prev = process.env.ADVERSE_MEDIA_MAXRECORDS;
+  process.env.ADVERSE_MEDIA_MAXRECORDS = '9999';
+  const clamped = gdeltUrl('X').includes('maxrecords=250');
+  process.env.ADVERSE_MEDIA_MAXRECORDS = '40';
+  const tuned = gdeltUrl('X').includes('maxrecords=40');
+  process.env.ADVERSE_MEDIA_MAXRECORDS = '';
+  const dflt = gdeltUrl('X').includes('maxrecords=250');
+  if (prev == null) delete process.env.ADVERSE_MEDIA_MAXRECORDS; else process.env.ADVERSE_MEDIA_MAXRECORDS = prev;
+  return clamped && tuned && dflt;
+})());
+check('LANG_TERMS gains the high-risk-region languages with native-script terms', (() => {
+  const added = ['az', 'kk', 'uz', 'ka', 'hy', 'ne', 'si', 'pa', 'mr', 'my', 'km', 'ha', 'so', 'am', 'af', 'sq', 'hr', 'sl', 'lt', 'lv', 'et', 'mk'];
+  return added.every(k => Array.isArray(LANG_TERMS[k]) && LANG_TERMS[k].length >= 8)
+    && LANG_TERMS.kk.includes('ақшаны жылыстату') && LANG_TERMS.ka.includes('ფულის გათეთრება')
+    && LANG_TERMS.hy.includes('փողերի լվացում') && LANG_TERMS.sq.includes('pastrim parash');
+})());
+check('LOCALES gains the edition-confirmed high-risk editions (still deduped by id)',
+  ['az-AZ', 'kk-KZ', 'ka-GE', 'hy-AM', 'my-MM', 'sq-AL', 'lt-LT'].every(id => LOCALES.some(l => l.id === id))
+  && LOCALES.length === new Set(LOCALES.map(l => l.id)).size);
+check('a native-language adverse headline scores a hit in a newly-added language (Kazakh)',
+  scoreAdverseMedia('Нурлан Бектас', [{ title: 'Нурлан Бектас ақшаны жылыстату ісі бойынша қамауға алынды', link: 'http://k/1' }], ALL_TERMS).hit === true);
+check('a strong native predicate (Georgian money laundering) escalates to high band',
+  scoreAdverseMedia('გიორგი', [{ title: 'გიორგი ფულის გათეთრება ბრალდებით დააკავეს', link: 'http://g/1' }], ALL_TERMS).band === 'high');
+check('a terms-only language with no Google News edition still scores via GDELT titles (Somali)',
+  scoreAdverseMedia('Cabdi Xasan', [{ title: 'Cabdi Xasan oo lagu xiray dhaqidda lacagta', link: 'http://so/1' }], ALL_TERMS).hit === true);
 
 /* ── Bing News — the THIRD global backbone (independent rate-limit pool) ── */
 check('bingNewsUrl targets the Bing News RSS endpoint with quoted name + risk terms',
@@ -259,5 +320,108 @@ check('sourceTierFor ranks known wires tier 1, regionals tier 2, unknowns tier 3
   && sourceTierFor({ link: 'https://blog.example.xyz/p' }) === 3
   && sourceTierFor({ source: 'Reuters' }) === 1);
 
+
+/* Cross-engine parity: screen.py's ADVERSE_KEYWORDS are the flagging contract —
+   both engines screen the same customers daily, and sanctions-screen.mjs only
+   pushes an adverse-media list entry / escalates the band on am.hit, so a term
+   only Python knows is a SILENT JS miss, not a loud one. Weak-tier generics must
+   stay weak (screen.py KEYWORD_TIER_WEAK) and a clean headline must still clear. */
+check('scoring covers the screen.py keyword classes the JS term set used to miss', (() => {
+  const s = t => scoreAdverseMedia('Al Noor Gold Trading', [{ title: 'Al Noor Gold Trading ' + t }], ALL_TERMS);
+  const pyOnly = [
+    'tied to cartel gold shipments', 'linked to a proliferation financing network',
+    'debarred by the World Bank over sourcing', 'boss jailed after theft and blackmail charges',
+    'linked to a mafia network in Dubai', 'hit by ransomware, darknet leak follows',
+    'accused of modern slavery and forced labour', 'refinery sourced conflict minerals',
+    'flagged in a dual-use export control probe', 'named in an arms embargo breach probe'
+  ];
+  return pyOnly.every(t => { const r = s(t); return r.hit === true && r.tier !== 'weak'; })
+    && s('publishes a human rights policy update').tier === 'weak'
+    && s('opens a new showroom in Deira').hit === false;
+})());
+check('parity terms widen SCORING only — the Google News query URL stays short (a rejected query returns zero items)',
+  adverseMediaUrl('Al Noor Gold Trading').length < 2000);
+
+/* ── GDELT retrieval breadth ─────────────────────────────────────────────────
+   PY_PARITY_TERMS were added SCORING-only and kept out of the Google News query
+   for a good reason: that query is already ~1.5KB per locale and one Google
+   rejects returns zero items. The reasoning does not transfer to GDELT — a
+   separate engine, one request per subject — which was still asking for only 26
+   terms. So an article about a subject's ransomware indictment or
+   modern-slavery prosecution scored perfectly IF something else surfaced it.
+   Nothing asked. These check the expansion is real and cannot backfire. */
+{
+  const name = 'Mohammed Abdullah Al-Rashid';
+  const wide = gdeltTerms(name);
+  check('gdelt: the query now asks for the typologies the scorer already knew',
+    wide.length > GDELT_RISK_TERMS.length + 30
+    && ['ransomware', 'kleptocracy', 'modern slavery', 'human trafficking', 'chemical weapons']
+      .every(t => wide.includes(t)));
+  check('gdelt: the proven base terms are never dropped to make room',
+    GDELT_RISK_TERMS.every(t => wide.includes(t)));
+  check('gdelt: the extras are the typology set, admitted on top of the base',
+    GDELT_EXTRA_TERMS.length >= 40
+    && GDELT_EXTRA_TERMS.every(t => !GDELT_RISK_TERMS.includes(t)));
+  check('gdelt: the built query stays inside the length cap',
+    gdeltQueryString(name, wide).length <= GDELT_QUERY_MAX);
+  /* A query GDELT rejects returns null from fetchSource, which costs the whole
+     worldwide backbone for that subject — strictly worse than asking narrowly.
+     A pathological subject name must therefore still yield a capped query with
+     the base set intact. */
+  const long = 'A'.repeat(400);
+  const wideLong = gdeltTerms(long);
+  check('gdelt: a pathological subject name caps the query instead of overrunning it',
+    gdeltQueryString(long, wideLong).length <= GDELT_QUERY_MAX
+    && GDELT_RISK_TERMS.every(t => wideLong.includes(t)));
+  check('gdelt: the fetch falls back to the base set if the wide query is rejected',
+    /GDELT rejected the/.test(readFileSync(join(ROOT2, 'scripts/adverse-media.mjs'), 'utf8')));
+  /* 'politic' is the one typology deliberately NOT retrieved: the query is
+     name-scoped and GDELT caps a subject at 250 records, so for any public
+     figure — and the PEP layer is 422,223 office-holders — it returns ordinary
+     political coverage that crowds real financial-crime reporting out of the
+     cap. Scoring keeps it; retrieval must not ask for it. */
+  check('gdelt: "politic" stays a SCORING signal and is never a retrieval term',
+    ALL_TERMS.includes('politic') && !wide.includes('politic'));
+  check('gdelt: every retrieval term is also a scoring term (retrieval can never outrun scoring)',
+    wide.every(t => ALL_TERMS.some(a => a.toLowerCase() === t.toLowerCase()
+      || t.toLowerCase().includes(a.toLowerCase()))));
+}
+
+/* ── GDELT circuit breaker (2026-09-19: ported from screen.py's
+   GDELT_BREAKER_AFTER after the JS engine's own run logs showed the exact
+   throttling pattern screen.py's breaker already exists to stop -- dozens of
+   "GDELT rejected" lines in a single run, some of them reproduced directly
+   against the live API even on the smallest 26-term base query, i.e. a
+   429/hard-down feed, not a too-long query. Pure state-transition logic
+   only; no network. ── */
+resetGdeltBreaker();
+check('gdelt breaker: starts closed with a zero counter',
+  gdeltBreakerState.open === false && gdeltBreakerState.consecutiveFailures === 0);
+
+resetGdeltBreaker();
+for (let i = 0; i < GDELT_BREAKER_AFTER - 1; i++) gdeltBreakerRecordFailure();
+check('gdelt breaker: stays closed one failure short of the threshold',
+  gdeltBreakerState.open === false && gdeltBreakerState.consecutiveFailures === GDELT_BREAKER_AFTER - 1);
+
+gdeltBreakerRecordFailure();
+check('gdelt breaker: opens on the Nth CONSECUTIVE failure (default 5, screen.py parity)',
+  gdeltBreakerState.open === true && gdeltBreakerState.consecutiveFailures === GDELT_BREAKER_AFTER);
+
+resetGdeltBreaker();
+for (let i = 0; i < GDELT_BREAKER_AFTER - 1; i++) gdeltBreakerRecordFailure();
+gdeltBreakerRecordSuccess();
+check('gdelt breaker: a success resets the counter before the breaker trips',
+  gdeltBreakerState.open === false && gdeltBreakerState.consecutiveFailures === 0);
+
+resetGdeltBreaker();
+for (let i = 0; i < GDELT_BREAKER_AFTER + 3; i++) gdeltBreakerRecordFailure();
+const openedAt = gdeltBreakerState.consecutiveFailures;
+gdeltBreakerRecordSuccess();
+check('gdelt breaker: once OPEN, a later success does not silently re-close it '
+  + '(only resetGdeltBreaker, called once per fresh run/process, may)',
+  gdeltBreakerState.open === true && openedAt > GDELT_BREAKER_AFTER);
+resetGdeltBreaker();
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
+

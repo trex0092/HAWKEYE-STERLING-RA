@@ -9,6 +9,8 @@
       "type": "csv",
       "parser": "ofac",
       "noHeader": true,
+      "charset": "latin1",
+      "_charset_note": "The legacy OFAC SDN.CSV is latin-1 on the wire (screen.py decodes it latin-1 at parse_ofac; the WHATWG Response.text() the JS fetcher used decodes UTF-8 regardless of Content-Type, so 0xD1 'Ñ' became U+FFFD and normalizeName split the token — 'PEÑA' cleared against customer 'PENA'). Decoding latin-1 restores the accented tokens; strictly recall-widening.",
       "minNames": 9000
     },
     {
@@ -19,6 +21,7 @@
       "type": "csv",
       "parser": "ofacalt",
       "noHeader": true,
+      "charset": "latin1",
       "mergeInto": "ofac-sdn",
       "_note": "The SDN's weak/strong a.k.a. names live in this SEPARATE headerless file (ent_num, alt_num, alt_type, alt_name, remarks). The screen folds them into the primary OFAC SDN list (mergeInto) so an alias hit reads as the SDN designation it is — screening sdn.csv's primary names alone is a false-negative gap (a party operating under an SDN alias would screen clear; mirrors screen.py parse_ofac_alt). If this file fails to load, the primary SDN list still screens but is flagged partial: alias coverage missing, standing SDN matches carried forward, never cleared off reduced coverage. COVERAGE FLOOR: minNames is PROVISIONAL and deliberately well below the observed a.k.a. count — it exists to catch a truncated body or a column shift (which would yield hundreds, not thousands), not to police normal churn. Ratchet it toward ~50% of the observed baseline once runs have logged real counts, per the floors-only-rise convention.",
       "minNames": 5000
@@ -44,12 +47,13 @@
     },
     {
       "id": "uk-ofsi",
-      "name": "UK OFSI — Consolidated list of targets (CSV)",
+      "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
       "jurisdiction": "Global",
-      "url": "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv",
+      "url": "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv",
       "type": "csv",
       "parser": "ofsi",
-      "minNames": 9000
+      "minNames": 9000,
+      "_note": "RETIRED SOURCE, FIXED 2026-09-22: the previous url (ofsistorage.blob.core.windows.net/.../ConList.csv, the OFSI Consolidated List) closed 28 Jan 2026 per GOV.UK — 'The UK Sanctions List is now the only source for all UK sanctions designations'. It kept returning HTTP 200 with a frozen file (observed 'Last Updated,03/06/2026' as late as 21 Sep 2026), so the screen kept reporting OK against 110-day-stale data. This is the OFFICIAL, license-clean UK Sanctions List (not an OpenSanctions mirror): same OFSI-family export shape as the retired file (Report Date banner row, then Unique ID / OFSI Group ID / Name 1..Name 6 / Name type columns), so parser 'ofsi' (parseOfsiCsv) needs no change — verified live 21 Sep 2026: Report Date: 21-Sep-2026, 58,335 name-joins (well above minNames), matches screen.py's parse_uk on the same file (15,520 unique names). Mirrors the au-dfat / au-dfat-opensanctions precedent above: prefer the official, license-clean feed over an OpenSanctions mirror once one is proven live."
     },
     {
       "id": "eu-fsf",

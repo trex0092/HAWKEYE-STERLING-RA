@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           # This job holds contents:write and fetches external content while handling
@@ -67,8 +67,6 @@ jobs:
             api.anthropic.com:443
             sanctionslistservice.ofac.treas.gov:443
             wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
-            hosted-compute-watchdog-prod-iad-01.githubapp.com:443
-            hosted-compute-request-orchestrator-prod-iad-01.githubapp.com:443
             scsanctions.un.org:443
             unsolprodfiles.blob.core.windows.net:443
             umsanrp1dltx4dj3sxtt.blob.core.windows.net:443
@@ -83,6 +81,8 @@ jobs:
             api.gdeltproject.org:443
             www.wikidata.org:443
             query.wikidata.org:443
+            api.fraudlabspro.com:443
+            *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # No credentials on disk (zizmor artipacked): the state push below
@@ -160,12 +160,28 @@ jobs:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
           RUN_MODE: onboarding
+          # HR - Employees screening population (MLRO-directed 2026-07-29,
+          # see screen.py). Never forwarded here before, so screen.py always
+          # fell back to its own hardcoded default (1216139945846994), which
+          # does not exist in Asana, and that FATAL guard aborted the run
+          # (confirmed: run 35391973300, 2026-09-18, 'Asana employee fetch
+          # failed (404)').
+          ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID }}
           ONBOARDING_WINDOW_HOURS: ${{ github.event.inputs.window_hours || '26' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # PDPL GATE: held OFF until the Anthropic DPA is executed + transfer basis recorded.
           # Set repo variable LLM_TRIAGE=1 to re-enable once signed (no code change needed).
           LLM_TRIAGE: ${{ vars.LLM_TRIAGE || '0' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'claude-haiku-4-5-20251001' }}
+          # FraudLabs SUPPORT SIGNAL (payment-fraud indicator on the contact
+          # email — supplementary, never a screening verdict). Same PDPL gate
+          # shape as LLM_TRIAGE: enabling sends the customer's email to
+          # FraudLabs, so record the processor + transfer basis in the
+          # third-party register, then set repo variable FRAUDLABS=1 (the
+          # FRAUDLABS_API_KEY secret must also exist). Signal failure is
+          # disclosed, never fatal.
+          FRAUDLABS: ${{ vars.FRAUDLABS || '0' }}
+          FRAUDLABS_API_KEY: ${{ secrets.FRAUDLABS_API_KEY }}
         run: python screen.py
 
       - name: Commit delta-state (what has already been reported)

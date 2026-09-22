@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { staleControls, unknownControls, isStale, daysBetween, utcDay, buildReport, CONTROLS, EXEMPT } from '../scripts/freshness-check.mjs';
+import { staleControls, unknownControls, isStale, daysBetween, utcDay, buildReport, summariseTodayRuns, CONTROLS, EXEMPT } from '../scripts/freshness-check.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -76,6 +76,77 @@ check('an in-progress-today control is not flagged stale', staleControls(onePend
 // but a control that never succeeded AND is not running today is still stale.
 const pendingElsewhere = allFresh.map((s, i) => i === 1 ? { ...s, lastSuccessDay: null, pendingToday: false } : s);
 check('a control neither successful nor running today is still stale', staleControls(pendingElsewhere, today).length === 1);
+
+/* THE MID-RUN PASS IS CONDITIONAL. Regression cover for a silent-clear hole:
+   pendingToday was read from the single most recent run, so a control that had
+   already failed several times today read as merely "mid-run" and was dropped
+   from the alarm entirely. With the daily screen firing 3x/day at ~64 min a
+   run is very often in flight at both 09:09 and 12:09, so a control could fail
+   all day behind a green freshness check. Once ANY run has finished
+   unsuccessfully today, an in-flight retry no longer buys silence. */
+const pendingAfterFailure = allFresh.map((s, i) => i === 1
+  ? { ...s, lastSuccessDay: '2026-06-24', pendingToday: true, failedToday: true } : s);
+r = staleControls(pendingAfterFailure, today);
+check('a control that already FAILED today is flagged even with a retry in flight',
+  r.length === 1 && r[0].id === CONTROLS[1].id);
+check('and the flagged row records both that it failed and that it is retrying',
+  r[0].failedToday === true && r[0].pendingToday === true);
+const failedNotRetrying = allFresh.map((s, i) => i === 1
+  ? { ...s, lastSuccessDay: '2026-06-24', pendingToday: false, failedToday: true } : s);
+check('a control that failed today with nothing in flight is still flagged',
+  staleControls(failedNotRetrying, today).length === 1);
+// A control with a success IN WINDOW is never dragged in by an unrelated
+// failed run today (a re-run, a manual dispatch) — success in window wins.
+const freshDespiteFailure = allFresh.map((s, i) => i === 1
+  ? { ...s, lastSuccessDay: today, pendingToday: true, failedToday: true } : s);
+check('a control that already succeeded in-window today is not flagged',
+  staleControls(freshDespiteFailure, today).length === 0);
+
+/* ── summariseTodayRuns, against REAL recorded API payloads ─────────────────
+   These are the actual Actions-API run objects for the Daily Screening
+   workflow on 2026-08-11, the day this hole was found: two runs dead from
+   lost runners and a third mid-sweep. Replaying them is the closest thing to
+   an integration test that stays offline, and it pins the exact production
+   shape the old per_page=1 read got wrong. */
+const REAL_0811 = [
+  { id: 31468597213, status: 'in_progress', conclusion: null,      run_started_at: '2026-08-11T07:21:08Z', created_at: '2026-08-11T07:21:08Z' },
+  { id: 31458943581, status: 'completed',   conclusion: 'failure', run_started_at: '2026-08-11T04:35:16Z', created_at: '2026-08-11T04:35:16Z' },
+  { id: 31452192472, status: 'completed',   conclusion: 'failure', run_started_at: '2026-08-11T02:22:53Z', created_at: '2026-08-11T02:22:53Z' },
+  { id: 31372580943, status: 'completed',   conclusion: 'success', run_started_at: '2026-08-10T09:00:13Z', created_at: '2026-08-10T09:00:13Z' },
+  { id: 31368009913, status: 'completed',   conclusion: 'cancelled', run_started_at: '2026-08-10T07:57:56Z', created_at: '2026-08-10T07:57:56Z' },
+];
+const real = summariseTodayRuns(REAL_0811, '2026-08-11');
+check('real 2026-08-11 payload: a run is seen in flight', real.pending === true);
+check('real 2026-08-11 payload: the two dead runs ARE seen as failures today',
+  real.failed === true);
+// The whole point: this combination must NOT be suppressed.
+const realStatus = CONTROLS.map(c => c.id === 'weekly-adverse-media.yml'
+  ? { ...c, lastSuccessDay: '2026-08-10', pendingToday: real.pending, failedToday: real.failed }
+  : { ...c, lastSuccessDay: '2026-08-11' });
+check('real 2026-08-11 payload: the screening control is FLAGGED, not silenced',
+  staleControls(realStatus, '2026-08-11').some(s => s.id === 'weekly-adverse-media.yml'));
+// Yesterday's runs must not leak into today's verdict.
+const yday = summariseTodayRuns(REAL_0811, '2026-08-10');
+check('a prior day\'s cancelled run counts as that day\'s failure, not today\'s',
+  yday.failed === true && yday.pending === false);
+check('a day with no runs at all reports neither pending nor failed',
+  (d => d.pending === false && d.failed === false)(summariseTodayRuns(REAL_0811, '2026-06-01')));
+check('summariseTodayRuns tolerates a missing/empty run list',
+  (d => d.pending === false && d.failed === false)(summariseTodayRuns(undefined, today)));
+// skipped is not a failure: a no-op make-up firing did not fail to screen.
+check('a skipped run today is not counted as a failure',
+  summariseTodayRuns([{ status: 'completed', conclusion: 'skipped', created_at: today + 'T01:00:00Z' }], today).failed === false);
+check('a timed_out run today IS counted as a failure',
+  summariseTodayRuns([{ status: 'completed', conclusion: 'timed_out', created_at: today + 'T01:00:00Z' }], today).failed === true);
+check('a queued run today counts as pending',
+  summariseTodayRuns([{ status: 'queued', conclusion: null, created_at: today + 'T01:00:00Z' }], today).pending === true);
+
+// The report must say WHICH of the three shapes each stale control is.
+const shapeReport = buildReport(staleControls(pendingAfterFailure, today), today, CONTROLS.length);
+check('the alarm report distinguishes "failed, retry in flight" from "did not run"',
+  /FAILED — retry in flight/.test(shapeReport));
+check('the alarm report marks a never-fired control as "no run"',
+  /no run/.test(buildReport(staleControls(pendingElsewhere, today), today, CONTROLS.length)));
 
 // a failed API query is UNKNOWN, never "stale/never ran" - the old behavior
 // (caught error, lastSuccessDay left null) reported a transient GitHub API
@@ -173,6 +244,7 @@ const EXPECTED_CRONS = {
   'advisor-eval.yml':         ['9 8 * * 1'],
   'advisor-bias-eval.yml':    ['9 9 1 */3 *'],
   'quarterly-review.yml':     ['9 6 1 1,4,7,10 *'],
+  'pep-worldwide.yml':        ['17 2 * * 0'],
 };
 check('every monitored control has a pinned cron', CONTROLS.every(c => EXPECTED_CRONS[c.id]));
 for (const c of CONTROLS) {

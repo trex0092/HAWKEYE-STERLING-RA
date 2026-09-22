@@ -29,6 +29,7 @@ name: Sanctions Screen
 #   SCREEN_ADVERSE_MEDIA          '0' to disable Google News adverse-media (default on)
 #   SCREEN_PEP                    '0' to disable the Wikidata PEP signal (default on)
 #   SCREEN_INTERPOL               '1' to ENABLE the Interpol Red Notice per-subject signal (default OFF; public subset only, supplementary — verify the public API on the runner before turning on)
+#   SCREEN_FBI                    '1' to ENABLE the FBI Wanted per-subject signal (default OFF; wanted posters only — missing-person/information posters are excluded by the module; verify on the runner before turning on)
 #   ASANA_OM_PROJECT_GID          daily audit task project (vars.ASANA_DELIVERY_PROJECT_GID -> HAWKEYE STERLING APP)
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
@@ -57,10 +58,15 @@ jobs:
       contents: write
       issues: write
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # bound the daily re-screen; a hang must fail loudly, not stall the control
+    # Sized for FULL-BASE enrichment: sanctions matching is instant, but the
+    # adverse-media/PEP phase now runs to a 90-min budget so every subject gets
+    # worldwide-media coverage every run (the old 12-min budget skipped the same
+    # ~720 tail subjects daily). The digest lands ~75 min later than before as a
+    # consequence. A hang past the budget+wrap-up must still fail loudly.
+    timeout-minutes: 120
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           # Allowlist derived from the job's actual fetches: runner/toolchain
@@ -68,21 +74,23 @@ jobs:
           # designation lists (OFAC/UN/EU/UK, DFAT via its OpenSanctions mirror
           # on data.opensanctions.org — UAE EOCN is an in-repo file), the
           # adverse-media feeds (Google News RSS + GDELT), the Wikidata PEP
-          # signal, and Interpol (for when SCREEN_INTERPOL=1). Anything else —
-          # including an exfiltration attempt from a compromised dependency —
-          # is blocked and surfaces loudly.
+          # signal, Interpol (for when SCREEN_INTERPOL=1), FBI Wanted (for when
+          # SCREEN_FBI=1), and the worldwide national lists added 2026-08-05
+          # (Trade.gov CSL, Sri Lanka, HK CEDB — each fail-safe: a blocked or
+          # down source discloses DEGRADED coverage, never a silent all-clear).
+          # Anything else — including an exfiltration attempt from a
+          # compromised dependency — is blocked and surfaces loudly.
           egress-policy: block
           allowed-endpoints: >
             github.com:443
             api.github.com:443
             codeload.github.com:443
             objects.githubusercontent.com:443
+            raw.githubusercontent.com:443
             nodejs.org:443
             app.asana.com:443
             sanctionslistservice.ofac.treas.gov:443
             wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com:443
-            hosted-compute-watchdog-prod-iad-01.githubapp.com:443
-            hosted-compute-request-orchestrator-prod-iad-01.githubapp.com:443
             scsanctions.un.org:443
             unsolprodfiles.blob.core.windows.net:443
             umsanrp1dltx4dj3sxtt.blob.core.windows.net:443
@@ -101,6 +109,24 @@ jobs:
             www.dfat.gov.au:443
             data.opensanctions.org:443
             apigwext.worldbank.org:443
+            api.ofac-api.com:443
+            data.trade.gov:443
+            www.competentauthority.gov.lk:443
+            www.government.nl:443
+            sifi.minfin.fgov.be:443
+            geldefonds.gouv.mc:443
+            nbctf.mod.gov.il:443
+            pctc.pss.gov.sa:443
+            portal.moi.gov.qa:443
+            api.fbi.gov:443
+            repet.jus.gob.ar:443
+            olinda.bcb.gov.br:443
+            contas.tcu.gov.br:443
+            tfs.fic.gov.za:443
+            apim.adb.org:443
+            data.iadb.org:443
+            omawww.sat.gob.mx:80
+            *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # No credentials on disk (zizmor artipacked): the state push below
@@ -132,6 +158,16 @@ jobs:
           else
             echo "no screen-state branch yet — using state from main"
           fi
+          # Worldwide PEP list artifact (weekly Wikidata harvest, CC0 —
+          # public-officials data, unencrypted). Absent branch = layer off,
+          # logged by the screen; standing PEP-list matches stay protected
+          # via evaluatedSignals, never silently cleared.
+          if git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
+            echo "worldwide PEP list overlaid from pep-worldwide-state"
+          else
+            echo "no pep-worldwide-state branch yet — worldwide PEP layer pending first harvest"
+          fi
 
       - name: Screen the customer base
         id: screen
@@ -139,17 +175,23 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
-          # "Sanctions updates" section of the Ongoing Monitoring project
-          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
-          # MIRROR: also file this alert in the queue the MLRO works from —
-          # project 1213914392047129 "Sanctions/Media/PEP - Monitoring",
-          # section 1213914392047131 "Daily Sanctions Screening". #305 routed
-          # every pipeline card to the app project, so these alerts were being
-          # created correctly into a queue nobody watches for them. One task,
-          # two memberships — additive; the #305 destination is unchanged.
-          # Clear ASANA_MIRROR_PROJECT_GID to disable.
-          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID || '1213914392047129' }}
-          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID || '1213914392047131' }}
+          ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID }}
+          # "Sanctions updates" section, gid 1218451960830318. Repointed
+          # 2026-09-16: same fix as sanctions-watch.yml -- this was reading
+          # the generic, never-set ASANA_DELIVERY_SECTION_GID and silently
+          # falling through to "Assessment Report" (1216203370612916). The
+          # repo variable also held a stale value from an earlier Asana
+          # reorganization, corrected in the same pass.
+          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1218451960830318' }}
+          # MIRROR (RETIRED 2026-09-15): the separate "Sanctions/Media/PEP -
+          # Monitoring" project (1213914392047129, section 1213914392047131) was
+          # merged into HAWKEYE STERLING APP, so mirroring here would just re-add
+          # the SAME project the digest above already targets. Both vars below
+          # default to empty (disabled) via the original "Clear
+          # ASANA_MIRROR_PROJECT_GID to disable" escape hatch, until/unless a
+          # genuinely separate MLRO queue exists again.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           # Google News locales swept per subject (pinned core + daily rotation).
@@ -164,6 +206,7 @@ jobs:
           BING_NEWS: ${{ vars.BING_NEWS || '1' }}
           SCREEN_PEP: ${{ vars.SCREEN_PEP }}
           SCREEN_INTERPOL: ${{ vars.SCREEN_INTERPOL }}
+          SCREEN_FBI: ${{ vars.SCREEN_FBI }}
           # Ongoing Monitoring audit trail — the section is found/created by name
           # at runtime, so the section GID var is an optional override.
           ASANA_OM_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
@@ -173,6 +216,16 @@ jobs:
           # Daily Screening digest. Set the vars to '0' to restore them.
           SCREEN_SUPPRESS_ALERTS: ${{ vars.SCREEN_SUPPRESS_ALERTS || '1' }}
           SCREEN_SKIP_AUDIT_TASK: ${{ vars.SCREEN_SKIP_AUDIT_TASK || '1' }}
+          # OFAC-API SECOND OPINION — independent corroboration attached to
+          # NEW/CHANGED matches only (capped, additive-only: it can never
+          # downgrade, clear, or re-alert a hit; a failed lookup is disclosed
+          # on the case card as a lost signal). Third-party transfer: record
+          # the processor in the third-party register, then set repo var
+          # OFACAPI=1 (the OFAC_API_KEY secret must also exist).
+          OFACAPI: ${{ vars.OFACAPI || '0' }}
+          OFAC_API_KEY: ${{ secrets.OFAC_API_KEY }}
+          # Cleared-FP registry kill switch (default on; empty registry = no-op)
+          SCREEN_WHITELIST: ${{ vars.SCREEN_WHITELIST || '1' }}
         run: node scripts/sanctions-screen.mjs
 
       - name: Manage screening case lifecycle + post the daily results digest to Asana
@@ -182,15 +235,18 @@ jobs:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_CASES_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
-          # "Sanctions updates" section — the run's RESULTS surface (Asana, not GitHub)
-          ASANA_SCREEN_RESULTS_SECTION_GID: ${{ vars.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203370612916' }}
-          # MIRROR the daily digest into the MLRO queue. This env was set only on
-          # the SCREEN step above, whose script consumes it for the (suppressed-
-          # by-default) alert card — the digest poster runs HERE, so the digest
-          # never reached the MLRO queue at all. Same values, both steps.
-          # Clear ASANA_MIRROR_PROJECT_GID to disable.
-          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID || '1213914392047129' }}
-          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID || '1213914392047131' }}
+          # "Sanctions updates" section — the run's RESULTS surface (Asana, not
+          # GitHub). Repointed 2026-09-16: this literal fallback pointed at
+          # "Assessment Report" (1216203370612916), not "Sanctions updates",
+          # even though the step comment already said "Sanctions updates".
+          # The real section is 1218451960830318, verified against the live
+          # Asana API.
+          ASANA_SCREEN_RESULTS_SECTION_GID: ${{ vars.ASANA_SCREEN_RESULTS_SECTION_GID || '1218451960830318' }}
+          # MIRROR (RETIRED 2026-09-15, see the screen step above for why): both
+          # vars now default to empty (disabled) since their destination project
+          # was merged into HAWKEYE STERLING APP.
+          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
+          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
         run: node scripts/screening-cases.mjs
 
       - name: Screening metrics (non-blocking observability)

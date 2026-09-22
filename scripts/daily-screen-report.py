@@ -348,6 +348,61 @@ elif unavailable:
 else:
     task_name = f"🔍 {date_iso} — Daily Sanctions Screening"
 
+# Same-day re-run guard. This workflow is manual-only now, so a re-dispatch is
+# ordinary — and three dispatches on 10 Aug 2026 filed three identical DEGRADED
+# cards, which is how this gap was found. Every other delivery stream in the
+# repo carries a duplicate guard (asana-notify's findRecentDuplicate,
+# sanctions-screen's omCardToSkip); this one never did.
+#
+# Direction-aware on COVERAGE, which is what these three titles actually encode
+# (findings live in the notes, not the title): 🔍 full coverage, ⚠️ degraded
+# because a source was unavailable, ⛔ refused because a coverage floor broke.
+#
+# So the card that deserves to stand for the day is the one with the BEST
+# coverage, and a later run must post when it improves on what is filed. The
+# first version of this guard ranked ⛔ highest and skipped anything "less
+# severe" — modelled on omCardToSkip, where the axis really is findings and a
+# CLEAR must never hide a HIT. Applied to coverage that is backwards, and it
+# showed immediately: on 10 Aug the run that finally loaded Australia DFAT and
+# Switzerland SECO — 29,276 designated names the earlier runs never had — was
+# skipped in favour of a DEGRADED card describing worse coverage. The board
+# would have recorded the day as degraded when it was not.
+#
+# Post when today's coverage beats the best already filed; skip when it equals
+# or falls short, so a re-run cannot downgrade the day's record either. A
+# failed lookup posts anyway: losing a screening record is worse than a
+# duplicate card.
+_COVERAGE = {"⛔": 0, "⚠️": 1, "🔍": 2}       # worst → best
+_today_rank = _COVERAGE.get(task_name.split(" ", 1)[0], 2)
+try:
+    _existing, _offset, _pages = [], None, 0
+    while True:
+        _u = f"https://app.asana.com/api/1.0/projects/{project_gid}/tasks?opt_fields=name&limit=100"
+        if _offset:
+            _u += f"&offset={_offset}"
+        _lr = requests.get(_u, headers=headers, timeout=30)
+        if _lr.status_code != 200:
+            raise RuntimeError(f"HTTP {_lr.status_code}")
+        _j = _lr.json()
+        _existing += [str(t.get("name") or "") for t in (_j.get("data") or [])]
+        _offset = (_j.get("next_page") or {}).get("offset")
+        _pages += 1
+        if not _offset or _pages >= 50:
+            break
+    _same_day = [n for n in _existing
+                 if date_iso in n and "Daily Sanctions Screening" in n]
+    _best = max((_COVERAGE.get(n.split(" ", 1)[0], 2) for n in _same_day), default=-1)
+    if _same_day and _best >= _today_rank:
+        print(f"↩️  Already filed for {date_iso} with coverage as good or better "
+              f"({_same_day[0]}) — skipping the duplicate card. "
+              "The screening itself ran and its result is in this log.")
+        raise SystemExit(0)
+except SystemExit:
+    raise
+except Exception as _e:
+    print(f"⚠️  Duplicate check failed ({_e}) — posting anyway "
+          "(a lost screening record is worse than a duplicate card)")
+
 payload = {
     "data": {
         "name": task_name,

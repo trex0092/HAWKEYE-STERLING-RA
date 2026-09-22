@@ -52,6 +52,57 @@ export const WEAK_TERMS = new Set([
 ]);
 for (const t of WEAK_TERMS) ADVERSE_TERMS.push(t);
 
+/* ── Python-parity scoring terms (screen.py ADVERSE_KEYWORDS) ─────────────────
+   Every keyword the Python engine flags on must flag here too: both engines
+   screen the SAME customers daily, so a term only screen.py knows is a headline
+   the Python run reports and the JS digest silently drops — no list entry, no
+   band escalation, hit:false with nothing marked partial or errored. These had
+   no substring cover in ALL_TERMS ("cartel", "mafia", "bribe", "corrupt",
+   "debarred", "proliferation financing", "ransomware", "modern slavery",
+   "conflict minerals", "prison", …).
+
+   SCORING ONLY — deliberately NOT pushed into ADVERSE_TERMS, which is also
+   OR-joined into every Google News query: appending these takes the per-locale
+   query URL from ~1.5KB to ~3KB, and a query Google rejects returns zero items,
+   trading a scoring gap for a RETRIEVAL gap. Scoring is where the loss is:
+   gdeltUrl already ASKS for 'cartel' / 'proliferation financing' / 'raid' /
+   'seized' and nothing scored those items on arrival. Widening the term set can
+   only add matches to an item, never remove one. */
+export const PY_PARITY_TERMS = [
+  // Sanctions / proliferation / terrorism
+  'sanction', 'embargo', 'designated terrorist', 'extremist', 'radicalis',
+  'radicaliz', 'militant', 'proliferation financing', 'weapons of mass destruction',
+  'wmd', 'dual-use', 'export control', 'chemical weapons', 'biological weapons',
+  'debarred',
+  // Financial crime / corruption
+  'financial crime', 'economic crime', 'pyramid scheme', 'asset misappropriation',
+  'misuse of funds', 'bribe', 'corrupt', 'kleptocracy', 'state capture',
+  'abuse of power', 'identity theft', 'blackmail',
+  // Enforcement / legal status
+  'prosecute', 'litigate', 'felon', 'imprisonment', 'jail', 'prison', 'theft',
+  'murder', 'politic',
+  // Organised crime / cyber
+  'mafia', 'cartel', 'illicit', 'cybercrime', 'ransomware', 'darknet',
+  /* Terms the GDELT query has ASKED FOR all along with nothing to score them —
+     the exact defect PY_PARITY_TERMS was created to fix, left half-closed. An
+     item retrieved because it mentioned a raid or an asset freeze arrived and
+     scored zero on the very words that surfaced it. Found by the invariant that
+     every retrieval term must also be a scoring term. */
+  'investigation', 'raid', 'seized', 'asset freeze', 'prosecution',
+  // ESG / minerals / human rights
+  'human rights', 'forced labour', 'forced labor', 'modern slavery',
+  'child labour', 'child labor', 'conflict minerals', 'blood diamond',
+  'environmental violation', 'toxic waste', 'land grabbing', 'indigenous rights',
+  'due diligence failure'
+];
+/* The generics among them are weak-tier in screen.py (KEYWORD_TIER_WEAK) — mirror
+   that tiering, or an ESG/"human rights" headline would arrive at tier 'normal'
+   here and 'weak' there. Added AFTER the push above so they widen SCORING only,
+   and only for terms that matched nothing before: no existing match is downgraded. */
+for (const t of ['politic', 'litigate', 'dual-use', 'human rights',
+  'environmental violation', 'toxic waste', 'land grabbing', 'indigenous rights',
+  'due diligence failure']) WEAK_TERMS.add(t);
+
 /* Arabic-language risk terms — for a UAE deployment, adverse media often breaks
    in Arabic press first. Querying these (against Arabic Google News) closes a
    recall gap English-only screening leaves open. Matching is Unicode-aware (see
@@ -137,12 +188,39 @@ export const LANG_TERMS = {
     'ufisadi', 'ubadhirifu', 'amekamatwa', 'magendo'],
   bn: ['জালিয়াতি', 'অর্থ পাচার', 'নিষেধাজ্ঞা', 'সন্ত্রাস', 'সন্ত্রাসে অর্থায়ন', 'ঘুষ', 'দুর্নীতি',
     'আত্মসাৎ', 'গ্রেপ্তার', 'পাচার'],
-  ta: ['மோசடி', 'பணமோசடி', 'தடைகள்', 'பயங்கரவாதம்', 'லஞ்சம்', 'ஊழல்', 'கையாடல்', 'கைது', 'கடத்தல்']
+  ta: ['மோசடி', 'பணமோசடி', 'தடைகள்', 'பயங்கரவாதம்', 'லஞ்சம்', 'ஊழல்', 'கையாடல்', 'கைது', 'கடத்தல்'],
+  // ── High-risk-region languages (2026-08-05, adversarially-verified native AML lexicons) ──
+  // Central Asia & Caucasus, South & SE Asia, Africa, Balkans & Baltics. Terms feed
+  // ALL_TERMS, so even the languages WITHOUT a Google News edition (uz, lo, ha, so, am,
+  // mk) improve scoring of GDELT's original-language titles.
+  az: ['pul yuyulması', 'çirkli pulların yuyulması', 'fırıldaqçılıq', 'dələduzluq', 'sanksiyalar', 'terrorçuluq', 'terrorçuluğun maliyyələşdirilməsi', 'rüşvətxorluq', 'rüşvət', 'korrupsiya', 'mənimsəmə', 'vəsaitlərin mənimsənilməsi', 'həbs edildi', 'həbs olundu', 'məhkum edildi', 'insan alveri', 'qanunsuz alver', 'qaçaqmalçılıq'],
+  kk: ['ақшаны жылыстату', 'ақша жылыстату', 'алаяқтық', 'санкциялар', 'терроризм', 'лаңкестік', 'терроризмді қаржыландыру', 'лаңкестікті қаржыландыру', 'пара алу', 'парақорлық', 'сыбайлас жемқорлық', 'коррупция', 'қаражатты иемдену', 'жымқыру', 'қамауға алынды', 'сотталды', 'кінәлі деп танылды', 'адам саудасы', 'контрабанда'],
+  uz: ['pul yuvish', 'jinoiy yo\'l bilan olingan pullarni legallashtirish', 'firibgarlik', 'sanksiyalar', 'terrorizm', 'terrorizmni moliyalashtirish', 'pora', 'poraxo\'rlik', 'korrupsiya', 'mansab suiiste\'moli', 'mablag\'ni o\'zlashtirish', 'hibsga olindi', 'qamoqqa olindi', 'sudlandi', 'aybdor deb topildi', 'odam savdosi', 'kontrabanda'],
+  ka: ['ფულის გათეთრება', 'თაღლითობა', 'სანქციები', 'ტერორიზმი', 'ტერორიზმის დაფინანსება', 'ქრთამი', 'მექრთამეობა', 'კორუფცია', 'მითვისება', 'გაფლანგვა', 'დააკავეს', 'დაკავებულია', 'მსჯავრი დაედო', 'გაასამართლეს', 'ტრეფიკინგი', 'ადამიანით ვაჭრობა', 'კონტრაბანდა'],
+  hy: ['փողերի լվացում', 'դրամի լվացում', 'խարդախություն', 'պատժամիջոցներ', 'սանկցիաներ', 'ահաբեկչություն', 'ահաբեկչության ֆինանսավորում', 'կաշառք', 'կաշառակերություն', 'կոռուպցիա', 'յուրացում', 'ձերբակալվել է', 'ձերբակալվեց', 'դատապարտվել է', 'մեղավոր ճանաչվեց', 'թրաֆիքինգ', 'մարդկանց առևտուր', 'մաքսանենգություն'],
+  ne: ['सम्पत्ति शुद्धीकरण', 'ठगी', 'प्रतिबन्ध', 'आतंकवाद', 'आतंकवादी वित्तपोषण', 'घुस', 'भ्रष्टाचार', 'हिनामिना', 'पक्राउ', 'दोषी ठहर', 'तस्करी', 'चोरी निकासी'],
+  si: ['මුදල් විශුද්ධිකරණය', 'වංචාව', 'සම්බාධක', 'ත්‍රස්තවාදය', 'ත්‍රස්තවාදී මූල්‍යකරණය', 'අල්ලස', 'දූෂණය', 'අවභාවිතය', 'අත්අඩංගුවට', 'වරදකරු', 'ජාවාරම'],
+  pa: ['ਮਨੀ ਲਾਂਡਰਿੰਗ', 'ਧੋਖਾਧੜੀ', 'ਪਾਬੰਦੀਆਂ', 'ਅੱਤਵਾਦ', 'ਅੱਤਵਾਦੀ ਫੰਡਿੰਗ', 'ਰਿਸ਼ਵਤ', 'ਭ੍ਰਿਸ਼ਟਾਚਾਰ', 'ਗਬਨ', 'ਗ੍ਰਿਫਤਾਰ', 'ਦੋਸ਼ੀ', 'ਤਸਕਰੀ', 'ਸਮਗਲਿੰਗ'],
+  mr: ['मनी लाँडरिंग', 'फसवणूक', 'निर्बंध', 'दहशतवाद', 'दहशतवादी अर्थपुरवठा', 'लाच', 'भ्रष्टाचार', 'अपहार', 'अटक', 'दोषी', 'तस्करी', 'चोरटी वाहतूक'],
+  my: ['ငွေကြေးခဝါချမှု', 'လိမ်လည်မှု', 'ပိတ်ဆို့အရေးယူမှု', 'အကြမ်းဖက်ဝါဒ', 'အကြမ်းဖက်မှု', 'အကြမ်းဖက်မှုကို ငွေကြေးထောက်ပံ့မှု', 'လာဘ်ပေးလာဘ်ယူမှု', 'အဂတိလိုက်စားမှု', 'ငွေအလွဲသုံးစားမှု', 'ဖမ်းဆီး', 'ပြစ်ဒဏ်ချမှတ်', 'လူကုန်ကူးမှု', 'မှောင်ခိုကူးသန်းမှု', 'မှောင်ခိုတင်သွင်းမှု'],
+  km: ['ការសម្អាតប្រាក់', 'ការក្លែងបន្លំ', 'ទណ្ឌកម្ម', 'ភេរវកម្ម', 'ការផ្តល់ហិរញ្ញប្បទានដល់ភេរវកម្ម', 'ការសូកប៉ាន់', 'សំណូក', 'អំពើពុករលួយ', 'ចាប់ខ្លួន', 'កាត់ទោស', 'ការជួញដូរមនុស្ស', 'ការនាំចូលដោយខុសច្បាប់'],
+  lo: ['ການຟອກເງິນ', 'ການສໍ້ໂກງ', 'ມາດຕະການຄວ່ຳບາດ', 'ການລົງໂທດ', 'ການກໍ່ການຮ້າຍ', 'ການສະໜອງທຶນໃຫ້ການກໍ່ການຮ້າຍ', 'ການໃຫ້ສິນບົນ', 'ການສໍ້ລາດບັງຫຼວງ', 'ການຍັກຍອກເງິນ', 'ຖືກຈັບກຸມ', 'ຖືກຕັດສິນລົງໂທດ', 'ການຄ້າມະນຸດ', 'ການລັກລອບຄ້າ', 'ການລັກລອບຂົນສົ່ງ'],
+  ha: ['halasta kuɗin haram', 'zamba', 'takunkumi', 'ta\'addanci', 'tallafin ta\'addanci', 'cin hanci', 'cin hanci da rashawa', 'almubazzaranci', 'an kama', 'an samu da laifi', 'fataucin mutane', 'fasa-kwauri'],
+  so: ['dhaqidda lacagta', 'khiyaano', 'cunaqabatayn', 'argagixiso', 'maalgelinta argagixisada', 'laaluush', 'musuqmaasuq', 'la xiray', 'xukun lagu riday', 'ganacsiga dadka', 'tahriib'],
+  am: ['ሕገ-ወጥ የገንዘብ ዝውውር', 'ማጭበርበር', 'ማዕቀብ', 'ሽብርተኝነት', 'ሽብርተኝነትን በገንዘብ መደገፍ', 'ጉቦ', 'ሙስና', 'እምነት ማጉደል', 'ታሰረ', 'ጥፋተኛ ተባለ', 'ሕገ-ወጥ የሰዎች ዝውውር', 'ኮንትሮባንድ'],
+  af: ['geldwassery', 'bedrog', 'sanksies', 'terrorisme', 'terreurfinansiering', 'omkopery', 'korrupsie', 'verduistering', 'gearresteer', 'skuldig bevind', 'mensehandel', 'smokkelary'],
+  sq: ['pastrim parash', 'mashtrim', 'sanksione', 'terrorizëm', 'financim i terrorizmit', 'ryshfet', 'korrupsion', 'përvetësim', 'arrestuar', 'dënuar', 'trafikim', 'kontrabandë'],
+  hr: ['pranje novca', 'prijevara', 'sankcije', 'terorizam', 'financiranje terorizma', 'podmićivanje', 'korupcija', 'pronevjera', 'uhićen', 'osuđen', 'trgovina ljudima', 'krijumčarenje'],
+  sl: ['pranje denarja', 'goljufija', 'sankcije', 'terorizem', 'financiranje terorizma', 'podkupovanje', 'korupcija', 'poneverba', 'aretiran', 'obsojen', 'trgovina z ljudmi', 'tihotapljenje'],
+  lt: ['pinigų plovimas', 'sukčiavimas', 'sankcijos', 'terorizmas', 'terorizmo finansavimas', 'kyšininkavimas', 'korupcija', 'pasisavinimas', 'suimtas', 'nuteistas', 'prekyba žmonėmis', 'kontrabanda'],
+  lv: ['naudas atmazgāšana', 'krāpšana', 'sankcijas', 'terorisms', 'terorisma finansēšana', 'kukuļošana', 'korupcija', 'piesavināšanās', 'aizturēts', 'notiesāts', 'cilvēku tirdzniecība', 'kontrabanda'],
+  et: ['rahapesu', 'pettus', 'sanktsioonid', 'terrorism', 'terrorismi rahastamine', 'altkäemaks', 'korruptsioon', 'omastamine', 'vahistatud', 'süüdi mõistetud', 'inimkaubandus', 'salakaubavedu'],
+  mk: ['перење пари', 'измама', 'санкции', 'тероризам', 'финансирање на тероризам', 'поткуп', 'корупција', 'проневера', 'уапсен', 'осуден', 'трговија со луѓе', 'криумчарење']
 };
 
 /* Union of every language's terms — the term set used when scoring the merged,
    multi-locale item stream. */
-export const ALL_TERMS = [...new Set(Object.values(LANG_TERMS).flat())];
+export const ALL_TERMS = [...new Set([...Object.values(LANG_TERMS).flat(), ...PY_PARITY_TERMS])];
 
 /* "Strong" (escalating) predicates across languages: money laundering, sanctions
    (+ evasion), terrorism, terrorist financing. A hit on any of these → high band. */
@@ -164,7 +242,31 @@ const STRONG_LIST = [
   'پولشویی', 'تروریسم', 'تأمین مالی تروریسم',
   'منی لانڈرنگ', 'دہشت گردی',
   'відмивання грошей', 'санкції', 'тероризм', 'фінансування тероризму',
-  'witwassen', 'sancties', 'terrorisme', 'terrorismefinanciering'
+  'witwassen', 'sancties', 'terrorisme', 'terrorismefinanciering',
+  // High-risk-region languages (2026-08-05): money laundering / sanctions / terrorism / TF predicates
+  'pul yuyulması', 'çirkli pulların yuyulması', 'sanksiyalar', 'terrorçuluq', 'terrorçuluğun maliyyələşdirilməsi',
+  'ақшаны жылыстату', 'ақша жылыстату', 'санкциялар', 'терроризм', 'лаңкестік', 'терроризмді қаржыландыру', 'лаңкестікті қаржыландыру',
+  'pul yuvish', 'jinoiy yo\'l bilan olingan pullarni legallashtirish', 'terrorizm', 'terrorizmni moliyalashtirish',
+  'ფულის გათეთრება', 'სანქციები', 'ტერორიზმი', 'ტერორიზმის დაფინანსება',
+  'փողերի լվացում', 'դրամի լվացում', 'պատժամիջոցներ', 'սանկցիաներ', 'ահաբեկչություն', 'ահաբեկչության ֆինանսավորում',
+  'सम्पत्ति शुद्धीकरण', 'प्रतिबन्ध', 'आतंकवाद', 'आतंकवादी वित्तपोषण',
+  'මුදල් විශුද්ධිකරණය', 'සම්බාධක', 'ත්‍රස්තවාදය', 'ත්‍රස්තවාදී මූල්‍යකරණය',
+  'ਮਨੀ ਲਾਂਡਰਿੰਗ', 'ਪਾਬੰਦੀਆਂ', 'ਅੱਤਵਾਦ', 'ਅੱਤਵਾਦੀ ਫੰਡਿੰਗ',
+  'मनी लाँडरिंग', 'निर्बंध', 'दहशतवाद', 'दहशतवादी अर्थपुरवठा',
+  'ငွေကြေးခဝါချမှု', 'ပိတ်ဆို့အရေးယူမှု', 'အကြမ်းဖက်ဝါဒ', 'အကြမ်းဖက်မှုကို ငွေကြေးထောက်ပံ့မှု',
+  'ការសម្អាតប្រាក់', 'ទណ្ឌកម្ម', 'ភេរវកម្ម', 'ការផ្តល់ហិរញ្ញប្បទានដល់ភេរវកម្ម',
+  'ການຟອກເງິນ', 'ມາດຕະການຄວ່ຳບາດ', 'ການກໍ່ການຮ້າຍ', 'ການສະໜອງທຶນໃຫ້ການກໍ່ການຮ້າຍ',
+  'halasta kuɗin haram', 'takunkumi', 'ta\'addanci', 'tallafin ta\'addanci',
+  'dhaqidda lacagta', 'cunaqabatayn', 'argagixiso', 'maalgelinta argagixisada',
+  'ሕገ-ወጥ የገንዘብ ዝውውር', 'ማዕቀብ', 'ሽብርተኝነት', 'ሽብርተኝነትን በገንዘብ መደገፍ',
+  'geldwassery', 'sanksies', 'terrorisme', 'terreurfinansiering',
+  'pastrim parash', 'sanksione', 'terrorizëm', 'financim i terrorizmit',
+  'pranje novca', 'sankcije', 'terorizam', 'financiranje terorizma',
+  'pranje denarja', 'terorizem',
+  'pinigų plovimas', 'sankcijos', 'terorizmas', 'terorizmo finansavimas',
+  'naudas atmazgāšana', 'sankcijas', 'terorisms', 'terorisma finansēšana',
+  'rahapesu', 'sanktsioonid', 'terrorism', 'terrorismi rahastamine',
+  'перење пари', 'санкции', 'тероризам', 'финансирање на тероризам'
 ];
 const STRONG_TERMS = new Set(STRONG_LIST);
 
@@ -258,7 +360,29 @@ export const LOCALES = [
   // More Latin America
   { id: 'es-CO', hl: 'es-419', gl: 'CO', ceid: 'CO:es-419', lang: 'es' },
   { id: 'es-CL', hl: 'es-419', gl: 'CL', ceid: 'CL:es-419', lang: 'es' },
-  { id: 'es-PE', hl: 'es-419', gl: 'PE', ceid: 'PE:es-419', lang: 'es' }
+  { id: 'es-PE', hl: 'es-419', gl: 'PE', ceid: 'PE:es-419', lang: 'es' },
+  // ── High-risk-region editions (2026-08-05, edition-confirmed languages) ──
+  // Central Asia & Caucasus
+  { id: 'az-AZ', hl: 'az', gl: 'AZ', ceid: 'AZ:az', lang: 'az' },
+  { id: 'kk-KZ', hl: 'kk', gl: 'KZ', ceid: 'KZ:kk', lang: 'kk' },
+  { id: 'ka-GE', hl: 'ka', gl: 'GE', ceid: 'GE:ka', lang: 'ka' },
+  { id: 'hy-AM', hl: 'hy', gl: 'AM', ceid: 'AM:hy', lang: 'hy' },
+  // South & Southeast Asia
+  { id: 'ne-NP', hl: 'ne', gl: 'NP', ceid: 'NP:ne', lang: 'ne' },
+  { id: 'si-LK', hl: 'si', gl: 'LK', ceid: 'LK:si', lang: 'si' },
+  { id: 'pa-IN', hl: 'pa', gl: 'IN', ceid: 'IN:pa', lang: 'pa' },
+  { id: 'mr-IN', hl: 'mr', gl: 'IN', ceid: 'IN:mr', lang: 'mr' },
+  { id: 'my-MM', hl: 'my', gl: 'MM', ceid: 'MM:my', lang: 'my' },
+  { id: 'km-KH', hl: 'km', gl: 'KH', ceid: 'KH:km', lang: 'km' },
+  // Africa
+  { id: 'af-ZA', hl: 'af', gl: 'ZA', ceid: 'ZA:af', lang: 'af' },
+  // Balkans & Baltics
+  { id: 'sq-AL', hl: 'sq', gl: 'AL', ceid: 'AL:sq', lang: 'sq' },
+  { id: 'hr-HR', hl: 'hr', gl: 'HR', ceid: 'HR:hr', lang: 'hr' },
+  { id: 'sl-SI', hl: 'sl', gl: 'SI', ceid: 'SI:sl', lang: 'sl' },
+  { id: 'lt-LT', hl: 'lt', gl: 'LT', ceid: 'LT:lt', lang: 'lt' },
+  { id: 'lv-LV', hl: 'lv', gl: 'LV', ceid: 'LV:lv', lang: 'lv' },
+  { id: 'et-EE', hl: 'et', gl: 'EE', ceid: 'EE:et', lang: 'et' }
 ];
 
 /* The locale set to sweep this run — all of LOCALES unless narrowed by the
@@ -356,11 +480,125 @@ export function adverseMediaUrlFor(name, loc) {
    and outlets that Google News RSS does not surface (it machine-translates, so
    English risk terms still reach non-English coverage). The worldwide backbone
    of the sweep; the per-locale Google News queries add regional depth. */
-export function gdeltUrl(name, terms = ['sanctions', 'sanctions evasion', 'money laundering', 'fraud', 'corruption', 'bribery', 'terrorism', 'terrorist financing', 'embezzlement', 'trafficking']) {
-  const q = '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
+export const GDELT_RISK_TERMS = [
+  'sanctions', 'sanctions evasion', 'money laundering', 'launder', 'fraud',
+  'corruption', 'bribery', 'embezzlement', 'terrorism', 'terrorist financing',
+  'proliferation financing', 'organized crime', 'cartel', 'trafficking',
+  'smuggling', 'narcotics', 'tax evasion', 'ponzi', 'indicted', 'convicted',
+  'arrested', 'investigation', 'raid', 'seized', 'asset freeze', 'blacklisted'
+];
+/* Typologies the SCORER has always known but the RETRIEVAL query never asked
+   for. PY_PARITY_TERMS were added scoring-only and deliberately kept out of the
+   Google News query, because that query is already ~1.5KB per locale and one
+   Google rejects returns zero items — trading a scoring gap for a retrieval gap
+   is a bad trade. That reasoning is sound for Google News and does NOT transfer
+   to GDELT: GDELT is a separate engine, one request per subject, and its query
+   carried only 26 terms. So an article about a subject's ransomware indictment,
+   kleptocracy allegations or modern-slavery prosecution could be scored
+   perfectly — if something else happened to surface it. Nothing asked.
+
+   These are the typology terms worth RETRIEVING on, drawn from the FATF-shaped
+   categories the scorer already recognises. Kept to terms specific enough to be
+   evidence of the typology rather than generic newswire vocabulary. */
+export const GDELT_EXTRA_TERMS = [
+  // Financial crime
+  'financial crime', 'economic crime', 'wire fraud', 'accounting fraud',
+  'asset misappropriation', 'identity theft', 'pyramid scheme', 'insider trading',
+  'market manipulation', 'counterfeiting', 'kickback', 'forgery', 'extortion',
+  // Terrorist financing / proliferation
+  'designated terrorist', 'extremist', 'radicalisation', 'militant',
+  'weapons of mass destruction', 'chemical weapons', 'biological weapons',
+  'arms trafficking', 'weapons smuggling', 'dual-use', 'export control',
+  // Corruption / organised crime
+  'kleptocracy', 'state capture', 'abuse of power', 'misuse of funds',
+  'conflict of interest', 'mafia', 'human trafficking', 'drug trafficking',
+  'people smuggling', 'forced labour', 'modern slavery', 'wildlife trafficking',
+  // Cyber
+  'cybercrime', 'ransomware', 'darknet',
+  // Legal / enforcement status
+  'prosecuted', 'prosecution', 'imprisonment', 'blackmail', 'debarred',
+  'regulatory breach', 'litigation', 'felon', 'jail', 'murder', 'theft',
+  // Stems of typologies already asked for in a longer form: GDELT matches whole
+  // words, so "corruption" does not retrieve an article that only says
+  // "corrupt".
+  'corrupt', 'bribe', 'wmd', 'litigate', 'prosecute',
+];
+
+/* DELIBERATELY NOT RETRIEVED: 'politic'. The scorer keeps it as a weak-tier
+   signal, which is right — but as a GDELT retrieval term it is the one entry on
+   the typology list that would do harm. The query is name-scoped and GDELT caps
+   a subject at 250 records, so for any public figure — and the PEP layer this
+   screen now carries is 422,223 office-holders — "politic" returns ordinary
+   political coverage that crowds genuine financial-crime reporting out of the
+   cap. That trades real recall for noise, which is the opposite of the point.
+   Scoring keeps it; retrieval does not ask for it. */
+
+/* A GDELT query that the API rejects returns null from fetchSource, which costs
+   the ENTIRE worldwide backbone for that subject — strictly worse than asking
+   for fewer terms. So the extras are admitted only while the built query stays
+   under a conservative length, and checkAdverseMedia falls back to the proven
+   base set if the wide query fails. Expansion can add recall; it must never be
+   able to subtract it. */
+export const GDELT_QUERY_MAX = Number(process.env.GDELT_QUERY_MAX) || 1600;
+
+export function gdeltTerms(name, extra = GDELT_EXTRA_TERMS, max = GDELT_QUERY_MAX) {
+  const out = [...GDELT_RISK_TERMS];
+  const len = (ts) => gdeltQueryString(name, ts).length;
+  for (const t of extra) {
+    if (out.includes(t)) continue;
+    out.push(t);
+    if (len(out) > max) { out.pop(); break; }
+  }
+  return out;
+}
+
+export function gdeltQueryString(name, terms) {
+  return '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
+}
+
+export function gdeltUrl(name, terms = gdeltTerms(name)) {
+  const q = gdeltQueryString(name, terms);
   const span = String(process.env.ADVERSE_MEDIA_TIMESPAN || '12m');
+  /* GDELT caps maxrecords at 250 — fetch at the API maximum by default: the
+     screen's mandate is maximum worldwide recall, and this is one request per
+     subject either way (volume, not request rate). Scoring downstream gates
+     precision. ADVERSE_MEDIA_MAXRECORDS lowers it without a code change if a
+     shared runner ever trips GDELT's per-IP throttle. */
+  const maxRec = Math.max(1, Math.min(250, Number(process.env.ADVERSE_MEDIA_MAXRECORDS) || 250));
   return 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q)
-    + '&mode=artlist&format=json&maxrecords=75&sort=datedesc&timespan=' + encodeURIComponent(span);
+    + '&mode=artlist&format=json&maxrecords=' + maxRec + '&sort=datedesc&timespan=' + encodeURIComponent(span);
+}
+
+/* Run-level GDELT circuit breaker, ported from screen.py's GDELT_BREAKER_AFTER
+   (test/engine_test.py already proves this exact pattern there; this mirrors
+   it here rather than inventing a second design). GDELT throttles busy
+   shared IPs (GitHub-hosted runners) and, once it does, stays down for the
+   rest of the run: every subsequent subject would otherwise burn a full
+   fetchSource timeout (default 20s, x2 when the wide query also has to
+   retry on the base set) waiting on a feed that is not coming back. After
+   this many CONSECUTIVE hard failures (wide query AND its base-set retry
+   both failed) the feed is declared down for the REST OF THE RUN with one
+   loud log line; each subject's coverage then stands on the Google News
+   locale sweep, same as the Python engine. A success resets the counter.
+   This is module-level in-memory state: it re-arms fresh on the next
+   process invocation, because each scheduled workflow run is a fresh
+   `node` process. */
+export const GDELT_BREAKER_AFTER = Number(process.env.GDELT_BREAKER_AFTER) || 5;
+export const gdeltBreakerState = { consecutiveFailures: 0, open: false };
+export function resetGdeltBreaker() {
+  gdeltBreakerState.consecutiveFailures = 0;
+  gdeltBreakerState.open = false;
+}
+export function gdeltBreakerRecordSuccess() {
+  gdeltBreakerState.consecutiveFailures = 0;
+}
+export function gdeltBreakerRecordFailure() {
+  gdeltBreakerState.consecutiveFailures++;
+  if (gdeltBreakerState.consecutiveFailures >= GDELT_BREAKER_AFTER && !gdeltBreakerState.open) {
+    gdeltBreakerState.open = true;
+    console.warn('adverse-media: GDELT down (' + GDELT_BREAKER_AFTER + ' subjects in a row) — circuit OPEN, '
+      + 'skipping GDELT for the rest of the run; Google News coverage stands');
+  }
 }
 
 const RSS_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
@@ -378,9 +616,19 @@ function decode(x) {
    "follows his arrest last week"), so it is captured, tag-stripped and bounded
    for scoring alongside the title. */
 export function parseRss(xml) {
+  /* NULL means "could not ask", [] means "asked, nothing found" — fetchSource
+     passes the distinction straight to checkAdverseMedia, which counts a null
+     locale as failed coverage instead of a clean sweep. A body with no feed
+     envelope at all is not an empty feed: Google News answers HTTP 200 with a
+     consent/interstitial page when it throttles a runner IP, and scoring that
+     as "no adverse media" cleared the subject on coverage that never ran. An
+     RSS endpoint always returns a document, so absence of the envelope — not
+     absence of items — is the failure signal. */
+  const s = String(xml == null ? '' : xml);
+  if (!/<(rss|feed|channel)\b/i.test(s)) return null;
   const items = [], re = /<item>([\s\S]*?)<\/item>/g;
   let m;
-  while ((m = re.exec(String(xml)))) {
+  while ((m = re.exec(s))) {
     const b = m[1];
     const tag = n => { const t = new RegExp('<' + n + '\\b[^>]*>([\\s\\S]*?)<\\/' + n + '>').exec(b); return t ? decode(t[1]).trim() : ''; };
     const title = tag('title');
@@ -469,11 +717,29 @@ function normalize(s) {
 }
 
 /* Parse a GDELT DOC 2.0 artlist JSON response → [{ title, link, source, date }],
-   the same item shape parseRss yields, so scoreAdverseMedia handles both. */
+   the same item shape parseRss yields, so scoreAdverseMedia handles both.
+
+   NULL means "could not ask", [] means "asked, nothing found" — and the caller
+   depends on the difference: `gd !== null` is what marks GDELT as a working
+   backbone, and a null makes the run partial (or errored, if Google News is
+   down too) so a standing adverse-media match is carried forward instead of
+   cleared. This used to return [] for ANY unparseable body, which is the
+   silent-false-clear this repo exists to prevent: GDELT answers HTTP 200 with
+   a plain-text complaint when a query is rejected and with an HTML error page
+   when it is overloaded, and both were being scored as a clean sweep of the
+   entire worldwide index.
+
+   A body that is empty or whitespace is the one benign case — GDELT returns it
+   for some zero-result queries — so that alone still means "nothing found". */
 export function parseGdelt(body) {
+  const raw = typeof body === 'string' ? body : null;
+  if (raw !== null && raw.trim() === '') return [];
   let json;
-  try { json = typeof body === 'string' ? JSON.parse(body) : body; } catch { return []; }
-  const arts = json && Array.isArray(json.articles) ? json.articles : [];
+  try { json = raw !== null ? JSON.parse(raw) : body; } catch { return null; }
+  /* Valid JSON without an `articles` array is an error envelope, not a result
+     set — GDELT's own zero-result shape is {"articles":[]}. */
+  if (!json || typeof json !== 'object' || !Array.isArray(json.articles)) return null;
+  const arts = json.articles;
   return arts.map(a => ({
     title: decode(String(a.title || '')),
     link: String(a.url || ''),
@@ -664,6 +930,13 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const sourcesOk = okLocales.length + (gd !== null ? 1 : 0) + (bingOn && bg !== null ? 1 : 0);
   const sourcesTotal = localeSet.length + 1 + (bingOn ? 1 : 0); // + GDELT (+ Bing)
   const failed = sourcesTotal - sourcesOk;
-  const out = { ...result, localesQueried: localeSet.length, sourcesOk, sourcesFailed: failed, itemsScanned: items.length };
+  /* Did this run sweep the FULL locale matrix? The default sweep is a budgeted
+     rotation (≈8 of 70+ editions/run), so a standing hit found on a non-core
+     regional edition is not re-queried most days — and would clear as "no
+     longer found" off coverage that never looked. fullMatrix lets the caller
+     mark such a standing adverse-media match unverified (carry forward), so it
+     only auto-clears on a full-matrix sweep or an MLRO disposition. */
+  const fullMatrix = localeSet.length >= LOCALES.length;
+  const out = { ...result, localesQueried: localeSet.length, fullMatrix, sourcesOk, sourcesFailed: failed, itemsScanned: items.length };
   return failed ? { ...out, partial: true } : out;
 }

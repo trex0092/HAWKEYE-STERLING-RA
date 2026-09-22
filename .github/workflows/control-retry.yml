@@ -27,8 +27,9 @@ on:
     - cron: '7 10 * * *'   # second pass — catches a retry that itself died; still before freshness (~11:07)
   workflow_dispatch:
 
+# Least privilege: read-only at top level; the healer job below elevates the
+# one scope it needs (Scorecard Token-Permissions).
 permissions:
-  actions: write   # read run history + fire workflow_dispatch on the controls
   contents: read
 
 concurrency:
@@ -37,16 +38,21 @@ concurrency:
 
 jobs:
   heal:
+    # actions: write — read run history + fire workflow_dispatch on the controls.
+    permissions:
+      actions: write
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
           allowed-endpoints: >
             api.github.com:443
+            *.githubapp.com:443
 
       - name: Re-dispatch any daily control missing today's success
         env:

@@ -124,3 +124,22 @@ runs with a **zero baseline** (sole remaining accepted finding: the documented
 inline `zizmor: ignore[dangerous-triggers]` in `labeler.yml`). This section is
 an addendum rather than an edit because §3's dismissal texts are a point-in-time
 record of what the owner clicked.
+
+## 6 · Addendum (2026-08-05) — source-probe alerts #141/#142
+
+The worldwide-coverage build added `scripts/source-probe.mjs` (PR #401), a
+dispatch-only diagnostic that fetches sources **already configured in the
+screening registry** (selected by id — the workflow input cannot aim it at an
+arbitrary URL). CodeQL raised two medium `js/file-access-to-http` alerts on
+its fetch: registry-file data flowing into an outbound request.
+
+**Disposition: DISMISS (used in tested code / intended behavior).** The data
+flow the query flags *is the instrument's function* — identical in kind to
+the daily screen's own list fetcher, which loads the same registry and
+fetches the same URLs. The mitigations are structural, not incidental: the
+registry is in-repo and PR-reviewed (changing a URL is a reviewed act), the
+probe validates scheme (`http(s)` only), runs with `contents: read` and **no
+secrets in its environment**, and publishes evidence only to a step summary
++ artifact. Owner action: dismiss #141 and #142 in Security → Code scanning
+with reason "used in tested code", citing this section — the alert record
+stays, per the §3 convention.

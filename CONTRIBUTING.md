@@ -4,6 +4,11 @@ Thank you for helping improve Hawkeye Sterling. This is an AML/CFT compliance
 tool, so correctness, auditability, and a clean change history matter as much as
 the feature itself. Please read this guide before opening a pull request.
 
+**Related:** [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) ·
+[Maintainers](MAINTAINERS.md) · [Security](SECURITY.md) ·
+[Code of Conduct](CODE_OF_CONDUCT.md) · [Changelog](CHANGELOG.md) ·
+[Docs index](docs/README.md)
+
 > **License note:** this is proprietary software (see [`LICENSE`](LICENSE)).
 > Contributions are accepted only from authorized collaborators. By submitting a
 > contribution you confirm you have the right to do so and assign it to the

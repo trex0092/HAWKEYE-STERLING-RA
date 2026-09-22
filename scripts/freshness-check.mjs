@@ -40,6 +40,7 @@ export const CONTROLS = [
   { id: 'fatf-watchdog.yml',        name: 'FATF Watchdog (country lists)',                         cadence: 'daily',     maxAgeDays: 0 },
   { id: 'onboarding-screen.yml',    name: 'Onboarding Screen (6-hourly)',                          cadence: 'daily',     maxAgeDays: 0 },
   { id: 'advisor-eval.yml',         name: 'Advisor Guardrail Eval (weekly)',                       cadence: 'weekly',    maxAgeDays: 8 },
+  { id: 'pep-worldwide.yml',        name: 'PEP Worldwide Harvest (weekly)',                        cadence: 'weekly',    maxAgeDays: 8 },
   { id: 'advisor-bias-eval.yml',    name: 'Advisor Bias Eval (quarterly)',                         cadence: 'quarterly', maxAgeDays: 96 },
   { id: 'quarterly-review.yml',     name: 'Quarterly Screening Review',                            cadence: 'quarterly', maxAgeDays: 96 },
 ];
@@ -61,6 +62,8 @@ export const EXEMPT = {
   'dependabot-autorebase.yml': 'repo-hygiene sweep that asks Dependabot to rebase auto-merge-armed PRs stranded behind main; a missed firing only delays a bump until the next sweep or push-to-main, and a stalled bump stays owner-visible on the open-PR list — no ingestion/eval duty',
   'eocn-reconcile.yml': 'prepares the weekly EOCN review branch + files the sign-off task; the review duty itself is enforced by the daily screening review-age gate (exit 3 past 7 days), which is what this alarm monitors',
   'dast-zap.yml': 'security scan of the deployed site',
+  'delivery-watchdog.yml': 'daily-report delivery probe (Asana task filed vs expected); self-alerting to Asana on a missing report, red badge is the alarm',
+  'fortify.yml': 'third-party SAST/SCA scanner (Fortify) requiring live FoD/SSC account credentials that are not currently configured in this repo; not a compliance-screening control with a regulatory ingestion/eval duty, so a failed or missing run has no freshness window to enforce',
   'freshness-check.yml': 'this alarm itself',
   'function-health.yml': 'site operations probe; self-alerting',
   'governance-report.yml': 'reports ON control state; the controls it reads are monitored individually',
@@ -97,23 +100,57 @@ export function isStale(lastSuccessDay, today, maxAgeDays) {
   return age > (maxAgeDays || 0);
 }
 
+/* A workflow run that has not reached a conclusion yet. */
+const ACTIVE_STATUSES = ['queued', 'in_progress', 'requested', 'waiting', 'pending'];
+
+/* Pure decision: what has a workflow done TODAY, given its recent runs as the
+   Actions API returns them? Lives here, beside the other pure decisions, rather
+   than inside the fetch that feeds it — this file's contract is that the
+   decision logic is offline-tested and only the runner block touches the
+   network, and the two signals below decide whether a mandatory control is
+   allowed to stay silent. They are regression-tested against real recorded
+   API payloads from the 2026-08-11 incident.
+     pending — a run is still executing, so today is an open question.
+     failed  — a run has already FINISHED unsuccessfully, so it is not.
+   `cancelled` and `timed_out` count as failures: neither produced a screening.
+   `skipped` does not — a no-op make-up firing is not a failure. */
+export function summariseTodayRuns(runs, today) {
+  const todays = (runs || []).filter(r => utcDay(r.run_started_at || r.created_at) === today);
+  return {
+    pending: todays.some(r => ACTIVE_STATUSES.includes(r.status)),
+    failed: todays.some(r => r.status === 'completed'
+                             && r.conclusion && r.conclusion !== 'success' && r.conclusion !== 'skipped'),
+  };
+}
+
 /* Pure decision: given each control's last successful-run day, return the
    controls whose latest success falls outside the control's cadence window
    (never ran, ran but failed, or last succeeded too long ago). A control with
    a run that STARTED today but is still in progress is NOT stale — the alarm
    is for a control that did not FIRE inside its window (bad cron / disabled /
    runner outage), not one that is mid-run (the daily full-coverage screen
-   legitimately takes ~45 min). Its own failure path alerts separately if that
-   run later fails, and the next check re-verifies. A control whose API query
-   FAILED (queryError set) is excluded here: a failed query is not evidence
-   the control missed its window - unknownControls() reports those honestly.
+   legitimately takes ~45 min). A control whose API query FAILED (queryError
+   set) is excluded here: a failed query is not evidence the control missed its
+   window - unknownControls() reports those honestly.
+
+   THE MID-RUN PASS IS NOT UNCONDITIONAL. It applies only while today is still
+   an open question. Once a run has already FINISHED unsuccessfully today,
+   "something is running" stops being evidence of health: the control has
+   demonstrably failed, and the thing in flight is a retry that may fail too.
+   Suppressing on that read green through a day of failures — the exact
+   silent-clear this estate forbids — and the window is wide, because the daily
+   screen fires three times a day at ~64 min each, so 09:09 and 12:09 can BOTH
+   land while a retry is mid-sweep. A day that heals reports green at the next
+   firing; a day that does not is now loud the whole way through.
    statuses: [{ id, name, cadence, maxAgeDays, lastSuccessDay, pendingToday?,
-   queryError? }]. */
+   failedToday?, queryError? }]. */
 export function staleControls(statuses, today) {
   return statuses
-    .filter(s => !s.queryError && isStale(s.lastSuccessDay, today, s.maxAgeDays) && !s.pendingToday)
+    .filter(s => !s.queryError && isStale(s.lastSuccessDay, today, s.maxAgeDays)
+                 && !(s.pendingToday && !s.failedToday))
     .map(s => ({ id: s.id, name: s.name, cadence: s.cadence || 'daily',
-                 maxAgeDays: s.maxAgeDays || 0, lastSuccessDay: s.lastSuccessDay || null }));
+                 maxAgeDays: s.maxAgeDays || 0, lastSuccessDay: s.lastSuccessDay || null,
+                 pendingToday: !!s.pendingToday, failedToday: !!s.failedToday }));
 }
 
 /* Controls whose status could NOT be verified because the last-success API
@@ -135,10 +172,17 @@ export function buildReport(stale, today, total, unknown = []) {
   }
   if (stale.length) {
     lines.push(`**${stale.length} of ${total} mandatory scheduled control(s) have NO successful run inside their cadence window.**`, '');
-    lines.push('| Control | Cadence | Window | Last successful run |', '| --- | --- | --- | --- |');
+    lines.push('| Control | Cadence | Window | Last successful run | Today |', '| --- | --- | --- | --- | --- |');
     for (const s of stale) {
       const window = (s.maxAgeDays || 0) === 0 ? 'today' : `${s.maxAgeDays} days`;
-      lines.push(`| ${s.name} | ${s.cadence} | ${window} | ${s.lastSuccessDay || 'never'} |`);
+      // Naming what happened TODAY separates the three ways a control reaches
+      // this table — never fired, fired and failed, or failed and is retrying
+      // right now. They need different responses, and the old table could not
+      // tell them apart.
+      const todayCell = s.failedToday
+        ? (s.pendingToday ? 'FAILED — retry in flight' : 'FAILED')
+        : (s.pendingToday ? 'in flight' : 'no run');
+      lines.push(`| ${s.name} | ${s.cadence} | ${window} | ${s.lastSuccessDay || 'never'} | ${todayCell} |`);
     }
     lines.push('', 'A mandatory control outside its cadence window is a potential regulatory breach (e.g. UNSC / EOCN ingestion must run daily without delay; the Advisor evals evidence the AI assurance cadence). Investigate the schedule, the workflow status, and the runner before relying on the affected control.');
   }
@@ -171,13 +215,16 @@ async function lastSuccessDay(repo, token, workflowId) {
   return run ? utcDay(run.run_started_at || run.created_at) : null;
 }
 
-/* Whether the workflow has a run that STARTED today and is still executing
-   (queued / in_progress / waiting) — i.e. the control fired today and is mid-run.
-   Used so a long screen or an eval running right now doesn't trip a false
-   "did not run" alarm while it is still running. */
-async function pendingToday(repo, token, workflowId, today) {
+/* Fetch this workflow's recent runs and hand them to summariseTodayRuns.
+   Both signals come from ONE call. The previous version asked only "is the
+   single most recent run active?" (per_page=1), which is why a control could
+   fail repeatedly all day and still read as merely mid-run — the failures sat
+   just below the window this query looked at. Widening the page costs nothing
+   and is strictly more evidence; a control firing at most a handful of times a
+   day (the busiest here is onboarding-screen at 6-hourly) fits well inside 20. */
+async function todayRuns(repo, token, workflowId, today) {
   const url = `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs`
-    + `?per_page=1`;
+    + `?per_page=20`;
   const res = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -188,10 +235,7 @@ async function pendingToday(repo, token, workflowId, today) {
   });
   if (!res.ok) throw new Error(`GitHub API ${res.status} for ${workflowId}`);
   const data = await res.json();
-  const run = (data.workflow_runs || [])[0];
-  if (!run) return false;
-  const active = ['queued', 'in_progress', 'requested', 'waiting', 'pending'].includes(run.status);
-  return active && utcDay(run.run_started_at || run.created_at) === today;
+  return summariseTodayRuns(data.workflow_runs, today);
 }
 
 async function main() {
@@ -206,7 +250,7 @@ async function main() {
   // The controls are independent: query them concurrently (at most 2 calls
   // each) instead of up to 18 sequential round-trips.
   const statuses = await Promise.all(CONTROLS.map(async c => {
-    let day = null, pending = false, queryError = null;
+    let day = null, pending = false, failed = false, queryError = null;
     try { day = await lastSuccessDay(repo, token, c.id); }
     catch (e) {
       // A failed query means UNKNOWN, never "never ran": leaving day null
@@ -216,11 +260,12 @@ async function main() {
       console.error(`  warn: could not query ${c.id}: ${e.message}`);
     }
     if (!queryError && isStale(day, today, c.maxAgeDays)) {
-      // Only need the extra call when there's no success in-window — is it mid-run?
-      try { pending = await pendingToday(repo, token, c.id, today); }
-      catch (e) { console.error(`  warn: could not query in-progress ${c.id}: ${e.message}`); }
+      // Only need the extra call when there's no success in-window — what has
+      // the control done today: still running, or already failed?
+      try { ({ pending, failed } = await todayRuns(repo, token, c.id, today)); }
+      catch (e) { console.error(`  warn: could not query today's runs for ${c.id}: ${e.message}`); }
     }
-    return { ...c, lastSuccessDay: day, pendingToday: pending, queryError };
+    return { ...c, lastSuccessDay: day, pendingToday: pending, failedToday: failed, queryError };
   }));
   const stale = staleControls(statuses, today);
   const unknown = unknownControls(statuses);

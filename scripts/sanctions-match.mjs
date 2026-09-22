@@ -44,6 +44,12 @@ export function normalizeName(s) {
     .replace(/ł/g, 'l').replace(/ø/g, 'o').replace(/[đð]/g, 'd')
     .replace(/þ/g, 'th').replace(/æ/g, 'ae').replace(/œ/g, 'oe')
     .replace(/ħ/g, 'h').replace(/ŧ/g, 't').replace(/ə/g, 'e').replace(/ŋ/g, 'ng')
+    /* African-Latin hook letters: screen.py folds Ɖ→D and Ɔ→O, JS did not, so a
+       short designation spelled with Ɔ/Ɖ (e.g. "Ɔla") keyed apart from its ASCII
+       customer spelling ("Ola") and cleared — a cross-engine false negative the
+       parity corpus never exercised. Lowercase forms suffice (JS folds after
+       lower-casing). Strictly widening. */
+    .replace(/ɖ/g, 'd').replace(/ɔ/g, 'o')
     /* Turkish dotless ı has no NFKD decomposition and is NOT folded by
        lowercasing, so "Kılıç" and "Kilic" normalized to different strings and
        an ı-spelled subject could sit a phantom 2 edits from its own name —
@@ -351,6 +357,66 @@ export function parseOpenSanctionsCsv(body) {
   return names;
 }
 
+/* US Trade.gov Consolidated Screening List bulk CSV (keyless download):
+   comma-delimited with a header row; eleven US lists in one feed (BIS Entity
+   List / Denied Persons / Unverified, State Dept nonproliferation + debarred,
+   OFAC re-included). The primary name sits in a `name` column and the
+   ';'-separated a.k.a. names in `alt_names` — NOT `aliases`, which is why the
+   OpenSanctions simple.csv parser would silently drop every alias here. */
+export function parseCslCsv(body) {
+  const rows = parseDelimited(body, ',');
+  if (rows.length < 2) return [];
+  const header = rows[0].map(c => c.trim().toLowerCase());
+  const nameIdx = header.indexOf('name');
+  const altIdx = header.findIndex(c => c === 'alt_names' || c === 'alt names' || c === 'alternate_names');
+  const srcIdx = header.indexOf('source');
+  if (nameIdx < 0) return [];
+  const names = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    /* The CSL bundles the full OFAC SDN block — already screened (with its
+       alias fold) via the dedicated OFAC sources. Dropping those rows here
+       keeps a hit attributed to its authoritative list, and keeps this
+       source's count meaning "the eleven NON-OFAC-SDN lists". */
+    if (srcIdx >= 0 && /specially designated nationals/i.test(r[srcIdx] || '')) continue;
+    const n = (r[nameIdx] || '').trim();
+    if (n) names.push(n);
+    if (altIdx >= 0) {
+      for (const piece of String(r[altIdx] || '').split(';')) {
+        const a = piece.trim();
+        if (a) names.push(a);
+      }
+    }
+  }
+  return names;
+}
+
+/* IDB Open Data "Dataset of Sanctioned firms and individuals" CSV (CKAN file
+   endpoint, keyless; proven live 2026-08-06 probe run 31070807037). Header:
+   Title,Entity,Nationality,Country,From,To,Prohibited Practice,Source,
+   Tipo de sancion del BID,IDB Sanction Source,Other Name — the sanctioned
+   party's name is `Title`, alternates in `Other Name`. Recall-monotone: every
+   row indexes (historical debarments included, like the ADB register). */
+export function parseIdbCsv(body) {
+  const rows = parseDelimited(body, ',');
+  if (rows.length < 2) return [];
+  const header = rows[0].map(c => c.trim().toLowerCase());
+  const nameIdx = header.indexOf('title');
+  const altIdx = header.indexOf('other name');
+  if (nameIdx < 0) return [];
+  const names = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const n = (r[nameIdx] || '').trim();
+    if (n) names.push(n);
+    if (altIdx >= 0) {
+      const a = (r[altIdx] || '').trim();
+      if (a) names.push(a);
+    }
+  }
+  return names;
+}
+
 /* Best-effort generic sanctions XML (Canada SEMA, Switzerland SECO and similar):
    join given/last name tags, take whole/entity name tags, and split alias tags.
    Returns [] if nothing recognisable is found (caller flags coverage degraded). */
@@ -361,14 +427,14 @@ export function parseGenericXml(body) {
   while ((m = recordRe.exec(s))) {
     matched = true;
     const block = m[2];
-    const given = firstTag(block, 'GivenName') || firstTag(block, 'givenName') || firstTag(block, 'FirstName') || firstTag(block, 'firstName');
-    const last = firstTag(block, 'LastName') || firstTag(block, 'lastName') || firstTag(block, 'Surname');
+    const given = firstTag(block, 'GivenName') || firstTag(block, 'givenName') || firstTag(block, 'FirstName') || firstTag(block, 'firstName') || firstTag(block, 'GivenName-Prenom');
+    const last = firstTag(block, 'LastName') || firstTag(block, 'lastName') || firstTag(block, 'Surname') || firstTag(block, 'LastName-NomDeFamille');
     const whole = firstTag(block, 'Entity') || firstTag(block, 'entity') || firstTag(block, 'WholeName')
-      || firstTag(block, 'wholeName') || firstTag(block, 'Name') || firstTag(block, 'name');
+      || firstTag(block, 'wholeName') || firstTag(block, 'Name') || firstTag(block, 'name') || firstTag(block, 'EntityOrShip-EntiteOuNavire');
     const combined = [given, last].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
     if (combined) names.push(combined);
     if (whole && whole !== combined) names.push(whole);
-    for (const t of ['Aliases', 'aliases', 'Alias', 'alias', 'AKA', 'aka']) {
+    for (const t of ['Aliases', 'aliases', 'Alias', 'alias', 'AKA', 'aka', 'Aliases-Alias']) {
       for (const a of allTags(block, t)) for (const piece of a.split(/[\/;|]/)) { const v = piece.trim(); if (v) names.push(v); }
     }
   }
@@ -492,7 +558,17 @@ export function parseSheetRows(xml, shared = []) {
       const vM = /<v\b[^>]*>([\s\S]*?)<\/v>/i.exec(inner);
       let val = '';
       if (type === 's') val = vM ? (shared[+vM[1]] || '') : '';
-      else if (type === 'inlineStr') { const tM = /<t\b[^>]*>([\s\S]*?)<\/t>/i.exec(inner); val = tM ? decodeXml(tM[1]) : ''; }
+      /* Inline strings carry rich text the same way shared strings do: several
+         <r><t>…</t></r> runs that CONCATENATE into one value. Reading only the
+         first run truncated a designated name mid-string ("ISLAMIC
+         REVOLUTIONARY" for "ISLAMIC REVOLUTIONARY GUARD CORPS") and the count
+         floor never fires on a truncation — so join every run, exactly as
+         parseSharedStrings does. */
+      else if (type === 'inlineStr') {
+        const tRe = /<t\b[^>]*>([\s\S]*?)<\/t>/gi;
+        let tM; val = '';
+        while ((tM = tRe.exec(inner))) val += decodeXml(tM[1]);
+      }
       else val = vM ? decodeXml(vM[1]) : '';
       cells[col] = String(val).replace(/\s+/g, ' ').trim();
     }
@@ -512,22 +588,132 @@ export function parseDfatXlsx(buf) {
   const files = unzipEntries(buf);
   if (!files.size) return [];
   const shared = parseSharedStrings(bufStr(files.get('xl/sharedStrings.xml')));
-  let sheetXml = bufStr(files.get('xl/worksheets/sheet1.xml'));
-  if (!sheetXml) for (const [k, v] of files) { if (/^xl\/worksheets\/.*\.xml$/i.test(k)) { sheetXml = bufStr(v); break; } }
-  const rows = parseSheetRows(sheetXml, shared);
+  /* EVERY worksheet, not just sheet1: the Saudi PCCT workbook keeps
+     individuals / entities / vessels on separate tabs, and reading only the
+     first yielded 7 vessel names below the coverage floor (2026-08-05 probe
+     evidence). Sheets without a name-bearing header contribute nothing. */
+  const sheetNames = [...files.keys()].filter(k => /^xl\/worksheets\/.*\.xml$/i.test(k)).sort();
+  const names = [];
+  for (const sn of sheetNames) {
+    const rows = parseSheetRows(bufStr(files.get(sn)), shared);
+    if (!rows.length) continue;
+    /* Header-row SCAN (first 8 rows), not first-non-empty: the Israel NBCTF
+       sheet puts Hebrew captions on row 0 and the English header ("Name of
+       Individual - English/Hebrew/Arabic") on row 1 — taking row 0 as the
+       header found no name column and parsed 0 (same probe evidence). */
+    let h = -1;
+    for (let i = 0; i < Math.min(rows.length, 8); i++) {
+      if (rows[i].some(c => /name/i.test(String(c)) && !/name\s*type/i.test(String(c)))) { h = i; break; }
+    }
+    if (h < 0) continue;
+    const header = rows[h].map(c => String(c).toLowerCase().trim());
+    const nameCols = [];
+    header.forEach((c, i) => { if (/name/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
+    if (!nameCols.length) continue;
+    for (let i = h + 1; i < rows.length; i++) {
+      /* Skip an all-dash placeholder in any name column — the Israel NBCTF
+         organisations sheet fills empty a.k.a. columns with "----" (not a bare
+         "-"), which the old `!== '-'` guard let through as a bogus designated
+         name (2026-08-05 probe evidence). A run of dashes is never a name. */
+      for (const ci of nameCols) { const v = (rows[i][ci] || '').trim(); if (v && !/^-+$/.test(v)) names.push(v); }
+    }
+  }
+  return names;
+}
+
+/* Mexico SAT Artículo 69-B (EFOS invoice-mill list): latin-1 comma CSV with
+   two preamble rows before the header. Only LIVE statuses screen — a taxpayer
+   who REBUTTED the presumption (Desvirtuado) or won in court (Sentencia
+   Favorable) must never flag; Presunto/Definitivo are the operative rows.
+   Tier framing lives in the registry entry: tax-integrity signal, not a
+   financial-sanctions designation. */
+export function parseSatCsv(body) {
+  const rows = parseDelimited(body, ',');
+  let h = -1, nameIdx = -1, sitIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 8); i++) {
+    const cells = rows[i].map(c => c.toLowerCase());
+    const n = cells.findIndex(c => /nombre del contribuyente|raz.n social/.test(c));
+    if (n >= 0) { h = i; nameIdx = n; sitIdx = cells.findIndex(c => /situaci.n/.test(c)); break; }
+  }
+  if (h < 0) return [];
+  const names = [];
+  for (let i = h + 1; i < rows.length; i++) {
+    const sit = sitIdx >= 0 ? String(rows[i][sitIdx] || '').toLowerCase() : '';
+    if (sitIdx >= 0 && !/presunto|definitivo/.test(sit)) continue;
+    const v = (rows[i][nameIdx] || '').trim();
+    if (v) names.push(v);
+  }
+  return names;
+}
+
+/* ── ODS reader — for lists published ONLY as .ods (OpenDocument) ─────────────
+   The Netherlands publishes its National Sanctions List Terrorism as an ODS
+   spreadsheet. An .ods is a ZIP whose content.xml holds the sheet; the same
+   minimal ZIP reader used for XLSX applies. parseOdsContent is the pure part
+   (unit-testable without constructing a ZIP): rows of <table:table-cell>
+   values, a header row located by name-bearing columns (Dutch or English),
+   names joined across those columns. Best-effort like every sibling parser. */
+export function parseOdsContent(xml) {
+  const text = String(xml || '');
+  const rows = [];
+  const rowRe = /<table:table-row[^>]*>([\s\S]*?)<\/table:table-row>/g;
+  /* MERGED cells occupy their extra grid positions with <table:covered-table-cell>.
+     Matching only <table:table-cell> skipped those positions, shifting every
+     later cell in the row LEFT — a merged row then read its name out of the
+     wrong column and vanished from the index while the row count stayed above
+     the floor. Covered cells are matched too and contribute an empty value, so
+     column positions survive a merge. The attribute group is LAZY so it cannot
+     swallow a self-closing "/" and turn <table:table-cell/> into an open tag
+     that then eats the next cell's content (the greedy form did — every empty
+     self-closed cell shifted the row). */
+  const cellRe = /<table:(covered-table-cell|table-cell)([^>]*?)(?:\/>|>([\s\S]*?)<\/table:(?:covered-table-cell|table-cell)>)/g;
+  let rm;
+  while ((rm = rowRe.exec(text)) && rows.length < 100000) {
+    const cells = [];
+    let cm;
+    while ((cm = cellRe.exec(rm[1]))) {
+      const covered = cm[1] === 'covered-table-cell';
+      const attrs = cm[2] || '';
+      const inner = covered ? '' : (cm[3] || '');
+      const ps = [...inner.matchAll(/<text:p[^>]*>([\s\S]*?)<\/text:p>/g)].map(p => {
+        /* Tag-strip to a FIXPOINT (a single pass would let "<scr<x>ipt>"
+           reconstruct "<script>" — CodeQL js/incomplete-multi-character-
+           sanitization), with the closing ">" optional so an unterminated
+           "<script" fragment is dropped too. Then entities, with &amp;
+           unescaped LAST — first would turn a literal "&amp;lt;" into "<"
+           (double-unescape; same ordering discipline as batch-screen's cell()). */
+        let t = p[1];
+        for (let prev; prev !== t;) { prev = t; t = t.replace(/<[^>]*>?/g, ''); }
+        return t.replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim();
+      });
+      const v = ps.join(' ').replace(/\s+/g, ' ').trim();
+      const rep = /table:number-columns-repeated="(\d+)"/.exec(attrs);
+      const times = Math.min(rep ? +rep[1] : 1, 200);   // repeated blanks pad to sheet width; cap so a 16k-repeat can't balloon
+      for (let i = 0; i < times; i++) cells.push(v);
+    }
+    if (cells.some(c => c)) rows.push(cells);
+  }
   if (!rows.length) return [];
   let h = 0;
-  while (h < rows.length && !rows[h].some(c => c && c.trim())) h++;
-  const header = (rows[h] || []).map(c => String(c).toLowerCase().trim());
+  while (h < rows.length && !rows[h].some(c => /na(?:a)?m|name/i.test(c))) h++;
+  if (h >= rows.length) return [];
   const nameCols = [];
-  header.forEach((c, i) => { if (/name/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
-  if (!nameCols.length) header.forEach((c, i) => { if (c === 'name') nameCols.push(i); });
+  rows[h].forEach((c, i) => { if (/na(?:a)?m|name/i.test(c) && !/type|kolom/i.test(c)) nameCols.push(i); });
   if (!nameCols.length) return [];
   const names = [];
   for (let i = h + 1; i < rows.length; i++) {
-    for (const ci of nameCols) { const v = (rows[i][ci] || '').trim(); if (v) names.push(v); }
+    const name = nameCols.map(ci => (rows[i][ci] || '').trim()).filter(Boolean)
+      .join(' ').replace(/\s+/g, ' ').trim();
+    if (name) names.push(name);
   }
   return names;
+}
+
+export function parseOdsList(buf) {
+  const files = unzipEntries(buf);
+  if (!files.size) return [];
+  return parseOdsContent(bufStr(files.get('content.xml')));
 }
 
 /* Generic JSON list parser — several national registers publish JSON rather than
@@ -536,9 +722,9 @@ export function parseDfatXlsx(buf) {
    names from the common name-bearing keys (and assemble first+last where a record
    splits them), plus aliases. Best-effort: returns [] if nothing recognisable, so
    the caller flags coverage degraded rather than inferring a false clear. */
-const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination|supp_name|firm_name)$/i;
-const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename)$/i;
-const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom)$/i;
+const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination|supp_name|firm_name|nome|nomepessoa|nome_pessoa|nomecompleto|nome_completo|razaosocial|razao_social|razonsocial|razon_social|denominacion|denominacao|nombrecompleto|nombre_completo|fullnameen|fullnamear)$/i;
+const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename|nombre|nombres)$/i;
+const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom|apellido|apellidos)$/i;
 const JSON_ALIAS = /^(alias|aliases|aka|akas|othernames|other_names|alternativenames|alternative_names|alternatename|alternative_spelling|autresnoms)$/i;
 export function parseJsonList(body) {
   let data;
@@ -548,16 +734,25 @@ export function parseJsonList(body) {
     if (node == null || depth > 8) return;
     if (Array.isArray(node)) { for (const x of node) visit(x, depth + 1); return; }
     if (typeof node !== 'object') return;
-    let whole = '', first = '', last = '';
+    /* EVERY whole-name key on a record screens — Qatar's NCTC carries the
+       designation in fullNameEn AND fullNameAr, and keeping only the first
+       dropped the Arabic form the transliteration nets want (2026-08-05
+       probe evidence). Multiple wholes on one record are just aliases of
+       each other; the Set at the end dedupes. */
+    const wholes = [];
+    let first = '', last = '';
     for (const [k, v] of Object.entries(node)) {
       if (typeof v === 'string' && v.trim()) {
-        if (!whole && JSON_WHOLE.test(k)) whole = v.trim();
+        if (JSON_WHOLE.test(k)) wholes.push(v.trim());
         else if (!first && JSON_FIRST.test(k)) first = v.trim();
         else if (!last && JSON_LAST.test(k)) last = v.trim();
       }
     }
-    const assembled = (whole || [first, last].filter(Boolean).join(' ')).replace(/\s+/g, ' ').trim();
-    if (assembled) out.push(assembled);
+    for (const w of wholes) { const t = w.replace(/\s+/g, ' ').trim(); if (t) out.push(t); }
+    if (!wholes.length) {
+      const assembled = [first, last].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+      if (assembled) out.push(assembled);
+    }
     for (const [k, v] of Object.entries(node)) {
       if (JSON_ALIAS.test(k)) {
         if (typeof v === 'string') for (const piece of v.split(/[;/|]/)) { const t = piece.trim(); if (t) out.push(t); }
@@ -571,6 +766,49 @@ export function parseJsonList(body) {
     }
   };
   visit(data, 0);
+  return [...new Set(out.filter(Boolean))];
+}
+
+/* UN-consolidated-list JSON (the shape Argentina's RePET republishes at
+   /xml/personas.json and /xml/entidades.json — the same schema as the UN XML,
+   in JSON). Each record carries the party name as ORDERED parts —
+   FIRST_NAME / SECOND_NAME / THIRD_NAME / FOURTH_NAME / NAME — that must be
+   CONCATENATED, plus designated a.k.a. names under INDIVIDUAL_ALIAS /
+   ENTITY_ALIAS as {…, ALIAS_NAME}. The generic JSON walker matched only
+   FIRST_NAME (JSON_FIRST) and so indexed a bare first name per individual and
+   dropped every alias — a silent recall AND precision loss on a live source.
+   This mirrors screen.py's parse_un name assembly exactly. Falls back to the
+   generic walker when a body carries no UN-structured record, so a non-UN feed
+   routed here can never parse to fewer names than the generic path would. */
+export function parseUnJson(body) {
+  let data;
+  try { data = typeof body === 'string' ? JSON.parse(body) : body; } catch { return []; }
+  const records = Array.isArray(data) ? data
+    : (data && typeof data === 'object' ? (data.records || data.results || data.data || data.items || []) : []);
+  const out = [];
+  let structured = 0;
+  for (const rec of (Array.isArray(records) ? records : [])) {
+    if (!rec || typeof rec !== 'object') continue;
+    let hit = false;
+    const parts = [];
+    for (const f of ['FIRST_NAME', 'SECOND_NAME', 'THIRD_NAME', 'FOURTH_NAME', 'NAME']) {
+      const v = rec[f];
+      if (typeof v === 'string' && v.trim()) parts.push(v.trim());
+    }
+    if (parts.length) { out.push(parts.join(' ').replace(/\s+/g, ' ').trim()); hit = true; }
+    for (const ac of ['INDIVIDUAL_ALIAS', 'ENTITY_ALIAS']) {
+      const arr = rec[ac];
+      if (Array.isArray(arr)) for (const a of arr) {
+        const an = a && typeof a === 'object' ? (a.ALIAS_NAME ?? a.alias_name ?? a.aliasName) : null;
+        if (typeof an === 'string' && an.trim()) { out.push(an.trim()); hit = true; }
+      }
+    }
+    if (hit) structured++;
+  }
+  /* No UN-structured record recognised → this isn't a UN-shaped feed; defer to
+     the generic walker rather than return empty (degrade to the old behaviour,
+     never below it). */
+  if (!structured) return parseJsonList(body);
   return [...new Set(out.filter(Boolean))];
 }
 
@@ -607,10 +845,15 @@ export function parseList(source, body) {
   if (p === 'un' || /^un[-_]/.test(id)) return parseUnXml(body);
   if (p === 'ofsi' || /ofsi/.test(id) || /^uk/.test(id)) return parseOfsiCsv(body);
   if (p === 'opensanctions') return parseOpenSanctionsCsv(body); // targets.simple.csv mirrors (comma CSV: name + ;-separated aliases)
+  if (p === 'csl') return parseCslCsv(body);                     // Trade.gov Consolidated Screening List (comma CSV: name + ;-separated alt_names)
+  if (p === 'idbcsv') return parseIdbCsv(body);                  // IDB sanctioned firms/individuals CSV (Title + Other Name columns)
   if (p === 'eu' || /^eu/.test(id)) return parseEuCsv(body);
+  if (p === 'unjson') return parseUnJson(body);                 // UN-consolidated-list JSON (RePET personas/entidades: ordered name parts + ALIAS_NAME)
   if (p === 'json') return parseJsonList(body);
   if (p === 'curated' || source.type === 'curated') return parseCuratedList(body);
+  if (p === 'mxsat') return parseSatCsv(body);                   // Mexico SAT 69-B (latin-1 CSV, live statuses only)
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
+  if (p === 'ods' || source.type === 'ods') return parseOdsList(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
   if (p === 'xml' || source.type === 'xml') return parseGenericXml(body);
   const xml = parseGenericXml(body);
