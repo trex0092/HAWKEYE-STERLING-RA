@@ -296,8 +296,13 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
       + '</em>');
   }
   if (en.amLocalesPerSubject) {
+    const backbones = Array.isArray(en.amBackbones) && en.amBackbones.length
+      ? en.amBackbones.join(' + ') : 'GDELT global index';
     h.push('<em>Adverse-media sweep: ' + esc(String(en.amLocalesPerSubject))
-      + ' news edition(s) per subject this run (pinned core + daily rotation over the worldwide matrix) + GDELT global index.</em>');
+      + ' news edition(s) per subject this run (pinned core + daily rotation'
+      + (en.amMatrixTotal ? ' over the ' + esc(String(en.amMatrixTotal)) + '-edition worldwide matrix' : ' over the worldwide matrix')
+      + (en.amRotationCycleDays ? ' — every edition swept within ' + esc(String(en.amRotationCycleDays)) + ' run(s)' : '')
+      + ') + ' + esc(backbones) + ' on every subject, every run.</em>');
   }
   const ai = r.ai_enrichment || null;
   if (ai && ai.text) {

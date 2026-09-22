@@ -3,14 +3,7 @@
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
-  GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, GDELT_QUERY_MAX, gdeltTerms,
-  gdeltQueryString, GDELT_BREAKER_AFTER, gdeltBreakerState, resetGdeltBreaker,
-  gdeltBreakerRecordSuccess, gdeltBreakerRecordFailure } from '../scripts/adverse-media.mjs';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
-
-const ROOT2 = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker } from '../scripts/adverse-media.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -256,6 +249,34 @@ check('a strong native predicate (Georgian money laundering) escalates to high b
   scoreAdverseMedia('გიორგი', [{ title: 'გიორგი ფულის გათეთრება ბრალდებით დააკავეს', link: 'http://g/1' }], ALL_TERMS).band === 'high');
 check('a terms-only language with no Google News edition still scores via GDELT titles (Somali)',
   scoreAdverseMedia('Cabdi Xasan', [{ title: 'Cabdi Xasan oo lagu xiray dhaqidda lacagta', link: 'http://so/1' }], ALL_TERMS).hit === true);
+
+/* ── Bing News — the THIRD global backbone (independent rate-limit pool) ── */
+check('bingNewsUrl targets the Bing News RSS endpoint with quoted name + risk terms',
+  bingNewsUrl('Acme Co').startsWith('https://www.bing.com/news/search?q=')
+  && bingNewsUrl('Acme Co').includes('format=rss')
+  && decodeURIComponent(bingNewsUrl('Acme Co')).includes('"Acme Co"')
+  && decodeURIComponent(bingNewsUrl('Acme Co')).includes('money laundering'));
+
+/* ── Google News run-level breaker — refusals stop the hammering, loudly ── */
+check('breaker: refusal shapes accumulate and open at the threshold; success resets', (() => {
+  resetGnewsBreaker();
+  for (let i = 0; i < 24; i++) noteGnewsResult(false, 429);
+  const notOpenYet = !gnewsBreakerOpen();
+  noteGnewsResult(true, 200);                      // success resets the streak
+  for (let i = 0; i < 24; i++) noteGnewsResult(false, 429);
+  const stillClosed = !gnewsBreakerOpen();
+  noteGnewsResult(false, 0);                       // network failure counts
+  const nowOpen = gnewsBreakerOpen();
+  resetGnewsBreaker();
+  return notOpenYet && stillClosed && nowOpen && !gnewsBreakerOpen();
+})());
+check('breaker: a non-refusal failure (e.g. HTTP 500 parse path) never opens it', (() => {
+  resetGnewsBreaker();
+  for (let i = 0; i < 60; i++) noteGnewsResult(false, 500);
+  const closed = !gnewsBreakerOpen();
+  resetGnewsBreaker();
+  return closed;
+})());
 
 /* ── Phase-4 hardening: description scanning, tiers, canonical dedup ──────── */
 const descRss = '<rss><channel><item><title>Acme Corp restructures Gulf operations</title>'
