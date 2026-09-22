@@ -1,0 +1,139 @@
+name: Stale Branch Audit
+
+# Flags branches whose entire content is already present in main (ahead_by ==
+# 0 against main) and whose tip commit is older than 14 days, as candidates
+# for deletion. Born from 2026-09-22: two such branches (ci/split-smoke-
+# artifacts, claude/hawkeye-sterling-repair-32z6br) sat abandoned for months
+# before anyone noticed, found only by manual inspection during an unrelated
+# task.
+#
+# READ-ONLY on branches: this workflow NEVER deletes a branch. It opens or
+# updates a single tracking issue so a human decides. If the stale list is
+# empty on a run and the tracking issue is still open (because the branches
+# were cleaned up since the last flag), it closes the issue — self-clearing,
+# same pattern as the other alerts in this repo.
+#
+# Branches used as live state storage by the daily controls (*-state,
+# *-progress, *-reconcile, pep-shard-N) are hard-excluded below, never
+# evaluated at all — they are expected to diverge from main permanently and
+# must never be flagged, let alone deleted.
+
+on:
+  schedule:
+    - cron: '43 8 * * 1'   # 08:43 UTC every Monday, after the daily watchers (odd minute)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stale-branch-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            *.githubapp.com:443
+
+      - name: Find fully-merged stale branches and file/clear the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          python3 <<'PY'
+          import json, os, subprocess, sys, datetime
+
+          REPO = os.environ["REPO"]
+          TOKEN = os.environ["GH_TOKEN"]
+          BASE = "main"
+          MIN_AGE_DAYS = 14
+          ISSUE_TITLE = "Stale branch audit: fully-merged branches to review"
+
+          # Never evaluate branches that are live state storage for the daily
+          # controls — they are expected to diverge from main forever.
+          def is_state_branch(name):
+              if name in ("main",):
+                  return True
+              if name.endswith(("-state", "-progress", "-reconcile")):
+                  return True
+              if name.startswith("pep-shard-") and name[len("pep-shard-"):].isdigit():
+                  return True
+              return False
+
+          def gh(path, method="GET", data=None):
+              cmd = ["curl", "-sS", "-X", method,
+                     "-H", f"Authorization: Bearer {TOKEN}",
+                     "-H", "Accept: application/vnd.github+json",
+                     f"https://api.github.com{path}"]
+              if data is not None:
+                  cmd += ["-d", json.dumps(data)]
+              out = subprocess.run(cmd, capture_output=True, text=True, check=True)
+              return json.loads(out.stdout) if out.stdout.strip() else {}
+
+          branches = gh(f"/repos/{REPO}/branches?per_page=100")
+          if isinstance(branches, dict):
+              print("::error::unexpected branches response:", branches)
+              sys.exit(1)
+
+          now = datetime.datetime.now(datetime.timezone.utc)
+          stale = []
+          for b in branches:
+              name = b["name"]
+              if is_state_branch(name):
+                  continue
+              detail = gh(f"/repos/{REPO}/branches/{name}")
+              date_str = detail["commit"]["commit"]["committer"]["date"]
+              tip_date = datetime.datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+              age_days = (now - tip_date).days
+              if age_days < MIN_AGE_DAYS:
+                  continue
+              cmp = gh(f"/repos/{REPO}/compare/{BASE}...{name}")
+              ahead = cmp.get("ahead_by")
+              if ahead == 0:
+                  stale.append({"name": name, "age_days": age_days, "last_commit": date_str})
+
+          # Find the existing tracking issue, if any (open, exact title match).
+          issues = gh(f"/repos/{REPO}/issues?state=open&per_page=100")
+          existing = next((i for i in issues if i.get("title") == ISSUE_TITLE and "pull_request" not in i), None)
+
+          if not stale:
+              print("OK — no stale branches found")
+              if existing:
+                  gh(f"/repos/{REPO}/issues/{existing['number']}", method="PATCH",
+                     data={"state": "closed"})
+                  print(f"Closed tracking issue #{existing['number']} (list is now empty)")
+              sys.exit(0)
+
+          lines = [
+              "Branches with zero commits ahead of `main` (fully absorbed already) and a tip commit older than "
+              f"{MIN_AGE_DAYS} days, found by the Stale Branch Audit workflow. This issue never triggers a "
+              "deletion — it is filed for a human to review and delete by hand if agreed.",
+              "",
+              "| Branch | Last commit | Age (days) |",
+              "| --- | --- | --- |",
+          ]
+          for s in sorted(stale, key=lambda s: -s["age_days"]):
+              lines.append(f"| `{s['name']}` | {s['last_commit']} | {s['age_days']} |")
+          body = "\n".join(lines)
+
+          if existing:
+              gh(f"/repos/{REPO}/issues/{existing['number']}", method="PATCH", data={"body": body})
+              print(f"Updated tracking issue #{existing['number']} with {len(stale)} stale branch(es)")
+          else:
+              created = gh(f"/repos/{REPO}/issues", method="POST",
+                            data={"title": ISSUE_TITLE, "body": body, "labels": ["housekeeping"]})
+              print(f"Filed tracking issue #{created.get('number')} with {len(stale)} stale branch(es)")
+          PY
