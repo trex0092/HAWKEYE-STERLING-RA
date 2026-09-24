@@ -6140,9 +6140,69 @@ NARRATIVE_SHRINK_RUNGS = (
     {"candidates": 1, "articles": 1, "subjects": 8, "matches": 8},
 )
 
+def _existing_report_task(mode, run_time):
+    """gid of a "daily" or "makeup" report ALREADY delivered today, or "" if none.
+
+    Root cause (confirmed from the 2026-09-17 job log, 11 duplicate "Daily
+    AML/CFT Screening Report" posts in one day): post_unified_task used to run
+    unconditionally on every invocation. The EOCN freshness gate later in the
+    SAME script run (see its exit(3) below) can mark an already-delivered run
+    as a GitHub Actions "failure" even though the report already posted fine.
+    The workflow's own "skip if today already succeeded" preflight check
+    trusts that job-level conclusion, and workflow_dispatch bypasses the
+    check entirely, so every scheduled retry and every manual re-run that
+    day re-ran the whole pipeline and posted another identical report.
+
+    "daily" and "makeup" are each meant to post exactly ONE book-wide report
+    per calendar day, so (mode, date) is a safe, unambiguous key for them.
+    "onboarding" is deliberately NOT deduped here: it is meant to post once
+    per new customer, and this function has no per-customer identifier to
+    tell two genuine same-day onboardings apart from a repeat of one, so a
+    naive date-only key would risk silently dropping a real second customer's
+    report, a worse outcome than an occasional duplicate. Checking Asana
+    directly, instead of trusting this run's own eventual exit code, is
+    immune to which trigger fired the run and to any later, unrelated step
+    throwing after the post already succeeded.
+    """
+    if mode not in ("daily", "makeup"):
+        return ""
+    dt = run_time.strftime("%d %b %Y")
+    prefix = (f"Daily AML/CFT Screening Report (coverage make-up) — "
+              if mode == "makeup" else "Daily AML/CFT Screening Report — ")
+    suffix = f"— {dt}"
+    since = run_time.strftime("%Y-%m-%dT00:00:00.000Z")
+    params = {"project": ASANA_ONGOING_MON_GID, "modified_since": since,
+              "opt_fields": "gid,name", "limit": 100}
+    while True:
+        r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=params)
+        if r is None or r.status_code not in (200, 201):
+            # Read failed: log it and let the caller post normally. A missed
+            # dedup check risks, at worst, repeating the known duplicate
+            # pattern; blocking the post on a read failure risks a missed
+            # mandatory daily control, which is the worse of the two.
+            log(f"  dedup check: could not read today's reports "
+                f"({getattr(r, 'status_code', 'network')}) — posting normally")
+            return ""
+        data = r.json() if isinstance(r.json(), dict) else {}
+        for t in (data.get("data") or []):
+            name = t.get("name") or ""
+            if name.startswith(prefix) and name.endswith(suffix):
+                return t.get("gid") or ""
+        next_page = data.get("next_page") or None
+        if not next_page or not next_page.get("offset"):
+            return ""
+        params["offset"] = next_page["offset"]
+
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
                       rebuild=None):
     dt = run_time.strftime("%d %b %Y")
+    existing_gid = _existing_report_task(mode, run_time)
+    if existing_gid:
+        log(f"SKIP: a {mode} report for {dt} was already delivered as "
+            f"{existing_gid} (dedup check added 2026-09-24 after the 17 Sep "
+            f"duplicate-posting incident) — not posting a duplicate")
+        progress("delivered", task_gid=existing_gid)
+        return existing_gid
     n_s, n_a, n_p = len(possible_matches), len(adverse_findings), len(pep_findings)
     # Professional register: a words-not-emoji status marker, counts spelled
     # out, the date last. "ACTION REQUIRED" is the scannable signal.
