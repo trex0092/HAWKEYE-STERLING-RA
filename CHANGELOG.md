@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-25
+
 - **The daily screening was being killed at 64 minutes by our own egress
   allowlist** (`.github/workflows/weekly-adverse-media.yml`,
   `test/workflow-hardening.test.mjs`). A GitHub-hosted runner heartbeats to
