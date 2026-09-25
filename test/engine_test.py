@@ -2994,6 +2994,19 @@ check("legacy daily post failure arms the delivery gate (no more green no-delive
 # one explicitly instead of relying on what used to be the default.
 _posted = []
 def _record_post(method, url, **kw):
+    # 2026-09-25: post_unified_task now makes a GET first (the same-day/
+    # same-batch dedup check added 2026-09-24) before its POST. This mock
+    # predates that and only ever modelled the POST; without the method
+    # check the GET call itself got appended to _posted (as None, since it
+    # has no json= kwarg), corrupting _posted[0] below. A real "no prior
+    # report" GET returns an empty Asana task list, not a created-task body.
+    if method != "POST":
+        class _G:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": []}
+        return _G()
     _posted.append(kw.get("json"))
     class _R:
         status_code = 201
@@ -3077,6 +3090,16 @@ check("capped narrative still lists the top items of every section",
 # without it (legacy), the cap_notes backstop truncates the middle away.
 _posted_shrink = []
 def _record_shrink(method, url, **kw):
+    # See the matching note on _record_post above: the dedup GET added
+    # 2026-09-24 must not be recorded as if it were the POST this mock was
+    # written to model, and must see a real empty task list back.
+    if method != "POST":
+        class _G:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": []}
+        return _G()
     _posted_shrink.append(kw.get("json"))
     class _R:
         status_code = 201

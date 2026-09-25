@@ -5999,10 +5999,26 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             _ri = adverse_locale_indices(run_time)
             _mkts = ", ".join(GNEWS_LOCALES[i][2] for i in _ri)
             _cyc = adverse_rotation_cycle_days()
+            # The rotation-scope claim below is about DESIGN (GDELT's query targets
+            # every subject regardless of the locale-rotation gate Google News uses),
+            # not this run's actual outcome — those are disclosed separately above
+            # ("News feed coverage this run..."). A static "runs on EVERY subject"
+            # claim here, unconditional on the actual gdelt/subjects count, reads as
+            # overclaiming full coverage right next to a run that measurably didn't
+            # get one, which is exactly the kind of silent-clear this engine exists
+            # to avoid. Report the shortfall by name when this run's GDELT count is
+            # actually short, and reserve the design claim for when it is not.
+            _nfc = stats.get("news_feed_coverage") or {}
+            _gdelt_reached, _nfc_subjects = _nfc.get("gdelt"), _nfc.get("subjects")
+            if _gdelt_reached is not None and _nfc_subjects and _gdelt_reached < _nfc_subjects:
+                _gdelt_note = (f"GDELT's global index reached only {_gdelt_reached} of {_nfc_subjects} subject(s) "
+                               "this run — not gated by the rotation, but not immune to its own throttling either.")
+            else:
+                _gdelt_note = ("GDELT's global index runs on EVERY subject every run regardless, so worldwide "
+                               "reach is not gated on the rotation.")
             A(f"   Worldwide rotation: this run swept {_mkts}. The {ADVERSE_CORE_LOCALES} core editions run every day; the rest of the "
               f"{len(GNEWS_LOCALES)}-market matrix rotates, so every market is swept within {_cyc} run(s). "
-              "GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
-              "the rotation adds local-language press on top of it.")
+              f"{_gdelt_note} The rotation adds local-language press on top of GDELT's baseline coverage.")
             # Ledger verdict: the rotation claim above, VERIFIED against the
             # recorded sweep dates — overdue markets alarm loudly, a clean
             # mature ledger states its evidence, a young ledger says so.
@@ -6213,7 +6229,12 @@ def _existing_report_task(mode, run_time, customer_gids=None):
                 f"({getattr(r, 'status_code', 'network')}) — posting normally")
             return ""
         data = r.json() if isinstance(r.json(), dict) else {}
-        for t in (data.get("data") or []):
+        tasks = data.get("data")
+        if not isinstance(tasks, list):
+            tasks = []
+        for t in tasks:
+            if not isinstance(t, dict):
+                continue
             name = t.get("name") or ""
             if mode == "onboarding":
                 if name.startswith(name_prefix) and marker in (t.get("notes") or ""):
