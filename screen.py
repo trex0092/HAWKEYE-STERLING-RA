@@ -6140,53 +6140,85 @@ NARRATIVE_SHRINK_RUNGS = (
     {"candidates": 1, "articles": 1, "subjects": 8, "matches": 8},
 )
 
-def _existing_report_task(mode, run_time):
-    """gid of a "daily" or "makeup" report ALREADY delivered today, or "" if none.
+def _onboarding_batch_key(customer_gids):
+    """Short, stable fingerprint of a customer-gid set, used only to recognise
+    a REPEAT of the exact same onboarding batch (not to identify customers)."""
+    return hashlib.sha256(",".join(sorted(customer_gids or [])).encode()).hexdigest()[:12]
 
-    Root cause (confirmed from the 2026-09-17 job log, 11 duplicate "Daily
-    AML/CFT Screening Report" posts in one day): post_unified_task used to run
+ONBOARDING_MARKER_LOOKBACK_HOURS = int(os.environ.get(
+    "ONBOARDING_MARKER_LOOKBACK_HOURS", str(ONBOARDING_WINDOW_HOURS + 2)))
+
+def _existing_report_task(mode, run_time, customer_gids=None):
+    """gid of a report ALREADY delivered for this mode, or "" if none.
+
+    "daily" / "makeup" (dedup key: mode + calendar date) — root cause
+    confirmed from the 2026-09-17 job log, 11 duplicate "Daily AML/CFT
+    Screening Report" posts in one day: post_unified_task used to run
     unconditionally on every invocation. The EOCN freshness gate later in the
     SAME script run (see its exit(3) below) can mark an already-delivered run
     as a GitHub Actions "failure" even though the report already posted fine.
     The workflow's own "skip if today already succeeded" preflight check
     trusts that job-level conclusion, and workflow_dispatch bypasses the
     check entirely, so every scheduled retry and every manual re-run that
-    day re-ran the whole pipeline and posted another identical report.
+    day re-ran the whole pipeline and posted another identical report. Each
+    of these modes is meant to post exactly ONE book-wide report per
+    calendar day, so (mode, date) is a safe, unambiguous key for them.
 
-    "daily" and "makeup" are each meant to post exactly ONE book-wide report
-    per calendar day, so (mode, date) is a safe, unambiguous key for them.
-    "onboarding" is deliberately NOT deduped here: it is meant to post once
-    per new customer, and this function has no per-customer identifier to
-    tell two genuine same-day onboardings apart from a repeat of one, so a
-    naive date-only key would risk silently dropping a real second customer's
-    report, a worse outcome than an occasional duplicate. Checking Asana
-    directly, instead of trusting this run's own eventual exit code, is
-    immune to which trigger fired the run and to any later, unrelated step
-    throwing after the post already succeeded.
+    "onboarding" (dedup key: the exact set of customer gids in this batch) —
+    a SEPARATE, non-crash root cause, confirmed from the 18-19 Sep 2026
+    reports: the same customer stays "fresh" (ONBOARDING_WINDOW_HOURS, 26h
+    by default) across several runs of the ~6-hourly onboarding workflow, and
+    every run that finds it posts a full report again, with no memory of
+    "already reported this customer", producing up to ~4-5 near-identical
+    reports per customer before they age out of the window. Unlike
+    daily/makeup, a plain date key is unsafe here (a second, genuinely
+    different customer onboarded the same day must still get its own
+    report), so the key is the customer-gid set itself: post_unified_task
+    embeds a short fingerprint of that set in the delivered task's notes (see
+    below), and this looks for a prior report carrying the SAME fingerprint
+    within the lookback window, rather than matching by date or title.
+
+    Checking Asana directly, instead of trusting this run's own eventual
+    exit code or any of its own delta-state, is immune to which trigger
+    fired the run and to any later, unrelated step throwing after the post
+    already succeeded.
     """
-    if mode not in ("daily", "makeup"):
+    if mode not in ("daily", "makeup", "onboarding"):
         return ""
-    dt = run_time.strftime("%d %b %Y")
-    prefix = (f"Daily AML/CFT Screening Report (coverage make-up) — "
-              if mode == "makeup" else "Daily AML/CFT Screening Report — ")
-    suffix = f"— {dt}"
-    since = run_time.strftime("%Y-%m-%dT00:00:00.000Z")
-    params = {"project": ASANA_ONGOING_MON_GID, "modified_since": since,
-              "opt_fields": "gid,name", "limit": 100}
+    if mode == "onboarding":
+        if not customer_gids:
+            return ""
+        marker = f"onboarding-batch:{_onboarding_batch_key(customer_gids)}"
+        since = (run_time - datetime.timedelta(hours=ONBOARDING_MARKER_LOOKBACK_HOURS)
+                 ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        params = {"project": ASANA_ONGOING_MON_GID, "modified_since": since,
+                  "opt_fields": "gid,name,notes", "limit": 100}
+        name_prefix = "Onboarding Screening Report — "
+    else:
+        dt = run_time.strftime("%d %b %Y")
+        name_prefix = (f"Daily AML/CFT Screening Report (coverage make-up) — "
+                       if mode == "makeup" else "Daily AML/CFT Screening Report — ")
+        suffix = f"— {dt}"
+        since = run_time.strftime("%Y-%m-%dT00:00:00.000Z")
+        params = {"project": ASANA_ONGOING_MON_GID, "modified_since": since,
+                  "opt_fields": "gid,name", "limit": 100}
     while True:
         r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=params)
         if r is None or r.status_code not in (200, 201):
             # Read failed: log it and let the caller post normally. A missed
-            # dedup check risks, at worst, repeating the known duplicate
+            # dedup check risks, at worst, repeating a known duplicate
             # pattern; blocking the post on a read failure risks a missed
-            # mandatory daily control, which is the worse of the two.
-            log(f"  dedup check: could not read today's reports "
+            # mandatory control, which is the worse of the two.
+            log(f"  dedup check: could not read prior reports "
                 f"({getattr(r, 'status_code', 'network')}) — posting normally")
             return ""
         data = r.json() if isinstance(r.json(), dict) else {}
         for t in (data.get("data") or []):
             name = t.get("name") or ""
-            if name.startswith(prefix) and name.endswith(suffix):
+            if mode == "onboarding":
+                if name.startswith(name_prefix) and marker in (t.get("notes") or ""):
+                    return t.get("gid") or ""
+            elif name.startswith(name_prefix) and name.endswith(suffix):
                 return t.get("gid") or ""
         next_page = data.get("next_page") or None
         if not next_page or not next_page.get("offset"):
@@ -6194,9 +6226,9 @@ def _existing_report_task(mode, run_time):
         params["offset"] = next_page["offset"]
 
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
-                      rebuild=None):
+                      rebuild=None, customer_gids=None):
     dt = run_time.strftime("%d %b %Y")
-    existing_gid = _existing_report_task(mode, run_time)
+    existing_gid = _existing_report_task(mode, run_time, customer_gids)
     if existing_gid:
         log(f"SKIP: a {mode} report for {dt} was already delivered as "
             f"{existing_gid} (dedup check added 2026-09-24 after the 17 Sep "
@@ -6238,9 +6270,18 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
             else:
                 log(f"  narrative exceeds the {budget}-byte budget even at the deepest section caps — "
                     "cap_notes backstop will truncate (marker in-body)")
+        notes_body = cap_notes(body, budget)
+        if mode == "onboarding" and customer_gids:
+            # Dedup marker for _existing_report_task's onboarding lookup
+            # above — identifies a REPEAT of this exact customer batch, never
+            # shown as anything but a plain trailing line (no hidden markup,
+            # so it survives Asana's rich-text conversion intact and stays
+            # visible/auditable to the MLRO rather than hidden).
+            notes_body += (f"\n\n(internal dedup marker, not a finding: "
+                           f"onboarding-batch:{_onboarding_batch_key(customer_gids)})")
         payload = {"data": {
             "name": task_name[:250],
-            "notes": cap_notes(body, budget),
+            "notes": notes_body,
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
             "projects": _mlro_queue_targets()[0],
@@ -7036,7 +7077,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                    adverse_findings, pep_findings, mode=mode,
                                    rebuild=lambda caps: build_unified_narrative(
                                        possible_matches, clear, adverse_findings,
-                                       pep_findings, list_meta, stats, run_time, caps=caps))
+                                       pep_findings, list_meta, stats, run_time, caps=caps),
+                                   customer_gids=[c.get("gid", "") for c in customers])
     # MLRO case subtasks for the NEW items only (keeps the case list actionable);
     # overflow/failed items ride the reserved backlog inside `state`.
     open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
