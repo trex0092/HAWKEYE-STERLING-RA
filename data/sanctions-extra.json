@@ -205,8 +205,8 @@
       "url": "https://www.competentauthority.gov.lk/resources/1373/Individuals_list.xlsx",
       "type": "xlsx",
       "parser": "xlsx",
-      "enabled": false,
-      "_note": "Sri Lanka national 1373 designations (XLSX). DISABLED — probe evidence 2026-08-05: connection fails from GitHub runners even with browser headers (DNS resolves, TLS/connection dies). Curated path, or periodic re-probe via source-probe.yml.",
+      "enabled": true,
+      "_note": "Sri Lanka national 1373 designations (XLSX). RE-ENABLED 2026-09-25 (source-probe run 36177942741): the endpoint that failed to connect from GitHub runners on 2026-08-05 (DNS resolved, TLS/connection died) now returns http 200 with a genuine, parseable XLSX (51,216 bytes; columns S/N, Reference Number, Name, Title, Designation, DL/Passport No, NIC No, Date of Birth, Citizenship, Address (Sri Lanka), Address (Foreign), Listed on), confirmed via sheet reconnaissance showing real LTTE-designation rows (e.g. Velupillai Revathan, IN/CA/2025/01). minNames left at the prior conservative floor (30) since the probe only samples the first rows, not the full count; ratchet upward once a live run logs the real baseline, per the floors-only-rise convention. If this regresses, the prior 2026-08-05 connection-failure note is preserved in git history.",
       "minNames": 30
     },
     {
