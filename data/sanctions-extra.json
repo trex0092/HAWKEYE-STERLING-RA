@@ -446,7 +446,7 @@
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey: the Police UNSCR-1373 designations (~22 non-UN entries) publish as HTML tables with periodic dated attachments (curated path); MFAT's Russia Sanctions Register XLSX has a stable keyless URL but sits behind an Imperva JS challenge that a plain fetch cannot pass — test from a runner before promoting; if the challenge holds, it stays curated. Supersedes the older nz-terror stub above."
+      "_note": "2026-08-05 survey: the Police UNSCR-1373 designations (~22 non-UN entries) publish as HTML tables with periodic dated attachments (curated path); MFAT's Russia Sanctions Register XLSX has a stable keyless URL but sits behind an Imperva JS challenge that a plain fetch cannot pass — test from a runner before promoting; if the challenge holds, it stays curated. Supersedes the older nz-terror stub above. UPDATE 2026-09-25: the Police UNSCR-1373 designations this note describes are now covered by the nz-terror entry above (re-sourced to OpenSanctions' nz_designated_terrorists, 21 entities, same day) - that portion of this cluster is resolved, not superseded-and-abandoned. The MFAT Russia Sanctions Register (the Imperva-challenged XLSX) is still untested and still open."
     },
     {
       "id": "za-fic-tfs",
@@ -475,16 +475,82 @@
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey record: Kazakhstan's Web-SFM endpoint became key-gated ~Sep 2025 (rejected under the keyless doctrine); Kyrgyzstan's FIU XML rotates its filename each update and Azerbaijan's FMS XML sits behind an index page — both need HTML link-discovery the single-GET fetcher deliberately does not do (a future fetch feature, not a source entry); Georgia's Otkhozoria-Tatunashvili list (~33 names) and Armenia's national designations publish as gazette HTML / dated PDFs (curated path); Moldova's CAS-SIS list consolidates UN lists already screened. One documented stub, enabled:false — survey record, never counted as coverage."
+      "_note": "2026-08-05 survey record: Kazakhstan's Web-SFM endpoint became key-gated ~Sep 2025 (rejected under the keyless doctrine); Kyrgyzstan's FIU XML rotates its filename each update and Azerbaijan's FMS XML sits behind an index page — both need HTML link-discovery the single-GET fetcher deliberately does not do (a future fetch feature, not a source entry); Georgia's Otkhozoria-Tatunashvili list (~33 names) and Armenia's national designations publish as gazette HTML / dated PDFs (curated path); Moldova's CAS-SIS list consolidates UN lists already screened. One documented stub, enabled:false — survey record, never counted as coverage. VERIFIED 2026-09-25: Kazakhstan confirmed still uncovered by OpenSanctions (their own country page: 'we are not yet including any programs targeting entities in Kazakhstan'). Moldova's CAS-SIS assumption checked directly against OpenSanctions' md_terror_sanctions (709 entities, fetched live) - its own first record cites a UN Security Council 1718 Committee (DPRK) designation, consistent with this being substantially UN-derived; kept disabled, this appears correct rather than corrected. Georgia and Armenia: no OpenSanctions mirror found today either."
+    },
+    {
+      "id": "jp-mof",
+      "name": "Japan — MOF Economic Sanctions List",
+      "jurisdiction": "Japan",
+      "url": "https://data.opensanctions.org/datasets/latest/jp_mof_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 1500,
+      "_note": "Japan's Ministry of Finance sanctions under the Foreign Exchange and Foreign Trade Law. ADDED 2026-09-25: split out of asia-html-cluster (Japan MOF used dated XLSX filenames, no stable endpoint per the 2026-08-05 survey) once OpenSanctions' jp_mof_sanctions was confirmed live: http 200, 2,804 entities, 2.1MB, Japanese-script names intact."
+    },
+    {
+      "id": "sg-terrorists",
+      "name": "Singapore — Targeted Financial Sanctions",
+      "jurisdiction": "Singapore",
+      "url": "https://data.opensanctions.org/datasets/latest/sg_terrorists/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 20,
+      "_note": "Singapore MAS designations under the Terrorism (Suppression of Financing) Act 2002, First Schedule. ADDED 2026-09-25: split out of asia-html-cluster (TSOFA First Schedule was statute HTML per the 2026-08-05 survey) once OpenSanctions' sg_terrorists was confirmed live: http 200, 41 entities, e.g. Promsvyazbank PJSC under Russia-related MAS sanctions."
+    },
+    {
+      "id": "my-moha",
+      "name": "Malaysia — MOHA Sanctions List",
+      "jurisdiction": "Malaysia",
+      "url": "https://data.opensanctions.org/datasets/latest/my_moha_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 40,
+      "_note": "Malaysia Ministry of Home Affairs (Kementerian Dalam Negeri) terrorism designations. ADDED 2026-09-25: split out of asia-html-cluster once OpenSanctions' my_moha_sanctions was confirmed live: http 200, 79 entities, including domestic designations beyond the UN list (e.g. Jamaat-ul-Mujahideen Bangladesh)."
+    },
+    {
+      "id": "id-dttot",
+      "name": "Indonesia — DTTOT (Suspected Terrorists List)",
+      "jurisdiction": "Indonesia",
+      "url": "https://data.opensanctions.org/datasets/latest/id_dttot/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 250,
+      "_note": "Indonesia's DTTOT, individuals/organizations determined by the Central Jakarta District Court under Law 9/2013 on terrorism financing. ADDED 2026-09-25: split out of asia-html-cluster (dated attachments page per the 2026-08-05 survey) once OpenSanctions' id_dttot was confirmed live: http 200, 529 entities."
+    },
+    {
+      "id": "pk-nacta",
+      "name": "Pakistan — NACTA Proscribed Persons",
+      "jurisdiction": "Pakistan",
+      "url": "https://data.opensanctions.org/datasets/latest/pk_proscribed_persons/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 3000,
+      "_note": "Pakistan's 4th Schedule under the Anti-Terrorism Act 1997. ADDED 2026-09-25: split out of asia-html-cluster (HTML tables per the 2026-08-05 survey) once OpenSanctions' pk_proscribed_persons was confirmed live: http 200, 5,189 entities, 1.16MB. OpenSanctions itself notes the publisher's site can't be polled fully automatically, so this mirror refreshes roughly every 90 days, not daily - re-verify staleness periodically, the same discipline this repo already applies to the EOCN list."
+    },
+    {
+      "id": "ph-amlc",
+      "name": "Philippines — AMLC Sanctions",
+      "jurisdiction": "Philippines",
+      "url": "https://data.opensanctions.org/datasets/latest/ph_amlc_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 40,
+      "_note": "Philippines Anti-Money Laundering Council designations under RA 10168, implementing Anti-Terrorism Council designations. ADDED 2026-09-25: split out of asia-html-cluster once OpenSanctions' ph_amlc_sanctions was confirmed live: http 200, 96 entities."
     },
     {
       "id": "asia-html-cluster",
-      "name": "Asia national lists — Japan MOF / Korea KoFIU / Taiwan MOJ / Singapore TSOFA / Indonesia DTTOT / Malaysia MOHA / Philippines AMLC / Thailand AMLO / India MHA / Pakistan NACTA / Bahrain / Oman / Kuwait",
+      "name": "Asia national lists — Korea KoFIU / Taiwan MOJ / Thailand AMLO / India MHA / Bahrain / Oman / Kuwait",
       "jurisdiction": "Asia-Pacific / GCC",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 worldwide survey verdict: these national lists publish only as HTML pages, PDFs, or dated-filename spreadsheets — no stable keyless machine-readable endpoint (details in the survey record; Japan MOF uses dated XLSX names, Singapore's TSOFA First Schedule is statute HTML, Indonesia's DTTOT is a page of dated attachments, Pakistan NACTA is HTML tables). Their UN-relayed content is already screened via un-consolidated; the national increments await either official feeds or curated files via the four-eyes SOP. One documented stub instead of thirteen: this entry is the survey's record, not screening coverage — enabled:false means it never counts as screened."
+      "_note": "2026-08-05 survey verdict, six countries split out 2026-09-25 (Japan/Singapore/Malaysia/Indonesia/Pakistan/Philippines - see the jp-mof / sg-terrorists / my-moha / id-dttot / pk-nacta / ph-amlc entries above, once an OpenSanctions mirror was confirmed live for each): the remaining seven still publish only as HTML pages, PDFs, or dated-filename spreadsheets, and I could not find an OpenSanctions (or other) mirror for any of them today either - Korea, Taiwan, Thailand and India show no standalone national sanctions dataset in OpenSanctions' catalog as of this search; Bahrain, Oman and Kuwait likewise (their designations appear to run through GCC/UN channels rather than a distinct national list OpenSanctions tracks separately). One-pass negative result, not a certified absence. Their UN-relayed content is already screened via un-consolidated."
     }
   ]
 }
