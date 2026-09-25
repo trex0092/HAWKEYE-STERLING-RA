@@ -89,7 +89,14 @@ jobs:
           # inference (an Advisor guardrail failure is AI/Advisor governance
           # content), not confirmed intent. Reuses ASANA_WEEKLY_SECTION_GID rather
           # than adding a new variable for the same physical section.
-          ASANA_SECTION_GID: ${{ vars.ASANA_WEEKLY_SECTION_GID || '1216782693874840' }}
+          # RE-FIXED 2026-09-24: 1216782693874840 no longer existed in the live
+          # project (Asana 400 "Unknown object", confirmed on run 35868429817) --
+          # deleted sometime after the 09-17 fix during an unrelated section
+          # cleanup. The live project's "AI & Platform Governance" section is now
+          # 1218785568483509 (same name, re-provisioned gid, verified against the
+          # live Asana API just now). Updated the repo variable to match and
+          # corrected this literal fallback for defense-in-depth.
+          ASANA_SECTION_GID: ${{ vars.ASANA_WEEKLY_SECTION_GID || '1218785568483509' }}
         # Title must not claim a regression when the eval could not run (e.g. the
         # API returned 400s on a billing lapse) — the report's Result line is the
         # discriminator, written by scripts/advisor-eval.mjs.

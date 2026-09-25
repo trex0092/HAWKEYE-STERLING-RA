@@ -5999,10 +5999,26 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             _ri = adverse_locale_indices(run_time)
             _mkts = ", ".join(GNEWS_LOCALES[i][2] for i in _ri)
             _cyc = adverse_rotation_cycle_days()
+            # The rotation-scope claim below is about DESIGN (GDELT's query targets
+            # every subject regardless of the locale-rotation gate Google News uses),
+            # not this run's actual outcome — those are disclosed separately above
+            # ("News feed coverage this run..."). A static "runs on EVERY subject"
+            # claim here, unconditional on the actual gdelt/subjects count, reads as
+            # overclaiming full coverage right next to a run that measurably didn't
+            # get one, which is exactly the kind of silent-clear this engine exists
+            # to avoid. Report the shortfall by name when this run's GDELT count is
+            # actually short, and reserve the design claim for when it is not.
+            _nfc = stats.get("news_feed_coverage") or {}
+            _gdelt_reached, _nfc_subjects = _nfc.get("gdelt"), _nfc.get("subjects")
+            if _gdelt_reached is not None and _nfc_subjects and _gdelt_reached < _nfc_subjects:
+                _gdelt_note = (f"GDELT's global index reached only {_gdelt_reached} of {_nfc_subjects} subject(s) "
+                               "this run — not gated by the rotation, but not immune to its own throttling either.")
+            else:
+                _gdelt_note = ("GDELT's global index runs on EVERY subject every run regardless, so worldwide "
+                               "reach is not gated on the rotation.")
             A(f"   Worldwide rotation: this run swept {_mkts}. The {ADVERSE_CORE_LOCALES} core editions run every day; the rest of the "
               f"{len(GNEWS_LOCALES)}-market matrix rotates, so every market is swept within {_cyc} run(s). "
-              "GDELT's global index runs on EVERY subject every run regardless, so worldwide reach is not gated on the rotation — "
-              "the rotation adds local-language press on top of it.")
+              f"{_gdelt_note} The rotation adds local-language press on top of GDELT's baseline coverage.")
             # Ledger verdict: the rotation claim above, VERIFIED against the
             # recorded sweep dates — overdue markets alarm loudly, a clean
             # mature ledger states its evidence, a young ledger says so.
@@ -6140,9 +6156,106 @@ NARRATIVE_SHRINK_RUNGS = (
     {"candidates": 1, "articles": 1, "subjects": 8, "matches": 8},
 )
 
+def _onboarding_batch_key(customer_gids):
+    """Short, stable fingerprint of a customer-gid set, used only to recognise
+    a REPEAT of the exact same onboarding batch (not to identify customers)."""
+    return hashlib.sha256(",".join(sorted(customer_gids or [])).encode()).hexdigest()[:12]
+
+ONBOARDING_MARKER_LOOKBACK_HOURS = int(os.environ.get(
+    "ONBOARDING_MARKER_LOOKBACK_HOURS", str(ONBOARDING_WINDOW_HOURS + 2)))
+
+def _existing_report_task(mode, run_time, customer_gids=None):
+    """gid of a report ALREADY delivered for this mode, or "" if none.
+
+    "daily" / "makeup" (dedup key: mode + calendar date) — root cause
+    confirmed from the 2026-09-17 job log, 11 duplicate "Daily AML/CFT
+    Screening Report" posts in one day: post_unified_task used to run
+    unconditionally on every invocation. The EOCN freshness gate later in the
+    SAME script run (see its exit(3) below) can mark an already-delivered run
+    as a GitHub Actions "failure" even though the report already posted fine.
+    The workflow's own "skip if today already succeeded" preflight check
+    trusts that job-level conclusion, and workflow_dispatch bypasses the
+    check entirely, so every scheduled retry and every manual re-run that
+    day re-ran the whole pipeline and posted another identical report. Each
+    of these modes is meant to post exactly ONE book-wide report per
+    calendar day, so (mode, date) is a safe, unambiguous key for them.
+
+    "onboarding" (dedup key: the exact set of customer gids in this batch) —
+    a SEPARATE, non-crash root cause, confirmed from the 18-19 Sep 2026
+    reports: the same customer stays "fresh" (ONBOARDING_WINDOW_HOURS, 26h
+    by default) across several runs of the ~6-hourly onboarding workflow, and
+    every run that finds it posts a full report again, with no memory of
+    "already reported this customer", producing up to ~4-5 near-identical
+    reports per customer before they age out of the window. Unlike
+    daily/makeup, a plain date key is unsafe here (a second, genuinely
+    different customer onboarded the same day must still get its own
+    report), so the key is the customer-gid set itself: post_unified_task
+    embeds a short fingerprint of that set in the delivered task's notes (see
+    below), and this looks for a prior report carrying the SAME fingerprint
+    within the lookback window, rather than matching by date or title.
+
+    Checking Asana directly, instead of trusting this run's own eventual
+    exit code or any of its own delta-state, is immune to which trigger
+    fired the run and to any later, unrelated step throwing after the post
+    already succeeded.
+    """
+    if mode not in ("daily", "makeup", "onboarding"):
+        return ""
+    if mode == "onboarding":
+        if not customer_gids:
+            return ""
+        marker = f"onboarding-batch:{_onboarding_batch_key(customer_gids)}"
+        since = (run_time - datetime.timedelta(hours=ONBOARDING_MARKER_LOOKBACK_HOURS)
+                 ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        params = {"project": ASANA_ONGOING_MON_GID, "modified_since": since,
+                  "opt_fields": "gid,name,notes", "limit": 100}
+        name_prefix = "Onboarding Screening Report — "
+    else:
+        dt = run_time.strftime("%d %b %Y")
+        name_prefix = ("Daily AML/CFT Screening Report (coverage make-up) — "
+                       if mode == "makeup" else "Daily AML/CFT Screening Report — ")
+        suffix = f"— {dt}"
+        since = run_time.strftime("%Y-%m-%dT00:00:00.000Z")
+        params = {"project": ASANA_ONGOING_MON_GID, "modified_since": since,
+                  "opt_fields": "gid,name", "limit": 100}
+    while True:
+        r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=params)
+        if r is None or r.status_code not in (200, 201):
+            # Read failed: log it and let the caller post normally. A missed
+            # dedup check risks, at worst, repeating a known duplicate
+            # pattern; blocking the post on a read failure risks a missed
+            # mandatory control, which is the worse of the two.
+            log(f"  dedup check: could not read prior reports "
+                f"({getattr(r, 'status_code', 'network')}) — posting normally")
+            return ""
+        data = r.json() if isinstance(r.json(), dict) else {}
+        tasks = data.get("data")
+        if not isinstance(tasks, list):
+            tasks = []
+        for t in tasks:
+            if not isinstance(t, dict):
+                continue
+            name = t.get("name") or ""
+            if mode == "onboarding":
+                if name.startswith(name_prefix) and marker in (t.get("notes") or ""):
+                    return t.get("gid") or ""
+            elif name.startswith(name_prefix) and name.endswith(suffix):
+                return t.get("gid") or ""
+        next_page = data.get("next_page") or None
+        if not next_page or not next_page.get("offset"):
+            return ""
+        params["offset"] = next_page["offset"]
+
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
-                      rebuild=None):
+                      rebuild=None, customer_gids=None):
     dt = run_time.strftime("%d %b %Y")
+    existing_gid = _existing_report_task(mode, run_time, customer_gids)
+    if existing_gid:
+        log(f"SKIP: a {mode} report for {dt} was already delivered as "
+            f"{existing_gid} (dedup check added 2026-09-24 after the 17 Sep "
+            f"duplicate-posting incident) — not posting a duplicate")
+        progress("delivered", task_gid=existing_gid)
+        return existing_gid
     n_s, n_a, n_p = len(possible_matches), len(adverse_findings), len(pep_findings)
     # Professional register: a words-not-emoji status marker, counts spelled
     # out, the date last. "ACTION REQUIRED" is the scannable signal.
@@ -6178,9 +6291,18 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
             else:
                 log(f"  narrative exceeds the {budget}-byte budget even at the deepest section caps — "
                     "cap_notes backstop will truncate (marker in-body)")
+        notes_body = cap_notes(body, budget)
+        if mode == "onboarding" and customer_gids:
+            # Dedup marker for _existing_report_task's onboarding lookup
+            # above — identifies a REPEAT of this exact customer batch, never
+            # shown as anything but a plain trailing line (no hidden markup,
+            # so it survives Asana's rich-text conversion intact and stays
+            # visible/auditable to the MLRO rather than hidden).
+            notes_body += (f"\n\n(internal dedup marker, not a finding: "
+                           f"onboarding-batch:{_onboarding_batch_key(customer_gids)})")
         payload = {"data": {
             "name": task_name[:250],
-            "notes": cap_notes(body, budget),
+            "notes": notes_body,
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
             "projects": _mlro_queue_targets()[0],
@@ -6976,7 +7098,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                    adverse_findings, pep_findings, mode=mode,
                                    rebuild=lambda caps: build_unified_narrative(
                                        possible_matches, clear, adverse_findings,
-                                       pep_findings, list_meta, stats, run_time, caps=caps))
+                                       pep_findings, list_meta, stats, run_time, caps=caps),
+                                   customer_gids=[c.get("gid", "") for c in customers])
     # MLRO case subtasks for the NEW items only (keeps the case list actionable);
     # overflow/failed items ride the reserved backlog inside `state`.
     open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,

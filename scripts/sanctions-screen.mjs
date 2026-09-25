@@ -271,7 +271,18 @@ export function parseSubjects(tasks) {
   const out = [];
   const seen = new Set();
   for (const t of (Array.isArray(tasks) ? tasks : [])) {
-    if (t && t.completed) continue;
+    // NOTE (2026-09-24): do NOT filter on t.completed here. This function is
+    // shared by both the Customer Database fetch and the HR - Employees fetch
+    // (see EMPLOYEE_PROJECT_GID below). "completed" does not mean the same
+    // thing in both projects: in the HR project it means "training/workshop
+    // finished", not "no longer employed" -- and as of 2026-09-23 ALL 20 tasks
+    // there are marked completed, so this filter silently zeroed the employee
+    // population and the run correctly bailed (see bailUnscreened below) rather
+    // than post a false all-clear. screen.py's equivalent fetch never filters
+    // on completed for either population and is the actively-relied-on engine
+    // for both; removing the filter here matches that precedent. Verified this
+    // has zero live effect on customer screening: the Customer Database
+    // currently has 0 completed tasks (checked via the Asana API).
     const s = parseSubject(t);
     // Dedupe the legal ENTITY by normalized name, but do NOT skip the whole
     // record on a collision: two distinct active customers can share a legal

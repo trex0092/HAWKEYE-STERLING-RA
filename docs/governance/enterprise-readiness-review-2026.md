@@ -307,6 +307,15 @@ COSO, ISO 31000, FATF RBA, Wolfsberg guidance, and GDPR/PDPL as cited inline.*
 deliberately left unedited (same convention as the code-scanning triage record). Every claim below
 is [OBSERVED] against commit `8576ad61` unless marked otherwise.*
 
+*Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
+read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days
+old, for a human to review and delete by hand; it never deletes a branch itself, and hard-excludes
+every live state-tracking branch pattern. Same commit widened Control Retry from two passes/day to
+twelve staggered passes after a scheduler-wide outage skipped both original passes. Coverage
+addition only — no scored control changed.*
+
+Verified at HEAD: 66 workflows · 185 markdown documents under docs/ (152 excluding docs/research/auto).
+
 *Estate re-verification · 21 July 2026 — the GitHub Actions expansion added four workflows
 (container-scan, attestation-verify, dependabot-automerge, compliance-calendar; every new job
 egress-blocked). Coverage additions only — no scored control changed; scores stand as re-scored

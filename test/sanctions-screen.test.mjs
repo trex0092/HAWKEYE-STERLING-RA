@@ -35,7 +35,13 @@ const s = parseSubject(task);
 check('parseSubject pulls name + jurisdiction + licence + gid',
   s.name === 'WPM INT LLC' && s.jurisdiction === 'United Arab Emirates' && s.idNumber === 'DMCC-12345' && s.gid === '111' && s.entityType === 'organisation');
 const subs = parseSubjects([task, { name: 'Done Co', completed: true }, { name: 'WPM Int  LLC', completed: false }, { name: 'Xafari DMCC', completed: false }]);
-check('parseSubjects skips completed + dedups by key', subs.length === 2 && subs.map(x => x.name).sort().join('|') === 'WPM INT LLC|Xafari DMCC');
+// 2026-09-24: parseSubjects no longer filters on `completed` (see the NOTE
+// at its definition) — this function is shared with the HR - Employees
+// fetch, where "completed" means "training finished", not "off-boarded",
+// and every employee task was marked completed, so the old filter silently
+// zeroed that population. `completed: true` rows are included here now;
+// only the case/spacing-duplicate "WPM Int  LLC" is still deduped away.
+check('parseSubjects does not filter on completed, still dedups by key', subs.length === 3 && subs.map(x => x.name).sort().join('|') === 'Done Co|WPM INT LLC|Xafari DMCC');
 
 /* ── principal / UBO extraction (so individuals are screened, not just the company) ── */
 const cddNotes = [

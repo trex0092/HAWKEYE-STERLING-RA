@@ -179,7 +179,64 @@ jobs:
           done
           [ -n "$pushed" ] || { echo "::error::push of the prepared eocn-reconcile branch failed"; exit 1; }
 
+      - name: Check for an already-open EOCN review task
+        id: existing
+        # 2026-09-25: this workflow used to file a brand-new Asana task on
+        # every twice-weekly run regardless of whether the last one was ever
+        # actioned. Found 20 of them sitting open, back to 27 Jul, none ever
+        # merged or completed — the single rolling branch design comment
+        # above ("stale preparations never pile up") covers the branch, but
+        # nothing covered the Asana task it pages the MLRO with. Unlike the
+        # daily/makeup screening reports (one row per calendar day is always
+        # correct), this alert's title carries no date, so an old one and a
+        # new one are asking for the exact same action — skip filing another
+        # while one is still open, rather than paging the same request N
+        # times before it's ever actioned once.
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, subprocess
+
+          TOKEN = os.environ["ASANA_ACCESS_TOKEN"]
+          PROJECT_GID = "1216203370612914"  # HAWKEYE STERLING APP — same default asana-alert.mjs uses
+          PREFIX = "EOCN weekly review prepared"
+
+          def gh(url):
+              cmd = ["curl", "-sS", "-H", f"Authorization: Bearer {TOKEN}", url]
+              out = subprocess.run(cmd, capture_output=True, text=True, check=True)
+              return json.loads(out.stdout) if out.stdout.strip() else {}
+
+          existing = ""
+          offset = ""
+          base = (f"https://app.asana.com/api/1.0/tasks?project={PROJECT_GID}"
+                  # completed_since=now is Asana's documented idiom for "incomplete
+                  # tasks only" (no future-dated completion can already exist).
+                  "&completed_since=now&opt_fields=name&limit=100")
+          while True:
+              data = gh(base + (f"&offset={offset}" if offset else ""))
+              for t in (data.get("data") or []):
+                  if (t.get("name") or "").startswith(PREFIX):
+                      existing = t.get("gid", "")
+                      break
+              if existing:
+                  break
+              nxt = (data.get("next_page") or {}).get("offset")
+              if not nxt:
+                  break
+              offset = nxt
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"skip={'1' if existing else ''}\n")
+          if existing:
+              print(f"An EOCN review request is already open (task {existing}) — "
+                    "not filing another until it's actioned.")
+          else:
+              print("No open EOCN review request found — filing one.")
+          PYEOF
+
       - name: File the review task in Asana
+        if: steps.existing.outputs.skip != '1'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ADDED: ${{ steps.reconcile.outputs.added }}
