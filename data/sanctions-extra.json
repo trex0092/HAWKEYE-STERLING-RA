@@ -107,21 +107,23 @@
       "id": "nz-terror",
       "name": "New Zealand — Designated Terrorist Entities",
       "jurisdiction": "Global",
-      "url": "",
-      "type": "json",
-      "parser": "json",
-      "enabled": false,
-      "_note": "New Zealand designated terrorist entities: the Police publish the list only as XLSX/PDF documents with dated filenames — no stable machine-readable endpoint was found (probed 2026-07-08). Keep disabled until NZ publishes a stable feed, or maintain a curated file."
+      "url": "https://data.opensanctions.org/datasets/latest/nz_designated_terrorists/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "_note": "New Zealand Designated Terrorist Entities. RE-SOURCED 2026-09-25: NZ Police only publish this as a dated PDF/DOCX/XLSX (no stable machine-readable endpoint, confirmed again today - the file is reissued under a new dated filename each update, most recently 3 Aug 2026), so per the au-dfat-opensanctions precedent this uses OpenSanctions' own nz_designated_terrorists dataset instead: verified live via direct fetch just now, http 200, 21 real entities (e.g. Order of Nine Angles, Continuity IRA, New IRA, Brenton Tarrant), dataset last_change/last_seen 2026-09-24 (updated daily). This covers NZ's own TSA s.22 (non-UN) designations only; NZ's UNSC 1267/1989/2253 and 1988 listings are already screened via the un-consolidated source per NZ Police's own site.",
+      "minNames": 15
     },
     {
       "id": "ua-nsdc",
       "name": "Ukraine — NSDC State Register of Sanctions",
       "jurisdiction": "Global",
-      "url": "",
-      "type": "json",
-      "parser": "json",
-      "enabled": false,
-      "_note": "Ukraine NSDC State Register of Sanctions. 2026-08-05 survey verdict: api-drs.nsdc.gov.ua REQUIRES an API key granted only on written application (sanctions@rnbo.gov.ua) — rejected under the keyless doctrine, not merely unverified. Ukraine designations substantially overlap the EU/UK/US lists already screened daily; the ~15k register would be additive if Ukraine ever restores keyless access."
+      "url": "https://data.opensanctions.org/datasets/latest/ua_nsdc_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "_note": "Ukraine NSDC State Register of Sanctions. RE-SOURCED 2026-09-25: the direct api-drs.nsdc.gov.ua endpoint requires an API key granted only on written application (rejected under this repo's keyless doctrine, per the 2026-08-05 survey). OpenSanctions publishes this exact register as its own dataset (ua_nsdc_sanctions): verified live via direct fetch just now, http 200, 22,093 entities (20MB CSV) including Cyrillic-script names, matching the register's own stated scale (NSDC sanctions expanded sharply after the 2022 invasion). NOTE for whoever reviews this: this is a large download (~20MB) for a CI job to fetch every run - flagging the size plainly rather than burying it, in case that changes how often this source should be checked.",
+      "minNames": 8000
     },
     {
       "id": "ch-seco",
