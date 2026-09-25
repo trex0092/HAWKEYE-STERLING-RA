@@ -6196,7 +6196,7 @@ def _existing_report_task(mode, run_time, customer_gids=None):
         name_prefix = "Onboarding Screening Report — "
     else:
         dt = run_time.strftime("%d %b %Y")
-        name_prefix = (f"Daily AML/CFT Screening Report (coverage make-up) — "
+        name_prefix = ("Daily AML/CFT Screening Report (coverage make-up) — "
                        if mode == "makeup" else "Daily AML/CFT Screening Report — ")
         suffix = f"— {dt}"
         since = run_time.strftime("%Y-%m-%dT00:00:00.000Z")
