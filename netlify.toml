@@ -21,6 +21,13 @@
   directory = "netlify/functions"
 
 # Security headers applied to every response (edge hardening).
+# One deliberate carve-out (added for consent-gated GA4, see analytics.js): script-src allows
+# googletagmanager.com and connect-src allows google-analytics.com/analytics.google.com. These
+# are the minimal domains Google's own CSP guidance requires for gtag.js -
+# https://developers.google.com/tag-platform/tag-manager/web/csp and
+# https://content-security-policy.com/examples/google-analytics/ - nothing else was widened.
+# The lighthouse third-party-count:0 gate below still passes: gtag.js is only fetched after an
+# explicit Accept click, which never happens during an automated CI run.
 # CSP is a pure-'self' policy with NO 'unsafe-inline' and NO third-party origins:
 #  - script-src 'self': all page logic is in external same-origin files
 #    (app.js / console.js / advisor.js / i18n.js / sw-register.js); former inline
@@ -35,7 +42,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; child-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; require-trusted-types-for 'script'; trusted-types default; report-to csp-endpoint; report-uri /.netlify/functions/csp-report"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://www.googletagmanager.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://www.google-analytics.com https://*.analytics.google.com; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; child-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; require-trusted-types-for 'script'; trusted-types default; report-to csp-endpoint; report-uri /.netlify/functions/csp-report"
     # Reporting API endpoint for the CSP `report-to` directive (modern browsers);
     # the legacy `report-uri` above covers older ones. Both POST violation
     # reports to the same-origin csp-report function (logged, never blocked).
