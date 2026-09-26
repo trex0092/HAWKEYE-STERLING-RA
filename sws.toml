@@ -18,7 +18,7 @@
 [[advanced.headers]]
 source = "**"
 [advanced.headers.headers]
-Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; child-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; require-trusted-types-for 'script'; trusted-types default; report-to csp-endpoint; report-uri /.netlify/functions/csp-report"
+Content-Security-Policy = "default-src 'self'; script-src 'self' https://www.googletagmanager.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://www.google-analytics.com https://*.analytics.google.com; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; child-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; require-trusted-types-for 'script'; trusted-types default; report-to csp-endpoint; report-uri /.netlify/functions/csp-report"
 Reporting-Endpoints = "csp-endpoint=\"/.netlify/functions/csp-report\""
 X-Frame-Options = "DENY"
 X-Content-Type-Options = "nosniff"
