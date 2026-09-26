@@ -448,12 +448,12 @@
     },
     {
       "id": "mdb-debarment-cluster",
-      "name": "MDB debarments — EBRD (POST-only API) / IDB (Socrata export unconfirmed) / AfDB (export route unconfirmed) / World Bank (key-walled)",
+      "name": "MDB debarments — EBRD (POST-only API) / AfDB (export route unconfirmed) / World Bank (key-walled)",
       "jurisdiction": "Global (MDB)",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey record: EBRD's ineligible-entities endpoint (www.ebrd.com/bin/ebrd_dxp/filterlistservlet) is a form-encoded POST — the single-GET fetcher cannot call it (a POST-capable source option is a small follow-up); IDB's Socrata export (mydata.iadb.org rows.csv) and AfDB's CSV export route are documented but their exact dataset paths were unverifiable from the sandbox — promote to live entries once confirmed from a runner; the World Bank's every machine-readable route requires an API key (re-confirmed — stays rejected under the keyless doctrine). ADB (enabled above) already carries the 2010 Mutual-Enforcement cross-debarments of the other MDBs, so the marginal gap while these stay stubs is the non-cross-debarred remainder."
+      "_note": "2026-08-05 survey record, corrected 2026-09-26: IDB is RESOLVED (see idb-sanctions above, OpenSanctions mirror, live). This label previously still said 'IDB Socrata export unconfirmed' after that was fixed - stale, not a live gap. Remaining genuine blockers: EBRD's ineligible-entities endpoint is a form-encoded POST the single-GET fetcher can't call; AfDB's export route is documented but unverifiable from this sandbox; World Bank's every machine-readable route requires an API key (rejected under the keyless doctrine). ADB (enabled elsewhere) already carries the 2010 cross-debarment agreement's coverage."
     },
     {
       "id": "nz-mfat-russia",
