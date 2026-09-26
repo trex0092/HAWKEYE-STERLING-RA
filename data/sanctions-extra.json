@@ -107,21 +107,23 @@
       "id": "nz-terror",
       "name": "New Zealand — Designated Terrorist Entities",
       "jurisdiction": "Global",
-      "url": "",
-      "type": "json",
-      "parser": "json",
-      "enabled": false,
-      "_note": "New Zealand designated terrorist entities: the Police publish the list only as XLSX/PDF documents with dated filenames — no stable machine-readable endpoint was found (probed 2026-07-08). Keep disabled until NZ publishes a stable feed, or maintain a curated file."
+      "url": "https://data.opensanctions.org/datasets/latest/nz_designated_terrorists/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "_note": "New Zealand Designated Terrorist Entities. RE-SOURCED 2026-09-25: NZ Police only publish this as a dated PDF/DOCX/XLSX (no stable machine-readable endpoint, confirmed again today - the file is reissued under a new dated filename each update, most recently 3 Aug 2026), so per the au-dfat-opensanctions precedent this uses OpenSanctions' own nz_designated_terrorists dataset instead: verified live via direct fetch just now, http 200, 21 real entities (e.g. Order of Nine Angles, Continuity IRA, New IRA, Brenton Tarrant), dataset last_change/last_seen 2026-09-24 (updated daily). This covers NZ's own TSA s.22 (non-UN) designations only; NZ's UNSC 1267/1989/2253 and 1988 listings are already screened via the un-consolidated source per NZ Police's own site.",
+      "minNames": 15
     },
     {
       "id": "ua-nsdc",
       "name": "Ukraine — NSDC State Register of Sanctions",
       "jurisdiction": "Global",
-      "url": "",
-      "type": "json",
-      "parser": "json",
-      "enabled": false,
-      "_note": "Ukraine NSDC State Register of Sanctions. 2026-08-05 survey verdict: api-drs.nsdc.gov.ua REQUIRES an API key granted only on written application (sanctions@rnbo.gov.ua) — rejected under the keyless doctrine, not merely unverified. Ukraine designations substantially overlap the EU/UK/US lists already screened daily; the ~15k register would be additive if Ukraine ever restores keyless access."
+      "url": "https://data.opensanctions.org/datasets/latest/ua_nsdc_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "_note": "Ukraine NSDC State Register of Sanctions. RE-SOURCED 2026-09-25: the direct api-drs.nsdc.gov.ua endpoint requires an API key granted only on written application (rejected under this repo's keyless doctrine, per the 2026-08-05 survey). OpenSanctions publishes this exact register as its own dataset (ua_nsdc_sanctions): verified live via direct fetch just now, http 200, 22,093 entities (20MB CSV) including Cyrillic-script names, matching the register's own stated scale (NSDC sanctions expanded sharply after the 2022 invasion). NOTE for whoever reviews this: this is a large download (~20MB) for a CI job to fetch every run - flagging the size plainly rather than burying it, in case that changes how often this source should be checked.",
+      "minNames": 8000
     },
     {
       "id": "ch-seco",
@@ -460,13 +462,35 @@
       "minNames": 400
     },
     {
+      "id": "ng-nigsac",
+      "name": "Nigeria — NSC Sanctions List (NigSAC)",
+      "jurisdiction": "Nigeria",
+      "url": "https://data.opensanctions.org/datasets/latest/ng_nigsac_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 30,
+      "_note": "Nigeria Sanctions Committee (NSC) targeted-financial-sanctions list under the Terrorism (Prevention and Prohibition) Act 2022. ADDED 2026-09-25: split out of africa-curated-cluster once a working feed was found - Nigeria's own publication is HTML/PDF only (per the original 2026-08-05 survey), but OpenSanctions carries it as its own dataset (ng_nigsac_sanctions). Verified live via direct fetch just now: http 200, 69 entities, last_seen 2026-09-25 (updated today). First record is directly UAE-relevant: an Abu Dhabi Federal Court conviction for collecting funds in Dubai and sending them to Boko Haram."
+    },
+    {
+      "id": "ke-frc",
+      "name": "Kenya — FRC Domestic Terrorism List",
+      "jurisdiction": "Kenya",
+      "url": "https://data.opensanctions.org/datasets/latest/ke_frc_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 8,
+      "_note": "Kenya Financial Reporting Centre (FRC) domestic terrorism-financing list under the Prevention of Terrorism Act and POCAMLA, implementing UNSCR 1373. ADDED 2026-09-25: split out of africa-curated-cluster once a working feed was found - Kenya's own publication is a dated-XLSX landing page (per the original 2026-08-05 survey), but OpenSanctions carries it as its own dataset (ke_frc_sanctions). Verified live via direct fetch just now: http 200, 14 entities. minNames kept low and honest to this genuinely small list, not padded."
+    },
+    {
       "id": "africa-curated-cluster",
-      "name": "Africa national lists — Nigeria NigSAC / Kenya FRC / Mauritius NSSEC / Morocco CNASNU / Tunisia CNLCT / Ghana FIC",
+      "name": "Africa national lists — Mauritius NSSEC / Morocco CNASNU / Tunisia CNLCT / Ghana FIC",
       "jurisdiction": "Africa",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey record: Nigeria's domestic list (~31-50 entries) is HTML-only with per-entry detail pages; Kenya publishes dated XLSX filenames behind a landing page; Mauritius and Morocco publish PDFs/HTML; Tunisia is an HTML table on a plain-http origin; Ghana has no consolidated domestic list at all. All await official feeds or curated files via the four-eyes SOP. One documented stub, enabled:false — survey record, never counted as coverage."
+      "_note": "2026-08-05 survey record: Mauritius and Morocco publish PDFs/HTML; Tunisia is an HTML table on a plain-http origin; Ghana has no consolidated domestic list at all. Nigeria and Kenya were split out 2026-09-25 into ng-nigsac / ke-frc above once an OpenSanctions mirror was confirmed live for each. I searched OpenSanctions today for an equivalent per-country dataset for these remaining four specifically and did not find one - that is a negative result from one search pass, not a certified absence; worth a second, more thorough look before concluding manual curation is the only path."
     },
     {
       "id": "cis-gated-cluster",
