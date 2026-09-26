@@ -1,12 +1,12 @@
 {
-  "updated": "2026-09-26",
+  "updated": "2026-09-25",
   "sources": {
     "ofac-sdn": {
       "hash": "9de877621a889b52cdb2694a5ec18026bb3fedeee80b0a79b96fa791baf55179",
       "bytes": 5508969,
-      "checkedAt": "2026-09-26",
+      "checkedAt": "2026-09-25",
       "changedAt": "2026-09-24",
-      "contentAsOf": "2026-09-26",
+      "contentAsOf": "2026-09-25",
       "status": 200,
       "prevHash": "32a0e9d519041bd6e47c46fff6f82be3f5908176d5bb971e60acb3d5bf9ab54c",
       "count": 19392,
@@ -15,9 +15,9 @@
     "ofac-sdn-alt": {
       "hash": "b5de50c451cf97341b664ffbc5d3ddac8b8cedc81d5cded801fa6527f92b468e",
       "bytes": 1023573,
-      "checkedAt": "2026-09-26",
+      "checkedAt": "2026-09-25",
       "changedAt": "2026-09-24",
-      "contentAsOf": "2026-09-26",
+      "contentAsOf": "2026-09-25",
       "status": 200,
       "prevHash": "0af7cc64b6a1f76c327d5f86ff3957f0062025d521494efd9ea8448871f58011",
       "count": 20206,
@@ -26,9 +26,9 @@
     "ofac-consolidated": {
       "hash": "c9196b486efa2f4e425b8622bbc421d3c6e3298eee5c663fb4acd93d9a299c91",
       "bytes": 347103,
-      "checkedAt": "2026-09-26",
+      "checkedAt": "2026-09-25",
       "changedAt": "2026-09-24",
-      "contentAsOf": "2026-09-26",
+      "contentAsOf": "2026-09-25",
       "status": 200,
       "prevHash": "5a2a743f745b481c6384c5743f335b15b350eef4bb67cbe6e3068370f1217470",
       "count": 442,
@@ -37,9 +37,9 @@
     "un-consolidated": {
       "hash": "0ff53e25bcd3b7e8302dd52a6476caef7959915fdceb289fc7988dd021d03c90",
       "bytes": 603729,
-      "checkedAt": "2026-09-26",
+      "checkedAt": "2026-09-25",
       "changedAt": "2026-09-05",
-      "contentAsOf": "2026-09-26",
+      "contentAsOf": "2026-09-25",
       "status": 200,
       "prevHash": "fdc1343f80a9f9e225da782e1b3b43e72c2d23c768c03488acf83e869abbb855",
       "count": 1011,
@@ -48,21 +48,21 @@
     "uk-ofsi": {
       "hash": "7a1df99a31bd06dbe4ad3e47f43c3ef98eea53bc6cdce3f8f0e05ac900080b70",
       "bytes": 15708355,
-      "checkedAt": "2026-09-26",
+      "checkedAt": "2026-09-25",
       "changedAt": "2026-06-16",
       "contentAsOf": "2026-09-20",
       "status": "error",
       "count": 19762,
-      "errStreak": 6,
+      "errStreak": 5,
       "error": "fetch failed",
-      "errorStreak": 6
+      "errorStreak": 5
     },
     "eu-fsf": {
       "hash": "c492d22122aaf1dfebe585dac235d154fd957f3b325873e587bde65c4a2d703f",
       "bytes": 21320168,
-      "checkedAt": "2026-09-26",
+      "checkedAt": "2026-09-25",
       "changedAt": "2026-09-23",
-      "contentAsOf": "2026-09-26",
+      "contentAsOf": "2026-09-25",
       "status": 200,
       "prevHash": "41302ed1adfe569dffe6f58fa190eb2cc35d514dafde8f0ec5ddac51c82cc9fb",
       "count": 43891,
