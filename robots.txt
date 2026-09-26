@@ -1,0 +1,8 @@
+# Hawkeye Sterling is an internal AML/CFT compliance risk-assessment tool for a
+# regulated UAE DPMS entity, not a public marketing site. The rest of this repo's
+# security posture (pure-'self' CSP, X-Frame-Options DENY, locked-down
+# Permissions-Policy, HSTS preload) is built to minimize exposure; blocking
+# indexing is the consistent default. Reverse this in one line if public
+# discoverability is actually wanted.
+User-agent: *
+Disallow: /
