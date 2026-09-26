@@ -1,0 +1,146 @@
+{
+  "_README": "Morocco CNASNU (Commission Nationale chargee de l'application des Sanctions...) Local Terrorist List. Source: Decision no. 01-2023 of 09/01/2023, 'Mise a jour de la Liste des inscriptions - personnes physiques et entites - sur la Liste Locale', published at https://cnasnu.justice.gov.ma/wp-content/uploads/2023/01/MAJ-Liste-Locale-2_-version-fin.pdf . Fetched and transcribed directly from the primary government PDF on 2026-09-26 (not a secondary source - the earlier documented attempt at Bahrain's equivalent PDF failed extraction; this one succeeded cleanly). Verified against https://cnasnu.justice.gov.ma/language/fr/decisions/ on the same date that 01-2023 remains the most recent decision listed (no newer update exists as of fetch time). Passport/CIN numbers in the source PDF are already partially redacted by CNASNU itself (asterisked); reproduced here as redacted, not completed or guessed.",
+  "source_url": "https://cnasnu.justice.gov.ma/wp-content/uploads/2023/01/MAJ-Liste-Locale-2_-version-fin.pdf",
+  "decision": "CNASNU Decision No. 01-2023, 09/01/2023",
+  "fetched": "2026-09-26",
+  "count": 12,
+  "entries": [
+    {
+      "ref": "CNASNU/LL_11/2023",
+      "name": "EL MESAOUDI ABDELHAMID",
+      "aliases": [
+        "Jirash Al-Maghribi"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1980-12-17",
+      "pob": "Nador",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_12/2023",
+      "name": "LAMKHANTAR MOHAMMED",
+      "aliases": [
+        "Abu Houdayfa",
+        "Al-Bahri",
+        "Mouhannad Al-Houiko"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1976-01-05",
+      "pob": "Khouribga",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_13/2023",
+      "name": "AARAB MOUNIR",
+      "aliases": [
+        "Abdallah Chamali",
+        "Al-I'lami",
+        "Attiyatullah"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1984-04-17",
+      "pob": "Tetouan",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_14/2023",
+      "name": "EL ASMAR MUSTAPHA",
+      "aliases": [
+        "Abu Khalil"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1965-09-08",
+      "pob": "Casablanca",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_15/2023",
+      "name": "MAZOUZ MOHAMED",
+      "aliases": [
+        "Abu Al-Izz"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1973-12-31",
+      "pob": "Casablanca",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_16/2023",
+      "name": "MOHAMMED MOUJRID",
+      "aliases": [
+        "Abu Jaber Al-Maghribi"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1990-05-04",
+      "pob": "Kenitra",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_17/2023",
+      "name": "AYOUB RAHMOUN",
+      "aliases": [
+        "Abu Suhaib"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1987-04-14",
+      "pob": "Tit Mellil",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_18/2023",
+      "name": "MELIANI EL MEHDI",
+      "aliases": [
+        "Abu Maryam"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1988-05-07",
+      "pob": "Casablanca",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_19/2023",
+      "name": "SAID SALIH",
+      "aliases": [
+        "Abu Omar Al-Farouk"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1977-11-03",
+      "pob": "Casablanca",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_20/2023",
+      "name": "ADNANE ISSAME",
+      "aliases": [
+        "Abu Mansour"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1983-04-12",
+      "pob": "Rabat",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_21/2023",
+      "name": "OTMAN EL MAHDALI",
+      "aliases": [
+        "Abu Khattab Al-Maghribi"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1990-04-10",
+      "pob": "Fnideq",
+      "designation_date": "2023-01-09"
+    },
+    {
+      "ref": "CNASNU/LL_22/2023",
+      "name": "FATIHA HASSANI",
+      "aliases": [
+        "Umm Adam"
+      ],
+      "nationality": "Moroccan",
+      "dob": "1961",
+      "pob": "Casablanca",
+      "designation_date": "2023-01-09",
+      "gender": "F"
+    }
+  ]
+}
