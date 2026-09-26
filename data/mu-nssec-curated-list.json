@@ -1,0 +1,56 @@
+{
+  "_README": "Mauritius National Sanctions Secretariat (NSSec) List of Designated Parties, kept under Section 11 of the UN (Financial Prohibitions, Arms Embargo and Travel Ban) Sanctions Act 2019. Curated because NSSec republishes this list under a new dated filename each update (e.g. List_of_designated_parties_as_at_06_June_2025..pdf) rather than a stable URL, the same rotating-filename problem this repo already documents for Kyrgyzstan and Azerbaijan. To refresh: check https://nssec.govmu.org/Pages/NSSec/List-of-Designated-Parties.aspx for a newer dated PDF, verify it against NSSec's own Communique announcements (nssec.govmu.org/Communique/), and update lastReviewed.",
+  "listDate": "2025-06-06",
+  "sourceUrl": "https://nssec.govmu.org/Documents/Notice/List_of_designated_parties_as_at_06_June_2025..pdf",
+  "lastReviewed": "2026-09-26",
+  "verificationNote": "Fetched directly 2026-09-26: clean English-language table (Ref No/Surname/Other Names/Title/Designation/D.O.B/P.O.B/A.K.A/Nationality/Passport/NID/Address/Designated on), no OCR or script-extraction issues (contrast with Bahrain's corrupted Arabic extraction, documented separately). Cross-checked against independent press coverage of the underlying case (Mauritius ISIS-financing prosecution, July 2025 court appearance) confirming the same three names and the same 5 June 2025 designation date. Re-checked field by field against the source text before commit; two stray spaces in NID numbers were caught and corrected in the process.",
+  "entries": [
+    {
+      "refNo": "MUI.001",
+      "surname": "GOLAMAULLY",
+      "otherNames": "Mohammad Zafirr Rechad",
+      "title": "Mr",
+      "dob": "1989-02-21",
+      "pob": "Mauritius",
+      "aka": [
+        "Abu Hud",
+        "Paladin of Jihad"
+      ],
+      "nationality": "Mauritian",
+      "passportNumber": "1122922",
+      "nid": "G2102893102063",
+      "address": "2A, Riverside Villa, Morcellement Leblanc, Thomson Road, Vacoas, Mauritius",
+      "designatedOn": "2025-06-05"
+    },
+    {
+      "refNo": "MUI.002",
+      "surname": "GOLAMAULLY",
+      "otherNames": "Lubnaa Rechad",
+      "title": "Ms",
+      "dob": "1992-08-10",
+      "pob": "Mauritius",
+      "aka": [],
+      "nationality": "Mauritian",
+      "passportNumber": "1253749",
+      "nid": "G100892310553B",
+      "address": "2A, Riverside Villa, Morcellement Leblanc, Thomson Road, Vacoas, Mauritius",
+      "designatedOn": "2025-06-05"
+    },
+    {
+      "refNo": "MUI.003",
+      "surname": "JODHUN",
+      "otherNames": "Samuel Tashvin",
+      "title": "Mr",
+      "dob": "2003-03-20",
+      "pob": "Mauritius",
+      "aka": [
+        "Mohamad Bilall Jodhun"
+      ],
+      "nationality": "Mauritian",
+      "passportNumber": "C097580",
+      "nid": "J2003030059576",
+      "address": "BK E12 NHDC, Cite La Cure, Mauritius",
+      "designatedOn": "2025-06-05"
+    }
+  ]
+}
