@@ -276,6 +276,17 @@ const STRONG_TERMS = new Set(STRONG_LIST);
    local press differs; non-English locales query their own language's terms.
    Tunable at runtime with ADVERSE_MEDIA_LOCALES (comma-separated ids). */
 export const LOCALES = [
+  /* AUDITED 2026-09-26: every entry above and below was re-tested live against Google News RSS
+     (randomized order, 2.5s spacing, checked twice) by comparing the response's OWN <language> tag
+     to what this entry claims - not just checking for http 200, which is what let the removed
+     entries slip in as "edition-confirmed" on 2026-08-05 despite silently returning a DIFFERENT
+     edition (fa-IR, ur-PK, tl-PH, da-DK, sw-KE, sw-TZ, az-AZ, kk-KZ, ka-GE, hy-AM, ne-NP, si-LK,
+     my-MM, km-KH, af-ZA, sq-AL, hr-HR - 17 entries removed, each one verified to have no working
+     hl/gl combination, not just the one on file). A false 'confirmed' entry is worse than no entry:
+     it reports a language as screened when it silently was not. Going forward, "edition-confirmed"
+     for a new locale means the response's own <language>/ceid metadata was checked to match, not
+     just that the request returned 200 - see the audit method in PR discussion for the exact test. */
+
   // English — global regional editions
   { id: 'en-US', hl: 'en-US', gl: 'US', ceid: 'US:en', lang: 'en' },
   { id: 'en-GB', hl: 'en-GB', gl: 'GB', ceid: 'GB:en', lang: 'en' },
@@ -318,8 +329,6 @@ export const LOCALES = [
   { id: 'ko-KR', hl: 'ko', gl: 'KR', ceid: 'KR:ko', lang: 'ko' },
   { id: 'hi-IN', hl: 'hi', gl: 'IN', ceid: 'IN:hi', lang: 'hi' },
   { id: 'id-ID', hl: 'id', gl: 'ID', ceid: 'ID:id', lang: 'id' },
-  { id: 'fa-IR', hl: 'fa', gl: 'IR', ceid: 'IR:fa', lang: 'fa' },
-  { id: 'ur-PK', hl: 'ur', gl: 'PK', ceid: 'PK:ur', lang: 'ur' },
   { id: 'nl-NL', hl: 'nl', gl: 'NL', ceid: 'NL:nl', lang: 'nl' },
   // ── Extended worldwide coverage (weaponised global sweep) ──
   // More MENA / Gulf
@@ -338,12 +347,10 @@ export const LOCALES = [
   { id: 'ms-MY', hl: 'ms', gl: 'MY', ceid: 'MY:ms', lang: 'ms' },
   { id: 'bn-BD', hl: 'bn', gl: 'BD', ceid: 'BD:bn', lang: 'bn' },
   { id: 'ta-IN', hl: 'ta', gl: 'IN', ceid: 'IN:ta', lang: 'ta' },
-  { id: 'tl-PH', hl: 'tl', gl: 'PH', ceid: 'PH:tl', lang: 'tl' },
   // More Europe
   { id: 'pl-PL', hl: 'pl', gl: 'PL', ceid: 'PL:pl', lang: 'pl' },
   { id: 'sv-SE', hl: 'sv', gl: 'SE', ceid: 'SE:sv', lang: 'sv' },
   { id: 'no-NO', hl: 'no', gl: 'NO', ceid: 'NO:no', lang: 'no' },
-  { id: 'da-DK', hl: 'da', gl: 'DK', ceid: 'DK:da', lang: 'da' },
   { id: 'fi-FI', hl: 'fi', gl: 'FI', ceid: 'FI:fi', lang: 'fi' },
   { id: 'el-GR', hl: 'el', gl: 'GR', ceid: 'GR:el', lang: 'el' },
   { id: 'ro-RO', hl: 'ro', gl: 'RO', ceid: 'RO:ro', lang: 'ro' },
@@ -355,30 +362,17 @@ export const LOCALES = [
   // More Africa / South Asia English + Swahili
   { id: 'en-KE', hl: 'en-KE', gl: 'KE', ceid: 'KE:en', lang: 'en' },
   { id: 'en-GH', hl: 'en-GH', gl: 'GH', ceid: 'GH:en', lang: 'en' },
-  { id: 'sw-KE', hl: 'sw', gl: 'KE', ceid: 'KE:sw', lang: 'sw' },
-  { id: 'sw-TZ', hl: 'sw', gl: 'TZ', ceid: 'TZ:sw', lang: 'sw' },
   // More Latin America
   { id: 'es-CO', hl: 'es-419', gl: 'CO', ceid: 'CO:es-419', lang: 'es' },
   { id: 'es-CL', hl: 'es-419', gl: 'CL', ceid: 'CL:es-419', lang: 'es' },
   { id: 'es-PE', hl: 'es-419', gl: 'PE', ceid: 'PE:es-419', lang: 'es' },
   // ── High-risk-region editions (2026-08-05, edition-confirmed languages) ──
   // Central Asia & Caucasus
-  { id: 'az-AZ', hl: 'az', gl: 'AZ', ceid: 'AZ:az', lang: 'az' },
-  { id: 'kk-KZ', hl: 'kk', gl: 'KZ', ceid: 'KZ:kk', lang: 'kk' },
-  { id: 'ka-GE', hl: 'ka', gl: 'GE', ceid: 'GE:ka', lang: 'ka' },
-  { id: 'hy-AM', hl: 'hy', gl: 'AM', ceid: 'AM:hy', lang: 'hy' },
   // South & Southeast Asia
-  { id: 'ne-NP', hl: 'ne', gl: 'NP', ceid: 'NP:ne', lang: 'ne' },
-  { id: 'si-LK', hl: 'si', gl: 'LK', ceid: 'LK:si', lang: 'si' },
   { id: 'pa-IN', hl: 'pa', gl: 'IN', ceid: 'IN:pa', lang: 'pa' },
   { id: 'mr-IN', hl: 'mr', gl: 'IN', ceid: 'IN:mr', lang: 'mr' },
-  { id: 'my-MM', hl: 'my', gl: 'MM', ceid: 'MM:my', lang: 'my' },
-  { id: 'km-KH', hl: 'km', gl: 'KH', ceid: 'KH:km', lang: 'km' },
   // Africa
-  { id: 'af-ZA', hl: 'af', gl: 'ZA', ceid: 'ZA:af', lang: 'af' },
   // Balkans & Baltics
-  { id: 'sq-AL', hl: 'sq', gl: 'AL', ceid: 'AL:sq', lang: 'sq' },
-  { id: 'hr-HR', hl: 'hr', gl: 'HR', ceid: 'HR:hr', lang: 'hr' },
   { id: 'sl-SI', hl: 'sl', gl: 'SI', ceid: 'SI:sl', lang: 'sl' },
   { id: 'lt-LT', hl: 'lt', gl: 'LT', ceid: 'LT:lt', lang: 'lt' },
   { id: 'lv-LV', hl: 'lv', gl: 'LV', ceid: 'LV:lv', lang: 'lv' },
