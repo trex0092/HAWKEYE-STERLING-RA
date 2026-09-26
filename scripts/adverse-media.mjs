@@ -36,7 +36,19 @@ export const ADVERSE_TERMS = [
   'launder', 'kickback', 'terror funding', 'market manipulation', 'embezzle',
   'indict', 'convict', 'arrest', 'smuggl', 'traffick', 'extort', 'forgery',
   'narcotics', 'organised crime', 'conflict gold', 'ponzi', 'illegal mining',
-  'contraband'
+  'contraband',
+  /* ADDED 2026-09-26: proliferation financing (CPF) had zero coverage in this array despite
+     being present in GDELT_RISK_TERMS/PY_PARITY_TERMS for the GDELT channel - meaning the
+     GNews headline-matching channel could not surface a CPF-related headline at all. CPF is a
+     core pillar of this entity's own regulatory mandate (UAE Cabinet Resolution 134/2025), so
+     this was a real gap between the two screening channels, not a cosmetic one. */
+  'proliferation financing', 'weapons of mass destruction', 'wmd', 'dual-use',
+  'chemical weapons', 'biological weapons', 'arms trafficking', 'weapons smuggling',
+  /* Genuine additions verified absent from every term array in this file (ADVERSE_TERMS,
+     GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, PY_PARITY_TERMS) before being added - not
+     re-added duplicates of what a categorized-keyword-list screenshot already covered. */
+  'court case', 'fined', 'unlawful', 'verdict', 'tax fraud', 'vat fraud', 'cyber fraud',
+  'financing of terrorism'
 ];
 
 /* WEAK (generic, high-noise) terms: they flag a story FOR THE RECORD but a
@@ -516,6 +528,9 @@ export const GDELT_EXTRA_TERMS = [
   // words, so "corruption" does not retrieve an article that only says
   // "corrupt".
   'corrupt', 'bribe', 'wmd', 'litigate', 'prosecute',
+  // Genuinely missing from this file's term arrays before 2026-09-26 (verified, not assumed):
+  'court case', 'fined', 'unlawful', 'verdict', 'tax fraud', 'vat fraud', 'cyber fraud',
+  'financing of terrorism',
 ];
 
 /* DELIBERATELY NOT RETRIEVED: 'politic'. The scorer keeps it as a weak-tier
