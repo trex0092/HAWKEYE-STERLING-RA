@@ -149,7 +149,11 @@ export const LANG_TERMS = {
   it: ['frode', 'riciclaggio di denaro', 'sanzioni', 'terrorismo', 'finanziamento del terrorismo',
     'corruzione', 'tangente', 'appropriazione indebita', 'arrestato', 'condannato', 'traffico', 'contrabbando'],
   tr: ['dolandırıcılık', 'kara para aklama', 'yaptırımlar', 'terörizm', 'terörün finansmanı',
-    'rüşvet', 'yolsuzluk', 'zimmet', 'tutuklandı', 'mahkûm', 'kaçakçılık'],
+    'rüşvet', 'yolsuzluk', 'zimmet', 'tutuklandı', 'mahkûm', 'kaçakçılık',
+    // Verified 2026-09-26 against MASAK's own site (masak.hmb.gov.tr) and authoritative Turkish
+    // AML/CFT legal sources - not machine-translated guesses.
+    'terörizmin finansmanı', 'terör örgütü', 'organize suç', 'uyuşturucu ticareti',
+    'vergi kaçakçılığı', 'sahtecilik', 'müsadere'],
   ja: ['詐欺', 'マネーロンダリング', '資金洗浄', '制裁', 'テロ', 'テロ資金供与', '贈収賄', '汚職', '横領', '逮捕', '有罪', '密輸'],
   ko: ['사기', '자금세탁', '제재', '테러', '테러자금', '뇌물', '부패', '횡령', '체포', '유죄', '밀수'],
   hi: ['धोखाधड़ी', 'मनी लॉन्ड्रिंग', 'प्रतिबंध', 'आतंकवाद', 'आतंकी वित्तपोषण', 'रिश्वत', 'भ्रष्टाचार', 'गबन', 'गिरफ्तार', 'दोषी', 'तस्करी'],
