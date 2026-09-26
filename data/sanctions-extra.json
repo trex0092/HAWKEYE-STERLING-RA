@@ -305,31 +305,45 @@
       "id": "tr-masak",
       "name": "Turkey — MASAK asset-freeze lists (Law 6415/7262)",
       "jurisdiction": "Turkey",
-      "url": "https://en.hmb.gov.tr/fcib-tf-current-list",
-      "type": "curated",
-      "parser": "curated",
-      "enabled": false,
-      "_note": "Turkey's national B/C/D category freezes (~1,600 beyond the UN mirror) publish as bot-protected HTML/attachment pages — no stable machine-readable endpoint (2026-08-05 survey). Curated path per the EOCN doctrine: populate a curated file from the official pages via the four-eyes SOP, or revisit if MASAK publishes a feed."
+      "url": "https://data.opensanctions.org/datasets/latest/tr_fcib/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "_note": "Turkey's national B/C/D category freezes (~1,600 beyond the UN mirror) publish as bot-protected HTML/attachment pages — no stable machine-readable endpoint (2026-08-05 survey). Curated path per the EOCN doctrine: populate a curated file from the official pages via the four-eyes SOP, or revisit if MASAK publishes a feed. RESOLVED 2026-09-26: the direct hmb.gov.tr page is still bot-protected HTML, unchanged. OpenSanctions carries this exact list as tr_fcib: verified live via direct fetch, http 200, 2,285 entities, real Turkish names under Law 6415 Article 7 asset freezes.",
+      "minNames": 1500
+    },
+    {
+      "id": "tr-wanted",
+      "name": "Türkiye — Ministry of Interior Terrorist Wanted List",
+      "jurisdiction": "Turkey",
+      "url": "https://data.opensanctions.org/datasets/latest/tr_wanted/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 1500,
+      "_note": "ADDED 2026-09-26, alongside the tr-masak fix: a second, distinct Turkish national list found in the same OpenSanctions catalog pass. Verified live via direct fetch: http 200, 2,556 entities. Not previously tracked in this file at all (not a fix of an existing disabled entry)."
     },
     {
       "id": "eg-mlcu",
       "name": "Egypt — MLCU Domestic Terrorist Lists",
       "jurisdiction": "Egypt",
-      "url": "https://mlcu.org.eg/ar/3125/",
-      "type": "curated",
-      "parser": "curated",
-      "enabled": false,
-      "_note": "Egypt's domestic lists (~3,500-7,000 persons — the largest national list in the MENA survey) publish as Arabic-schema XLSX behind bot protection; no keyless machine-readable path verified (2026-08-05). Too large to hand-curate; revisit with a dedicated fetch/parse spike if a stable endpoint is confirmed from the runner."
+      "url": "https://data.opensanctions.org/datasets/latest/eg_terrorists/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "_note": "Egypt's domestic lists (~3,500-7,000 persons — the largest national list in the MENA survey) publish as Arabic-schema XLSX behind bot protection; no keyless machine-readable path verified (2026-08-05). Too large to hand-curate; revisit with a dedicated fetch/parse spike if a stable endpoint is confirmed from the runner. RESOLVED 2026-09-26: the direct mlcu.org.eg page is still bot-protected, unchanged - but this turned out not to need hand-curation after all. OpenSanctions carries Egypt's domestic terrorist list (eg_terrorists): verified live via direct fetch, http 200, 3,626 entities, in the scale range this note itself predicted (3,500-7,000). The largest single addition from today's sweep after Ukraine.",
+      "minNames": 3000
     },
     {
       "id": "jo-amlu",
       "name": "Jordan — AMLU National Sanctions List",
       "jurisdiction": "Jordan",
-      "url": "https://sanctions.amlu.gov.jo/EN/List/National1_List",
-      "type": "curated",
-      "parser": "curated",
-      "enabled": false,
-      "_note": "Jordan AMLU national list. Probe evidence 2026-08-05: the runner CAN reach it (http 200 — the earlier '403 from Actions' note did not reproduce) but publication is a server-rendered HTML page (121KB, ASP.NET), not a machine-readable feed. Stays curated/disabled until an export endpoint is found; re-probe via source-probe.yml."
+      "url": "https://data.opensanctions.org/datasets/latest/jo_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "_note": "Jordan AMLU national list. Probe evidence 2026-08-05: the runner CAN reach it (http 200 — the earlier '403 from Actions' note did not reproduce) but publication is a server-rendered HTML page (121KB, ASP.NET), not a machine-readable feed. Stays curated/disabled until an export endpoint is found; re-probe via source-probe.yml. RESOLVED 2026-09-26: the direct AMLU page is still a 121KB HTML render, unchanged. OpenSanctions carries Jordan's national sanctions list separately (jo_sanctions, not the same crawl attempt as the direct page): verified live via direct fetch, http 200, 46 entities.",
+      "minNames": 30
     },
     {
       "id": "ar-repet",
@@ -442,13 +456,24 @@
       "_note": "2026-08-05 survey record: EBRD's ineligible-entities endpoint (www.ebrd.com/bin/ebrd_dxp/filterlistservlet) is a form-encoded POST — the single-GET fetcher cannot call it (a POST-capable source option is a small follow-up); IDB's Socrata export (mydata.iadb.org rows.csv) and AfDB's CSV export route are documented but their exact dataset paths were unverifiable from the sandbox — promote to live entries once confirmed from a runner; the World Bank's every machine-readable route requires an API key (re-confirmed — stays rejected under the keyless doctrine). ADB (enabled above) already carries the 2010 Mutual-Enforcement cross-debarments of the other MDBs, so the marginal gap while these stay stubs is the non-cross-debarred remainder."
     },
     {
+      "id": "nz-mfat-russia",
+      "name": "New Zealand — MFAT Russia Sanctions Register",
+      "jurisdiction": "New Zealand",
+      "url": "https://www.mfat.govt.nz/assets/Countries-and-Regions/Europe/Ukraine/Russia-Sanctions-Register.xlsx",
+      "type": "xlsx",
+      "parser": "xlsx",
+      "enabled": true,
+      "minNames": 1000,
+      "_note": "New Zealand's Russia Sanctions Act 2022 register. ADDED 2026-09-26: the 2026-08-05 survey flagged this URL as sitting behind an Imperva JS challenge untested from a runner. Tested it directly today with a plain curl (no browser headers): http 200, a genuine 21.6MB XLSX (Microsoft Excel 2007+, confirmed via file-type check, not just a content-type header). The challenge does not block a plain server-side fetch. Using the direct official source over OpenSanctions' nz_russia_sanctions mirror (also verified live, 1,902 entities) per this repo's own stated preference for an official feed once proven live."
+    },
+    {
       "id": "nz-cluster",
       "name": "New Zealand — Police designated entities (HTML) / MFAT Russia Sanctions Register (WAF-challenged XLSX)",
       "jurisdiction": "New Zealand",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey: the Police UNSCR-1373 designations (~22 non-UN entries) publish as HTML tables with periodic dated attachments (curated path); MFAT's Russia Sanctions Register XLSX has a stable keyless URL but sits behind an Imperva JS challenge that a plain fetch cannot pass — test from a runner before promoting; if the challenge holds, it stays curated. Supersedes the older nz-terror stub above. UPDATE 2026-09-25: the Police UNSCR-1373 designations this note describes are now covered by the nz-terror entry above (re-sourced to OpenSanctions' nz_designated_terrorists, 21 entities, same day) - that portion of this cluster is resolved, not superseded-and-abandoned. The MFAT Russia Sanctions Register (the Imperva-challenged XLSX) is still untested and still open."
+      "_note": "2026-08-05 survey: the Police UNSCR-1373 designations (~22 non-UN entries) publish as HTML tables with periodic dated attachments (curated path); MFAT's Russia Sanctions Register XLSX has a stable keyless URL but sits behind an Imperva JS challenge that a plain fetch cannot pass — test from a runner before promoting; if the challenge holds, it stays curated. Supersedes the older nz-terror stub above. UPDATE 2026-09-25: the Police UNSCR-1373 designations this note describes are now covered by the nz-terror entry above (re-sourced to OpenSanctions' nz_designated_terrorists, 21 entities, same day) - that portion of this cluster is resolved, not superseded-and-abandoned. The MFAT Russia Sanctions Register (the Imperva-challenged XLSX) is still untested and still open. FULLY RESOLVED 2026-09-26: the MFAT Russia Sanctions Register direct XLSX was tested from here (this session, standing in for 'a runner') and the Imperva challenge did not block a plain fetch - see nz-mfat-russia above. Both halves of this stub are now live sources; nothing left open here."
     },
     {
       "id": "za-fic-tfs",
@@ -484,22 +509,44 @@
       "_note": "Kenya Financial Reporting Centre (FRC) domestic terrorism-financing list under the Prevention of Terrorism Act and POCAMLA, implementing UNSCR 1373. ADDED 2026-09-25: split out of africa-curated-cluster once a working feed was found - Kenya's own publication is a dated-XLSX landing page (per the original 2026-08-05 survey), but OpenSanctions carries it as its own dataset (ke_frc_sanctions). Verified live via direct fetch just now: http 200, 14 entities. minNames kept low and honest to this genuinely small list, not padded."
     },
     {
+      "id": "tn-cnlct",
+      "name": "Tunisia — National Counter-Terrorism List (CNLCT)",
+      "jurisdiction": "Tunisia",
+      "url": "https://data.opensanctions.org/datasets/latest/tn_cnlct/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 200,
+      "_note": "Tunisia's National Counter-Terrorism Commission list. ADDED 2026-09-26: split out of africa-curated-cluster (HTML table on a plain-http origin per the 2026-08-05 survey) once OpenSanctions' tn_cnlct was confirmed live: http 200, 297 entities, real French-language content (e.g. a case tied to the murder of a shepherd, Najib al-Qasimi, 12 Oct 2013)."
+    },
+    {
       "id": "africa-curated-cluster",
-      "name": "Africa national lists — Mauritius NSSEC / Morocco CNASNU / Tunisia CNLCT / Ghana FIC",
+      "name": "Africa national lists — Mauritius NSSEC / Morocco CNASNU / Ghana FIC",
       "jurisdiction": "Africa",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey record: Mauritius and Morocco publish PDFs/HTML; Tunisia is an HTML table on a plain-http origin; Ghana has no consolidated domestic list at all. Nigeria and Kenya were split out 2026-09-25 into ng-nigsac / ke-frc above once an OpenSanctions mirror was confirmed live for each. I searched OpenSanctions today for an equivalent per-country dataset for these remaining four specifically and did not find one - that is a negative result from one search pass, not a certified absence; worth a second, more thorough look before concluding manual curation is the only path."
+      "_note": "2026-08-05 survey record: Mauritius and Morocco publish PDFs/HTML; Tunisia is an HTML table on a plain-http origin; Ghana has no consolidated domestic list at all. Nigeria and Kenya were split out 2026-09-25 into ng-nigsac / ke-frc above once an OpenSanctions mirror was confirmed live for each. I searched OpenSanctions today for an equivalent per-country dataset for these remaining four specifically and did not find one - that is a negative result from one search pass, not a certified absence; worth a second, more thorough look before concluding manual curation is the only path. Tunisia (CNLCT) split out 2026-09-26 - see tn-cnlct above. Down to three: Mauritius, Morocco, Ghana, still nothing found for any of them even after a full catalog-based search of OpenSanctions' 724 sources on 2026-09-26 (not just a name-guessing search) - Morocco and Ghana show only parliamentary-membership data there, no sanctions list; Mauritius shows nothing at all."
+    },
+    {
+      "id": "ge-ot-list",
+      "name": "Georgia — Otkhozoria–Tatunashvili List",
+      "jurisdiction": "Georgia",
+      "url": "https://data.opensanctions.org/datasets/latest/ge_ot_list/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 25,
+      "_note": "Individuals sanctioned under Georgia's 2018 Otkhozoria-Tatunashvili List for crimes against Georgian citizens in Abkhazia/South Ossetia. ADDED 2026-09-26: split out of cis-gated-cluster once OpenSanctions' ge_ot_list was confirmed live: http 200, exactly 33 entities, matching the list's own well-documented size at launch (contemporary press: 'Georgia released the first 33 names'). Names cross-checked against that coverage (Otar Turnanba, Vladimir Nachach-Ogly, Rashid Kandzhi-Ogly all present)."
     },
     {
       "id": "cis-gated-cluster",
-      "name": "CIS national lists — Kazakhstan AFM (gated 2025) / Kyrgyzstan FIU (rotating filenames) / Azerbaijan FMS (link-discovery) / Georgia (gazette HTML) / Armenia (dated PDFs) / Moldova (UN-duplicate)",
+      "name": "CIS national lists — Kazakhstan AFM (gated 2025) / Kyrgyzstan FIU (rotating filenames) / Azerbaijan FMS (link-discovery) / Armenia (dated PDFs) / Moldova (UN-duplicate)",
       "jurisdiction": "CIS / Caucasus",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey record: Kazakhstan's Web-SFM endpoint became key-gated ~Sep 2025 (rejected under the keyless doctrine); Kyrgyzstan's FIU XML rotates its filename each update and Azerbaijan's FMS XML sits behind an index page — both need HTML link-discovery the single-GET fetcher deliberately does not do (a future fetch feature, not a source entry); Georgia's Otkhozoria-Tatunashvili list (~33 names) and Armenia's national designations publish as gazette HTML / dated PDFs (curated path); Moldova's CAS-SIS list consolidates UN lists already screened. One documented stub, enabled:false — survey record, never counted as coverage. VERIFIED 2026-09-25: Kazakhstan confirmed still uncovered by OpenSanctions (their own country page: 'we are not yet including any programs targeting entities in Kazakhstan'). Moldova's CAS-SIS assumption checked directly against OpenSanctions' md_terror_sanctions (709 entities, fetched live) - its own first record cites a UN Security Council 1718 Committee (DPRK) designation, consistent with this being substantially UN-derived; kept disabled, this appears correct rather than corrected. Georgia and Armenia: no OpenSanctions mirror found today either."
+      "_note": "2026-08-05 survey record: Kazakhstan's Web-SFM endpoint became key-gated ~Sep 2025 (rejected under the keyless doctrine); Kyrgyzstan's FIU XML rotates its filename each update and Azerbaijan's FMS XML sits behind an index page — both need HTML link-discovery the single-GET fetcher deliberately does not do (a future fetch feature, not a source entry); Georgia's Otkhozoria-Tatunashvili list (~33 names) and Armenia's national designations publish as gazette HTML / dated PDFs (curated path); Moldova's CAS-SIS list consolidates UN lists already screened. One documented stub, enabled:false — survey record, never counted as coverage. VERIFIED 2026-09-25: Kazakhstan confirmed still uncovered by OpenSanctions (their own country page: 'we are not yet including any programs targeting entities in Kazakhstan'). Moldova's CAS-SIS assumption checked directly against OpenSanctions' md_terror_sanctions (709 entities, fetched live) - its own first record cites a UN Security Council 1718 Committee (DPRK) designation, consistent with this being substantially UN-derived; kept disabled, this appears correct rather than corrected. Georgia and Armenia: no OpenSanctions mirror found today either. Georgia (Otkhozoria-Tatunashvili List) split out 2026-09-26 - see ge-ot-list above. Also confirmed today, more concretely than before: OpenSanctions' own kz_afmrk_sanctions dataset page states in its own words that Kazakhstan's list 'is no longer accessible from the official source, an API key is now required... correspondence with the Financial Monitoring Agency for broader access has not been successful' - i.e. even OpenSanctions, with more standing than this project, could not get it either. Armenia: OpenSanctions tracks only parliamentary-membership data for Armenia, no sanctions list."
     },
     {
       "id": "jp-mof",
@@ -568,13 +615,35 @@
       "_note": "Philippines Anti-Money Laundering Council designations under RA 10168, implementing Anti-Terrorism Council designations. ADDED 2026-09-25: split out of asia-html-cluster once OpenSanctions' ph_amlc_sanctions was confirmed live: http 200, 96 entities."
     },
     {
+      "id": "th-designated",
+      "name": "Thailand — Designated Persons List",
+      "jurisdiction": "Thailand",
+      "url": "https://data.opensanctions.org/datasets/latest/th_designated_person/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 250,
+      "_note": "Thailand AMLO's terrorism-financing designated persons list. ADDED 2026-09-26: split out of asia-html-cluster once OpenSanctions' th_designated_person was confirmed live: http 200, 384 entities, real Thai names and addresses."
+    },
+    {
+      "id": "in-mha",
+      "name": "India — MHA Banned Organizations",
+      "jurisdiction": "India",
+      "url": "https://data.opensanctions.org/datasets/latest/in_mha_banned/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 80,
+      "_note": "India's Ministry of Home Affairs banned organizations under UAPA's Fourth Schedule. ADDED 2026-09-26: split out of asia-html-cluster once OpenSanctions' in_mha_banned was confirmed live: http 200, 147 entities."
+    },
+    {
       "id": "asia-html-cluster",
-      "name": "Asia national lists — Korea KoFIU / Taiwan MOJ / Thailand AMLO / India MHA / Bahrain / Oman / Kuwait",
+      "name": "Asia national lists — Korea KoFIU / Taiwan MOJ / Bahrain / Oman / Kuwait",
       "jurisdiction": "Asia-Pacific / GCC",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey verdict, six countries split out 2026-09-25 (Japan/Singapore/Malaysia/Indonesia/Pakistan/Philippines - see the jp-mof / sg-terrorists / my-moha / id-dttot / pk-nacta / ph-amlc entries above, once an OpenSanctions mirror was confirmed live for each): the remaining seven still publish only as HTML pages, PDFs, or dated-filename spreadsheets, and I could not find an OpenSanctions (or other) mirror for any of them today either - Korea, Taiwan, Thailand and India show no standalone national sanctions dataset in OpenSanctions' catalog as of this search; Bahrain, Oman and Kuwait likewise (their designations appear to run through GCC/UN channels rather than a distinct national list OpenSanctions tracks separately). One-pass negative result, not a certified absence. Their UN-relayed content is already screened via un-consolidated."
+      "_note": "2026-08-05 survey verdict, six countries split out 2026-09-25 (Japan/Singapore/Malaysia/Indonesia/Pakistan/Philippines - see the jp-mof / sg-terrorists / my-moha / id-dttot / pk-nacta / ph-amlc entries above, once an OpenSanctions mirror was confirmed live for each): the remaining seven still publish only as HTML pages, PDFs, or dated-filename spreadsheets, and I could not find an OpenSanctions (or other) mirror for any of them today either - Korea, Taiwan, Thailand and India show no standalone national sanctions dataset in OpenSanctions' catalog as of this search; Bahrain, Oman and Kuwait likewise (their designations appear to run through GCC/UN channels rather than a distinct national list OpenSanctions tracks separately). One-pass negative result, not a certified absence. Their UN-relayed content is already screened via un-consolidated. Thailand and India split out 2026-09-26 (th-designated, in-mha above). Down to five: Korea, Taiwan, Bahrain, Oman, Kuwait - re-checked today via OpenSanctions' full 724-source catalog, not just guessed slugs, and still nothing beyond parliamentary-membership data (Bahrain, Oman) or export-control lists not matching this cluster's original terrorism-designation description (Taiwan's Strategic High-Tech Commodities list is real but is an export-control regime, not the 'Taiwan MOJ' asset-freeze list this entry originally meant)."
     }
   ]
 }
