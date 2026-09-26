@@ -254,8 +254,11 @@ check('LANG_TERMS gains the high-risk-region languages with native-script terms'
     && LANG_TERMS.kk.includes('ақшаны жылыстату') && LANG_TERMS.ka.includes('ფულის გათეთრება')
     && LANG_TERMS.hy.includes('փողերի լվացում') && LANG_TERMS.sq.includes('pastrim parash');
 })());
-check('LOCALES gains the edition-confirmed high-risk editions (still deduped by id)',
-  ['az-AZ', 'kk-KZ', 'ka-GE', 'hy-AM', 'my-MM', 'sq-AL', 'lt-LT'].every(id => LOCALES.some(l => l.id === id))
+check('LOCALES keeps lt-LT and drops the 2026-09-26-audited fallbacks, still deduped by id',
+  ['lt-LT'].every(id => LOCALES.some(l => l.id === id))
+  && ['az-AZ', 'kk-KZ', 'ka-GE', 'hy-AM', 'my-MM', 'sq-AL', 'fa-IR', 'ur-PK', 'tl-PH', 'da-DK',
+      'sw-KE', 'sw-TZ', 'ne-NP', 'si-LK', 'km-KH', 'af-ZA', 'hr-HR']
+    .every(id => !LOCALES.some(l => l.id === id))
   && LOCALES.length === new Set(LOCALES.map(l => l.id)).size);
 check('a native-language adverse headline scores a hit in a newly-added language (Kazakh)',
   scoreAdverseMedia('Нурлан Бектас', [{ title: 'Нурлан Бектас ақшаны жылыстату ісі бойынша қамауға алынды', link: 'http://k/1' }], ALL_TERMS).hit === true);
