@@ -462,13 +462,35 @@
       "minNames": 400
     },
     {
+      "id": "ng-nigsac",
+      "name": "Nigeria — NSC Sanctions List (NigSAC)",
+      "jurisdiction": "Nigeria",
+      "url": "https://data.opensanctions.org/datasets/latest/ng_nigsac_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 30,
+      "_note": "Nigeria Sanctions Committee (NSC) targeted-financial-sanctions list under the Terrorism (Prevention and Prohibition) Act 2022. ADDED 2026-09-25: split out of africa-curated-cluster once a working feed was found - Nigeria's own publication is HTML/PDF only (per the original 2026-08-05 survey), but OpenSanctions carries it as its own dataset (ng_nigsac_sanctions). Verified live via direct fetch just now: http 200, 69 entities, last_seen 2026-09-25 (updated today). First record is directly UAE-relevant: an Abu Dhabi Federal Court conviction for collecting funds in Dubai and sending them to Boko Haram."
+    },
+    {
+      "id": "ke-frc",
+      "name": "Kenya — FRC Domestic Terrorism List",
+      "jurisdiction": "Kenya",
+      "url": "https://data.opensanctions.org/datasets/latest/ke_frc_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 8,
+      "_note": "Kenya Financial Reporting Centre (FRC) domestic terrorism-financing list under the Prevention of Terrorism Act and POCAMLA, implementing UNSCR 1373. ADDED 2026-09-25: split out of africa-curated-cluster once a working feed was found - Kenya's own publication is a dated-XLSX landing page (per the original 2026-08-05 survey), but OpenSanctions carries it as its own dataset (ke_frc_sanctions). Verified live via direct fetch just now: http 200, 14 entities. minNames kept low and honest to this genuinely small list, not padded."
+    },
+    {
       "id": "africa-curated-cluster",
-      "name": "Africa national lists — Nigeria NigSAC / Kenya FRC / Mauritius NSSEC / Morocco CNASNU / Tunisia CNLCT / Ghana FIC",
+      "name": "Africa national lists — Mauritius NSSEC / Morocco CNASNU / Tunisia CNLCT / Ghana FIC",
       "jurisdiction": "Africa",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey record: Nigeria's domestic list (~31-50 entries) is HTML-only with per-entry detail pages; Kenya publishes dated XLSX filenames behind a landing page; Mauritius and Morocco publish PDFs/HTML; Tunisia is an HTML table on a plain-http origin; Ghana has no consolidated domestic list at all. All await official feeds or curated files via the four-eyes SOP. One documented stub, enabled:false — survey record, never counted as coverage."
+      "_note": "2026-08-05 survey record: Mauritius and Morocco publish PDFs/HTML; Tunisia is an HTML table on a plain-http origin; Ghana has no consolidated domestic list at all. Nigeria and Kenya were split out 2026-09-25 into ng-nigsac / ke-frc above once an OpenSanctions mirror was confirmed live for each. I searched OpenSanctions today for an equivalent per-country dataset for these remaining four specifically and did not find one - that is a negative result from one search pass, not a certified absence; worth a second, more thorough look before concluding manual curation is the only path."
     },
     {
       "id": "cis-gated-cluster",
