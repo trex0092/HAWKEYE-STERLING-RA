@@ -532,12 +532,12 @@
     },
     {
       "id": "africa-curated-cluster",
-      "name": "Africa national lists: Morocco CNASNU / Ghana FIC",
+      "name": "Africa curated cluster: Ghana (no consolidated domestic list)",
       "jurisdiction": "Africa",
       "type": "curated",
       "parser": "curated",
       "enabled": false,
-      "_note": "2026-08-05 survey record: Mauritius and Morocco publish PDFs/HTML; Tunisia is an HTML table on a plain-http origin; Ghana has no consolidated domestic list at all. Nigeria and Kenya were split out 2026-09-25 into ng-nigsac / ke-frc above once an OpenSanctions mirror was confirmed live for each. I searched OpenSanctions today for an equivalent per-country dataset for these remaining four specifically and did not find one - that is a negative result from one search pass, not a certified absence; worth a second, more thorough look before concluding manual curation is the only path. Tunisia (CNLCT) split out 2026-09-26 - see tn-cnlct above. Down to three: Mauritius, Morocco, Ghana, still nothing found for any of them even after a full catalog-based search of OpenSanctions' 724 sources on 2026-09-26 (not just a name-guessing search) - Morocco and Ghana show only parliamentary-membership data there, no sanctions list; Mauritius shows nothing at all.\n\nATTEMPTED HAND-CURATION 2026-09-26: found CNASNU's own 'Liste Locale' page for Morocco - https://cnasnu.justice.gov.ma/language/fr/liste-locale/ - which lists two dated local-list decisions (09/01/2023, Decision No. 1/2023; 07/04/2022, Decision No. 3/2022) each behind a 'Télécharger' button. Could not extract the actual PDF URLs: they're embedded as href attributes in page HTML that a plain content fetch renders as text without exposing the link target, and I have no browser tool here to inspect or click through them. The page and the decision references are real and current (last decision under two years old); the file itself is one click away for whoever can reach it with a browser. Mauritius, Ghana: no page or document surfaced this session either.\n\nFINAL VERDICT 2026-09-26 on Ghana: unchanged from the original survey and independently confirmed twice more since (OpenSanctions catalog check, this session's targeted search) - Ghana has no consolidated domestic terrorism-financing list at all. This isn't an unfound file; by Ghana's own regulatory design there is nothing beyond the UN-consolidated source already screened here. Morocco remains the one open lead in this cluster (see the CNASNU finding above). Mauritius (NSSec) split out 2026-09-26 into its own curated source, see mu-nssec above. This cluster is now Morocco and Ghana only."
+      "_note": "2026-08-05 survey record, updated 2026-09-26: Mauritius resolved (mu-nssec, curated), Morocco resolved (ma-cnasnu, curated - see below, primary-source PDF fetched clean 2026-09-26). Tunisia split out as tn-cnlct. Nigeria/Kenya split out as ng-nigsac/ke-frc. Down to one: Ghana. No consolidated domestic list exists at all for Ghana, confirmed twice by regulatory design (see docs from the earlier 2026-09-26 country-by-country session)."
     },
     {
       "id": "ge-ot-list",
@@ -721,6 +721,28 @@
       "enabled": true,
       "minNames": 200,
       "_note": "ADDED 2026-09-26, WITH AN IMPORTANT CAVEAT: this does not resolve the cis-gated-cluster finding above that Kyrgyzstan's full current register lives behind an access wall restricted to registered institutions. This is a SEPARATE, smaller public list that OpenSanctions itself describes as 'minimalistic and has limited quality' - genuinely useful as a supplement (1,244 real entities, refreshed daily), but should not be read as having closed the earlier-documented gap. Both things are true at once: a partial public list exists, and the complete current one does not."
+    },
+    {
+      "id": "ma-cnasnu",
+      "name": "Morocco: CNASNU Local Terrorist List",
+      "jurisdiction": "Morocco",
+      "url": "data/ma-cnasnu-curated-list.json",
+      "type": "curated",
+      "parser": "curated",
+      "enabled": true,
+      "minNames": 5,
+      "_note": "ADDED 2026-09-26. Resolved the long-documented Morocco gap: unlike the earlier failed attempt at Bahrain's Arabic gazette PDF, this one (CNASNU Decision No. 01-2023, 09/01/2023) extracted cleanly. 12 individuals, all counter-terrorism designations (ISIS/Al-Qaeda affiliation), full names + aliases + DOB + place of birth transcribed from the primary government PDF at https://cnasnu.justice.gov.ma/wp-content/uploads/2023/01/MAJ-Liste-Locale-2_-version-fin.pdf . Verified against https://cnasnu.justice.gov.ma/language/fr/decisions/ same day that 01-2023 is still the most recent decision published - not a stale 2023 snapshot presented as current without checking. Passport/CIN numbers are redacted in the source document itself, reproduced as-is, not completed."
+    },
+    {
+      "id": "idb-sanctions",
+      "name": "Inter-American Development Bank: Sanctioned Firms & Individuals (OpenSanctions mirror)",
+      "jurisdiction": "Global (Latin America/Caribbean-focused)",
+      "url": "https://data.opensanctions.org/artifacts/iadb_sanctions/latest/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 500,
+      "_note": "ADDED 2026-09-26: closes the 'IDB Socrata export unconfirmed' half of mdb-debarment-cluster. Rather than chase IDB's own raw export, used OpenSanctions' iadb_sanctions mirror instead - same safe pattern as every other OpenSanctions-sourced entry this session. Verified live via curl: 1,239 targets, 131 countries, weekly refresh (Sundays), last change 2026-09-23."
     }
   ]
 }
