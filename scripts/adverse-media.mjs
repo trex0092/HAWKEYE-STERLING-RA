@@ -123,7 +123,12 @@ for (const t of ['politic', 'litigate', 'dual-use', 'human rights',
    clear, since the English + GDELT queries still run). */
 export const ADVERSE_TERMS_AR = [
   'احتيال', 'غسل الأموال', 'عقوبات', 'إرهاب', 'تمويل الإرهاب',
-  'رشوة', 'فساد', 'اختلاس', 'اعتقال', 'إدانة', 'تهريب', 'الاتجار بالبشر'
+  'رشوة', 'فساد', 'اختلاس', 'اعتقال', 'إدانة', 'تهريب', 'الاتجار بالبشر',
+  // Verified 2026-09-26 against UAE government sources (u.ae, Federal Decree-Law No. 20 of 2018's
+  // own title) and an Arabic policy-analysis source using precise legal/financial terminology -
+  // not machine-translated guesses.
+  'تمويل التنظيمات غير المشروعة', 'التهرب الضريبي', 'الجريمة المنظمة',
+  'انتشار أسلحة الدمار الشامل'
 ];
 
 /* ── Multilingual risk-term dictionaries ──────────────────────────────────────
