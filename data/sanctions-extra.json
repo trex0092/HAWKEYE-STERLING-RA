@@ -688,6 +688,39 @@
       "enabled": true,
       "minNames": 3000,
       "_note": "ADDED 2026-09-26: data/seco-curated-list.json has sat as an empty template since it was written (entries: [], never populated) because SECO's sesam.search.admin.ch portal serves a stateful JSF search page to a plain GET, not raw data. What that note missed: OpenSanctions runs its own 'ch_seco_sanctions' dataset, sourced from SECO's actual direct XML download action URL (sesam.search.admin.ch/.../downloadXmlGesamtliste.xhtml?action=downloadXmlGesamtlisteAction), refreshed every 2 hours. Verified live via curl: 18,084 total entities, 6,739 targets, last change 2026-09-07. seco-curated-list.json's README should be treated as superseded by this source, not as an open task."
+    },
+    {
+      "id": "sa-pcct",
+      "name": "Saudi Arabia: PCCT National Terrorism List (UNSCR 1373)",
+      "jurisdiction": "Saudi Arabia",
+      "url": "https://data.opensanctions.org/artifacts/sa_pcct_terrorism_list/latest/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 200,
+      "_note": "ADDED 2026-09-26: found via OpenSanctions' full sources index rather than an ad hoc search - the index lists every country-specific dataset they maintain, which turned out to be a far more efficient way to identify remaining coverage than searching one country at a time. Saudi Arabia's own Permanent Committee for Counter-Terrorism (under the Presidency of State Security) publishes a National Terrorism List implementing UNSCR 1373. OpenSanctions added this dataset 2026-07-27; verified live via curl: 335 targets, daily refresh, last change 2026-09-02."
+    },
+    {
+      "id": "qa-nctc",
+      "name": "Qatar: NCTC Unified Sanction Record",
+      "jurisdiction": "Qatar",
+      "url": "https://data.opensanctions.org/artifacts/qa_nctc_sanctions/latest/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 200,
+      "_note": "ADDED 2026-09-26: found via the same OpenSanctions sources-index sweep as sa-pcct. Qatar's National Counter Terrorism Committee (NCTC) publishes a Unified Record combining UN-mandated and national designations. This closes the last unaddressed GCC state from earlier this session (Bahrain/Oman/Kuwait/Saudi Arabia already covered or documented; Qatar was simply never checked)."
+    },
+    {
+      "id": "kg-fiu-public",
+      "name": "Kyrgyzstan: FIU Public List (partial, OpenSanctions)",
+      "jurisdiction": "Kyrgyzstan",
+      "url": "https://data.opensanctions.org/artifacts/kg_fiu_national/latest/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 200,
+      "_note": "ADDED 2026-09-26, WITH AN IMPORTANT CAVEAT: this does not resolve the cis-gated-cluster finding above that Kyrgyzstan's full current register lives behind an access wall restricted to registered institutions. This is a SEPARATE, smaller public list that OpenSanctions itself describes as 'minimalistic and has limited quality' - genuinely useful as a supplement (1,244 real entities, refreshed daily), but should not be read as having closed the earlier-documented gap. Both things are true at once: a partial public list exists, and the complete current one does not."
     }
   ]
 }
