@@ -44,7 +44,7 @@
       "parser": "xml",
       "enabled": false,
       "browserHeaders": true,
-      "_note": "Azerbaijan State Security Service autonomous domestic designations. STILL DISABLED — source-probe 2026-08-05 (run 31030989375): http://hms.gov.az/en/olkedaxili-siyahi returns an HTML single-page app ('STATE SECURITY SERVICE / TARGETED FINANCIAL SANCTIONS'), not XML — the designations render client-side, no static XML at this URL. Enabling needs the JS app's underlying data endpoint (not discoverable from the sandbox); re-probe once that URL is found.",
+      "_note": "CORRECTED 2026-09-26: the 'no static XML, JS-rendered only' finding above was itself outdated. A direct static XML feed exists: https://hms.gov.az/uploads/list/1/76f9249ad1975c2308115fa9954d3e94.xml (found via static page-source grep, not a browser tool). Verified live: well-formed CONSOLIDATED_LIST XML, 36 individuals. But its embedded dateGenerated is 2023-12-27 - nearly 3 years stale - and 36 is the exact same count already covered by az-fiu (OpenSanctions az_fiu_sanctions, daily refresh, current as of 2026-01). Kept disabled: adding this would be a redundant, staler duplicate of a source already live, not new coverage.",
       "minNames": 5
     },
     {
