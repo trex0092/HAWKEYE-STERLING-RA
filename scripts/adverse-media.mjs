@@ -216,7 +216,11 @@ export const LANG_TERMS = {
   vi: ['gian lận', 'rửa tiền', 'trừng phạt', 'khủng bố', 'tài trợ khủng bố', 'hối lộ',
     'tham nhũng', 'biển thủ', 'bị bắt', 'kết án', 'buôn lậu'],
   ms: ['penipuan', 'pengubahan wang haram', 'sekatan', 'keganasan', 'pembiayaan keganasan',
-    'rasuah', 'salah guna dana', 'ditangkap', 'penyeludupan'],
+    'rasuah', 'salah guna dana', 'ditangkap', 'penyeludupan',
+    // Verified 2026-09-27 against Bank Negara Malaysia (amlcft.bnm.gov.my) and the AMLA 2001
+    // (Anti-Money Laundering, Anti-Terrorism Financing and Proceeds of Unlawful Activities Act)
+    // - covers the active sanctions-extra.json source my-moha.
+    'laporan transaksi mencurigakan', 'institusi pelapor', 'sekatan kewangan yang disasarkan'],
   tl: ['pandaraya', 'parusa', 'terorismo', 'pagpopondo sa terorismo', 'suhol', 'korupsiyon',
     'malversasyon', 'inaresto', 'nahatulan'],
   sw: ['ulaghai', 'utakatishaji fedha', 'vikwazo', 'ugaidi', 'ufadhili wa ugaidi', 'rushwa',
