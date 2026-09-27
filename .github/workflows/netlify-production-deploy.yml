@@ -43,6 +43,24 @@ on:
       - 'netlify.toml'
       - 'manifest.webmanifest'
       - 'fonts.css'
+  # Daily safety net (07:00 UTC, one hour ahead of the Site Currency alarm):
+  # the path filter above is deliberately narrow, so a merge that changes what
+  # main ships WITHOUT touching a served path (a Docker-only config, a script
+  # the served app doesn't load, etc.) never fires this workflow on its own -
+  # it only gets deployed as a side effect of some LATER served-path push
+  # dragging main's current HEAD along with it (observed 26 Sep: a sws.toml-
+  # only commit reached production only because the build hook fired for the
+  # next push and Netlify built whatever was at HEAD by then, not the commit
+  # that triggered it). This unconditional daily re-fire closes that gap and
+  # self-heals a day's worth of "Netlify's Git integration is still broken"
+  # without waiting on a qualifying push - `kicked` still no-ops quietly if
+  # NETLIFY_BUILD_HOOK_URL is unset, so this is a strict addition, not a new
+  # failure mode. `retry` intentionally stays push-only (see that job): a
+  # scheduled run that fails doesn't self-retry same-day, it just tries again
+  # at tomorrow's 07:00 UTC, with Site Currency as the independent alarm in
+  # between.
+  schedule:
+    - cron: '0 7 * * *'
 
 permissions:
   contents: read
