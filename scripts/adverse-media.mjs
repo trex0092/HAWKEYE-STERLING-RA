@@ -155,7 +155,11 @@ export const LANG_TERMS = {
     'blanchiment de capitaux', 'LCB-FT', 'déclaration de soupçon', 'fraude fiscale',
     'abus de biens sociaux', 'bénéficiaire effectif'],
   de: ['Betrug', 'Geldwäsche', 'Sanktionen', 'Terrorismus', 'Terrorismusfinanzierung',
-    'Bestechung', 'Korruption', 'Veruntreuung', 'verhaftet', 'verurteilt', 'Schmuggel', 'Menschenhandel'],
+    'Bestechung', 'Korruption', 'Veruntreuung', 'verhaftet', 'verurteilt', 'Schmuggel', 'Menschenhandel',
+    // Verified 2026-09-27 against MROS (fedpol.admin.ch - Switzerland's official Money
+    // Laundering Reporting Office) and the Geldwäschereigesetz (GwG) - covers the active
+    // sanctions-extra.json sources for Switzerland (ch-seco, ch-seco-opensanctions).
+    'Verdachtsmeldung', 'Finanzintermediär', 'Sorgfaltspflicht'],
   pt: ['fraude', 'lavagem de dinheiro', 'sanções', 'terrorismo', 'financiamento do terrorismo',
     'suborno', 'corrupção', 'desvio de dinheiro', 'preso', 'condenado', 'tráfico', 'contrabando'],
   ru: ['мошенничество', 'отмывание денег', 'санкции', 'терроризм', 'финансирование терроризма',
