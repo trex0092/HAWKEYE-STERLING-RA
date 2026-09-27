@@ -68,6 +68,7 @@ export const EXEMPT = {
   'function-health.yml': 'site operations probe; self-alerting',
   'governance-report.yml': 'reports ON control state; the controls it reads are monitored individually',
   'link-check.yml': 'documentation hygiene',
+  'netlify-production-deploy.yml': 'CD trigger for the Netlify build hook (daily-cron fallback added 2026-09-27, PR #609, for the Git-integration break since 27 Jun); no ingestion/eval duty of its own, and its failure symptom (production drifting from main) is already caught by site-currency.yml, which self-alerts to Asana on that drift',
   'osv-scanner.yml': 'security scan',
   'scorecard.yml': 'security posture scan',
   'scorecard-milestone.yml': 'one-shot dated reminder (files the 2026-09-09 Scorecard 9.0 verification task); date-guarded and title-deduped, deleted after sign-off — no recurring ingestion/eval duty',
