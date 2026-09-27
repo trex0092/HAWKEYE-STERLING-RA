@@ -155,7 +155,11 @@ export const LANG_TERMS = {
     'blanchiment de capitaux', 'LCB-FT', 'déclaration de soupçon', 'fraude fiscale',
     'abus de biens sociaux', 'bénéficiaire effectif'],
   de: ['Betrug', 'Geldwäsche', 'Sanktionen', 'Terrorismus', 'Terrorismusfinanzierung',
-    'Bestechung', 'Korruption', 'Veruntreuung', 'verhaftet', 'verurteilt', 'Schmuggel', 'Menschenhandel'],
+    'Bestechung', 'Korruption', 'Veruntreuung', 'verhaftet', 'verurteilt', 'Schmuggel', 'Menschenhandel',
+    // Verified 2026-09-27 against MROS (fedpol.admin.ch - Switzerland's official Money
+    // Laundering Reporting Office) and the Geldwäschereigesetz (GwG) - covers the active
+    // sanctions-extra.json sources for Switzerland (ch-seco, ch-seco-opensanctions).
+    'Verdachtsmeldung', 'Finanzintermediär', 'Sorgfaltspflicht'],
   pt: ['fraude', 'lavagem de dinheiro', 'sanções', 'terrorismo', 'financiamento do terrorismo',
     'suborno', 'corrupção', 'desvio de dinheiro', 'preso', 'condenado', 'tráfico', 'contrabando'],
   ru: ['мошенничество', 'отмывание денег', 'санкции', 'терроризм', 'финансирование терроризма',
@@ -169,15 +173,26 @@ export const LANG_TERMS = {
     // AML/CFT legal sources - not machine-translated guesses.
     'terörizmin finansmanı', 'terör örgütü', 'organize suç', 'uyuşturucu ticareti',
     'vergi kaçakçılığı', 'sahtecilik', 'müsadere'],
-  ja: ['詐欺', 'マネーロンダリング', '資金洗浄', '制裁', 'テロ', 'テロ資金供与', '贈収賄', '汚職', '横領', '逮捕', '有罪', '密輸'],
+  ja: ['詐欺', 'マネーロンダリング', '資金洗浄', '制裁', 'テロ', 'テロ資金供与', '贈収賄', '汚職', '横領', '逮捕', '有罪', '密輸',
+    // Verified 2026-09-27 against JAFIC (npa.go.jp, Japan Financial Intelligence Center under
+    // the National Police Agency) and the Act on Prevention of Transfer of Criminal Proceeds -
+    // covers the active sanctions-extra.json source jp-mof.
+    '疑わしい取引の届出', '資産凍結', '犯罪収益'],
   ko: ['사기', '자금세탁', '제재', '테러', '테러자금', '뇌물', '부패', '횡령', '체포', '유죄', '밀수'],
   hi: ['धोखाधड़ी', 'मनी लॉन्ड्रिंग', 'प्रतिबंध', 'आतंकवाद', 'आतंकी वित्तपोषण', 'रिश्वत', 'भ्रष्टाचार', 'गबन', 'गिरफ्तार', 'दोषी', 'तस्करी'],
   id: ['penipuan', 'pencucian uang', 'sanksi', 'terorisme', 'pendanaan terorisme', 'suap',
-    'korupsi', 'penggelapan', 'ditangkap', 'terpidana', 'penyelundupan'],
+    'korupsi', 'penggelapan', 'ditangkap', 'terpidana', 'penyelundupan',
+    // Verified 2026-09-27 against PPATK (ppatk.go.id, Indonesia's FIU) and UU No. 8 Tahun
+    // 2010 - covers the active sanctions-extra.json source id-dttot.
+    'transaksi keuangan mencurigakan', 'tindak pidana pencucian uang', 'penyedia jasa keuangan'],
   fa: ['کلاهبرداری', 'پولشویی', 'تحریم', 'تروریسم', 'تأمین مالی تروریسم', 'رشوه', 'فساد', 'اختلاس', 'دستگیر', 'محکوم', 'قاچاق'],
   ur: ['دھوکہ دہی', 'منی لانڈرنگ', 'پابندیاں', 'دہشت گردی', 'دہشت گردی کی مالی معاونت', 'رشوت', 'بدعنوانی', 'غبن', 'گرفتار', 'اسمگلنگ'],
   uk: ['шахрайство', 'відмивання грошей', 'санкції', 'тероризм', 'фінансування тероризму',
-    'хабарництво', 'корупція', 'розтрата', 'заарештований', 'засуджений', 'контрабанда'],
+    'хабарництво', 'корупція', 'розтрата', 'заарештований', 'засуджений', 'контрабанда',
+    // Verified 2026-09-27 against Ukraine's AML/CFT law ("Про запобігання та протидію
+    // легалізації (відмиванню) доходів...") and Держфінмоніторинг (fiu.gov.ua, Ukraine's
+    // FIU) - covers the active sanctions-extra.json source ua-nsdc.
+    'легалізація доходів', 'фінансовий моніторинг', 'підозрілі операції'],
   nl: ['fraude', 'witwassen', 'sancties', 'terrorisme', 'terrorismefinanciering', 'omkoping',
     'corruptie', 'verduistering', 'gearresteerd', 'veroordeeld', 'smokkel'],
   // ── Extended worldwide language coverage (weaponised global sweep) ──
