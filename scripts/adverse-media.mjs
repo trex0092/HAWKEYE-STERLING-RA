@@ -143,7 +143,12 @@ export const LANG_TERMS = {
     'financiación del terrorismo', 'soborno', 'corrupción', 'malversación', 'detenido',
     'condenado', 'narcotráfico', 'contrabando'],
   fr: ['fraude', "blanchiment d'argent", 'sanctions', 'terrorisme', 'financement du terrorisme',
-    'corruption', 'pot-de-vin', 'détournement de fonds', 'arrêté', 'condamné', 'trafic', 'contrebande'],
+    'corruption', 'pot-de-vin', 'détournement de fonds', 'arrêté', 'condamné', 'trafic', 'contrebande',
+    // Verified 2026-09-27 against TRACFIN's own site (economie.gouv.fr/tracfin) and the Code
+    // monétaire et financier (Légifrance) - covers France, Canada, Morocco, Belgium and Monaco,
+    // all active sanctions-extra.json sources sharing this language.
+    'blanchiment de capitaux', 'LCB-FT', 'déclaration de soupçon', 'fraude fiscale',
+    'abus de biens sociaux', 'bénéficiaire effectif'],
   de: ['Betrug', 'Geldwäsche', 'Sanktionen', 'Terrorismus', 'Terrorismusfinanzierung',
     'Bestechung', 'Korruption', 'Veruntreuung', 'verhaftet', 'verurteilt', 'Schmuggel', 'Menschenhandel'],
   pt: ['fraude', 'lavagem de dinheiro', 'sanções', 'terrorismo', 'financiamento do terrorismo',
@@ -196,7 +201,11 @@ export const LANG_TERMS = {
   sr: ['prevara', 'pranje novca', 'sankcije', 'terorizam', 'korupcija', 'mito', 'uhapšen',
     'krijumčarenje', 'превара', 'прање новца', 'санкције', 'тероризам', 'корупција'],
   he: ['הונאה', 'הלבנת הון', 'סנקציות', 'טרור', 'מימון טרור', 'שוחד', 'שחיתות', 'מעילה',
-    'נעצר', 'הורשע', 'הברחה'],
+    'נעצר', 'הורשע', 'הברחה',
+    // Verified 2026-09-27 against IMPA (gov.il, Israel's Money Laundering and Terror Financing
+    // Prohibition Authority) and Bank of Israel (boi.org.il) - covers Israel, an active
+    // sanctions-extra.json source (il-nbctf, il-nbctf-orgs).
+    'דיווח בלתי רגיל', 'עבירת מקור', 'הכר את הלקוח'],
   th: ['ฉ้อโกง', 'ฟอกเงิน', 'คว่ำบาตร', 'ก่อการร้าย', 'สนับสนุนการก่อการร้าย', 'สินบน',
     'ทุจริต', 'ยักยอก', 'ถูกจับ', 'ลักลอบ'],
   vi: ['gian lận', 'rửa tiền', 'trừng phạt', 'khủng bố', 'tài trợ khủng bố', 'hối lộ',
