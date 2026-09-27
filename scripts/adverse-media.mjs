@@ -179,7 +179,11 @@ export const LANG_TERMS = {
   id: ['penipuan', 'pencucian uang', 'sanksi', 'terorisme', 'pendanaan terorisme', 'suap',
     'korupsi', 'penggelapan', 'ditangkap', 'terpidana', 'penyelundupan'],
   fa: ['کلاهبرداری', 'پولشویی', 'تحریم', 'تروریسم', 'تأمین مالی تروریسم', 'رشوه', 'فساد', 'اختلاس', 'دستگیر', 'محکوم', 'قاچاق'],
-  ur: ['دھوکہ دہی', 'منی لانڈرنگ', 'پابندیاں', 'دہشت گردی', 'دہشت گردی کی مالی معاونت', 'رشوت', 'بدعنوانی', 'غبن', 'گرفتار', 'اسمگلنگ'],
+  ur: ['دھوکہ دہی', 'منی لانڈرنگ', 'پابندیاں', 'دہشت گردی', 'دہشت گردی کی مالی معاونت', 'رشوت', 'بدعنوانی', 'غبن', 'گرفتار', 'اسمگلنگ',
+    // Verified 2026-09-27 against Pakistan's FMU (fmu.gov.pk, established under the AML Act
+    // 2010) and financial press coverage of FMU/State Bank guidance - covers the active
+    // sanctions-extra.json source pk-nacta.
+    'مشکوک لین دین', 'نامزد غیر مالیاتی کاروباری ادارے', 'اصل مالکان'],
   uk: ['шахрайство', 'відмивання грошей', 'санкції', 'тероризм', 'фінансування тероризму',
     'хабарництво', 'корупція', 'розтрата', 'заарештований', 'засуджений', 'контрабанда',
     // Verified 2026-09-27 against Ukraine's AML/CFT law ("Про запобігання та протидію
