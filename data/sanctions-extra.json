@@ -56,7 +56,7 @@
       "parser": "xml",
       "enabled": false,
       "browserHeaders": true,
-      "_note": "Kyrgyzstan State Financial Intelligence Service national list (autonomous designations beyond UN). STILL DISABLED — source-probe 2026-08-05 (run 31030989375): https://fiu.gov.kg/sked/9?language=ru returns an HTML page (Yii app behind Cloudflare), not XML — the list is HTML-rendered, no static XML feed at this URL. Enabling needs either an HTML-table scraper or the app's data endpoint; re-probe once identified.",
+      "_note": "Kyrgyzstan State Financial Intelligence Service national list (autonomous designations beyond UN). STILL DISABLED — source-probe 2026-08-05 (run 31030989375): https://fiu.gov.kg/sked/9?language=ru returns an HTML page (Yii app behind Cloudflare), not XML — the list is HTML-rendered, no static XML feed at this URL. Enabling needs either an HTML-table scraper or the app's data endpoint; re-probe once identified. RE-PROBED 2026-09-27 (run 36339819753): the same URL now returns a hard fetch failure (no HTTP response at all), not the HTML page seen in the Aug probe — the failure mode has changed from wrong-content-type to unreachable. Still disabled either way; noting the shift so a future probe isn't surprised by it.",
       "minNames": 20
     },
     {
