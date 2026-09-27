@@ -172,7 +172,10 @@ export const LANG_TERMS = {
   ko: ['사기', '자금세탁', '제재', '테러', '테러자금', '뇌물', '부패', '횡령', '체포', '유죄', '밀수'],
   hi: ['धोखाधड़ी', 'मनी लॉन्ड्रिंग', 'प्रतिबंध', 'आतंकवाद', 'आतंकी वित्तपोषण', 'रिश्वत', 'भ्रष्टाचार', 'गबन', 'गिरफ्तार', 'दोषी', 'तस्करी'],
   id: ['penipuan', 'pencucian uang', 'sanksi', 'terorisme', 'pendanaan terorisme', 'suap',
-    'korupsi', 'penggelapan', 'ditangkap', 'terpidana', 'penyelundupan'],
+    'korupsi', 'penggelapan', 'ditangkap', 'terpidana', 'penyelundupan',
+    // Verified 2026-09-27 against PPATK (ppatk.go.id, Indonesia's FIU) and UU No. 8 Tahun
+    // 2010 - covers the active sanctions-extra.json source id-dttot.
+    'transaksi keuangan mencurigakan', 'tindak pidana pencucian uang', 'penyedia jasa keuangan'],
   fa: ['کلاهبرداری', 'پولشویی', 'تحریم', 'تروریسم', 'تأمین مالی تروریسم', 'رشوه', 'فساد', 'اختلاس', 'دستگیر', 'محکوم', 'قاچاق'],
   ur: ['دھوکہ دہی', 'منی لانڈرنگ', 'پابندیاں', 'دہشت گردی', 'دہشت گردی کی مالی معاونت', 'رشوت', 'بدعنوانی', 'غبن', 'گرفتار', 'اسمگلنگ'],
   uk: ['шахрайство', 'відмивання грошей', 'санкції', 'тероризм', 'фінансування тероризму',
