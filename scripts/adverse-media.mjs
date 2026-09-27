@@ -179,7 +179,11 @@ export const LANG_TERMS = {
     // covers the active sanctions-extra.json source jp-mof.
     '疑わしい取引の届出', '資産凍結', '犯罪収益'],
   ko: ['사기', '자금세탁', '제재', '테러', '테러자금', '뇌물', '부패', '횡령', '체포', '유죄', '밀수'],
-  hi: ['धोखाधड़ी', 'मनी लॉन्ड्रिंग', 'प्रतिबंध', 'आतंकवाद', 'आतंकी वित्तपोषण', 'रिश्वत', 'भ्रष्टाचार', 'गबन', 'गिरफ्तार', 'दोषी', 'तस्करी'],
+  hi: ['धोखाधड़ी', 'मनी लॉन्ड्रिंग', 'प्रतिबंध', 'आतंकवाद', 'आतंकी वित्तपोषण', 'रिश्वत', 'भ्रष्टाचार', 'गबन', 'गिरफ्तार', 'दोषी', 'तस्करी',
+    // Verified 2026-09-27 against FIU-IND (fiuindia.gov.in / dor.gov.in, India's Financial
+    // Intelligence Unit) and the Prevention of Money Laundering Act, 2002 (PMLA) - covers the
+    // active sanctions-extra.json source in-mha.
+    'संदिग्ध लेनदेन रिपोर्ट', 'धन शोधन निवारण अधिनियम', 'प्रवर्तन निदेशालय'],
   id: ['penipuan', 'pencucian uang', 'sanksi', 'terorisme', 'pendanaan terorisme', 'suap',
     'korupsi', 'penggelapan', 'ditangkap', 'terpidana', 'penyelundupan',
     // Verified 2026-09-27 against PPATK (ppatk.go.id, Indonesia's FIU) and UU No. 8 Tahun
