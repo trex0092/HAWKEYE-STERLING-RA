@@ -245,7 +245,15 @@ export const LANG_TERMS = {
     // - covers the active sanctions-extra.json source my-moha.
     'laporan transaksi mencurigakan', 'institusi pelapor', 'sekatan kewangan yang disasarkan'],
   tl: ['pandaraya', 'parusa', 'terorismo', 'pagpopondo sa terorismo', 'suhol', 'korupsiyon',
-    'malversasyon', 'inaresto', 'nahatulan'],
+    'malversasyon', 'inaresto', 'nahatulan',
+    // Verified 2026-09-27 against real Filipino-language news coverage of actual AMLC
+    // (Anti-Money Laundering Council, amlc.gov.ph) proceedings - covers the active
+    // sanctions-extra.json source ph-amlc. Only one addition, deliberately: Philippine
+    // AML discourse, even in Filipino-language reporting, consistently keeps "money
+    // laundering", "AMLC" and "covered transactions" in English rather than translating
+    // them (confirmed across multiple independent news sources on the same 2026 AMLC
+    // hearing) - inventing Tagalog forms for those would not match real usage.
+    'kahina-hinalang transaksyon'],
   sw: ['ulaghai', 'utakatishaji fedha', 'vikwazo', 'ugaidi', 'ufadhili wa ugaidi', 'rushwa',
     'ufisadi', 'ubadhirifu', 'amekamatwa', 'magendo'],
   bn: ['জালিয়াতি', 'অর্থ পাচার', 'নিষেধাজ্ঞা', 'সন্ত্রাস', 'সন্ত্রাসে অর্থায়ন', 'ঘুষ', 'দুর্নীতি',
