@@ -141,7 +141,12 @@ export const LANG_TERMS = {
   ar: ADVERSE_TERMS_AR,
   es: ['fraude', 'lavado de dinero', 'blanqueo de capitales', 'sanciones', 'terrorismo',
     'financiación del terrorismo', 'soborno', 'corrupción', 'malversación', 'detenido',
-    'condenado', 'narcotráfico', 'contrabando'],
+    'condenado', 'narcotráfico', 'contrabando',
+    // Verified 2026-09-27 against Argentina's UIF (argentina.gob.ar/uif, InfoLEG) and Mexico's
+    // UIF (uif.gob.mx, under Hacienda/SHCP) - covers both active sanctions-extra.json sources
+    // sharing this language (ar-repet/ar-repet-entidades, mx-sat-69b).
+    'lavado de activos', 'reporte de operación sospechosa', 'operaciones inusuales',
+    'sujeto obligado', 'recursos de procedencia ilícita'],
   fr: ['fraude', "blanchiment d'argent", 'sanctions', 'terrorisme', 'financement du terrorisme',
     'corruption', 'pot-de-vin', 'détournement de fonds', 'arrêté', 'condamné', 'trafic', 'contrebande',
     // Verified 2026-09-27 against TRACFIN's own site (economie.gouv.fr/tracfin) and the Code
@@ -152,11 +157,7 @@ export const LANG_TERMS = {
   de: ['Betrug', 'Geldwäsche', 'Sanktionen', 'Terrorismus', 'Terrorismusfinanzierung',
     'Bestechung', 'Korruption', 'Veruntreuung', 'verhaftet', 'verurteilt', 'Schmuggel', 'Menschenhandel'],
   pt: ['fraude', 'lavagem de dinheiro', 'sanções', 'terrorismo', 'financiamento do terrorismo',
-    'suborno', 'corrupção', 'desvio de dinheiro', 'preso', 'condenado', 'tráfico', 'contrabando',
-    // Verified 2026-09-27 against COAF (Brazil's FIU, under Banco Central) and Banco Central
-    // Circular 3.978/2020 - Brazil is the highest-value active sanctions-extra.json target for
-    // this language (4 sources: br-bcb-qgi, br-bcb-qgp, br-tcu-inidoneos, br-tcu-inabilitados).
-    'comunicação de operação suspeita', 'evasão de divisas', 'crime organizado'],
+    'suborno', 'corrupção', 'desvio de dinheiro', 'preso', 'condenado', 'tráfico', 'contrabando'],
   ru: ['мошенничество', 'отмывание денег', 'санкции', 'терроризм', 'финансирование терроризма',
     'взяточничество', 'коррупция', 'растрата', 'арестован', 'осуждён', 'контрабанда'],
   zh: ['欺诈', '诈骗', '洗钱', '制裁', '恐怖主义', '恐怖融资', '贿赂', '腐败', '挪用公款', '被捕', '定罪', '走私', '贩运'],
