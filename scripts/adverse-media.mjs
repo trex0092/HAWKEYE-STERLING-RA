@@ -397,7 +397,26 @@ export const LOCALES = [
   { id: 'sl-SI', hl: 'sl', gl: 'SI', ceid: 'SI:sl', lang: 'sl' },
   { id: 'lt-LT', hl: 'lt', gl: 'LT', ceid: 'LT:lt', lang: 'lt' },
   { id: 'lv-LV', hl: 'lv', gl: 'LV', ceid: 'LV:lv', lang: 'lv' },
-  { id: 'et-EE', hl: 'et', gl: 'EE', ceid: 'EE:et', lang: 'et' }
+  { id: 'et-EE', hl: 'et', gl: 'EE', ceid: 'EE:et', lang: 'et' },
+
+  /* AUDITED 2026-09-27: added after cross-referencing every enabled country in
+     sanctions-extra.json against this list to find countries with active
+     sanctions screening but zero local-language news coverage. Same method as
+     the 2026-09-26 audit above: -L to follow redirects, then compare the
+     redirect's own gl/ceid AND actual article content against an
+     already-confirmed edition for that country/language, not just HTTP 200.
+     Tried and REJECTED (silently substitutes a DIFFERENT country's edition -
+     confirmed no distinct Google News RSS edition exists for these):
+       lk-LK (en-LK -> silently served en-US)
+       mc-MC (fr-MC -> silently served fr-FR, gl changed MC to FR)
+       tn-TN (ar + gl=TN -> silently served EG's Arabic edition)
+       mu-MU (en-MU -> silently served en-US)
+       kg-KG (ru + gl=KG -> silently served RU's Russian edition)
+     Do not re-add these without a materially different query - they were
+     tested, not merely absent. */
+  { id: 'en-NZ', hl: 'en-NZ', gl: 'NZ', ceid: 'NZ:en', lang: 'en' },
+  { id: 'nl-BE', hl: 'nl', gl: 'BE', ceid: 'BE:nl', lang: 'nl' },
+  { id: 'fr-BE', hl: 'fr', gl: 'BE', ceid: 'BE:fr', lang: 'fr' },
 ];
 
 /* The locale set to sweep this run — all of LOCALES unless narrowed by the
