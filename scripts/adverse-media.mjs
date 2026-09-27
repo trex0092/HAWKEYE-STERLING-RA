@@ -186,7 +186,11 @@ export const LANG_TERMS = {
     // 2010 - covers the active sanctions-extra.json source id-dttot.
     'transaksi keuangan mencurigakan', 'tindak pidana pencucian uang', 'penyedia jasa keuangan'],
   fa: ['کلاهبرداری', 'پولشویی', 'تحریم', 'تروریسم', 'تأمین مالی تروریسم', 'رشوه', 'فساد', 'اختلاس', 'دستگیر', 'محکوم', 'قاچاق'],
-  ur: ['دھوکہ دہی', 'منی لانڈرنگ', 'پابندیاں', 'دہشت گردی', 'دہشت گردی کی مالی معاونت', 'رشوت', 'بدعنوانی', 'غبن', 'گرفتار', 'اسمگلنگ'],
+  ur: ['دھوکہ دہی', 'منی لانڈرنگ', 'پابندیاں', 'دہشت گردی', 'دہشت گردی کی مالی معاونت', 'رشوت', 'بدعنوانی', 'غبن', 'گرفتار', 'اسمگلنگ',
+    // Verified 2026-09-27 against Pakistan's FMU (fmu.gov.pk, established under the AML Act
+    // 2010) and financial press coverage of FMU/State Bank guidance - covers the active
+    // sanctions-extra.json source pk-nacta.
+    'مشکوک لین دین', 'نامزد غیر مالیاتی کاروباری ادارے', 'اصل مالکان'],
   uk: ['шахрайство', 'відмивання грошей', 'санкції', 'тероризм', 'фінансування тероризму',
     'хабарництво', 'корупція', 'розтрата', 'заарештований', 'засуджений', 'контрабанда',
     // Verified 2026-09-27 against Ukraine's AML/CFT law ("Про запобігання та протидію
@@ -227,7 +231,11 @@ export const LANG_TERMS = {
     // sanctions-extra.json source (il-nbctf, il-nbctf-orgs).
     'דיווח בלתי רגיל', 'עבירת מקור', 'הכר את הלקוח'],
   th: ['ฉ้อโกง', 'ฟอกเงิน', 'คว่ำบาตร', 'ก่อการร้าย', 'สนับสนุนการก่อการร้าย', 'สินบน',
-    'ทุจริต', 'ยักยอก', 'ถูกจับ', 'ลักลอบ'],
+    'ทุจริต', 'ยักยอก', 'ถูกจับ', 'ลักลอบ',
+    // Verified 2026-09-27 against AMLO (amlo.go.th, Thailand's Anti-Money Laundering Office)
+    // and the Anti-Money Laundering Act B.E. 2542 - covers the active sanctions-extra.json
+    // source th-designated (named directly after the second term added here).
+    'ธุรกรรมที่มีเหตุอันควรสงสัย', 'บุคคลที่ถูกกำหนด'],
   vi: ['gian lận', 'rửa tiền', 'trừng phạt', 'khủng bố', 'tài trợ khủng bố', 'hối lộ',
     'tham nhũng', 'biển thủ', 'bị bắt', 'kết án', 'buôn lậu'],
   ms: ['penipuan', 'pengubahan wang haram', 'sekatan', 'keganasan', 'pembiayaan keganasan',
