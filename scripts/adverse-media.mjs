@@ -227,7 +227,11 @@ export const LANG_TERMS = {
     // sanctions-extra.json source (il-nbctf, il-nbctf-orgs).
     'דיווח בלתי רגיל', 'עבירת מקור', 'הכר את הלקוח'],
   th: ['ฉ้อโกง', 'ฟอกเงิน', 'คว่ำบาตร', 'ก่อการร้าย', 'สนับสนุนการก่อการร้าย', 'สินบน',
-    'ทุจริต', 'ยักยอก', 'ถูกจับ', 'ลักลอบ'],
+    'ทุจริต', 'ยักยอก', 'ถูกจับ', 'ลักลอบ',
+    // Verified 2026-09-27 against AMLO (amlo.go.th, Thailand's Anti-Money Laundering Office)
+    // and the Anti-Money Laundering Act B.E. 2542 - covers the active sanctions-extra.json
+    // source th-designated (named directly after the second term added here).
+    'ธุรกรรมที่มีเหตุอันควรสงสัย', 'บุคคลที่ถูกกำหนด'],
   vi: ['gian lận', 'rửa tiền', 'trừng phạt', 'khủng bố', 'tài trợ khủng bố', 'hối lộ',
     'tham nhũng', 'biển thủ', 'bị bắt', 'kết án', 'buôn lậu'],
   ms: ['penipuan', 'pengubahan wang haram', 'sekatan', 'keganasan', 'pembiayaan keganasan',
