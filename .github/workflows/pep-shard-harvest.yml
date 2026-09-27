@@ -100,7 +100,7 @@ jobs:
           # Sized to finish inside the job timeout; the budget is a backstop, not
           # the normal path, because a shard hands nothing to the merge until it
           # completes its slice.
-          PEP_TIME_BUDGET_MIN: '140'
+          PEP_TIME_BUDGET_MIN: '145'
         run: |
           # Exit 75 is a PLANNED pause in the ordinary chain, which resumes from
           # the checkpoint it just wrote. A shard has no next link: it publishes
