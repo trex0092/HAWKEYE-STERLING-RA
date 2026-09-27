@@ -173,15 +173,26 @@ export const LANG_TERMS = {
     // AML/CFT legal sources - not machine-translated guesses.
     'terörizmin finansmanı', 'terör örgütü', 'organize suç', 'uyuşturucu ticareti',
     'vergi kaçakçılığı', 'sahtecilik', 'müsadere'],
-  ja: ['詐欺', 'マネーロンダリング', '資金洗浄', '制裁', 'テロ', 'テロ資金供与', '贈収賄', '汚職', '横領', '逮捕', '有罪', '密輸'],
+  ja: ['詐欺', 'マネーロンダリング', '資金洗浄', '制裁', 'テロ', 'テロ資金供与', '贈収賄', '汚職', '横領', '逮捕', '有罪', '密輸',
+    // Verified 2026-09-27 against JAFIC (npa.go.jp, Japan Financial Intelligence Center under
+    // the National Police Agency) and the Act on Prevention of Transfer of Criminal Proceeds -
+    // covers the active sanctions-extra.json source jp-mof.
+    '疑わしい取引の届出', '資産凍結', '犯罪収益'],
   ko: ['사기', '자금세탁', '제재', '테러', '테러자금', '뇌물', '부패', '횡령', '체포', '유죄', '밀수'],
   hi: ['धोखाधड़ी', 'मनी लॉन्ड्रिंग', 'प्रतिबंध', 'आतंकवाद', 'आतंकी वित्तपोषण', 'रिश्वत', 'भ्रष्टाचार', 'गबन', 'गिरफ्तार', 'दोषी', 'तस्करी'],
   id: ['penipuan', 'pencucian uang', 'sanksi', 'terorisme', 'pendanaan terorisme', 'suap',
-    'korupsi', 'penggelapan', 'ditangkap', 'terpidana', 'penyelundupan'],
+    'korupsi', 'penggelapan', 'ditangkap', 'terpidana', 'penyelundupan',
+    // Verified 2026-09-27 against PPATK (ppatk.go.id, Indonesia's FIU) and UU No. 8 Tahun
+    // 2010 - covers the active sanctions-extra.json source id-dttot.
+    'transaksi keuangan mencurigakan', 'tindak pidana pencucian uang', 'penyedia jasa keuangan'],
   fa: ['کلاهبرداری', 'پولشویی', 'تحریم', 'تروریسم', 'تأمین مالی تروریسم', 'رشوه', 'فساد', 'اختلاس', 'دستگیر', 'محکوم', 'قاچاق'],
   ur: ['دھوکہ دہی', 'منی لانڈرنگ', 'پابندیاں', 'دہشت گردی', 'دہشت گردی کی مالی معاونت', 'رشوت', 'بدعنوانی', 'غبن', 'گرفتار', 'اسمگلنگ'],
   uk: ['шахрайство', 'відмивання грошей', 'санкції', 'тероризм', 'фінансування тероризму',
-    'хабарництво', 'корупція', 'розтрата', 'заарештований', 'засуджений', 'контрабанда'],
+    'хабарництво', 'корупція', 'розтрата', 'заарештований', 'засуджений', 'контрабанда',
+    // Verified 2026-09-27 against Ukraine's AML/CFT law ("Про запобігання та протидію
+    // легалізації (відмиванню) доходів...") and Держфінмоніторинг (fiu.gov.ua, Ukraine's
+    // FIU) - covers the active sanctions-extra.json source ua-nsdc.
+    'легалізація доходів', 'фінансовий моніторинг', 'підозрілі операції'],
   nl: ['fraude', 'witwassen', 'sancties', 'terrorisme', 'terrorismefinanciering', 'omkoping',
     'corruptie', 'verduistering', 'gearresteerd', 'veroordeeld', 'smokkel'],
   // ── Extended worldwide language coverage (weaponised global sweep) ──
@@ -224,7 +235,11 @@ export const LANG_TERMS = {
   vi: ['gian lận', 'rửa tiền', 'trừng phạt', 'khủng bố', 'tài trợ khủng bố', 'hối lộ',
     'tham nhũng', 'biển thủ', 'bị bắt', 'kết án', 'buôn lậu'],
   ms: ['penipuan', 'pengubahan wang haram', 'sekatan', 'keganasan', 'pembiayaan keganasan',
-    'rasuah', 'salah guna dana', 'ditangkap', 'penyeludupan'],
+    'rasuah', 'salah guna dana', 'ditangkap', 'penyeludupan',
+    // Verified 2026-09-27 against Bank Negara Malaysia (amlcft.bnm.gov.my) and the AMLA 2001
+    // (Anti-Money Laundering, Anti-Terrorism Financing and Proceeds of Unlawful Activities Act)
+    // - covers the active sanctions-extra.json source my-moha.
+    'laporan transaksi mencurigakan', 'institusi pelapor', 'sekatan kewangan yang disasarkan'],
   tl: ['pandaraya', 'parusa', 'terorismo', 'pagpopondo sa terorismo', 'suhol', 'korupsiyon',
     'malversasyon', 'inaresto', 'nahatulan'],
   sw: ['ulaghai', 'utakatishaji fedha', 'vikwazo', 'ugaidi', 'ufadhili wa ugaidi', 'rushwa',
