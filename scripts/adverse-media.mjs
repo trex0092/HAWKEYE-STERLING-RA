@@ -209,7 +209,12 @@ export const LANG_TERMS = {
     // FIU) - covers the active sanctions-extra.json source ua-nsdc.
     'легалізація доходів', 'фінансовий моніторинг', 'підозрілі операції'],
   nl: ['fraude', 'witwassen', 'sancties', 'terrorisme', 'terrorismefinanciering', 'omkoping',
-    'corruptie', 'verduistering', 'gearresteerd', 'veroordeeld', 'smokkel'],
+    'corruptie', 'verduistering', 'gearresteerd', 'veroordeeld', 'smokkel',
+    // Verified 2026-09-27 against FIU-Nederland (fiu-nederland.nl) and the Wwft (Wet ter
+    // voorkoming van witwassen en financieren van terrorisme) - covers the active
+    // sanctions-extra.json sources nl-terror (Netherlands) and be-fod (Belgium, Dutch
+    // being one of its three official languages).
+    'ongebruikelijke transactie', 'meldplicht', 'poortwachters'],
   // ── Extended worldwide language coverage (weaponised global sweep) ──
   pl: ['oszustwo', 'pranie pieniędzy', 'sankcje', 'terroryzm', 'finansowanie terroryzmu',
     'łapówka', 'korupcja', 'sprzeniewierzenie', 'aresztowany', 'skazany', 'przemyt'],
@@ -294,7 +299,13 @@ export const LANG_TERMS = {
   hr: ['pranje novca', 'prijevara', 'sankcije', 'terorizam', 'financiranje terorizma', 'podmićivanje', 'korupcija', 'pronevjera', 'uhićen', 'osuđen', 'trgovina ljudima', 'krijumčarenje'],
   sl: ['pranje denarja', 'goljufija', 'sankcije', 'terorizem', 'financiranje terorizma', 'podkupovanje', 'korupcija', 'poneverba', 'aretiran', 'obsojen', 'trgovina z ljudmi', 'tihotapljenje'],
   lt: ['pinigų plovimas', 'sukčiavimas', 'sankcijos', 'terorizmas', 'terorizmo finansavimas', 'kyšininkavimas', 'korupcija', 'pasisavinimas', 'suimtas', 'nuteistas', 'prekyba žmonėmis', 'kontrabanda'],
-  lv: ['naudas atmazgāšana', 'krāpšana', 'sankcijas', 'terorisms', 'terorisma finansēšana', 'kukuļošana', 'korupcija', 'piesavināšanās', 'aizturēts', 'notiesāts', 'cilvēku tirdzniecība', 'kontrabanda'],
+  lv: ['naudas atmazgāšana', 'krāpšana', 'sankcijas', 'terorisms', 'terorisma finansēšana', 'kukuļošana', 'korupcija', 'piesavināšanās', 'aizturēts', 'notiesāts', 'cilvēku tirdzniecība', 'kontrabanda',
+    // Verified 2026-09-27 against Latvia's FID (fid.gov.lv, Finanšu izlūkošanas dienests -
+    // Financial Intelligence Unit) and the NILLTPFN law (Noziedzīgi iegūtu līdzekļu
+    // legalizācijas un terorisma un proliferācijas finansēšanas novēršanas likums) - covers
+    // the active sanctions-extra.json source lv-fid. Deliberately a small addition: only
+    // terms directly verified against these sources, not further generic vocabulary.
+    'noziedzīgi iegūtu līdzekļu legalizācija', 'terorisma un proliferācijas finansēšana', 'pamatotas aizdomas'],
   et: ['rahapesu', 'pettus', 'sanktsioonid', 'terrorism', 'terrorismi rahastamine', 'altkäemaks', 'korruptsioon', 'omastamine', 'vahistatud', 'süüdi mõistetud', 'inimkaubandus', 'salakaubavedu'],
   mk: ['перење пари', 'измама', 'санкции', 'тероризам', 'финансирање на тероризам', 'поткуп', 'корупција', 'проневера', 'уапсен', 'осуден', 'трговија со луѓе', 'криумчарење']
 };
