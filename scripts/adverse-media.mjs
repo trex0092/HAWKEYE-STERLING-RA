@@ -161,7 +161,14 @@ export const LANG_TERMS = {
     // sanctions-extra.json sources for Switzerland (ch-seco, ch-seco-opensanctions).
     'Verdachtsmeldung', 'Finanzintermediär', 'Sorgfaltspflicht'],
   pt: ['fraude', 'lavagem de dinheiro', 'sanções', 'terrorismo', 'financiamento do terrorismo',
-    'suborno', 'corrupção', 'desvio de dinheiro', 'preso', 'condenado', 'tráfico', 'contrabando'],
+    'suborno', 'corrupção', 'desvio de dinheiro', 'preso', 'condenado', 'tráfico', 'contrabando',
+    // Verified 2026-09-27 against COAF (Brazil's FIU, under Banco Central) and Banco Central
+    // Circular 3.978/2020 - Brazil is the highest-value active sanctions-extra.json target for
+    // this language (4 sources: br-bcb-qgi, br-bcb-qgp, br-tcu-inidoneos, br-tcu-inabilitados).
+    // Restored 2026-09-27 after being silently lost to a stale-base overwrite in a later PR
+    // (#614) that was built from an outdated in-memory copy of this file - see that PR's own
+    // commit message for the full root-cause note.
+    'comunicação de operação suspeita', 'evasão de divisas', 'crime organizado'],
   ru: ['мошенничество', 'отмывание денег', 'санкции', 'терроризм', 'финансирование терроризма',
     'взяточничество', 'коррупция', 'растрата', 'арестован', 'осуждён', 'контрабанда'],
   zh: ['欺诈', '诈骗', '洗钱', '制裁', '恐怖主义', '恐怖融资', '贿赂', '腐败', '挪用公款', '被捕', '定罪', '走私', '贩运'],
