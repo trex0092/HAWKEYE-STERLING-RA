@@ -942,11 +942,13 @@ check('PEP list: dataset flattens to a matcher list + per-name office context ma
   && _plist.count === 2);
 check('PEP list: the list name rides the non-whitelistable PEP prefix',
   pep.PEP_LIST_NAME.startsWith('PEP ('));
-check('PEP harvest: batch-failure gate tolerates a few flaky WDQS batches, refuses an outage',
-  pep.batchFailureOk(5, 100).ok === true
-  && pep.batchFailureOk(15, 100).ok === false
+check('PEP harvest: final artifact fails closed on any missed WDQS holder batch',
+  pep.PEP_MAX_BATCH_FAIL_PCT === 0
+  && pep.batchFailureOk(1, 100).ok === false
+  && pep.batchFailureOk(5, 100).ok === false
+  && pep.batchFailureOk(0, 100).ok === true
   && pep.batchFailureOk(0, 0).ok === true
-  && pep.batchFailureOk(10, 100).ok === true);
+  && pep.batchFailureOk(1, 0).ok === false);
 check('PEP harvest: holder batch size stays well under the WDQS 60s kill (≤ 100)',
   pep.HOLDER_BATCH <= 100);
 check('PEP classes: the core FATF categories stay REQUIRED, expansions are optional', (() => {
