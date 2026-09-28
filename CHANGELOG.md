@@ -23,6 +23,9 @@ bump merged to `main`.
   All three stay disabled until a source-probe run on a runner shows the
   parse. `www.vm.ee:443` is added to the egress allowlist, and the register
   moves Estonia from `identified` to `pending`.
+- **Estonia screened: `ee-vm-belarus` enabled.** Runner probe 36391541492
+  read 615 names against a floor of 250. The register moves Estonia to
+  `screened`; its two other lists stay disabled until their own probes run.
 - **Estonia parser reads `<ol><li>` lists too.** Runner probe 36391013267
   showed the Belarus page renders its 273 designations as an ordered list,
   with the numbers added by the browser, so the parser found 0 names and the
