@@ -156,6 +156,10 @@ jobs:
         run: node scripts/coverage-figures.mjs --check
       - name: Check the country coverage gap report is in sync with the screening configuration
         run: node scripts/country-coverage-report.mjs --check
+      - name: Require 195-country sanctions, adverse-media and PEP screening scope
+        run: node scripts/validate-screening-country-coverage.mjs --check
+      - name: Require worldwide sanctions, adverse-media and PEP backbones
+        run: node scripts/validate-worldwide-screening.mjs --check
       - name: Run console + advisor screen smoke tests
         run: node test/screens.test.js
       - name: Run advisor full-surface smoke tests (every Q&A subject + tool + ask phase)
