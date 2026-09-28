@@ -27,11 +27,11 @@
     },
     {
       "country": "Andorra",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-09-28 (status unchanged): the UIFAND information note to banks (uifand.ad) tells obliged entities to monitor sanctions-list updates, especially the UN Security Council consolidated list, under Law 14/2017; whether a separate national list exists is not yet confirmed"
+      "note": "researched 2026-09-28: the UIFAND \"Mesures restrictives\" page (uifand.ad; Llei 14/2017, art. 49) links only the UN Security Council consolidated list and its search tool, plus UIFAND Resolution 1-2026 (14 May 2026) and the application guide; no Andorran national list is published there. Covered by the UN list (screened daily)"
     },
     {
       "country": "Angola",
@@ -259,7 +259,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Sub-decree on Freezing of Property of Designated Terrorists (10 Mar 2014, cafiu.gov.kh) covers UNSCR 1267 and 1373; Art. 4 requires the Ministry of Justice to publish UN listings and de-listings on its website. I found no published Cambodian domestic (1373) list and cannot confirm whether one exists"
     },
     {
       "country": "Cameroon",
@@ -629,8 +630,9 @@
     },
     {
       "country": "Holy See",
-      "status": "not-researched",
-      "baseline": []
+      "status": "identified",
+      "baseline": [],
+      "note": "researched 2026-09-28: the ASIF Annual Report 2023 (asif.va) states that under Art. 71(1) of Law No. XVIII the President of the Governorate of Vatican City State \"periodically issues ordinances updating the 'List of Subjects that Threaten International Peace and Security'\", incorporating UN Security Council and EU indications and any indications from ASIF or law enforcement. No machine-readable file verified yet; the list is expected to overlap mostly with the UN and EU lists (I cannot confirm whether it has national-only entries)"
     },
     {
       "country": "Honduras",
@@ -932,7 +934,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the RMI \"Guidance on TFS for Banks, FSPs & DNFBPs\" (rmicourts.org, 2023) says the UN list and \"domestic designations made by the Minister (if any)\" are accessible through the Banking Commission website (rmiobc.com). I cannot confirm whether any domestic designation exists"
     },
     {
       "country": "Mauritania",
@@ -1316,11 +1319,11 @@
     },
     {
       "country": "Senegal",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-09-28 (status unchanged): CENTIF's \"Commission consultative de Gel administratif (CCGA)\" page (centif.sn/fr/ccga) states the CCGA, created under Article 14 of Decree No 2022-2308 of 30 December 2022, assists the finance minister in implementing freezes for persons listed under UN Security Council resolutions; no published national list found yet"
+      "note": "researched 2026-09-28: CENTIF's \"Sanctions financières ciblée (SFC)\" page (centif.sn/fr/sancib) links only the UN Security Council consolidated list, and its \"Commission consultative de Gel administratif (CCGA)\" page (centif.sn/fr/ccga) describes the CCGA (Art. 14, Decree No 2022-2308 of 30 December 2022) as assisting the finance minister with freezes for persons listed under UN Security Council resolutions. No published Senegalese national list found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Serbia",
@@ -1621,10 +1624,11 @@
     },
     {
       "country": "Uzbekistan",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Department on Combating Economic Crimes under the General Prosecutor's Office publishes its lists at prodepartament.uz/ru/wanted-list/national: 8 list forms (Forms 5, 6, 9 and 10 based on information from Uzbek competent authorities; Forms 7, 8, 11 and 12 on information from foreign competent authorities), each downloadable as XLSX in Russian and Uzbek. Not staged: file layout not yet probed, and I cannot confirm the composition of the national entries, so whether to screen them is an MLRO policy decision (as for Tajikistan)"
     },
     {
       "country": "Vanuatu",

@@ -16,7 +16,14 @@ bump merged to `main`.
   `identified`: under the FIU's TFS guidance, domestic designations are
   published in the Gazette and on the FIU website. Cyprus gets a partial
   note: Law 150(I)/2025 provides for national sanctions, but no published
-  national list was found. Researched rows: 121 → 125.
+  national list was found. Andorra and Senegal are `assessed-not-loadable`
+  because their FIU sanctions pages link only the UN list. The Holy See is
+  `identified`: the Governorate's ordinances update its "List of Subjects
+  that Threaten International Peace and Security" (ASIF Annual Report
+  2023). Uzbekistan is `identified`: the Department on Combating Economic
+  Crimes publishes 8 list forms as XLSX. It is not staged, because screening
+  it is an MLRO policy decision. The Marshall Islands and Cambodia get partial
+  notes. Researched rows: 121 → 129.
 - **Belize: `bz-fiu-consolidated` staged (disabled).** This is the FIU's
   official Consolidated Belize Sanctions List: High Court orders covering
   domestic and UNSCR designations, published as XLSX. Its month-named file
