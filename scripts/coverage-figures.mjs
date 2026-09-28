@@ -61,9 +61,14 @@ export function countryRegister(root = ROOT) {
   return JSON.parse(readFileSync(join(root, 'data/sanctions-country-coverage.json'), 'utf8')).countries || [];
 }
 
+export function screeningCountryMatrix(root = ROOT) {
+  return JSON.parse(readFileSync(join(root, 'data/screening-country-coverage.json'), 'utf8'));
+}
+
 export function buildFigures(root = ROOT) {
   const sources = screenedSources(root);
   const jurisdictions = new Set(sources.map(issuingCountry).filter(Boolean));
+  const screening = screeningCountryMatrix(root);
   return {
     adverseMediaEditions: LOCALES.length,
     adverseMediaCountries: new Set(LOCALES.map(l => l.gl)).size,
@@ -71,6 +76,9 @@ export function buildFigures(root = ROOT) {
     sanctionsLists: sources.length,
     sanctionsJurisdictions: jurisdictions.size,
     sanctionsCountriesResearched: countryRegister(root).filter(r => r.status !== 'not-researched').length,
+    sanctionsCountriesCovered: screening.counts?.sanctionsCovered || 0,
+    adverseMediaCountriesCovered: screening.counts?.adverseMediaCovered || 0,
+    pepCountriesCovered: screening.counts?.pepCovered || 0,
   };
 }
 
@@ -84,6 +92,9 @@ export function buildFile(root = ROOT) {
       adverseMediaLanguages: 'languages with native risk terms in the scorer (scripts/adverse-media.mjs LANG_TERMS)',
       sanctionsLists: 'enabled sources in data/sanctions-sources.json + data/sanctions-extra.json (extra: with url or file), excluding alias-only sources (mergeInto)',
       sanctionsCountriesResearched: 'of the 195 countries in data/sanctions-country-coverage.json, how many have a recorded research outcome (screened, pending, identified or assessed-not-loadable) rather than not-researched',
+      sanctionsCountriesCovered: 'countries included in the worldwide sanctions screening scope; global consolidated lists apply irrespective of subject nationality, with national/regional lists layered where available',
+      adverseMediaCountriesCovered: 'countries included in worldwide name-scoped adverse-media screening through GDELT and Bing News, with Google News editions adding regional depth',
+      pepCountriesCovered: 'countries included in the worldwide PEP screening scope through the Wikidata public-office holder harvest; screening is not country-filtered',
       sanctionsJurisdictions: 'distinct issuing countries among those sources: the jurisdiction field, or for entries marked Global (a list\'s reach, not its issuer) the country named in the list title; UN, EU and development-bank lists are supranational and not counted',
     },
   };
