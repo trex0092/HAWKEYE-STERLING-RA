@@ -7,6 +7,11 @@
   "entries": [
     {
       "refNo": "MUI.001",
+      "name": "Mohammad Zafirr Rechad GOLAMAULLY",
+      "aliases": [
+        "Abu Hud",
+        "Paladin of Jihad"
+      ],
       "surname": "GOLAMAULLY",
       "otherNames": "Mohammad Zafirr Rechad",
       "title": "Mr",
@@ -24,6 +29,8 @@
     },
     {
       "refNo": "MUI.002",
+      "name": "Lubnaa Rechad GOLAMAULLY",
+      "aliases": [],
       "surname": "GOLAMAULLY",
       "otherNames": "Lubnaa Rechad",
       "title": "Ms",
@@ -38,6 +45,10 @@
     },
     {
       "refNo": "MUI.003",
+      "name": "Samuel Tashvin JODHUN",
+      "aliases": [
+        "Mohamad Bilall Jodhun"
+      ],
       "surname": "JODHUN",
       "otherNames": "Samuel Tashvin",
       "title": "Mr",
@@ -52,5 +63,6 @@
       "address": "BK E12 NHDC, Cite La Cure, Mauritius",
       "designatedOn": "2025-06-05"
     }
-  ]
+  ],
+  "schemaNote": "2026-09-27: each entry carries name + aliases in addition to the structured fields. scripts/sanctions-match.mjs parseCuratedList reads ONLY name and aliases, so before this the file loaded zero names into screening. name is otherNames + surname (the matcher is order-insensitive); aliases mirror aka. The structured fields are unchanged and remain the audit record."
 }

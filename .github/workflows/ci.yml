@@ -71,6 +71,8 @@ jobs:
         run: node test/daily-brief.test.mjs
       - name: Run governance-report unit tests
         run: node test/governance-report.test.mjs
+      - name: Run sanctions-registry integrity test (curated files load, source hosts are on the egress allowlist)
+        run: node test/sanctions-registry-integrity.test.mjs
       - name: Run board-figure drift guard (committed figures match the live estate)
         run: node test/board-figures.test.mjs
       - name: Run delivery-watchdog unit tests

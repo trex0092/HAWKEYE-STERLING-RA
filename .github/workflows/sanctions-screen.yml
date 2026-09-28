@@ -80,6 +80,12 @@ jobs:
           # down source discloses DEGRADED coverage, never a silent all-clear).
           # Anything else — including an exfiltration attempt from a
           # compromised dependency — is blocked and surfaces loudly.
+          # UK Sanctions List (sanctionslist.fcdo.gov.uk, repointed 2026-09-22)
+          # and NZ MFAT (www.mfat.govt.nz) added 2026-09-27: both were enabled
+          # sources whose hosts were missing from this list, so every run
+          # blocked them ("fetch failed") and screened without the UK list.
+          # test/sanctions-registry-integrity.test.mjs now fails if any enabled
+          # source host is missing from this allowlist.
           egress-policy: block
           allowed-endpoints: >
             github.com:443
@@ -122,6 +128,8 @@ jobs:
             repet.jus.gob.ar:443
             olinda.bcb.gov.br:443
             contas.tcu.gov.br:443
+            sanctionslist.fcdo.gov.uk:443
+            www.mfat.govt.nz:443
             tfs.fic.gov.za:443
             apim.adb.org:443
             data.iadb.org:443
