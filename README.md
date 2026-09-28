@@ -231,6 +231,16 @@ by **09:00 UAE**:
 - **EU consolidated financial-sanctions list**: screened daily and directly applicable in the 27 EU member states (27 rows carry `EU`). An EU member without its own national list is therefore still covered for EU-level sanctions; only a separate national list, where one exists, is additional.
 - **US OFAC and the UK Sanctions List**: also screened daily. Their designations reach many targets worldwide, including in Latin America and the Caribbean, but they are those issuers' lists, not a country's own, so they are not recorded as `baseline`.
 
+### FATF black and grey lists
+
+[`data/fatf-assessments.json`](data/fatf-assessments.json) holds the FATF lists from the [19 June 2026 statements](https://www.fatf-gafi.org/en/countries/black-and-grey-lists.html) (Paris plenary, 17–19 June 2026), with each jurisdiction's assessment: its FSRB, when it made its high-level political commitment, its MER adoption date where the statement gives one, its action-plan status, and the action-plan items quoted verbatim.
+
+- **Black list** (High-Risk Jurisdictions subject to a Call for Action), 3 jurisdictions: DPRK and Iran (call for countermeasures); Myanmar (call for enhanced due diligence).
+- **Grey list** (Jurisdictions under Increased Monitoring), 22 jurisdictions: Angola, Bolivia, Bosnia and Herzegovina, Bulgaria, Cameroon, Côte d'Ivoire, Democratic Republic of the Congo, Haiti, Iraq, Kenya, Kuwait, Lao PDR, Lebanon, Monaco, Nepal, Papua New Guinea, South Sudan, Syria, Venezuela, Vietnam, Virgin Islands (UK) and Yemen.
+- The FATF found that Bulgaria, Côte d'Ivoire, the DRC and Monaco had substantially completed their action plans, which warrants an on-site assessment. Algeria and Namibia were removed in June 2026.
+
+The register's `fatf` field marks each listed country, and the MCP server serves the file as `hawkeye://reference/fatf-assessments`. A test fails if this file, the register and the risk-scoring list [`data/jurisdiction-risk.json`](data/jurisdiction-risk.json) disagree. Update all three after every FATF plenary (February, June and October).
+
 ## MCP server (AI-agent access to the engine)
 
 A **Model Context Protocol (MCP)** server exposes the deterministic screening

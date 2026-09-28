@@ -1,5 +1,5 @@
 {
-  "_README": "Sanctions coverage by country, all 195 (193 UN member states + the Holy See + Palestine). status: screened = at least one national list from this issuer is loaded by the screen today (test/board-figures.test.mjs ties this to data/sanctions-*.json); pending = a candidate exists and is recorded, not yet loaded (see note); identified = a national list is known to exist, official machine-readable file not yet verified; assessed-not-loadable = researched, cannot be loaded (see note); not-researched = no research recorded yet. NEVER mark a country as having no national list without evidence. Independently of this table, the UN Security Council Consolidated List is screened daily and binds every UN member state; the EU list is screened too. baseline: the multilateral lists the screen loads every day that already apply to the country regardless of its own status here — UN = UN Security Council Consolidated List (binding on every UN member state under Chapter VII; the Holy See and Palestine are observers, not members); EU = EU consolidated financial-sanctions list (directly applicable in the 27 EU member states). US OFAC and the UK list are screened too and reach many designees worldwide, but they are those issuers' lists, not the country's own, so they are not recorded as baseline.",
+  "_README": "Sanctions coverage by country, all 195 (193 UN member states + the Holy See + Palestine). status: screened = at least one national list from this issuer is loaded by the screen today (test/board-figures.test.mjs ties this to data/sanctions-*.json); pending = a candidate exists and is recorded, not yet loaded (see note); identified = a national list is known to exist, official machine-readable file not yet verified; assessed-not-loadable = researched, cannot be loaded (see note); not-researched = no research recorded yet. NEVER mark a country as having no national list without evidence. Independently of this table, the UN Security Council Consolidated List is screened daily and binds every UN member state; the EU list is screened too. baseline: the multilateral lists the screen loads every day that already apply to the country regardless of its own status here — UN = UN Security Council Consolidated List (binding on every UN member state under Chapter VII; the Holy See and Palestine are observers, not members); EU = EU consolidated financial-sanctions list (directly applicable in the 27 EU member states). US OFAC and the UK list are screened too and reach many designees worldwide, but they are those issuers' lists, not the country's own, so they are not recorded as baseline. `fatf` marks a country on the FATF black or grey list (June 2026 plenary); the assessment behind it is in data/fatf-assessments.json.",
   "updated": "2026-09-28",
   "countries": [
     {
@@ -35,7 +35,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Antigua and Barbuda",
@@ -169,14 +170,16 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: the Cancillería \"Reglamento para la remisión de las listas del Consejo de Seguridad\" (cancilleria.gob.bo, 16-08-2024) governs relaying the UNSC lists and a national-designation procedure under UNSCR 1373; no published national designation list was found. Covered by the UN list (screened daily)"
+      "note": "researched 2026-09-28: the Cancillería \"Reglamento para la remisión de las listas del Consejo de Seguridad\" (cancilleria.gob.bo, 16-08-2024) governs relaying the UNSC lists and a national-designation procedure under UNSCR 1373; no published national designation list was found. Covered by the UN list (screened daily)",
+      "fatf": "grey"
     },
     {
       "country": "Bosnia and Herzegovina",
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Botswana",
@@ -212,7 +215,8 @@
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Burkina Faso",
@@ -247,7 +251,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Canada",
@@ -323,7 +328,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Croatia",
@@ -365,14 +371,16 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "black"
     },
     {
       "country": "Democratic Republic of the Congo",
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Denmark",
@@ -585,7 +593,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Holy See",
@@ -640,7 +649,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "black"
     },
     {
       "country": "Iraq",
@@ -649,7 +659,8 @@
       "note": "official keyless JSON API (api.aml.iq, 6,284 rows, 10 per page) verified live 2026-09-28; names are Arabic-only and the matcher does not compare Arabic with Latin script, so adding it now would add no real recall",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Ireland",
@@ -722,7 +733,8 @@
       ],
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Kiribati",
@@ -736,7 +748,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Kyrgyzstan",
@@ -753,7 +766,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Latvia",
@@ -771,7 +785,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Lesotho",
@@ -927,7 +942,8 @@
       ],
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Mongolia",
@@ -965,7 +981,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "black"
     },
     {
       "country": "Namibia",
@@ -986,7 +1003,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Netherlands",
@@ -1090,7 +1108,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Paraguay",
@@ -1313,7 +1332,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Spain",
@@ -1371,7 +1391,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Tajikistan",
@@ -1538,21 +1559,24 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Vietnam",
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Yemen",
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Zambia",

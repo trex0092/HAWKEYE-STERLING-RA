@@ -10,6 +10,15 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **FATF black and grey lists with their assessments.** The new file
+  `data/fatf-assessments.json` covers all 25 jurisdictions from the FATF
+  19 June 2026 statements (3 black, 22 grey). Each entry gives the FSRB, the
+  commitment date, the MER adoption date where stated, the action-plan
+  status, and the action-plan items quoted verbatim with their source URL.
+  Register rows gain a `fatf` field, and the MCP resource
+  `hawkeye://reference/fatf-assessments` serves the file. A test pins the
+  assessments, `data/jurisdiction-risk.json` and the register to the same
+  jurisdictions. The README gains a "FATF black and grey lists" section.
 - **Americas register research (15 countries).** Recorded from official
   regulator/FIU pages, each cited in its row note: Paraguay, Chile, Peru,
   Bahamas, Colombia, Panama, Costa Rica, Dominican Republic, Uruguay, Bolivia,

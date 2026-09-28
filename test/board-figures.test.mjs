@@ -89,5 +89,27 @@ console.log('\n— sanctions country coverage register (195) —\n');
     reg.filter(r => r.status !== 'screened' && r.status !== 'not-researched').every(r => r.note));
 }
 
+/* FATF black/grey lists: data/fatf-assessments.json (the assessment text),
+   data/jurisdiction-risk.json (the scoring nudge) and the register's `fatf`
+   field must name the same jurisdictions, so a plenary update to one without
+   the others fails here instead of silently disagreeing. */
+{
+  const fa = JSON.parse(readFileSync(join(ROOT, 'data/fatf-assessments.json'), 'utf8'));
+  const jr = JSON.parse(readFileSync(join(ROOT, 'data/jurisdiction-risk.json'), 'utf8'));
+  const reg = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-country-coverage.json'), 'utf8')).countries;
+  const J = fa.jurisdictions || [];
+  const same = (a, b) => a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
+  const of = l => J.filter(j => j.list === l);
+  check('FATF black list matches jurisdiction-risk high', same(of('black').map(j => j.riskName), jr.high || []));
+  check('FATF grey list matches jurisdiction-risk grey', same(of('grey').map(j => j.riskName), jr.grey || []));
+  check('register `fatf` field matches the assessments', same(
+    reg.filter(r => r.fatf).map(r => r.country + ':' + r.fatf),
+    J.filter(j => j.register).map(j => j.register + ':' + j.list)));
+  check('every FATF assessment cites a fatf-gafi.org statement and has action-plan items',
+    J.length > 0 && J.every(j => /^https:\/\/www\.fatf-gafi\.org\//.test(j.source) && Array.isArray(j.actionPlan) && j.actionPlan.length && j.status && j.statementDate));
+  check('black-list entries state the FATF call (countermeasures or enhanced due diligence)',
+    of('black').every(j => j.call === 'countermeasures' || j.call === 'enhanced due diligence'));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

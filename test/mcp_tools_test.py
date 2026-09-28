@@ -272,6 +272,10 @@ rr = rpc("resources/read", {"uri": "hawkeye://reference/jurisdiction-risk"})
 check("resources/read returns JSON contents for a known uri", rr["result"]["contents"][0]["mimeType"] == "application/json"
       and json.loads(rr["result"]["contents"][0]["text"]) is not None)
 check("resources/read errors on an unknown uri", "error" in rpc("resources/read", {"uri": "hawkeye://nope"}))
+fa = rpc("resources/read", {"uri": "hawkeye://reference/fatf-assessments"})
+fa_doc = json.loads(fa["result"]["contents"][0]["text"])
+check("resources/read serves the FATF assessments (black + grey, each with a source)",
+      {j["list"] for j in fa_doc["jurisdictions"]} == {"black", "grey"} and all(j["source"] for j in fa_doc["jurisdictions"]))
 
 pl = rpc("prompts/list")["result"]["prompts"]
 check("prompts/list returns the prompt templates", len(pl) == len(mcp_server.PROMPTS))
