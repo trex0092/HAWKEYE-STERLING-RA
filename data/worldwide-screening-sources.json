@@ -1,0 +1,103 @@
+{
+  "_README": "Required worldwide screening backbones. These are real configured sources/engines, not a claim that one provider publishes a separate national list for every country. CI validates that the backbones remain wired and that the 195-country screening matrix remains complete.",
+  "version": 1,
+  "countryUniverse": 195,
+  "domains": {
+    "sanctions": {
+      "required": true,
+      "coverageMode": "global consolidated baseline plus national/regional supplements",
+      "sources": [
+        {
+          "id": "un-consolidated",
+          "name": "UN Security Council Consolidated List",
+          "kind": "official-consolidated",
+          "required": true,
+          "registry": "data/sanctions-sources.json"
+        },
+        {
+          "id": "ofac-sdn",
+          "name": "US OFAC SDN",
+          "kind": "official-consolidated",
+          "required": true,
+          "registry": "data/sanctions-sources.json"
+        },
+        {
+          "id": "ofac-consolidated",
+          "name": "US OFAC Consolidated non-SDN",
+          "kind": "official-consolidated",
+          "required": true,
+          "registry": "data/sanctions-sources.json"
+        },
+        {
+          "id": "uk-ofsi",
+          "name": "UK Sanctions List",
+          "kind": "official-consolidated",
+          "required": true,
+          "registry": "data/sanctions-sources.json"
+        },
+        {
+          "id": "eu-fsf",
+          "name": "EU Consolidated Financial Sanctions List",
+          "kind": "official-consolidated",
+          "required": true,
+          "registry": "data/sanctions-sources.json"
+        }
+      ],
+      "supplements": "data/sanctions-extra.json",
+      "countryResearch": "data/sanctions-country-coverage.json",
+      "availabilityRule": "all required consolidated sources configured; national/regional sources supplement coverage where a defensible source is available"
+    },
+    "adverseMedia": {
+      "required": true,
+      "coverageMode": "worldwide name-scoped multi-backbone search",
+      "sources": [
+        {
+          "id": "google-news-rss",
+          "name": "Google News RSS worldwide locale rotation",
+          "kind": "public-rss",
+          "required": true,
+          "implementation": "scripts/adverse-media.mjs",
+          "endpoint": "https://news.google.com/rss/search"
+        },
+        {
+          "id": "gdelt-doc-2",
+          "name": "GDELT DOC 2.0 global index",
+          "kind": "global-news-index",
+          "required": true,
+          "implementation": "scripts/adverse-media.mjs",
+          "endpoint": "https://api.gdeltproject.org/api/v2/doc/doc"
+        },
+        {
+          "id": "bing-news-rss",
+          "name": "Bing News RSS",
+          "kind": "public-rss",
+          "required": true,
+          "implementation": "scripts/adverse-media.mjs",
+          "endpoint": "https://www.bing.com/news/search"
+        }
+      ],
+      "availabilityRule": "all three backbones are implemented by default; per-run failures must surface as partial/degraded rather than clean"
+    },
+    "pep": {
+      "required": true,
+      "coverageMode": "worldwide public-office holder dataset",
+      "sources": [
+        {
+          "id": "wikidata-pep-worldwide",
+          "name": "PEP (Worldwide — Wikidata)",
+          "kind": "harvested-worldwide-dataset",
+          "required": true,
+          "implementation": "scripts/pep-worldwide.mjs",
+          "workflow": ".github/workflows/pep-worldwide.yml",
+          "stateArtifact": "data/pep-worldwide.json",
+          "stateBranch": "pep-worldwide-state",
+          "endpoints": [
+            "https://query.wikidata.org/sparql",
+            "https://www.wikidata.org/w/api.php"
+          ]
+        }
+      ],
+      "availabilityRule": "weekly harvested worldwide artifact with refuse-to-overwrite floor/shrink guards; daily screening consumes the last complete artifact"
+    }
+  }
+}

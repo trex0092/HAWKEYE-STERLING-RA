@@ -1,0 +1,36 @@
+{
+  "_README": "Screening-scope contract. 'covered' means a subject from that country is included in the engine's global screening surface. It does NOT mean a dedicated national sanctions list, Google News edition, or country-specific PEP feed exists. Those depth metrics are reported separately.",
+  "version": 1,
+  "expectedCountries": 195,
+  "sanctions": {
+    "scope": "global-subject-screening",
+    "covered": true,
+    "countryFilter": false,
+    "basis": [
+      "UN Consolidated",
+      "worldwide supplementary sanctions sources"
+    ],
+    "depthMetric": "nationalStatus"
+  },
+  "adverseMedia": {
+    "scope": "global-name-sweep",
+    "covered": true,
+    "countryFilter": false,
+    "basis": [
+      "GDELT",
+      "Bing News"
+    ],
+    "dedicatedEditionOptional": true,
+    "depthMetric": "dedicatedGoogleNewsEdition"
+  },
+  "pep": {
+    "scope": "worldwide-person-screening",
+    "covered": true,
+    "countryFilter": false,
+    "basis": [
+      "PEP (Worldwide — Wikidata)",
+      "per-name PEP secondary checks"
+    ],
+    "countryContext": "office-country metadata is harvested where available; screening itself is not country-filtered"
+  }
+}

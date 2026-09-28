@@ -56,7 +56,9 @@ const DRIFT_CHECKS = [
   { script: 'scripts/reg-sources-doc.mjs', label: 'Regulatory Watch docs in sync with data/reg-sources.json', fix: 'node scripts/reg-sources-doc.mjs' },
   { script: 'scripts/grc-metrics.mjs', label: 'GRC metrics snapshot in sync with the assurance matrix, obligation register, third-party register and CAPA log', fix: 'node scripts/grc-metrics.mjs --write' },
   { script: 'scripts/coverage-figures.mjs', label: 'README coverage figures in sync with the adverse-media locale matrix, risk-term languages and sanctions source files', fix: 'node scripts/coverage-figures.mjs --write' },
-  { script: 'scripts/country-coverage-report.mjs', label: 'Country coverage gap report in sync with sanctions register and adverse-media locales', fix: 'npm run coverage:report:write' }
+  { script: 'scripts/country-coverage-report.mjs', label: 'Country coverage gap report in sync with sanctions register and adverse-media locales', fix: 'npm run coverage:report:write' },
+  { script: 'scripts/validate-screening-country-coverage.mjs', label: '195-country sanctions, adverse-media and PEP screening scope complete', fix: 'npm run coverage:screening' },
+  { script: 'scripts/validate-worldwide-screening.mjs', label: 'Worldwide sanctions, adverse-media and PEP backbones available', fix: 'npm run coverage:worldwide' }
 ];
 
 const failures = [];
