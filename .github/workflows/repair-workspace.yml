@@ -1,0 +1,52 @@
+name: Temporary repair workspace
+
+on:
+  push:
+    branches: [fix/mcp-validation-and-screening-20260928]
+    paths: [.github/workflows/repair-workspace.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          # Checkout, pinned development dependencies and artifact upload only.
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            registry.npmjs.org:443
+            *.githubapp.com:443
+            *.blob.core.windows.net:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Install the pinned development tools without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Package committed source and development tools only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/repair-workspace"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/repair-workspace"
+          cp -a node_modules "$RUNNER_TEMP/repair-workspace/"
+          tar -czf "$RUNNER_TEMP/repair-workspace.tar.gz" -C "$RUNNER_TEMP/repair-workspace" .
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: repair-workspace
+          path: ${{ runner.temp }}/repair-workspace.tar.gz
+          retention-days: 1
+          if-no-files-found: error
