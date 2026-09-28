@@ -65,7 +65,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the Central Bank of Armenia \"Applicable Lists\" page (cba.am/en/applicable-lists/) links the \"List of Designated Persons Pursuant to the United Nations Security Council Resolution 1373\" as a PDF (cba.am/file_manager/FMC/FMC%20en/Regulations/20211021%20-%20National%20Designations%20List.pdf). PDF parse and name count not yet verified; www.cba.am is not reachable from this sandbox, so a runner probe is needed"
+      "note": "researched 2026-09-28: a national list exists — the Central Bank of Armenia \"Applicable Lists\" page (cba.am/en/applicable-lists/) links the \"List of Designated Persons Pursuant to the United Nations Security Council Resolution 1373\" as a PDF (cba.am/file_manager/FMC/FMC%20en/Regulations/20211021%20-%20National%20Designations%20List.pdf). PDF parse and name count not yet verified; www.cba.am is not reachable from this sandbox, so a runner probe is needed Reconciliation: this supersedes the registry's 2026-09-26 verdict (data/sanctions-extra.json, CIS/Caucasus cluster) that found \"no evidence of an active distinct national designation list\" — the CBA page links a 2021-10-21 national designations PDF."
     },
     {
       "country": "Australia",
@@ -781,7 +781,7 @@
         "UN"
       ],
       "fatf": "grey",
-      "note": "partial research 2026-09-28 (status unchanged): the MOFA Committee for the Implementation of Security Council Resolutions (Cabinet Resolution No 1396 of 11 November 2013; mofa.gov.kw/en/CTC/) publishes UN Security Council resolution and sanctions-list updates; whether a separate national list is published is not yet confirmed"
+      "note": "partial research 2026-09-28 (status unchanged): the MOFA Committee for the Implementation of Security Council Resolutions (Cabinet Resolution No 1396 of 11 November 2013; mofa.gov.kw/en/CTC/) publishes UN Security Council resolution and sanctions-list updates; whether a separate national list is published is not yet confirmed; the registry's 2026-09-26 verdict (data/sanctions-extra.json) records that Kuwait designates jointly through the Terrorist Financing Targeting Center, whose joint designations flow through OFAC's SDN list (already screened)"
     },
     {
       "country": "Kyrgyzstan",
@@ -1118,7 +1118,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — National Committee for Combating Terrorism (TFS Committee) Decision No 1 (published by the Central Bank of Oman, cbo.gov.om) defines the \"List\" as including \"the local list where persons are designated pursuant to a decision issued by the TFS Committee\" alongside the UN lists; the local list's publication format is not yet verified"
+      "note": "researched 2026-09-28: a national list exists — National Committee for Combating Terrorism (TFS Committee) Decision No 1 (published by the Central Bank of Oman, cbo.gov.om) defines the \"List\" as including \"the local list where persons are designated pursuant to a decision issued by the TFS Committee\" alongside the UN lists; the local list's publication format is not yet verified Reconciliation: the registry's 2026-09-26 verdict (data/sanctions-extra.json) cites Oman's December 2024 MENAFATF evaluation that Oman \"is still hesitant to proactively propose designations on its own motion to the local list\"; a later press report (Muscat Daily) describes 10 persons and 1 entity added to the Local Terrorist List, so the list may now have entries — unverified."
     },
     {
       "country": "Pakistan",
@@ -1224,7 +1224,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — per KoFIU \"CFT Regime\" (kofiu.go.kr/eng/policy/ptfps02_1.do), the Financial Services Commission designates and publicly announces \"Persons Subject to Restrictions on Financial Transactions\" under Article 4(1) of the Act on Prohibition of Financing for Offences of Public Intimidation (first designation of 974 individuals and organisations on 22 December 2008); the current list is published as the FSC \"Regulations on the Designation/Revocation of Persons Subject to Restrictions on Financial Transactions, Etc.\" on law.go.kr. Format (regulation annex) and machine readability not yet verified"
+      "note": "researched 2026-09-28: a national list exists — per KoFIU \"CFT Regime\" (kofiu.go.kr/eng/policy/ptfps02_1.do), the Financial Services Commission designates and publicly announces \"Persons Subject to Restrictions on Financial Transactions\" under Article 4(1) of the Act on Prohibition of Financing for Offences of Public Intimidation (first designation of 974 individuals and organisations on 22 December 2008); the current list is published as the FSC \"Regulations on the Designation/Revocation of Persons Subject to Restrictions on Financial Transactions, Etc.\" on law.go.kr. Format (regulation annex) and machine readability not yet verified Reconciliation: the registry's 2026-09-26 verdict (data/sanctions-extra.json, Asia national-lists cluster) records KoFIU describing designations as automatic mirrors of UN Security Council designations; whether the FSC list also carries non-UN (autonomous) designations is not verified here, so no source is staged."
     },
     {
       "country": "Romania",
