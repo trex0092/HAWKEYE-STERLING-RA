@@ -3,9 +3,9 @@
 **Project handbook:** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md) · [Changelog](CHANGELOG.md) · [Citation](CITATION.cff) · [Docs index](docs/README.md)
 
 <!-- Screening coverage (generated from the engine's own configuration by scripts/coverage-figures.mjs, CI drift-checked) -->
-[![Sanctions Worldwide Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fbadges%2Fsanctions-worldwide.json)](data/screening-country-coverage.json)
-[![Adverse Media Worldwide Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fbadges%2Fadverse-media-worldwide.json)](data/screening-country-coverage.json)
-[![PEP Worldwide Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fbadges%2Fpep-worldwide.json)](data/screening-country-coverage.json)
+[![Sanctions Worldwide Coverage](data/badges/sanctions-worldwide.svg)](data/screening-country-coverage.json)
+[![Adverse Media Worldwide Coverage](data/badges/adverse-media-worldwide.svg)](data/screening-country-coverage.json)
+[![PEP Worldwide Coverage](data/badges/pep-worldwide.svg)](data/screening-country-coverage.json)
 
 **Worldwide screening scope:** sanctions, adverse media and PEP each cover the full 195-country subject universe. Dedicated national sanctions sources and dedicated Google News editions are separate depth metrics shown below.
 [![Sanctions Lists Screened](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsLists&label=sanctions%20lists%20screened&color=b31b1b)](data/coverage-figures.json)
