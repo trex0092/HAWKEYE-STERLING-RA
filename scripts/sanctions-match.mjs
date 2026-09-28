@@ -883,7 +883,10 @@ export function parseCzMfaCsv(body) {
    Romanian rendering — also screens on its own, as does the name without it. */
 const HTML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 function htmlText(s) {
-  return String(s || '').replace(/<[^>]*>/g, ' ')
+  /* Tags stripped, then any stray angle bracket removed too, so a nested or
+     broken tag ("<scr<b>ipt>") can never survive as markup. Entities are
+     decoded last, in ONE pass, so "&amp;lt;" yields the literal "&lt;". */
+  return String(s || '').replace(/<[^>]*>/g, ' ').replace(/[<>]/g, ' ')
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
       if (e[0] === '#') {
         const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);

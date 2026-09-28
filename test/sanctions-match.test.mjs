@@ -693,6 +693,8 @@ check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') =
   check('HTML table: trailing parenthetical screens alone and without it',
     md.includes('Zawaya Group for Development and Investment Co Ltd') && md.includes('Grupul Zawaya pentru dezvoltare și investiții Co Ltd'));
   check('HTML table: entities decoded', md.includes('AL & SONS'));
+  check('HTML table: nested/broken tags leave no angle brackets behind',
+    parseHtmlTable('<table><tr><th>Name</th></tr><tr><td>ACME <scr<b>ipt> LTD</td></tr></table>').every(n => !/[<>]/.test(n)));
   check('HTML table: no name header parses 0 names', parseHtmlTable('<table><tr><td>x</td></tr></table>').length === 0);
   check('parseList routes parser htmltable', parseList({ id: 'md-sis-terror', parser: 'htmltable' }, MD).length === md.length);
 }
