@@ -1084,10 +1084,21 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const bg = bgRaw === null ? null : bgRaw.map(i => ({ ...i, source: i.source || 'Bing News' }));
 
   const enUs = localeResults.find(r => r.id === 'en-US');
-  const backboneOk = (enUs && enUs.items !== null) || gd !== null || (bingOn && bg !== null);
-  if (!backboneOk) return { errored: true, error: 'global adverse-media backbones unreachable (Google News en-US + GDELT' + (bingOn ? ' + Bing News' : '') + ')', localesQueried: localeSet.length };
-
   const okLocales = localeResults.filter(r => r.items !== null);
+  const backbones = {
+    googleNews: okLocales.length > 0,
+    googleNewsEnUs: !!(enUs && enUs.items !== null),
+    gdelt: gd !== null,
+    bingEnabled: bingOn,
+    bing: bingOn && bg !== null,
+  };
+  const backboneOk = backbones.googleNewsEnUs || backbones.gdelt || backbones.bing;
+  if (!backboneOk) return {
+    errored: true,
+    error: 'global adverse-media backbones unreachable (Google News en-US + GDELT' + (bingOn ? ' + Bing News' : '') + ')',
+    localesQueried: localeSet.length,
+    backbones,
+  };
   const items = dedupItems([...okLocales.flatMap(r => r.items), ...(gd || []), ...(bg || [])]);
   const result = scoreAdverseMedia(name, items, ALL_TERMS);
 
@@ -1101,6 +1112,14 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
      mark such a standing adverse-media match unverified (carry forward), so it
      only auto-clears on a full-matrix sweep or an MLRO disposition. */
   const fullMatrix = localeSet.length >= LOCALES.length;
-  const out = { ...result, localesQueried: localeSet.length, fullMatrix, sourcesOk, sourcesFailed: failed, itemsScanned: items.length };
+  const out = {
+    ...result,
+    localesQueried: localeSet.length,
+    fullMatrix,
+    sourcesOk,
+    sourcesFailed: failed,
+    itemsScanned: items.length,
+    backbones,
+  };
   return failed ? { ...out, partial: true } : out;
 }

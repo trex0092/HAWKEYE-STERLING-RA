@@ -34,6 +34,13 @@ name: Sanctions Screen
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sanctions-screen.mjs'
+      - 'scripts/screening-assurance.mjs'
+      - 'data/worldwide-screening-sources.json'
+      - '.github/workflows/sanctions-screen.yml'
   # Re-scheduled 2026-07-08 as the SCREENING CASE ENGINE: runs daily after the
   # Sanctions Watch (05:07) with fresh lists, refreshes the per-subject state,
   # then the case-manager step turns every flag into a managed lifecycle CASE
@@ -268,6 +275,11 @@ jobs:
         continue-on-error: true
         run: node scripts/screening-metrics.mjs
 
+      - name: Prove worldwide screening runtime assurance
+        id: assurance
+        if: steps.screen.outputs.screen_error != 'true'
+        run: node scripts/screening-assurance.mjs --write
+
       - name: Persist screening + case state (screen-state branch)
         # always() so state is persisted even if the CASES step failed AFTER
         # creating cases in Asana — otherwise the new case GIDs written locally are
@@ -290,9 +302,10 @@ jobs:
           # carries only <file>.enc: the plaintext working files are restored
           # to their main-branch content so CURRENT subject data never lands
           # on the public branch (P30, encrypt-forward).
-          if [ -n "$(git status --porcelain data/sanctions-screen-state.json data/screening-cases-state.json 2>/dev/null)" ]; then
+          if [ -n "$(git status --porcelain data/sanctions-screen-state.json data/screening-cases-state.json data/screening-assurance.json data/badges/sanctions-operational.svg data/badges/adverse-media-operational.svg data/badges/pep-operational.svg 2>/dev/null)" ]; then
             git config user.name "sanctions-screen"
             git config user.email "actions@github.com"
+            git add data/screening-assurance.json data/badges/sanctions-operational.svg data/badges/adverse-media-operational.svg data/badges/pep-operational.svg 2>/dev/null || true
             if [ -n "$STATE_ENCRYPTION_KEY" ]; then
               node scripts/state-crypto.mjs encrypt data/sanctions-screen-state.json data/screening-cases-state.json
               for f in data/sanctions-screen-state.json data/screening-cases-state.json; do

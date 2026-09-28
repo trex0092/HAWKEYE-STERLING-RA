@@ -37,6 +37,7 @@ export const CONTROLS = [
   { id: 'weekly-adverse-media.yml', name: 'Daily Screening (Sanctions + Adverse Media + PEP)',     cadence: 'daily',     maxAgeDays: 0 },
   { id: 'regulatory-watch.yml',     name: 'Regulatory Watch',                                      cadence: 'daily',     maxAgeDays: 0 },
   { id: 'sanctions-screen.yml',     name: 'Sanctions Screen (case engine)',                        cadence: 'daily',     maxAgeDays: 0 },
+  { id: 'screening-assurance.yml', name: 'Worldwide Screening Runtime Assurance',                   cadence: 'daily',     maxAgeDays: 0 },
   { id: 'fatf-watchdog.yml',        name: 'FATF Watchdog (country lists)',                         cadence: 'daily',     maxAgeDays: 0 },
   { id: 'onboarding-screen.yml',    name: 'Onboarding Screen (6-hourly)',                          cadence: 'daily',     maxAgeDays: 0 },
   { id: 'advisor-eval.yml',         name: 'Advisor Guardrail Eval (weekly)',                       cadence: 'weekly',    maxAgeDays: 8 },
