@@ -1,0 +1,62 @@
+name: Screening Assurance
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screening-assurance
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            raw.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+            *.githubapp.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Overlay latest runtime assurance evidence
+        run: |
+          git fetch origin screen-state --depth=1
+          git checkout FETCH_HEAD -- data/screening-assurance.json
+          git checkout FETCH_HEAD -- data/badges/sanctions-operational.svg
+          git checkout FETCH_HEAD -- data/badges/adverse-media-operational.svg
+          git checkout FETCH_HEAD -- data/badges/pep-operational.svg
+
+      - name: Require fresh operational evidence
+        run: node scripts/screening-assurance.mjs --check
+
+      - name: Alert in Asana when worldwide screening assurance fails
+        if: failure()
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "SCREENING ASSURANCE DEGRADED: worldwide sanctions / adverse media / PEP evidence failed" \
+            "The fail-loud runtime assurance control found stale or degraded screening evidence. A green 195-country scope badge is not operational proof. Review the Screening Assurance run and the underlying Sanctions Screen / adverse-media / PEP evidence before relying on a clean screening result. Run: $RUN_URL"

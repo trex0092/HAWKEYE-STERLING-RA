@@ -20,7 +20,11 @@
     "test": "node scripts/run-tests.mjs",
     "test:visual": "playwright test --config=playwright.config.mjs",
     "test:e2e": "playwright test --config=playwright.cross-browser.config.mjs",
-    "sbom": "node scripts/gen-sbom.mjs"
+    "sbom": "node scripts/gen-sbom.mjs",
+    "coverage:countries": "node scripts/validate-country-coverage.mjs",
+    "coverage:report": "node scripts/country-coverage-report.mjs",
+    "coverage:report:write": "node scripts/country-coverage-report.mjs --write",
+    "coverage:report:check": "node scripts/country-coverage-report.mjs --check"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

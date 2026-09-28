@@ -1,8 +1,26 @@
 # Hawkeye Sterling - Entity Risk Assessment (RA)
 
-**Project handbook:** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md) · [Changelog](CHANGELOG.md) · [Citation](CITATION.cff) · [Docs index](docs/README.md)
+**Project:** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md)
 
-<!-- Screening coverage (dynamic - generated from the engine's own configuration by scripts/coverage-figures.mjs, CI drift-checked) -->
+**Technical & compliance:** [Architecture](docs/architecture/README.md) · [Compliance Methodology](docs/policies/README.md) · [Screening Coverage](data/screening-country-coverage.json) · [Data Sources](data/README.md) · [Controls](docs/governance/README.md) · [Operations](docs/security/deploy-rollback-runbook.md) · [Changelog](CHANGELOG.md) · [Citation](CITATION.cff) · [Docs index](docs/README.md)
+
+<!-- Runtime assurance: generated from the actual daily screen and persisted on screen-state.
+     A green badge means the last run loaded every required sanctions backbone, completed
+     adverse-media enrichment without errors/partials/skips, and used a fresh complete
+     worldwide PEP artifact. The independent Screening Assurance workflow fails when this
+     evidence is stale. -->
+[![Sanctions Runtime](https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/screen-state/data/badges/sanctions-operational.svg)](https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/screen-state/data/screening-assurance.json)
+[![Adverse Media Runtime](https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/screen-state/data/badges/adverse-media-operational.svg)](https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/screen-state/data/screening-assurance.json)
+[![PEP Runtime](https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/screen-state/data/badges/pep-operational.svg)](https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/screen-state/data/screening-assurance.json)
+[![Screening Assurance](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/screening-assurance.yml?branch=main&label=runtime%20assurance)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/screening-assurance.yml)
+
+<!-- Configured scope: generated from the engine's own configuration by scripts/coverage-figures.mjs, CI drift-checked.
+     These badges describe intended geographic applicability, not proof that a particular run succeeded. -->
+[![Sanctions Configured Scope](data/badges/sanctions-worldwide.svg)](data/screening-country-coverage.json)
+[![Adverse Media Configured Scope](data/badges/adverse-media-worldwide.svg)](data/screening-country-coverage.json)
+[![PEP Configured Scope](data/badges/pep-worldwide.svg)](data/screening-country-coverage.json)
+
+**Worldwide screening scope:** the configured sanctions, adverse-media and PEP controls apply to the full 195-country subject universe. Runtime operational status is reported separately above from actual screening evidence. Dedicated national sanctions sources and dedicated Google News editions are depth metrics shown below.
 [![Sanctions Lists Screened](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsLists&label=sanctions%20lists%20screened&color=b31b1b)](data/coverage-figures.json)
 [![Sanctions Jurisdictions](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsJurisdictions&label=sanctions%20jurisdictions&color=b31b1b)](data/coverage-figures.json)
 [![Sanctions Countries Researched](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsCountriesResearched&label=sanctions%20countries%20researched&suffix=%20%2F%20195&color=b31b1b)](data/sanctions-country-coverage.json)

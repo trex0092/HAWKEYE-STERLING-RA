@@ -26,6 +26,11 @@ import { dirname, join, resolve } from 'node:path';
 import { LOCALES, LANG_TERMS } from './adverse-media.mjs';
 
 export const FIGURES_FILE = 'data/coverage-figures.json';
+export const BADGE_FILES = {
+  sanctions: 'data/badges/sanctions-worldwide.svg',
+  adverseMedia: 'data/badges/adverse-media-worldwide.svg',
+  pep: 'data/badges/pep-worldwide.svg',
+};
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -61,9 +66,14 @@ export function countryRegister(root = ROOT) {
   return JSON.parse(readFileSync(join(root, 'data/sanctions-country-coverage.json'), 'utf8')).countries || [];
 }
 
+export function screeningCountryMatrix(root = ROOT) {
+  return JSON.parse(readFileSync(join(root, 'data/screening-country-coverage.json'), 'utf8'));
+}
+
 export function buildFigures(root = ROOT) {
   const sources = screenedSources(root);
   const jurisdictions = new Set(sources.map(issuingCountry).filter(Boolean));
+  const screening = screeningCountryMatrix(root);
   return {
     adverseMediaEditions: LOCALES.length,
     adverseMediaCountries: new Set(LOCALES.map(l => l.gl)).size,
@@ -71,6 +81,40 @@ export function buildFigures(root = ROOT) {
     sanctionsLists: sources.length,
     sanctionsJurisdictions: jurisdictions.size,
     sanctionsCountriesResearched: countryRegister(root).filter(r => r.status !== 'not-researched').length,
+    sanctionsCountriesCovered: screening.counts?.sanctionsCovered || 0,
+    adverseMediaCountriesCovered: screening.counts?.adverseMediaCovered || 0,
+    pepCountriesCovered: screening.counts?.pepCovered || 0,
+  };
+}
+
+function xmlEscape(s) {
+  return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+}
+
+export function buildBadges(figures) {
+  const badge = (label, value) => {
+    const message = value + ' / 195';
+    const color = value === 195 ? '#4c1' : '#e05d44';
+    const labelWidth = Math.max(110, label.length * 7 + 18);
+    const valueWidth = 72;
+    const total = labelWidth + valueWidth;
+    const lx = labelWidth / 2;
+    const vx = labelWidth + valueWidth / 2;
+    return [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + total + '" height="20" role="img" aria-label="' + xmlEscape(label + ': ' + message) + '">',
+      '<title>' + xmlEscape(label + ': ' + message) + '</title>',
+      '<linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>',
+      '<clipPath id="r"><rect width="' + total + '" height="20" rx="3"/></clipPath>',
+      '<g clip-path="url(#r)"><rect width="' + labelWidth + '" height="20" fill="#555"/><rect x="' + labelWidth + '" width="' + valueWidth + '" height="20" fill="' + color + '"/><rect width="' + total + '" height="20" fill="url(#s)"/></g>',
+      '<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11"><text x="' + lx + '" y="15" fill="#010101" fill-opacity=".3">' + xmlEscape(label) + '</text><text x="' + lx + '" y="14">' + xmlEscape(label) + '</text><text x="' + vx + '" y="15" fill="#010101" fill-opacity=".3">' + xmlEscape(message) + '</text><text x="' + vx + '" y="14">' + xmlEscape(message) + '</text></g>',
+      '</svg>',
+      ''
+    ].join('');
+  };
+  return {
+    sanctions: badge('sanctions worldwide coverage', figures.sanctionsCountriesCovered),
+    adverseMedia: badge('adverse media worldwide coverage', figures.adverseMediaCountriesCovered),
+    pep: badge('PEP worldwide coverage', figures.pepCountriesCovered),
   };
 }
 
@@ -84,6 +128,9 @@ export function buildFile(root = ROOT) {
       adverseMediaLanguages: 'languages with native risk terms in the scorer (scripts/adverse-media.mjs LANG_TERMS)',
       sanctionsLists: 'enabled sources in data/sanctions-sources.json + data/sanctions-extra.json (extra: with url or file), excluding alias-only sources (mergeInto)',
       sanctionsCountriesResearched: 'of the 195 countries in data/sanctions-country-coverage.json, how many have a recorded research outcome (screened, pending, identified or assessed-not-loadable) rather than not-researched',
+      sanctionsCountriesCovered: 'countries included in the worldwide sanctions screening scope; global consolidated lists apply irrespective of subject nationality, with national/regional lists layered where available',
+      adverseMediaCountriesCovered: 'countries included in worldwide name-scoped adverse-media screening through GDELT and Bing News, with Google News editions adding regional depth',
+      pepCountriesCovered: 'countries included in the worldwide PEP screening scope through the Wikidata public-office holder harvest; screening is not country-filtered',
       sanctionsJurisdictions: 'distinct issuing countries among those sources: the jurisdiction field, or for entries marked Global (a list\'s reach, not its issuer) the country named in the list title; UN, EU and development-bank lists are supranational and not counted',
     },
   };
@@ -94,7 +141,11 @@ function main() {
   const fresh = buildFile();
   if (mode === '--write') {
     writeFileSync(join(ROOT, FIGURES_FILE), JSON.stringify(fresh, null, 2) + '\n');
-    console.log('wrote ' + FIGURES_FILE + ': ' + JSON.stringify(fresh.figures));
+    const badges = buildBadges(fresh.figures);
+    for (const [key, rel] of Object.entries(BADGE_FILES)) {
+      writeFileSync(join(ROOT, rel), badges[key]);
+    }
+    console.log('wrote ' + FIGURES_FILE + ' + endpoint badges: ' + JSON.stringify(fresh.figures));
     return;
   }
   console.log(JSON.stringify(fresh.figures, null, 2));
@@ -108,6 +159,17 @@ function main() {
       process.exitCode = 1;
     } else {
       console.log('coverage-figures: ' + FIGURES_FILE + ' is in sync.');
+    }
+    const badges = buildBadges(fresh.figures);
+    for (const [key, rel] of Object.entries(BADGE_FILES)) {
+      let committedBadge = null;
+      try { committedBadge = readFileSync(join(ROOT, rel), 'utf8'); } catch { /* reported below */ }
+      if (committedBadge !== badges[key]) {
+        console.error('DRIFT: badge ' + rel + ' is stale — run `node scripts/coverage-figures.mjs --write` and commit.');
+        process.exitCode = 1;
+      } else {
+        console.log('coverage-figures: ' + rel + ' is in sync.');
+      }
     }
   }
 }

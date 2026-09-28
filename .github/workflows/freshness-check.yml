@@ -12,6 +12,13 @@ name: Freshness Check
 # Needs the ASANA_ACCESS_TOKEN repository secret to route the alert to Asana.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/freshness-check.mjs'
+      - 'scripts/control-retry.mjs'
+      - 'data/**'
   schedule:
     - cron: '9 9 * * *' # 09:09 UTC daily — after sanctions-watch (05:07), the screening runs and regulatory-watch (06:19)
     - cron: '9 12 * * *' # second firing — re-verifies after the Control Retry dispatcher's healing passes (07:37/10:07), and heals this alarm's own badge if the first firing died transiently. Idempotent read-only check; a still-stale control simply alerts twice, which is the point.
@@ -66,4 +73,4 @@ jobs:
         run: |
           node scripts/asana-alert.mjs \
             "CONTROL STALE: a mandatory scheduled compliance control missed its cadence window" \
-            "The Freshness Check found that at least one mandatory control (daily: Sanctions Watch / Daily Screening / Sanctions Screen / Regulatory Watch / FATF Watchdog / Onboarding Screen; weekly: Advisor Guardrail Eval; quarterly: Advisor Bias Eval / Quarterly Screening Review) has no successful run inside its cadence window. A scheduled control that silently stops is a potential regulatory breach (e.g. UNSC / EOCN ingestion must run daily without delay; the evals evidence the AI assurance cadence). Review the schedules and the run log: $RUN_URL"
+            "The Freshness Check found that at least one mandatory control (daily: Sanctions Watch / Daily Screening / Sanctions Screen / Worldwide Screening Runtime Assurance / Regulatory Watch / FATF Watchdog / Onboarding Screen; weekly: Advisor Guardrail Eval; quarterly: Advisor Bias Eval / Quarterly Screening Review) has no successful run inside its cadence window. A scheduled control that silently stops is a potential regulatory breach (e.g. UNSC / EOCN ingestion must run daily without delay; the evals evidence the AI assurance cadence). Review the schedules and the run log: $RUN_URL"

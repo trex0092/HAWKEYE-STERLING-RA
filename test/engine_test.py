@@ -911,6 +911,64 @@ _vel = txn_monitor.evaluate([
 check("R.16 velocity fires on a 10x spike vs the genuine baseline (spike day excluded)",
       any(a["rule"] == "VELOCITY" for a in _vel["alerts"]))
 
+
+# Expanded transaction-monitoring red flags from the approved source libraries.
+_base_txn = {"customer": "T", "date": "2026-09-28", "amount": 25000,
+             "direction": "in", "method": "wire"}
+_tp = txn_monitor.evaluate([{**_base_txn, "third_party_payment": True,
+                            "third_party_relationship": "unrelated"}])
+check("TXN detects an explicitly unrelated third-party payment",
+      any(a["rule"] == "THIRD_PARTY_PAYMENT" for a in _tp["alerts"]))
+_tp_ok = txn_monitor.evaluate([{**_base_txn, "third_party_payment": True,
+                               "third_party_relationship": "contracted-agent"}])
+check("TXN does not infer unrelated status when a relationship is recorded",
+      not any(a["rule"] == "THIRD_PARTY_PAYMENT" for a in _tp_ok["alerts"]))
+
+_ref = txn_monitor.evaluate([{**_base_txn, "transaction_type": "refund",
+                             "funding_account": "ACC-A", "refund_account": "ACC-B",
+                             "refund_reason_documented": False}])
+check("TXN detects refund diversion to a different account without documented reason",
+      any(a["rule"] == "REFUND_DIVERSION" for a in _ref["alerts"]))
+_ref_ok = txn_monitor.evaluate([{**_base_txn, "transaction_type": "refund",
+                                "funding_account": "ACC-A", "refund_account": "ACC-B",
+                                "refund_reason_documented": True}])
+check("TXN documented refund-account exception suppresses the automated alert",
+      not any(a["rule"] == "REFUND_DIVERSION" for a in _ref_ok["alerts"]))
+
+_price = txn_monitor.evaluate([{**_base_txn, "unit_price": 112.0, "market_unit_price": 100.0}])
+check("TXN detects >10% deviation from the supplied market price",
+      any(a["rule"] == "PRICING_DEVIATION" for a in _price["alerts"]))
+_price_ok = txn_monitor.evaluate([{**_base_txn, "unit_price": 108.0, "market_unit_price": 100.0}])
+check("TXN does not alert inside the configured price-deviation tolerance",
+      not any(a["rule"] == "PRICING_DEVIATION" for a in _price_ok["alerts"]))
+
+_phantom = txn_monitor.evaluate([{**_base_txn, "goods_transaction": True,
+                                 "payment_completed": True, "delivery_confirmed": False}])
+check("TXN detects paid goods transaction with explicitly unconfirmed delivery",
+      any(a["rule"] == "PHANTOM_DELIVERY" for a in _phantom["alerts"]))
+_phantom_unknown = txn_monitor.evaluate([{**_base_txn, "goods_transaction": True,
+                                         "payment_completed": True, "delivery_confirmed": None}])
+check("TXN unknown delivery evidence does not get converted into a false factual alert",
+      not any(a["rule"] == "PHANTOM_DELIVERY" for a in _phantom_unknown["alerts"]))
+
+_inv = txn_monitor.evaluate([{**_base_txn, "invoice_mismatch": True}])
+check("TXN surfaces a material invoice/shipment reconciliation mismatch",
+      any(a["rule"] == "INVOICE_MISMATCH" for a in _inv["alerts"]))
+_route = txn_monitor.evaluate([{**_base_txn, "route_mismatch": True}])
+check("TXN surfaces an explicit payment/shipping route mismatch",
+      any(a["rule"] == "ROUTE_MISMATCH" for a in _route["alerts"]))
+
+with open(os.path.join(ROOT, "data", "transaction-monitoring-rules.json"), encoding="utf-8") as _tmr_f:
+    _tmr = json.load(_tmr_f)
+_tm_rules = _tmr.get("rules", [])
+check("TXN rule registry contains no automatic filing decisions",
+      bool(_tm_rules) and all(r.get("automatic_filing") is False for r in _tm_rules))
+check("TXN engine rules are represented in the machine-readable registry",
+      {r.get("engine_rule") for r in _tm_rules}.issuperset(
+          {"THRESHOLD","STRUCTURING","VELOCITY","HIGH_RISK_GEO","PASSTHROUGH","ROUND_AMOUNT",
+           "THIRD_PARTY_PAYMENT","REFUND_DIVERSION","PRICING_DEVIATION",
+           "PHANTOM_DELIVERY","INVOICE_MISMATCH","ROUTE_MISMATCH"}))
+
 # ── monitoring.py: runtime metrics + source-coverage drift ────────────────────
 print("monitoring.py — runtime metrics + coverage drift")
 import tempfile as _tf
