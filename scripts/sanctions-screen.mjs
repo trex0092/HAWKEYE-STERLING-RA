@@ -1876,6 +1876,13 @@ async function main() {
       if (pep.count > 0 && pep.list.names.length) {
         cfg.pepIndex = buildIndex([pep.list]);
         cfg.pepMeta = pep.meta;
+        cfg.pepWorldwideEvidence = {
+          active: true,
+          count: pep.count,
+          harvested: pep.harvested || '',
+          partial: !!pep.partial,
+          expected: pep.expected || pep.count,
+        };
         console.log('sanctions-screen: worldwide PEP list active — ' + pep.count + ' persons ('
           + pep.list.names.length + ' names incl. multilingual aliases; harvested ' + (pep.harvested || 'unknown') + ')');
         /* Degrade loudly: a mid-harvest artifact covers only part of the world's
@@ -2011,6 +2018,8 @@ async function main() {
     failures: screen.notes || [],
     enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0, pepErrors: screen.pepErrors || 0,
       skipped: screen.enrichSkipped || 0,
+      pepLookupEnabled: !!cfg.pep,
+      pepWorldwide: cfg.pepWorldwideEvidence || { active: false, count: 0, harvested: '', partial: false, expected: 0 },
       /* per-subject adverse-media sweep breadth this run — the SAME resolution
          checkAdverseMedia uses (explicit edition ids win over the budgeted
          core+rotation sweep), so the digest's provenance matches the lookups */
