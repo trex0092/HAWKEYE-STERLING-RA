@@ -239,7 +239,7 @@ const EXPECTED_CRONS = {
   'weekly-adverse-media.yml': ['7 0 * * *', '7 3 * * *', '7 6 * * *'],
   'regulatory-watch.yml':     ['19 6 * * *'],
   'sanctions-screen.yml':     ['37 5 * * *'],
-  'screening-assurance.yml': ['17 */6 * * *'],
+  'screening-assurance.yml':  ['17 */6 * * *'],
   'fatf-watchdog.yml':        ['7 6 * * *'],
   'onboarding-screen.yml':    ['11 */6 * * *'],
   'advisor-eval.yml':         ['9 8 * * 1'],
