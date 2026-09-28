@@ -18,10 +18,10 @@ bump merged to `main`.
   overseas political organisations, so screening it is an MLRO policy
   decision; the same applies to Mali, Burkina Faso, Niger, Tajikistan, Rwanda, Cuba and Myanmar, whose
   lists reportedly include journalists and political figures. Papua New Guinea (no domestic designations), Namibia, Ghana, Sierra
-  Leone, Samoa and Solomon Islands (UN lists only) are
+  Leone, Samoa, Solomon Islands and Malawi (UN lists only) are
   `assessed-not-loadable`. Kuwait, Lebanon, Laos, DR Congo, Syria,
-  Haiti, Bosnia and Herzegovina, Brunei, Senegal, Togo, Benin, Zimbabwe, Botswana, Sudan, Tanzania, Iran, Vanuatu, Guyana and Mongolia get partial notes. Researched rows:
-  89 → 119.
+  Haiti, Bosnia and Herzegovina, Brunei, Senegal, Togo, Benin, Zimbabwe, Botswana, Sudan, Tanzania, Iran, Vanuatu, Guyana, Mongolia and Seychelles get partial notes. Researched rows:
+  89 → 120.
 - **Register research: Norway, Iceland, Montenegro, San Marino, Malta,
   Liechtenstein, North Macedonia** recorded as
   `assessed-not-loadable`. Each implements UN sanctions (and, for the first

@@ -881,10 +881,11 @@
     },
     {
       "country": "Malawi",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: per the ESAAMLG Mutual Evaluation Report of Malawi (September 2019, fatf-gafi.org), Malawi's practice is to download the UN consolidated sanctions list and send it to supervisory authorities and reporting institutions, with TFS implementation at a formative stage; no national list found. Covered by the UN list (screened daily). Evidence is dated (2019)"
     },
     {
       "country": "Malaysia",
@@ -1329,7 +1330,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Seychelles FIU publishes \"International sanctions\" and \"Sanctions List\" pages (seychellesfiu.sc) under the Prevention of Terrorism (Implementation of UNSC Resolutions on Suppression of Terrorism) Regulations 2015, which direct supervisors to circulate sanctions lists on receipt; the \"Sanctions List\" page was not read, so whether it carries national designations is not confirmed"
     },
     {
       "country": "Sierra Leone",
