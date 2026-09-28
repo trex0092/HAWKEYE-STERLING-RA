@@ -112,10 +112,18 @@ export function assessRuntime({
   });
 
   const pepReasons = [];
+  const pepRun = e.pepWorldwide || {};
   const pepCount = num(pepDataset?.count);
   const pepExpected = num(pepDataset?.expected);
   const pepAge = ageHours(pepDataset?.harvested, nowMs);
   if (!pepDataset || typeof pepDataset !== 'object') pepReasons.push('worldwide PEP artifact is missing');
+  if (pepRun.active !== true) pepReasons.push('daily screen did not load the worldwide PEP artifact');
+  if (num(pepRun.count) !== pepCount) pepReasons.push('daily screen PEP count does not match the harvested artifact');
+  if (pepRun.harvested && pepDataset?.harvested && pepRun.harvested !== pepDataset.harvested) {
+    pepReasons.push('daily screen consumed a different PEP harvest than the assurance artifact');
+  }
+  if (pepRun.partial === true) pepReasons.push('daily screen reports the worldwide PEP layer as partial');
+  if (e.pepLookupEnabled !== true) pepReasons.push('live per-name PEP lookup is disabled');
   if (pepCount < PEP_FLOOR) pepReasons.push('worldwide PEP artifact below floor: ' + pepCount + ' < ' + PEP_FLOOR);
   if (pepDataset?.partial === true) pepReasons.push('worldwide PEP artifact is partial' + (pepExpected ? ': ' + pepCount + '/' + pepExpected : ''));
   if (!Number.isFinite(pepAge)) pepReasons.push('worldwide PEP artifact has no valid harvest timestamp');
@@ -129,6 +137,10 @@ export function assessRuntime({
     harvestedAt: pepDataset?.harvested || '',
     ageHours: Number.isFinite(pepAge) ? Math.round(pepAge * 10) / 10 : null,
     floor: PEP_FLOOR,
+    dailyScreenActive: pepRun.active === true,
+    dailyScreenCount: num(pepRun.count),
+    dailyScreenHarvestedAt: pepRun.harvested || '',
+    liveLookupEnabled: e.pepLookupEnabled === true,
     liveLookupErrors: num(e.pepErrors),
     skippedSubjects: num(e.skipped),
   });
