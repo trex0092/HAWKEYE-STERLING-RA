@@ -54,7 +54,8 @@ const PYTHON = process.env.PYTHON || 'python3';
    already runs above. */
 const DRIFT_CHECKS = [
   { script: 'scripts/reg-sources-doc.mjs', label: 'Regulatory Watch docs in sync with data/reg-sources.json', fix: 'node scripts/reg-sources-doc.mjs' },
-  { script: 'scripts/grc-metrics.mjs', label: 'GRC metrics snapshot in sync with the assurance matrix, obligation register, third-party register and CAPA log', fix: 'node scripts/grc-metrics.mjs --write' }
+  { script: 'scripts/grc-metrics.mjs', label: 'GRC metrics snapshot in sync with the assurance matrix, obligation register, third-party register and CAPA log', fix: 'node scripts/grc-metrics.mjs --write' },
+  { script: 'scripts/coverage-figures.mjs', label: 'README coverage figures in sync with the adverse-media locale matrix, risk-term languages and sanctions source files', fix: 'node scripts/coverage-figures.mjs --write' }
 ];
 
 const failures = [];
