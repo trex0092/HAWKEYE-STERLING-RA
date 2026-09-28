@@ -10,6 +10,15 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **The Python engine's rotation ledger counted four markets it never swept**
+  (`screen.py` `GNEWS_LOCALES`). The live Google News audits of 2026-09-27/28
+  found that `DK:da` silently serves the Norwegian edition and `LK:en` serves
+  en-US. They also found that `TZ:en` and `UG:en` keep their code but serve one
+  generic international-English feed with no local press. The engine still
+  swept all four and stamped them in the rotation ledger as covered markets.
+  They are removed, taking the matrix from 91 to 87 editions. Each duplicated
+  content another listed edition already sweeps, so recall is unchanged and
+  the coverage claim is now true. The Swahili `KE:sw`/`TZ:sw` editions are kept.
 - **Adverse media: six verified Google News editions added** (`scripts/adverse-media.mjs`):
   Ireland (`en-IE`), Canada in English (`en-CA`), Austria (`de-AT`), US Spanish
   (`es-US`), Malaysia in English (`en-MY`) and Morocco in French (`fr-MA`), taking
@@ -28,7 +37,7 @@ bump merged to `main`.
     US-Spanish feed.
 - **README: screening-coverage badges and status badges for more live
   controls.** A new coverage row shows the sanctions lists screened (59), the
-  national sanctions jurisdictions (36), the adverse-media Google News
+  countries issuing the screened sanctions lists (40; first published as 36, which wrongly left out Canada, France, Ukraine and the UK because their lists are tagged `Global` for their reach, and was corrected the same day), the adverse-media Google News
   editions (73), their countries (67) and the risk-term languages (61), plus
   the three news backbones and the PEP source. The numbers come from
   `data/coverage-figures.json`, which `scripts/coverage-figures.mjs` generates

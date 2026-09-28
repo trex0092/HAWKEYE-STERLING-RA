@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildFigures, countWorkflows, countDocs, countAutoDocs, egressSplit, FIGURES_FILE } from '../scripts/board-figures.mjs';
+import { issuingCountry, screenedSources } from '../scripts/coverage-figures.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let passed = 0, failed = 0;
@@ -32,6 +33,29 @@ for (const [k, v] of Object.entries(live)) {
 }
 for (const k of Object.keys(committed.figures || {})) {
   check(`committed figure "${k}" is still a computed figure`, k in live);
+}
+
+/* Coverage figures (the README sanctions-jurisdictions badge). "jurisdiction:
+   Global" in the source files is a list's REACH, not its issuer — counting only
+   non-Global entries silently dropped Canada, France, Ukraine and the UK from
+   the badge (36 shown vs 40 issuing countries screened). */
+console.log('\n— coverage figures: sanctions issuing countries —\n');
+check('a Global-reach national list counts its issuing country (Canada SEMA)',
+  issuingCountry({ jurisdiction: 'Global', name: 'Canada — Consolidated Autonomous Sanctions (SEMA, XML)' }) === 'Canada');
+check('US OFAC and the UK list map to their countries',
+  issuingCountry({ jurisdiction: 'Global', name: 'US OFAC — SDN list (CSV)' }) === 'United States'
+  && issuingCountry({ jurisdiction: 'Global', name: 'UK Sanctions List — FCDO/OFSI consolidated targets (CSV)' }) === 'United Kingdom');
+check('UN, EU and development-bank lists are supranational, never a country',
+  [['UN Security Council — Consolidated list (XML)', 'Global'], ['EU — Consolidated financial sanctions list (CSV)', 'Global'],
+   ['ADB — Published Debarment & Suspension Register', 'Global (MDB)'],
+   ['Inter-American Development Bank: Sanctioned Firms & Individuals', 'Global (Latin America/Caribbean-focused)']]
+    .every(([name, jurisdiction]) => issuingCountry({ name, jurisdiction }) === null));
+check('a national jurisdiction field is used as-is',
+  issuingCountry({ jurisdiction: 'Brazil', name: 'Brazil — BCB Disqualified Persons' }) === 'Brazil');
+{
+  const live = new Set(screenedSources().map(issuingCountry).filter(Boolean));
+  check('the live screened set counts Canada, France, Ukraine and the UK as issuers',
+    ['Canada', 'France', 'Ukraine', 'United Kingdom', 'United States'].every(c => live.has(c)));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
