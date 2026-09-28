@@ -655,7 +655,9 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
 (async () => {
   // Flush the fire-and-forget audit append from purgeStaleDraft (block 27) before asserting.
   // auditAppend chains async WebCrypto, so poll a few ticks rather than relying on a single one.
-  for (let i = 0; i < 50 && !A.auditAll().some(e => e.event === 'retention.purge'); i++) await new Promise(r => setTimeout(r, 1));
+  // Same 300-tick budget as the delivery polls below: 50 ticks (~50ms) was too tight on a loaded
+  // runner (CI run 36388610815 failed here while the same commit passed in its sibling run).
+  for (let i = 0; i < 300 && !A.auditAll().some(e => e.event === 'retention.purge'); i++) await new Promise(r => setTimeout(r, 1));
   check('retention: the purge is recorded in the activity log', A.auditAll().some(e => e.event === 'retention.purge'));
 
   const fn = require('../netlify/functions/asana-task.js');
