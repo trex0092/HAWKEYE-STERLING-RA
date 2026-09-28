@@ -158,7 +158,7 @@
       "sources": [
         "bz-fiu-consolidated"
       ],
-      "note": "official FIU \"Consolidated Belize Sanctions List\" (High Court orders; domestic and UNSCR designations; XML/XLSX/PDF, July 2026 edition) staged disabled with page discovery, pending a source-probe run"
+      "note": "official FIU \"Consolidated Belize Sanctions List\" (High Court orders; XLSX/XML/PDF) staged disabled. Runner probe 36397059655 fetched the XLSX: UN-layout sheet with BZ-prefixed UN reference numbers, i.e. substantially a re-export of the UN list already screened; kept disabled until a UN-layout reader exists and any non-UN (domestic) rows are confirmed"
     },
     {
       "country": "Benin",

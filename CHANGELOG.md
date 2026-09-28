@@ -15,8 +15,11 @@ bump merged to `main`.
   domestic and UNSCR designations, published as XLSX. Its month-named file
   is found from the FIU page, and discovery must match exactly one `.xlsx`
   link, because a month name cannot be sorted by date. `fiubelize.org` is
-  added to the screen's egress allowlist. The source is enabled only after a
-  runner probe shows the name floor met.
+  added to the screen's egress allowlist. Runner probe 36397059655 fetched the
+  file but found a UN-layout re-export (UN references prefixed "BZ"). The
+  generic reader splits its name columns into single-word fragments, so the
+  source stays **disabled**. It is redundant with the UN list, as with
+  `za-fic-tfs`.
 - **Register research (FATF-listed, Gulf, Asia): Oman, Nepal, Vietnam, Côte
   d'Ivoire, Republic of Korea, China, Algeria, Mali, Burkina Faso, Niger,
   Armenia, Tajikistan, Bangladesh, Ethiopia, Zambia, Rwanda, Mozambique, Somalia, Uganda, Palestine, Fiji, Cuba, Myanmar, Maldives**
