@@ -10,6 +10,32 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Register research: Slovenia, Croatia, Slovakia** recorded as
+  `assessed-not-loadable`. Each ministry's sanctions page points only to the
+  UN and EU lists, and neither is published nationally. Guyana is
+  `identified`: under the FIU's TFS guidance, domestic designations are
+  published in the Gazette and on the FIU website. Cyprus gets a partial
+  note: Law 150(I)/2025 provides for national sanctions, but no published
+  national list was found. Andorra and Senegal are `assessed-not-loadable`
+  because their FIU sanctions pages link only the UN list. The Holy See is
+  `identified`: the Governorate's ordinances update its "List of Subjects
+  that Threaten International Peace and Security" (ASIF Annual Report
+  2023). Uzbekistan is `identified`: the Department on Combating Economic
+  Crimes publishes 8 list forms as XLSX. It is not staged, because screening
+  it is an MLRO policy decision. The Marshall Islands and Cambodia get partial
+  notes. Lebanon is `identified`: the Internal Security Forces publish the
+  national UNSCR 1373 list, updated 15/04/2025, as a legacy `.xls` file,
+  which the registry cannot read yet. Suriname is `identified`: S.B. 2025
+  no. 53 establishes the Nationale Sanctielijst, but no names are published
+  yet. Kuwait's partial note now cites Ministerial Resolution No. 8 of 2025,
+  under which the Committee may designate persons under UNSCR 1373.
+  Tanzania is `identified`: the Minister of Home Affairs publishes the Domestic
+  List in the Gazette, per the FIU's TFS guidelines. Angola gets a partial
+  note (Law No. 1/12). Turkmenistan is `assessed-not-loadable` because its FIU
+  site links only UN lists. The Laos note now cites the 4 September 2025
+  decree establishing a Domestic Designation List, which has no published
+  list yet. Djibouti gets a partial note (Law No. 104/AN/24, Art. 9).
+  Researched rows: 121 → 133.
 - **Belize: `bz-fiu-consolidated` staged (disabled).** This is the FIU's
   official Consolidated Belize Sanctions List: High Court orders covering
   domestic and UNSCR designations, published as XLSX. Its month-named file
@@ -31,7 +57,7 @@ bump merged to `main`.
   Leone, Samoa, Solomon Islands and Malawi (UN lists only) are
   `assessed-not-loadable`. Kuwait, Lebanon, Laos, DR Congo, Syria,
   Haiti, Bosnia and Herzegovina, Brunei, Senegal, Togo, Benin, Zimbabwe, Botswana, Sudan, Tanzania, Iran, Vanuatu, Guyana, Mongolia and Seychelles get partial notes. Researched rows:
-  89 → 120.
+  89 → 121.
 - **Register research: Norway, Iceland, Montenegro, San Marino, Malta,
   Liechtenstein, North Macedonia** recorded as
   `assessed-not-loadable`. Each implements UN sanctions (and, for the first
