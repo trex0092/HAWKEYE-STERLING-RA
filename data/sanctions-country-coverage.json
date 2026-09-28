@@ -137,7 +137,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the KGB \"Перечень организаций и физических лиц, причастных к террористической деятельности\", linked from the State Control Committee \"Полезные ссылки\" page (kgk.gov.by) and published by the KGB as an .xlsx file (e.g. \"Перечень.xlsx\", 326.5 KB, on the KGB's official channel); the MVD separately publishes a list of persons involved in extremist activity (mvd.gov.by). Not staged: whether to screen these lists, and an official web URL for the file, are unverified; screening them is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — the KGB \"Перечень организаций и физических лиц, причастных к террористической деятельности\", linked from the State Control Committee \"Полезные ссылки\" page (kgk.gov.by) and published by the KGB as an .xlsx file (e.g. \"Перечень.xlsx\", 326.5 KB, on the KGB's official channel); the MVD separately publishes a list of persons involved in extremist activity (mvd.gov.by). Not staged: whether to screen these lists, and an official web URL for the file, are unverified; screening them is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Belgium",
@@ -239,7 +240,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — by order of 19 November 2024 the Minister of Economy froze the assets of 113 natural persons and 2 entities (JNIM/GSIM and the Islamic State in the Greater Sahara) for six renewable months under the national counter-terrorism freezing framework (reported by the state daily Sidwaya, sidwaya.info); no consolidated online publication by the ministry or CENTIF found yet. Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — by order of 19 November 2024 the Minister of Economy froze the assets of 113 natural persons and 2 entities (JNIM/GSIM and the Islamic State in the Greater Sahara) for six renewable months under the national counter-terrorism freezing framework (reported by the state daily Sidwaya, sidwaya.info); no consolidated online publication by the ministry or CENTIF found yet. Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Burundi",
@@ -309,7 +311,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the Ministry of Public Security has published batches of identified terrorist organisations and individuals (the first batch of \"Eastern Turkistan\" organisations and 11 individuals, per the Chinese Mission to the EU page \"Eastern Turkistan terrorism issue\", eu.china-mission.gov.cn; later batches cited in the literature). No consolidated machine-readable publication found. Not staged: screening these national designations is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Public Security has published batches of identified terrorist organisations and individuals (the first batch of \"Eastern Turkistan\" organisations and 11 individuals, per the Chinese Mission to the EU page \"Eastern Turkistan terrorism issue\", eu.china-mission.gov.cn; later batches cited in the literature). No consolidated machine-readable publication found. Not staged: screening these national designations is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Colombia",
@@ -365,7 +368,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the Ministry of the Interior \"Lista Nacional de personas y entidades que han sido sometidas a investigaciones penales y se encuentran buscadas por las autoridades cubanas\" (Resolución 19/2023, Gaceta Oficial of 7 December 2023, as published by the Ministry of Foreign Affairs, cubaminrex.cu), updated by Resolución 13/2025 in July 2025 (per press reports: 62 persons and 20 entities). Not staged: press reports say the entries are mostly exiled opposition activists and media figures, so screening this list is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — the Ministry of the Interior \"Lista Nacional de personas y entidades que han sido sometidas a investigaciones penales y se encuentran buscadas por las autoridades cubanas\" (Resolución 19/2023, Gaceta Oficial of 7 December 2023, as published by the Ministry of Foreign Affairs, cubaminrex.cu), updated by Resolución 13/2025 in July 2025 (per press reports: 62 persons and 20 entities). Not staged: press reports say the entries are mostly exiled opposition activists and media figures, so screening this list is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Cyprus",
@@ -504,7 +508,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: national designations exist — the Council of Ministers resolution of 1 May 2021 designated the TPLF and \"Shene\" (OLA) as terrorist organisations under Proclamation No. 1176/2020 (Embassy of Ethiopia, ethiopianembassy.org; also reported in the US State Department Country Reports on Terrorism 2021). No consolidated published list found and the current status of these designations is not verified. Not staged: designations of political/armed movements are an MLRO policy decision"
+      "note": "researched 2026-09-28: national designations exist — the Council of Ministers resolution of 1 May 2021 designated the TPLF and \"Shene\" (OLA) as terrorist organisations under Proclamation No. 1176/2020 (Embassy of Ethiopia, ethiopianembassy.org; also reported in the US State Department Country Reports on Terrorism 2021). No consolidated published list found and the current status of these designations is not verified. Not staged: designations of political/armed movements are an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Fiji",
@@ -920,7 +925,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the Ministry of Economy and Finance page \"Sanctions financières ciblées : Liste des personnes physiques inscrites sur la liste nationale et sur la liste du Conseil de Sécurité des Nations Unies\" (finances.ml/node/623); inscriptions are made by order of the finance minister (six-month renewable administrative freeze) under Decree N°2023-0591/PT-RM of 11 October 2023 amending Decree N°2021-0682/PT-RM, most recently an order of 18 June 2026 adding twelve persons (per press reports). Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Economy and Finance page \"Sanctions financières ciblées : Liste des personnes physiques inscrites sur la liste nationale et sur la liste du Conseil de Sécurité des Nations Unies\" (finances.ml/node/623); inscriptions are made by order of the finance minister (six-month renewable administrative freeze) under Decree N°2023-0591/PT-RM of 11 October 2023 amending Decree N°2021-0682/PT-RM, most recently an order of 18 June 2026 adding twelve persons (per press reports). Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Malta",
@@ -1036,7 +1042,8 @@
         "UN"
       ],
       "fatf": "black",
-      "note": "researched 2026-09-28: national designations exist — the military authorities' Anti-Terrorism Central Committee declared the CRPH, the National Unity Government and the People's Defence Force terrorist organisations under the 2014 Counter-Terrorism Law (May 2021; state broadcaster Myanmar International TV, myanmaritv.com; also Irrawaddy, VOA) and in September 2024 added major ethnic armed groups (Al Jazeera). No consolidated machine-readable list found. Not staged: these designations target opposition/resistance bodies, so screening them is an MLRO policy decision. Myanmar is on the FATF call-for-action list (see data/fatf-assessments.json)"
+      "note": "researched 2026-09-28: national designations exist — the military authorities' Anti-Terrorism Central Committee declared the CRPH, the National Unity Government and the People's Defence Force terrorist organisations under the 2014 Counter-Terrorism Law (May 2021; state broadcaster Myanmar International TV, myanmaritv.com; also Irrawaddy, VOA) and in September 2024 added major ethnic armed groups (Al Jazeera). No consolidated machine-readable list found. Not staged: these designations target opposition/resistance bodies, so screening them is an MLRO policy decision. Myanmar is on the FATF call-for-action list (see data/fatf-assessments.json)",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Namibia",
@@ -1098,7 +1105,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the \"Fichier des personnes, groupes de personnes ou entités impliqués dans des actes terroristes\" (FPGE), created by ordinance of 27 August 2024 (Government of Niger, gouv.ne), with inscription entailing asset freezing and travel bans, decided by a National Committee; entries are announced in the state daily Le Sahel (lesahel.org). No consolidated machine-readable publication found. Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — the \"Fichier des personnes, groupes de personnes ou entités impliqués dans des actes terroristes\" (FPGE), created by ordinance of 27 August 2024 (Government of Niger, gouv.ne), with inscription entailing asset freezing and travel bans, decided by a National Committee; entries are announced in the state daily Le Sahel (lesahel.org). No consolidated machine-readable publication found. Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Nigeria",
@@ -1254,7 +1262,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — Rosfinmonitoring's \"Перечень организаций и физических лиц, в отношении которых имеются сведения об их причастности к экстремистской деятельности или терроризму\" under Federal Law 115-FZ art. 6 and Government Resolution No 804 of 06.08.2015, published in full as numbered HTML entries at fedsfm.ru/documents/terrorists-catalog-portal-act (national list; separate from the UN-derived lists at fedsfm.ru/documents/omu-or-terr-list). Not staged: whether to screen this list (it includes designations for \"extremist activity\" under Russian law, and runner reachability of fedsfm.ru is unverified) is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — Rosfinmonitoring's \"Перечень организаций и физических лиц, в отношении которых имеются сведения об их причастности к экстремистской деятельности или терроризму\" under Federal Law 115-FZ art. 6 and Government Resolution No 804 of 06.08.2015, published in full as numbered HTML entries at fedsfm.ru/documents/terrorists-catalog-portal-act (national list; separate from the UN-derived lists at fedsfm.ru/documents/omu-or-terr-list). Not staged: whether to screen this list (it includes designations for \"extremist activity\" under Russian law, and runner reachability of fedsfm.ru is unverified) is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Rwanda",
@@ -1262,7 +1271,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the Domestic List of designated persons (terrorists and terrorism financiers, 25 individuals, approved 14 October 2025) published by the Ministry of Justice as a PDF (minijust.gov.rw/fileadmin/user_upload/Minijust/Publications/Domestic_list_of_designated_persons/Domestic_list__14.10.2025.pdf), announced by the Financial Intelligence Centre public notice (fic.gov.rw) under the 2021 TFS Regulations. Not staged: entries are linked to groups including the exiled opposition Rwanda National Congress (per press reports), so screening this list is an MLRO policy decision; PDF parse not yet verified"
+      "note": "researched 2026-09-28: a national list exists — the Domestic List of designated persons (terrorists and terrorism financiers, 25 individuals, approved 14 October 2025) published by the Ministry of Justice as a PDF (minijust.gov.rw/fileadmin/user_upload/Minijust/Publications/Domestic_list_of_designated_persons/Domestic_list__14.10.2025.pdf), announced by the Financial Intelligence Centre public notice (fic.gov.rw) under the 2021 TFS Regulations. Not staged: entries are linked to groups including the exiled opposition Rwanda National Congress (per press reports), so screening this list is an MLRO policy decision; PDF parse not yet verified",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Saint Kitts and Nevis",
@@ -1481,7 +1491,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the National Bank of Tajikistan Financial Monitoring Department keeps a public list of over 2,400 names of suspected terrorists as defined by the authorities, which the US State Department Country Reports on Terrorism 2023 (state.gov) says also includes opposition journalists and activists. Not staged: screening this list is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — the National Bank of Tajikistan Financial Monitoring Department keeps a public list of over 2,400 names of suspected terrorists as defined by the authorities, which the US State Department Country Reports on Terrorism 2023 (state.gov) says also includes opposition journalists and activists. Not staged: screening this list is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Tanzania",
@@ -1632,7 +1643,8 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: the Department on Combating Economic Crimes under the General Prosecutor's Office publishes its lists at prodepartament.uz/ru/wanted-list/national: 8 list forms (Forms 5, 6, 9 and 10 based on information from Uzbek competent authorities; Forms 7, 8, 11 and 12 on information from foreign competent authorities), each downloadable as XLSX in Russian and Uzbek. Not staged: file layout not yet probed, and I cannot confirm the composition of the national entries, so whether to screen them is an MLRO policy decision (as for Tajikistan)"
+      "note": "researched 2026-09-28: the Department on Combating Economic Crimes under the General Prosecutor's Office publishes its lists at prodepartament.uz/ru/wanted-list/national: 8 list forms (Forms 5, 6, 9 and 10 based on information from Uzbek competent authorities; Forms 7, 8, 11 and 12 on information from foreign competent authorities), each downloadable as XLSX in Russian and Uzbek. Not staged: file layout not yet probed, and I cannot confirm the composition of the national entries, so whether to screen them is an MLRO policy decision (as for Tajikistan)",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Vanuatu",
@@ -1657,7 +1669,8 @@
         "UN"
       ],
       "fatf": "grey",
-      "note": "researched 2026-09-28: a national list exists — the Ministry of Public Security portal page \"Tổ chức khủng bố\" (bocongan.gov.vn/to-chuc-khung-bo) publishes the list of organisations and individuals related to terrorism under Decree 93/2024/NĐ-CP (amending Decree 122/2013/NĐ-CP), as individual HTML articles, separate from its page relaying UN Security Council designations. Not staged: the national entries include overseas political organisations, so screening them is an MLRO policy decision"
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Public Security portal page \"Tổ chức khủng bố\" (bocongan.gov.vn/to-chuc-khung-bo) publishes the list of organisations and individuals related to terrorism under Decree 93/2024/NĐ-CP (amending Decree 122/2013/NĐ-CP), as individual HTML articles, separate from its page relaying UN Security Council designations. Not staged: the national entries include overseas political organisations, so screening them is an MLRO policy decision",
+      "requiresMlroPolicyDecision": true
     },
     {
       "country": "Yemen",
