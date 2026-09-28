@@ -638,6 +638,11 @@ RESOURCES = {
         "application/json",
         lambda: _read_json_file("data/jurisdiction-risk.json"),
     ),
+    "hawkeye://reference/fatf-assessments": (
+        "FATF black/grey lists with each jurisdiction's action-plan assessment (verbatim, sourced)",
+        "application/json",
+        lambda: _read_json_file("data/fatf-assessments.json"),
+    ),
     "hawkeye://reference/internal-watchlist": (
         "Firm-internal watchlist (declined/known-bad counterparties)",
         "application/json",

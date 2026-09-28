@@ -1,0 +1,514 @@
+{
+  "_README": "FATF \"black\" (High-Risk Jurisdictions subject to a Call for Action) and \"grey\" (Jurisdictions under Increased Monitoring) lists with each jurisdiction's FATF assessment: FSRB, month of the high-level political commitment, MER adoption where the statement gives it, action-plan status, and the action-plan items quoted verbatim from the FATF public statements of 19 June 2026 (Paris plenary, 17–19 June 2026). Source text © FATF/OECD; each row carries its source URL. `register` is the row name in data/sanctions-country-coverage.json (null for a jurisdiction that is not one of the 195 countries); `riskName` is the name in data/jurisdiction-risk.json, and test/board-figures.test.mjs pins both lists to this file so they cannot drift. `statementDate` is the date of the FATF text quoted (a jurisdiction that deferred reporting keeps its earlier statement). Review after every FATF plenary (February, June, October).",
+  "plenary": "2026-06-19",
+  "sources": {
+    "black": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/call-for-action-june-2026.html",
+    "grey": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+  },
+  "delisted": [
+    {
+      "jurisdiction": "Algeria",
+      "date": "2026-06-19",
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Namibia",
+      "date": "2026-06-19",
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    }
+  ],
+  "jurisdictions": [
+    {
+      "jurisdiction": "Democratic People's Republic of Korea",
+      "register": "Democratic People's Republic of Korea",
+      "riskName": "North Korea",
+      "list": "black",
+      "call": "countermeasures",
+      "fsrb": null,
+      "committed": null,
+      "status": "call for countermeasures (reiterated since 2011)",
+      "statementDate": "2026-06-19",
+      "note": "The listed items are the countermeasures the FATF calls on all countries to apply; the FATF also encourages enhanced due diligence given DPRK use of front and shell companies (UNSCR 2270).",
+      "actionPlan": [
+        "Terminate correspondent relationships with DPRK banks",
+        "Close any subsidiaries or branches of DPRK banks in their countries",
+        "Limit business relationships & financial transactions with DPRK persons"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/call-for-action-june-2026.html"
+    },
+    {
+      "jurisdiction": "Iran",
+      "register": "Iran",
+      "riskName": "Islamic Republic of Iran",
+      "list": "black",
+      "call": "countermeasures",
+      "fsrb": null,
+      "committed": "2016-06",
+      "status": "call for countermeasures (since February 2020); action plan expired January 2018 and remains incomplete",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "adequately criminalizing terrorist financing, including by removing the exemption for designated groups “attempting to end foreign occupation, colonialism and racism”",
+        "identifying and freezing terrorist assets in line with the relevant United Nations Security Council resolutions",
+        "ensuring an adequate and enforceable customer due diligence regime",
+        "demonstrating how authorities are identifying and sanctioning unlicensed money/value transfer service providers",
+        "ensure that the ratification and implementation of the Palermo and TF Conventions are in line with the FATF standards and clarify the capability to provide mutual legal assistance",
+        "ensuring that financial institutions verify that wire transfers contain complete originator and beneficiary information"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/call-for-action-june-2026.html"
+    },
+    {
+      "jurisdiction": "Myanmar",
+      "register": "Myanmar",
+      "riskName": "Myanmar",
+      "list": "black",
+      "call": "enhanced due diligence",
+      "fsrb": null,
+      "committed": "2020-02",
+      "status": "call for enhanced due diligence (since October 2022); action plan expired September 2021; the FATF will consider countermeasures if no further progress is made by October 2026",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "increasing operational analysis and disseminations by the financial intelligence unit (FIU)",
+        "ensuring that ML is investigated/prosecuted in line with risks"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/call-for-action-june-2026.html"
+    },
+    {
+      "jurisdiction": "Angola",
+      "register": "Angola",
+      "riskName": "Angola",
+      "list": "grey",
+      "fsrb": "ESAAMLG",
+      "committed": "2024-10",
+      "status": "ongoing: continue implementing the action plan",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "improving risk-based supervision of non-financial banking entities and DNFBPs",
+        "ensuring competent authorities have adequate, accurate and timely access to beneficial ownership information and that breaches to obligations are adequately addressed",
+        "demonstrating an increase in ML investigations and prosecutions",
+        "demonstrating the ability to identify, investigate and prosecute TF",
+        "demonstrating an effective process to implement targeted financial sanctions without delay"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Bolivia",
+      "register": "Bolivia",
+      "riskName": "Bolivia",
+      "list": "grey",
+      "fsrb": "GAFILAT",
+      "committed": "2025-06",
+      "status": "ongoing: continue implementing the action plan",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "ensuring relevant special investigative techniques can be used in ML investigations",
+        "implementing risk-based supervision of real estate agents, lawyers, accountants and DPMS",
+        "ensuring that breaches to beneficial ownership obligations are sanctioned",
+        "increasing ML investigations and prosecutions in line with the country’s risks (including other high-risk predicates in addition to corruption and drug trafficking)"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Bosnia and Herzegovina",
+      "register": "Bosnia and Herzegovina",
+      "riskName": "Bosnia-Herzegovina",
+      "list": "grey",
+      "fsrb": "MONEYVAL",
+      "committed": "2026-06",
+      "merAdopted": "2024-12",
+      "status": "newly identified June 2026",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "further deepening its understanding of ML/TF risks",
+        "adopting policies to systematically make use of international cooperation",
+        "strengthening notary supervisors’ understanding of ML/TF risks, ensuring consistent AML/CFT supervision of DNFBPs and imposing proportionate, dissuasive and effective sanctions on the banking sector",
+        "ensuring that there is timely availability of accurate and up-to-date basic and beneficial ownership information",
+        "providing targeted feedback on the quality of STRs",
+        "demonstrating an increase in investigations and prosecutions of ML",
+        "demonstrating that effective, proportionate and dissuasive sanctions are being applied for breaches of specific crossborder cash declaration regimes",
+        "demonstrating it is proactively pursuing TF cases and clarifying the interpretation of the TF offence",
+        "ensuring its supervisors can apply the full range of effective, proportionate and dissuasive sanctions for breaches of PF and TF TFS obligations"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Bulgaria",
+      "register": "Bulgaria",
+      "riskName": "Bulgaria",
+      "list": "grey",
+      "fsrb": "MONEYVAL",
+      "committed": "2023-10",
+      "status": "substantially completed: at its June 2026 Plenary the FATF made the initial determination that the action plan is substantially completed and warrants an on-site assessment",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "implementing its national AML/CFT Strategy through adopting a comprehensive action plan",
+        "addressing remaining technical compliance deficiencies",
+        "demonstrating initial implementation of risk-based supervision for postal money operators, currency exchange providers and real estate agents and establishing market entry controls for VASPs and postal money operators",
+        "ensuring that the beneficial ownership information held in the Register is accurate and up-to-date",
+        "completing the implementation of the automated system to ensure more automated prioritisation of STRs",
+        "improving investigations and prosecutions of different types of money laundering in line with risks, including high-scale corruption and organised crime",
+        "ensuring that confiscation is pursued as a policy objective",
+        "ensuring the ability to conduct parallel financial investigations in all terrorism investigations",
+        "addressing gaps in the TF and PF targeted financial sanctions (TFS) frameworks",
+        "identifying the subset of NPOs most vulnerable to TF abuse and demonstrating initial implementation of risk-based monitoring to prevent abuse for TF purposes"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html",
+      "note": "Items are the reforms the FATF records as made; delisting follows only after a successful on-site assessment."
+    },
+    {
+      "jurisdiction": "Cameroon",
+      "register": "Cameroon",
+      "riskName": "Cameroon",
+      "list": "grey",
+      "fsrb": "GABAC",
+      "committed": "2023-06",
+      "status": "ongoing: all action-plan deadlines have expired and work remains",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "enhancing risk-based supervision of banks and implementing effective risk-based supervision for non-bank FIs and DNFBPs, and conducting appropriate outreach to high-risk FIs and DNFBPs",
+        "enhancing secure information exchange between the FIU, reporting entities and competent authorities",
+        "implementing policies and procedures for seizing and confiscating proceeds and instrumentalities of crime and managing frozen, seized and confiscated property",
+        "demonstrating effective implementation of TF and PF TFS regimes and implementing a risk-based approach to NPOs without disrupting legitimate NPO activities"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Côte d'Ivoire",
+      "register": "Côte d'Ivoire",
+      "riskName": "Cote D'Ivoire",
+      "list": "grey",
+      "fsrb": "GIABA",
+      "committed": "2024-10",
+      "status": "substantially completed: at its June 2026 Plenary the FATF made the initial determination that the action plan is substantially completed and warrants an on-site assessment",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "enhancing its use of international cooperation in ML/TF investigations and prosecutions",
+        "improving the implementation of risk-based supervision of financial institutions and designated non-financial businesses and professions and conducting outreach campaigns to improve compliance",
+        "improving the verification and access of basic and beneficial ownership information of legal persons and applying sanctions in case of violation",
+        "enhancing the use of financial intelligence by law enforcement authorities and improving disseminations by the FIU",
+        "demonstrating a sustained increase in the number of ML and TF investigations and prosecutions of different types in line with the country’s risk profile",
+        "strengthening the targeted financial sanctions framework"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html",
+      "note": "Items are the reforms the FATF records as made; delisting follows only after a successful on-site assessment."
+    },
+    {
+      "jurisdiction": "Democratic Republic of the Congo",
+      "register": "Democratic Republic of the Congo",
+      "riskName": "The Democratic Republic Of Congo",
+      "list": "grey",
+      "fsrb": "GABAC",
+      "committed": "2022-10",
+      "status": "substantially completed: at its June 2026 Plenary the FATF made the initial determination that the action plan is substantially completed and warrants an on-site assessment",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "finalising the NRA on ML and TF and adopting an AML/CFT national strategy",
+        "designating supervisory authorities for all DNFBP sectors, and developing and implementing a risk-based supervision plan",
+        "adequately resourcing the FIU, and build its capacity to conduct operational and strategic analysis",
+        "strengthening the capabilities of authorities involved in the investigation and prosecution of ML and TF",
+        "demonstrating effective implementation of TF and PF-related TFS"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html",
+      "note": "Items are the reforms the FATF records as made; delisting follows only after a successful on-site assessment."
+    },
+    {
+      "jurisdiction": "Haiti",
+      "register": "Haiti",
+      "riskName": "Haiti",
+      "list": "grey",
+      "fsrb": "CFATF",
+      "committed": "2021-06",
+      "status": "ongoing: all action-plan deadlines have expired and work remains",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "implementing risk-based AML/CFT supervision for DNFBPs deemed to constitute a higher ML/TF risk",
+        "ensuring basic and beneficial ownership information are maintained and accessible in a timely manner",
+        "demonstrating authorities are identifying, investigating and prosecuting ML cases in a manner consistent with Haiti’s risk profile",
+        "demonstrating an increase of identification, tracing and recovery of proceeds of crimes",
+        "addressing the technical deficiencies in its targeted financial sanctions regime",
+        "conducting appropriate risk-based monitoring of NPOs vulnerable to TF abuse without disrupting or discouraging legitimate NPO activities"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Iraq",
+      "register": "Iraq",
+      "riskName": "Iraq",
+      "list": "grey",
+      "fsrb": "MENAFATF",
+      "committed": "2026-06",
+      "merAdopted": "2024-11",
+      "status": "newly identified June 2026",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "enhancing its understanding of specific ML/TF risks and adopting appropriate riskbased preventive measures",
+        "enhancing the detection of informal money or value transfer services, establishing a legislative framework for VSAPs and applying effective, proportionate and dissuasive sanctions for breaches of AML/CFT requirements",
+        "ensuring FIs and DFNBPs apply TFS and PEP measures",
+        "increasing the quantity and quality of STRs with a focus on high-risk sectors and demonstrating an increase use of financial information particularly related to DNFPBs",
+        "enhancing risk-based implementation of beneficial ownership measures",
+        "pursuing more ML investigations and prosecutions of ML and reviewing sentencing in ML cases",
+        "pursuing more TF investigations and prosecutions in relation to specific TF risks and addressing the technical compliance issues in relation to its TF offence",
+        "developing a robust understanding of the NPO sector and the TF risks affecting NPOs and implementing risk-based measures while avoiding undue disruption or other unintended consequences for legitimate NPO activities",
+        "enhancing its ability to identify and combat PF TFS evasion"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Kenya",
+      "register": "Kenya",
+      "riskName": "Kenya",
+      "list": "grey",
+      "fsrb": "ESAAMLG",
+      "committed": "2024-02",
+      "status": "ongoing: continue implementing the action plan",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "improving risk-based AML/CFT supervision of FIs and DNFBPs",
+        "enhancing the understanding of preventive measures by FIs and DNFBPs, including to increase STR filing",
+        "designating an authority for the regulation of trusts and collection of accurate and up-to-date beneficial ownership information and implementing remedial actions for breaches of compliance with transparency requirements for legal persons and arrangements",
+        "improving the use and quality of financial intelligence products",
+        "increasing ML investigations and prosecutions in line with risks",
+        "bringing the TFS framework in compliance with R.6 and ensure its effective implementation",
+        "revising the framework for NPO regulation and oversight to ensure that mitigating measures are risk-based and do not disrupt or discourage legitimate NPO activity"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Kuwait",
+      "register": "Kuwait",
+      "riskName": "Kuwait",
+      "list": "grey",
+      "fsrb": "MENAFATF",
+      "committed": "2026-02",
+      "merAdopted": "2024-06",
+      "status": "ongoing; reporting deferred — February 2026 statement repeated, may not reflect the most recent status",
+      "statementDate": "2026-02-13",
+      "actionPlan": [
+        "enhancing outreach to real estate agents and DPMSs on STR reporting, including through distribution of sector-based indicators of ML/TF",
+        "ensuring that beneficial ownership information in the registry is accurate, and applying effective, proportionate and dissuasive sanctions in cases of inaccurate information where appropriate",
+        "increasing ML investigations and prosecutions in relation to cross-border movements of currency and BNIs"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Lao PDR",
+      "register": "Laos",
+      "riskName": "Lao People's Democratic Republic",
+      "list": "grey",
+      "fsrb": "APG",
+      "committed": "2025-02",
+      "status": "ongoing: continue implementing the action plan",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "enhancing its understanding of ML/TF risks",
+        "improving risk-based supervision of casinos, banks, and reporting entities in SEZs, including fit and proper checks",
+        "enhancing the quality and quantity of financial intelligence analysis and spontaneous dissemination to law enforcement agencies",
+        "ensuring that law enforcement agencies receive training and guidance on money laundering",
+        "demonstrating an increase in ML investigations and prosecutions in line with Lao PDR’s risk profile, with an emphasis on crimes with a transnational element that require international co-operation",
+        "developing a national confiscation policy consistent with its ML/TF risks",
+        "demonstrating that relevant competent authorities are taking measures to identify, seize, and, where applicable, confiscate proceeds and instrumentalities of crime in line with the risk profile",
+        "monitoring FIs’ and DNFBPs’ compliance with PF TFS obligations",
+        "addressing technical compliance deficiencies in Recommendations 6, 7, and 10"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Lebanon",
+      "register": "Lebanon",
+      "riskName": "Lebanon",
+      "list": "grey",
+      "fsrb": "MENAFATF",
+      "committed": "2024-10",
+      "status": "ongoing: continue implementing the action plan",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "conducting assessments of specific terrorist financing and money laundering risks identified in the MER and ensuring that policies and measures are in place to mitigate these risks",
+        "enhancing mechanisms to ensure the timely and effective execution of requests for mutual legal assistance, extradition and asset recovery",
+        "enhancing DNFBPs’ risk understanding and applying effective, proportionate and dissuasive sanctions for breaches of AML/CFT obligations",
+        "ensuring beneficial ownership information is up-to-date and that there are adequate sanctions and risk-mitigating in place for legal persons",
+        "enhancing competent authorities’ use of products of the FIU and financial intelligence",
+        "demonstrating a sustained increase in investigations, prosecutions and court rulings for types of ML in line with the risk",
+        "improving its approach to asset recovery and identifying and seizing illicit cross-border movements of currency and precious metals and stones",
+        "pursuing TF investigations and sharing information with foreign partners related to investigations of TF as called for in the MER",
+        "enhancing the implementation of targeted financial sanctions without delay, particularly at DNFBPs and certain non-banking financial institutions",
+        "undertaking targeted and risk-based monitoring of high-risk NPOs, without disrupting or discouraging legitimate NPO activities"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Monaco",
+      "register": "Monaco",
+      "riskName": "Monaco",
+      "list": "grey",
+      "fsrb": "MONEYVAL",
+      "committed": "2024-06",
+      "status": "substantially completed: at its June 2026 Plenary the FATF made the initial determination that the action plan is substantially completed and warrants an on-site assessment",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "strengthening the understanding of risk in relation to money laundering and income tax fraud committed abroad",
+        "demonstrating a sustained increase in outbound requests to identify and seek the seizure of criminal assets abroad",
+        "enhancing the application of sanctions for AML/CFT breaches and breaches of basic and beneficial ownership requirements",
+        "completing its resourcing program for its FIU and strengthen the quality and timeliness of STR reporting",
+        "enhancing judicial efficiency, including through increasing resources of investigative judges and prosecutors and the application of effective, dissuasive and proportionate sanctions for money laundering",
+        "increasing the seizure of property suspected to derive from criminal activities"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html",
+      "note": "Items are the reforms the FATF records as made; delisting follows only after a successful on-site assessment."
+    },
+    {
+      "jurisdiction": "Nepal",
+      "register": "Nepal",
+      "riskName": "Nepal",
+      "list": "grey",
+      "fsrb": "APG",
+      "committed": "2025-02",
+      "status": "ongoing: continue implementing the action plan",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "improving its understanding of key ML/TF risks",
+        "improving risk-based supervision of commercial banks, higher-risk cooperatives, casinos, DPMS, and the real estate sector",
+        "demonstrating the identification and sanctioning of materially significant illegal MVTS/hundi providers, without hindering financial inclusion",
+        "increasing capacity and co-ordination of competent authorities to conduct ML investigations",
+        "demonstrating an increase in ML investigations and prosecutions",
+        "demonstrating measures to identify, trace, restrain, seize, and, where applicable, confiscate proceeds and instrumentalities of crime in line with the risk profile"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Papua New Guinea",
+      "register": "Papua New Guinea",
+      "riskName": "Papua New Guinea",
+      "list": "grey",
+      "fsrb": "APG",
+      "committed": "2026-02",
+      "merAdopted": "2024-09",
+      "status": "ongoing; reporting deferred — February 2026 statement repeated, may not reflect the most recent status",
+      "statementDate": "2026-02-13",
+      "actionPlan": [
+        "improving its understanding of ML risks and endorsing the National AML/CFT/CPF Strategic Plan",
+        "proactively seeking outbound international cooperation to identify and trace criminal property abroad",
+        "improving risk-based supervision of banks, MVTS/FX dealers and higher risk DNFBPs",
+        "demonstrating an increase in ML investigations and prosecutions",
+        "demonstrating an increase in freezing/seizing and confiscation of criminal proceeds, instrumentalities and property of equivalent value",
+        "conducting training for competent authorities to enhance their understanding of TFS-PF implementation",
+        "addressing technical compliance deficiencies, including with respect to the ML offence, TF offence, TFS-PF, politically exposed persons and suspicious transaction reporting"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "South Sudan",
+      "register": "South Sudan",
+      "riskName": "South Sudan",
+      "list": "grey",
+      "fsrb": "ESAAMLG",
+      "committed": "2021-06",
+      "status": "ongoing: limited progress; all action-plan deadlines have expired and work remains",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "ensuring that competent authorities are suitably structured and capacitated to implement a risk-based approach to AML/CFT supervision for financial institutions",
+        "developing a comprehensive legal framework to collect and verify the accuracy of beneficial ownership information for legal persons",
+        "finalising the operationalisation of a fully functioning and independent FIU",
+        "establishing and implementing the legal and institutional framework to implement targeted financial sanctions in compliance with United Nations Security Council Resolutions on terrorism and WMD proliferation financing",
+        "commencing implementation of targeted risk-based supervision/monitoring of NPOs at risk of TF abuse"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Syria",
+      "register": "Syria",
+      "riskName": "Syria",
+      "list": "grey",
+      "fsrb": "MENAFATF",
+      "committed": "2010-02",
+      "status": "action plan substantially addressed at a technical level (June 2014); on-site visit not yet possible due to the security situation — February 2023 statement repeated",
+      "statementDate": "2023-02",
+      "actionPlan": [
+        "criminalising terrorist financing",
+        "establishing procedures for freezing terrorist assets"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html",
+      "note": "Items are the reforms the FATF found substantially addressed in June 2014, not open actions."
+    },
+    {
+      "jurisdiction": "Venezuela",
+      "register": "Venezuela",
+      "riskName": "Venezuela",
+      "list": "grey",
+      "fsrb": "CFATF",
+      "committed": "2024-06",
+      "status": "ongoing: continue implementing the action plan",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "strengthening its understanding of ML/TF risks, including in relation to TF and legal persons and arrangements",
+        "ensuring the full range of financial institutions and DNFBPs are subject to AML/CFT measures and risk-based supervision",
+        "ensuring adequate, accurate and up-to-date beneficial ownership information is accessible in a timely manner",
+        "enhancing the resources of the FIU and improving competent authorities’ use of financial intelligence",
+        "enhancing the investigation and prosecution of ML and TF",
+        "ensuring measures to prevent the abuse of NPOs for TF are targeted, proportionate, and risk-based and do not disrupt or discourage legitimate activities within the NPO sector",
+        "implementing TF-and PF-related targeted financial sanctions without delay"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Vietnam",
+      "register": "Vietnam",
+      "riskName": "Vietnam",
+      "list": "grey",
+      "fsrb": "APG",
+      "committed": "2023-06",
+      "status": "ongoing: the FATF strongly urges swift implementation as all deadlines expired in May 2025",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "increasing risk understanding",
+        "enhancing international co-operation",
+        "implementing effective risk-based supervision for FIs and DNFBPs",
+        "taking action to regulate virtual assets and virtual asset service providers",
+        "addressing technical compliance deficiencies, including with respect to the ML offence, targeted financial sanctions, customer due diligence and suspicious transaction reporting",
+        "conducting outreach activities with the private sector",
+        "establishing a regime that provides competent authorities with adequate, accurate and up-to-date information on beneficial ownership",
+        "enhancing the quality and quantity of financial intelligence analysis and dissemination",
+        "prioritising parallel financial investigations and demonstrating an increase in the number of ML investigations and prosecutions undertaken",
+        "demonstrating that there is monitoring of FIs and DNFBPs for compliance with PF TFS obligations and that there is co-operation and coordination between authorities to prevent PF TFS from being evaded"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html"
+    },
+    {
+      "jurisdiction": "Virgin Islands (UK)",
+      "register": null,
+      "riskName": "British Virgin Islands",
+      "list": "grey",
+      "fsrb": "CFATF",
+      "committed": "2025-06",
+      "status": "ongoing: continue implementing the action plan",
+      "statementDate": "2026-06-19",
+      "actionPlan": [
+        "enhancing risk-based supervision of TCSPs, Investment Businesses and VASPs",
+        "ensuring that accurate and up-to-date beneficial ownership information is available to competent authorities and breaches to obligations are sanctioned",
+        "improving the quality of SARs and ensuring that reporting is in line with risk",
+        "systematically pursuing ML investigations and prosecutions in line with risk",
+        "increasing the seizure and confiscation of criminal proceeds"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html",
+      "note": "British Overseas Territory — not one of the 195 countries in data/sanctions-country-coverage.json."
+    },
+    {
+      "jurisdiction": "Yemen",
+      "register": "Yemen",
+      "riskName": "Yemen",
+      "list": "grey",
+      "fsrb": "MENAFATF",
+      "committed": "2010-02",
+      "status": "action plan substantially addressed at a technical level (June 2014); on-site visit not yet possible due to the security situation — February 2023 statement repeated",
+      "statementDate": "2023-02",
+      "actionPlan": [
+        "adequately criminalising money laundering and terrorist financing",
+        "establishing procedures to identify and freeze terrorist assets",
+        "improving its customer due diligence and suspicious transaction reporting requirements",
+        "issuing guidance",
+        "developing the monitoring and supervisory capacity of the financial sector supervisory authorities and the financial intelligence unit",
+        "establishing a fully operational and effectively functioning financial intelligence unit"
+      ],
+      "source": "https://www.fatf-gafi.org/en/publications/High-risk-and-other-monitored-jurisdictions/increased-monitoring-june-2026.html",
+      "note": "Items are the reforms the FATF found substantially addressed in June 2014, not open actions."
+    }
+  ]
+}

@@ -10,6 +10,63 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Register research (FATF-listed, Gulf, Asia): Oman, Nepal, Vietnam, Côte
+  d'Ivoire, Republic of Korea, China, Algeria, Mali, Burkina Faso, Niger**
+  recorded as `identified`, each with the official source for its
+  national list. Vietnam's national list is not staged: its entries include
+  overseas political organisations, so screening it is an MLRO policy
+  decision; the same applies to Mali, Burkina Faso and Niger, whose lists
+  reportedly include journalists and political figures. Papua New Guinea is `assessed-not-loadable` (no domestic
+  designations; UN lists only). Kuwait, Lebanon, Laos, DR Congo, Syria,
+  Haiti, Bosnia and Herzegovina, Brunei and Senegal get partial notes. Researched rows:
+  89 → 100.
+- **Register research: Norway, Iceland, Montenegro, San Marino, Malta,
+  Liechtenstein, North Macedonia** recorded as
+  `assessed-not-loadable`. Each implements UN sanctions (and, for the first
+  three, mirrors or relays the EU lists), with no separate national list.
+  Albania is `identified`: a Council of Ministers list of persons declared as
+  terrorism financiers exists on qbz.gov.al, but its format is not yet
+  verified. Russia (Rosfinmonitoring terrorism/extremism list) and Belarus
+  (KGB terrorism list) are `identified`, as is Hungary (national terrorism
+  list under Act LII of 2017). Neither is staged: screening them is
+  an MLRO policy decision. Researched rows: 78 → 89.
+- **Poland: `pl-mswia-sanctions` enabled.** Runner probe 36393616291 (on
+  main) found the MSWiA spreadsheet via `linkMatch` discovery and read 461
+  names (floor 100). Poland moves to `screened`.
+- **Estonia: `ee-vm-russia-ukraine` enabled.** Runner probe 36392452572
+  (on main) read 5 names (floor 3). Estonia now screens all three official
+  MFA lists.
+- **Register research: El Salvador, Nicaragua, Spain, Germany, Italy,
+  Portugal, Ireland, Luxembourg, Sweden, Finland, Denmark** recorded as
+  `assessed-not-loadable`. Finland has a national freezing list, but it is
+  supplied only on request from the National Bureau of Investigation. Greece
+  is `identified`: its national list exists but no published copy was found. Each row cites the official source that
+  shows UN/EU lists relayed, or national measures issued only as individual
+  decrees, with no consolidated national list. Researched rows: 66 → 78.
+- **FATF black and grey lists with their assessments.** The new file
+  `data/fatf-assessments.json` covers all 25 jurisdictions from the FATF
+  19 June 2026 statements (3 black, 22 grey). Each entry gives the FSRB, the
+  commitment date, the MER adoption date where stated, the action-plan
+  status, and the action-plan items quoted verbatim with their source URL.
+  Register rows gain a `fatf` field, and the MCP resource
+  `hawkeye://reference/fatf-assessments` serves the file. A test pins the
+  assessments, `data/jurisdiction-risk.json` and the register to the same
+  jurisdictions. The README gains a "FATF black and grey lists" section.
+- **Americas register research (15 countries).** Recorded from official
+  regulator/FIU pages, each cited in its row note: Paraguay, Chile, Peru,
+  Bahamas, Colombia, Panama, Costa Rica, Dominican Republic, Uruguay, Bolivia,
+  Guatemala, Honduras and Jamaica are `assessed-not-loadable` (UN relay, no
+  separate national list found); Trinidad and Tobago and Ecuador are
+  `identified` (national designations exist, file not yet verified).
+  Researched rows: 51 → 66 of 195.
+- **Estonia: `ee-vm-human-rights` enabled.** Runner probe 36391873968 read
+  193 names (floor 150).
+- **Register `baseline` per country.** Every row now records the daily lists
+  that already cover it: `UN` for the 193 UN members and `EU` for the 27 EU
+  members. A test pins both counts, and that both lists are enabled. The
+  README gains a "Sanctions coverage by country" section explaining UN, EU,
+  and OFAC/UK coverage.
+
 - **Sanctions: Estonia's three national lists staged (disabled)**
   (`data/sanctions-extra.json`). They are `ee-vm-belarus` (273 designations),
   `ee-vm-human-rights` (160) and `ee-vm-russia-ukraine` (3). The MFA publishes

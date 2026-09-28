@@ -79,6 +79,7 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | URI | Contents |
 | --- | --- |
 | `hawkeye://reference/jurisdiction-risk` | The maintained higher-risk jurisdiction list. |
+| `hawkeye://reference/fatf-assessments` | FATF black/grey lists with each jurisdiction's action-plan assessment, quoted from the FATF statements with source URLs. |
 | `hawkeye://reference/internal-watchlist` | The firm-internal watchlist file. |
 
 ## Prompts

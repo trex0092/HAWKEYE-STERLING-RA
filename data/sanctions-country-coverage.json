@@ -1,30 +1,52 @@
 {
-  "_README": "Sanctions coverage by country, all 195 (193 UN member states + the Holy See + Palestine). status: screened = at least one national list from this issuer is loaded by the screen today (test/board-figures.test.mjs ties this to data/sanctions-*.json); pending = a candidate exists and is recorded, not yet loaded (see note); identified = a national list is known to exist, official machine-readable file not yet verified; assessed-not-loadable = researched, cannot be loaded (see note); not-researched = no research recorded yet. NEVER mark a country as having no national list without evidence. Independently of this table, the UN Security Council Consolidated List is screened daily and binds every UN member state; the EU list is screened too.",
+  "_README": "Sanctions coverage by country, all 195 (193 UN member states + the Holy See + Palestine). status: screened = at least one national list from this issuer is loaded by the screen today (test/board-figures.test.mjs ties this to data/sanctions-*.json); pending = a candidate exists and is recorded, not yet loaded (see note); identified = a national list is known to exist, official machine-readable file not yet verified; assessed-not-loadable = researched, cannot be loaded (see note); not-researched = no research recorded yet. NEVER mark a country as having no national list without evidence. Independently of this table, the UN Security Council Consolidated List is screened daily and binds every UN member state; the EU list is screened too. baseline: the multilateral lists the screen loads every day that already apply to the country regardless of its own status here — UN = UN Security Council Consolidated List (binding on every UN member state under Chapter VII; the Holy See and Palestine are observers, not members); EU = EU consolidated financial-sanctions list (directly applicable in the 27 EU member states). US OFAC and the UK list are screened too and reach many designees worldwide, but they are those issuers' lists, not the country's own, so they are not recorded as baseline. `fatf` marks a country on the FATF black or grey list (June 2026 plenary); the assessment behind it is in data/fatf-assessments.json.",
   "updated": "2026-09-28",
   "countries": [
     {
       "country": "Afghanistan",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Albania",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Council of Ministers decision \"Për listën e personave të shpallur si financues të terrorizmit\" (on the list of persons declared as terrorism financiers), consolidated text dated 2025-06-25 on the Official Publications Centre (qbz.gov.al/preview/7a4e2629-2856-4f8c-a9b5-fa1af9af990a/cons/20250625), which tasks the Minister of Finance through the General Directorate for the Prevention of Money Laundering (fiu.gov.al) with the freezing measures. The page is a document viewer that the scraper could not read; the file format and name count are not yet verified"
     },
     {
       "country": "Algeria",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Ministry of the Interior page \"Liste nationale des personnes et entités terroristes\" (interieur.gov.dz/liste-nationale-des-personnes-et-entites-terroristes/), national legal basis Décret exécutif N° 25-103 of 12 March 2025 (the classification commission was created by Décret exécutif N° 21-384, per the Journal officiel, joradp.dz). Page format and name count not yet verified by a runner probe"
     },
     {
       "country": "Andorra",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the UIFAND information note to banks (uifand.ad) tells obliged entities to monitor sanctions-list updates, especially the UN Security Council consolidated list, under Law 14/2017; whether a separate national list exists is not yet confirmed"
     },
     {
       "country": "Angola",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Antigua and Barbuda",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Argentina",
@@ -32,11 +54,17 @@
       "sources": [
         "ar-repet",
         "ar-repet-entidades"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Armenia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Australia",
@@ -44,73 +72,126 @@
       "sources": [
         "au-dfat",
         "au-dfat-opensanctions"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Austria",
       "status": "identified",
-      "note": "Austrian National Bank terrorism-financing regulations (48 targets per the OpenSanctions catalogue); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+      "note": "Austrian National Bank terrorism-financing regulations (48 targets per the OpenSanctions catalogue); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified",
+      "baseline": [
+        "UN",
+        "EU"
+      ]
     },
     {
       "country": "Azerbaijan",
       "status": "screened",
       "sources": [
         "az-fiu"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Bahamas",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: Compliance Commission \"UN Orders\" page (ccb.finance.gov.bs/regulatory-legal-framework/un-orders/) — orders under s.44 Anti-Terrorism Act 2018 list entities designated by the UN; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Bahrain",
       "status": "screened",
       "sources": [
         "bh-gazette"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Bangladesh",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Barbados",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Belarus",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — the KGB \"Перечень организаций и физических лиц, причастных к террористической деятельности\", linked from the State Control Committee \"Полезные ссылки\" page (kgk.gov.by) and published by the KGB as an .xlsx file (e.g. \"Перечень.xlsx\", 326.5 KB, on the KGB's official channel); the MVD separately publishes a list of persons involved in extremist activity (mvd.gov.by). Not staged: whether to screen these lists, and an official web URL for the file, are unverified; screening them is an MLRO policy decision"
     },
     {
       "country": "Belgium",
       "status": "screened",
       "sources": [
         "be-fod"
+      ],
+      "baseline": [
+        "UN",
+        "EU"
       ]
     },
     {
       "country": "Belize",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Benin",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Bhutan",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Bolivia",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the Cancillería \"Reglamento para la remisión de las listas del Consejo de Seguridad\" (cancilleria.gob.bo, 16-08-2024) governs relaying the UNSC lists and a national-designation procedure under UNSCR 1373; no published national designation list was found. Covered by the UN list (screened daily)",
+      "fatf": "grey"
     },
     {
       "country": "Bosnia and Herzegovina",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): restrictive measures, including freezing, are implemented under the Law on Implementation of Restrictive Measures by Council of Ministers decisions, per BiH's OSCE submission FSC.EMI/80/13; no current published national list found yet"
     },
     {
       "country": "Botswana",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Brazil",
@@ -120,91 +201,168 @@
         "br-bcb-qgp",
         "br-tcu-inabilitados",
         "br-tcu-inidoneos"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Brunei",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Brunei Darussalam Central Bank page \"Information for the General Public\" (bdcb.gov.bn) confirms ministerial designations under the Anti-Terrorism (Terrorist Financing) Regulations 2013 and section 65 of the Anti-Terrorism Order 2011; no published national list found yet"
     },
     {
       "country": "Bulgaria",
       "status": "identified",
-      "note": "national terrorism-financing list (State Agency for National Security web page); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+      "note": "national terrorism-financing list (State Agency for National Security web page); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Burkina Faso",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — by order of 19 November 2024 the Minister of Economy froze the assets of 113 natural persons and 2 entities (JNIM/GSIM and the Islamic State in the Greater Sahara) for six renewable months under the national counter-terrorism freezing framework (reported by the state daily Sidwaya, sidwaya.info); no consolidated online publication by the ministry or CENTIF found yet. Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
     },
     {
       "country": "Burundi",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Cabo Verde",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Cambodia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Cameroon",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Canada",
       "status": "screened",
       "sources": [
         "ca-sema"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Central African Republic",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Chad",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Chile",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the UAF publishes \"Listas de Resoluciones ONU\" (uaf.cl, sujetos-obligados/sector-privado/listas-de-resoluciones-onu), i.e. the UNSC lists; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "China",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Public Security has published batches of identified terrorist organisations and individuals (the first batch of \"Eastern Turkistan\" organisations and 11 individuals, per the Chinese Mission to the EU page \"Eastern Turkistan terrorism issue\", eu.china-mission.gov.cn; later batches cited in the literature). No consolidated machine-readable publication found. Not staged: screening these national designations is an MLRO policy decision"
     },
     {
       "country": "Colombia",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the UIAF FAQ (uiaf.gov.co, Documento_Preguntas_frecuentes.pdf §2.22) states the only binding international lists for Colombia are the UNSC lists; a UIAF news item reports Colombia adopted a list of terrorist persons/organisations made up of US State Department designations (US designations are reached by the OFAC lists, screened daily). No separate machine-readable national list was found"
     },
     {
       "country": "Comoros",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Congo",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Costa Rica",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: ICD/UIF Nota Técnica 15-2025 on targeted financial sanctions and the Dirección Nacional de Notariado \"Alertas internacionales\" page direct obligated entities to the UNSC designation lists (and foreign-country freezing requests); no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Côte d'Ivoire",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "researched 2026-09-28: a national list exists — the CENTIF page \"Liste des Sanctions Financières Ciblées (SFC)\" (centif.ci/liste-des-sanctions/) publishes the list of persons designated under UNSCR 1373 (national designations), made by ministerial arrêté (e.g. the arrêté of 22 August 2024 entering 29 persons on the national list with asset freezing, energie.gouv.ci); the list is published as a PDF, \"Liste des personnes désignées comme affiliées au terrorisme\" (centif.ci/wp-content/uploads/2025/02/listenationale1373.pdf, 30 pages); parse and name count not yet verified by a runner probe"
     },
     {
       "country": "Croatia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN",
+        "EU"
+      ]
     },
     {
       "country": "Cuba",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Cyprus",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the MFA \"Sanctions\" page (gov.cy/mfa) says national sanctions may be adopted by the Council of Ministers under Law 150(I)/2025 (National Sanctions Implementation Unit); whether any national designations have been published is not yet confirmed"
     },
     {
       "country": "Czechia",
@@ -212,160 +370,287 @@
       "sources": [
         "cz-mzv-national"
       ],
-      "note": "screened: cz-mzv-national (official MFA CSV, Act No. 1/2023 Coll.); the dated filename is discovered from the official open-data page each run; runner-verified by source-probe run 36388018140 on 2026-09-28"
+      "note": "screened: cz-mzv-national (official MFA CSV, Act No. 1/2023 Coll.); the dated filename is discovered from the official open-data page each run; runner-verified by source-probe run 36388018140 on 2026-09-28",
+      "baseline": [
+        "UN",
+        "EU"
+      ]
     },
     {
       "country": "Democratic People's Republic of Korea",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "black"
     },
     {
       "country": "Democratic Republic of the Congo",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): CENAREF (cenaref.org) reports the CONASAFIC national committee for targeted financial sanctions was set up on 17 April 2025 to apply UN TFS (UNSCR 1267, 1373, 1718) under Law 25/048 and Decree 24/24; no published national designation list found yet"
     },
     {
       "country": "Denmark",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Danish Business Authority guidance \"Vejledning om indefrysning\" (eksportkontrol.erhvervsstyrelsen.dk) defines sanctions as restrictive measures adopted by the UN and/or the EU, and the Ministry of Foreign Affairs page \"Sanktioner\" (um.dk) states that economic sanctions such as asset freezes are implemented in the EU; no national list was found. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Djibouti",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Dominica",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Dominican Republic",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: UAF Decreto 407-17 (reglamento de congelamiento preventivo, Ley 155-17) applies preventive freezing to persons listed by the UNSC committees (1267/1988/1718 and successors); no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Ecuador",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "national designations exist: the UAFE page \"Resoluciones de la ONU por sanciones o exenciones a personas naturales o jurídicas\" (uafe.gob.ec) carries UNSC listing notices and a \"Designación de Organizaciones de Personas como Terroristas\" item (national terrorist-organisation designations); no machine-readable list file verified yet"
     },
     {
       "country": "Egypt",
       "status": "screened",
       "sources": [
         "eg-mlcu"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "El Salvador",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: Asamblea Legislativa Decreto N.° 928 (asamblea.gob.sv) provides for applying UN Security Council terrorist designations to the persons, groups and entities listed; no separate published national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Equatorial Guinea",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Eritrea",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Estonia",
       "status": "screened",
-      "note": "screened: ee-vm-belarus (official MFA list, International Sanctions Act; 615 names) runner-verified by source-probe run 36391541492 on 2026-09-28; ee-vm-human-rights and ee-vm-russia-ukraine staged, pending their own probe runs",
+      "note": "screened: all three official MFA lists under the International Sanctions Act — ee-vm-belarus (615 names, source-probe run 36391541492), ee-vm-human-rights (193 names, run 36391873968) and ee-vm-russia-ukraine (5 names, run 36392452572)",
       "sources": [
         "ee-vm-belarus",
         "ee-vm-human-rights",
         "ee-vm-russia-ukraine"
+      ],
+      "baseline": [
+        "UN",
+        "EU"
       ]
     },
     {
       "country": "Eswatini",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Ethiopia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Fiji",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Finland",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: a national list exists — freezing decisions under the Act on the Freezing of Funds with a View to Combating Terrorism (325/2013), made by the NBI Financial Intelligence Unit and published in the Official Gazette (finanssivalvonta.fi). Per rahanpesu.fi (\"Talouspakotteet ja jäädytyspäätökset\"), the public list is supplied only on request in Word or Excel from the NBI registry (kirjaamo.keskusrikospoliisi@poliisi.fi); an online download is under consideration. Not machine-fetchable today; obtaining it is an MLRO request, not an engineering act"
     },
     {
       "country": "France",
       "status": "screened",
       "sources": [
         "fr-dgt"
+      ],
+      "baseline": [
+        "UN",
+        "EU"
       ]
     },
     {
       "country": "Gabon",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Gambia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Georgia",
       "status": "screened",
       "sources": [
         "ge-ot-list"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Germany",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Bundesbank \"Finanzsanktionen\" page (bundesbank.de) states restrictions derive from UN, EU and national measures and are \"maßgeblich durch das Recht der Europäischen Union bestimmt\"; for UN listings the economics ministry issues individual interim measures (\"Einzeleingriffe\", §§ 4 and 6 AWG) rather than a consolidated national list. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Ghana",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Greece",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Hellenic AML Authority Financial Sanctions Unit (Unit B, fsu.aml-authority.gov.gr) maintains a \"National list of persons related to terrorism and terrorism financing\" with asset freezing, on information from the Ministry of Citizen Protection and prosecuting/judicial authorities; no published copy or download link was found on 2026-09-28"
     },
     {
       "country": "Grenada",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Guatemala",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the Superintendencia de Bancos / IVE page \"Listas ONU\" (sib.gob.gt/ive/sistema-de-prevencion-de-ld-ft/listas-onu/) relays the persons and entities designated by the UN Security Council for terrorism; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Guinea",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Guinea-Bissau",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Guyana",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Haiti",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): press reports (May 2025) describe the Justice Minister ordering freezes of assets of persons sanctioned by the UN (UNSCR 2653) under a national decree of 30 April 2023; UCREF (ucref.gouv.ht) is the FIU; no published national list found yet"
     },
     {
       "country": "Holy See",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": []
     },
     {
       "country": "Honduras",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the CNBS PPLAFT page \"Lista ONU\" (pplaft.cnbs.gob.hn/lista-onu/) relays the UNSC Consolidated List; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Hungary",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: Act LII of 2017 (net.jogtar.hu, §§ 16/A–16/B) establishes \"Magyarország terrorizmus elleni nemzeti listája\" (Hungary's national list against terrorism) for groups and organisations not on the EU or UN lists, adopted by Government decree on the proposal of the minister responsible for counter-terrorism or justice, with asset freezing; the decree text, current entries and any machine-readable publication are not yet verified. EU and UN lists covered by the baseline"
     },
     {
       "country": "Iceland",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the Government page \"Þvingunaraðgerðir\" (stjornarradid.is) states Iceland applies sanctions decided in cooperation with international organisations, groups of states or partner states under Act No 68/2023, and links the UN Security Council consolidated list and the EU financial-sanctions list as the party lists; no separate national list. Not an EU member (no EU baseline row); covered by the UN list, and in substance by the EU list (both screened daily)"
     },
     {
       "country": "India",
       "status": "screened",
       "sources": [
         "in-mha"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
@@ -373,21 +658,37 @@
       "status": "screened",
       "sources": [
         "id-dttot"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Iran",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "black"
     },
     {
       "country": "Iraq",
       "status": "pending",
       "sources": [],
-      "note": "official keyless JSON API (api.aml.iq, 6,284 rows, 10 per page) verified live 2026-09-28; names are Arabic-only and the matcher does not compare Arabic with Latin script, so adding it now would add no real recall"
+      "note": "official keyless JSON API (api.aml.iq, 6,284 rows, 10 per page) verified live 2026-09-28; names are Arabic-only and the matcher does not compare Arabic with Latin script, so adding it now would add no real recall",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Ireland",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Government page \"Restrictive Measures (Sanctions)\" (ireland.ie) states \"Ireland does not impose any unilateral sanctions regimes, but implements UN and EU sanctions\"; the Central Bank of Ireland points to the EU and UN consolidated lists. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Israel",
@@ -395,21 +696,36 @@
       "sources": [
         "il-nbctf",
         "il-nbctf-orgs"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Italy",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the MEF Comitato di sicurezza finanziaria page (dt.mef.gov.it) names the CSF as the authority implementing UN and EU freezes (d.lgs. 109/2007); national freezes are individual decrees published as PDFs (e.g. the Artem Uss and Nabagala decrees), not a consolidated list. The UIF page \"Comunicazioni sanzioni finanziarie\" relays UN/EU lists (and OFAC for information only). Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Jamaica",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: listings are made by ministerial Orders under the Terrorism Prevention Act, e.g. the MFAFT \"Formal Order Dec 29 2021\" (mfaft.gov.jm) adding a listed entity \"in keeping with a decision of the United Nations\"; these are per-order PDFs relaying UN decisions, not a consolidated machine-readable national list. Covered by the UN list (screened daily)"
     },
     {
       "country": "Japan",
       "status": "screened",
       "sources": [
         "jp-mof"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
@@ -417,65 +733,113 @@
       "status": "screened",
       "sources": [
         "jo-amlu"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Kazakhstan",
       "status": "assessed-not-loadable",
-      "note": "national list assessed 2026-08-05: Web-SFM endpoint key-gated since ~Sep 2025 (rejected under the keyless doctrine)"
+      "note": "national list assessed 2026-08-05: Web-SFM endpoint key-gated since ~Sep 2025 (rejected under the keyless doctrine)",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Kenya",
       "status": "screened",
       "sources": [
         "ke-frc"
-      ]
+      ],
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Kiribati",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Kuwait",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): the MOFA Committee for the Implementation of Security Council Resolutions (Cabinet Resolution No 1396 of 11 November 2013; mofa.gov.kw/en/CTC/) publishes UN Security Council resolution and sanctions-list updates; whether a separate national list is published is not yet confirmed"
     },
     {
       "country": "Kyrgyzstan",
       "status": "screened",
       "sources": [
         "kg-fiu-public"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Laos",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): the Bank of the Lao PDR published a Decree on withholding, seizing or freezing funds related to terrorists (bol.gov.la, 18-12-2025) establishing targeted financial sanctions procedures; whether a national list is published by AMLIO is not yet confirmed"
     },
     {
       "country": "Latvia",
       "status": "screened",
       "sources": [
         "lv-fid"
+      ],
+      "baseline": [
+        "UN",
+        "EU"
       ]
     },
     {
       "country": "Lebanon",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): the Special Investigation Commission (sic.gov.lb) is the FIU with freezing powers; no published national designation list found yet"
     },
     {
       "country": "Lesotho",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Liberia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Libya",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Liechtenstein",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the FIU page \"Internationale und EU-Sanktionen\" (llv.li) states UN and EU sanctions are implemented under the International Sanctions Act (ISG) case by case by government ordinance, published on gesetze.li, and points to the UN consolidated list; no autonomous national list was found. Not an EU member (no EU baseline row); covered by the UN list, and in substance by the EU list (both screened daily)"
     },
     {
       "country": "Lithuania",
@@ -483,52 +847,91 @@
       "sources": [
         "lt-migracija-magnitsky"
       ],
-      "note": "screened: lt-migracija-magnitsky (official Migration Department JSON, 284 entry-ban designations); runner-verified by source-probe run 36388112480 on 2026-09-28"
+      "note": "screened: lt-migracija-magnitsky (official Migration Department JSON, 284 entry-ban designations); runner-verified by source-probe run 36388112480 on 2026-09-28",
+      "baseline": [
+        "UN",
+        "EU"
+      ]
     },
     {
       "country": "Luxembourg",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Ministry of Finance page \"Sanctions financières internationales\" (mfin.gouvernement.lu) states that under the law of 19 December 2020 designation is made automatically by reference to the lists annexed to EU or UN acts; its sub-pages on UN designations and pre-2020 designations returned HTTP 404 on 2026-09-28. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Madagascar",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Malawi",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Malaysia",
       "status": "screened",
       "sources": [
         "my-moha"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Maldives",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Mali",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Economy and Finance page \"Sanctions financières ciblées : Liste des personnes physiques inscrites sur la liste nationale et sur la liste du Conseil de Sécurité des Nations Unies\" (finances.ml/node/623); inscriptions are made by order of the finance minister (six-month renewable administrative freeze) under Decree N°2023-0591/PT-RM of 11 October 2023 amending Decree N°2021-0682/PT-RM, most recently an order of 18 June 2026 adding twelve persons (per press reports). Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
     },
     {
       "country": "Malta",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Sanctions Monitoring Board page \"About\" (smb.gov.mt) states \"All sanctions issued by the European Union and the United Nations Security Council are directly applicable under the National Interest (Enabling Powers) Act, Cap 365\"; no separate national list was found. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Marshall Islands",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Mauritania",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Mauritius",
       "status": "screened",
       "sources": [
         "mu-nssec"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
@@ -536,11 +939,17 @@
       "status": "screened",
       "sources": [
         "mx-sat-69b"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Micronesia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Moldova",
@@ -548,55 +957,94 @@
       "sources": [
         "md-sis-terror"
       ],
-      "note": "screened: md-sis-terror (official SIS Anti-Terrorist Centre list, served as an HTML table); runner-verified by source-probe run 36388020414 on 2026-09-28"
+      "note": "screened: md-sis-terror (official SIS Anti-Terrorist Centre list, served as an HTML table); runner-verified by source-probe run 36388020414 on 2026-09-28",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Monaco",
       "status": "screened",
       "sources": [
         "mc-gels"
-      ]
+      ],
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Mongolia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Montenegro",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the Police Directorate FIU page \"Liste označenih lica\" (gov.me/foj) links the UN Security Council, EU and OFAC lists, and the Central Bank page \"Liste sankcija i visokorizičnih zemalja\" (cbcg.me) points to the Government page on UN restrictive measures; no separate national list was found. Covered by the UN list (screened daily); EU and OFAC lists also screened"
     },
     {
       "country": "Morocco",
       "status": "screened",
       "sources": [
         "ma-cnasnu"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Mozambique",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Myanmar",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "black"
     },
     {
       "country": "Namibia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Nauru",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Nepal",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "researched 2026-09-28: a national list exists — the Nepal Rastra Bank \"Guideline on Targeted Financial Sanctions for Financial Institutions\" (nrb.org.np) defines the \"Domestic Terrorist List\" as the national terrorist list published by the Ministry of Home Affairs under UNSCR 1373; the MoHA publication and its format are not yet verified"
     },
     {
       "country": "Netherlands",
       "status": "screened",
       "sources": [
         "nl-terror"
+      ],
+      "baseline": [
+        "UN",
+        "EU"
       ]
     },
     {
@@ -605,84 +1053,146 @@
       "sources": [
         "nz-mfat-russia",
         "nz-terror"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Nicaragua",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the UAF circulates UN Security Council list updates to the authorities (e.g. Poder Judicial DGCIP \"Cooperación Listas ONU\", UAF-C.E. 0761 2026, 30.03.2026, poderjudicial.gob.ni); no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Niger",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — the \"Fichier des personnes, groupes de personnes ou entités impliqués dans des actes terroristes\" (FPGE), created by ordinance of 27 August 2024 (Government of Niger, gouv.ne), with inscription entailing asset freezing and travel bans, decided by a National Committee; entries are announced in the state daily Le Sahel (lesahel.org). No consolidated machine-readable publication found. Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
     },
     {
       "country": "Nigeria",
       "status": "screened",
       "sources": [
         "ng-nigsac"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "North Macedonia",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the Financial Intelligence Office page \"Листи на санкции\" (ufr.gov.mk/?page_id=257) publishes a consolidated list of natural and legal persons subject to restrictive measures \"согласно резолуциите на Советот за безбедност\" (under UN Security Council resolutions), applied under the Law on Restrictive Measures; no separate national designation list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Norway",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "note": "researched 2026-09-28: the Ministry of Foreign Affairs page \"Sanksjoner\" (regjeringen.no) states Norway is bound under international law to implement UN Security Council sanctions and also implements a range of EU restrictive measures, each by regulation (forskrift) on Lovdata, and that Norway \"i all hovedsak har tilsvarende sanksjonsregler\" to the EU; no separate consolidated national list was found. Not an EU member, so no EU baseline row, but the listed persons are in substance those on the UN and EU lists (both screened daily)",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Oman",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — National Committee for Combating Terrorism (TFS Committee) Decision No 1 (published by the Central Bank of Oman, cbo.gov.om) defines the \"List\" as including \"the local list where persons are designated pursuant to a decision issued by the TFS Committee\" alongside the UN lists; the local list's publication format is not yet verified"
     },
     {
       "country": "Pakistan",
       "status": "screened",
       "sources": [
         "pk-nacta"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Palau",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Palestine",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": []
     },
     {
       "country": "Panama",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: MEF Guía I-REG-001-19 \"Respuesta Lista ONU\" (mef.gob.pa) defines the operative list as the UNSC lists; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Papua New Guinea",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "researched 2026-09-28: per the PNG Sanctions Secretariat site (pngsanctionssecretariat.gov.pg, \"About Us\" / \"Consolidated List\"; read via the search index — the host is not reachable from this sandbox), prohibitions under the Sanctions Act are currently placed only on UN Security Council-designated persons and entities because there has been no domestic designation, and its Consolidated List consists of four UNSC committee lists. Covered by the UN list (screened daily)"
     },
     {
       "country": "Paraguay",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the SEPRELAD page \"Consulta a Listas de Sanciones\" (seprelad.gov.py/?page_id=2753) links only the UNSC consolidated list, the US OFAC SDN list, the FATF lists and the EU non-cooperative-jurisdictions list; no separate national designation list was found. Covered by the UN list (screened daily); OFAC is screened too"
     },
     {
       "country": "Peru",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: SBS \"Revisión de Listas de Interés\" (sbs.gob.pe/prevencion-de-lavado-activos/listas-de-interes) and Resolución SBS 02610-2021 describe UIF-Perú administrative freezing for UNSC-designated persons; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Philippines",
       "status": "screened",
       "sources": [
         "ph-amlc"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Poland",
-      "status": "pending",
-      "note": "official MSWiA sanctions-list spreadsheet (.xlsx attachment on gov.pl, 26.05.2026 edition) staged disabled with page discovery, pending a source-probe run; the Ministry of Finance GIIF Art. 118 list is not yet staged",
+      "status": "screened",
+      "note": "screened: pl-mswia-sanctions, the official MSWiA list of persons and entities subject to sanctions (461 names, source-probe run 36393616291); the Ministry of Finance GIIF Art. 118 list is not yet staged",
       "sources": [
         "pl-mswia-sanctions"
+      ],
+      "baseline": [
+        "UN",
+        "EU"
       ]
     },
     {
       "country": "Portugal",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Banco de Portugal page \"Medidas Restritivas\" (bportugal.pt) defines restrictive measures as those approved by the United Nations or the European Union, applied under Lei n.º 97/2017 of 23 August; no separate national list was found. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Qatar",
@@ -690,47 +1200,84 @@
       "sources": [
         "qa-nctc",
         "qa-nctc-opensanctions"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Republic of Korea",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — per KoFIU \"CFT Regime\" (kofiu.go.kr/eng/policy/ptfps02_1.do), the Financial Services Commission designates and publicly announces \"Persons Subject to Restrictions on Financial Transactions\" under Article 4(1) of the Act on Prohibition of Financing for Offences of Public Intimidation (first designation of 974 individuals and organisations on 22 December 2008); the current list is published as the FSC \"Regulations on the Designation/Revocation of Persons Subject to Restrictions on Financial Transactions, Etc.\" on law.go.kr. Format (regulation annex) and machine readability not yet verified"
     },
     {
       "country": "Romania",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN",
+        "EU"
+      ]
     },
     {
       "country": "Russia",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: a national list exists — Rosfinmonitoring's \"Перечень организаций и физических лиц, в отношении которых имеются сведения об их причастности к экстремистской деятельности или терроризму\" under Federal Law 115-FZ art. 6 and Government Resolution No 804 of 06.08.2015, published in full as numbered HTML entries at fedsfm.ru/documents/terrorists-catalog-portal-act (national list; separate from the UN-derived lists at fedsfm.ru/documents/omu-or-terr-list). Not staged: whether to screen this list (it includes designations for \"extremist activity\" under Russian law, and runner reachability of fedsfm.ru is unverified) is an MLRO policy decision"
     },
     {
       "country": "Rwanda",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Saint Kitts and Nevis",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Saint Lucia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Saint Vincent and the Grenadines",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Samoa",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "San Marino",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: the Financial Intelligence Agency page \"Misure restrittive ONU\" (aif.sm) states San Marino adopts without delay, by Congress of State resolution, the restrictive measures of the UN Security Council and its committees; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Sao Tome and Principe",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Saudi Arabia",
@@ -738,79 +1285,140 @@
       "sources": [
         "sa-pcct",
         "sa-pcct-opensanctions"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Senegal",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): CENTIF's \"Commission consultative de Gel administratif (CCGA)\" page (centif.sn/fr/ccga) states the CCGA, created under Article 14 of Decree No 2022-2308 of 30 December 2022, assists the finance minister in implementing freezes for persons listed under UN Security Council resolutions; no published national list found yet"
     },
     {
       "country": "Serbia",
       "status": "identified",
-      "note": "domestic list of designated persons (APML search engine); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+      "note": "domestic list of designated persons (APML search engine); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Seychelles",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Sierra Leone",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Singapore",
       "status": "screened",
       "sources": [
         "sg-terrorists"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Slovakia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): Act 289/2016 on the implementation of international sanctions (mfsr.sk) sets a process for adding persons to and removing them from a \"zoznam sankcionovaných osôb\"; whether a separate national list is published is not yet confirmed"
     },
     {
       "country": "Slovenia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): gov.si \"Omejevalni ukrepi\" says Slovenia may adopt national restrictive measures by government decree under ZOUPAMO, while obliged bodies follow UN and EU sanctions lists; no national list found yet"
     },
     {
       "country": "Solomon Islands",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Somalia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "South Africa",
       "status": "assessed-not-loadable",
-      "note": "FIC list assessed 2026-08-06: a UN Security Council relay, already screened via the UN list"
+      "note": "FIC list assessed 2026-08-06: a UN Security Council relay, already screened via the UN list",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "South Sudan",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Spain",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Tesoro Público page \"Sanciones derivadas de financiación del Terrorismo\" (tesoro.es) lists only the UN Security Council Consolidated List (UNSCR 1267/1989/2253) and the EU terrorism list; no separate Spanish national list is published there. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Sri Lanka",
       "status": "screened",
       "sources": [
         "lk-ca-1373"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Sudan",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Suriname",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Sweden",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN",
+        "EU"
+      ],
+      "note": "researched 2026-09-28: the Government page \"International sanctions\" (government.se) states \"Sanctions that apply in Sweden have been adopted by the UN or the EU\"; Finansinspektionen says the same. No national list. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Switzerland",
@@ -818,48 +1426,81 @@
       "sources": [
         "ch-seco",
         "ch-seco-opensanctions"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Syria",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): press reports (e.g. The Syrian Observer) describe a \"local list\" of about 615 persons and 105 entities published by the Anti-Money Laundering and Terrorism Financing Commission under UNSCR 1373 and 1267; the official publication has not been verified"
     },
     {
       "country": "Tajikistan",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Tanzania",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Thailand",
       "status": "screened",
       "sources": [
         "th-designated"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Timor-Leste",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Togo",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Tonga",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Trinidad and Tobago",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "note": "national list exists: the FIUTT Consolidated List of High Court Orders (Anti-Terrorism Act s.22AA), now served through the TFS Search Tool (fiu.gov.tt/tfs-search-tool/tfs-search-tool-2/, portal fiu.sanctionslist.gov.tt) which offers a downloadable Excel of all persons/entities listed by T&T High Court order; the download URL has not yet been verified from a runner"
     },
     {
       "country": "Tunisia",
       "status": "screened",
       "sources": [
         "tn-cnlct"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
@@ -868,25 +1509,40 @@
       "sources": [
         "tr-masak",
         "tr-wanted"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Turkmenistan",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Tuvalu",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Uganda",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Ukraine",
       "status": "screened",
       "sources": [
         "ua-nsdc"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
@@ -895,6 +1551,9 @@
       "sources": [
         "internal-watchlist",
         "uae-eocn-local-terrorist"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
@@ -902,6 +1561,9 @@
       "status": "screened",
       "sources": [
         "uk-ofsi"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
@@ -911,39 +1573,71 @@
         "ofac-consolidated",
         "ofac-sdn",
         "us-csl"
+      ],
+      "baseline": [
+        "UN"
       ]
     },
     {
       "country": "Uruguay",
-      "status": "not-researched"
+      "status": "assessed-not-loadable",
+      "baseline": [
+        "UN"
+      ],
+      "note": "researched 2026-09-28: SENACLAFT directs obligated entities to the UNSC Consolidated List (gub.uy, \"Opciones alternativas para búsqueda en Listas de Consejo de Seguridad\"); no separate national sanctions list was found. Note for PEP work: the BCU page \"UIAF - Listas de control\" states SENACLAFT has published a reference PEP list since August 2021"
     },
     {
       "country": "Uzbekistan",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Vanuatu",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Venezuela",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Vietnam",
-      "status": "not-researched"
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey",
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Public Security portal page \"Tổ chức khủng bố\" (bocongan.gov.vn/to-chuc-khung-bo) publishes the list of organisations and individuals related to terrorism under Decree 93/2024/NĐ-CP (amending Decree 122/2013/NĐ-CP), as individual HTML articles, separate from its page relaying UN Security Council designations. Not staged: the national entries include overseas political organisations, so screening them is an MLRO policy decision"
     },
     {
       "country": "Yemen",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "grey"
     },
     {
       "country": "Zambia",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     },
     {
       "country": "Zimbabwe",
-      "status": "not-researched"
+      "status": "not-researched",
+      "baseline": [
+        "UN"
+      ]
     }
   ]
 }
