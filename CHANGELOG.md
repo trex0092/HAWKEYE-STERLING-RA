@@ -29,7 +29,9 @@ bump merged to `main`.
   no. 53 establishes the Nationale Sanctielijst, but no names are published
   yet. Kuwait's partial note now cites Ministerial Resolution No. 8 of 2025,
   under which the Committee may designate persons under UNSCR 1373.
-  Researched rows: 121 → 131.
+  Tanzania is `identified`: the Minister of Home Affairs publishes the Domestic
+  List in the Gazette, per the FIU's TFS guidelines. Angola gets a partial
+  note (Law No. 1/12). Researched rows: 121 → 132.
 - **Belize: `bz-fiu-consolidated` staged (disabled).** This is the FIU's
   official Consolidated Belize Sanctions List: High Court orders covering
   domestic and UNSCR designations, published as XLSX. Its month-named file

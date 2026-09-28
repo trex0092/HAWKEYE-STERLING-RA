@@ -39,7 +39,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): Law No. 1/12 of 12 January (designation and execution of international legal acts; PDF hosted on uif.ao) provides for a national list of persons, groups and entities designated by the national designating authority. No published national list was found on official sites, so I cannot confirm whether any national designation exists"
     },
     {
       "country": "Antigua and Barbuda",
@@ -1483,11 +1484,11 @@
     },
     {
       "country": "Tanzania",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-09-28 (status unchanged): the Prevention of Terrorism Act (R.E. 2023, published by the FIU, fiu.go.tz) provides for domestic designations; no published national designation list found yet"
+      "note": "researched 2026-09-28: the FIU \"Guidelines on Targeted Financial Sanctions\" (fiu.go.tz, revised) define the \"Domestic List\" as individuals or entities declared by the Minister of Home Affairs under the Prevention of Terrorism Act, and require reporting persons to update it \"upon publication in the Gazette\" (paras 2.3.2.1-2.3.2.4). Published in the Gazette only; no machine-readable file verified"
     },
     {
       "country": "Thailand",
