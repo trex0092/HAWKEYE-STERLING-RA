@@ -603,14 +603,29 @@ export function parseDfatXlsx(buf) {
        header found no name column and parsed 0 (same probe evidence). */
     let h = -1;
     for (let i = 0; i < Math.min(rows.length, 8); i++) {
-      if (rows[i].some(c => /name/i.test(String(c)) && !/name\s*type/i.test(String(c)))) { h = i; break; }
+      if (rows[i].some(c => /name|nazwisko/i.test(String(c)) && !/name\s*type/i.test(String(c)))) { h = i; break; }
     }
     if (h < 0) continue;
     const header = rows[h].map(c => String(c).toLowerCase().trim());
     const nameCols = [];
-    header.forEach((c, i) => { if (/name/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
+    header.forEach((c, i) => { if (/name|nazwisko/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
     if (!nameCols.length) continue;
+    /* Poland's MSWiA workbook (source-probe run 36391592244, 2026-09-28):
+       header "Nazwisko i imię" (surname and given name) and a "Data
+       wykreślenia z listy" (date struck off the list) column — a row with a
+       strike-off date is no longer designated and never screens. A trailing
+       parenthetical alias ("BELOV Alexey (BELOV Alexy)") also screens on its
+       own. Both apply only to sheets carrying those Polish headers. */
+    const struckCol = header.findIndex(c => /wykreśl/.test(c));
+    const polish = header.some(c => /nazwisko/.test(c));
     for (let i = h + 1; i < rows.length; i++) {
+      if (struckCol >= 0 && String(rows[i][struckCol] || '').trim()) continue;
+      if (polish) {
+        for (const ci of nameCols) {
+          const p = String(rows[i][ci] || '').match(/^(.*\S)\s*\(([^()]+)\)\s*$/);
+          if (p) names.push(p[1].trim(), p[2].trim());
+        }
+      }
       /* Skip an all-dash placeholder in any name column — the Israel NBCTF
          organisations sheet fills empty a.k.a. columns with "----" (not a bare
          "-"), which the old `!== '-'` guard let through as a bogus designated
@@ -930,8 +945,8 @@ export function parseHtmlTable(body) {
    too (split on ; , or /, leading "also"/"ka" dropped). "SURNAME, Given"
    is turned into "Given SURNAME". Single-token fragments (a bare given name
    such as the "(Grigory)" in "Hryhory (Grigory) Yuryevich AZARONAK") are not
-   screened alone — they would match half the world. Lines that do not start
-   with a number never screen. */
+   screened alone — they would match half the world. Only numbered lines and
+   the items of a real ordered list screen; prose never does. */
 export function parseNumberedNameList(body) {
   /* Line breaks become a visible sentinel (U+241E) before tag stripping,
      because htmlText collapses all whitespace, newlines included. */
@@ -943,10 +958,22 @@ export function parseNumberedNameList(body) {
     const v = String(n || '').replace(/^\s*(also|ka)\s+/i, '').replace(/\s+/g, ' ').trim();
     if (v.split(' ').length >= 2) out.push(flip(v));
   };
+  const entries = [];
   for (const raw of lines) {
     const m = raw.trim().match(/^\d{1,4}\.\s+(.+)$/);
-    if (!m) continue;
-    const entry = m[1];
+    if (m) entries.push(m[1]);
+  }
+  /* The same page family also renders lists as <ol><li> (the numbers come
+     from the browser — the Belarus page, source-probe run 36391013267: 273
+     items, 0 numbered text lines). Each <li> of an ordered list with 3+
+     items is an entry; breadcrumb <ol>s (2 items, class "breadcrumb") never
+     are. */
+  for (const [, attrs, inner] of String(body || '').matchAll(/<ol\b([^>]*)>([\s\S]*?)<\/ol>/gi)) {
+    if (/breadcrumb/i.test(attrs)) continue;
+    const items = [...inner.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map(x => htmlText(x[1]));
+    if (items.length >= 3) entries.push(...items.filter(Boolean));
+  }
+  for (const entry of entries) {
     add(entry.replace(/\([^()]*(?:\)|$)/g, ' '));
     for (const [, inner] of entry.matchAll(/\(([^()]*)(?:\)|$)/g)) {
       for (const part of inner.split(';')) {

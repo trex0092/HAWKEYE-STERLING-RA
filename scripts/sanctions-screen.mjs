@@ -1308,23 +1308,42 @@ export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = ''
    the page, kept only when https on the page's own host, latest filename wins
    (the dated stems sort lexically). Returns null when nothing qualifies — the
    caller throws, so the list reports as failed rather than screening a stale
-   edition. Pure; pinned in test/sanctions-screen.test.mjs. */
-export function discoverDatedLink(html, pageUrl, fileStem) {
+   edition. Pure; pinned in test/sanctions-screen.test.mjs.
+
+   `linkMatch` (optional) is for pages whose file links share a generic stem
+   (gov.pl serves every attachment as /attachment/<uuid>, and the MSWiA page
+   links one decision PDF per designee beside the one spreadsheet): the
+   anchor's own markup and text must contain it (e.g. "Format: xlsx"), and
+   EXACTLY ONE anchor may qualify — zero or several returns null, so an
+   ambiguous page fails loudly instead of guessing (source-probe run
+   36390719857 showed the stem alone picking an 11-page PDF). */
+export function discoverDatedLink(html, pageUrl, fileStem, linkMatch) {
   const stem = String(fileStem || '');
   if (!stem) return null;
   let page;
   try { page = new URL(pageUrl); } catch { return null; }
   const found = [];
-  const re = /href\s*=\s*["']([^"']+)["']/gi;
+  const want = typeof linkMatch === 'string' && linkMatch ? linkMatch : '';
+  const re = want
+    ? /<a\b([^>]*)>([\s\S]*?)<\/a>/gi
+    : /href\s*=\s*["']([^"']+)["']/gi;
   let m;
   while ((m = re.exec(String(html || '')))) {
-    if (!m[1].includes(stem)) continue;
+    let href = m[1];
+    if (want) {
+      if (!(m[1] + m[2]).includes(want)) continue;
+      const h = m[1].match(/href\s*=\s*["']([^"']+)["']/i);
+      if (!h) continue;
+      href = h[1];
+    }
+    if (!href.includes(stem)) continue;
     let u;
-    try { u = new URL(m[1].replace(/&amp;/g, '&'), page); } catch { continue; }
+    try { u = new URL(href.replace(/&amp;/g, '&'), page); } catch { continue; }
     if (u.protocol !== 'https:' || u.hostname !== page.hostname) continue;
-    found.push(u);
+    if (!found.some(f => f.href === u.href)) found.push(u);
   }
   if (!found.length) return null;
+  if (want && found.length !== 1) return null;
   const file = (u) => u.pathname.slice(u.pathname.lastIndexOf('/') + 1);
   found.sort((a, b) => (file(a) < file(b) ? 1 : file(a) > file(b) ? -1 : 0));
   return found[0].href;
@@ -1349,7 +1368,7 @@ async function fetchListBody(source, timeoutMs = 60000) {
       if (!r.ok) throw new Error('link discovery page HTTP ' + r.status);
       return await r.text();
     }, timeoutMs);
-    href = discoverDatedLink(html, page, source.discover.fileStem);
+    href = discoverDatedLink(html, page, source.discover.fileStem, source.discover.linkMatch);
     if (!href) throw new Error('link discovery: no ' + source.discover.fileStem + '* file linked from ' + page);
   }
   let parsed;

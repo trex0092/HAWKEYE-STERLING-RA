@@ -801,11 +801,12 @@
       "parser": "xlsx",
       "discover": {
         "page": "https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami",
-        "fileStem": "/attachment/"
+        "fileStem": "/attachment/",
+        "linkMatch": "Format: xlsx"
       },
       "enabled": false,
       "minNames": 100,
-      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official MSWiA page https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami (seen via a web search index 2026-09-28; page version 168.0, 26.05.2026) links one spreadsheet under 'Materiały': 'Lista sankcyjna - tabela 26.05.2026r' (tabela_lista_sankcyjna_26_05_2026.xlsx, 0.19MB) at this /attachment/<uuid> URL. The attachment id changes with each edition, so `discover` resolves it from the page each run; because the stem is the generic '/attachment/', discovery is only safe while the page links ONE attachment — the probe report must show that before enabling. Column layout, redirects (final host must be on the egress allowlist) and the name count are unverified: enable only if the probe's 'Parsed by the registry parser' section shows names and the minNames floor met. minNames 100 is a provisional floor (the MSWiA list has carried several hundred entries since 2023, e.g. 365 Belarusian nationals added 29.05.2023 per the ministry's own communiqué)."
+      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official MSWiA page https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami (seen via a web search index 2026-09-28; page version 168.0, 26.05.2026) links one spreadsheet under 'Materiały': 'Lista sankcyjna - tabela 26.05.2026r' (tabela_lista_sankcyjna_26_05_2026.xlsx, 0.19MB) at this /attachment/<uuid> URL. The attachment id changes with each edition, so `discover` resolves it from the page each run; the page links one decision PDF per designee under the same generic '/attachment/' stem, so discovery also requires linkMatch 'Format: xlsx' (the spreadsheet anchor's aria-label) on exactly one anchor. Source-probe run 36390719857 (2026-09-28, before linkMatch) showed the stem alone picking an 11-page PDF: 0 names, floor NOT met, source correctly stayed disabled. Column layout, redirects (final host must be on the egress allowlist) and the name count are unverified: enable only if the probe's 'Parsed by the registry parser' section shows names and the minNames floor met. minNames 100 is a provisional floor (the MSWiA list has carried several hundred entries since 2023, e.g. 365 Belarusian nationals added 29.05.2023 per the ministry's own communiqué)."
     },
     {
       "id": "ee-vm-belarus",
@@ -814,9 +815,9 @@
       "url": "https://www.vm.ee/en/sanctions-government-republic-view-situation-belarus",
       "type": "html",
       "parser": "numberedlist",
-      "enabled": false,
+      "enabled": true,
       "minNames": 250,
-      "_note": "273 numbered designations on 2026-09-28 (page 'Last updated: 26.08.2025'); regulation of the Government of 28 August 2020 No 65; measure: prohibition on entry. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); the list is published only as a web page of numbered lines, read by parseNumberedNameList. Page fetched 2026-09-28 via an external fetcher (HTTP 200). ADDED DISABLED pending a source-probe run on a GitHub runner: enable only if the probe's 'Parsed by the registry parser' section shows the names with the minNames floor met."
+      "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36391541492 (GitHub runner, branch claude/sharp-davinci-asendp @ cf75f3b) fetched HTTP 200 text/html (131,871 bytes, via Cloudflare) and parseNumberedNameList read 615 names (minNames 250, met) — the 273 <ol><li> designations plus their Belarusian/Russian Cyrillic variants. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); regulation of the Government of 28 August 2020 No 65; measure: prohibition on entry (entry-ban designations, not an asset freeze — label accordingly)."
     },
     {
       "id": "ee-vm-human-rights",

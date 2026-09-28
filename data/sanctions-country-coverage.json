@@ -263,8 +263,8 @@
     },
     {
       "country": "Estonia",
-      "status": "pending",
-      "note": "three official MFA list pages (International Sanctions Act) staged disabled with a numbered-list parser, pending a source-probe run",
+      "status": "screened",
+      "note": "screened: ee-vm-belarus (official MFA list, International Sanctions Act; 615 names) runner-verified by source-probe run 36391541492 on 2026-09-28; ee-vm-human-rights and ee-vm-russia-ukraine staged, pending their own probe runs",
       "sources": [
         "ee-vm-belarus",
         "ee-vm-human-rights",

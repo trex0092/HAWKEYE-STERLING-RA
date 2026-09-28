@@ -23,6 +23,29 @@ bump merged to `main`.
   All three stay disabled until a source-probe run on a runner shows the
   parse. `www.vm.ee:443` is added to the egress allowlist, and the register
   moves Estonia from `identified` to `pending`.
+- **Poland spreadsheet reader.** Runner probe 36391592244 found the correct
+  `.xlsx` via `linkMatch` (200,687 bytes), but the parser read 0 names: the
+  name header is Polish (`Nazwisko i imię`). The XLSX reader now accepts it,
+  skips rows with a struck-off date (`Data wykreślenia z listy`), and screens
+  a parenthetical alias on its own. Poland stays disabled until a probe
+  shows the floor met.
+- **Estonia screened: `ee-vm-belarus` enabled.** Runner probe 36391541492
+  read 615 names against a floor of 250. The register moves Estonia to
+  `screened`; its two other lists stay disabled until their own probes run.
+- **Estonia parser reads `<ol><li>` lists too.** Runner probe 36391013267
+  showed the Belarus page renders its 273 designations as an ordered list,
+  with the numbers added by the browser, so the parser found 0 names and the
+  source stayed disabled. Items of any ordered list with 3 or more entries
+  now screen, and breadcrumb lists never do. The fetched page now yields
+  615 names: 273 entries plus their Latin and Cyrillic variants.
+- **Discovery: optional `linkMatch` for pages with a generic link stem.**
+  gov.pl serves every file as `/attachment/<uuid>`. The MSWiA page links one
+  decision PDF per designee beside the single spreadsheet, and source-probe
+  run 36390719857 showed the stem alone picking an 11-page PDF. That run
+  found 0 names against a floor of 100, so the source correctly stayed
+  disabled. With `linkMatch`, exactly one anchor must contain the string
+  (Poland uses `Format: xlsx`); zero or several anchors return nothing, so
+  the list fails loudly.
 
 - **Sanctions: Lithuania, Czechia and Moldova national lists now screened**
   (`data/sanctions-extra.json`). Each was enabled only after a source-probe

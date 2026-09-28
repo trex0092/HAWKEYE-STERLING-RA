@@ -616,6 +616,30 @@ const dashXlsx = makeZip([
 const dashNames = parseDfatXlsx(dashXlsx);
 check('XLSX reader drops an all-dash "----" placeholder, keeps the real name',
   dashNames.includes('ZEDPAY') && !dashNames.some(n => /^-+$/.test(n)));
+/* Poland MSWiA workbook — header and rows from source-probe run 36391592244:
+   "Nazwisko i imię" is the name column; a row with a "Data wykreślenia z
+   listy" (struck-off date) never screens; a parenthetical alias screens too. */
+const PL_SHARED = '<sst>' +
+  ['Nazwisko i imię', 'Dane identyfikacyjne osoby', 'Data umieszczenia na liście', 'Data wykreślenia z listy',
+   'ALAUDINOV Apti Aronovich', 'urodzony 5 października 1973 r.', '26.04.2022',
+   'BELOV Alexey (BELOV Alexy)', 'STRUCKOFF Ivan', '01.01.2024']
+    .map(s => '<si><t>' + s + '</t></si>').join('') + '</sst>';
+const PL_SHEET = '<worksheet><sheetData>' +
+  '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c></row>' +
+  '<row r="2"><c r="A2" t="s"><v>4</v></c><c r="B2" t="s"><v>5</v></c><c r="C2" t="s"><v>6</v></c></row>' +
+  '<row r="3"><c r="A3" t="s"><v>7</v></c><c r="C3" t="s"><v>6</v></c></row>' +
+  '<row r="4"><c r="A4" t="s"><v>8</v></c><c r="C4" t="s"><v>6</v></c><c r="D4" t="s"><v>9</v></c></row>' +
+  '</sheetData></worksheet>';
+const plNames = parseDfatXlsx(makeZip([
+  { name: 'xl/sharedStrings.xml', data: PL_SHARED },
+  { name: 'xl/worksheets/sheet1.xml', data: PL_SHEET },
+]));
+check('XLSX (Poland MSWiA): "Nazwisko i imię" is read as the name column',
+  plNames.includes('ALAUDINOV Apti Aronovich') && !plNames.some(n => /urodzony/.test(n)));
+check('XLSX (Poland MSWiA): a parenthetical alias screens alone and without it',
+  plNames.includes('BELOV Alexey') && plNames.includes('BELOV Alexy'));
+check('XLSX (Poland MSWiA): a struck-off row (Data wykreślenia set) never screens',
+  !plNames.some(n => /STRUCKOFF/.test(n)));
 const SAT = '"Informacion actualizada",,,\n' +
   'Listado completo de contribuyentes,,,\n' +
   'No,RFC,Nombre del Contribuyente,Situacion del contribuyente\n' +
@@ -726,6 +750,18 @@ check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') =
   check('EE list: un-numbered prose and dates never screen',
     !ee.some(n => /Sanctions Act|updated|directive/i.test(n)));
   check('parseList routes parser numberedlist', parseList({ id: 'ee-x', parser: 'numberedlist' }, EE).length === ee.length);
+  /* The Belarus page renders the list as <ol><li> — numbers come from the
+     browser (runner probe 36391013267 parsed 0 names before this). Markup
+     copied from the live page, breadcrumb <ol> included. */
+  const BY = '<ol class="breadcrumb breadcrumb-vp"><li><a href="/en">Home</a></li><li>The sanctions of the Government</li></ol>'
+    + '<div class="field__item"><ol>\n\t<li>Alexander Grigoryevich LUKASHENKO (Аляксандр Рыгоравiч ЛУКАШЭНКА; Александр Григорьевич ЛУКАШЕНКО)</li>\n'
+    + '\t<li>Viktor Aleksandrovich LUKASHENKO&nbsp;(Вiктар Аляксандаравiч ЛУКАШЭНКА; Виктор Александрович ЛУКАШЕНКО)</li>\n'
+    + '\t<li>Maxim RYZHENKOV&nbsp;(РЫЖАНКОЎ Максім Уладзіміравіч, РЫЖЕНКОВ Максим Владимирович)</li>\n</ol></div>';
+  const by = parseNumberedNameList(BY);
+  check('EE list: <ol><li> items screen with their Cyrillic variants',
+    by.includes('Alexander Grigoryevich LUKASHENKO') && by.includes('Александр Григорьевич ЛУКАШЕНКО')
+    && by.includes('Viktor Aleksandrovich LUKASHENKO') && by.includes('РЫЖЕНКОВ Максим Владимирович'));
+  check('EE list: breadcrumb <ol> never screens', !by.some(n => /sanctions of the Government|Home/.test(n)));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
