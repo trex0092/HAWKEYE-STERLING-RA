@@ -23,6 +23,12 @@ bump merged to `main`.
   All three stay disabled until a source-probe run on a runner shows the
   parse. `www.vm.ee:443` is added to the egress allowlist, and the register
   moves Estonia from `identified` to `pending`.
+- **Estonia parser reads `<ol><li>` lists too.** Runner probe 36391013267
+  showed the Belarus page renders its 273 designations as an ordered list,
+  with the numbers added by the browser, so the parser found 0 names and the
+  source stayed disabled. Items of any ordered list with 3 or more entries
+  now screen, and breadcrumb lists never do. The fetched page now yields
+  615 names: 273 entries plus their Latin and Cyrillic variants.
 - **Discovery: optional `linkMatch` for pages with a generic link stem.**
   gov.pl serves every file as `/attachment/<uuid>`. The MSWiA page links one
   decision PDF per designee beside the single spreadsheet, and source-probe

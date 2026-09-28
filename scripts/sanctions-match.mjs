@@ -930,8 +930,8 @@ export function parseHtmlTable(body) {
    too (split on ; , or /, leading "also"/"ka" dropped). "SURNAME, Given"
    is turned into "Given SURNAME". Single-token fragments (a bare given name
    such as the "(Grigory)" in "Hryhory (Grigory) Yuryevich AZARONAK") are not
-   screened alone — they would match half the world. Lines that do not start
-   with a number never screen. */
+   screened alone — they would match half the world. Only numbered lines and
+   the items of a real ordered list screen; prose never does. */
 export function parseNumberedNameList(body) {
   /* Line breaks become a visible sentinel (U+241E) before tag stripping,
      because htmlText collapses all whitespace, newlines included. */
@@ -943,10 +943,22 @@ export function parseNumberedNameList(body) {
     const v = String(n || '').replace(/^\s*(also|ka)\s+/i, '').replace(/\s+/g, ' ').trim();
     if (v.split(' ').length >= 2) out.push(flip(v));
   };
+  const entries = [];
   for (const raw of lines) {
     const m = raw.trim().match(/^\d{1,4}\.\s+(.+)$/);
-    if (!m) continue;
-    const entry = m[1];
+    if (m) entries.push(m[1]);
+  }
+  /* The same page family also renders lists as <ol><li> (the numbers come
+     from the browser — the Belarus page, source-probe run 36391013267: 273
+     items, 0 numbered text lines). Each <li> of an ordered list with 3+
+     items is an entry; breadcrumb <ol>s (2 items, class "breadcrumb") never
+     are. */
+  for (const [, attrs, inner] of String(body || '').matchAll(/<ol\b([^>]*)>([\s\S]*?)<\/ol>/gi)) {
+    if (/breadcrumb/i.test(attrs)) continue;
+    const items = [...inner.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map(x => htmlText(x[1]));
+    if (items.length >= 3) entries.push(...items.filter(Boolean));
+  }
+  for (const entry of entries) {
     add(entry.replace(/\([^()]*(?:\)|$)/g, ' '));
     for (const [, inner] of entry.matchAll(/\(([^()]*)(?:\)|$)/g)) {
       for (const part of inner.split(';')) {

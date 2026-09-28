@@ -726,6 +726,18 @@ check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') =
   check('EE list: un-numbered prose and dates never screen',
     !ee.some(n => /Sanctions Act|updated|directive/i.test(n)));
   check('parseList routes parser numberedlist', parseList({ id: 'ee-x', parser: 'numberedlist' }, EE).length === ee.length);
+  /* The Belarus page renders the list as <ol><li> — numbers come from the
+     browser (runner probe 36391013267 parsed 0 names before this). Markup
+     copied from the live page, breadcrumb <ol> included. */
+  const BY = '<ol class="breadcrumb breadcrumb-vp"><li><a href="/en">Home</a></li><li>The sanctions of the Government</li></ol>'
+    + '<div class="field__item"><ol>\n\t<li>Alexander Grigoryevich LUKASHENKO (Аляксандр Рыгоравiч ЛУКАШЭНКА; Александр Григорьевич ЛУКАШЕНКО)</li>\n'
+    + '\t<li>Viktor Aleksandrovich LUKASHENKO&nbsp;(Вiктар Аляксандаравiч ЛУКАШЭНКА; Виктор Александрович ЛУКАШЕНКО)</li>\n'
+    + '\t<li>Maxim RYZHENKOV&nbsp;(РЫЖАНКОЎ Максім Уладзіміравіч, РЫЖЕНКОВ Максим Владимирович)</li>\n</ol></div>';
+  const by = parseNumberedNameList(BY);
+  check('EE list: <ol><li> items screen with their Cyrillic variants',
+    by.includes('Alexander Grigoryevich LUKASHENKO') && by.includes('Александр Григорьевич ЛУКАШЕНКО')
+    && by.includes('Viktor Aleksandrovich LUKASHENKO') && by.includes('РЫЖЕНКОВ Максим Владимирович'));
+  check('EE list: breadcrumb <ol> never screens', !by.some(n => /sanctions of the Government|Home/.test(n)));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
