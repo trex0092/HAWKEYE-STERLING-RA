@@ -76,14 +76,22 @@ export function assessRuntime({
 
   const e = results?.enrichment || {};
   const backbones = new Set(arr(e.amBackbones).map(String));
+  const backboneFailures = e.amBackboneFailures || {};
   const adverseReasons = [];
   if (num(results?.screened) <= 0) adverseReasons.push('no subjects were screened');
   if (num(e.skipped) > 0) adverseReasons.push(num(e.skipped) + ' subjects skipped enrichment');
   if (num(e.amErrors) > 0) adverseReasons.push(num(e.amErrors) + ' subjects had adverse-media errors');
   if (num(e.amPartial) > 0) adverseReasons.push(num(e.amPartial) + ' subjects had partial adverse-media coverage');
   if (num(e.amLocalesPerSubject) <= 0) adverseReasons.push('Google News locale sweep did not run');
-  if (!backbones.has('GDELT global index')) adverseReasons.push('GDELT global index did not run');
-  if (!backbones.has('Bing News')) adverseReasons.push('Bing News did not run');
+  if (!backbones.has('Google News RSS') || num(backboneFailures.googleNews) > 0) {
+    adverseReasons.push('Google News failed for ' + num(backboneFailures.googleNews) + ' subject(s)');
+  }
+  if (!backbones.has('GDELT global index') || num(backboneFailures.gdelt) > 0) {
+    adverseReasons.push('GDELT failed for ' + num(backboneFailures.gdelt) + ' subject(s)');
+  }
+  if (!backbones.has('Bing News') || num(backboneFailures.bing) > 0) {
+    adverseReasons.push('Bing News failed for ' + num(backboneFailures.bing) + ' subject(s)');
+  }
   if (num(e.amMatrixTotal) !== num(expectedAdverseMatrix)) {
     adverseReasons.push('adverse-media matrix mismatch: run ' + num(e.amMatrixTotal) + ', configured ' + num(expectedAdverseMatrix));
   }
@@ -93,6 +101,11 @@ export function assessRuntime({
     matrixTotal: num(e.amMatrixTotal),
     rotationCycleDays: num(e.amRotationCycleDays),
     globalBackbones: [...backbones],
+    backboneFailures: {
+      googleNews: num(backboneFailures.googleNews),
+      gdelt: num(backboneFailures.gdelt),
+      bing: num(backboneFailures.bing),
+    },
     errors: num(e.amErrors),
     partialSubjects: num(e.amPartial),
     skippedSubjects: num(e.skipped),
