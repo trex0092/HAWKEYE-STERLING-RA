@@ -20,12 +20,11 @@
  * That is the same defect this repo has now found at four other layers:
  * counted as covered, actually not covered, and silent about it.
  *
- * The fix is to compare something that cannot be forgotten. `netlify.toml`
- * sets `publish = "."` with no build step, so every served asset is a
- * checked-in file byte-for-byte. Hashing them is therefore an exact test of
- * "is production serving this commit's code?" — and any merge that changes
- * what the site serves necessarily changes a hash. Nobody has to remember
- * anything.
+ * The primary signal is now a Netlify-generated deploy marker:
+ * `data/deploy-meta.json`, written from Netlify's immutable `COMMIT_REF`
+ * during the build. That proves exactly which Git commit is live. Asset hashes
+ * remain a secondary integrity diagnostic, so Netlify/CDN serve-time rewriting
+ * can be surfaced without being misclassified as deployment staleness.
  *
  * SCOPE (stated, not silent)
  * --------------------------
@@ -203,6 +202,29 @@ async function lastChangedAt(name, { timeoutMs = 15000 } = {}) {
   }
 }
 
+
+async function fetchDeployMeta(origin, timeoutMs = 15000) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${origin}/data/deploy-meta.json`, {
+      signal: ac.signal,
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    });
+    if (!res.ok) return { ok: false, status: res.status, reason: `HTTP ${res.status}` };
+    const body = await res.json();
+    const commit = String(body?.commit || '').trim().toLowerCase();
+    if (!/^[0-9a-f]{40}$/.test(commit)) {
+      return { ok: false, status: res.status, reason: 'invalid or missing commit in deploy-meta.json' };
+    }
+    return { ok: true, commit, body };
+  } catch (err) {
+    return { ok: false, status: 0, reason: err?.name === 'AbortError' ? 'timed out' : String(err?.message || err) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchAsset(origin, name, timeoutMs) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -273,6 +295,19 @@ async function main() {
     process.exit(2);
   }
   const graceSeconds = Number.parseInt(process.env.GRACE_SECONDS || '86400', 10);
+  const expectedCommit = String(process.env.EXPECTED_DEPLOY_SHA || process.env.GITHUB_SHA || '').trim().toLowerCase();
+  const deployMeta = await fetchDeployMeta(origin);
+
+  if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit)) {
+    console.log(`deploy marker: live ${deployMeta.commit} · expected ${expectedCommit}`);
+    if (deployMeta.commit !== expectedCommit) {
+      annotate(`::error::PRODUCTION DRIFT — live deploy commit ${deployMeta.commit} does not match expected ${expectedCommit}.`);
+      process.exit(1);
+    }
+  } else if (/^[0-9a-f]{40}$/.test(expectedCommit)) {
+    console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); falling back to asset comparison`);
+  }
+
   const { results, decision } = await compare({ origin, graceSeconds });
 
   const width = Math.max(...results.map((r) => r.name.length));
@@ -298,6 +333,14 @@ async function main() {
   }
   console.log('');
   console.log(`verdict: ${decision.verdict.toUpperCase()} — ${decision.reason}`);
+
+  if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit) && deployMeta.commit === expectedCommit) {
+    if (!decision.ok) {
+      annotate(`::warning::Deploy commit is current, but ${decision.stale.length || decision.unreadable.length} served asset(s) differ or are unreadable. Treating this as serve-time integrity diagnostics, not deploy staleness.`);
+    }
+    console.log('verdict: CURRENT — deployed commit marker matches expected Git SHA');
+    return;
+  }
 
   if (decision.ok) {
     if (decision.verdict === 'lag') {
