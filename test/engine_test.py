@@ -4039,6 +4039,32 @@ _fc_zero = screen.build_unified_narrative(
 check("report: coverage is disclosed even on a zero-adverse-finding run",
       "News feed coverage this run" in _fc_zero)
 
+# (2b) REGRESSION (2026-09-28). The report tests above pass because they hand-build
+# `stats` with news_feed_coverage in it. The production stats dict in
+# screen_subject_set() lost both news_feed_coverage and am_skipped in the #573 rewrite
+# (2026-09-22): the readers stayed, the writers did not, so for six days every real
+# report dropped the coverage disclosure and claimed GDELT "runs on EVERY subject"
+# while its breaker was opening ~1 minute into every full sweep. Guard the whole class:
+# every key the unified report READS from `stats` must have a WRITER.
+import re as _re_ck
+_bun_i = _screen_src.index("def build_unified_narrative(")
+_bun_j = _re_ck.search(r"^def ", _screen_src[_bun_i + 10:], _re_ck.M)
+_bun_src = _screen_src[_bun_i:_bun_i + 10 + _bun_j.start()]
+_reads = set(_re_ck.findall(r"\bstats\.get\(\s*[\"']([A-Za-z_0-9]+)[\"']", _bun_src))
+_reads |= set(_re_ck.findall(r"\bstats\[\s*[\"']([A-Za-z_0-9]+)[\"']\s*\](?!\s*=[^=])", _bun_src))
+_lit_i = _screen_src.index('stats = {"customers_total"')
+_lit_j = _screen_src.index('"ai_mode": _ai_mode_label()}', _lit_i) + len('"ai_mode": _ai_mode_label()}')
+_writes = set(_re_ck.findall(r"[\"']([A-Za-z_0-9]+)[\"']\s*:", _screen_src[_lit_i:_lit_j]))
+_writes |= set(_re_ck.findall(r"\bstats\[\s*[\"']([A-Za-z_0-9]+)[\"']\s*\]\s*=[^=]", _screen_src))
+check("regression guard is looking at real data (the report reads several stats keys)",
+      len(_reads) >= 15 and len(_writes) >= 20)
+check("every stats key the unified report reads has a writer in screen_subject_set (missing: %s)"
+      % sorted(_reads - _writes), _reads <= _writes)
+check("production stats carries news_feed_coverage (the ONE-feed-only / GDELT-reach disclosure)",
+      "news_feed_coverage" in _writes)
+check("production stats carries am_skipped (the deadline-deferral disclosure)",
+      "am_skipped" in _writes)
+
 # (3) "AI-assisted triage" was reported while 557 of 557 model calls failed:
 # an HTTP error reply deliberately does not open the breaker, so nothing said so.
 _am_saved = (screen.ai.AI_ENABLED, screen.ai.LLM_TRIAGE, dict(screen.ai.LLM_CALLS), screen.ai._LLM_STATE["open"])

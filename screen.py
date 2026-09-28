@@ -7070,7 +7070,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "rotation_ledger_mature":
                  (_ledger_age_days(rotation_ledger.get("__started__"), run_time) or 0)
                  > rotation_overdue_limit_days(),
-             "am_blackout": counts["am_blackout"], "pep_mirror": counts["pep_mirror"],
+             "am_blackout": counts["am_blackout"], "am_skipped": counts.get("am_skipped", 0),
+             # Both keys were dropped by the #573 rewrite of this dict (2026-09-22): the report
+             # readers (news-feed coverage line, GDELT-reach note, deadline-deferral note) stayed,
+             # so every report silently lost its coverage disclosure and asserted GDELT reaches
+             # every subject. test/engine_test.py now fails if a report-read key has no writer.
+             "news_feed_coverage": feed_coverage_snapshot(),
+             "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "bulletin_failures": rb_failures,
              "adverse_repeat": repeat_patterns,
