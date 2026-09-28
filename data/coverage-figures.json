@@ -7,7 +7,7 @@
     "sanctionsLists": 66,
     "sanctionsJurisdictions": 45,
     "sanctionsCountriesResearched": 133,
-    "sanctionsCountriesCovered": 195,
+    "sanctionsCountriesCovered": 45,
     "adverseMediaCountriesCovered": 195,
     "pepCountriesCovered": 195
   },
@@ -18,7 +18,7 @@
     "sanctionsLists": "enabled sources in data/sanctions-sources.json + data/sanctions-extra.json (extra: with url or file), excluding alias-only sources (mergeInto)",
     "sanctionsCountriesResearched": "of the 195 countries in data/sanctions-country-coverage.json, how many have a recorded research outcome (screened, pending, identified or assessed-not-loadable) rather than not-researched",
     "sanctionsJurisdictions": "distinct issuing countries among those sources: the jurisdiction field, or for entries marked Global (a list's reach, not its issuer) the country named in the list title; UN, EU and development-bank lists are supranational and not counted",
-    "sanctionsCountriesCovered": "countries included in the worldwide sanctions screening scope; global consolidated lists apply irrespective of subject nationality, with national/regional lists layered where available",
+    "sanctionsCountriesCovered": "countries whose own national sanctions source is loaded by the screen today (status=screened in data/sanctions-country-coverage.json). Global UN/EU/US/UK backbones are separate baseline coverage and do not turn unresolved national-source gaps into covered countries",
     "adverseMediaCountriesCovered": "countries included in worldwide name-scoped adverse-media screening through GDELT and Bing News, with Google News editions adding regional depth",
     "pepCountriesCovered": "countries included in the worldwide PEP screening scope through the Wikidata public-office holder harvest; screening is not country-filtered"
   }
