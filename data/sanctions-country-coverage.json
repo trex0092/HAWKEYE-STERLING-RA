@@ -499,10 +499,11 @@
     },
     {
       "country": "Fiji",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list is referenced — the Fiji FIU \"Targeted Financial Sanctions\" page (fijifiu.gov.fj/FTR-Act-You/Targeted-Financial-Sanctions) links a \"Fiji Sanctions - Local List\" alongside the UNSC consolidated list (per the search index; the scraper could not read the link target). Legal basis, format and entries not yet verified"
     },
     {
       "country": "Finland",
@@ -1270,10 +1271,11 @@
     },
     {
       "country": "Samoa",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the APG Mutual Evaluation Report of Samoa (2015, fatf-gafi.org) found Samoa has a legal mechanism to designate under UNSCR 1373 (Counter Terrorism Act 2014) but that no designations had been made; no later national list found. Covered by the UN list (screened daily). Evidence is dated (2015)"
     },
     {
       "country": "San Marino",
@@ -1362,10 +1364,11 @@
     },
     {
       "country": "Solomon Islands",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the APG Mutual Evaluation Report of Solomon Islands (October 2019, fatf-gafi.org) found no legal framework for terrorism-related targeted financial sanctions and that the authorities had begun disseminating UN notices; no national list found. Covered by the UN list (screened daily). Evidence is dated (2019)"
     },
     {
       "country": "Somalia",
@@ -1616,7 +1619,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the United Nations Financial Sanctions Act 2017 allows prohibitions on persons designated by the UN Security Council or by the Prime Minister on the advice of the National Security Advisory Committee, with the FIU as sanctions secretariat (fiu.gov.vu; its \"UN Financial Sanctions\" page returned HTTP 404 on 2026-09-28); no published domestic list found"
     },
     {
       "country": "Venezuela",
