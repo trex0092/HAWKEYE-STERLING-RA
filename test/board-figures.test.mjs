@@ -123,7 +123,16 @@ console.log('\n— runtime worldwide screening assurance —\n');
     enrichment: {
       amErrors: 0, amPartial: 0, pepErrors: 0, skipped: 0,
       amLocalesPerSubject: 8, amRotationCycleDays: 9, amMatrixTotal: 79,
-      amBackbones: ['GDELT global index', 'Bing News'],
+      amBackboneFailures: { googleNews: 0, gdelt: 0, bing: 0 },
+      amBackbones: ['Google News RSS', 'GDELT global index', 'Bing News'],
+      pepLookupEnabled: true,
+      pepWorldwide: {
+        active: true,
+        count: 50000,
+        harvested: '2026-09-27T00:00:00.000Z',
+        partial: false,
+        expected: 50000,
+      },
     },
   };
   const pep = {
@@ -145,6 +154,19 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const am = assessRuntime({ results: amPartial, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
   check('runtime assurance fails when adverse-media coverage is partial',
     !am.domains.adverseMedia.operational);
+
+  const gdeltDown = structuredClone(results);
+  gdeltDown.enrichment.amBackboneFailures.gdelt = 1;
+  gdeltDown.enrichment.amBackbones = ['Google News RSS', 'Bing News'];
+  const gd = assessRuntime({ results: gdeltDown, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance fails when a configured adverse-media backbone did not answer',
+    !gd.domains.adverseMedia.operational && gd.domains.adverseMedia.reasons.some(r => r.includes('GDELT')));
+
+  const pepNotConsumed = structuredClone(results);
+  pepNotConsumed.enrichment.pepWorldwide.active = false;
+  const pc = assessRuntime({ results: pepNotConsumed, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance fails when the daily screen did not consume the worldwide PEP artifact',
+    !pc.domains.pep.operational);
 
   const partialPep = { ...pep, partial: true, expected: 60000 };
   const pp = assessRuntime({ results, pepDataset: partialPep, contract, nowMs, expectedAdverseMatrix: 79 });
