@@ -71,7 +71,7 @@ jobs:
           # Keep in step with the daily entries in scripts/freshness-check.mjs
           # CONTROLS (maxAgeDays 0). The freshness test pins that list; a new
           # daily control should be added in both places.
-          CONTROLS="sanctions-watch.yml weekly-adverse-media.yml regulatory-watch.yml sanctions-screen.yml fatf-watchdog.yml onboarding-screen.yml"
+          CONTROLS="sanctions-watch.yml weekly-adverse-media.yml regulatory-watch.yml sanctions-screen.yml screening-assurance.yml fatf-watchdog.yml onboarding-screen.yml"
           today="$(date -u +%Y-%m-%d)"
           rc=0
           for wf in $CONTROLS; do
