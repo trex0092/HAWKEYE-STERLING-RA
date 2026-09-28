@@ -61,10 +61,11 @@
     },
     {
       "country": "Armenia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Central Bank of Armenia \"Applicable Lists\" page (cba.am/en/applicable-lists/) links the \"List of Designated Persons Pursuant to the United Nations Security Council Resolution 1373\" as a PDF (cba.am/file_manager/FMC/FMC%20en/Regulations/20211021%20-%20National%20Designations%20List.pdf). PDF parse and name count not yet verified; www.cba.am is not reachable from this sandbox, so a runner probe is needed Reconciliation: this supersedes the registry's 2026-09-26 verdict (data/sanctions-extra.json, CIS/Caucasus cluster) that found \"no evidence of an active distinct national designation list\" — the CBA page links a 2021-10-21 national designations PDF."
     },
     {
       "country": "Australia",
@@ -116,10 +117,11 @@
     },
     {
       "country": "Bangladesh",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Bangladesh Financial Intelligence Unit FAQ (bfiu.org.bd/index.php/others/faq) states the Government, under the Anti-Terrorism Act 2009 (ss. 20 and 20A), may by order proscribe persons or entities or enlist them in the sanction list, and that 8 organisations are currently listed as terrorist entities and banned by official gazette. Publication format (gazette notifications) not machine-readable as found"
     },
     {
       "country": "Barbados",
@@ -149,17 +151,22 @@
     },
     {
       "country": "Belize",
-      "status": "not-researched",
+      "status": "pending",
       "baseline": [
         "UN"
-      ]
+      ],
+      "sources": [
+        "bz-fiu-consolidated"
+      ],
+      "note": "official FIU \"Consolidated Belize Sanctions List\" (High Court orders; XLSX/XML/PDF) staged disabled. Runner probe 36397059655 fetched the XLSX: UN-layout sheet with BZ-prefixed UN reference numbers, i.e. substantially a re-export of the UN list already screened; kept disabled until a UN-layout reader exists and any non-UN (domestic) rows are confirmed"
     },
     {
       "country": "Benin",
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): CENTIF-BJ (centif.bj) is the FIU; a decree of 21 June 2017 designates the competent freezing authority and an interministerial order of 22 February 2018 set up the consultative commission on administrative freezing (per the 2023 GIABA follow-up report); no published national list found yet"
     },
     {
       "country": "Bhutan",
@@ -191,7 +198,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Counter-Terrorism Act subsidiary legislation (botswanalaws.com) defines designated persons with reference to UNSC resolutions; the Financial Intelligence Agency operates under the Financial Intelligence Act 2022; no published national list found yet"
     },
     {
       "country": "Brazil",
@@ -350,10 +358,11 @@
     },
     {
       "country": "Cuba",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Ministry of the Interior \"Lista Nacional de personas y entidades que han sido sometidas a investigaciones penales y se encuentran buscadas por las autoridades cubanas\" (Resolución 19/2023, Gaceta Oficial of 7 December 2023, as published by the Ministry of Foreign Affairs, cubaminrex.cu), updated by Resolución 13/2025 in July 2025 (per press reports: 62 persons and 20 entities). Not staged: press reports say the entries are mostly exiled opposition activists and media figures, so screening this list is an MLRO policy decision"
     },
     {
       "country": "Cyprus",
@@ -487,17 +496,19 @@
     },
     {
       "country": "Ethiopia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: national designations exist — the Council of Ministers resolution of 1 May 2021 designated the TPLF and \"Shene\" (OLA) as terrorist organisations under Proclamation No. 1176/2020 (Embassy of Ethiopia, ethiopianembassy.org; also reported in the US State Department Country Reports on Terrorism 2021). No consolidated published list found and the current status of these designations is not verified. Not staged: designations of political/armed movements are an MLRO policy decision"
     },
     {
       "country": "Fiji",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list is referenced — the Fiji FIU \"Targeted Financial Sanctions\" page (fijifiu.gov.fj/FTR-Act-You/Targeted-Financial-Sanctions) links a \"Fiji Sanctions - Local List\" alongside the UNSC consolidated list (per the search index; the scraper could not read the link target). Legal basis, format and entries not yet verified"
     },
     {
       "country": "Finland",
@@ -554,10 +565,11 @@
     },
     {
       "country": "Ghana",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: under the Anti-Terrorism Act 2008 (Act 762), the Anti-Terrorism (Amendment) Act 2012 (Act 842; mint.gov.gh) and the Anti-Terrorism Regulations 2012, the Attorney-General publishes the listing and de-listing of individuals and entities designated by the UN Security Council within 24 hours of receipt from the Minister for Foreign Affairs; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Greece",
@@ -602,7 +614,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the FIU guidelines on targeted financial sanctions (fiu.gov.gy, Guideline No. 1 of 2022 and TFS procedures of 27 Oct 2023) provide for persons designated by the UNSC and for entities \"specified\" by order of the Minister of Finance under section 2(2) of the AML/CFT Act 2009 (UNSCR 1373); whether any national specification order is published is not yet confirmed"
     },
     {
       "country": "Haiti",
@@ -669,7 +682,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "black"
+      "fatf": "black",
+      "note": "partial research 2026-09-28 (status unchanged): the only national \"terrorist\" designations found are parliamentary laws designating foreign state armed forces (e.g. US CENTCOM, 2019; European armies, 2026) under the law countering the IRGC designation (press reports: CBS News, The Nation); these are not a person/entity screening list. Iran is on the FATF call-for-action list (see data/fatf-assessments.json)"
     },
     {
       "country": "Iraq",
@@ -771,7 +785,7 @@
         "UN"
       ],
       "fatf": "grey",
-      "note": "partial research 2026-09-28 (status unchanged): the MOFA Committee for the Implementation of Security Council Resolutions (Cabinet Resolution No 1396 of 11 November 2013; mofa.gov.kw/en/CTC/) publishes UN Security Council resolution and sanctions-list updates; whether a separate national list is published is not yet confirmed"
+      "note": "partial research 2026-09-28 (status unchanged): the MOFA Committee for the Implementation of Security Council Resolutions (Cabinet Resolution No 1396 of 11 November 2013; mofa.gov.kw/en/CTC/) publishes UN Security Council resolution and sanctions-list updates; whether a separate national list is published is not yet confirmed; the registry's 2026-09-26 verdict (data/sanctions-extra.json) records that Kuwait designates jointly through the Terrorist Financing Targeting Center, whose joint designations flow through OFAC's SDN list (already screened)"
     },
     {
       "country": "Kyrgyzstan",
@@ -871,10 +885,11 @@
     },
     {
       "country": "Malawi",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: per the ESAAMLG Mutual Evaluation Report of Malawi (September 2019, fatf-gafi.org), Malawi's practice is to download the UN consolidated sanctions list and send it to supervisory authorities and reporting institutions, with TFS implementation at a formative stage; no national list found. Covered by the UN list (screened daily). Evidence is dated (2019)"
     },
     {
       "country": "Malaysia",
@@ -888,10 +903,11 @@
     },
     {
       "country": "Maldives",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — terrorist organisations designated under section 18(a) of the Anti-Terrorism Act (Law No. 32/2015) are published in the Government Gazette (17 organisations designated in September 2019, per the US State Department Country Reports on Terrorism 2019; list republished in the gazette on 9 October 2023 per press reports); the National Counter Terrorism Centre is nctc.gov.mv. Gazette format and current entries not yet verified"
     },
     {
       "country": "Mali",
@@ -978,7 +994,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Financial Information Unit (fiu.mongolbank.mn) operates under the 2013 Law on Combating Money Laundering and Terrorism Financing (UNODC-hosted text); no published national designation list found yet"
     },
     {
       "country": "Montenegro",
@@ -1000,25 +1017,28 @@
     },
     {
       "country": "Mozambique",
-      "status": "not-researched",
-      "baseline": [
-        "UN"
-      ]
-    },
-    {
-      "country": "Myanmar",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
       ],
-      "fatf": "black"
+      "note": "researched 2026-09-28: a national list exists — the \"Lista Nacional\" of persons, groups and entities designated by the Attorney General as terrorists, foreign terrorist fighters or financiers, defined in the GIFiM guidelines on specific financial sanctions (22 August 2025, published by Banco de Moçambique, bancomoc.mz); GIFiM (gifim.gov.mz) also relays the UN consolidated list. Publication of the national list itself not yet verified"
+    },
+    {
+      "country": "Myanmar",
+      "status": "identified",
+      "baseline": [
+        "UN"
+      ],
+      "fatf": "black",
+      "note": "researched 2026-09-28: national designations exist — the military authorities' Anti-Terrorism Central Committee declared the CRPH, the National Unity Government and the People's Defence Force terrorist organisations under the 2014 Counter-Terrorism Law (May 2021; state broadcaster Myanmar International TV, myanmaritv.com; also Irrawaddy, VOA) and in September 2024 added major ethnic armed groups (Al Jazeera). No consolidated machine-readable list found. Not staged: these designations target opposition/resistance bodies, so screening them is an MLRO policy decision. Myanmar is on the FATF call-for-action list (see data/fatf-assessments.json)"
     },
     {
       "country": "Namibia",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Financial Intelligence Centre \"Targeted Financial Sanctions\" page (fic.na) directs screening against the UN Security Council sanctions lists under the Prevention and Combating of Terrorist and Proliferation Activities Act, and FIC circulars (e.g. Circular 07 of 2026) relay UNSC list changes; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Nauru",
@@ -1106,7 +1126,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — National Committee for Combating Terrorism (TFS Committee) Decision No 1 (published by the Central Bank of Oman, cbo.gov.om) defines the \"List\" as including \"the local list where persons are designated pursuant to a decision issued by the TFS Committee\" alongside the UN lists; the local list's publication format is not yet verified"
+      "note": "researched 2026-09-28: a national list exists — National Committee for Combating Terrorism (TFS Committee) Decision No 1 (published by the Central Bank of Oman, cbo.gov.om) defines the \"List\" as including \"the local list where persons are designated pursuant to a decision issued by the TFS Committee\" alongside the UN lists; the local list's publication format is not yet verified Reconciliation: the registry's 2026-09-26 verdict (data/sanctions-extra.json) cites Oman's December 2024 MENAFATF evaluation that Oman \"is still hesitant to proactively propose designations on its own motion to the local list\"; a later press report (Muscat Daily) describes 10 persons and 1 entity added to the Local Terrorist List, so the list may now have entries — unverified."
     },
     {
       "country": "Pakistan",
@@ -1127,8 +1147,9 @@
     },
     {
       "country": "Palestine",
-      "status": "not-researched",
-      "baseline": []
+      "status": "identified",
+      "baseline": [],
+      "note": "researched 2026-09-28: a national list exists — the Palestine Monetary Authority \"Local Freezing List\" (pma.ps/en/Legislation/AMLCFT/LocalFreezingList) of persons sanctioned by the Security Council Resolutions Enforcing Committee formed under Decree No. (14) of 2015, with transfer prohibitions (AML/CFT Decree-Law No. 39 of 2022, ffu.ps). Not a UN member, so no UN baseline row; page format and name count not yet verified by a runner probe"
     },
     {
       "country": "Panama",
@@ -1211,7 +1232,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — per KoFIU \"CFT Regime\" (kofiu.go.kr/eng/policy/ptfps02_1.do), the Financial Services Commission designates and publicly announces \"Persons Subject to Restrictions on Financial Transactions\" under Article 4(1) of the Act on Prohibition of Financing for Offences of Public Intimidation (first designation of 974 individuals and organisations on 22 December 2008); the current list is published as the FSC \"Regulations on the Designation/Revocation of Persons Subject to Restrictions on Financial Transactions, Etc.\" on law.go.kr. Format (regulation annex) and machine readability not yet verified"
+      "note": "researched 2026-09-28: a national list exists — per KoFIU \"CFT Regime\" (kofiu.go.kr/eng/policy/ptfps02_1.do), the Financial Services Commission designates and publicly announces \"Persons Subject to Restrictions on Financial Transactions\" under Article 4(1) of the Act on Prohibition of Financing for Offences of Public Intimidation (first designation of 974 individuals and organisations on 22 December 2008); the current list is published as the FSC \"Regulations on the Designation/Revocation of Persons Subject to Restrictions on Financial Transactions, Etc.\" on law.go.kr. Format (regulation annex) and machine readability not yet verified Reconciliation: the registry's 2026-09-26 verdict (data/sanctions-extra.json, Asia national-lists cluster) records KoFIU describing designations as automatic mirrors of UN Security Council designations; whether the FSC list also carries non-UN (autonomous) designations is not verified here, so no source is staged."
     },
     {
       "country": "Romania",
@@ -1231,10 +1252,11 @@
     },
     {
       "country": "Rwanda",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Domestic List of designated persons (terrorists and terrorism financiers, 25 individuals, approved 14 October 2025) published by the Ministry of Justice as a PDF (minijust.gov.rw/fileadmin/user_upload/Minijust/Publications/Domestic_list_of_designated_persons/Domestic_list__14.10.2025.pdf), announced by the Financial Intelligence Centre public notice (fic.gov.rw) under the 2021 TFS Regulations. Not staged: entries are linked to groups including the exiled opposition Rwanda National Congress (per press reports), so screening this list is an MLRO policy decision; PDF parse not yet verified"
     },
     {
       "country": "Saint Kitts and Nevis",
@@ -1259,10 +1281,11 @@
     },
     {
       "country": "Samoa",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the APG Mutual Evaluation Report of Samoa (2015, fatf-gafi.org) found Samoa has a legal mechanism to designate under UNSCR 1373 (Counter Terrorism Act 2014) but that no designations had been made; no later national list found. Covered by the UN list (screened daily). Evidence is dated (2015)"
     },
     {
       "country": "San Marino",
@@ -1311,14 +1334,16 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Seychelles FIU publishes \"International sanctions\" and \"Sanctions List\" pages (seychellesfiu.sc) under the Prevention of Terrorism (Implementation of UNSC Resolutions on Suppression of Terrorism) Regulations 2015, which direct supervisors to circulate sanctions lists on receipt; the \"Sanctions List\" page was not read, so whether it carries national designations is not confirmed"
     },
     {
       "country": "Sierra Leone",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: per the GIABA Mutual Evaluation Report of Sierra Leone (2020, fatf-gafi.org), the Financial Intelligence Agency receives the UN lists of designated persons from the Ministry of Foreign Affairs for freezing; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Singapore",
@@ -1350,17 +1375,19 @@
     },
     {
       "country": "Solomon Islands",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the APG Mutual Evaluation Report of Solomon Islands (October 2019, fatf-gafi.org) found no legal framework for terrorism-related targeted financial sanctions and that the authorities had begun disseminating UN notices; no national list found. Covered by the UN list (screened daily). Evidence is dated (2019)"
     },
     {
       "country": "Somalia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the National Anti-Money Laundering Committee \"Targeted Financial Sanction List\" pages (namlc.gov.so/targeted-financial-sanction-list/…, namlc.gov.so/list-of-financial-sanction-targets/…) and the Financial Reporting Center page \"Targeted Financial Sanction List\" (frc.gov.so/list-of-financial-sanction-targets-copy/) publish national designations of al-Shabaab financiers under Article 6 of the Targeted Financial Sanctions Act 2023. Page format and name count not yet verified by a runner probe"
     },
     {
       "country": "South Africa",
@@ -1402,7 +1429,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the US State Department Country Reports on Terrorism 2013/2020 describe the Sudan Financial Information Unit circulating the UN 1267 list (and US lists) to financial institutions; no current official source found for a national list"
     },
     {
       "country": "Suriname",
@@ -1442,17 +1470,19 @@
     },
     {
       "country": "Tajikistan",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the National Bank of Tajikistan Financial Monitoring Department keeps a public list of over 2,400 names of suspected terrorists as defined by the authorities, which the US State Department Country Reports on Terrorism 2023 (state.gov) says also includes opposition journalists and activists. Not staged: screening this list is an MLRO policy decision"
     },
     {
       "country": "Tanzania",
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Prevention of Terrorism Act (R.E. 2023, published by the FIU, fiu.go.tz) provides for domestic designations; no published national designation list found yet"
     },
     {
       "country": "Thailand",
@@ -1476,7 +1506,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): CENTIF-TG (centif.tg) is the FIU; a consultative commission on asset freezing was established by Decree 2018-123, and Togo's report to the UN General Assembly Sixth Committee (un.org) describes the freezing procedure under the uniform AML/CFT law (arts. 100–107); no published national list found yet"
     },
     {
       "country": "Tonga",
@@ -1530,10 +1561,11 @@
     },
     {
       "country": "Uganda",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists in statute — the Anti-Terrorism Act 2002 (ULII, ulii.org) defines \"terrorist organisation\" as an organisation specified in its Second Schedule, which lists four organisations, with ministerial powers under section 10; the Anti-Terrorism Regulations 2025 (SI 75 of 2025, ulii.org) also apply. The Financial Intelligence Authority page \"Sanctions\" (fia.go.ug) was not read. No machine-readable national list found"
     },
     {
       "country": "Ukraine",
@@ -1598,7 +1630,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the United Nations Financial Sanctions Act 2017 allows prohibitions on persons designated by the UN Security Council or by the Prime Minister on the advice of the National Security Advisory Committee, with the FIU as sanctions secretariat (fiu.gov.vu; its \"UN Financial Sanctions\" page returned HTTP 404 on 2026-09-28); no published domestic list found"
     },
     {
       "country": "Venezuela",
@@ -1627,17 +1660,19 @@
     },
     {
       "country": "Zambia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: national listings exist in law — per the Financial Intelligence Centre (fic.gov.zm, \"UNSCR Sanctions List\" FAQ and TFS guidance), the Anti-Terrorism and Non-Proliferation Act No. 6 of 2018 prohibits dealings with persons on the UNSC lists or \"local listings as established by the National Anti-Terrorism Centre\" (NATC, natc.gov.zm, which manages listing and de-listing); the NATC local list publication is not yet verified"
     },
     {
       "country": "Zimbabwe",
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): SI 56 of 2019 under the Suppression of Foreign and International Terrorism Act implements UNSCR 1267 and 1373 (per the FIU \"AML/CFT Framework\" page, fiu.co.zw); no published national designation list found yet"
     }
   ]
 }

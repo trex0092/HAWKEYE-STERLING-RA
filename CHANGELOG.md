@@ -10,16 +10,28 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Belize: `bz-fiu-consolidated` staged (disabled).** This is the FIU's
+  official Consolidated Belize Sanctions List: High Court orders covering
+  domestic and UNSCR designations, published as XLSX. Its month-named file
+  is found from the FIU page, and discovery must match exactly one `.xlsx`
+  link, because a month name cannot be sorted by date. `fiubelize.org` is
+  added to the screen's egress allowlist. Runner probe 36397059655 fetched the
+  file but found a UN-layout re-export (UN references prefixed "BZ"). The
+  generic reader splits its name columns into single-word fragments, so the
+  source stays **disabled**. It is redundant with the UN list, as with
+  `za-fic-tfs`.
 - **Register research (FATF-listed, Gulf, Asia): Oman, Nepal, Vietnam, Côte
-  d'Ivoire, Republic of Korea, China, Algeria, Mali, Burkina Faso, Niger**
+  d'Ivoire, Republic of Korea, China, Algeria, Mali, Burkina Faso, Niger,
+  Armenia, Tajikistan, Bangladesh, Ethiopia, Zambia, Rwanda, Mozambique, Somalia, Uganda, Palestine, Fiji, Cuba, Myanmar, Maldives**
   recorded as `identified`, each with the official source for its
   national list. Vietnam's national list is not staged: its entries include
   overseas political organisations, so screening it is an MLRO policy
-  decision; the same applies to Mali, Burkina Faso and Niger, whose lists
-  reportedly include journalists and political figures. Papua New Guinea is `assessed-not-loadable` (no domestic
-  designations; UN lists only). Kuwait, Lebanon, Laos, DR Congo, Syria,
-  Haiti, Bosnia and Herzegovina, Brunei and Senegal get partial notes. Researched rows:
-  89 → 100.
+  decision; the same applies to Mali, Burkina Faso, Niger, Tajikistan, Rwanda, Cuba and Myanmar, whose
+  lists reportedly include journalists and political figures. Papua New Guinea (no domestic designations), Namibia, Ghana, Sierra
+  Leone, Samoa, Solomon Islands and Malawi (UN lists only) are
+  `assessed-not-loadable`. Kuwait, Lebanon, Laos, DR Congo, Syria,
+  Haiti, Bosnia and Herzegovina, Brunei, Senegal, Togo, Benin, Zimbabwe, Botswana, Sudan, Tanzania, Iran, Vanuatu, Guyana, Mongolia and Seychelles get partial notes. Researched rows:
+  89 → 120.
 - **Register research: Norway, Iceland, Montenegro, San Marino, Malta,
   Liechtenstein, North Macedonia** recorded as
   `assessed-not-loadable`. Each implements UN sanctions (and, for the first
