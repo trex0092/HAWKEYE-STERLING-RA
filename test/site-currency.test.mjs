@@ -11,7 +11,7 @@
         site is not a current site, and that distinction is the whole point.
 
    Usage: node test/site-currency.test.mjs */
-import { decide, discoverServedAssets, firstDivergence, sha256 } from '../scripts/site-currency.mjs';
+import { decide, discoverServedAssets, firstDivergence, isDeployRelevantPath, sha256 } from '../scripts/site-currency.mjs';
 
 let passed = 0, failed = 0;
 const check = (name, cond) => { if (cond) { passed++; console.log('  ok  ' + name); } else { failed++; console.log('FAIL  ' + name); } };
@@ -108,6 +108,18 @@ const opts = { graceSeconds: 86400, now: NOW };
 {
   check('sha256 is stable', sha256(Buffer.from('hawkeye')) === sha256(Buffer.from('hawkeye')));
   check('sha256 separates a one-byte change', sha256(Buffer.from('hawkeye')) !== sha256(Buffer.from('hawkeyf')));
+}
+
+/* ---- deploy relevance classifier ---- */
+{
+  check('served root HTML is deploy-relevant', isDeployRelevantPath('index.html'));
+  check('served root JS is deploy-relevant', isDeployRelevantPath('app.js'));
+  check('Netlify config is deploy-relevant', isDeployRelevantPath('netlify.toml'));
+  check('Netlify functions are deploy-relevant', isDeployRelevantPath('netlify/functions/brain-soul.js'));
+  check('assets are deploy-relevant', isDeployRelevantPath('assets/logo.svg'));
+  check('workflow-only changes are not deploy-relevant', !isDeployRelevantPath('.github/workflows/ci.yml'));
+  check('docs-only changes are not deploy-relevant', !isDeployRelevantPath('README.md'));
+  check('screening data-only changes are not deploy-relevant', !isDeployRelevantPath('data/sanctions-country-coverage.json'));
 }
 
 /* ---- a divergence names itself ----

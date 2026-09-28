@@ -203,6 +203,33 @@ async function lastChangedAt(name, { timeoutMs = 15000 } = {}) {
 }
 
 
+export function isDeployRelevantPath(name) {
+  const p = String(name || '').replace(/^\.\//, '');
+  if (!p) return false;
+  if (/^[^/]+\.(?:html|js|css|webmanifest)$/.test(p)) return true;
+  return p === 'netlify.toml' || p.startsWith('assets/') || p.startsWith('netlify/');
+}
+
+async function deployRelevantChangesSince(base, head, timeoutMs = 15000) {
+  const slug = process.env.GITHUB_REPOSITORY;
+  if (!slug || !/^[0-9a-f]{40}$/.test(base) || !/^[0-9a-f]{40}$/.test(head)) return null;
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(`https://api.github.com/repos/${slug}/compare/${base}...${head}`, { headers, signal: ac.signal });
+    if (!res.ok) return null;
+    const body = await res.json();
+    if (!Array.isArray(body.files)) return null;
+    return body.files.filter((x) => isDeployRelevantPath(x && x.filename)).map((x) => x.filename);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchDeployMeta(origin, timeoutMs = 15000) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -301,7 +328,16 @@ async function main() {
   if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit)) {
     console.log(`deploy marker: live ${deployMeta.commit} · expected ${expectedCommit}`);
     if (deployMeta.commit !== expectedCommit) {
-      annotate(`::notice::Live deploy marker is behind main; verifying served assets before declaring drift (docs/workflow-only commits may not require a production rebuild).`);
+      const changed = await deployRelevantChangesSince(deployMeta.commit, expectedCommit);
+      if (Array.isArray(changed) && changed.length === 0) {
+        console.log('verdict: CURRENT — commits since the live deploy marker contain no deploy-relevant app changes');
+        return;
+      }
+      if (Array.isArray(changed) && changed.length) {
+        annotate(`::notice::Live deploy marker is behind main and ${changed.length} deploy-relevant path(s) changed: ${changed.slice(0, 12).join(', ')}`);
+      } else {
+        annotate(`::notice::Live deploy marker is behind main; compare evidence unavailable, falling back to served-asset verification.`);
+      }
     }
   } else if (/^[0-9a-f]{40}$/.test(expectedCommit)) {
     console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); falling back to asset comparison`);

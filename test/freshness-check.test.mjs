@@ -14,6 +14,12 @@ function check(name, cond) {
 console.log('\n— freshness-check unit tests —\n');
 
 // utcDay / daysBetween
+check('latestSuccessDay uses actual successful completed runs, not query ordering',
+  latestSuccessDay([
+    { status: 'completed', conclusion: 'failure', created_at: '2026-09-28T12:00:00Z' },
+    { status: 'completed', conclusion: 'success', created_at: '2026-09-28T09:38:00Z' },
+    { status: 'completed', conclusion: 'success', created_at: '2026-09-27T09:38:00Z' },
+  ]) === '2026-09-28');
 check('utcDay extracts UTC date', utcDay('2026-06-25T05:01:33Z') === '2026-06-25');
 check('utcDay null on empty', utcDay(null) === null);
 check('utcDay null on garbage', utcDay('not-a-date') === null);
