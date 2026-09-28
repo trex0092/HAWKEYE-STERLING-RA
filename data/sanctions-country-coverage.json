@@ -674,7 +674,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "black"
+      "fatf": "black",
+      "note": "partial research 2026-09-28 (status unchanged): the only national \"terrorist\" designations found are parliamentary laws designating foreign state armed forces (e.g. US CENTCOM, 2019; European armies, 2026) under the law countering the IRGC designation (press reports: CBS News, The Nation); these are not a person/entity screening list. Iran is on the FATF call-for-action list (see data/fatf-assessments.json)"
     },
     {
       "country": "Iraq",
@@ -1134,8 +1135,9 @@
     },
     {
       "country": "Palestine",
-      "status": "not-researched",
-      "baseline": []
+      "status": "identified",
+      "baseline": [],
+      "note": "researched 2026-09-28: a national list exists — the Palestine Monetary Authority \"Local Freezing List\" (pma.ps/en/Legislation/AMLCFT/LocalFreezingList) of persons sanctioned by the Security Council Resolutions Enforcing Committee formed under Decree No. (14) of 2015, with transfer prohibitions (AML/CFT Decree-Law No. 39 of 2022, ffu.ps). Not a UN member, so no UN baseline row; page format and name count not yet verified by a runner probe"
     },
     {
       "country": "Panama",
