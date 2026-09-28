@@ -193,11 +193,13 @@ export function mergeShardNames(slices) {
   }
   return names;
 }
-/* A harvest that lost more than this fraction of its holder batches to WDQS
-   errors did not sweep enough of the graph to trust — fail loudly rather than
-   write a thin list. Below it, a few flaky batches are tolerated (the run
-   keeps what it got) and the floor/shrink gates still guard the write. */
-export const PEP_MAX_BATCH_FAIL_PCT = Number(process.env.PEP_MAX_BATCH_FAIL_PCT) || 0.1;
+/* A final worldwide PEP artifact is only complete when every holder batch
+   answered. Count/shrink gates cannot prove identity-level continuity: newly
+   discovered people can numerically offset people lost in a failed batch.
+   Therefore the final harvest fails closed on ANY holder-batch failure.
+   This constant remains exported for compatibility and evidence, but is pinned
+   to zero by design rather than being operator-relaxable. */
+export const PEP_MAX_BATCH_FAIL_PCT = 0;
 /* Refuse-to-overwrite guards: an absolute floor plus a relative-shrink gate
    vs the previous artifact (a half-empty harvest is an outage upstream, not
    a mass global de-listing). */
@@ -463,14 +465,20 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names, exp
   };
 }
 
-/* Holder-batch failure gate: a harvest that lost too large a fraction of its
-   WDQS batches did not sweep enough of the graph to trust. Pure for tests. */
-export function batchFailureOk(failed, total, pct = PEP_MAX_BATCH_FAIL_PCT) {
-  if (!total) return { ok: true, reason: '' };
-  const rate = failed / total;
-  return rate > pct
-    ? { ok: false, reason: `${failed}/${total} holder batches failed (${Math.round(rate * 100)}% > ${Math.round(pct * 100)}% gate) — WDQS outage, not a trustworthy sweep` }
+/* Holder-batch failure gate: final artifacts fail closed on any missed WDQS
+   holder batch. A zero-failure requirement is necessary for identity-level
+   completeness; aggregate count comparisons cannot detect one-for-one churn. */
+export function batchFailureOk(failed, total) {
+  const f = Math.max(0, Number(failed) || 0);
+  const t = Math.max(0, Number(total) || 0);
+  if (!t) return f
+    ? { ok: false, reason: f + ' holder batch failure(s) recorded with no valid batch total — not a trustworthy sweep' }
     : { ok: true, reason: '' };
+  if (f > 0) {
+    const rate = f / t;
+    return { ok: false, reason: f + '/' + t + ' holder batches failed (' + Math.round(rate * 100) + '%) — final worldwide PEP artifacts require zero missed batches' };
+  }
+  return { ok: true, reason: '' };
 }
 
 /* Refuse-to-overwrite guard. prev may be null (first harvest). */
@@ -794,7 +802,7 @@ async function harvest(outfile) {
     console.error('pep-worldwide: REFUSING to write — ' + bgate.reason + ' (previous artifact kept)');
     process.exit(1);
   }
-  if (batchFailed) console.log(`pep-worldwide: tolerated ${batchFailed}/${batchTotal} flaky holder batches (within the ${Math.round(PEP_MAX_BATCH_FAIL_PCT * 100)}% gate)`);
+  if (batchFailed) console.error(`pep-worldwide: invariant violation — ${batchFailed}/${batchTotal} failed holder batches passed the fail-closed gate`);
 
   /* Office context — the name and country of the offices that actually have a
      holder. Both were treated as cosmetic and both were wrong to skip.
