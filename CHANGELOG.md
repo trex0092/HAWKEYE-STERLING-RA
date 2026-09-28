@@ -10,6 +10,13 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Americas register research (15 countries).** Recorded from official
+  regulator/FIU pages, each cited in its row note: Paraguay, Chile, Peru,
+  Bahamas, Colombia, Panama, Costa Rica, Dominican Republic, Uruguay, Bolivia,
+  Guatemala, Honduras and Jamaica are `assessed-not-loadable` (UN relay, no
+  separate national list found); Trinidad and Tobago and Ecuador are
+  `identified` (national designations exist, file not yet verified).
+  Researched rows: 51 → 66 of 195.
 - **Estonia: `ee-vm-human-rights` enabled.** Runner probe 36391873968 read
   193 names (floor 150).
 - **Register `baseline` per country.** Every row now records the daily lists

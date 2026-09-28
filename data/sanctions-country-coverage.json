@@ -94,10 +94,11 @@
     },
     {
       "country": "Bahamas",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: Compliance Commission \"UN Orders\" page (ccb.finance.gov.bs/regulatory-legal-framework/un-orders/) — orders under s.44 Anti-Terrorism Act 2018 list entities designated by the UN; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Bahrain",
@@ -164,10 +165,11 @@
     },
     {
       "country": "Bolivia",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Cancillería \"Reglamento para la remisión de las listas del Consejo de Seguridad\" (cancilleria.gob.bo, 16-08-2024) governs relaying the UNSC lists and a national-designation procedure under UNSCR 1373; no published national designation list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Bosnia and Herzegovina",
@@ -273,10 +275,11 @@
     },
     {
       "country": "Chile",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the UAF publishes \"Listas de Resoluciones ONU\" (uaf.cl, sujetos-obligados/sector-privado/listas-de-resoluciones-onu), i.e. the UNSC lists; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "China",
@@ -287,10 +290,11 @@
     },
     {
       "country": "Colombia",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the UIAF FAQ (uiaf.gov.co, Documento_Preguntas_frecuentes.pdf §2.22) states the only binding international lists for Colombia are the UNSC lists; a UIAF news item reports Colombia adopted a list of terrorist persons/organisations made up of US State Department designations (US designations are reached by the OFAC lists, screened daily). No separate machine-readable national list was found"
     },
     {
       "country": "Comoros",
@@ -308,10 +312,11 @@
     },
     {
       "country": "Costa Rica",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: ICD/UIF Nota Técnica 15-2025 on targeted financial sanctions and the Dirección Nacional de Notariado \"Alertas internacionales\" page direct obligated entities to the UNSC designation lists (and foreign-country freezing requests); no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Côte d'Ivoire",
@@ -393,17 +398,19 @@
     },
     {
       "country": "Dominican Republic",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: UAF Decreto 407-17 (reglamento de congelamiento preventivo, Ley 155-17) applies preventive freezing to persons listed by the UNSC committees (1267/1988/1718 and successors); no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Ecuador",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "national designations exist: the UAFE page \"Resoluciones de la ONU por sanciones o exenciones a personas naturales o jurídicas\" (uafe.gob.ec) carries UNSC listing notices and a \"Designación de Organizaciones de Personas como Terroristas\" item (national terrorist-organisation designations); no machine-readable list file verified yet"
     },
     {
       "country": "Egypt",
@@ -546,10 +553,11 @@
     },
     {
       "country": "Guatemala",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Superintendencia de Bancos / IVE page \"Listas ONU\" (sib.gob.gt/ive/sistema-de-prevencion-de-ld-ft/listas-onu/) relays the persons and entities designated by the UN Security Council for terrorism; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Guinea",
@@ -586,10 +594,11 @@
     },
     {
       "country": "Honduras",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the CNBS PPLAFT page \"Lista ONU\" (pplaft.cnbs.gob.hn/lista-onu/) relays the UNSC Consolidated List; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Hungary",
@@ -671,10 +680,11 @@
     },
     {
       "country": "Jamaica",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: listings are made by ministerial Orders under the Terrorism Prevention Act, e.g. the MFAFT \"Formal Order Dec 29 2021\" (mfaft.gov.jm) adding a listed entity \"in keeping with a decision of the United Nations\"; these are per-order PDFs relaying UN decisions, not a consolidated machine-readable national list. Covered by the UN list (screened daily)"
     },
     {
       "country": "Japan",
@@ -1069,10 +1079,11 @@
     },
     {
       "country": "Panama",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: MEF Guía I-REG-001-19 \"Respuesta Lista ONU\" (mef.gob.pa) defines the operative list as the UNSC lists; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Papua New Guinea",
@@ -1083,17 +1094,19 @@
     },
     {
       "country": "Paraguay",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the SEPRELAD page \"Consulta a Listas de Sanciones\" (seprelad.gov.py/?page_id=2753) links only the UNSC consolidated list, the US OFAC SDN list, the FATF lists and the EU non-cooperative-jurisdictions list; no separate national designation list was found. Covered by the UN list (screened daily); OFAC is screened too"
     },
     {
       "country": "Peru",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: SBS \"Revisión de Listas de Interés\" (sbs.gob.pe/prevencion-de-lavado-activos/listas-de-interes) and Resolución SBS 02610-2021 describe UIF-Perú administrative freezing for UNSC-designated persons; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Philippines",
@@ -1407,10 +1420,11 @@
     },
     {
       "country": "Trinidad and Tobago",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "national list exists: the FIUTT Consolidated List of High Court Orders (Anti-Terrorism Act s.22AA), now served through the TFS Search Tool (fiu.gov.tt/tfs-search-tool/tfs-search-tool-2/, portal fiu.sanctionslist.gov.tt) which offers a downloadable Excel of all persons/entities listed by T&T High Court order; the download URL has not yet been verified from a runner"
     },
     {
       "country": "Tunisia",
@@ -1499,10 +1513,11 @@
     },
     {
       "country": "Uruguay",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: SENACLAFT directs obligated entities to the UNSC Consolidated List (gub.uy, \"Opciones alternativas para búsqueda en Listas de Consejo de Seguridad\"); no separate national sanctions list was found. Note for PEP work: the BCU page \"UIAF - Listas de control\" states SENACLAFT has published a reference PEP list since August 2021"
     },
     {
       "country": "Uzbekistan",
