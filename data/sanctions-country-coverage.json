@@ -354,10 +354,11 @@
     },
     {
       "country": "Cuba",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Ministry of the Interior \"Lista Nacional de personas y entidades que han sido sometidas a investigaciones penales y se encuentran buscadas por las autoridades cubanas\" (Resolución 19/2023, Gaceta Oficial of 7 December 2023, as published by the Ministry of Foreign Affairs, cubaminrex.cu), updated by Resolución 13/2025 in July 2025 (per press reports: 62 persons and 20 entities). Not staged: press reports say the entries are mostly exiled opposition activists and media figures, so screening this list is an MLRO policy decision"
     },
     {
       "country": "Cyprus",
@@ -609,7 +610,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the FIU guidelines on targeted financial sanctions (fiu.gov.gy, Guideline No. 1 of 2022 and TFS procedures of 27 Oct 2023) provide for persons designated by the UNSC and for entities \"specified\" by order of the Minister of Finance under section 2(2) of the AML/CFT Act 2009 (UNSCR 1373); whether any national specification order is published is not yet confirmed"
     },
     {
       "country": "Haiti",

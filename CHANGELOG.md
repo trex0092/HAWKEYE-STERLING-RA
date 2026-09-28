@@ -12,16 +12,16 @@ bump merged to `main`.
 
 - **Register research (FATF-listed, Gulf, Asia): Oman, Nepal, Vietnam, Côte
   d'Ivoire, Republic of Korea, China, Algeria, Mali, Burkina Faso, Niger,
-  Armenia, Tajikistan, Bangladesh, Ethiopia, Zambia, Rwanda, Mozambique, Somalia, Uganda, Palestine, Fiji**
+  Armenia, Tajikistan, Bangladesh, Ethiopia, Zambia, Rwanda, Mozambique, Somalia, Uganda, Palestine, Fiji, Cuba**
   recorded as `identified`, each with the official source for its
   national list. Vietnam's national list is not staged: its entries include
   overseas political organisations, so screening it is an MLRO policy
-  decision; the same applies to Mali, Burkina Faso, Niger, Tajikistan and Rwanda, whose
+  decision; the same applies to Mali, Burkina Faso, Niger, Tajikistan, Rwanda and Cuba, whose
   lists reportedly include journalists and political figures. Papua New Guinea (no domestic designations), Namibia, Ghana, Sierra
   Leone, Samoa and Solomon Islands (UN lists only) are
   `assessed-not-loadable`. Kuwait, Lebanon, Laos, DR Congo, Syria,
-  Haiti, Bosnia and Herzegovina, Brunei, Senegal, Togo, Benin, Zimbabwe, Botswana, Sudan, Tanzania, Iran and Vanuatu get partial notes. Researched rows:
-  89 → 116.
+  Haiti, Bosnia and Herzegovina, Brunei, Senegal, Togo, Benin, Zimbabwe, Botswana, Sudan, Tanzania, Iran, Vanuatu and Guyana get partial notes. Researched rows:
+  89 → 117.
 - **Register research: Norway, Iceland, Montenegro, San Marino, Malta,
   Liechtenstein, North Macedonia** recorded as
   `assessed-not-loadable`. Each implements UN sanctions (and, for the first
