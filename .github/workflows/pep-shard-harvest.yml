@@ -208,7 +208,8 @@ jobs:
             # permission"), which lost the whole harvest. Only data/ files may
             # differ from the tip. Every reader takes single files off this
             # branch (`git checkout FETCH_HEAD -- data/...`), never its tree.
-            export GIT_INDEX_FILE="$(mktemp -u)"
+            GIT_INDEX_FILE="$(mktemp -u)"
+            export GIT_INDEX_FILE
             parent_args=()
             rc=0
             git ls-remote --exit-code --heads origin pep-worldwide-state >/dev/null 2>&1 || rc=$?
