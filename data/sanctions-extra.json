@@ -464,7 +464,7 @@
       "parser": "xlsx",
       "enabled": true,
       "minNames": 1000,
-      "_note": "New Zealand's Russia Sanctions Act 2022 register. ADDED 2026-09-26: the 2026-08-05 survey flagged this URL as sitting behind an Imperva JS challenge untested from a runner. Tested it directly today with a plain curl (no browser headers): http 200, a genuine 21.6MB XLSX (Microsoft Excel 2007+, confirmed via file-type check, not just a content-type header). The challenge does not block a plain server-side fetch. Using the direct official source over OpenSanctions' nz_russia_sanctions mirror (also verified live, 1,902 entities) per this repo's own stated preference for an official feed once proven live."
+      "_note": "New Zealand's Russia Sanctions Act 2022 register. ADDED 2026-09-26: the 2026-08-05 survey flagged this URL as sitting behind an Imperva JS challenge untested from a runner. Tested it directly today with a plain curl (no browser headers): http 200, a genuine 21.6MB XLSX (Microsoft Excel 2007+, confirmed via file-type check, not just a content-type header). The challenge does not block a plain server-side fetch. Using the direct official source over OpenSanctions' nz_russia_sanctions mirror (also verified live, 1,902 entities) per this repo's own stated preference for an official feed once proven live. ALLOWLIST GAP FIXED 2026-09-27: www.mfat.govt.nz was not on sanctions-screen.yml's egress allowlist (policy: block), so the 2026-09-27 scheduled run reported 'fetch failed' for this source. Host added."
     },
     {
       "id": "nz-cluster",
@@ -516,8 +516,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 200,
-      "_note": "Tunisia's National Counter-Terrorism Commission list. ADDED 2026-09-26: split out of africa-curated-cluster (HTML table on a plain-http origin per the 2026-08-05 survey) once OpenSanctions' tn_cnlct was confirmed live: http 200, 297 entities, real French-language content (e.g. a case tied to the murder of a shepherd, Najib al-Qasimi, 12 Oct 2013)."
+      "minNames": 150,
+      "_note": "Tunisia's National Counter-Terrorism Commission list. ADDED 2026-09-26: split out of africa-curated-cluster (HTML table on a plain-http origin per the 2026-08-05 survey) once OpenSanctions' tn_cnlct was confirmed live: http 200, 297 entities, real French-language content (e.g. a case tied to the murder of a shepherd, Najib al-Qasimi, 12 Oct 2013). FLOOR CORRECTED 2026-09-27: the dataset holds 166 records (159 Person + 7 Organization, counted with a real CSV parser; last_seen 2026-09-26), not 297. The original figure was a wc -l line count inflated by multi-line quoted cells. With minNames 200 every run reported 'parsed 166 name(s), below its 200 coverage floor - truncated source' and stayed degraded permanently. The floor is now 150 (about 90% of the true size) so a genuine truncation still trips it."
     },
     {
       "id": "bh-gazette",
@@ -539,7 +539,7 @@
       "parser": "curated",
       "enabled": true,
       "minNames": 1,
-      "_note": "ADDED 2026-09-26: found NSSec's actual master list page (nssec.govmu.org/Pages/NSSec/List-of-Designated-Parties.aspx), which links a dated PDF (List_of_designated_parties_as_at_06_June_2025..pdf), the same rotating-filename pattern as Kyrgyzstan/Azerbaijan, hence curated not a live URL. Unlike Bahrain's corrupted Arabic extraction, this fetched clean: 3 entries, English-language structured table (name/DOB/POB/AKA/nationality/passport/NID/address/designation date), transcribed into data/mu-nssec-curated-list.json and cross-checked against independent press coverage of the same case (a July 2025 Mauritius ISIS-financing prosecution naming the same three people on the same date). minNames deliberately set to 1, not padded: this is genuinely a tiny, real list, and honesty about its size matters more than looking impressive. Caught and fixed one of my own transcription slips (stray spaces in two NID numbers) by re-checking against the source text before this went anywhere, noted here so the next reviewer knows to spot-check curated entries the same way."
+      "_note": "ADDED 2026-09-26: found NSSec's actual master list page (nssec.govmu.org/Pages/NSSec/List-of-Designated-Parties.aspx), which links a dated PDF (List_of_designated_parties_as_at_06_June_2025..pdf), the same rotating-filename pattern as Kyrgyzstan/Azerbaijan, hence curated not a live URL. Unlike Bahrain's corrupted Arabic extraction, this fetched clean: 3 entries, English-language structured table (name/DOB/POB/AKA/nationality/passport/NID/address/designation date), transcribed into data/mu-nssec-curated-list.json and cross-checked against independent press coverage of the same case (a July 2025 Mauritius ISIS-financing prosecution naming the same three people on the same date). minNames deliberately set to 1, not padded: this is genuinely a tiny, real list, and honesty about its size matters more than looking impressive. Caught and fixed one of my own transcription slips (stray spaces in two NID numbers) by re-checking against the source text before this went anywhere, noted here so the next reviewer knows to spot-check curated entries the same way. LOADED ZERO NAMES until 2026-09-27: parseCuratedList reads only name/aliases but this file used surname/otherNames/aka, so every run reported 'parsed 0 names - coverage degraded'. Entries now also carry name + aliases (see the file's schemaNote); the loader now yields 6 name strings from the 3 designated persons. test/sanctions-registry-integrity.test.mjs guards this class of failure."
     },
     {
       "id": "africa-curated-cluster",
