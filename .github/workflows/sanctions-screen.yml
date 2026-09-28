@@ -62,6 +62,7 @@ jobs:
   screen:
     # Write scopes live at job level (top level is read-only — least privilege).
     permissions:
+      actions: write
       contents: write
       issues: write
     runs-on: ubuntu-latest
@@ -281,6 +282,7 @@ jobs:
         run: node scripts/screening-assurance.mjs --write
 
       - name: Persist screening + case state (screen-state branch)
+        id: persist
         # always() so state is persisted even if the CASES step failed AFTER
         # creating cases in Asana — otherwise the new case GIDs written locally are
         # lost and next run creates DUPLICATE cases. Only skip on a screen error
@@ -328,6 +330,24 @@ jobs:
           else
             echo "state unchanged"
           fi
+
+      - name: Refresh runtime assurance watchdog
+        if: always() && steps.screen.outputs.screen_error != 'true' && steps.persist.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -sS -o /tmp/assurance-dispatch.out -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/screening-assurance.yml/dispatches" \
+            -d '{"ref":"main"}')
+          if [ "$code" != "204" ]; then
+            cat /tmp/assurance-dispatch.out
+            echo
+            echo "::error::could not dispatch Screening Assurance (HTTP $code)"
+            exit 1
+          fi
+          echo "::notice::Screening Assurance dispatched against freshly persisted runtime evidence."
 
       - name: Open a GitHub issue if the screen could not run, or a hit was not delivered
         # In case-engine mode alerts are suppressed (asana_posted is always false)
