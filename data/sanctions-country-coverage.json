@@ -226,10 +226,11 @@
     },
     {
       "country": "Burkina Faso",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — by order of 19 November 2024 the Minister of Economy froze the assets of 113 natural persons and 2 entities (JNIM/GSIM and the Islamic State in the Greater Sahara) for six renewable months under the national counter-terrorism freezing framework (reported by the state daily Sidwaya, sidwaya.info); no consolidated online publication by the ministry or CENTIF found yet. Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
     },
     {
       "country": "Burundi",
@@ -337,7 +338,7 @@
         "UN"
       ],
       "fatf": "grey",
-      "note": "researched 2026-09-28: a national list exists — the CENTIF page \"Liste des Sanctions Financières Ciblées (SFC)\" (centif.ci/liste-des-sanctions/) publishes the list of persons designated under UNSCR 1373 (national designations), made by ministerial arrêté (e.g. the arrêté of 22 August 2024 entering 29 persons on the national list with asset freezing, energie.gouv.ci); file format not yet verified"
+      "note": "researched 2026-09-28: a national list exists — the CENTIF page \"Liste des Sanctions Financières Ciblées (SFC)\" (centif.ci/liste-des-sanctions/) publishes the list of persons designated under UNSCR 1373 (national designations), made by ministerial arrêté (e.g. the arrêté of 22 August 2024 entering 29 persons on the national list with asset freezing, energie.gouv.ci); the list is published as a PDF, \"Liste des personnes désignées comme affiliées au terrorisme\" (centif.ci/wp-content/uploads/2025/02/listenationale1373.pdf, 30 pages); parse and name count not yet verified by a runner probe"
     },
     {
       "country": "Croatia",
@@ -894,10 +895,11 @@
     },
     {
       "country": "Mali",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Economy and Finance page \"Sanctions financières ciblées : Liste des personnes physiques inscrites sur la liste nationale et sur la liste du Conseil de Sécurité des Nations Unies\" (finances.ml/node/623); inscriptions are made by order of the finance minister (six-month renewable administrative freeze) under Decree N°2023-0591/PT-RM of 11 October 2023 amending Decree N°2021-0682/PT-RM, most recently an order of 18 June 2026 adding twelve persons (per press reports). Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
     },
     {
       "country": "Malta",
@@ -1066,10 +1068,11 @@
     },
     {
       "country": "Niger",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the \"Fichier des personnes, groupes de personnes ou entités impliqués dans des actes terroristes\" (FPGE), created by ordinance of 27 August 2024 (Government of Niger, gouv.ne), with inscription entailing asset freezing and travel bans, decided by a National Committee; entries are announced in the state daily Le Sahel (lesahel.org). No consolidated machine-readable publication found. Not staged: press reports say the entries include journalists and political figures, so screening this list is an MLRO policy decision"
     },
     {
       "country": "Nigeria",
@@ -1292,7 +1295,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): CENTIF's \"Commission consultative de Gel administratif (CCGA)\" page (centif.sn/fr/ccga) states the CCGA, created under Article 14 of Decree No 2022-2308 of 30 December 2022, assists the finance minister in implementing freezes for persons listed under UN Security Council resolutions; no published national list found yet"
     },
     {
       "country": "Serbia",
