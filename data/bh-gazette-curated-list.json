@@ -1,0 +1,1961 @@
+{
+  "_README": "Bahrain National Terrorism List (قائمة الإرهاب الوطنية لمملكة البحرين). Source: Cabinet Resolution No. (01-2741) of 11 March 2024, published as Official Gazette Supplement No. 3739 (28 March 2024) by the Legislation & Legal Opinion Commission, https://www.lloc.gov.bh/PDF/RNCAB0124.pdf - cross-confirmed as the correct primary source via Wikipedia's own citation for 'List of organizations designated as terrorist by Bahrain'. Fetched and extracted 2026-09-27. \n\nBACKGROUND: an earlier session (documented elsewhere in this registry) attempted this same PDF, fetched it successfully, but found the Arabic text extraction corrupted and correctly declined to guess at corrupted names - leaving this source unresolved rather than risking a mangled sanctions screen. This session re-attempted extraction using pdftotext -layout (poppler-utils) rather than a generic fetch-and-render, with materially better results, but genuine corruption (a spurious replacement character, U+FFFD, and in some cases a literal inserted mid-word space) was still present in the raw extraction - this was not simply a clean success. \n\nMETHODOLOGY: (1) structural validation - the document's own preamble states it is updating an earlier list (Gazette No. 3649, 11 Jan 2023) by adding 15 individuals + 8 entities + 1 vessel, but the document BODY prints the resulting FULL cumulative list, which parsed to exactly 208 individuals, 172 entities, and 7 vessels - an exact match to this same source's figures as already cited elsewhere in this registry from independent prior research, which is itself a strong cross-check that no entries were silently dropped or duplicated. (2) corruption remediation - of 387 total entries, 369 (95%) were clean after mechanically stripping the U+FFFD artifact character (verified across many entries, including several independently, publicly checkable names that decoded correctly: Yusuf al-Qaradawi, Hassan Nasrallah, Qasem Soleimani, Khalifa Mohammed Turki Al-Subaie). The remaining 18 entries had a second defect (an inserted mid-word space, distinct from U+FFFD) and were resolved individually, using only in-document evidence: a clean restatement of the same name/word elsewhere in that entry's own alias list; a standard boilerplate phrase (شركة/'company', استيراد وتصدير/'import and export', معروف باسم/'known as') confirmed clean dozens of times elsewhere in this exact document; or an explicit English name given directly in the same entry (used as authoritative where present). Two entries (individual #106, one alias element each in two places) had NO clean in-document resolution and were left explicitly omitted rather than guessed - see each affected entry's verification_note. \n\nEvery one of the 12 entries that required this kind of reconstruction carries its own verification_note documenting exactly which mechanism was used, so a reviewer can check the reasoning against the primary source PDF directly rather than take it on faith. Nationality and location annotations, where the source PDF states them, are preserved inline in the name field exactly as printed (e.g. '(قطري)'/Qatari, '- متواجد في تركيا'/located in Turkey) rather than parsed into a separate structured field, since the source's own phrasing for these varies entry to entry and forcing it into a fixed schema risked introducing new errors.",
+  "source_url": "https://www.lloc.gov.bh/PDF/RNCAB0124.pdf",
+  "decision": "Cabinet Resolution No. (01-2741), 11 March 2024 - Official Gazette Supplement No. 3739, 28 March 2024",
+  "fetched": "2026-09-27",
+  "count": 387,
+  "count_by_type": {
+    "individual": 208,
+    "entity": 172,
+    "vessel": 7
+  },
+  "entries": [
+    {
+      "ref": "BH-IND-1",
+      "type": "individual",
+      "name": "خليفة محمد تركي السبيعي (قطري)"
+    },
+    {
+      "ref": "BH-IND-2",
+      "type": "individual",
+      "name": "عبدالملك محمد يوسف عبدالسالم (أردني)"
+    },
+    {
+      "ref": "BH-IND-3",
+      "type": "individual",
+      "name": "أشرف محمد يوسف عثمان عبدالسالم (أردني)"
+    },
+    {
+      "ref": "BH-IND-4",
+      "type": "individual",
+      "name": "إبراهيم عيسى الحجي محمد الباكر (قطري)"
+    },
+    {
+      "ref": "BH-IND-5",
+      "type": "individual",
+      "name": "عبدالعزيز بن خليفة العطية (قطري)"
+    },
+    {
+      "ref": "BH-IND-6",
+      "type": "individual",
+      "name": "سالم حسن خليفة راشد الكواري (قطري)"
+    },
+    {
+      "ref": "BH-IND-7",
+      "type": "individual",
+      "name": "عبداهلل غانم مسلم الخوار (قطري)"
+    },
+    {
+      "ref": "BH-IND-8",
+      "type": "individual",
+      "name": "سعد بن سعد محمد الكعبي (قطري)"
+    },
+    {
+      "ref": "BH-IND-9",
+      "type": "individual",
+      "name": "عبداللطيف بن عبداهلل الكواري (قطري)"
+    },
+    {
+      "ref": "BH-IND-10",
+      "type": "individual",
+      "name": "محمد سعيد بن حلوان السقطري (قطري)"
+    },
+    {
+      "ref": "BH-IND-11",
+      "type": "individual",
+      "name": "عبدالرحمن بن عمير النعيمي (قطري)"
+    },
+    {
+      "ref": "BH-IND-12",
+      "type": "individual",
+      "name": "عبدالوهاب محمد عبدالرحمن الحميقاني (يمني)"
+    },
+    {
+      "ref": "BH-IND-13",
+      "type": "individual",
+      "name": "خليفة بن محمد الربان (قطري)"
+    },
+    {
+      "ref": "BH-IND-14",
+      "type": "individual",
+      "name": "عبداهلل بن خالد آل ثاني (قطري)"
+    },
+    {
+      "ref": "BH-IND-15",
+      "type": "individual",
+      "name": "عبدالرحيم أحمد الحرام (قطري)"
+    },
+    {
+      "ref": "BH-IND-16",
+      "type": "individual",
+      "name": "حجاج بن فهد حجاج محمد العجمي (كويتي)"
+    },
+    {
+      "ref": "BH-IND-17",
+      "type": "individual",
+      "name": "مبارك محمد العجي (قطري)"
+    },
+    {
+      "ref": "BH-IND-18",
+      "type": "individual",
+      "name": "جابر بن ناصر المري (قطري)"
+    },
+    {
+      "ref": "BH-IND-19",
+      "type": "individual",
+      "name": "يوسف عبداهلل القرضاوي (مصري)"
+    },
+    {
+      "ref": "BH-IND-20",
+      "type": "individual",
+      "name": "محمد جاسم السليطي (قطري)"
+    },
+    {
+      "ref": "BH-IND-21",
+      "type": "individual",
+      "name": "علي بن عبداهلل السويدي (قطري)"
+    },
+    {
+      "ref": "BH-IND-22",
+      "type": "individual",
+      "name": "هاشم صالح عبداهلل العوضي (قطري)"
+    },
+    {
+      "ref": "BH-IND-23",
+      "type": "individual",
+      "name": "علي محمد محمد الصالبي (ليبي)"
+    },
+    {
+      "ref": "BH-IND-24",
+      "type": "individual",
+      "name": "عبدالحكيم بلحاج (ليبي)"
+    },
+    {
+      "ref": "BH-IND-25",
+      "type": "individual",
+      "name": "المهدي حاراتي (ليبي)"
+    },
+    {
+      "ref": "BH-IND-26",
+      "type": "individual",
+      "name": "إسماعيل محمد محمد الصالبي (ليبي)"
+    },
+    {
+      "ref": "BH-IND-27",
+      "type": "individual",
+      "name": "الصادق عبدالرحمن علي الغرياني (ليبي)"
+    },
+    {
+      "ref": "BH-IND-28",
+      "type": "individual",
+      "name": "حمد عبداهلل الفطيس المري (قطري)"
+    },
+    {
+      "ref": "BH-IND-29",
+      "type": "individual",
+      "name": "محمد أحمد شوقي الإسالمبولي (مصري)"
+    },
+    {
+      "ref": "BH-IND-30",
+      "type": "individual",
+      "name": "طارق عبدالموجود إبراهيم الزمر (مصري)"
+    },
+    {
+      "ref": "BH-IND-31",
+      "type": "individual",
+      "name": "محمد عبدالمقصود محمد عفيفي (مصري)"
+    },
+    {
+      "ref": "BH-IND-32",
+      "type": "individual",
+      "name": "محمد الصغير عبدالرحيم محمد (مصري)"
+    },
+    {
+      "ref": "BH-IND-33",
+      "type": "individual",
+      "name": "وجدي عبدالحميد محمد غنيم (مصري)"
+    },
+    {
+      "ref": "BH-IND-34",
+      "type": "individual",
+      "name": "حسن أحمد حسن محمد الدقي الهوتي (إماراتي)"
+    },
+    {
+      "ref": "BH-IND-35",
+      "type": "individual",
+      "name": "حاكم عبيسان الحميدي المطيري (سعودي – كويتي)"
+    },
+    {
+      "ref": "BH-IND-36",
+      "type": "individual",
+      "name": "عبداهلل محمد سليمان المحيسني (سعودي)"
+    },
+    {
+      "ref": "BH-IND-37",
+      "type": "individual",
+      "name": "حامد عبداهلل أحمد العلي (كويتي)"
+    },
+    {
+      "ref": "BH-IND-38",
+      "type": "individual",
+      "name": "أيمن أحمد عبدالغني حسنين (مصري)"
+    },
+    {
+      "ref": "BH-IND-39",
+      "type": "individual",
+      "name": "عاصم عبدالماجد محمد ماضي (مصري)"
+    },
+    {
+      "ref": "BH-IND-40",
+      "type": "individual",
+      "name": "يحيى عقيل سالمان عقيل (مصري)"
+    },
+    {
+      "ref": "BH-IND-41",
+      "type": "individual",
+      "name": "محمد حمادة السيد إبراهيم (مصري)"
+    },
+    {
+      "ref": "BH-IND-42",
+      "type": "individual",
+      "name": "عبدالرحمن محمد شكري عبدالرحمن (مصري)"
+    },
+    {
+      "ref": "BH-IND-43",
+      "type": "individual",
+      "name": "حسين محمد رضا إبراهيم يوسف (مصري)"
+    },
+    {
+      "ref": "BH-IND-44",
+      "type": "individual",
+      "name": "أحمد عبدالحافظ محمود عبدالهدى (مصري)"
+    },
+    {
+      "ref": "BH-IND-45",
+      "type": "individual",
+      "name": "مسلم فؤاد طرفان (مصري)"
+    },
+    {
+      "ref": "BH-IND-46",
+      "type": "individual",
+      "name": "أيمن محمود صادق رفعت (مصري)"
+    },
+    {
+      "ref": "BH-IND-47",
+      "type": "individual",
+      "name": "محمد سعد عبدالنعيم أحمد (مصري)"
+    },
+    {
+      "ref": "BH-IND-48",
+      "type": "individual",
+      "name": "محمد سعد عبدالمطلب عبده الرازقي (مصري)"
+    },
+    {
+      "ref": "BH-IND-49",
+      "type": "individual",
+      "name": "أحمد فؤاد أحمد جاد بلتاجي (مصري)"
+    },
+    {
+      "ref": "BH-IND-50",
+      "type": "individual",
+      "name": "أحمد رجب رجب سليمان (مصري)"
+    },
+    {
+      "ref": "BH-IND-51",
+      "type": "individual",
+      "name": "كريم محمد محمد عبدالعزيز (مصري)"
+    },
+    {
+      "ref": "BH-IND-52",
+      "type": "individual",
+      "name": "علي زكي محمد علي (مصري)"
+    },
+    {
+      "ref": "BH-IND-53",
+      "type": "individual",
+      "name": "ناجي إبراهيم العزولي (مصري)"
+    },
+    {
+      "ref": "BH-IND-54",
+      "type": "individual",
+      "name": "شحاته فتحي حافظ محمد سليمان (مصري)"
+    },
+    {
+      "ref": "BH-IND-55",
+      "type": "individual",
+      "name": "محمد محرم فهمي أبوزيد (مصري)"
+    },
+    {
+      "ref": "BH-IND-56",
+      "type": "individual",
+      "name": "عمرو عبدالناصر عبدالحق عبدالباري (مصري)"
+    },
+    {
+      "ref": "BH-IND-57",
+      "type": "individual",
+      "name": "علي حسن إبراهيم عبدالظاهر (مصري)"
+    },
+    {
+      "ref": "BH-IND-58",
+      "type": "individual",
+      "name": "مرتضى مجيد السندي (بحريني)"
+    },
+    {
+      "ref": "BH-IND-59",
+      "type": "individual",
+      "name": "أحمد الحسن الدعسكي (بحريني)"
+    },
+    {
+      "ref": "BH-IND-60",
+      "type": "individual",
+      "name": "خالد سعيد فضل راشد البوعينين (قطري)"
+    },
+    {
+      "ref": "BH-IND-61",
+      "type": "individual",
+      "name": "شقر جمعة خميس الشهواني (قطري)"
+    },
+    {
+      "ref": "BH-IND-62",
+      "type": "individual",
+      "name": "صالح أحمد الغانم (قطري)"
+    },
+    {
+      "ref": "BH-IND-63",
+      "type": "individual",
+      "name": "حامد حمد حامد العلي (كويتي)"
+    },
+    {
+      "ref": "BH-IND-64",
+      "type": "individual",
+      "name": "عبداهلل محمد علي اليزيدي (يمني)"
+    },
+    {
+      "ref": "BH-IND-65",
+      "type": "individual",
+      "name": "أحمد علي أحمد برعود (يمني)"
+    },
+    {
+      "ref": "BH-IND-66",
+      "type": "individual",
+      "name": "محمد بكر الدباء (يمني)"
+    },
+    {
+      "ref": "BH-IND-67",
+      "type": "individual",
+      "name": "الساعدي عبداهلل إبراهيم بوخزيم (ليبي)"
+    },
+    {
+      "ref": "BH-IND-68",
+      "type": "individual",
+      "name": "أحمد عبدالجليل حسناوي (ليبي)"
+    },
+    {
+      "ref": "BH-IND-69",
+      "type": "individual",
+      "name": "نايف صالح سالم القيسي (يمني)"
+    },
+    {
+      "ref": "BH-IND-70",
+      "type": "individual",
+      "name": "عبدالوهاب محمد عبدالوهاب الحميقاني (يمني)"
+    },
+    {
+      "ref": "BH-IND-71",
+      "type": "individual",
+      "name": "هاشم محسن عيدروس (يمني)"
+    },
+    {
+      "ref": "BH-IND-72",
+      "type": "individual",
+      "name": "نشوان العدني (يمني)"
+    },
+    {
+      "ref": "BH-IND-73",
+      "type": "individual",
+      "name": "خالد عبداهلل صالح المرفدي (يمني)"
+    },
+    {
+      "ref": "BH-IND-74",
+      "type": "individual",
+      "name": "سيف الرب سالم الحيشي (يمني)"
+    },
+    {
+      "ref": "BH-IND-75",
+      "type": "individual",
+      "name": "عادل عبده فاري عثمان الذهباني (يمني)"
+    },
+    {
+      "ref": "BH-IND-76",
+      "type": "individual",
+      "name": "رضوان قنان (رضوان محمد حسين قنان) (يمني)"
+    },
+    {
+      "ref": "BH-IND-77",
+      "type": "individual",
+      "name": "والي نشوان اليافعي (يمني)"
+    },
+    {
+      "ref": "BH-IND-78",
+      "type": "individual",
+      "name": "خالد سعيد غابش العبيدي (يمني)"
+    },
+    {
+      "ref": "BH-IND-79",
+      "type": "individual",
+      "name": "بالل علي الوافي (يمني)"
+    },
+    {
+      "ref": "BH-IND-80",
+      "type": "individual",
+      "name": "خالد ناظم ديان"
+    },
+    {
+      "ref": "BH-IND-81",
+      "type": "individual",
+      "name": "سالم جابر عمر علي سلطان فتح اهلل جابر"
+    },
+    {
+      "ref": "BH-IND-82",
+      "type": "individual",
+      "name": "ميسر علي موسى عبداهلل الجبوري"
+    },
+    {
+      "ref": "BH-IND-83",
+      "type": "individual",
+      "name": "محمد علي سعيد أتم"
+    },
+    {
+      "ref": "BH-IND-84",
+      "type": "individual",
+      "name": "حسن علي محمد جمعة سلطان"
+    },
+    {
+      "ref": "BH-IND-85",
+      "type": "individual",
+      "name": "محمد سليمان حيدر محمد الحيدر"
+    },
+    {
+      "ref": "BH-IND-86",
+      "type": "individual",
+      "name": "محمد جمال أحمد حشمت عبدالحميد"
+    },
+    {
+      "ref": "BH-IND-87",
+      "type": "individual",
+      "name": "السيد محمود عزت إبراهيم عيسى"
+    },
+    {
+      "ref": "BH-IND-88",
+      "type": "individual",
+      "name": "يحيى السيد إبراهيم محمد موسى"
+    },
+    {
+      "ref": "BH-IND-89",
+      "type": "individual",
+      "name": "قدري محمد فهمي محمود الشيخ"
+    },
+    {
+      "ref": "BH-IND-90",
+      "type": "individual",
+      "name": "عالء علي علي محمد السماحي"
+    },
+    {
+      "ref": "BH-IND-91",
+      "type": "individual",
+      "name": "حسن نصر اهلل"
+    },
+    {
+      "ref": "BH-IND-92",
+      "type": "individual",
+      "name": "نعيم قاسم"
+    },
+    {
+      "ref": "BH-IND-93",
+      "type": "individual",
+      "name": "إبراهيم أمين السيد"
+    },
+    {
+      "ref": "BH-IND-94",
+      "type": "individual",
+      "name": "محمد يزبك"
+    },
+    {
+      "ref": "BH-IND-95",
+      "type": "individual",
+      "name": "حسين خليل"
+    },
+    {
+      "ref": "BH-IND-96",
+      "type": "individual",
+      "name": "هاشم صفي الدين"
+    },
+    {
+      "ref": "BH-IND-97",
+      "type": "individual",
+      "name": "طالل حمية"
+    },
+    {
+      "ref": "BH-IND-98",
+      "type": "individual",
+      "name": "أدهم تباجا"
+    },
+    {
+      "ref": "BH-IND-99",
+      "type": "individual",
+      "name": "علي يوسف جراء"
+    },
+    {
+      "ref": "BH-IND-100",
+      "type": "individual",
+      "name": "حسن إبراهيمي"
+    },
+    {
+      "ref": "BH-IND-101",
+      "type": "individual",
+      "name": "محمد إبراهيم أوحدي (معروف باسم :جالل أوحدي ،جالل طاهري ،جالل وحيدي)"
+    },
+    {
+      "ref": "BH-IND-102",
+      "type": "individual",
+      "name": "إسماعيل رضوي (معروف باسم :مصطفى مهاجري)"
+    },
+    {
+      "ref": "BH-IND-103",
+      "type": "individual",
+      "name": "عبداهلل صمد فاروقي (معروف باسم :عبدالصمد)"
+    },
+    {
+      "ref": "BH-IND-104",
+      "type": "individual",
+      "name": "محمد داود مزامل"
+    },
+    {
+      "ref": "BH-IND-105",
+      "type": "individual",
+      "name": "عبدالرحيم منان (معروف باسم :حاجي منان ،عبدالرحيم) "
+    },
+    {
+      "ref": "BH-IND-106",
+      "type": "individual",
+      "name": "محمد نعيم باريش (معروف باسم :مال نعيم بارايش ،مال نعيم باريشآ خوند ،مال نعيم باريش ،مال نعيم باريه ،مال نعيم باريك ،[alias omitted - \"غل\" unresolved, likely truncated \"غلام\"] ،مال نعيم باريش ،نعيم بريش ،[alias omitted - \"غل\" unresolved, likely truncated \"غلام\"] ،مال نعيم اهلل)",
+      "verification_note": "Two alias variants (each containing an unresolved 2-letter token, likely a truncated 'غلام'/Ghulam) were omitted from the alias list rather than guessed at; primary name and 8 other aliases are unaffected."
+    },
+    {
+      "ref": "BH-IND-107",
+      "type": "individual",
+      "name": "عبدالعزيز (معروف باسم :عبدالعزيز شاه زماني ،عبدالعزيز بلوش)"
+    },
+    {
+      "ref": "BH-IND-108",
+      "type": "individual",
+      "name": "صدر إبراهيم"
+    },
+    {
+      "ref": "BH-IND-109",
+      "type": "individual",
+      "name": "عبدالمجيد (معروف باسم :حافظ مجيد)"
+    },
+    {
+      "ref": "BH-IND-110",
+      "type": "individual",
+      "name": "قاسم سليماني"
+    },
+    {
+      "ref": "BH-IND-111",
+      "type": "individual",
+      "name": "حامد عبدالالهي"
+    },
+    {
+      "ref": "BH-IND-112",
+      "type": "individual",
+      "name": "عبدالرضا شهالي"
+    },
+    {
+      "ref": "BH-IND-113",
+      "type": "individual",
+      "name": "شبل محسن الزيدي (معروف باسم :شبل الزيدي ،شبل محسن أبو إياد الزيدي ،حجي شبل محسن ،مهدي جعفر صالح ،شبل حجي)",
+      "verification_note": "Primary name corrected using this entry's own alias list, which independently restates the same name cleanly twice ('شبل الزيدي', 'شبل محسن أبو إياد الزيدي')."
+    },
+    {
+      "ref": "BH-IND-114",
+      "type": "individual",
+      "name": "يوسف هاشم (معروف باسم :يوسف هاشم ،صادق حجي ،سيد صادق)"
+    },
+    {
+      "ref": "BH-IND-115",
+      "type": "individual",
+      "name": "محمد عبدالهادي فرحات (معروف باسم :محمد فرحات)"
+    },
+    {
+      "ref": "BH-IND-116",
+      "type": "individual",
+      "name": "عدنان حسين الكوثراني (معروف باسم :عدنان الكوثراني ،عدنان محمد الكوثراني، عدنان الكوثراني)",
+      "verification_note": "'عدنان' and 'الكوثراني' independently confirmed via this entry's own clean alias restatements. The middle element 'حسين' was not independently restated elsewhere in this entry, but shows the identical space-insertion defect verified twice elsewhere in the same sentence."
+    },
+    {
+      "ref": "BH-IND-117",
+      "type": "individual",
+      "name": "باسم جواد نصر اهلل (معروف باسم :محمد جواد نصر اهلل)"
+    },
+    {
+      "ref": "BH-IND-118",
+      "type": "individual",
+      "name": "قاسم عبداهلل علي (معروف باسم :قاسم عبداهلل ،قاسم عبداهلل أحمد ،قاسم المؤمن)"
+    },
+    {
+      "ref": "BH-IND-119",
+      "type": "individual",
+      "name": "عبدالرحمن علي حسين الأحمد الراوي"
+    },
+    {
+      "ref": "BH-IND-120",
+      "type": "individual",
+      "name": "سيد حبيب أحمد خان"
+    },
+    {
+      "ref": "BH-IND-121",
+      "type": "individual",
+      "name": "إسماعيل قاآني ( – )Esma'il Gha'aniالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-122",
+      "type": "individual",
+      "name": "محمد حجازي ( – )Mohammad Hejaziالموقع :إيران ولبنان"
+    },
+    {
+      "ref": "BH-IND-123",
+      "type": "individual",
+      "name": "رستم قاسمي ( – )Rostam Qasemiالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-124",
+      "type": "individual",
+      "name": "مرتضى قاسمي ( – )Morteza Qasemiالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-125",
+      "type": "individual",
+      "name": "علي قصير ( – )Ali Qasirالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-126",
+      "type": "individual",
+      "name": "شمس اهلل اسدي ( – )Shamsollah Asadiالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-127",
+      "type": "individual",
+      "name": "محمد رضا اكبري ( – )Mohammadreza Ali Akbariالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-128",
+      "type": "individual",
+      "name": "محمد قصير ( – )Muhammad Qasirالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-129",
+      "type": "individual",
+      "name": "محمد قاسم البزال (( )Muhammad Qasim al-Bazzalالملقب :الحاج معين) (لبناني) – الموقع :لبنان",
+      "verification_note": "Arabic transliteration was corrupted; the entry gives the name in English directly ('Muhammad Qasim al-Bazzal'), used as authoritative."
+    },
+    {
+      "ref": "BH-IND-130",
+      "type": "individual",
+      "name": "محمود اشتري ( – )Mahmud Ashtariالموقع :لبنان"
+    },
+    {
+      "ref": "BH-IND-131",
+      "type": "individual",
+      "name": "تنكسيري علي رضا ( – )Tangsiri Ali Rezaالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-132",
+      "type": "individual",
+      "name": "عباس غالم شاهي ( – )Abbas Gholamshahiالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-133",
+      "type": "individual",
+      "name": "رمضان زيراهي ( – )Ramezan Zirahiالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-134",
+      "type": "individual",
+      "name": "ياداهلل بادين ( – )Yadollah Badinالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-135",
+      "type": "individual",
+      "name": "منصور رفنكار ( – )Mansur Ravankarالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-136",
+      "type": "individual",
+      "name": "علي عزمال ( – )Ali Ozma'lالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-137",
+      "type": "individual",
+      "name": "آية اهلل إبراهيمي ( – )Ayatollah Ebrahimiالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-138",
+      "type": "individual",
+      "name": "علي رضا أتباكي ( – )Alireza Atabakiالموقع :إيران"
+    },
+    {
+      "ref": "BH-IND-139",
+      "type": "individual",
+      "name": "إبراهيم علي ضاهر (لبناني)"
+    },
+    {
+      "ref": "BH-IND-140",
+      "type": "individual",
+      "name": "أحمد محمد يزبك (لبناني)"
+    },
+    {
+      "ref": "BH-IND-141",
+      "type": "individual",
+      "name": "عباس حسن غريب (لبناني)"
+    },
+    {
+      "ref": "BH-IND-142",
+      "type": "individual",
+      "name": "وحيد محمد سبيتي (لبناني)"
+    },
+    {
+      "ref": "BH-IND-143",
+      "type": "individual",
+      "name": "مصطفى حبيب حرب (لبناني)"
+    },
+    {
+      "ref": "BH-IND-144",
+      "type": "individual",
+      "name": "عزت يوسف عكر (لبناني)"
+    },
+    {
+      "ref": "BH-IND-145",
+      "type": "individual",
+      "name": "حسن شحادة عثمان (لبناني)"
+    },
+    {
+      "ref": "BH-IND-146",
+      "type": "individual",
+      "name": "إدريس علي عواد الفاي (عراقي) -متواجد في تركيا"
+    },
+    {
+      "ref": "BH-IND-147",
+      "type": "individual",
+      "name": "إبراهيم علي عواد الفاي -متواجد في تركيا"
+    },
+    {
+      "ref": "BH-IND-148",
+      "type": "individual",
+      "name": "عالء الخنفرة (سوري) – متواجد في تركيا"
+    },
+    {
+      "ref": "BH-IND-149",
+      "type": "individual",
+      "name": "محمد جعفر قصير الملقب (الحاج فادي أو شيخ صالح) (لبناني)"
+    },
+    {
+      "ref": "BH-IND-150",
+      "type": "individual",
+      "name": "بهنام شهرياي (إيراني)"
+    },
+    {
+      "ref": "BH-IND-151",
+      "type": "individual",
+      "name": "منير علي نعيم شعيتو الملقب (الحاج هاشم) (لبناني)"
+    },
+    {
+      "ref": "BH-IND-152",
+      "type": "individual",
+      "name": "علي موسى داقوق (لبناني)"
+    },
+    {
+      "ref": "BH-IND-153",
+      "type": "individual",
+      "name": "محمد عبدالكريم الغماري (يمني)"
+    },
+    {
+      "ref": "BH-IND-154",
+      "type": "individual",
+      "name": "صالح مسفر صالح الشاعر (يمني)"
+    },
+    {
+      "ref": "BH-IND-155",
+      "type": "individual",
+      "name": "يوسف المداني (يمني)"
+    },
+    {
+      "ref": "BH-IND-156",
+      "type": "individual",
+      "name": "صالح بن محمد بن حمد بن شاجع (يمني)"
+    },
+    {
+      "ref": "BH-IND-157",
+      "type": "individual",
+      "name": "علي سالم علي الحريري المهري (يمني)"
+    },
+    {
+      "ref": "BH-IND-158",
+      "type": "individual",
+      "name": "نبيل عبداهلل علي الوزير (يمني)"
+    },
+    {
+      "ref": "BH-IND-159",
+      "type": "individual",
+      "name": "إسماعيل بن إبراهيم الوزير (يمني)"
+    },
+    {
+      "ref": "BH-IND-160",
+      "type": "individual",
+      "name": "قصي إبراهيم الوزير (يمني)"
+    },
+    {
+      "ref": "BH-IND-161",
+      "type": "individual",
+      "name": "علي بن ناصر قرشة (يمني)"
+    },
+    {
+      "ref": "BH-IND-162",
+      "type": "individual",
+      "name": "زيد علي يحيى الشرفي (يمني)"
+    },
+    {
+      "ref": "BH-IND-163",
+      "type": "individual",
+      "name": "عبداهلل أبكر عبدالباري"
+    },
+    {
+      "ref": "BH-IND-164",
+      "type": "individual",
+      "name": "صدام أحمد محمد الفقيه (يمني)"
+    },
+    {
+      "ref": "BH-IND-165",
+      "type": "individual",
+      "name": "محمد نجيب كريم (لبناني)"
+    },
+    {
+      "ref": "BH-IND-166",
+      "type": "individual",
+      "name": "محمد سلمان فواز (لبناني)"
+    },
+    {
+      "ref": "BH-IND-167",
+      "type": "individual",
+      "name": "عبدالرضا شاهالئي (إيراني)"
+    },
+    {
+      "ref": "BH-IND-168",
+      "type": "individual",
+      "name": "سعيد أحمد محمد الجمال (يمني /متواجد في إيران)"
+    },
+    {
+      "ref": "BH-IND-169",
+      "type": "individual",
+      "name": "عبدي ناصر علي محمود (بريطاني من أصل حوثي /متواجد في تركيا)"
+    },
+    {
+      "ref": "BH-IND-170",
+      "type": "individual",
+      "name": "مانوج صبهروال (هندي /متواجد في الإمارات)"
+    },
+    {
+      "ref": "BH-IND-171",
+      "type": "individual",
+      "name": "هاني عبدالمجيد محمد أسعد (يمني /متواجد في تركيا)"
+    },
+    {
+      "ref": "BH-IND-172",
+      "type": "individual",
+      "name": "جامع علي محمد (صومالي /متواجد في عمان)"
+    },
+    {
+      "ref": "BH-IND-173",
+      "type": "individual",
+      "name": "طالب علي الأحمد الراوي (سوري /متواجد في تركيا)"
+    },
+    {
+      "ref": "BH-IND-174",
+      "type": "individual",
+      "name": "عبدالجليل المالح (سوري /متواجد في اليونان)"
+    },
+    {
+      "ref": "BH-IND-175",
+      "type": "individual",
+      "name": "عدنان عياد (لبناني)"
+    },
+    {
+      "ref": "BH-IND-176",
+      "type": "individual",
+      "name": "جهاد عدنان عياد (لبناني)"
+    },
+    {
+      "ref": "BH-IND-177",
+      "type": "individual",
+      "name": "علي عادل ذياب (لبناني)"
+    },
+    {
+      "ref": "BH-IND-178",
+      "type": "individual",
+      "name": "عادل ذياب (لبناني)"
+    },
+    {
+      "ref": "BH-IND-179",
+      "type": "individual",
+      "name": "علي محمد الداون (لبناني)"
+    },
+    {
+      "ref": "BH-IND-180",
+      "type": "individual",
+      "name": "جهاد سالم العلم (لبناني)"
+    },
+    {
+      "ref": "BH-IND-181",
+      "type": "individual",
+      "name": "علي قصير (لبناني)"
+    },
+    {
+      "ref": "BH-IND-182",
+      "type": "individual",
+      "name": "مقداد أميني (إيراني)"
+    },
+    {
+      "ref": "BH-IND-183",
+      "type": "individual",
+      "name": "سيد مرتضى مياني هاشمي (إيراني)"
+    },
+    {
+      "ref": "BH-IND-184",
+      "type": "individual",
+      "name": "عصمت اهلل خلوزاي (سوري)"
+    },
+    {
+      "ref": "BH-IND-185",
+      "type": "individual",
+      "name": "عالء خنفورة (سوري)"
+    },
+    {
+      "ref": "BH-IND-186",
+      "type": "individual",
+      "name": "براء قطرجي (سوري)"
+    },
+    {
+      "ref": "BH-IND-187",
+      "type": "individual",
+      "name": "حسان بن أحمد قطرجي (سوري)"
+    },
+    {
+      "ref": "BH-IND-188",
+      "type": "individual",
+      "name": "عبدالرحمن أبو موسى (نيجيري)"
+    },
+    {
+      "ref": "BH-IND-189",
+      "type": "individual",
+      "name": "صالح يوسف أدامو (نيجيري)"
+    },
+    {
+      "ref": "BH-IND-190",
+      "type": "individual",
+      "name": "بشير علي يوسف (نيجيري)"
+    },
+    {
+      "ref": "BH-IND-191",
+      "type": "individual",
+      "name": "محمد إبراهيم عيسى (نيجيري)"
+    },
+    {
+      "ref": "BH-IND-192",
+      "type": "individual",
+      "name": "إبراهيم علي الحسن (نيجيري)"
+    },
+    {
+      "ref": "BH-IND-193",
+      "type": "individual",
+      "name": "سوراجو أبوبكر محمد (نيجيري)"
+    },
+    {
+      "ref": "BH-IND-194",
+      "type": "individual",
+      "name": "حسين أحمد عبداهلل أحمد حسين الدمامي"
+    },
+    {
+      "ref": "BH-IND-195",
+      "type": "individual",
+      "name": "حسين علي أحمد داوود"
+    },
+    {
+      "ref": "BH-IND-196",
+      "type": "individual",
+      "name": "عبدالرؤوف عبداهلل أحمد الشايب"
+    },
+    {
+      "ref": "BH-IND-197",
+      "type": "individual",
+      "name": "ميثم عمران حسين عمران الجمري"
+    },
+    {
+      "ref": "BH-IND-198",
+      "type": "individual",
+      "name": "يوسف عبداهلل درويش عبداهلل العباسي (بحريني)"
+    },
+    {
+      "ref": "BH-IND-199",
+      "type": "individual",
+      "name": "إبراهيم عادل عبدالوهاب جمعان (بحريني)"
+    },
+    {
+      "ref": "BH-IND-200",
+      "type": "individual",
+      "name": "خالد علي عبدالرحمن محمد (بحريني)"
+    },
+    {
+      "ref": "BH-IND-201",
+      "type": "individual",
+      "name": "عبدالعزيز عبدالكريم محمود محمد المال (بحريني)"
+    },
+    {
+      "ref": "BH-IND-202",
+      "type": "individual",
+      "name": "عمر عبدالوهاب يوسف مبارك الزياني (بحريني)"
+    },
+    {
+      "ref": "BH-IND-203",
+      "type": "individual",
+      "name": "أدهم عبداهلل عبدربه عبداهلل الحمري (بحريني)"
+    },
+    {
+      "ref": "BH-IND-204",
+      "type": "individual",
+      "name": "علي عبدالنبي أحمد إبراهيم الشوفه (بحريني)"
+    },
+    {
+      "ref": "BH-IND-205",
+      "type": "individual",
+      "name": "حسن أحمد رضي حسين سرحان (بحريني)"
+    },
+    {
+      "ref": "BH-IND-206",
+      "type": "individual",
+      "name": "عيسى صالح عيسى محمد سلمان"
+    },
+    {
+      "ref": "BH-IND-207",
+      "type": "individual",
+      "name": "عبده عبداهلل دائل أحمد (يمني)"
+    },
+    {
+      "ref": "BH-IND-208",
+      "type": "individual",
+      "name": "رحمت اهلل حيدري (إيراني). ب‌-الكيانات والتنظيمات:"
+    },
+    {
+      "ref": "BH-ENT-1",
+      "type": "entity",
+      "name": "حزب اهلل"
+    },
+    {
+      "ref": "BH-ENT-2",
+      "type": "entity",
+      "name": "أنصار الإسالم تنظيم القاعدة الكتائب الكردية"
+    },
+    {
+      "ref": "BH-ENT-3",
+      "type": "entity",
+      "name": "تنظيم الدولة الإسالمية في العراق والشام (داعش)"
+    },
+    {
+      "ref": "BH-ENT-4",
+      "type": "entity",
+      "name": "القاعدة في شبه الجزيرة العربية"
+    },
+    {
+      "ref": "BH-ENT-5",
+      "type": "entity",
+      "name": "جبهة النصرة (سوريا)"
+    },
+    {
+      "ref": "BH-ENT-6",
+      "type": "entity",
+      "name": "جماعة أبو سياف (الفلبين)"
+    },
+    {
+      "ref": "BH-ENT-7",
+      "type": "entity",
+      "name": "حركة المجاهدين (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-8",
+      "type": "entity",
+      "name": "تنظيم القاعدة"
+    },
+    {
+      "ref": "BH-ENT-9",
+      "type": "entity",
+      "name": "حركة أوزباكستان الإسالمية (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-10",
+      "type": "entity",
+      "name": "جيش محمد (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-11",
+      "type": "entity",
+      "name": "لشكر طيبة (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-12",
+      "type": "entity",
+      "name": "عصبة الأنصار (لبنان)"
+    },
+    {
+      "ref": "BH-ENT-13",
+      "type": "entity",
+      "name": "القاعدة في بالد المغرب الإسالمي (شمال أفريقيا)"
+    },
+    {
+      "ref": "BH-ENT-14",
+      "type": "entity",
+      "name": "تحريك طالبان باكستان /طالبان الباكستانية (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-15",
+      "type": "entity",
+      "name": "كتائب عبداهلل عزام (لبنان)"
+    },
+    {
+      "ref": "BH-ENT-16",
+      "type": "entity",
+      "name": "أنصار الدين (مالي)"
+    },
+    {
+      "ref": "BH-ENT-17",
+      "type": "entity",
+      "name": "بوكو حرام (نيجيريا)"
+    },
+    {
+      "ref": "BH-ENT-18",
+      "type": "entity",
+      "name": "أنصار الشريعة في بنغازي (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-19",
+      "type": "entity",
+      "name": "أنصار الشريعة في درنة (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-20",
+      "type": "entity",
+      "name": "الجماعة الإسالمية (إندونيسيا)"
+    },
+    {
+      "ref": "BH-ENT-21",
+      "type": "entity",
+      "name": "لشكر جنكوي (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-22",
+      "type": "entity",
+      "name": "حركة الجهاد الإسالمي (باكستان -بنغالديش)"
+    },
+    {
+      "ref": "BH-ENT-23",
+      "type": "entity",
+      "name": "جماعة انشروت توحيد (إندونيسيا)"
+    },
+    {
+      "ref": "BH-ENT-24",
+      "type": "entity",
+      "name": "جماعة أنصار المسلمين في بالد السودان (نيجيريا)"
+    },
+    {
+      "ref": "BH-ENT-25",
+      "type": "entity",
+      "name": "كتيبة الملثمون (الجزائر)"
+    },
+    {
+      "ref": "BH-ENT-26",
+      "type": "entity",
+      "name": "أنصار الشريعة في تونس (تونس)"
+    },
+    {
+      "ref": "BH-ENT-27",
+      "type": "entity",
+      "name": "المرابطون (مالي)"
+    },
+    {
+      "ref": "BH-ENT-28",
+      "type": "entity",
+      "name": "الجماعة الإسالمية المسلحة (الجزائر)"
+    },
+    {
+      "ref": "BH-ENT-29",
+      "type": "entity",
+      "name": "جماعة حماة الدعوة السلفية"
+    },
+    {
+      "ref": "BH-ENT-30",
+      "type": "entity",
+      "name": "حركة شرق تركستان الإسالمية (الصين)"
+    },
+    {
+      "ref": "BH-ENT-31",
+      "type": "entity",
+      "name": "الجهاد الإسالمي المصري (مصر)"
+    },
+    {
+      "ref": "BH-ENT-32",
+      "type": "entity",
+      "name": "إمارة القوقاز (روسيا)"
+    },
+    {
+      "ref": "BH-ENT-33",
+      "type": "entity",
+      "name": "مؤسسة الإغاثة العالمية (الواليات المتحدة الأمريكية)"
+    },
+    {
+      "ref": "BH-ENT-34",
+      "type": "entity",
+      "name": "حركة شام الإسالم (سوريا)"
+    },
+    {
+      "ref": "BH-ENT-35",
+      "type": "entity",
+      "name": "جمعية الهالل الأحمر الإندونيسية (إندونيسيا)"
+    },
+    {
+      "ref": "BH-ENT-36",
+      "type": "entity",
+      "name": "جيش عدن أبين الإسالمي"
+    },
+    {
+      "ref": "BH-ENT-37",
+      "type": "entity",
+      "name": "لواء الدولي الإسالمي (روسيا)"
+    },
+    {
+      "ref": "BH-ENT-38",
+      "type": "entity",
+      "name": "جماعة الجهاد الإسالمي -متحدة مع حركة أوزباكستان الإسالمية"
+    },
+    {
+      "ref": "BH-ENT-39",
+      "type": "entity",
+      "name": "جماعة أهل السنة للدعوة والجهاد (شمال أفريقيا)"
+    },
+    {
+      "ref": "BH-ENT-40",
+      "type": "entity",
+      "name": "جند الخالفة (الجزائر)"
+    },
+    {
+      "ref": "BH-ENT-41",
+      "type": "entity",
+      "name": "الجماعة الإسالمية المقاتلة في ليبيا"
+    },
+    {
+      "ref": "BH-ENT-42",
+      "type": "entity",
+      "name": "مكتب الخدمات"
+    },
+    {
+      "ref": "BH-ENT-43",
+      "type": "entity",
+      "name": "الجماعة الإسالمية المقاتلة في المغرب"
+    },
+    {
+      "ref": "BH-ENT-44",
+      "type": "entity",
+      "name": "شبكة محمد جمال (مصر)"
+    },
+    {
+      "ref": "BH-ENT-45",
+      "type": "entity",
+      "name": "مجاهدين تيمور (إندونيسيا)"
+    },
+    {
+      "ref": "BH-ENT-46",
+      "type": "entity",
+      "name": "جماعة التوحيد والجهاد في غرب أفريقيا"
+    },
+    {
+      "ref": "BH-ENT-47",
+      "type": "entity",
+      "name": "حركة رجاح سليمان (الفلبين)"
+    },
+    {
+      "ref": "BH-ENT-48",
+      "type": "entity",
+      "name": "جمعية إحياء التراث الإسالمي (فرع أفغانستان وباكستان)"
+    },
+    {
+      "ref": "BH-ENT-49",
+      "type": "entity",
+      "name": "لواء شهداء رياض الصالحين (روسيا)"
+    },
+    {
+      "ref": "BH-ENT-50",
+      "type": "entity",
+      "name": "فوج الجهاد الإسالمي (روسيا)"
+    },
+    {
+      "ref": "BH-ENT-51",
+      "type": "entity",
+      "name": "جيش المهاجرين والأنصار (سوريا)"
+    },
+    {
+      "ref": "BH-ENT-52",
+      "type": "entity",
+      "name": "الجماعة الإسالمية المقاتلة في تونس"
+    },
+    {
+      "ref": "BH-ENT-53",
+      "type": "entity",
+      "name": "منظمة إعادة بناء الأمة (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-54",
+      "type": "entity",
+      "name": "منظمة الوفاء للعمل الإنساني (أفغانستان)"
+    },
+    {
+      "ref": "BH-ENT-55",
+      "type": "entity",
+      "name": "االتحاد الإسالمية (الصومال)"
+    },
+    {
+      "ref": "BH-ENT-56",
+      "type": "entity",
+      "name": "ائتمان الأختر الدولية"
+    },
+    {
+      "ref": "BH-ENT-57",
+      "type": "entity",
+      "name": "مؤسسة الحرمين الخيرية"
+    },
+    {
+      "ref": "BH-ENT-58",
+      "type": "entity",
+      "name": "لجنة دعم الأفغان (أفغانستان)"
+    },
+    {
+      "ref": "BH-ENT-59",
+      "type": "entity",
+      "name": "الموقعون بالدم (مالي)"
+    },
+    {
+      "ref": "BH-ENT-60",
+      "type": "entity",
+      "name": "الفرقان (البوسنة والهرسك)"
+    },
+    {
+      "ref": "BH-ENT-61",
+      "type": "entity",
+      "name": "ائتمان الراشد (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-62",
+      "type": "entity",
+      "name": "مؤسسة الإحسان الخيرية"
+    },
+    {
+      "ref": "BH-ENT-63",
+      "type": "entity",
+      "name": "جمعية التعاون الإسالمية (أفغانستان)"
+    },
+    {
+      "ref": "BH-ENT-64",
+      "type": "entity",
+      "name": "ائتمان الرابطة (باكستان)"
+    },
+    {
+      "ref": "BH-ENT-65",
+      "type": "entity",
+      "name": "مكتب وكالة طيبة الدولية (البوسنة والهرسك)"
+    },
+    {
+      "ref": "BH-ENT-66",
+      "type": "entity",
+      "name": "ائتالف شباب 14فبراير (البحرين)"
+    },
+    {
+      "ref": "BH-ENT-67",
+      "type": "entity",
+      "name": "سرايا الأشتر (البحرين)"
+    },
+    {
+      "ref": "BH-ENT-68",
+      "type": "entity",
+      "name": "سرايا المقاومة الشعبية (البحرين)"
+    },
+    {
+      "ref": "BH-ENT-69",
+      "type": "entity",
+      "name": "مركز قطر للعمل التطوعي (قطر)"
+    },
+    {
+      "ref": "BH-ENT-70",
+      "type": "entity",
+      "name": "شركة دوحة أبل -شركة إنترنت ودعم تكنولوجي (قطر)"
+    },
+    {
+      "ref": "BH-ENT-71",
+      "type": "entity",
+      "name": "قطر الخيرية (قطر)"
+    },
+    {
+      "ref": "BH-ENT-72",
+      "type": "entity",
+      "name": "مؤسسة الشيخ عيد آل ثاني الخيرية (قطر)"
+    },
+    {
+      "ref": "BH-ENT-73",
+      "type": "entity",
+      "name": "مؤسسة الشيخ ثاني بن عبداهلل للخدمات الإنسانية (قطر)"
+    },
+    {
+      "ref": "BH-ENT-74",
+      "type": "entity",
+      "name": "سرايا الدفاع عن بنغازي (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-75",
+      "type": "entity",
+      "name": "حزب اهلل البحريني (البحرين)"
+    },
+    {
+      "ref": "BH-ENT-76",
+      "type": "entity",
+      "name": "سرايا المختار (البحرين)"
+    },
+    {
+      "ref": "BH-ENT-77",
+      "type": "entity",
+      "name": "حركة أحرار البحرين (البحرين)"
+    },
+    {
+      "ref": "BH-ENT-78",
+      "type": "entity",
+      "name": "مؤسسة البالغ الخيرية (اليمن)"
+    },
+    {
+      "ref": "BH-ENT-79",
+      "type": "entity",
+      "name": "جمعية الإحسان الخيرية (اليمن)"
+    },
+    {
+      "ref": "BH-ENT-80",
+      "type": "entity",
+      "name": "مؤسسة الرحمة الخيرية (اليمن)"
+    },
+    {
+      "ref": "BH-ENT-81",
+      "type": "entity",
+      "name": "مجلس شورى ثوار بني غازي (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-82",
+      "type": "entity",
+      "name": "مركز السرايا للإعالم (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-83",
+      "type": "entity",
+      "name": "وكالة بشرى الإخبارية (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-84",
+      "type": "entity",
+      "name": "كتيبة راف اهلل السحاتي (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-85",
+      "type": "entity",
+      "name": "قناة نبأ (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-86",
+      "type": "entity",
+      "name": "مؤسسة التناصح للدعوة والثقافة والإعالم (ليبيا)"
+    },
+    {
+      "ref": "BH-ENT-87",
+      "type": "entity",
+      "name": "جمعية الرحمة الخيرية (اليمن)"
+    },
+    {
+      "ref": "BH-ENT-88",
+      "type": "entity",
+      "name": "سوبرماركت الخير (اليمن)"
+    },
+    {
+      "ref": "BH-ENT-89",
+      "type": "entity",
+      "name": "المجلس الإسالمي العالمي (مساع)"
+    },
+    {
+      "ref": "BH-ENT-90",
+      "type": "entity",
+      "name": "االتحاد العالمي لعلماء المسلمين"
+    },
+    {
+      "ref": "BH-ENT-91",
+      "type": "entity",
+      "name": "مجموعة الإنماء"
+    },
+    {
+      "ref": "BH-ENT-92",
+      "type": "entity",
+      "name": "شركة الإنماء للهندسة والمقاوالت"
+    },
+    {
+      "ref": "BH-ENT-93",
+      "type": "entity",
+      "name": "مجموعة سبكترم"
+    },
+    {
+      "ref": "BH-ENT-94",
+      "type": "entity",
+      "name": "ماهر للتجارة"
+    },
+    {
+      "ref": "BH-ENT-95",
+      "type": "entity",
+      "name": "الحرس الثوري الإيراني"
+    },
+    {
+      "ref": "BH-ENT-96",
+      "type": "entity",
+      "name": "قوات المقاومة الإيرانية الباسيج (معروفة باسم :باسيج ،باسيج ،باسيجي ملي ،تعبئة المنظمة المقموعة ،منظمة التعبئة الوطنية ،تعبئة المقاومة الوطنية ،قوة تعبئة المقاومة ،منظمة الباسيج للمقاومة) ",
+      "verification_note": "'الباسيج' (Basij) is a globally standard, internationally documented term (Iran's IRGC-affiliated paramilitary force); correction is a mechanical de-spacing of a well-known proper noun, not a guess."
+    },
+    {
+      "ref": "BH-ENT-97",
+      "type": "entity",
+      "name": "بونياد تافون باسيج (معروف باسم :مؤسسة باسيج التعاونية)"
+    },
+    {
+      "ref": "BH-ENT-98",
+      "type": "entity",
+      "name": "بنك اقتصاد مهر (معروف باسم :بنك مهر الغير ربحي)"
+    },
+    {
+      "ref": "BH-ENT-99",
+      "type": "entity",
+      "name": "بنك ملة"
+    },
+    {
+      "ref": "BH-ENT-100",
+      "type": "entity",
+      "name": "شركة اقتصاد مهر الإيرانية لالستثمارات (معروف باسم :شركة اقتصاد مهر الإيرانية لالستثمارات ،شركة مهري اقتصادي الإيرانية لالستثمارات ،شركة مهر االقتصادية الإيرانية ،استثمارات مهر االقتصادية الإيرانية) ",
+      "verification_note": "'مهر' (Mehr) confirmed via two clean restatements of the same company-name element elsewhere in this same entry."
+    },
+    {
+      "ref": "BH-ENT-101",
+      "type": "entity",
+      "name": "شركة االستثمارات الإيرانية تادبيرجان عطية"
+    },
+    {
+      "ref": "BH-ENT-102",
+      "type": "entity",
+      "name": "شركة نيجن ساهل لالستثمارات الملكية (معروف باسم :شركة نيجن ساهل الملكية)"
+    },
+    {
+      "ref": "BH-ENT-103",
+      "type": "entity",
+      "name": "مجموعة اقتصاد مهر المالية"
+    },
+    {
+      "ref": "BH-ENT-104",
+      "type": "entity",
+      "name": "شركة تكنوتار الهندسية"
+    },
+    {
+      "ref": "BH-ENT-105",
+      "type": "entity",
+      "name": "شركة تكتر لالستثمار"
+    },
+    {
+      "ref": "BH-ENT-106",
+      "type": "entity",
+      "name": "شركة إيران لصناعة الجرارات (معروف باسم :إيران لصناعة الجرارات)"
+    },
+    {
+      "ref": "BH-ENT-107",
+      "type": "entity",
+      "name": "شركة إيران لتطوير مناجم الزنك"
+    },
+    {
+      "ref": "BH-ENT-108",
+      "type": "entity",
+      "name": "كالسيمين (معروف باسم :كالسيمين)"
+    },
+    {
+      "ref": "BH-ENT-109",
+      "type": "entity",
+      "name": "شركة قشم للصهر والتخفيض (معروف باسم :مجمع قشم للصهر والتخفيض)"
+    },
+    {
+      "ref": "BH-ENT-110",
+      "type": "entity",
+      "name": "شركة بندر عباس لإنتاج الزنك"
+    },
+    {
+      "ref": "BH-ENT-111",
+      "type": "entity",
+      "name": "شركة زانجان لإنتاج الحمض (معروف باسم :صانعي الحمض والفاند رونيكاران، زانجان صانعي الحمض ،حمض زانجان سازان)",
+      "verification_note": "'زانجان' and 'الحمض' confirmed via clean restatements later in this same entry's own alias list."
+    },
+    {
+      "ref": "BH-ENT-112",
+      "type": "entity",
+      "name": "الشركة الإيرانية للمحفزات الكيميائية"
+    },
+    {
+      "ref": "BH-ENT-113",
+      "type": "entity",
+      "name": "شركة أصفهان مباركة للحديد (معروف باسم :شركة مباركة للحديد)"
+    },
+    {
+      "ref": "BH-ENT-114",
+      "type": "entity",
+      "name": "شركة أنديشه مهفاران لالستثمار"
+    },
+    {
+      "ref": "BH-ENT-115",
+      "type": "entity",
+      "name": "البنك الفارسي"
+    },
+    {
+      "ref": "BH-ENT-116",
+      "type": "entity",
+      "name": "بنك سينا (معروف باسم :معهد سينا للتمويل واالئتمان)"
+    },
+    {
+      "ref": "BH-ENT-117",
+      "type": "entity",
+      "name": "مجموعة باهمان"
+    },
+    {
+      "ref": "BH-ENT-118",
+      "type": "entity",
+      "name": "شركة تواصل"
+    },
+    {
+      "ref": "BH-ENT-119",
+      "type": "entity",
+      "name": "شركة الحرم للصرافة"
+    },
+    {
+      "ref": "BH-ENT-120",
+      "type": "entity",
+      "name": "شركة الخالدي للصرافة"
+    },
+    {
+      "ref": "BH-ENT-121",
+      "type": "entity",
+      "name": "منظمة نجاة للرعاية االجتماعية \"نجاة\""
+    },
+    {
+      "ref": "BH-ENT-122",
+      "type": "entity",
+      "name": "مؤسسة أفريكو 1أوفشور ( – )Africo 1 Off-Shore SALالموقع :لبنان"
+    },
+    {
+      "ref": "BH-ENT-123",
+      "type": "entity",
+      "name": "نادي كيش بي إن آي (Kish P&I Club) - الموقع: إيران",
+      "verification_note": "English name given directly in entry ('Kish P&I Club'); Arabic is a phonetic transliteration of 'P&I' as printed in the source."
+    },
+    {
+      "ref": "BH-ENT-124",
+      "type": "entity",
+      "name": "شركة حوقول أوفشور (الخارجية) ( - )Hokoul S.A.L. Offshoreالموقع :لبنان"
+    },
+    {
+      "ref": "BH-ENT-125",
+      "type": "entity",
+      "name": "مجموعة تالقي ( – )Talaqi Groupالموقع :لبنان"
+    },
+    {
+      "ref": "BH-ENT-126",
+      "type": "entity",
+      "name": "ألوميكس ( – )Alumixالموقع :لبنان"
+    },
+    {
+      "ref": "BH-ENT-127",
+      "type": "entity",
+      "name": "نغم الحياة ( – )Nagham Al Hayatالموقع :سوريا"
+    },
+    {
+      "ref": "BH-ENT-128",
+      "type": "entity",
+      "name": "توافق ( – )Tawafukالموقع :لبنان"
+    },
+    {
+      "ref": "BH-ENT-129",
+      "type": "entity",
+      "name": "شركة حمراهان بيشرو للتجارة (– )Hamrahan Pishro Tejarat Trading Company الموقع :إيران"
+    },
+    {
+      "ref": "BH-ENT-130",
+      "type": "entity",
+      "name": "فيلق القدس - الحرس الثوري الإيراني (Iranian Revolutionary Guard – Quds Force) (IRGC-GF) - الموقع: إيران",
+      "verification_note": "Bidi (RTL/LTR) text-mixing scrambled the Arabic/English word order in extraction; every component word (Iranian Revolutionary Guard, Quds, Force, IRGC-GF) is individually clean and unambiguous - reassembled in standard order. 'IRGC-GF' reproduced exactly as printed in the source (not corrected to the more common IRGC-QF)."
+    },
+    {
+      "ref": "BH-ENT-131",
+      "type": "entity",
+      "name": "شركة بنك أنصار للسمسرة ( – )Ansar Bank Brokerage Companyالموقع :إيران"
+    },
+    {
+      "ref": "BH-ENT-132",
+      "type": "entity",
+      "name": "أنصار للصرافة ( – )Ansar Exchangeالموقع :إيران"
+    },
+    {
+      "ref": "BH-ENT-133",
+      "type": "entity",
+      "name": "أطلس للصرافة ( – )Atlas Exchangeالموقع :إيران"
+    },
+    {
+      "ref": "BH-ENT-134",
+      "type": "entity",
+      "name": "شركة منابع ثروة الجنوب للتجارة العامة (Manabea Tharwat Al-Janoob General ) – Trading Companyالموقع :إيران"
+    },
+    {
+      "ref": "BH-ENT-135",
+      "type": "entity",
+      "name": "خدمات طيف لاستخراج المعادن (Taif Mining Services, LLC) - الموقع: سلطنة عمان",
+      "verification_note": "English name given directly ('Taif Mining Services, LLC'); reassembled from a bidi-scrambled extraction using the entry's own clean English words."
+    },
+    {
+      "ref": "BH-ENT-136",
+      "type": "entity",
+      "name": "شركة الفاي للخدمات المالية – مقرها تركيا"
+    },
+    {
+      "ref": "BH-ENT-137",
+      "type": "entity",
+      "name": "شركة سام أويل للتجارة والخدمات النفطية المحدودة (استيراد وتصدير النفط والتوكيالت التجارية /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-138",
+      "type": "entity",
+      "name": "مؤسسة الزهراء للتجارة والتوكيلات (استيراد وتصدير النفط ،وبيع القرطاسية والمستلزمات المكتبية /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-139",
+      "type": "entity",
+      "name": "شركتي أبراج اليمن – والذهب الأسود (استيراد وتصدير النفط /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-140",
+      "type": "entity",
+      "name": "شركة فيول أويل الستيراد المشتقات النفطية (استيراد وتصدير النفط /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-141",
+      "type": "entity",
+      "name": "شركة سلم رود للتجارة واالستيراد (استيراد وتصدير النفط /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-142",
+      "type": "entity",
+      "name": "شركة أبكر للخدمات والنفط (استيراد وتصدير النفط /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-143",
+      "type": "entity",
+      "name": "شركة الفقيه العالمية للتجارة والصناعة والخدمات النفطية المحدودة (صناعة وتجارة واستيراد وتصدير البالس تيك والمش تقات النفطي ة والأدوات المنزلية والم واد الغذائية والطبية والإلكترونية وقطع غيار المركبات والمواد الزراعية ومواد البناء وغيرها /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-144",
+      "type": "entity",
+      "name": "شركة سبأ العالمية للتبغ المحدودة (تجارة وصناعة واستيراد التبغ والسجائر وتوكيالت تجارية /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-145",
+      "type": "entity",
+      "name": "شركة أويل برايمر (استيراد وتصدير النفط /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-146",
+      "type": "entity",
+      "name": "شركة يمن أبوت للتجارة المحدودة (صناعة وتجارة واستيراد وتصدير التبغ والكبريت والبالستيك والأدوات المنزلية والمواد الغذائية والطبية والإلكترونية وقطع غيار المركبات والمواد الزراعية ومواد البناء وغيرها /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-147",
+      "type": "entity",
+      "name": "شركة صحاري للصرافة والتحويالت المالية (بيع وشراء العمالت الأجنبية وتحويالت مالية داخلية وخارجية /مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-148",
+      "type": "entity",
+      "name": "شركة (( )Adoon General Trading FZEتجارة عامة /الصومال والإمارات)"
+    },
+    {
+      "ref": "BH-ENT-149",
+      "type": "entity",
+      "name": "شركة (( )Adoon General Trading LLCتجارة عامة /الإمارات)"
+    },
+    {
+      "ref": "BH-ENT-150",
+      "type": "entity",
+      "name": "شركة (( )Adoon General Trading Gida Sanayi Ve Ticaret Anonim Sirktiتجارة عامة /تركيا)"
+    },
+    {
+      "ref": "BH-ENT-151",
+      "type": "entity",
+      "name": "شركة سويد وأولاده للصرافة (Swaid And Sons For Exchange CO) - شركة للصرافة / اليمن",
+      "verification_note": "English name given directly ('Swaid And Sons For Exchange CO'); reassembled from a bidi-scrambled extraction."
+    },
+    {
+      "ref": "BH-ENT-152",
+      "type": "entity",
+      "name": "شركة الأمير للهندسة والإنشاءات والتجارة العامة (مقرها لبنان)"
+    },
+    {
+      "ref": "BH-ENT-153",
+      "type": "entity",
+      "name": "شركة (( )Golden Group SAL Affshoreمقرها لبنان)"
+    },
+    {
+      "ref": "BH-ENT-154",
+      "type": "entity",
+      "name": "شركة (( )Golden Group Trading SARLمقرها لبنان)"
+    },
+    {
+      "ref": "BH-ENT-155",
+      "type": "entity",
+      "name": "شركة (( )Hamer and Nail Construction Limitedمقرها زامبيا)"
+    },
+    {
+      "ref": "BH-ENT-156",
+      "type": "entity",
+      "name": "شركة (( )Hamidco Investment Limitedمقرها زامبيا)"
+    },
+    {
+      "ref": "BH-ENT-157",
+      "type": "entity",
+      "name": "شركة إنشاءات ش.م.ل.ل (مقرها لبنان)"
+    },
+    {
+      "ref": "BH-ENT-158",
+      "type": "entity",
+      "name": "شركة جمول وعياد للصناعة والتجارة (مقرها لبنان)"
+    },
+    {
+      "ref": "BH-ENT-159",
+      "type": "entity",
+      "name": "شركة (( )Land Metics SARLمقرها لبنان)"
+    },
+    {
+      "ref": "BH-ENT-160",
+      "type": "entity",
+      "name": "شركة (( )Land Metics SAL Off-shoreمقرها لبنان)"
+    },
+    {
+      "ref": "BH-ENT-161",
+      "type": "entity",
+      "name": "شركة (( )Top Fashion Gmbh Konfekionsbugeleiمقرها ألمانيا)"
+    },
+    {
+      "ref": "BH-ENT-162",
+      "type": "entity",
+      "name": "شركة دار السالم للسفر والسياحة (مقرها لبنان)"
+    },
+    {
+      "ref": "BH-ENT-163",
+      "type": "entity",
+      "name": "مؤسسة القطرجي (مقرها سوريا)"
+    },
+    {
+      "ref": "BH-ENT-164",
+      "type": "entity",
+      "name": "جماعة الحوثي"
+    },
+    {
+      "ref": "BH-ENT-165",
+      "type": "entity",
+      "name": "شركة معاذ عبداهلل دائل لالستيراد والتصدير (مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-166",
+      "type": "entity",
+      "name": "الشركة العالمية إكسبرس للصرافة والتحويالت المالية (مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-167",
+      "type": "entity",
+      "name": "شركة الحظاء للصرافة (مقرها اليمن)"
+    },
+    {
+      "ref": "BH-ENT-168",
+      "type": "entity",
+      "name": "شركة بيريدوت للتجارة والشحن (مقرها الشارقة -الإمارات)"
+    },
+    {
+      "ref": "BH-ENT-169",
+      "type": "entity",
+      "name": "سافران لخدمات المطار (مقرها طهران -إيران)"
+    },
+    {
+      "ref": "BH-ENT-170",
+      "type": "entity",
+      "name": "شركة بارافاربارس (( )Paravar Parsمقرها طهران -إيران)"
+    },
+    {
+      "ref": "BH-ENT-171",
+      "type": "entity",
+      "name": "شركة تصميم وتصنيع محركات الطائرات (( )DAMAمقرها طهران -إيران)"
+    },
+    {
+      "ref": "BH-ENT-172",
+      "type": "entity",
+      "name": "شركة بهارستان كيش (مقرها طهران -إيران)",
+      "verification_note": "A section-header fragment ('ج -القطع البحرية:') that leaked into this entry from a parsing boundary issue (not a source-document defect) was removed."
+    },
+    {
+      "ref": "BH-VES-1",
+      "type": "vessel",
+      "name": "ياسمين(.)JASMINE"
+    },
+    {
+      "ref": "BH-VES-2",
+      "type": "vessel",
+      "name": "المصير (ديستني) (.)DESTINY"
+    },
+    {
+      "ref": "BH-VES-3",
+      "type": "vessel",
+      "name": "السعادة ( 1هبينيس .)HAPPINESS 1( )1"
+    },
+    {
+      "ref": "BH-VES-4",
+      "type": "vessel",
+      "name": "سينوبا (.)SINOPA"
+    },
+    {
+      "ref": "BH-VES-5",
+      "type": "vessel",
+      "name": "ديليس (.)DELICE"
+    },
+    {
+      "ref": "BH-VES-6",
+      "type": "vessel",
+      "name": "سفينة (( )Triple Successناقلة نفط الخام ،مقرها الأبيض المتوسط)"
+    },
+    {
+      "ref": "BH-VES-7",
+      "type": "vessel",
+      "name": "سفينة Threeأو (( )Light Moonناقلة سائبة)"
+    }
+  ]
+}
