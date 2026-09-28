@@ -30,6 +30,9 @@ name: Site Currency (live deploy vs main)
 # site is not a current site. See scripts/site-currency.mjs.
 
 on:
+  workflow_run:
+    workflows: ["Netlify Production Deploy (build hook)"]
+    types: [completed]
   schedule:
     - cron: '7 8 * * *'   # 08:07 UTC daily — after the morning controls, before freshness (~11:07)
   workflow_dispatch:
