@@ -1,6 +1,8 @@
 # Hawkeye Sterling - Entity Risk Assessment (RA)
 
-**Project handbook:** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md) · [Changelog](CHANGELOG.md) · [Citation](CITATION.cff) · [Docs index](docs/README.md)
+**Project:** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md)
+
+**Technical & compliance:** [Architecture](docs/architecture/README.md) · [Compliance Methodology](docs/policies/README.md) · [Screening Coverage](data/screening-country-coverage.json) · [Data Sources](data/README.md) · [Controls](docs/governance/README.md) · [Operations](docs/security/deploy-rollback-runbook.md) · [Changelog](CHANGELOG.md) · [Citation](CITATION.cff) · [Docs index](docs/README.md)
 
 <!-- Screening coverage (generated from the engine's own configuration by scripts/coverage-figures.mjs, CI drift-checked) -->
 [![Sanctions Worldwide Coverage](data/badges/sanctions-worldwide.svg)](data/screening-country-coverage.json)
