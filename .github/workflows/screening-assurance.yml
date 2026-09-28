@@ -4,12 +4,6 @@ on:
   schedule:
     - cron: '17 */6 * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/screening-assurance.mjs'
-      - 'data/worldwide-screening-sources.json'
-      - '.github/workflows/screening-assurance.yml'
 
 permissions:
   contents: read
