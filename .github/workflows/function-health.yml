@@ -22,6 +22,11 @@ name: Function Health
 #   asserting ok:true. Do not reduce that back to a status-code check.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/function-health.yml'
+      - 'netlify/functions/**'
   schedule:
     - cron: '23 5 * * *'   # 05:23 UTC daily (just after site-health at 05:19; odd minute)
   workflow_dispatch:
