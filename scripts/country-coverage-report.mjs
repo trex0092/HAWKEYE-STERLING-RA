@@ -37,7 +37,7 @@ export function buildCountryCoverageReport(register = readRegister()) {
   const editions = editionCountries(register);
   const fatf = sortRows(register.countries.filter((row) => row.fatf === "black" || row.fatf === "grey"));
   const nonFatfNotResearched = register.countries.filter((row) => row.status === "not-researched" && !row.fatf).sort((a,b) => a.country.localeCompare(b.country, "en"));
-  const nonFatfKnown = sortRows(register.countries.filter((row) => !row.fatf && (row.status === "identified" || row.status === "pending")));
+  const nonFatfKnown = sortRows(register.countries.filter((row) => !row.fatf && (row.status === "identified" || row.status === "pending")));\n  const mlroGated = sortRows(register.countries.filter((row) => row.requiresMlroPolicyDecision === true));
   const noEdition = register.countries.filter((row) => !editions.has(row.country)).map((row) => row.country).sort((a,b) => a.localeCompare(b, "en"));
   const statusCounts = Object.create(null);
   for (const row of register.countries) statusCounts[row.status] = (statusCounts[row.status] || 0) + 1;
@@ -56,7 +56,7 @@ export function buildCountryCoverageReport(register = readRegister()) {
   out.push(table(["Country","AM edition","Partial note"], nonFatfNotResearched.map((row) => [row.country,editions.has(row.country) ? "yes" : "no",partialNote(row)])), "");
   out.push("## Sanctions: list known but file not verified (" + (statusCounts.identified || 0) + ") and pending (" + (statusCounts.pending || 0) + ")", "");
   out.push(table(["Country","Status","AM edition"], nonFatfKnown.map((row) => [row.country,row.status,editions.has(row.country) ? "yes" : "no"])), "");
-  out.push("## Adverse media: " + noEdition.length + " countries with no dedicated Google News edition", "");
+  out.push("## MLRO policy decision required (" + mlroGated.length + ")", "");\n  out.push(table(["Country","Sanctions status","FATF"], mlroGated.map((row) => [row.country,row.status,row.fatf || ""])), "");\n  out.push("## Adverse media: " + noEdition.length + " countries with no dedicated Google News edition", "");
   out.push(noEdition.join(", "), "");
   out.push("## Regeneration", "");
   out.push("Run `npm run coverage:report` to print this report, `npm run coverage:report:write` to refresh it, or `npm run coverage:report:check` to fail on drift.", "");
