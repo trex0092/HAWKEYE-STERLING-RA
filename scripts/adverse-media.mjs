@@ -483,6 +483,10 @@ export const LOCALES = [
        tn-TN (ar + gl=TN -> silently served EG's Arabic edition)
        mu-MU (en-MU -> silently served en-US)
        kg-KG (ru + gl=KG -> silently served RU's Russian edition)
+       fr-LB (fr + gl=LB -> silently served FR:fr; 2026-09-28, 34 items, all
+              French outlets e.g. lemonde.fr / lefigaro.fr, no Lebanese press.
+              Candidate taken from an external project's feed list, then
+              tested with the method above)
      Do not re-add these without a materially different query - they were
      tested, not merely absent. */
   { id: 'en-NZ', hl: 'en-NZ', gl: 'NZ', ceid: 'NZ:en', lang: 'en' },

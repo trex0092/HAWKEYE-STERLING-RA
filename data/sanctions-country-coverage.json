@@ -263,8 +263,13 @@
     },
     {
       "country": "Estonia",
-      "status": "identified",
-      "note": "national list under the International Sanctions Act (Foreign Ministry web page); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+      "status": "pending",
+      "note": "three official MFA list pages (International Sanctions Act) staged disabled with a numbered-list parser, pending a source-probe run",
+      "sources": [
+        "ee-vm-belarus",
+        "ee-vm-human-rights",
+        "ee-vm-russia-ukraine"
+      ]
     },
     {
       "country": "Eswatini",

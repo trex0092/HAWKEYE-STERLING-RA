@@ -5,7 +5,7 @@ import {
   parseEuCsv, parseOpenSanctionsCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName, nameVariants, translitCanonToken, indelRatio, tokenSetRatio, isTokenSubset,
   MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters, trigramsOf, fuzzyTokenMatches,
-  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseSatCsv, parseJsonList, parseUnJson, parseCzMfaCsv, parseHtmlTable,
+  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseSatCsv, parseJsonList, parseUnJson, parseCzMfaCsv, parseHtmlTable, parseNumberedNameList,
   phoneticKey, phonTokens, phoneticProfile, phoneticPairMatch
 } from '../scripts/sanctions-match.mjs';
 import { deflateRawSync } from 'node:zlib';
@@ -697,6 +697,35 @@ check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') =
     parseHtmlTable('<table><tr><th>Name</th></tr><tr><td>ACME <scr<b>ipt> LTD</td></tr></table>').every(n => !/[<>]/.test(n)));
   check('HTML table: no name header parses 0 names', parseHtmlTable('<table><tr><td>x</td></tr></table>').length === 0);
   check('parseList routes parser htmltable', parseList({ id: 'md-sis-terror', parser: 'htmltable' }, MD).length === md.length);
+}
+
+/* Estonia MFA numbered name lists (vm.ee, three pages, 2026-09-28) — lines
+   copied from the live pages: surname-first with "(also …)" aliases, given-
+   first with Cyrillic variants (comma, semicolon or slash separated, one with
+   its closing parenthesis missing), and a lone given name in parentheses. */
+{
+  const EE = '<p>According to directive No 70:</p><p>1. ALAUDINOV, Apti Kharonovich (also ALAUDINOV, Apt Aaronovitch; ALAUDINOV, Apty)<br>\n'
+    + '2. ALEKSANDROVA, Svetlana Yurievna</p>'
+    + '<p>004. Maxim RYZHENKOV (РЫЖАНКОЎ Максім Уладзіміравіч, РЫЖЕНКОВ Максим Владимирович)</p>'
+    + '<p>059. Andrei KUNTSEVICH (КУНЦЭВІЧ Андрэй Міхайлавіч, КУНЦЕВИЧ Андрей Михайлович</p>'
+    + '<p>146. Hryhory (Grigory) Yuryevich AZARONAK (АЗАРЁНОК Григорий Юрьевич)</p>'
+    + '<p>201. Aleksei HAVRICHENKO (GAVRICHENKO Aleksei/ГАВРИЧЕНКО Алексей)</p>'
+    + '<p>092. Viktorya SHABUNIA (ka ШАБУНЯ Виктория Валерьевна)</p>'
+    + '<p>According to § 28 of the International Sanctions Act, the subject may submit an inquiry.</p><p>Last updated: 26.08.2025</p>';
+  const ee = parseNumberedNameList(EE);
+  check('EE list: "SURNAME, Given" flips to given-first, every (also …) alias screens',
+    ee.includes('Apti Kharonovich ALAUDINOV') && ee.includes('Apt Aaronovitch ALAUDINOV') && ee.includes('Apty ALAUDINOV')
+    && ee.includes('Svetlana Yurievna ALEKSANDROVA'));
+  check('EE list: comma-separated Cyrillic variants each screen, even with the ")" missing',
+    ee.includes('РЫЖЕНКОВ Максим Владимирович') && ee.includes('РЫЖАНКОЎ Максім Уладзіміравіч')
+    && ee.includes('КУНЦЕВИЧ Андрей Михайлович'));
+  check('EE list: slash variants and "ka" prefix handled',
+    ee.includes('GAVRICHENKO Aleksei') && ee.includes('ГАВРИЧЕНКО Алексей') && ee.includes('ШАБУНЯ Виктория Валерьевна'));
+  check('EE list: an inline parenthetical is removed from the main name, and a lone given name never screens alone',
+    ee.includes('Hryhory Yuryevich AZARONAK') && !ee.includes('Grigory'));
+  check('EE list: un-numbered prose and dates never screen',
+    !ee.some(n => /Sanctions Act|updated|directive/i.test(n)));
+  check('parseList routes parser numberedlist', parseList({ id: 'ee-x', parser: 'numberedlist' }, EE).length === ee.length);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
