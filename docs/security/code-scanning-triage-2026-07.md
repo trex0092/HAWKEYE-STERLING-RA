@@ -143,3 +143,23 @@ secrets in its environment**, and publishes evidence only to a step summary
 + artifact. Owner action: dismiss #141 and #142 in Security → Code scanning
 with reason "used in tested code", citing this section — the alert record
 stays, per the §3 convention.
+
+## 7 · Addendum (2026-09-28) — dated-file discovery and probe alerts (PR #639)
+
+PR #639 added opt-in dated-file discovery (`discover: { page, fileStem }`) to
+`fetchListBody`, and taught `source-probe.mjs` to resolve that discovery and
+fetch the resolved URL. CodeQL raised three medium `js/file-access-to-http`
+alerts on the new fetches, all on the head commit `e7e0546`:
+- `scripts/sanctions-screen.mjs` — the discovery-page fetch;
+- `scripts/source-probe.mjs` — the probe's discovery-page fetch, and its list
+  fetch, which now uses the resolved URL.
+
+**Disposition: same class as §3 ("Config-supplied fetch URLs") and §6.** The
+page URL comes from the version-controlled registry (`data/sanctions-extra.json`),
+exactly like every list URL. The discovered file link is accepted only when it
+is **https on the discovery page's own host** (`discoverDatedLink`, pinned in
+`test/sanctions-screen.test.mjs`), so a page cannot redirect the fetch to a
+third-party host. The screen additionally runs under `egress-policy: block`
+with the host allow-list. Owner action: dismiss the three alerts in Security →
+Code scanning with reason "used in tested code", citing this section — the
+alert record stays, per the §3 convention.

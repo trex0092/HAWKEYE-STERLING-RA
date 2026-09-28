@@ -1569,6 +1569,19 @@ check('probe: report renders outcome, key paths, discovered links, and the diagn
   _spMd.includes('## a — A') && _spMd.includes('http 200') && _spMd.includes('k = v')
   && _spMd.includes('Data-file links discovered') && _spMd.includes('https://x.example/list.xml')
   && _spMd.includes('Diagnostic only'));
+{
+  const ps = await sp.parseSummary({ id: 'md-x', parser: 'htmltable', minNames: 2 },
+    Buffer.from('<table><tr><th>Persoană Fizică / Entitate</th></tr><tr><td>ALPHA ONE</td></tr><tr><td>BETA TWO</td></tr></table>'));
+  check('probe: parseSummary runs the registry parser and reports the minNames verdict',
+    ps[0] === 'parser htmltable: 2 names (minNames 2, met)' && ps.includes('  e.g. ALPHA ONE'));
+  const ps2 = await sp.parseSummary({ id: 'cz-x', parser: 'czmfa', minNames: 5 }, Buffer.from('a,b\n1,2\n'));
+  check('probe: parseSummary flags an unmet floor', /0 names \(minNames 5, NOT met\)/.test(ps2[0]));
+  const md = sp.renderReport([{ id: 'z', name: 'Z', url: 'https://h.example/f.csv', discovered: 'https://h.example/page',
+    finalUrl: 'https://cdn.example/f.csv', outcome: 'fetched', status: 200, parsed: ['parser x: 3 names'] }]);
+  check('probe: report shows discovery source, post-redirect host and the parse result',
+    md.includes('discovered via https://h.example/page') && md.includes('final url (after redirects): https://cdn.example/f.csv')
+    && md.includes('Parsed by the registry parser') && md.includes('parser x: 3 names'));
+}
 check('probe: link discovery pulls data-file hrefs off an HTML landing page, absolutized', (() => {
   const html = '<a href="/Content/TFSList.xml">XML</a> <a href="download.ashx?fileType=xlsx">XLSX</a> '
     + '<a href="/about">About us</a> <img src="/logo.png">';
@@ -1687,6 +1700,21 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     /const sections = await asanaPaged\(projectGid, '\/sections'/.test(src));
   check('asana paging: soft mode is used ONLY by the dedup scan',
     (src.match(/soft: true/g) || []).length === 1 && /dedup scan[^\n]*\{ soft: true \}/.test(src));
+}
+
+/* Dated-file link discovery (Czechia MFA publishes each edition under a new
+   filename). Link shape copied from the live open-data page 2026-09-28. */
+{
+  const page = 'https://mzv.gov.cz/jnp/cz/o_ministerstvu/otevrena_data/index_5.html';
+  const html = '<a href="/file/6100000/Vnitrostatni_sankcni_seznam_2026_03_01.csv">old</a>'
+    + '<a href="https://mzv.gov.cz/file/6248997/Vnitrostatni_sankcni_seznam_2026_07_23.csv">csv</a>'
+    + '<a href="https://evil.example/file/1/Vnitrostatni_sankcni_seznam_2099_01_01.csv">x</a>'
+    + '<a href="http://mzv.gov.cz/file/2/Vnitrostatni_sankcni_seznam_2098_01_01.csv">x</a>';
+  check('discoverDatedLink picks the latest dated edition on the page host',
+    scr.discoverDatedLink(html, page, 'Vnitrostatni_sankcni_seznam_') === 'https://mzv.gov.cz/file/6248997/Vnitrostatni_sankcni_seznam_2026_07_23.csv');
+  check('discoverDatedLink returns null when nothing matches (caller fails loudly)',
+    scr.discoverDatedLink('<a href="/x.csv">x</a>', page, 'Vnitrostatni_sankcni_seznam_') === null);
+  check('discoverDatedLink refuses an empty stem', scr.discoverDatedLink(html, page, '') === null);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

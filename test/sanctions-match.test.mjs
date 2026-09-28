@@ -5,7 +5,7 @@ import {
   parseEuCsv, parseOpenSanctionsCsv, parseGenericXml, parseSecoXml, parseCuratedList, parseList, levenshtein, similarity,
   buildIndex, screenName, nameVariants, translitCanonToken, indelRatio, tokenSetRatio, isTokenSubset,
   MANUAL_REVIEW_LIST, TOKENSET_THRESHOLD, lostScriptLetters, trigramsOf, fuzzyTokenMatches,
-  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseSatCsv, parseJsonList, parseUnJson,
+  unzipEntries, parseSharedStrings, parseSheetRows, parseDfatXlsx, parseSatCsv, parseJsonList, parseUnJson, parseCzMfaCsv, parseHtmlTable,
   phoneticKey, phonTokens, phoneticProfile, phoneticPairMatch
 } from '../scripts/sanctions-match.mjs';
 import { deflateRawSync } from 'node:zlib';
@@ -656,6 +656,47 @@ check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') =
     lt.includes('MIKHAIL FRIDMAN') && lt.includes('KHABIB SHARIPOV'));
   check('parseJsonList does not harvest nationality labels as names (migracija.lt)',
     lt.length === 2 && !lt.some(n => /ISRAEL|IZRAELIO/.test(n)));
+}
+
+/* Czechia MFA national list — header and first data row copied from the runner
+   probe (source-probe run 36388018140): slash-separated transliterations pair
+   by position; only "platný" (valid) rows screen. */
+{
+  const CZ = '﻿"Příjmení fyzické osoby/název právnické osoby/označení nebo název entity ","Jméno fyzické osoby ","Stav zápisu","Poznámka ke stavu zápisu","Datum narození fyzické osoby "\n\n'
+    + '"GUNĎAJEV/GUNDYAYEV/ГУНДЯЕВ","Vladimir Michajlovič/Vladimir Mikhailovich/Владимир Михайлович","platný",,20.11.1946\n'
+    + '"STRUCK OFF","Ivan","neplatný",,01.01.1970\n'
+    + '"ACME HOLDINGS LTD","","platný",,\n'
+    + '"PETROV/ПЕТРОВ","Oleg","platný",,\n';
+  const cz = parseCzMfaCsv(CZ);
+  check('CZ MFA: transliterations pair by position (Latin + Cyrillic)',
+    cz.includes('Vladimir Mikhailovich GUNDYAYEV') && cz.includes('Vladimir Michajlovič GUNĎAJEV') && cz.includes('Владимир Михайлович ГУНДЯЕВ'));
+  check('CZ MFA: struck-off (neplatný) entries never screen', !cz.some(n => /STRUCK/.test(n)));
+  check('CZ MFA: entity row with no given name screens its name alone', cz.includes('ACME HOLDINGS LTD'));
+  check('CZ MFA: unequal variant counts pair every surname with every given name',
+    cz.includes('Oleg PETROV') && cz.includes('Oleg ПЕТРОВ'));
+  check('CZ MFA: no header row parses 0 names (degrades, never guesses)', parseCzMfaCsv('a,b\n1,2\n').length === 0);
+  check('parseList routes parser czmfa', parseList({ id: 'cz-mzv-national', parser: 'czmfa' }, CZ).length === cz.length);
+}
+
+/* Moldova SIS anti-terrorist list — served as application/vnd.ms-excel but the
+   body is an HTML table (source-probe run 36388020414); markup copied from it. */
+{
+  const MD = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /></head><body><table>'
+    + '<thead><tr><th>Număr de referință</th><th>Persoană Fizică / Entitate</th><th>Data de naștere</th><th>Sancțiuni teroriste</th></tr></thead><tbody>'
+    + '<tr class="odd"><td>1</td><td>\t Zawaya Group for Development and Investment Co Ltd (Grupul Zawaya pentru dezvoltare și investiții Co Ltd)</td><td></td><td>Decizia (PESC) 2024/385</td></tr>\n'
+    + '<tr class="even"><td>QDi.436</td><td> ABUBAKAR SWALLEH</td><td>a) 13 ianuarie 1992</td><td>ISIL</td></tr>\n'
+    + '<tr class="odd"><td>QDi.9</td><td>AL &amp; SONS</td><td></td><td></td></tr></tbody></table></body></html>';
+  const md = parseHtmlTable(MD);
+  check('HTML table: name column located by header, whitespace trimmed', md.includes('ABUBAKAR SWALLEH'));
+  check('HTML table: header, reference and date cells never harvested as names',
+    !md.some(n => /Persoan|QDi|ianuarie|ISIL/.test(n)));
+  check('HTML table: trailing parenthetical screens alone and without it',
+    md.includes('Zawaya Group for Development and Investment Co Ltd') && md.includes('Grupul Zawaya pentru dezvoltare și investiții Co Ltd'));
+  check('HTML table: entities decoded', md.includes('AL & SONS'));
+  check('HTML table: nested/broken tags leave no angle brackets behind',
+    parseHtmlTable('<table><tr><th>Name</th></tr><tr><td>ACME <scr<b>ipt> LTD</td></tr></table>').every(n => !/[<>]/.test(n)));
+  check('HTML table: no name header parses 0 names', parseHtmlTable('<table><tr><td>x</td></tr></table>').length === 0);
+  check('parseList routes parser htmltable', parseList({ id: 'md-sis-terror', parser: 'htmltable' }, MD).length === md.length);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
