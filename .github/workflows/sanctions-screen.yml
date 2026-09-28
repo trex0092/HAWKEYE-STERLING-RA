@@ -34,6 +34,13 @@ name: Sanctions Screen
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sanctions-screen.mjs'
+      - 'scripts/screening-assurance.mjs'
+      - 'data/worldwide-screening-sources.json'
+      - '.github/workflows/sanctions-screen.yml'
   # Re-scheduled 2026-07-08 as the SCREENING CASE ENGINE: runs daily after the
   # Sanctions Watch (05:07) with fresh lists, refreshes the per-subject state,
   # then the case-manager step turns every flag into a managed lifecycle CASE
