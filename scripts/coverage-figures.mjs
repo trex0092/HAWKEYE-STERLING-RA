@@ -54,6 +54,13 @@ export function issuingCountry(s) {
   return ISSUER_ALIASES[prefix] || prefix;
 }
 
+/* The 195-country register (data/sanctions-country-coverage.json): how many of
+   the world's countries have had their national sanctions publication
+   researched, whatever the outcome. */
+export function countryRegister(root = ROOT) {
+  return JSON.parse(readFileSync(join(root, 'data/sanctions-country-coverage.json'), 'utf8')).countries || [];
+}
+
 export function buildFigures(root = ROOT) {
   const sources = screenedSources(root);
   const jurisdictions = new Set(sources.map(issuingCountry).filter(Boolean));
@@ -63,6 +70,7 @@ export function buildFigures(root = ROOT) {
     adverseMediaLanguages: Object.keys(LANG_TERMS).length,
     sanctionsLists: sources.length,
     sanctionsJurisdictions: jurisdictions.size,
+    sanctionsCountriesResearched: countryRegister(root).filter(r => r.status !== 'not-researched').length,
   };
 }
 
@@ -75,6 +83,7 @@ export function buildFile(root = ROOT) {
       adverseMediaCountries: 'distinct countries (gl) across those editions',
       adverseMediaLanguages: 'languages with native risk terms in the scorer (scripts/adverse-media.mjs LANG_TERMS)',
       sanctionsLists: 'enabled sources in data/sanctions-sources.json + data/sanctions-extra.json (extra: with url or file), excluding alias-only sources (mergeInto)',
+      sanctionsCountriesResearched: 'of the 195 countries in data/sanctions-country-coverage.json, how many have a recorded research outcome (screened, pending, identified or assessed-not-loadable) rather than not-researched',
       sanctionsJurisdictions: 'distinct issuing countries among those sources: the jurisdiction field, or for entries marked Global (a list\'s reach, not its issuer) the country named in the list title; UN, EU and development-bank lists are supranational and not counted',
     },
   };

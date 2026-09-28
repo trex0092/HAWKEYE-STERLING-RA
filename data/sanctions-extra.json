@@ -754,6 +754,38 @@
       "enabled": true,
       "minNames": 500,
       "_note": "ADDED 2026-09-26: closes the 'IDB Socrata export unconfirmed' half of mdb-debarment-cluster. Rather than chase IDB's own raw export, used OpenSanctions' iadb_sanctions mirror instead - same safe pattern as every other OpenSanctions-sourced entry this session. Verified live via curl: 1,239 targets, 131 countries, weekly refresh (Sundays), last change 2026-09-23."
+    },
+    {
+      "id": "lt-migracija-magnitsky",
+      "name": "Lithuania — Migration Department: Designated Persons (Magnitsky amendments, entry bans)",
+      "jurisdiction": "Lithuania",
+      "url": "https://www.migracija.lt/external/nam/search?pageNo=0&pageSize=500&language=lt",
+      "type": "json",
+      "parser": "json",
+      "enabled": false,
+      "minNames": 200,
+      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run on a GitHub runner. Official, keyless JSON from the Migration Department under the Ministry of the Interior (publisher of the Lithuanian list under the Magnitsky amendments to the Law on the Legal Status of Aliens, Art. 133). Fetched live 2026-09-28 via an external fetcher: HTTP 200 application/json, numFound 284, all 284 returned in one page at pageSize=500; records carry vardas (first name) / pavarde (surname), gimimoData (DOB), pilietybes (nationality). parseJsonList reads vardas/pavarde (added the same day) -> 284 unique Latin-script names. Nature: ENTRY BANS (Magnitsky-type), not an asset freeze — screen as a sanctions-type signal, label accordingly. Enable once the probe shows the runner receives the same payload; minNames 200 guards against a truncated page."
+    },
+    {
+      "id": "cz-mzv-national",
+      "name": "Czechia — MFA National Sanctions List (Vnitrostátní sankční seznam, CSV)",
+      "jurisdiction": "Czechia",
+      "url": "https://mzv.gov.cz/file/6248997/Vnitrostatni_sankcni_seznam_2026_07_23.csv",
+      "type": "csv",
+      "enabled": false,
+      "minNames": 5,
+      "_note": "ADDED 2026-09-28, DISABLED pending (1) a source-probe run to see the CSV's real columns/encoding and choose a parser, and (2) link discovery: the official open-data page https://mzv.gov.cz/jnp/cz/o_ministerstvu/otevrena_data/index_5.html publishes the list (Act No. 1/2023 Coll.) as a DATED file (this URL is the 2026-07-23 edition, page updated 2026-07-24) that changes name on every update, so a pinned URL would go silently stale — same failure class as kg-fiu. The page itself was reachable 2026-09-28 (HTTP 200); the CSV download was refused to an external fetcher by an anti-bot check."
+    },
+    {
+      "id": "md-sis-terror",
+      "name": "Moldova — SIS Anti-Terrorist Centre: List of persons, entities and groups involved in terrorist activity",
+      "jurisdiction": "Moldova",
+      "url": "https://antiteror.sis.md/lista-terorista-xls",
+      "type": "xlsx",
+      "parser": "xlsx",
+      "enabled": false,
+      "minNames": 50,
+      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official page https://antiteror.sis.md/advanced-page-type/listele-teroriste (HTTP 200 on 2026-09-28) links this spreadsheet download and a PDF; neither this sandbox (proxy 403) nor an external fetcher could retrieve the file's bytes, so its format is unverified: the path says 'xls', which may be legacy BIFF .xls that the zero-dependency parser cannot read (only OOXML .xlsx/.ods). The probe decides: enable if it is .xlsx with a name column; otherwise record the observed format here and keep disabled."
     }
   ]
 }

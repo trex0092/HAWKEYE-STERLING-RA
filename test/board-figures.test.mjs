@@ -58,5 +58,26 @@ check('a national jurisdiction field is used as-is',
     ['Canada', 'France', 'Ukraine', 'United Kingdom', 'United States'].every(c => live.has(c)));
 }
 
+/* The 195-country sanctions coverage register. "screened" is the one status a
+   file edit could overstate, so it is pinned to the live configuration in both
+   directions: every country marked screened really issues a loaded list, and
+   every issuing country of a loaded list is marked screened. */
+console.log('\n— sanctions country coverage register (195) —\n');
+{
+  const reg = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-country-coverage.json'), 'utf8')).countries;
+  const names = reg.map(r => r.country);
+  check('the register lists exactly 195 countries, each once', names.length === 195 && new Set(names).size === 195);
+  const allowed = new Set(['screened', 'pending', 'identified', 'assessed-not-loadable', 'not-researched']);
+  check('every row has a known status', reg.every(r => allowed.has(r.status)));
+  const live = new Set(screenedSources().map(issuingCountry).filter(Boolean));
+  const marked = new Set(reg.filter(r => r.status === 'screened').map(r => r.country));
+  check('every country marked screened issues a list the screen loads',
+    [...marked].every(c => live.has(c)));
+  check('every issuing country of a loaded list is marked screened',
+    [...live].every(c => marked.has(c)));
+  check('non-screened statuses other than not-researched carry a note',
+    reg.filter(r => r.status !== 'screened' && r.status !== 'not-researched').every(r => r.note));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

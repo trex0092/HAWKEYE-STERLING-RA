@@ -1,0 +1,941 @@
+{
+  "_README": "Sanctions coverage by country, all 195 (193 UN member states + the Holy See + Palestine). status: screened = at least one national list from this issuer is loaded by the screen today (test/board-figures.test.mjs ties this to data/sanctions-*.json); pending = a candidate exists and is recorded, not yet loaded (see note); identified = a national list is known to exist, official machine-readable file not yet verified; assessed-not-loadable = researched, cannot be loaded (see note); not-researched = no research recorded yet. NEVER mark a country as having no national list without evidence. Independently of this table, the UN Security Council Consolidated List is screened daily and binds every UN member state; the EU list is screened too.",
+  "updated": "2026-09-28",
+  "countries": [
+    {
+      "country": "Afghanistan",
+      "status": "not-researched"
+    },
+    {
+      "country": "Albania",
+      "status": "not-researched"
+    },
+    {
+      "country": "Algeria",
+      "status": "not-researched"
+    },
+    {
+      "country": "Andorra",
+      "status": "not-researched"
+    },
+    {
+      "country": "Angola",
+      "status": "not-researched"
+    },
+    {
+      "country": "Antigua and Barbuda",
+      "status": "not-researched"
+    },
+    {
+      "country": "Argentina",
+      "status": "screened",
+      "sources": [
+        "ar-repet",
+        "ar-repet-entidades"
+      ]
+    },
+    {
+      "country": "Armenia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Australia",
+      "status": "screened",
+      "sources": [
+        "au-dfat",
+        "au-dfat-opensanctions"
+      ]
+    },
+    {
+      "country": "Austria",
+      "status": "identified",
+      "note": "Austrian National Bank terrorism-financing regulations (48 targets per the OpenSanctions catalogue); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+    },
+    {
+      "country": "Azerbaijan",
+      "status": "screened",
+      "sources": [
+        "az-fiu"
+      ]
+    },
+    {
+      "country": "Bahamas",
+      "status": "not-researched"
+    },
+    {
+      "country": "Bahrain",
+      "status": "screened",
+      "sources": [
+        "bh-gazette"
+      ]
+    },
+    {
+      "country": "Bangladesh",
+      "status": "not-researched"
+    },
+    {
+      "country": "Barbados",
+      "status": "not-researched"
+    },
+    {
+      "country": "Belarus",
+      "status": "not-researched"
+    },
+    {
+      "country": "Belgium",
+      "status": "screened",
+      "sources": [
+        "be-fod"
+      ]
+    },
+    {
+      "country": "Belize",
+      "status": "not-researched"
+    },
+    {
+      "country": "Benin",
+      "status": "not-researched"
+    },
+    {
+      "country": "Bhutan",
+      "status": "not-researched"
+    },
+    {
+      "country": "Bolivia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Bosnia and Herzegovina",
+      "status": "not-researched"
+    },
+    {
+      "country": "Botswana",
+      "status": "not-researched"
+    },
+    {
+      "country": "Brazil",
+      "status": "screened",
+      "sources": [
+        "br-bcb-qgi",
+        "br-bcb-qgp",
+        "br-tcu-inabilitados",
+        "br-tcu-inidoneos"
+      ]
+    },
+    {
+      "country": "Brunei",
+      "status": "not-researched"
+    },
+    {
+      "country": "Bulgaria",
+      "status": "identified",
+      "note": "national terrorism-financing list (State Agency for National Security web page); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+    },
+    {
+      "country": "Burkina Faso",
+      "status": "not-researched"
+    },
+    {
+      "country": "Burundi",
+      "status": "not-researched"
+    },
+    {
+      "country": "Cabo Verde",
+      "status": "not-researched"
+    },
+    {
+      "country": "Cambodia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Cameroon",
+      "status": "not-researched"
+    },
+    {
+      "country": "Canada",
+      "status": "screened",
+      "sources": [
+        "ca-sema"
+      ]
+    },
+    {
+      "country": "Central African Republic",
+      "status": "not-researched"
+    },
+    {
+      "country": "Chad",
+      "status": "not-researched"
+    },
+    {
+      "country": "Chile",
+      "status": "not-researched"
+    },
+    {
+      "country": "China",
+      "status": "not-researched"
+    },
+    {
+      "country": "Colombia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Comoros",
+      "status": "not-researched"
+    },
+    {
+      "country": "Congo",
+      "status": "not-researched"
+    },
+    {
+      "country": "Costa Rica",
+      "status": "not-researched"
+    },
+    {
+      "country": "Côte d'Ivoire",
+      "status": "not-researched"
+    },
+    {
+      "country": "Croatia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Cuba",
+      "status": "not-researched"
+    },
+    {
+      "country": "Cyprus",
+      "status": "not-researched"
+    },
+    {
+      "country": "Czechia",
+      "status": "pending",
+      "sources": [
+        "cz-mzv-national"
+      ],
+      "note": "official CSV (Act No. 1/2023 Coll.); dated filename changes on each update, so needs link discovery; CSV columns unverified (anti-bot on external fetch)"
+    },
+    {
+      "country": "Democratic People's Republic of Korea",
+      "status": "not-researched"
+    },
+    {
+      "country": "Democratic Republic of the Congo",
+      "status": "not-researched"
+    },
+    {
+      "country": "Denmark",
+      "status": "not-researched"
+    },
+    {
+      "country": "Djibouti",
+      "status": "not-researched"
+    },
+    {
+      "country": "Dominica",
+      "status": "not-researched"
+    },
+    {
+      "country": "Dominican Republic",
+      "status": "not-researched"
+    },
+    {
+      "country": "Ecuador",
+      "status": "not-researched"
+    },
+    {
+      "country": "Egypt",
+      "status": "screened",
+      "sources": [
+        "eg-mlcu"
+      ]
+    },
+    {
+      "country": "El Salvador",
+      "status": "not-researched"
+    },
+    {
+      "country": "Equatorial Guinea",
+      "status": "not-researched"
+    },
+    {
+      "country": "Eritrea",
+      "status": "not-researched"
+    },
+    {
+      "country": "Estonia",
+      "status": "identified",
+      "note": "national list under the International Sanctions Act (Foreign Ministry web page); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+    },
+    {
+      "country": "Eswatini",
+      "status": "not-researched"
+    },
+    {
+      "country": "Ethiopia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Fiji",
+      "status": "not-researched"
+    },
+    {
+      "country": "Finland",
+      "status": "not-researched"
+    },
+    {
+      "country": "France",
+      "status": "screened",
+      "sources": [
+        "fr-dgt"
+      ]
+    },
+    {
+      "country": "Gabon",
+      "status": "not-researched"
+    },
+    {
+      "country": "Gambia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Georgia",
+      "status": "screened",
+      "sources": [
+        "ge-ot-list"
+      ]
+    },
+    {
+      "country": "Germany",
+      "status": "not-researched"
+    },
+    {
+      "country": "Ghana",
+      "status": "not-researched"
+    },
+    {
+      "country": "Greece",
+      "status": "not-researched"
+    },
+    {
+      "country": "Grenada",
+      "status": "not-researched"
+    },
+    {
+      "country": "Guatemala",
+      "status": "not-researched"
+    },
+    {
+      "country": "Guinea",
+      "status": "not-researched"
+    },
+    {
+      "country": "Guinea-Bissau",
+      "status": "not-researched"
+    },
+    {
+      "country": "Guyana",
+      "status": "not-researched"
+    },
+    {
+      "country": "Haiti",
+      "status": "not-researched"
+    },
+    {
+      "country": "Holy See",
+      "status": "not-researched"
+    },
+    {
+      "country": "Honduras",
+      "status": "not-researched"
+    },
+    {
+      "country": "Hungary",
+      "status": "not-researched"
+    },
+    {
+      "country": "Iceland",
+      "status": "not-researched"
+    },
+    {
+      "country": "India",
+      "status": "screened",
+      "sources": [
+        "in-mha"
+      ]
+    },
+    {
+      "country": "Indonesia",
+      "status": "screened",
+      "sources": [
+        "id-dttot"
+      ]
+    },
+    {
+      "country": "Iran",
+      "status": "not-researched"
+    },
+    {
+      "country": "Iraq",
+      "status": "pending",
+      "sources": [],
+      "note": "official keyless JSON API (api.aml.iq, 6,284 rows, 10 per page) verified live 2026-09-28; names are Arabic-only and the matcher does not compare Arabic with Latin script, so adding it now would add no real recall"
+    },
+    {
+      "country": "Ireland",
+      "status": "not-researched"
+    },
+    {
+      "country": "Israel",
+      "status": "screened",
+      "sources": [
+        "il-nbctf",
+        "il-nbctf-orgs"
+      ]
+    },
+    {
+      "country": "Italy",
+      "status": "not-researched"
+    },
+    {
+      "country": "Jamaica",
+      "status": "not-researched"
+    },
+    {
+      "country": "Japan",
+      "status": "screened",
+      "sources": [
+        "jp-mof"
+      ]
+    },
+    {
+      "country": "Jordan",
+      "status": "screened",
+      "sources": [
+        "jo-amlu"
+      ]
+    },
+    {
+      "country": "Kazakhstan",
+      "status": "assessed-not-loadable",
+      "note": "national list assessed 2026-08-05: Web-SFM endpoint key-gated since ~Sep 2025 (rejected under the keyless doctrine)"
+    },
+    {
+      "country": "Kenya",
+      "status": "screened",
+      "sources": [
+        "ke-frc"
+      ]
+    },
+    {
+      "country": "Kiribati",
+      "status": "not-researched"
+    },
+    {
+      "country": "Kuwait",
+      "status": "not-researched"
+    },
+    {
+      "country": "Kyrgyzstan",
+      "status": "screened",
+      "sources": [
+        "kg-fiu-public"
+      ]
+    },
+    {
+      "country": "Laos",
+      "status": "not-researched"
+    },
+    {
+      "country": "Latvia",
+      "status": "screened",
+      "sources": [
+        "lv-fid"
+      ]
+    },
+    {
+      "country": "Lebanon",
+      "status": "not-researched"
+    },
+    {
+      "country": "Lesotho",
+      "status": "not-researched"
+    },
+    {
+      "country": "Liberia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Libya",
+      "status": "not-researched"
+    },
+    {
+      "country": "Liechtenstein",
+      "status": "not-researched"
+    },
+    {
+      "country": "Lithuania",
+      "status": "pending",
+      "sources": [
+        "lt-migracija-magnitsky"
+      ],
+      "note": "official keyless JSON verified live 2026-09-28 (284 names parse); disabled until a source-probe run confirms the GitHub runner receives it"
+    },
+    {
+      "country": "Luxembourg",
+      "status": "not-researched"
+    },
+    {
+      "country": "Madagascar",
+      "status": "not-researched"
+    },
+    {
+      "country": "Malawi",
+      "status": "not-researched"
+    },
+    {
+      "country": "Malaysia",
+      "status": "screened",
+      "sources": [
+        "my-moha"
+      ]
+    },
+    {
+      "country": "Maldives",
+      "status": "not-researched"
+    },
+    {
+      "country": "Mali",
+      "status": "not-researched"
+    },
+    {
+      "country": "Malta",
+      "status": "not-researched"
+    },
+    {
+      "country": "Marshall Islands",
+      "status": "not-researched"
+    },
+    {
+      "country": "Mauritania",
+      "status": "not-researched"
+    },
+    {
+      "country": "Mauritius",
+      "status": "screened",
+      "sources": [
+        "mu-nssec"
+      ]
+    },
+    {
+      "country": "Mexico",
+      "status": "screened",
+      "sources": [
+        "mx-sat-69b"
+      ]
+    },
+    {
+      "country": "Micronesia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Moldova",
+      "status": "pending",
+      "sources": [
+        "md-sis-terror"
+      ],
+      "note": "official spreadsheet download; format unverified (may be legacy .xls, which the zero-dependency parser cannot read)"
+    },
+    {
+      "country": "Monaco",
+      "status": "screened",
+      "sources": [
+        "mc-gels"
+      ]
+    },
+    {
+      "country": "Mongolia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Montenegro",
+      "status": "not-researched"
+    },
+    {
+      "country": "Morocco",
+      "status": "screened",
+      "sources": [
+        "ma-cnasnu"
+      ]
+    },
+    {
+      "country": "Mozambique",
+      "status": "not-researched"
+    },
+    {
+      "country": "Myanmar",
+      "status": "not-researched"
+    },
+    {
+      "country": "Namibia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Nauru",
+      "status": "not-researched"
+    },
+    {
+      "country": "Nepal",
+      "status": "not-researched"
+    },
+    {
+      "country": "Netherlands",
+      "status": "screened",
+      "sources": [
+        "nl-terror"
+      ]
+    },
+    {
+      "country": "New Zealand",
+      "status": "screened",
+      "sources": [
+        "nz-mfat-russia",
+        "nz-terror"
+      ]
+    },
+    {
+      "country": "Nicaragua",
+      "status": "not-researched"
+    },
+    {
+      "country": "Niger",
+      "status": "not-researched"
+    },
+    {
+      "country": "Nigeria",
+      "status": "screened",
+      "sources": [
+        "ng-nigsac"
+      ]
+    },
+    {
+      "country": "North Macedonia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Norway",
+      "status": "not-researched"
+    },
+    {
+      "country": "Oman",
+      "status": "not-researched"
+    },
+    {
+      "country": "Pakistan",
+      "status": "screened",
+      "sources": [
+        "pk-nacta"
+      ]
+    },
+    {
+      "country": "Palau",
+      "status": "not-researched"
+    },
+    {
+      "country": "Palestine",
+      "status": "not-researched"
+    },
+    {
+      "country": "Panama",
+      "status": "not-researched"
+    },
+    {
+      "country": "Papua New Guinea",
+      "status": "not-researched"
+    },
+    {
+      "country": "Paraguay",
+      "status": "not-researched"
+    },
+    {
+      "country": "Peru",
+      "status": "not-researched"
+    },
+    {
+      "country": "Philippines",
+      "status": "screened",
+      "sources": [
+        "ph-amlc"
+      ]
+    },
+    {
+      "country": "Poland",
+      "status": "identified",
+      "note": "two national lists (Ministry of Finance GIIF Art. 118; MSWiA sanctions list), published as web pages; identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+    },
+    {
+      "country": "Portugal",
+      "status": "not-researched"
+    },
+    {
+      "country": "Qatar",
+      "status": "screened",
+      "sources": [
+        "qa-nctc",
+        "qa-nctc-opensanctions"
+      ]
+    },
+    {
+      "country": "Republic of Korea",
+      "status": "not-researched"
+    },
+    {
+      "country": "Romania",
+      "status": "not-researched"
+    },
+    {
+      "country": "Russia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Rwanda",
+      "status": "not-researched"
+    },
+    {
+      "country": "Saint Kitts and Nevis",
+      "status": "not-researched"
+    },
+    {
+      "country": "Saint Lucia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Saint Vincent and the Grenadines",
+      "status": "not-researched"
+    },
+    {
+      "country": "Samoa",
+      "status": "not-researched"
+    },
+    {
+      "country": "San Marino",
+      "status": "not-researched"
+    },
+    {
+      "country": "Sao Tome and Principe",
+      "status": "not-researched"
+    },
+    {
+      "country": "Saudi Arabia",
+      "status": "screened",
+      "sources": [
+        "sa-pcct",
+        "sa-pcct-opensanctions"
+      ]
+    },
+    {
+      "country": "Senegal",
+      "status": "not-researched"
+    },
+    {
+      "country": "Serbia",
+      "status": "identified",
+      "note": "domestic list of designated persons (APML search engine); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+    },
+    {
+      "country": "Seychelles",
+      "status": "not-researched"
+    },
+    {
+      "country": "Sierra Leone",
+      "status": "not-researched"
+    },
+    {
+      "country": "Singapore",
+      "status": "screened",
+      "sources": [
+        "sg-terrorists"
+      ]
+    },
+    {
+      "country": "Slovakia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Slovenia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Solomon Islands",
+      "status": "not-researched"
+    },
+    {
+      "country": "Somalia",
+      "status": "not-researched"
+    },
+    {
+      "country": "South Africa",
+      "status": "assessed-not-loadable",
+      "note": "FIC list assessed 2026-08-06: a UN Security Council relay, already screened via the UN list"
+    },
+    {
+      "country": "South Sudan",
+      "status": "not-researched"
+    },
+    {
+      "country": "Spain",
+      "status": "not-researched"
+    },
+    {
+      "country": "Sri Lanka",
+      "status": "screened",
+      "sources": [
+        "lk-ca-1373"
+      ]
+    },
+    {
+      "country": "Sudan",
+      "status": "not-researched"
+    },
+    {
+      "country": "Suriname",
+      "status": "not-researched"
+    },
+    {
+      "country": "Sweden",
+      "status": "not-researched"
+    },
+    {
+      "country": "Switzerland",
+      "status": "screened",
+      "sources": [
+        "ch-seco",
+        "ch-seco-opensanctions"
+      ]
+    },
+    {
+      "country": "Syria",
+      "status": "not-researched"
+    },
+    {
+      "country": "Tajikistan",
+      "status": "not-researched"
+    },
+    {
+      "country": "Tanzania",
+      "status": "not-researched"
+    },
+    {
+      "country": "Thailand",
+      "status": "screened",
+      "sources": [
+        "th-designated"
+      ]
+    },
+    {
+      "country": "Timor-Leste",
+      "status": "not-researched"
+    },
+    {
+      "country": "Togo",
+      "status": "not-researched"
+    },
+    {
+      "country": "Tonga",
+      "status": "not-researched"
+    },
+    {
+      "country": "Trinidad and Tobago",
+      "status": "not-researched"
+    },
+    {
+      "country": "Tunisia",
+      "status": "screened",
+      "sources": [
+        "tn-cnlct"
+      ]
+    },
+    {
+      "country": "Turkey",
+      "status": "screened",
+      "sources": [
+        "tr-masak",
+        "tr-wanted"
+      ]
+    },
+    {
+      "country": "Turkmenistan",
+      "status": "not-researched"
+    },
+    {
+      "country": "Tuvalu",
+      "status": "not-researched"
+    },
+    {
+      "country": "Uganda",
+      "status": "not-researched"
+    },
+    {
+      "country": "Ukraine",
+      "status": "screened",
+      "sources": [
+        "ua-nsdc"
+      ]
+    },
+    {
+      "country": "United Arab Emirates",
+      "status": "screened",
+      "sources": [
+        "internal-watchlist",
+        "uae-eocn-local-terrorist"
+      ]
+    },
+    {
+      "country": "United Kingdom",
+      "status": "screened",
+      "sources": [
+        "uk-ofsi"
+      ]
+    },
+    {
+      "country": "United States",
+      "status": "screened",
+      "sources": [
+        "ofac-consolidated",
+        "ofac-sdn",
+        "us-csl"
+      ]
+    },
+    {
+      "country": "Uruguay",
+      "status": "not-researched"
+    },
+    {
+      "country": "Uzbekistan",
+      "status": "not-researched"
+    },
+    {
+      "country": "Vanuatu",
+      "status": "not-researched"
+    },
+    {
+      "country": "Venezuela",
+      "status": "not-researched"
+    },
+    {
+      "country": "Vietnam",
+      "status": "not-researched"
+    },
+    {
+      "country": "Yemen",
+      "status": "not-researched"
+    },
+    {
+      "country": "Zambia",
+      "status": "not-researched"
+    },
+    {
+      "country": "Zimbabwe",
+      "status": "not-researched"
+    }
+  ]
+}
