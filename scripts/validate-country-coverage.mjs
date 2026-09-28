@@ -58,6 +58,14 @@ function validate(register) {
       fail(errors, `${country}: screened status requires at least one national source id`);
     }
 
+    const noteRequiresMlro = /MLRO policy decision/i.test(entry.note || "");
+    if (Boolean(entry.requiresMlroPolicyDecision) !== noteRequiresMlro) {
+      fail(errors, `${country}: requiresMlroPolicyDecision must match the documented MLRO policy-decision note`);
+    }
+    if (entry.requiresMlroPolicyDecision === true && entry.status === "screened") {
+      fail(errors, `${country}: cannot be marked screened while an MLRO policy decision is still required`);
+    }
+
     if (entry.fatf === "black" || entry.fatf === "grey") {
       fatfPriority.push({
         country,
