@@ -17,7 +17,8 @@ IMPORTANT — DATA INTEGRITY (no hallucination):
 
 To connect a real feed: export TXN_FEED_PATH=/path/to/transactions.json — a JSON
 list of {customer, date (YYYY-MM-DD), amount (AED), direction "in"|"out",
-method "cash"|"wire"|"gold", counterparty, counterparty_country}.
+method "cash"|"wire"|"gold", counterparty, counterparty_country, plus optional
+trade-control fields defined in data/transaction-feed.schema.json}.
 
 THRESHOLDS (UAE DPMS context — tune in config):
   • AED 55,000  — DPMS cash-transaction reporting threshold (DPMSR / goAML).
@@ -33,6 +34,7 @@ STRUCTURING_BAND      = 0.10   # within 10% under a threshold = "just under"
 STRUCTURING_MIN_COUNT = 3      # N sub-threshold txns in the window
 STRUCTURING_WINDOW_D  = 7      # days
 VELOCITY_FACTOR       = 4.0    # a day > N× the customer's mean daily volume
+PRICE_DEVIATION_PCT   = float(os.environ.get("TXN_PRICE_DEVIATION_PCT", "10"))
 TXN_FEED_PATH         = os.environ.get("TXN_FEED_PATH", "")
 
 
@@ -218,9 +220,95 @@ def rule_rapid_passthrough(txns):
     return out
 
 
+
+def rule_third_party_payment(txns):
+    """Explicit unrelated third-party payer/payee involvement.
+
+    This rule never infers relationship from names. It fires only when the feed
+    states third_party_payment=true AND the recorded relationship is unrelated.
+    """
+    out = []
+    for t in txns:
+        if t.get("third_party_payment") is True and _norm(t.get("third_party_relationship")) == "unrelated":
+            out.append(_alert("THIRD_PARTY_PAYMENT", "HIGH", t,
+                "payment involves an explicitly unrelated third party — review contractual/commercial nexus"))
+    return out
+
+
+def rule_refund_diversion(txns):
+    """Refund directed away from the original funding account.
+
+    A different account alone is not enough where the feed records a documented
+    legitimate reason; that evidence suppresses the automated alert.
+    """
+    out = []
+    for t in txns:
+        if _norm(t.get("transaction_type")) != "refund":
+            continue
+        funding = _norm(t.get("funding_account"))
+        refund = _norm(t.get("refund_account"))
+        if funding and refund and funding != refund and t.get("refund_reason_documented") is not True:
+            out.append(_alert("REFUND_DIVERSION", "HIGH", t,
+                "refund account differs from original funding account with no documented legitimate reason"))
+    return out
+
+
+def rule_pricing_deviation(txns):
+    """Transaction unit price materially differs from supplied market reference.
+
+    The engine does NOT obtain or invent a market price. Both unit_price and
+    market_unit_price must be supplied by the transaction feed or an upstream
+    controlled pricing source.
+    """
+    out = []
+    for t in txns:
+        try:
+            price = float(t.get("unit_price"))
+            market = float(t.get("market_unit_price"))
+        except (TypeError, ValueError):
+            continue
+        if market <= 0:
+            continue
+        deviation = abs(price - market) / market * 100
+        if deviation > PRICE_DEVIATION_PCT:
+            out.append(_alert("PRICING_DEVIATION", "HIGH", t,
+                f"unit price deviates {deviation:.1f}% from supplied market reference "
+                f"(tolerance {PRICE_DEVIATION_PCT:g}%)"))
+    return out
+
+
+def rule_phantom_delivery(txns):
+    """Paid/completed goods transaction explicitly lacking delivery evidence."""
+    out = []
+    for t in txns:
+        if (t.get("goods_transaction") is True
+                and t.get("payment_completed") is True
+                and t.get("delivery_confirmed") is False):
+            out.append(_alert("PHANTOM_DELIVERY", "HIGH", t,
+                "goods transaction is paid/completed but the feed records no confirmed physical delivery"))
+    return out
+
+
+def rule_invoice_mismatch(txns):
+    """Material trade-document reconciliation mismatch supplied by upstream controls."""
+    return [_alert("INVOICE_MISMATCH", "HIGH", t,
+            "structured invoice/shipment reconciliation records a material mismatch")
+            for t in txns if t.get("invoice_mismatch") is True]
+
+
+def rule_route_mismatch(txns):
+    """Payment or shipment route explicitly inconsistent with the documented trade."""
+    return [_alert("ROUTE_MISMATCH", "HIGH", t,
+            "payment or shipment route is recorded as inconsistent with the underlying trade")
+            for t in txns if t.get("route_mismatch") is True]
+
+
 _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_high_risk_counterparty, rule_rapid_passthrough,
-          rule_cdd_trigger, rule_round_amount_cash]
+          rule_cdd_trigger, rule_round_amount_cash,
+          rule_third_party_payment, rule_refund_diversion,
+          rule_pricing_deviation, rule_phantom_delivery,
+          rule_invoice_mismatch, rule_route_mismatch]
 
 
 def _any_customer(txns):
