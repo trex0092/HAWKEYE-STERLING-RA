@@ -804,9 +804,9 @@
         "fileStem": "/attachment/",
         "linkMatch": "Format: xlsx"
       },
-      "enabled": false,
+      "enabled": true,
       "minNames": 100,
-      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official MSWiA page https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami (seen via a web search index 2026-09-28; page version 168.0, 26.05.2026) links one spreadsheet under 'Materiały': 'Lista sankcyjna - tabela 26.05.2026r' (tabela_lista_sankcyjna_26_05_2026.xlsx, 0.19MB) at this /attachment/<uuid> URL. The attachment id changes with each edition, so `discover` resolves it from the page each run; the page links one decision PDF per designee under the same generic '/attachment/' stem, so discovery also requires linkMatch 'Format: xlsx' (the spreadsheet anchor's aria-label) on exactly one anchor. Source-probe run 36390719857 (2026-09-28, before linkMatch) showed the stem alone picking an 11-page PDF: 0 names, floor NOT met, source correctly stayed disabled. Column layout, redirects (final host must be on the egress allowlist) and the name count are unverified: enable only if the probe's 'Parsed by the registry parser' section shows names and the minNames floor met. minNames 100 is a provisional floor (the MSWiA list has carried several hundred entries since 2023, e.g. 365 Belarusian nationals added 29.05.2023 per the ministry's own communiqué)."
+      "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36393616291 (GitHub runner, main) discovered the spreadsheet via linkMatch 'Format: xlsx' on https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami, fetched it (200,687 bytes, xlsx) and the xlsx parser read 461 names (minNames 100, met). Header row: 'Nazwisko i imię | Dane identyfikacyjne osoby | Uzasadnienie wpisu na listę | Zastosowane środki sankcyjne | Data umieszczenia na liście | Data wykreślenia z listy'; rows with a struck-off date are skipped. The attachment id changes with each edition, so `discover` resolves it from the page each run; earlier probe 36390719857 (stem only) picked a decision PDF and 36391592244 read 0 names before the Polish-header fix. Official list of the Minister of the Interior and Administration (MSWiA)."
     },
     {
       "id": "ee-vm-belarus",

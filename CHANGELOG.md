@@ -10,6 +10,9 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Poland: `pl-mswia-sanctions` enabled.** Runner probe 36393616291 (on
+  main) found the MSWiA spreadsheet via `linkMatch` discovery and read 461
+  names (floor 100). Poland moves to `screened`.
 - **Estonia: `ee-vm-russia-ukraine` enabled.** Runner probe 36392452572
   (on main) read 5 names (floor 3). Estonia now screens all three official
   MFA lists.
