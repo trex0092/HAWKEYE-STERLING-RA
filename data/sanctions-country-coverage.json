@@ -898,10 +898,11 @@
     },
     {
       "country": "Maldives",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — terrorist organisations designated under section 18(a) of the Anti-Terrorism Act (Law No. 32/2015) are published in the Government Gazette (17 organisations designated in September 2019, per the US State Department Country Reports on Terrorism 2019; list republished in the gazette on 9 October 2023 per press reports); the National Counter Terrorism Centre is nctc.gov.mv. Gazette format and current entries not yet verified"
     },
     {
       "country": "Mali",
@@ -988,7 +989,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Financial Information Unit (fiu.mongolbank.mn) operates under the 2013 Law on Combating Money Laundering and Terrorism Financing (UNODC-hosted text); no published national designation list found yet"
     },
     {
       "country": "Montenegro",
@@ -1018,11 +1020,12 @@
     },
     {
       "country": "Myanmar",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
       ],
-      "fatf": "black"
+      "fatf": "black",
+      "note": "researched 2026-09-28: national designations exist — the military authorities' Anti-Terrorism Central Committee declared the CRPH, the National Unity Government and the People's Defence Force terrorist organisations under the 2014 Counter-Terrorism Law (May 2021; state broadcaster Myanmar International TV, myanmaritv.com; also Irrawaddy, VOA) and in September 2024 added major ethnic armed groups (Al Jazeera). No consolidated machine-readable list found. Not staged: these designations target opposition/resistance bodies, so screening them is an MLRO policy decision. Myanmar is on the FATF call-for-action list (see data/fatf-assessments.json)"
     },
     {
       "country": "Namibia",
