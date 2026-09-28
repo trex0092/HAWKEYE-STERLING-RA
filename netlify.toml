@@ -1,9 +1,10 @@
-# Static single-file app — publish the repo root, no build step.
+# Static app — publish the repo root. The only build step writes data/deploy-meta.json from Netlify's COMMIT_REF so production currency can be verified against the exact deployed Git SHA.
 # package.json exists for the DEV/CI toolchain only (all devDependencies, no
 # install scripts): Netlify's dependency-install step is a fast no-op for the
 # deploy — the published site is the checked-in files, unchanged. Node version
 # for the build image is pinned by .nvmrc (22, same as CI).
 [build]
+  command = "node scripts/netlify-deploy-meta.mjs"
   publish = "."
 
 # Serve every checked-in file BYTE-FOR-BYTE — never let Netlify's post-processing
