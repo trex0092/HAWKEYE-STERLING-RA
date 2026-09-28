@@ -1,0 +1,3635 @@
+{
+  "generatedFrom": [
+    "data/sanctions-country-coverage.json",
+    "scripts/adverse-media.mjs",
+    "data/screening-scope.json"
+  ],
+  "counts": {
+    "countries": 195,
+    "sanctionsCovered": 195,
+    "adverseMediaCovered": 195,
+    "pepCovered": 195,
+    "nationalSanctionsScreened": 45,
+    "dedicatedGoogleNewsEditions": 67
+  },
+  "countries": [
+    {
+      "country": "Afghanistan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Albania",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Algeria",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Andorra",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Angola",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Antigua and Barbuda",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Argentina",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ar-repet",
+          "ar-repet-entidades"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Armenia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Australia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "au-dfat",
+          "au-dfat-opensanctions"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Austria",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Azerbaijan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "az-fiu"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Bahamas",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Bahrain",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "bh-gazette"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Bangladesh",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Barbados",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Belarus",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Belgium",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "be-fod"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Belize",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "pending",
+        "nationalSources": [
+          "bz-fiu-consolidated"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Benin",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Bhutan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Bolivia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Bosnia and Herzegovina",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Botswana",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Brazil",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "br-bcb-qgi",
+          "br-bcb-qgp",
+          "br-tcu-inabilitados",
+          "br-tcu-inidoneos"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Brunei",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Bulgaria",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Burkina Faso",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Burundi",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Cabo Verde",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Cambodia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Cameroon",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Canada",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ca-sema"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Central African Republic",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Chad",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Chile",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "China",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Colombia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Comoros",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Congo",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Costa Rica",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Côte d'Ivoire",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Croatia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Cuba",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Cyprus",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Czechia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "cz-mzv-national"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Democratic People's Republic of Korea",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Democratic Republic of the Congo",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Denmark",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Djibouti",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Dominica",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Dominican Republic",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Ecuador",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Egypt",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "eg-mlcu"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "El Salvador",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Equatorial Guinea",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Eritrea",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Estonia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ee-vm-belarus",
+          "ee-vm-human-rights",
+          "ee-vm-russia-ukraine"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Eswatini",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Ethiopia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Fiji",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Finland",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "France",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "fr-dgt"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Gabon",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Gambia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Georgia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ge-ot-list"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Germany",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Ghana",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Greece",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Grenada",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Guatemala",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Guinea",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Guinea-Bissau",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Guyana",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Haiti",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Holy See",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Honduras",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Hungary",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Iceland",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "India",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "in-mha"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Indonesia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "id-dttot"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Iran",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Iraq",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "pending",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Ireland",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Israel",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "il-nbctf",
+          "il-nbctf-orgs"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Italy",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Jamaica",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Japan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "jp-mof"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Jordan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "jo-amlu"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Kazakhstan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Kenya",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ke-frc"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Kiribati",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Kuwait",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Kyrgyzstan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "kg-fiu-public"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Laos",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Latvia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "lv-fid"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Lebanon",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Lesotho",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Liberia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Libya",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Liechtenstein",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Lithuania",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "lt-migracija-magnitsky"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Luxembourg",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Madagascar",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Malawi",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Malaysia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "my-moha"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Maldives",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Mali",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Malta",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Marshall Islands",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Mauritania",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Mauritius",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "mu-nssec"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Mexico",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "mx-sat-69b"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Micronesia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Moldova",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "md-sis-terror"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Monaco",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "mc-gels"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Mongolia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Montenegro",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Morocco",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ma-cnasnu"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Mozambique",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Myanmar",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Namibia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Nauru",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Nepal",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Netherlands",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "nl-terror"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "New Zealand",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "nz-mfat-russia",
+          "nz-terror"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Nicaragua",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Niger",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Nigeria",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ng-nigsac"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "North Macedonia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Norway",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Oman",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Pakistan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "pk-nacta"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Palau",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Palestine",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Panama",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Papua New Guinea",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Paraguay",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Peru",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Philippines",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ph-amlc"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Poland",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "pl-mswia-sanctions"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Portugal",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Qatar",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "qa-nctc",
+          "qa-nctc-opensanctions"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Republic of Korea",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Romania",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Russia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Rwanda",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Saint Kitts and Nevis",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Saint Lucia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Saint Vincent and the Grenadines",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Samoa",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "San Marino",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Sao Tome and Principe",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Saudi Arabia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "sa-pcct",
+          "sa-pcct-opensanctions"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Senegal",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Serbia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Seychelles",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Sierra Leone",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Singapore",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "sg-terrorists"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Slovakia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Slovenia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Solomon Islands",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Somalia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "South Africa",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "South Sudan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Spain",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Sri Lanka",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "lk-ca-1373"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Sudan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Suriname",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Sweden",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Switzerland",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ch-seco",
+          "ch-seco-opensanctions"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Syria",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Tajikistan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Tanzania",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Thailand",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "th-designated"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Timor-Leste",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Togo",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Tonga",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Trinidad and Tobago",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Tunisia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "tn-cnlct"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Turkey",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "tr-masak",
+          "tr-wanted"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Turkmenistan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Tuvalu",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Uganda",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Ukraine",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ua-nsdc"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "United Arab Emirates",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "internal-watchlist",
+          "uae-eocn-local-terrorist"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "United Kingdom",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "uk-ofsi"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "United States",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ofac-consolidated",
+          "ofac-sdn",
+          "us-csl"
+        ]
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Uruguay",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "assessed-not-loadable",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Uzbekistan",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Vanuatu",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Venezuela",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Vietnam",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": true
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Yemen",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Zambia",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "identified",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    },
+    {
+      "country": "Zimbabwe",
+      "sanctions": {
+        "covered": true,
+        "scope": "global-subject-screening",
+        "nationalStatus": "not-researched",
+        "nationalSources": []
+      },
+      "adverseMedia": {
+        "covered": true,
+        "scope": "global-name-sweep",
+        "dedicatedGoogleNewsEdition": false
+      },
+      "pep": {
+        "covered": true,
+        "scope": "worldwide-person-screening"
+      }
+    }
+  ]
+}

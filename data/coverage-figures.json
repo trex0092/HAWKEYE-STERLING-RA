@@ -6,7 +6,10 @@
     "adverseMediaLanguages": 61,
     "sanctionsLists": 66,
     "sanctionsJurisdictions": 45,
-    "sanctionsCountriesResearched": 133
+    "sanctionsCountriesResearched": 133,
+    "sanctionsCountriesCovered": 195,
+    "adverseMediaCountriesCovered": 195,
+    "pepCountriesCovered": 195
   },
   "definitions": {
     "adverseMediaEditions": "Google News country/language editions in the adverse-media locale matrix (scripts/adverse-media.mjs LOCALES); the daily run sweeps a budgeted rotation of them plus GDELT and Bing News",
@@ -14,6 +17,9 @@
     "adverseMediaLanguages": "languages with native risk terms in the scorer (scripts/adverse-media.mjs LANG_TERMS)",
     "sanctionsLists": "enabled sources in data/sanctions-sources.json + data/sanctions-extra.json (extra: with url or file), excluding alias-only sources (mergeInto)",
     "sanctionsCountriesResearched": "of the 195 countries in data/sanctions-country-coverage.json, how many have a recorded research outcome (screened, pending, identified or assessed-not-loadable) rather than not-researched",
-    "sanctionsJurisdictions": "distinct issuing countries among those sources: the jurisdiction field, or for entries marked Global (a list's reach, not its issuer) the country named in the list title; UN, EU and development-bank lists are supranational and not counted"
+    "sanctionsJurisdictions": "distinct issuing countries among those sources: the jurisdiction field, or for entries marked Global (a list's reach, not its issuer) the country named in the list title; UN, EU and development-bank lists are supranational and not counted",
+    "sanctionsCountriesCovered": "countries included in the worldwide sanctions screening scope; global consolidated lists apply irrespective of subject nationality, with national/regional lists layered where available",
+    "adverseMediaCountriesCovered": "countries included in worldwide name-scoped adverse-media screening through GDELT and Bing News, with Google News editions adding regional depth",
+    "pepCountriesCovered": "countries included in the worldwide PEP screening scope through the Wikidata public-office holder harvest; screening is not country-filtered"
   }
 }
