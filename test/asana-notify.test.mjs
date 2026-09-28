@@ -202,7 +202,7 @@ check('a sectionless mirror still joins the project',
      different step with no mirror env — the whole-file regex above stayed
      green while the daily digest never reached the MLRO queue. */
   const stepBlock = (yaml, runLine) =>
-    yaml.split(/\n\s+- name: /).find(s => s.includes(runLine)) || '';
+    yaml.split(/\n\s+- name: /).find(s => s.includes('run: node ' + runLine)) || '';
   const yScreen = readFileSync(join(ROOT2, '.github/workflows', 'sanctions-screen.yml'), 'utf8');
   check('sanctions-screen.yml assigns the mirror env on the DIGEST step (screening-cases.mjs — its consumer)',
     mirrorRe.test(stepBlock(yScreen, 'scripts/screening-cases.mjs')));
