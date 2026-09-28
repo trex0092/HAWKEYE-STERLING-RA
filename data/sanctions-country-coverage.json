@@ -350,11 +350,12 @@
     },
     {
       "country": "Croatia",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the MVEP \"Restrictive Measures\" page (mvep.gov.hr) describes the Law on Restrictive Measures (OG 133/23) as applying measures \"in accordance with the legal acts of the European Union\" and states Croatia is bound by UNSC resolutions; the only lists it links are the EU consolidated financial-sanctions list and the UN consolidated list. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Cuba",
@@ -371,7 +372,7 @@
         "UN",
         "EU"
       ],
-      "note": "partial research 2026-09-28 (status unchanged): the MFA \"Sanctions\" page (gov.cy/mfa) says national sanctions may be adopted by the Council of Ministers under Law 150(I)/2025 (National Sanctions Implementation Unit); whether any national designations have been published is not yet confirmed"
+      "note": "partial research 2026-09-28 (status unchanged): the MFA \"Sanctions\" page (gov.cy/mfa) states \"National sanctions cover situations not regulated by EU law or UNSC resolutions\"; the legal basis is Law 150(I)/2025 (designation by the Council of Ministers on the Foreign Minister's recommendation). No published national designation list was found; I cannot confirm whether any national designation has been made"
     },
     {
       "country": "Czechia",
@@ -611,11 +612,11 @@
     },
     {
       "country": "Guyana",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-09-28 (status unchanged): the FIU guidelines on targeted financial sanctions (fiu.gov.gy, Guideline No. 1 of 2022 and TFS procedures of 27 Oct 2023) provide for persons designated by the UNSC and for entities \"specified\" by order of the Minister of Finance under section 2(2) of the AML/CFT Act 2009 (UNSCR 1373); whether any national specification order is published is not yet confirmed"
+      "note": "researched 2026-09-28: the FIU \"Guidance on Targeted Financial Sanctions\" (fiu.gov.gy, TFS-TF-PF-Guidelines-2023) provides for domestic designations by the Minister of Finance under the AML/CFT Act 2009 and states \"When a domestic designation occurs the designated person or entity is published in the Gazette, as well as on the FIU's website\". No machine-readable file verified yet"
     },
     {
       "country": "Haiti",
@@ -1357,21 +1358,21 @@
     },
     {
       "country": "Slovakia",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
       ],
-      "note": "partial research 2026-09-28 (status unchanged): Act 289/2016 on the implementation of international sanctions (mfsr.sk) sets a process for adding persons to and removing them from a \"zoznam sankcionovaných osôb\"; whether a separate national list is published is not yet confirmed"
+      "note": "researched 2026-09-28: the Ministry of Finance \"Sanctions list\" page (mfsr.sk) states sanctions lists \"form a part of the annexes to the UN Security Council's resolutions and the annexes to individual EU regulations\", implemented through Act No. 289/2016 Coll.; no separate Slovak list is published there. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Slovenia",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
       ],
-      "note": "partial research 2026-09-28 (status unchanged): gov.si \"Omejevalni ukrepi\" says Slovenia may adopt national restrictive measures by government decree under ZOUPAMO, while obliged bodies follow UN and EU sanctions lists; no national list found yet"
+      "note": "researched 2026-09-28: the gov.si \"Restrictive measures\" page describes the ZOUPAMO regime as applying EU regulations and the UN Security Council consolidated list (Art. 3(4)-(5)); authorities \"are obliged to follow the sanctions lists, in particular via electronic notifications provided by the UN and the EU\". No separate Slovenian list is published there. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Solomon Islands",
