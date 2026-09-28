@@ -384,11 +384,12 @@
     },
     {
       "country": "Denmark",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Danish Business Authority guidance \"Vejledning om indefrysning\" (eksportkontrol.erhvervsstyrelsen.dk) defines sanctions as restrictive measures adopted by the UN and/or the EU, and the Ministry of Foreign Affairs page \"Sanktioner\" (um.dk) states that economic sanctions such as asset freezes are implemented in the EU; no national list was found. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Djibouti",
