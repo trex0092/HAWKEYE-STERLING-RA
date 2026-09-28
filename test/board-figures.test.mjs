@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { buildFigures, countWorkflows, countDocs, countAutoDocs, egressSplit, FIGURES_FILE } from '../scripts/board-figures.mjs';
 import { issuingCountry, screenedSources } from '../scripts/coverage-figures.mjs';
+import { assessRuntime, checkStored } from '../scripts/screening-assurance.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let passed = 0, failed = 0;
@@ -87,6 +88,72 @@ console.log('\n— sanctions country coverage register (195) —\n');
     reg.filter(r => (r.baseline || []).includes('EU')).length === 27 && on('eu-fsf'));
   check('non-screened statuses other than not-researched carry a note',
     reg.filter(r => r.status !== 'screened' && r.status !== 'not-researched').every(r => r.note));
+}
+
+/* Runtime worldwide screening assurance: green means actual run evidence,
+   not a static 195-country scope flag. */
+console.log('\n— runtime worldwide screening assurance —\n');
+{
+  const contract = {
+    countryUniverse: 195,
+    domains: {
+      sanctions: {
+        sources: [
+          { id: 'un-consolidated', required: true },
+          { id: 'ofac-sdn', required: true },
+          { id: 'ofac-consolidated', required: true },
+          { id: 'uk-ofsi', required: true },
+          { id: 'eu-fsf', required: true },
+        ],
+      },
+    },
+  };
+  const results = {
+    date: '2026-09-28',
+    screened: 12,
+    degraded: false,
+    failures: [],
+    lists: [
+      { id: 'un-consolidated', count: 1000, partial: false },
+      { id: 'ofac-sdn', count: 10000, partial: false },
+      { id: 'ofac-consolidated', count: 500, partial: false },
+      { id: 'uk-ofsi', count: 10000, partial: false },
+      { id: 'eu-fsf', count: 25000, partial: false },
+    ],
+    enrichment: {
+      amErrors: 0, amPartial: 0, pepErrors: 0, skipped: 0,
+      amLocalesPerSubject: 8, amRotationCycleDays: 9, amMatrixTotal: 79,
+      amBackbones: ['GDELT global index', 'Bing News'],
+    },
+  };
+  const pep = {
+    count: 50000, harvested: '2026-09-27T00:00:00.000Z', entries: [],
+  };
+  const nowMs = Date.parse('2026-09-28T00:00:00.000Z');
+  const ok = assessRuntime({ results, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance passes only when all three domains have complete current evidence',
+    ok.operational && ok.domains.sanctions.operational && ok.domains.adverseMedia.operational && ok.domains.pep.operational);
+
+  const noOfac = structuredClone(results);
+  noOfac.lists = noOfac.lists.filter(x => x.id !== 'ofac-sdn');
+  const miss = assessRuntime({ results: noOfac, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance fails when a required sanctions backbone is missing',
+    !miss.domains.sanctions.operational && miss.domains.sanctions.reasons.some(r => r.includes('ofac-sdn')));
+
+  const amPartial = structuredClone(results);
+  amPartial.enrichment.amPartial = 1;
+  const am = assessRuntime({ results: amPartial, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance fails when adverse-media coverage is partial',
+    !am.domains.adverseMedia.operational);
+
+  const partialPep = { ...pep, partial: true, expected: 60000 };
+  const pp = assessRuntime({ results, pepDataset: partialPep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance fails when the worldwide PEP artifact is partial',
+    !pp.domains.pep.operational);
+
+  const stale = checkStored({ ...ok, generatedAt: '2026-09-20T00:00:00.000Z' },
+    { nowMs, maxAgeHours: 36 });
+  check('stored runtime assurance fails closed when evidence is stale', !stale.ok);
 }
 
 /* FATF black/grey lists: data/fatf-assessments.json (the assessment text),
