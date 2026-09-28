@@ -488,6 +488,31 @@ export const LOCALES = [
   { id: 'en-NZ', hl: 'en-NZ', gl: 'NZ', ceid: 'NZ:en', lang: 'en' },
   { id: 'nl-BE', hl: 'nl', gl: 'BE', ceid: 'BE:nl', lang: 'nl' },
   { id: 'fr-BE', hl: 'fr', gl: 'BE', ceid: 'BE:fr', lang: 'fr' },
+
+  /* AUDITED 2026-09-28: each candidate fetched live (the RSS search endpoint,
+     query "money laundering" or its local-language form) and compared with an
+     already-confirmed edition of the same language on the same query: the
+     final ceid must equal the requested one, AND the article set must differ
+     from the confirmed edition, AND the country's own press must be present.
+     Accepted, with the measured evidence:
+       en-IE  kept IE:en; 19/100 sources on .ie (RTE, Irish Times); 53/100 overlap with US:en
+       en-CA  kept CA:en; 9/100 sources on .ca (CBC, gov.bc.ca); 72/100 with US:en, 56/100 with IE:en
+       de-AT  kept AT:de; 25/100 sources on .at (Kurier, WKO); 50/100 overlap with DE:de
+       es-US  kept US:es-419; 13/100 US Spanish-language outlets (Telemundo, Univision),
+              none in US:en; 41/100 overlap with MX:es-419
+     Tried and REJECTED:
+       da-DK  (DK:da -> silently served NO:no, the Norwegian edition)
+       en-TZ, en-UG, en-ZW, en-BW, en-NA, en-ET  (ceid kept, but 0-1/100 sources on
+              the country's own domain and 82-94/100 identical to EACH OTHER: one
+              generic international-English feed echoing the requested ceid, not
+              six country editions)
+       es-VE  (0/100 .ve sources; 73/100 identical to US:es-419)
+       fr-SN  (0/100 .sn sources; 72/100 identical to FR:fr)
+     Same rule as the audits above: do not re-add without new evidence. */
+  { id: 'en-IE', hl: 'en-IE', gl: 'IE', ceid: 'IE:en', lang: 'en' },
+  { id: 'en-CA', hl: 'en-CA', gl: 'CA', ceid: 'CA:en', lang: 'en' },
+  { id: 'de-AT', hl: 'de', gl: 'AT', ceid: 'AT:de', lang: 'de' },
+  { id: 'es-US', hl: 'es-419', gl: 'US', ceid: 'US:es-419', lang: 'es' },
 ];
 
 /* The locale set to sweep this run — all of LOCALES unless narrowed by the
