@@ -6,7 +6,7 @@ const ROOT = process.cwd();
 const REGISTER_PATH = path.join(ROOT, "data", "sanctions-country-coverage.json");
 const OUTPUT_PATH = path.join(ROOT, "docs", "generated", "country-coverage-gaps.md");
 const STATUS_ORDER = new Map([["not-researched",0],["pending",1],["identified",2],["assessed-not-loadable",3],["screened",4]]);
-const REGION_ALIASES = { KR: "Republic of Korea", RU: "Russia", VN: "Vietnam", US: "United States", GB: "United Kingdom" };
+const REGION_ALIASES = { KR: "Republic of Korea", RU: "Russia", VN: "Vietnam", US: "United States", GB: "United Kingdom", TR: "Turkey" };
 
 function readRegister() {
   const register = JSON.parse(fs.readFileSync(REGISTER_PATH, "utf8"));
