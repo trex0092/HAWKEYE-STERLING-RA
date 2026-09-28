@@ -17,10 +17,10 @@ bump merged to `main`.
   national list. Vietnam's national list is not staged: its entries include
   overseas political organisations, so screening it is an MLRO policy
   decision; the same applies to Mali, Burkina Faso, Niger, Tajikistan and Rwanda, whose
-  lists reportedly include journalists and political figures. Papua New Guinea (no domestic designations) and Namibia (UN lists
-  relayed) are `assessed-not-loadable`. Kuwait, Lebanon, Laos, DR Congo, Syria,
+  lists reportedly include journalists and political figures. Papua New Guinea (no domestic designations), Namibia, Ghana and Sierra
+  Leone (UN lists relayed) are `assessed-not-loadable`. Kuwait, Lebanon, Laos, DR Congo, Syria,
   Haiti, Bosnia and Herzegovina, Brunei, Senegal, Togo, Benin, Zimbabwe, Botswana, Sudan, Tanzania and Iran get partial notes. Researched rows:
-  89 → 111.
+  89 → 113.
 - **Register research: Norway, Iceland, Montenegro, San Marino, Malta,
   Liechtenstein, North Macedonia** recorded as
   `assessed-not-loadable`. Each implements UN sanctions (and, for the first

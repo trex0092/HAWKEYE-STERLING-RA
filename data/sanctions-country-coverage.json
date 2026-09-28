@@ -559,10 +559,11 @@
     },
     {
       "country": "Ghana",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: under the Anti-Terrorism Act 2008 (Act 762), the Anti-Terrorism (Amendment) Act 2012 (Act 842; mint.gov.gh) and the Anti-Terrorism Regulations 2012, the Attorney-General publishes the listing and de-listing of individuals and entities designated by the UN Security Council within 24 hours of receipt from the Minister for Foreign Affairs; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Greece",
@@ -1325,10 +1326,11 @@
     },
     {
       "country": "Sierra Leone",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: per the GIABA Mutual Evaluation Report of Sierra Leone (2020, fatf-gafi.org), the Financial Intelligence Agency receives the UN lists of designated persons from the Ministry of Foreign Affairs for freezing; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Singapore",
