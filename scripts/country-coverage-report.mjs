@@ -57,7 +57,9 @@ export function buildCountryCoverageReport(register = readRegister()) {
   out.push(table(["Country","AM edition","Partial note"], nonFatfNotResearched.map((row) => [row.country,editions.has(row.country) ? "yes" : "no",partialNote(row)])), "");
   out.push("## Sanctions: list known but file not verified (" + (statusCounts.identified || 0) + ") and pending (" + (statusCounts.pending || 0) + ")", "");
   out.push(table(["Country","Status","AM edition"], nonFatfKnown.map((row) => [row.country,row.status,editions.has(row.country) ? "yes" : "no"])), "");
-  out.push("## MLRO policy decision required (" + mlroGated.length + ")", "");\n  out.push(table(["Country","Sanctions status","FATF"], mlroGated.map((row) => [row.country,row.status,row.fatf || ""])), "");\n  out.push("## Adverse media: " + noEdition.length + " countries with no dedicated Google News edition", "");
+  out.push("## MLRO policy decision required (" + mlroGated.length + ")", "");
+  out.push(table(["Country","Sanctions status","FATF"], mlroGated.map((row) => [row.country,row.status,row.fatf || ""])), "");
+  out.push("## Adverse media: " + noEdition.length + " countries with no dedicated Google News edition", "");
   out.push(noEdition.join(", "), "");
   out.push("## Regeneration", "");
   out.push("Run `npm run coverage:report` to print this report, `npm run coverage:report:write` to refresh it, or `npm run coverage:report:check` to fail on drift.", "");
