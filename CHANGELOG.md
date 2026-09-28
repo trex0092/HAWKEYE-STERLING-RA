@@ -27,6 +27,20 @@ bump merged to `main`.
     jurisdictions. The register moves these three countries from `pending` to
     `screened` (screened 43, pending 1). Tests were added to
     `test/sanctions-match.test.mjs` and `test/sanctions-screen.test.mjs`.
+- **Source probe proves the parse, not just the fetch**
+  (`scripts/source-probe.mjs`). Each probe now reports:
+  - the source's own registry parser output: name count, a sample of names,
+    and whether the `minNames` floor was met;
+  - the final URL after redirects, so an off-allowlist host is caught before
+    a source is enabled;
+  - the `discover` link resolution, done exactly as the screen does it.
+- **Poland staged (disabled)**: `pl-mswia-sanctions`, the Interior Ministry
+  (MSWiA) sanctions-list `.xlsx` on gov.pl, with page discovery.
+  `www.gov.pl:443` is added to the screen's egress allowlist. The register
+  moves Poland from `identified` to `pending`.
+- `test/app.test.js`: the retention-purge audit poll now has the same
+  300-tick budget as its sibling polls. It had failed once on a loaded runner
+  at 50 ticks; the assertion itself is unchanged.
 
 - **Sanctions: a 195-country coverage register, and three official national
   lists staged** (`data/sanctions-country-coverage.json`,

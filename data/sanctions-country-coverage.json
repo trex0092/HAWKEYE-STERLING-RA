@@ -669,8 +669,11 @@
     },
     {
       "country": "Poland",
-      "status": "identified",
-      "note": "two national lists (Ministry of Finance GIIF Art. 118; MSWiA sanctions list), published as web pages; identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified"
+      "status": "pending",
+      "note": "official MSWiA sanctions-list spreadsheet (.xlsx attachment on gov.pl, 26.05.2026 edition) staged disabled with page discovery, pending a source-probe run; the Ministry of Finance GIIF Art. 118 list is not yet staged",
+      "sources": [
+        "pl-mswia-sanctions"
+      ]
     },
     {
       "country": "Portugal",

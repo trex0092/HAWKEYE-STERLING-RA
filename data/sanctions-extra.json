@@ -791,6 +791,21 @@
       "enabled": true,
       "minNames": 50,
       "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36388020414 (GitHub runner, main@f978c16) fetched HTTP 200, 196,017 bytes, labelled application/vnd.ms-excel but the body is an HTML <table> (header: Număr de referință / Persoană Fizică / Entitate / Data de naștere / Sancțiuni teroriste / Sancțiuni de proliferare) — so it is read as text by parseHtmlTable, not as a spreadsheet. Published by the SIS Anti-Terrorist Centre (official page https://antiteror.sis.md/advanced-page-type/listele-teroriste). Content: Moldova's consolidated list, largely UN 1267/ISIL-Al-Qaida (QDi.* references) and EU CFSP terrorist designations, plus national entries; a trailing parenthetical (Romanian rendering) screens on its own too."
+    },
+    {
+      "id": "pl-mswia-sanctions",
+      "name": "Poland — Ministry of the Interior and Administration (MSWiA): List of persons and entities subject to sanctions",
+      "jurisdiction": "Poland",
+      "url": "https://www.gov.pl/attachment/efe8ad28-0dd8-454b-b0ab-ea58033aa902",
+      "type": "xlsx",
+      "parser": "xlsx",
+      "discover": {
+        "page": "https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami",
+        "fileStem": "/attachment/"
+      },
+      "enabled": false,
+      "minNames": 100,
+      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official MSWiA page https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami (seen via a web search index 2026-09-28; page version 168.0, 26.05.2026) links one spreadsheet under 'Materiały': 'Lista sankcyjna - tabela 26.05.2026r' (tabela_lista_sankcyjna_26_05_2026.xlsx, 0.19MB) at this /attachment/<uuid> URL. The attachment id changes with each edition, so `discover` resolves it from the page each run; because the stem is the generic '/attachment/', discovery is only safe while the page links ONE attachment — the probe report must show that before enabling. Column layout, redirects (final host must be on the egress allowlist) and the name count are unverified: enable only if the probe's 'Parsed by the registry parser' section shows names and the minNames floor met. minNames 100 is a provisional floor (the MSWiA list has carried several hundred entries since 2023, e.g. 365 Belarusian nationals added 29.05.2023 per the ministry's own communiqué)."
     }
   ]
 }

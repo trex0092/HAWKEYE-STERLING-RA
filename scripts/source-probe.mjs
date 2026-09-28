@@ -115,17 +115,40 @@ export async function sheetHeaders(buf) {
   }
 }
 
+/* Parse reconnaissance: run the source's OWN registry parser over the fetched
+   body (bytes for spreadsheet parsers, text otherwise — decoded with the
+   source's charset when it declares one), so the probe proves the parse, not
+   just the fetch. Pure given the parser; pinned in test/sanctions-screen.test.mjs. */
+export async function parseSummary(s, buf) {
+  try {
+    const m = await import('./sanctions-match.mjs');
+    const binary = /^(xlsx|dfat|ods)$/i.test(String(s.parser || '')) || /^(xlsx|ods)$/i.test(String(s.type || ''));
+    const body = binary ? buf
+      : (typeof s.charset === 'string' && s.charset ? new TextDecoder(s.charset).decode(buf) : Buffer.from(buf).toString('utf8'));
+    const names = m.parseList(s, body);
+    const floor = Number(s.minNames) || 0;
+    return ['parser ' + (s.parser || s.type || '(inferred)') + ': ' + names.length + ' names'
+      + (floor ? ' (minNames ' + floor + (names.length >= floor ? ', met)' : ', NOT met)') : ''),
+      ...names.slice(0, 8).map(n => '  e.g. ' + String(n).slice(0, 120))];
+  } catch (e) {
+    return ['parse failed: ' + String(e && e.message || e).slice(0, 160)];
+  }
+}
+
 export function renderReport(results) {
   const L = ['# Source probe', ''];
   for (const r of results) {
     L.push('## ' + r.id + ' — ' + (r.name || ''), '');
     L.push('- url: ' + r.url);
+    if (r.discovered) L.push('- discovered via ' + r.discovered);
+    if (r.finalUrl && r.finalUrl !== r.url) L.push('- final url (after redirects): ' + r.finalUrl);
     L.push('- outcome: ' + r.outcome + (r.status ? ' (http ' + r.status + ')' : ''));
     if (r.contentType) L.push('- content-type: ' + r.contentType);
     if (r.bytes != null) L.push('- bytes: ' + r.bytes);
     if (r.server) L.push('- server: ' + r.server);
     if (r.jsonPaths && r.jsonPaths.length) { L.push('', '### JSON key paths', '```', ...r.jsonPaths, '```'); }
     if (r.links && r.links.length) { L.push('', '### Data-file links discovered', '```', ...r.links, '```'); }
+    if (r.parsed && r.parsed.length) { L.push('', '### Parsed by the registry parser', '```', ...r.parsed, '```'); }
     if (r.sheet && r.sheet.length) { L.push('', '### Sheet reconnaissance', '```', ...r.sheet, '```'); }
     if (r.sample) { L.push('', '### Body sample (bounded, control bytes escaped)', '```', r.sample, '```'); }
     L.push('');
@@ -139,7 +162,16 @@ async function probeOne(s, timeoutMs = 90000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(s.url, {
+    /* A source with `discover` is resolved exactly as the screen resolves it,
+       so the probe exercises the real path, not a pinned edition. */
+    if (s.discover && s.discover.page) {
+      const { discoverDatedLink } = await import('./sanctions-screen.mjs');
+      const pr = await fetch(String(s.discover.page), { signal: ctrl.signal, redirect: 'follow' });
+      const found = pr.ok ? discoverDatedLink(await pr.text(), String(s.discover.page), s.discover.fileStem) : null;
+      if (!found) { r.outcome = 'discovery-failed (page http ' + pr.status + ')'; return r; }
+      r.url = found; r.discovered = s.discover.page;
+    }
+    const res = await fetch(r.url, {
       signal: ctrl.signal, redirect: 'follow',
       headers: {
         /* Realistic browser headers — several of the disabled sources sit
@@ -151,16 +183,18 @@ async function probeOne(s, timeoutMs = 90000) {
       },
     });
     r.status = res.status;
+    r.finalUrl = res.url || '';
     r.contentType = res.headers.get('content-type') || '';
     r.server = res.headers.get('server') || '';
     const buf = Buffer.from(await res.arrayBuffer());
     r.bytes = buf.length;
     r.outcome = res.ok ? 'fetched' : 'http-error';
+    if (res.ok) r.parsed = await parseSummary(s, buf);
     if (/zip|officedocument|opendocument/.test(r.contentType) || buf.subarray(0, 2).toString() === 'PK') {
       r.sheet = await sheetHeaders(buf);
     } else {
       r.jsonPaths = jsonKeyPaths(buf);
-      r.links = extractDataLinks(buf, s.url);
+      r.links = extractDataLinks(buf, r.url);
       r.sample = sampleBody(buf);
     }
   } catch (e) {

@@ -1569,6 +1569,19 @@ check('probe: report renders outcome, key paths, discovered links, and the diagn
   _spMd.includes('## a — A') && _spMd.includes('http 200') && _spMd.includes('k = v')
   && _spMd.includes('Data-file links discovered') && _spMd.includes('https://x.example/list.xml')
   && _spMd.includes('Diagnostic only'));
+{
+  const ps = await sp.parseSummary({ id: 'md-x', parser: 'htmltable', minNames: 2 },
+    Buffer.from('<table><tr><th>Persoană Fizică / Entitate</th></tr><tr><td>ALPHA ONE</td></tr><tr><td>BETA TWO</td></tr></table>'));
+  check('probe: parseSummary runs the registry parser and reports the minNames verdict',
+    ps[0] === 'parser htmltable: 2 names (minNames 2, met)' && ps.includes('  e.g. ALPHA ONE'));
+  const ps2 = await sp.parseSummary({ id: 'cz-x', parser: 'czmfa', minNames: 5 }, Buffer.from('a,b\n1,2\n'));
+  check('probe: parseSummary flags an unmet floor', /0 names \(minNames 5, NOT met\)/.test(ps2[0]));
+  const md = sp.renderReport([{ id: 'z', name: 'Z', url: 'https://h.example/f.csv', discovered: 'https://h.example/page',
+    finalUrl: 'https://cdn.example/f.csv', outcome: 'fetched', status: 200, parsed: ['parser x: 3 names'] }]);
+  check('probe: report shows discovery source, post-redirect host and the parse result',
+    md.includes('discovered via https://h.example/page') && md.includes('final url (after redirects): https://cdn.example/f.csv')
+    && md.includes('Parsed by the registry parser') && md.includes('parser x: 3 names'));
+}
 check('probe: link discovery pulls data-file hrefs off an HTML landing page, absolutized', (() => {
   const html = '<a href="/Content/TFSList.xml">XML</a> <a href="download.ashx?fileType=xlsx">XLSX</a> '
     + '<a href="/about">About us</a> <img src="/logo.png">';
