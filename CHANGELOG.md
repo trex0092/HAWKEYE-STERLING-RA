@@ -10,6 +10,17 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **The daily Sanctions Screen digest could still be refused as too large**
+  (`scripts/asana-notify.mjs`). On 2026-09-26 `screening-cases` failed with
+  `.html_notes : Rich text value is too large`, so the MLRO got no results
+  digest for a run of 905 subjects and 76 new matches. `fitAsanaHtml` capped
+  `html_notes` by UTF-8 bytes, but Asana also limits the converted rich text,
+  which can entity-encode every non-ASCII character. The Turkish, Arabic and
+  em-dash-heavy rows the digest carries weigh far more that way than in bytes.
+  `html_notes` is now measured by the same worst-case accounting the `notes`
+  field and `screen.py` already use (`asanaHtmlSize`). `notifyAsana` also
+  retries once on a 60% budget if Asana still answers "too large". Any
+  truncation is disclosed in the card.
 - **The Node adverse-media screen's GDELT fallback and breaker were never wired
   in** (`scripts/adverse-media.mjs`). The code comments said `checkAdverseMedia`
   retries GDELT on the base term set when the widened typology query is rejected,
