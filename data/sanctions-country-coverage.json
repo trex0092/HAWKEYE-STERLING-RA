@@ -432,10 +432,11 @@
     },
     {
       "country": "El Salvador",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: Asamblea Legislativa Decreto N.° 928 (asamblea.gob.sv) provides for applying UN Security Council terrorist designations to the persons, groups and entities listed; no separate published national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Equatorial Guinea",
@@ -454,7 +455,7 @@
     {
       "country": "Estonia",
       "status": "screened",
-      "note": "screened: ee-vm-belarus (615 names, source-probe run 36391541492) and ee-vm-human-rights (193 names, run 36391873968), official MFA lists under the International Sanctions Act; ee-vm-russia-ukraine staged, pending its own probe run",
+      "note": "screened: all three official MFA lists under the International Sanctions Act — ee-vm-belarus (615 names, source-probe run 36391541492), ee-vm-human-rights (193 names, run 36391873968) and ee-vm-russia-ukraine (5 names, run 36392452572)",
       "sources": [
         "ee-vm-belarus",
         "ee-vm-human-rights",
@@ -531,11 +532,12 @@
     },
     {
       "country": "Germany",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Bundesbank \"Finanzsanktionen\" page (bundesbank.de) states restrictions derive from UN, EU and national measures and are \"maßgeblich durch das Recht der Europäischen Union bestimmt\"; for UN listings the economics ministry issues individual interim measures (\"Einzeleingriffe\", §§ 4 and 6 AWG) rather than a consolidated national list. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Ghana",
@@ -683,11 +685,12 @@
     },
     {
       "country": "Italy",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the MEF Comitato di sicurezza finanziaria page (dt.mef.gov.it) names the CSF as the authority implementing UN and EU freezes (d.lgs. 109/2007); national freezes are individual decrees published as PDFs (e.g. the Artem Uss and Nabagala decrees), not a consolidated list. The UIF page \"Comunicazioni sanzioni finanziarie\" relays UN/EU lists (and OFAC for information only). Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Jamaica",
@@ -1030,10 +1033,11 @@
     },
     {
       "country": "Nicaragua",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the UAF circulates UN Security Council list updates to the authorities (e.g. Poder Judicial DGCIP \"Cooperación Listas ONU\", UAF-C.E. 0761 2026, 30.03.2026, poderjudicial.gob.ni); no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Niger",
@@ -1337,11 +1341,12 @@
     },
     {
       "country": "Spain",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Tesoro Público page \"Sanciones derivadas de financiación del Terrorismo\" (tesoro.es) lists only the UN Security Council Consolidated List (UNSCR 1267/1989/2253) and the EU terrorism list; no separate Spanish national list is published there. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Sri Lanka",

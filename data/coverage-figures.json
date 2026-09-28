@@ -4,9 +4,9 @@
     "adverseMediaEditions": 79,
     "adverseMediaCountries": 69,
     "adverseMediaLanguages": 61,
-    "sanctionsLists": 64,
+    "sanctionsLists": 65,
     "sanctionsJurisdictions": 44,
-    "sanctionsCountriesResearched": 66
+    "sanctionsCountriesResearched": 71
   },
   "definitions": {
     "adverseMediaEditions": "Google News country/language editions in the adverse-media locale matrix (scripts/adverse-media.mjs LOCALES); the daily run sweeps a budgeted rotation of them plus GDELT and Bing News",
