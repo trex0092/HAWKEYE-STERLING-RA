@@ -10,9 +10,12 @@ bump merged to `main`.
 
 ## [Unreleased]
 
-- **Register research: Norway, Iceland, Montenegro** recorded as
-  `assessed-not-loadable`. Each implements UN sanctions and mirrors or relays
-  the EU lists, with no separate national list. Researched rows: 78 → 81.
+- **Register research: Norway, Iceland, Montenegro, San Marino** recorded as
+  `assessed-not-loadable`. Each implements UN sanctions (and, for the first
+  three, mirrors or relays the EU lists), with no separate national list.
+  Albania is `identified`: a Council of Ministers list of persons declared as
+  terrorism financiers exists on qbz.gov.al, but its format is not yet
+  verified. Researched rows: 78 → 83.
 - **Poland: `pl-mswia-sanctions` enabled.** Runner probe 36393616291 (on
   main) found the MSWiA spreadsheet via `linkMatch` discovery and read 461
   names (floor 100). Poland moves to `screened`.

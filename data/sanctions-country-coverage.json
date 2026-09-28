@@ -11,10 +11,11 @@
     },
     {
       "country": "Albania",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Council of Ministers decision \"Për listën e personave të shpallur si financues të terrorizmit\" (on the list of persons declared as terrorism financiers), consolidated text dated 2025-06-25 on the Official Publications Centre (qbz.gov.al/preview/7a4e2629-2856-4f8c-a9b5-fa1af9af990a/cons/20250625), which tasks the Minister of Finance through the General Directorate for the Prevention of Money Laundering (fiu.gov.al) with the freezing measures. The page is a document viewer that the scraper could not read; the file format and name count are not yet verified"
     },
     {
       "country": "Algeria",
@@ -28,7 +29,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the UIFAND information note to banks (uifand.ad) tells obliged entities to monitor sanctions-list updates, especially the UN Security Council consolidated list, under Law 14/2017; whether a separate national list exists is not yet confirmed"
     },
     {
       "country": "Angola",
@@ -1241,10 +1243,11 @@
     },
     {
       "country": "San Marino",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Financial Intelligence Agency page \"Misure restrittive ONU\" (aif.sm) states San Marino adopts without delay, by Congress of State resolution, the restrictive measures of the UN Security Council and its committees; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Sao Tome and Principe",
