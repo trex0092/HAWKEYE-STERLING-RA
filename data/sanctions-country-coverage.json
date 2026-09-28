@@ -19,10 +19,11 @@
     },
     {
       "country": "Algeria",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Ministry of the Interior page \"Liste nationale des personnes et entités terroristes\" (interieur.gov.dz/liste-nationale-des-personnes-et-entites-terroristes/), national legal basis Décret exécutif N° 25-103 of 12 March 2025 (the classification commission was created by Décret exécutif N° 21-384, per the Journal officiel, joradp.dz). Page format and name count not yet verified by a runner probe"
     },
     {
       "country": "Andorra",
@@ -210,7 +211,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Brunei Darussalam Central Bank page \"Information for the General Public\" (bdcb.gov.bn) confirms ministerial designations under the Anti-Terrorism (Terrorist Financing) Regulations 2013 and section 65 of the Anti-Terrorism Order 2011; no published national list found yet"
     },
     {
       "country": "Bulgaria",
