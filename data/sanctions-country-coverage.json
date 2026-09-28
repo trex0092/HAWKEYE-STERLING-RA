@@ -61,10 +61,11 @@
     },
     {
       "country": "Armenia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Central Bank of Armenia \"Applicable Lists\" page (cba.am/en/applicable-lists/) links the \"List of Designated Persons Pursuant to the United Nations Security Council Resolution 1373\" as a PDF (cba.am/file_manager/FMC/FMC%20en/Regulations/20211021%20-%20National%20Designations%20List.pdf). PDF parse and name count not yet verified; www.cba.am is not reachable from this sandbox, so a runner probe is needed"
     },
     {
       "country": "Australia",
@@ -159,7 +160,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): CENTIF-BJ (centif.bj) is the FIU; a decree of 21 June 2017 designates the competent freezing authority and an interministerial order of 22 February 2018 set up the consultative commission on administrative freezing (per the 2023 GIABA follow-up report); no published national list found yet"
     },
     {
       "country": "Bhutan",
@@ -1442,10 +1444,11 @@
     },
     {
       "country": "Tajikistan",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the National Bank of Tajikistan Financial Monitoring Department keeps a public list of over 2,400 names of suspected terrorists as defined by the authorities, which the US State Department Country Reports on Terrorism 2023 (state.gov) says also includes opposition journalists and activists. Not staged: screening this list is an MLRO policy decision"
     },
     {
       "country": "Tanzania",
@@ -1476,7 +1479,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): CENTIF-TG (centif.tg) is the FIU; a consultative commission on asset freezing was established by Decree 2018-123, and Togo's report to the UN General Assembly Sixth Committee (un.org) describes the freezing procedure under the uniform AML/CFT law (arts. 100–107); no published national list found yet"
     },
     {
       "country": "Tonga",
