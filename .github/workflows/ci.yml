@@ -97,6 +97,8 @@ jobs:
         run: node test/rescreen-trigger.test.mjs
       - name: Run state-branch encryption guard
         run: node test/state-crypto.test.mjs
+      - name: Block runtime state branches and live state from PR history
+        run: node test/state-branch-isolation.test.mjs
       - name: Run sanctions-screen unit tests
         run: node test/sanctions-screen.test.mjs
       - name: Run employee-screening-wiring regression test
