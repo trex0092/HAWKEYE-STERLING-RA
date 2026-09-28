@@ -71,6 +71,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -84,6 +85,7 @@ jobs:
           # divergence is treated as drift rather than excused as lag — safe,
           # but noisier than it needs to be.
           GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: node scripts/site-currency.mjs
 
       - name: Alert in Asana on production drift
