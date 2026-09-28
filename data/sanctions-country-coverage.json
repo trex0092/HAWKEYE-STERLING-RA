@@ -194,7 +194,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Counter-Terrorism Act subsidiary legislation (botswanalaws.com) defines designated persons with reference to UNSC resolutions; the Financial Intelligence Agency operates under the Financial Intelligence Act 2022; no published national list found yet"
     },
     {
       "country": "Brazil",
@@ -1004,10 +1005,11 @@
     },
     {
       "country": "Mozambique",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the \"Lista Nacional\" of persons, groups and entities designated by the Attorney General as terrorists, foreign terrorist fighters or financiers, defined in the GIFiM guidelines on specific financial sanctions (22 August 2025, published by Banco de Moçambique, bancomoc.mz); GIFiM (gifim.gov.mz) also relays the UN consolidated list. Publication of the national list itself not yet verified"
     },
     {
       "country": "Myanmar",
@@ -1236,10 +1238,11 @@
     },
     {
       "country": "Rwanda",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Domestic List of designated persons (terrorists and terrorism financiers, 25 individuals, approved 14 October 2025) published by the Ministry of Justice as a PDF (minijust.gov.rw/fileadmin/user_upload/Minijust/Publications/Domestic_list_of_designated_persons/Domestic_list__14.10.2025.pdf), announced by the Financial Intelligence Centre public notice (fic.gov.rw) under the 2021 TFS Regulations. Not staged: entries are linked to groups including the exiled opposition Rwanda National Congress (per press reports), so screening this list is an MLRO policy decision; PDF parse not yet verified"
     },
     {
       "country": "Saint Kitts and Nevis",
@@ -1645,7 +1648,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): SI 56 of 2019 under the Suppression of Foreign and International Terrorism Act implements UNSCR 1267 and 1373 (per the FIU \"AML/CFT Framework\" page, fiu.co.zw); no published national designation list found yet"
     }
   ]
 }
