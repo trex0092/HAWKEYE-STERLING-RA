@@ -14,7 +14,7 @@ name: Advisor Eval
 
 on:
   schedule:
-    - cron: '9 8 * * *'   # 08:09 UTC daily so upstream Advisor availability stays current
+    - cron: '9 8 * * 1'   # 08:09 UTC every Monday, after the daily watchers (odd minute)
   workflow_dispatch:
   # A model change must not wait up to a week for its live confirmation. The
   # 2026-07-29 Claude 5 swap merged on a Wednesday, which left the guardrails
