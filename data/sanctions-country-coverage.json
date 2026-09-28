@@ -620,11 +620,12 @@
     },
     {
       "country": "Hungary",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: Act LII of 2017 (net.jogtar.hu, §§ 16/A–16/B) establishes \"Magyarország terrorizmus elleni nemzeti listája\" (Hungary's national list against terrorism) for groups and organisations not on the EU or UN lists, adopted by Government decree on the proposal of the minister responsible for counter-terrorism or justice, with asset freezing; the decree text, current entries and any machine-readable publication are not yet verified. EU and UN lists covered by the baseline"
     },
     {
       "country": "Iceland",
@@ -1071,10 +1072,11 @@
     },
     {
       "country": "North Macedonia",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Financial Intelligence Office page \"Листи на санкции\" (ufr.gov.mk/?page_id=257) publishes a consolidated list of natural and legal persons subject to restrictive measures \"согласно резолуциите на Советот за безбедност\" (under UN Security Council resolutions), applied under the Law on Restrictive Measures; no separate national designation list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Norway",
