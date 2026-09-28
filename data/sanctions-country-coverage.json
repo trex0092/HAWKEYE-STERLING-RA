@@ -625,10 +625,11 @@
     },
     {
       "country": "Iceland",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Government page \"Þvingunaraðgerðir\" (stjornarradid.is) states Iceland applies sanctions decided in cooperation with international organisations, groups of states or partner states under Act No 68/2023, and links the UN Security Council consolidated list and the EU financial-sanctions list as the party lists; no separate national list. Not an EU member (no EU baseline row); covered by the UN list, and in substance by the EU list (both screened daily)"
     },
     {
       "country": "India",
@@ -963,10 +964,11 @@
     },
     {
       "country": "Montenegro",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Police Directorate FIU page \"Liste označenih lica\" (gov.me/foj) links the UN Security Council, EU and OFAC lists, and the Central Bank page \"Liste sankcija i visokorizičnih zemalja\" (cbcg.me) points to the Government page on UN restrictive measures; no separate national list was found. Covered by the UN list (screened daily); EU and OFAC lists also screened"
     },
     {
       "country": "Morocco",
@@ -1071,7 +1073,8 @@
     },
     {
       "country": "Norway",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
+      "note": "researched 2026-09-28: the Ministry of Foreign Affairs page \"Sanksjoner\" (regjeringen.no) states Norway is bound under international law to implement UN Security Council sanctions and also implements a range of EU restrictive measures, each by regulation (forskrift) on Lovdata, and that Norway \"i all hovedsak har tilsvarende sanksjonsregler\" to the EU; no separate consolidated national list was found. Not an EU member, so no EU baseline row, but the listed persons are in substance those on the UN and EU lists (both screened daily)",
       "baseline": [
         "UN"
       ]
