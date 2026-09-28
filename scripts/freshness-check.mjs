@@ -201,33 +201,18 @@ export function buildReport(stale, today, total, unknown = []) {
 }
 
 /* ── Network (runner only; not imported by tests) ── */
-async function lastSuccessDay(repo, token, workflowId) {
-  const url = `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs`
-    + `?status=success&per_page=1`;
-  const res = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'hawkeye-freshness-check',
-    },
-  });
-  if (!res.ok) throw new Error(`GitHub API ${res.status} for ${workflowId}`);
-  const data = await res.json();
-  const run = (data.workflow_runs || [])[0];
-  return run ? utcDay(run.run_started_at || run.created_at) : null;
+export function latestSuccessDay(runs) {
+  const successes = (runs || [])
+    .filter(r => r && r.status === 'completed' && r.conclusion === 'success')
+    .map(r => utcDay(r.run_started_at || r.created_at))
+    .filter(Boolean)
+    .sort()
+    .reverse();
+  return successes[0] || null;
 }
 
-/* Fetch this workflow's recent runs and hand them to summariseTodayRuns.
-   Both signals come from ONE call. The previous version asked only "is the
-   single most recent run active?" (per_page=1), which is why a control could
-   fail repeatedly all day and still read as merely mid-run — the failures sat
-   just below the window this query looked at. Widening the page costs nothing
-   and is strictly more evidence; a control firing at most a handful of times a
-   day (the busiest here is onboarding-screen at 6-hourly) fits well inside 20. */
-async function todayRuns(repo, token, workflowId, today) {
-  const url = `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs`
-    + `?per_page=20`;
+async function recentRuns(repo, token, workflowId) {
+  const url = `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs?per_page=50`;
   const res = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -238,7 +223,7 @@ async function todayRuns(repo, token, workflowId, today) {
   });
   if (!res.ok) throw new Error(`GitHub API ${res.status} for ${workflowId}`);
   const data = await res.json();
-  return summariseTodayRuns(data.workflow_runs, today);
+  return data.workflow_runs || [];
 }
 
 async function main() {
@@ -254,19 +239,13 @@ async function main() {
   // each) instead of up to 18 sequential round-trips.
   const statuses = await Promise.all(CONTROLS.map(async c => {
     let day = null, pending = false, failed = false, queryError = null;
-    try { day = await lastSuccessDay(repo, token, c.id); }
-    catch (e) {
-      // A failed query means UNKNOWN, never "never ran": leaving day null
-      // here used to make the control indistinguishable from one that truly
-      // has no success on record. unknownControls() reports it separately.
+    try {
+      const runs = await recentRuns(repo, token, c.id);
+      day = latestSuccessDay(runs);
+      ({ pending, failed } = summariseTodayRuns(runs, today));
+    } catch (e) {
       queryError = e.message;
       console.error(`  warn: could not query ${c.id}: ${e.message}`);
-    }
-    if (!queryError && isStale(day, today, c.maxAgeDays)) {
-      // Only need the extra call when there's no success in-window — what has
-      // the control done today: still running, or already failed?
-      try { ({ pending, failed } = await todayRuns(repo, token, c.id, today)); }
-      catch (e) { console.error(`  warn: could not query today's runs for ${c.id}: ${e.message}`); }
     }
     return { ...c, lastSuccessDay: day, pendingToday: pending, failedToday: failed, queryError };
   }));
