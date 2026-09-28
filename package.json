@@ -24,9 +24,7 @@
     "coverage:countries": "node scripts/validate-country-coverage.mjs",
     "coverage:report": "node scripts/country-coverage-report.mjs",
     "coverage:report:write": "node scripts/country-coverage-report.mjs --write",
-    "coverage:report:check": "node scripts/country-coverage-report.mjs --check",
-    "coverage:screening": "node scripts/validate-screening-country-coverage.mjs",
-    "coverage:worldwide": "node scripts/validate-worldwide-screening.mjs"
+    "coverage:report:check": "node scripts/country-coverage-report.mjs --check"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
