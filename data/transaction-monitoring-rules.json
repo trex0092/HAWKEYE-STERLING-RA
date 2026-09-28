@@ -1,0 +1,257 @@
+{
+  "_README": "Machine-readable transaction-monitoring rule registry. Rules are alerts for review, not automatic STR/SAR filing decisions. detection=automated means the rule can be evaluated from explicit structured transaction fields. detection=review means human or external evidence is required. The source_red_flags values preserve links to the Fine Gold red-flag libraries.",
+  "version": 1,
+  "decision_authority": "Compliance Officer / MLRO",
+  "rules": [
+    {
+      "id": "TXN-THRESHOLD-001",
+      "engine_rule": "THRESHOLD",
+      "typology": "threshold_reporting",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RF-TXN-20"
+      ],
+      "description": "Cash transaction at or above the configured DPMS cash reporting threshold.",
+      "required_fields": [
+        "amount",
+        "method"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-STRUCT-001",
+      "engine_rule": "STRUCTURING",
+      "typology": "structuring",
+      "severity": "CRITICAL",
+      "detection": "automated",
+      "source_red_flags": [
+        "RF-TXN-20",
+        "RFC-063",
+        "RFC-064",
+        "RFC-065",
+        "RFC-066",
+        "RFC-067",
+        "RFC-070",
+        "RFC-071"
+      ],
+      "description": "Repeated or fragmented transactions just below the reporting threshold within the configured monitoring window.",
+      "required_fields": [
+        "customer",
+        "date",
+        "amount",
+        "method"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-VELOCITY-001",
+      "engine_rule": "VELOCITY",
+      "typology": "profile_deviation",
+      "severity": "MEDIUM",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-051",
+        "RFC-052",
+        "RFC-053"
+      ],
+      "description": "Transaction-day volume materially exceeds the customer's observed baseline.",
+      "required_fields": [
+        "customer",
+        "date",
+        "amount"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-GEO-001",
+      "engine_rule": "HIGH_RISK_GEO",
+      "typology": "geographic_risk",
+      "severity": "risk_based",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-231",
+        "RFC-232",
+        "RFC-238"
+      ],
+      "description": "Counterparty jurisdiction is in the maintained higher-risk jurisdiction table.",
+      "required_fields": [
+        "counterparty_country"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-PASS-001",
+      "engine_rule": "PASSTHROUGH",
+      "typology": "layering",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RF-TXN-21",
+        "RF-TXN-22"
+      ],
+      "description": "Similar value received and transferred onward within a short period.",
+      "required_fields": [
+        "customer",
+        "date",
+        "amount",
+        "direction"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-ROUND-001",
+      "engine_rule": "ROUND_AMOUNT",
+      "typology": "cash_pattern",
+      "severity": "MEDIUM",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-073",
+        "RFC-076",
+        "RFC-077",
+        "RFC-078"
+      ],
+      "description": "Repeated exact-round cash transactions inconsistent with metal-rate-priced activity.",
+      "required_fields": [
+        "amount",
+        "method"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-3P-001",
+      "engine_rule": "THIRD_PARTY_PAYMENT",
+      "typology": "third_party_payment",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RF-TXN-14",
+        "RFC-083",
+        "RFC-084",
+        "RFC-085",
+        "RFC-086",
+        "RFC-087",
+        "RFC-088",
+        "RFC-089"
+      ],
+      "description": "Payment originates from or is directed to a party explicitly recorded as unrelated to the transaction.",
+      "required_fields": [
+        "third_party_payment",
+        "third_party_relationship"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-REFUND-001",
+      "engine_rule": "REFUND_DIVERSION",
+      "typology": "refund_diversion",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-105",
+        "RFC-106",
+        "RFC-107",
+        "RFC-108",
+        "RFC-109"
+      ],
+      "description": "Refund is directed to an account different from the original funding account without an explicitly documented legitimate reason.",
+      "required_fields": [
+        "transaction_type",
+        "funding_account",
+        "refund_account",
+        "refund_reason_documented"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-PRICE-001",
+      "engine_rule": "PRICING_DEVIATION",
+      "typology": "trade_value_manipulation",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RF-TXN-24",
+        "RF-TXN-25",
+        "RF-TXN-26",
+        "RFC-114",
+        "RFC-115",
+        "RFC-118",
+        "RFC-119",
+        "RFC-123"
+      ],
+      "description": "Recorded transaction unit price differs from the supplied reference market price by more than the configured tolerance.",
+      "required_fields": [
+        "unit_price",
+        "market_unit_price"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-PHANTOM-001",
+      "engine_rule": "PHANTOM_DELIVERY",
+      "typology": "phantom_trade",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RF-TXN-28",
+        "RFC-151",
+        "RFC-152",
+        "RFC-153"
+      ],
+      "description": "A completed or paid goods transaction is explicitly recorded without evidence of physical delivery.",
+      "required_fields": [
+        "goods_transaction",
+        "payment_completed",
+        "delivery_confirmed"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-INVOICE-001",
+      "engine_rule": "INVOICE_MISMATCH",
+      "typology": "trade_document_mismatch",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RF-TXN-27",
+        "RF-TXN-29",
+        "RFC-126",
+        "RFC-127",
+        "RFC-128",
+        "RFC-129",
+        "RFC-138",
+        "RFC-139",
+        "RFC-140",
+        "RFC-148",
+        "RFC-149",
+        "RFC-150"
+      ],
+      "description": "Structured invoice, shipment, weight, purity, quantity, or value reconciliation is explicitly marked as materially mismatched.",
+      "required_fields": [
+        "invoice_mismatch"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-ROUTE-001",
+      "engine_rule": "ROUTE_MISMATCH",
+      "typology": "route_obfuscation",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RF-PF-57",
+        "RF-PF-58",
+        "RFC-173",
+        "RFC-176",
+        "RFC-177",
+        "RFC-178",
+        "RFC-187"
+      ],
+      "description": "Payment or shipping route is explicitly recorded as inconsistent with the underlying trade route or business nexus.",
+      "required_fields": [
+        "route_mismatch"
+      ],
+      "automatic_filing": false
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hawkeye Sterling transaction feed record",
+  "type": "object",
+  "required": [
+    "customer",
+    "date",
+    "amount",
+    "direction",
+    "method"
+  ],
+  "properties": {
+    "transaction_id": {
+      "type": "string"
+    },
+    "customer": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}"
+    },
+    "amount": {
+      "type": "number",
+      "minimum": 0
+    },
+    "currency": {
+      "type": "string",
+      "default": "AED"
+    },
+    "direction": {
+      "enum": [
+        "in",
+        "out"
+      ]
+    },
+    "method": {
+      "type": "string"
+    },
+    "counterparty": {
+      "type": "string"
+    },
+    "counterparty_country": {
+      "type": "string"
+    },
+    "transaction_type": {
+      "type": "string"
+    },
+    "third_party_payment": {
+      "type": "boolean"
+    },
+    "third_party_relationship": {
+      "type": "string",
+      "description": "Use unrelated only where the lack of contractual/commercial relationship is established."
+    },
+    "funding_account": {
+      "type": "string"
+    },
+    "refund_account": {
+      "type": "string"
+    },
+    "refund_reason_documented": {
+      "type": "boolean"
+    },
+    "unit_price": {
+      "type": "number",
+      "minimum": 0
+    },
+    "market_unit_price": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "goods_transaction": {
+      "type": "boolean"
+    },
+    "payment_completed": {
+      "type": "boolean"
+    },
+    "delivery_confirmed": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "invoice_mismatch": {
+      "type": "boolean",
+      "description": "True only after structured reconciliation identifies a material mismatch."
+    },
+    "route_mismatch": {
+      "type": "boolean",
+      "description": "True only when the actual payment or shipment route is inconsistent with the documented underlying trade."
+    }
+  },
+  "additionalProperties": true
+}
