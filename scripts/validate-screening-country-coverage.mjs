@@ -21,7 +21,7 @@ const localeEnd = adverseSource.indexOf("];", localeStart);
 const localeBlock = localeStart >= 0 && localeEnd > localeStart
   ? adverseSource.slice(localeStart, localeEnd + 2)
   : "";
-const glCodes = [...localeBlock.matchAll(/\\bgl:\\s*'([A-Z]{2})'/g)].map((m) => m[1]);
+const glCodes = [...localeBlock.matchAll(/\bgl:\s*'([A-Z]{2})'/g)].map((m) => m[1]);
 const aliases = { KR: "Republic of Korea", RU: "Russia", VN: "Vietnam", US: "United States", GB: "United Kingdom", TR: "Turkey" };
 const displayNames = new Intl.DisplayNames(["en"], { type: "region" });
 const registerCountries = new Set(sanctionsRegister.countries.map((r) => r.country));
