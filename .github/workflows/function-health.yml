@@ -22,6 +22,9 @@ name: Function Health
 #   asserting ok:true. Do not reduce that back to a status-code check.
 
 on:
+  workflow_run:
+    workflows: ["Netlify Production Deploy (build hook)"]
+    types: [completed]
   schedule:
     - cron: '23 5 * * *'   # 05:23 UTC daily (just after site-health at 05:19; odd minute)
   workflow_dispatch:
@@ -38,6 +41,7 @@ concurrency:
 
 jobs:
   probe:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10 # a hung curl must not pin a runner
     steps:
