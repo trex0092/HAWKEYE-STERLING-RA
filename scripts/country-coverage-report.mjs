@@ -37,7 +37,8 @@ export function buildCountryCoverageReport(register = readRegister()) {
   const editions = editionCountries(register);
   const fatf = sortRows(register.countries.filter((row) => row.fatf === "black" || row.fatf === "grey"));
   const nonFatfNotResearched = register.countries.filter((row) => row.status === "not-researched" && !row.fatf).sort((a,b) => a.country.localeCompare(b.country, "en"));
-  const nonFatfKnown = sortRows(register.countries.filter((row) => !row.fatf && (row.status === "identified" || row.status === "pending")));\n  const mlroGated = sortRows(register.countries.filter((row) => row.requiresMlroPolicyDecision === true));
+  const nonFatfKnown = sortRows(register.countries.filter((row) => !row.fatf && (row.status === "identified" || row.status === "pending")));
+  const mlroGated = sortRows(register.countries.filter((row) => row.requiresMlroPolicyDecision === true));
   const noEdition = register.countries.filter((row) => !editions.has(row.country)).map((row) => row.country).sort((a,b) => a.localeCompare(b, "en"));
   const statusCounts = Object.create(null);
   for (const row of register.countries) statusCounts[row.status] = (statusCounts[row.status] || 0) + 1;
