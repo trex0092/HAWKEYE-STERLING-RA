@@ -182,7 +182,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): restrictive measures, including freezing, are implemented under the Law on Implementation of Restrictive Measures by Council of Ministers decisions, per BiH's OSCE submission FSC.EMI/80/13; no current published national list found yet"
     },
     {
       "country": "Botswana",
@@ -385,7 +386,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): CENAREF (cenaref.org) reports the CONASAFIC national committee for targeted financial sanctions was set up on 17 April 2025 to apply UN TFS (UNSCR 1267, 1373, 1718) under Law 25/048 and Decree 24/24; no published national designation list found yet"
     },
     {
       "country": "Denmark",
@@ -604,7 +606,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): press reports (May 2025) describe the Justice Minister ordering freezes of assets of persons sanctioned by the UN (UNSCR 2653) under a national decree of 30 April 2023; UCREF (ucref.gouv.ht) is the FIU; no published national list found yet"
     },
     {
       "country": "Holy See",
@@ -1131,11 +1134,12 @@
     },
     {
       "country": "Papua New Guinea",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "researched 2026-09-28: per the PNG Sanctions Secretariat site (pngsanctionssecretariat.gov.pg, \"About Us\" / \"Consolidated List\"; read via the search index — the host is not reachable from this sandbox), prohibitions under the Sanctions Act are currently placed only on UN Security Council-designated persons and entities because there has been no domestic designation, and its Consolidated List consists of four UNSC committee lists. Covered by the UN list (screened daily)"
     },
     {
       "country": "Paraguay",
@@ -1425,7 +1429,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): press reports (e.g. The Syrian Observer) describe a \"local list\" of about 615 persons and 105 entities published by the Anti-Money Laundering and Terrorism Financing Commission under UNSCR 1373 and 1267; the official publication has not been verified"
     },
     {
       "country": "Tajikistan",
