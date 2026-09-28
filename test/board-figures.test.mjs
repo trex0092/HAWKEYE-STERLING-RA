@@ -75,6 +75,16 @@ console.log('\n— sanctions country coverage register (195) —\n');
     [...marked].every(c => live.has(c)));
   check('every issuing country of a loaded list is marked screened',
     [...live].every(c => marked.has(c)));
+  /* baseline = the multilateral lists already screened daily for every row:
+     UN for all 193 UN members (not the Holy See / Palestine), EU for the 27
+     EU members — and both lists must really be enabled in the registry. */
+  const core = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-sources.json'), 'utf8')).sources || [];
+  const on = id => core.some(s => s.id === id && s.enabled !== false);
+  const unRows = reg.filter(r => (r.baseline || []).includes('UN'));
+  check('baseline UN covers exactly the 193 UN members and the UN list is enabled',
+    unRows.length === 193 && !unRows.some(r => r.country === 'Holy See' || r.country === 'Palestine') && on('un-consolidated'));
+  check('baseline EU covers exactly the 27 EU members and the EU list is enabled',
+    reg.filter(r => (r.baseline || []).includes('EU')).length === 27 && on('eu-fsf'));
   check('non-screened statuses other than not-researched carry a note',
     reg.filter(r => r.status !== 'screened' && r.status !== 'not-researched').every(r => r.note));
 }

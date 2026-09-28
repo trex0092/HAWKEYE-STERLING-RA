@@ -826,9 +826,9 @@
       "url": "https://www.vm.ee/en/list-subjects-sanction-government-republic-ensure-following-human-rights",
       "type": "html",
       "parser": "numberedlist",
-      "enabled": false,
+      "enabled": true,
       "minNames": 150,
-      "_note": "160 numbered designations on 2026-09-28, 193 names with aliases as parsed locally from the fetched page; regulation of the Government of 18 May 2023 No 48; measure: prohibition on entry. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); the list is published only as a web page of numbered lines, read by parseNumberedNameList. Page fetched 2026-09-28 via an external fetcher (HTTP 200). ADDED DISABLED pending a source-probe run on a GitHub runner: enable only if the probe's 'Parsed by the registry parser' section shows the names with the minNames floor met."
+      "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36391873968 (GitHub runner) fetched HTTP 200 text/html and parseNumberedNameList read 193 names (minNames 150, met) — 160 numbered designations plus their (also …) aliases. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); regulation of the Government of 18 May 2023 No 48; measure: prohibition on entry (entry-ban designations, not an asset freeze — label accordingly)."
     },
     {
       "id": "ee-vm-russia-ukraine",

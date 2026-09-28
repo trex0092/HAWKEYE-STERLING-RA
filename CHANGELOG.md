@@ -10,6 +10,14 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Estonia: `ee-vm-human-rights` enabled.** Runner probe 36391873968 read
+  193 names (floor 150).
+- **Register `baseline` per country.** Every row now records the daily lists
+  that already cover it: `UN` for the 193 UN members and `EU` for the 27 EU
+  members. A test pins both counts, and that both lists are enabled. The
+  README gains a "Sanctions coverage by country" section explaining UN, EU,
+  and OFAC/UK coverage.
+
 - **Sanctions: Estonia's three national lists staged (disabled)**
   (`data/sanctions-extra.json`). They are `ee-vm-belarus` (273 designations),
   `ee-vm-human-rights` (160) and `ee-vm-russia-ukraine` (3). The MFA publishes

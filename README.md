@@ -223,6 +223,14 @@ by **09:00 UAE**:
 - **QA / governance gate** - before publish, a deterministic gate verifies degrade-loudly, that every finding carries its source, that no prompt-injection item was model-classified, and that every flagged subject has a risk rating; failures surface as **⚠ ATTENTION** in the report, never silently passed.
 - **Observability** - the report's **§⑥ Agentic Operating Model** prints the full agent audit trail + QA gate + credential-scoping summary for every run.
 
+### Sanctions coverage by country
+
+[`data/sanctions-country-coverage.json`](data/sanctions-country-coverage.json) records all 195 countries. Each row has its national-list `status` and a `baseline` of lists that already cover it every day:
+
+- **UN Security Council Consolidated List**: screened daily and binding on every UN member state (193 rows carry `UN`).
+- **EU consolidated financial-sanctions list**: screened daily and directly applicable in the 27 EU member states (27 rows carry `EU`). An EU member without its own national list is therefore still covered for EU-level sanctions; only a separate national list, where one exists, is additional.
+- **US OFAC and the UK Sanctions List**: also screened daily. Their designations reach many targets worldwide, including in Latin America and the Caribbean, but they are those issuers' lists, not a country's own, so they are not recorded as `baseline`.
+
 ## MCP server (AI-agent access to the engine)
 
 A **Model Context Protocol (MCP)** server exposes the deterministic screening
