@@ -1593,6 +1593,7 @@ async function screenLocally(subjects, cfg) {
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
   let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
+  const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0 };
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
      bound the whole enrichment phase by a wall-clock budget: once it elapses the
@@ -1660,6 +1661,9 @@ async function screenLocally(subjects, cfg) {
 
     if (cfg.adverseMedia && enrich) {
       const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
+      if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
+      if (!am.backbones?.bing) amBackboneFailures.bing++;
       if (am.partial) amPartial++;   // narrowed coverage — disclosed, never silent
       if (am.errored) { amErrors++; enrichmentIncomplete = true; }
       else {
@@ -1756,7 +1760,7 @@ async function screenLocally(subjects, cfg) {
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -2018,8 +2022,13 @@ async function main() {
          independent global backbones ran alongside every subject's sweep */
       amRotationCycleDays: cfg.adverseMedia ? rotationCycleDays() : 0,
       amMatrixTotal: LOCALES.length,
+      amBackboneFailures: screen.amBackboneFailures || { googleNews: 0, gdelt: 0, bing: 0 },
       amBackbones: cfg.adverseMedia
-        ? ['GDELT global index', ...(process.env.BING_NEWS !== '0' ? ['Bing News'] : [])]
+        ? [
+            ...(screen.amBackboneFailures?.googleNews === 0 ? ['Google News RSS'] : []),
+            ...(screen.amBackboneFailures?.gdelt === 0 ? ['GDELT global index'] : []),
+            ...(screen.amBackboneFailures?.bing === 0 ? ['Bing News'] : []),
+          ]
         : [] },
     /* Log-only challenger evidence (SCREEN_SHADOW_THRESHOLD) — kept OUT of
        alerts/matchCount/state; feeds the champion-challenger decision log. */
