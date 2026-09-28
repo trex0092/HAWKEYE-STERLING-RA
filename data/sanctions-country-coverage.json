@@ -129,10 +129,11 @@
     },
     {
       "country": "Belarus",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the KGB \"Перечень организаций и физических лиц, причастных к террористической деятельности\", linked from the State Control Committee \"Полезные ссылки\" page (kgk.gov.by) and published by the KGB as an .xlsx file (e.g. \"Перечень.xlsx\", 326.5 KB, on the KGB's official channel); the MVD separately publishes a list of persons involved in extremist activity (mvd.gov.by). Not staged: whether to screen these lists, and an official web URL for the file, are unverified; screening them is an MLRO policy decision"
     },
     {
       "country": "Belgium",
@@ -822,10 +823,11 @@
     },
     {
       "country": "Liechtenstein",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the FIU page \"Internationale und EU-Sanktionen\" (llv.li) states UN and EU sanctions are implemented under the International Sanctions Act (ISG) case by case by government ordinance, published on gesetze.li, and points to the UN consolidated list; no autonomous national list was found. Not an EU member (no EU baseline row); covered by the UN list, and in substance by the EU list (both screened daily)"
     },
     {
       "country": "Lithuania",
@@ -888,11 +890,12 @@
     },
     {
       "country": "Malta",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Sanctions Monitoring Board page \"About\" (smb.gov.mt) states \"All sanctions issued by the European Union and the United Nations Security Council are directly applicable under the National Interest (Enabling Powers) Act, Cap 365\"; no separate national list was found. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Marshall Islands",
@@ -1201,10 +1204,11 @@
     },
     {
       "country": "Russia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — Rosfinmonitoring's \"Перечень организаций и физических лиц, в отношении которых имеются сведения об их причастности к экстремистской деятельности или терроризму\" under Federal Law 115-FZ art. 6 and Government Resolution No 804 of 06.08.2015, published in full as numbered HTML entries at fedsfm.ru/documents/terrorists-catalog-portal-act (national list; separate from the UN-derived lists at fedsfm.ru/documents/omu-or-terr-list). Not staged: whether to screen this list (it includes designations for \"extremist activity\" under Russian law, and runner reachability of fedsfm.ru is unverified) is an MLRO policy decision"
     },
     {
       "country": "Rwanda",
