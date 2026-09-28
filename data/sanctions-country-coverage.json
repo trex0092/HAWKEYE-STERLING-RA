@@ -489,11 +489,12 @@
     },
     {
       "country": "Finland",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — freezing decisions under the Act on the Freezing of Funds with a View to Combating Terrorism (325/2013), made by the NBI Financial Intelligence Unit and published in the Official Gazette (finanssivalvonta.fi). Per rahanpesu.fi (\"Talouspakotteet ja jäädytyspäätökset\"), the public list is supplied only on request in Word or Excel from the NBI registry (kirjaamo.keskusrikospoliisi@poliisi.fi); an online download is under consideration. Not machine-fetchable today; obtaining it is an MLRO request, not an engineering act"
     },
     {
       "country": "France",
@@ -548,11 +549,12 @@
     },
     {
       "country": "Greece",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Hellenic AML Authority Financial Sanctions Unit (Unit B, fsu.aml-authority.gov.gr) maintains a \"National list of persons related to terrorism and terrorism financing\" with asset freezing, on information from the Ministry of Citizen Protection and prosecuting/judicial authorities; no published copy or download link was found on 2026-09-28"
     },
     {
       "country": "Grenada",
@@ -666,11 +668,12 @@
     },
     {
       "country": "Ireland",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Government page \"Restrictive Measures (Sanctions)\" (ireland.ie) states \"Ireland does not impose any unilateral sanctions regimes, but implements UN and EU sanctions\"; the Central Bank of Ireland points to the EU and UN consolidated lists. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Israel",
@@ -833,11 +836,12 @@
     },
     {
       "country": "Luxembourg",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Ministry of Finance page \"Sanctions financières internationales\" (mfin.gouvernement.lu) states that under the law of 19 December 2020 designation is made automatically by reference to the lists annexed to EU or UN acts; its sub-pages on UN designations and pre-2020 designations returned HTTP 404 on 2026-09-28. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Madagascar",
@@ -1155,11 +1159,12 @@
     },
     {
       "country": "Portugal",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Banco de Portugal page \"Medidas Restritivas\" (bportugal.pt) defines restrictive measures as those approved by the United Nations or the European Union, applied under Lei n.º 97/2017 of 23 August; no separate national list was found. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Qatar",
@@ -1374,11 +1379,12 @@
     },
     {
       "country": "Sweden",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Government page \"International sanctions\" (government.se) states \"Sanctions that apply in Sweden have been adopted by the UN or the EU\"; Finansinspektionen says the same. No national list. Covered by the UN and EU lists (screened daily)"
     },
     {
       "country": "Switzerland",

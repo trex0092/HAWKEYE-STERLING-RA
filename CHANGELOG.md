@@ -16,10 +16,13 @@ bump merged to `main`.
 - **Estonia: `ee-vm-russia-ukraine` enabled.** Runner probe 36392452572
   (on main) read 5 names (floor 3). Estonia now screens all three official
   MFA lists.
-- **Register research: El Salvador, Nicaragua, Spain, Germany, Italy**
-  recorded as `assessed-not-loadable`. Each row cites the official source that
+- **Register research: El Salvador, Nicaragua, Spain, Germany, Italy,
+  Portugal, Ireland, Luxembourg, Sweden, Finland** recorded as
+  `assessed-not-loadable`. Finland has a national freezing list, but it is
+  supplied only on request from the National Bureau of Investigation. Greece
+  is `identified`: its national list exists but no published copy was found. Each row cites the official source that
   shows UN/EU lists relayed, or national measures issued only as individual
-  decrees, with no consolidated national list. Researched rows: 66 → 71.
+  decrees, with no consolidated national list. Researched rows: 66 → 77.
 - **FATF black and grey lists with their assessments.** The new file
   `data/fatf-assessments.json` covers all 25 jurisdictions from the FATF
   19 June 2026 statements (3 black, 22 grey). Each entry gives the FSRB, the
