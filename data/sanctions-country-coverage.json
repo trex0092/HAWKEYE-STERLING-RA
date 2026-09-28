@@ -117,10 +117,11 @@
     },
     {
       "country": "Bangladesh",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Bangladesh Financial Intelligence Unit FAQ (bfiu.org.bd/index.php/others/faq) states the Government, under the Anti-Terrorism Act 2009 (ss. 20 and 20A), may by order proscribe persons or entities or enlist them in the sanction list, and that 8 organisations are currently listed as terrorist entities and banned by official gazette. Publication format (gazette notifications) not machine-readable as found"
     },
     {
       "country": "Barbados",
@@ -489,10 +490,11 @@
     },
     {
       "country": "Ethiopia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: national designations exist — the Council of Ministers resolution of 1 May 2021 designated the TPLF and \"Shene\" (OLA) as terrorist organisations under Proclamation No. 1176/2020 (Embassy of Ethiopia, ethiopianembassy.org; also reported in the US State Department Country Reports on Terrorism 2021). No consolidated published list found and the current status of these designations is not verified. Not staged: designations of political/armed movements are an MLRO policy decision"
     },
     {
       "country": "Fiji",
@@ -1017,10 +1019,11 @@
     },
     {
       "country": "Namibia",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Financial Intelligence Centre \"Targeted Financial Sanctions\" page (fic.na) directs screening against the UN Security Council sanctions lists under the Prevention and Combating of Terrorist and Proliferation Activities Act, and FIC circulars (e.g. Circular 07 of 2026) relay UNSC list changes; no separate national list was found. Covered by the UN list (screened daily)"
     },
     {
       "country": "Nauru",
@@ -1631,10 +1634,11 @@
     },
     {
       "country": "Zambia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: national listings exist in law — per the Financial Intelligence Centre (fic.gov.zm, \"UNSCR Sanctions List\" FAQ and TFS guidance), the Anti-Terrorism and Non-Proliferation Act No. 6 of 2018 prohibits dealings with persons on the UNSC lists or \"local listings as established by the National Anti-Terrorism Centre\" (NATC, natc.gov.zm, which manages listing and de-listing); the NATC local list publication is not yet verified"
     },
     {
       "country": "Zimbabwe",
