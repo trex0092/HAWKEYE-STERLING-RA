@@ -10,6 +10,18 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **README: screening-coverage badges and status badges for more live
+  controls.** A new coverage row shows the sanctions lists screened (59), the
+  national sanctions jurisdictions (36), the adverse-media Google News
+  editions (73), their countries (67) and the risk-term languages (61), plus
+  the three news backbones and the PEP source. The numbers come from
+  `data/coverage-figures.json`, which `scripts/coverage-figures.mjs` generates
+  from the engine's own configuration (the `LOCALES` and `LANG_TERMS` tables
+  and the two sanctions source files). A new `--check` drift step in `ci.yml`
+  and `npm test` stops them going stale. Status badges were added for the PEP
+  harvest, PEP chain watchdog, EOCN reconcile, site currency, delivery
+  watchdog, control retry, production deploy, bandit, Fortify, dependency
+  review, Lighthouse and Scorecard workflows.
 - **The daily Sanctions Screen digest could still be refused as too large**
   (`scripts/asana-notify.mjs`). On 2026-09-26 `screening-cases` failed with
   `.html_notes : Rich text value is too large`, so the MLRO got no results

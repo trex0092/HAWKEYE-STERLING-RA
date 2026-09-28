@@ -2,6 +2,18 @@
 
 **Project handbook:** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md) · [Changelog](CHANGELOG.md) · [Citation](CITATION.cff) · [Docs index](docs/README.md)
 
+<!-- Screening coverage (dynamic - generated from the engine's own configuration by scripts/coverage-figures.mjs, CI drift-checked) -->
+[![Sanctions Lists Screened](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsLists&label=sanctions%20lists%20screened&color=b31b1b)](data/coverage-figures.json)
+[![Sanctions Jurisdictions](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsJurisdictions&label=sanctions%20jurisdictions&color=b31b1b)](data/coverage-figures.json)
+[![Adverse Media Editions](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaEditions&label=adverse%20media%20editions&color=e67e22)](data/coverage-figures.json)
+[![Adverse Media Countries](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaCountries&label=adverse%20media%20countries&color=e67e22)](data/coverage-figures.json)
+[![Adverse Media Languages](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaLanguages&label=adverse%20media%20languages&color=e67e22)](data/coverage-figures.json)
+[![Adverse media backbones](https://img.shields.io/badge/adverse%20media%20backbones-Google%20News%20%C2%B7%20GDELT%20%C2%B7%20Bing-e67e22)](scripts/adverse-media.mjs)
+[![PEP source](https://img.shields.io/badge/PEP-worldwide%20%28Wikidata%29%20%2B%20RCA-8e44ad)](screen.py)
+[![PEP Harvest](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/pep-worldwide.yml?branch=main&label=pep%20harvest)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/pep-worldwide.yml)
+[![PEP Chain Watchdog](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/pep-chain-watchdog.yml?branch=main&label=pep%20chain%20watchdog)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/pep-chain-watchdog.yml)
+[![EOCN Reconcile](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/eocn-reconcile.yml?branch=main&label=eocn%20reconcile)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/eocn-reconcile.yml)
+
 [![CI](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/ci.yml/badge.svg)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/codeql.yml/badge.svg)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/codeql.yml)
 [![Daily Screening](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/weekly-adverse-media.yml?branch=main&label=daily%20screening)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/weekly-adverse-media.yml)
@@ -24,6 +36,11 @@
 [![Docker Smoke](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/docker-smoke.yml?branch=main&label=docker%20smoke)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/docker-smoke.yml)
 [![Container Scan](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/container-scan.yml?branch=main&label=container%20scan)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/container-scan.yml)
 [![Attestation Verify](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/attestation-verify.yml?branch=main&label=attestation%20verify)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/attestation-verify.yml)
+[![Bandit](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/bandit.yml?branch=main&label=bandit)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/bandit.yml)
+[![Fortify](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/fortify.yml?branch=main&label=fortify)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/fortify.yml)
+[![Dependency Review](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/dependency-review.yml?branch=main&label=dependency%20review)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/dependency-review.yml)
+[![Lighthouse](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/lighthouse.yml?branch=main&label=lighthouse)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/lighthouse.yml)
+[![Scorecard](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/scorecard.yml?branch=main&label=scorecard)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/scorecard.yml)
 
 <!-- Live compliance controls (scheduled watchers - a red badge IS the alarm) -->
 [![Regulatory Watch](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/regulatory-watch.yml?branch=main&label=regulatory%20watch)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/regulatory-watch.yml)
@@ -33,6 +50,10 @@
 [![Citations](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/link-check.yml?branch=main&label=citations)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/link-check.yml)
 [![Site Health](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/site-health.yml?branch=main&label=site%20health)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/site-health.yml)
 [![Function Health](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/function-health.yml?branch=main&label=function%20health)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/function-health.yml)
+[![Site Currency](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/site-currency.yml?branch=main&label=site%20currency)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/site-currency.yml)
+[![Delivery Watchdog](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/delivery-watchdog.yml?branch=main&label=delivery%20watchdog)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/delivery-watchdog.yml)
+[![Control Retry](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/control-retry.yml?branch=main&label=control%20retry)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/control-retry.yml)
+[![Production Deploy](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/netlify-production-deploy.yml?branch=main&label=production%20deploy)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/netlify-production-deploy.yml)
 
 <!-- Scheduled ops, reporting & AI assurance (live workflow status) -->
 [![Anomaly Watch](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/anomaly-watch.yml?branch=main&label=anomaly%20watch)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/anomaly-watch.yml)
