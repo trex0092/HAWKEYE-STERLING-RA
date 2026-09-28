@@ -31,7 +31,11 @@ bump merged to `main`.
   under which the Committee may designate persons under UNSCR 1373.
   Tanzania is `identified`: the Minister of Home Affairs publishes the Domestic
   List in the Gazette, per the FIU's TFS guidelines. Angola gets a partial
-  note (Law No. 1/12). Researched rows: 121 → 132.
+  note (Law No. 1/12). Turkmenistan is `assessed-not-loadable` because its FIU
+  site links only UN lists. The Laos note now cites the 4 September 2025
+  decree establishing a Domestic Designation List, which has no published
+  list yet. Djibouti gets a partial note (Law No. 104/AN/24, Art. 9).
+  Researched rows: 121 → 133.
 - **Belize: `bz-fiu-consolidated` staged (disabled).** This is the FIU's
   official Consolidated Belize Sanctions List: High Court orders covering
   domestic and UNSCR designations, published as XLSX. Its month-named file

@@ -419,7 +419,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): Law No. 104/AN/24/9ème L (Journal officiel, journalofficiel.dj, 7 March 2024), amending Law No. 110/AN/11/6ème L on terrorist financing, gives a Comité Technique power (Art. 9) to \"Désigner et radier des personnes et entités\" and to implement UN targeted financial sanctions. No published national list found; I cannot confirm any national designation"
     },
     {
       "country": "Dominica",
@@ -808,7 +809,7 @@
         "UN"
       ],
       "fatf": "grey",
-      "note": "partial research 2026-09-28 (status unchanged): the Bank of the Lao PDR published a Decree on withholding, seizing or freezing funds related to terrorists (bol.gov.la, 18-12-2025) establishing targeted financial sanctions procedures; whether a national list is published by AMLIO is not yet confirmed"
+      "note": "partial research 2026-09-28 (status unchanged): the Decree on Withholding, Seizing or Freezing Funds related to Terrorists and the Financing of Terrorism (4 September 2025; Bank of the Lao PDR PDF, bol.gov.la) establishes a \"Domestic Designation List\" (Art. 17): MOPS proposes, the NCC approves, and the list is to be published on a government website. The AMLIO site (amlio.gov.la) links only the UN list and a UN-list screening app. No published domestic list found; I cannot confirm any designation yet"
     },
     {
       "country": "Latvia",
@@ -1553,10 +1554,11 @@
     },
     {
       "country": "Turkmenistan",
-      "status": "not-researched",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Financial Monitoring Service homepage (turkmenfmd.gov.tm/en) links only UN Security Council material: the Consolidated List and the 1267/1989/2253, 1988, 1718 and 2231 committee lists (PDF). No Turkmen national list is published there, and I cannot confirm whether a non-public one exists. Covered by the UN list (screened daily)"
     },
     {
       "country": "Tuvalu",
