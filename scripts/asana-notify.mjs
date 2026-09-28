@@ -194,12 +194,27 @@ export async function notifyAsana(name, notes, opts = {}) {
   } catch (e) {
     console.warn('asana-notify: duplicate check failed (' + (e && e.message || e) + ') — posting anyway');
   }
-  /* Byte-capped, tag-aware — a character slice let a multilingual digest weigh
-     65,424 bytes against Asana's 65,400 limit and lose the whole card. */
+  /* Size-capped (worst-case rich text, see asanaHtmlSize), tag-aware — a
+     character slice let a multilingual digest weigh 65,424 bytes against
+     Asana's 65,400 limit and lose the whole card. */
   if (opts.html) data.html_notes = fitAsanaHtml(opts.html);
   else data.notes = fitAsanaText(notes);   // byte cut, and SAYS it was cut
   if (opts.assignee !== null) data.assignee = opts.assignee || 'me';
-  const d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
+  let d;
+  try {
+    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
+  } catch (e) {
+    /* Backstop (screen.py post_unified_task parity): should Asana's accounting
+       ever outgrow asanaHtmlSize, refit once on a smaller budget rather than
+       lose the whole card. The refit always carries the TRUNCATED notice. */
+    if (!opts.html || !/too large/i.test(String(e && e.message || e))) throw e;
+    const smaller = Math.floor(ASANA_HTML_MAX_BYTES * 0.6);
+    console.warn('asana-notify: Asana refused html_notes as too large — retrying once at a '
+      + smaller + '-byte rich-text budget (truncation disclosed in the card)');
+    data.html_notes = fitAsanaHtml(opts.html, smaller);
+    if (data.html_notes === opts.html) throw e;   // nothing left to cut
+    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
+  }
   const gid = d.data && d.data.gid;
   /* File the new task under its section, so it lands in the right column/list
      group instead of the project's default section. Non-fatal if it fails — the
@@ -223,7 +238,20 @@ export async function notifyAsana(name, notes, opts = {}) {
      html_notes: Value is too large, 65424 > 65400 bytes
 
    The MLRO got no digest at all on a run that found 88 new matches — the day
-   the card mattered most. Cap by byte length, and leave room for the notice.
+   the card mattered most.
+
+   Bytes were still not the measure. On 2026-09-26 a digest that PASSED the
+   byte cap was refused with a different error:
+
+     .html_notes : Rich text value is too large
+
+   That is the same limit `notes` hits (see asanaTextSize below): Asana also
+   limits the CONVERTED rich text, which can numeric-entity-encode every
+   non-ASCII code point (İ → &#304;, — → &#8212;, م → &#1605;). A byte cap
+   under-counts exactly the Turkish, Arabic and punctuation-heavy rows the
+   digest carries. So measure with asanaHtmlSize, which is never below the
+   UTF-8 length either, so both limits hold. Leave room for the notice, and
+   notifyAsana retries once on a smaller budget if Asana still refuses.
 
    Truncating is not just a substring: html_notes is parsed as STRICT XML, so a
    cut through the middle of a tag, or one that orphans an open <ul>, 400s
@@ -232,19 +260,34 @@ export async function notifyAsana(name, notes, opts = {}) {
 export const ASANA_HTML_MAX_BYTES = Number(process.env.ASANA_HTML_MAX_BYTES) || 65000;
 const VOID_TAGS = new Set(['br', 'hr', 'img']);
 
+/* Worst-case stored size of an html_notes body. The markup is already
+   escaped as sent, so &, < and > cost one apiece. Quotes may be re-escaped
+   in text nodes (&quot; / &#39;), so they are budgeted at 6. Attribute quotes
+   are over-counted, which is harmless. Every non-ASCII code point costs its
+   numeric-entity form, which is never smaller than its UTF-8 bytes. */
+export function asanaHtmlSize(s) {
+  let total = 0;
+  for (const ch of String(s == null ? '' : s)) {
+    if (ch === '"' || ch === "'") { total += 6; continue; }
+    const cp = ch.codePointAt(0);
+    total += cp < 0x80 ? 1 : 3 + String(cp).length;   // "&#" + digits + ";"
+  }
+  return total;
+}
+
 export function fitAsanaHtml(html, max = ASANA_HTML_MAX_BYTES) {
   const s = String(html == null ? '' : html);
-  if (Buffer.byteLength(s, 'utf8') <= max) return s;
+  if (asanaHtmlSize(s) <= max) return s;
   const notice = '<strong>⚠ TRUNCATED to fit Asana\'s size limit — findings below the cut are NOT in this card. '
     + 'Treat it as incomplete and read the full report on the screening run.</strong>';
-  const budget = max - Buffer.byteLength(notice, 'utf8') - 32;   // 32: room for closers
+  const budget = max - asanaHtmlSize(notice) - 32;   // 32: room for closers
 
   /* Walk whole characters so a multi-byte sequence is never split. */
-  let cut = 0, bytes = 0;
+  let cut = 0, size = 0;
   for (const ch of s) {
-    const b = Buffer.byteLength(ch, 'utf8');
-    if (bytes + b > budget) break;
-    bytes += b; cut += ch.length;
+    const b = asanaHtmlSize(ch);
+    if (size + b > budget) break;
+    size += b; cut += ch.length;
   }
   /* Where does the cut land? If it is inside TEXT (the last '<' is already
      closed) we can keep the text right up to the cut — backing up to the tag
@@ -298,9 +341,10 @@ export function fitAsanaHtml(html, max = ASANA_HTML_MAX_BYTES) {
    both engines cap the same field by the same rule — the JS side shipped the
    byte version earlier today and would have hit the identical wall.
 
-   fitAsanaHtml above keeps its UTF-8 byte cap, and that is not an
-   inconsistency: html_notes is counted as SENT, which is what the live
-   rejection reported ("Value is too large, 65424 > 65400 bytes").
+   fitAsanaHtml above uses the same entity accounting (asanaHtmlSize), minus
+   the &/</> escapes, because html_notes arrives already escaped. It moved
+   off its UTF-8 byte cap after the 2026-09-26 "Rich text value is too large"
+   refusal showed html_notes is limited after conversion too.
 
    Truncation is always marked so a cut record never reads as a complete one. */
 const ENTITY_COST = { '&': 5, '<': 4, '>': 4, '"': 6, "'": 6 };

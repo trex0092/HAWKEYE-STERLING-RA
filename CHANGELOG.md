@@ -10,6 +10,28 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **The daily Sanctions Screen digest could still be refused as too large**
+  (`scripts/asana-notify.mjs`). On 2026-09-26 `screening-cases` failed with
+  `.html_notes : Rich text value is too large`, so the MLRO got no results
+  digest for a run of 905 subjects and 76 new matches. `fitAsanaHtml` capped
+  `html_notes` by UTF-8 bytes, but Asana also limits the converted rich text,
+  which can entity-encode every non-ASCII character. The Turkish, Arabic and
+  em-dash-heavy rows the digest carries weigh far more that way than in bytes.
+  `html_notes` is now measured by the same worst-case accounting the `notes`
+  field and `screen.py` already use (`asanaHtmlSize`). `notifyAsana` also
+  retries once on a 60% budget if Asana still answers "too large". Any
+  truncation is disclosed in the card.
+- **The Node adverse-media screen's GDELT fallback and breaker were never wired
+  in** (`scripts/adverse-media.mjs`). The code comments said `checkAdverseMedia`
+  retries GDELT on the base term set when the widened typology query is rejected,
+  and stops asking a hard-down GDELT via the run-level breaker (`screen.py`
+  parity). Neither was true: it made one wide-query request per subject, so a
+  rejected wide query cost that subject the whole GDELT backbone, and nothing
+  outside the tests called `gdeltBreakerRecordFailure()`. Both are now in the
+  live path. A subject whose GDELT fetch is skipped or fails still counts GDELT
+  as a failed source (partial, or errored if no other backbone answered), never
+  as a clear. `test/adverse-media.test.mjs` drives `checkAdverseMedia` against a
+  stubbed `fetch` to prove it, and its `knownGap()` wrapper is removed.
 - **The UK Sanctions List and New Zealand's Russia register were not being
   screened** (`.github/workflows/sanctions-screen.yml`, #630). `uk-ofsi` was
   repointed to `sanctionslist.fcdo.gov.uk` on 2026-09-22, but the workflow's egress

@@ -4,7 +4,7 @@
 import {
   isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
-  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize
+  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize
 } from '../scripts/asana-notify.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -260,8 +260,8 @@ check('a sectionless mirror still joins the project',
   oneNode += '</code></body>';
   const fittedNode = fitAsanaHtml(oneNode);
   check('asana html: a cut inside a giant text node keeps the text, not just the tag',
-    bytes(fittedNode) <= ASANA_HTML_MAX_BYTES && wellFormed(fittedNode)
-      && fittedNode.includes('row 100 ') && bytes(fittedNode) > ASANA_HTML_MAX_BYTES * 0.9);
+    asanaHtmlSize(fittedNode) <= ASANA_HTML_MAX_BYTES && wellFormed(fittedNode)
+      && fittedNode.includes('row 100 ') && asanaHtmlSize(fittedNode) > ASANA_HTML_MAX_BYTES * 0.9);
   /* …and never mid-entity: "&amp" without its ';' fails XML as hard as a
      broken tag. Sized so the cut lands inside the escaped ampersand run. */
   const ents = '<body><code>' + '&amp;'.repeat(40000) + '</code></body>';
@@ -270,6 +270,70 @@ check('a sectionless mirror still joins the project',
     bytes(fittedEnt) <= ASANA_HTML_MAX_BYTES
       && !/&[a-z]*$/i.test(fittedEnt.replace(/<\/?[a-zA-Z][^>]*>|⚠[^<]*/g, ''))
       && (fittedEnt.match(/&/g) || []).length === (fittedEnt.match(/&amp;/g) || []).length);
+}
+
+/* 2026-09-26: a digest that PASSED the byte cap was refused anyway —
+   ".html_notes : Rich text value is too large". html_notes is limited after
+   Asana's rich-text conversion too, which can entity-encode every non-ASCII
+   code point, so the Turkish / Arabic / em-dash rows the digest carries weigh
+   far more than their UTF-8 bytes. The fit must use that worst-case measure. */
+{
+  const bytes = (x) => Buffer.byteLength(x, 'utf8');
+  check('asana html size: never below the UTF-8 length (so the byte limit still holds)',
+    ['a', 'İ', '—', 'م', '中', '🛡', '<li>x</li>'].every(c => asanaHtmlSize(c) >= bytes(c)));
+  check('asana html size: non-ASCII costs its numeric-entity form; markup stays one per character',
+    asanaHtmlSize('İ') === 6 && asanaHtmlSize('—') === 7 && asanaHtmlSize('<b>&amp;</b>') === 12);
+  const row = '<li><strong>FDN DEMİR ÇELİK TİCARETİ ANONİM ŞİRKETİ</strong> — Türkiye · '
+    + 'الرئيس محمد بن راشد · MEDIUM · score 44 · review</li>';
+  let digest = '<body><h1>Sanctions Screen — daily results</h1><ul>';
+  while (bytes(digest + row) < ASANA_HTML_MAX_BYTES - 200) digest += row;
+  digest += '</ul></body>';
+  check('asana html: the 2026-09-26 shape passes the old byte cap yet is far over the rich-text size',
+    bytes(digest) <= ASANA_HTML_MAX_BYTES && asanaHtmlSize(digest) > ASANA_HTML_MAX_BYTES * 1.5);
+  const fitted = fitAsanaHtml(digest);
+  check('asana html: that digest is now cut to fit, with the cut disclosed',
+    fitted !== digest && asanaHtmlSize(fitted) <= ASANA_HTML_MAX_BYTES && /TRUNCATED/.test(fitted)
+      && fitted.endsWith('</body>'));
+}
+
+/* Backstop: should Asana still refuse the body as too large, notifyAsana refits
+   ONCE on a smaller budget instead of losing the card (screen.py parity). Any
+   other rejection is not retried. */
+{
+  async function postWith(firstReply, html) {
+    const orig = globalThis.fetch, prevTok = process.env.ASANA_ACCESS_TOKEN, prevWarn = console.warn;
+    process.env.ASANA_ACCESS_TOKEN = 'test-token';
+    console.warn = () => {};
+    const posts = [];
+    globalThis.fetch = async (url, init) => {
+      if (String(url).endsWith('/tasks') && init && init.method === 'POST') {
+        posts.push(JSON.parse(init.body).data.html_notes);
+        if (posts.length === 1 && firstReply) return firstReply;
+        return { ok: true, status: 201, json: async () => ({ data: { gid: 'T1', permalink_url: 'https://p' } }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ data: [] }) };
+    };
+    let url = null, err = null;
+    try { url = await notifyAsana('Sanctions Screen — test', '', { html, assignee: null }); }
+    catch (e) { err = e; }
+    finally {
+      globalThis.fetch = orig; console.warn = prevWarn;
+      if (prevTok === undefined) delete process.env.ASANA_ACCESS_TOKEN; else process.env.ASANA_ACCESS_TOKEN = prevTok;
+    }
+    return { posts, url, err };
+  }
+  const refusal = (msg) => ({ ok: false, status: 400, headers: { get: () => null },
+    json: async () => ({ errors: [{ message: msg }] }) });
+  let body = '<body><ul>';
+  for (let i = 0; i < 2500; i++) body += '<li>row ' + i + ' — Türkiye</li>';
+  body += '</ul></body>';
+  const r1 = await postWith(refusal('.html_notes : Rich text value is too large'), body);
+  check('asana notify: a "too large" refusal is retried once on a smaller budget, and the card lands',
+    r1.posts.length === 2 && r1.url === 'https://p' && r1.err === null
+      && asanaHtmlSize(r1.posts[1]) < asanaHtmlSize(r1.posts[0]) && /TRUNCATED/.test(r1.posts[1]));
+  const r2 = await postWith(refusal('assignee: Not a recognized ID'), body);
+  check('asana notify: any other 400 is not retried and still fails loudly',
+    r2.posts.length === 1 && r2.err !== null && /Asana 400/.test(r2.err.message));
 }
 
 /* Same byte-vs-character bug, same blast radius, in the PLAIN-TEXT fields.

@@ -987,6 +987,22 @@ export async function mapPool(items, limit, fn) {
   return out;
 }
 
+/* One subject's GDELT fetch: the widened typology query first, then — only if
+   GDELT refuses it — the proven base set, so the expansion can never cost the
+   subject its worldwide backbone. Only a failure of BOTH counts toward the
+   run-level breaker (a rejected long query is not a down feed). */
+async function fetchGdelt(name, timeoutMs) {
+  const wide = gdeltTerms(name);
+  let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt, 'application/json', timeoutMs);
+  if (gd === null && wide.length > GDELT_RISK_TERMS.length) {
+    console.warn('adverse-media: GDELT rejected the widened query — retrying on the base term set');
+    gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt, 'application/json', timeoutMs);
+  }
+  if (gd === null) gdeltBreakerRecordFailure();
+  else gdeltBreakerRecordSuccess();
+  return gd;
+}
+
 /* Network: fetch + screen one subject's adverse media across the WORLDWIDE locale
    matrix (per-language Google News editions) plus GDELT's global index, merging
    and de-duplicating every item before scoring against ALL_TERMS (all languages).
@@ -1015,7 +1031,7 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   // languages) + Bing News (third rate-limit pool) alongside the pooled
   // per-locale Google News fetches. A Google News fetch is skipped once the
   // run-level breaker is open — skipped counts as failed (partial), never ok.
-  const gdeltP = fetchSource(gdeltUrl(name), parseGdelt, 'application/json', timeoutMs);
+  const gdeltP = gdeltBreakerState.open ? Promise.resolve(null) : fetchGdelt(name, timeoutMs);
   const bingP = bingOn ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs) : Promise.resolve(null);
   const localeResults = await mapPool(localeSet, conc, loc =>
     (_gnews.open
