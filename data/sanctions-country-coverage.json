@@ -292,10 +292,11 @@
     },
     {
       "country": "China",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Public Security has published batches of identified terrorist organisations and individuals (the first batch of \"Eastern Turkistan\" organisations and 11 individuals, per the Chinese Mission to the EU page \"Eastern Turkistan terrorism issue\", eu.china-mission.gov.cn; later batches cited in the literature). No consolidated machine-readable publication found. Not staged: screening these national designations is an MLRO policy decision"
     },
     {
       "country": "Colombia",
@@ -1201,10 +1202,11 @@
     },
     {
       "country": "Republic of Korea",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — per KoFIU \"CFT Regime\" (kofiu.go.kr/eng/policy/ptfps02_1.do), the Financial Services Commission designates and publicly announces \"Persons Subject to Restrictions on Financial Transactions\" under Article 4(1) of the Act on Prohibition of Financing for Offences of Public Intimidation (first designation of 974 individuals and organisations on 22 December 2008); the current list is published as the FSC \"Regulations on the Designation/Revocation of Persons Subject to Restrictions on Financial Transactions, Etc.\" on law.go.kr. Format (regulation annex) and machine readability not yet verified"
     },
     {
       "country": "Romania",
