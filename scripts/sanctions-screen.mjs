@@ -2001,7 +2001,9 @@ async function main() {
     screened: subjects.length, entities, individuals,
     newMatches: alerts.length, matchCount, clearedCount: cleared.length,
     degraded: screen.degraded,
-    lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({ name: L.name, count: (L.names || []).length })),
+    lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({
+      id: L.id || '', name: L.name, count: (L.names || []).length, partial: !!L.partial
+    })),
     failures: screen.notes || [],
     enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0, pepErrors: screen.pepErrors || 0,
       skipped: screen.enrichSkipped || 0,
