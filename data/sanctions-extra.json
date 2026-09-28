@@ -806,6 +806,39 @@
       "enabled": false,
       "minNames": 100,
       "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official MSWiA page https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami (seen via a web search index 2026-09-28; page version 168.0, 26.05.2026) links one spreadsheet under 'Materiały': 'Lista sankcyjna - tabela 26.05.2026r' (tabela_lista_sankcyjna_26_05_2026.xlsx, 0.19MB) at this /attachment/<uuid> URL. The attachment id changes with each edition, so `discover` resolves it from the page each run; because the stem is the generic '/attachment/', discovery is only safe while the page links ONE attachment — the probe report must show that before enabling. Column layout, redirects (final host must be on the egress allowlist) and the name count are unverified: enable only if the probe's 'Parsed by the registry parser' section shows names and the minNames floor met. minNames 100 is a provisional floor (the MSWiA list has carried several hundred entries since 2023, e.g. 365 Belarusian nationals added 29.05.2023 per the ministry's own communiqué)."
+    },
+    {
+      "id": "ee-vm-belarus",
+      "name": "Estonia — MFA: Sanctions of the Government of the Republic in view of the situation in Belarus (entry bans)",
+      "jurisdiction": "Estonia",
+      "url": "https://www.vm.ee/en/sanctions-government-republic-view-situation-belarus",
+      "type": "html",
+      "parser": "numberedlist",
+      "enabled": false,
+      "minNames": 250,
+      "_note": "273 numbered designations on 2026-09-28 (page 'Last updated: 26.08.2025'); regulation of the Government of 28 August 2020 No 65; measure: prohibition on entry. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); the list is published only as a web page of numbered lines, read by parseNumberedNameList. Page fetched 2026-09-28 via an external fetcher (HTTP 200). ADDED DISABLED pending a source-probe run on a GitHub runner: enable only if the probe's 'Parsed by the registry parser' section shows the names with the minNames floor met."
+    },
+    {
+      "id": "ee-vm-human-rights",
+      "name": "Estonia — MFA: Sanction of the Government of the Republic to ensure following of human rights (entry bans)",
+      "jurisdiction": "Estonia",
+      "url": "https://www.vm.ee/en/list-subjects-sanction-government-republic-ensure-following-human-rights",
+      "type": "html",
+      "parser": "numberedlist",
+      "enabled": false,
+      "minNames": 150,
+      "_note": "160 numbered designations on 2026-09-28, 193 names with aliases as parsed locally from the fetched page; regulation of the Government of 18 May 2023 No 48; measure: prohibition on entry. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); the list is published only as a web page of numbered lines, read by parseNumberedNameList. Page fetched 2026-09-28 via an external fetcher (HTTP 200). ADDED DISABLED pending a source-probe run on a GitHub runner: enable only if the probe's 'Parsed by the registry parser' section shows the names with the minNames floor met."
+    },
+    {
+      "id": "ee-vm-russia-ukraine",
+      "name": "Estonia — MFA: Sanction to protect Estonia's security and interests and against the actions of the Russian Federation in Ukraine (asset freeze + entry ban)",
+      "jurisdiction": "Estonia",
+      "url": "https://www.vm.ee/en/list-subjects-sanction-government-republic-protect-estonias-security-and-interests-and-against",
+      "type": "html",
+      "parser": "numberedlist",
+      "enabled": false,
+      "minNames": 3,
+      "_note": "3 numbered designations on 2026-09-28; regulation of the Government of 13 March 2025 No 18; measures: funds frozen, no funds made available, entry prohibited. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); the list is published only as a web page of numbered lines, read by parseNumberedNameList. Page fetched 2026-09-28 via an external fetcher (HTTP 200). ADDED DISABLED pending a source-probe run on a GitHub runner: enable only if the probe's 'Parsed by the registry parser' section shows the names with the minNames floor met."
     }
   ]
 }

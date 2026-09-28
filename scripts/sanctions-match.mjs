@@ -921,6 +921,44 @@ export function parseHtmlTable(body) {
   return [...new Set(out.filter(x => x.length > 1))];
 }
 
+/* Numbered name lists published as web pages (Estonia MFA, International
+   Sanctions Act lists, vm.ee, 2026-09-28). Each designation is one numbered
+   line — "9. BOGATIROV, Letscha (also BOGATYREV, Lecha; BOGATYRYOV, Lecha)",
+   "008. Lidia Mikhailovna YERMOSHINA (Лідзія Міхайлаўна ЯРМОШЫНА; …)",
+   "2. Mikhail Vladimirovich DEGTYARYOV (also Mikhail Vladimirovich DEGTYAREV)".
+   The name outside the parentheses screens; every alias inside them screens
+   too (split on ; , or /, leading "also"/"ka" dropped). "SURNAME, Given"
+   is turned into "Given SURNAME". Single-token fragments (a bare given name
+   such as the "(Grigory)" in "Hryhory (Grigory) Yuryevich AZARONAK") are not
+   screened alone — they would match half the world. Lines that do not start
+   with a number never screen. */
+export function parseNumberedNameList(body) {
+  /* Line breaks become a visible sentinel (U+241E) before tag stripping,
+     because htmlText collapses all whitespace, newlines included. */
+  const lines = htmlText(String(body || '').replace(/<br\s*\/?>|<\/p>|<\/li>|<\/div>|\n/gi, ' ␞ ')).split('␞');
+  const SURNAME_FIRST = /^([\p{Lu}'’\- ]{2,}),\s*(\S.*)$/u;
+  const flip = (n) => { const m = n.match(SURNAME_FIRST); return m ? m[2].trim() + ' ' + m[1].trim() : n; };
+  const out = [];
+  const add = (n) => {
+    const v = String(n || '').replace(/^\s*(also|ka)\s+/i, '').replace(/\s+/g, ' ').trim();
+    if (v.split(' ').length >= 2) out.push(flip(v));
+  };
+  for (const raw of lines) {
+    const m = raw.trim().match(/^\d{1,4}\.\s+(.+)$/);
+    if (!m) continue;
+    const entry = m[1];
+    add(entry.replace(/\([^()]*(?:\)|$)/g, ' '));
+    for (const [, inner] of entry.matchAll(/\(([^()]*)(?:\)|$)/g)) {
+      for (const part of inner.split(';')) {
+        const t = part.trim().replace(/^(also|ka)\s+/i, '');
+        if (SURNAME_FIRST.test(t)) add(t);
+        else for (const piece of t.split(/[,/]/)) add(piece);
+      }
+    }
+  }
+  return [...new Set(out)];
+}
+
 /* Dispatch a source body to the right parser. `source.parser` wins; otherwise
    infer from id/type. Unknown formats fall back to generic XML then CSV col 0. */
 export function parseList(source, body) {
@@ -940,6 +978,7 @@ export function parseList(source, body) {
   if (p === 'curated' || source.type === 'curated') return parseCuratedList(body);
   if (p === 'mxsat') return parseSatCsv(body);                   // Mexico SAT 69-B (latin-1 CSV, live statuses only)
   if (p === 'czmfa') return parseCzMfaCsv(body);                 // Czechia MFA national list (CSV, slash-separated transliterations, valid rows only)
+  if (p === 'numberedlist') return parseNumberedNameList(body);   // numbered name lists on web pages (Estonia MFA)
   if (p === 'htmltable') return parseHtmlTable(body);            // lists served as an HTML <table> (Moldova SIS, labelled vnd.ms-excel)
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
   if (p === 'ods' || source.type === 'ods') return parseOdsList(body);

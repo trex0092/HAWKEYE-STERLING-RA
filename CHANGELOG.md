@@ -10,6 +10,20 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Sanctions: Estonia's three national lists staged (disabled)**
+  (`data/sanctions-extra.json`). They are `ee-vm-belarus` (273 designations),
+  `ee-vm-human-rights` (160) and `ee-vm-russia-ukraine` (3). The MFA publishes
+  them only as web pages of numbered lines, so they are read by a new
+  `parseNumberedNameList`, which:
+  - turns "SURNAME, Given" into given-name-first order;
+  - screens every alias in parentheses, including Latin, Cyrillic and
+    slash-separated variants;
+  - never screens a lone given name on its own.
+
+  All three stay disabled until a source-probe run on a runner shows the
+  parse. `www.vm.ee:443` is added to the egress allowlist, and the register
+  moves Estonia from `identified` to `pending`.
+
 - **Sanctions: Lithuania, Czechia and Moldova national lists now screened**
   (`data/sanctions-extra.json`). Each was enabled only after a source-probe
   run on a GitHub runner fetched the official file:
