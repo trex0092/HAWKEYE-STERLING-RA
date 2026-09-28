@@ -5,26 +5,15 @@ import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, sco
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
   bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
-  gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker } from '../scripts/adverse-media.mjs';
+  gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker,
+  checkAdverseMedia } from '../scripts/adverse-media.mjs';
 import { readFileSync } from 'node:fs';
 
-let passed = 0, failed = 0, gaps = 0;
+let passed = 0, failed = 0;
 function check(name, cond) {
   if (cond) { passed++; console.log('  ok  ' + name); }
   else { failed++; console.log('FAIL  ' + name); }
 }
-/* For an assertion covering behavior that is implemented and unit-tested
-   elsewhere in this file but not yet wired into the live call path. Reported
-   distinctly (never silently passed, never counted as a build-blocking FAIL)
-   so one tracked, already-diagnosed gap can't block every other assertion in
-   this file - or the unrelated CI steps that run after it - the way it did
-   until 2026-09-22. Remove this wrapper (revert to a normal check()) once the
-   integration ships and the assertion holds on its own merits. */
-function knownGap(name, cond, issueUrl) {
-  if (cond) { passed++; console.log('  ok  ' + name + '  (was tracked at ' + issueUrl + ' - integration now shipped, please remove the knownGap() wrapper)'); }
-  else { gaps++; console.log('GAP   ' + name + '  (tracked: ' + issueUrl + ')'); }
-}
-
 check('adverseMediaUrl targets Google News RSS with quoted name + risk terms',
   adverseMediaUrl('Acme Co').startsWith('https://news.google.com/rss/search?q=') &&
   decodeURIComponent(adverseMediaUrl('Acme Co')).includes('"Acme Co"') &&
@@ -390,9 +379,8 @@ check('parity terms widen SCORING only — the Google News query URL stays short
   check('gdelt: a pathological subject name caps the query instead of overrunning it',
     gdeltQueryString(long, wideLong).length <= GDELT_QUERY_MAX
     && GDELT_RISK_TERMS.every(t => wideLong.includes(t)));
-  knownGap('gdelt: the fetch falls back to the base set if the wide query is rejected',
-    /GDELT rejected the/.test(readFileSync(new URL('../scripts/adverse-media.mjs', import.meta.url), 'utf8')),
-    'https://github.com/trex0092/HAWKEYE-STERLING-RA/issues/575');
+  check('gdelt: the fetch falls back to the base set if the wide query is rejected',
+    /GDELT rejected the/.test(readFileSync(new URL('../scripts/adverse-media.mjs', import.meta.url), 'utf8')));
   /* 'politic' is the one typology deliberately NOT retrieved: the query is
      name-scoped and GDELT caps a subject at 250 records, so for any public
      figure — and the PEP layer is 422,223 office-holders — it returns ordinary
@@ -440,6 +428,59 @@ check('gdelt breaker: once OPEN, a later success does not silently re-close it '
   gdeltBreakerState.open === true && openedAt > GDELT_BREAKER_AFTER);
 resetGdeltBreaker();
 
-console.log('\n' + passed + ' passed, ' + failed + ' failed' + (gaps ? ', ' + gaps + ' known gap(s) (see linked issues)' : '') + '\n');
+/* ── checkAdverseMedia's live GDELT path, against a stubbed fetch (no network).
+   Locales [] and BING_NEWS=0 isolate GDELT as the only backbone, so the
+   result shape shows exactly what the GDELT call path did. ── */
+{
+  const realFetch = globalThis.fetch;
+  const realBing = process.env.BING_NEWS;
+  const realWarn = console.warn;
+  process.env.BING_NEWS = '0';
+  console.warn = () => {};
+  const subject = 'Acme Trading LLC';
+  const baseUrl = gdeltUrl(subject, GDELT_RISK_TERMS);
+  const wideUrl = gdeltUrl(subject);
+  const hitBody = JSON.stringify({ articles: [
+    { title: 'Acme Trading LLC director charged with money laundering', url: 'http://x/g1', domain: 'example.org', seendate: '20260901T000000Z' }] });
+  // fetchSource reads only ok / status / text() — a plain stand-in, no Response global needed.
+  const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, text: async () => body });
+  let calls = [];
+  const stub = (route) => { calls = []; globalThis.fetch = async (url) => { calls.push(String(url)); return route(String(url)); }; };
+  const opts = { timeoutMs: 2000, locales: [] };
+  try {
+    resetGdeltBreaker();
+    stub(url => url === wideUrl ? reply(400, 'query too long') : reply(200, hitBody));
+    const r = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: a rejected wide query is retried on the base set, and the base-set hit is found',
+      calls.length === 2 && calls[0] === wideUrl && calls[1] === baseUrl && r.hit === true && !r.errored && !r.partial);
+    check('gdelt live path: a rejected wide query rescued by the base set does not count toward the breaker',
+      gdeltBreakerState.consecutiveFailures === 0 && gdeltBreakerState.open === false);
+
+    stub(() => reply(200, hitBody));
+    const r2 = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: an accepted wide query costs one request (no retry)',
+      calls.length === 1 && calls[0] === wideUrl && r2.hit === true);
+
+    resetGdeltBreaker();
+    stub(() => reply(429, 'rate limited'));
+    let allErrored = true;
+    for (let i = 0; i < GDELT_BREAKER_AFTER; i++) allErrored = (await checkAdverseMedia(subject, opts)).errored === true && allErrored;
+    check('gdelt live path: wide AND base failing counts as one failure per subject; the breaker opens at the threshold',
+      gdeltBreakerState.open === true && calls.length === 2 * GDELT_BREAKER_AFTER);
+    check('gdelt live path: a subject GDELT could not answer is errored, never a silent clear',
+      allErrored);
+    stub(() => reply(200, hitBody));
+    const r3 = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: once the breaker is open GDELT is not asked again, and the subject degrades loudly',
+      calls.length === 0 && r3.errored === true);
+  } finally {
+    globalThis.fetch = realFetch;
+    console.warn = realWarn;
+    if (realBing === undefined) delete process.env.BING_NEWS; else process.env.BING_NEWS = realBing;
+    resetGdeltBreaker();
+  }
+}
+
+console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed ? 1 : 0);
 
