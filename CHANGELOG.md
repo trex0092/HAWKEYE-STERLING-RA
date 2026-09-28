@@ -10,6 +10,68 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **The UK Sanctions List and New Zealand's Russia register were not being
+  screened** (`.github/workflows/sanctions-screen.yml`, #630). `uk-ofsi` was
+  repointed to `sanctionslist.fcdo.gov.uk` on 2026-09-22, but the workflow's egress
+  policy is `block` and only the retired `ofsistorage` host was allowlisted. The
+  2026-09-27 scheduled run logged `uk-ofsi failed - fetch failed` and ended
+  `degraded=true`; `nz-mfat-russia` (`www.mfat.govt.nz`) failed the same way. Both
+  hosts are now allowlisted. Not yet confirmed on a real run: that needs the next
+  scheduled `sanctions-screen`.
+- **Three curated sources were loading no names at all** (`data/sanctions-extra.json`,
+  `data/mu-nssec-curated-list.json`, #629, #630). `ma-cnasnu` (live since
+  2026-09-26) and the new `bh-gazette` pointed at their in-repo file with `url`, but
+  `fetchListBody()` only treats a source as local when the field is `file`, so both
+  threw `Invalid URL` and surfaced only as a generic "coverage degraded" note.
+  `mu-nssec` used `surname`/`otherNames`/`aka`, which `parseCuratedList` does not
+  read, so it parsed 0 names. All three now load (28, 387 and 6 name strings).
+- **Seven OpenSanctions sources were returning HTTP 404** (`data/sanctions-extra.json`,
+  #627, #628): `az-fiu`, `au-dfat-opensanctions`, `ch-seco-opensanctions`,
+  `sa-pcct-opensanctions`, `qa-nctc-opensanctions`, `kg-fiu-public`, `idb-sanctions`.
+  OpenSanctions moved these from `artifacts/<name>/latest/` to
+  `datasets/latest/<name>/`; the old path answers `NoSuchKey`. The new URLs redirect
+  within `data.opensanctions.org` (already allowlisted) and returned current data.
+  #627 also gave the OpenSanctions copies of `sa-pcct` and `qa-nctc` their own ids:
+  the loader does not dedupe by id, so each list was being fetched twice.
+- **Added the Bahrain National Terrorism List**
+  (`data/bh-gazette-curated-list.json`, #629): 208 individuals, 172 entities and 7
+  vessels from Cabinet Resolution 01-2741 (Official Gazette Supplement 3739, 28 March
+  2024). An earlier session had left this unresolved because the Arabic extraction
+  was corrupted. `pdftotext -layout` extracted it far more cleanly, but not
+  perfectly: 369 of 387 entries needed only a stray U+FFFD removed, and 18 also had
+  an inserted mid-word space, resolved one by one from evidence inside the same
+  document, never guessed. Two alias variants of individual #106 could not be
+  resolved and were omitted; the middle name of #116 is not independently
+  confirmed. 12 entries carry a `verification_note`. The transcription was merged
+  without a second-person review.
+- **Tunisia's coverage floor was set from a wrong count**
+  (`data/sanctions-extra.json`, #630). `tn-cnlct` had `minNames: 200`, taken from a
+  `wc -l` figure (297) inflated by multi-line CSV cells. The dataset has 166 records
+  (159 Person, 7 Organization), so every run reported a false "truncated source" and
+  stayed degraded. The floor is now 150.
+- **New registry integrity test** (`test/sanctions-registry-integrity.test.mjs`,
+  #630). Offline, registered in `ci.yml`. Fails on: a curated source using `url`
+  instead of `file`; a curated file yielding fewer names than `minNames`; an enabled
+  source host missing from the `sanctions-screen.yml` egress allowlist; a retired
+  OpenSanctions `artifacts/` URL; two enabled sources sharing an id. Run against
+  main before the fixes it failed on exactly `uk-ofsi`, `nz-mfat-russia` and
+  `mu-nssec`.
+- **Adverse-media term lists for 15 languages were checked against each country's
+  own FIU or AML law rather than translated** (`scripts/adverse-media.mjs`, #611 to
+  #622, #624, #625): French, Hebrew, Portuguese, Spanish, German, Ukrainian,
+  Japanese, Indonesian, Malay, Thai, Urdu, Tagalog, Hindi, Latvian and Dutch, plus
+  New Zealand and Belgian locales (#611). Tagalog received a single term, because
+  Philippine AML discourse keeps money laundering, AMLC and covered transactions in
+  English. #626 restored the Portuguese terms that #614 silently deleted: it was
+  built from a copy of the file fetched before #613 merged.
+- **Freshness-check exemption for the Netlify fallback cron**
+  (`scripts/freshness-check.mjs`, #623). The daily schedule added in #609 was never
+  registered, so the freshness-check test failed; the workflow is now listed as
+  exempt (it has no ingestion or evaluation duty).
+- **`kg-fiu` note updated** (`data/sanctions-extra.json`, commit `ea4c4bb`, pushed
+  straight to `main` without a PR). Records that a 2026-09-27 probe got no HTTP
+  response at all, where the 2026-08-05 probe got an HTML page.
+
 ## [4.0.0] - 2026-09-25
 
 - **The daily screening was being killed at 64 minutes by our own egress
