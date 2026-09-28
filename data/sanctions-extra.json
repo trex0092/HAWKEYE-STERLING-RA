@@ -801,11 +801,12 @@
       "parser": "xlsx",
       "discover": {
         "page": "https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami",
-        "fileStem": "/attachment/"
+        "fileStem": "/attachment/",
+        "linkMatch": "Format: xlsx"
       },
       "enabled": false,
       "minNames": 100,
-      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official MSWiA page https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami (seen via a web search index 2026-09-28; page version 168.0, 26.05.2026) links one spreadsheet under 'Materiały': 'Lista sankcyjna - tabela 26.05.2026r' (tabela_lista_sankcyjna_26_05_2026.xlsx, 0.19MB) at this /attachment/<uuid> URL. The attachment id changes with each edition, so `discover` resolves it from the page each run; because the stem is the generic '/attachment/', discovery is only safe while the page links ONE attachment — the probe report must show that before enabling. Column layout, redirects (final host must be on the egress allowlist) and the name count are unverified: enable only if the probe's 'Parsed by the registry parser' section shows names and the minNames floor met. minNames 100 is a provisional floor (the MSWiA list has carried several hundred entries since 2023, e.g. 365 Belarusian nationals added 29.05.2023 per the ministry's own communiqué)."
+      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official MSWiA page https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami (seen via a web search index 2026-09-28; page version 168.0, 26.05.2026) links one spreadsheet under 'Materiały': 'Lista sankcyjna - tabela 26.05.2026r' (tabela_lista_sankcyjna_26_05_2026.xlsx, 0.19MB) at this /attachment/<uuid> URL. The attachment id changes with each edition, so `discover` resolves it from the page each run; the page links one decision PDF per designee under the same generic '/attachment/' stem, so discovery also requires linkMatch 'Format: xlsx' (the spreadsheet anchor's aria-label) on exactly one anchor. Source-probe run 36390719857 (2026-09-28, before linkMatch) showed the stem alone picking an 11-page PDF: 0 names, floor NOT met, source correctly stayed disabled. Column layout, redirects (final host must be on the egress allowlist) and the name count are unverified: enable only if the probe's 'Parsed by the registry parser' section shows names and the minNames floor met. minNames 100 is a provisional floor (the MSWiA list has carried several hundred entries since 2023, e.g. 365 Belarusian nationals added 29.05.2023 per the ministry's own communiqué)."
     },
     {
       "id": "ee-vm-belarus",

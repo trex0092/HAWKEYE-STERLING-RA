@@ -167,7 +167,7 @@ async function probeOne(s, timeoutMs = 90000) {
     if (s.discover && s.discover.page) {
       const { discoverDatedLink } = await import('./sanctions-screen.mjs');
       const pr = await fetch(String(s.discover.page), { signal: ctrl.signal, redirect: 'follow' });
-      const found = pr.ok ? discoverDatedLink(await pr.text(), String(s.discover.page), s.discover.fileStem) : null;
+      const found = pr.ok ? discoverDatedLink(await pr.text(), String(s.discover.page), s.discover.fileStem, s.discover.linkMatch) : null;
       if (!found) { r.outcome = 'discovery-failed (page http ' + pr.status + ')'; return r; }
       r.url = found; r.discovered = s.discover.page;
     }

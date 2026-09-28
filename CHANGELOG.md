@@ -23,6 +23,14 @@ bump merged to `main`.
   All three stay disabled until a source-probe run on a runner shows the
   parse. `www.vm.ee:443` is added to the egress allowlist, and the register
   moves Estonia from `identified` to `pending`.
+- **Discovery: optional `linkMatch` for pages with a generic link stem.**
+  gov.pl serves every file as `/attachment/<uuid>`. The MSWiA page links one
+  decision PDF per designee beside the single spreadsheet, and source-probe
+  run 36390719857 showed the stem alone picking an 11-page PDF. That run
+  found 0 names against a floor of 100, so the source correctly stayed
+  disabled. With `linkMatch`, exactly one anchor must contain the string
+  (Poland uses `Format: xlsx`); zero or several anchors return nothing, so
+  the list fails loudly.
 
 - **Sanctions: Lithuania, Czechia and Moldova national lists now screened**
   (`data/sanctions-extra.json`). Each was enabled only after a source-probe

@@ -1715,6 +1715,20 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   check('discoverDatedLink returns null when nothing matches (caller fails loudly)',
     scr.discoverDatedLink('<a href="/x.csv">x</a>', page, 'Vnitrostatni_sankcni_seznam_') === null);
   check('discoverDatedLink refuses an empty stem', scr.discoverDatedLink(html, page, '') === null);
+  /* gov.pl MSWiA page (markup copied 2026-09-28): one decision PDF per
+     designee under /attachment/<uuid>, and the single spreadsheet whose
+     anchor says "Format: xlsx". */
+  const pl = 'https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami';
+  const plHtml = '<td><a href="https://www.gov.pl/attachment/ff7b1a9a-17fe-42eb-859a-76d665ad4d90">OOO Koshelek.ru</a></td>'
+    + '<td><a href="https://www.gov.pl/attachment/09caa539-81a6-4d5e-b25b-3a28216c0ca8">MASHENSKY Alexandr</a></td>'
+    + '<h3>Materiały</h3><a class="file-download" href="https://www.gov.pl/attachment/efe8ad28-0dd8-454b-b0ab-ea58033aa902" download="" '
+    + 'aria-label=" Pobierz plik Lista sankcyjna - tabela 26.05.2026r Rozmiar: 0.19MB Format: xlsx"> Lista sankcyjna - tabela 26.05.2026r</a>';
+  check('discoverDatedLink with linkMatch picks the one labelled spreadsheet, not the lexically-last attachment',
+    scr.discoverDatedLink(plHtml, pl, '/attachment/', 'Format: xlsx') === 'https://www.gov.pl/attachment/efe8ad28-0dd8-454b-b0ab-ea58033aa902'
+    && scr.discoverDatedLink(plHtml, pl, '/attachment/') === 'https://www.gov.pl/attachment/ff7b1a9a-17fe-42eb-859a-76d665ad4d90');
+  check('discoverDatedLink with linkMatch fails loudly (null) when two anchors qualify or none do',
+    scr.discoverDatedLink(plHtml + plHtml.replace('efe8ad28', 'aaaa0000'), pl, '/attachment/', 'Format: xlsx') === null
+    && scr.discoverDatedLink(plHtml, pl, '/attachment/', 'Format: ods') === null);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
