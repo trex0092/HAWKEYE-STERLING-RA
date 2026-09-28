@@ -788,7 +788,7 @@
         "UN"
       ],
       "fatf": "grey",
-      "note": "partial research 2026-09-28 (status unchanged): the MOFA Committee for the Implementation of Security Council Resolutions (Cabinet Resolution No 1396 of 11 November 2013; mofa.gov.kw/en/CTC/) publishes UN Security Council resolution and sanctions-list updates; whether a separate national list is published is not yet confirmed; the registry's 2026-09-26 verdict (data/sanctions-extra.json) records that Kuwait designates jointly through the Terrorist Financing Targeting Center, whose joint designations flow through OFAC's SDN list (already screened)"
+      "note": "partial research 2026-09-28 (status unchanged): the MOFA Committee for the Implementation of Security Council Resolutions (Cabinet Resolution No 1396 of 11 November 2013; mofa.gov.kw/en/CTC/) publishes UN sanctions-list updates, and Ministerial Resolution No. 8 of 2025 (MOFA-hosted PDF) empowers the Committee to designate under UNSCR 1373 (Art. 12) with a freeze obligation (Art. 21). The CTC page does not publish a national list, and I cannot confirm whether any 1373 designations exist. The registry's 2026-09-26 verdict (data/sanctions-extra.json) records Kuwait's joint Terrorist Financing Targeting Center designations, which flow through OFAC's SDN list (already screened)"
     },
     {
       "country": "Kyrgyzstan",
@@ -822,12 +822,12 @@
     },
     {
       "country": "Lebanon",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
       ],
       "fatf": "grey",
-      "note": "partial research 2026-09-28 (status unchanged): the Special Investigation Commission (sic.gov.lb) is the FIU with freezing powers; no published national designation list found yet"
+      "note": "researched 2026-09-28: the Internal Security Forces page \"National Terrorism Financial List\" (isf.gov.lb/national-terrorism-financial-list/; Law No. 44 of 24/11/2015) publishes the national UNSCR 1373 list, updated 15/04/2025, as a legacy Excel file (isf.gov.lb/wp-content/uploads/2025/04/en_file.xls). Not staged: the registry has no reader for legacy .xls (BIFF) files (xlsx and ods only), and isf.gov.lb is not reachable from this sandbox, so the file layout is not yet verified"
     },
     {
       "country": "Lesotho",
@@ -1438,10 +1438,11 @@
     },
     {
       "country": "Suriname",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: the Raad Internationale Sancties (ris-suriname.com) links \"Nationale Sanctielijst\" to S.B. 2025 no. 53 (Staatsbesluit of 23 April 2025 implementing the Nationale Sanctielijst, UNSCR 1373). That is a procedural decree with no names; it places the list under the Minister and the Council. I found no published list of names and cannot confirm any national designation yet"
     },
     {
       "country": "Sweden",

@@ -23,7 +23,13 @@ bump merged to `main`.
   2023). Uzbekistan is `identified`: the Department on Combating Economic
   Crimes publishes 8 list forms as XLSX. It is not staged, because screening
   it is an MLRO policy decision. The Marshall Islands and Cambodia get partial
-  notes. Researched rows: 121 → 129.
+  notes. Lebanon is `identified`: the Internal Security Forces publish the
+  national UNSCR 1373 list, updated 15/04/2025, as a legacy `.xls` file,
+  which the registry cannot read yet. Suriname is `identified`: S.B. 2025
+  no. 53 establishes the Nationale Sanctielijst, but no names are published
+  yet. Kuwait's partial note now cites Ministerial Resolution No. 8 of 2025,
+  under which the Committee may designate persons under UNSCR 1373.
+  Researched rows: 121 → 131.
 - **Belize: `bz-fiu-consolidated` staged (disabled).** This is the FIU's
   official Consolidated Belize Sanctions List: High Court orders covering
   domestic and UNSCR designations, published as XLSX. Its month-named file
