@@ -37,11 +37,26 @@ export function screenedSources(root = ROOT) {
   return [...core, ...extra].filter(s => !s.mergeInto);
 }
 
+/* In the source files `jurisdiction: "Global"` describes a list's REACH (it
+   targets worldwide), not its ISSUER: Canada's SEMA, France's DGT and the US
+   OFAC lists are all marked Global. The issuing country is therefore read from
+   the list name's prefix ("Canada — …") for those entries. Supranational and
+   multilateral issuers are named here explicitly so they are never counted as
+   a country; any other prefix on a Global entry is its issuing country. */
+const ISSUER_ALIASES = { 'US OFAC': 'United States', 'UK Sanctions List': 'United Kingdom' };
+const SUPRANATIONAL = new Set(['UN Security Council', 'EU', 'IDB', 'ADB', 'Inter-American Development Bank']);
+
+export function issuingCountry(s) {
+  const j = String(s.jurisdiction || '').trim();
+  if (j && !/^global\b/i.test(j)) return j;
+  const prefix = String(s.name || '').split(/ — |: /)[0].trim();
+  if (!prefix || SUPRANATIONAL.has(prefix)) return null;
+  return ISSUER_ALIASES[prefix] || prefix;
+}
+
 export function buildFigures(root = ROOT) {
   const sources = screenedSources(root);
-  const jurisdictions = new Set(sources
-    .map(s => String(s.jurisdiction || '').trim())
-    .filter(j => j && !/^global\b/i.test(j)));
+  const jurisdictions = new Set(sources.map(issuingCountry).filter(Boolean));
   return {
     adverseMediaEditions: LOCALES.length,
     adverseMediaCountries: new Set(LOCALES.map(l => l.gl)).size,
@@ -60,7 +75,7 @@ export function buildFile(root = ROOT) {
       adverseMediaCountries: 'distinct countries (gl) across those editions',
       adverseMediaLanguages: 'languages with native risk terms in the scorer (scripts/adverse-media.mjs LANG_TERMS)',
       sanctionsLists: 'enabled sources in data/sanctions-sources.json + data/sanctions-extra.json (extra: with url or file), excluding alias-only sources (mergeInto)',
-      sanctionsJurisdictions: 'distinct national jurisdictions among those sources (entries marked Global — UN, EU, OFAC, OFSI, MDB lists — excluded)',
+      sanctionsJurisdictions: 'distinct issuing countries among those sources: the jurisdiction field, or for entries marked Global (a list\'s reach, not its issuer) the country named in the list title; UN, EU and development-bank lists are supranational and not counted',
     },
   };
 }

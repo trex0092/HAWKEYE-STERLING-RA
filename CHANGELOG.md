@@ -37,7 +37,7 @@ bump merged to `main`.
     US-Spanish feed.
 - **README: screening-coverage badges and status badges for more live
   controls.** A new coverage row shows the sanctions lists screened (59), the
-  national sanctions jurisdictions (36), the adverse-media Google News
+  countries issuing the screened sanctions lists (40; first published as 36, which wrongly left out Canada, France, Ukraine and the UK because their lists are tagged `Global` for their reach, and was corrected the same day), the adverse-media Google News
   editions (73), their countries (67) and the risk-term languages (61), plus
   the three news backbones and the PEP source. The numbers come from
   `data/coverage-figures.json`, which `scripts/coverage-figures.mjs` generates

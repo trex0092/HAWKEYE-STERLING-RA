@@ -5,13 +5,13 @@
     "adverseMediaCountries": 69,
     "adverseMediaLanguages": 61,
     "sanctionsLists": 59,
-    "sanctionsJurisdictions": 36
+    "sanctionsJurisdictions": 40
   },
   "definitions": {
     "adverseMediaEditions": "Google News country/language editions in the adverse-media locale matrix (scripts/adverse-media.mjs LOCALES); the daily run sweeps a budgeted rotation of them plus GDELT and Bing News",
     "adverseMediaCountries": "distinct countries (gl) across those editions",
     "adverseMediaLanguages": "languages with native risk terms in the scorer (scripts/adverse-media.mjs LANG_TERMS)",
     "sanctionsLists": "enabled sources in data/sanctions-sources.json + data/sanctions-extra.json (extra: with url or file), excluding alias-only sources (mergeInto)",
-    "sanctionsJurisdictions": "distinct national jurisdictions among those sources (entries marked Global — UN, EU, OFAC, OFSI, MDB lists — excluded)"
+    "sanctionsJurisdictions": "distinct issuing countries among those sources: the jurisdiction field, or for entries marked Global (a list's reach, not its issuer) the country named in the list title; UN, EU and development-bank lists are supranational and not counted"
   }
 }
