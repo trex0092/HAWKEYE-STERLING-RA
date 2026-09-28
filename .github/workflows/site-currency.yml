@@ -30,6 +30,12 @@ name: Site Currency (live deploy vs main)
 # site is not a current site. See scripts/site-currency.mjs.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/site-currency.yml'
+      - 'scripts/site-currency.mjs'
+      - 'netlify.toml'
   schedule:
     - cron: '7 8 * * *'   # 08:07 UTC daily — after the morning controls, before freshness (~11:07)
   workflow_dispatch:
