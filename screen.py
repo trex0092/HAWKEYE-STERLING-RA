@@ -347,7 +347,9 @@ GNEWS_LOCALES = [
     ("vi",    "VN", "VN:vi", "vi"),
     ("ms",    "MY", "MY:ms", "ms"),
     ("bn",    "BD", "BD:bn", "bn"),
-    ("en-IN", "LK", "LK:en", "en"),
+    # ("en-IN", "LK", "LK:en") removed 2026-09-28: Google silently serves the
+    # en-US edition for it (adverse-media.mjs audit 2026-09-27) — no Sri Lankan
+    # coverage, so the rotation ledger must not count it as a market.
     # More Europe
     ("pl",    "PL", "PL:pl", "pl"),
     ("sv",    "SE", "SE:sv", "sv"),
@@ -357,14 +359,15 @@ GNEWS_LOCALES = [
     # More Africa
     ("en-KE", "KE", "KE:en", "en"),
     ("en-GH", "GH", "GH:en", "en"),
-    ("en-TZ", "TZ", "TZ:en", "en"),
+    # ("en-TZ", "TZ", "TZ:en") removed 2026-09-28 — see the UG:en note below.
     # More Latin America
     ("es-419", "CO", "CO:es-419", "es"),
     ("es-419", "CL", "CL:es-419", "es"),
     ("es-419", "PE", "PE:es-419", "es"),
     # Nordics / Central & Eastern Europe / Balkans
     ("no",    "NO", "NO:no", "no"),
-    ("da",    "DK", "DK:da", "da"),
+    # ("da", "DK", "DK:da") removed 2026-09-28: Google silently serves NO:no
+    # (the Norwegian edition, already listed) — adverse-media.mjs audit.
     ("fi",    "FI", "FI:fi", "fi"),
     ("hu",    "HU", "HU:hu", "hu"),
     ("sk",    "SK", "SK:sk", "sk"),
@@ -375,7 +378,12 @@ GNEWS_LOCALES = [
     ("sw",    "KE", "KE:sw", "sw"),
     ("sw",    "TZ", "TZ:sw", "sw"),
     ("ta",    "IN", "IN:ta", "ta"),
-    ("en-NG", "UG", "UG:en", "en"),
+    # ("en-NG", "UG", "UG:en") removed 2026-09-28, with TZ:en above: both keep
+    # their ceid but serve one generic international-English feed (0-1/100
+    # local sources, 82-94/100 identical to each other; adverse-media.mjs
+    # audit). Every removed entry duplicated content another edition already
+    # sweeps, so recall is unchanged; the ledger simply stops claiming those
+    # markets. The Swahili KE:sw / TZ:sw editions are untouched.
     # High-risk-region editions (2026-08-05, edition-confirmed languages — mirrors adverse-media.mjs)
     ("az", "AZ", "AZ:az", "az"),
     ("kk", "KZ", "KZ:kk", "kk"),
