@@ -98,7 +98,7 @@ ASANA_ONGOING_MON_GID = "1216203370612914"   # RETIRED 2026-09-15: "Sanctions/Me
 # Monitoring" project (old value 1213914392047129) was merged into HAWKEYE
 # STERLING APP -- this must always be a live project (delivery is FATAL
 # otherwise), so it is repointed here rather than disabled.
-ASANA_SECTION_GID     = "1218452114962158"   # "Screening Daily Report" section (HAWKEYE STERLING APP); old section 1213914392047131 died with the project above
+ASANA_SECTION_GID     = "1216203370612916"   # "Assessment Report" section (HAWKEYE STERLING APP), verified live 2026-09-28
 # ── Second screening population + second delivery queue (MLRO, 2026-07-29) ──
 # Screening reads BOTH populations: the Customer Database (customers + their
 # UBOs/owners) and the HR – Employees project (staff screening — FATF R.18 /

@@ -81,6 +81,13 @@ jobs:
             api.gdeltproject.org:443
             www.wikidata.org:443
             query.wikidata.org:443
+            www.sec.gov:443
+            www.fca.org.uk:443
+            www.justice.gov:443
+            www.cftc.gov:443
+            www.occ.gov:443
+            www.dfsa.ae:443
+            www.europol.europa.eu:443
             api.fraudlabspro.com:443
             *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

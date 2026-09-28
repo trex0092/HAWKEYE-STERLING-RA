@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { staleControls, unknownControls, isStale, daysBetween, utcDay, buildReport, summariseTodayRuns, CONTROLS, EXEMPT } from '../scripts/freshness-check.mjs';
+import { staleControls, unknownControls, isStale, daysBetween, utcDay, buildReport, summariseTodayRuns, latestSuccessDay, CONTROLS, EXEMPT } from '../scripts/freshness-check.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {

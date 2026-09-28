@@ -32,7 +32,6 @@ regexes = [
   # number near the word "ASANA" (e.g. process.env.ASANA_*_GID || '<gid>' defaults).
   '''1216203370612914''',  # HAWKEYE STERLING APP project (RA delivery target)
   '''1216203370612916''',  # section: Assessment Report (pipeline report delivery target)
-  '''1218452114962158''',  # section: Screening Daily Report (screen.py ASANA_SECTION_GID, since #518)
   '''1216782693874840''',  # section: AI & Platform Governance (weekly-summary.yml + advisor-eval.yml since #528)
   '''1218451992088222''',  # section: Regulatory changes (regulatory-watch.yml, since #525 -- missed at the time)
   '''1218451989290544''',  # section: FATF list moves (fatf-watchdog.yml, since #525 -- missed at the time)
