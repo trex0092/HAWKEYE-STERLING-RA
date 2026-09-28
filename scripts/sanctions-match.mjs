@@ -723,8 +723,8 @@ export function parseOdsList(buf) {
    splits them), plus aliases. Best-effort: returns [] if nothing recognisable, so
    the caller flags coverage degraded rather than inferring a false clear. */
 const JSON_WHOLE = /^(name|fullname|full_name|wholename|whole_name|displayname|legalname|legal_name|entityname|entity_name|designation|caption|raisonsociale|raison_sociale|nomcomplet|denomination|supp_name|firm_name|nome|nomepessoa|nome_pessoa|nomecompleto|nome_completo|razaosocial|razao_social|razonsocial|razon_social|denominacion|denominacao|nombrecompleto|nombre_completo|fullnameen|fullnamear)$/i;
-const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename|nombre|nombres)$/i;
-const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom|apellido|apellidos)$/i;
+const JSON_FIRST = /^(firstname|first_name|prenom|prenoms|givenname|given_name|forename|nombre|nombres|vardas)$/i;   // vardas: Lithuanian (migracija.lt)
+const JSON_LAST = /^(lastname|last_name|surname|familyname|family_name|nom|apellido|apellidos|pavarde)$/i;   // pavarde: Lithuanian (migracija.lt)
 const JSON_ALIAS = /^(alias|aliases|aka|akas|othernames|other_names|alternativenames|alternative_names|alternatename|alternative_spelling|autresnoms)$/i;
 export function parseJsonList(body) {
   let data;

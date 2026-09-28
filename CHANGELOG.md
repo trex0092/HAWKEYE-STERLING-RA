@@ -10,6 +10,27 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Sanctions: a 195-country coverage register, and three official national
+  lists staged** (`data/sanctions-country-coverage.json`,
+  `data/sanctions-extra.json`).
+  - **The register** lists every country (193 UN members plus the Holy See and
+    Palestine) with its status: `screened` (40), `pending` (4), `identified`
+    (5), `assessed-not-loadable` (2) or `not-researched` (144). A test pins
+    `screened` to the live configuration in both directions, and no country is
+    marked as having no national list without evidence. A new README badge
+    shows countries researched (51 / 195). The UN Security Council list,
+    screened daily, binds every UN member state regardless.
+  - **Staged, disabled until a GitHub-runner source probe confirms each one:**
+    Lithuania's Migration Department list (official keyless JSON; 284 names
+    verified live), Czechia's MFA national list (official CSV, but its dated
+    filename needs link discovery) and Moldova's SIS terrorist list
+    (spreadsheet of unverified format).
+  - **Parser:** `parseJsonList` now reads the Lithuanian `vardas`/`pavarde`
+    name fields, with tests.
+  - **Network allowlist:** the three hosts are added to `sanctions-screen.yml`.
+  - **Iraq:** its official API was verified live, but names are Arabic-only,
+    so it is recorded as pending until the matcher can compare Arabic with
+    Latin script.
 - **The Python engine's rotation ledger counted four markets it never swept**
   (`screen.py` `GNEWS_LOCALES`). The live Google News audits of 2026-09-27/28
   found that `DK:da` silently serves the Norwegian edition and `LK:en` serves

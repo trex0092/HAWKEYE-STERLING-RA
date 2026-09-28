@@ -74,7 +74,7 @@ PR.
 | You changed | Run |
 |---|---|
 | `docs/governance/open-actions-register.md`, `data/obligations.json`, appetite/risk data | `node scripts/grc-metrics.mjs --write` |
-| `LOCALES`/`LANG_TERMS` in `scripts/adverse-media.mjs`, `data/sanctions-sources.json`, `data/sanctions-extra.json` | `node scripts/coverage-figures.mjs --write` |
+| `LOCALES`/`LANG_TERMS` in `scripts/adverse-media.mjs`, `data/sanctions-sources.json`, `data/sanctions-extra.json`, `data/sanctions-country-coverage.json` | `node scripts/coverage-figures.mjs --write` |
 | Added/removed any `docs/**/*.md` or workflow | `node scripts/board-figures.mjs --write` **and** update the newest "Verified at HEAD" line in `docs/governance/enterprise-readiness-review-2026.md` §18 |
 
 `npm test` runs both `--check` modes and names the regen command on drift.

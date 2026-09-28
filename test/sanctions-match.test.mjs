@@ -640,5 +640,23 @@ check('Qatar NCTC JSON keys (fullNameEn/fullNameAr) screen both scripts',
 check('normalizeName folds Ɔ to o (Ɔla == Ola)', normalizeName('Ɔla') === normalizeName('Ola'));
 check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') === normalizeName('Damir'));
 
+/* Lithuania's Migration Department list (migracija.lt, 2026-09-28) splits the
+   name into vardas (first) / pavarde (surname) inside a {list, numFound, page}
+   envelope. Shape copied from the live response: one person must yield exactly
+   one assembled Latin-script name, and the nested nationality object (titleEn,
+   titleLt, key, code) must not leak in as a name. */
+{
+  const lt = parseJsonList({ list: [
+    { vardas: 'MIKHAIL', pavarde: 'FRIDMAN', gimimoData: '1964-04-21', lytis: 'V',
+      pilietybes: [{ valstybe: { pilietybeClaEntry: { key: 'ISR', code: 'MIGRIS_KL05_PILIETYBES', titleLt: 'IZRAELIO', titleEn: 'ISRAEL' } } }],
+      uzdraustaIki: '2027-01-21', priezastis: 'UTPĮ 133 str. 4 d.' },
+    { vardas: 'KHABIB', pavarde: 'SHARIPOV', gimimoData: '1990-06-01' },
+  ], numFound: 2, page: { pageNo: 0, pageSize: 500 } });
+  check('parseJsonList assembles vardas+pavarde (Lithuania migracija.lt)',
+    lt.includes('MIKHAIL FRIDMAN') && lt.includes('KHABIB SHARIPOV'));
+  check('parseJsonList does not harvest nationality labels as names (migracija.lt)',
+    lt.length === 2 && !lt.some(n => /ISRAEL|IZRAELIO/.test(n)));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
