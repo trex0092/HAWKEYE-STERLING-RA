@@ -328,11 +328,12 @@
     },
     {
       "country": "Côte d'Ivoire",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "researched 2026-09-28: a national list exists — the CENTIF page \"Liste des Sanctions Financières Ciblées (SFC)\" (centif.ci/liste-des-sanctions/) publishes the list of persons designated under UNSCR 1373 (national designations), made by ministerial arrêté (e.g. the arrêté of 22 August 2024 entering 29 persons on the national list with asset freezing, energie.gouv.ci); file format not yet verified"
     },
     {
       "country": "Croatia",
@@ -762,7 +763,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): the MOFA Committee for the Implementation of Security Council Resolutions (Cabinet Resolution No 1396 of 11 November 2013; mofa.gov.kw/en/CTC/) publishes UN Security Council resolution and sanctions-list updates; whether a separate national list is published is not yet confirmed"
     },
     {
       "country": "Kyrgyzstan",
@@ -780,7 +782,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): the Bank of the Lao PDR published a Decree on withholding, seizing or freezing funds related to terrorists (bol.gov.la, 18-12-2025) establishing targeted financial sanctions procedures; whether a national list is published by AMLIO is not yet confirmed"
     },
     {
       "country": "Latvia",
@@ -799,7 +802,8 @@
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "partial research 2026-09-28 (status unchanged): the Special Investigation Commission (sic.gov.lb) is the FIU with freezing powers; no published national designation list found yet"
     },
     {
       "country": "Lesotho",
@@ -1017,11 +1021,12 @@
     },
     {
       "country": "Nepal",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "researched 2026-09-28: a national list exists — the Nepal Rastra Bank \"Guideline on Targeted Financial Sanctions for Financial Institutions\" (nrb.org.np) defines the \"Domestic Terrorist List\" as the national terrorist list published by the Ministry of Home Affairs under UNSCR 1373; the MoHA publication and its format are not yet verified"
     },
     {
       "country": "Netherlands",
@@ -1088,10 +1093,11 @@
     },
     {
       "country": "Oman",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — National Committee for Combating Terrorism (TFS Committee) Decision No 1 (published by the Central Bank of Oman, cbo.gov.om) defines the \"List\" as including \"the local list where persons are designated pursuant to a decision issued by the TFS Committee\" alongside the UN lists; the local list's publication format is not yet verified"
     },
     {
       "country": "Pakistan",
@@ -1591,11 +1597,12 @@
     },
     {
       "country": "Vietnam",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "researched 2026-09-28: a national list exists — the Ministry of Public Security portal page \"Tổ chức khủng bố\" (bocongan.gov.vn/to-chuc-khung-bo) publishes the list of organisations and individuals related to terrorism under Decree 93/2024/NĐ-CP (amending Decree 122/2013/NĐ-CP), as individual HTML articles, separate from its page relaying UN Security Council designations. Not staged: the national entries include overseas political organisations, so screening them is an MLRO policy decision"
     },
     {
       "country": "Yemen",
