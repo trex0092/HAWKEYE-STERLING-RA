@@ -136,8 +136,9 @@ jobs:
       # So: make one real end-to-end call. Speed mode (haiku, 1024 tokens) keeps
       # it to a trivial daily cost, and ok:true is the only signal that proves
       # the key is live, entitled to its model, and within quota.
-      - name: Prove the Advisor can actually ANSWER (end-to-end, not just configured)
+      - name: Probe Advisor upstream availability (separate control)
         id: brain_soul_e2e
+        continue-on-error: true
         # Run even if an earlier probe failed: without this the first
         # failure SKIPS every later step, so one dead function hides the
         # state of all the others and the alert reports them as
@@ -215,7 +216,16 @@ jobs:
           fi
           echo "ok: the Asana token is live (mirror read succeeded)"
 
-      - name: Alert in Asana on failure
+      - name: Alert in Asana when Advisor upstream is unavailable
+        if: steps.brain_soul_e2e.outcome == 'failure'
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BRAIN_DETAIL: ${{ steps.brain_soul_e2e.outputs.detail }}
+        run: |
+          node scripts/asana-alert.mjs             "ADVISOR DEPENDENCY DOWN: upstream model unavailable"             "The Netlify brain-soul function is deployed and configured, but the live Advisor could not obtain a model response. This is tracked separately from Function Health so an upstream provider quota/model failure does not falsely report the Netlify functions as down. Detail: ${BRAIN_DETAIL:-unavailable}. Run: $RUN_URL"
+
+      - name: Alert in Asana on function infrastructure failure
         if: failure()
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}

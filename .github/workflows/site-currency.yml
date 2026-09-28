@@ -81,6 +81,7 @@ jobs:
           # divergence is treated as drift rather than excused as lag — safe,
           # but noisier than it needs to be.
           GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_DEPLOY_SHA: ${{ github.sha }}
         run: node scripts/site-currency.mjs
 
       - name: Alert in Asana on production drift

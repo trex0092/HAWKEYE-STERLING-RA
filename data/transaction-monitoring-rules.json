@@ -1,5 +1,5 @@
 {
-  "_README": "Machine-readable transaction-monitoring rule registry. Rules are alerts for review, not automatic STR/SAR filing decisions. detection=automated means the rule can be evaluated from explicit structured transaction fields. detection=review means human or external evidence is required. The source_red_flags values preserve links to the Fine Gold red-flag libraries.",
+  "_README": "Machine-readable transaction-monitoring rule registry. Rules are alerts for review, not automatic STR/SAR filing decisions. detection=automated means the rule can be evaluated from explicit structured transaction fields. detection=review means human or external evidence is required. The source_red_flags values preserve links to the source red-flag libraries.",
   "version": 1,
   "decision_authority": "Compliance Officer / MLRO",
   "rules": [

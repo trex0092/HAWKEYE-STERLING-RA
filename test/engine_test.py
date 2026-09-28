@@ -912,7 +912,7 @@ check("R.16 velocity fires on a 10x spike vs the genuine baseline (spike day exc
       any(a["rule"] == "VELOCITY" for a in _vel["alerts"]))
 
 
-# Expanded transaction-monitoring red flags from the Fine Gold rule libraries.
+# Expanded transaction-monitoring red flags from the approved source libraries.
 _base_txn = {"customer": "T", "date": "2026-09-28", "amount": 25000,
              "direction": "in", "method": "wire"}
 _tp = txn_monitor.evaluate([{**_base_txn, "third_party_payment": True,

@@ -227,6 +227,32 @@ jobs:
   #     the cap this job goes red itself and says so, because a Netlify build
   #     spends the team's build minutes and a fourth identical failure needs
   #     eyes, not another build.
+  refresh-health:
+    needs: deploy
+    if: ${{ success() }}
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+
+      - name: Refresh production health badges
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run site-currency.yml --repo "$GITHUB_REPOSITORY" --ref main
+          gh workflow run function-health.yml --repo "$GITHUB_REPOSITORY" --ref main
+          echo "::notice::Dispatched Site Currency and Function Health after verified production publish."
+
   retry:
     needs: deploy
     if: ${{ failure() && github.event_name == 'push' }}

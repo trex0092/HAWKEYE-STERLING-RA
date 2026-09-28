@@ -27,9 +27,9 @@ import { LOCALES, LANG_TERMS } from './adverse-media.mjs';
 
 export const FIGURES_FILE = 'data/coverage-figures.json';
 export const BADGE_FILES = {
-  sanctions: 'data/badges/sanctions-worldwide.json',
-  adverseMedia: 'data/badges/adverse-media-worldwide.json',
-  pep: 'data/badges/pep-worldwide.json',
+  sanctions: 'data/badges/sanctions-worldwide.svg',
+  adverseMedia: 'data/badges/adverse-media-worldwide.svg',
+  pep: 'data/badges/pep-worldwide.svg',
 };
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -87,13 +87,30 @@ export function buildFigures(root = ROOT) {
   };
 }
 
+function xmlEscape(s) {
+  return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+}
+
 export function buildBadges(figures) {
-  const badge = (label, value) => ({
-    schemaVersion: 1,
-    label,
-    message: value + ' / 195',
-    color: value === 195 ? 'brightgreen' : 'red',
-  });
+  const badge = (label, value) => {
+    const message = value + ' / 195';
+    const color = value === 195 ? '#4c1' : '#e05d44';
+    const labelWidth = Math.max(110, label.length * 7 + 18);
+    const valueWidth = 72;
+    const total = labelWidth + valueWidth;
+    const lx = labelWidth / 2;
+    const vx = labelWidth + valueWidth / 2;
+    return [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + total + '" height="20" role="img" aria-label="' + xmlEscape(label + ': ' + message) + '">',
+      '<title>' + xmlEscape(label + ': ' + message) + '</title>',
+      '<linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>',
+      '<clipPath id="r"><rect width="' + total + '" height="20" rx="3"/></clipPath>',
+      '<g clip-path="url(#r)"><rect width="' + labelWidth + '" height="20" fill="#555"/><rect x="' + labelWidth + '" width="' + valueWidth + '" height="20" fill="' + color + '"/><rect width="' + total + '" height="20" fill="url(#s)"/></g>',
+      '<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11"><text x="' + lx + '" y="15" fill="#010101" fill-opacity=".3">' + xmlEscape(label) + '</text><text x="' + lx + '" y="14">' + xmlEscape(label) + '</text><text x="' + vx + '" y="15" fill="#010101" fill-opacity=".3">' + xmlEscape(message) + '</text><text x="' + vx + '" y="14">' + xmlEscape(message) + '</text></g>',
+      '</svg>',
+      ''
+    ].join('');
+  };
   return {
     sanctions: badge('sanctions worldwide coverage', figures.sanctionsCountriesCovered),
     adverseMedia: badge('adverse media worldwide coverage', figures.adverseMediaCountriesCovered),
@@ -126,7 +143,7 @@ function main() {
     writeFileSync(join(ROOT, FIGURES_FILE), JSON.stringify(fresh, null, 2) + '\n');
     const badges = buildBadges(fresh.figures);
     for (const [key, rel] of Object.entries(BADGE_FILES)) {
-      writeFileSync(join(ROOT, rel), JSON.stringify(badges[key], null, 2) + '\n');
+      writeFileSync(join(ROOT, rel), badges[key]);
     }
     console.log('wrote ' + FIGURES_FILE + ' + endpoint badges: ' + JSON.stringify(fresh.figures));
     return;
@@ -146,8 +163,8 @@ function main() {
     const badges = buildBadges(fresh.figures);
     for (const [key, rel] of Object.entries(BADGE_FILES)) {
       let committedBadge = null;
-      try { committedBadge = JSON.parse(readFileSync(join(ROOT, rel), 'utf8')); } catch { /* reported below */ }
-      if (!committedBadge || JSON.stringify(committedBadge) !== JSON.stringify(badges[key])) {
+      try { committedBadge = readFileSync(join(ROOT, rel), 'utf8'); } catch { /* reported below */ }
+      if (committedBadge !== badges[key]) {
         console.error('DRIFT: badge ' + rel + ' is stale — run `node scripts/coverage-figures.mjs --write` and commit.');
         process.exitCode = 1;
       } else {
