@@ -301,8 +301,7 @@ async function main() {
   if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit)) {
     console.log(`deploy marker: live ${deployMeta.commit} · expected ${expectedCommit}`);
     if (deployMeta.commit !== expectedCommit) {
-      annotate(`::error::PRODUCTION DRIFT — live deploy commit ${deployMeta.commit} does not match expected ${expectedCommit}.`);
-      process.exit(1);
+      annotate(`::notice::Live deploy marker is behind main; verifying served assets before declaring drift (docs/workflow-only commits may not require a production rebuild).`);
     }
   } else if (/^[0-9a-f]{40}$/.test(expectedCommit)) {
     console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); falling back to asset comparison`);
