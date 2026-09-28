@@ -834,6 +834,90 @@ export function parseCuratedList(json) {
   return out.filter(Boolean);
 }
 
+/* Czechia MFA National Sanctions List (Vnitrostátní sankční seznam, Act No.
+   1/2023 Coll.): UTF-8 comma CSV, header row first. Columns observed on the
+   runner (source-probe run 36388018140, 2026-09-28): "Příjmení fyzické
+   osoby/název právnické osoby/…" (surname or entity name), "Jméno fyzické
+   osoby" (given names), "Stav zápisu" (entry status, e.g. "platný"), …
+   Each name cell carries its transliterations slash-separated, in the same
+   order in both columns ("GUNĎAJEV/GUNDYAYEV/ГУНДЯЕВ" + "Vladimir
+   Michajlovič/Vladimir Mikhailovich/Владимир Михайлович"), so variants pair
+   by position; unequal counts pair every surname with every given name
+   (recall over tidiness). Only VALID entries screen: a row whose status is
+   not "platný" (e.g. "neplatný", struck off) never flags. */
+export function parseCzMfaCsv(body) {
+  const rows = parseDelimited(String(body || '').replace(/^﻿/, ''), ',');
+  let h = -1, sIdx = -1, gIdx = -1, stIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 8); i++) {
+    const cells = rows[i].map(c => c.trim().toLowerCase());
+    const s = cells.findIndex(c => /^p[řr][íi]jmen[íi]/.test(c));
+    if (s >= 0) {
+      h = i; sIdx = s;
+      gIdx = cells.findIndex(c => /^jm[ée]no/.test(c));
+      stIdx = cells.findIndex(c => /^stav z[áa]pisu/.test(c));
+      break;
+    }
+  }
+  if (h < 0) return [];
+  const split = (v) => String(v || '').split('/').map(x => x.replace(/\s+/g, ' ').trim()).filter(x => x.length > 1);
+  const out = [];
+  for (let i = h + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (stIdx >= 0 && !/^platn/i.test(String(r[stIdx] || '').trim())) continue;
+    const sur = split(r[sIdx]);
+    const giv = gIdx >= 0 ? split(r[gIdx]) : [];
+    if (!sur.length) continue;
+    if (!giv.length) { out.push(...sur); continue; }
+    if (giv.length === sur.length) sur.forEach((s, k) => out.push(giv[k] + ' ' + s));
+    else for (const s of sur) for (const g of giv) out.push(g + ' ' + s);
+  }
+  return [...new Set(out)];
+}
+
+/* Lists published as an HTML <table> (Moldova's SIS anti-terrorist list is
+   served as application/vnd.ms-excel but the body is an HTML table — source-
+   probe run 36388020414, 2026-09-28). The header row is the first row with a
+   name-bearing cell (Romanian "Persoană Fizică / Entitate", or name/nume/
+   denumire); that column is read from every later row. A trailing
+   parenthetical — "Zawaya Group … Co Ltd (Grupul Zawaya … Co Ltd)", the
+   Romanian rendering — also screens on its own, as does the name without it. */
+const HTML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+function htmlText(s) {
+  return String(s || '').replace(/<[^>]*>/g, ' ')
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+      if (e[0] === '#') {
+        const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : ' ';
+      }
+      return HTML_ENTITIES[e.toLowerCase()] ?? m;
+    })
+    .replace(/\s+/g, ' ').trim();
+}
+export function parseHtmlTable(body) {
+  const rows = [];
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let m;
+  while ((m = rowRe.exec(String(body || '')))) {
+    const cells = [];
+    const cellRe = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi;
+    let c;
+    while ((c = cellRe.exec(m[1]))) cells.push(htmlText(c[1]));
+    rows.push(cells);
+  }
+  const h = rows.findIndex(r => r.some(c => /persoan|entitat|\bname\b|\bnume\b|denumire/i.test(c)));
+  if (h < 0) return [];
+  const col = rows[h].findIndex(c => /persoan|entitat|\bname\b|\bnume\b|denumire/i.test(c));
+  const out = [];
+  for (let i = h + 1; i < rows.length; i++) {
+    const v = rows[i][col] || '';
+    if (!v) continue;
+    out.push(v);
+    const p = v.match(/^(.*\S)\s*\(([^()]+)\)\s*$/);
+    if (p) out.push(p[1].trim(), p[2].trim());
+  }
+  return [...new Set(out.filter(x => x.length > 1))];
+}
+
 /* Dispatch a source body to the right parser. `source.parser` wins; otherwise
    infer from id/type. Unknown formats fall back to generic XML then CSV col 0. */
 export function parseList(source, body) {
@@ -852,6 +936,8 @@ export function parseList(source, body) {
   if (p === 'json') return parseJsonList(body);
   if (p === 'curated' || source.type === 'curated') return parseCuratedList(body);
   if (p === 'mxsat') return parseSatCsv(body);                   // Mexico SAT 69-B (latin-1 CSV, live statuses only)
+  if (p === 'czmfa') return parseCzMfaCsv(body);                 // Czechia MFA national list (CSV, slash-separated transliterations, valid rows only)
+  if (p === 'htmltable') return parseHtmlTable(body);            // lists served as an HTML <table> (Moldova SIS, labelled vnd.ms-excel)
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
   if (p === 'ods' || source.type === 'ods') return parseOdsList(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);

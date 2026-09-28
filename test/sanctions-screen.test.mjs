@@ -1689,5 +1689,20 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     (src.match(/soft: true/g) || []).length === 1 && /dedup scan[^\n]*\{ soft: true \}/.test(src));
 }
 
+/* Dated-file link discovery (Czechia MFA publishes each edition under a new
+   filename). Link shape copied from the live open-data page 2026-09-28. */
+{
+  const page = 'https://mzv.gov.cz/jnp/cz/o_ministerstvu/otevrena_data/index_5.html';
+  const html = '<a href="/file/6100000/Vnitrostatni_sankcni_seznam_2026_03_01.csv">old</a>'
+    + '<a href="https://mzv.gov.cz/file/6248997/Vnitrostatni_sankcni_seznam_2026_07_23.csv">csv</a>'
+    + '<a href="https://evil.example/file/1/Vnitrostatni_sankcni_seznam_2099_01_01.csv">x</a>'
+    + '<a href="http://mzv.gov.cz/file/2/Vnitrostatni_sankcni_seznam_2098_01_01.csv">x</a>';
+  check('discoverDatedLink picks the latest dated edition on the page host',
+    scr.discoverDatedLink(html, page, 'Vnitrostatni_sankcni_seznam_') === 'https://mzv.gov.cz/file/6248997/Vnitrostatni_sankcni_seznam_2026_07_23.csv');
+  check('discoverDatedLink returns null when nothing matches (caller fails loudly)',
+    scr.discoverDatedLink('<a href="/x.csv">x</a>', page, 'Vnitrostatni_sankcni_seznam_') === null);
+  check('discoverDatedLink refuses an empty stem', scr.discoverDatedLink(html, page, '') === null);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -762,9 +762,9 @@
       "url": "https://www.migracija.lt/external/nam/search?pageNo=0&pageSize=500&language=lt",
       "type": "json",
       "parser": "json",
-      "enabled": false,
+      "enabled": true,
       "minNames": 200,
-      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run on a GitHub runner. Official, keyless JSON from the Migration Department under the Ministry of the Interior (publisher of the Lithuanian list under the Magnitsky amendments to the Law on the Legal Status of Aliens, Art. 133). Fetched live 2026-09-28 via an external fetcher: HTTP 200 application/json, numFound 284, all 284 returned in one page at pageSize=500; records carry vardas (first name) / pavarde (surname), gimimoData (DOB), pilietybes (nationality). parseJsonList reads vardas/pavarde (added the same day) -> 284 unique Latin-script names. Nature: ENTRY BANS (Magnitsky-type), not an asset freeze — screen as a sanctions-type signal, label accordingly. Enable once the probe shows the runner receives the same payload; minNames 200 guards against a truncated page."
+      "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36388112480 (GitHub runner, main@f978c16) fetched HTTP 200 application/json, 135,838 bytes, numFound 284, list[].vardas/pavarde as parsed by parseJsonList. Official, keyless JSON from the Migration Department under the Ministry of the Interior (Lithuanian list under the Magnitsky amendments to the Law on the Legal Status of Aliens, Art. 133). Nature: ENTRY BANS (Magnitsky-type), not an asset freeze — a sanctions-type signal, label accordingly. pageSize=500 returns all 284 in one page; if numFound ever exceeds 500 the page truncates, and minNames 200 only catches a collapse, so raise pageSize before the register reaches 500."
     },
     {
       "id": "cz-mzv-national",
@@ -772,20 +772,25 @@
       "jurisdiction": "Czechia",
       "url": "https://mzv.gov.cz/file/6248997/Vnitrostatni_sankcni_seznam_2026_07_23.csv",
       "type": "csv",
-      "enabled": false,
+      "enabled": true,
       "minNames": 5,
-      "_note": "ADDED 2026-09-28, DISABLED pending (1) a source-probe run to see the CSV's real columns/encoding and choose a parser, and (2) link discovery: the official open-data page https://mzv.gov.cz/jnp/cz/o_ministerstvu/otevrena_data/index_5.html publishes the list (Act No. 1/2023 Coll.) as a DATED file (this URL is the 2026-07-23 edition, page updated 2026-07-24) that changes name on every update, so a pinned URL would go silently stale — same failure class as kg-fiu. The page itself was reachable 2026-09-28 (HTTP 200); the CSV download was refused to an external fetcher by an anti-bot check."
+      "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36388018140 (GitHub runner, main@f978c16) fetched the CSV HTTP 200 text/csv, 66,940 bytes, UTF-8 comma CSV; columns Příjmení…/Jméno fyzické osoby/Stav zápisu/… (Act No. 1/2023 Coll.). parseCzMfaCsv pairs the slash-separated transliterations and screens only 'platný' (valid) rows. The file is DATED and renamed on each update, so `discover` resolves the current edition from the official open-data page on every run (the page linked exactly this file on 2026-09-28); `url` is the last edition seen and is NOT used by the screen while `discover` is set. If the page stops linking a matching file the list fails loudly (never screens a stale edition). The Czech list is short (national designations on top of EU lists), hence minNames 5.",
+      "parser": "czmfa",
+      "discover": {
+        "page": "https://mzv.gov.cz/jnp/cz/o_ministerstvu/otevrena_data/index_5.html",
+        "fileStem": "Vnitrostatni_sankcni_seznam_"
+      }
     },
     {
       "id": "md-sis-terror",
       "name": "Moldova — SIS Anti-Terrorist Centre: List of persons, entities and groups involved in terrorist activity",
       "jurisdiction": "Moldova",
       "url": "https://antiteror.sis.md/lista-terorista-xls",
-      "type": "xlsx",
-      "parser": "xlsx",
-      "enabled": false,
+      "type": "html",
+      "parser": "htmltable",
+      "enabled": true,
       "minNames": 50,
-      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official page https://antiteror.sis.md/advanced-page-type/listele-teroriste (HTTP 200 on 2026-09-28) links this spreadsheet download and a PDF; neither this sandbox (proxy 403) nor an external fetcher could retrieve the file's bytes, so its format is unverified: the path says 'xls', which may be legacy BIFF .xls that the zero-dependency parser cannot read (only OOXML .xlsx/.ods). The probe decides: enable if it is .xlsx with a name column; otherwise record the observed format here and keep disabled."
+      "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36388020414 (GitHub runner, main@f978c16) fetched HTTP 200, 196,017 bytes, labelled application/vnd.ms-excel but the body is an HTML <table> (header: Număr de referință / Persoană Fizică / Entitate / Data de naștere / Sancțiuni teroriste / Sancțiuni de proliferare) — so it is read as text by parseHtmlTable, not as a spreadsheet. Published by the SIS Anti-Terrorist Centre (official page https://antiteror.sis.md/advanced-page-type/listele-teroriste). Content: Moldova's consolidated list, largely UN 1267/ISIL-Al-Qaida (QDi.* references) and EU CFSP terrorist designations, plus national entries; a trailing parenthetical (Romanian rendering) screens on its own too."
     }
   ]
 }

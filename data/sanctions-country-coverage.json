@@ -208,11 +208,11 @@
     },
     {
       "country": "Czechia",
-      "status": "pending",
+      "status": "screened",
       "sources": [
         "cz-mzv-national"
       ],
-      "note": "official CSV (Act No. 1/2023 Coll.); dated filename changes on each update, so needs link discovery; CSV columns unverified (anti-bot on external fetch)"
+      "note": "screened: cz-mzv-national (official MFA CSV, Act No. 1/2023 Coll.); the dated filename is discovered from the official open-data page each run; runner-verified by source-probe run 36388018140 on 2026-09-28"
     },
     {
       "country": "Democratic People's Republic of Korea",
@@ -474,11 +474,11 @@
     },
     {
       "country": "Lithuania",
-      "status": "pending",
+      "status": "screened",
       "sources": [
         "lt-migracija-magnitsky"
       ],
-      "note": "official keyless JSON verified live 2026-09-28 (284 names parse); disabled until a source-probe run confirms the GitHub runner receives it"
+      "note": "screened: lt-migracija-magnitsky (official Migration Department JSON, 284 entry-ban designations); runner-verified by source-probe run 36388112480 on 2026-09-28"
     },
     {
       "country": "Luxembourg",
@@ -539,11 +539,11 @@
     },
     {
       "country": "Moldova",
-      "status": "pending",
+      "status": "screened",
       "sources": [
         "md-sis-terror"
       ],
-      "note": "official spreadsheet download; format unverified (may be legacy .xls, which the zero-dependency parser cannot read)"
+      "note": "screened: md-sis-terror (official SIS Anti-Terrorist Centre list, served as an HTML table); runner-verified by source-probe run 36388020414 on 2026-09-28"
     },
     {
       "country": "Monaco",

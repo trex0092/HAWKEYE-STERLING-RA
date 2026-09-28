@@ -1300,6 +1300,36 @@ export async function fetchPaginatedJson(url, headers, pg, signal, sourceId = ''
   return JSON.stringify({ [dataPath]: all });
 }
 
+/* Dated-file link discovery. Some registries publish each edition under a new
+   filename (Czechia MFA: /file/<id>/Vnitrostatni_sankcni_seznam_YYYY_MM_DD.csv),
+   so a pinned URL goes silently stale on the next update. A source opting in
+   with `discover: { page, fileStem }` has its file resolved from the official
+   landing page on every run: every href containing the stem, resolved against
+   the page, kept only when https on the page's own host, latest filename wins
+   (the dated stems sort lexically). Returns null when nothing qualifies — the
+   caller throws, so the list reports as failed rather than screening a stale
+   edition. Pure; pinned in test/sanctions-screen.test.mjs. */
+export function discoverDatedLink(html, pageUrl, fileStem) {
+  const stem = String(fileStem || '');
+  if (!stem) return null;
+  let page;
+  try { page = new URL(pageUrl); } catch { return null; }
+  const found = [];
+  const re = /href\s*=\s*["']([^"']+)["']/gi;
+  let m;
+  while ((m = re.exec(String(html || '')))) {
+    if (!m[1].includes(stem)) continue;
+    let u;
+    try { u = new URL(m[1].replace(/&amp;/g, '&'), page); } catch { continue; }
+    if (u.protocol !== 'https:' || u.hostname !== page.hostname) continue;
+    found.push(u);
+  }
+  if (!found.length) return null;
+  const file = (u) => u.pathname.slice(u.pathname.lastIndexOf('/') + 1);
+  found.sort((a, b) => (file(a) < file(b) ? 1 : file(a) > file(b) ? -1 : 0));
+  return found[0].href;
+}
+
 /* Fetch one consolidated list — a remote URL, or an in-repo curated file
    (source.file, e.g. the UAE EOCN list). Returns the raw body or throws. */
 async function fetchListBody(source, timeoutMs = 60000) {
@@ -1310,8 +1340,20 @@ async function fetchListBody(source, timeoutMs = 60000) {
   /* The URL comes from the in-repo sources config; still validate the scheme so a
      tampered/extra source can only ever trigger an ordinary http(s) GET (never
      file:, ftp:, etc.) before it reaches fetch. */
+  let href = source.url;
+  if (source.discover && source.discover.page) {
+    const page = String(source.discover.page);
+    if (!/^https:\/\//.test(page)) throw new Error('discover.page must be https');
+    const html = await withTimeout(async (signal) => {
+      const r = await fetch(page, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
+      if (!r.ok) throw new Error('link discovery page HTTP ' + r.status);
+      return await r.text();
+    }, timeoutMs);
+    href = discoverDatedLink(html, page, source.discover.fileStem);
+    if (!href) throw new Error('link discovery: no ' + source.discover.fileStem + '* file linked from ' + page);
+  }
   let parsed;
-  try { parsed = new URL(source.url); } catch { throw new Error('invalid url'); }
+  try { parsed = new URL(href); } catch { throw new Error('invalid url'); }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('unsupported url scheme: ' + parsed.protocol);
   /* XLSX sources (e.g. Australia DFAT) are binary ZIP containers — read the raw
      bytes as a Buffer; reading them as text would corrupt the archive. Text lists
