@@ -508,11 +508,22 @@ export const LOCALES = [
               six country editions)
        es-VE  (0/100 .ve sources; 73/100 identical to US:es-419)
        fr-SN  (0/100 .sn sources; 72/100 identical to FR:fr)
+     Second batch, same day and method:
+       en-MY  ACCEPTED: kept MY:en; Malaysian press present (thestar.com.my,
+              freemalaysiatoday.com; 5/100 on .my); 64/100 overlap with US:en and
+              71/100 with the generic English feed (whose members share 82-94/100)
+       fr-MA  ACCEPTED: kept MA:fr; 9/100 sources on .ma (le360.ma); 69/100 overlap
+              with FR:fr (French-language Moroccan press, alongside ar-MA)
+       REJECTED: pt-AO (-> silently served PT:pt-150); es-UY, es-EC, es-PA,
+              es-DO, es-CR (all five -> silently served US:es-419, byte-identical);
+              fr-CI (-> silently served FR:fr)
      Same rule as the audits above: do not re-add without new evidence. */
   { id: 'en-IE', hl: 'en-IE', gl: 'IE', ceid: 'IE:en', lang: 'en' },
   { id: 'en-CA', hl: 'en-CA', gl: 'CA', ceid: 'CA:en', lang: 'en' },
   { id: 'de-AT', hl: 'de', gl: 'AT', ceid: 'AT:de', lang: 'de' },
   { id: 'es-US', hl: 'es-419', gl: 'US', ceid: 'US:es-419', lang: 'es' },
+  { id: 'en-MY', hl: 'en-MY', gl: 'MY', ceid: 'MY:en', lang: 'en' },
+  { id: 'fr-MA', hl: 'fr', gl: 'MA', ceid: 'MA:fr', lang: 'fr' },
 ];
 
 /* The locale set to sweep this run — all of LOCALES unless narrowed by the

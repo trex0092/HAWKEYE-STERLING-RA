@@ -10,18 +10,22 @@ bump merged to `main`.
 
 ## [Unreleased]
 
-- **Adverse media: four verified Google News editions added** (`scripts/adverse-media.mjs`):
-  Ireland (`en-IE`), Canada in English (`en-CA`), Austria (`de-AT`) and US Spanish
-  (`es-US`), taking the matrix from 73 to 77 editions and 67 to 69 countries.
+- **Adverse media: six verified Google News editions added** (`scripts/adverse-media.mjs`):
+  Ireland (`en-IE`), Canada in English (`en-CA`), Austria (`de-AT`), US Spanish
+  (`es-US`), Malaysia in English (`en-MY`) and Morocco in French (`fr-MA`), taking
+  the matrix from 73 to 79 editions and 67 to 69 countries.
   Each was fetched live and compared with a confirmed edition on the same query.
   The edition code had to be kept, the article set had to differ, and the
   country's own press had to be present. The evidence is recorded in the code.
-  Ten candidates were rejected and recorded so they are not re-added blind:
+  Seventeen candidates were rejected and recorded so they are not re-added blind:
   - `da-DK` silently served the Norwegian edition.
   - `en-TZ`, `en-UG`, `en-ZW`, `en-BW`, `en-NA` and `en-ET` turned out to be
     one generic English feed, 82-94% identical to each other, with no local
     press.
   - `es-VE` and `fr-SN` had no local press and mirrored US-Spanish and France.
+  - `pt-AO` silently served Portugal's edition, and `fr-CI` silently served France's.
+  - `es-UY`, `es-EC`, `es-PA`, `es-DO` and `es-CR` all silently served the same
+    US-Spanish feed.
 - **README: screening-coverage badges and status badges for more live
   controls.** A new coverage row shows the sanctions lists screened (59), the
   national sanctions jurisdictions (36), the adverse-media Google News
