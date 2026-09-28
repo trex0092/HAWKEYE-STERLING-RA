@@ -603,14 +603,29 @@ export function parseDfatXlsx(buf) {
        header found no name column and parsed 0 (same probe evidence). */
     let h = -1;
     for (let i = 0; i < Math.min(rows.length, 8); i++) {
-      if (rows[i].some(c => /name/i.test(String(c)) && !/name\s*type/i.test(String(c)))) { h = i; break; }
+      if (rows[i].some(c => /name|nazwisko/i.test(String(c)) && !/name\s*type/i.test(String(c)))) { h = i; break; }
     }
     if (h < 0) continue;
     const header = rows[h].map(c => String(c).toLowerCase().trim());
     const nameCols = [];
-    header.forEach((c, i) => { if (/name/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
+    header.forEach((c, i) => { if (/name|nazwisko/.test(c) && !/name\s*type/.test(c)) nameCols.push(i); });
     if (!nameCols.length) continue;
+    /* Poland's MSWiA workbook (source-probe run 36391592244, 2026-09-28):
+       header "Nazwisko i imię" (surname and given name) and a "Data
+       wykreślenia z listy" (date struck off the list) column — a row with a
+       strike-off date is no longer designated and never screens. A trailing
+       parenthetical alias ("BELOV Alexey (BELOV Alexy)") also screens on its
+       own. Both apply only to sheets carrying those Polish headers. */
+    const struckCol = header.findIndex(c => /wykreśl/.test(c));
+    const polish = header.some(c => /nazwisko/.test(c));
     for (let i = h + 1; i < rows.length; i++) {
+      if (struckCol >= 0 && String(rows[i][struckCol] || '').trim()) continue;
+      if (polish) {
+        for (const ci of nameCols) {
+          const p = String(rows[i][ci] || '').match(/^(.*\S)\s*\(([^()]+)\)\s*$/);
+          if (p) names.push(p[1].trim(), p[2].trim());
+        }
+      }
       /* Skip an all-dash placeholder in any name column — the Israel NBCTF
          organisations sheet fills empty a.k.a. columns with "----" (not a bare
          "-"), which the old `!== '-'` guard let through as a bogus designated
