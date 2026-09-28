@@ -1365,10 +1365,11 @@
     },
     {
       "country": "Somalia",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists — the National Anti-Money Laundering Committee \"Targeted Financial Sanction List\" pages (namlc.gov.so/targeted-financial-sanction-list/…, namlc.gov.so/list-of-financial-sanction-targets/…) and the Financial Reporting Center page \"Targeted Financial Sanction List\" (frc.gov.so/list-of-financial-sanction-targets-copy/) publish national designations of al-Shabaab financiers under Article 6 of the Targeted Financial Sanctions Act 2023. Page format and name count not yet verified by a runner probe"
     },
     {
       "country": "South Africa",
@@ -1410,7 +1411,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the US State Department Country Reports on Terrorism 2013/2020 describe the Sudan Financial Information Unit circulating the UN 1267 list (and US lists) to financial institutions; no current official source found for a national list"
     },
     {
       "country": "Suriname",
@@ -1461,7 +1463,8 @@
       "status": "not-researched",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "partial research 2026-09-28 (status unchanged): the Prevention of Terrorism Act (R.E. 2023, published by the FIU, fiu.go.tz) provides for domestic designations; no published national designation list found yet"
     },
     {
       "country": "Thailand",
@@ -1540,10 +1543,11 @@
     },
     {
       "country": "Uganda",
-      "status": "not-researched",
+      "status": "identified",
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "researched 2026-09-28: a national list exists in statute — the Anti-Terrorism Act 2002 (ULII, ulii.org) defines \"terrorist organisation\" as an organisation specified in its Second Schedule, which lists four organisations, with ministerial powers under section 10; the Anti-Terrorism Regulations 2025 (SI 75 of 2025, ulii.org) also apply. The Financial Intelligence Authority page \"Sanctions\" (fia.go.ug) was not read. No machine-readable national list found"
     },
     {
       "country": "Ukraine",
