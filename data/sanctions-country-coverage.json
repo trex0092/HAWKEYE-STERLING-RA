@@ -151,10 +151,14 @@
     },
     {
       "country": "Belize",
-      "status": "not-researched",
+      "status": "pending",
       "baseline": [
         "UN"
-      ]
+      ],
+      "sources": [
+        "bz-fiu-consolidated"
+      ],
+      "note": "official FIU \"Consolidated Belize Sanctions List\" (High Court orders; domestic and UNSCR designations; XML/XLSX/PDF, July 2026 edition) staged disabled with page discovery, pending a source-probe run"
     },
     {
       "country": "Benin",

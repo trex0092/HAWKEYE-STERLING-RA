@@ -809,6 +809,22 @@
       "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36393616291 (GitHub runner, main) discovered the spreadsheet via linkMatch 'Format: xlsx' on https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami, fetched it (200,687 bytes, xlsx) and the xlsx parser read 461 names (minNames 100, met). Header row: 'Nazwisko i imię | Dane identyfikacyjne osoby | Uzasadnienie wpisu na listę | Zastosowane środki sankcyjne | Data umieszczenia na liście | Data wykreślenia z listy'; rows with a struck-off date are skipped. The attachment id changes with each edition, so `discover` resolves it from the page each run; earlier probe 36390719857 (stem only) picked a decision PDF and 36391592244 read 0 names before the Polish-header fix. Official list of the Minister of the Interior and Administration (MSWiA)."
     },
     {
+      "id": "bz-fiu-consolidated",
+      "name": "Belize — FIU Consolidated Belize Sanctions List (High Court orders: domestic and UNSCR designations)",
+      "jurisdiction": "Belize",
+      "url": "https://fiubelize.org/consolidated-belize-sanctions-list/",
+      "type": "xlsx",
+      "parser": "xlsx",
+      "discover": {
+        "page": "https://fiubelize.org/consolidated-belize-sanctions-list/",
+        "fileStem": "belize_consolidated_sanctions_list",
+        "linkMatch": ".xlsx"
+      },
+      "enabled": false,
+      "minNames": 20,
+      "_note": "ADDED 2026-09-28, DISABLED pending a source-probe run. The official FIU Belize page (fiubelize.org/consolidated-belize-sanctions-list/, read 2026-09-28 via an external fetcher) describes a consolidated list of individuals and entities subject to sanctions under Orders of the High Court of Belize, giving effect to both domestic sanctions mechanisms and UNSCR obligations (Money Laundering and Terrorism (Prevention) Act as amended 2023), published as XML, XLSX and PDF; the XLSX link was dated JULY2026 (belize_consolidated_sanctions_listJULY2026.xlsx). The filename carries a month NAME, so a lexicographic 'latest' sort would misorder editions: discovery therefore requires exactly one anchor containing '.xlsx' with the stem (linkMatch), and fails loudly otherwise. Column headers, name count and whether entries beyond the UN list exist are unverified: enable only if the probe's 'Parsed by the registry parser' section shows names with the minNames floor met (minNames 20 is provisional)."
+    },
+    {
       "id": "ee-vm-belarus",
       "name": "Estonia — MFA: Sanctions of the Government of the Republic in view of the situation in Belarus (entry bans)",
       "jurisdiction": "Estonia",

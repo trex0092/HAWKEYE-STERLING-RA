@@ -10,6 +10,13 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Belize: `bz-fiu-consolidated` staged (disabled).** This is the FIU's
+  official Consolidated Belize Sanctions List: High Court orders covering
+  domestic and UNSCR designations, published as XLSX. Its month-named file
+  is found from the FIU page, and discovery must match exactly one `.xlsx`
+  link, because a month name cannot be sorted by date. `fiubelize.org` is
+  added to the screen's egress allowlist. The source is enabled only after a
+  runner probe shows the name floor met.
 - **Register research (FATF-listed, Gulf, Asia): Oman, Nepal, Vietnam, Côte
   d'Ivoire, Republic of Korea, China, Algeria, Mali, Burkina Faso, Niger,
   Armenia, Tajikistan, Bangladesh, Ethiopia, Zambia, Rwanda, Mozambique, Somalia, Uganda, Palestine, Fiji, Cuba, Myanmar, Maldives**
