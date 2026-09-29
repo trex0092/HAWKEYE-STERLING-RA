@@ -45,6 +45,7 @@
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { pathToFileURL } from 'node:url';
+import { retryAfterDelayMs, MAX_RETRY_AFTER_MS } from './runtime-recovery.mjs';
 
 export const PEP_LIST_NAME = 'PEP (Worldwide — Wikidata)';
 export const SPARQL_ENDPOINT = 'https://query.wikidata.org/sparql';
@@ -546,7 +547,7 @@ export function pepListFromDataset(dataset) {
    error instead of an unbounded stall. */
 const ATTEMPT_TIMEOUT_MS = 90000;
 
-async function fetchJson(url, { tries = 6 } = {}) {
+export async function fetchJson(url, { tries = 6, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
   let lastErr;
   for (let i = 0; i < tries; i++) {
     const ctrl = new AbortController();
@@ -554,17 +555,34 @@ async function fetchJson(url, { tries = 6 } = {}) {
     try {
       const r = await fetch(url, { signal: ctrl.signal, headers: { 'user-agent': UA, accept: 'application/sparql-results+json, application/json' } });
       if (r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503 || r.status === 504) {
-        const ra = Number(r.headers.get('retry-after')) || (2 ** i * 5);
-        console.error(`  http ${r.status} — backing off ${ra}s`);
-        await new Promise(res => setTimeout(res, ra * 1000));
+        const delayMs = Math.min(MAX_RETRY_AFTER_MS, Math.max(5000,
+          retryAfterDelayMs(r.headers?.get?.('retry-after')), 2 ** i * 5000));
+        console.error('  http ' + r.status + ' - retry delay ' + delayMs + 'ms');
         lastErr = new Error('HTTP ' + r.status);
+        if (i + 1 < tries) await wait(delayMs);
         continue;
       }
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      return await r.json();
+      const data = await r.json();
+      // MediaWiki returns maxlag with HTTP 200. An API error is not
+      // an empty entity batch and must never skip the retry path.
+      if (data && (data.error || data.errors)) {
+        const errors = Array.isArray(data.errors) ? data.errors : [data.error || data.errors];
+        const codes = errors.map(e => String(e?.code || 'unknown')).join(',');
+        lastErr = new Error('Wikidata API error: ' + codes);
+        if (errors.some(e => e?.code === 'maxlag' || e?.code === 'ratelimited')) {
+const delayMs = Math.min(MAX_RETRY_AFTER_MS, Math.max(5000,
+  retryAfterDelayMs(r.headers?.get?.('retry-after')), 2 ** i * 5000));
+console.error('  Wikidata ' + codes + ' - retry delay ' + delayMs + 'ms');
+if (i + 1 < tries) await wait(delayMs);
+continue;
+        }
+        throw lastErr;
+      }
+      return data;
     } catch (e) {
       lastErr = e;
-      await new Promise(res => setTimeout(res, 2 ** i * 2000));
+      if (i + 1 < tries) await wait(Math.min(MAX_RETRY_AFTER_MS, 2 ** i * 2000));
     } finally {
       clearTimeout(kill);
     }

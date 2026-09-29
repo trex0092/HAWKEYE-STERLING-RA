@@ -132,4 +132,45 @@ try {
     complete.count === 2 && !complete.partial
     && complete.entries.some(e => e.qid === 'Q2' && e.name === 'Synthetic Person Two'));
 } finally { rmSync(dir, { recursive: true, force: true }); }
+// Retry the real fetch boundary without network traffic or wall-clock sleeps.
+{
+  const original = globalThis.fetch;
+  const delays = [];
+  const wait = async ms => { delays.push(ms); };
+  const success = { entities: { Q2: { id: 'Q2', labels: { en: { value: 'Synthetic Person' } } } } };
+  const response = (body, retryAfter = null, status = 200) => ({
+    ok: status === 200, status, headers: { get: () => retryAfter }, json: async () => body,
+  });
+  let requests = 0;
+  try {
+    globalThis.fetch = async () => { requests++; return requests === 1
+      ? response({ error: { code: 'maxlag', lag: 9.8 } }, '9') : response(success); };
+    const recovered = await pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait });
+    check('HTTP 200 maxlag retries the same batch and returns recovered entities', requests === 2 && recovered === success);
+    check('maxlag honors Retry-After and does not sleep after recovery', delays.length === 1 && delays[0] === 9000);
+    requests = 0; delays.length = 0;
+    globalThis.fetch = async () => { requests++; return response({ error: { code: 'maxlag' } }); };
+    await assert.rejects(pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 3, wait }), /maxlag/);
+    check('persistent maxlag terminates at the retry budget without a false empty batch', requests === 3);
+    check('headerless maxlag backs off at least five seconds and has no final sleep', delays.join(',') === '5000,10000');
+    requests = 0; delays.length = 0;
+    globalThis.fetch = async () => { requests++; return requests === 1
+      ? response({ errors: [{ code: 'ratelimited' }], entities: success.entities }, '7') : response(success); };
+    const modern = await pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait });
+    check('modern API errors are retried even when the payload also contains entities', requests === 2 && modern === success && delays[0] === 7000);
+    requests = 0; delays.length = 0;
+    globalThis.fetch = async () => { requests++; return response({ error: { code: 'badvalue' } }); };
+    await assert.rejects(pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 1, wait }), /badvalue/);
+    check('other API errors are never returned as successful data', requests === 1 && delays.length === 0);
+    requests = 0; delays.length = 0;
+    globalThis.fetch = async () => { requests++; return requests === 1
+      ? response(null, '8', 429) : response(success); };
+    const throttled = await pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait });
+    check('HTTP throttling still recovers with bounded Retry-After', requests === 2 && throttled === success && delays[0] === 8000);
+    requests = 0; delays.length = 0;
+    globalThis.fetch = async () => { requests++; return response({ error: { code: 'maxlag' } }, '99999999'); };
+    await assert.rejects(pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait }), /maxlag/);
+    check('a hostile retry header cannot schedule an unbounded wait', delays.length === 1 && delays[0] === 900000);
+  } finally { globalThis.fetch = original; }
+}
 console.log('runtime-priority: ' + checks + ' checks passed');
