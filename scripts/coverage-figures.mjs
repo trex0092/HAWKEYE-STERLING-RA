@@ -112,7 +112,7 @@ export function buildBadges(figures) {
     ].join('');
   };
   return {
-    sanctions: badge('sanctions worldwide coverage', figures.sanctionsCountriesCovered),
+    sanctions: badge('sanctions national-source depth', figures.sanctionsCountriesCovered),
     adverseMedia: badge('adverse media worldwide coverage', figures.adverseMediaCountriesCovered),
     pep: badge('PEP worldwide coverage', figures.pepCountriesCovered),
   };
