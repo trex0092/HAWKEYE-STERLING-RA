@@ -2209,7 +2209,40 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
             else:
                 log(f"  Bing News unavailable for this subject ({str(e)[:80]}) — other feeds stand")
 
-    _record_feed_coverage(attempts > 0 and failures < attempts, gdelt_ok, bing_ok)
+    # One last-resort retry when the subject has ZERO fresh-story coverage.
+    # This is deliberately narrow: retry only the independent global backbones,
+    # never the whole Google locale sweep, and only before declaring the subject
+    # uncovered. The existing global rate gates still pace both calls.
+    gnews_ok = attempts > 0 and failures < attempts
+    if not gnews_ok and not gdelt_ok and not bing_ok:
+        retry_delay = max(0.0, float(os.environ.get("ADVERSE_BACKBONE_RETRY_SEC", "3")))
+        if retry_delay:
+            time.sleep(retry_delay)
+        if BING_NEWS and not _BING_STATE["open"]:
+            try:
+                for a in search_bing_news(name, max_results):
+                    if a["title"] not in seen_titles:
+                        seen_titles.add(a["title"])
+                        articles.append(a)
+                bing_ok = True
+                _BING_STATE["consecutive_failures"] = 0
+                _BING_GATE.reward()
+                log(f"  adverse-media last-resort retry recovered Bing News coverage for '{name}'")
+            except Exception as e:
+                log(f"  adverse-media last-resort Bing retry failed ({str(e)[:80]})")
+        if not bing_ok and not _GDELT_STATE["open"]:
+            try:
+                for a in search_gdelt(name, max_results):
+                    if a["title"] not in seen_titles:
+                        seen_titles.add(a["title"])
+                        articles.append(a)
+                gdelt_ok = True
+                _GDELT_STATE["consecutive_failures"] = 0
+                log(f"  adverse-media last-resort retry recovered GDELT coverage for '{name}'")
+            except Exception as e:
+                log(f"  adverse-media last-resort GDELT retry failed ({str(e)[:80]})")
+
+    _record_feed_coverage(gnews_ok, gdelt_ok, bing_ok)
 
     # Degrade loudly: if EVERY Google-News fetch failed (or its breaker skipped
     # the feed entirely) AND GDELT failed AND Bing News failed, we have ZERO
