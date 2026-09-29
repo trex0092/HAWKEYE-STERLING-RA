@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '17 */6 * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Daily Screening (Sanctions + Adverse Media + PEP)"
+      - "PEP Worldwide Harvest"
+      - "Sanctions Screen"
+    types: [completed]
 
 permissions:
   contents: read
@@ -14,6 +20,10 @@ concurrency:
 
 jobs:
   verify:
+    # A successful upstream runtime control has just published fresh evidence.
+    # Failed upstream controls are already red themselves and may not publish
+    # trustworthy state, so do not manufacture a second stale-evidence alert.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
