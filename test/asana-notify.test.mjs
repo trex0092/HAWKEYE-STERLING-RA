@@ -107,6 +107,22 @@ check('buildHtmlBody produces a single <body> root with escaped content', (() =>
   return h.startsWith('<body>') && h.endsWith('</body>') && h.includes('&lt;X&gt;') && h.includes('A &amp; B');
 })());
 
+/* Four-section contract: monitoring deliveries must not fall into a default
+   section or recreate a retired section. */
+{
+  const prevTok = process.env.ASANA_ACCESS_TOKEN;
+  process.env.ASANA_ACCESS_TOKEN = 'test-token';
+  let err = null;
+  try { await notifyAsana('Unknown monitoring alert', 'body', { project: '1216203370612914', section: '9999999999999999' }); }
+  catch (e) { err = e; }
+  finally {
+    if (prevTok === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = prevTok;
+  }
+  check('monitoring delivery fails closed on an unapproved section',
+    !!err && /explicit approved section|unapproved|routing/i.test(String(err.message)));
+}
+
 /* ── MIRROR: one card, two project memberships ──
    #305 routed every pipeline Asana card to the HAWKEYE STERLING APP project.
    The law-change queue is worked from a DIFFERENT project, so from 22 Jul 2026
@@ -119,10 +135,24 @@ async function capturePayload(opts) {
   const prevTok = process.env.ASANA_ACCESS_TOKEN;
   process.env.ASANA_ACCESS_TOKEN = 'test-token';
   let captured = null;
+  const memberships = [];
   globalThis.fetch = async (url, init) => {
-    if (String(url).includes('/tasks') && init && init.method === 'POST') {
+    const u = String(url);
+    if (u.includes('/sections/') && (!init || !init.method || init.method === 'GET')) {
+      return { ok: true, status: 200, json: async () => ({ data: {
+        gid: APP_SEC, name: 'Regulatory Changes', project: { gid: APP }
+      } }), text: async () => '' };
+    }
+    if (u.endsWith('/tasks') && init && init.method === 'POST') {
       captured = JSON.parse(init.body).data;
       return { ok: true, status: 201, json: async () => ({ data: { gid: 'T1', permalink_url: 'https://p' } }), text: async () => '' };
+    }
+    if (u.includes('/sections/') && u.endsWith('/addTask') && init && init.method === 'POST') {
+      memberships.push({ project: { gid: APP }, section: { gid: APP_SEC } });
+      return { ok: true, status: 200, json: async () => ({ data: {} }), text: async () => '' };
+    }
+    if (u.includes('/tasks/T1?opt_fields=memberships.')) {
+      return { ok: true, status: 200, json: async () => ({ data: { memberships } }), text: async () => '' };
     }
     return { ok: true, status: 200, json: async () => ({ data: [] }), text: async () => '' };
   };
@@ -135,7 +165,7 @@ async function capturePayload(opts) {
   return captured;
 }
 
-const APP = '1216203370612914', APP_SEC = '1216203370612916';
+const APP = '1216203370612914', APP_SEC = '1218451992088222';
 const MON = '1213914392047129', MON_SEC = '1216203873114460';
 
 const mirrored = await capturePayload({ project: APP, section: APP_SEC, mirror: [{ project: MON, section: MON_SEC }] });
@@ -158,7 +188,7 @@ check('no mirror configured leaves the payload exactly as before',
   plain.projects.length === 1 && plain.projects[0] === APP && plain.memberships === undefined);
 
 /* A mirror pointing at the primary must not produce a self-membership. */
-const self = await capturePayload({ project: APP, mirror: [{ project: APP, section: APP_SEC }] });
+const self = await capturePayload({ project: APP, section: APP_SEC, mirror: [{ project: APP, section: APP_SEC }] });
 check('a mirror equal to the primary is deduped away',
   self.projects.length === 1 && self.memberships === undefined);
 
@@ -305,16 +335,33 @@ check('a sectionless mirror still joins the project',
     process.env.ASANA_ACCESS_TOKEN = 'test-token';
     console.warn = () => {};
     const posts = [];
+    let placed = false;
     globalThis.fetch = async (url, init) => {
-      if (String(url).endsWith('/tasks') && init && init.method === 'POST') {
+      const u = String(url);
+      if (u.includes('/sections/1218451960830318?')) {
+        return { ok: true, status: 200, json: async () => ({ data: {
+          gid: '1218451960830318', name: 'Screening Sanctions Update',
+          project: { gid: '1216203370612914' }
+        } }) };
+      }
+      if (u.endsWith('/tasks') && init && init.method === 'POST') {
         posts.push(JSON.parse(init.body).data.html_notes);
         if (posts.length === 1 && firstReply) return firstReply;
         return { ok: true, status: 201, json: async () => ({ data: { gid: 'T1', permalink_url: 'https://p' } }) };
       }
+      if (u.includes('/sections/1218451960830318/addTask')) {
+        placed = true;
+        return { ok: true, status: 200, json: async () => ({ data: {} }) };
+      }
+      if (u.includes('/tasks/T1?opt_fields=memberships.')) {
+        return { ok: true, status: 200, json: async () => ({ data: { memberships: placed ? [{
+          project: { gid: '1216203370612914' }, section: { gid: '1218451960830318' }
+        }] : [] } }) };
+      }
       return { ok: true, status: 200, json: async () => ({ data: [] }) };
     };
     let url = null, err = null;
-    try { url = await notifyAsana('Sanctions Screen — test', '', { html, assignee: null }); }
+    try { url = await notifyAsana('Sanctions Screen — test', '', { html, assignee: null, section: '1218451960830318' }); }
     catch (e) { err = e; }
     finally {
       globalThis.fetch = orig; console.warn = prevWarn;
