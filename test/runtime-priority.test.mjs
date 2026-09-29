@@ -1,6 +1,6 @@
 /* Synthetic, offline integration checks. No screening-provider traffic. */
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -172,5 +172,45 @@ try {
     await assert.rejects(pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait }), /maxlag/);
     check('a hostile retry header cannot schedule an unbounded wait', delays.length === 1 && delays[0] === 900000);
   } finally { globalThis.fetch = original; }
+}
+// Exercise the exact publication loop in a disposable, offline Git index.
+{
+  const workflow = readFileSync(new URL('../.github/workflows/sanctions-screen.yml', import.meta.url), 'utf8');
+  const persist = workflow.split('      - name: Persist screening + case state (screen-state branch)')[1]
+    .split('      - name: Refresh runtime assurance watchdog')[0];
+  check('unfinished screens cannot publish over existing runtime evidence',
+    persist.includes("if: always() && steps.screen.outcome == 'success' && steps.screen.outputs.screen_error != 'true'"));
+  check('a failed case-delivery step does not prevent preserving completed screening state',
+    !persist.includes('steps.cases.outcome'));
+  check('the state publisher cannot force-push over a concurrent update', !/git push\s+--force\b/.test(persist));
+  const loop = persist.match(/            for f in "\$\{files\[@\]\}"; do\n[\s\S]*?            done/);
+  check('the production file-publication loop is present', !!loop);
+  const work = mkdtempSync(join(tmpdir(), 'screen-retain-'));
+  const run = (command, args, options = {}) => {
+    const result = spawnSync(command, args, { cwd: work, encoding: 'utf8', timeout: 10000, ...options });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    return result.stdout.trim();
+  };
+  try {
+    run('git', ['init', '--quiet']);
+    writeFileSync(join(work, 'report.json'), '{"operational":false,"generatedAt":"2026-09-29T11:21:16.658Z"}');
+    writeFileSync(join(work, 'badge.svg'), '<svg>degraded</svg>');
+    run('git', ['add', 'report.json', 'badge.svg']);
+    const initial = run('git', ['write-tree']);
+    const env = { ...process.env, GIT_INDEX_FILE: join(work, '.git', 'publication-index') };
+    run('git', ['read-tree', initial], { env });
+    rmSync(join(work, 'report.json')); rmSync(join(work, 'badge.svg'));
+    run('bash', ['-e', '-c', 'files=(report.json badge.svg)\n' + loop[0]], { env });
+    check('absent report and badge outputs preserve the complete prior tree',
+      run('git', ['write-tree'], { env }) === initial);
+    writeFileSync(join(work, 'report.json'), '{"operational":false,"generatedAt":"2026-09-29T13:30:00.000Z"}');
+    run('bash', ['-e', '-c', 'files=(report.json badge.svg)\n' + loop[0]], { env });
+    check('a replacement report does not erase an absent badge',
+      run('git', ['show', ':badge.svg'], { env }) === '<svg>degraded</svg>');
+    const replacement = JSON.parse(run('git', ['show', ':report.json'], { env }));
+    check('new evidence replaces only its own output and keeps its actual verdict',
+      replacement.generatedAt === '2026-09-29T13:30:00.000Z' && replacement.operational === false);
+  } finally { rmSync(work, { recursive: true, force: true }); }
 }
 console.log('runtime-priority: ' + checks + ' checks passed');

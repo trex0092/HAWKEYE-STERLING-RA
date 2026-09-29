@@ -38,7 +38,7 @@ on:
   # Sanctions Watch (05:07) with fresh lists, refreshes the per-subject state,
   # then the case-manager step turns every flag into a managed lifecycle CASE
   # (New -> Under Review -> Cleared/Escalated) with a 5-day SLA and aging
-  # alerts. Its own flat alert card and daily audit task stay SUPPRESSED so it
+  # alerts. Its own flat alert card + daily audit task stay SUPPRESSED so it
   # never duplicates the unified Daily Screening digest.
   schedule:
     - cron: '37 5 * * *'   # 05:37 UTC = 09:37 UAE daily (odd minute)
@@ -280,11 +280,9 @@ jobs:
 
       - name: Persist screening + case state (screen-state branch)
         id: persist
-        # always() so state is persisted even if the CASES step failed AFTER
-        # creating cases in Asana — otherwise the new case GIDs written locally are
-        # lost and next run creates DUPLICATE cases. Only skip on a screen error
-        # (where no valid state was produced).
-        if: always() && steps.screen.outputs.screen_error != 'true'
+        # always() preserves case GIDs even if case delivery fails after a
+        # completed screen. A cancelled/failed screen has no publishable result.
+        if: always() && steps.screen.outcome == 'success' && steps.screen.outputs.screen_error != 'true'
         env:
           # Step output crosses into the shell via env (never inline ${{ }} in run:)
           # — the title can carry an upstream error message, so this is load-bearing.
@@ -344,7 +342,7 @@ jobs:
               if [ -e "$f" ]; then
                 git update-index --add --cacheinfo "100644,$(git hash-object -w "$f"),$f"
               else
-                git update-index --force-remove "$f" 2>/dev/null || true
+                echo "::notice::retaining last published $f; this run produced no replacement"
               fi
             done
 
@@ -354,7 +352,7 @@ jobs:
 
             pushed=
             for attempt in 1 2 3 4 5; do
-              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$commit":refs/heads/screen-state && { pushed=1; break; }
+              git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$commit":refs/heads/screen-state && { pushed=1; break; }
               echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done
