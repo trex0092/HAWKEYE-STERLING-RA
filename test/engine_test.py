@@ -1383,13 +1383,15 @@ _calls["gnews"] = 0
 screen.search_adverse_media("After Breaker DMCC")
 check("Google News is not fetched once its circuit is open", _calls["gnews"] == 0)
 screen.search_gdelt = _gdelt_down
-screen._GDELT_STATE["open"] = True                   # both feeds down
+screen._GDELT_STATE["open"] = True
+screen.search_bing_news = _bing_down
+screen._BING_STATE["open"] = True                    # all three fresh-story backbones unavailable
 _raised = ""
 try:
     screen.search_adverse_media("No Coverage At All Ltd")
 except RuntimeError as e:
     _raised = str(e)
-check("breaker-open subjects still degrade loudly when GDELT is down too (no silent clear)",
+check("breaker-open subjects still degrade loudly when GDELT and Bing are down too (no silent clear)",
       "circuit open" in _raised)
 
 # Partial throttling never trips the breaker: one success resets the streak.
