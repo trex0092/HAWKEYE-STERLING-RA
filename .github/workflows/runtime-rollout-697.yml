@@ -1,0 +1,109 @@
+name: Temporary verified runtime rollout 697
+on:
+  push:
+    branches: [ops/diagnostic-only-not-for-merge-20260929]
+    paths: [.github/workflows/runtime-rollout-697.yml]
+permissions:
+  contents: read
+concurrency:
+  group: runtime-rollout-697
+  cancel-in-progress: false
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Harden runner
+        # GitHub control API only, no source-provider traffic or state writes.
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: github.com:443 api.github.com:443 *.githubapp.com:443
+      - name: Dispatch current repaired controls and preserve harvest progress
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { appendFileSync } from 'node:fs';
+          const root = 'https://api.github.com/repos/trex0092/HAWKEYE-STERLING-RA';
+          const fixed = 'd37456a2e36eb1d2d2346dbbb62fbb63e82ec2ce';
+          const firstRepair = '315f24734729f4bb916109ca49897a3499244148';
+          const api = async (path, method = 'GET', body) => {
+            const res = await fetch(root + path, { method, signal: AbortSignal.timeout(30000),
+              headers: { authorization: 'Bearer ' + process.env.GH_TOKEN,
+                accept: 'application/vnd.github+json', 'content-type': 'application/json',
+                'user-agent': 'HawkeyeSterling-VerifiedRuntimeRollout' },
+              ...(body ? { body: JSON.stringify(body) } : {}),
+            });
+            if (!res.ok) throw new Error(method + ' ' + path + ': HTTP ' + res.status);
+            const text = await res.text();
+            return text ? JSON.parse(text) : null;
+          };
+          const report = value => {
+            const text = JSON.stringify(value);
+            console.log(text);
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + '\n\n');
+          };
+          const main = await api('/branches/main');
+          const pr = await api('/pulls/697');
+          assert.equal(main.commit.sha, fixed, 'Only the exact verified current main is dispatched');
+          assert.equal(pr.merged, true);
+          assert.equal(pr.merge_commit_sha, fixed);
+          assert.equal(pr.head.sha, '70a2b63f3d1234ac4d941d2a6e0fddc58cd6f05b');
+          const active = r => ['pending', 'queued', 'in_progress', 'waiting', 'requested'].includes(r.status);
+          async function ensureRun(workflow) {
+            const path = '/actions/workflows/' + workflow + '/runs?branch=main&per_page=30';
+            let runs = (await api(path)).workflow_runs;
+            let run = runs.find(r => r.head_sha === fixed);
+            if (!run) {
+              await api('/actions/workflows/' + workflow + '/dispatches', 'POST', { ref: 'main' });
+              for (let i = 0; i < 12 && !run; i++) {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                runs = (await api(path)).workflow_runs;
+                run = runs.find(r => r.head_sha === fixed);
+              }
+            }
+            assert.ok(run, 'Dispatch must produce a verifiable run');
+            assert.equal(run.head_branch, 'main');
+            assert.equal(run.path, '.github/workflows/' + workflow);
+            report({ control: workflow, id: run.id, status: run.status,
+              conclusion: run.conclusion, sha: run.head_sha, url: run.html_url });
+            return run;
+          }
+          const nextPep = await ensureRun('pep-worldwide.yml');
+          const old = await api('/actions/runs/36567561462');
+          assert.equal(old.head_sha, firstRepair);
+          assert.equal(old.head_branch, 'main');
+          assert.equal(old.path, '.github/workflows/pep-worldwide.yml');
+          if (active(old) && active(nextPep)) {
+            // Normal cancellation invokes the harvester's checkpoint handler;
+            // its cancelled()-guarded persist step remains allowed to finish.
+            // Never force-cancel and never cancel the concurrent screening run.
+            await api('/actions/runs/' + old.id + '/cancel', 'POST');
+            report({ action: 'normal cancellation accepted for superseded PEP code only', url: old.html_url });
+            let finished = old;
+            for (let i = 0; i < 36 && finished.status !== 'completed'; i++) {
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              finished = await api('/actions/runs/' + old.id);
+            }
+            assert.equal(finished.status, 'completed', 'Old harvest must finish its cancellation cleanup');
+            const jobs = (await api('/actions/runs/' + old.id + '/jobs')).jobs;
+            const persist = jobs.flatMap(j => j.steps || []).find(s => s.name.startsWith('Persist the artifact + checkpoint'));
+            assert.equal(persist?.conclusion, 'success', 'Verify checkpoint publication before claiming preserved progress');
+            report({ action: 'PEP checkpoint publication verified', priorRun: old.id, persist: persist.conclusion });
+          }
+          // Queue the latest news-priority code, but retain the existing screen's
+          // completed work. A completed PEP harvest also requests a fresh screen.
+          await ensureRun('sanctions-screen.yml');
+          const newestPep = await api('/actions/runs/' + nextPep.id);
+          report({ control: 'PEP recovery', id: newestPep.id, status: newestPep.status,
+            conclusion: newestPep.conclusion, sha: newestPep.head_sha, url: newestPep.html_url });
+          const existingScreen = await api('/actions/runs/36567565904');
+          report({ control: 'Existing screen retained', id: existingScreen.id,
+            status: existingScreen.status, conclusion: existingScreen.conclusion, url: existingScreen.html_url });
+          NODE
