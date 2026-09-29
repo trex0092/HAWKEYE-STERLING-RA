@@ -21,6 +21,11 @@ paths = [
   '''\.env\.example''',
 ]
 regexes = [
+  # Documentation-only placeholder introduced by the Composio operating guide.
+  # The generic-api-key rule captures the words after COMPOSIO_API_KEY= even
+  # though this is explicitly not a credential value. Keep this value-specific,
+  # not a whole-file exemption, so real secrets in the guide remain detectable.
+  '''project API key''',
   # EU FSF public access token embedded in the sanctions-list download URL.
   # Matched as the BARE value (no token= prefix): the generic-api-key rule's
   # secret group captures only the value, so a prefixed regex misses it when
