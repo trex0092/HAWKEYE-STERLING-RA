@@ -11,7 +11,9 @@
 
    Reuses the task-creation pattern from scripts/fatf-watchdog.mjs. */
 
-// "Ongoing Monitoring" (merged target; workspace: Compliance Tasks)
+import { MONITORING_PROJECT, approvedSectionByName, requireApprovedSection, verifySection } from './asana-sections.mjs';
+
+// HAWKEYE STERLING APP monitoring project
 export const REG_PROJECT_GID =
   process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
 
@@ -104,10 +106,14 @@ export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6, dedupPr
    idempotent (an existing name is reused), shared by the schedulers that file
    under a named column. */
 export async function ensureSection(projectGid, name) {
-  /* PAGINATED. A single limit=100 read stops at the 100th section, so a column
-     past that point reads as absent and this function creates a DUPLICATE of
-     it — the card then lands somewhere nobody watches, which is exactly the
-     failure the mirror logic below exists to undo. */
+  /* The monitoring project is intentionally restricted to four approved
+     sections. Never recreate retired lifecycle or legacy sections there. */
+  if (String(projectGid) === MONITORING_PROJECT) {
+    const approved = approvedSectionByName(name);
+    if (!approved) throw new Error('Asana routing: refusing unapproved monitoring section: ' + name);
+    await verifySection(asana, projectGid, approved.gid);
+    return approved.gid;
+  }
   const want = String(name).trim().toLowerCase();
   for (const sec of await asanaPages('/projects/' + projectGid + '/sections?limit=100&opt_fields=name', 'sections in project ' + projectGid)) {
     if (String(sec.name || '').trim().toLowerCase() === want) return sec.gid;
@@ -158,6 +164,10 @@ export async function notifyAsana(name, notes, opts = {}) {
     console.log('asana-notify: ASANA_ACCESS_TOKEN not set — skipping Asana card ("' + name + '")');
     return null;
   }
+  if (String(project) === MONITORING_PROJECT) {
+    requireApprovedSection(project, opts.section);
+    await verifySection(asana, project, opts.section);
+  }
   const due = opts.due || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const data = {
     /* Byte-capped, not character-capped — see fitAsanaHtml's note. Alert titles
@@ -187,8 +197,11 @@ export async function notifyAsana(name, notes, opts = {}) {
   try {
     const dup = findRecentDuplicate(await listProjectTasks(project), data.name, Date.now(), 6, opts.dedupPrefix || null);
     if (dup) {
+      if (String(project) === MONITORING_PROJECT && opts.section) {
+        await asana('/sections/' + opts.section + '/addTask', { method: 'POST', body: JSON.stringify({ data: { task: dup.gid } }) });
+      }
       console.log('asana-notify: ' + (opts.dedupPrefix ? 'same-prefix card ("' + opts.dedupPrefix + '")' : 'identical card')
-        + ' already filed within 6h — skipping ("' + data.name + '")');
+        + ' already filed within 6h — verified/routed ("' + data.name + '")');
       return dup.permalink_url || null;
     }
   } catch (e) {
@@ -216,14 +229,17 @@ export async function notifyAsana(name, notes, opts = {}) {
     d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
   }
   const gid = d.data && d.data.gid;
-  /* File the new task under its section, so it lands in the right column/list
-     group instead of the project's default section. Non-fatal if it fails — the
-     task already exists in the project. */
+  /* Placement is part of delivery. A card in the wrong section is not a
+     successful delivery, so fail loudly instead of leaving it in the default
+     section. */
   if (gid && opts.section) {
-    try {
-      await asana('/sections/' + opts.section + '/addTask', { method: 'POST', body: JSON.stringify({ data: { task: gid } }) });
-    } catch (e) {
-      console.warn('asana-notify: could not move task to section ' + opts.section + ' (' + (e && e.message || e) + ')');
+    await asana('/sections/' + opts.section + '/addTask', { method: 'POST', body: JSON.stringify({ data: { task: gid } }) });
+    if (String(project) === MONITORING_PROJECT) {
+      const check = await asana('/tasks/' + gid + '?opt_fields=memberships.project.gid,memberships.section.gid');
+      const placed = ((check.data && check.data.memberships) || []).some(m =>
+        m.project && String(m.project.gid) === String(project) &&
+        m.section && String(m.section.gid) === String(opts.section));
+      if (!placed) throw new Error('Asana routing: task ' + gid + ' was created but is not in approved section ' + opts.section);
     }
   }
   return d.data && d.data.permalink_url;
