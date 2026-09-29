@@ -149,6 +149,14 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance fails when a required sanctions backbone is missing',
     !miss.domains.sanctions.operational && miss.domains.sanctions.reasons.some(r => r.includes('ofac-sdn')));
 
+  const supplementalDown = structuredClone(results);
+  supplementalDown.degraded = true;
+  supplementalDown.failures = ['Nigeria national supplement unavailable'];
+  const supp = assessRuntime({ results: supplementalDown, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance keeps sanctions operational when only supplementary sources are degraded',
+    supp.domains.sanctions.operational
+    && supp.domains.sanctions.warnings.some(r => r.includes('supplementary sanctions sources')));
+
   const amPartial = structuredClone(results);
   amPartial.enrichment.amPartial = 1;
   const am = assessRuntime({ results: amPartial, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
