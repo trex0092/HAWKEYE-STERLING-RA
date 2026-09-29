@@ -93,6 +93,17 @@ jobs:
           else
             echo "no pep-worldwide-state branch yet — first harvest"
           fi
+          # Remember the artifact we STARTED with. The persist step must only
+          # discard a newly written checkpoint when a DIFFERENT complete
+          # artifact appeared while this link was running. Previously it
+          # treated the old complete artifact as proof of completion and
+          # deleted every pause checkpoint, so each dispatched link restarted
+          # from zero forever while the August artifact stayed stale.
+          if [ -e data/pep-worldwide.json ]; then
+            echo "PEP_BASELINE_ARTIFACT_SHA=$(sha256sum data/pep-worldwide.json | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          else
+            echo "PEP_BASELINE_ARTIFACT_SHA=" >> "$GITHUB_ENV"
+          fi
 
       - name: Harvest the worldwide PEP list from Wikidata
         id: harvest
@@ -150,13 +161,17 @@ jobs:
           if [ ! -e data/pep-worldwide.json ]; then
             git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
           fi
-          if [ -e data/pep-worldwide.json ] && node -e '
+          current_artifact_sha=""
+          if [ -e data/pep-worldwide.json ]; then
+            current_artifact_sha="$(sha256sum data/pep-worldwide.json | cut -d' ' -f1)"
+          fi
+          if [ -n "$current_artifact_sha" ]              && [ "$current_artifact_sha" != "${PEP_BASELINE_ARTIFACT_SHA:-}" ]              && node -e '
             const fs = require("fs"), zlib = require("zlib");
             const b = fs.readFileSync("data/pep-worldwide.json");
             const d = JSON.parse((b[0] === 0x1f && b[1] === 0x8b) ? zlib.gunzipSync(b).toString("utf8") : b.toString("utf8"));
             process.exit(d && d.count > 0 && !d.partial ? 0 : 1);
           ' 2>/dev/null; then
-            echo "a COMPLETE artifact is already published — dropping this link's spent checkpoint"
+            echo "a NEW complete artifact appeared during this link — dropping the now-spent checkpoint"
             rm -f data/pep-worldwide-checkpoint.json
           fi
 
