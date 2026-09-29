@@ -193,7 +193,7 @@ check('a mirror equal to the primary is deduped away',
   self.projects.length === 1 && self.memberships === undefined);
 
 /* A mirror without a section still joins the project (default section). */
-const noSec = await capturePayload({ project: APP, mirror: [{ project: MON }] });
+const noSec = await capturePayload({ project: APP, section: APP_SEC, mirror: [{ project: MON }] });
 check('a sectionless mirror still joins the project',
   noSec.projects.includes(MON) && (noSec.memberships || []).some(m => m.project === MON && !('section' in m)));
 
