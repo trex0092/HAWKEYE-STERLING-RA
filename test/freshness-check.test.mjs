@@ -261,5 +261,16 @@ for (const c of CONTROLS) {
     JSON.stringify(crons) === JSON.stringify(EXPECTED_CRONS[c.id]));
 }
 
+const assuranceWf = readFileSync(join(wfDir, 'screening-assurance.yml'), 'utf8');
+check('screening assurance auto-runs after fresh daily-screen evidence',
+  /workflow_run:/.test(assuranceWf)
+  && /Daily Screening \(Sanctions \+ Adverse Media \+ PEP\)/.test(assuranceWf));
+check('screening assurance auto-runs after fresh PEP evidence',
+  /PEP Worldwide Harvest/.test(assuranceWf));
+check('screening assurance auto-runs after fresh sanctions-case evidence',
+  /Sanctions Screen/.test(assuranceWf));
+check('workflow-run assurance only verifies successful upstream evidence',
+  /github\.event\.workflow_run\.conclusion == 'success'/.test(assuranceWf));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
