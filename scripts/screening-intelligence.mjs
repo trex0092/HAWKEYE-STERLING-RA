@@ -206,7 +206,9 @@ export function localWatchlistAdapter(entries = []) {
 export function buildDecisionSupport(subject = {}, hits = []) {
   const mediaQuality = hits.map(articleEvidenceQuality).filter(Boolean);
   return {
-    fingerprint: canonicalFingerprint(subject, aliasCluster(subject, hits)),
+    // Identity fingerprint must remain stable as screening evidence changes.
+    // Hit names belong in aliases/graph evidence, not in the subject identity key.
+    fingerprint: canonicalFingerprint(subject),
     queryByExample: queryByExample(subject),
     aliases: aliasCluster(subject, hits),
     matchConfidence: evidenceWeightedConfidence(subject, hits),
