@@ -478,7 +478,7 @@ resetGdeltBreaker();
       calls.length === 1 && calls[0] === wideUrl && r2.hit === true);
 
     resetGdeltBreaker();
-    stub(() => reply(429, 'rate limited'));
+    stub(() => reply(503, 'temporarily unavailable'));
     let allErrored = true;
     for (let i = 0; i < GDELT_BREAKER_AFTER; i++) allErrored = (await checkAdverseMedia(subject, opts)).errored === true && allErrored;
     check('gdelt live path: wide AND base failing counts as one failure per subject; the breaker opens at the threshold',

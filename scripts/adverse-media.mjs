@@ -947,6 +947,10 @@ export const GNEWS_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GNEWS_MIN_IN
 export const GDELT_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GDELT_MIN_INTERVAL_MS) || 5000);
 export const BING_MIN_INTERVAL_MS = Math.max(0, Number(process.env.BING_MIN_INTERVAL_MS) || 500);
 
+// Some providers return 429 without Retry-After. Back off the shared queue anyway.
+export const ADVERSE_RATE_LIMIT_BACKOFF_MS = Math.min(900000,
+  Math.max(1000, Number(process.env.ADVERSE_RATE_LIMIT_BACKOFF_MS) || 30000));
+
 const _gnewsGate = new RequestStartGate(GNEWS_MIN_INTERVAL_MS);
 const _gdeltGate = new RequestStartGate(GDELT_MIN_INTERVAL_MS);
 const _bingGate = new RequestStartGate(BING_MIN_INTERVAL_MS);
@@ -975,7 +979,8 @@ async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, per
       headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: accept }
     });
     if (!res.ok) {
-      if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after')));
+      if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after'))
+        || (res.status === 429 ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
       if (note) note(false, res.status, ticket);
       return null;
     }
@@ -1051,9 +1056,12 @@ async function fetchGdelt(name, timeoutMs) {
   if (!ticket) return null;
   const permit = () => gdeltBreakerState.accepts(ticket) ? ticket : null;
   const wide = gdeltTerms(name);
+  let wideStatus = 0;
+  const noteWide = (_ok, status) => { wideStatus = status; };
   let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,
-    'application/json', timeoutMs, null, _gdeltGate, permit);
-  if (gd === null && wide.length > GDELT_RISK_TERMS.length && permit()) {
+    'application/json', timeoutMs, noteWide, _gdeltGate, permit);
+  // A 429 is not a query rejection. A shorter query consumes the same quota.
+  if (gd === null && wideStatus !== 429 && wide.length > GDELT_RISK_TERMS.length && permit()) {
     console.warn('adverse-media: GDELT rejected the widened query; retrying on the base term set');
     gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt,
       'application/json', timeoutMs, null, _gdeltGate, permit);
@@ -1083,13 +1091,18 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const conc = Math.max(1, concurrency || Number(process.env.ADVERSE_MEDIA_CONCURRENCY) || 6);
   const bingOn = process.env.BING_NEWS !== '0';
 
-  const gd = await fetchGdelt(name, timeoutMs);
-  let bgRaw = await (bingOn
-    ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate)
-    : Promise.resolve(null));
-  const localeResults = await mapPool(localeSet, conc, loc =>
-    fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))
-  );
+  // Independent providers start independently. GDELT queueing or a timeout
+  // must not prevent Google News and Bing from being asked. Their own shared
+  // gates still enforce pacing, and every response is validated before use.
+  const [gd, initialBing, localeResults] = await Promise.all([
+    fetchGdelt(name, timeoutMs),
+    bingOn
+      ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate)
+      : Promise.resolve(null),
+    mapPool(localeSet, conc, loc =>
+      fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))),
+  ]);
+  let bgRaw = initialBing;
 
   let retryAttempted = false;
   let retryRecovered = false;
