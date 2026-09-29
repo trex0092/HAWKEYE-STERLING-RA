@@ -1070,6 +1070,36 @@ async function withTimeout(promiseFactory, timeoutMs) {
   finally { clearTimeout(t); }
 }
 
+/* National sanctions endpoints are materially less reliable than Asana.
+   Retry transient transport failures and 429/5xx responses before declaring
+   coverage degraded. Each attempt gets its own timeout. AbortError means the
+   endpoint consumed the whole budget, so it is not multiplied into several
+   long hangs; configured fallbackSourceId coverage can take over instead. */
+async function fetchSourceResponse(url, options = {}, timeoutMs = 60000, attempts = 2, label = 'source') {
+  let lastErr = null;
+  const max = Math.max(1, Number(attempts) || 1);
+  for (let attempt = 0; attempt < max; attempt++) {
+    try {
+      const r = await withTimeout(
+        signal => fetch(url, { ...options, signal }),
+        timeoutMs
+      );
+      if (r.ok || !isRetryable(r.status) || attempt === max - 1) return r;
+      const delay = retryDelayMs(attempt, r.headers && r.headers.get && r.headers.get('retry-after'));
+      console.warn('sanctions-screen: ' + label + ' HTTP ' + r.status + ' — retry in ' + delay + 'ms');
+      await asanaSleep(delay);
+    } catch (e) {
+      lastErr = e;
+      if (e && e.name === 'AbortError') throw e;
+      if (attempt === max - 1) throw e;
+      const delay = Math.min(4000, 750 * (2 ** attempt));
+      console.warn('sanctions-screen: ' + label + ' transport failure — retry in ' + delay + 'ms: ' + String(e && e.message || e).slice(0, 120));
+      await asanaSleep(delay);
+    }
+  }
+  throw lastErr || new Error(label + ' fetch failed');
+}
+
 /* 429/5xx are retried with bounded backoff (shared policy from asana-notify);
    each attempt gets its own timeout so a hang still fails loudly. */
 const asanaSleep = ms => new Promise(res => setTimeout(res, ms));
@@ -1399,11 +1429,22 @@ async function fetchListBody(source, timeoutMs = 60000) {
   if (source.discover && source.discover.page) {
     const page = String(source.discover.page);
     if (!/^https:\/\//.test(page)) throw new Error('discover.page must be https');
-    const html = await withTimeout(async (signal) => {
-      const r = await fetch(page, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
-      if (!r.ok) throw new Error('link discovery page HTTP ' + r.status);
-      return await r.text();
-    }, timeoutMs);
+    const discoverHeaders = source.browserHeaders
+      ? {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.9',
+      }
+      : { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' };
+    const r = await fetchSourceResponse(
+      page,
+      { redirect: 'follow', headers: discoverHeaders },
+      timeoutMs,
+      source.fetchAttempts || 2,
+      source.id + ' discovery'
+    );
+    if (!r.ok) throw new Error('link discovery page HTTP ' + r.status);
+    const html = await r.text();
     href = discoverDatedLink(html, page, source.discover.fileStem, source.discover.linkMatch);
     if (!href) throw new Error('link discovery: no ' + source.discover.fileStem + '* file linked from ' + page);
   }
@@ -1443,18 +1484,22 @@ async function fetchListBody(source, timeoutMs = 60000) {
     const pagTimeout = Math.min(300000, Math.max(timeoutMs, pages * 1500));
     return withTimeout((signal) => fetchPaginatedJson(parsed.href, headers, source.paginate, signal, source.id), pagTimeout);
   }
-  return withTimeout(async (signal) => {
-    const r = await fetch(parsed.href, { signal, redirect: 'follow', headers });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    if (binary) return Buffer.from(await r.arrayBuffer());
-    /* Legacy registries still serve legacy encodings — Mexico SAT's 69-B CSV
-       is latin-1, and decoding it as UTF-8 corrupts every accented name
-       BEFORE matching (looks green, misses matches). Per-source opt-in. */
-    if (typeof source.charset === 'string' && source.charset) {
-      return new TextDecoder(source.charset).decode(await r.arrayBuffer());
-    }
-    return await r.text();
-  }, timeoutMs);
+  const r = await fetchSourceResponse(
+    parsed.href,
+    { redirect: 'follow', headers },
+    timeoutMs,
+    source.fetchAttempts || 2,
+    source.id || source.name || 'sanctions source'
+  );
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  if (binary) return Buffer.from(await r.arrayBuffer());
+  /* Legacy registries still serve legacy encodings — Mexico SAT's 69-B CSV
+     is latin-1, and decoding it as UTF-8 corrupts every accented name
+     BEFORE matching (looks green, misses matches). Per-source opt-in. */
+  if (typeof source.charset === 'string' && source.charset) {
+    return new TextDecoder(source.charset).decode(await r.arrayBuffer());
+  }
+  return await r.text();
 }
 
 /* Fold alias-only sources (source.mergeInto = <primary source id> — e.g. the
