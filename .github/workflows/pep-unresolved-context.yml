@@ -5,35 +5,81 @@ on:
     paths: [.github/workflows/pep-unresolved-context.yml]
 permissions:
   contents: read
+concurrency:
+  group: temporary-pep-context
+  cancel-in-progress: false
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Harden runner
-        # Public Wikidata reads only. No credentials, source edits or evidence writes.
+        # Read-only public source and PEP state inspection, no publication or source edits.
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
         with:
           disable-sudo: true
           egress-policy: block
-          allowed-endpoints: github.com:443 api.github.com:443 www.wikidata.org:443 *.githubapp.com:443
-      - name: Read complete entity claims and office context
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 nodejs.org:443 www.wikidata.org:443 *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 4583059b622e54a2f497010fa9ca86b028766998
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Read published coverage and resolve only current missing identifiers
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
+          git fetch origin pep-worldwide-state --depth=1
+          git show FETCH_HEAD:data/pep-worldwide.json > /tmp/pep-artifact.json
+          git show FETCH_HEAD:data/pep-worldwide-checkpoint.json > /tmp/pep-checkpoint.json
           node --input-type=module <<'NODE'
-          const people = ['Q58316593', 'Q58316598', 'Q58316599', 'Q58334883'];
-          const offices = ['Q57521595', 'Q57521602', 'Q57521603', 'Q57523402'];
-          const places = ['Q701332', 'Q701470', 'Q1917569', 'Q508177'];
-          const url = new URL('https://www.wikidata.org/w/api.php');
-          url.search = new URLSearchParams({ action: 'wbgetentities', format: 'json',
-            ids: [...people, ...offices, ...places].join('|'), props: 'info|labels|descriptions|aliases|claims|sitelinks', maxlag: '5' });
-          const response = await fetch(url, { signal: AbortSignal.timeout(30000),
-            headers: { 'User-Agent': 'HawkeyeSterling-PEPHarvest/1.0 (source verification; github.com/trex0092/HAWKEYE-STERLING-RA)' } });
-          if (!response.ok) throw new Error('Wikidata HTTP ' + response.status);
-          const data = await response.json();
-          if (data.error || data.errors) throw new Error(JSON.stringify(data.error || data.errors));
-          for (const [qid, item] of Object.entries(data.entities || {})) {
-            if (people.includes(qid)) console.log('UNRESOLVED_ITEM ' + JSON.stringify(item));
-            else console.log('CONTEXT_ITEM ' + JSON.stringify({ qid, labels: item.labels,
-              descriptions: item.descriptions, claims: item.claims, sitelinks: item.sitelinks }));
+          import { appendFileSync } from 'node:fs';
+          import { readJsonMaybeGz, hasScreenableName, seedResumeNames, pendingLabels } from './scripts/pep-worldwide.mjs';
+          const artifact = readJsonMaybeGz('/tmp/pep-artifact.json');
+          const cp = readJsonMaybeGz('/tmp/pep-checkpoint.json');
+          const qids = cp.labelQids || [...new Set(cp.holderRows.map(r => r.person))];
+          const published = new Set(artifact.entries.filter(hasScreenableName).map(e => e.qid));
+          const missing = qids.filter(q => !published.has(q));
+          const names = new Map(cp.names);
+          const reused = seedResumeNames(qids, names, artifact, cp.harvestedAt);
+          const summary = { artifactCount: artifact.count, expected: artifact.expected,
+            partial: artifact.partial, harvested: artifact.harvested, checkpointHarvest: cp.harvestedAt,
+            checkpointResume: cp.resumeCount, checkpointNames: cp.names.length,
+            sameHarvestReused: reused, remainingAfterReuse: pendingLabels(qids, names, { count: 1, index: 0 }).length,
+            missingFromArtifact: missing.slice(0, 40), missingCount: missing.length };
+          console.log('PEP_STATE_SUMMARY ' + JSON.stringify(summary));
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, '```json\n' + JSON.stringify(summary, null, 2) + '\n```\n');
+          const api = async params => {
+            const url = new URL('https://www.wikidata.org/w/api.php');
+            url.search = new URLSearchParams({ format: 'json', formatversion: '2', maxlag: '5', ...params });
+            const res = await fetch(url, { signal: AbortSignal.timeout(30000),
+              headers: { 'User-Agent': 'HawkeyeSterling-PEPHarvest/1.0 (public source verification; github.com/trex0092/HAWKEYE-STERLING-RA)' } });
+            if (!res.ok) throw new Error('Wikidata HTTP ' + res.status);
+            const data = await res.json();
+            if (data.error || data.errors) throw new Error(JSON.stringify(data.error || data.errors));
+            return data;
+          };
+          if (missing.length && missing.length <= 40) {
+            const entities = await api({ action: 'wbgetentities', ids: missing.join('|'),
+              props: 'info|labels|aliases|claims|sitelinks', redirects: 'yes' });
+            console.log('IDENTITY_REDIRECTS ' + JSON.stringify(entities.redirects || []));
+            for (const [key, e] of Object.entries(entities.entities || {})) {
+              console.log('MISSING_ENTITY ' + JSON.stringify({ key, id: e.id, missing: e.missing,
+                lastrevid: e.lastrevid, labels: e.labels, aliases: e.aliases,
+                claims: e.claims, sitelinks: e.sitelinks }));
+            }
+          }
+          const ids = ['Q58316593', 'Q58316598', 'Q58316599', 'Q58334883',
+            'Q136689291', 'Q136689343', 'Q136689373'];
+          for (const qid of ids) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const data = await api({ action: 'query', prop: 'revisions', titles: qid,
+              rvlimit: '3', rvprop: 'ids|timestamp|comment' });
+            console.log('SOURCE_REVISION_CONTEXT ' + JSON.stringify({ qid, pages: data.query?.pages }));
           }
           NODE
