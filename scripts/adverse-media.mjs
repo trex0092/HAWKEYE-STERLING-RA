@@ -958,7 +958,54 @@ export function sourceTierFor(item) {
 /* Fetch one source with a per-request timeout. Returns the parsed item array,
    or null on any failure (so the caller can tell "no hits" from "couldn't ask").
    `note(ok, status)` — optional per-result observer (the Google News breaker). */
-async function fetchSource(url, parse, accept, timeoutMs, note) {
+export class RequestStartGate {
+  constructor(intervalMs = 0) {
+    this.intervalMs = Math.max(0, Number(intervalMs) || 0);
+    this.nextAt = 0;
+    this.tail = Promise.resolve();
+  }
+
+  async wait() {
+    let release;
+    const prior = this.tail;
+    this.tail = new Promise(resolve => { release = resolve; });
+    await prior;
+    try {
+      const delay = Math.max(0, this.nextAt - Date.now());
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+      this.nextAt = Date.now() + this.intervalMs;
+    } finally {
+      release();
+    }
+  }
+
+  reset() {
+    this.nextAt = 0;
+    this.tail = Promise.resolve();
+  }
+}
+
+export const GNEWS_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GNEWS_MIN_INTERVAL_MS) || 400);
+export const GDELT_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GDELT_MIN_INTERVAL_MS) || 5000);
+export const BING_MIN_INTERVAL_MS = Math.max(0, Number(process.env.BING_MIN_INTERVAL_MS) || 500);
+
+const _gnewsGate = new RequestStartGate(GNEWS_MIN_INTERVAL_MS);
+const _gdeltGate = new RequestStartGate(GDELT_MIN_INTERVAL_MS);
+const _bingGate = new RequestStartGate(BING_MIN_INTERVAL_MS);
+
+export function resetAdverseMediaRateGates() {
+  _gnewsGate.reset();
+  _gdeltGate.reset();
+  _bingGate.reset();
+}
+
+/* Fetch one source with a run-global start gate. The screening engine processes
+   several subjects concurrently, and each subject also sweeps several locales.
+   Without a gate those two concurrency layers multiplied into bursts of dozens
+   of requests per second from one runner IP, which tripped Google/GDELT
+   protection and degraded nearly the whole book. */
+async function fetchSource(url, parse, accept, timeoutMs, note, gate = null) {
+  if (gate) await gate.wait();
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -1033,10 +1080,10 @@ export async function mapPool(items, limit, fn) {
    run-level breaker (a rejected long query is not a down feed). */
 async function fetchGdelt(name, timeoutMs) {
   const wide = gdeltTerms(name);
-  let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt, 'application/json', timeoutMs);
+  let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt, 'application/json', timeoutMs, null, _gdeltGate);
   if (gd === null && wide.length > GDELT_RISK_TERMS.length) {
     console.warn('adverse-media: GDELT rejected the widened query — retrying on the base term set');
-    gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt, 'application/json', timeoutMs);
+    gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt, 'application/json', timeoutMs, null, _gdeltGate);
   }
   if (gd === null) gdeltBreakerRecordFailure();
   else gdeltBreakerRecordSuccess();
@@ -1072,11 +1119,11 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   // per-locale Google News fetches. A Google News fetch is skipped once the
   // run-level breaker is open — skipped counts as failed (partial), never ok.
   const gdeltP = gdeltBreakerState.open ? Promise.resolve(null) : fetchGdelt(name, timeoutMs);
-  const bingP = bingOn ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs) : Promise.resolve(null);
+  const bingP = bingOn ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate) : Promise.resolve(null);
   const localeResults = await mapPool(localeSet, conc, loc =>
     (_gnews.open
       ? Promise.resolve(null)
-      : fetchSource(adverseMediaUrlFor(name, loc), parseRss, xmlAccept, timeoutMs, noteGnewsResult))
+      : fetchSource(adverseMediaUrlFor(name, loc), parseRss, xmlAccept, timeoutMs, noteGnewsResult, _gnewsGate))
       .then(items => ({ id: loc.id, items }))
   );
   const gd = await gdeltP;
