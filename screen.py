@@ -2230,18 +2230,10 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                 log(f"  adverse-media last-resort retry recovered Bing News coverage for '{name}'")
             except Exception as e:
                 log(f"  adverse-media last-resort Bing retry failed ({str(e)[:80]})")
-        if not bing_ok and not _GDELT_STATE["open"]:
-            try:
-                for a in search_gdelt(name, max_results):
-                    if a["title"] not in seen_titles:
-                        seen_titles.add(a["title"])
-                        articles.append(a)
-                gdelt_ok = True
-                _GDELT_STATE["consecutive_failures"] = 0
-                log(f"  adverse-media last-resort retry recovered GDELT coverage for '{name}'")
-            except Exception as e:
-                log(f"  adverse-media last-resort GDELT retry failed ({str(e)[:80]})")
-
+        # GDELT already has its own retry/fallback query and breaker accounting.
+        # Do not double-call it here; the last-resort chance uses Bing's
+        # independent rate-limit pool so one transient Bing refusal does not
+        # manufacture an uncovered subject.
     _record_feed_coverage(gnews_ok, gdelt_ok, bing_ok)
 
     # Degrade loudly: if EVERY Google-News fetch failed (or its breaker skipped
