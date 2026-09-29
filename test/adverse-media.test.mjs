@@ -497,6 +497,46 @@ resetGdeltBreaker();
   }
 }
 
+/* ── Last-resort independent-backbone retry ─────────────────────────────── */
+{
+  const realFetch = globalThis.fetch;
+  const realBing = process.env.BING_NEWS;
+  const realRetry = process.env.ADVERSE_BACKBONE_RETRY_MS;
+  process.env.BING_NEWS = '1';
+  process.env.ADVERSE_BACKBONE_RETRY_MS = '1';
+  resetGdeltBreaker();
+  resetGnewsBreaker();
+  resetAdverseMediaRateGates();
+  let bingCalls = 0;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('api.gdeltproject.org')) {
+      return { ok: false, status: 429, text: async () => 'rate limited' };
+    }
+    if (u.includes('www.bing.com')) {
+      bingCalls++;
+      if (bingCalls === 1) return { ok: false, status: 503, text: async () => 'try again' };
+      return { ok: true, status: 200, text: async () => '<rss><channel><title>ok</title></channel></rss>' };
+    }
+    throw new Error('unexpected fetch in retry test: ' + u);
+  };
+  try {
+    const r = await checkAdverseMedia('Retry Recovery LLC', { timeoutMs: 2000, locales: [] });
+    check('last-resort adverse retry recovers coverage when Bing succeeds on the second gated attempt',
+      !r.errored && r.retryAttempted === true && r.retryRecovered === true
+      && r.backbones.bing === true && bingCalls === 2);
+    check('recovered subject remains partial when GDELT redundancy is unavailable, never falsely complete',
+      r.partial === true && r.sourcesFailed >= 1);
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realBing === undefined) delete process.env.BING_NEWS; else process.env.BING_NEWS = realBing;
+    if (realRetry === undefined) delete process.env.ADVERSE_BACKBONE_RETRY_MS; else process.env.ADVERSE_BACKBONE_RETRY_MS = realRetry;
+    resetGdeltBreaker();
+    resetGnewsBreaker();
+    resetAdverseMediaRateGates();
+  }
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed ? 1 : 0);
 
