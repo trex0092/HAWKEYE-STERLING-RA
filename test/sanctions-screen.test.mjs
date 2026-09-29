@@ -1471,6 +1471,26 @@ check('sanctions loader resolves declared fallback coverage before setting degra
     && /unresolved\.length > 0/.test(src);
 })());
 
+check('SECO direct source declares its already-enabled SECO mirror as coverage fallback', (() => {
+  const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
+  const direct = (extra.sources || []).find(s => s.id === 'ch-seco');
+  const fallback = (extra.sources || []).find(s => s.id === 'ch-seco-opensanctions');
+  return direct && fallback && fallback.enabled !== false
+    && direct.fallbackSourceId === 'ch-seco-opensanctions';
+})());
+
+check('Poland MSWiA dynamic attachment fetch is browser-shaped and transient-retry hardened', (() => {
+  const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
+  const poland = (extra.sources || []).find(s => s.id === 'pl-mswia-sanctions');
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  return poland && poland.browserHeaders === true
+    && Number(poland.fetchAttempts) >= 3
+    && Number(poland.timeoutMs) >= 60000
+    && /async function fetchSourceResponse/.test(src)
+    && /transport failure/.test(src)
+    && /isRetryable\(r\.status\)/.test(src);
+})());
+
 /* ── paginated JSON list reader (ADB debarment register: 10 rows/page, its own
    next-link points at an unreachable internal host, so we page by size/offset) ── */
 check('getByPath walks a dotted path and tolerates a missing branch',
