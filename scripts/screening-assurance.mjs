@@ -134,6 +134,7 @@ export function assessRuntime({
   }, adverseWarnings);
 
   const pepReasons = [];
+  const pepWarnings = [];
   const pepRun = e.pepWorldwide || {};
   const pepCount = num(pepDataset?.count);
   const pepExpected = num(pepDataset?.expected);
@@ -145,13 +146,21 @@ export function assessRuntime({
     pepReasons.push('daily screen consumed a different PEP harvest than the assurance artifact');
   }
   if (pepRun.partial === true) pepReasons.push('daily screen reports the worldwide PEP layer as partial');
-  if (e.pepLookupEnabled !== true) pepReasons.push('live per-name PEP lookup is disabled');
   if (pepCount < PEP_FLOOR) pepReasons.push('worldwide PEP artifact below floor: ' + pepCount + ' < ' + PEP_FLOOR);
   if (pepDataset?.partial === true) pepReasons.push('worldwide PEP artifact is partial' + (pepExpected ? ': ' + pepCount + '/' + pepExpected : ''));
   if (!Number.isFinite(pepAge)) pepReasons.push('worldwide PEP artifact has no valid harvest timestamp');
   else if (pepAge > pepMaxAgeHours) pepReasons.push('worldwide PEP artifact is stale: ' + Math.round(pepAge) + 'h > ' + pepMaxAgeHours + 'h');
-  if (num(e.pepErrors) > 0) pepReasons.push(num(e.pepErrors) + ' subjects had live PEP lookup errors');
-  if (num(e.skipped) > 0) pepReasons.push(num(e.skipped) + ' subjects skipped PEP enrichment');
+
+  /* The complete worldwide artifact is the operative PEP screening layer: it
+     is loaded locally and matched against every subject before network
+     enrichment. checkPep() is an additional live Wikidata lookup and the case
+     digest itself labels enrichment "best-effort". A transient live lookup
+     failure or enrichment time-budget skip must therefore remain visible, but
+     cannot invalidate a fresh, complete local PEP screen. */
+  if (e.pepLookupEnabled !== true) pepWarnings.push('supplementary live per-name PEP lookup is disabled');
+  if (num(e.pepErrors) > 0) pepWarnings.push(num(e.pepErrors) + ' supplementary live PEP lookup(s) errored');
+  if (num(e.skipped) > 0) pepWarnings.push(num(e.skipped) + ' subject(s) skipped supplementary PEP enrichment');
+
   const pep = domain(pepReasons.length === 0, pepReasons, {
     persons: pepCount,
     expected: pepExpected || pepCount,
@@ -165,7 +174,7 @@ export function assessRuntime({
     liveLookupEnabled: e.pepLookupEnabled === true,
     liveLookupErrors: num(e.pepErrors),
     skippedSubjects: num(e.skipped),
-  });
+  }, pepWarnings);
 
   return {
     version: 1,
