@@ -15,24 +15,22 @@ name: Auto Release
 # failure. Gating only the publish step keeps required-reviewer control over
 # anything that actually ships while ordinary pushes stay a green no-op.
 on:
+  # APP_VERSION lives in app.js. Only a push that touches that source can create
+  # a new automatic release decision; unrelated merges must not spawn another
+  # protected-environment wait for the same unreleased version.
   push:
     branches: [main]
+    paths:
+      - 'app.js'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Serialize, never cancel: the historical failure mode (queued gated runs
-# cancelling each other, red badge with no real failure) came from
-# cancel-in-progress on a fully-gated workflow. With the gate now confined to
-# the `release` job, a non-cancelling group only prevents the remaining race —
-# two rapid merges for the SAME version both passing `check` and colliding on
-# `gh release create`; the second run now waits and lands as a green
-# "already released" no-op instead.
-concurrency:
-  group: auto-release
-  cancel-in-progress: false
-
+# Do NOT serialize the whole workflow. A real release may wait for protected
+# environment approval, and workflow-wide concurrency would make every later
+# no-op push sit behind that approval indefinitely. Only the publish job below
+# is serialized, which is the actual race that needs protection.
 jobs:
   check:
     runs-on: ubuntu-latest

@@ -34,18 +34,11 @@ name: Sanctions Screen
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/sanctions-screen.mjs'
-      - 'scripts/screening-assurance.mjs'
-      - 'data/worldwide-screening-sources.json'
-      - '.github/workflows/sanctions-screen.yml'
   # Re-scheduled 2026-07-08 as the SCREENING CASE ENGINE: runs daily after the
   # Sanctions Watch (05:07) with fresh lists, refreshes the per-subject state,
   # then the case-manager step turns every flag into a managed lifecycle CASE
   # (New -> Under Review -> Cleared/Escalated) with a 5-day SLA and aging
-  # alerts. Its own flat alert card and daily audit task stay SUPPRESSED so it
+  # alerts. Its own flat alert card + daily audit task stay SUPPRESSED so it
   # never duplicates the unified Daily Screening digest.
   schedule:
     - cron: '37 5 * * *'   # 05:37 UTC = 09:37 UAE daily (odd minute)
@@ -54,8 +47,12 @@ on:
 permissions:
   contents: read
 
+# This workflow is an OPERATIONAL control, not a code-validation workflow.
+# Source changes are exercised by CI. Keeping the runtime workflow schedule/
+# manual-only prevents ordinary merges from creating hour-long full-base
+# screens or being mistaken by freshness checks for today's mandatory control.
 concurrency:
-  group: sanctions-screen
+  group: sanctions-screen-runtime
   cancel-in-progress: false
 
 jobs:
@@ -283,11 +280,9 @@ jobs:
 
       - name: Persist screening + case state (screen-state branch)
         id: persist
-        # always() so state is persisted even if the CASES step failed AFTER
-        # creating cases in Asana — otherwise the new case GIDs written locally are
-        # lost and next run creates DUPLICATE cases. Only skip on a screen error
-        # (where no valid state was produced).
-        if: always() && steps.screen.outputs.screen_error != 'true'
+        # always() preserves case GIDs even if case delivery fails after a
+        # completed screen. A cancelled/failed screen has no publishable result.
+        if: always() && steps.screen.outcome == 'success' && steps.screen.outputs.screen_error != 'true'
         env:
           # Step output crosses into the shell via env (never inline ${{ }} in run:)
           # — the title can carry an upstream error message, so this is load-bearing.
@@ -295,34 +290,69 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}
         run: |
-          # Branch protection blocks direct pushes to main (GH006 — the old
-          # main-push here failed silently since 7 Jul), so the state lives on
-          # the screen-state branch: rebuilt as <current main> + one data
-          # commit, force-updated each run. Auth is the ephemeral env token in
-          # the push URL — the checkout persists no credentials, so nothing
-          # lands in .git/config. With STATE_ENCRYPTION_KEY set, the commit
-          # carries only <file>.enc: the plaintext working files are restored
-          # to their main-branch content so CURRENT subject data never lands
-          # on the public branch (P30, encrypt-forward).
+          # screen-state is a DATA branch. Build the commit on its existing tree
+          # and replace only screening data files. Rebuilding from the current
+          # main checkout can carry .github/workflows changes and GitHub rejects
+          # those writes for the Actions token.
           if [ -n "$(git status --porcelain data/sanctions-screen-state.json data/screening-cases-state.json data/screening-assurance.json data/badges/sanctions-operational.svg data/badges/adverse-media-operational.svg data/badges/pep-operational.svg 2>/dev/null)" ]; then
             git config user.name "sanctions-screen"
             git config user.email "actions@github.com"
-            git add data/screening-assurance.json data/badges/sanctions-operational.svg data/badges/adverse-media-operational.svg data/badges/pep-operational.svg 2>/dev/null || true
+
             if [ -n "$STATE_ENCRYPTION_KEY" ]; then
               node scripts/state-crypto.mjs encrypt data/sanctions-screen-state.json data/screening-cases-state.json
               for f in data/sanctions-screen-state.json data/screening-cases-state.json; do
-                [ -f "$f.enc" ] && git add "$f.enc"
                 git checkout HEAD -- "$f" 2>/dev/null || true
               done
             else
               echo "::warning::screen-state persisted in PLAINTEXT (subject data) - set the STATE_ENCRYPTION_KEY secret to encrypt state commits (P30)"
-              git add data/sanctions-screen-state.json
-              git add data/screening-cases-state.json 2>/dev/null || true
             fi
-            git commit -m "$TITLE [skip ci]"
+
+            GIT_INDEX_FILE="$(mktemp -u)"
+            export GIT_INDEX_FILE
+            parent_args=()
+            rc=0
+            git ls-remote --exit-code --heads origin screen-state >/dev/null 2>&1 || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              git fetch origin screen-state --depth=1
+              tip="$(git rev-parse FETCH_HEAD)"
+              git read-tree "$tip"
+              parent_args=(-p "$tip")
+            elif [ "$rc" -eq 2 ]; then
+              git read-tree --empty
+            else
+              echo "::error::could not read screen-state (ls-remote rc=$rc) - refusing to rebuild the branch blind"
+              exit 1
+            fi
+
+            files=(
+              data/screening-assurance.json
+              data/badges/sanctions-operational.svg
+              data/badges/adverse-media-operational.svg
+              data/badges/pep-operational.svg
+            )
+            if [ -n "$STATE_ENCRYPTION_KEY" ]; then
+              files+=(data/sanctions-screen-state.json.enc data/screening-cases-state.json.enc)
+              git update-index --force-remove data/sanctions-screen-state.json data/screening-cases-state.json 2>/dev/null || true
+            else
+              files+=(data/sanctions-screen-state.json data/screening-cases-state.json)
+              git update-index --force-remove data/sanctions-screen-state.json.enc data/screening-cases-state.json.enc 2>/dev/null || true
+            fi
+
+            for f in "${files[@]}"; do
+              if [ -e "$f" ]; then
+                git update-index --add --cacheinfo "100644,$(git hash-object -w "$f"),$f"
+              else
+                echo "::notice::retaining last published $f; this run produced no replacement"
+              fi
+            done
+
+            tree="$(git write-tree)"
+            commit="$(git commit-tree "$tree" "${parent_args[@]}" -m "$TITLE [skip ci]")"
+            unset GIT_INDEX_FILE
+
             pushed=
             for attempt in 1 2 3 4 5; do
-              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/screen-state && { pushed=1; break; }
+              git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$commit":refs/heads/screen-state && { pushed=1; break; }
               echo "push failed (attempt $attempt) — retrying"
               sleep $((attempt * 3))
             done

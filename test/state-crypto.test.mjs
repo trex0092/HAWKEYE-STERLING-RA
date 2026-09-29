@@ -70,5 +70,19 @@ for (const [wf, files] of [
     body.includes('git checkout HEAD -- "$f"') && !body.includes('git checkout -- "$f"'));
 }
 
+
+const sanctionsWf = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');
+check('sanctions-screen builds screen-state from the existing state branch tree, not the main checkout tree',
+  /git read-tree "\$tip"/.test(sanctionsWf)
+  && /git commit-tree "\$tree"/.test(sanctionsWf)
+  && /refs\/heads\/screen-state/.test(sanctionsWf));
+check('sanctions-screen does not force-push HEAD as the screen-state branch payload',
+  !/HEAD:refs\/heads\/screen-state/.test(sanctionsWf));
+check('sanctions-screen data-only state commit updates assurance badges and encrypted subject state',
+  /data\/screening-assurance\.json/.test(sanctionsWf)
+  && /data\/badges\/sanctions-operational\.svg/.test(sanctionsWf)
+  && /data\/sanctions-screen-state\.json\.enc/.test(sanctionsWf)
+  && /data\/screening-cases-state\.json\.enc/.test(sanctionsWf));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

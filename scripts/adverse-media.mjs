@@ -19,6 +19,8 @@
    Pure helpers (query building + RSS parsing + scoring) are unit-tested offline;
    the fetch wrapper is the only network part. */
 import { readFileSync } from 'node:fs';
+import { RecoveryCircuit, RequestStartGate, retryAfterDelayMs } from './runtime-recovery.mjs';
+export { RequestStartGate, retryAfterDelayMs };
 
 /* ── English risk terms (default) ─────────────────────────────────────────────
    Appended to the customer name. A hit on a "strong" term (see STRONG_LIST)
@@ -717,35 +719,18 @@ export function gdeltUrl(name, terms = gdeltTerms(name)) {
     + '&mode=artlist&format=json&maxrecords=' + maxRec + '&sort=datedesc&timespan=' + encodeURIComponent(span);
 }
 
-/* Run-level GDELT circuit breaker, ported from screen.py's GDELT_BREAKER_AFTER
-   (test/engine_test.py already proves this exact pattern there; this mirrors
-   it here rather than inventing a second design). GDELT throttles busy
-   shared IPs (GitHub-hosted runners) and, once it does, stays down for the
-   rest of the run: every subsequent subject would otherwise burn a full
-   fetchSource timeout (default 20s, x2 when the wide query also has to
-   retry on the base set) waiting on a feed that is not coming back. After
-   this many CONSECUTIVE hard failures (wide query AND its base-set retry
-   both failed) the feed is declared down for the REST OF THE RUN with one
-   loud log line; each subject's coverage then stands on the Google News
-   locale sweep, same as the Python engine. A success resets the counter.
-   This is module-level in-memory state: it re-arms fresh on the next
-   process invocation, because each scheduled workflow run is a fresh
-   `node` process. */
+/* A cooldown only admits one probe. Validated probe coverage, not elapsed
+   time or a late pre-outage response, is what closes the circuit. */
+export const ADVERSE_RECOVERY_COOLDOWN_MS = Math.min(900000,
+  Math.max(1000, Number(process.env.ADVERSE_RECOVERY_COOLDOWN_MS) || 120000));
 export const GDELT_BREAKER_AFTER = Number(process.env.GDELT_BREAKER_AFTER) || 5;
-export const gdeltBreakerState = { consecutiveFailures: 0, open: false };
-export function resetGdeltBreaker() {
-  gdeltBreakerState.consecutiveFailures = 0;
-  gdeltBreakerState.open = false;
-}
-export function gdeltBreakerRecordSuccess() {
-  gdeltBreakerState.consecutiveFailures = 0;
-}
-export function gdeltBreakerRecordFailure() {
-  gdeltBreakerState.consecutiveFailures++;
-  if (gdeltBreakerState.consecutiveFailures >= GDELT_BREAKER_AFTER && !gdeltBreakerState.open) {
-    gdeltBreakerState.open = true;
-    console.warn('adverse-media: GDELT down (' + GDELT_BREAKER_AFTER + ' subjects in a row) — circuit OPEN, '
-      + 'skipping GDELT for the rest of the run; Google News coverage stands');
+export const gdeltBreakerState = new RecoveryCircuit(GDELT_BREAKER_AFTER, ADVERSE_RECOVERY_COOLDOWN_MS);
+export function resetGdeltBreaker() { gdeltBreakerState.reset(); }
+export function gdeltBreakerPermit(nowMs = Date.now()) { return gdeltBreakerState.permit(nowMs); }
+export function gdeltBreakerRecordSuccess(ticket = null) { gdeltBreakerState.success(ticket); }
+export function gdeltBreakerRecordFailure(ticket = null) {
+  if (gdeltBreakerState.failure(ticket)) {
+    console.warn('adverse-media: GDELT circuit OPEN; coverage remains unavailable until a validated cooldown probe succeeds');
   }
 }
 
@@ -958,36 +943,13 @@ export function sourceTierFor(item) {
 /* Fetch one source with a per-request timeout. Returns the parsed item array,
    or null on any failure (so the caller can tell "no hits" from "couldn't ask").
    `note(ok, status)` — optional per-result observer (the Google News breaker). */
-export class RequestStartGate {
-  constructor(intervalMs = 0) {
-    this.intervalMs = Math.max(0, Number(intervalMs) || 0);
-    this.nextAt = 0;
-    this.tail = Promise.resolve();
-  }
-
-  async wait() {
-    let release;
-    const prior = this.tail;
-    this.tail = new Promise(resolve => { release = resolve; });
-    await prior;
-    try {
-      const delay = Math.max(0, this.nextAt - Date.now());
-      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-      this.nextAt = Date.now() + this.intervalMs;
-    } finally {
-      release();
-    }
-  }
-
-  reset() {
-    this.nextAt = 0;
-    this.tail = Promise.resolve();
-  }
-}
-
 export const GNEWS_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GNEWS_MIN_INTERVAL_MS) || 400);
 export const GDELT_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GDELT_MIN_INTERVAL_MS) || 5000);
 export const BING_MIN_INTERVAL_MS = Math.max(0, Number(process.env.BING_MIN_INTERVAL_MS) || 500);
+
+// Some providers return 429 without Retry-After. Back off the shared queue anyway.
+export const ADVERSE_RATE_LIMIT_BACKOFF_MS = Math.min(900000,
+  Math.max(1000, Number(process.env.ADVERSE_RATE_LIMIT_BACKOFF_MS) || 30000));
 
 const _gnewsGate = new RequestStartGate(GNEWS_MIN_INTERVAL_MS);
 const _gdeltGate = new RequestStartGate(GDELT_MIN_INTERVAL_MS);
@@ -1004,8 +966,11 @@ export function resetAdverseMediaRateGates() {
    Without a gate those two concurrency layers multiplied into bursts of dozens
    of requests per second from one runner IP, which tripped Google/GDELT
    protection and degraded nearly the whole book. */
-async function fetchSource(url, parse, accept, timeoutMs, note, gate = null) {
+async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, permit = null) {
   if (gate) await gate.wait();
+  // Check admission AFTER queueing: an earlier request may have opened it.
+  const ticket = permit ? permit() : null;
+  if (permit && !ticket) return null;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -1013,37 +978,45 @@ async function fetchSource(url, parse, accept, timeoutMs, note, gate = null) {
       signal: ctrl.signal, redirect: 'follow',
       headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: accept }
     });
-    if (note) note(res.ok, res.status);
-    if (!res.ok) return null;
-    return parse(await res.text());
-  } catch { if (note) note(false, 0); return null; }
+    if (!res.ok) {
+      if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after'))
+        || (res.status === 429 ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
+      if (note) note(false, res.status, ticket);
+      return null;
+    }
+    const items = parse(await res.text());
+    // HTTP 200 consent/error pages are not successful screening coverage.
+    if (note) note(items !== null, res.status, ticket);
+    return items;
+  } catch { if (note) note(false, 0, ticket); return null; }
   finally { clearTimeout(t); }
 }
 
-/* ── Google News run-level rate-limit BREAKER (screen.py _GNEWS_STATE parity) ──
-   The empirical failure shape: once Google's per-IP limiter trips, EVERY
-   further edition fetch in the run is refused, and hammering it only extends
-   the penalty — 805/838 subjects came back with zero coverage that way. When
-   GNEWS_BREAKER_AFTER consecutive refusals (429/403/503 or network) are seen,
-   the breaker opens for the REST OF THE RUN: remaining Google News fetches are
-   skipped (each still counted as a failed source, so every affected subject is
-   marked partial — disclosed, never a silent clear), while GDELT and Bing News
-   (independent rate-limit pools) keep the worldwide backbones up. */
+/* Google News uses the same bounded recovery policy. Only the en-US global
+   backbone may probe an open circuit; regional traffic waits for recovery. */
 const GNEWS_BREAKER_AFTER = Math.max(1, Number(process.env.GNEWS_BREAKER_AFTER) || 25);
-const _gnews = { consecutive: 0, open: false };
+const _gnews = new RecoveryCircuit(GNEWS_BREAKER_AFTER, ADVERSE_RECOVERY_COOLDOWN_MS);
 export function gnewsBreakerOpen() { return _gnews.open; }
-export function resetGnewsBreaker() { _gnews.consecutive = 0; _gnews.open = false; }
-export function noteGnewsResult(ok, status) {
-  if (ok) { _gnews.consecutive = 0; return; }
-  /* Only refusal shapes count — a parse quirk must not open the breaker. */
-  if (status === 429 || status === 403 || status === 503 || status === 0) {
-    _gnews.consecutive++;
-    if (!_gnews.open && _gnews.consecutive >= GNEWS_BREAKER_AFTER) {
-      _gnews.open = true;
-      console.error('adverse-media: Google News refused ' + _gnews.consecutive
-        + ' consecutive fetches — breaker OPEN for the rest of the run (affected subjects are marked partial; GDELT + Bing News backbones continue)');
+export function resetGnewsBreaker() { _gnews.reset(); }
+export function gnewsCanRequest(localeId = 'en-US', nowMs = Date.now()) {
+  return !_gnews.open || (localeId === 'en-US' && _gnews.canRequest(nowMs));
+}
+export function gnewsBreakerPermit(localeId = 'en-US', nowMs = Date.now()) {
+  return gnewsCanRequest(localeId, nowMs) ? _gnews.permit(nowMs) : null;
+}
+export function noteGnewsResult(ok, status, ticket = null) {
+  if (ok) { _gnews.success(ticket); return; }
+  if (ticket?.probe || [429, 403, 503, 0].includes(status)) {
+    if (_gnews.failure(ticket)) {
+      console.error('adverse-media: Google News circuit OPEN; only one en-US probe is admitted after cooldown');
     }
   }
+}
+function fetchGoogleNews(name, loc, timeoutMs) {
+  if (!gnewsCanRequest(loc.id)) return Promise.resolve(null);
+  return fetchSource(adverseMediaUrlFor(name, loc), parseRss,
+    'application/rss+xml, application/xml, text/xml', timeoutMs,
+    noteGnewsResult, _gnewsGate, () => gnewsBreakerPermit(loc.id));
 }
 
 /* ── Bing News RSS — independent THIRD news backbone (screen.py parity) ──────
@@ -1079,14 +1052,22 @@ export async function mapPool(items, limit, fn) {
    subject its worldwide backbone. Only a failure of BOTH counts toward the
    run-level breaker (a rejected long query is not a down feed). */
 async function fetchGdelt(name, timeoutMs) {
+  const ticket = gdeltBreakerPermit();
+  if (!ticket) return null;
+  const permit = () => gdeltBreakerState.accepts(ticket) ? ticket : null;
   const wide = gdeltTerms(name);
-  let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt, 'application/json', timeoutMs, null, _gdeltGate);
-  if (gd === null && wide.length > GDELT_RISK_TERMS.length) {
-    console.warn('adverse-media: GDELT rejected the widened query — retrying on the base term set');
-    gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt, 'application/json', timeoutMs, null, _gdeltGate);
+  let wideStatus = 0;
+  const noteWide = (_ok, status) => { wideStatus = status; };
+  let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,
+    'application/json', timeoutMs, noteWide, _gdeltGate, permit);
+  // A 429 is not a query rejection. A shorter query consumes the same quota.
+  if (gd === null && wideStatus !== 429 && wide.length > GDELT_RISK_TERMS.length && permit()) {
+    console.warn('adverse-media: GDELT rejected the widened query; retrying on the base term set');
+    gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt,
+      'application/json', timeoutMs, null, _gdeltGate, permit);
   }
-  if (gd === null) gdeltBreakerRecordFailure();
-  else gdeltBreakerRecordSuccess();
+  if (gd === null) gdeltBreakerRecordFailure(ticket);
+  else gdeltBreakerRecordSuccess(ticket);
   return gd;
 }
 
@@ -1105,31 +1086,50 @@ async function fetchGdelt(name, timeoutMs) {
    ADVERSE_MEDIA_CONCURRENCY, ADVERSE_MEDIA_TIMESPAN, opts.{concurrency,locales}. */
 export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, locales } = {}) {
   const xmlAccept = 'application/rss+xml, application/xml, text/xml';
-  /* Precedence: an explicit opts.locales wins; an explicit ADVERSE_MEDIA_LOCALES
-     id-list wins next (the operator chose exact editions); otherwise the
-     BUDGETED core+rotation sweep — never the raw full matrix, which is the
-     measured way to trip Google News' per-IP limiter and zero out coverage. */
   const explicitIds = String(process.env.ADVERSE_MEDIA_LOCALES || '').trim();
   const localeSet = locales || (explicitIds ? activeLocales() : budgetedLocales());
   const conc = Math.max(1, concurrency || Number(process.env.ADVERSE_MEDIA_CONCURRENCY) || 6);
   const bingOn = process.env.BING_NEWS !== '0';
 
-  // The three global backbones run together: GDELT (worldwide index, 65+
-  // languages) + Bing News (third rate-limit pool) alongside the pooled
-  // per-locale Google News fetches. A Google News fetch is skipped once the
-  // run-level breaker is open — skipped counts as failed (partial), never ok.
-  const gdeltP = gdeltBreakerState.open ? Promise.resolve(null) : fetchGdelt(name, timeoutMs);
-  const bingP = bingOn ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate) : Promise.resolve(null);
-  const localeResults = await mapPool(localeSet, conc, loc =>
-    (_gnews.open
-      ? Promise.resolve(null)
-      : fetchSource(adverseMediaUrlFor(name, loc), parseRss, xmlAccept, timeoutMs, noteGnewsResult, _gnewsGate))
-      .then(items => ({ id: loc.id, items }))
-  );
-  const gd = await gdeltP;
-  const bgRaw = await bingP;
-  const bg = bgRaw === null ? null : bgRaw.map(i => ({ ...i, source: i.source || 'Bing News' }));
+  // Independent providers start independently. GDELT queueing or a timeout
+  // must not prevent Google News and Bing from being asked. Their own shared
+  // gates still enforce pacing, and every response is validated before use.
+  const [gd, initialBing, localeResults] = await Promise.all([
+    fetchGdelt(name, timeoutMs),
+    bingOn
+      ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate)
+      : Promise.resolve(null),
+    mapPool(localeSet, conc, loc =>
+      fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))),
+  ]);
+  let bgRaw = initialBing;
 
+  let retryAttempted = false;
+  let retryRecovered = false;
+  const firstEnUs = localeResults.find(r => r.id === 'en-US');
+  const firstOk = !!((firstEnUs && firstEnUs.items !== null) || gd !== null || (bingOn && bgRaw !== null));
+  const retryBing = bingOn && bgRaw === null;
+  const retryEnUs = (gnewsCanRequest('en-US') && (!firstEnUs || firstEnUs.items === null))
+    ? localeSet.find(loc => loc.id === 'en-US')
+    : null;
+
+  if (!firstOk && (retryBing || retryEnUs)) {
+    retryAttempted = true;
+    const retryDelayMs = Math.max(0, Number(process.env.ADVERSE_BACKBONE_RETRY_MS) || 3000);
+    if (retryDelayMs) await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+
+    if (retryBing) {
+      bgRaw = await fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate);
+    }
+    if (retryEnUs) {
+      const items = await fetchGoogleNews(name, retryEnUs, timeoutMs);
+      const idx = localeResults.findIndex(r => r.id === 'en-US');
+      if (idx >= 0) localeResults[idx] = { id: 'en-US', items };
+      else localeResults.push({ id: 'en-US', items });
+    }
+  }
+
+  const bg = bgRaw === null ? null : bgRaw.map(it => ({ ...it, source: it.source || 'Bing News' }));
   const enUs = localeResults.find(r => r.id === 'en-US');
   const okLocales = localeResults.filter(r => r.items !== null);
   const backbones = {
@@ -1140,25 +1140,27 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
     bing: bingOn && bg !== null,
   };
   const backboneOk = backbones.googleNewsEnUs || backbones.gdelt || backbones.bing;
-  if (!backboneOk) return {
-    errored: true,
-    error: 'global adverse-media backbones unreachable (Google News en-US + GDELT' + (bingOn ? ' + Bing News' : '') + ')',
-    localesQueried: localeSet.length,
-    backbones,
-  };
+  retryRecovered = retryAttempted && backboneOk;
+
+  if (!backboneOk) {
+    return {
+      errored: true,
+      error: 'global adverse-media backbones unreachable after one gated retry (Google News en-US + GDELT'
+        + (bingOn ? ' + Bing News' : '') + ')',
+      localesQueried: localeSet.length,
+      backbones,
+      retryAttempted,
+      retryRecovered,
+    };
+  }
+
   const items = dedupItems([...okLocales.flatMap(r => r.items), ...(gd || []), ...(bg || [])]);
   const result = scoreAdverseMedia(name, items, ALL_TERMS);
-
   const sourcesOk = okLocales.length + (gd !== null ? 1 : 0) + (bingOn && bg !== null ? 1 : 0);
-  const sourcesTotal = localeSet.length + 1 + (bingOn ? 1 : 0); // + GDELT (+ Bing)
+  const sourcesTotal = localeSet.length + 1 + (bingOn ? 1 : 0);
   const failed = sourcesTotal - sourcesOk;
-  /* Did this run sweep the FULL locale matrix? The default sweep is a budgeted
-     rotation (≈8 of 70+ editions/run), so a standing hit found on a non-core
-     regional edition is not re-queried most days — and would clear as "no
-     longer found" off coverage that never looked. fullMatrix lets the caller
-     mark such a standing adverse-media match unverified (carry forward), so it
-     only auto-clears on a full-matrix sweep or an MLRO disposition. */
   const fullMatrix = localeSet.length >= LOCALES.length;
+
   const out = {
     ...result,
     localesQueried: localeSet.length,
@@ -1167,6 +1169,8 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
     sourcesFailed: failed,
     itemsScanned: items.length,
     backbones,
+    retryAttempted,
+    retryRecovered,
   };
   return failed ? { ...out, partial: true } : out;
 }

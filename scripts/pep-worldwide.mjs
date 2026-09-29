@@ -45,6 +45,7 @@
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { pathToFileURL } from 'node:url';
+import { retryAfterDelayMs, MAX_RETRY_AFTER_MS } from './runtime-recovery.mjs';
 
 export const PEP_LIST_NAME = 'PEP (Worldwide — Wikidata)';
 export const SPARQL_ENDPOINT = 'https://query.wikidata.org/sparql';
@@ -177,7 +178,7 @@ export function pendingOffices(positions, holderRows, want = 'label') {
    shard computes the same partition regardless of what each has banked. */
 export function pendingLabels(allQids, names, { count = PEP_SHARD_COUNT, index = PEP_SHARD_INDEX } = {}) {
   const mine = count > 1 ? shardOf(allQids, index, count) : allQids;
-  return mine.filter(q => !names.has(q));
+  return mine.filter(q => !hasScreenableName(names.get(q)));
 }
 
 /* Merge shard name-slices back into one map. Later shards never overwrite an
@@ -188,7 +189,7 @@ export function mergeShardNames(slices) {
   const names = new Map();
   for (const slice of slices) {
     for (const [qid, nm] of slice || []) {
-      if (!names.has(qid) && nm && nm.name) names.set(qid, nm);
+      if (!hasScreenableName(names.get(qid)) && hasScreenableName(nm)) names.set(qid, nm);
     }
   }
   return names;
@@ -408,19 +409,38 @@ export function parseSparqlBindings(json) {
    mul, else the first label; every other-language label AND every alias in
    every language becomes an alias (dedup, keep original scripts — the
    matcher's transliteration nets want the Arabic/Cyrillic/Han forms). */
+export function hasScreenableName(value) {
+  return !!value && typeof value.name === 'string' && value.name.trim().length > 0;
+}
 export function namesFromEntity(entity) {
-  const labels = (entity && entity.labels) || {};
-  const primary = (labels.en && labels.en.value)
-    || (labels.mul && labels.mul.value)
-    || (Object.values(labels)[0] && Object.values(labels)[0].value) || '';
-  const all = new Set();
-  for (const l of Object.values(labels)) if (l && l.value) all.add(l.value.trim());
-  for (const arr of Object.values((entity && entity.aliases) || {})) {
-    if (Array.isArray(arr)) for (const a of arr) if (a && a.value) all.add(a.value.trim());
+  if (!entity || Object.hasOwn(entity, 'missing') || Object.hasOwn(entity, 'invalid')) {
+    return { name: '', aliases: [] };
+  }
+  const labels = entity.labels || {};
+  const text = item => typeof item?.value === 'string' ? item.value.trim() : '';
+  const primary = [labels.en, labels.mul, ...Object.values(labels)].map(text).find(Boolean) || '';
+  const all = new Set(Object.values(labels).map(text).filter(Boolean));
+  for (const arr of Object.values(entity.aliases || {})) {
+    if (Array.isArray(arr)) for (const item of arr) {
+      const value = text(item);
+      if (value) all.add(value);
+    }
   }
   all.delete(primary);
-  all.delete('');
-  return { name: primary.trim(), aliases: [...all] };
+  return { name: primary, aliases: [...all] };
+}
+// Failed or empty entities must remain pending, not become banked QIDs.
+export function bankLabelNames(names, data) {
+  if (!data || data.error || data.errors) return 0;
+  let banked = 0;
+  for (const [qid, entity] of Object.entries(data.entities || {})) {
+    if (!/^Q\d+$/.test(qid)) continue;
+    const value = namesFromEntity(entity);
+    if (!hasScreenableName(value)) continue;
+    names.set(qid, value);
+    banked++;
+  }
+  return banked;
 }
 
 /* Assemble the artifact. holderRows: [{ person, pos, end?, classKey }];
@@ -445,7 +465,7 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names, exp
   const classes = {};
   for (const [qid, meta] of byPerson) {
     const nm = names.get(qid);
-    if (!nm || !nm.name) continue;   // unlabeled entity — nothing screenable
+    if (!hasScreenableName(nm)) continue;   // unlabeled entity — nothing screenable
     classes[meta.classKey] = (classes[meta.classKey] || 0) + 1;
     entries.push({
       qid, name: nm.name, aliases: nm.aliases,
@@ -458,7 +478,8 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names, exp
      recorded so every consumer can say so out loud: a PEP who has not been
      harvested yet screens CLEAN, and silence must never be read as "not a PEP".
      A complete harvest omits the flag entirely. */
-  const partial = Number.isFinite(expected) && expected > 0 && entries.length < expected;
+  expected = Math.max(byPerson.size, Number.isFinite(expected) ? expected : 0);
+  const partial = entries.length < expected;
   return {
     v: 1, list: PEP_LIST_NAME, harvested: harvestedAt, count: entries.length, classes, entries,
     ...(partial ? { partial: true, expected } : {}),
@@ -526,7 +547,7 @@ export function pepListFromDataset(dataset) {
    error instead of an unbounded stall. */
 const ATTEMPT_TIMEOUT_MS = 90000;
 
-async function fetchJson(url, { tries = 6 } = {}) {
+export async function fetchJson(url, { tries = 6, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
   let lastErr;
   for (let i = 0; i < tries; i++) {
     const ctrl = new AbortController();
@@ -534,17 +555,34 @@ async function fetchJson(url, { tries = 6 } = {}) {
     try {
       const r = await fetch(url, { signal: ctrl.signal, headers: { 'user-agent': UA, accept: 'application/sparql-results+json, application/json' } });
       if (r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503 || r.status === 504) {
-        const ra = Number(r.headers.get('retry-after')) || (2 ** i * 5);
-        console.error(`  http ${r.status} — backing off ${ra}s`);
-        await new Promise(res => setTimeout(res, ra * 1000));
+        const delayMs = Math.min(MAX_RETRY_AFTER_MS, Math.max(5000,
+          retryAfterDelayMs(r.headers?.get?.('retry-after')), 2 ** i * 5000));
+        console.error('  http ' + r.status + ' - retry delay ' + delayMs + 'ms');
         lastErr = new Error('HTTP ' + r.status);
+        if (i + 1 < tries) await wait(delayMs);
         continue;
       }
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      return await r.json();
+      const data = await r.json();
+      // MediaWiki returns maxlag with HTTP 200. An API error is not
+      // an empty entity batch and must never skip the retry path.
+      if (data && (data.error || data.errors)) {
+        const errors = Array.isArray(data.errors) ? data.errors : [data.error || data.errors];
+        const codes = errors.map(e => String(e?.code || 'unknown')).join(',');
+        lastErr = new Error('Wikidata API error: ' + codes);
+        if (errors.some(e => e?.code === 'maxlag' || e?.code === 'ratelimited')) {
+const delayMs = Math.min(MAX_RETRY_AFTER_MS, Math.max(5000,
+  retryAfterDelayMs(r.headers?.get?.('retry-after')), 2 ** i * 5000));
+console.error('  Wikidata ' + codes + ' - retry delay ' + delayMs + 'ms');
+if (i + 1 < tries) await wait(delayMs);
+continue;
+        }
+        throw lastErr;
+      }
+      return data;
     } catch (e) {
       lastErr = e;
-      await new Promise(res => setTimeout(res, 2 ** i * 2000));
+      if (i + 1 < tries) await wait(Math.min(MAX_RETRY_AFTER_MS, 2 ** i * 2000));
     } finally {
       clearTimeout(kill);
     }
@@ -570,6 +608,26 @@ async function fetchLabelWindow(qids, start) {
     jobs.push(fetchJsonSafe(labelsUrl(qids.slice(off, off + LABEL_CHUNK))));
   }
   return Promise.all(jobs);
+}
+
+/* Reuse names already published by another link of this exact harvest.
+   Older harvests remain fallback evidence only, never fresh label progress.
+   Preserve the full holder denominator and never replace a usable banked name. */
+export function seedResumeNames(qids, names, artifact, harvestedAt) {
+  if (!artifact || !harvestedAt || artifact.harvested !== harvestedAt
+    || artifact.expected !== qids.length || !Array.isArray(artifact.entries)
+    || artifact.count !== artifact.entries.length) return 0;
+  const wanted = new Set(qids);
+  let added = 0;
+  for (const entry of artifact.entries) {
+    if (!entry || !/^Q\d+$/.test(entry.qid) || !wanted.has(entry.qid)
+      || !hasScreenableName(entry) || hasScreenableName(names.get(entry.qid))) continue;
+    names.set(entry.qid, { name: entry.name.trim(),
+      aliases: Array.isArray(entry.aliases)
+        ? entry.aliases.filter(a => typeof a === 'string' && a.trim()).map(a => a.trim()) : [] });
+    added++;
+  }
+  return added;
 }
 
 async function harvest(outfile) {
@@ -832,14 +890,16 @@ async function harvest(outfile) {
      this much work wherever the link happened to be. */
   const BANK_EVERY_MS = 5 * 60 * 1000;
 
-  if (PEP_SHARD_COUNT === 1) {
+  // Person-name coverage has priority over optional office context. This
+  // function runs only after the non-sharded name pass has no unresolved QIDs.
+  const enrichOffices = async () => {
     /* Pausing mid-office hands the run to the labels phase with whatever names
        are already banked — never an empty list. The old pause wrote names: []
        unconditionally, so a pause here would have discarded every person name a
        previous link had harvested. */
     const officeState = () => ({
-      labelQids: (st && st.phase === 'labels') ? st.labelQids : [...new Set(holderRows.map(r => r.person))],
-      names: (st && st.phase === 'labels') ? [...st.names] : [],
+      labelQids: allQids,
+      names: [...names],
       next: { labelIdx: 0 },
     });
     const officePause = () => pause('labels', officeState());
@@ -938,12 +998,12 @@ async function harvest(outfile) {
       for (const p of positions.values()) if (cnames.has(p.country)) p.country = cnames.get(p.country);
       console.log(`  resolved ${cnames.size}/${countryQids.length} country names`);
     }
-  }
+  };
 
   /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
   let allQids, names;
   if (st && st.phase === 'labels') {
-    allQids = st.labelQids;
+    allQids = [...new Set([...st.labelQids, ...holderRows.map(r => r.person)])];
     names = st.names;
   } else {
     allQids = [...new Set(holderRows.map(r => r.person))];
@@ -954,6 +1014,12 @@ async function harvest(outfile) {
      list, never a slice or a remainder. Every partial write is measured against
      it, so the shortfall a consumer sees is the real one. */
   const expectedTotal = allQids.length;
+  if (st && st.phase === 'labels') {
+    let published = null;
+    try { published = readJsonMaybeGz(outfile); } catch { /* no reusable artifact */ }
+    const reused = seedResumeNames(allQids, names, published, harvestedAt);
+    if (reused) console.log('pep-worldwide: reused ' + reused + ' published names from this same harvest');
+  }
 
   /* Never a saved labelIdx — see pendingLabels: a resume that marched past a
      throttled window would drop those people from the list for good. The 07:16
@@ -1010,7 +1076,7 @@ async function harvest(outfile) {
     });
     if (overBudget()) pause('labels', snapshot());
     for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk leaves those persons unnamed — the next resume retries them
-      if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
+      bankLabelNames(names, data);
     }
     if (win % 4 === 0) console.log(`  names: ${Math.min(i + LABEL_WINDOW, personQids.length)}/${personQids.length} this run (${names.size}/${expectedTotal} banked)`);
     if (Date.now() - lastBank >= BANK_EVERY_MS) {
@@ -1030,6 +1096,16 @@ async function harvest(outfile) {
     console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`);
     return 0;
   }
+
+  const unresolved = pendingLabels(allQids, names, { count: 1, index: 0 });
+  if (unresolved.length) {
+    writeCp('labels', { labelQids: allQids, names: [...names], next: { labelIdx: 0 } });
+    shipPartialNow();
+    console.error('pep-worldwide: ' + unresolved.length + ' person labels remain unresolved; keeping checkpoint and requesting a bounded resume');
+    return RESUME_EXIT_CODE;
+  }
+
+  await enrichOffices();
 
   const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
   const gate = writeArtifact(dataset, (carried) => buildPepDataset({

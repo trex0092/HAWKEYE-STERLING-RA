@@ -104,6 +104,8 @@ jobs:
         run: node test/sanctions-screen.test.mjs
       - name: Run structured entity-resolution tests
         run: node test/entity-resolution.test.mjs
+      - name: Run cross-repo screening intelligence tests
+        run: node test/screening-intelligence.test.mjs
       - name: Run employee-screening-wiring regression test
         run: node test/employee-screening-wiring.test.mjs
       - name: Run sanctions matcher unit tests
@@ -128,6 +130,10 @@ jobs:
         run: node test/gen-icons.test.mjs
       - name: Run adverse-media unit tests
         run: node test/adverse-media.test.mjs
+      - name: Run fail-closed news and PEP runtime recovery regressions
+        run: node test/runtime-recovery.test.mjs
+      - name: Run independent provider and PEP resume priority regressions
+        run: node test/runtime-priority.test.mjs
       - name: Run PEP-check unit tests
         run: node test/pep-check.test.mjs
       - name: Run link-check unit tests
@@ -175,6 +181,8 @@ jobs:
         run: node test/prompt-register.test.mjs
       - name: Run tool & connector register test (agent authz + no model tool-calling)
         run: node test/tool-register.test.mjs
+      - name: Composio integration tests
+        run: node test/composio-integration.test.mjs
       - name: Run obligation register test (instruments, controls, watch sources)
         run: node test/obligations.test.mjs
       - name: Run GRC metrics test (metric bases + KRI wiring + appetite vs code)

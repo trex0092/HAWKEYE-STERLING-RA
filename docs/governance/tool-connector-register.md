@@ -6,7 +6,7 @@
 **Source of truth:** [`data/tool-surfaces.json`](../../data/tool-surfaces.json) (machine-readable; this page is the human view)
 **Enforcement:** [`test/tool-register.test.mjs`](../../test/tool-register.test.mjs) (CI, every pull request)
 **Review cadence:** quarterly with the [AI asset register](ai-asset-register.md), and on any new action, credential or egress host.
-**Last reviewed:** 2026-07-28
+**Last reviewed:** 2026-09-29
 
 > **Why this register exists.** Three registers now sit side by side and answer
 > different questions. [`ai-asset-register.md`](ai-asset-register.md): *which AI
@@ -30,7 +30,7 @@ caller and fails CI the moment a tool declaration appears while the register
 says tool-calling is off — so re-opening that path is a reviewed code change,
 never a quiet configuration flip.
 
-**One MCP server ships; no MCP client does.** `mcp_server.py` (2026-08-03,
+**One local MCP server ships; no application MCP client does.** `mcp_server.py` (2026-08-03,
 #377/#378) exposes the deterministic engine tools over **local stdio only** —
 stdlib JSON-RPC, no network listener, every argument validated and capped, and
 since 2026-08-04 every tool call recorded to the shared `agents.AgentLog` as
@@ -43,7 +43,10 @@ workspace through MCP tooling in their own assistant (see
 [`asana-integration-audit.md`](../asana-integration-audit.md)); that acts as the
 human, under the human's own credential, and any drift it creates is caught by
 `scripts/asana-reconcile.mjs` like any other manual edit. **No repository secret
-is ever handed to an MCP client.**
+is ever handed to the local MCP client.** The optional Composio orchestration
+surface can mint a hosted Composio MCP session only after an authenticated
+server-side admin request. Hawkeye does not consume that MCP endpoint itself,
+and model tool-calling remains disabled.
 
 ---
 
@@ -92,12 +95,15 @@ stops — that is what makes it non-agentic in the asset register.
 | **Entity reference** | `api.gleif.org`, `ws-public.interpol.int` | — | Entity/individual name as a query | Disable the individual check workflows |
 | **Regulatory watch** | `www.fatf-gafi.org`, `web.archive.org` | — | Nothing; public pages by URL | Disable the workflow · remove the source from `data/reg-sources.json` |
 | **Own site** | `hawkeye-sterling-ra.netlify.app` | — | Nothing beyond the probe | Disable site-health/currency · `PRIMARY_ORIGIN` / `ALLOWED_ORIGINS` bound the functions |
+| **Composio** | `backend.composio.dev` | `COMPOSIO_API_KEY`, `COMPOSIO_WEBHOOK_SECRET` | Only arguments and results for an explicitly invoked connected-app action. Depending on the selected tool this can include email, documents/files, Slack messages, Asana tasks or GitHub data | `COMPOSIO_ENABLED=0` · unset the API key · revoke connected accounts · keep `COMPOSIO_ALLOW_PROXY=0` |
 
 Two names, one workspace: the Python engine reads `ASANA_TOKEN` (required at
 import — the engine refuses to start rather than degrade silently) while Node
 and the Netlify functions read `ASANA_ACCESS_TOKEN`;
 `.github/workflows/netlify-deploy.yml` bridges them. Both are secrets; neither
 reaches the browser.
+
+The Composio bridge is documented in [`../composio-integration.md`](../composio-integration.md). It is an outer orchestration layer only. It is not called by sanctions, adverse-media, PEP, scoring or runtime-assurance code, and `APP_SHARED_TOKEN` is mandatory before the endpoint will operate.
 
 Vendor terms, DPA status, data residency and cross-border basis for these same
 services are **not** repeated here — they live in

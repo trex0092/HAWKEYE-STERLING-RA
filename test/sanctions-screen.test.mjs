@@ -39,10 +39,10 @@ const personTask = {
   gid: 'p1', name: 'Example Gold LLC',
   notes: 'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — UBO\nName: Ahmad Example\nNationality: Jordan\nDate of Birth: 09/04/1980\nPassport No.: N-12345\nSECTION 5 — NEXT'
 };
-const principals = parsePrincipals(personTask);
+const identityPrincipals = parsePrincipals(personTask);
 check('parsePrincipals preserves nationality, DOB and passport for identity corroboration',
-  principals.length === 1 && principals[0].nationality === 'Jordan'
-  && principals[0].dob === '09/04/1980' && principals[0].passport === 'N-12345');
+  identityPrincipals.length === 1 && identityPrincipals[0].nationality === 'Jordan'
+  && identityPrincipals[0].dob === '09/04/1980' && identityPrincipals[0].passport === 'N-12345');
 const personSubjects = parseSubjects([personTask]);
 const person = personSubjects.find(x => x.entityType === 'individual');
 check('parseSubjects carries structured identity attributes into the screening subject',
@@ -605,6 +605,13 @@ check('the issue step is always()-guarded so it still fires after the red bail',
   /if: always\(\) && \(steps\.screen\.outputs\.screen_error == 'true'/.test(screenYml));
 check('control-retry heals on missing SUCCESS (a red bail is now re-dispatched)',
   /conclusion.*success/.test(retryYml) && /sanctions-screen\.yml/.test(retryYml));
+check('operational sanctions screen is schedule/manual only — code pushes are validated by CI instead',
+  !/^\s*push:/m.test(screenYml)
+  && /^\s*schedule:/m.test(screenYml)
+  && /^\s*workflow_dispatch:/m.test(screenYml));
+check('sanctions runtime concurrency cannot be confused with source-code validation runs',
+  /group:\s*sanctions-screen-runtime/.test(screenYml)
+  && /cancel-in-progress:\s*false/.test(screenYml));
 
 /* ── contract pin: the Asana credential is checked where Asana is CALLED, not
    at import. screen.py used to read ASANA_TOKEN with an unguarded
@@ -1170,7 +1177,7 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
     /* Read the office block itself rather than a fixed character window after
        the guard — a distance-based match silently goes red the moment the block
        grows, which tells you nothing about the invariant. */
-    const officeBlock = src.slice(src.indexOf('if (PEP_SHARD_COUNT === 1) {'), src.indexOf('/* Labels phase'));
+    const officeBlock = src.slice(src.indexOf('const enrichOffices = async () => {'), src.indexOf('/* Labels phase'));
     check('PEP offices: the pass is NOT gated on the phase (that is what switched it off for good)',
       !/if \(!st \|\| st\.phase !== 'labels'\) \{[\s\S]{0,200}offices/.test(src)
       && officeBlock.includes('pendingOffices'));
@@ -1183,7 +1190,7 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
       (officeBlock.match(/officeTick\(\);/g) || []).length
         === (officeBlock.match(/if \(overBudget\(\)\) officePause\(\);/g) || []).length
       && (officeBlock.match(/officeTick\(\);/g) || []).length === 3
-      && src.indexOf('const BANK_EVERY_MS') < src.indexOf('if (PEP_SHARD_COUNT === 1) {'));
+      && src.indexOf('const BANK_EVERY_MS') < src.indexOf('const enrichOffices = async () => {'));
     /* P17/P1001 answer with an ENTITY. Left as-is the artifact would carry
        "Q30" where a country belongs, which on an MLRO's screen is barely better
        than the blank it replaced. */
@@ -1462,6 +1469,26 @@ check('sanctions loader resolves declared fallback coverage before setting degra
     && /fullyLoaded\.has\(fallback\)/.test(src)
     && /coverage preserved/.test(src)
     && /unresolved\.length > 0/.test(src);
+})());
+
+check('SECO direct source declares its already-enabled SECO mirror as coverage fallback', (() => {
+  const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
+  const direct = (extra.sources || []).find(s => s.id === 'ch-seco');
+  const fallback = (extra.sources || []).find(s => s.id === 'ch-seco-opensanctions');
+  return direct && fallback && fallback.enabled !== false
+    && direct.fallbackSourceId === 'ch-seco-opensanctions';
+})());
+
+check('Poland MSWiA dynamic attachment fetch is browser-shaped and transient-retry hardened', (() => {
+  const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
+  const poland = (extra.sources || []).find(s => s.id === 'pl-mswia-sanctions');
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  return poland && poland.browserHeaders === true
+    && Number(poland.fetchAttempts) >= 3
+    && Number(poland.timeoutMs) >= 60000
+    && /async function fetchSourceResponse/.test(src)
+    && /transport failure/.test(src)
+    && /isRetryable\(r\.status\)/.test(src);
 })());
 
 /* ── paginated JSON list reader (ADB debarment register: 10 rows/page, its own

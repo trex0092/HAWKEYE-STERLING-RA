@@ -36,12 +36,13 @@ import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDela
   fitAsanaText, fitAsanaName } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
-import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
+import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 import { checkFbi } from './fbi-check.mjs';
 import { pepListFromDataset, readJsonMaybeGz, PEP_LIST_NAME } from './pep-worldwide.mjs';
 import { corroborateIdentity, corroborateArticleIdentity, identityLabel } from './entity-resolution.mjs';
+import { buildDecisionSupport } from './screening-intelligence.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -383,6 +384,11 @@ export function normalizeResult(r, src) {
     key: src ? src.key : normalizeName(subjName),
     name: (src && src.name) || String(subjName),
     jurisdiction: src && src.jurisdiction,
+    nationality: src && src.nationality,
+    dob: src && src.dob,
+    passport: src && src.passport,
+    registrationNumber: src && src.registrationNumber,
+    idNumber: src && src.idNumber,
     gid: src && src.gid,
     entityType: (src && src.entityType) || 'organisation',
     parent: src && src.parent,
@@ -706,7 +712,10 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
            rendered CASE-XXXXXX with no link for every company). Old state
            records simply lack these fields — renderers fall back. */
         gid: r.gid, entityType: r.entityType, parent: r.parent, role: r.role,
+        nationality: r.nationality, dob: r.dob, passport: r.passport,
+        registrationNumber: r.registrationNumber, idNumber: r.idNumber,
         hits: hitDetail(lists),
+        decisionSupport: buildDecisionSupport(r, lists),
         /* Report-only row: every hit is a cleared-FP pair — the case engine
            opens no case; the report keeps the row, annotated. RECOMPUTED after
            the carry-forward merges above, never copied from r: the flag was
@@ -720,7 +729,10 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
       if (!prior || prior.signature !== sig) {
         alerts.push({ key: r.key, name: r.name, jurisdiction: r.jurisdiction, gid: r.gid,
           entityType: r.entityType, parent: r.parent, role: r.role,
-          band, topScore: r.topScore, recommendation, lists, isNew: !prior });
+          nationality: r.nationality, dob: r.dob, passport: r.passport,
+          registrationNumber: r.registrationNumber, idNumber: r.idNumber,
+          band, topScore: r.topScore, recommendation, lists,
+          decisionSupport: buildDecisionSupport(r, lists), isNew: !prior });
       }
     } else if (prev[r.key]) {
       const prior = prev[r.key];
@@ -1058,6 +1070,36 @@ async function withTimeout(promiseFactory, timeoutMs) {
   finally { clearTimeout(t); }
 }
 
+/* National sanctions endpoints are materially less reliable than Asana.
+   Retry transient transport failures and 429/5xx responses before declaring
+   coverage degraded. Each attempt gets its own timeout. AbortError means the
+   endpoint consumed the whole budget, so it is not multiplied into several
+   long hangs; configured fallbackSourceId coverage can take over instead. */
+async function fetchSourceResponse(url, options = {}, timeoutMs = 60000, attempts = 2, label = 'source') {
+  let lastErr = null;
+  const max = Math.max(1, Number(attempts) || 1);
+  for (let attempt = 0; attempt < max; attempt++) {
+    try {
+      const r = await withTimeout(
+        signal => fetch(url, { ...options, signal }),
+        timeoutMs
+      );
+      if (r.ok || !isRetryable(r.status) || attempt === max - 1) return r;
+      const delay = retryDelayMs(attempt, r.headers && r.headers.get && r.headers.get('retry-after'));
+      console.warn('sanctions-screen: ' + label + ' HTTP ' + r.status + ' — retry in ' + delay + 'ms');
+      await asanaSleep(delay);
+    } catch (e) {
+      lastErr = e;
+      if (e && e.name === 'AbortError') throw e;
+      if (attempt === max - 1) throw e;
+      const delay = Math.min(4000, 750 * (2 ** attempt));
+      console.warn('sanctions-screen: ' + label + ' transport failure — retry in ' + delay + 'ms: ' + String(e && e.message || e).slice(0, 120));
+      await asanaSleep(delay);
+    }
+  }
+  throw lastErr || new Error(label + ' fetch failed');
+}
+
 /* 429/5xx are retried with bounded backoff (shared policy from asana-notify);
    each attempt gets its own timeout so a hang still fails loudly. */
 const asanaSleep = ms => new Promise(res => setTimeout(res, ms));
@@ -1113,7 +1155,7 @@ export async function asanaPaged(projectGid, path, optFields, token, what, { sof
   }
 }
 
-async function fetchAsanaSubjects(projectGid, token) {
+export async function fetchAsanaSubjects(projectGid, token) {
   return parseSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
 }
 
@@ -1387,11 +1429,22 @@ async function fetchListBody(source, timeoutMs = 60000) {
   if (source.discover && source.discover.page) {
     const page = String(source.discover.page);
     if (!/^https:\/\//.test(page)) throw new Error('discover.page must be https');
-    const html = await withTimeout(async (signal) => {
-      const r = await fetch(page, { signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' } });
-      if (!r.ok) throw new Error('link discovery page HTTP ' + r.status);
-      return await r.text();
-    }, timeoutMs);
+    const discoverHeaders = source.browserHeaders
+      ? {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.9',
+      }
+      : { 'user-agent': 'HawkeyeSterling-SanctionsScreen/1.0' };
+    const r = await fetchSourceResponse(
+      page,
+      { redirect: 'follow', headers: discoverHeaders },
+      timeoutMs,
+      source.fetchAttempts || 2,
+      source.id + ' discovery'
+    );
+    if (!r.ok) throw new Error('link discovery page HTTP ' + r.status);
+    const html = await r.text();
     href = discoverDatedLink(html, page, source.discover.fileStem, source.discover.linkMatch);
     if (!href) throw new Error('link discovery: no ' + source.discover.fileStem + '* file linked from ' + page);
   }
@@ -1431,18 +1484,22 @@ async function fetchListBody(source, timeoutMs = 60000) {
     const pagTimeout = Math.min(300000, Math.max(timeoutMs, pages * 1500));
     return withTimeout((signal) => fetchPaginatedJson(parsed.href, headers, source.paginate, signal, source.id), pagTimeout);
   }
-  return withTimeout(async (signal) => {
-    const r = await fetch(parsed.href, { signal, redirect: 'follow', headers });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    if (binary) return Buffer.from(await r.arrayBuffer());
-    /* Legacy registries still serve legacy encodings — Mexico SAT's 69-B CSV
-       is latin-1, and decoding it as UTF-8 corrupts every accented name
-       BEFORE matching (looks green, misses matches). Per-source opt-in. */
-    if (typeof source.charset === 'string' && source.charset) {
-      return new TextDecoder(source.charset).decode(await r.arrayBuffer());
-    }
-    return await r.text();
-  }, timeoutMs);
+  const r = await fetchSourceResponse(
+    parsed.href,
+    { redirect: 'follow', headers },
+    timeoutMs,
+    source.fetchAttempts || 2,
+    source.id || source.name || 'sanctions source'
+  );
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  if (binary) return Buffer.from(await r.arrayBuffer());
+  /* Legacy registries still serve legacy encodings — Mexico SAT's 69-B CSV
+     is latin-1, and decoding it as UTF-8 corrupts every accented name
+     BEFORE matching (looks green, misses matches). Per-source opt-in. */
+  if (typeof source.charset === 'string' && source.charset) {
+    return new TextDecoder(source.charset).decode(await r.arrayBuffer());
+  }
+  return await r.text();
 }
 
 /* Fold alias-only sources (source.mergeInto = <primary source id> — e.g. the
@@ -1511,7 +1568,11 @@ export async function loadSanctionsLists(cfg) {
   try { sources = loadSources(readFileSync(cfg.sourcesFile, 'utf8')).filter(s => s.enabled !== false); }
   catch (e) { return { lists: [], degraded: true, fetched: 0, total: 0, notes: ['sources file unreadable: ' + (e && e.message || e)] }; }
 
-  if (existsSync(cfg.extraFile)) {
+  if (Array.isArray(cfg.sourceIds) && cfg.sourceIds.length) {
+    const wanted = new Set(cfg.sourceIds.map(String));
+    sources = sources.filter(s => wanted.has(String(s.id || '')));
+  }
+  if (existsSync(cfg.extraFile) && !(Array.isArray(cfg.sourceIds) && cfg.sourceIds.length)) {
     try {
       const extra = JSON.parse(readFileSync(cfg.extraFile, 'utf8'));
       for (const s of ((extra && extra.sources) || [])) if (s && s.enabled !== false && (s.url || s.file)) sources.push(s);
@@ -1609,7 +1670,7 @@ const strongerBand = (a, b) => ((BAND_RANK[a] || 0) >= (BAND_RANK[b] || 0) ? a :
    plus (optional) adverse-media and PEP signals. Produces the SAME normalised
    per-subject rows the engine path produced, so diff/alert/report are unchanged.
    Each signal contributes a `lists[]` entry; a subject with any hit is material. */
-async function screenLocally(subjects, cfg) {
+export async function screenLocally(subjects, cfg) {
   const loaded = await loadSanctionsLists(cfg);
   /* No list at all = we cannot screen sanctions — never infer a clean result. */
   if (!loaded.lists.length) return { results: [], anyOk: false, degraded: true, errored: 0, notes: loaded.notes, coverage: loaded };
@@ -1633,7 +1694,8 @@ async function screenLocally(subjects, cfg) {
      and report it, but it does NOT degrade the sanctions screen or weaken its
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
-  let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
+  let amErrors = 0, amPartial = 0, amRetryAttempted = 0, amRetryRecovered = 0;
+  let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0 };
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
@@ -1708,7 +1770,9 @@ async function screenLocally(subjects, cfg) {
       if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
       if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
       if (!am.backbones?.bing) amBackboneFailures.bing++;
-      if (am.partial) amPartial++;   // narrowed coverage — disclosed, never silent
+      if (am.retryAttempted) amRetryAttempted++;
+      if (am.retryRecovered) amRetryRecovered++;
+      if (am.partial) amPartial++;   // narrowed redundancy — disclosed, never silent
       if (am.errored) { amErrors++; enrichmentIncomplete = true; }
       else {
         /* A disclosed-partial sweep (a queried edition failed) OR a budgeted
@@ -1730,6 +1794,7 @@ async function screenLocally(subjects, cfg) {
           score: am.score,
           identity,
           source: (am.top && am.top.source) || '',
+          sourceTier: am.top ? sourceTierFor(am.top) : 3,
           evidenceUrl: (am.top && (am.top.link || am.top.url)) || '',
           provenance: { sourceId: 'adverse-media', sourceUrl: (am.top && (am.top.link || am.top.url)) || '' },
         });
@@ -1822,12 +1887,13 @@ async function screenLocally(subjects, cfg) {
   }
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
-  if (amPartial) console.log('sanctions-screen: adverse-media coverage was PARTIAL for ' + amPartial + ' subject(s) — some locales/GDELT did not answer (disclosed in the digest)');
+  if (amPartial) console.log('sanctions-screen: adverse-media redundancy was PARTIAL for ' + amPartial + ' subject(s) — at least one queried source did not answer (disclosed in the digest)');
+  if (amRetryAttempted) console.log('sanctions-screen: last-resort adverse backbone retry attempted for ' + amRetryAttempted + ' subject(s); recovered ' + amRetryRecovered);
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -2083,7 +2149,9 @@ async function main() {
       id: L.id || '', name: L.name, count: (L.names || []).length, partial: !!L.partial
     })),
     failures: screen.notes || [],
-    enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0, pepErrors: screen.pepErrors || 0,
+    enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0,
+      amRetryAttempted: screen.amRetryAttempted || 0, amRetryRecovered: screen.amRetryRecovered || 0,
+      pepErrors: screen.pepErrors || 0,
       skipped: screen.enrichSkipped || 0,
       pepLookupEnabled: !!cfg.pep,
       pepWorldwide: cfg.pepWorldwideEvidence || { active: false, count: 0, harvested: '', partial: false, expected: 0 },
@@ -2115,7 +2183,8 @@ async function main() {
       lists: (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean),
       /* Evidence detail (matched designated name · score · mechanism ·
          confidence) so the digest names WHAT matched, not just which list. */
-      hits: hitDetail((a.lists || []).filter(h => typeof h === 'object'))
+      hits: hitDetail((a.lists || []).filter(h => typeof h === 'object')),
+      decisionSupport: a.decisionSupport || buildDecisionSupport(a, (a.lists || []).filter(h => typeof h === 'object'))
     })),
     cleared: cleared.map(c => c.name)
   }, null, 2) + '\n');

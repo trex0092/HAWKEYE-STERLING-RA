@@ -123,5 +123,16 @@ for (const wf of workflows) {
   }
 }
 
+/* 6. AUTO RELEASE TRIGGER — APP_VERSION is sourced from app.js. Unrelated
+   main pushes must not create duplicate protected-environment waits for the
+   same unreleased version; manual dispatch remains the recovery path. */
+{
+  const auto = readFileSync(join(wfDir, 'auto-release.yml'), 'utf8');
+  check('auto-release push trigger is scoped to app.js (the APP_VERSION source)',
+    /push:\s*\n\s*branches:\s*\[main\][\s\S]*?paths:\s*\n\s*- ['"]app\.js['"]/.test(auto));
+  check('auto-release keeps workflow_dispatch for manual/recovery publishing',
+    /^\s{2}workflow_dispatch:\s*$/m.test(auto));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

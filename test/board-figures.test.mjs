@@ -86,6 +86,13 @@ console.log('\n— sanctions country coverage register (195) —\n');
     unRows.length === 193 && !unRows.some(r => r.country === 'Holy See' || r.country === 'Palestine') && on('un-consolidated'));
   check('baseline EU covers exactly the 27 EU members and the EU list is enabled',
     reg.filter(r => (r.baseline || []).includes('EU')).length === 27 && on('eu-fsf'));
+  const badgeSrc = readFileSync(join(ROOT, 'scripts/coverage-figures.mjs'), 'utf8');
+  const sanctionsDepthBadge = readFileSync(join(ROOT, 'data/badges/sanctions-worldwide.svg'), 'utf8');
+  check('national sanctions-source depth badge is informational, not a false red runtime verdict',
+    /informational \? '#007ec6'/.test(badgeSrc)
+    && /sanctions national-source depth/.test(sanctionsDepthBadge)
+    && /#007ec6/.test(sanctionsDepthBadge)
+    && !/#e05d44/.test(sanctionsDepthBadge));
   check('non-screened statuses other than not-researched carry a note',
     reg.filter(r => r.status !== 'screened' && r.status !== 'not-researched').every(r => r.note));
 }
@@ -149,18 +156,37 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance fails when a required sanctions backbone is missing',
     !miss.domains.sanctions.operational && miss.domains.sanctions.reasons.some(r => r.includes('ofac-sdn')));
 
+  const supplementalDown = structuredClone(results);
+  supplementalDown.degraded = true;
+  supplementalDown.failures = ['Nigeria national supplement unavailable'];
+  const supp = assessRuntime({ results: supplementalDown, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance keeps sanctions operational when only supplementary sources are degraded',
+    supp.domains.sanctions.operational
+    && supp.domains.sanctions.warnings.some(r => r.includes('supplementary sanctions sources')));
+
   const amPartial = structuredClone(results);
   amPartial.enrichment.amPartial = 1;
   const am = assessRuntime({ results: amPartial, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
-  check('runtime assurance fails when adverse-media coverage is partial',
-    !am.domains.adverseMedia.operational);
+  check('runtime assurance stays operational when redundancy is reduced but no subject lost all adverse-media coverage',
+    am.domains.adverseMedia.operational
+    && am.domains.adverseMedia.warnings.some(r => r.includes('reduced adverse-media source redundancy')));
 
   const gdeltDown = structuredClone(results);
   gdeltDown.enrichment.amBackboneFailures.gdelt = 1;
   gdeltDown.enrichment.amBackbones = ['Google News RSS', 'Bing News'];
   const gd = assessRuntime({ results: gdeltDown, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
-  check('runtime assurance fails when a configured adverse-media backbone did not answer',
-    !gd.domains.adverseMedia.operational && gd.domains.adverseMedia.reasons.some(r => r.includes('GDELT')));
+  check('runtime assurance warns, but does not fail, when one redundant adverse-media backbone is unavailable',
+    gd.domains.adverseMedia.operational
+    && gd.domains.adverseMedia.warnings.some(r => r.includes('GDELT')));
+
+  const uncovered = structuredClone(results);
+  uncovered.enrichment.amErrors = 1;
+  uncovered.enrichment.amRetryAttempted = 1;
+  uncovered.enrichment.amRetryRecovered = 0;
+  const uc = assessRuntime({ results: uncovered, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance fails when any subject has zero global adverse-media backbone coverage after retry',
+    !uc.domains.adverseMedia.operational
+    && uc.domains.adverseMedia.reasons.some(r => r.includes('zero adverse-media backbone coverage')));
 
   const pepNotConsumed = structuredClone(results);
   pepNotConsumed.enrichment.pepWorldwide.active = false;
@@ -172,6 +198,22 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const pp = assessRuntime({ results, pepDataset: partialPep, contract, nowMs, expectedAdverseMatrix: 79 });
   check('runtime assurance fails when the worldwide PEP artifact is partial',
     !pp.domains.pep.operational);
+
+  const pepLiveErrors = structuredClone(results);
+  pepLiveErrors.enrichment.pepErrors = 5;
+  pepLiveErrors.enrichment.skipped = 1;
+  const ple = assessRuntime({ results: pepLiveErrors, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance keeps PEP operational when the complete local artifact screened all subjects but supplementary live lookups errored',
+    ple.domains.pep.operational
+    && ple.domains.pep.warnings.some(r => r.includes('supplementary live PEP lookup'))
+    && ple.domains.pep.warnings.some(r => r.includes('supplementary PEP enrichment')));
+
+  const pepLiveOff = structuredClone(results);
+  pepLiveOff.enrichment.pepLookupEnabled = false;
+  const plo = assessRuntime({ results: pepLiveOff, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance treats disabled live PEP lookup as a warning when fresh complete local PEP coverage is present',
+    plo.domains.pep.operational
+    && plo.domains.pep.warnings.some(r => r.includes('live per-name PEP lookup is disabled')));
 
   const stale = checkStored({ ...ok, generatedAt: '2026-09-20T00:00:00.000Z' },
     { nowMs, maxAgeHours: 36 });

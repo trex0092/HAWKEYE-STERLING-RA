@@ -92,9 +92,12 @@ function xmlEscape(s) {
 }
 
 export function buildBadges(figures) {
-  const badge = (label, value) => {
+  const badge = (label, value, { informational = false } = {}) => {
     const message = value + ' / 195';
-    const color = value === 195 ? '#4c1' : '#e05d44';
+    // Coverage-depth metrics are descriptive, not operational pass/fail
+    // controls. Use informational blue for partial depth; reserve red for
+    // actual runtime-assurance failures in screening-assurance.mjs.
+    const color = informational ? '#007ec6' : (value === 195 ? '#4c1' : '#e05d44');
     const labelWidth = Math.max(110, label.length * 7 + 18);
     const valueWidth = 72;
     const total = labelWidth + valueWidth;
@@ -112,7 +115,7 @@ export function buildBadges(figures) {
     ].join('');
   };
   return {
-    sanctions: badge('sanctions worldwide coverage', figures.sanctionsCountriesCovered),
+    sanctions: badge('sanctions national-source depth', figures.sanctionsCountriesCovered, { informational: true }),
     adverseMedia: badge('adverse media worldwide coverage', figures.adverseMediaCountriesCovered),
     pep: badge('PEP worldwide coverage', figures.pepCountriesCovered),
   };

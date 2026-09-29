@@ -2,37 +2,47 @@
 
 Updated: 2026-09-29
 
-This register records external repositories reviewed while improving HAWKEYE screening. It distinguishes architectural influence from code/data import. No third-party sanctions or PEP dataset is imported by this change set.
+This register records external repositories reviewed while improving HAWKEYE screening. It distinguishes architectural influence from code/data import. No third-party sanctions or PEP production dataset is imported by this change set.
 
-| Repository | Observed licence metadata | HAWKEYE use | Adoption status |
-| --- | --- | --- | --- |
-| opensanctions/opensanctions | MIT code repository | Source normalization, provenance, alias/entity modelling patterns | Architecture only; no OpenSanctions production dataset imported |
-| opensanctions/yente | MIT | Bulk/entity matching and query-by-example benchmark pattern | Existing shadow benchmark retained; not promoted to primary matcher |
-| opensanctions/nomenklatura | MIT | Entity resolution and canonical identity concepts | Native structured corroboration layer added |
-| moj-analytical-services/splink | MIT | Multi-attribute probabilistic linkage concepts | Native weighted corroboration added; no Splink runtime dependency |
-| checkmarble/marble | NOASSERTION in GitHub metadata | Case/audit lifecycle concepts | Reference only |
-| FinCrimeRadar/fincrimeradar | No licence metadata exposed by GitHub | Sanctions/PEP/adverse-media architecture comparison | Reference only; no code/data imported |
-| vyayasan/kyc-analyst | MIT | Human-in-the-loop checkpoints and deterministic evidence | Existing MLRO/four-eyes model retained |
-| plutopulp/adverse-media-screening | No licence metadata exposed by GitHub | Article/entity/evidence separation | Native adverse-media identity evidence added; no code imported |
-| intuon-technologies/AML | Apache-2.0 | On-prem screening/case architecture | Reference only |
-| AbgarSim/sieve-aml | MIT | Small ingest-normalize-index-match pipeline | Reference only |
-| alephdata/aleph | MIT | Investigative provenance and entity evidence | Hit provenance/evidence URLs added |
-| alephdata/followthemoney | MIT | Entity property modelling | Structured identity fields carried through screening |
+## Implemented capabilities mapped to external repositories
 
-## Implemented from the review
+| # | Repository | Observed licence metadata | Capability implemented natively in HAWKEYE | Live integration |
+|---:|---|---|---|---|
+| 1 | opensanctions/opensanctions | MIT code repository | Per-hit provenance completeness, source IDs and evidence URLs | `scripts/screening-intelligence.mjs::provenanceCompleteness`; persisted on sanctions/PEP/media hits |
+| 2 | opensanctions/yente | MIT | Query-by-example structured screening profile | `queryByExample`; attached to every flagged subject's decision-support record |
+| 3 | opensanctions/nomenklatura | MIT | Canonical entity fingerprint and alias clustering | `canonicalFingerprint` + `aliasCluster`; persisted to state/case evidence |
+| 4 | moj-analytical-services/splink | MIT | Explainable field-level evidence weighting | `evidenceWeightedConfidence`; name + identity + provenance + independent corroboration |
+| 5 | checkmarble/marble | NOASSERTION in GitHub metadata | Deterministic case priority and review SLA | `casePriority`; rendered on Asana case cards and daily digest |
+| 6 | FinCrimeRadar/fincrimeradar | No licence metadata exposed by GitHub | Sanctions/PEP/adverse-media cross-domain fusion | `domainFusion`; rendered in Asana evidence |
+| 7 | vyayasan/kyc-analyst | MIT | Human-verification checklist with explicit missing evidence | `analystChecklist`; missing evidence shown on case cards |
+| 8 | plutopulp/adverse-media-screening | No licence metadata exposed by GitHub | Article evidence quality scoring using source tier + identity + provenance | `articleEvidenceQuality`; stored in decision-support evidence |
+| 9 | AbgarSim/sieve-aml | MIT | Screening-source/ingest diagnostics and provenance coverage metric | `sourceDiagnostics`; case evidence reports incomplete provenance |
+| 10 | alephdata/followthemoney | MIT | Typed entity projection for Person/Organization screening subjects | `typedEntity`; persisted in decision-support record |
+| 11 | alephdata/aleph | MIT | Subject → hit → source relationship graph | `relationshipGraph`; persisted for investigative traceability |
+| 12 | intuon-technologies/AML | Apache-2.0 | Normalized local-watchlist adapter | `localWatchlistAdapter`; shared internal entity shape for firm-owned watchlists |
 
-1. Structured identity corroboration now uses available CDD attributes in addition to name similarity: nationality/jurisdiction, DOB, passport/registration identifiers, and entity type.
-2. The layer is recall-monotone: contradictory identity evidence is recorded for analyst review but never suppresses an existing sanctions hit.
-3. PEP matches now carry structured corroboration and their Wikidata entity reference.
-4. Adverse-media matches now carry identity-evidence level plus source and evidence URL.
-5. Sanctions hits now carry configured source provenance where available.
+All 12 capabilities are implemented without adding a runtime dependency. The main integration points are:
+
+- `scripts/screening-intelligence.mjs` — native implementation of the adopted patterns.
+- `scripts/sanctions-screen.mjs` — attaches decision-support evidence to live flagged subjects, state, and results artifacts.
+- `scripts/screening-cases.mjs` — renders case priority, SLA, confidence factors, cross-domain evidence, provenance coverage, missing evidence, and subject fingerprint into Asana case cards and the daily screening digest.
+- `test/screening-intelligence.test.mjs` — offline regression coverage for every adopted capability.
+- `.github/workflows/ci.yml` — executes the intelligence regression suite on every CI run.
+
+## Earlier screening improvements retained
+
+1. Structured identity corroboration uses available CDD attributes in addition to name similarity: nationality/jurisdiction, DOB, passport/registration identifiers, and entity type.
+2. Contradictory identity evidence is retained for analyst review and never suppresses an existing sanctions hit.
+3. PEP matches carry structured corroboration and Wikidata entity references.
+4. Adverse-media matches carry identity-evidence level, source and evidence URL.
+5. Sanctions hits carry configured source provenance where available.
 6. CDD principal parsing preserves nationality, DOB and passport fields for screening.
-7. Offline regression tests and CI coverage protect the new behavior.
-8. The existing yente benchmark remains shadow-only until measured results justify a governed matcher change.
+7. The yente comparison remains shadow/benchmark-only; it is not the operative matcher.
 
-## Explicit non-adoptions
+## Licensing and supply-chain boundary
 
 - No OpenSanctions production dataset is imported by this work. Software repository licence and data licence are treated as separate questions.
-- Repositories without clear licence metadata are reference-only.
+- Repositories without clear licence metadata are idea/reference sources only. No source code is copied from them.
 - No third-party matcher replaces HAWKEYE's live matcher without benchmark evidence and model-validation/change-control approval.
-- No adverse-media LLM is added to the live decision path; deterministic evidence remains the primary control.
+- No new runtime package is added. The implementation remains dependency-free at runtime.
+- No adverse-media LLM is added to the operative screening decision path. Deterministic evidence remains authoritative.
