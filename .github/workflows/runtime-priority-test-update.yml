@@ -16,7 +16,7 @@ jobs:
       contents: write
     steps:
       - name: Harden runner
-        # Tests are offline; checkout, toolchain and verified branch push only.
+        # Offline tests, checkout and verified branch push only.
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
         with:
           disable-sudo: true
@@ -26,69 +26,35 @@ jobs:
             objects.githubusercontent.com:443 nodejs.org:443 *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: fix/runtime-priority-20260929
+          ref: fix/runtime-priority-tests-20260929
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Update source boundary and exercise successful office enrichment
+      - name: Apply immutable regression correction to merged source
         run: |
-          test "$(git rev-parse HEAD)" = 'df4df14d9ecb749cf8307fd08ea89ab6ae4dd186'
-          node --input-type=module <<'NODE'
+          test "$(git rev-parse HEAD)" = '3a8aa3cde52784c0bc0b60ae811a23986ee8381e'
+          git fetch origin b20f164fec3eb32a282f6a2d2a6c61f6632c070c --depth=1
+          node --input-type=module <<'APPLY'
           import assert from 'node:assert/strict';
-          import { readFileSync, writeFileSync } from 'node:fs';
-          const guardPath = 'test/sanctions-screen.test.mjs';
-          const before = "const officeBlock = src.slice(src.indexOf('if (PEP_SHARD_COUNT === 1) {'), src.indexOf('/* Labels phase'));";
-          const guard = readFileSync(guardPath, 'utf8');
-          assert.equal(guard.split(before).length, 2, 'Unique office-block boundary');
-          writeFileSync(guardPath, guard.replace(before,
-            "const officeBlock = src.slice(src.indexOf('const enrichOffices = async () => {'), src.indexOf('/* Labels phase'));"));
-          const path = 'test/runtime-priority.test.mjs';
-          const text = readFileSync(path, 'utf8');
-          const marker = '} finally { rmSync(dir, { recursive: true, force: true }); }';
-          assert.equal(text.split(marker).length, 2);
-          const addition = String.raw`  // Complete the same checkpoint. Office work must still run after names.
-            writeFileSync(preload, 'globalThis.fetch = ' + (async function (url) {
-              const u = new URL(url);
-              if (u.hostname === 'www.wikidata.org') {
-                const ids = u.searchParams.get('ids').split('|');
-                console.log('LABEL_IDS=' + ids.join(','));
-                return { ok: true, status: 200, headers: { get: () => null },
-                  json: async () => ({ entities: Object.fromEntries(ids.map(id =>
-                    [id, { id, labels: { en: { value: id === 'Q2' ? 'Synthetic Person Two' : 'Synthetic Office' } } }])) }) };
-              }
-              if (u.hostname === 'query.wikidata.org') return {
-                ok: true, status: 200, headers: { get: () => null },
-                json: async () => ({ results: { bindings: [] } }),
-              };
-              throw new Error('Unexpected network');
-            }).toString() + ';');
-            const done = spawnSync(process.execPath,
-              ['--import', pathToFileURL(preload).href, 'scripts/pep-worldwide.mjs', 'harvest', outfile],
-              { cwd: process.cwd(), encoding: 'utf8', timeout: 15000,
-                env: { ...process.env, PEP_FLOOR: '1', PEP_SHARD_COUNT: '1', PEP_SHARD_INDEX: '0', PEP_TIME_BUDGET_MIN: '100', PEP_MAX_RESUMES: '12' } });
-            assert.ifError(done.error);
-            if (done.status !== 0) console.error(done.stdout + done.stderr);
-            check('completed person-name pass still runs optional office enrichment',
-              done.status === 0 && done.stdout.includes('LABEL_IDS=Q100'));
-            check('missing person is fetched before office labels on a successful resume',
-              done.stdout.indexOf('LABEL_IDS=Q2') >= 0
-              && done.stdout.indexOf('LABEL_IDS=Q2') < done.stdout.indexOf('LABEL_IDS=Q100'));
-            const complete = pep.readJsonMaybeGz(outfile);
-            check('office enrichment retains every newly completed person name',
-              complete.count === 2 && !complete.partial
-              && complete.entries.some(e => e.qid === 'Q2' && e.name === 'Synthetic Person Two'));
-          `;
-          writeFileSync(path, text.replace(marker, addition + marker));
-          NODE
-      - name: Run full affected suites
+          import { execFileSync, spawnSync } from 'node:child_process';
+          const source = execFileSync('git', ['show', 'b20f164fec3eb32a282f6a2d2a6c61f6632c070c:.github/workflows/runtime-priority-test-update.yml'], { encoding: 'utf8' });
+          const match = /^          node --input-type=module <<'NODE'\n([\s\S]*?)^          NODE$/m.exec(source);
+          assert.ok(match, 'Exact reviewed test patch is present');
+          const run = spawnSync(process.execPath, ['--input-type=module'], {
+            input: match[1].replace(/^          /gm, ''), stdio: ['pipe', 'inherit', 'inherit'], encoding: 'utf8',
+          });
+          assert.ifError(run.error);
+          assert.equal(run.status, 0);
+          APPLY
+      - name: Verify full affected suites
         run: |
           git diff --check
           node test/sanctions-screen.test.mjs
           node test/runtime-priority.test.mjs
           node test/runtime-recovery.test.mjs
-      - name: Commit verified test update
+      - name: Commit verified test changes only
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -96,4 +62,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- test/sanctions-screen.test.mjs test/runtime-priority.test.mjs
           git commit -m 'test: preserve office enrichment guards after person-name priority refactor'
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/fix/runtime-priority-20260929
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/fix/runtime-priority-tests-20260929
