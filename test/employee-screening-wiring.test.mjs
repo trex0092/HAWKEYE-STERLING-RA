@@ -29,7 +29,7 @@ const WORKFLOWS = [
   { file: '.github/workflows/onboarding-screen.yml', engine: 'Python (screen.py, onboarding mode)', varName: 'ASANA_EMPLOYEE_DB_GID' },
 ];
 
-const FORWARD_RE = (name) => new RegExp(name + ':\\s*\\$\\{\\{\\s*vars\\.' + name + '\\s*\\}\\}');
+const FORWARD_RE = (name) => new RegExp(name + ':\\s*\\$\\{\\{\\s*vars\\.' + name + '(?:\\s*\\|\\|\\s*[^}]+)?\\s*\\}\\}');
 
 for (const wf of WORKFLOWS) {
   const text = readFileSync(wf.file, 'utf8');
