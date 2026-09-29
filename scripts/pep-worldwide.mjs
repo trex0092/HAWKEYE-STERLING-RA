@@ -177,7 +177,7 @@ export function pendingOffices(positions, holderRows, want = 'label') {
    shard computes the same partition regardless of what each has banked. */
 export function pendingLabels(allQids, names, { count = PEP_SHARD_COUNT, index = PEP_SHARD_INDEX } = {}) {
   const mine = count > 1 ? shardOf(allQids, index, count) : allQids;
-  return mine.filter(q => !names.has(q));
+  return mine.filter(q => !hasScreenableName(names.get(q)));
 }
 
 /* Merge shard name-slices back into one map. Later shards never overwrite an
@@ -188,7 +188,7 @@ export function mergeShardNames(slices) {
   const names = new Map();
   for (const slice of slices) {
     for (const [qid, nm] of slice || []) {
-      if (!names.has(qid) && nm && nm.name) names.set(qid, nm);
+      if (!hasScreenableName(names.get(qid)) && hasScreenableName(nm)) names.set(qid, nm);
     }
   }
   return names;
@@ -408,19 +408,38 @@ export function parseSparqlBindings(json) {
    mul, else the first label; every other-language label AND every alias in
    every language becomes an alias (dedup, keep original scripts — the
    matcher's transliteration nets want the Arabic/Cyrillic/Han forms). */
+export function hasScreenableName(value) {
+  return !!value && typeof value.name === 'string' && value.name.trim().length > 0;
+}
 export function namesFromEntity(entity) {
-  const labels = (entity && entity.labels) || {};
-  const primary = (labels.en && labels.en.value)
-    || (labels.mul && labels.mul.value)
-    || (Object.values(labels)[0] && Object.values(labels)[0].value) || '';
-  const all = new Set();
-  for (const l of Object.values(labels)) if (l && l.value) all.add(l.value.trim());
-  for (const arr of Object.values((entity && entity.aliases) || {})) {
-    if (Array.isArray(arr)) for (const a of arr) if (a && a.value) all.add(a.value.trim());
+  if (!entity || Object.hasOwn(entity, 'missing') || Object.hasOwn(entity, 'invalid')) {
+    return { name: '', aliases: [] };
+  }
+  const labels = entity.labels || {};
+  const text = item => typeof item?.value === 'string' ? item.value.trim() : '';
+  const primary = [labels.en, labels.mul, ...Object.values(labels)].map(text).find(Boolean) || '';
+  const all = new Set(Object.values(labels).map(text).filter(Boolean));
+  for (const arr of Object.values(entity.aliases || {})) {
+    if (Array.isArray(arr)) for (const item of arr) {
+      const value = text(item);
+      if (value) all.add(value);
+    }
   }
   all.delete(primary);
-  all.delete('');
-  return { name: primary.trim(), aliases: [...all] };
+  return { name: primary, aliases: [...all] };
+}
+// Failed or empty entities must remain pending, not become banked QIDs.
+export function bankLabelNames(names, data) {
+  if (!data || data.error || data.errors) return 0;
+  let banked = 0;
+  for (const [qid, entity] of Object.entries(data.entities || {})) {
+    if (!/^Q\d+$/.test(qid)) continue;
+    const value = namesFromEntity(entity);
+    if (!hasScreenableName(value)) continue;
+    names.set(qid, value);
+    banked++;
+  }
+  return banked;
 }
 
 /* Assemble the artifact. holderRows: [{ person, pos, end?, classKey }];
@@ -445,7 +464,7 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names, exp
   const classes = {};
   for (const [qid, meta] of byPerson) {
     const nm = names.get(qid);
-    if (!nm || !nm.name) continue;   // unlabeled entity — nothing screenable
+    if (!hasScreenableName(nm)) continue;   // unlabeled entity — nothing screenable
     classes[meta.classKey] = (classes[meta.classKey] || 0) + 1;
     entries.push({
       qid, name: nm.name, aliases: nm.aliases,
@@ -458,7 +477,8 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names, exp
      recorded so every consumer can say so out loud: a PEP who has not been
      harvested yet screens CLEAN, and silence must never be read as "not a PEP".
      A complete harvest omits the flag entirely. */
-  const partial = Number.isFinite(expected) && expected > 0 && entries.length < expected;
+  expected = Math.max(byPerson.size, Number.isFinite(expected) ? expected : 0);
+  const partial = entries.length < expected;
   return {
     v: 1, list: PEP_LIST_NAME, harvested: harvestedAt, count: entries.length, classes, entries,
     ...(partial ? { partial: true, expected } : {}),
@@ -943,7 +963,7 @@ async function harvest(outfile) {
   /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
   let allQids, names;
   if (st && st.phase === 'labels') {
-    allQids = st.labelQids;
+    allQids = [...new Set([...st.labelQids, ...holderRows.map(r => r.person)])];
     names = st.names;
   } else {
     allQids = [...new Set(holderRows.map(r => r.person))];
@@ -1010,7 +1030,7 @@ async function harvest(outfile) {
     });
     if (overBudget()) pause('labels', snapshot());
     for (const data of await fetchLabelWindow(personQids, i)) {   // a lost label chunk leaves those persons unnamed — the next resume retries them
-      if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));
+      bankLabelNames(names, data);
     }
     if (win % 4 === 0) console.log(`  names: ${Math.min(i + LABEL_WINDOW, personQids.length)}/${personQids.length} this run (${names.size}/${expectedTotal} banked)`);
     if (Date.now() - lastBank >= BANK_EVERY_MS) {
@@ -1029,6 +1049,14 @@ async function harvest(outfile) {
     writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, run: PEP_SHARD_RUN, harvestedAt, names: [...names] });
     console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`);
     return 0;
+  }
+
+  const unresolved = pendingLabels(allQids, names, { count: 1, index: 0 });
+  if (unresolved.length) {
+    writeCp('labels', { labelQids: allQids, names: [...names], next: { labelIdx: 0 } });
+    shipPartialNow();
+    console.error('pep-worldwide: ' + unresolved.length + ' person labels remain unresolved; keeping checkpoint and requesting a bounded resume');
+    return RESUME_EXIT_CODE;
   }
 
   const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });

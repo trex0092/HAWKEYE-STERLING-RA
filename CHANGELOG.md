@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Runtime recovery without false clears.** News circuits now admit one validated recovery probe after cooldown, ignore stale in-flight results, re-check admission after queueing, and share bounded Retry-After backoff. Missing or blank PEP names remain pending; incomplete non-sharded harvests retain their checkpoint and request a bounded resume. Dataset completeness is derived from all discovered holders even when an expected count is omitted or understated. Runtime assurance thresholds are unchanged.
+
 - **Optional Composio orchestration layer.** Added a server-side Tool Router bridge for Asana, Gmail, Google Drive, Slack and GitHub with per-user sessions, connected-account linking, tool discovery/execution, hosted MCP session metadata, trigger management, signed webhook receipt, session mount operations and an independently gated raw proxy path. The integration is off by default, requires `APP_SHARED_TOKEN`, keeps project/webhook secrets server-side, and is explicitly excluded from sanctions, adverse-media, PEP, risk scoring and runtime assurance.
 
 - **Register research: Slovenia, Croatia, Slovakia** recorded as
