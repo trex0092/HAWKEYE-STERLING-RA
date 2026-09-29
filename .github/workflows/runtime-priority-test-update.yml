@@ -39,6 +39,7 @@ jobs:
           node --input-type=module <<'APPLY'
           import assert from 'node:assert/strict';
           import { execFileSync, spawnSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
           const source = execFileSync('git', ['show', 'b20f164fec3eb32a282f6a2d2a6c61f6632c070c:.github/workflows/runtime-priority-test-update.yml'], { encoding: 'utf8' });
           const match = /^          node --input-type=module <<'NODE'\n([\s\S]*?)^          NODE$/m.exec(source);
           assert.ok(match, 'Exact reviewed test patch is present');
@@ -47,6 +48,12 @@ jobs:
           });
           assert.ifError(run.error);
           assert.equal(run.status, 0);
+          // The timer-order assertion independently points to the same old block.
+          const path = 'test/sanctions-screen.test.mjs';
+          const text = readFileSync(path, 'utf8');
+          const old = "src.indexOf('if (PEP_SHARD_COUNT === 1) {')";
+          assert.equal(text.split(old).length, 2, 'Remaining timer boundary');
+          writeFileSync(path, text.replace(old, "src.indexOf('const enrichOffices = async () => {')"));
           APPLY
       - name: Verify full affected suites
         run: |
