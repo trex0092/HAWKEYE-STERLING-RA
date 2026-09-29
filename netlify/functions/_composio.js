@@ -21,6 +21,8 @@
  * not depend on this adapter. Composio is an outer orchestration layer only.
  */
 
+const { URLSearchParams } = require('node:url');
+
 const DEFAULT_BASE_URL = 'https://backend.composio.dev';
 const DEFAULT_TOOLKITS = ['asana', 'gmail', 'googledrive', 'slack', 'github'];
 
