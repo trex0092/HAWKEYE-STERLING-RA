@@ -54,9 +54,12 @@ on:
 permissions:
   contents: read
 
+# Push-triggered validation runs are supersedable. Keep them separate from the
+# scheduled/manual control so a burst of merges cannot queue hours of obsolete
+# full-base screens or block today's mandatory runtime screen.
 concurrency:
-  group: sanctions-screen
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'push' && 'sanctions-screen-push' || 'sanctions-screen-runtime' }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   screen:
