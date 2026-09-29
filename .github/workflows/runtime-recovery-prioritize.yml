@@ -1,0 +1,194 @@
+name: Runtime recovery priority and diagnosis
+
+on:
+  push:
+    branches: [ops/runtime-recovery-693]
+    paths: [.github/workflows/runtime-recovery-prioritize.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-recovery-priority-693
+  cancel-in-progress: false
+
+jobs:
+  recovery:
+    if: github.ref == 'refs/heads/ops/runtime-recovery-693'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          # GitHub control APIs, pinned source checkout, and read-only provider diagnosis.
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            query.wikidata.org:443
+            www.wikidata.org:443
+            api.gdeltproject.org:443
+            news.google.com:443
+            www.bing.com:443
+            *.githubapp.com:443
+      - name: Release only obsolete executions with verified repaired successors
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { appendFileSync } from 'node:fs';
+          const root = 'https://api.github.com/repos/trex0092/HAWKEYE-STERLING-RA';
+          const fixed = '315f24734729f4bb916109ca49897a3499244148';
+          const legacy = '439fbdde7b0bcbbaa743797ef65b93ba3a723636';
+          const api = async (path, method = 'GET') => {
+            const res = await fetch(root + path, {
+              method, signal: AbortSignal.timeout(30000),
+              headers: { authorization: 'Bearer ' + process.env.GH_TOKEN,
+                accept: 'application/vnd.github+json', 'user-agent': 'HawkeyeSterling-RuntimeRecovery' },
+            });
+            if (!res.ok) throw new Error(method + ' ' + path + ': HTTP ' + res.status);
+            const text = await res.text();
+            return text ? JSON.parse(text) : null;
+          };
+          const targets = [
+            { old: 36559668435, next: 36567561462, path: '.github/workflows/pep-worldwide.yml' },
+            { old: 36560840468, next: 36567565904, path: '.github/workflows/sanctions-screen.yml' },
+          ];
+          const lines = ['# Runtime recovery priority', ''];
+          for (const target of targets) {
+            const prior = await api('/actions/runs/' + target.old);
+            const next = await api('/actions/runs/' + target.next);
+            assert.equal(prior.head_sha, legacy);
+            assert.equal(prior.path, target.path);
+            assert.equal(prior.head_branch, 'main');
+            assert.equal(next.head_sha, fixed);
+            assert.equal(next.path, target.path);
+            assert.equal(next.head_branch, 'main');
+            if (prior.status === 'completed') {
+              console.log('Legacy run already completed: ' + prior.html_url);
+              continue;
+            }
+            assert.ok(['pending', 'queued', 'in_progress'].includes(next.status),
+              'A repaired successor must already be active; refuse a blind cancellation');
+            // Normal cancellation only. The harvest handles the signal, banks
+            // its checkpoint, and its cancelled()-guarded persist step runs.
+            await api('/actions/runs/' + target.old + '/cancel', 'POST');
+            const line = 'Normal cancellation accepted for obsolete run ' + prior.html_url
+              + '; repaired successor ' + next.html_url;
+            console.log(line);
+            lines.push(line);
+          }
+          const deadline = Date.now() + 150000;
+          while (Date.now() < deadline) {
+            const states = await Promise.all(targets.map(t => api('/actions/runs/' + t.old)));
+            if (states.every(r => r.status === 'completed')) break;
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          for (const target of targets) {
+            for (const id of [target.old, target.next]) {
+              const run = await api('/actions/runs/' + id);
+              const line = run.html_url + ': ' + run.status + ' / ' + (run.conclusion || 'not finished');
+              console.log(line);
+              lines.push(line);
+            }
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          NODE
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: 315f24734729f4bb916109ca49897a3499244148
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Inspect PEP state without publishing or changing any screening evidence
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          git fetch origin pep-worldwide-state --depth=1
+          git show FETCH_HEAD:data/pep-worldwide.json > /tmp/pep-artifact.json
+          if git cat-file -e FETCH_HEAD:data/pep-worldwide-checkpoint.json; then
+            git show FETCH_HEAD:data/pep-worldwide-checkpoint.json > /tmp/pep-checkpoint.json
+          fi
+          node --input-type=module <<'NODE'
+          import { existsSync, appendFileSync } from 'node:fs';
+          import { readJsonMaybeGz, pendingLabels, namesFromEntity } from './scripts/pep-worldwide.mjs';
+          const artifact = readJsonMaybeGz('/tmp/pep-artifact.json');
+          const summary = { count: artifact.count, expected: artifact.expected,
+            partial: artifact.partial, harvested: artifact.harvested,
+            entries: artifact.entries.length };
+          console.log('PEP_ARTIFACT ' + JSON.stringify(summary));
+          if (existsSync('/tmp/pep-checkpoint.json')) {
+            const cp = readJsonMaybeGz('/tmp/pep-checkpoint.json');
+            const names = new Map(cp.names || []);
+            const qids = [...new Set([...(cp.labelQids || []), ...(cp.holderRows || []).map(r => r.person)])];
+            const missing = pendingLabels(qids, names, { count: 1, index: 0 });
+            const published = new Set(artifact.entries.map(e => e.qid));
+            const gaps = qids.filter(q => !published.has(q));
+            console.log('PEP_CHECKPOINT ' + JSON.stringify({ phase: cp.phase, resumeCount: cp.resumeCount,
+              harvestedAt: cp.harvestedAt, holderQids: qids.length, pendingNames: missing.length,
+              missingFromArtifact: gaps.length, firstPending: missing.slice(0, 20), firstGaps: gaps.slice(0, 20) }));
+            const inspect = [...new Set([...gaps.slice(0, 10), ...missing.slice(0, 10)])]
+              .filter(q => /^Q\d+$/.test(q));
+            if (inspect.length) {
+              const url = new URL('https://www.wikidata.org/w/api.php');
+              url.search = new URLSearchParams({ action: 'wbgetentities', format: 'json',
+                ids: inspect.join('|'), props: 'labels|aliases', maxlag: '5' });
+              const res = await fetch(url, { signal: AbortSignal.timeout(15000),
+                headers: { 'user-agent': 'HawkeyeSterling-PEPHarvest/1.0 (runtime recovery diagnosis)' } });
+              console.log('PEP_LOOKUP_HTTP ' + res.status);
+              const body = await res.text();
+              if (res.ok) {
+                try {
+                  const data = JSON.parse(body);
+                  if (data.error || data.errors) console.log('PEP_API_ERROR ' + JSON.stringify(data.error || data.errors));
+                  for (const [qid, e] of Object.entries(data.entities || {})) {
+                    console.log('PEP_ENTITY ' + JSON.stringify({ qid, id: e.id, missing: Object.hasOwn(e, 'missing'),
+                      labelLanguages: Object.keys(e.labels || {}), name: namesFromEntity(e).name,
+                      aliasLanguages: Object.keys(e.aliases || {}) }));
+                  }
+                  if (data.redirects) console.log('PEP_REDIRECTS ' + JSON.stringify(data.redirects));
+                } catch { console.log('PEP_NON_JSON ' + body.slice(0, 300)); }
+              } else console.log('PEP_HTTP_ERROR ' + body.slice(0, 300));
+            }
+          } else console.log('PEP_CHECKPOINT absent');
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nPEP read-only metadata: `' + JSON.stringify(summary) + '`\n');
+          NODE
+      - name: Diagnose news provider responses with a synthetic subject
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          import { checkAdverseMedia, LOCALES } from './scripts/adverse-media.mjs';
+          const original = globalThis.fetch;
+          globalThis.fetch = async (url, opts) => {
+            const host = new URL(url).hostname;
+            try {
+              const res = await original(url, opts);
+              console.log('NEWS_HTTP ' + JSON.stringify({ host, status: res.status,
+                retryAfter: res.headers.get('retry-after'), type: res.headers.get('content-type') }));
+              const text = await res.clone().text();
+              if (!res.ok || (host === 'api.gdeltproject.org' && !text.trim().startsWith('{'))) {
+                console.log('NEWS_ERROR ' + host + ' ' + text.slice(0, 400));
+              }
+              return res;
+            } catch (error) { console.log('NEWS_FETCH_ERROR ' + host + ' ' + error.message); throw error; }
+          };
+          const result = await checkAdverseMedia('Hawkeye Synthetic Coverage Diagnostic', {
+            locales: [LOCALES.find(l => l.id === 'en-US')], timeoutMs: 12000,
+          });
+          const summary = { errored: result.errored, partial: result.partial,
+            backbones: result.backbones, retryAttempted: result.retryAttempted, retryRecovered: result.retryRecovered };
+          console.log('NEWS_DIAGNOSTIC ' + JSON.stringify(summary));
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            '\nSynthetic provider diagnosis, NOT customer screening evidence: `' + JSON.stringify(summary) + '`\n');
+          NODE

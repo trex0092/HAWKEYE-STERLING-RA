@@ -1,0 +1,72 @@
+name: Runtime priority test update
+on:
+  push:
+    branches: [ops/runtime-recovery-693]
+    paths: [.github/workflows/runtime-priority-test-update.yml]
+permissions:
+  contents: read
+concurrency:
+  group: runtime-priority-test-update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Harden runner
+        # Offline tests, checkout and verified branch push only.
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 nodejs.org:443 *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/runtime-priority-tests-20260929
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Apply immutable regression correction to merged source
+        run: |
+          test "$(git rev-parse HEAD)" = '3a8aa3cde52784c0bc0b60ae811a23986ee8381e'
+          git fetch origin b20f164fec3eb32a282f6a2d2a6c61f6632c070c --depth=1
+          node --input-type=module <<'APPLY'
+          import assert from 'node:assert/strict';
+          import { execFileSync, spawnSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const source = execFileSync('git', ['show', 'b20f164fec3eb32a282f6a2d2a6c61f6632c070c:.github/workflows/runtime-priority-test-update.yml'], { encoding: 'utf8' });
+          const match = /^          node --input-type=module <<'NODE'\n([\s\S]*?)^          NODE$/m.exec(source);
+          assert.ok(match, 'Exact reviewed test patch is present');
+          const run = spawnSync(process.execPath, ['--input-type=module'], {
+            input: match[1].replace(/^          /gm, ''), stdio: ['pipe', 'inherit', 'inherit'], encoding: 'utf8',
+          });
+          assert.ifError(run.error);
+          assert.equal(run.status, 0);
+          // The timer-order assertion independently points to the same old block.
+          const path = 'test/sanctions-screen.test.mjs';
+          const text = readFileSync(path, 'utf8');
+          const old = "src.indexOf('if (PEP_SHARD_COUNT === 1) {')";
+          assert.equal(text.split(old).length, 2, 'Remaining timer boundary');
+          writeFileSync(path, text.replace(old, "src.indexOf('const enrichOffices = async () => {')"));
+          APPLY
+      - name: Verify full affected suites
+        run: |
+          git diff --check
+          node test/sanctions-screen.test.mjs
+          node test/runtime-priority.test.mjs
+          node test/runtime-recovery.test.mjs
+      - name: Commit verified test changes only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- test/sanctions-screen.test.mjs test/runtime-priority.test.mjs
+          git commit -m 'test: preserve office enrichment guards after person-name priority refactor'
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/fix/runtime-priority-tests-20260929
