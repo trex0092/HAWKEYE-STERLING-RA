@@ -41,6 +41,7 @@ import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 import { checkFbi } from './fbi-check.mjs';
 import { pepListFromDataset, readJsonMaybeGz, PEP_LIST_NAME } from './pep-worldwide.mjs';
+import { corroborateIdentity, corroborateArticleIdentity, identityLabel } from './entity-resolution.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -235,14 +236,20 @@ export function parsePrincipals(task) {
   if (!block) return [];
   const people = [];
   const seen = new Set();
-  const push = (name, role, nationality) => {
+  const push = (name, role, nationality, dob = '', passport = '') => {
     const n = String(name || '').replace(/\s+/g, ' ').trim();
     const k = normalizeName(n);
     if (!n || !k || seen.has(k)) return;
     // Guard against label rows being read as a name.
     if (/^(n\/?a|none|nil|not applicable|pending|tbc)$/i.test(n)) return;
     seen.add(k);
-    people.push({ name: n, role: String(role || 'Principal').replace(/\s+/g, ' ').trim(), nationality: String(nationality || '').trim() });
+    people.push({
+      name: n,
+      role: String(role || 'Principal').replace(/\s+/g, ' ').trim(),
+      nationality: String(nationality || '').trim(),
+      dob: String(dob || '').trim(),
+      passport: String(passport || '').trim(),
+    });
   };
   const partRe = /Individual\s*\d+\s*[—\-–:]\s*([^\n]*)([\s\S]*?)(?=Individual\s*\d+\s*[—\-–:]|$)/gi;
   let m, structured = false;
@@ -250,7 +257,13 @@ export function parsePrincipals(task) {
     const role = m[1].trim();
     const sub = m[2] || '';
     const nm = /\bName\s*:\s*([^\n]+)/i.exec(sub);
-    if (nm) { structured = true; const nat = /\bNationality\s*:\s*([^\n]+)/i.exec(sub); push(nm[1], role || 'Principal', nat ? nat[1] : ''); }
+    if (nm) {
+      structured = true;
+      const nat = /\bNationality\s*:\s*([^\n]+)/i.exec(sub);
+      const dob = /\b(?:Date of Birth|DOB|Birth Date)\s*:\s*([^\n]+)/i.exec(sub);
+      const pass = /\b(?:Passport(?: No\.?| Number)?|Passport ID)\s*:\s*([^\n]+)/i.exec(sub);
+      push(nm[1], role || 'Principal', nat ? nat[1] : '', dob ? dob[1] : '', pass ? pass[1] : '');
+    }
   }
   if (!structured) {
     // No "Individual N —" structure: harvest names from explicit name-bearing
@@ -308,6 +321,9 @@ export function parseSubjects(tasks) {
       out.push({
         key, name: p.name, entityType: 'individual',
         jurisdiction: p.nationality || undefined,
+        nationality: p.nationality || undefined,
+        dob: p.dob || undefined,
+        passport: p.passport || undefined,
         gid: (t && t.gid) || undefined,
         parent: s.name, role: p.role || 'Principal',
       });
@@ -334,6 +350,10 @@ export function normalizeHit(h) {
      (some external shapes use `confidence` as a score — handled above). */
   if (h.mechanism) out.mechanism = String(h.mechanism);
   if (typeof h.confidence === 'string' && num(h.confidence) === null) out.confidence = h.confidence;
+  if (h.identity) out.identity = h.identity;
+  if (h.provenance) out.provenance = h.provenance;
+  if (h.evidenceUrl) out.evidenceUrl = String(h.evidenceUrl);
+  if (h.source) out.source = String(h.source);
   /* Cleared-FP annotation must survive this rebuild or the demotion (and its
      audit trail) silently vanishes between the matcher and the state. */
   if (h.whitelisted) {
@@ -493,6 +513,10 @@ export function hitDetail(lists) {
     const d = { list: h.list, hitName: h.hitName || '', score: h.score ?? null };
     if (h.mechanism) d.mechanism = h.mechanism;
     if (h.confidence) d.confidence = h.confidence;
+    if (h.identity) d.identity = h.identity;
+    if (h.provenance) d.provenance = h.provenance;
+    if (h.evidenceUrl) d.evidenceUrl = h.evidenceUrl;
+    if (h.source) d.source = h.source;
     if (h.carriedForward) d.carriedForward = true;
     if (h.whitelisted) {
       d.whitelisted = true;
@@ -1512,12 +1536,12 @@ export async function loadSanctionsLists(cfg) {
         return;
       }
       if (belowFloor(s, names)) {
-        lists.push({ id: s.id, name: s.name, names, partial: true });
+        lists.push({ id: s.id, name: s.name, names, partial: true, sourceUrl: s.url || s.file || '', jurisdiction: s.jurisdiction || '' });
         failures.push({ source: s, reason: 'parsed ' + names.length + ' name(s), below its ' + s.minNames + ' coverage floor - truncated source' });
         console.error('sanctions-screen: ' + s.id + ' below coverage floor (' + names.length + ' < ' + s.minNames + ')');
         return;
       }
-      lists.push({ id: s.id, name: s.name, names });
+      lists.push({ id: s.id, name: s.name, names, sourceUrl: s.url || s.file || '', jurisdiction: s.jurisdiction || '' });
       fetched++;
       console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');
     } catch (e) {
@@ -1591,6 +1615,11 @@ async function screenLocally(subjects, cfg) {
   if (!loaded.lists.length) return { results: [], anyOk: false, degraded: true, errored: 0, notes: loaded.notes, coverage: loaded };
 
   const index = buildIndex(loaded.lists);
+  const sourceMeta = new Map(loaded.lists.map(l => [l.name, {
+    sourceId: l.id || '',
+    sourceUrl: l.sourceUrl || '',
+    jurisdiction: l.jurisdiction || '',
+  }]));
   const thr = cfg.threshold * 100;
   const phonMode = resolvePhoneticMode(process.env.MATCH_PHONETIC);
   const shadowThr = resolveShadowThreshold(process.env.SCREEN_SHADOW_THRESHOLD, cfg.threshold);
@@ -1647,7 +1676,10 @@ async function screenLocally(subjects, cfg) {
           + '" [' + ps.list + '] ' + ps.shape + ' key match, score ' + ps.score + ' — no hit emitted');
       }
     }
-    const lists = [...raw.lists];
+    const lists = raw.lists.map(h => {
+      const provenance = sourceMeta.get(h.list);
+      return provenance ? { ...h, provenance } : { ...h };
+    });
     /* Cleared-FP registry: annotate matcher hits whose exact subject+designated-
        name+list pair an analyst already cleared. Runs BEFORE enrichment merges,
        so enrichment findings (adverse media / PEP / Interpol) can never be
@@ -1688,7 +1720,19 @@ async function screenLocally(subjects, cfg) {
         if (am.partial || am.fullMatrix === false) unverified.add('Adverse media (Google News)');
       }
       if (!am.errored && am.hit) {
-        lists.push({ list: 'Adverse media (Google News)', hitName: (am.top && am.top.title || '').slice(0, 180) + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : '') + (am.tier === 'weak' ? ' [weak-tier — generic terms only, corroboration needed]' : ''), score: am.score });
+        const identity = corroborateArticleIdentity(s, am.top || {});
+        lists.push({
+          list: 'Adverse media (Google News)',
+          hitName: (am.top && am.top.title || '').slice(0, 180)
+            + (am.terms.length ? ' [' + am.terms.join(', ') + ']' : '')
+            + (am.tier === 'weak' ? ' [weak-tier — generic terms only, corroboration needed]' : '')
+            + ' [identity: ' + identity.level + ']',
+          score: am.score,
+          identity,
+          source: (am.top && am.top.source) || '',
+          evidenceUrl: (am.top && (am.top.link || am.top.url)) || '',
+          provenance: { sourceId: 'adverse-media', sourceUrl: (am.top && (am.top.link || am.top.url)) || '' },
+        });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
     }
@@ -1727,7 +1771,18 @@ async function screenLocally(subjects, cfg) {
         const ctx = cfg.pepMeta && cfg.pepMeta.get(h.hitName);
         const detail = ctx ? (h.hitName + ' — ' + [ctx.position, ctx.country].filter(Boolean).join(', ')
           + (ctx.current ? '' : ' (former, within the PEP recency window)')) : h.hitName;
-        lists.push({ list: h.list, hitName: detail.slice(0, 180), score: h.score });
+        const identity = corroborateIdentity(s, {
+          country: ctx && ctx.country,
+          entityType: 'individual',
+        }, { nameScore: h.score });
+        lists.push({
+          list: h.list,
+          hitName: (detail + ' [identity: ' + identityLabel(identity) + ']').slice(0, 240),
+          score: h.score,
+          identity,
+          evidenceUrl: ctx && ctx.qid ? 'https://www.wikidata.org/wiki/' + ctx.qid : '',
+          provenance: { sourceId: 'wikidata-pep-worldwide', entityId: (ctx && ctx.qid) || '' },
+        });
       }
       if (pw.lists.length) { band = strongerBand(band, 'medium'); topScore = Math.max(topScore, Math.min(pw.topScore, 89)); }
     }

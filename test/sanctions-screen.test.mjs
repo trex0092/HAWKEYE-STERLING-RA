@@ -35,6 +35,18 @@ const s = parseSubject(task);
 check('parseSubject pulls name + jurisdiction + licence + gid',
   s.name === 'WPM INT LLC' && s.jurisdiction === 'United Arab Emirates' && s.idNumber === 'DMCC-12345' && s.gid === '111' && s.entityType === 'organisation');
 const subs = parseSubjects([task, { name: 'Done Co', completed: true }, { name: 'WPM Int  LLC', completed: false }, { name: 'Xafari DMCC', completed: false }]);
+const personTask = {
+  gid: 'p1', name: 'Example Gold LLC',
+  notes: 'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — UBO\nName: Ahmad Example\nNationality: Jordan\nDate of Birth: 09/04/1980\nPassport No.: N-12345\nSECTION 5 — NEXT'
+};
+const principals = parsePrincipals(personTask);
+check('parsePrincipals preserves nationality, DOB and passport for identity corroboration',
+  principals.length === 1 && principals[0].nationality === 'Jordan'
+  && principals[0].dob === '09/04/1980' && principals[0].passport === 'N-12345');
+const personSubjects = parseSubjects([personTask]);
+const person = personSubjects.find(x => x.entityType === 'individual');
+check('parseSubjects carries structured identity attributes into the screening subject',
+  person && person.nationality === 'Jordan' && person.dob === '09/04/1980' && person.passport === 'N-12345');
 // 2026-09-24: parseSubjects no longer filters on `completed` (see the NOTE
 // at its definition) — this function is shared with the HR - Employees
 // fetch, where "completed" means "training finished", not "off-boarded",
