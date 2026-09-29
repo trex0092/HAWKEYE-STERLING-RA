@@ -192,6 +192,22 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance fails when the worldwide PEP artifact is partial',
     !pp.domains.pep.operational);
 
+  const pepLiveErrors = structuredClone(results);
+  pepLiveErrors.enrichment.pepErrors = 5;
+  pepLiveErrors.enrichment.skipped = 1;
+  const ple = assessRuntime({ results: pepLiveErrors, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance keeps PEP operational when the complete local artifact screened all subjects but supplementary live lookups errored',
+    ple.domains.pep.operational
+    && ple.domains.pep.warnings.some(r => r.includes('supplementary live PEP lookup'))
+    && ple.domains.pep.warnings.some(r => r.includes('supplementary PEP enrichment')));
+
+  const pepLiveOff = structuredClone(results);
+  pepLiveOff.enrichment.pepLookupEnabled = false;
+  const plo = assessRuntime({ results: pepLiveOff, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance treats disabled live PEP lookup as a warning when fresh complete local PEP coverage is present',
+    plo.domains.pep.operational
+    && plo.domains.pep.warnings.some(r => r.includes('live per-name PEP lookup is disabled')));
+
   const stale = checkStored({ ...ok, generatedAt: '2026-09-20T00:00:00.000Z' },
     { nowMs, maxAgeHours: 36 });
   check('stored runtime assurance fails closed when evidence is stale', !stale.ok);
