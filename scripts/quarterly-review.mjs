@@ -14,7 +14,7 @@ import {
   notifyAsana, asanaEnabled, ensureSection, listProjectTasks, runUrl, REG_PROJECT_GID
 } from './asana-notify.mjs';
 
-export const SECTION_NAME = 'Adverse Media & PEP Monitoring';
+export const SECTION_NAME = 'Screening Adverse Media & PEP’s Update';
 
 /* "Q3 2026" for any date inside that quarter (UTC). */
 export function quarterLabel(d) {
