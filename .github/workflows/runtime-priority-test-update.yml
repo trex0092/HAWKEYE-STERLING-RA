@@ -39,22 +39,37 @@ jobs:
           import assert from 'node:assert/strict';
           import { readFileSync, writeFileSync } from 'node:fs';
           const guardPath = 'test/sanctions-screen.test.mjs';
-          const before = "src.indexOf('if (PEP_SHARD_COUNT === 1) {')";
+          const before = "const officeBlock = src.slice(src.indexOf('if (PEP_SHARD_COUNT === 1) {'), src.indexOf('/* Labels phase'));";
           const guard = readFileSync(guardPath, 'utf8');
-          assert.equal(guard.split(before).length, 2);
-          writeFileSync(guardPath, guard.replace(before, "src.indexOf('const enrichOffices = async () => {')"));
+          assert.equal(guard.split(before).length, 2, 'Unique office-block boundary');
+          writeFileSync(guardPath, guard.replace(before,
+            "const officeBlock = src.slice(src.indexOf('const enrichOffices = async () => {'), src.indexOf('/* Labels phase'));"));
           const path = 'test/runtime-priority.test.mjs';
           const text = readFileSync(path, 'utf8');
           const marker = '} finally { rmSync(dir, { recursive: true, force: true }); }';
           assert.equal(text.split(marker).length, 2);
-          const addition = String.raw`  // Complete the same checkpoint. Optional office work must still run,
-            // but only after the missing person has a validated name.
-            writeFileSync(preload, "globalThis.fetch = async (url) => { const u = new URL(url); if (u.hostname === 'www.wikidata.org') { const ids = u.searchParams.get('ids').split('|'); console.log('LABEL_IDS=' + ids.join(',')); return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ entities: Object.fromEntries(ids.map(id => [id, { id, labels: { en: { value: id === 'Q2' ? 'Synthetic Person Two' : 'Synthetic Office' } } }])) }) }; } if (u.hostname === 'query.wikidata.org') return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ results: { bindings: [] } }) }; throw new Error('Unexpected network'); };\n");
+          const addition = String.raw`  // Complete the same checkpoint. Office work must still run after names.
+            writeFileSync(preload, 'globalThis.fetch = ' + (async function (url) {
+              const u = new URL(url);
+              if (u.hostname === 'www.wikidata.org') {
+                const ids = u.searchParams.get('ids').split('|');
+                console.log('LABEL_IDS=' + ids.join(','));
+                return { ok: true, status: 200, headers: { get: () => null },
+                  json: async () => ({ entities: Object.fromEntries(ids.map(id =>
+                    [id, { id, labels: { en: { value: id === 'Q2' ? 'Synthetic Person Two' : 'Synthetic Office' } } }])) }) };
+              }
+              if (u.hostname === 'query.wikidata.org') return {
+                ok: true, status: 200, headers: { get: () => null },
+                json: async () => ({ results: { bindings: [] } }),
+              };
+              throw new Error('Unexpected network');
+            }).toString() + ';');
             const done = spawnSync(process.execPath,
               ['--import', pathToFileURL(preload).href, 'scripts/pep-worldwide.mjs', 'harvest', outfile],
               { cwd: process.cwd(), encoding: 'utf8', timeout: 15000,
                 env: { ...process.env, PEP_FLOOR: '1', PEP_SHARD_COUNT: '1', PEP_SHARD_INDEX: '0', PEP_TIME_BUDGET_MIN: '100', PEP_MAX_RESUMES: '12' } });
             assert.ifError(done.error);
+            if (done.status !== 0) console.error(done.stdout + done.stderr);
             check('completed person-name pass still runs optional office enrichment',
               done.status === 0 && done.stdout.includes('LABEL_IDS=Q100'));
             check('missing person is fetched before office labels on a successful resume',
