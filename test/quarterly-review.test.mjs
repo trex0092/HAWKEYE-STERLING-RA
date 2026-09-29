@@ -27,7 +27,7 @@ check('checklist names both keyword sets and both sources',
 check('sign-off line and model-validation linkage present',
   notes.includes('Sign-off') && notes.includes('model-validation-2026.md'));
 check('run link is embedded when provided', notes.includes('https://example/run'));
-check('section constant is the AM/PEP monitoring column', SECTION_NAME === 'Adverse Media & PEP Monitoring');
+check('section constant routes to the approved AM/PEP section', SECTION_NAME === 'Screening Adverse Media & PEP’s Update');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

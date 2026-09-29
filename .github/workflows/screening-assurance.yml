@@ -55,6 +55,7 @@ jobs:
         if: failure()
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_SECTION_GID: '1218451960830318'
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node scripts/asana-alert.mjs \

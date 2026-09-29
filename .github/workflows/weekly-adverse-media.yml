@@ -366,7 +366,10 @@ jobs:
           # see screen.py). Never forwarded here before, so screen.py always
           # fell back to its own hardcoded default (1216139945846994), which
           # does not exist in Asana, and that FATAL guard aborted the run.
-          ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID }}
+          ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID || '1216239131596624' }}
+          ASANA_DELIVERY_SECTION_GID: '1218979441933783'
+          ASANA_SANCTIONS_SECTION_GID: '1218451960830318'
+          ASANA_MEDIA_SECTION_GID: '1218979441933783'
           # Contact point for regulator feeds that refuse an anonymous caller.
           # SEC.gov's automated-access policy wants the requester declared with a
           # contact address; both SEC feeds have 403'd on every run since at

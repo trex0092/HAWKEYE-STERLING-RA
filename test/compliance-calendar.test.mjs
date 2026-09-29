@@ -102,7 +102,7 @@ check('every registry event yields a due occurrence on some day (window is reach
   events.every(e => dueOccurrences(e, e.date || e.anchor).length > 0));
 
 /* ── constants ───────────────────────────────────────────────────────────── */
-check('section constant routes to the calendar column', SECTION_NAME === 'Compliance Calendar');
+check('section constant routes to the approved regulatory section', SECTION_NAME === 'Regulatory Changes');
 check('default grace covers a weekly cron gap', DEFAULT_GRACE_DAYS === 7);
 check('todayUtc formats YYYY-MM-DD',
   /^\d{4}-\d{2}-\d{2}$/.test(todayUtc(new Date(Date.UTC(2026, 6, 21, 12))))

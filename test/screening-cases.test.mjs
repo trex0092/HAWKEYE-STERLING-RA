@@ -1,7 +1,8 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, CASE_SECTIONS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { planCaseActions, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { caseSection, SECTIONS } from '../scripts/asana-sections.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -30,7 +31,15 @@ check('caseTitle falls back to the subject gid for a legal-entity key',
 check('caseTitle without any gid still renders (pre-migration record)',
   caseTitle('amber international fzco', subj({ name: 'Amber International FZCO' }))
     === '🧾 CASE-XXXXXX — Amber International FZCO — sanctions-match');
-check('the four lifecycle sections are defined', Object.keys(CASE_SECTIONS).length === 4 && CASE_SLA_DAYS === 5);
+check('case SLA remains five days', CASE_SLA_DAYS === 5);
+check('sanctions cases route to Screening Sanctions Update',
+  caseSection({ hits: [{ list: 'UK OFSI' }] }) === SECTIONS.sanctions.gid);
+check('PEP cases route to Screening Adverse Media & PEP’s Update',
+  caseSection({ hits: [{ list: 'PEP (Wikidata)' }] }) === SECTIONS.media.gid);
+check('adverse-media cases route to Screening Adverse Media & PEP’s Update',
+  caseSection({ hits: [{ list: 'Adverse media (GDELT)' }] }) === SECTIONS.media.gid);
+check('mixed cases retain sanctions priority without creating another section',
+  caseSection({ hits: [{ list: 'Adverse media (GDELT)' }, { list: 'UN Consolidated' }] }) === SECTIONS.sanctions.gid);
 
 /* ── planner ── */
 const KEY = 'john doe|ubo|1214107985842154';

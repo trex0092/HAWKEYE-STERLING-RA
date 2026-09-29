@@ -22,9 +22,10 @@
    Pure planner exported for offline unit tests. */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { asana, asanaEnabled, ensureSection, esc, runUrl, notifyAsana,
+import { asana, asanaEnabled, esc, runUrl, notifyAsana,
   fitAsanaHtml, fitAsanaName } from './asana-notify.mjs';
 import { enrichScreeningResults } from './openai-screening-enrichment.mjs';
+import { SECTIONS, caseSection } from './asana-sections.mjs';
 
 export const SCREEN_STATE_FILE = 'data/sanctions-screen-state.json';
 export const CASES_FILE = 'data/screening-cases-state.json';
@@ -33,13 +34,6 @@ export const CASES_FILE = 'data/screening-cases-state.json';
    on the Asana card links to its lifecycle case. */
 export const RESULTS_FILE = 'sanctions-screen-results.json';
 export const CASE_SLA_DAYS = 5;
-export const CASE_SECTIONS = {
-  new: '🚨 Screening Cases — New',
-  review: '🔎 Screening Cases — Under Review',
-  cleared: '✅ Screening Cases — Cleared',
-  escalated: '⚠️ Screening Cases — Escalated'
-};
-
 export function addDays(isoDay, days) {
   const t = Date.parse(String(isoDay || '').slice(0, 10));
   if (Number.isNaN(t)) return null;
@@ -440,14 +434,7 @@ async function main() {
 
   const link = runUrl();
   let failed = 0;
-  let secNew, secCleared, secEscalated;
-  if (actions.length) {
-    secNew = await ensureSection(projectGid, CASE_SECTIONS.new);
-    secCleared = await ensureSection(projectGid, CASE_SECTIONS.cleared);
-    /* Ensure the two human sections exist too, so the board reads as a flow. */
-    await ensureSection(projectGid, CASE_SECTIONS.review);
-    secEscalated = await ensureSection(projectGid, CASE_SECTIONS.escalated);
-  } else {
+  if (!actions.length) {
     console.log('screening-cases: all cases already in the right state.');
   }
   for (const a of actions) {
@@ -464,7 +451,7 @@ async function main() {
             due_on: a.dueOn || addDays(today, CASE_SLA_DAYS),
             assignee,
             projects: [projectGid],
-            memberships: [{ project: projectGid, section: secNew }]
+            memberships: [{ project: projectGid, section: caseSection(a.subject) }]
           } })
         });
         const gid = d.data && d.data.gid;
@@ -481,10 +468,6 @@ async function main() {
         casesState[a.key] = { ...casesState[a.key], agingAlerted: true };
         console.log('  aging comment on case ' + a.key + ' (' + a.ageDays + 'd)');
       } else if (a.type === 'clear') {
-        await asana('/sections/' + secCleared + '/addTask', {
-          method: 'POST',
-          body: JSON.stringify({ data: { task: a.caseGid } })
-        });
         const clearText = a.reason === 'whitelist'
           ? '✅ AUTO-CLEARED (cleared-FP registry) — every hit on this case is a designated-name pair an analyst already dispositioned as a false positive. The ' + today + ' screen keeps the subject on the report, annotated and demoted; a NEW or CHANGED designated name re-opens a fresh case.'
           : '✅ AUTO-CLEARED — the subject was not flagged by the ' + today + ' screening run. Moved to Cleared and completed. Reopen if a manual review is still owed.';
@@ -497,12 +480,8 @@ async function main() {
           ...(a.reason === 'whitelist' ? { clearedBy: 'cleared-FP registry' } : {}) };
         console.log('  auto-cleared case ' + a.key + (a.reason === 'whitelist' ? ' (cleared-FP registry)' : ''));
       } else if (a.type === 'disposition-clear') {
-        /* State already records the disposition (evidence: case gid + tick) —
-           this is the Asana-side acknowledgement: move, comment, complete. */
-        await asana('/sections/' + secCleared + '/addTask', {
-          method: 'POST',
-          body: JSON.stringify({ data: { task: a.caseGid } })
-        });
+        /* State already records the disposition. Keep the task in its approved
+           screening section, add the audit note, and complete it. */
         await asana('/tasks/' + a.caseGid + '/stories', {
           method: 'POST',
           body: JSON.stringify({ data: { text: '🏷️ DISPOSITIONED — FALSE POSITIVE (ticked on this card). Case cleared; the matched designated-name pair(s) join the cleared-FP registry from the next screening run: identical hits are demoted with this clearance cited, and a NEW or CHANGED designated name re-opens normally.' } })
@@ -510,10 +489,6 @@ async function main() {
         await asana('/tasks/' + a.caseGid, { method: 'PUT', body: JSON.stringify({ data: { completed: true } }) });
         console.log('  dispositioned FALSE POSITIVE — case ' + a.key + ' cleared, pairs registered');
       } else if (a.type === 'disposition-escalate-ack') {
-        await asana('/sections/' + secEscalated + '/addTask', {
-          method: 'POST',
-          body: JSON.stringify({ data: { task: a.caseGid } })
-        });
         await asana('/tasks/' + a.caseGid + '/stories', {
           method: 'POST',
           body: JSON.stringify({ data: { text: '🔺 ESCALATED (ticked on this card) — moved to Escalated; auto-clear is disabled for this case until a human closes it. TFS obligations (freeze / report without delay) are the MLRO’s call — see the sanctions decision tree.' } })
@@ -557,7 +532,7 @@ async function main() {
       if (ai.text) console.log('screening-cases: OpenAI analyst enhancement appended (' + (ai.model || 'configured model') + ')');
       else if (ai.enabled && ai.error) console.warn('screening-cases: OpenAI enhancement unavailable — ' + ai.error + '; original digest will still post');
       const html = buildResultsDigestHtml(digestResults, a => (casesState[a.key] || {}).taskGid || null);
-      const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || '1216203370612916';
+      const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || SECTIONS.sanctions.gid;
       /* Mirror the daily case digest into the queue the MLRO actually works
          (see the MIRROR note in asana-notify). One task, two memberships. */
       const mirror = process.env.ASANA_MIRROR_PROJECT_GID

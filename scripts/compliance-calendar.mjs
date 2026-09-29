@@ -34,7 +34,7 @@ import {
   notifyAsana, asanaEnabled, ensureSection, listProjectTasks, runUrl, REG_PROJECT_GID
 } from './asana-notify.mjs';
 
-export const SECTION_NAME = 'Compliance Calendar';
+export const SECTION_NAME = 'Regulatory Changes';
 export const CALENDAR_FILE = 'data/compliance-calendar.json';
 export const DEFAULT_GRACE_DAYS = 7;
 

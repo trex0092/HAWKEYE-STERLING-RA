@@ -33,7 +33,7 @@ check('self-destruct instruction present (workflow fires once by design)',
   notes.includes('delete .github/workflows/scorecard-milestone.yml'));
 check('sign-off line present', notes.includes('Sign-off'));
 check('run link is embedded when provided', notes.includes('https://example/run'));
-check('section constant routes to the governance column', SECTION_NAME === 'Repository Governance');
+check('section constant routes to the approved regulatory section', SECTION_NAME === 'Regulatory Changes');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

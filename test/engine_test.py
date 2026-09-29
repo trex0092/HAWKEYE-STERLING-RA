@@ -3063,10 +3063,8 @@ finally:
 check("legacy daily post failure arms the delivery gate (no more green no-delivery)",
       _armed_daily)
 
-# The UNIFIED poster must multi-home into every CONFIGURED MLRO queue. Delivery
-# now creates the task in the project(s) first, then places it into section(s)
-# with addProject calls. This prevents a stale section GID from rejecting the
-# report task itself while preserving section placement whenever it is valid.
+# The UNIFIED poster must deliver only to the approved Adverse Media & PEP
+# section. Follow Ups is reserved for document expiries and pending documents.
 _posted = []
 _attached = []
 def _record_post(method, url, **kw):
@@ -3096,33 +3094,26 @@ def _record_post(method, url, **kw):
     raise AssertionError(f"unexpected Asana call: {method} {url}")
 
 screen.asana_request = _record_post
-_orig_fu2, _orig_fu_sec2 = screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID
 try:
-    screen.ASANA_FOLLOWUPS_GID = "9999999999999991"
-    screen.ASANA_FOLLOWUPS_SECTION_GID = "9999999999999992"
-    screen.post_unified_task("narrative", _dt.datetime(2026, 7, 29, 9, 0), [], [], [])
+    _gid_ok = screen.post_unified_task("narrative", _dt.datetime(2026, 7, 29, 9, 0), [], [], [])
 finally:
     screen.asana_request = _orig_asana_request
-    screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID = _orig_fu2, _orig_fu_sec2
 _data = (_posted[0] or {}).get("data", {}) if _posted else {}
-check("unified daily task is created in BOTH MLRO projects when a second one is configured",
-      set(_data.get("projects", [])) ==
-      {screen.ASANA_ONGOING_MON_GID, "9999999999999991"})
+check("unified daily task is created only in HAWKEYE STERLING APP",
+      _data.get("projects") == [screen.ASANA_ONGOING_MON_GID])
 check("unified daily task creation does not atomically depend on section GIDs",
       "memberships" not in _data)
 _attached_pairs = {
     (a["data"].get("project"), a["data"].get("section"))
     for a in _attached if a and a.get("data")
 }
-check("unified daily task is placed into both configured delivery sections after creation",
-      _attached_pairs == {
-          (screen.ASANA_ONGOING_MON_GID, screen.ASANA_SECTION_GID),
-          ("9999999999999991", "9999999999999992"),
+check("unified daily task is placed only in the approved adverse-media/PEP section",
+      _gid_ok == "1" and _attached_pairs == {
+          (screen.ASANA_ONGOING_MON_GID, screen.ASANA_MEDIA_SECTION_GID),
       })
 
-# A stale/deleted section must degrade placement, not erase the screening
-# result. The task create succeeds, addProject returns 400, and the poster must
-# still return the delivered task GID without arming the delivery-failure gate.
+# Wrong section placement is a DELIVERY FAILURE. A task that exists in the
+# project default column is not an acceptable compliance delivery.
 _section_calls = []
 def _stale_section_post(method, url, **kw):
     if method == "GET":
@@ -3154,21 +3145,14 @@ try:
     _gid = screen.post_unified_task("narrative", _dt.datetime(2026, 9, 29, 9, 0), [], [], [])
 finally:
     screen.asana_request = _orig_asana_request
-check("stale Asana section does not suppress delivery of the screening report",
-      _gid == "delivered-1" and not screen.UNIFIED_DELIVERY_FAILED["failed"] and bool(_section_calls))
+check("stale Asana section fails closed instead of claiming delivery",
+      _gid is None and screen.UNIFIED_DELIVERY_FAILED["failed"] and bool(_section_calls))
 screen.UNIFIED_DELIVERY_FAILED["failed"] = _prev_failed
 
-# _mlro_queue_targets directly: dropping the Follow Ups queue must collapse the
-# multi-homing to the single delivery project membership, never an empty one.
-_orig_fu, _orig_fu_sec = screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID
-try:
-    screen.ASANA_FOLLOWUPS_GID = ""
-    _pj1, _mb1 = screen._mlro_queue_targets()
-finally:
-    screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID = _orig_fu, _orig_fu_sec
-check("queue targets without Follow Ups: one project, one sectioned membership",
+_pj1, _mb1 = screen._mlro_queue_targets()
+check("queue targets are exactly one project and the approved media section",
       _pj1 == [screen.ASANA_ONGOING_MON_GID]
-      and _mb1 == [{"project": screen.ASANA_ONGOING_MON_GID, "section": screen.ASANA_SECTION_GID}])
+      and _mb1 == [{"project": screen.ASANA_ONGOING_MON_GID, "section": screen.ASANA_MEDIA_SECTION_GID}])
 
 # ── screen.py: section-aware narrative shrink (§② must survive delivery) ─────
 # Regression: cap_notes keeps head + tail, so an oversized report lost its
@@ -3377,9 +3361,14 @@ def _cs_stub(status_seq):
     _cs_sent.clear()
 
     def _req(method, url, **kw):
+        if url.endswith("/addProject"):
+            return types.SimpleNamespace(status_code=200, text="stub")
         _cs_sent.append(kw.get("json", {}).get("data", {}))
         code = seq.pop(0) if seq else 500
-        return types.SimpleNamespace(status_code=code, text="stub")
+        _resp = types.SimpleNamespace(status_code=code, text="stub")
+        if code in (200, 201):
+            _resp.json = lambda: {"data": {"gid": "case-gid"}}
+        return _resp
     return _req
 
 
@@ -3394,7 +3383,7 @@ _cs_note = ("Customer: Example Trading LLC\n"
             + "Narrative paragraph. " * 40)
 try:
     screen.asana_request = _cs_stub([201])
-    _ok = screen.create_case_subtask("parent-gid", "🔴 SANCTIONS case: Example", _cs_note, "2026-07-29")
+    _ok = screen.create_case_subtask("parent-gid", "🔴 SANCTIONS case: Example", _cs_note, "2026-07-29", screen.ASANA_SANCTIONS_SECTION_GID)
     _sent = _cs_sent[0]["notes"]
     check("create_case_subtask reports success when Asana accepts", _ok is True)
     check("oversized case note is truncated, not sent whole", len(_sent) < len(_cs_note))
@@ -3410,14 +3399,14 @@ try:
     # cut notes the API would have taken in full.
     _mid = "x" * 20000 + "\n" + _cs_disp
     screen.asana_request = _cs_stub([201])
-    screen.create_case_subtask("parent-gid", "case", _mid, "2026-07-29")
+    screen.create_case_subtask("parent-gid", "case", _mid, "2026-07-29", screen.ASANA_SANCTIONS_SECTION_GID)
     check("a 20k-char case note is delivered INTACT (old cap cut it at 8,000)",
           _cs_sent[0]["notes"] == _mid)
 
     # A refused create is re-queued to the backlog and retried on later runs, so
     # a payload Asana rejects at full budget would re-fail forever.
     screen.asana_request = _cs_stub([400, 201])
-    _ok2 = screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    _ok2 = screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29", screen.ASANA_SANCTIONS_SECTION_GID)
     check("a size refusal (400) is re-bid at the smaller budget and succeeds", _ok2 is True)
     check("the re-bid actually shrank the payload",
           len(_cs_sent) == 2 and len(_cs_sent[1]["notes"]) < len(_cs_sent[0]["notes"]))
@@ -3428,10 +3417,10 @@ try:
     # An auth/rate/network failure fails identically at any size — re-bidding
     # smaller just burns a second call against the rate limit.
     screen.asana_request = _cs_stub([401, 201])
-    _ok3 = screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    _ok3 = screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29", screen.ASANA_SANCTIONS_SECTION_GID)
     check("a non-size failure (401) is NOT re-bid smaller", _ok3 is False and len(_cs_sent) == 1)
     screen.asana_request = _cs_stub([429, 201])
-    screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29")
+    screen.create_case_subtask("parent-gid", "case", _cs_note, "2026-07-29", screen.ASANA_SANCTIONS_SECTION_GID)
     check("a rate-limit (429) is NOT re-bid smaller either", len(_cs_sent) == 1)
 
     # WIRING, not just behaviour: the head-slice must not come back.
@@ -4054,9 +4043,7 @@ _req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
 os.environ.pop("ANTHROPIC_API_KEY", None)
 _reset_llm()
 
-# ── 21 Sep 2026 engine fixes: case-board attach, honest news-feed coverage, honest AI mode ──
-# (1) Case subtasks were created with only a `parent`, so Asana gave them ZERO
-# project/section membership and they never showed on the case board.
+# ── Case placement: only the two approved screening sections are valid ───────
 _cb_calls = []
 def _cb_stub(create_status=201, create_gid="777", attach_status=200):
     _cb_calls.clear()
@@ -4069,45 +4056,45 @@ def _cb_stub(create_status=201, create_gid="777", attach_status=200):
         return _resp
     return _req
 _cb_orig_req = screen.asana_request
-_cb_orig_sec = screen.ASANA_CASES_NEW_SECTION_GID
 try:
-    screen.ASANA_CASES_NEW_SECTION_GID = "9999999999999901"
     screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
     screen.asana_request = _cb_stub()
-    _cb_ok = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
-    _cb_attach = [c for c in _cb_calls if c[1].endswith("/addProject")]
+    _cb_ok = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21",
+                                        screen.ASANA_SANCTIONS_SECTION_GID)
+    _cb_attach = [x for x in _cb_calls if x[1].endswith("/addProject")]
     check("case subtask: created OK", _cb_ok is True)
-    check("case subtask: attached to the board via addProject on the NEW task gid",
+    check("case subtask: attached using the NEW task gid",
           len(_cb_attach) == 1 and _cb_attach[0][1].endswith("/tasks/777/addProject"))
-    check("case subtask: attach targets the monitoring project and the New-cases section",
+    check("case subtask: sanctions case targets the approved sanctions section",
           _cb_attach[0][2].get("project") == screen.ASANA_ONGOING_MON_GID
-          and _cb_attach[0][2].get("section") == "9999999999999901")
+          and _cb_attach[0][2].get("section") == screen.ASANA_SANCTIONS_SECTION_GID)
     check("case subtask: attach is counted", screen.CASE_BOARD_ATTACH["attached"] == 1)
 
     screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
-    screen.asana_request = _cb_stub(attach_status=500)
-    _cb_ok2 = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
-    check("case subtask: a failed attach never fails the case itself", _cb_ok2 is True)
-    check("case subtask: a failed attach is counted (loud), not swallowed",
-          screen.CASE_BOARD_ATTACH["failed"] == 1 and screen.CASE_BOARD_ATTACH["attached"] == 0)
-
-    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
-    screen.asana_request = _cb_stub(create_gid=None)
-    screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
-    check("case subtask: an unreadable create response is counted as a failed attach, no blind call",
-          screen.CASE_BOARD_ATTACH["failed"] == 1
-          and not [c for c in _cb_calls if c[1].endswith("/addProject")])
-
-    screen.ASANA_CASES_NEW_SECTION_GID = ""
-    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
     screen.asana_request = _cb_stub()
-    screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21")
-    check("case subtask: an empty section setting disables the attach",
-          not [c for c in _cb_calls if c[1].endswith("/addProject")]
-          and screen.CASE_BOARD_ATTACH == {"attached": 0, "failed": 0})
+    _cb_media = screen.create_case_subtask("parent-gid", "PEP case", "note", "2026-09-21",
+                                           screen.ASANA_MEDIA_SECTION_GID)
+    _cb_attach = [x for x in _cb_calls if x[1].endswith("/addProject")]
+    check("case subtask: PEP/adverse case targets the approved media section",
+          _cb_media is True and _cb_attach[0][2].get("section") == screen.ASANA_MEDIA_SECTION_GID)
+
+    _bad_section = False
+    try:
+        screen.attach_case_to_board("777", "9999999999999901")
+    except RuntimeError:
+        _bad_section = True
+    check("case subtask: an unapproved section is rejected before any Asana move",
+          _bad_section)
+
+    screen.CASE_BOARD_ATTACH.update(attached=0, failed=0)
+    screen.asana_request = _cb_stub(attach_status=500)
+    _cb_ok2 = screen.create_case_subtask("parent-gid", "case", "note", "2026-09-21",
+                                         screen.ASANA_SANCTIONS_SECTION_GID)
+    check("case subtask: a failed attach never erases the created case", _cb_ok2 is True)
+    check("case subtask: a failed attach is counted loudly",
+          screen.CASE_BOARD_ATTACH["failed"] == 1 and screen.CASE_BOARD_ATTACH["attached"] == 0)
 finally:
     screen.asana_request = _cb_orig_req
-    screen.ASANA_CASES_NEW_SECTION_GID = _cb_orig_sec
 
 # (2) The report claimed GDELT "runs on EVERY subject every run regardless" on a
 # run where its circuit opened after 5 subjects. Coverage is now counted per
