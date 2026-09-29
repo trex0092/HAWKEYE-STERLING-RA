@@ -263,4 +263,5 @@ async function main() {
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   main();
-}
+}  'sanctions-runtime-assurance.yml': 'fast evidence refresh for the sanctions domain; sanctions-screen.yml remains the mandatory daily case-engine control and screening-assurance.yml remains the mandatory all-domain runtime control',
+
