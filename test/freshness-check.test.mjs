@@ -262,15 +262,23 @@ for (const c of CONTROLS) {
 }
 
 const assuranceWf = readFileSync(join(wfDir, 'screening-assurance.yml'), 'utf8');
-check('screening assurance auto-runs after fresh daily-screen evidence',
-  /workflow_run:/.test(assuranceWf)
-  && /Daily Screening \(Sanctions \+ Adverse Media \+ PEP\)/.test(assuranceWf));
-check('screening assurance auto-runs after fresh PEP evidence',
-  /PEP Worldwide Harvest/.test(assuranceWf));
-check('screening assurance auto-runs after fresh sanctions-case evidence',
-  /Sanctions Screen/.test(assuranceWf));
-check('workflow-run assurance only verifies successful upstream evidence',
-  /github\.event\.workflow_run\.conclusion == 'success'/.test(assuranceWf));
+const dailyScreenWf = readFileSync(join(wfDir, 'weekly-adverse-media.yml'), 'utf8');
+const pepWf = readFileSync(join(wfDir, 'pep-worldwide.yml'), 'utf8');
+const sanctionsScreenWf = readFileSync(join(wfDir, 'sanctions-screen.yml'), 'utf8');
+
+check('screening assurance avoids the dangerous workflow_run trigger',
+  !/workflow_run:/.test(assuranceWf));
+check('successful daily screening explicitly dispatches Screening Assurance',
+  /Refresh Screening Assurance/.test(dailyScreenWf)
+  && /needs\.adverse-media\.result == 'success'/.test(dailyScreenWf)
+  && /screening-assurance\.yml\/dispatches/.test(dailyScreenWf)
+  && /actions:\s*write/.test(dailyScreenWf));
+check('complete PEP harvest dispatches Screening Assurance but a resume link does not',
+  /Dispatch Screening Assurance after complete PEP harvest/.test(pepWf)
+  && /steps\.harvest\.outputs\.resume != '1'/.test(pepWf)
+  && /screening-assurance\.yml\/dispatches/.test(pepWf));
+check('Sanctions Screen still explicitly dispatches Screening Assurance',
+  /screening-assurance\.yml\/dispatches/.test(sanctionsScreenWf));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
