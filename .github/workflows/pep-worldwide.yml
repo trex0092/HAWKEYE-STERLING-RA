@@ -270,3 +270,20 @@ jobs:
                 : ["# PEP worldwide harvest", "", "no artifact and no checkpoint — see the harvest step log"];
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join("\n") + "\n");
           '
+
+      - name: Dispatch Screening Assurance after complete PEP harvest
+        if: steps.harvest.outputs.resume != '1'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -sS -o /tmp/assurance-dispatch.out -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/screening-assurance.yml/dispatches" \
+            -d '{"ref":"main"}')
+          if [ "$code" != "204" ]; then
+            cat /tmp/assurance-dispatch.out
+            echo "::error::Screening Assurance dispatch failed with HTTP $code"
+            exit 1
+          fi
+          echo "Screening Assurance dispatched after complete PEP harvest"
