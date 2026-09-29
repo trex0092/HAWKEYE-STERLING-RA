@@ -8,10 +8,13 @@ name: PEP Shard Harvest
 # a separate client with its own rate budget — so N shards buy close to N times
 # the throughput, which more parallelism in a single job cannot.
 #
-# This is ADDITIVE and dispatch-only. pep-worldwide.yml keeps its weekly
-# schedule and its self-resuming chain untouched; if a sharded run goes wrong,
-# the ordinary chain is still grinding away and nothing is lost. Use this to
-# clear a large backlog, then let the weekly harvest carry on as normal.
+# This is ADDITIVE. pep-worldwide.yml keeps its weekly schedule and its
+# self-resuming chain untouched; if a sharded run goes wrong, the ordinary
+# chain is still grinding away and nothing is lost. Manual dispatch remains
+# available. A protected-main push that changes THIS workflow also launches one
+# shard run, which makes reviewed harvester changes self-validating and gives us
+# a safe way to clear an existing checkpoint backlog without a separate API
+# dispatcher. Ordinary source-code pushes do not match the path filter.
 #
 # Shards never share a ref: each force-pushes ONLY its own pep-shard-<i> branch,
 # so concurrent writes cannot race or drop each other's work, and the single
@@ -20,6 +23,10 @@ name: PEP Shard Harvest
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pep-shard-harvest.yml'
 
 permissions:
   contents: read
