@@ -15,7 +15,7 @@ import {
   notifyAsana, asanaEnabled, ensureSection, listProjectTasks, runUrl, REG_PROJECT_GID
 } from './asana-notify.mjs';
 
-export const SECTION_NAME = 'Repository Governance';
+export const SECTION_NAME = 'Regulatory Changes';
 
 /* The gate lifts 90 days after repo creation (2026-06-11T07:56:32Z). */
 export const MILESTONE_DATE = '2026-09-09';
