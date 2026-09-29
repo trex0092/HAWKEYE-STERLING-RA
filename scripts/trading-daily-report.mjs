@@ -272,7 +272,7 @@ async function main(argv) {
     console.error('trading-daily-report: Asana is not configured — report NOT delivered.');
     process.exit(1);
   }
-  const url = await notifyAsana(fitAsanaName(report.title), fitAsanaText(report.notes));
+  const url = await notifyAsana(fitAsanaName(report.title), fitAsanaText(report.notes), { section: '1218451992088222' });
   console.log('\ndelivered: ' + (url || '(no url returned)'));
   /* A source-unavailable card is still a delivery, but the run is not a
      success — exit non-zero so the schedule shows red rather than green. */
