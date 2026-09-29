@@ -41,8 +41,8 @@ function ageHours(iso, nowMs) {
   return Number.isFinite(t) ? Math.max(0, (nowMs - t) / 3600000) : Infinity;
 }
 
-function domain(ok, reasons, evidence) {
-  return { operational: !!ok, reasons: reasons.filter(Boolean), evidence };
+function domain(ok, reasons, evidence, warnings = []) {
+  return { operational: !!ok, reasons: reasons.filter(Boolean), warnings: warnings.filter(Boolean), evidence };
 }
 
 export function assessRuntime({
@@ -78,23 +78,36 @@ export function assessRuntime({
   const backbones = new Set(arr(e.amBackbones).map(String));
   const backboneFailures = e.amBackboneFailures || {};
   const adverseReasons = [];
+  const adverseWarnings = [];
   if (num(results?.screened) <= 0) adverseReasons.push('no subjects were screened');
   if (num(e.skipped) > 0) adverseReasons.push(num(e.skipped) + ' subjects skipped enrichment');
-  if (num(e.amErrors) > 0) adverseReasons.push(num(e.amErrors) + ' subjects had adverse-media errors');
-  if (num(e.amPartial) > 0) adverseReasons.push(num(e.amPartial) + ' subjects had partial adverse-media coverage');
+  /* amErrors means a subject had ZERO working global backbone after the
+     last-resort retry. That is a real coverage failure and remains fatal. */
+  if (num(e.amErrors) > 0) adverseReasons.push(num(e.amErrors) + ' subjects had zero adverse-media backbone coverage');
   if (num(e.amLocalesPerSubject) <= 0) adverseReasons.push('Google News locale sweep did not run');
-  if (!backbones.has('Google News RSS') || num(backboneFailures.googleNews) > 0) {
-    adverseReasons.push('Google News failed for ' + num(backboneFailures.googleNews) + ' subject(s)');
-  }
-  if (!backbones.has('GDELT global index') || num(backboneFailures.gdelt) > 0) {
-    adverseReasons.push('GDELT failed for ' + num(backboneFailures.gdelt) + ' subject(s)');
-  }
-  if (!backbones.has('Bing News') || num(backboneFailures.bing) > 0) {
-    adverseReasons.push('Bing News failed for ' + num(backboneFailures.bing) + ' subject(s)');
-  }
   if (num(e.amMatrixTotal) !== num(expectedAdverseMatrix)) {
     adverseReasons.push('adverse-media matrix mismatch: run ' + num(e.amMatrixTotal) + ', configured ' + num(expectedAdverseMatrix));
   }
+
+  /* Redundancy loss is not the same as no screening coverage. A subject covered
+     by Bing while Google/GDELT are rate-limited was still screened; mark that
+     as a warning, preserve carry-forward semantics, and keep the domain green
+     when EVERY subject had at least one global backbone. */
+  if (num(e.amPartial) > 0) adverseWarnings.push(num(e.amPartial) + ' subjects had reduced adverse-media source redundancy');
+  if (!backbones.has('Google News RSS') || num(backboneFailures.googleNews) > 0) {
+    adverseWarnings.push('Google News unavailable for ' + num(backboneFailures.googleNews) + ' subject(s)');
+  }
+  if (!backbones.has('GDELT global index') || num(backboneFailures.gdelt) > 0) {
+    adverseWarnings.push('GDELT unavailable for ' + num(backboneFailures.gdelt) + ' subject(s)');
+  }
+  if (!backbones.has('Bing News') || num(backboneFailures.bing) > 0) {
+    adverseWarnings.push('Bing News unavailable for ' + num(backboneFailures.bing) + ' subject(s)');
+  }
+  if (num(e.amRetryAttempted) > 0) {
+    adverseWarnings.push('last-resort backbone retry attempted for ' + num(e.amRetryAttempted)
+      + ' subject(s), recovered ' + num(e.amRetryRecovered));
+  }
+
   const adverseMedia = domain(adverseReasons.length === 0, adverseReasons, {
     screenedSubjects: num(results?.screened),
     googleNewsLocalesPerSubject: num(e.amLocalesPerSubject),
@@ -108,8 +121,10 @@ export function assessRuntime({
     },
     errors: num(e.amErrors),
     partialSubjects: num(e.amPartial),
+    retryAttempted: num(e.amRetryAttempted),
+    retryRecovered: num(e.amRetryRecovered),
     skippedSubjects: num(e.skipped),
-  });
+  }, adverseWarnings);
 
   const pepReasons = [];
   const pepRun = e.pepWorldwide || {};
@@ -169,7 +184,8 @@ export function badgeSvg(label, d) {
   const message = ok ? 'operational' : 'degraded';
   const color = ok ? '#4c1' : '#e05d44';
   const lw = Math.max(110, label.length * 7 + 18), vw = 78, total = lw + vw;
-  const title = label + ': ' + message + (ok ? '' : ' — ' + arr(d?.reasons).join('; '));
+  const warningText = arr(d?.warnings).length ? ' — warnings: ' + arr(d?.warnings).join('; ') : '';
+  const title = label + ': ' + message + (ok ? warningText : ' — ' + arr(d?.reasons).join('; ') + warningText);
   return '<svg xmlns="http://www.w3.org/2000/svg" width="' + total + '" height="20" role="img" aria-label="' + esc(title) + '">'
     + '<title>' + esc(title) + '</title>'
     + '<clipPath id="r"><rect width="' + total + '" height="20" rx="3"/></clipPath>'
