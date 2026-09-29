@@ -1,0 +1,78 @@
+name: Runtime recovery dispatch
+
+on:
+  push:
+    branches: [ops/runtime-recovery-693]
+    paths: [.github/workflows/runtime-recovery-dispatch.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-recovery-dispatch-693
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: github.ref == 'refs/heads/ops/runtime-recovery-693'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          # Egress is limited to GitHub API dispatch and the runner watchdog.
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            *.githubapp.com:443
+      - name: Verify merged code and dispatch existing controls on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { appendFileSync } from 'node:fs';
+          const root = 'https://api.github.com/repos/trex0092/HAWKEYE-STERLING-RA';
+          const merged = '315f24734729f4bb916109ca49897a3499244148';
+          async function api(path, method = 'GET', body) {
+            const response = await fetch(root + path, {
+              method,
+              headers: {
+                authorization: 'Bearer ' + process.env.GH_TOKEN,
+                accept: 'application/vnd.github+json',
+                'content-type': 'application/json',
+                'user-agent': 'HawkeyeSterling-RuntimeRecovery',
+              },
+              ...(body ? { body: JSON.stringify(body) } : {}),
+              signal: AbortSignal.timeout(30000),
+            });
+            if (!response.ok) throw new Error(method + ' ' + path + ': HTTP ' + response.status);
+            return response.status === 204 ? null : response.json();
+          }
+          const comparison = await api('/compare/' + merged + '...main');
+          assert.ok(['ahead', 'identical'].includes(comparison.status), 'Main must include PR 693');
+          const main = await api('/commits/main');
+          const lines = ['# Runtime recovery after PR 693', '', 'Main commit: `' + main.sha + '`', ''];
+          for (const workflow of ['pep-worldwide.yml', 'sanctions-screen.yml']) {
+            const runs = await api('/actions/workflows/' + workflow + '/runs?branch=main&per_page=10');
+            assert.ok(Array.isArray(runs.workflow_runs), 'Workflow runs must be readable');
+            const active = runs.workflow_runs.find(r => r.head_sha === main.sha && r.status !== 'completed');
+            if (active) {
+              const line = workflow + ': already active at ' + active.html_url;
+              console.log(line);
+              lines.push(line);
+              continue;
+            }
+            await api('/actions/workflows/' + workflow + '/dispatches', 'POST', { ref: 'main' });
+            const line = workflow + ': dispatch accepted for main. Completion and runtime assurance are not yet verified.';
+            console.log(line);
+            lines.push(line);
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          NODE
