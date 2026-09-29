@@ -53,6 +53,19 @@ jobs:
         run: |
           node --check scripts/workflow-recovery.mjs
           node scripts/workflow-recovery.mjs --self-test
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { CONTROLS } from './scripts/freshness-check.mjs';
+          import { decide } from './scripts/workflow-recovery.mjs';
+          const control = CONTROLS.find(c => c.id === 'sanctions-screen.yml');
+          assert.ok(control, 'the actual sanctions producer must remain registered');
+          const nowMs = Date.parse('2026-09-29T12:00:00Z');
+          const run = { id: 1, event: 'schedule', head_branch: 'main',
+            status: 'completed', conclusion: 'success', created_at: '2026-09-29T06:00:00Z' };
+          assert.equal(decide(control, [run], { nowMs }).action, 'healthy');
+          assert.equal(decide(control, [{ ...run, conclusion: 'failure' }], { nowMs }).action, 'dispatch');
+          console.log('Registry integration: successful sanctions execution is recognized; a failed bail is retried.');
+          NODE
 
   heal:
     needs: validate

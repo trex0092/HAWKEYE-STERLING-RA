@@ -64,33 +64,39 @@ export function makeApi({ repo, token, fetchImpl = fetch, wait = sleep }) {
     if (!path.startsWith('/actions/')) throw new Error('refusing non-Actions API path');
     const url = `https://api.github.com/repos/${repo}${path}`;
     for (let attempt = 0; attempt < 3; attempt++) {
-      let res;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
       try {
-        res = await fetchImpl(url, {
-          method,
-          headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(15000),
-          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        });
-      } catch {
-        if (method !== 'GET' || attempt === 2) throw new Error(`${method} transport failure; outcome unverified`);
-        await wait(1000 * 2 ** attempt);
-        continue;
+        let res;
+        try {
+          res = await fetchImpl(url, {
+            method,
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          });
+        } catch {
+          if (method !== 'GET' || attempt === 2) throw new Error(`${method} transport failure; outcome unverified`);
+          await wait(1000 * 2 ** attempt);
+          continue;
+        }
+        if (method === 'GET' && (res.status === 429 || res.status >= 500) && attempt < 2) {
+          const retry = Number(res.headers?.get('retry-after'));
+          await wait(Math.min(30000, Math.max(1000 * 2 ** attempt, Number.isFinite(retry) ? retry * 1000 : 0)));
+          continue;
+        }
+        if (!res.ok) throw new Error(`${method} ${path.split('?')[0]} returned HTTP ${res.status}`);
+        if (method === 'POST') {
+          if (res.status !== 204) throw new Error(`dispatch returned unexpected HTTP ${res.status}`);
+          return null;
+        }
+        let data;
+        try { data = await res.json(); } catch { throw new Error('GitHub returned invalid JSON'); }
+        return { data, next: /rel="next"/.test(res.headers?.get('link') || '') };
+      } finally {
+        clearTimeout(timer);
       }
-      if (method === 'GET' && (res.status === 429 || res.status >= 500) && attempt < 2) {
-        const retry = Number(res.headers?.get('retry-after'));
-        await wait(Math.min(30000, Math.max(1000 * 2 ** attempt, Number.isFinite(retry) ? retry * 1000 : 0)));
-        continue;
-      }
-      if (!res.ok) throw new Error(`${method} ${path.split('?')[0]} returned HTTP ${res.status}`);
-      if (method === 'POST') {
-        if (res.status !== 204) throw new Error(`dispatch returned unexpected HTTP ${res.status}`);
-        return null;
-      }
-      let data;
-      try { data = await res.json(); } catch { throw new Error('GitHub returned invalid JSON'); }
-      return { data, next: /rel="next"/.test(res.headers?.get('link') || '') };
     }
     throw new Error('GitHub request exhausted retry budget');
   };
