@@ -94,11 +94,12 @@ DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "05:00")
 DELIVERY_RESERVE_MIN  = int(os.environ.get("DELIVERY_RESERVE_MIN", "20"))
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
-ASANA_ONGOING_MON_GID = "1216203370612914"   # RETIRED 2026-09-15: "Sanctions/Media/PEP -
-# Monitoring" project (old value 1213914392047129) was merged into HAWKEYE
-# STERLING APP -- this must always be a live project (delivery is FATAL
-# otherwise), so it is repointed here rather than disabled.
-ASANA_SECTION_GID     = "1216203370612916"   # "Assessment Report" section (HAWKEYE STERLING APP), verified live 2026-09-28
+# Delivery target is configurable so an Asana reorganisation can be repaired by
+# updating repository variables without waiting for a code release. The defaults
+# are the live HAWKEYE STERLING APP project and Assessment Report section,
+# verified through the Asana API on 2026-09-29.
+ASANA_ONGOING_MON_GID = os.environ.get("ASANA_DELIVERY_PROJECT_GID", "1216203370612914")
+ASANA_SECTION_GID     = os.environ.get("ASANA_DELIVERY_SECTION_GID", "1216203370612916")
 # ── Second screening population + second delivery queue (MLRO, 2026-07-29) ──
 # Screening reads BOTH populations: the Customer Database (customers + their
 # UBOs/owners) and the HR – Employees project (staff screening — FATF R.18 /
@@ -129,7 +130,7 @@ def _mlro_queue_targets():
             m["section"] = ASANA_FOLLOWUPS_SECTION_GID
         memberships.append(m)
     return projects, memberships
-ASANA_ASSIGNEE_GID    = "1213645083721304"   # default case/OM assignee (MLRO)
+ASANA_ASSIGNEE_GID    = os.environ.get("ASANA_ASSIGNEE_GID", "1213645083721304")   # default case/OM assignee (MLRO)
 # Case subtasks are created with only a `parent`, and Asana does not put a
 # subtask on any project board by itself: every case created since at least
 # 27 Aug 2026 had ZERO project/section membership and was invisible on the
@@ -1357,6 +1358,38 @@ def progress(phase, **detail):
         pass
 
 # ── ASANA TRANSPORT (honours 429 rate-limit; retries transient errors) ────────
+def _attach_task_sections(task_gid, memberships):
+    """Place an already-created task into its configured Asana sections.
+
+    Task creation deliberately happens with PROJECT membership only. Asana
+    rejects the entire create request when a section GID is stale or deleted.
+    That previously meant a valid screening result never reached Asana at all.
+    Section placement is therefore a second step: a stale section remains loud,
+    but the report itself is already durably delivered to the live project.
+    """
+    failures = []
+    for membership in memberships or []:
+        project = membership.get("project")
+        section = membership.get("section")
+        if not task_gid or not project or not section:
+            continue
+        r = asana_request(
+            "POST",
+            f"https://app.asana.com/api/1.0/tasks/{task_gid}/addProject",
+            json={"data": {"project": project, "section": section}},
+        )
+        if r is None or r.status_code not in (200, 201):
+            failures.append({
+                "project": project,
+                "section": section,
+                "status": getattr(r, "status_code", "network"),
+                "body": getattr(r, "text", "")[:200],
+            })
+            log(f"  WARNING: screening report {task_gid} was delivered to Asana project "
+                f"{project} but section placement {section} failed: "
+                f"{getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
+    return failures
+
 ASANA_NOTES_MAX = 65000    # opening budget in worst-case rich-text bytes — see _asana_notes_size
 ASANA_NOTES_FLOOR = 12000  # shrink-chain floor: keeps the summary + sign-off intact
 # Case subtasks post to the SAME notes field as the daily report, so they get the
@@ -4999,19 +5032,21 @@ def post_daily_task(narrative, run_time, run_label, n_matches):
     flag = "⚠️" if n_matches > 0 else "✅"
     task_name = (f"🔍 {flag} Daily Sanctions Screening — "
                  f"OFAC / UN / EU / UK / AU / CH / UAE EOCN — {dt} ({run_label})")
+    projects, memberships = _mlro_queue_targets()
     payload = {
         "data": {
             "name": task_name,
             "notes": cap_notes(narrative),
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
-            "projects": _mlro_queue_targets()[0],
-            "memberships": _mlro_queue_targets()[1],
+            "projects": projects,
         }
     }
     r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
     if r is not None and r.status_code in (200,201):
-        log(f"✅ Daily task created: {r.json()['data']['gid']}")
+        gid = r.json()["data"]["gid"]
+        _attach_task_sections(gid, memberships)
+        log(f"✅ Daily task created: {gid}")
     else:
         log(f"❌ Task failed: {getattr(r,'status_code','network')} — {getattr(r,'text','')[:300]}")
         # Arm the delivery gate: a run whose report never reached the MLRO queue
@@ -6308,19 +6343,25 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
             # visible/auditable to the MLRO rather than hidden).
             notes_body += (f"\n\n(internal dedup marker, not a finding: "
                            f"onboarding-batch:{_onboarding_batch_key(customer_gids)})")
+        projects, memberships = _mlro_queue_targets()
         payload = {"data": {
             "name": task_name[:250],
             "notes": notes_body,
             "due_on": run_time.strftime("%Y-%m-%d"),
             "assignee": ASANA_ASSIGNEE_GID,
-            "projects": _mlro_queue_targets()[0],
-            "memberships": _mlro_queue_targets()[1],
+            # Create against projects first. A stale section must never make
+            # Asana reject the screening report itself.
+            "projects": projects,
         }}
         r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
         if r is not None and r.status_code in (200, 201):
             gid = r.json()["data"]["gid"]
+            section_failures = _attach_task_sections(gid, memberships)
             NOTES_BUDGET["learned"] = budget  # persisted with the delta-state on delivery
-            log(f"OK Unified daily task created: {gid}")
+            if section_failures:
+                log(f"OK Unified daily task created: {gid} (section placement degraded)")
+            else:
+                log(f"OK Unified daily task created: {gid}")
             # The report is in the MLRO's hands from here. A death recorded
             # after this marker cost the run its state persistence and its
             # follow-up attestation, but NOT the day's screening — a materially
