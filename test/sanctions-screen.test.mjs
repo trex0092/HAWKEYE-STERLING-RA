@@ -1177,7 +1177,7 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
     /* Read the office block itself rather than a fixed character window after
        the guard — a distance-based match silently goes red the moment the block
        grows, which tells you nothing about the invariant. */
-    const officeBlock = src.slice(src.indexOf('if (PEP_SHARD_COUNT === 1) {'), src.indexOf('/* Labels phase'));
+    const officeBlock = src.slice(src.indexOf('const enrichOffices = async () => {'), src.indexOf('/* Labels phase'));
     check('PEP offices: the pass is NOT gated on the phase (that is what switched it off for good)',
       !/if \(!st \|\| st\.phase !== 'labels'\) \{[\s\S]{0,200}offices/.test(src)
       && officeBlock.includes('pendingOffices'));
@@ -1190,7 +1190,7 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
       (officeBlock.match(/officeTick\(\);/g) || []).length
         === (officeBlock.match(/if \(overBudget\(\)\) officePause\(\);/g) || []).length
       && (officeBlock.match(/officeTick\(\);/g) || []).length === 3
-      && src.indexOf('const BANK_EVERY_MS') < src.indexOf('if (PEP_SHARD_COUNT === 1) {'));
+      && src.indexOf('const BANK_EVERY_MS') < src.indexOf('const enrichOffices = async () => {'));
     /* P17/P1001 answer with an ENTITY. Left as-is the artifact would carry
        "Q30" where a country belongs, which on an MLRO's screen is barely better
        than the blank it replaced. */

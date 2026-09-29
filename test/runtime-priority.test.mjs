@@ -100,5 +100,36 @@ try {
   check('unresolved source records do not become a false complete artifact', published.partial && published.expected === 2 && published.count === 1);
   const saved = pep.readCheckpoint(cpfile);
   check('current person-name progress is preserved in the checkpoint', new Map(saved.names).get('Q1').name === 'Synthetic Published One');
+  // Complete the same checkpoint. Office work must still run after names.
+  writeFileSync(preload, 'globalThis.fetch = ' + (async function (url) {
+    const u = new URL(url);
+    if (u.hostname === 'www.wikidata.org') {
+      const ids = u.searchParams.get('ids').split('|');
+      console.log('LABEL_IDS=' + ids.join(','));
+      return { ok: true, status: 200, headers: { get: () => null },
+        json: async () => ({ entities: Object.fromEntries(ids.map(id =>
+          [id, { id, labels: { en: { value: id === 'Q2' ? 'Synthetic Person Two' : 'Synthetic Office' } } }])) }) };
+    }
+    if (u.hostname === 'query.wikidata.org') return {
+      ok: true, status: 200, headers: { get: () => null },
+      json: async () => ({ results: { bindings: [] } }),
+    };
+    throw new Error('Unexpected network');
+  }).toString() + ';');
+  const done = spawnSync(process.execPath,
+    ['--import', pathToFileURL(preload).href, 'scripts/pep-worldwide.mjs', 'harvest', outfile],
+    { cwd: process.cwd(), encoding: 'utf8', timeout: 15000,
+      env: { ...process.env, PEP_FLOOR: '1', PEP_SHARD_COUNT: '1', PEP_SHARD_INDEX: '0', PEP_TIME_BUDGET_MIN: '100', PEP_MAX_RESUMES: '12' } });
+  assert.ifError(done.error);
+  if (done.status !== 0) console.error(done.stdout + done.stderr);
+  check('completed person-name pass still runs optional office enrichment',
+    done.status === 0 && done.stdout.includes('LABEL_IDS=Q100'));
+  check('missing person is fetched before office labels on a successful resume',
+    done.stdout.indexOf('LABEL_IDS=Q2') >= 0
+    && done.stdout.indexOf('LABEL_IDS=Q2') < done.stdout.indexOf('LABEL_IDS=Q100'));
+  const complete = pep.readJsonMaybeGz(outfile);
+  check('office enrichment retains every newly completed person name',
+    complete.count === 2 && !complete.partial
+    && complete.entries.some(e => e.qid === 'Q2' && e.name === 'Synthetic Person Two'));
 } finally { rmSync(dir, { recursive: true, force: true }); }
 console.log('runtime-priority: ' + checks + ' checks passed');
