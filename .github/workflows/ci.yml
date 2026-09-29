@@ -132,6 +132,8 @@ jobs:
         run: node test/adverse-media.test.mjs
       - name: Run fail-closed news and PEP runtime recovery regressions
         run: node test/runtime-recovery.test.mjs
+      - name: Run independent provider and PEP resume priority regressions
+        run: node test/runtime-priority.test.mjs
       - name: Run PEP-check unit tests
         run: node test/pep-check.test.mjs
       - name: Run link-check unit tests
