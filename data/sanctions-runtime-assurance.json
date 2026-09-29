@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-29T10:55:40.181Z",
+  "githubRunId": "36558499620",
+  "commit": "439fbdde7b0bcbbaa743797ef65b93ba3a723636",
+  "screenedSubjects": 906,
+  "requiredSourceIds": [
+    "un-consolidated",
+    "ofac-sdn",
+    "ofac-consolidated",
+    "uk-ofsi",
+    "eu-fsf"
+  ],
+  "operational": true,
+  "reasons": [],
+  "warnings": [],
+  "evidence": {
+    "screenedSubjects": 906,
+    "loadedSources": [
+      {
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3778,
+        "partial": false
+      },
+      {
+        "id": "uk-ofsi",
+        "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+        "count": 58336,
+        "partial": false
+      },
+      {
+        "id": "ofac-consolidated",
+        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
+        "count": 1664,
+        "partial": false
+      },
+      {
+        "id": "ofac-sdn",
+        "name": "US OFAC — SDN list (CSV)",
+        "count": 19391,
+        "partial": false
+      },
+      {
+        "id": "eu-fsf",
+        "name": "EU — Consolidated financial sanctions list (CSV)",
+        "count": 31073,
+        "partial": false
+      }
+    ],
+    "requiredSourceIds": [
+      "un-consolidated",
+      "ofac-sdn",
+      "ofac-consolidated",
+      "uk-ofsi",
+      "eu-fsf"
+    ],
+    "notes": []
+  }
+}
