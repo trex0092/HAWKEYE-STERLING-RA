@@ -29,13 +29,14 @@
       "basis": "Not instrumented: the register’s governance rows carry no target date pending the Board’s item-17 decision, so the KRI cannot be aged; the engineering rows opened 2026-08 carry maintainer-set dates and are counted per row by openActionsWithoutTargetDate. See KRI-09 in data/risk-appetite.json."
     },
     "thirdPartyAssessmentCoverage": {
-      "value": 71.4,
+      "value": 62.5,
       "numerator": 5,
-      "denominator": 7,
+      "denominator": 8,
       "basis": "Vendors whose safeguard/DPA position is settled ÷ vendors in the third-party register. A cell still asking for a confirmation counts as outstanding.",
       "outstanding": [
         "Asana",
-        "Anthropic"
+        "Anthropic",
+        "Composio"
       ]
     },
     "auditFindingClosureRate": {
@@ -117,7 +118,7 @@
       "appetite_ref": "RA-04",
       "owner": "MLRO / DPO",
       "escalation_sla": "Same business day to the MLRO and the DPO; the affected path is gated OFF before the escalation, not after it.",
-      "value": 71.4,
+      "value": 62.5,
       "threshold": {
         "operator": ">=",
         "value": 100

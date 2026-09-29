@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Optional Composio orchestration layer.** Added a server-side Tool Router bridge for Asana, Gmail, Google Drive, Slack and GitHub with per-user sessions, connected-account linking, tool discovery/execution, hosted MCP session metadata, trigger management, signed webhook receipt, session mount operations and an independently gated raw proxy path. The integration is off by default, requires `APP_SHARED_TOKEN`, keeps project/webhook secrets server-side, and is explicitly excluded from sanctions, adverse-media, PEP, risk scoring and runtime assurance.
+
 - **Register research: Slovenia, Croatia, Slovakia** recorded as
   `assessed-not-loadable`. Each ministry's sanctions page points only to the
   UN and EU lists, and neither is published nationally. Guyana is

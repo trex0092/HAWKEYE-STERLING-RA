@@ -1,7 +1,6 @@
 # API Reference — Netlify Functions
 
-The app's only backend: four serverless functions plus a shared rate limiter and a
-CSP-report sink. **The Asana token and Anthropic key live in the Netlify
+The app's backend includes the assessment functions, a shared rate limiter, a CSP-report sink, and an optional governed Composio orchestration surface. **The Asana token and Anthropic key live in the Netlify
 environment and never reach the browser.** All functions apply, at the boundary:
 a **CORS origin allow-list** (same-origin + `PRIMARY_ORIGIN`/`ALLOWED_ORIGINS`),
 **POST-only** (405 otherwise), **`application/json` only** (415), a **1 MB body
@@ -70,6 +69,34 @@ guardrails; tipping-off guard (P4) can withhold
 output; injection/charter-leak detection; kill switch `ADVISOR_ENABLED`; upstream
 error bodies are **not** reflected to the client.
 
+
+## `composio-router` — optional business-app orchestration
+Server-side bridge to Composio Tool Router for approved Asana, Gmail, Google
+Drive, Slack and GitHub connections. Disabled by default and excluded from
+screening, scoring and runtime-assurance decisions.
+
+**Request** `POST /.netlify/functions/composio-router`, with
+`X-App-Token: <APP_SHARED_TOKEN>`.
+
+Supported action families include per-user session lifecycle, connected-account
+linking, toolkit and tool discovery, tool and meta-tool execution, hosted MCP
+session metadata, trigger management, webhook subscription management, and
+session mount file operations. Raw authenticated proxy execution remains
+separately disabled unless `COMPOSIO_ALLOW_PROXY=1`.
+
+**Guards** — requires `COMPOSIO_ENABLED=1`, `COMPOSIO_API_KEY` and a configured
+`APP_SHARED_TOKEN`; toolkit allow-list; origin checks; independent rate-limit
+bucket; project key never returned to the client.
+
+See [Composio orchestration integration](../composio-integration.md).
+
+## `composio-webhook` — signed Composio trigger receiver
+Receives Composio trigger deliveries and verifies `webhook-id`,
+`webhook-timestamp` and `webhook-signature` using HMAC-SHA256 and
+`COMPOSIO_WEBHOOK_SECRET`, with a bounded replay window. A valid event is
+audit-labelled and acknowledged. Receipt does not automatically execute an
+external action.
+
 ## `csp-report` — CSP violation sink
 Receives `report-uri` CSP violation reports for monitoring. No secrets, no PII.
 
@@ -83,6 +110,12 @@ Receives `report-uri` CSP violation reports for monitoring. No secrets, no PII.
 | `ASANA_CF_REF/TIER/SCORE/NEXT_REVIEW` | asana-task | custom-field GIDs |
 | `ANTHROPIC_API_KEY` | brain-soul | Advisor (absent ⇒ Advisor off, no egress) |
 | `PRIMARY_ORIGIN` / `ALLOWED_ORIGINS` | all | CORS allow-list |
+| `COMPOSIO_API_KEY` | composio-router | server-side Composio project key |
+| `COMPOSIO_ENABLED` | composio-router | master kill switch, default off |
+| `COMPOSIO_TOOLKITS` | composio-router | approved toolkit allow-list |
+| `COMPOSIO_ALLOW_PROXY` | composio-router | separate raw proxy execution gate, default off |
+| `COMPOSIO_WEBHOOK_SECRET` | composio-webhook | verifies signed trigger delivery |
+| `APP_SHARED_TOKEN` | composio-router and other protected data endpoints | required shared request token for Composio orchestration |
 | `ADVISOR_ENABLED` | brain-soul | kill switch |
 | `ADVISOR_PLATFORM_CAP_MS` | brain-soul | the site's function execution cap (default 10000). The abort budget and every mode's token budget derive from it, so the function returns its own governed answer rather than being killed mid-flight — a killed invocation runs none of the guards |
 
