@@ -1,108 +1,97 @@
 name: Control Retry (self-healing dispatcher)
 
-# Repo-wide self-healing for the mandatory DAILY controls. The 24-25 Jul
-# incidents showed the failure mode: a scheduled control's runner VM dies to a
-# transient infra kill ("The runner has received a shutdown signal"), the day's
-# run stays red, and nothing re-fires it until a human notices hours later —
-# meanwhile Freshness Check correctly cascades red. weekly-adverse-media.yml
-# gained its own 03:07 UTC retry; this dispatcher generalises the pattern to
-# EVERY daily control without touching each workflow: for each control with no
-# successful run today (UTC) and no run currently queued/in progress, it fires
-# one workflow_dispatch. Originally two passes (07:37 and 10:07 UTC); widened 2026-09-22 to twelve
-# staggered passes (06:07-11:37 UTC, see the `on:` block below for why) so a
-# scheduler-wide outage can't take out every healing attempt in the same day
-# it takes out the controls being healed.
-#
-# Deliberately narrow, so it can never mask a real failure:
-#   - a control that fails DETERMINISTICALLY (e.g. the EOCN review-age gate)
-#     fails again on re-dispatch and the day stays honestly red;
-#   - a control mid-run is left alone (its own concurrency group would queue
-#     the duplicate anyway);
-#   - at most one dispatch per control per firing — no retry storms.
-# The weekly/quarterly evals are excluded: their windows are days-wide, so a
-# single transient death never breaches them and their own schedules recover.
-
+# Shared recovery for the registered mandatory controls, including overdue
+# weekly/quarterly controls, plus safe runtime/delivery/production probes.
+# A dispatch request is never reported as proof that a control is operational.
 on:
   schedule:
-    # 2026-09-22: the two-pass design (07:37, 10:07) assumed GitHub's scheduler
-    # would land at least one of two firings. On 2026-09-22 it landed NEITHER —
-    # the same morning that 4 of the daily controls' own schedules were also
-    # skipped — so the dispatcher meant to heal a scheduler miss was itself
-    # silently skipped by the same failure mode, and nothing healed until a
-    # human (via chat) manually re-dispatched every affected control. Widened
-    # to a dozen staggered passes so a scheduler-wide outage has to eat nearly
-    # every slot in a 6-hour window, not just 2, to leave a day unhealed.
-    - cron: '7,37 6-11 * * *'   # every ~30 min, 06:07-11:37 UTC — all land before Freshness Check's 12:09 pass
+    - cron: '7,37 6-23 * * *'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/control-retry.yml'
+      - 'scripts/workflow-recovery.mjs'
+      - 'scripts/freshness-check.mjs'
+  pull_request:
+    paths:
+      - '.github/workflows/control-retry.yml'
+      - 'scripts/workflow-recovery.mjs'
+      - 'scripts/freshness-check.mjs'
 
-# Least privilege: read-only at top level; the healer job below elevates the
-# one scope it needs (Scorecard Token-Permissions).
 permissions:
   contents: read
 
 concurrency:
-  group: control-retry
+  group: control-retry-${{ github.event_name == 'pull_request' && github.ref || 'runtime' }}
   cancel-in-progress: false
 
 jobs:
-  heal:
-    # actions: write — read run history + fire workflow_dispatch on the controls.
-    permissions:
-      actions: write
-      contents: read
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - name: Harden the runner (egress block)
+      - name: Harden the runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           egress-policy: block
           allowed-endpoints: >
+            github.com:443
             api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
             *.githubapp.com:443
-
-      - name: Re-dispatch any daily control missing today's success
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Validate recovery syntax and offline regression cases
         run: |
-          set -u
-          # Keep in step with the daily entries in scripts/freshness-check.mjs
-          # CONTROLS (maxAgeDays 0). The freshness test pins that list; a new
-          # daily control should be added in both places.
-          CONTROLS="sanctions-watch.yml weekly-adverse-media.yml regulatory-watch.yml sanctions-screen.yml screening-assurance.yml fatf-watchdog.yml onboarding-screen.yml"
-          today="$(date -u +%Y-%m-%d)"
-          rc=0
-          for wf in $CONTROLS; do
-            resp=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/$REPO/actions/workflows/$wf/runs?created=%3E%3D${today}&per_page=50") || { echo "::error::API query failed for $wf"; rc=1; continue; }
-            summary=$(printf '%s' "$resp" | python3 -c '
-          import json, sys
-          d = json.load(sys.stdin)
-          runs = d.get("workflow_runs", [])
-          ok = sum(1 for r in runs if r.get("conclusion") == "success")
-          live = sum(1 for r in runs if r.get("status") in ("queued", "in_progress", "waiting"))
-          print(f"{ok} {live} {len(runs)}")')
-            ok=$(echo "$summary" | cut -d' ' -f1)
-            live=$(echo "$summary" | cut -d' ' -f2)
-            total=$(echo "$summary" | cut -d' ' -f3)
-            if [ "$ok" -gt 0 ]; then
-              echo "OK   $wf — $ok success(es) today ($total run(s))"
-            elif [ "$live" -gt 0 ]; then
-              echo "WAIT $wf — a run is queued/in progress; leaving it alone"
-            else
-              echo "HEAL $wf — no success and nothing running today ($total run(s)); dispatching"
-              code=$(curl -sS -o /tmp/dispatch.out -w '%{http_code}' -X POST \
-                -H "Authorization: Bearer $GH_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                "https://api.github.com/repos/$REPO/actions/workflows/$wf/dispatches" \
-                -d '{"ref":"main"}')
-              if [ "$code" != "204" ]; then
-                cat /tmp/dispatch.out; echo
-                echo "::error::dispatch failed for $wf (HTTP $code)"
-                rc=1
-              fi
-            fi
-          done
-          exit "$rc"
+          node --check scripts/workflow-recovery.mjs
+          node scripts/workflow-recovery.mjs --self-test
+
+  heal:
+    needs: validate
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+            *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Recover controls without duplicate runs or false success
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/workflow-recovery.mjs
+      - name: Alert when recovery needs intervention
+        if: failure()
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "WORKFLOW RECOVERY BLOCKED: a registered control needs intervention" \
+            "Recovery encountered an unverifiable status, disabled workflow, or exhausted retry budget. Review the per-control job summary. No operational pass is inferred from an accepted dispatch. $RUN_URL"
