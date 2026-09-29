@@ -297,10 +297,17 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
         ? hits.map(x => x.list + (x.hitName ? ': “' + x.hitName + '”' : '')
             + (x.score != null ? ' (' + x.score + (x.confidence ? ' · ' + x.confidence : '') + ')' : '')).join(' · ')
         : (a.lists || []).join(', ');
+      const ds = a.decisionSupport || {};
+      const pri = ds.casePriority || {};
+      const mc = ds.matchConfidence || {};
+      const fusion = ds.domainFusion || {};
       h.push('<li>' + badge + ' <strong>' + esc(a.name || '') + '</strong>'
         + (a.jurisdiction ? ' (' + esc(a.jurisdiction) + ')' : '')
         + ' — ' + esc(String(a.band || '').toUpperCase()) + ' · score ' + esc(String(a.topScore ?? '?'))
         + ' · ' + esc(a.recommendation || 'review')
+        + (pri.priority ? ' · priority ' + esc(pri.priority) + (pri.slaHours ? '/' + esc(String(pri.slaHours)) + 'h' : '') : '')
+        + (mc.score != null ? ' · evidence ' + esc(String(mc.score)) + '/100' : '')
+        + (Array.isArray(fusion.active) && fusion.active.length ? ' · domains ' + esc(fusion.active.join('+')) : '')
         + ' — matched on: ' + esc(matchedOn || 'see case')
         + (caseGid ? ' — <a data-asana-gid="' + esc(caseGid) + '"/>' : ' — case pending')
         + '</li>');
