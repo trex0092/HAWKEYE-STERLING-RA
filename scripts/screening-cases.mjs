@@ -167,6 +167,36 @@ export function caseHtml(key, s, runLink, priorCase) {
   h.push('<li><strong>Subject:</strong> ' + esc(s.name || '') + (s.jurisdiction ? ' (' + esc(s.jurisdiction) + ')' : '')
     + (s.role || s.parent ? ' — ' + esc([s.role, s.parent ? 'of ' + s.parent : ''].filter(Boolean).join(' ')) : '') + '</li>');
   h.push('<li><strong>Recommendation:</strong> ' + esc(s.recommendation || 'review') + ' · band ' + esc(s.band || '?') + ' · score ' + esc(String(s.topScore ?? '?')) + '</li>');
+  const ds = s.decisionSupport || null;
+  if (ds) {
+    const pri = ds.casePriority || {};
+    const mc = ds.matchConfidence || {};
+    const fusion = ds.domainFusion || {};
+    const diag = ds.sourceDiagnostics || {};
+    const checklist = ds.analystChecklist || {};
+    h.push('<li><strong>Case priority:</strong> ' + esc(pri.priority || 'normal')
+      + (pri.slaHours ? ' · target ' + esc(String(pri.slaHours)) + 'h' : '')
+      + (pri.reason ? ' · ' + esc(pri.reason) : '') + '</li>');
+    h.push('<li><strong>Decision-support confidence:</strong> ' + esc(String(mc.score ?? 0))
+      + '/100 · ' + esc(mc.band || 'insufficient')
+      + ' (supporting evidence only; never suppresses a hit)</li>');
+    if (Array.isArray(mc.contributions) && mc.contributions.length) {
+      h.push('<li><strong>Confidence factors:</strong> '
+        + esc(mc.contributions.map(x => x.signal + ' +' + x.points).join(' · ')) + '</li>');
+    }
+    if (Array.isArray(fusion.active) && fusion.active.length) {
+      h.push('<li><strong>Cross-domain signals:</strong> ' + esc(fusion.active.join(', '))
+        + (fusion.crossDomain ? ' · corroborated across domains' : '') + '</li>');
+    }
+    h.push('<li><strong>Evidence traceability:</strong> ' + esc(String(diag.evidenceUrlCoverage ?? 100))
+      + '% with source/evidence URL · ' + esc(String(diag.incompleteProvenance ?? 0))
+      + ' hit(s) with incomplete provenance</li>');
+    if (Array.isArray(checklist.missingEvidence) && checklist.missingEvidence.length) {
+      h.push('<li><strong>Verification still required:</strong> '
+        + esc(checklist.missingEvidence.join(', ')) + '</li>');
+    }
+    if (ds.fingerprint) h.push('<li><strong>Canonical subject fingerprint:</strong> <code>' + esc(ds.fingerprint) + '</code></li>');
+  }
   /* Evidence rows: matched designated name · score · mechanism · confidence
      when the state carries hit detail (post-migration records); the list-names
      line for older records — the card must never say less than it used to. */
@@ -267,10 +297,17 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
         ? hits.map(x => x.list + (x.hitName ? ': “' + x.hitName + '”' : '')
             + (x.score != null ? ' (' + x.score + (x.confidence ? ' · ' + x.confidence : '') + ')' : '')).join(' · ')
         : (a.lists || []).join(', ');
+      const ds = a.decisionSupport || {};
+      const pri = ds.casePriority || {};
+      const mc = ds.matchConfidence || {};
+      const fusion = ds.domainFusion || {};
       h.push('<li>' + badge + ' <strong>' + esc(a.name || '') + '</strong>'
         + (a.jurisdiction ? ' (' + esc(a.jurisdiction) + ')' : '')
         + ' — ' + esc(String(a.band || '').toUpperCase()) + ' · score ' + esc(String(a.topScore ?? '?'))
         + ' · ' + esc(a.recommendation || 'review')
+        + (pri.priority ? ' · priority ' + esc(pri.priority) + (pri.slaHours ? '/' + esc(String(pri.slaHours)) + 'h' : '') : '')
+        + (mc.score != null ? ' · evidence ' + esc(String(mc.score)) + '/100' : '')
+        + (Array.isArray(fusion.active) && fusion.active.length ? ' · domains ' + esc(fusion.active.join('+')) : '')
         + ' — matched on: ' + esc(matchedOn || 'see case')
         + (caseGid ? ' — <a data-asana-gid="' + esc(caseGid) + '"/>' : ' — case pending')
         + '</li>');
