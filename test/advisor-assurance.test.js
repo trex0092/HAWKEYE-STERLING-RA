@@ -14,6 +14,7 @@
    Usage: node test/advisor-assurance.test.js */
 
 const path = require('path');
+const fs = require('fs');
 const MOD = path.join(__dirname, '..', 'netlify', 'functions', 'brain-soul.js');
 
 let passed = 0, failed = 0;
@@ -440,7 +441,7 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
      request". That would have had someone debugging a payload while the real
      fix was a billing limit. The body is CLASSIFIED (never reflected) to tell
      quota apart from malformed, on both statuses that can carry it. */
-  const evalSrc = readFileSync(join(ROOT, 'scripts/advisor-eval.mjs'), 'utf8');
+  const evalSrc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'advisor-eval.mjs'), 'utf8');
 check('advisor eval aborts remaining live cases after a provider-wide quota/billing failure',
   /provider-wide quota\/billing failure is terminal/.test(evalSrc)
   && /break evalLoop/.test(evalSrc)
