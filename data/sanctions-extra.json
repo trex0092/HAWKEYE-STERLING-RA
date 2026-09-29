@@ -289,7 +289,8 @@
       "enabled": true,
       "_note": "Qatar NCTC unified record. RE-ENABLED 2026-08-05 on probe evidence: the endpoint serves real JSON (864 designations, ~1.45MB) MISLABELED as text/html; keys are fullNameEn/fullNameAr (now known to the generic JSON walker — English + Arabic names both screen). Verified end-to-end with browser headers; the portal-state URL is the documented one and the probe re-verifies it on demand.",
       "minNames": 200,
-      "browserHeaders": true
+      "browserHeaders": true,
+      "fallbackSourceId": "qa-nctc-opensanctions"
     },
     {
       "id": "hk-cedb",
