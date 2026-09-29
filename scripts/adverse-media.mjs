@@ -1136,25 +1136,25 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   let retryRecovered = false;
   const firstEnUs = localeResults.find(r => r.id === 'en-US');
   const firstOk = (firstEnUs && firstEnUs.items !== null) || gd !== null || (bingOn && bgRaw !== null);
-  if (!firstOk) {
+  const retryBing = bingOn && bgRaw === null;
+  const retryEnUs = (!_gnews.open && (!firstEnUs || firstEnUs.items === null))
+    ? localeSet.find(loc => loc.id === 'en-US') : null;
+  if (!firstOk && (retryBing || retryEnUs)) {
     retryAttempted = true;
     const retryDelayMs = Math.max(0, Number(process.env.ADVERSE_BACKBONE_RETRY_MS) || 3000);
     if (retryDelayMs) await new Promise(resolve => setTimeout(resolve, retryDelayMs));
 
-    if (bingOn && bgRaw === null) {
+    if (retryBing) {
       bgRaw = await fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate);
     }
-    if (gd === null && !gdeltBreakerState.open) {
-      gd = await fetchGdelt(name, timeoutMs);
-    }
-    if ((!firstEnUs || firstEnUs.items === null) && !_gnews.open) {
-      const enUsLoc = localeSet.find(loc => loc.id === 'en-US') || LOCALES.find(loc => loc.id === 'en-US');
-      if (enUsLoc) {
-        const items = await fetchSource(adverseMediaUrlFor(name, enUsLoc), parseRss, xmlAccept, timeoutMs, noteGnewsResult, _gnewsGate);
-        const idx = localeResults.findIndex(r => r.id === 'en-US');
-        if (idx >= 0) localeResults[idx] = { id: 'en-US', items };
-        else localeResults.push({ id: 'en-US', items });
-      }
+    /* GDELT already performs its own wide-query -> base-query retry and records
+       breaker state. Do not double-call it here; the last-resort chance is on
+       the independent Bing / core Google pools. */
+    if (retryEnUs) {
+      const items = await fetchSource(adverseMediaUrlFor(name, retryEnUs), parseRss, xmlAccept, timeoutMs, noteGnewsResult, _gnewsGate);
+      const idx = localeResults.findIndex(r => r.id === 'en-US');
+      if (idx >= 0) localeResults[idx] = { id: 'en-US', items };
+      else localeResults.push({ id: 'en-US', items });
     }
   }
 
