@@ -1,0 +1,65 @@
+name: PEP name history inspection
+on:
+  push:
+    branches: [ops/runtime-recovery-693]
+    paths: [.github/workflows/pep-name-history-inspect.yml]
+permissions:
+  contents: read
+concurrency:
+  group: pep-name-history-inspect
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner
+        # Read-only public Wikidata revision queries. No repository or source writes.
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 www.wikidata.org:443 *.githubapp.com:443
+      - name: Inspect public revisions for seven unresolved items
+        run: |
+          node --input-type=module <<'NODE'
+          const ids = ['Q58316593', 'Q58316598', 'Q58316599', 'Q58334883',
+            'Q136689291', 'Q136689343', 'Q136689373'];
+          for (const qid of ids) {
+            const url = new URL('https://www.wikidata.org/w/api.php');
+            url.search = new URLSearchParams({ action: 'query', format: 'json', formatversion: '2',
+              prop: 'revisions', titles: qid, rvslots: 'main', rvlimit: '50',
+              rvprop: 'ids|timestamp|content', maxlag: '5' });
+            const res = await fetch(url, { signal: AbortSignal.timeout(30000),
+              headers: { 'User-Agent': 'HawkeyeSterling-PEPHarvest/1.0 (public source verification; github.com/trex0092/HAWKEYE-STERLING-RA)' } });
+            if (!res.ok) throw new Error(qid + ' HTTP ' + res.status);
+            const data = await res.json();
+            if (data.error || data.errors) throw new Error(JSON.stringify(data.error || data.errors));
+            const pages = data.query?.pages || [];
+            const revisions = pages.flatMap(p => p.revisions || []);
+            const seen = new Set();
+            let named = 0;
+            for (const r of revisions) {
+              const raw = r.slots?.main?.content;
+              if (typeof raw !== 'string') continue;
+              let item;
+              try { item = JSON.parse(raw); } catch { continue; }
+              const labels = Object.fromEntries(Object.entries(item.labels || {})
+                .filter(([, l]) => typeof l?.value === 'string' && l.value.trim())
+                .map(([lang, l]) => [lang, l.value]));
+              if (!Object.keys(labels).length) continue;
+              named++;
+              const key = JSON.stringify(labels);
+              if (seen.has(key) || seen.size >= 6) continue;
+              seen.add(key);
+              console.log('HISTORICAL_NAME_EVIDENCE ' + JSON.stringify({ qid, itemId: item.id,
+                revid: r.revid, timestamp: r.timestamp, labels,
+                offices: (item.claims?.P39 || []).map(s => s.mainsnak?.datavalue?.value?.id),
+                source: 'https://www.wikidata.org/w/index.php?title=' + qid + '&oldid=' + r.revid }));
+            }
+            console.log('HISTORY_SUMMARY ' + JSON.stringify({ qid, revisions: revisions.length,
+              namedRevisions: named, moreAvailable: !!data.continue }));
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          NODE
