@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- Retry Wikidata HTTP 200 maxlag and rate-limit error payloads with bounded backoff and Retry-After, rather than treating them as successfully fetched empty PEP name batches.
+
 ### Fixed
 
 - Start independent news providers concurrently, back off shared queues on headerless HTTP 429, and avoid repeating rate-limited GDELT queries.
