@@ -34,13 +34,6 @@ name: Sanctions Screen
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/sanctions-screen.mjs'
-      - 'scripts/screening-assurance.mjs'
-      - 'data/worldwide-screening-sources.json'
-      - '.github/workflows/sanctions-screen.yml'
   # Re-scheduled 2026-07-08 as the SCREENING CASE ENGINE: runs daily after the
   # Sanctions Watch (05:07) with fresh lists, refreshes the per-subject state,
   # then the case-manager step turns every flag into a managed lifecycle CASE
@@ -54,12 +47,13 @@ on:
 permissions:
   contents: read
 
-# Push-triggered validation runs are supersedable. Keep them separate from the
-# scheduled/manual control so a burst of merges cannot queue hours of obsolete
-# full-base screens or block today's mandatory runtime screen.
+# This workflow is an OPERATIONAL control, not a code-validation workflow.
+# Source changes are exercised by CI. Keeping the runtime workflow schedule/
+# manual-only prevents ordinary merges from creating hour-long full-base
+# screens or being mistaken by freshness checks for today's mandatory control.
 concurrency:
-  group: ${{ github.event_name == 'push' && 'sanctions-screen-push' || 'sanctions-screen-runtime' }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  group: sanctions-screen-runtime
+  cancel-in-progress: false
 
 jobs:
   screen:
