@@ -1103,4 +1103,98 @@ async function fetchGdelt(name, timeoutMs) {
    The return shape is a superset of the original { hit, score, band, top, count,
    terms } — existing callers are unaffected. Tunables: ADVERSE_MEDIA_LOCALES,
    ADVERSE_MEDIA_CONCURRENCY, ADVERSE_MEDIA_TIMESPAN, opts.{concurrency,locales}. */
-export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, locales
+export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, locales } = {}) {
+  const xmlAccept = 'application/rss+xml, application/xml, text/xml';
+  const explicitIds = String(process.env.ADVERSE_MEDIA_LOCALES || '').trim();
+  const localeSet = locales || (explicitIds ? activeLocales() : budgetedLocales());
+  const conc = Math.max(1, concurrency || Number(process.env.ADVERSE_MEDIA_CONCURRENCY) || 6);
+  const bingOn = process.env.BING_NEWS !== '0';
+
+  let gd = await (gdeltBreakerState.open ? Promise.resolve(null) : fetchGdelt(name, timeoutMs));
+  let bgRaw = await (bingOn
+    ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate)
+    : Promise.resolve(null));
+  let localeResults = await mapPool(localeSet, conc, loc =>
+    (_gnews.open
+      ? Promise.resolve(null)
+      : fetchSource(adverseMediaUrlFor(name, loc), parseRss, xmlAccept, timeoutMs, noteGnewsResult, _gnewsGate))
+      .then(items => ({ id: loc.id, items }))
+  );
+
+  let retryAttempted = false;
+  let retryRecovered = false;
+  const firstEnUs = localeResults.find(r => r.id === 'en-US');
+  const firstOk = !!((firstEnUs && firstEnUs.items !== null) || gd !== null || (bingOn && bgRaw !== null));
+  const retryBing = bingOn && bgRaw === null;
+  const retryEnUs = (!_gnews.open && (!firstEnUs || firstEnUs.items === null))
+    ? localeSet.find(loc => loc.id === 'en-US')
+    : null;
+
+  if (!firstOk && (retryBing || retryEnUs)) {
+    retryAttempted = true;
+    const retryDelayMs = Math.max(0, Number(process.env.ADVERSE_BACKBONE_RETRY_MS) || 3000);
+    if (retryDelayMs) await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+
+    if (retryBing) {
+      bgRaw = await fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate);
+    }
+    if (retryEnUs) {
+      const items = await fetchSource(
+        adverseMediaUrlFor(name, retryEnUs),
+        parseRss,
+        xmlAccept,
+        timeoutMs,
+        noteGnewsResult,
+        _gnewsGate
+      );
+      const idx = localeResults.findIndex(r => r.id === 'en-US');
+      if (idx >= 0) localeResults[idx] = { id: 'en-US', items };
+      else localeResults.push({ id: 'en-US', items });
+    }
+  }
+
+  const bg = bgRaw === null ? null : bgRaw.map(it => ({ ...it, source: it.source || 'Bing News' }));
+  const enUs = localeResults.find(r => r.id === 'en-US');
+  const okLocales = localeResults.filter(r => r.items !== null);
+  const backbones = {
+    googleNews: okLocales.length > 0,
+    googleNewsEnUs: !!(enUs && enUs.items !== null),
+    gdelt: gd !== null,
+    bingEnabled: bingOn,
+    bing: bingOn && bg !== null,
+  };
+  const backboneOk = backbones.googleNewsEnUs || backbones.gdelt || backbones.bing;
+  retryRecovered = retryAttempted && backboneOk;
+
+  if (!backboneOk) {
+    return {
+      errored: true,
+      error: 'global adverse-media backbones unreachable after one gated retry (Google News en-US + GDELT'
+        + (bingOn ? ' + Bing News' : '') + ')',
+      localesQueried: localeSet.length,
+      backbones,
+      retryAttempted,
+      retryRecovered,
+    };
+  }
+
+  const items = dedupItems([...okLocales.flatMap(r => r.items), ...(gd || []), ...(bg || [])]);
+  const result = scoreAdverseMedia(name, items, ALL_TERMS);
+  const sourcesOk = okLocales.length + (gd !== null ? 1 : 0) + (bingOn && bg !== null ? 1 : 0);
+  const sourcesTotal = localeSet.length + 1 + (bingOn ? 1 : 0);
+  const failed = sourcesTotal - sourcesOk;
+  const fullMatrix = localeSet.length >= LOCALES.length;
+
+  const out = {
+    ...result,
+    localesQueried: localeSet.length,
+    fullMatrix,
+    sourcesOk,
+    sourcesFailed: failed,
+    itemsScanned: items.length,
+    backbones,
+    retryAttempted,
+    retryRecovered,
+  };
+  return failed ? { ...out, partial: true } : out;
+}
