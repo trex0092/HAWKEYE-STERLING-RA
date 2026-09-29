@@ -99,7 +99,11 @@ ASANA_CUSTOMER_DB_GID = "1214107620220121"
 # are the live HAWKEYE STERLING APP project and Assessment Report section,
 # verified through the Asana API on 2026-09-29.
 ASANA_ONGOING_MON_GID = os.environ.get("ASANA_DELIVERY_PROJECT_GID", "1216203370612914")
-ASANA_SECTION_GID     = os.environ.get("ASANA_DELIVERY_SECTION_GID", "1216203370612916")
+ASANA_SANCTIONS_SECTION_GID = os.environ.get("ASANA_SANCTIONS_SECTION_GID", "1218451960830318")
+ASANA_MEDIA_SECTION_GID = os.environ.get("ASANA_MEDIA_SECTION_GID", "1218979441933783")
+# The Python unified report is the adverse-media/PEP delivery surface. The
+# sanctions-only digest has its own delivery in scripts/screening-cases.mjs.
+ASANA_SECTION_GID     = os.environ.get("ASANA_DELIVERY_SECTION_GID", ASANA_MEDIA_SECTION_GID)
 # ── Second screening population + second delivery queue (MLRO, 2026-07-29) ──
 # Screening reads BOTH populations: the Customer Database (customers + their
 # UBOs/owners) and the HR – Employees project (staff screening — FATF R.18 /
@@ -107,7 +111,7 @@ ASANA_SECTION_GID     = os.environ.get("ASANA_DELIVERY_SECTION_GID", "1216203370
 # disable employee screening explicitly; an unreachable or empty project while
 # configured is FATAL, exactly like the customer database — a screening
 # population that silently drops out is a silent clear.
-ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", "1216139945846994")
+ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", "1216239131596624")
 # RETIRED 2026-09-15: the daily deliverable used to be multi-homed into a
 # second MLRO queue, the separate "Follow Ups" project (old value
 # 1215884707932023). That project was merged into HAWKEYE STERLING APP (it
@@ -131,13 +135,9 @@ def _mlro_queue_targets():
         memberships.append(m)
     return projects, memberships
 ASANA_ASSIGNEE_GID    = os.environ.get("ASANA_ASSIGNEE_GID", "1213645083721304")   # default case/OM assignee (MLRO)
-# Case subtasks are created with only a `parent`, and Asana does not put a
-# subtask on any project board by itself: every case created since at least
-# 27 Aug 2026 had ZERO project/section membership and was invisible on the
-# case board. They are now attached, after creation, to this section of the
-# monitoring project ("Screening Cases - New"). Set the variable empty to
-# disable the attach (cases then stay board-less, as before).
-ASANA_CASES_NEW_SECTION_GID = os.environ.get("ASANA_CASES_NEW_SECTION_GID", "1216908203079873")
+# Case subtasks stay inside the approved screening sections. Sanctions cases
+# go to Screening Sanctions Update; adverse-media and PEP cases go to the
+# combined Adverse Media & PEP section. No lifecycle section is auto-created.
 CASE_BOARD_ATTACH = {"attached": 0, "failed": 0}
 
 # ── Match thresholds — env-tunable, ONE-WAY (challenger runs more sensitive
@@ -6411,28 +6411,24 @@ def _new_task_gid(resp):
     except Exception:
         return ""
 
-def attach_case_to_board(task_gid):
-    """Put a just-created case subtask on the MLRO case board.
-
-    A failure is LOUD (log line + GitHub ::warning:: annotation + counter) but
-    never fails the case itself: the case exists and is assigned, it just is
-    not visible on the board until someone re-attaches it."""
-    if not ASANA_CASES_NEW_SECTION_GID:
-        return False
+def attach_case_to_board(task_gid, section_gid):
+    """Attach a just-created case to its approved screening section."""
+    allowed = {ASANA_SANCTIONS_SECTION_GID, ASANA_MEDIA_SECTION_GID}
+    if section_gid not in allowed:
+        raise RuntimeError(f"refusing unapproved Asana case section {section_gid!r}")
     ok = False
     if task_gid:
         r = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{task_gid}/addProject",
                           json={"data": {"project": ASANA_ONGOING_MON_GID,
-                                         "section": ASANA_CASES_NEW_SECTION_GID}})
+                                         "section": section_gid}})
         ok = r is not None and getattr(r, "status_code", None) in (200, 201)
     CASE_BOARD_ATTACH["attached" if ok else "failed"] += 1
     if not ok:
-        log(f"  case subtask {task_gid or '(gid unreadable)'} was created but NOT attached to the case board")
-        print("::warning::MLRO case subtask created but not attached to the case board "
-              "(no project/section membership); re-attach it by hand", flush=True)
+        log(f"  case subtask {task_gid or '(gid unreadable)'} was created but NOT attached to approved section {section_gid}")
+        print("::warning::MLRO case subtask created but not attached to its approved screening section", flush=True)
     return ok
 
-def create_case_subtask(parent_gid, name, notes, due_on):
+def create_case_subtask(parent_gid, name, notes, due_on, section_gid):
     """One trackable MLRO case per NEW hit — assigned, with a disposition to set.
 
     Notes are capped with cap_notes (keeps the TAIL), never head-sliced. The end
@@ -6458,7 +6454,7 @@ def create_case_subtask(parent_gid, name, notes, due_on):
         }}
         r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
         if r is not None and r.status_code in (200, 201):
-            attach_case_to_board(_new_task_gid(r))
+            attach_case_to_board(_new_task_gid(r), section_gid)
             return True
         # Only a size/validation refusal is worth re-bidding smaller; an auth,
         # rate-limit or network failure fails identically at any budget.
@@ -6488,7 +6484,7 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
     and are drained on later runs — sanctions first, oldest first — so an item
     past the cap is cased LATER, not never."""
     due_on = run_time.strftime("%Y-%m-%d")
-    queue = []  # (priority, name, notes)
+    queue = []  # (priority, name, notes, section_gid)
     for m in possible_matches:
         # Identity-excluded candidates raise no case. The report demotes them
         # (recorded, reasoned, overrulable) but the CASE QUEUE is where the
@@ -6516,7 +6512,7 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         if risk and (risk["rating"] == "HIGH" or any(h["score"] >= 95 for h in new_hits)):
             notes += ["", ai.draft_str(m["name"], m.get("permalink", ""), new_hits,
                                        False, [], risk)]
-        queue.append((0, nm, "\n".join(notes)))
+        queue.append((0, nm, "\n".join(notes), ASANA_SANCTIONS_SECTION_GID))
     for p in pep_findings:
         if not p.get("is_new"): continue
         nm = f"🟠 PEP case: {p['subject_name']} — {p.get('category','PEP')}"
@@ -6529,7 +6525,7 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
                  source_line,
                  f"Description: {p.get('description','')}", f"Record: {p.get('permalink','')}",
                  "", "Disposition: [ ] not a PEP   [ ] confirmed PEP — apply EDD   [ ] investigate"]
-        queue.append((1, nm, "\n".join(notes)))
+        queue.append((1, nm, "\n".join(notes), ASANA_MEDIA_SECTION_GID))
     for f in adverse_findings:
         new_arts = [a for a in f["articles"] if a.get("is_new")]
         if not new_arts: continue
@@ -6540,14 +6536,14 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
             notes.append(f"- {a['title']}  [{', '.join(a.get('categories',[])) or 'uncategorised'}]")
             notes.append(f"  {a.get('source','?')} — {a.get('date','?')}  {a.get('url','')}")
         notes += ["", "Disposition: [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR"]
-        queue.append((2, nm, "\n".join(notes)))
+        queue.append((2, nm, "\n".join(notes), ASANA_MEDIA_SECTION_GID))
 
     # Merge today's NEW items with the carried backlog. Sort key (priority,
     # queued-date, arrival order): a backlogged sanctions case beats today's
     # adverse case, and within a priority the longest-waiting item goes first.
     today_iso = due_on
-    entries = [{"p": p, "name": nm, "notes": notes, "queued": today_iso}
-               for p, nm, notes in sorted(queue, key=lambda x: x[0])]
+    entries = [{"p": p, "name": nm, "notes": notes, "section": section, "queued": today_iso}
+               for p, nm, notes, section in sorted(queue, key=lambda x: x[0])]
     today_names = {e["name"] for e in entries}
     backlog = [e for e in load_case_backlog(state) if e["name"] not in today_names]
     if backlog:
@@ -6562,7 +6558,7 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
                 (e["notes"] + (f"\n\n(backlogged since the {e['queued']} run — "
                                f"case capacity or a create failure deferred it)"
                                if e["queued"] and e["queued"] != today_iso else "")),
-                due_on):
+                due_on, e.get("section") or (ASANA_SANCTIONS_SECTION_GID if e["p"] == 0 else ASANA_MEDIA_SECTION_GID)):
             leftover.append(e)
         else:
             created += 1
@@ -6580,6 +6576,7 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
                 log(f"  case backlog: {len(leftover)} item(s) carried to the next run")
             state[CASE_BACKLOG_KEY] = [
                 {"p": e["p"], "name": e["name"][:250], "notes": e["notes"][:8000],
+                 "section": e.get("section") or (ASANA_SANCTIONS_SECTION_GID if e["p"] == 0 else ASANA_MEDIA_SECTION_GID),
                  "queued": e["queued"] or today_iso} for e in leftover]
     if len(combined) > CASE_SUBTASK_CAP:
         log(f"  case cap: created {created}, {len(combined) - CASE_SUBTASK_CAP} additional NEW item(s) "
