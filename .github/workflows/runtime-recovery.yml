@@ -34,204 +34,32 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Apply exact source edits, preserving all unrelated content
+      - name: Apply the immutable, hash-guarded source patch
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          import { readFileSync, writeFileSync } from 'node:fs';
-          import { execFileSync } from 'node:child_process';
-          const hashes = {
-            'scripts/adverse-media.mjs': '7e3b2bbc5faa125e73322a7f651bb08939704830',
-            'scripts/pep-worldwide.mjs': '39172109aed0f7a73f6d533119a887e337616c9f',
-          };
-          for (const [file, hash] of Object.entries(hashes)) {
-            assert.equal(execFileSync('git', ['hash-object', file], { encoding: 'utf8' }).trim(), hash,
-              'Source changed; refuse to overwrite ' + file);
-          }
-          function once(text, from, to) {
-            assert.equal(text.split(from).length, 2, 'Expected one exact edit anchor: ' + from.slice(0, 100));
-            return text.replace(from, to);
-          }
-          function section(text, start, end, replacement) {
-            assert.equal(text.split(start).length, 2, 'Unique start anchor required');
-            const first = text.indexOf(start), last = text.indexOf(end, first);
-            assert.ok(last > first, 'End anchor required');
-            return text.slice(0, first) + replacement + text.slice(last);
-          }
-          let am = readFileSync('scripts/adverse-media.mjs', 'utf8');
-          am = once(am, "import { readFileSync } from 'node:fs';", "import { readFileSync } from 'node:fs';\nimport { RecoveryCircuit, RequestStartGate, retryAfterDelayMs } from './runtime-recovery.mjs';\nexport { RequestStartGate, retryAfterDelayMs };");
-          am = section(am, '/* Run-level GDELT circuit breaker,', 'const RSS_ENT', `/* A cooldown only admits one probe. Validated probe coverage, not elapsed\n   time or a late pre-outage response, is what closes the circuit. */
-          export const ADVERSE_RECOVERY_COOLDOWN_MS = Math.min(900000,
-            Math.max(1000, Number(process.env.ADVERSE_RECOVERY_COOLDOWN_MS) || 120000));
-          export const GDELT_BREAKER_AFTER = Number(process.env.GDELT_BREAKER_AFTER) || 5;
-          export const gdeltBreakerState = new RecoveryCircuit(GDELT_BREAKER_AFTER, ADVERSE_RECOVERY_COOLDOWN_MS);
-          export function resetGdeltBreaker() { gdeltBreakerState.reset(); }
-          export function gdeltBreakerPermit(nowMs = Date.now()) { return gdeltBreakerState.permit(nowMs); }
-          export function gdeltBreakerRecordSuccess(ticket = null) { gdeltBreakerState.success(ticket); }
-          export function gdeltBreakerRecordFailure(ticket = null) {
-            if (gdeltBreakerState.failure(ticket)) {
-              console.warn('adverse-media: GDELT circuit OPEN; coverage remains unavailable until a validated cooldown probe succeeds');
-            }
-          }
-
-          `);
-          am = section(am, 'export class RequestStartGate {', 'export const GNEWS_MIN_INTERVAL_MS', '');
-          am = section(am, 'async function fetchSource(', '/* \u2500\u2500 Google News', `async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, permit = null) {
-            if (gate) await gate.wait();
-            // Check admission AFTER queueing: an earlier request may have opened it.
-            const ticket = permit ? permit() : null;
-            if (permit && !ticket) return null;
-            const ctrl = new AbortController();
-            const t = setTimeout(() => ctrl.abort(), timeoutMs);
-            try {
-              const res = await fetch(url, {
-                signal: ctrl.signal, redirect: 'follow',
-                headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: accept }
-              });
-              if (!res.ok) {
-                if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after')));
-                if (note) note(false, res.status, ticket);
-                return null;
-              }
-              const items = parse(await res.text());
-              // HTTP 200 consent/error pages are not successful screening coverage.
-              if (note) note(items !== null, res.status, ticket);
-              return items;
-            } catch { if (note) note(false, 0, ticket); return null; }
-            finally { clearTimeout(t); }
-          }
-
-          `);
-          am = section(am, '/* \u2500\u2500 Google News', '/* \u2500\u2500 Bing News', `/* Google News uses the same bounded recovery policy. Only the en-US global
-             backbone may probe an open circuit; regional traffic waits for recovery. */
-          const GNEWS_BREAKER_AFTER = Math.max(1, Number(process.env.GNEWS_BREAKER_AFTER) || 25);
-          const _gnews = new RecoveryCircuit(GNEWS_BREAKER_AFTER, ADVERSE_RECOVERY_COOLDOWN_MS);
-          export function gnewsBreakerOpen() { return _gnews.open; }
-          export function resetGnewsBreaker() { _gnews.reset(); }
-          export function gnewsCanRequest(localeId = 'en-US', nowMs = Date.now()) {
-            return !_gnews.open || (localeId === 'en-US' && _gnews.canRequest(nowMs));
-          }
-          export function gnewsBreakerPermit(localeId = 'en-US', nowMs = Date.now()) {
-            return gnewsCanRequest(localeId, nowMs) ? _gnews.permit(nowMs) : null;
-          }
-          export function noteGnewsResult(ok, status, ticket = null) {
-            if (ok) { _gnews.success(ticket); return; }
-            if (ticket?.probe || [429, 403, 503, 0].includes(status)) {
-              if (_gnews.failure(ticket)) {
-                console.error('adverse-media: Google News circuit OPEN; only one en-US probe is admitted after cooldown');
-              }
-            }
-          }
-          function fetchGoogleNews(name, loc, timeoutMs) {
-            if (!gnewsCanRequest(loc.id)) return Promise.resolve(null);
-            return fetchSource(adverseMediaUrlFor(name, loc), parseRss,
-              'application/rss+xml, application/xml, text/xml', timeoutMs,
-              noteGnewsResult, _gnewsGate, () => gnewsBreakerPermit(loc.id));
-          }
-
-          `);
-          am = section(am, 'async function fetchGdelt(name, timeoutMs) {', '/* Network: fetch + screen', `async function fetchGdelt(name, timeoutMs) {
-            const ticket = gdeltBreakerPermit();
-            if (!ticket) return null;
-            const permit = () => gdeltBreakerState.accepts(ticket) ? ticket : null;
-            const wide = gdeltTerms(name);
-            let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,
-              'application/json', timeoutMs, null, _gdeltGate, permit);
-            if (gd === null && wide.length > GDELT_RISK_TERMS.length && permit()) {
-              console.warn('adverse-media: GDELT rejected the widened query; retrying on the base term set');
-              gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt,
-                'application/json', timeoutMs, null, _gdeltGate, permit);
-            }
-            if (gd === null) gdeltBreakerRecordFailure(ticket);
-            else gdeltBreakerRecordSuccess(ticket);
-            return gd;
-          }
-
-          `);
-          am = once(am, 'let gd = await (gdeltBreakerState.open ? Promise.resolve(null) : fetchGdelt(name, timeoutMs));',
-            'const gd = await fetchGdelt(name, timeoutMs);');
-          am = section(am, '  let localeResults = await mapPool(localeSet, conc, loc =>', '  let retryAttempted = false;', `  const localeResults = await mapPool(localeSet, conc, loc =>
-              fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))
-            );
-
-          `);
-          am = once(am, "const retryEnUs = (!_gnews.open && (!firstEnUs || firstEnUs.items === null))",
-            "const retryEnUs = (gnewsCanRequest('en-US') && (!firstEnUs || firstEnUs.items === null))");
-          am = section(am, '      const items = await fetchSource(\n        adverseMediaUrlFor(name, retryEnUs),', "      const idx = localeResults.findIndex(r => r.id === 'en-US');",
-            '      const items = await fetchGoogleNews(name, retryEnUs, timeoutMs);\n');
-          writeFileSync('scripts/adverse-media.mjs', am);
-
-          let pep = readFileSync('scripts/pep-worldwide.mjs', 'utf8');
-          pep = once(pep, 'return mine.filter(q => !names.has(q));', 'return mine.filter(q => !hasScreenableName(names.get(q)));');
-          pep = once(pep, 'if (!names.has(qid) && nm && nm.name) names.set(qid, nm);',
-            'if (!hasScreenableName(names.get(qid)) && hasScreenableName(nm)) names.set(qid, nm);');
-          pep = section(pep, 'export function namesFromEntity(entity) {', '/* Assemble the artifact.', `export function hasScreenableName(value) {
-            return !!value && typeof value.name === 'string' && value.name.trim().length > 0;
-          }
-          export function namesFromEntity(entity) {
-            if (!entity || Object.hasOwn(entity, 'missing') || Object.hasOwn(entity, 'invalid')) {
-              return { name: '', aliases: [] };
-            }
-            const labels = entity.labels || {};
-            const text = item => typeof item?.value === 'string' ? item.value.trim() : '';
-            const primary = [labels.en, labels.mul, ...Object.values(labels)].map(text).find(Boolean) || '';
-            const all = new Set(Object.values(labels).map(text).filter(Boolean));
-            for (const arr of Object.values(entity.aliases || {})) {
-              if (Array.isArray(arr)) for (const item of arr) {
-                const value = text(item);
-                if (value) all.add(value);
-              }
-            }
-            all.delete(primary);
-            return { name: primary, aliases: [...all] };
-          }
-          // Failed or empty entities must remain pending, not become banked QIDs.
-          export function bankLabelNames(names, data) {
-            if (!data || data.error || data.errors) return 0;
-            let banked = 0;
-            for (const [qid, entity] of Object.entries(data.entities || {})) {
-              if (!/^Q\\d+$/.test(qid)) continue;
-              const value = namesFromEntity(entity);
-              if (!hasScreenableName(value)) continue;
-              names.set(qid, value);
-              banked++;
-            }
-            return banked;
-          }
-
-          `);
-          pep = once(pep, 'if (!nm || !nm.name) continue;', 'if (!hasScreenableName(nm)) continue;');
-          pep = once(pep, 'const partial = Number.isFinite(expected) && expected > 0 && entries.length < expected;',
-            'expected = Math.max(byPerson.size, Number.isFinite(expected) ? expected : 0);\n  const partial = entries.length < expected;');
-          pep = once(pep, '    allQids = st.labelQids;',
-            '    allQids = [...new Set([...st.labelQids, ...holderRows.map(r => r.person)])];');
-          pep = once(pep, 'if (data) for (const [qid, ent] of Object.entries((data && data.entities) || {})) names.set(qid, namesFromEntity(ent));',
-            'bankLabelNames(names, data);');
-          const finalAnchor = '  const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });';
-          pep = once(pep, finalAnchor, `  const unresolved = pendingLabels(allQids, names, { count: 1, index: 0 });
-            if (unresolved.length) {
-              writeCp('labels', { labelQids: allQids, names: [...names], next: { labelIdx: 0 } });
-              shipPartialNow();
-              console.error('pep-worldwide: ' + unresolved.length + ' person labels remain unresolved; keeping checkpoint and requesting a bounded resume');
-              return RESUME_EXIT_CODE;
-            }
-
-          ` + finalAnchor);
-          writeFileSync('scripts/pep-worldwide.mjs', pep);
-          let changelog = readFileSync('CHANGELOG.md', 'utf8');
-          changelog = once(changelog, '## [Unreleased]\n', '## [Unreleased]\n\n- **Runtime recovery without false clears.** News circuits now admit one validated recovery probe after cooldown, ignore stale in-flight results, re-check admission after queueing, and share bounded Retry-After backoff. Missing or blank PEP names remain pending; incomplete non-sharded harvests retain their checkpoint and request a bounded resume. Dataset completeness is derived from all discovered holders even when an expected count is omitted or understated. Runtime assurance thresholds are unchanged.\n');
-          writeFileSync('CHANGELOG.md', changelog);
+          import { execFileSync, spawnSync } from 'node:child_process';
+          // Reuse the exact patch already exercised by the 32 recovery checks.
+          // This literal commit is immutable; no downloaded or PR-provided script.
+          const text = execFileSync('git', ['show',
+            '31efc7825e29fa974a5e784ee92076dcaed74bdb:.github/workflows/runtime-recovery.yml'],
+            { encoding: 'utf8' });
+          const match = /^          node --input-type=module <<'NODE'\n([\s\S]*?)^          NODE$/m.exec(text);
+          assert.ok(match, 'Expected exact patch heredoc');
+          const code = match[1].replace(/^          /gm, '');
+          const run = spawnSync(process.execPath, ['--input-type=module'], {
+            input: code, stdio: ['pipe', 'inherit', 'inherit'], encoding: 'utf8',
+          });
+          assert.ifError(run.error);
+          assert.equal(run.status, 0, 'Source patch must succeed');
           NODE
           git diff --check
-      - name: Verify syntax and offline regressions
-        env:
-          GDELT_MIN_INTERVAL_MS: '1'
-          GNEWS_MIN_INTERVAL_MS: '1'
-          BING_MIN_INTERVAL_MS: '1'
+      - name: Verify syntax and offline regressions with production defaults
         run: |
           node --check scripts/adverse-media.mjs
           node --check scripts/pep-worldwide.mjs
