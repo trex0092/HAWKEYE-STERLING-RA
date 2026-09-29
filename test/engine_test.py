@@ -1285,8 +1285,8 @@ except RuntimeError as e:
     _raised = str(e)
 check("throttled subject early-exits after 4 Google fetches (not the full sweep)", _calls["gnews"] == 4)
 check("total outage still degrades loudly after the last-resort backbone retry", "all 4" in _raised)
-check("last-resort outage path retries both independent global backbones once",
-      _calls["gdelt"] == 2 and _calls["bing"] == 2)
+check("last-resort outage path retries the independent Bing backbone once without double-calling GDELT",
+      _calls["gdelt"] == 1 and _calls["bing"] == 2)
 # Pace-before-send through the run-global gate: Google still gets its ordinary
 # gated waits, while the retry path may add independent-feed gate waits.
 check("failed fetches are paced too (no zero-delay retry storm)", _calls["sleeps"] >= 3)
