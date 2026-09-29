@@ -81,7 +81,7 @@ try {
   gate.deferFor(10);
   const start = Date.now();
   const waiting = gate.wait();
-  queueMicrotask(() => gate.deferFor(30));
+  globalThis.queueMicrotask(() => gate.deferFor(30));
   await waiting;
   check('a queued request re-checks a Retry-After deadline extended while asleep', Date.now() - start >= 25);
 
