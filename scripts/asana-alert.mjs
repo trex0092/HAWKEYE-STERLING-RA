@@ -33,9 +33,17 @@ import { asana } from './asana-notify.mjs';
 import { requireApprovedSection, verifySection } from './asana-sections.mjs';
 
 const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWKEYE STERLING APP */
-const SECTION_GID = process.env.ASANA_SECTION_GID || '';
 const title = process.argv[2];
 const notes = process.argv[3] || '';
+
+function defaultSectionForAlert(value) {
+  const s = String(value || '').toLowerCase();
+  if (/passport|emirates id|\beid\b|licen[cs]e|pending document|proof of address/.test(s)) return '1218451243658328';
+  if (/adverse media|\bpep\b/.test(s)) return '1218979441933783';
+  if (/sanction|screening assurance/.test(s)) return '1218451960830318';
+  return '1218451992088222';
+}
+const SECTION_GID = process.env.ASANA_SECTION_GID || defaultSectionForAlert(title);
 
 if (!process.env.ASANA_ACCESS_TOKEN) { console.error('ASANA_ACCESS_TOKEN missing'); process.exit(1); }
 if (!title) { console.error('usage: node scripts/asana-alert.mjs "<title>" "<notes>"'); process.exit(1); }
