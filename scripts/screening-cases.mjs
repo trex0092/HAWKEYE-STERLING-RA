@@ -34,13 +34,6 @@ export const CASES_FILE = 'data/screening-cases-state.json';
    on the Asana card links to its lifecycle case. */
 export const RESULTS_FILE = 'sanctions-screen-results.json';
 export const CASE_SLA_DAYS = 5;
-export const CASE_SECTIONS = {
-  new: '🚨 Screening Cases — New',
-  review: '🔎 Screening Cases — Under Review',
-  cleared: '✅ Screening Cases — Cleared',
-  escalated: '⚠️ Screening Cases — Escalated'
-};
-
 export function addDays(isoDay, days) {
   const t = Date.parse(String(isoDay || '').slice(0, 10));
   if (Number.isNaN(t)) return null;
