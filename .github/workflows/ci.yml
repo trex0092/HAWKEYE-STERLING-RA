@@ -177,6 +177,8 @@ jobs:
         run: node test/prompt-register.test.mjs
       - name: Run tool & connector register test (agent authz + no model tool-calling)
         run: node test/tool-register.test.mjs
+      - name: Composio integration tests
+        run: node test/composio-integration.test.mjs
       - name: Run obligation register test (instruments, controls, watch sources)
         run: node test/obligations.test.mjs
       - name: Run GRC metrics test (metric bases + KRI wiring + appetite vs code)
