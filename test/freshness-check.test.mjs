@@ -282,5 +282,17 @@ check('PEP shard accelerator auto-runs only for its own reviewed workflow change
   /push:\s*\n\s*branches:\s*\[main\]/.test(pepShardWf)
   && /paths:\s*\n\s*- ['"]\.github\/workflows\/pep-shard-harvest\.yml['"]/.test(pepShardWf));
 
+const pepWatchdogWf = readFileSync(join(wfDir, 'pep-chain-watchdog.yml'), 'utf8');
+check('PEP watchdog observes ordinary and sharded harvests without checking out repository code',
+  /PEP Worldwide Harvest/.test(pepWatchdogWf)
+  && /PEP Shard Harvest/.test(pepWatchdogWf)
+  && !/actions\/checkout/.test(pepWatchdogWf));
+check('ordinary PEP failures alone use the bounded resume recovery job',
+  /github\.event\.workflow_run\.name == 'PEP Worldwide Harvest'\s*&&\s*github\.event\.workflow_run\.conclusion == 'failure'/.test(pepWatchdogWf));
+check('successful sharded PEP completion dispatches Sanctions Screen to rebuild assurance',
+  /refresh-after-sharded-completion:/.test(pepWatchdogWf)
+  && /github\.event\.workflow_run\.name == 'PEP Shard Harvest'\s*&&\s*github\.event\.workflow_run\.conclusion == 'success'/.test(pepWatchdogWf)
+  && /sanctions-screen\.yml\/dispatches/.test(pepWatchdogWf));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
