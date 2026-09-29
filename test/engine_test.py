@@ -3201,13 +3201,25 @@ def _record_shrink(method, url, **kw):
             @staticmethod
             def json(): return {"data": []}
         return _G()
-    _posted_shrink.append(kw.get("json"))
-    class _R:
-        status_code = 201
-        text = ""
-        @staticmethod
-        def json(): return {"data": {"gid": "1"}}
-    return _R()
+    # Project-first delivery now follows each task create with one or more
+    # /addProject calls. Only task-create payloads contain notes and belong in
+    # this sizing regression's capture list.
+    if url.endswith("/api/1.0/tasks"):
+        _posted_shrink.append(kw.get("json"))
+        class _R:
+            status_code = 201
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "1"}}
+        return _R()
+    if "/addProject" in url:
+        class _A:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": {}}
+        return _A()
+    raise AssertionError(f"unexpected Asana call: {method} {url}")
 _orig_stored = screen.NOTES_BUDGET["stored"]
 screen.asana_request = _record_shrink
 try:
