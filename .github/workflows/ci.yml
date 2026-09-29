@@ -104,6 +104,8 @@ jobs:
         run: node test/sanctions-screen.test.mjs
       - name: Run structured entity-resolution tests
         run: node test/entity-resolution.test.mjs
+      - name: Run cross-repo screening intelligence tests
+        run: node test/screening-intelligence.test.mjs
       - name: Run employee-screening-wiring regression test
         run: node test/employee-screening-wiring.test.mjs
       - name: Run sanctions matcher unit tests
