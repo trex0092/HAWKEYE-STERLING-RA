@@ -15,8 +15,13 @@ name: Auto Release
 # failure. Gating only the publish step keeps required-reviewer control over
 # anything that actually ships while ordinary pushes stay a green no-op.
 on:
+  # APP_VERSION lives in app.js. Only a push that touches that source can create
+  # a new automatic release decision; unrelated merges must not spawn another
+  # protected-environment wait for the same unreleased version.
   push:
     branches: [main]
+    paths:
+      - 'app.js'
   workflow_dispatch:
 
 permissions:
