@@ -36,7 +36,7 @@ import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDela
   fitAsanaText, fitAsanaName } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
-import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
+import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 import { checkFbi } from './fbi-check.mjs';
@@ -1742,6 +1742,7 @@ async function screenLocally(subjects, cfg) {
           score: am.score,
           identity,
           source: (am.top && am.top.source) || '',
+          sourceTier: am.top ? sourceTierFor(am.top) : 3,
           evidenceUrl: (am.top && (am.top.link || am.top.url)) || '',
           provenance: { sourceId: 'adverse-media', sourceUrl: (am.top && (am.top.link || am.top.url)) || '' },
         });
