@@ -1,0 +1,104 @@
+/* Synthetic, offline integration checks. No screening-provider traffic. */
+import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
+process.env.GDELT_MIN_INTERVAL_MS = '1';
+process.env.GNEWS_MIN_INTERVAL_MS = '1';
+process.env.BING_MIN_INTERVAL_MS = '1';
+process.env.ADVERSE_RATE_LIMIT_BACKOFF_MS = '1000';
+process.env.BING_NEWS = '1';
+const am = await import('../scripts/adverse-media.mjs');
+const pep = await import('../scripts/pep-worldwide.mjs');
+let checks = 0;
+const check = (message, value) => { assert.ok(value, message); checks++; console.log('ok - ' + message); };
+const reply = (status, text) => ({ ok: status === 200, status,
+  headers: { get: () => null }, text: async () => text });
+const rss = '<rss><channel></channel></rss>';
+const options = { locales: [am.LOCALES.find(l => l.id === 'en-US')], timeoutMs: 2000 };
+const realFetch = globalThis.fetch;
+try {
+  am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+  const seen = new Set();
+  let release;
+  const blocked = new Promise(resolve => { release = resolve; });
+  globalThis.fetch = async url => {
+    const host = new URL(url).hostname; seen.add(host);
+    return host === 'api.gdeltproject.org' ? blocked : reply(200, rss);
+  };
+  const pending = am.checkAdverseMedia('Synthetic Parallel Example', options);
+  let independent;
+  try {
+    await new Promise(resolve => setTimeout(resolve, 30));
+    independent = seen.has('news.google.com') && seen.has('www.bing.com');
+  } finally { release(reply(200, '{"articles":[]}')); }
+  const complete = await pending;
+  check('Google and Bing start before a stalled GDELT request resolves', independent);
+  check('all validated providers retain complete coverage', !complete.errored && !complete.partial && complete.backbones.gdelt);
+  am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+  const starts = [];
+  globalThis.fetch = async url => {
+    const host = new URL(url).hostname;
+    if (host === 'api.gdeltproject.org') { starts.push(Date.now()); return reply(429, 'Rate limited'); }
+    return reply(200, rss);
+  };
+  const limited = await am.checkAdverseMedia('Synthetic Rate Limit One', options);
+  check('HTTP 429 does not trigger a second shorter GDELT query', starts.length === 1);
+  check('a provider refusal stays partial while independent validated coverage survives',
+    limited.partial && !limited.errored && !limited.backbones.gdelt && limited.backbones.bing && limited.backbones.googleNewsEnUs);
+  await am.checkAdverseMedia('Synthetic Rate Limit Two', options);
+  check('429 without Retry-After postpones the shared provider queue',
+    starts.length === 2 && starts[1] - starts[0] >= am.ADVERSE_RATE_LIMIT_BACKOFF_MS - 10);
+} finally {
+  globalThis.fetch = realFetch;
+  am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+}
+const stamp = new Date().toISOString();
+const qids = ['Q1', 'Q2', 'Q3'];
+const before = { name: 'Current One', aliases: [] };
+const artifact = { harvested: stamp, expected: 3, count: 3, entries: [
+  { qid: 'Q1', name: 'Published One', aliases: [] },
+  { qid: 'Q2', name: ' Published Two ', aliases: [' Two ', null, 42] },
+  { qid: 'Q3', name: ' ', aliases: [] },
+] };
+const names = new Map([['Q1', before]]);
+check('same-harvest publication fills only usable missing names', pep.seedResumeNames(qids, names, artifact, stamp) === 1);
+check('existing banked names are not overwritten', names.get('Q1') === before);
+check('reused names and aliases are validated and trimmed', names.get('Q2').name === 'Published Two' && names.get('Q2').aliases.join(',') === 'Two');
+check('an unnamed published entry remains pending', pep.pendingLabels(qids, names, { count: 1, index: 0 }).join(',') === 'Q3');
+check('an old harvest cannot count as new label progress', pep.seedResumeNames(qids, new Map(), { ...artifact, harvested: '2020-01-01' }, stamp) === 0);
+check('a different holder universe cannot seed progress', pep.seedResumeNames(qids, new Map(), { ...artifact, expected: 2 }, stamp) === 0);
+check('inconsistent artifact counts are rejected', pep.seedResumeNames(qids, new Map(), { ...artifact, count: 2 }, stamp) === 0);
+const foreign = { ...artifact, count: 1, entries: [{ qid: 'Q999', name: 'Other Person' }] };
+check('persons outside the current holder universe cannot enter the name bank', pep.seedResumeNames(qids, new Map(), foreign, stamp) === 0);
+const dir = mkdtempSync(join(tmpdir(), 'pep-priority-'));
+try {
+  const outfile = join(dir, 'pep.json');
+  const cpfile = pep.checkpointPath(outfile);
+  const positions = pep.PEP_ROOT_CLASSES.map((c, i) => ['Q' + (100 + i), { label: '', country: '', classKey: c.key }]);
+  const rows = pep.PEP_ROOT_CLASSES.map((c, i) => ({ person: i ? 'Q1' : 'Q2', pos: 'Q' + (100 + i), classKey: c.key }));
+  pep.writeCheckpoint(cpfile, { v: 1, phase: 'labels', sinceIso: stamp, harvestedAt: stamp, resumeCount: 0,
+    positions, posByClass: pep.PEP_ROOT_CLASSES.map((c, i) => [c.key, ['Q' + (100 + i)]]),
+    holderRows: rows, classHolders: Object.fromEntries(pep.PEP_ROOT_CLASSES.map(c => [c.key, 1])),
+    classBatchFailed: {}, batchTotal: rows.length, batchFailed: 0,
+    labelQids: ['Q1', 'Q2'], names: [], next: { labelIdx: 0 } });
+  pep.writeJsonGz(outfile, { harvested: stamp, expected: 2, count: 1, partial: true,
+    entries: [{ qid: 'Q1', name: 'Synthetic Published One', aliases: [] }] });
+  const preload = join(dir, 'stub.mjs');
+  writeFileSync(preload, "globalThis.fetch = async (url) => { const u = new URL(url); console.log('FETCH_IDS=' + u.searchParams.get('ids')); if (u.hostname !== 'www.wikidata.org' || u.searchParams.get('ids') !== 'Q2') throw new Error('Optional office work or already-published name fetched before missing person'); return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ entities: { Q2: { id: 'Q2', missing: '' } } }) }; };\n");
+  const run = spawnSync(process.execPath,
+    ['--import', pathToFileURL(preload).href, 'scripts/pep-worldwide.mjs', 'harvest', outfile],
+    { cwd: process.cwd(), encoding: 'utf8', timeout: 15000,
+      env: { ...process.env, PEP_FLOOR: '1', PEP_SHARD_COUNT: '1', PEP_SHARD_INDEX: '0', PEP_TIME_BUDGET_MIN: '100', PEP_MAX_RESUMES: '12' } });
+  assert.ifError(run.error);
+  check('real CLI reaches missing persons before optional office enrichment', run.status === pep.RESUME_EXIT_CODE && run.stdout.includes('FETCH_IDS=Q2'));
+  check('same-harvest names are reused by the real resume path', run.stdout.includes('reused 1 published names'));
+  check('only the missing person is fetched', (run.stdout.match(/FETCH_IDS=/g) || []).length === 1);
+  const published = pep.readJsonMaybeGz(outfile);
+  check('unresolved source records do not become a false complete artifact', published.partial && published.expected === 2 && published.count === 1);
+  const saved = pep.readCheckpoint(cpfile);
+  check('current person-name progress is preserved in the checkpoint', new Map(saved.names).get('Q1').name === 'Synthetic Published One');
+} finally { rmSync(dir, { recursive: true, force: true }); }
+console.log('runtime-priority: ' + checks + ' checks passed');
