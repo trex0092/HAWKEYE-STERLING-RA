@@ -4,6 +4,7 @@ import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, sco
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
   bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker,
+  RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
   gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker,
   checkAdverseMedia } from '../scripts/adverse-media.mjs';
@@ -14,6 +15,21 @@ function check(name, cond) {
   if (cond) { passed++; console.log('  ok  ' + name); }
   else { failed++; console.log('FAIL  ' + name); }
 }
+check('run-global adverse-media feed gates have safe non-zero production defaults',
+  GNEWS_MIN_INTERVAL_MS >= 250 && GDELT_MIN_INTERVAL_MS >= 1000 && BING_MIN_INTERVAL_MS >= 250);
+
+{
+  const gate = new RequestStartGate(20);
+  const starts = [];
+  await Promise.all(Array.from({ length: 4 }, async () => {
+    await gate.wait();
+    starts.push(Date.now());
+  }));
+  const deltas = starts.slice(1).map((t, i) => t - starts[i]);
+  check('RequestStartGate serialises concurrent callers and spaces request starts globally',
+    starts.length === 4 && deltas.every(d => d >= 15));
+}
+
 check('adverseMediaUrl targets Google News RSS with quoted name + risk terms',
   adverseMediaUrl('Acme Co').startsWith('https://news.google.com/rss/search?q=') &&
   decodeURIComponent(adverseMediaUrl('Acme Co')).includes('"Acme Co"') &&

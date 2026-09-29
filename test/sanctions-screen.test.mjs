@@ -1409,6 +1409,16 @@ check('PEP interrupt: the persist step still commits when the job is CANCELLED (
   const gate = (persist.match(/^\s*if:\s*(.+)$/m) || [])[1] || '';
   return /cancelled\(\)/.test(gate) && !/always\(\)/.test(gate);
 })());
+check('PEP checkpoint: an old complete artifact cannot erase a newly banked resume checkpoint', (() => {
+  const wf = readFileSync(join(ROOT, '.github/workflows/pep-worldwide.yml'), 'utf8');
+  const overlay = wf.slice(wf.indexOf('Overlay the previous artifact + any checkpoint'), wf.indexOf('Harvest the worldwide PEP list'));
+  const persist = wf.slice(wf.indexOf('Persist the artifact + checkpoint'), wf.indexOf('Re-dispatch to resume'));
+  return /PEP_BASELINE_ARTIFACT_SHA=/.test(overlay)
+    && /current_artifact_sha/.test(persist)
+    && /PEP_BASELINE_ARTIFACT_SHA/.test(persist)
+    && /current_artifact_sha\" != \"\$\{PEP_BASELINE_ARTIFACT_SHA:-\}/.test(persist)
+    && /a NEW complete artifact appeared during this link/.test(persist);
+})());
 check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned checkpoint cannot steer queries', (() => {
   const st = pep.restoreCheckpoint({
     v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
@@ -1424,6 +1434,22 @@ check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned 
     && !st.positions.has('evil} SERVICE <http://x>')
     && st.sinceIso === '2026-08-01T00:00:00Z' && st.resumeCount === 2
     && st.next.classIdx === 1 && st.batchTotal === 4 && st.names.get('Q7').name === 'A';
+})());
+
+/* Redundant-source coverage: a primary national endpoint may fail while a
+   configured mirror for the SAME register is healthy. That is not missing
+   coverage and must not turn the whole sanctions domain degraded. */
+check('Qatar NCTC declares its OpenSanctions mirror as an explicit coverage fallback', (() => {
+  const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
+  const q = (extra.sources || []).find(s => s.id === 'qa-nctc');
+  return q && q.fallbackSourceId === 'qa-nctc-opensanctions';
+})());
+check('sanctions loader resolves declared fallback coverage before setting degraded', (() => {
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  return /fallbackSourceId/.test(src)
+    && /fullyLoaded\.has\(fallback\)/.test(src)
+    && /coverage preserved/.test(src)
+    && /unresolved\.length > 0/.test(src);
 })());
 
 /* ── paginated JSON list reader (ADB debarment register: 10 rows/page, its own

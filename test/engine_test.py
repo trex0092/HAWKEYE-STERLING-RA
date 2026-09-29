@@ -3037,41 +3037,38 @@ finally:
 check("legacy daily post failure arms the delivery gate (no more green no-delivery)",
       _armed_daily)
 
-# The UNIFIED poster must multi-home into every CONFIGURED MLRO queue. The
-# 2026-07-29 proof run delivered to Ongoing Monitoring only: _mlro_queue_targets()
-# existed and both LEGACY posters used it, but the unified path (the one the
-# daily workflow actually takes) still hardcoded a single queue. Pin the payload.
-#
-# #518 (2026-09-15) retired ASANA_FOLLOWUPS_GID's default (the separate "Follow
-# Ups" project was merged into HAWKEYE STERLING APP and deleted, same as
-# ASANA_ONGOING_MON_GID's old target), so it is now EMPTY unless a repo secret/
-# var configures a genuinely separate queue again (exercised by the
-# "queue targets without Follow Ups" check right below this one). This test's
-# job is unchanged: prove post_unified_task actually RESPECTS a configured
-# second queue end to end rather than hardcoding a single one, so it configures
-# one explicitly instead of relying on what used to be the default.
+# The UNIFIED poster must multi-home into every CONFIGURED MLRO queue. Delivery
+# now creates the task in the project(s) first, then places it into section(s)
+# with addProject calls. This prevents a stale section GID from rejecting the
+# report task itself while preserving section placement whenever it is valid.
 _posted = []
+_attached = []
 def _record_post(method, url, **kw):
-    # 2026-09-25: post_unified_task now makes a GET first (the same-day/
-    # same-batch dedup check added 2026-09-24) before its POST. This mock
-    # predates that and only ever modelled the POST; without the method
-    # check the GET call itself got appended to _posted (as None, since it
-    # has no json= kwarg), corrupting _posted[0] below. A real "no prior
-    # report" GET returns an empty Asana task list, not a created-task body.
-    if method != "POST":
+    if method == "GET":
         class _G:
             status_code = 200
             text = ""
             @staticmethod
             def json(): return {"data": []}
         return _G()
-    _posted.append(kw.get("json"))
-    class _R:
-        status_code = 201
-        text = ""
-        @staticmethod
-        def json(): return {"data": {"gid": "1"}}
-    return _R()
+    if url.endswith("/api/1.0/tasks"):
+        _posted.append(kw.get("json"))
+        class _R:
+            status_code = 201
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "1"}}
+        return _R()
+    if "/addProject" in url:
+        _attached.append(kw.get("json"))
+        class _A:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": {}}
+        return _A()
+    raise AssertionError(f"unexpected Asana call: {method} {url}")
+
 screen.asana_request = _record_post
 _orig_fu2, _orig_fu_sec2 = screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID
 try:
@@ -3082,15 +3079,61 @@ finally:
     screen.asana_request = _orig_asana_request
     screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID = _orig_fu2, _orig_fu_sec2
 _data = (_posted[0] or {}).get("data", {}) if _posted else {}
-check("unified daily task is multi-homed into BOTH MLRO queues when a second one is configured (projects)",
+check("unified daily task is created in BOTH MLRO projects when a second one is configured",
       set(_data.get("projects", [])) ==
       {screen.ASANA_ONGOING_MON_GID, "9999999999999991"})
-_mem = {m.get("project"): m.get("section") for m in _data.get("memberships", [])}
-check("unified daily task lands in the configured second queue's delivery section",
-      _mem.get("9999999999999991") == "9999999999999992"
-      and _mem.get(screen.ASANA_ONGOING_MON_GID) == screen.ASANA_SECTION_GID)
+check("unified daily task creation does not atomically depend on section GIDs",
+      "memberships" not in _data)
+_attached_pairs = {
+    (a["data"].get("project"), a["data"].get("section"))
+    for a in _attached if a and a.get("data")
+}
+check("unified daily task is placed into both configured delivery sections after creation",
+      _attached_pairs == {
+          (screen.ASANA_ONGOING_MON_GID, screen.ASANA_SECTION_GID),
+          ("9999999999999991", "9999999999999992"),
+      })
+
+# A stale/deleted section must degrade placement, not erase the screening
+# result. The task create succeeds, addProject returns 400, and the poster must
+# still return the delivered task GID without arming the delivery-failure gate.
+_section_calls = []
+def _stale_section_post(method, url, **kw):
+    if method == "GET":
+        class _G:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": []}
+        return _G()
+    if url.endswith("/api/1.0/tasks"):
+        class _R:
+            status_code = 201
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "delivered-1"}}
+        return _R()
+    if "/addProject" in url:
+        _section_calls.append(kw.get("json"))
+        class _Bad:
+            status_code = 400
+            text = "Section must be in project"
+        return _Bad()
+    raise AssertionError(f"unexpected Asana call: {method} {url}")
+
+_prev_failed = screen.UNIFIED_DELIVERY_FAILED["failed"]
+screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+screen.asana_request = _stale_section_post
+try:
+    _gid = screen.post_unified_task("narrative", _dt.datetime(2026, 9, 29, 9, 0), [], [], [])
+finally:
+    screen.asana_request = _orig_asana_request
+check("stale Asana section does not suppress delivery of the screening report",
+      _gid == "delivered-1" and not screen.UNIFIED_DELIVERY_FAILED["failed"] and bool(_section_calls))
+screen.UNIFIED_DELIVERY_FAILED["failed"] = _prev_failed
+
 # _mlro_queue_targets directly: dropping the Follow Ups queue must collapse the
-# multi-homing to the single Ongoing Monitoring membership, never an empty one.
+# multi-homing to the single delivery project membership, never an empty one.
 _orig_fu, _orig_fu_sec = screen.ASANA_FOLLOWUPS_GID, screen.ASANA_FOLLOWUPS_SECTION_GID
 try:
     screen.ASANA_FOLLOWUPS_GID = ""

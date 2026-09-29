@@ -440,7 +440,13 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
      request". That would have had someone debugging a payload while the real
      fix was a billing limit. The body is CLASSIFIED (never reflected) to tell
      quota apart from malformed, on both statuses that can carry it. */
-  const LIMIT_MSG = 'You have reached your specified API usage limits. You will regain access on 2026-08-01 at 00:00 UTC.';
+  const evalSrc = readFileSync(join(ROOT, 'scripts/advisor-eval.mjs'), 'utf8');
+check('advisor eval aborts remaining live cases after a provider-wide quota/billing failure',
+  /provider-wide quota\/billing failure is terminal/.test(evalSrc)
+  && /break evalLoop/.test(evalSrc)
+  && /NOT_ATTEMPTED/.test(evalSrc));
+
+const LIMIT_MSG = 'You have reached your specified API usage limits. You will regain access on 2026-08-01 at 00:00 UTC.';
   check('a 400 carrying a usage-limit body is named as BILLING, not malformed',
     /usage limit or run out of credit/i.test(I.apiErrorHint(400, LIMIT_MSG))
     && !/malformed/i.test(I.apiErrorHint(400, LIMIT_MSG)));

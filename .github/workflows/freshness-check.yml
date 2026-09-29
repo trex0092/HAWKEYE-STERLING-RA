@@ -61,12 +61,22 @@ jobs:
 
       - name: Verify mandatory controls ran inside their cadence window
         id: freshness
+        # A push can happen before the day's mandatory controls have run. The
+        # previous workflow executed the live freshness alarm on every workflow
+        # edit and therefore produced false "stale" failures early in the UTC
+        # day. Runtime freshness is only meaningful on the scheduled checks or
+        # an explicit manual verification.
+        if: github.event_name != 'push'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/freshness-check.mjs
 
+      - name: Validate freshness-check code on push
+        if: github.event_name == 'push'
+        run: node --test test/freshness-check.test.mjs
+
       - name: Alert in Asana on stale control
-        if: failure()
+        if: failure() && github.event_name != 'push'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

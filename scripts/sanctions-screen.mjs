@@ -1487,9 +1487,6 @@ export async function loadSanctionsLists(cfg) {
   try { sources = loadSources(readFileSync(cfg.sourcesFile, 'utf8')).filter(s => s.enabled !== false); }
   catch (e) { return { lists: [], degraded: true, fetched: 0, total: 0, notes: ['sources file unreadable: ' + (e && e.message || e)] }; }
 
-  /* Extra / curated lists (e.g. the UAE EOCN file, or extra national XML lists)
-     are loaded leniently — a curated entry has `file` instead of `url`, which the
-     strict loadSources validator rejects. */
   if (existsSync(cfg.extraFile)) {
     try {
       const extra = JSON.parse(readFileSync(cfg.extraFile, 'utf8'));
@@ -1497,31 +1494,26 @@ export async function loadSanctionsLists(cfg) {
     } catch (e) { console.error('sanctions-screen: extra sources unreadable (' + (e && e.message || e) + ')'); }
   }
 
-  const lists = [], notes = [];
+  const lists = [], notes = [], failures = [];
   let fetched = 0;
   await Promise.all(sources.map(async (s) => {
     try {
-      /* Per-source override for slow generators (SECO's SESAM service builds the
-         full-list XML on request and blows the flat 60s budget). */
       const body = await fetchListBody(s, Number(s.timeoutMs) || cfg.listTimeoutMs);
       const names = parseList(s, body);
       if (!names.length) {
-        /* An OPTIONAL source (source.optional — the firm-internal watchlist)
-           may legitimately be empty: "no internal designations" is a valid
-           state, reported informationally and counted as fetched so it never
-           degrades coverage. Official lists keep the fail-safe: empty means
-           DEGRADED, never a silent all-clear. */
-        if (s.optional) { fetched++; notes.push(s.name + ' has no entries — optional internal list, coverage unaffected'); console.log('sanctions-screen: ' + s.id + ' empty (optional) — screened set unchanged'); return; }
-        notes.push(s.name + ' parsed 0 names — coverage degraded'); console.error('sanctions-screen: ' + s.id + ' parsed 0 names'); return;
+        if (s.optional) {
+          fetched++;
+          notes.push(s.name + ' has no entries - optional internal list, coverage unaffected');
+          console.log('sanctions-screen: ' + s.id + ' empty (optional) - screened set unchanged');
+          return;
+        }
+        failures.push({ source: s, reason: 'parsed 0 names' });
+        console.error('sanctions-screen: ' + s.id + ' parsed 0 names');
+        return;
       }
       if (belowFloor(s, names)) {
-        /* The names that DID parse still screen — a hit on a truncated list is
-           a real hit — but the list is marked partial so standing matches are
-           carried forward instead of cleared (the same contract as a failed
-           alias file), and the run reports DEGRADED: a "no match" against a
-           truncated list is provisional, never an all-clear. */
         lists.push({ id: s.id, name: s.name, names, partial: true });
-        notes.push(s.name + ' parsed ' + names.length + ' name(s), below its ' + s.minNames + ' coverage floor — truncated source; coverage degraded');
+        failures.push({ source: s, reason: 'parsed ' + names.length + ' name(s), below its ' + s.minNames + ' coverage floor - truncated source' });
         console.error('sanctions-screen: ' + s.id + ' below coverage floor (' + names.length + ' < ' + s.minNames + ')');
         return;
       }
@@ -1529,17 +1521,37 @@ export async function loadSanctionsLists(cfg) {
       fetched++;
       console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');
     } catch (e) {
-      notes.push(s.name + ' could not be loaded (' + (e && e.message || e) + ') — coverage degraded');
-      console.error('sanctions-screen: ' + s.id + ' failed — ' + (e && e.message || e));
+      failures.push({ source: s, reason: 'could not be loaded (' + (e && e.message || e) + ')' });
+      console.error('sanctions-screen: ' + s.id + ' failed - ' + (e && e.message || e));
     }
   }));
-  /* Alias-only sources (OFAC alt.csv) fold into their primary list so alias
-     hits carry the primary designation; a missing alias file soft-degrades
-     that list (partial) — reported, never a hard fail of the primary load. */
+
   const fold = foldAliasSources(lists, sources);
   for (const f of fold.folded) console.log('sanctions-screen: ' + f);
   for (const n of fold.notes) { notes.push(n); console.error('sanctions-screen: ' + n); }
-  return { lists, degraded: fetched < sources.length, fetched, total: sources.length, notes };
+
+  const fullyLoaded = new Set(lists.filter(l => !l.partial).map(l => l.id));
+  const unresolved = [];
+  for (const failure of failures) {
+    const s = failure.source || {};
+    const fallback = String(s.fallbackSourceId || '');
+    if (fallback && fullyLoaded.has(fallback)) {
+      notes.push(s.name + ' ' + failure.reason + ' - fallback ' + fallback + ' loaded successfully; coverage preserved');
+      console.warn('sanctions-screen: ' + s.id + ' unavailable, but fallback ' + fallback + ' is loaded - coverage preserved');
+    } else {
+      unresolved.push(failure);
+      notes.push(s.name + ' ' + failure.reason + ' - coverage degraded');
+    }
+  }
+
+  return {
+    lists,
+    degraded: unresolved.length > 0 || fold.notes.length > 0,
+    fetched,
+    total: sources.length,
+    notes,
+    unresolvedSources: unresolved.map(x => x.source && x.source.id).filter(Boolean),
+  };
 }
 
 /* Enrichment fairness: rotate an array by a day-derived offset. The enrichment
