@@ -351,6 +351,9 @@ export function normalizeHit(h) {
   if (h.mechanism) out.mechanism = String(h.mechanism);
   if (typeof h.confidence === 'string' && num(h.confidence) === null) out.confidence = h.confidence;
   if (h.identity) out.identity = h.identity;
+  if (h.provenance) out.provenance = h.provenance;
+  if (h.evidenceUrl) out.evidenceUrl = String(h.evidenceUrl);
+  if (h.source) out.source = String(h.source);
   /* Cleared-FP annotation must survive this rebuild or the demotion (and its
      audit trail) silently vanishes between the matcher and the state. */
   if (h.whitelisted) {
@@ -511,6 +514,9 @@ export function hitDetail(lists) {
     if (h.mechanism) d.mechanism = h.mechanism;
     if (h.confidence) d.confidence = h.confidence;
     if (h.identity) d.identity = h.identity;
+    if (h.provenance) d.provenance = h.provenance;
+    if (h.evidenceUrl) d.evidenceUrl = h.evidenceUrl;
+    if (h.source) d.source = h.source;
     if (h.carriedForward) d.carriedForward = true;
     if (h.whitelisted) {
       d.whitelisted = true;
@@ -1530,12 +1536,12 @@ export async function loadSanctionsLists(cfg) {
         return;
       }
       if (belowFloor(s, names)) {
-        lists.push({ id: s.id, name: s.name, names, partial: true });
+        lists.push({ id: s.id, name: s.name, names, partial: true, sourceUrl: s.url || s.file || '', jurisdiction: s.jurisdiction || '' });
         failures.push({ source: s, reason: 'parsed ' + names.length + ' name(s), below its ' + s.minNames + ' coverage floor - truncated source' });
         console.error('sanctions-screen: ' + s.id + ' below coverage floor (' + names.length + ' < ' + s.minNames + ')');
         return;
       }
-      lists.push({ id: s.id, name: s.name, names });
+      lists.push({ id: s.id, name: s.name, names, sourceUrl: s.url || s.file || '', jurisdiction: s.jurisdiction || '' });
       fetched++;
       console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');
     } catch (e) {
@@ -1609,6 +1615,11 @@ async function screenLocally(subjects, cfg) {
   if (!loaded.lists.length) return { results: [], anyOk: false, degraded: true, errored: 0, notes: loaded.notes, coverage: loaded };
 
   const index = buildIndex(loaded.lists);
+  const sourceMeta = new Map(loaded.lists.map(l => [l.name, {
+    sourceId: l.id || '',
+    sourceUrl: l.sourceUrl || '',
+    jurisdiction: l.jurisdiction || '',
+  }]));
   const thr = cfg.threshold * 100;
   const phonMode = resolvePhoneticMode(process.env.MATCH_PHONETIC);
   const shadowThr = resolveShadowThreshold(process.env.SCREEN_SHADOW_THRESHOLD, cfg.threshold);
@@ -1665,7 +1676,10 @@ async function screenLocally(subjects, cfg) {
           + '" [' + ps.list + '] ' + ps.shape + ' key match, score ' + ps.score + ' — no hit emitted');
       }
     }
-    const lists = [...raw.lists];
+    const lists = raw.lists.map(h => {
+      const provenance = sourceMeta.get(h.list);
+      return provenance ? { ...h, provenance } : { ...h };
+    });
     /* Cleared-FP registry: annotate matcher hits whose exact subject+designated-
        name+list pair an analyst already cleared. Runs BEFORE enrichment merges,
        so enrichment findings (adverse media / PEP / Interpol) can never be
@@ -1715,6 +1729,9 @@ async function screenLocally(subjects, cfg) {
             + ' [identity: ' + identity.level + ']',
           score: am.score,
           identity,
+          source: (am.top && am.top.source) || '',
+          evidenceUrl: (am.top && (am.top.link || am.top.url)) || '',
+          provenance: { sourceId: 'adverse-media', sourceUrl: (am.top && (am.top.link || am.top.url)) || '' },
         });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
@@ -1763,6 +1780,8 @@ async function screenLocally(subjects, cfg) {
           hitName: (detail + ' [identity: ' + identityLabel(identity) + ']').slice(0, 240),
           score: h.score,
           identity,
+          evidenceUrl: ctx && ctx.qid ? 'https://www.wikidata.org/wiki/' + ctx.qid : '',
+          provenance: { sourceId: 'wikidata-pep-worldwide', entityId: (ctx && ctx.qid) || '' },
         });
       }
       if (pw.lists.length) { band = strongerBand(band, 'medium'); topScore = Math.max(topScore, Math.min(pw.topScore, 89)); }
