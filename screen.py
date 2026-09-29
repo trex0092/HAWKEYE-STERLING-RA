@@ -119,21 +119,12 @@ ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", "121623913159662
 # mirroring into it would just re-add the SAME project ASANA_ONGOING_MON_GID
 # already targets above, so the second membership is disabled (empty default)
 # until/unless a genuinely separate MLRO queue exists again.
-ASANA_FOLLOWUPS_GID = os.environ.get("ASANA_FOLLOWUPS_GID", "")
-ASANA_FOLLOWUPS_SECTION_GID = os.environ.get("ASANA_FOLLOWUPS_SECTION_GID", "")
-
 def _mlro_queue_targets():
-    """projects + memberships for a daily deliverable, multi-homed into every
-    configured MLRO queue. Failure to reach ANY queue is a delivery failure."""
-    projects = [ASANA_ONGOING_MON_GID]
-    memberships = [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}]
-    if ASANA_FOLLOWUPS_GID:
-        projects.append(ASANA_FOLLOWUPS_GID)
-        m = {"project": ASANA_FOLLOWUPS_GID}
-        if ASANA_FOLLOWUPS_SECTION_GID:
-            m["section"] = ASANA_FOLLOWUPS_SECTION_GID
-        memberships.append(m)
-    return projects, memberships
+    """The unified screening report has one approved Asana destination.
+    Follow Ups is reserved for document expiry/pending-document work and must
+    never receive screening reports."""
+    return ([ASANA_ONGOING_MON_GID],
+            [{"project": ASANA_ONGOING_MON_GID, "section": ASANA_SECTION_GID}])
 ASANA_ASSIGNEE_GID    = os.environ.get("ASANA_ASSIGNEE_GID", "1213645083721304")   # default case/OM assignee (MLRO)
 # Case subtasks stay inside the approved screening sections. Sanctions cases
 # go to Screening Sanctions Update; adverse-media and PEP cases go to the
@@ -1435,7 +1426,8 @@ def load_case_backlog(state):
         if (isinstance(e, dict) and isinstance(e.get("name"), str) and e["name"]
                 and isinstance(e.get("notes"), str)):
             out.append({"p": int(e.get("p", 0) or 0), "name": e["name"],
-                        "notes": e["notes"], "queued": str(e.get("queued", ""))[:10]})
+                        "notes": e["notes"], "section": str(e.get("section", "")),
+                        "queued": str(e.get("queued", ""))[:10]})
     return out
 
 def _clamp_notes_budget(v):
@@ -6384,13 +6376,10 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
             section_failures = _attach_task_sections(gid, memberships)
             NOTES_BUDGET["learned"] = budget  # persisted with the delta-state on delivery
             if section_failures:
-                log(f"OK Unified daily task created: {gid} (section placement degraded)")
-            else:
-                log(f"OK Unified daily task created: {gid}")
-            # The report is in the MLRO's hands from here. A death recorded
-            # after this marker cost the run its state persistence and its
-            # follow-up attestation, but NOT the day's screening — a materially
-            # different incident from one that died before it.
+                log(f"FAIL unified task placement: {gid} exists, but approved section placement failed")
+                UNIFIED_DELIVERY_FAILED["failed"] = True
+                return None
+            log(f"OK Unified daily task created and placed in approved section: {gid}")
             progress("delivered", task_gid=gid)
             return gid
         last = r
