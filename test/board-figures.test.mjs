@@ -86,6 +86,13 @@ console.log('\n— sanctions country coverage register (195) —\n');
     unRows.length === 193 && !unRows.some(r => r.country === 'Holy See' || r.country === 'Palestine') && on('un-consolidated'));
   check('baseline EU covers exactly the 27 EU members and the EU list is enabled',
     reg.filter(r => (r.baseline || []).includes('EU')).length === 27 && on('eu-fsf'));
+  const badgeSrc = readFileSync(join(ROOT, 'scripts/coverage-figures.mjs'), 'utf8');
+  const sanctionsDepthBadge = readFileSync(join(ROOT, 'data/badges/sanctions-worldwide.svg'), 'utf8');
+  check('national sanctions-source depth badge is informational, not a false red runtime verdict',
+    /informational \? '#007ec6'/.test(badgeSrc)
+    && /sanctions national-source depth/.test(sanctionsDepthBadge)
+    && /#007ec6/.test(sanctionsDepthBadge)
+    && !/#e05d44/.test(sanctionsDepthBadge));
   check('non-screened statuses other than not-researched carry a note',
     reg.filter(r => r.status !== 'screened' && r.status !== 'not-researched').every(r => r.note));
 }
