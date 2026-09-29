@@ -71,6 +71,7 @@ jobs:
           mkdir -p /tmp/sanctions-runtime/data/badges
           cp data/sanctions-runtime-assurance.json /tmp/sanctions-runtime/data/
           cp data/badges/sanctions-operational.svg /tmp/sanctions-runtime/data/badges/
+          rm -f data/sanctions-runtime-assurance.json data/badges/sanctions-operational.svg
 
           git config user.name "sanctions-runtime-assurance"
           git config user.email "actions@github.com"
