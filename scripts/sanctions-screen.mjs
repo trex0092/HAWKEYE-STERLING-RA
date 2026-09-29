@@ -42,6 +42,7 @@ import { checkInterpol } from './interpol-check.mjs';
 import { checkFbi } from './fbi-check.mjs';
 import { pepListFromDataset, readJsonMaybeGz, PEP_LIST_NAME } from './pep-worldwide.mjs';
 import { corroborateIdentity, corroborateArticleIdentity, identityLabel } from './entity-resolution.mjs';
+import { buildDecisionSupport } from './screening-intelligence.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -383,6 +384,11 @@ export function normalizeResult(r, src) {
     key: src ? src.key : normalizeName(subjName),
     name: (src && src.name) || String(subjName),
     jurisdiction: src && src.jurisdiction,
+    nationality: src && src.nationality,
+    dob: src && src.dob,
+    passport: src && src.passport,
+    registrationNumber: src && src.registrationNumber,
+    idNumber: src && src.idNumber,
     gid: src && src.gid,
     entityType: (src && src.entityType) || 'organisation',
     parent: src && src.parent,
@@ -706,7 +712,10 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
            rendered CASE-XXXXXX with no link for every company). Old state
            records simply lack these fields — renderers fall back. */
         gid: r.gid, entityType: r.entityType, parent: r.parent, role: r.role,
+        nationality: r.nationality, dob: r.dob, passport: r.passport,
+        registrationNumber: r.registrationNumber, idNumber: r.idNumber,
         hits: hitDetail(lists),
+        decisionSupport: buildDecisionSupport(r, lists),
         /* Report-only row: every hit is a cleared-FP pair — the case engine
            opens no case; the report keeps the row, annotated. RECOMPUTED after
            the carry-forward merges above, never copied from r: the flag was
@@ -720,7 +729,10 @@ export function diffState(prevState, results, today, threshold, screenedLists, e
       if (!prior || prior.signature !== sig) {
         alerts.push({ key: r.key, name: r.name, jurisdiction: r.jurisdiction, gid: r.gid,
           entityType: r.entityType, parent: r.parent, role: r.role,
-          band, topScore: r.topScore, recommendation, lists, isNew: !prior });
+          nationality: r.nationality, dob: r.dob, passport: r.passport,
+          registrationNumber: r.registrationNumber, idNumber: r.idNumber,
+          band, topScore: r.topScore, recommendation, lists,
+          decisionSupport: buildDecisionSupport(r, lists), isNew: !prior });
       }
     } else if (prev[r.key]) {
       const prior = prev[r.key];
@@ -2115,7 +2127,8 @@ async function main() {
       lists: (a.lists || []).map(h => (typeof h === 'string' ? h : h.list)).filter(Boolean),
       /* Evidence detail (matched designated name · score · mechanism ·
          confidence) so the digest names WHAT matched, not just which list. */
-      hits: hitDetail((a.lists || []).filter(h => typeof h === 'object'))
+      hits: hitDetail((a.lists || []).filter(h => typeof h === 'object')),
+      decisionSupport: a.decisionSupport || buildDecisionSupport(a, (a.lists || []).filter(h => typeof h === 'object'))
     })),
     cleared: cleared.map(c => c.name)
   }, null, 2) + '\n');
