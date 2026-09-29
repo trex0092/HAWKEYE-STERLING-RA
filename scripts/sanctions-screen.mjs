@@ -1645,7 +1645,8 @@ async function screenLocally(subjects, cfg) {
      and report it, but it does NOT degrade the sanctions screen or weaken its
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
-  let amErrors = 0, amPartial = 0, pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
+  let amErrors = 0, amPartial = 0, amRetryAttempted = 0, amRetryRecovered = 0;
+  let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0 };
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
@@ -1720,7 +1721,9 @@ async function screenLocally(subjects, cfg) {
       if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
       if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
       if (!am.backbones?.bing) amBackboneFailures.bing++;
-      if (am.partial) amPartial++;   // narrowed coverage — disclosed, never silent
+      if (am.retryAttempted) amRetryAttempted++;
+      if (am.retryRecovered) amRetryRecovered++;
+      if (am.partial) amPartial++;   // narrowed redundancy — disclosed, never silent
       if (am.errored) { amErrors++; enrichmentIncomplete = true; }
       else {
         /* A disclosed-partial sweep (a queried edition failed) OR a budgeted
@@ -1835,12 +1838,13 @@ async function screenLocally(subjects, cfg) {
   }
 
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
-  if (amPartial) console.log('sanctions-screen: adverse-media coverage was PARTIAL for ' + amPartial + ' subject(s) — some locales/GDELT did not answer (disclosed in the digest)');
+  if (amPartial) console.log('sanctions-screen: adverse-media redundancy was PARTIAL for ' + amPartial + ' subject(s) — at least one queried source did not answer (disclosed in the digest)');
+  if (amRetryAttempted) console.log('sanctions-screen: last-resort adverse backbone retry attempted for ' + amRetryAttempted + ' subject(s); recovered ' + amRetryRecovered);
   if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -2096,7 +2100,9 @@ async function main() {
       id: L.id || '', name: L.name, count: (L.names || []).length, partial: !!L.partial
     })),
     failures: screen.notes || [],
-    enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0, pepErrors: screen.pepErrors || 0,
+    enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0,
+      amRetryAttempted: screen.amRetryAttempted || 0, amRetryRecovered: screen.amRetryRecovered || 0,
+      pepErrors: screen.pepErrors || 0,
       skipped: screen.enrichSkipped || 0,
       pepLookupEnabled: !!cfg.pep,
       pepWorldwide: cfg.pepWorldwideEvidence || { active: false, count: 0, harvested: '', partial: false, expected: 0 },
