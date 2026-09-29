@@ -16,7 +16,7 @@
 
 <!-- Configured scope: generated from the engine's own configuration by scripts/coverage-figures.mjs, CI drift-checked.
      These badges describe intended geographic applicability, not proof that a particular run succeeded. -->
-[![Sanctions Configured Scope](data/badges/sanctions-worldwide.svg)](data/screening-country-coverage.json)
+[![Sanctions National Source Depth](data/badges/sanctions-worldwide.svg)](data/screening-country-coverage.json)
 [![Adverse Media Configured Scope](data/badges/adverse-media-worldwide.svg)](data/screening-country-coverage.json)
 [![PEP Configured Scope](data/badges/pep-worldwide.svg)](data/screening-country-coverage.json)
 
