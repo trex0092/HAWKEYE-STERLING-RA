@@ -263,6 +263,7 @@ for (const c of CONTROLS) {
 
 const assuranceWf = readFileSync(join(wfDir, 'screening-assurance.yml'), 'utf8');
 const pepWf = readFileSync(join(wfDir, 'pep-worldwide.yml'), 'utf8');
+const pepShardWf = readFileSync(join(wfDir, 'pep-shard-harvest.yml'), 'utf8');
 const sanctionsScreenWf = readFileSync(join(wfDir, 'sanctions-screen.yml'), 'utf8');
 
 check('screening assurance avoids the dangerous workflow_run trigger',
@@ -277,6 +278,9 @@ check('Sanctions Screen writes runtime assurance before persisting state',
   && /Persist screening \+ case state/.test(sanctionsScreenWf));
 check('Sanctions Screen verifies freshly persisted assurance through the checker workflow',
   /screening-assurance\.yml\/dispatches/.test(sanctionsScreenWf));
+check('PEP shard accelerator auto-runs only for its own reviewed workflow change on main',
+  /push:\s*\n\s*branches:\s*\[main\]/.test(pepShardWf)
+  && /paths:\s*\n\s*- ['"]\.github\/workflows\/pep-shard-harvest\.yml['"]/.test(pepShardWf));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
