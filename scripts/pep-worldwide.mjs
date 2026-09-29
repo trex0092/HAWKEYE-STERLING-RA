@@ -592,6 +592,26 @@ async function fetchLabelWindow(qids, start) {
   return Promise.all(jobs);
 }
 
+/* Reuse names already published by another link of this exact harvest.
+   Older harvests remain fallback evidence only, never fresh label progress.
+   Preserve the full holder denominator and never replace a usable banked name. */
+export function seedResumeNames(qids, names, artifact, harvestedAt) {
+  if (!artifact || !harvestedAt || artifact.harvested !== harvestedAt
+    || artifact.expected !== qids.length || !Array.isArray(artifact.entries)
+    || artifact.count !== artifact.entries.length) return 0;
+  const wanted = new Set(qids);
+  let added = 0;
+  for (const entry of artifact.entries) {
+    if (!entry || !/^Q\d+$/.test(entry.qid) || !wanted.has(entry.qid)
+      || !hasScreenableName(entry) || hasScreenableName(names.get(entry.qid))) continue;
+    names.set(entry.qid, { name: entry.name.trim(),
+      aliases: Array.isArray(entry.aliases)
+        ? entry.aliases.filter(a => typeof a === 'string' && a.trim()).map(a => a.trim()) : [] });
+    added++;
+  }
+  return added;
+}
+
 async function harvest(outfile) {
   const cpFile = checkpointPath(outfile);
   const startedMs = Date.now();
@@ -852,14 +872,16 @@ async function harvest(outfile) {
      this much work wherever the link happened to be. */
   const BANK_EVERY_MS = 5 * 60 * 1000;
 
-  if (PEP_SHARD_COUNT === 1) {
+  // Person-name coverage has priority over optional office context. This
+  // function runs only after the non-sharded name pass has no unresolved QIDs.
+  const enrichOffices = async () => {
     /* Pausing mid-office hands the run to the labels phase with whatever names
        are already banked — never an empty list. The old pause wrote names: []
        unconditionally, so a pause here would have discarded every person name a
        previous link had harvested. */
     const officeState = () => ({
-      labelQids: (st && st.phase === 'labels') ? st.labelQids : [...new Set(holderRows.map(r => r.person))],
-      names: (st && st.phase === 'labels') ? [...st.names] : [],
+      labelQids: allQids,
+      names: [...names],
       next: { labelIdx: 0 },
     });
     const officePause = () => pause('labels', officeState());
@@ -958,7 +980,7 @@ async function harvest(outfile) {
       for (const p of positions.values()) if (cnames.has(p.country)) p.country = cnames.get(p.country);
       console.log(`  resolved ${cnames.size}/${countryQids.length} country names`);
     }
-  }
+  };
 
   /* Labels phase — resumable per chunk; banked names ride the checkpoint. */
   let allQids, names;
@@ -974,6 +996,12 @@ async function harvest(outfile) {
      list, never a slice or a remainder. Every partial write is measured against
      it, so the shortfall a consumer sees is the real one. */
   const expectedTotal = allQids.length;
+  if (st && st.phase === 'labels') {
+    let published = null;
+    try { published = readJsonMaybeGz(outfile); } catch { /* no reusable artifact */ }
+    const reused = seedResumeNames(allQids, names, published, harvestedAt);
+    if (reused) console.log('pep-worldwide: reused ' + reused + ' published names from this same harvest');
+  }
 
   /* Never a saved labelIdx — see pendingLabels: a resume that marched past a
      throttled window would drop those people from the list for good. The 07:16
@@ -1058,6 +1086,8 @@ async function harvest(outfile) {
     console.error('pep-worldwide: ' + unresolved.length + ' person labels remain unresolved; keeping checkpoint and requesting a bounded resume');
     return RESUME_EXIT_CODE;
   }
+
+  await enrichOffices();
 
   const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
   const gate = writeArtifact(dataset, (carried) => buildPepDataset({
