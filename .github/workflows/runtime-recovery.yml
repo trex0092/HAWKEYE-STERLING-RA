@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          fetch-depth: 3
+          fetch-depth: 4
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
@@ -68,7 +68,6 @@ jobs:
             echo "Running $test_file"
             node "$test_file"
           done
-          node test/screening-assurance.test.mjs
       - name: Commit verified source repair to this branch only
         env:
           GH_TOKEN: ${{ github.token }}
