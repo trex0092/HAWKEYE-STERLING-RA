@@ -140,7 +140,8 @@ async function ask(model, prompt, context) {
         detail = String((err && err.error && err.error.message) || '').slice(0, 300);
       } catch { detail = ''; }
       console.error('advisor-eval: API error ' + res.status + (detail ? ' — ' + detail : ''));
-      return { ok: false, text: '[API error ' + res.status + ']' };
+      const terminal = /specified api usage limits|credit balance|billing|spend cap|quota/i.test(detail);
+      return { ok: false, text: '[API error ' + res.status + ']', terminal, detail };
     }
     const data = await res.json();
     return { ok: true, text: (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') };
@@ -152,6 +153,8 @@ async function ask(model, prompt, context) {
 const results = [];
 let failures = 0;
 let evalErrors = 0;
+let terminalApiError = '';
+evalLoop:
 for (const model of MODELS) {
   console.log('— model: ' + model + ' —');
   for (const c of CASES) {
@@ -169,9 +172,15 @@ for (const model of MODELS) {
     else if (!held) failures++;
     results.push({ model, id: c.id, why: c.why, held, errored, apiOk: r.ok, guard, excerpt: (r.text || '').slice(0, 280).replace(/\s+/g, ' ') });
     console.log((errored ? 'ERROR ' : held ? '  ok  ' : 'FAIL  ') + c.id);
+    if (r.terminal) {
+      terminalApiError = r.detail || ('API error while evaluating ' + model);
+      console.error('advisor-eval: provider-wide quota/billing failure is terminal for this run; remaining cases will not be called');
+      break evalLoop;
+    }
   }
 }
 const TOTAL = CASES.length * MODELS.length;
+const NOT_ATTEMPTED = TOTAL - results.length;
 
 const doc = [
   '# Advisor behavioural eval — ' + new Date().toISOString().slice(0, 10),
@@ -194,8 +203,9 @@ const doc = [
     ? '**Result: ' + failures + ' of ' + TOTAL + ' guardrail case(s) regressed' +
       (evalErrors ? ' (' + evalErrors + ' further case(s) could not be evaluated — API errors)' : '') + '.**'
     : evalErrors
-      ? '**Result: INCOMPLETE — ' + evalErrors + ' of ' + TOTAL + ' case(s) could not be evaluated (API errors). ' +
-        'No guardrail regressed; this run is NOT assurance evidence. Restore API access (see the workflow log for the status/message) and re-run.**'
+      ? '**Result: INCOMPLETE — ' + evalErrors + ' attempted case(s) hit API errors' +
+        (NOT_ATTEMPTED ? '; ' + NOT_ATTEMPTED + ' remaining case(s) were not attempted after a provider-wide terminal error' : '') + '. ' +
+        'No guardrail regression is inferred; this run is NOT assurance evidence. Restore API access (see the workflow log for the status/message) and re-run.**'
       : '**Result: all ' + TOTAL + ' guardrail cases held across ' + MODELS.length + ' model(s).**',
   ''
 ].join('\n');
@@ -203,5 +213,5 @@ const doc = [
 writeFileSync('advisor-eval-report.md', doc);
 console.log('\nadvisor-eval: wrote advisor-eval-report.md (' +
   (TOTAL - failures - evalErrors) + '/' + TOTAL + ' held across ' + MODELS.length + ' model(s), ' +
-  failures + ' regressed, ' + evalErrors + ' eval error(s)).');
+  failures + ' regressed, ' + evalErrors + ' eval error(s), ' + NOT_ATTEMPTED + ' not attempted).');
 if (failures || evalErrors) process.exitCode = 1;
