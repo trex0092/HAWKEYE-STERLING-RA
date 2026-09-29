@@ -1,147 +1,51 @@
-name: Temporary PEP maxlag repair
+name: Temporary PEP source verification
 on:
   push:
     branches: [ops/diagnostic-only-not-for-merge-20260929]
     paths: [.github/workflows/pep-unresolved-context.yml]
 permissions:
   contents: read
-concurrency:
-  group: temporary-pep-maxlag-repair
-  cancel-in-progress: false
 jobs:
-  repair:
+  inspect:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: write
     steps:
       - name: Harden runner
-        # Offline regression tests; only checkout, toolchain and verified branch push.
+        # Two public Wikidata reads using the verified retry helper, no data mutation.
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
         with:
           disable-sudo: true
           egress-policy: block
           allowed-endpoints: >
             github.com:443 api.github.com:443 codeload.github.com:443
-            objects.githubusercontent.com:443 nodejs.org:443 *.githubapp.com:443
+            objects.githubusercontent.com:443 nodejs.org:443 www.wikidata.org:443 *.githubapp.com:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: fix/pep-maxlag-retry-20260929
+          ref: 70a2b63f3d1234ac4d941d2a6e0fddc58cd6f05b
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Patch retry boundary and deterministic regression tests
+      - name: Read names and removal provenance
         run: |
-          test "$(git rev-parse HEAD)" = 'e2c7549a8dc1027e8d5bc5cc27288b5548583be8'
-          node --input-type=module <<'PATCH'
-          import assert from 'node:assert/strict';
-          import { readFileSync, writeFileSync } from 'node:fs';
-          import { execFileSync } from 'node:child_process';
-          function once(text, before, after) {
-            assert.equal(text.split(before).length, 2, 'Unique anchor: ' + before.slice(0, 100));
-            return text.replace(before, after);
-          }
-          const path = 'scripts/pep-worldwide.mjs';
-          assert.equal(execFileSync('git', ['hash-object', path], { encoding: 'utf8' }).trim(), '836161ec4ab3f7ad23e654db89945d517300792a');
-          let src = readFileSync(path, 'utf8');
-          src = once(src, "import { pathToFileURL } from 'node:url';",
-            "import { pathToFileURL } from 'node:url';\nimport { retryAfterDelayMs, MAX_RETRY_AFTER_MS } from './runtime-recovery.mjs';");
-          src = once(src, 'async function fetchJson(url, { tries = 6 } = {}) {',
-            'export async function fetchJson(url, { tries = 6, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {');
-          src = once(src,
-            "        const ra = Number(r.headers.get('retry-after')) || (2 ** i * 5);\n        console.error(`  http ${r.status} — backing off ${ra}s`);\n        await new Promise(res => setTimeout(res, ra * 1000));\n        lastErr = new Error('HTTP ' + r.status);",
-            "        const delayMs = Math.min(MAX_RETRY_AFTER_MS, Math.max(5000,\n          retryAfterDelayMs(r.headers?.get?.('retry-after')), 2 ** i * 5000));\n        console.error('  http ' + r.status + ' - retry delay ' + delayMs + 'ms');\n        lastErr = new Error('HTTP ' + r.status);\n        if (i + 1 < tries) await wait(delayMs);");
-          src = once(src, '      return await r.json();', String.raw`      const data = await r.json();
-                // MediaWiki returns maxlag with HTTP 200. An API error is not
-                // an empty entity batch and must never skip the retry path.
-                if (data && (data.error || data.errors)) {
-                  const errors = Array.isArray(data.errors) ? data.errors : [data.error || data.errors];
-                  const codes = errors.map(e => String(e?.code || 'unknown')).join(',');
-                  lastErr = new Error('Wikidata API error: ' + codes);
-                  if (errors.some(e => e?.code === 'maxlag' || e?.code === 'ratelimited')) {
-                    const delayMs = Math.min(MAX_RETRY_AFTER_MS, Math.max(5000,
-                      retryAfterDelayMs(r.headers?.get?.('retry-after')), 2 ** i * 5000));
-                    console.error('  Wikidata ' + codes + ' - retry delay ' + delayMs + 'ms');
-                    if (i + 1 < tries) await wait(delayMs);
-                    continue;
-                  }
-                  throw lastErr;
-                }
-                return data;`.replace(/^          /gm, ''));
-          src = once(src, '      await new Promise(res => setTimeout(res, 2 ** i * 2000));',
-            '      if (i + 1 < tries) await wait(Math.min(MAX_RETRY_AFTER_MS, 2 ** i * 2000));');
-          writeFileSync(path, src);
-          const testPath = 'test/runtime-priority.test.mjs';
-          let test = readFileSync(testPath, 'utf8');
-          const extra = String.raw`// Retry the real fetch boundary without network traffic or wall-clock sleeps.
-          {
-            const original = globalThis.fetch;
-            const delays = [];
-            const wait = async ms => { delays.push(ms); };
-            const success = { entities: { Q2: { id: 'Q2', labels: { en: { value: 'Synthetic Person' } } } } };
-            const response = (body, retryAfter = null, status = 200) => ({
-              ok: status === 200, status, headers: { get: () => retryAfter }, json: async () => body,
-            });
-            let requests = 0;
-            try {
-              globalThis.fetch = async () => { requests++; return requests === 1
-                ? response({ error: { code: 'maxlag', lag: 9.8 } }, '9') : response(success); };
-              const recovered = await pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait });
-              check('HTTP 200 maxlag retries the same batch and returns recovered entities', requests === 2 && recovered === success);
-              check('maxlag honors Retry-After and does not sleep after recovery', delays.length === 1 && delays[0] === 9000);
-              requests = 0; delays.length = 0;
-              globalThis.fetch = async () => { requests++; return response({ error: { code: 'maxlag' } }); };
-              await assert.rejects(pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 3, wait }), /maxlag/);
-              check('persistent maxlag terminates at the retry budget without a false empty batch', requests === 3);
-              check('headerless maxlag backs off at least five seconds and has no final sleep', delays.join(',') === '5000,10000');
-              requests = 0; delays.length = 0;
-              globalThis.fetch = async () => { requests++; return requests === 1
-                ? response({ errors: [{ code: 'ratelimited' }], entities: success.entities }, '7') : response(success); };
-              const modern = await pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait });
-              check('modern API errors are retried even when the payload also contains entities', requests === 2 && modern === success && delays[0] === 7000);
-              requests = 0; delays.length = 0;
-              globalThis.fetch = async () => { requests++; return response({ error: { code: 'badvalue' } }); };
-              await assert.rejects(pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 1, wait }), /badvalue/);
-              check('other API errors are never returned as successful data', requests === 1 && delays.length === 0);
-              requests = 0; delays.length = 0;
-              globalThis.fetch = async () => { requests++; return requests === 1
-                ? response(null, '8', 429) : response(success); };
-              const throttled = await pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait });
-              check('HTTP throttling still recovers with bounded Retry-After', requests === 2 && throttled === success && delays[0] === 8000);
-              requests = 0; delays.length = 0;
-              globalThis.fetch = async () => { requests++; return response({ error: { code: 'maxlag' } }, '99999999'); };
-              await assert.rejects(pep.fetchJson('https://www.wikidata.org/w/api.php', { tries: 2, wait }), /maxlag/);
-              check('a hostile retry header cannot schedule an unbounded wait', delays.length === 1 && delays[0] === 900000);
-            } finally { globalThis.fetch = original; }
-          }
-          `;
-          test = once(test, "console.log('runtime-priority: ' + checks + ' checks passed');",
-            extra + "console.log('runtime-priority: ' + checks + ' checks passed');");
-          writeFileSync(testPath, test);
-          const logPath = 'CHANGELOG.md';
-          const log = readFileSync(logPath, 'utf8');
-          writeFileSync(logPath, once(log, '## [Unreleased]',
-            '## [Unreleased]\n\n- Retry Wikidata HTTP 200 maxlag and rate-limit error payloads with bounded backoff and Retry-After, rather than treating them as successfully fetched empty PEP name batches.'));
-          PATCH
-      - name: Verify affected production and integration suites
-        run: |
-          git diff --check
-          node --check scripts/pep-worldwide.mjs
-          node test/sanctions-screen.test.mjs
-          node test/runtime-priority.test.mjs
-          node test/runtime-recovery.test.mjs
-          node test/pep-check.test.mjs
-          node test/board-figures.test.mjs
-          node test/changelog.test.mjs
-          node test/ci-coverage.test.mjs
-      - name: Commit only verified repair files
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- scripts/pep-worldwide.mjs test/runtime-priority.test.mjs CHANGELOG.md
-          git commit -m 'fix: retry Wikidata maxlag errors instead of accepting empty PEP batches'
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/fix/pep-maxlag-retry-20260929
+          node --input-type=module <<'NODE'
+          import { fetchJson } from './scripts/pep-worldwide.mjs';
+          import { appendFileSync } from 'node:fs';
+          const ids = ['Q58316593','Q58316598','Q58316599','Q58334883','Q136689291','Q136689343','Q136689373'];
+          const api = params => {
+            const url = new URL('https://www.wikidata.org/w/api.php');
+            url.search = new URLSearchParams({ format: 'json', formatversion: '2', maxlag: '5', ...params });
+            return fetchJson(url.href, { tries: 3 });
+          };
+          const current = await api({ action: 'wbgetentities', ids: ids.join('|'), props: 'info|labels|aliases|claims|sitelinks', redirects: 'yes' });
+          const rows = Object.entries(current.entities || {}).map(([key,e]) => ({
+            key, id: e.id, missing: e.missing, lastrevid: e.lastrevid, labels: e.labels, aliases: e.aliases,
+            names: Object.fromEntries(['P1477','P1559','P2561','P735','P734'].filter(p => e.claims?.[p]).map(p => [p,e.claims[p]])),
+            offices: e.claims?.P39, sitelinks: e.sitelinks,
+          }));
+          console.log('CURRENT_SOURCE_IDENTITIES ' + JSON.stringify({ redirects: current.redirects, rows }));
+          const revisions = await api({ action: 'query', titles: ids.join('|'), prop: 'revisions', rvprop: 'ids|timestamp|comment' });
+          console.log('LATEST_SOURCE_REVISIONS ' + JSON.stringify(revisions.query?.pages));
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, '```json\n' + JSON.stringify({ rows, revisions: revisions.query?.pages }, null, 2) + '\n```\n');
+          NODE
