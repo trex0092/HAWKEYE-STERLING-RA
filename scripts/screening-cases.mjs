@@ -22,7 +22,7 @@
    Pure planner exported for offline unit tests. */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { asana, asanaEnabled, ensureSection, esc, runUrl, notifyAsana,
+import { asana, asanaEnabled, esc, runUrl, notifyAsana,
   fitAsanaHtml, fitAsanaName } from './asana-notify.mjs';
 import { enrichScreeningResults } from './openai-screening-enrichment.mjs';
 import { SECTIONS, caseSection } from './asana-sections.mjs';
