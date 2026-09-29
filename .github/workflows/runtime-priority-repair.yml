@@ -1,0 +1,244 @@
+name: Runtime priority repair
+
+on:
+  push:
+    branches: [fix/runtime-priority-20260929]
+    paths: [.github/workflows/runtime-priority-repair.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-priority-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Harden runner
+        # Offline source verification; only checkout, toolchain and branch push need egress.
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 nodejs.org:443 *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Apply exact source changes and regression tests
+        run: |
+          node --input-type=module <<'PATCH'
+          import assert from 'node:assert/strict';
+          import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          function replaceOnce(text, before, after) {
+            assert.equal(text.split(before).length, 2, 'Unique patch anchor: ' + before.slice(0, 100));
+            return text.replace(before, after);
+          }
+          const amPath = 'scripts/adverse-media.mjs';
+          const pepPath = 'scripts/pep-worldwide.mjs';
+          for (const [file, sha] of [[amPath, 'fa33a22cb9f6a1242355a8bdceb5b0da6d29b842'], [pepPath, '4974b8535903c2bd2a5af79a4a22e836685f614f']]) {
+            assert.equal(execFileSync('git', ['hash-object', file], { encoding: 'utf8' }).trim(), sha, 'Unchanged source ' + file);
+          }
+          let am = readFileSync(amPath, 'utf8');
+          am = replaceOnce(am,
+            'const _gnewsGate = new RequestStartGate(GNEWS_MIN_INTERVAL_MS);',
+            '// Some providers return 429 without Retry-After. Back off the shared queue anyway.\nexport const ADVERSE_RATE_LIMIT_BACKOFF_MS = Math.min(900000,\n  Math.max(1000, Number(process.env.ADVERSE_RATE_LIMIT_BACKOFF_MS) || 30000));\n\nconst _gnewsGate = new RequestStartGate(GNEWS_MIN_INTERVAL_MS);');
+          am = replaceOnce(am,
+            "if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after')));",
+            "if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after'))\n        || (res.status === 429 ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));");
+          am = replaceOnce(am,
+            "  let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,\n    'application/json', timeoutMs, null, _gdeltGate, permit);\n  if (gd === null && wide.length > GDELT_RISK_TERMS.length && permit()) {",
+            "  let wideStatus = 0;\n  const noteWide = (_ok, status) => { wideStatus = status; };\n  let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,\n    'application/json', timeoutMs, noteWide, _gdeltGate, permit);\n  // A 429 is not a query rejection. A shorter query consumes the same quota.\n  if (gd === null && wideStatus !== 429 && wide.length > GDELT_RISK_TERMS.length && permit()) {");
+          am = replaceOnce(am,
+            "  const gd = await fetchGdelt(name, timeoutMs);\n  let bgRaw = await (bingOn\n    ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate)\n    : Promise.resolve(null));\n  const localeResults = await mapPool(localeSet, conc, loc =>\n    fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))\n  );",
+            "  // Independent providers start independently. GDELT queueing or a timeout\n  // must not prevent Google News and Bing from being asked. Their own shared\n  // gates still enforce pacing, and every response is validated before use.\n  const [gd, initialBing, localeResults] = await Promise.all([\n    fetchGdelt(name, timeoutMs),\n    bingOn\n      ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate)\n      : Promise.resolve(null),\n    mapPool(localeSet, conc, loc =>\n      fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))),\n  ]);\n  let bgRaw = initialBing;");
+          writeFileSync(amPath, am);
+          let pep = readFileSync(pepPath, 'utf8');
+          const seed = String.raw`/* Reuse names already published by another link of this exact harvest.
+             Older harvests remain fallback evidence only, never fresh label progress.
+             Preserve the full holder denominator and never replace a usable banked name. */
+          export function seedResumeNames(qids, names, artifact, harvestedAt) {
+            if (!artifact || !harvestedAt || artifact.harvested !== harvestedAt
+              || artifact.expected !== qids.length || !Array.isArray(artifact.entries)
+              || artifact.count !== artifact.entries.length) return 0;
+            const wanted = new Set(qids);
+            let added = 0;
+            for (const entry of artifact.entries) {
+              if (!entry || !/^Q\d+$/.test(entry.qid) || !wanted.has(entry.qid)
+                || !hasScreenableName(entry) || hasScreenableName(names.get(entry.qid))) continue;
+              names.set(entry.qid, { name: entry.name.trim(),
+                aliases: Array.isArray(entry.aliases)
+                  ? entry.aliases.filter(a => typeof a === 'string' && a.trim()).map(a => a.trim()) : [] });
+              added++;
+            }
+            return added;
+          }
+
+          `;
+          pep = replaceOnce(pep, 'async function harvest(outfile) {', seed + 'async function harvest(outfile) {');
+          pep = replaceOnce(pep,
+            "  if (PEP_SHARD_COUNT === 1) {\n    /* Pausing mid-office",
+            "  // Person-name coverage has priority over optional office context. This\n  // function runs only after the non-sharded name pass has no unresolved QIDs.\n  const enrichOffices = async () => {\n    /* Pausing mid-office");
+          pep = replaceOnce(pep,
+            "      labelQids: (st && st.phase === 'labels') ? st.labelQids : [...new Set(holderRows.map(r => r.person))],\n      names: (st && st.phase === 'labels') ? [...st.names] : [],",
+            "      labelQids: allQids,\n      names: [...names],");
+          pep = replaceOnce(pep,
+            "  }\n\n  /* Labels phase ",
+            "  };\n\n  /* Labels phase ");
+          pep = replaceOnce(pep,
+            "  const expectedTotal = allQids.length;",
+            "  const expectedTotal = allQids.length;\n  if (st && st.phase === 'labels') {\n    let published = null;\n    try { published = readJsonMaybeGz(outfile); } catch { /* no reusable artifact */ }\n    const reused = seedResumeNames(allQids, names, published, harvestedAt);\n    if (reused) console.log('pep-worldwide: reused ' + reused + ' published names from this same harvest');\n  }");
+          pep = replaceOnce(pep,
+            '  const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });',
+            '  await enrichOffices();\n\n  const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });');
+          writeFileSync(pepPath, pep);
+          const test = String.raw`/* Synthetic, offline integration checks. No screening-provider traffic. */
+          import assert from 'node:assert/strict';
+          import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import { join } from 'node:path';
+          import { pathToFileURL } from 'node:url';
+          import { spawnSync } from 'node:child_process';
+          process.env.GDELT_MIN_INTERVAL_MS = '1';
+          process.env.GNEWS_MIN_INTERVAL_MS = '1';
+          process.env.BING_MIN_INTERVAL_MS = '1';
+          process.env.ADVERSE_RATE_LIMIT_BACKOFF_MS = '1000';
+          process.env.BING_NEWS = '1';
+          const am = await import('../scripts/adverse-media.mjs');
+          const pep = await import('../scripts/pep-worldwide.mjs');
+          let checks = 0;
+          const check = (message, value) => { assert.ok(value, message); checks++; console.log('ok - ' + message); };
+          const reply = (status, text) => ({ ok: status === 200, status,
+            headers: { get: () => null }, text: async () => text });
+          const rss = '<rss><channel></channel></rss>';
+          const options = { locales: [am.LOCALES.find(l => l.id === 'en-US')], timeoutMs: 2000 };
+          const realFetch = globalThis.fetch;
+          try {
+            am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+            const seen = new Set();
+            let release;
+            const blocked = new Promise(resolve => { release = resolve; });
+            globalThis.fetch = async url => {
+              const host = new URL(url).hostname; seen.add(host);
+              return host === 'api.gdeltproject.org' ? blocked : reply(200, rss);
+            };
+            const pending = am.checkAdverseMedia('Synthetic Parallel Example', options);
+            let independent;
+            try {
+              await new Promise(resolve => setTimeout(resolve, 30));
+              independent = seen.has('news.google.com') && seen.has('www.bing.com');
+            } finally { release(reply(200, '{"articles":[]}')); }
+            const complete = await pending;
+            check('Google and Bing start before a stalled GDELT request resolves', independent);
+            check('all validated providers retain complete coverage', !complete.errored && !complete.partial && complete.backbones.gdelt);
+            am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+            const starts = [];
+            globalThis.fetch = async url => {
+              const host = new URL(url).hostname;
+              if (host === 'api.gdeltproject.org') { starts.push(Date.now()); return reply(429, 'Rate limited'); }
+              return reply(200, rss);
+            };
+            const limited = await am.checkAdverseMedia('Synthetic Rate Limit One', options);
+            check('HTTP 429 does not trigger a second shorter GDELT query', starts.length === 1);
+            check('a provider refusal stays partial while independent validated coverage survives',
+              limited.partial && !limited.errored && !limited.backbones.gdelt && limited.backbones.bing && limited.backbones.googleNewsEnUs);
+            await am.checkAdverseMedia('Synthetic Rate Limit Two', options);
+            check('429 without Retry-After postpones the shared provider queue',
+              starts.length === 2 && starts[1] - starts[0] >= am.ADVERSE_RATE_LIMIT_BACKOFF_MS - 10);
+          } finally {
+            globalThis.fetch = realFetch;
+            am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+          }
+          const stamp = new Date().toISOString();
+          const qids = ['Q1', 'Q2', 'Q3'];
+          const before = { name: 'Current One', aliases: [] };
+          const artifact = { harvested: stamp, expected: 3, count: 3, entries: [
+            { qid: 'Q1', name: 'Published One', aliases: [] },
+            { qid: 'Q2', name: ' Published Two ', aliases: [' Two ', null, 42] },
+            { qid: 'Q3', name: ' ', aliases: [] },
+          ] };
+          const names = new Map([['Q1', before]]);
+          check('same-harvest publication fills only usable missing names', pep.seedResumeNames(qids, names, artifact, stamp) === 1);
+          check('existing banked names are not overwritten', names.get('Q1') === before);
+          check('reused names and aliases are validated and trimmed', names.get('Q2').name === 'Published Two' && names.get('Q2').aliases.join(',') === 'Two');
+          check('an unnamed published entry remains pending', pep.pendingLabels(qids, names, { count: 1, index: 0 }).join(',') === 'Q3');
+          check('an old harvest cannot count as new label progress', pep.seedResumeNames(qids, new Map(), { ...artifact, harvested: '2020-01-01' }, stamp) === 0);
+          check('a different holder universe cannot seed progress', pep.seedResumeNames(qids, new Map(), { ...artifact, expected: 2 }, stamp) === 0);
+          check('inconsistent artifact counts are rejected', pep.seedResumeNames(qids, new Map(), { ...artifact, count: 2 }, stamp) === 0);
+          const foreign = { ...artifact, count: 1, entries: [{ qid: 'Q999', name: 'Other Person' }] };
+          check('persons outside the current holder universe cannot enter the name bank', pep.seedResumeNames(qids, new Map(), foreign, stamp) === 0);
+          const dir = mkdtempSync(join(tmpdir(), 'pep-priority-'));
+          try {
+            const outfile = join(dir, 'pep.json');
+            const cpfile = pep.checkpointPath(outfile);
+            const positions = pep.PEP_ROOT_CLASSES.map((c, i) => ['Q' + (100 + i), { label: '', country: '', classKey: c.key }]);
+            const rows = pep.PEP_ROOT_CLASSES.map((c, i) => ({ person: i ? 'Q1' : 'Q2', pos: 'Q' + (100 + i), classKey: c.key }));
+            pep.writeCheckpoint(cpfile, { v: 1, phase: 'labels', sinceIso: stamp, harvestedAt: stamp, resumeCount: 0,
+              positions, posByClass: pep.PEP_ROOT_CLASSES.map((c, i) => [c.key, ['Q' + (100 + i)]]),
+              holderRows: rows, classHolders: Object.fromEntries(pep.PEP_ROOT_CLASSES.map(c => [c.key, 1])),
+              classBatchFailed: {}, batchTotal: rows.length, batchFailed: 0,
+              labelQids: ['Q1', 'Q2'], names: [], next: { labelIdx: 0 } });
+            pep.writeJsonGz(outfile, { harvested: stamp, expected: 2, count: 1, partial: true,
+              entries: [{ qid: 'Q1', name: 'Synthetic Published One', aliases: [] }] });
+            const preload = join(dir, 'stub.mjs');
+            writeFileSync(preload, "globalThis.fetch = async (url) => { const u = new URL(url); console.log('FETCH_IDS=' + u.searchParams.get('ids')); if (u.hostname !== 'www.wikidata.org' || u.searchParams.get('ids') !== 'Q2') throw new Error('Optional office work or already-published name fetched before missing person'); return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ entities: { Q2: { id: 'Q2', missing: '' } } }) }; };\n");
+            const run = spawnSync(process.execPath,
+              ['--import', pathToFileURL(preload).href, 'scripts/pep-worldwide.mjs', 'harvest', outfile],
+              { cwd: process.cwd(), encoding: 'utf8', timeout: 15000,
+                env: { ...process.env, PEP_FLOOR: '1', PEP_SHARD_COUNT: '1', PEP_SHARD_INDEX: '0', PEP_TIME_BUDGET_MIN: '100', PEP_MAX_RESUMES: '12' } });
+            assert.ifError(run.error);
+            check('real CLI reaches missing persons before optional office enrichment', run.status === pep.RESUME_EXIT_CODE && run.stdout.includes('FETCH_IDS=Q2'));
+            check('same-harvest names are reused by the real resume path', run.stdout.includes('reused 1 published names'));
+            check('only the missing person is fetched', (run.stdout.match(/FETCH_IDS=/g) || []).length === 1);
+            const published = pep.readJsonMaybeGz(outfile);
+            check('unresolved source records do not become a false complete artifact', published.partial && published.expected === 2 && published.count === 1);
+            const saved = pep.readCheckpoint(cpfile);
+            check('current person-name progress is preserved in the checkpoint', new Map(saved.names).get('Q1').name === 'Synthetic Published One');
+          } finally { rmSync(dir, { recursive: true, force: true }); }
+          console.log('runtime-priority: ' + checks + ' checks passed');
+          `;
+          writeFileSync('test/runtime-priority.test.mjs', test);
+          let ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+          ci = replaceOnce(ci, '        run: node test/runtime-recovery.test.mjs',
+            '        run: node test/runtime-recovery.test.mjs\n      - name: Run independent provider and PEP resume priority regressions\n        run: node test/runtime-priority.test.mjs');
+          writeFileSync('.github/workflows/ci.yml', ci);
+          let log = readFileSync('CHANGELOG.md', 'utf8');
+          log = replaceOnce(log, '## [Unreleased]', '## [Unreleased]\n\n### Fixed\n\n- Start independent news providers concurrently, back off shared queues on headerless HTTP 429, and avoid repeating rate-limited GDELT queries.\n- Prioritize missing PEP person names before optional office metadata and reuse validated names already published by the same harvest without changing the completeness denominator.');
+          writeFileSync('CHANGELOG.md', log);
+          // Branch-only bootstrap is not part of the final diff or workflow inventory.
+          unlinkSync('.github/workflows/runtime-priority-repair.yml');
+          PATCH
+      - name: Verify source and offline integration regressions
+        run: |
+          git diff --check
+          node --check scripts/adverse-media.mjs
+          node --check scripts/pep-worldwide.mjs
+          node test/runtime-priority.test.mjs
+          node test/runtime-recovery.test.mjs
+          node test/adverse-media.test.mjs
+          node test/pep-check.test.mjs
+          node test/board-figures.test.mjs
+          node test/changelog.test.mjs
+          node test/ci-coverage.test.mjs
+      - name: Commit verified changes to repair branch only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$GITHUB_REF_NAME" = 'fix/runtime-priority-20260929'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- scripts/adverse-media.mjs scripts/pep-worldwide.mjs test/runtime-priority.test.mjs .github/workflows/ci.yml CHANGELOG.md .github/workflows/runtime-priority-repair.yml
+          git diff --cached --stat
+          git commit -m 'fix: isolate news provider waits and prioritize PEP person-name completion'
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/fix/runtime-priority-20260929
