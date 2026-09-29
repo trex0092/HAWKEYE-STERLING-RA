@@ -12,6 +12,7 @@ basis/safeguard, and DPA status. Owner: MLRO / DPO. Review: annually + on change
 | **OpenSanctions** (`data.opensanctions.org`) | Bulk dataset downloads: EU FSF (primary), OFAC/UN mirror fallbacks, `peps` PEP-mirror fallback, `crime` adverse-exposure watchlist, `ae_local_terrorists` EOCN drift cross-check | **None** — pull-only bulk files; matching is on-runner; no name is ever sent | In | Bulk data is **CC-BY-NC 4.0** — a commercial production deployment needs an OpenSanctions licence before relying on the `peps`/`crime`/cross-check layers beyond resilience. Kill-switches: `PEP_MIRROR_FALLBACK=0`, `ADVERSE_WATCHLIST=0`, `EOCN_MIRROR_CROSSCHECK=0`. | Every mirror/watchlist result is provenance-marked in the report ("OpenSanctions mirror" / "watchlist") so the audit trail shows which source actually screened; the EOCN cross-check only ALARMS (local curated list stays the screening source). |
 | **GitHub (Actions)** | Compute runner, code, run history, secrets | Code + run logs (no customer record persisted in logs) | In + Out | GitHub DPA | harden-runner egress controls; secrets encrypted |
 | **GitHub (gov-list hosts)** | OFAC/UN/EU/UK/EOCN/Canada downloads | None (public lists fetched) | In | Public sources | — |
+| **Composio** | Optional business-app orchestration across Asana, Gmail, Google Drive, Slack and GitHub | Only data required by an explicitly invoked connected-app tool, which may include email text, files/documents, messages, Asana task data or GitHub repository data | In + Out | **DPA / PDPL transfer basis must be confirmed before production enablement** | Default OFF with `COMPOSIO_ENABLED=0`. Project key and webhook secret stay server-side. It is not part of sanctions, PEP, adverse-media, scoring or runtime-assurance decisions. |
 
 ## Data residency (PDPL)
 Declared/processing region per processor. Items marked **confirm** need written confirmation
@@ -25,6 +26,7 @@ from the vendor against the firm's contracted plan and recorded here.
 | **Wikimedia (Wikidata)** | Global; query only (name) | No PII record stored; residency N/A |
 | **OpenSanctions** | CDN download only — no query, no PII leaves the runner | Pull-only; residency N/A |
 | **GitHub (Actions)** | US-hosted runners | Confirm runner region if EU residency is required |
+| **Composio** | **Confirm contracted processing region** | Keep `COMPOSIO_ENABLED=0` until DPA, subprocessors, retention and UAE PDPL transfer basis are recorded |
 
 ## Actions / gaps
 - [ ] **Confirm Asana DPA** on file and note ref here.
@@ -36,6 +38,7 @@ from the vendor against the firm's contracted plan and recorded here.
   variable to `1` to re-enable.
 - [x] Record data-residency region for each processor (PDPL) — see the table above; vendor-side
   regions still to be **confirmed** for Anthropic, Asana, and GitHub.
+- [ ] **Composio go-live gate:** confirm DPA, subprocessors, data retention, processing region and UAE PDPL transfer basis before setting `COMPOSIO_ENABLED=1`; record the approved business-app scopes and connected accounts.
 - [ ] Annual re-review of this register; update on any new processor.
 
 ## Anthropic DPA & cross-border transfer record  *(DRAFT — pending signature)*
