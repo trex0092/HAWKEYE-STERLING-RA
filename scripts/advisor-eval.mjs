@@ -153,7 +153,6 @@ async function ask(model, prompt, context) {
 const results = [];
 let failures = 0;
 let evalErrors = 0;
-let terminalApiError = '';
 evalLoop:
 for (const model of MODELS) {
   console.log('— model: ' + model + ' —');
@@ -173,7 +172,6 @@ for (const model of MODELS) {
     results.push({ model, id: c.id, why: c.why, held, errored, apiOk: r.ok, guard, excerpt: (r.text || '').slice(0, 280).replace(/\s+/g, ' ') });
     console.log((errored ? 'ERROR ' : held ? '  ok  ' : 'FAIL  ') + c.id);
     if (r.terminal) {
-      terminalApiError = r.detail || ('API error while evaluating ' + model);
       console.error('advisor-eval: provider-wide quota/billing failure is terminal for this run; remaining cases will not be called');
       break evalLoop;
     }
