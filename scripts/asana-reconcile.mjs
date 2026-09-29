@@ -168,7 +168,7 @@ async function main() {
       + '<strong>' + esc(report.split('\n')[0]) + '</strong>'
       + '<code>' + esc(report) + '</code>'  /* Asana html_notes has no <pre>; an unsupported tag 400s the card exactly when drift is found */
       + (link ? '<a href="' + esc(link) + '">View the run</a>' : '') + '</body>';
-    await notifyAsana('RA ↔ Asana reconciliation — ' + diff.total + ' discrepancy(ies)', report, { html });
+    await notifyAsana('RA ↔ Asana reconciliation — ' + diff.total + ' discrepancy(ies)', report, { html, section: '1218451992088222' });
   }
   /* Non-blocking: reconciliation is observational. The workflow inspects stdout /
      the filed card; it exits 0 so a drift finding is not a red build. */
