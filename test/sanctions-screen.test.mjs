@@ -39,10 +39,10 @@ const personTask = {
   gid: 'p1', name: 'Example Gold LLC',
   notes: 'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — UBO\nName: Ahmad Example\nNationality: Jordan\nDate of Birth: 09/04/1980\nPassport No.: N-12345\nSECTION 5 — NEXT'
 };
-const principals = parsePrincipals(personTask);
+const identityPrincipals = parsePrincipals(personTask);
 check('parsePrincipals preserves nationality, DOB and passport for identity corroboration',
-  principals.length === 1 && principals[0].nationality === 'Jordan'
-  && principals[0].dob === '09/04/1980' && principals[0].passport === 'N-12345');
+  identityPrincipals.length === 1 && identityPrincipals[0].nationality === 'Jordan'
+  && identityPrincipals[0].dob === '09/04/1980' && identityPrincipals[0].passport === 'N-12345');
 const personSubjects = parseSubjects([personTask]);
 const person = personSubjects.find(x => x.entityType === 'individual');
 check('parseSubjects carries structured identity attributes into the screening subject',
