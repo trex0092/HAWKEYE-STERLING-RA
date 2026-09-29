@@ -1436,6 +1436,22 @@ check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned 
     && st.next.classIdx === 1 && st.batchTotal === 4 && st.names.get('Q7').name === 'A';
 })());
 
+/* Redundant-source coverage: a primary national endpoint may fail while a
+   configured mirror for the SAME register is healthy. That is not missing
+   coverage and must not turn the whole sanctions domain degraded. */
+check('Qatar NCTC declares its OpenSanctions mirror as an explicit coverage fallback', (() => {
+  const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
+  const q = (extra.sources || []).find(s => s.id === 'qa-nctc');
+  return q && q.fallbackSourceId === 'qa-nctc-opensanctions';
+})());
+check('sanctions loader resolves declared fallback coverage before setting degraded', (() => {
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  return /fallbackSourceId/.test(src)
+    && /fullyLoaded\.has\(fallback\)/.test(src)
+    && /coverage preserved/.test(src)
+    && /unresolved\.length > 0/.test(src);
+})());
+
 /* ── paginated JSON list reader (ADB debarment register: 10 rows/page, its own
    next-link points at an unreachable internal host, so we page by size/offset) ── */
 check('getByPath walks a dotted path and tolerates a missing branch',
