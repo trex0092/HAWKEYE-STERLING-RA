@@ -1155,7 +1155,7 @@ export async function asanaPaged(projectGid, path, optFields, token, what, { sof
   }
 }
 
-async function fetchAsanaSubjects(projectGid, token) {
+export async function fetchAsanaSubjects(projectGid, token) {
   return parseSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
 }
 
@@ -1568,7 +1568,11 @@ export async function loadSanctionsLists(cfg) {
   try { sources = loadSources(readFileSync(cfg.sourcesFile, 'utf8')).filter(s => s.enabled !== false); }
   catch (e) { return { lists: [], degraded: true, fetched: 0, total: 0, notes: ['sources file unreadable: ' + (e && e.message || e)] }; }
 
-  if (existsSync(cfg.extraFile)) {
+  if (Array.isArray(cfg.sourceIds) && cfg.sourceIds.length) {
+    const wanted = new Set(cfg.sourceIds.map(String));
+    sources = sources.filter(s => wanted.has(String(s.id || '')));
+  }
+  if (existsSync(cfg.extraFile) && !(Array.isArray(cfg.sourceIds) && cfg.sourceIds.length)) {
     try {
       const extra = JSON.parse(readFileSync(cfg.extraFile, 'utf8'));
       for (const s of ((extra && extra.sources) || [])) if (s && s.enabled !== false && (s.url || s.file)) sources.push(s);
@@ -1666,7 +1670,7 @@ const strongerBand = (a, b) => ((BAND_RANK[a] || 0) >= (BAND_RANK[b] || 0) ? a :
    plus (optional) adverse-media and PEP signals. Produces the SAME normalised
    per-subject rows the engine path produced, so diff/alert/report are unchanged.
    Each signal contributes a `lists[]` entry; a subject with any hit is material. */
-async function screenLocally(subjects, cfg) {
+export async function screenLocally(subjects, cfg) {
   const loaded = await loadSanctionsLists(cfg);
   /* No list at all = we cannot screen sanctions — never infer a clean result. */
   if (!loaded.lists.length) return { results: [], anyOk: false, degraded: true, errored: 0, notes: loaded.notes, coverage: loaded };

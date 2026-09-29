@@ -314,7 +314,7 @@ every live state-tracking branch pattern. Same commit widened Control Retry from
 twelve staggered passes after a scheduler-wide outage skipped both original passes. Coverage
 addition only — no scored control changed.*
 
-Verified at HEAD: 67 workflows · 188 markdown documents under docs/ (155 excluding docs/research/auto).
+Verified at HEAD: 68 workflows · 188 markdown documents under docs/ (155 excluding docs/research/auto).
 
 *Estate re-verification · 21 July 2026 — the GitHub Actions expansion added four workflows
 (container-scan, attestation-verify, dependabot-automerge, compliance-calendar; every new job
