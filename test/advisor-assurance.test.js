@@ -14,7 +14,6 @@
    Usage: node test/advisor-assurance.test.js */
 
 const path = require('path');
-const fs = require('fs');
 const MOD = path.join(__dirname, '..', 'netlify', 'functions', 'brain-soul.js');
 
 let passed = 0, failed = 0;
