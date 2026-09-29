@@ -23,7 +23,7 @@ on:
   # access), never from a pull request, so no untrusted input reaches the
   # privileged context. Do NOT add a checkout to this workflow.
   workflow_run:                     # zizmor: ignore[dangerous-triggers]
-    workflows: ["PEP Worldwide Harvest"]
+    workflows: ["PEP Worldwide Harvest", "PEP Shard Harvest"]
     types: [completed]
 
 permissions:
@@ -42,7 +42,7 @@ jobs:
     # Only a FAILED harvest link needs rescuing. A budget pause exits 0 (the run
     # dispatches its own successor), and a refused hollow harvest is a loud
     # failure worth one retry in case the upstream outage was transient.
-    if: github.event.workflow_run.conclusion == 'failure'
+    if: github.event.workflow_run.name == 'PEP Worldwide Harvest' && github.event.workflow_run.conclusion == 'failure'
     permissions:
       actions: write   # read run history + dispatch the resume
     runs-on: ubuntu-latest
@@ -104,3 +104,40 @@ jobs:
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pep-worldwide.yml/dispatches" \
             -d "$payload"
           echo "resume dispatched — the run resumes from the committed checkpoint"
+
+  refresh-after-sharded-completion:
+    # The sharded workflow is an accelerated producer of the SAME PEP artifact.
+    # A successful merge must rebuild the screening-assurance artifact before
+    # anyone relies on the PEP runtime badge. This privileged watcher checks out
+    # nothing and executes no repository code; it only dispatches the protected
+    # operational Sanctions Screen on main.
+    if: github.event.workflow_run.name == 'PEP Shard Harvest' && github.event.workflow_run.conclusion == 'success'
+    permissions:
+      actions: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            *.githubapp.com:443
+
+      - name: Dispatch Sanctions Screen to rebuild runtime assurance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -sS -o /tmp/screen-dispatch.out -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/sanctions-screen.yml/dispatches" \
+            -d '{"ref":"main"}')
+          if [ "$code" != "204" ]; then
+            cat /tmp/screen-dispatch.out
+            echo "::error::Sanctions Screen refresh dispatch failed with HTTP $code"
+            exit 1
+          fi
+          echo "Sanctions Screen dispatched after successful sharded PEP merge"
