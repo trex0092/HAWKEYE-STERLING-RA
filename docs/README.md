@@ -31,6 +31,7 @@ is the way in. Repo-level governance lives at the root:
 | [`AI-GOVERNANCE.md`](AI-GOVERNANCE.md) | Master model card + control mapping |
 | [`architecture.md`](architecture.md) | System architecture incl. the STRIDE threat model |
 | [`mcp-server.md`](mcp-server.md) | MCP server reference: tools, resources, prompts, safety, client config |
+| [`composio-integration.md`](composio-integration.md) | Optional governed Composio orchestration: sessions, connected apps, tools, triggers, webhook verification, MCP metadata and kill switches |
 | [`app-setup-runbook.md`](app-setup-runbook.md) | Stand up a second operator environment from zero |
 | [`regulatory-watch.md`](regulatory-watch.md) | The regulatory-watch sources and how the watcher works |
 | [`asana-integration-audit.md`](asana-integration-audit.md) | The Asana integration, audited end to end |
