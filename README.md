@@ -65,7 +65,6 @@
 [![Regulatory Watch](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/regulatory-watch.yml?branch=main&label=regulatory%20watch)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/regulatory-watch.yml)
 [![FATF Watchdog](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/fatf-watchdog.yml?branch=main&label=fatf%20watchdog)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/fatf-watchdog.yml)
 [![Sanctions Watch](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/sanctions-watch.yml?branch=main&label=sanctions%20watch)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/sanctions-watch.yml)
-[![Sanctions Screen](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/sanctions-screen.yml?branch=main&label=sanctions%20screen)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/sanctions-screen.yml)
 [![Citations](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/link-check.yml?branch=main&label=citations)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/link-check.yml)
 [![Site Health](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/site-health.yml?branch=main&label=site%20health)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/site-health.yml)
 [![Function Health](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/function-health.yml?branch=main&label=function%20health)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/function-health.yml)
@@ -85,7 +84,6 @@
 [![Asana Reconcile](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/asana-reconcile.yml?branch=main&label=asana%20reconcile)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/asana-reconcile.yml)
 [![Advisor Eval](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/advisor-eval.yml?branch=main&label=advisor%20eval)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/advisor-eval.yml)
 [![Advisor Bias Eval](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/advisor-bias-eval.yml?branch=main&label=advisor%20bias%20eval)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/advisor-bias-eval.yml)
-[![Auto Release](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/auto-release.yml?branch=main&label=auto%20release)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/auto-release.yml)
 [![Container Build](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/publish-container.yml?label=container%20build)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/publish-container.yml)
 [![Housekeeping](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/stale.yml?branch=main&label=housekeeping)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/stale.yml)
 
