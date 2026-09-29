@@ -1409,6 +1409,16 @@ check('PEP interrupt: the persist step still commits when the job is CANCELLED (
   const gate = (persist.match(/^\s*if:\s*(.+)$/m) || [])[1] || '';
   return /cancelled\(\)/.test(gate) && !/always\(\)/.test(gate);
 })());
+check('PEP checkpoint: an old complete artifact cannot erase a newly banked resume checkpoint', (() => {
+  const wf = readFileSync(join(ROOT, '.github/workflows/pep-worldwide.yml'), 'utf8');
+  const overlay = wf.slice(wf.indexOf('Overlay the previous artifact + any checkpoint'), wf.indexOf('Harvest the worldwide PEP list'));
+  const persist = wf.slice(wf.indexOf('Persist the artifact + checkpoint'), wf.indexOf('Re-dispatch to resume'));
+  return /PEP_BASELINE_ARTIFACT_SHA=/.test(overlay)
+    && /current_artifact_sha/.test(persist)
+    && /PEP_BASELINE_ARTIFACT_SHA/.test(persist)
+    && /current_artifact_sha\" != \"\$\{PEP_BASELINE_ARTIFACT_SHA:-\}/.test(persist)
+    && /a NEW complete artifact appeared during this link/.test(persist);
+})());
 check('PEP checkpoint: restore revalidates every URL-bound value — a poisoned checkpoint cannot steer queries', (() => {
   const st = pep.restoreCheckpoint({
     v: 1, sinceIso: '2026-08-01T00:00:00Z', harvestedAt: '2026-08-02T00:00:00Z',
