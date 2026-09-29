@@ -152,15 +152,26 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const amPartial = structuredClone(results);
   amPartial.enrichment.amPartial = 1;
   const am = assessRuntime({ results: amPartial, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
-  check('runtime assurance fails when adverse-media coverage is partial',
-    !am.domains.adverseMedia.operational);
+  check('runtime assurance stays operational when redundancy is reduced but no subject lost all adverse-media coverage',
+    am.domains.adverseMedia.operational
+    && am.domains.adverseMedia.warnings.some(r => r.includes('reduced adverse-media source redundancy')));
 
   const gdeltDown = structuredClone(results);
   gdeltDown.enrichment.amBackboneFailures.gdelt = 1;
   gdeltDown.enrichment.amBackbones = ['Google News RSS', 'Bing News'];
   const gd = assessRuntime({ results: gdeltDown, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
-  check('runtime assurance fails when a configured adverse-media backbone did not answer',
-    !gd.domains.adverseMedia.operational && gd.domains.adverseMedia.reasons.some(r => r.includes('GDELT')));
+  check('runtime assurance warns, but does not fail, when one redundant adverse-media backbone is unavailable',
+    gd.domains.adverseMedia.operational
+    && gd.domains.adverseMedia.warnings.some(r => r.includes('GDELT')));
+
+  const uncovered = structuredClone(results);
+  uncovered.enrichment.amErrors = 1;
+  uncovered.enrichment.amRetryAttempted = 1;
+  uncovered.enrichment.amRetryRecovered = 0;
+  const uc = assessRuntime({ results: uncovered, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance fails when any subject has zero global adverse-media backbone coverage after retry',
+    !uc.domains.adverseMedia.operational
+    && uc.domains.adverseMedia.reasons.some(r => r.includes('zero adverse-media backbone coverage')));
 
   const pepNotConsumed = structuredClone(results);
   pepNotConsumed.enrichment.pepWorldwide.active = false;

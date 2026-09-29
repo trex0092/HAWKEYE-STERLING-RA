@@ -1269,6 +1269,9 @@ def _bing_down(*_a, **_k):
     _calls["bing"] += 1
     raise RuntimeError("Bing News HTTP 429")
 
+# Keep the new last-resort retry deterministic/instant in this offline suite.
+os.environ["ADVERSE_BACKBONE_RETRY_SEC"] = "0"
+
 # Total outage: stop after the first 4 transport failures, pace every attempt,
 # and still degrade loudly (the caller records an am_error). Bing (the third
 # net) is stubbed down alongside GDELT so the Google-News fetch counter and
@@ -1280,14 +1283,35 @@ try:
     screen.search_adverse_media("Total Outage LLC")
 except RuntimeError as e:
     _raised = str(e)
-check("throttled subject early-exits after 4 fetches (not the full sweep)", _calls["gnews"] == 4)
-check("total outage still degrades loudly (am_error raise)", "all 4" in _raised)
-# Pace-before-send through the run-global gate: the first slot of a fresh run
-# is immediate, every later fetch waits its turn — so 4 fetches = 3 gate waits,
-# and failures widen the shared interval instead of retrying back-to-back.
-check("failed fetches are paced too (no zero-delay retry storm)", _calls["sleeps"] == 3)
+check("throttled subject early-exits after 4 Google fetches (not the full sweep)", _calls["gnews"] == 4)
+check("total outage still degrades loudly after the last-resort backbone retry", "all 4" in _raised)
+check("last-resort outage path retries the independent Bing backbone once without double-calling GDELT",
+      _calls["gdelt"] == 1 and _calls["bing"] == 2)
+# Pace-before-send through the run-global gate: Google still gets its ordinary
+# gated waits, while the retry path may add independent-feed gate waits.
+check("failed fetches are paced too (no zero-delay retry storm)", _calls["sleeps"] >= 3)
 check("failures back the shared gate off multiplicatively",
       screen._GNEWS_GATE.interval > screen.GNEWS_MIN_INTERVAL)
+
+# A one-off Bing refusal no longer leaves a subject uncovered: when Google and
+# GDELT are both down, the last-resort retry gets exactly one second chance and
+# a clean Bing reply (even zero stories) counts as successful coverage.
+_reset_breaker(); _calls["gnews"] = _calls["gdelt"] = _calls["bing"] = 0
+screen.requests.get = _gnews_refused
+screen.search_gdelt = _gdelt_down
+def _bing_recovers(*_a, **_k):
+    _calls["bing"] += 1
+    if _calls["bing"] == 1:
+        raise RuntimeError("transient Bing refusal")
+    return []
+screen.search_bing_news = _bing_recovers
+_recovered = True
+try:
+    screen.search_adverse_media("Recovered Coverage LLC")
+except RuntimeError:
+    _recovered = False
+check("last-resort Bing retry recovers a subject that otherwise had zero fresh-story coverage",
+      _recovered and _calls["bing"] == 2)
 
 # Any success disarms the early exit — a healthy-but-flaky sweep still covers
 # every locale and keeps the coverage it found.
@@ -1359,13 +1383,15 @@ _calls["gnews"] = 0
 screen.search_adverse_media("After Breaker DMCC")
 check("Google News is not fetched once its circuit is open", _calls["gnews"] == 0)
 screen.search_gdelt = _gdelt_down
-screen._GDELT_STATE["open"] = True                   # both feeds down
+screen._GDELT_STATE["open"] = True
+screen.search_bing_news = _bing_down
+screen._BING_STATE["open"] = True                    # all three fresh-story backbones unavailable
 _raised = ""
 try:
     screen.search_adverse_media("No Coverage At All Ltd")
 except RuntimeError as e:
     _raised = str(e)
-check("breaker-open subjects still degrade loudly when GDELT is down too (no silent clear)",
+check("breaker-open subjects still degrade loudly when GDELT and Bing are down too (no silent clear)",
       "circuit open" in _raised)
 
 # Partial throttling never trips the breaker: one success resets the streak.
