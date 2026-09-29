@@ -133,7 +133,8 @@
       "parser": "seco",
       "enabled": true,
       "timeoutMs": 150000,
-      "_note": "Switzerland SECO consolidated sanctions list (Gesamtliste XML via the SESAM search service). Re-enabled 2026-07-08 with the dedicated parseSecoXml extractor (nested name-part/value blocks). SESAM generates the full-list XML server-side and needs well over the default 60s (both 2026-07-08 runs aborted at the flat timeout), hence the per-source 150s. A failed fetch or 0-name parse degrades coverage loudly.",
+      "fallbackSourceId": "ch-seco-opensanctions",
+      "_note": "Switzerland SECO consolidated sanctions list (Gesamtliste XML via the SESAM search service). Re-enabled 2026-07-08 with the dedicated parseSecoXml extractor (nested name-part/value blocks). SESAM generates the full-list XML server-side and needs well over the default 60s. If that stateful endpoint times out, the already-enabled ch-seco-opensanctions source provides redundant coverage; failure of both remains degraded.",
       "url": "https://www.sesam.search.admin.ch/sesam-search-web/pages/downloadXmlGesamtliste.xhtml?action=downloadXmlGesamtlisteAction",
       "minNames": 500
     },
@@ -806,6 +807,9 @@
         "linkMatch": "Format: xlsx"
       },
       "enabled": true,
+      "browserHeaders": true,
+      "fetchAttempts": 3,
+      "timeoutMs": 90000,
       "minNames": 100,
       "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36393616291 (GitHub runner, main) discovered the spreadsheet via linkMatch 'Format: xlsx' on https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami, fetched it (200,687 bytes, xlsx) and the xlsx parser read 461 names (minNames 100, met). Header row: 'Nazwisko i imię | Dane identyfikacyjne osoby | Uzasadnienie wpisu na listę | Zastosowane środki sankcyjne | Data umieszczenia na liście | Data wykreślenia z listy'; rows with a struck-off date are skipped. The attachment id changes with each edition, so `discover` resolves it from the page each run; earlier probe 36390719857 (stem only) picked a decision PDF and 36391592244 read 0 names before the Polish-header fix. Official list of the Minister of the Interior and Administration (MSWiA)."
     },
