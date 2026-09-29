@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 3
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
@@ -44,8 +44,6 @@ jobs:
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { execFileSync, spawnSync } from 'node:child_process';
-          // Reuse the exact patch already exercised by the 32 recovery checks.
-          // This literal commit is immutable; no downloaded or PR-provided script.
           const text = execFileSync('git', ['show',
             '31efc7825e29fa974a5e784ee92076dcaed74bdb:.github/workflows/runtime-recovery.yml'],
             { encoding: 'utf8' });
@@ -66,7 +64,10 @@ jobs:
           node --check scripts/runtime-recovery.mjs
           node test/runtime-recovery.test.mjs
           node test/adverse-media.test.mjs
-          node test/pep-worldwide.test.mjs
+          for test_file in test/*pep*.test.mjs; do
+            echo "Running $test_file"
+            node "$test_file"
+          done
           node test/screening-assurance.test.mjs
       - name: Commit verified source repair to this branch only
         env:
