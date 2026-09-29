@@ -62,17 +62,24 @@ export function assessRuntime({
   const partialRequired = requiredSanctions.filter(id => loadedById.get(id)?.partial === true);
   const emptyRequired = requiredSanctions.filter(id => num(loadedById.get(id)?.count) <= 0);
   const sanctionsReasons = [];
+  const sanctionsWarnings = [];
   if (num(results?.screened) <= 0) sanctionsReasons.push('no subjects were screened');
-  if (results?.degraded === true) sanctionsReasons.push('sanctions loader reported degraded coverage');
   if (missingRequired.length) sanctionsReasons.push('required sanctions sources missing: ' + missingRequired.join(', '));
   if (partialRequired.length) sanctionsReasons.push('required sanctions sources partial: ' + partialRequired.join(', '));
   if (emptyRequired.length) sanctionsReasons.push('required sanctions sources empty: ' + emptyRequired.join(', '));
+  /* The worldwide-screening contract defines five consolidated sources as the
+     required sanctions baseline. National/regional sources are supplements:
+     losing one must remain visible, but it is not equivalent to losing OFAC,
+     UN, UK, EU or OFAC non-SDN coverage. */
+  if (results?.degraded === true && sanctionsReasons.length === 0) {
+    sanctionsWarnings.push('one or more supplementary sanctions sources were unavailable or partial');
+  }
   const sanctions = domain(sanctionsReasons.length === 0, sanctionsReasons, {
     screenedSubjects: num(results?.screened),
     loadedSources: loaded.map(x => ({ id: x?.id || '', name: x?.name || '', count: num(x?.count), partial: !!x?.partial })),
     requiredSourceIds: requiredSanctions,
     notes: arr(results?.failures),
-  });
+  }, sanctionsWarnings);
 
   const e = results?.enrichment || {};
   const backbones = new Set(arr(e.amBackbones).map(String));
