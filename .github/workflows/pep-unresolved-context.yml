@@ -1,0 +1,39 @@
+name: Temporary PEP context inspection
+on:
+  push:
+    branches: [ops/diagnostic-only-not-for-merge-20260929]
+    paths: [.github/workflows/pep-unresolved-context.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Harden runner
+        # Public Wikidata reads only. No credentials, source edits or evidence writes.
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: github.com:443 api.github.com:443 www.wikidata.org:443 *.githubapp.com:443
+      - name: Read complete entity claims and office context
+        run: |
+          node --input-type=module <<'NODE'
+          const people = ['Q58316593', 'Q58316598', 'Q58316599', 'Q58334883'];
+          const offices = ['Q57521595', 'Q57521602', 'Q57521603', 'Q57523402'];
+          const places = ['Q701332', 'Q701470', 'Q1917569', 'Q508177'];
+          const url = new URL('https://www.wikidata.org/w/api.php');
+          url.search = new URLSearchParams({ action: 'wbgetentities', format: 'json',
+            ids: [...people, ...offices, ...places].join('|'), props: 'info|labels|descriptions|aliases|claims|sitelinks', maxlag: '5' });
+          const response = await fetch(url, { signal: AbortSignal.timeout(30000),
+            headers: { 'User-Agent': 'HawkeyeSterling-PEPHarvest/1.0 (source verification; github.com/trex0092/HAWKEYE-STERLING-RA)' } });
+          if (!response.ok) throw new Error('Wikidata HTTP ' + response.status);
+          const data = await response.json();
+          if (data.error || data.errors) throw new Error(JSON.stringify(data.error || data.errors));
+          for (const [qid, item] of Object.entries(data.entities || {})) {
+            if (people.includes(qid)) console.log('UNRESOLVED_ITEM ' + JSON.stringify(item));
+            else console.log('CONTEXT_ITEM ' + JSON.stringify({ qid, labels: item.labels,
+              descriptions: item.descriptions, claims: item.claims, sitelinks: item.sitelinks }));
+          }
+          NODE
