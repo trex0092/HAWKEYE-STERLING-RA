@@ -506,37 +506,3 @@ jobs:
           else
             echo "delta-state unchanged"
           fi
-
-  refresh-assurance:
-    name: Refresh Screening Assurance
-    needs: adverse-media
-    if: needs.adverse-media.result == 'success'
-    permissions:
-      actions: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Harden the runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
-        with:
-          disable-sudo: true
-          egress-policy: block
-          allowed-endpoints: >
-            api.github.com:443
-            *.githubapp.com:443
-      - name: Dispatch Screening Assurance with fresh daily-screen evidence
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          code=$(curl -sS -o /tmp/assurance-dispatch.out -w '%{http_code}' -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPO/actions/workflows/screening-assurance.yml/dispatches" \
-            -d '{"ref":"main"}')
-          if [ "$code" != "204" ]; then
-            cat /tmp/assurance-dispatch.out
-            echo "::error::Screening Assurance dispatch failed with HTTP $code"
-            exit 1
-          fi
-          echo "Screening Assurance dispatched after successful daily screening"
