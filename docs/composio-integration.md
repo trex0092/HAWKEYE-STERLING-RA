@@ -43,7 +43,7 @@ Keep `COMPOSIO_ENABLED=0` until all of the following are complete:
 Server-side environment:
 
 ```text
-COMPOSIO_API_KEY=<project API key>
+COMPOSIO_API_KEY=
 COMPOSIO_ENABLED=0
 COMPOSIO_TOOLKITS=asana,gmail,googledrive,slack,github
 COMPOSIO_BASE_URL=https://backend.composio.dev
