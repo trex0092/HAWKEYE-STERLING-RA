@@ -60,6 +60,10 @@ jobs:
       - name: ESLint (app logic, scripts, tests, functions)
         run: npm run lint
 
+      - name: Offline screening delivery and workflow regressions
+        # Synthetic fixtures only. No screening-provider or Asana traffic.
+        run: node --test test/screening-delivery.test.mjs test/screening-delivery-workflow.test.mjs test/screening-schema-bootstrap.test.mjs
+
       - name: Install the pinned Ruff
         run: pip install --quiet --require-hashes -r ci/ruff-requirements.txt
 
