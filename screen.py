@@ -1541,6 +1541,129 @@ def cap_notes(narrative, limit=None, tail_chars=1200):
         f"sign-off/retention preserved")
     return narrative[:lo] + marker + tail
 
+# A summary card is useful for triage, but it is not an acceptable archival
+# delivery surface when section-aware shrinking omits findings. Keep the
+# concise parent task, and attach the COMPLETE narrative underneath it in
+# deterministic, bounded subtasks. A run is not considered delivered until
+# every part exists in Asana.
+FULL_RESULTS_PART_MAX = 45000
+
+def split_full_results(narrative, limit=FULL_RESULTS_PART_MAX):
+    """Split a complete screening narrative into Asana-safe chunks.
+
+    Splits on line boundaries whenever possible and falls back to character
+    boundaries for a pathological single line. The notes-size function is
+    additive, so each returned chunk is independently bounded by limit under
+    the same worst-case rich-text accounting as the parent report. Nothing is
+    discarded and joining the chunks reconstructs the input byte-for-byte.
+    """
+    text = str(narrative or "")
+    if not text:
+        return [""]
+    chunks, current, current_size = [], [], 0
+    for line in text.splitlines(keepends=True):
+        line_size = _asana_notes_size(line)
+        if line_size <= limit:
+            if current and current_size + line_size > limit:
+                chunks.append("".join(current))
+                current, current_size = [], 0
+            current.append(line)
+            current_size += line_size
+            continue
+
+        if current:
+            chunks.append("".join(current))
+            current, current_size = [], 0
+
+        piece, piece_size = [], 0
+        for ch in line:
+            ch_size = _asana_notes_size(ch)
+            if piece and piece_size + ch_size > limit:
+                chunks.append("".join(piece))
+                piece, piece_size = [], 0
+            piece.append(ch)
+            piece_size += ch_size
+        if piece:
+            current, current_size = piece, piece_size
+
+    if current:
+        chunks.append("".join(current))
+    return chunks or [""]
+
+def _full_results_part_name(mode, dt, part, total):
+    label = "Onboarding Screening" if mode == "onboarding" else "Daily AML/CFT Screening"
+    if mode == "makeup":
+        label += " (coverage make-up)"
+    return f"{label} — COMPLETE RESULTS — part {part}/{total} — {dt}"[:250]
+
+def ensure_full_results_parts(parent_gid, narrative, run_time, mode="daily"):
+    """Guarantee the complete screening evidence is present in Asana.
+
+    The parent report may be section-aware shrunk to stay within Asana's
+    per-task rich-text limit. These child tasks carry the original unabridged
+    narrative in bounded parts. Names are deterministic, so a retry repairs
+    missing parts instead of duplicating them. Any read/create failure marks
+    delivery failed and prevents delta-state persistence.
+    """
+    if not parent_gid:
+        UNIFIED_DELIVERY_FAILED["failed"] = True
+        return False
+
+    dt = run_time.strftime("%d %b %Y")
+    chunks = split_full_results(narrative, FULL_RESULTS_PART_MAX)
+    expected = [_full_results_part_name(mode, dt, i + 1, len(chunks))
+                for i in range(len(chunks))]
+
+    existing = set()
+    params = {"limit": 100, "opt_fields": "gid,name"}
+    while True:
+        r = asana_request("GET", f"https://app.asana.com/api/1.0/tasks/{parent_gid}/subtasks",
+                          params=params)
+        if r is None or r.status_code != 200:
+            log(f"FAIL complete-results verification for parent {parent_gid}: "
+                f"{getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
+            UNIFIED_DELIVERY_FAILED["failed"] = True
+            return False
+        data = r.json() or {}
+        for t in data.get("data") or []:
+            existing.add(str(t.get("name") or ""))
+        next_page = data.get("next_page") or None
+        if not next_page or not next_page.get("offset"):
+            break
+        params["offset"] = next_page["offset"]
+
+    created = 0
+    for idx, (name, chunk) in enumerate(zip(expected, chunks), start=1):
+        if name in existing:
+            continue
+        header = (f"COMPLETE SCREENING EVIDENCE — part {idx}/{len(chunks)}\n"
+                  f"Parent report: {parent_gid}\n"
+                  "This is an archival continuation of the full engine output; "
+                  "no findings are omitted from the complete-results set.\n\n")
+        notes = header + chunk
+        if _asana_notes_size(notes) > ASANA_NOTES_MAX:
+            log(f"FAIL complete-results part {idx}: generated body exceeds Asana size budget")
+            UNIFIED_DELIVERY_FAILED["failed"] = True
+            return False
+        payload = {"data": {
+            "name": name,
+            "notes": notes,
+            "parent": parent_gid,
+            "assignee": ASANA_ASSIGNEE_GID,
+            "due_on": run_time.strftime("%Y-%m-%d"),
+        }}
+        r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+        if r is None or r.status_code not in (200, 201):
+            log(f"FAIL complete-results part {idx}/{len(chunks)}: "
+                f"{getattr(r,'status_code','network')} - {getattr(r,'text','')[:160]}")
+            UNIFIED_DELIVERY_FAILED["failed"] = True
+            return False
+        created += 1
+
+    log(f"OK complete screening evidence in Asana: {len(chunks)} part(s) "
+        f"under parent {parent_gid}" + (f" ({created} created)" if created else " (already complete)"))
+    return True
+
 # ── ADVERSE MEDIA ─────────────────────────────────────────────────────────────
 # How many Google News locales (from the worldwide GNEWS_LOCALES matrix) to sweep
 # per subject. Default 5 = the historic US/GB/AE(en)/TR/AE(ar) set (a safe floor
@@ -7166,6 +7289,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                        possible_matches, clear, adverse_findings,
                                        pep_findings, list_meta, stats, run_time, caps=caps),
                                    customer_gids=[c.get("gid", "") for c in customers])
+    # The parent card is intentionally compact when a full population report is
+    # too large for one Asana task. Delivery is complete only when the original,
+    # unabridged engine output is present beneath it as bounded continuation
+    # subtasks. On failure, clear parent_gid so delta-state is NOT persisted and
+    # every new finding is eligible for retry.
+    if parent_gid and not ensure_full_results_parts(parent_gid, narrative, run_time, mode=mode):
+        parent_gid = None
     # MLRO case subtasks for the NEW items only (keeps the case list actionable);
     # overflow/failed items ride the reserved backlog inside `state`.
     open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
@@ -7327,9 +7457,6 @@ def run_onboarding(run_time):
     enforce_list_outage_gate()
     enforce_eocn_review_gate()
     enforce_coverage_alarm_gate()
-    enforce_delivery_gate()
-    enforce_list_outage_gate()
-    enforce_eocn_review_gate()
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
