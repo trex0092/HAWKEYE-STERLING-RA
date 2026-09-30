@@ -178,7 +178,7 @@ export function pendingOffices(positions, holderRows, want = 'label') {
    shard computes the same partition regardless of what each has banked. */
 export function pendingLabels(allQids, names, { count = PEP_SHARD_COUNT, index = PEP_SHARD_INDEX } = {}) {
   const mine = count > 1 ? shardOf(allQids, index, count) : allQids;
-  return mine.filter(q => !isResolvedLabel(names.get(q)));
+  return mine.filter(q => !hasScreenableName(names.get(q)));
 }
 
 /* Merge shard name-slices back into one map. Later shards never overwrite an
@@ -189,12 +189,7 @@ export function mergeShardNames(slices) {
   const names = new Map();
   for (const slice of slices) {
     for (const [qid, nm] of slice || []) {
-      const current = names.get(qid);
-      if (hasScreenableName(nm)) {
-        if (!hasScreenableName(current)) names.set(qid, nm);
-      } else if (isResolvedUnscreenable(nm) && current === undefined) {
-        names.set(qid, nm);
-      }
+      if (!hasScreenableName(names.get(qid)) && hasScreenableName(nm)) names.set(qid, nm);
     }
   }
   return names;
@@ -417,16 +412,6 @@ export function parseSparqlBindings(json) {
 export function hasScreenableName(value) {
   return !!value && typeof value.name === 'string' && value.name.trim().length > 0;
 }
-/* A successful wbgetentities response can legitimately say that a holder QID
-   is missing/invalid or has no usable label/alias. That is a resolved
-   point-in-time result, not a transport failure. Persist a terminal marker so
-   the resumable harvest does not retry the same unscreenable QID forever. */
-export function isResolvedUnscreenable(value) {
-  return !!value && value.unscreenable === true && !hasScreenableName(value);
-}
-export function isResolvedLabel(value) {
-  return hasScreenableName(value) || isResolvedUnscreenable(value);
-}
 export function namesFromEntity(entity) {
   if (!entity || Object.hasOwn(entity, 'missing') || Object.hasOwn(entity, 'invalid')) {
     return { name: '', aliases: [] };
@@ -444,20 +429,16 @@ export function namesFromEntity(entity) {
   all.delete(primary);
   return { name: primary, aliases: [...all] };
 }
-// Failed REQUESTS remain pending. Entities returned successfully are resolved
-// for this harvest even when Wikidata has no screenable name for them.
+// Failed or empty entities must remain pending, not become banked QIDs.
 export function bankLabelNames(names, data) {
   if (!data || data.error || data.errors) return 0;
   let banked = 0;
   for (const [qid, entity] of Object.entries(data.entities || {})) {
     if (!/^Q\d+$/.test(qid)) continue;
     const value = namesFromEntity(entity);
-    if (hasScreenableName(value)) {
-      names.set(qid, value);
-      banked++;
-    } else if (!hasScreenableName(names.get(qid))) {
-      names.set(qid, { name: '', aliases: [], unscreenable: true });
-    }
+    if (!hasScreenableName(value)) continue;
+    names.set(qid, value);
+    banked++;
   }
   return banked;
 }
@@ -498,13 +479,6 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names, exp
      harvested yet screens CLEAN, and silence must never be read as "not a PEP".
      A complete harvest omits the flag entirely. */
   expected = Math.max(byPerson.size, Number.isFinite(expected) ? expected : 0);
-  /* Explicitly resolved unscreenable QIDs are not missing coverage: the API
-     answered, but supplied no name that a name-screening engine could compare.
-     Remove only those terminal responses from the denominator. Transport/API
-     failures never get this marker and therefore remain partial. */
-  const resolvedUnscreenable = [...byPerson.keys()]
-    .filter(qid => isResolvedUnscreenable(names.get(qid))).length;
-  expected = Math.max(0, expected - resolvedUnscreenable);
   const partial = entries.length < expected;
   return {
     v: 1, list: PEP_LIST_NAME, harvested: harvestedAt, count: entries.length, classes, entries,
