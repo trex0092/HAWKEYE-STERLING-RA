@@ -63,11 +63,11 @@ jobs:
       contents: write
       issues: write
     runs-on: ubuntu-latest
-    # Sized for FULL-BASE enrichment: sanctions matching is instant, but the
-    # adverse-media/PEP phase now runs to a 90-min budget so every subject gets
-    # worldwide-media coverage every run (the old 12-min budget skipped the same
-    # ~720 tail subjects daily). The digest lands ~75 min later than before as a
-    # consequence. A hang past the budget+wrap-up must still fail loudly.
+    # The 2026-09-30 run reached the 90-minute enrichment budget with five
+    # subjects remaining. Allow 100 minutes without increasing provider rates.
+    # Keep 20 minutes of job headroom for list loading, cases, delivery and state.
+    # Skipped enrichment still fails assurance; a larger budget is not proof
+    # that every provider answered or that the full population was covered.
     timeout-minutes: 120
     steps:
       - name: Harden the runner (egress block)
@@ -211,6 +211,7 @@ jobs:
           # genuinely separate MLRO queue exists again.
           ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
+          SCREEN_ENRICH_BUDGET_MS: '6000000'
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           # Google News locales swept per subject (pinned core + daily rotation).
@@ -275,8 +276,20 @@ jobs:
 
       - name: Prove worldwide screening runtime assurance
         id: assurance
-        if: steps.screen.outputs.screen_error != 'true'
+        # Case-delivery failures must not prevent current coverage evidence.
+        if: always() && !cancelled() && steps.screen.outcome == 'success' && steps.screen.outputs.screen_error != 'true'
         run: node scripts/screening-assurance.mjs --write
+
+      - name: Deliver and verify complete daily screening evidence in Asana
+        id: delivery
+        # A degraded assurance record still needs delivery. The assurance step
+        # stays failed; publishing that failure never turns coverage green.
+        if: always() && !cancelled() && steps.screen.outcome == 'success' && steps.screen.outputs.screen_error != 'true'
+        timeout-minutes: 10
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
+        run: node scripts/screening-delivery.mjs
 
       - name: Persist screening + case state (screen-state branch)
         id: persist
