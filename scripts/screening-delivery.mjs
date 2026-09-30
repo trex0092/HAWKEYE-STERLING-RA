@@ -247,7 +247,7 @@ async function main() {
     state: read('data/sanctions-screen-state.json'),
     runId: process.env.GITHUB_RUN_ID,
     assignee: process.env.ASANA_CASE_ASSIGNEE_GID || '1213645083721304',
-    request: (path, options = {}) => asana(path, { ...options, signal: AbortSignal.timeout(30000) }),
+    request: (path, options = {}) => asana(path, { ...options, signal: globalThis.AbortSignal.timeout(30000) }),
   });
   writeFileSync('screening-delivery-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
   for (const report of receipt.reports) console.log('screening-delivery: verified ' + report.domain + ' task ' + report.taskGid);
