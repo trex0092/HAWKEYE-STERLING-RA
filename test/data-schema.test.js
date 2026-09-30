@@ -57,8 +57,12 @@ try {
 // ── data/sanctions-screen-state.json ──────────────────────────────────────
 try {
   const sc = read('sanctions-screen-state.json');
-  check('screen-state: updated is a date', isDate(sc.updated));
-  check('screen-state: subjects is an object', sc.subjects && typeof sc.subjects === 'object' && !Array.isArray(sc.subjects));
+  // Main contains only an empty bootstrap; runtime state is overlaid from the
+  // encrypted state branch. Never invent a screening date to satisfy a test.
+  const subjectsValid = sc.subjects && typeof sc.subjects === 'object' && !Array.isArray(sc.subjects);
+  const emptyBootstrap = sc.updated === null && subjectsValid && Object.keys(sc.subjects).length === 0;
+  check('screen-state: updated is a date, or null only for an empty bootstrap', isDate(sc.updated) || emptyBootstrap);
+  check('screen-state: subjects is an object', subjectsValid);
   const bands = new Set(['critical', 'high', 'medium', 'low', 'clear', 'none']);
   let allOk = true;
   for (const [, s] of Object.entries(sc.subjects || {})) {
