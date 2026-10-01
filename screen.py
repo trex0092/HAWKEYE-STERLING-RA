@@ -3491,6 +3491,28 @@ def is_screenable_name(value):
     v = str(value or "").strip()
     return sum(1 for ch in v if ch.isalpha()) >= 2 and not _SCHEDULE_REF_RE.match(v)
 
+JUNK_DRIFT_RATIO = 0.5
+
+def drop_junk_names(label, names):
+    """Drop non-name values (dates, serials, schedule references) from a parsed
+    list. When they are the MAJORITY of the parse the source's format has
+    drifted: the list is returned EMPTY, so a core list trips its coverage
+    floor (obtained-but-corrupt → the run is refused) instead of screening
+    junk under a 'live' label — the Canada SEMA failure mode (1 Oct 2026),
+    guarded for every core list. Preserves the input's set/list type."""
+    items = list(names or [])
+    junk = [n for n in items if not is_screenable_name(n)]
+    if not junk:
+        return names
+    empty = set() if isinstance(names, set) else []
+    if len(junk) / len(items) > JUNK_DRIFT_RATIO:
+        log(f"  FORMAT DRIFT: {label} — {len(junk)} of {len(items)} parsed values are not names "
+            f"(dates / serials / schedule references); list treated as EMPTY (corrupt parse)")
+        return empty
+    log(f"  {label}: dropped {len(junk)} non-name value(s)")
+    kept = [n for n in items if is_screenable_name(n)]
+    return set(kept) if isinstance(names, set) else kept
+
 def parse_canada(data):
     """Canada Consolidated Autonomous Sanctions (SEMA), Global Affairs Canada — free XML.
     Tolerant parse: pulls entity names and combined given/last person names."""
@@ -5726,6 +5748,11 @@ def load_all_lists():
     # is a different schema again, so an OpenSanctions outage takes both down —
     # that surfaces as the usual outage-gate DEGRADED, never a silent gap.
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
+    ofac_names, un_names, uk_names, eu_names, au_names, ch_names, eocn_names = (
+        drop_junk_names(label, names) for label, names in (
+            ("OFAC SDN", ofac_names), ("UN Consolidated", un_names), ("UK Sanctions List", uk_names),
+            ("EU FSF", eu_names), ("Australia DFAT", au_names), ("Switzerland SECO", ch_names),
+            ("UAE EOCN", eocn_names)))
     list_meta = {
         "ofac": {"count":len(ofac_names),"date":ofac_date,"hash":ofac_hash,"tier":"core"},
         "un":   {"count":len(un_names),"date":un_date,"hash":un_hash,"tier":"core"},
@@ -7646,6 +7673,11 @@ def main():
     au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
     ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
+    ofac_names, un_names, uk_names, eu_names, au_names, ch_names, eocn_names = (
+        drop_junk_names(label, names) for label, names in (
+            ("OFAC SDN", ofac_names), ("UN Consolidated", un_names), ("UK Sanctions List", uk_names),
+            ("EU FSF", eu_names), ("Australia DFAT", au_names), ("Switzerland SECO", ch_names),
+            ("UAE EOCN", eocn_names)))
 
     list_meta = {
         "ofac":  {"count":len(ofac_names),  "date":ofac_date,  "hash":ofac_hash},

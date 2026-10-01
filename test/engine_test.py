@@ -4623,6 +4623,18 @@ check("is_screenable_name: digits/dates/schedule refs rejected; real names in an
       not screen.is_screenable_name("44102") and not screen.is_screenable_name("1, Part 1")
       and screen.is_screenable_name("ООО Ромашка") and screen.is_screenable_name("Partners Trading LLC"))
 
+# ── Format-drift guard on every core list (both list-building paths) ─────────
+_dj_mixed = screen.drop_junk_names("TEST", {"Ivan Petrov", "Rostec", "12345"})
+check("drop_junk_names: a stray non-name is dropped, real names kept (set type preserved)",
+      _dj_mixed == {"Ivan Petrov", "Rostec"} and isinstance(_dj_mixed, set))
+check("drop_junk_names: a parse that is MOSTLY junk is treated as empty (format drift)",
+      screen.drop_junk_names("TEST", ["44102", "1, Part 1", "45394", "Ivan Petrov"]) == [])
+check("drop_junk_names: a clean list is returned unchanged",
+      screen.drop_junk_names("TEST", ["Ivan Petrov", "ООО Ромашка"]) == ["Ivan Petrov", "ООО Ромашка"])
+_dj_src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
+check("drop_junk_names: applied to all seven core lists in BOTH list-building paths",
+      _dj_src.count('drop_junk_names(label, names) for label, names in (') == 2)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

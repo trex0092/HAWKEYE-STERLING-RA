@@ -2,7 +2,8 @@
    matching logic -- offline, the same split advisor-bias-eval.mjs uses for
    level(): no live Asana project needed, no ASANA_ACCESS_TOKEN needed.
    Usage: node test/delivery-watchdog.test.mjs */
-import { findTodaysReports, TITLE_PREFIX, reportDayToVerify, REPORT_DUE_UTC_HOUR } from '../scripts/delivery-watchdog.mjs';
+import { findTodaysReports, TITLE_PREFIX, reportDayToVerify, REPORT_DUE_UTC_HOUR,
+  hasFullResults, fullResultsRequired, FULL_RESULTS_SINCE } from '../scripts/delivery-watchdog.mjs';
 
 let passed = 0, failed = 0;
 const check = (name, cond) => { if (cond) { passed++; console.log('  ok  ' + name); } else { failed++; console.log('FAIL  ' + name); } };
@@ -52,6 +53,18 @@ check('at the due hour verifies today', reportDayToVerify(Date.parse('2026-10-01
 check('late in the day verifies today', reportDayToVerify(Date.parse('2026-10-01T23:59:59Z')) === '2026-10-01');
 check('the previous-day rollover crosses a month boundary',
   reportDayToVerify(Date.parse('2026-10-01T01:28:00Z')) === '2026-09-30');
+
+// Full results (#727): from the cutover, a report must carry BOTH attachments.
+check('full results: both attachments present → complete',
+  hasFullResults(['full-screening-report-2026-10-02.txt', 'screening-results-register-2026-10-02.csv']));
+check('full results: the report text alone is NOT complete',
+  !hasFullResults(['full-screening-report-2026-10-02.txt']));
+check('full results: the register alone is NOT complete',
+  !hasFullResults(['screening-results-register-2026-10-02.csv', 'analyst-notes.csv']));
+check('full results: no attachments is NOT complete', !hasFullResults([]) && !hasFullResults(null));
+check('full results: required from the cutover day onward, never for history (no false alarm on 1 Oct)',
+  FULL_RESULTS_SINCE === '2026-10-02' && fullResultsRequired('2026-10-02') && fullResultsRequired('2026-11-15')
+  && !fullResultsRequired('2026-10-01'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -43,7 +43,7 @@
    The matching logic is exported and unit-tested offline
    (test/delivery-watchdog.test.mjs), same split as advisor-bias-eval.mjs's
    level(): the network call runs only as main. */
-import { listProjectTasks } from './asana-notify.mjs';
+import { listProjectTasks, asana } from './asana-notify.mjs';
 
 // HAWKEYE STERLING APP -- where screen.py now files the daily report (see
 // screen.py's ASANA_ONGOING_MON_GID). RETIRED 2026-09-15: this used to read
@@ -84,6 +84,23 @@ export function reportDayToVerify(nowMs, dueHourUtc = REPORT_DUE_UTC_HOUR) {
   return day.toISOString().slice(0, 10);
 }
 
+/* FULL RESULTS: from 2 Oct 2026 every report task carries the complete report
+   and the results register as attachments (#727) — the card itself is capped by
+   Asana's notes limit, so a report without them delivered only its top
+   findings. A report filed WITHOUT both attachments is therefore not a complete
+   delivery. Days before the cutover pre-date the feature and are judged on the
+   report alone (no false alarm on history). Pure — unit-tested. */
+export const FULL_RESULTS_SINCE = '2026-10-02';
+export const FULL_REPORT_RE = /^full-screening-report-\d{4}-\d{2}-\d{2}\.txt$/;
+export const REGISTER_RE = /^screening-results-register-\d{4}-\d{2}-\d{2}\.csv$/;
+export function fullResultsRequired(day, since = FULL_RESULTS_SINCE) {
+  return String(day) >= since;
+}
+export function hasFullResults(attachmentNames) {
+  const names = (attachmentNames || []).map(n => String(n || ''));
+  return names.some(n => FULL_REPORT_RE.test(n)) && names.some(n => REGISTER_RE.test(n));
+}
+
 const DEADLINE_MS = 90000; // same bound as asana-alert.mjs, same rationale
 
 async function main() {
@@ -112,6 +129,33 @@ async function main() {
 
   const todays = findTodaysReports(tasks, today);
 
+  if (todays.length && fullResultsRequired(today)) {
+    // At least one of the day's reports must carry BOTH full-results files.
+    let complete = null;
+    for (const t of todays) {
+      let names;
+      try {
+        const res = await asana('/attachments?parent=' + t.gid + '&limit=100&opt_fields=name');
+        names = (res && res.data || []).map(a => a && a.name);
+      } catch (e) {
+        console.error('delivery-watchdog: could not list attachments of ' + (t.permalink_url || t.gid) + ' ('
+          + String(e && e.message || e).slice(0, 200) + ') -- full-results delivery is UNVERIFIABLE');
+        process.exitCode = 2;
+        return;
+      }
+      if (hasFullResults(names)) { complete = t; break; }
+    }
+    if (!complete) {
+      console.error('delivery-watchdog: report(s) filed for ' + today + ' (UTC) but NONE carries the full-results '
+        + 'attachments (full-screening-report-*.txt + screening-results-register-*.csv) -- only the capped '
+        + 'card reached Asana: ' + todays.map(t => t.permalink_url || t.name).join(', '));
+      process.exitCode = 1;
+      return;
+    }
+    console.log('delivery-watchdog: OK -- report with full results filed for ' + today + ' (UTC): '
+      + (complete.permalink_url || complete.name));
+    return;
+  }
   if (todays.length) {
     console.log('delivery-watchdog: OK -- ' + todays.length + ' report(s) filed for ' + today + ' (UTC): '
       + todays.map(t => t.permalink_url || t.name).join(', '));
