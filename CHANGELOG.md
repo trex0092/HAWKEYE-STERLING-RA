@@ -14,6 +14,9 @@ bump merged to `main`.
 
 ### Fixed
 
+- **README status board: no false red.**
+  - The six coverage-count badges (sanctions lists, sanctions jurisdictions, sanctions countries researched, and the adverse-media editions, countries and languages) were fixed-colour red or orange. They showed red regardless of their value, which read as a failing control. They are now neutral blue, like the national-source depth badge. These are configured counts, not health states; runtime health stays on the operational badges.
+  - The Advisor Eval badge stayed red after the 28–29 Sep Anthropic API usage-limit lapse, although today's run held 30/30 guardrails. The badge counts only scheduled and push runs. A change to `advisor-eval.yml` itself now re-runs the live eval, and this PR's merge produces that real verification on `main`.
 - **A failed screening run is now re-run before 09:00 UAE, and a missed deadline alerts at 09:00 instead of 22:00 UAE.** The morning dispatch only *started* both screens at 00:05 UTC. A run killed mid-flight was healed only by Control Retry, whose cron GitHub starts 4–6 h late, so the report could reach Asana around midday UTC. The Delivery Watchdog judged a day only after 18:00 UTC.
   - The firing that dispatched now runs a deadline guard (second job in `screening-morning-dispatch.yml`). It watches both screens until 05:00 UTC (09:00 UAE).
   - It re-dispatches a screen whose run ended without delivery evidence, at most twice per screen.
