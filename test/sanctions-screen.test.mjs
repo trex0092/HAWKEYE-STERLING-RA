@@ -952,6 +952,17 @@ pep.bankLabelNames(_redirectedNames, {
 check('PEP harvest: a merged-QID label is banked back onto the holder QID that WDQS returned',
   _redirectedNames.get('Q10')?.name === 'Redirected Person'
   && _redirectedNames.get('Q20')?.name === 'Redirected Person');
+const _missing = pep.confirmedMissingQids({
+  entities: {
+    Q10: { id: 'Q10', missing: '' },
+    Q11: { id: 'Q11', invalid: '' },
+    Q12: { id: 'Q12', labels: {}, aliases: {} },
+    Q14: { id: 'Q14', labels: {}, aliases: {} },
+  },
+  redirects: [{ from: 'Q13', to: 'Q14' }],
+}, ['Q10', 'Q11', 'Q12', 'Q13']);
+check('PEP harvest: only explicit missing/invalid Wikidata entities become source tombstones',
+  _missing.join(',') === 'Q10,Q11');
 const _ds = pep.buildPepDataset({
   harvestedAt: '2026-08-05T00:00:00Z',
   holderRows: [
@@ -1349,6 +1360,25 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   const codeH = await pep.mergeShards(outH, cp2, [half]);
   check('PEP merge: with no labelQids the denominator falls back to holder rows, and a measured shortfall is refused instead of published PARTIAL',
     codeH === 1 && !_ex(outH));
+
+  // Eventual-consistency edge: WDQS can retain a holder QID after Wikibase has
+  // deleted that person item. A shard may reduce the denominator only when it
+  // carries an explicit missing/invalid marker captured from wbgetentities.
+  holdersOnly({ holderRows: many.map(p => ({ person: p, pos: 'Q100', end: '', classKey: 'minister' })) });
+  const staleQid = many[M - 1];
+  const tombSlice = T + 'tomb.json';
+  pep.writeJsonGz(tombSlice, {
+    v: 1, shard: 0, of: 1, run: 'R-tomb',
+    names: many.slice(0, M - 1).map(q => [q, { name: 'P ' + q, aliases: [] }]),
+    missingQids: [staleQid],
+  });
+  const outT = T + 'out-tomb.json';
+  const codeT = await pep.mergeShards(outT, cp2, [tombSlice]);
+  const dT = _ex(outT) ? pep.readJsonMaybeGz(outT) : null;
+  check('PEP merge: a positively confirmed stale WDQS holder is excluded without hiding a live unresolved person',
+    codeT === 0 && dT && dT.count === M - 1 && dT.expected === M - 1
+    && dT.partial === false && dT.sourceTombstones?.includes(staleQid));
+
   holdersOnly({ holderRows: [] });
   const outE = T + 'oute.json';
   check('PEP merge: REFUSES outright when the shortfall cannot be measured at all',
