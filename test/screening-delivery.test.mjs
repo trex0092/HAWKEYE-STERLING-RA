@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { publishDailyScreening, buildReports, splitEvidence, textSize, validateEvidence,
-  PROJECT, DESTINATIONS } from '../scripts/screening-delivery.mjs';
+  PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName } from '../scripts/screening-delivery.mjs';
 
 const NOW = Date.parse('2026-09-30T10:00:00Z');
 function fixture() {
@@ -20,6 +20,8 @@ function fixture() {
 function api() {
   const tasks = new Map();
   const calls = [];
+  const attachments = new Map();   // gid -> { gid, name, parent, text }
+  let hideUploads = false;
   let next = 1000;
   let intercept = null;
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -38,6 +40,14 @@ function api() {
     calls.push({ path, method, data });
     if (intercept) { const response = await intercept(path, method, data); if (response !== undefined) return response; }
     let match;
+    if ((match = path.match(/^\/attachments\?parent=(\d+)/))) {
+      return { data: [...attachments.values()].filter(a => a.parent === match[1] && !a.hidden)
+        .map(a => ({ gid: a.gid, name: a.name })) };
+    }
+    if ((match = path.match(/^\/attachments\/(\d+)$/)) && method === 'DELETE') {
+      attachments.delete(match[1]);
+      return { data: {} };
+    }
     if (path.startsWith('/projects/')) return { data: [...tasks.values()].filter(t => !t.parent).map(clone) };
     if ((match = path.match(/^\/sections\/(\d+)\?/))) return { data: { gid: match[1], project: { gid: PROJECT } } };
     if ((match = path.match(/^\/sections\/(\d+)\/addTask$/))) {
@@ -58,7 +68,14 @@ function api() {
     }
     throw new Error('Unexpected test request: ' + method + ' ' + path);
   };
-  return { request, tasks, calls, add, setIntercept: fn => { intercept = fn; } };
+  const upload = async (parent, name, text, type) => {
+    const id = String(next++);
+    attachments.set(id, { gid: id, name, parent, text, type, hidden: hideUploads });
+    calls.push({ path: 'upload', method: 'POST', data: { parent, name } });
+    return id;
+  };
+  return { request, upload, tasks, calls, add, attachments,
+    hideUploads: v => { hideUploads = v; }, setIntercept: fn => { intercept = fn; } };
 }
 function verify(input) { return validateEvidence(input.results, input.assurance, input.state, input); }
 
@@ -86,14 +103,14 @@ for (const [name, change] of [
   test('rejects ' + name + ' before any write', async () => {
     const input = fixture(); change(input);
     const fake = api();
-    await assert.rejects(publishDailyScreening({ ...input, request: fake.request }));
+    await assert.rejects(publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }));
     assert.equal(fake.calls.length, 0);
   });
 }
 
 test('both sections receive read-back-verified daily reports, including a no-new-match day', async () => {
   const fake = api();
-  const receipt = await publishDailyScreening({ ...fixture(), request: fake.request });
+  const receipt = await publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload });
   assert.equal(receipt.reports.length, 2);
   assert.equal(receipt.projectGid, PROJECT);
   assert.equal(receipt.operational, true);
@@ -115,7 +132,7 @@ test('degraded PEP/adverse media is delivered honestly, never converted to opera
   input.assurance.domains.adverseMedia.operational = false;
   input.assurance.domains.adverseMedia.reasons = ['5 subjects skipped enrichment'];
   const fake = api();
-  const receipt = await publishDailyScreening({ ...input, request: fake.request });
+  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   assert.equal(receipt.operational, false);
   const media = fake.tasks.get(receipt.reports[1].taskGid);
   assert.match(media.notes, /PEP: DEGRADED/);
@@ -126,9 +143,9 @@ test('degraded PEP/adverse media is delivered honestly, never converted to opera
 
 test('rerun refreshes the same cards and evidence rather than keeping stale results', async () => {
   const input = fixture(), fake = api();
-  const before = await publishDailyScreening({ ...input, request: fake.request });
+  const before = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   input.results.alerts.push({ name: 'Synthetic Example', lists: ['PEP (Worldwide)'], hits: [{ list: 'PEP (Worldwide)', hitName: 'Synthetic Example' }] });
-  const after = await publishDailyScreening({ ...input, request: fake.request });
+  const after = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   assert.deepEqual(after.reports.map(r => r.taskGid), before.reports.map(r => r.taskGid));
   assert.equal(fake.tasks.size, 4);
   const media = fake.tasks.get(after.reports[1].taskGid);
@@ -139,10 +156,10 @@ test('rerun refreshes the same cards and evidence rather than keeping stale resu
 
 test('next date creates fresh daily reports rather than suppressing the day', async () => {
   const fake = api(), input = fixture();
-  const first = await publishDailyScreening({ ...input, request: fake.request });
+  const first = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   input.results.date = input.state.updated = input.assurance.run.date = '2026-10-01';
   input.assurance.generatedAt = '2026-10-01T10:00:00Z'; input.nowMs += 86400000;
-  const next = await publishDailyScreening({ ...input, request: fake.request });
+  const next = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   assert.notEqual(first.reports[0].taskGid, next.reports[0].taskGid);
   assert.equal([...fake.tasks.values()].filter(t => !t.parent).length, 4);
 });
@@ -174,11 +191,11 @@ test('large multilingual evidence is losslessly split under the rich-text budget
 test('shorter reruns supersede old machine pages without modifying analyst subtasks', async () => {
   const input = fixture(), fake = api();
   input.state.subjects.example = { name: 'Synthetic Example', lists: ['UN'], detail: 'x'.repeat(60000) };
-  const first = await publishDailyScreening({ ...input, request: fake.request });
+  const first = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   const parent = first.reports[0].taskGid;
   fake.add({ name: 'Analyst notes', notes: 'Preserve my investigation' }, parent);
   delete input.state.subjects.example;
-  await publishDailyScreening({ ...input, request: fake.request });
+  await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   const children = [...fake.tasks.values()].filter(t => t.parent?.gid === parent);
   assert.match(children.find(t => t.name === '[screening-evidence] 0002').notes, /^SUPERSEDED/);
   assert.equal(children.find(t => t.name === 'Analyst notes').notes, 'Preserve my investigation');
@@ -189,7 +206,7 @@ test('API/read-back failure leaves a pending report, but still attempts the othe
   fake.setIntercept((path, method) => {
     if (method === 'POST' && path === '/tasks/1000/subtasks') throw new Error('simulated unavailable');
   });
-  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request }), /sanctions delivery failed/);
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload }), /sanctions delivery failed/);
   assert.match(fake.tasks.get('1000').notes, /^DELIVERY INCOMPLETE/);
   const media = [...fake.tasks.values()].find(t => t.name.startsWith('Daily Adverse'));
   assert.match(media.notes, /^DELIVERY VERIFIED/);
@@ -202,7 +219,7 @@ test('read-back content mismatch is not delivery success', async () => {
       return { data: { name: 'Stale title', notes: 'Stale body' } };
     }
   });
-  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request }), /read-back/);
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload }), /read-back/);
 });
 
 test('wrong section membership fails verification', async () => {
@@ -213,13 +230,13 @@ test('wrong section membership fails verification', async () => {
       return { data: {} };
     }
   });
-  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request }), /wrong screening section/);
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload }), /wrong screening section/);
 });
 
 test('a destination from another project is rejected before creating tasks', async () => {
   const fake = api();
   fake.setIntercept(path => path.startsWith('/sections/') ? { data: { project: { gid: '1' } } } : undefined);
-  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request }), /approved project/);
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload }), /approved project/);
   assert.equal(fake.calls.filter(c => c.method === 'POST').length, 0);
 });
 
@@ -227,7 +244,7 @@ test('duplicate parent cards fail loudly rather than updating an arbitrary card'
   const input = fixture(), fake = api();
   const title = buildReports(input.results, input.assurance, input.state, input)[0].title;
   fake.add({ name: title }); fake.add({ name: title });
-  await assert.rejects(publishDailyScreening({ ...input, request: fake.request }), /require reconciliation/);
+  await assert.rejects(publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }), /require reconciliation/);
 });
 
 test('paginated scans include later pages when finding the existing report', async () => {
@@ -238,21 +255,21 @@ test('paginated scans include later pages when finding the existing report', asy
     if (path.startsWith('/projects/') && !path.includes('&offset=')) return { data: [], next_page: { offset: 'page 2' } };
     if (path.startsWith('/projects/') && path.includes('&offset=page%202')) return { data: [{ gid: old.gid, name: title }] };
   });
-  const receipt = await publishDailyScreening({ ...input, request: fake.request });
+  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   assert.equal(receipt.reports[0].taskGid, old.gid);
 });
 
 test('pagination loops or failures cannot fall through to duplicate creation', async () => {
   const fake = api();
   fake.setIntercept(() => ({ data: [], next_page: { offset: 'same' } }));
-  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request }), /pagination/);
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload }), /pagination/);
   assert.equal(fake.tasks.size, 0);
 });
 
 test('a successful-looking create without an identifier is rejected', async () => {
   const fake = api();
   fake.setIntercept((path, method) => path === '/tasks' && method === 'POST' ? { data: {} } : undefined);
-  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request }), /identifier/);
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload }), /identifier/);
 });
 
 
@@ -260,7 +277,7 @@ test('same-named analyst cards are never overwritten', async () => {
   const input = fixture(), fake = api();
   const title = buildReports(input.results, input.assurance, input.state, input)[0].title;
   const existing = fake.add({ name: title, notes: 'Analyst-owned report' });
-  await assert.rejects(publishDailyScreening({ ...input, request: fake.request }), /ownership marker/);
+  await assert.rejects(publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }), /ownership marker/);
   assert.equal(fake.tasks.get(existing.gid).notes, 'Analyst-owned report');
 });
 
@@ -268,7 +285,7 @@ test('page framing preserves whitespace inside quoted JSON across Asana trimming
   const input = fixture(), fake = api();
   const detail = ('word ' + 'م').repeat(12000);
   input.state.subjects.example = { name: 'Synthetic', lists: ['UN'], detail };
-  const receipt = await publishDailyScreening({ ...input, request: fake.request });
+  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
   const parent = receipt.reports[0].taskGid;
   const pages = [...fake.tasks.values()].filter(t => t.parent?.gid === parent)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -276,4 +293,77 @@ test('page framing preserves whitespace inside quoted JSON across Asana trimming
     .replace(/^BEGIN SCREENING EVIDENCE\n/, '').replace(/\nEND SCREENING EVIDENCE$/, '')).join('');
   assert.equal(JSON.parse(reconstructed).storedFindings.example.detail, detail);
   for (const page of pages) assert.ok(textSize(page.notes) <= 45000);
+});
+
+test('each results card carries a read-back-verified findings table, one row per hit', async () => {
+  const input = fixture();
+  input.state.subjects = {
+    'jane roe': { name: 'Jane Roe', entityType: 'individual', parent: 'Acme Gold', role: 'Shareholder',
+      band: 'medium', topScore: 88, recommendation: 'review', firstSeen: '2026-09-29', lastSeen: '2026-09-30',
+      lists: ['OFAC SDN', 'PEP (Worldwide — Wikidata)'],
+      hits: [{ list: 'OFAC SDN', hitName: '=ROE, Jane', score: 88, mechanism: 'subset', confidence: 'WEAK',
+               provenance: { sourceUrl: 'https://ofac.example/sdn.csv' } },
+             { list: 'PEP (Worldwide — Wikidata)', hitName: 'Jane Roe', score: 90, confidence: 'MODERATE' }] },
+  };
+  input.results.alerts = [{ key: 'jane roe', lists: ['OFAC SDN'], hits: [{ list: 'OFAC SDN' }] }];
+  input.results.cleared = ['Old Match'];
+  const fake = api();
+  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  assert.equal(receipt.reports.length, 2);
+  for (const report of receipt.reports) {
+    const files = [...fake.attachments.values()].filter(a => a.parent === report.taskGid);
+    assert.equal(files.length, 1, report.domain + ' card has exactly one findings table');
+    assert.equal(files[0].name, findingsAttachmentName(report.domain, '2026-09-30', '100'));
+    assert.ok(files[0].text.startsWith('\ufeffstatus,subject,'), 'BOM + header');
+    assert.match(fake.tasks.get(report.taskGid).notes, /Readable findings table \(one row per hit\) is attached/);
+  }
+  const sanctions = [...fake.attachments.values()].find(a => a.name.includes('-sanctions-')).text;
+  const media = [...fake.attachments.values()].find(a => a.name.includes('-media-')).text;
+  assert.match(sanctions, /NEW\/CHANGED,Jane Roe,individual,Acme Gold,Shareholder/);
+  assert.match(sanctions, /OFAC SDN,'=ROE\, Jane|OFAC SDN,"'=ROE, Jane"/, 'formula injection neutralised');
+  assert.doesNotMatch(sanctions, /PEP \(Worldwide/, 'PEP hits belong to the media table');
+  assert.match(sanctions, /CLEARED THIS RUN,Old Match/);
+  assert.match(media, /PEP \(Worldwide — Wikidata\),Jane Roe,90/);
+});
+
+test('a card is never marked verified without its findings table', async () => {
+  const fake = api();
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request }), /attachment uploader/);
+  for (const task of fake.tasks.values()) assert.doesNotMatch(String(task.notes), /^DELIVERY VERIFIED/);
+  const hidden = api();
+  hidden.hideUploads(true);
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: hidden.request, upload: hidden.upload }),
+    /did not confirm the findings attachment/);
+  for (const task of hidden.tasks.values()) assert.doesNotMatch(String(task.notes), /^DELIVERY VERIFIED/);
+});
+
+test('a rerun replaces the superseded findings table and leaves analyst files alone', async () => {
+  const input = fixture();
+  const fake = api();
+  const first = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  const card = first.reports[0].taskGid;
+  await fake.upload(card, 'analyst-notes.csv', 'x', 'text/csv');
+  input.runId = '101';
+  input.assurance.run.githubRunId = '101';
+  await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  const names = [...fake.attachments.values()].filter(a => a.parent === card).map(a => a.name).sort();
+  assert.deepEqual(names, ['analyst-notes.csv', findingsAttachmentName('sanctions', '2026-09-30', '101')]);
+});
+
+test('csvCell quotes separators and neutralises formulas', () => {
+  assert.equal(csvCell('a,b'), '"a,b"');
+  assert.equal(csvCell('say "hi"'), '"say ""hi"""');
+  assert.equal(csvCell('+1'), "'+1");
+  assert.equal(csvCell(['x', 'y']), 'x; y');
+  assert.ok(buildFindingsCsv('sanctions', [], [], []).startsWith('\ufeffstatus,'));
+});
+
+test('a same-run re-attempt keeps a single findings table', async () => {
+  const input = fixture();
+  const fake = api();
+  const first = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  for (const report of first.reports) {
+    assert.equal([...fake.attachments.values()].filter(a => a.parent === report.taskGid).length, 1);
+  }
 });
