@@ -945,7 +945,9 @@ export function sourceTierFor(item) {
    `note(ok, status)` — optional per-result observer (the Google News breaker). */
 export const GNEWS_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GNEWS_MIN_INTERVAL_MS) || 400);
 export const GDELT_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GDELT_MIN_INTERVAL_MS) || 5000);
-export const BING_MIN_INTERVAL_MS = Math.max(0, Number(process.env.BING_MIN_INTERVAL_MS) || 500);
+export const BING_MIN_INTERVAL_MS = Math.max(0, Number(process.env.BING_MIN_INTERVAL_MS) || 1000);
+export const ADVERSE_BACKBONE_MAX_ATTEMPTS = Math.max(1,
+  Math.min(5, Number(process.env.ADVERSE_BACKBONE_MAX_ATTEMPTS) || 3));
 
 // Some providers return 429 without Retry-After. Back off the shared queue anyway.
 export const ADVERSE_RATE_LIMIT_BACKOFF_MS = Math.min(900000,
@@ -1094,33 +1096,51 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   // Independent providers start independently. GDELT queueing or a timeout
   // must not prevent Google News and Bing from being asked. Their own shared
   // gates still enforce pacing, and every response is validated before use.
+  let bingStatus = 0;
+  const fetchBing = async () => {
+    let status = 0;
+    const items = await fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs,
+      (_ok, s) => { status = s; }, _bingGate);
+    bingStatus = status;
+    return items;
+  };
+
   const [gd, initialBing, localeResults] = await Promise.all([
     fetchGdelt(name, timeoutMs),
-    bingOn
-      ? fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate)
-      : Promise.resolve(null),
+    bingOn ? fetchBing() : Promise.resolve(null),
     mapPool(localeSet, conc, loc =>
       fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))),
   ]);
   let bgRaw = initialBing;
+  let bingAttempts = bingOn ? 1 : 0;
 
   let retryAttempted = false;
   let retryRecovered = false;
   const firstEnUs = localeResults.find(r => r.id === 'en-US');
   const firstOk = !!((firstEnUs && firstEnUs.items !== null) || gd !== null || (bingOn && bgRaw !== null));
-  const retryBing = bingOn && bgRaw === null;
   const retryEnUs = (gnewsCanRequest('en-US') && (!firstEnUs || firstEnUs.items === null))
     ? localeSet.find(loc => loc.id === 'en-US')
     : null;
 
-  if (!firstOk && (retryBing || retryEnUs)) {
+  if (!firstOk && ((bingOn && bgRaw === null) || retryEnUs)) {
     retryAttempted = true;
     const retryDelayMs = Math.max(0, Number(process.env.ADVERSE_BACKBONE_RETRY_MS) || 3000);
-    if (retryDelayMs) await new Promise(resolve => setTimeout(resolve, retryDelayMs));
 
-    if (retryBing) {
-      bgRaw = await fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs, null, _bingGate);
+    /* Do not declare a subject unscreened on one transient Bing refusal. The
+       previous path made exactly one immediate retry while the full-book sweep
+       was still pressuring the provider, leaving 111/906 subjects with zero
+       backbone coverage. Bing is the independent third pool, so give only the
+       ZERO-coverage subjects a small bounded retry ladder. The run-global gate
+       still serialises starts and honors Retry-After/429 deferrals. */
+    while (bingOn && bgRaw === null && bingAttempts < ADVERSE_BACKBONE_MAX_ATTEMPTS) {
+      const waitMs = retryDelayMs ? Math.min(30000, retryDelayMs * 2 ** Math.max(0, bingAttempts - 1)) : 0;
+      if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+      bgRaw = await fetchBing();
+      bingAttempts++;
     }
+
+    /* Google en-US gets one recovery probe only when its breaker admits it.
+       Never bypass the breaker just to turn an assurance badge green. */
     if (retryEnUs) {
       const items = await fetchGoogleNews(name, retryEnUs, timeoutMs);
       const idx = localeResults.findIndex(r => r.id === 'en-US');
@@ -1145,10 +1165,11 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   if (!backboneOk) {
     return {
       errored: true,
-      error: 'global adverse-media backbones unreachable after one gated retry (Google News en-US + GDELT'
+      error: 'global adverse-media backbones unreachable after bounded gated retries (Google News en-US + GDELT'
         + (bingOn ? ' + Bing News' : '') + ')',
       localesQueried: localeSet.length,
       backbones,
+      backboneStatus: { bing: bingStatus, bingAttempts },
       retryAttempted,
       retryRecovered,
     };
@@ -1169,6 +1190,7 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
     sourcesFailed: failed,
     itemsScanned: items.length,
     backbones,
+    backboneStatus: { bing: bingStatus, bingAttempts },
     retryAttempted,
     retryRecovered,
   };
