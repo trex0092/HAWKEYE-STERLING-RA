@@ -104,6 +104,12 @@ jobs:
           PEP_SHARD_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
           PEP_RECENCY_MONTHS: ${{ vars.PEP_RECENCY_MONTHS }}
           PEP_LABEL_CONCURRENCY: ${{ vars.PEP_LABEL_CONCURRENCY }}
+          # Sharding is the recovery path after the ordinary serial chain reaches
+          # its bounded resume cap. The shared checkpoint can therefore already
+          # carry resumeCount >= PEP_MAX_RESUMES. Give this one-shot sharded
+          # recovery enough headroom to consume that checkpoint instead of
+          # immediately refusing it for the same reason the serial chain stopped.
+          PEP_MAX_RESUMES: '1000000'
           # Sized to finish inside the job timeout; the budget is a backstop, not
           # the normal path, because a shard hands nothing to the merge until it
           # completes its slice.
