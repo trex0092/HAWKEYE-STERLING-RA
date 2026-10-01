@@ -764,5 +764,30 @@ check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') =
   check('EE list: breadcrumb <ol> never screens', !by.some(n => /sanctions of the Government|Home/.test(n)));
 }
 
+
+// ── Junk-name guard (1 Oct 2026: Canada SEMA XML with misaligned columns) ──
+{
+  const sm = await import('../scripts/sanctions-match.mjs');
+  const broken = '<data-set><record><EntityOrShip-EntiteOuNavire>1, Part 1</EntityOrShip-EntiteOuNavire>'
+    + '<TitleOrShipType-TitreOuTypeDeNavire>1</TitleOrShipType-TitreOuTypeDeNavire>'
+    + '<LastName-NomDeFamille>44102</LastName-NomDeFamille></record>'
+    + '<record><Country-Pays>1965-04-29</Country-Pays><EntityOrShip-EntiteOuNavire>Part 2</EntityOrShip-EntiteOuNavire>'
+    + '<LastName-NomDeFamille>45394</LastName-NomDeFamille></record></data-set>';
+  check('generic XML: a feed whose name fields hold only date serials / schedule refs yields NO names',
+    sm.parseGenericXml(broken).length === 0);
+  const good = '<data-set><record><GivenName-Prenom>Ivan</GivenName-Prenom><LastName-NomDeFamille>Petrov</LastName-NomDeFamille></record>'
+    + '<record><EntityOrShip-EntiteOuNavire>Rostec Industrial Holding</EntityOrShip-EntiteOuNavire></record>'
+    + '<record><EntityOrShip-EntiteOuNavire>ООО Ромашка</EntityOrShip-EntiteOuNavire></record>'
+    + '<record><EntityOrShip-EntiteOuNavire>王伟</EntityOrShip-EntiteOuNavire></record></data-set>';
+  const got = sm.parseGenericXml(good);
+  check('generic XML: real names in any script are kept (recall unchanged)',
+    got.includes('Ivan Petrov') && got.includes('Rostec Industrial Holding')
+    && got.includes('ООО Ромашка') && got.includes('王伟'));
+  check('isScreenableName: digits, dates and schedule refs are not names',
+    !sm.isScreenableName('44102') && !sm.isScreenableName('1965-04-29') && !sm.isScreenableName('1, Part 1')
+    && !sm.isScreenableName('Part 1.1') && !sm.isScreenableName(''));
+  check('isScreenableName: a two-letter name and a name containing "Part" are kept',
+    sm.isScreenableName('Li') && sm.isScreenableName('Partners Trading LLC') && sm.isScreenableName('Al Part Group'));
+}
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

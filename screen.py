@@ -3479,6 +3479,18 @@ def parse_eu(data):
     if not data: return names, "unknown", ""
     return names, "live", sha256_of(data)
 
+_SCHEDULE_REF_RE = re.compile(r"^(?:\d+\s*,\s*)?(?:schedule\s+\d+\s*,\s*)?part\s+[\d.]+$", re.I)
+
+def is_screenable_name(value):
+    """At least two letters (any script) and not a bare schedule reference.
+    Canada's SEMA XML (1 Oct 2026) published records with fields shifted
+    against their labels and no name anywhere: LastName held a date serial,
+    EntityOrShip the schedule ("1, Part 1"). Those values were screened as
+    designated names and the list reported 'live'. Junk is dropped so a list
+    with no real names reads unavailable and degrades loudly."""
+    v = str(value or "").strip()
+    return sum(1 for ch in v if ch.isalpha()) >= 2 and not _SCHEDULE_REF_RE.match(v)
+
 def parse_canada(data):
     """Canada Consolidated Autonomous Sanctions (SEMA), Global Affairs Canada — free XML.
     Tolerant parse: pulls entity names and combined given/last person names."""
@@ -3521,6 +3533,11 @@ def parse_canada(data):
                 names.update(aliases)
     except Exception as e:
         log(f"  Canada SEMA parse error: {e}")
+    junk = {n for n in names if not is_screenable_name(n)}
+    if junk:
+        log(f"  Canada SEMA: dropped {len(junk)} non-name value(s) (date serials / schedule "
+            f"references in name fields — the published XML's columns are misaligned)")
+        names -= junk
     if not names: return names, "unavailable", ""
     return names, "live", sha256_of(data)
 
