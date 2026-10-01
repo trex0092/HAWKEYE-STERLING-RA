@@ -1347,9 +1347,8 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   pep.writeJsonGz(half, { v: 1, shard: 0, of: 1, run: 'R2', names: many.slice(0, M / 2).map(q => [q, { name: 'P ' + q, aliases: [] }]) });
   const outH = T + 'outh.json';
   const codeH = await pep.mergeShards(outH, cp2, [half]);
-  const dH = _ex(outH) ? pep.readJsonMaybeGz(outH) : null;
-  check('PEP merge: with no labelQids the denominator falls back to the holder rows, so a short list is flagged PARTIAL',
-    codeH === 0 && dH && dH.count === M / 2 && dH.partial === true && dH.expected === M);
+  check('PEP merge: with no labelQids the denominator falls back to holder rows, and a measured shortfall is refused instead of published PARTIAL',
+    codeH === 1 && !_ex(outH));
   holdersOnly({ holderRows: [] });
   const outE = T + 'oute.json';
   check('PEP merge: REFUSES outright when the shortfall cannot be measured at all',
