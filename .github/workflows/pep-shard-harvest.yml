@@ -11,10 +11,11 @@ name: PEP Shard Harvest
 # This is ADDITIVE. pep-worldwide.yml keeps its weekly schedule and its
 # self-resuming chain untouched; if a sharded run goes wrong, the ordinary
 # chain is still grinding away and nothing is lost. Manual dispatch remains
-# available. A protected-main push that changes THIS workflow also launches one
-# shard run, which makes reviewed harvester changes self-validating and gives us
-# a safe way to clear an existing checkpoint backlog without a separate API
-# dispatcher. Ordinary source-code pushes do not match the path filter.
+# available. A protected-main push that changes this workflow OR the PEP
+# harvester launches one sharded run, which makes reviewed recovery logic
+# self-validating and gives us a safe way to clear an existing checkpoint
+# backlog without a separate API dispatcher. Unrelated source-code pushes do
+# not match the path filter.
 #
 # Shards never share a ref: each force-pushes ONLY its own pep-shard-<i> branch,
 # so concurrent writes cannot race or drop each other's work, and the single
@@ -27,6 +28,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/pep-shard-harvest.yml'
+      - 'scripts/pep-worldwide.mjs'
 
 permissions:
   contents: read
