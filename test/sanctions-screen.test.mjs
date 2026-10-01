@@ -1970,5 +1970,20 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     && /else console\.log\(report\);/.test(src));
 }
 
+
+/* Format-drift guard (Canada SEMA, 1 Oct 2026): a source whose parse yields
+   mostly non-names is treated as drifted, never screened as "loaded". */
+{
+  const d1 = scr.screenableNames(['44102', '1, Part 1', 'Part 2', '45394', 'Ivan Petrov']);
+  check('drift guard: a feed of mostly dates/serials/schedule refs is DRIFTED', d1.drifted && d1.dropped === 4);
+  const d2 = scr.screenableNames(['Ivan Petrov', 'Rostec', 'ООО Ромашка', '王伟', '12345']);
+  check('drift guard: a healthy feed keeps every real name and drops the stray number',
+    !d2.drifted && d2.dropped === 1 && d2.kept.length === 4 && d2.kept.includes('王伟'));
+  check('drift guard: an empty parse is not "drifted" (the 0-names path reports it)', !scr.screenableNames([]).drifted);
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  check('drift guard: the list loader applies it to every source before floors and indexing',
+    /const junk = screenableNames\(parsed\);[\s\S]{0,600}FORMAT DRIFT[\s\S]{0,400}const names = junk\.kept;/.test(src));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
