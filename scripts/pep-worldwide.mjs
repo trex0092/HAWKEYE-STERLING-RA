@@ -492,14 +492,54 @@ export function bankLabelNames(names, data, requestedQids = []) {
   return banked;
 }
 
+/* A successful fallback response can prove that a source item is not
+   name-screenable, which is different from a network failure. These exceptions
+   remain explicit evidence. Missing/invalid current items are stale source IDs;
+   existing items with no label, alias or Wikipedia sitelink are upstream data
+   quality gaps. Neither can match a customer name, so retrying them forever
+   cannot improve recall. A missing response object is NOT terminal and remains
+   retryable. */
+export function classifyUnscreenableEntities(data, requestedQids = []) {
+  if (!data || data.error || data.errors) return [];
+  const redirects = new Map();
+  for (const r of (Array.isArray(data.redirects) ? data.redirects : [])) {
+    const from = String(r?.from || ''), to = String(r?.to || '');
+    if (/^Q\d+$/.test(from) && /^Q\d+$/.test(to)) redirects.set(from, to);
+  }
+  const entities = data.entities || {};
+  const out = [];
+  for (const raw of (Array.isArray(requestedQids) ? requestedQids : [])) {
+    const qid = String(raw || '');
+    if (!/^Q\d+$/.test(qid)) continue;
+    const target = redirects.get(qid) || qid;
+    const entity = entities[target] || entities[qid];
+    if (!entity) continue;
+    if (Object.hasOwn(entity, 'missing')) {
+      out.push({ qid, target, reason: 'missing-from-current-wikidata' });
+      continue;
+    }
+    if (Object.hasOwn(entity, 'invalid')) {
+      out.push({ qid, target, reason: 'invalid-current-wikidata' });
+      continue;
+    }
+    if (!hasScreenableName(namesFromEntity(entity))) {
+      out.push({ qid, target, reason: 'no-label-alias-or-wikipedia-sitelink' });
+    }
+  }
+  return out;
+}
+
 /* Assemble the artifact. holderRows: [{ person, pos, end?, classKey }];
    positions: Map(posQid → {label, country}); names: Map(personQid →
    {name, aliases}). Dedupe by person, first class in PEP_ROOT_CLASSES order
    wins the headline position (they're declared most-senior-first). */
-export function buildPepDataset({ harvestedAt, holderRows, positions, names, expected }) {
+export function buildPepDataset({ harvestedAt, holderRows, positions, names, expected,
+  excludedQids = [], sourceExpected = 0, unmatchableSourceItems = [] }) {
+  const excluded = new Set(Array.isArray(excludedQids) ? excludedQids : []);
   const rank = new Map(PEP_ROOT_CLASSES.map((c, i) => [c.key, i]));
   const byPerson = new Map();
   for (const r of holderRows) {
+    if (excluded.has(r.person)) continue;
     const prev = byPerson.get(r.person);
     if (prev && (rank.get(prev.classKey) ?? 99) <= (rank.get(r.classKey) ?? 99)) continue;
     const pos = positions.get(r.pos) || {};
@@ -529,9 +569,14 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names, exp
      A complete harvest omits the flag entirely. */
   expected = Math.max(byPerson.size, Number.isFinite(expected) ? expected : 0);
   const partial = entries.length < expected;
+  const exceptions = (Array.isArray(unmatchableSourceItems) ? unmatchableSourceItems : [])
+    .filter(x => x && /^Q\d+$/.test(String(x.qid || '')))
+    .map(x => ({ qid: String(x.qid), target: String(x.target || x.qid), reason: String(x.reason || 'unspecified') }));
   return {
     v: 1, list: PEP_LIST_NAME, harvested: harvestedAt, count: entries.length, classes, entries,
     ...(partial ? { partial: true, expected } : {}),
+    ...(sourceExpected ? { sourceExpected: Number(sourceExpected) } : {}),
+    ...(exceptions.length ? { unmatchableSourceItems: exceptions } : {}),
   };
 }
 
@@ -1140,6 +1185,7 @@ async function harvest(outfile) {
      is non-convergence, not coverage. For the small unresolved tail only, make
      one richer wbgetentities pass that follows redirects and exposes Wikipedia
      sitelink titles as a name fallback. Network failures still remain pending. */
+  const terminalUnscreenable = new Map();
   const fallbackPending = pendingLabels(allQids, names);
   if (fallbackPending.length) {
     console.log(`pep-worldwide: attempting redirect/sitelink fallback for ${fallbackPending.length} unresolved person label(s)`);
@@ -1147,13 +1193,19 @@ async function harvest(outfile) {
       const batch = fallbackPending.slice(i, i + LABEL_CHUNK);
       const data = await fetchJsonSafe(fallbackLabelsUrl(batch));
       bankLabelNames(names, data, batch);
+      for (const item of classifyUnscreenableEntities(data, batch)) terminalUnscreenable.set(item.qid, item);
     }
     const stillPending = pendingLabels(allQids, names);
-    console.log(`pep-worldwide: fallback recovered ${fallbackPending.length - stillPending.length}/${fallbackPending.length}; ${stillPending.length} unresolved`);
-    if (stillPending.length) {
-      console.error('pep-worldwide: unresolved QIDs after redirect/sitelink fallback: '
-        + stillPending.slice(0, 50).join(', ')
-        + (stillPending.length > 50 ? ' ...' : ''));
+    const retryable = stillPending.filter(q => !terminalUnscreenable.has(q));
+    console.log(`pep-worldwide: fallback recovered ${fallbackPending.length - stillPending.length}/${fallbackPending.length}; ${stillPending.length} unresolved, ${terminalUnscreenable.size} confirmed upstream-unmatchable, ${retryable.length} retryable`);
+    if (terminalUnscreenable.size) {
+      console.warn('pep-worldwide: upstream items with no current screenable identity: '
+        + [...terminalUnscreenable.values()].map(x => x.qid + ':' + x.reason).join(', '));
+    }
+    if (retryable.length) {
+      console.error('pep-worldwide: retryable unresolved QIDs after redirect/sitelink fallback: '
+        + retryable.slice(0, 50).join(', ')
+        + (retryable.length > 50 ? ' ...' : ''));
     }
   }
 
@@ -1163,12 +1215,14 @@ async function harvest(outfile) {
      own view would publish a list missing everyone else's people, which the
      shrink gate would then hold against the real one. */
   if (PEP_SHARD_COUNT > 1) {
-    writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, run: PEP_SHARD_RUN, harvestedAt, names: [...names] });
-    console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`);
+    writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, run: PEP_SHARD_RUN,
+      harvestedAt, names: [...names], unmatchable: [...terminalUnscreenable.values()] });
+    console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names and ${terminalUnscreenable.size} upstream-unmatchable exception(s) emitted to ${outfile} for the merge step`);
     return 0;
   }
 
-  const unresolved = pendingLabels(allQids, names, { count: 1, index: 0 });
+  const unresolved = pendingLabels(allQids, names, { count: 1, index: 0 })
+    .filter(q => !terminalUnscreenable.has(q));
   if (unresolved.length) {
     writeCp('labels', { labelQids: allQids, names: [...names], next: { labelIdx: 0 } });
     shipPartialNow();
@@ -1178,7 +1232,14 @@ async function harvest(outfile) {
 
   await enrichOffices();
 
-  const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
+  const terminalItems = [...terminalUnscreenable.values()];
+  const dataset = buildPepDataset({
+    harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names,
+    expected: Math.max(0, expectedTotal - terminalItems.length),
+    excludedQids: terminalItems.map(x => x.qid),
+    sourceExpected: expectedTotal,
+    unmatchableSourceItems: terminalItems,
+  });
   const gate = writeArtifact(dataset, (carried) => buildPepDataset({
     harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
     names: mergeShardNames([[...names], carried]),
@@ -1207,6 +1268,7 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
   const st = restoreCheckpoint(cp);
   const slices = [];
   const seen = new Map();
+  const unmatchable = new Map();
   for (const f of shardFiles) {
     let s = null;
     try { s = readJsonMaybeGz(f); } catch (e) { s = null; }
@@ -1227,7 +1289,10 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
       return 1;
     }
     seen.set(s.shard, s.run || '');
-    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names${s.run ? ` (run ${s.run})` : ''}`);
+    for (const item of (Array.isArray(s.unmatchable) ? s.unmatchable : [])) {
+      if (item && /^Q\d+$/.test(String(item.qid || ''))) unmatchable.set(String(item.qid), item);
+    }
+    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names, ${Array.isArray(s.unmatchable) ? s.unmatchable.length : 0} upstream-unmatchable${s.run ? ` (run ${s.run})` : ''}`);
     slices.push(s.names);
   }
   const runs = [...new Set(seen.values())];
@@ -1300,9 +1365,14 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
     console.error('pep-worldwide: REFUSING to merge — the checkpoint carries neither a label list nor holder rows, so there is no way to tell how many people the list owes. Publishing would mark an unknown shortfall COMPLETE and the screen would stop warning that a PEP it has never harvested screens clean.');
     return 1;
   }
+  const terminalItems = [...unmatchable.values()];
+  const screenableExpected = Math.max(0, expected - terminalItems.length);
   const dataset = buildPepDataset({
     harvestedAt: st.harvestedAt, holderRows: st.holderRows, positions: st.positions, names,
-    expected,
+    expected: screenableExpected,
+    excludedQids: terminalItems.map(x => x.qid),
+    sourceExpected: expected,
+    unmatchableSourceItems: terminalItems,
   });
   /* The sharded path exists to FINISH a stuck label backlog. Publishing a
      partial merge as a successful recovery makes its workflow green while the
@@ -1310,8 +1380,11 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
      state artifact remains in place, and the run identifies the exact remaining
      shortfall instead of claiming recovery. */
   if (dataset.partial) {
-    console.error(`pep-worldwide: REFUSING to publish sharded merge — ${dataset.count}/${expected} persons are screenable; ${expected - dataset.count} remain unresolved after the redirect/sitelink fallback`);
+    console.error(`pep-worldwide: REFUSING to publish sharded merge — ${dataset.count}/${screenableExpected} screenable source persons are covered; ${screenableExpected - dataset.count} retryable label(s) remain unresolved. ${terminalItems.length} separately recorded upstream-unmatchable item(s) are not counted as screenable identities.`);
     return 1;
+  }
+  if (terminalItems.length) {
+    console.warn(`pep-worldwide: source data quality warning — ${terminalItems.length}/${expected} holder QID(s) have no current screenable identity metadata and are recorded in unmatchableSourceItems`);
   }
   let prev = null;
   try { prev = readJsonMaybeGz(outfile); } catch { prev = null; }
@@ -1324,7 +1397,7 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
   if (!dataset.partial) {
     try { unlinkSync(cpFile); console.log('pep-worldwide: harvest COMPLETE — checkpoint cleared'); } catch { /* none to clear */ }
   }
-  console.log(`pep-worldwide: merged ${slices.length} shards → ${dataset.count} of ${expected} persons${dataset.partial ? ' (PARTIAL)' : ' (complete)'} → ${outfile}`);
+  console.log(`pep-worldwide: merged ${slices.length} shards → ${dataset.count}/${screenableExpected} screenable persons complete, ${terminalItems.length} upstream-unmatchable source item(s) recorded, source total ${expected} → ${outfile}`);
   return 0;
 }
 
