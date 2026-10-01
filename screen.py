@@ -6521,6 +6521,47 @@ def attach_full_results(task_gid, full_report, register, run_time):
         log(f"OK full results attached to {task_gid} (full report + results register)")
     return ok_report and ok_register
 
+def task_attachment_names(task_gid):
+    """Names of the files attached to a task, or None when Asana cannot be read."""
+    r = asana_request("GET", "https://app.asana.com/api/1.0/attachments",
+                      params={"parent": task_gid, "opt_fields": "name", "limit": 100})
+    if r is None or r.status_code != 200:
+        return None
+    try:
+        return [a.get("name", "") for a in (r.json().get("data") or []) if isinstance(a, dict)]
+    except Exception:
+        return None
+
+def has_full_results(names):
+    """Both full-results files present (same contract as delivery-watchdog.mjs)."""
+    names = names or []
+    return (any(re.match(r"^full-screening-report-\d{4}-\d{2}-\d{2}\.txt$", n or "") for n in names)
+            and any(re.match(r"^screening-results-register-\d{4}-\d{2}-\d{2}\.csv$", n or "") for n in names))
+
+def heal_full_results(existing_gid, narrative, rebuild, register, run_time,
+                      possible_matches, adverse_findings, pep_findings):
+    """A re-run that finds today's report already delivered must still deliver
+    its full results if the first run's attachment upload failed — otherwise
+    Control Retry's re-run skips the card (dedup) and the gap can never heal
+    while the Delivery Watchdog keeps failing. Attaches only when missing."""
+    if not FULL_RESULTS_ATTACH:
+        return
+    names = task_attachment_names(existing_gid)
+    if names is None:
+        log(f"FAIL full results: could not list attachments of {existing_gid} — delivery UNVERIFIABLE")
+        FULL_RESULTS_FAILED["failed"] = True
+        return
+    if has_full_results(names):
+        log(f"  full results already attached to {existing_gid}")
+        return
+    log(f"  {existing_gid} was delivered WITHOUT its full results — attaching them now (self-heal)")
+    full_report = rebuild({"full": True}) if rebuild is not None else narrative
+    if not attach_full_results(existing_gid, full_report, register if register is not None
+                               else build_results_register(possible_matches, [], adverse_findings,
+                                                           pep_findings), run_time):
+        log(f"FAIL full results: self-heal upload to {existing_gid} failed")
+        FULL_RESULTS_FAILED["failed"] = True
+
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
                       rebuild=None, customer_gids=None, register=None):
     dt = run_time.strftime("%d %b %Y")
@@ -6529,6 +6570,8 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
         log(f"SKIP: a {mode} report for {dt} was already delivered as "
             f"{existing_gid} (dedup check added 2026-09-24 after the 17 Sep "
             f"duplicate-posting incident) — not posting a duplicate")
+        heal_full_results(existing_gid, narrative, rebuild, register, run_time,
+                          possible_matches, adverse_findings, pep_findings)
         progress("delivered", task_gid=existing_gid)
         return existing_gid
     n_s, n_a, n_p = len(possible_matches), len(adverse_findings), len(pep_findings)

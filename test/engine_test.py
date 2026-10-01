@@ -4635,6 +4635,44 @@ _dj_src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "s
 check("drop_junk_names: applied to all seven core lists in BOTH list-building paths",
       _dj_src.count('drop_junk_names(label, names) for label, names in (') == 2)
 
+# ── FULL RESULTS SELF-HEAL: a re-run attaches missing files to today's report ──
+check("has_full_results: both files required",
+      screen.has_full_results(["full-screening-report-2026-10-02.txt", "screening-results-register-2026-10-02.csv"])
+      and not screen.has_full_results(["full-screening-report-2026-10-02.txt"]) and not screen.has_full_results(None))
+_heal_calls = []
+class _HResp:
+    def __init__(self, code, data): self.status_code, self._d, self.text = code, data, ""
+    def json(self): return self._d
+def _heal_asana(existing):
+    def _f(method, url, **kw):
+        _heal_calls.append((method, url))
+        if method == "GET" and url.endswith("/attachments"):
+            return _HResp(200, {"data": [{"name": n} for n in existing]})
+        if method == "POST" and url.endswith("/attachments"):
+            return _HResp(200, {"data": {"gid": "a1"}})
+        return _HResp(200, {"data": {}})
+    return _f
+_orig_ar_heal, _prev_frf_heal = screen.asana_request, screen.FULL_RESULTS_FAILED["failed"]
+try:
+    screen.FULL_RESULTS_FAILED["failed"] = False
+    screen.asana_request = _heal_asana([])
+    screen.heal_full_results("rep-1", "card", lambda caps: "FULL", b"csv", _dt.datetime(2026, 10, 2), [], [], [])
+    _healed = [c for c in _heal_calls if c[0] == "POST"]
+    check("self-heal: a delivered report missing its full results gets both files on the re-run",
+          len(_healed) == 2 and not screen.FULL_RESULTS_FAILED["failed"])
+    _heal_calls.clear()
+    screen.asana_request = _heal_asana(["full-screening-report-2026-10-02.txt", "screening-results-register-2026-10-02.csv"])
+    screen.heal_full_results("rep-1", "card", lambda caps: "FULL", b"csv", _dt.datetime(2026, 10, 2), [], [], [])
+    check("self-heal: nothing is re-uploaded when the full results are already attached",
+          not [c for c in _heal_calls if c[0] == "POST"])
+    screen.asana_request = lambda method, url, **kw: _HResp(500, {})
+    screen.heal_full_results("rep-1", "card", None, b"csv", _dt.datetime(2026, 10, 2), [], [], [])
+    check("self-heal: an unreadable attachment list fails the delivery gate (never 'delivered')",
+          screen.FULL_RESULTS_FAILED["failed"])
+finally:
+    screen.asana_request = _orig_ar_heal
+    screen.FULL_RESULTS_FAILED["failed"] = _prev_frf_heal
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
