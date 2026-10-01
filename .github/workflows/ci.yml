@@ -205,6 +205,8 @@ jobs:
         run: node test/asset-integrity.test.mjs
       - name: Run readiness-review currency guard (re-score addendum matches the live estate)
         run: node test/readiness-review.test.mjs
+      - name: Run screening delivery workflow regression tests
+        run: node test/screening-delivery-workflow.test.mjs
       - name: Run CI coverage drift guard (every test file is wired into a workflow)
         run: node test/ci-coverage.test.mjs
       - name: Run site-currency verdict tests (a stale or unreadable site can never read as current)
