@@ -199,6 +199,21 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance fails when the worldwide PEP artifact is partial',
     !pp.domains.pep.operational);
 
+  const sourceExceptionsPep = {
+    ...pep,
+    sourceExpected: 50002,
+    unmatchableSourceItems: [
+      { qid: 'Q900001', target: 'Q900001', reason: 'no-label-alias-or-wikipedia-sitelink' },
+      { qid: 'Q900002', target: 'Q900002', reason: 'missing-from-current-wikidata' },
+    ],
+  };
+  const pse = assessRuntime({ results, pepDataset: sourceExceptionsPep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance keeps complete screenable PEP coverage operational while disclosing current upstream items with no matchable identity',
+    pse.domains.pep.operational
+    && pse.domains.pep.warnings.some(r => r.includes('upstream source-data exceptions'))
+    && pse.domains.pep.evidence.sourceExpected === 50002
+    && pse.domains.pep.evidence.unmatchableSourceItems.length === 2);
+
   const pepLiveErrors = structuredClone(results);
   pepLiveErrors.enrichment.pepErrors = 5;
   pepLiveErrors.enrichment.skipped = 1;
