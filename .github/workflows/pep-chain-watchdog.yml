@@ -129,7 +129,25 @@ jobs:
       - name: Dispatch Sanctions Screen to rebuild runtime assurance
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          # Numeric run id, passed via env (never interpolated into the shell).
+          SHARD_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
+          # Only a run whose merge job actually PUBLISHED an artifact needs a
+          # refresh. A sharded run with no checkpoint backlog (the harvest is
+          # already complete) skips its shard and merge jobs and still concludes
+          # success; re-screening the whole customer base for that would be an
+          # hour-long no-op.
+          curl -sSf -H "authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${SHARD_RUN_ID}/jobs?per_page=100" > jobs.json
+          merged=$(node -e '
+            const j = JSON.parse(require("fs").readFileSync("jobs.json", "utf8")).jobs || [];
+            console.log(j.some(x => x.name === "merge" && x.conclusion === "success") ? "1" : "0");
+          ')
+          if [ "$merged" != "1" ]; then
+            echo "sharded run ${SHARD_RUN_ID} published no artifact (no label backlog) — no runtime refresh needed"
+            exit 0
+          fi
           code=$(curl -sS -o /tmp/screen-dispatch.out -w '%{http_code}' -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \

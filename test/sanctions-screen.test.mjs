@@ -1311,6 +1311,43 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   check('PEP shard: each slice is stamped with the run that produced it',
     /PEP_SHARD_RUN:\s*\$\{\{\s*github\.run_id/.test(shardWf));
 
+  /* The overlay's `git checkout FETCH_HEAD -- <checkpoint>` STAGES the shared
+     checkpoint, so a shard commit built with `git add -- <slice>` alone carried
+     it too. One such branch was merged into main, and its spent checkpoint (at
+     the 12-resume cap) rode every harvest checkout: the weekly chain refused
+     to resume and never ran again. Pin all three layers of the fix. */
+  {
+    const publish = shardWf.slice(shardWf.indexOf("Publish this shard's slice"), shardWf.indexOf('  merge:'));
+    check('PEP shard: a slice commit unstages the overlaid checkpoint and verifies it carries only the slice',
+      /git reset -q\s*\n\s*git add -A -- data\/pep-shard\.json/.test(publish)
+      && /git diff --cached --name-only/.test(publish)
+      && /"\$staged" != "data\/pep-shard\.json"/.test(publish));
+    const pepWf = readFileSync(join(ROOT, '.github/workflows/pep-worldwide.yml'), 'utf8');
+    const overlay = pepWf.slice(pepWf.indexOf('Overlay the previous artifact + any checkpoint'), pepWf.indexOf('Harvest the worldwide PEP list'));
+    check('PEP checkpoint: the harvest discards any checkpoint from the main checkout before overlaying the state branch',
+      overlay.indexOf('rm -f data/pep-worldwide-checkpoint.json') !== -1
+      && overlay.indexOf('rm -f data/pep-worldwide-checkpoint.json') < overlay.indexOf('git fetch origin pep-worldwide-state'));
+    const { existsSync: inTree } = await import('node:fs');
+    check('PEP checkpoint: main carries no harvest state (checkpoint and shard slices live only on data branches)',
+      ['data/pep-worldwide-checkpoint.json', 'data/pep-shard.json', 'data/pep-shard-checkpoint.json']
+        .every(f => !inTree(join(ROOT, f))));
+    /* A push that edits the harvester re-runs this workflow. With the harvest
+       already complete there is no checkpoint, and every shard used to fail red
+       on that. The plan job must turn it into a clean no-op, and still fail
+       loudly when there is neither a checkpoint nor a complete artifact. */
+    const plan = shardWf.slice(shardWf.indexOf('  plan:'), shardWf.indexOf('  shard:'));
+    check('PEP shard: no checkpoint + complete artifact is a no-op; anything else without a checkpoint fails loudly',
+      /backlog=1/.test(plan) && /backlog=0/.test(plan)
+      && /!d\.partial/.test(plan) && /::error::no checkpoint/.test(plan)
+      && /needs: plan\s*\n\s*if: needs\.plan\.outputs\.backlog == '1'/.test(shardWf));
+    /* The merge job holds contents: write only, so a dispatch from it 403s,
+       turns the successful merge red and suppresses the watchdog refresh. */
+    const mergeJob = shardWf.slice(shardWf.indexOf('  merge:'))
+      .split('\n').filter(l => !/^\s*#/.test(l)).join('\n');
+    check('PEP shard: the contents-only merge job does not attempt a workflow dispatch it has no permission for',
+      !/\/dispatches/.test(mergeJob) && !/actions:\s*write/.test(mergeJob));
+  }
+
   /* Slices live on long-lived pep-shard-<i> branches, so a shard that fails
      leaves the PREVIOUS run's slice in place for the merge to pick up. Merging
      a stale, half-labelled slice publishes a list quietly short of real PEPs —

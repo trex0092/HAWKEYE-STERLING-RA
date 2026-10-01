@@ -86,6 +86,14 @@ jobs:
           # harvest — fetch it so a hollow harvest cannot pass as "first run".
           # A checkpoint on the branch means the previous run paused at its
           # time budget; overlaying it makes this run a RESUME, not a restart.
+          # The state branch is the ONLY source of a checkpoint. Discard any
+          # copy that arrived with the checkout of main first: a shard branch
+          # merged into main once carried a spent checkpoint already at the
+          # resume cap, and because the overlay below only REPLACES a file the
+          # state branch has, that stale copy survived into every run and each
+          # one refused to resume ("already resumed 12 times") — the weekly
+          # harvest could never start again.
+          rm -f data/pep-worldwide-checkpoint.json
           if git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
             git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
             git checkout FETCH_HEAD -- data/pep-worldwide-checkpoint.json 2>/dev/null || true

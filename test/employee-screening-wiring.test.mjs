@@ -37,6 +37,18 @@ for (const wf of WORKFLOWS) {
     FORWARD_RE(wf.varName).test(text));
 }
 
+/* An unset repo variable expands to an EMPTY string, which both engines read as
+   "employee screening disabled". Every screening workflow must therefore fall
+   back to the live HR - Employees project (1216239131596624) so a missing
+   variable can never silently drop the employee population. The onboarding
+   screen forwarded the bare variable with no fallback. */
+const EMPLOYEE_PROJECT_GID = '1216239131596624';
+for (const wf of WORKFLOWS) {
+  const text = readFileSync(wf.file, 'utf8');
+  check(`${wf.file}: ${wf.varName} falls back to the HR - Employees project when the repo variable is unset`,
+    new RegExp(wf.varName + ":\\s*\\$\\{\\{\\s*vars\\." + wf.varName + "\\s*\\|\\|\\s*'" + EMPLOYEE_PROJECT_GID + "'\\s*\\}\\}").test(text));
+}
+
 /* If screen.py's own env-var name for this population ever changes, every one
    of the above should change together -- catch a partial rename early rather
    than as a live 404 in production. */
