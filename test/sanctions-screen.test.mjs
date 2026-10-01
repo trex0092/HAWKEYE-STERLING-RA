@@ -605,13 +605,10 @@ check('the issue step is always()-guarded so it still fires after the red bail',
   /if: always\(\) && \(steps\.screen\.outputs\.screen_error == 'true'/.test(screenYml));
 check('control-retry heals on missing SUCCESS (a red bail is now re-dispatched)',
   /conclusion.*success/.test(retryYml) && /sanctions-screen\.yml/.test(retryYml));
-check('operational sanctions screen keeps schedule/manual control semantics; the only push trigger is the adverse-media engine path',
-  /^\s*schedule:/m.test(screenYml)
-  && /^\s*workflow_dispatch:/m.test(screenYml)
-  && /^\s*push:/m.test(screenYml)
-  && /branches:\s*\[main\]/.test(screenYml)
-  && /paths:\s*\n\s*- ['"]scripts\/adverse-media\.mjs['"]/.test(screenYml)
-  && !/paths:[\s\S]{0,220}- ['"]scripts\/sanctions-screen\.mjs['"]/.test(screenYml));
+check('operational sanctions screen is schedule/manual only — code pushes are validated by CI instead',
+  !/^\s*push:/m.test(screenYml)
+  && /^\s*schedule:/m.test(screenYml)
+  && /^\s*workflow_dispatch:/m.test(screenYml));
 check('sanctions runtime concurrency cannot be confused with source-code validation runs',
   /group:\s*sanctions-screen-runtime/.test(screenYml)
   && /cancel-in-progress:\s*false/.test(screenYml));
