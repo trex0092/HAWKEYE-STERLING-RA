@@ -28,6 +28,9 @@ on:
       - 'netlify/functions/brain-soul.js'
       - 'data/ai-assets.json'
       - 'scripts/advisor-eval.mjs'
+      # The workflow itself decides how the eval runs (secret, egress
+      # allow-list, failure routing): a change to it is re-verified too.
+      - '.github/workflows/advisor-eval.yml'
 
 # Least privilege at the top level; the job declares its own write scope.
 permissions:
