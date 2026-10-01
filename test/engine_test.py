@@ -4673,6 +4673,21 @@ finally:
     screen.asana_request = _orig_ar_heal
     screen.FULL_RESULTS_FAILED["failed"] = _prev_frf_heal
 
+# ── safe_err: encoded names in request URLs never reach the public log ───────
+class _ConnErr(Exception):
+    pass
+_se = screen.safe_err(_ConnErr("HTTPSConnectionPool(host='news.google.com', port=443): Max retries exceeded "
+                              "with url: /rss/search?q=%22Jane+Roe%22+fraud&hl=en (Caused by Timeout)"))
+check("safe_err: the URL path and query (URL-encoded subject name) are redacted",
+      "Jane" not in _se and "%22" not in _se and "news.google.com" in _se and "_ConnErr" in _se)
+_se2 = screen.safe_err(RuntimeError("GDELT HTTP 429 for https://api.gdeltproject.org/api/v2/doc/doc?query=%22Jane%20Roe%22"))
+check("safe_err: a bare URL keeps its host but loses the query", "Jane" not in _se2 and "gdeltproject.org" in _se2)
+_src_se = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
+check("safe_err: no news-feed failure line logs the raw exception text",
+      "google-news fetch/parse failed ({_k}): {str(e)" not in _src_se
+      and "unavailable for this subject ({str(e)" not in _src_se
+      and "retry failed ({str(e)" not in _src_se)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
