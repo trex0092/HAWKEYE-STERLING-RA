@@ -118,6 +118,86 @@ export function makeApi({ repo, token, fetchImpl = fetch, wait = sleep }) {
   };
 }
 
+/* MORNING DISPATCH — the on-time start for the daily screening, so its results
+ * are in Asana before 09:00 UAE (05:00 UTC). GitHub starts this repo's
+ * scheduled runs 4-6h late (sanctions-screen's 05:37 slot started 09:41-11:57
+ * UTC, 19-30 Sep 2026) and drops most firings of a frequent cron, but a
+ * workflow_dispatch starts at once. screening-morning-dispatch.yml is
+ * therefore scheduled several times in the UTC evening: whichever firing
+ * GitHub delivers first waits on the runner until 00:05 UTC, then dispatches
+ * both screens; later firings find today's runs and exit. 00:05 is the
+ * earliest SAME-UTC-day start (freshness-check counts runs per UTC day). An
+ * accepted dispatch is NOT proof of delivery -- each control's own evidence,
+ * Delivery Watchdog and Control Retry still judge that. */
+export const MORNING_CONTROLS = ['sanctions-screen.yml', 'weekly-adverse-media.yml'];
+export const MORNING_DISPATCH_UTC_MIN = 5;
+export const MORNING_MAX_WAIT_MS = 330 * 60000; // inside the job's 350-minute timeout
+
+export function morningPlan(nowMs, { atMin = MORNING_DISPATCH_UTC_MIN } = {}) {
+  if (!Number.isFinite(nowMs)) throw new Error('invalid clock');
+  const today = dayStart(nowMs);
+  // Evening firings (>= 12:00 UTC) prepare the NEXT UTC day; a firing delayed
+  // past midnight serves the day it lands in.
+  const targetDayMs = new Date(nowMs).getUTCHours() >= 12 ? today + DAY : today;
+  const dispatchAtMs = targetDayMs + atMin * 60000;
+  return { targetDay: new Date(targetDayMs).toISOString().slice(0, 10), targetDayMs,
+    dispatchAtMs, waitMs: Math.max(0, dispatchAtMs - nowMs) };
+}
+
+export function morningDecision(runs, targetDayMs, branch = 'main') {
+  if (!Array.isArray(runs) || !Number.isFinite(targetDayMs)) {
+    return { action: 'unknown', reason: 'invalid run history or target day' };
+  }
+  const started = runs.find(r => r && r.head_branch === branch && EVENTS.has(r.event)
+    && Number.isFinite(runTime(r)) && runTime(r) >= targetDayMs);
+  if (started) {
+    return { action: 'skip', reason: `run ${started.id} (${started.event}, ${started.status}) already started on the target UTC day` };
+  }
+  // A run still active from the PREVIOUS day does not cover today: dispatching
+  // queues behind it (cancel-in-progress is false), never in parallel.
+  return { action: 'dispatch', reason: 'no run has started on the target UTC day' };
+}
+
+async function morning() {
+  const api = makeApi({ repo: process.env.GITHUB_REPOSITORY, token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN });
+  const plan = morningPlan(Date.now());
+  const rows = [];
+  if (plan.waitMs > MORNING_MAX_WAIT_MS) {
+    rows.push({ id: 'all', action: 'deferred', reason: `fired ${Math.round(plan.waitMs / 60000)} min before the ${plan.targetDay} 00:05 UTC dispatch — longer than one job may wait; a later scheduled firing dispatches` });
+  } else {
+    console.log(`morning-dispatch: target ${plan.targetDay} 00:05 UTC; waiting ${Math.round(plan.waitMs / 60000)} min`);
+    for (let left = plan.waitMs; left > 0; left = plan.dispatchAtMs - Date.now()) {
+      await sleep(Math.min(left, 10 * 60000));
+      console.log(`morning-dispatch: ${Math.max(0, Math.round((plan.dispatchAtMs - Date.now()) / 60000))} min to dispatch`);
+    }
+    for (const id of MORNING_CONTROLS) {
+      try {
+        const path = `/actions/workflows/${encodeURIComponent(id)}`;
+        const { data: workflow } = await api(path);
+        if (workflow.state !== 'active') throw new Error(`workflow is ${workflow.state || 'unknown'}, not auto-enabling it`);
+        const runs = await readRuns(api, path + '/runs', { branch: 'main', created: '>=' + plan.targetDay });
+        const decision = morningDecision(runs, plan.targetDayMs);
+        if (decision.action === 'dispatch') {
+          await api(path + '/dispatches', { method: 'POST', body: { ref: 'main' } });
+          decision.action = 'dispatched';
+          decision.reason += '; request accepted, delivery NOT yet verified';
+        }
+        rows.push({ id, ...decision });
+      } catch (err) {
+        rows.push({ id, action: 'unknown', reason: String(err.message) });
+      }
+    }
+  }
+  const cell = value => String(value).replaceAll('|', '/').replace(/[\r\n]/g, ' ');
+  const report = ['# Morning screening dispatch', '',
+    'An accepted dispatch is not delivery evidence; Delivery Watchdog and each control judge that.', '',
+    '| Workflow | State | Detail |', '| --- | --- | --- |',
+    ...rows.map(r => `| ${cell(r.id)} | ${cell(r.action)} | ${cell(r.reason)} |`), ''].join('\n');
+  console.log(report);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
+  if (rows.some(r => r.action === 'unknown')) process.exitCode = 1;
+}
+
 export async function readRuns(api, path, filters, maxPages = 5) {
   const runs = [];
   for (let page = 1; page <= maxPages; page++) {
@@ -244,11 +324,33 @@ export async function selfTest() {
   await assert.rejects(readRuns(async () => ({ data: { workflow_runs: [] }, next: true }), '/actions/runs', {}, 2));
   const pages = await readRuns(async path => ({ data: { workflow_runs: [r()] }, next: new URL('https://example.test' + path).searchParams.get('page') === '1' }), '/actions/runs', {});
   assert.equal(pages.length, 2);
-  console.log('workflow-recovery: 25 offline regression checks passed');
+  // Morning dispatch: evening firings target the next UTC day's 00:05.
+  const evening = morningPlan(Date.parse('2026-10-01T21:30:00Z'));
+  assert.equal(evening.targetDay, '2026-10-02');
+  assert.equal(evening.waitMs, (2 * 60 + 35) * 60000);
+  const late = morningPlan(Date.parse('2026-10-02T01:40:00Z'));
+  assert.equal(late.targetDay, '2026-10-02');
+  assert.equal(late.waitMs, 0, 'a firing delayed past 00:05 dispatches at once');
+  assert.ok(morningPlan(Date.parse('2026-10-01T19:07:00Z')).waitMs <= MORNING_MAX_WAIT_MS,
+    'the earliest scheduled slot, if delivered on time, fits inside one job');
+  assert.ok(morningPlan(Date.parse('2026-10-01T13:00:00Z')).waitMs > MORNING_MAX_WAIT_MS);
+  const target = Date.parse('2026-10-02T00:00:00Z');
+  assert.equal(morningDecision([], target).action, 'dispatch');
+  assert.equal(morningDecision([r({ created_at: '2026-10-02T00:05:30Z', status: 'in_progress', conclusion: null })], target).action, 'skip');
+  assert.equal(morningDecision([r({ created_at: '2026-10-02T03:00:00Z', conclusion: 'failure' })], target).action, 'skip',
+    'a failed run today is Control Retry\'s to heal, never a second morning dispatch');
+  assert.equal(morningDecision([r({ created_at: '2026-10-01T22:00:00Z', status: 'in_progress', conclusion: null })], target).action, 'dispatch',
+    'yesterday\'s still-running screen does not cover today');
+  assert.equal(morningDecision([r({ created_at: '2026-10-02T01:00:00Z', head_branch: 'feature' })], target).action, 'dispatch');
+  assert.equal(morningDecision([r({ created_at: '2026-10-02T01:00:00Z', event: 'push' })], target).action, 'dispatch');
+  assert.equal(morningDecision(null, target).action, 'unknown');
+  assert.deepEqual(MORNING_CONTROLS, ['sanctions-screen.yml', 'weekly-adverse-media.yml']);
+  console.log('workflow-recovery: 39 offline regression checks passed');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  (process.argv.includes('--self-test') ? selfTest() : main()).catch(err => {
+  (process.argv.includes('--self-test') ? selfTest()
+    : process.argv.includes('--morning') ? morning() : main()).catch(err => {
     console.error('workflow-recovery: ' + err.message);
     process.exitCode = 1;
   });

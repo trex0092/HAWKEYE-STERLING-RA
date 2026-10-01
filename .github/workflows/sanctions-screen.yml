@@ -44,9 +44,9 @@ on:
   # (05:00 UTC). GitHub delivers this repo's scheduled events 4-6h late (the
   # 05:37 slot started 09:41-11:57 UTC over 19-30 Sep) and drops most of a
   # frequent cron (control-retry's 36 daily slots produced 1-3 runs a day), so
-  # no cron here can promise 09:00. The on-time trigger is an external
-  # workflow_dispatch shortly after 00:00 UTC (~95 min run, in Asana ~06:00
-  # UAE). This slot is the BACKSTOP: the earliest same-UTC-day start (a run on
+  # no cron here can promise 09:00. The on-time trigger is
+  # screening-morning-dispatch.yml's workflow_dispatch at 00:05 UTC (~95 min
+  # run, in Asana ~06:00 UAE). This slot is the BACKSTOP: the earliest same-UTC-day start (a run on
   # the previous UTC day would break freshness-check's maxAgeDays 0 window),
   # so a missed dispatch still lands ~08:00-10:00 UAE, not mid-afternoon.
   schedule:

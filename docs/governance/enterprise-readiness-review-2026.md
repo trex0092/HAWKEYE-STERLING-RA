@@ -307,6 +307,15 @@ COSO, ISO 31000, FATF RBA, Wolfsberg guidance, and GDPR/PDPL as cited inline.*
 deliberately left unedited (same convention as the code-scanning triage record). Every claim below
 is [OBSERVED] against commit `8576ad61` unless marked otherwise.*
 
+*Estate re-verification · 1 October 2026 — Screening Morning Dispatch added: GitHub delivers this
+repository's scheduled events 4-6h late, so the daily screening reached Asana mid-afternoon (UAE).
+The new workflow fires in the UTC evening, waits on the runner until 00:05 UTC and dispatches
+Sanctions Screen and Daily Screening, so results land before 09:00 UAE; each screen's own cron
+stays the backstop. An accepted dispatch is never reported as delivery. Timing change only — no
+scored control changed.*
+
+Verified at HEAD: 69 workflows · 188 markdown documents under docs/ (155 excluding docs/research/auto).
+
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days
 old, for a human to review and delete by hand; it never deletes a branch itself, and hard-excludes

@@ -4387,9 +4387,11 @@ _cust = {"gid": "111", "name": "Example Gold Trading LLC", "email": "owner@examp
 _emp = {"gid": "222", "name": "John Example Staff", "individuals": ["John Example Staff"],
         "entity_owners": [], "kyc": {}, "kind": "employee"}
 _mv = screen.mask_values_for_customer(_cust)
-check("mask: customer name, individuals, entity owners, email and ID number are masked",
+check("mask: customer name, individuals and entity owners are masked",
       all(v in _mv for v in ("Example Gold Trading LLC", "Jane Q Example", "JANE Q EXAMPLE",
-                             "jane q example", "Example Holdings Ltd", "owner@example.com", "P1234567")))
+                             "jane q example", "Example Holdings Ltd")))
+check("mask: email and ID numbers are not echoed into mask commands (never logged; CodeQL private-data)",
+      "owner@example.com" not in _mv and "P1234567" not in _mv)
 check("mask: values shorter than MASK_MIN_LEN are not masked",
       "Al" not in _mv and all(len(v) >= screen.MASK_MIN_LEN for v in _mv))
 _lines = []
@@ -4406,6 +4408,23 @@ try:
 finally:
     if _prev_gha is not None:
         os.environ["GITHUB_ACTIONS"] = _prev_gha
+# Regression: a Copilot Autofix (#725) made the no-emitter path `return 0`
+# unconditionally, so production runs masked nothing. On the runner the
+# default path must emit to stdout.
+import io as _io_priv, contextlib as _ctx_priv
+_prev_gha2 = os.environ.get("GITHUB_ACTIONS")
+os.environ["GITHUB_ACTIONS"] = "true"
+_buf = _io_priv.StringIO()
+try:
+    with _ctx_priv.redirect_stdout(_buf):
+        _n_prod = screen.mask_population([_emp])
+finally:
+    if _prev_gha2 is None:
+        os.environ.pop("GITHUB_ACTIONS", None)
+    else:
+        os.environ["GITHUB_ACTIONS"] = _prev_gha2
+check("mask: on GitHub Actions the default path emits ::add-mask:: to stdout (masking is live)",
+      _n_prod > 0 and "::add-mask::John Example Staff" in _buf.getvalue())
 check("subject_log_ref identifies a row by gid, never by name",
       screen.subject_log_ref(_cust) == "subject gid 111" and "Example" not in screen.subject_log_ref(_cust))
 _src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
