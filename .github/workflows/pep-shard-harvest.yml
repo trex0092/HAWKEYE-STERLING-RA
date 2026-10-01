@@ -47,6 +47,7 @@ jobs:
     # Writes ONLY refs/heads/pep-shard-<index>, never the shared state branch.
     permissions:
       contents: write
+      actions: write
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -272,3 +273,23 @@ jobs:
               ...Object.entries(d.classes).map(([k, v]) => "| " + k + " | " + v + " |")];
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join("\n") + "\n");
           '
+
+      - name: Refresh screening runtime evidence after complete sharded PEP harvest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # merge-shards now refuses a partial artifact, so reaching this step
+          # means pep-worldwide-state contains a complete PEP list. Re-run the
+          # runtime generator so PEP assurance is refreshed from that artifact,
+          # rather than leaving a stale degraded badge until tomorrow's schedule.
+          code=$(curl -sS -o /tmp/screen-dispatch.out -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/sanctions-screen.yml/dispatches" \
+            -d '{"ref":"main"}')
+          if [ "$code" != "204" ]; then
+            cat /tmp/screen-dispatch.out
+            echo "::error::Sanctions Screen refresh dispatch failed with HTTP $code"
+            exit 1
+          fi
+          echo "Sanctions Screen dispatched to rebuild screening assurance from the complete sharded PEP artifact"
