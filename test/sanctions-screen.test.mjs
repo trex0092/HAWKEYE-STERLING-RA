@@ -973,6 +973,15 @@ const _missing = pep.confirmedMissingQids({
 }, ['Q10', 'Q11', 'Q12', 'Q13']);
 check('PEP harvest: only explicit missing/invalid Wikidata entities become source tombstones',
   _missing.join(',') === 'Q10,Q11');
+const _unscreenable = pep.confirmedUnscreenableQids({
+  entities: {
+    Q20: { id: 'Q20', labels: {}, aliases: {}, sitelinks: {}, claims: { P31: [] } },
+    Q21: { id: 'Q21', labels: { en: { value: 'Named Person' } }, aliases: {}, sitelinks: {}, claims: {} },
+    Q22: { id: 'Q22', missing: '' },
+  },
+}, ['Q20', 'Q21', 'Q22', 'Q23']);
+check('PEP harvest: only successfully observed live entities with no supported identity become source-quality exceptions',
+  _unscreenable.join(',') === 'Q20');
 const _ds = pep.buildPepDataset({
   harvestedAt: '2026-08-05T00:00:00Z',
   holderRows: [

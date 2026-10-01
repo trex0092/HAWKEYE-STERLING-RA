@@ -534,6 +534,29 @@ export function confirmedMissingQids(data, requestedQids = []) {
   });
 }
 
+/* A live source item can also be intrinsically unmatchable: after labels,
+   aliases, Wikipedia sitelinks and explicit name-valued claims have all been
+   checked, the current entity still exposes no human name. That is not an
+   ingestion outage and infinite retries cannot make it screenable. Classify it
+   only from a successful API response, never from a missing response/network
+   failure. These QIDs remain explicit source-quality exceptions in the final
+   artifact and assurance evidence. */
+export function confirmedUnscreenableQids(data, requestedQids = []) {
+  if (!data || data.error || data.errors) return [];
+  const requested = (Array.isArray(requestedQids) ? requestedQids : [])
+    .map(String).filter(q => /^Q\d+$/.test(q));
+  const redirects = new Map((Array.isArray(data.redirects) ? data.redirects : [])
+    .map(r => [String(r?.from || ''), String(r?.to || '')])
+    .filter(([from, to]) => /^Q\d+$/.test(from) && /^Q\d+$/.test(to)));
+  const entities = data.entities || {};
+  return requested.filter(qid => {
+    const target = redirects.get(qid) || qid;
+    const entity = entities[target] || entities[qid];
+    if (!entity || Object.hasOwn(entity, 'missing') || Object.hasOwn(entity, 'invalid')) return false;
+    return !hasScreenableName(namesFromEntity(entity));
+  });
+}
+
 /* Assemble the artifact. holderRows: [{ person, pos, end?, classKey }];
    positions: Map(posQid → {label, country}); names: Map(personQid →
    {name, aliases}). Dedupe by person, first class in PEP_ROOT_CLASSES order
@@ -1183,6 +1206,7 @@ async function harvest(outfile) {
      one richer wbgetentities pass that follows redirects and exposes Wikipedia
      sitelink titles as a name fallback. Network failures still remain pending. */
   const confirmedMissing = new Set();
+  const confirmedUnscreenable = new Set();
   const fallbackClaimKeys = new Map();
   const fallbackPending = pendingLabels(allQids, names);
   if (fallbackPending.length) {
@@ -1192,6 +1216,7 @@ async function harvest(outfile) {
       const data = await fetchJsonSafe(fallbackLabelsUrl(batch));
       bankLabelNames(names, data, batch);
       for (const qid of confirmedMissingQids(data, batch)) confirmedMissing.add(qid);
+      for (const qid of confirmedUnscreenableQids(data, batch)) confirmedUnscreenable.add(qid);
       const redirects = new Map((Array.isArray(data?.redirects) ? data.redirects : [])
         .map(x => [String(x?.from || ''), String(x?.to || '')]));
       for (const qid of batch) {
@@ -1222,14 +1247,16 @@ async function harvest(outfile) {
     writeJsonGz(outfile, {
       v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, run: PEP_SHARD_RUN,
       harvestedAt, names: [...names], missingQids: [...confirmedMissing],
+      unscreenableQids: [...confirmedUnscreenable],
     });
     console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`
-      + (confirmedMissing.size ? `; ${confirmedMissing.size} stale WDQS holder QID(s) confirmed missing/invalid` : ''));
+      + (confirmedMissing.size ? `; ${confirmedMissing.size} stale WDQS holder QID(s) confirmed missing/invalid` : '')
+      + (confirmedUnscreenable.size ? `; ${confirmedUnscreenable.size} live source QID(s) have no screenable identity` : ''));
     return 0;
   }
 
   const unresolved = pendingLabels(allQids, names, { count: 1, index: 0 })
-    .filter(qid => !confirmedMissing.has(qid));
+    .filter(qid => !confirmedMissing.has(qid) && !confirmedUnscreenable.has(qid));
   if (unresolved.length) {
     writeCp('labels', { labelQids: allQids, names: [...names], next: { labelIdx: 0 } });
     shipPartialNow();
@@ -1239,18 +1266,24 @@ async function harvest(outfile) {
 
   await enrichOffices();
 
-  const finalHolderRows = confirmedMissing.size
-    ? holderRows.filter(r => !confirmedMissing.has(r.person))
+  const excludedSourceQids = new Set([...confirmedMissing, ...confirmedUnscreenable]);
+  const finalHolderRows = excludedSourceQids.size
+    ? holderRows.filter(r => !excludedSourceQids.has(r.person))
     : holderRows;
-  const finalExpected = Math.max(0, expectedTotal - confirmedMissing.size);
+  const finalExpected = Math.max(0, expectedTotal - excludedSourceQids.size);
   if (confirmedMissing.size) {
     console.log(`pep-worldwide: excluding ${confirmedMissing.size} stale WDQS holder QID(s) positively reported missing/invalid by Wikidata: ${[...confirmedMissing].join(', ')}`);
+  }
+  if (confirmedUnscreenable.size) {
+    console.warn(`pep-worldwide: ${confirmedUnscreenable.size} live source QID(s) expose no screenable identity after labels, aliases, sitelinks and name claims; recording as source-quality exceptions: ${[...confirmedUnscreenable].join(', ')}`);
   }
   const dataset = buildPepDataset({
     harvestedAt, holderRows: finalHolderRows,
     positions: new Map([...positions].map(([q, p]) => [q, p])), names, expected: finalExpected,
   });
   if (confirmedMissing.size) dataset.sourceTombstones = [...confirmedMissing].sort();
+  if (confirmedUnscreenable.size) dataset.sourceUnscreenable = [...confirmedUnscreenable].sort();
+  if (excludedSourceQids.size) dataset.sourceExpected = expectedTotal;
   const gate = writeArtifact(dataset, (carried) => {
     const rebuilt = buildPepDataset({
       harvestedAt, holderRows: finalHolderRows,
@@ -1258,6 +1291,8 @@ async function harvest(outfile) {
       names: mergeShardNames([[...names], carried]), expected: finalExpected,
     });
     if (confirmedMissing.size) rebuilt.sourceTombstones = [...confirmedMissing].sort();
+    if (confirmedUnscreenable.size) rebuilt.sourceUnscreenable = [...confirmedUnscreenable].sort();
+    if (excludedSourceQids.size) rebuilt.sourceExpected = expectedTotal;
     return rebuilt;
   });
   if (!gate.ok) {
@@ -1285,6 +1320,7 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
   const slices = [];
   const seen = new Map();
   const confirmedMissing = new Set();
+  const confirmedUnscreenable = new Set();
   for (const f of shardFiles) {
     let s = null;
     try { s = readJsonMaybeGz(f); } catch (e) { s = null; }
@@ -1308,8 +1344,12 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
     for (const qid of (Array.isArray(s.missingQids) ? s.missingQids : [])) {
       if (/^Q\d+$/.test(String(qid))) confirmedMissing.add(String(qid));
     }
+    for (const qid of (Array.isArray(s.unscreenableQids) ? s.unscreenableQids : [])) {
+      if (/^Q\d+$/.test(String(qid))) confirmedUnscreenable.add(String(qid));
+    }
     console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names${s.run ? ` (run ${s.run})` : ''}`
-      + (Array.isArray(s.missingQids) && s.missingQids.length ? `; ${s.missingQids.length} confirmed source tombstone(s)` : ''));
+      + (Array.isArray(s.missingQids) && s.missingQids.length ? `; ${s.missingQids.length} confirmed source tombstone(s)` : '')
+      + (Array.isArray(s.unscreenableQids) && s.unscreenableQids.length ? `; ${s.unscreenableQids.length} source-quality exception(s)` : ''));
     slices.push(s.names);
   }
   const runs = [...new Set(seen.values())];
@@ -1392,18 +1432,26 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
   const holderUniverse = new Set(st.holderRows.map(r => r.person));
   const tombstones = new Set([...confirmedMissing]
     .filter(qid => holderUniverse.has(qid) && !hasScreenableName(names.get(qid))));
-  const effectiveExpected = Math.max(0, expected - tombstones.size);
-  const effectiveHolderRows = tombstones.size
-    ? st.holderRows.filter(r => !tombstones.has(r.person))
+  const unscreenable = new Set([...confirmedUnscreenable]
+    .filter(qid => holderUniverse.has(qid) && !hasScreenableName(names.get(qid))));
+  const excludedSourceQids = new Set([...tombstones, ...unscreenable]);
+  const effectiveExpected = Math.max(0, expected - excludedSourceQids.size);
+  const effectiveHolderRows = excludedSourceQids.size
+    ? st.holderRows.filter(r => !excludedSourceQids.has(r.person))
     : st.holderRows;
   if (tombstones.size) {
     console.log(`pep-worldwide: excluding ${tombstones.size} stale WDQS holder QID(s) positively reported missing/invalid by Wikidata: ${[...tombstones].sort().join(', ')}`);
+  }
+  if (unscreenable.size) {
+    console.warn(`pep-worldwide: ${unscreenable.size} live source QID(s) expose no screenable identity after all supported name fields; recording explicit source-quality exceptions: ${[...unscreenable].sort().join(', ')}`);
   }
   const dataset = buildPepDataset({
     harvestedAt: st.harvestedAt, holderRows: effectiveHolderRows, positions: st.positions, names,
     expected: effectiveExpected,
   });
   if (tombstones.size) dataset.sourceTombstones = [...tombstones].sort();
+  if (unscreenable.size) dataset.sourceUnscreenable = [...unscreenable].sort();
+  if (excludedSourceQids.size) dataset.sourceExpected = expected;
   /* The sharded path exists to FINISH a stuck label backlog. Publishing a
      partial merge as a successful recovery makes its workflow green while the
      PEP runtime correctly stays degraded. Refuse that contradiction: the prior
