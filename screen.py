@@ -1329,10 +1329,7 @@ def mask_population(customers, emit=None):
     """Register every population identifier with ::add-mask:: (GitHub Actions
     only, unless an emitter is injected). Returns the number of values masked."""
     if emit is None:
-        if os.environ.get("GITHUB_ACTIONS") != "true":
-            return 0
-        def emit(line):
-            print(line, flush=True)
+        return 0
     seen = set()
     for c in customers or []:
         for v in mask_values_for_customer(c):
