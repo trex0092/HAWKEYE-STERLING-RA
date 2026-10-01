@@ -237,7 +237,7 @@ export function parsePrincipals(task) {
   if (!block) return [];
   const people = [];
   const seen = new Set();
-  const push = (name, role, nationality, dob = '', passport = '') => {
+  const push = (name, role, nationality, dob = '', passport = '', corporate = false) => {
     const n = String(name || '').replace(/\s+/g, ' ').trim();
     const k = normalizeName(n);
     if (!n || !k || seen.has(k)) return;
@@ -250,6 +250,7 @@ export function parsePrincipals(task) {
       nationality: String(nationality || '').trim(),
       dob: String(dob || '').trim(),
       passport: String(passport || '').trim(),
+      corporate: !!corporate,
     });
   };
   const partRe = /Individual\s*\d+\s*[—\-–:]\s*([^\n]*)([\s\S]*?)(?=Individual\s*\d+\s*[—\-–:]|$)/gi;
@@ -263,7 +264,14 @@ export function parsePrincipals(task) {
       const nat = /\bNationality\s*:\s*([^\n]+)/i.exec(sub);
       const dob = /\b(?:Date of Birth|DOB|Birth Date)\s*:\s*([^\n]+)/i.exec(sub);
       const pass = /\b(?:Passport(?: No\.?| Number)?|Passport ID)\s*:\s*([^\n]+)/i.exec(sub);
-      push(nm[1], role || 'Principal', nat ? nat[1] : '', dob ? dob[1] : '', pass ? pass[1] : '');
+      /* The CDD record states each party's kind ("Individual / Corporate:
+         Company"). A corporate shareholder is screened as an ORGANISATION, so
+         its case asks for a registration number, not a DOB/passport it cannot
+         have. Matching is unaffected either way: every name is screened
+         against every list. */
+      const kind = /\bIndividual\s*\/\s*Corporate\s*:\s*([^\n]+)/i.exec(sub);
+      const corporate = !!(kind && /\b(?:company|corporate|entity|legal person|llp|ltd|limited|trust|foundation|partnership)\b/i.test(kind[1]));
+      push(nm[1], role || 'Principal', nat ? nat[1] : '', dob ? dob[1] : '', pass ? pass[1] : '', corporate);
     }
   }
   if (!structured) {
@@ -320,7 +328,7 @@ export function parseSubjects(tasks) {
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({
-        key, name: p.name, entityType: 'individual',
+        key, name: p.name, entityType: p.corporate ? 'organisation' : 'individual',
         jurisdiction: p.nationality || undefined,
         nationality: p.nationality || undefined,
         dob: p.dob || undefined,
@@ -839,6 +847,11 @@ export function subjectLabel(a) {
     const ctx = [a.role || 'Principal', a.parent ? 'of ' + a.parent : ''].filter(Boolean).join(' ');
     return a.name + (ctx ? ' — ' + ctx : '') + ' [individual]';
   }
+  /* A corporate shareholder is an organisation that still belongs to a
+     customer: keep "Shareholder of <customer>" so the alert names the record. */
+  if (a && a.parent) {
+    return a.name + ' — ' + (a.role || 'Principal') + ' of ' + a.parent + ' [organisation]';
+  }
   return a ? a.name : '';
 }
 
@@ -894,7 +907,7 @@ export function buildScreenReport(alerts, cleared, today, meta = {}) {
 export function buildScreenHtml(alerts, { runLink, today, degraded, loadedLists, failures } = {}) {
   const items = alerts.map(a => {
     const juris = a.jurisdiction ? ' (' + esc(a.jurisdiction) + ')' : '';
-    const who = a.entityType === 'individual'
+    const who = (a.entityType === 'individual' || a.parent)
       ? '<strong>' + esc(a.name) + '</strong> <em>(' + esc([a.role || 'Principal', a.parent ? 'of ' + a.parent : ''].filter(Boolean).join(' ')) + ')</em>'
       : '<strong>' + esc(a.name) + '</strong>';
     return '<li>' + who + juris + ' — ' + esc(matchSummary(a)) + '</li>';
@@ -1157,6 +1170,35 @@ export async function asanaPaged(projectGid, path, optFields, token, what, { sof
 
 export async function fetchAsanaSubjects(projectGid, token) {
   return parseSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
+}
+
+/* HR – Employees: every task IS a natural person (the task name is the
+   employee's name), not a legal entity. parseSubjects types a top-level task as
+   an organisation, which made an employee's PEP hit read "entity type differs"
+   and asked the MLRO for a registration number instead of DOB / passport /
+   nationality. Same keys as before (state continuity: a standing employee match
+   is not re-raised as new); only the type, role and identifiers change. */
+export function parseEmployeeSubjects(tasks) {
+  const byGid = new Map((Array.isArray(tasks) ? tasks : []).map(t => [t && t.gid, t]));
+  return parseSubjects(tasks).map(s => {
+    if (s.entityType !== 'organisation' || s.parent) return s;
+    const notes = String((byGid.get(s.gid) || {}).notes || '');
+    const field = re => { const m = re.exec(notes); return m ? m[1].trim() : undefined; };
+    const nationality = field(/\bNationality\s*:\s*([^\n]+)/i);
+    return {
+      ...s,
+      entityType: 'individual',
+      role: 'Employee',
+      jurisdiction: nationality || s.jurisdiction,
+      nationality,
+      dob: field(/\b(?:Date of Birth|DOB|Birth Date)\s*:\s*([^\n]+)/i),
+      passport: field(/\bPassport(?: No\.?| Number| number)?\s*:\s*([^\n]+)/i),
+    };
+  });
+}
+
+export async function fetchAsanaEmployeeSubjects(projectGid, token) {
+  return parseEmployeeSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
 }
 
 /* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
@@ -2047,7 +2089,7 @@ async function main() {
 
   if (EMPLOYEE_PROJECT_GID) {
     let employees;
-    try { employees = await fetchAsanaSubjects(EMPLOYEE_PROJECT_GID, asanaToken); }
+    try { employees = await fetchAsanaEmployeeSubjects(EMPLOYEE_PROJECT_GID, asanaToken); }
     catch (e) { return bailUnscreened('could not read the HR – Employees project (' + (e && e.message || e) + ') — employee screening is configured, so the run must not proceed without it', today); }
     if (!employees.length) return bailUnscreened('the HR – Employees project returned 0 subjects while employee screening is configured — set ASANA_EMPLOYEE_PROJECT_GID empty to disable it explicitly', today);
     console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
