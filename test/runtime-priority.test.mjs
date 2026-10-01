@@ -87,7 +87,7 @@ try {
   pep.writeJsonGz(outfile, { harvested: stamp, expected: 2, count: 1, partial: true,
     entries: [{ qid: 'Q1', name: 'Synthetic Published One', aliases: [] }] });
   const preload = join(dir, 'stub.mjs');
-  writeFileSync(preload, "globalThis.fetch = async (url) => { const u = new URL(url); console.log('FETCH_IDS=' + u.searchParams.get('ids')); if (u.hostname !== 'www.wikidata.org' || u.searchParams.get('ids') !== 'Q2') throw new Error('Optional office work or already-published name fetched before missing person'); return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ entities: { Q2: { id: 'Q2', missing: '' } } }) }; };\n");
+  writeFileSync(preload, "globalThis.fetch = async (url) => { const u = new URL(url); console.log('FETCH_IDS=' + u.searchParams.get('ids')); if (u.hostname !== 'www.wikidata.org' || u.searchParams.get('ids') !== 'Q2') throw new Error('Optional office work or already-published name fetched before unresolved person'); return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ entities: { Q2: { id: 'Q2', labels: {}, aliases: {} } } }) }; };\n");
   const run = spawnSync(process.execPath,
     ['--import', pathToFileURL(preload).href, 'scripts/pep-worldwide.mjs', 'harvest', outfile],
     { cwd: process.cwd(), encoding: 'utf8', timeout: 15000,
