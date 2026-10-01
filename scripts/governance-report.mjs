@@ -25,13 +25,20 @@
 
 /* Shared Asana client: bounded retry on 429/5xx so a transient blip never
    drops the day's report (idempotency is by title-prefix check in main). */
+import { SECTIONS, requireApprovedSection } from './asana-sections.mjs';
 import { readFileSync } from 'node:fs';
 import { asana } from './asana-notify.mjs';
 
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
 /* Section resolved BY NAME at runtime (created if missing); GID overrides it. */
-export const GOV_SECTION_NAME = 'AI & Platform Governance';
+/* Governance reports file under the approved "Regulatory Changes" section of
+   HAWKEYE STERLING APP (scripts/asana-sections.mjs, #701/#703), like the other
+   governance reports. This used to resolve "AI & Platform Governance" by name
+   and CREATE it when absent, which re-provisioned a fifth, unapproved section
+   in the monitoring project (new gid each time) and left every alert routed
+   there by gid refused. */
+export const GOV_SECTION_NAME = SECTIONS.regulatory.name;
 const GOV_SECTION_GID = process.env.ASANA_GOV_SECTION_GID || '';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -310,15 +317,13 @@ async function listTaskNames(projectGid) {
   return names;
 }
 
-/* Resolve the section GID by name, creating it if absent (idempotent). */
-async function ensureSection(projectGid, name) {
-  if (GOV_SECTION_GID) return GOV_SECTION_GID;
-  const d = await asana('/projects/' + projectGid + '/sections?limit=100&opt_fields=name');
-  const want = name.trim().toLowerCase();
-  const found = (d.data || []).find(s => String(s.name || '').trim().toLowerCase() === want);
-  if (found) return found.gid;
-  const created = await asana('/projects/' + projectGid + '/sections', { method: 'POST', body: JSON.stringify({ data: { name } }) });
-  return created.data && created.data.gid;
+/* The governance section is pinned to an approved destination: never resolve
+   it by name and never create a section in the monitoring project. An
+   unapproved override is refused (the caller logs it; the task itself is still
+   created) instead of being honoured or recreated. */
+async function ensureSection(projectGid) {
+  const section = GOV_SECTION_GID || SECTIONS.regulatory.gid;
+  return requireApprovedSection(projectGid, section);
 }
 
 function runUrl() {
@@ -366,7 +371,7 @@ async function main() {
   const gid = made.data && made.data.gid;
   if (gid) {
     try {
-      const sectionGid = await ensureSection(REG_PROJECT_GID, GOV_SECTION_NAME);
+      const sectionGid = await ensureSection(REG_PROJECT_GID);
       if (sectionGid) await asana('/sections/' + sectionGid + '/addTask', { method: 'POST', body: JSON.stringify({ data: { task: gid } }) });
     } catch (e) { console.warn('governance-report: could not file under section (' + (e && e.message || e) + ')'); }
   }

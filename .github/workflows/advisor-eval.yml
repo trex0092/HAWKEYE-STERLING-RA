@@ -96,7 +96,15 @@ jobs:
           # 1218785568483509 (same name, re-provisioned gid, verified against the
           # live Asana API just now). Updated the repo variable to match and
           # corrected this literal fallback for defense-in-depth.
-          ASANA_SECTION_GID: ${{ vars.ASANA_WEEKLY_SECTION_GID || '1218785568483509' }}
+          # REPOINTED 2026-10-01: "AI & Platform Governance" is not one of the
+          # four approved HAWKEYE STERLING APP sections (scripts/asana-sections.mjs,
+          # #701/#703), so every alert routed there was refused ("an explicit
+          # approved section is required"). #703 moved the other governance
+          # reports to "Regulatory Changes"; this follows it. Pinned, not read
+          # from a repo variable: a stale variable cannot misroute an approved
+          # destination, and test/asana-notify.test.mjs fails CI on any
+          # unapproved section literal.
+          ASANA_SECTION_GID: '1218451992088222'
         # Title must not claim a regression when the eval could not run (e.g. the
         # API returned 400s on a billing lapse) — the report's Result line is the
         # discriminator, written by scripts/advisor-eval.mjs.

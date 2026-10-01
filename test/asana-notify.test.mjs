@@ -492,5 +492,37 @@ check('a sectionless mirror still joins the project',
     /const want = fitAsanaName\(name\)/.test(src));
 }
 
+/* ── every hard-coded monitoring section is an approved one ──
+   HAWKEYE STERLING APP is restricted to the approved sections in
+   scripts/asana-sections.mjs (#701/#703). Workflows and scripts still carried
+   section gids that no longer exist ("AI & Platform Governance"
+   1218785568483509, "FATF list moves" 1218451989290544, "Assessment Report"
+   1216203370612916): Advisor Eval's alert was refused outright and FATF
+   list-change alerts landed outside any section. Any SECTION-named setting
+   with a literal gid must name an approved section. */
+{
+  const { SECTIONS: APPROVED } = await import('../scripts/asana-sections.mjs');
+  const approvedGids = new Set(Object.values(APPROVED).map(x => x.gid));
+  const { readdirSync } = await import('node:fs');
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const files = [
+    ...readdirSync(join(root, '.github/workflows')).filter(f => f.endsWith('.yml')).map(f => '.github/workflows/' + f),
+    ...readdirSync(join(root, 'scripts')).filter(f => f.endsWith('.mjs')).map(f => 'scripts/' + f),
+    'screen.py',
+  ];
+  const offenders = [];
+  for (const f of files) {
+    readFileSync(join(root, f), 'utf8').split('\n').forEach((line, i) => {
+      const code = line.replace(/^\s*(#|\/\/|\*).*$/, '');
+      if (!/SECTION/i.test(code)) return;
+      for (const m of code.matchAll(/['"](12\d{14})['"]/g)) {
+        if (!approvedGids.has(m[1])) offenders.push(f + ':' + (i + 1) + ' ' + m[1]);
+      }
+    });
+  }
+  check('every literal monitoring section gid in workflows/scripts/screen.py is an approved section'
+    + (offenders.length ? ' — unapproved: ' + offenders.join(', ') : ''), offenders.length === 0);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

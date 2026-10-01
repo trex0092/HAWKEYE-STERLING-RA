@@ -281,7 +281,11 @@ jobs:
           # project "Sanctions/Media/PEP - Monitoring" / section "Screening
           # Daily Report".
           ASANA_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          ASANA_SECTION_GID: ${{ vars.ASANA_DELIVERY_SECTION_GID || '1216203370612916' }}
+          # REPOINTED 2026-10-01: "Assessment Report" (1216203370612916) no
+          # longer exists in HAWKEYE STERLING APP; sanctions results file
+          # under the approved "Screening Sanctions Update" section
+          # (scripts/asana-sections.mjs). Pinned like the other routes.
+          ASANA_SECTION_GID: '1218451960830318'
           ASANA_ASSIGNEE_GID: ${{ vars.ASANA_ASSIGNEE_GID || '1213645083721304' }}
           DATE_ISO: ${{ steps.date.outputs.DATE_ISO }}
           DATE_DISPLAY: ${{ steps.date.outputs.DATE_DISPLAY }}

@@ -21,8 +21,10 @@ const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWK
    "Ongoing Monitoring" project so all monitoring alerts stay
    together; the client-assessment digest/backup stay in HAWKEYE STERLING APP. */
 const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
-/* "FATF list moves" section of that project, so list-change alerts file neatly. */
-const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1216203370612916';
+/* FATF list moves file under the approved "Regulatory Changes" section
+   (scripts/asana-sections.mjs). The old "FATF list moves" and "Assessment
+   Report" sections no longer exist in HAWKEYE STERLING APP. */
+const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1218451992088222';
 const FATF_SKIP_ALERT = Number(process.env.FATF_SKIP_ALERT) || 2; /* consecutive unreachable runs before a monitoring-gap alert */
 
 /* FATF naming → the app's baseline naming */

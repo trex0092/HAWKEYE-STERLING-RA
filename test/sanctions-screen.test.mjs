@@ -3,7 +3,7 @@
      { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
    Usage: node test/sanctions-screen.test.mjs */
 import {
-  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, normalizeResult, normalizeScreenResponse,
+  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
@@ -92,6 +92,35 @@ check('each individual subject carries the parent customer gid + role for the al
 check('subjectLabel marks an individual with role + parent, entity stays plain',
   subjectLabel(withPpl.find(x => x.entityType === 'individual')).includes('[individual]') &&
   subjectLabel(withPpl[0]) === 'Amber International FZCO');
+
+/* A CDD record states each party's kind ("Individual / Corporate: Company").
+   Corporate shareholders were screened as individuals (their case asked for a
+   DOB/passport), and every HR employee task was screened as an ORGANISATION
+   (PEP hits read "entity type differs", no DOB/passport/nationality). Keys are
+   unchanged so standing matches are not re-raised. */
+{
+  const mixed = parseSubjects([{ gid: '9', name: 'ZAVERI AND CO TRADING FZCO', notes:
+    'SECTION 4 - IDENTIFICATIONS\n    Individual 1 - Shareholder\n    Name: PRANJIVANDAS ZAVERI LLP\n    Individual / Corporate: Company\n    Nationality: India\n'
+    + '    Individual 2 - Director\n    Name: MITESH JITENDRA RAICHURA\n    Individual / Corporate: Individual\n    Nationality: India\n    Date of Birth / Registration: March 24, 1986\n'
+    + 'SECTION 5 - PF\n' }]);
+  const corp = mixed.find(x => x.name === 'PRANJIVANDAS ZAVERI LLP');
+  const person = mixed.find(x => x.name === 'MITESH JITENDRA RAICHURA');
+  check('a corporate shareholder is screened as an organisation, still linked to its customer and role',
+    corp && corp.entityType === 'organisation' && corp.parent === 'ZAVERI AND CO TRADING FZCO' && corp.role === 'Shareholder'
+    && corp.key === 'pranjivandas zaveri llp|ubo|9');
+  check('a natural-person director stays an individual', person && person.entityType === 'individual');
+  check('a corporate shareholder alert still names its customer',
+    subjectLabel(corp) === 'PRANJIVANDAS ZAVERI LLP — Shareholder of ZAVERI AND CO TRADING FZCO [organisation]');
+  const emp = parseEmployeeSubjects([{ gid: 'e1', completed: true, name: 'LUISA FERNANDA MEJIA LOPEZ', notes:
+    'Name: Luisa Fernanda Mejia Lopez\nDate of Birth: November 05, 1992\nNationality: Colombia\nPassport number: AX514261\nExpiry Date: August 26, 2031\n' }]);
+  check('an HR employee is screened as an individual employee with DOB, nationality and passport (key unchanged)',
+    emp.length === 1 && emp[0].entityType === 'individual' && emp[0].role === 'Employee'
+    && emp[0].dob === 'November 05, 1992' && emp[0].nationality === 'Colombia' && emp[0].passport === 'AX514261'
+    && emp[0].key === 'luisa fernanda mejia lopez');
+  const src = readFileSync(new URL('../scripts/sanctions-screen.mjs', import.meta.url), 'utf8');
+  check('the employee population is fetched through the employee parser',
+    /employees = await fetchAsanaEmployeeSubjects\(EMPLOYEE_PROJECT_GID/.test(src));
+}
 
 /* Two DISTINCT active customers sharing a legal name: the duplicate entity row
    is deduped, but the second customer's principals must STILL be screened (they
