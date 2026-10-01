@@ -66,6 +66,24 @@ export function findTodaysReports(tasks, today, titlePrefix = TITLE_PREFIX) {
   });
 }
 
+/* Which UTC day's report is DUE at `nowMs`? The report is due once the
+   scheduled run and both self-healing retry passes have had their chance --
+   the hour the workflow's own cron fires (18:00 UTC). control-retry.yml
+   (scripts/workflow-recovery.mjs) also dispatches this watchdog whenever it
+   has no successful run "today", which happens just after 00:00 UTC. Judging
+   TODAY's report then raised "NO DAILY SCREENING REPORT FILED TODAY" alarms
+   in Asana for a report that was not due yet (2026-09-30 00:44, 2026-10-01
+   01:28 UTC; both days' reports were filed within hours). Before the due
+   hour the check verifies the PREVIOUS UTC day instead: a day that IS due,
+   so the result is never green on unverified state, and a genuinely missing
+   report still fails loudly. */
+export const REPORT_DUE_UTC_HOUR = 18;
+export function reportDayToVerify(nowMs, dueHourUtc = REPORT_DUE_UTC_HOUR) {
+  const now = new Date(nowMs);
+  const day = now.getUTCHours() >= dueHourUtc ? now : new Date(nowMs - 86400000);
+  return day.toISOString().slice(0, 10);
+}
+
 const DEADLINE_MS = 90000; // same bound as asana-alert.mjs, same rationale
 
 async function main() {
@@ -74,7 +92,7 @@ async function main() {
     process.exit(2);
   }
 
-  const today = new Date().toISOString().slice(0, 10); // UTC date, matching Asana's created_at
+  const today = reportDayToVerify(Date.now()); // the UTC day whose report is due (matches Asana's created_at)
   let timer;
   // clearTimeout in the finally below is required, not cosmetic: an
   // uncleared timer keeps Node alive until it fires, so a FAST successful
@@ -95,13 +113,13 @@ async function main() {
   const todays = findTodaysReports(tasks, today);
 
   if (todays.length) {
-    console.log('delivery-watchdog: OK -- ' + todays.length + ' report(s) filed today (' + today + '): '
+    console.log('delivery-watchdog: OK -- ' + todays.length + ' report(s) filed for ' + today + ' (UTC): '
       + todays.map(t => t.permalink_url || t.name).join(', '));
     return;
   }
 
-  console.error('delivery-watchdog: NO "' + TITLE_PREFIX + '" task found for today (' + today
-    + ') in project ' + PROJECT_GID + ' -- the daily sanctions/PEP/adverse-media screening has NOT '
+  console.error('delivery-watchdog: NO "' + TITLE_PREFIX + '" task found for ' + today
+    + ' (UTC, now due) in project ' + PROJECT_GID + ' -- the daily sanctions/PEP/adverse-media screening has NOT '
     + 'been evidenced as delivered.');
   process.exitCode = 1;
 }

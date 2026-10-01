@@ -2,7 +2,7 @@
    matching logic -- offline, the same split advisor-bias-eval.mjs uses for
    level(): no live Asana project needed, no ASANA_ACCESS_TOKEN needed.
    Usage: node test/delivery-watchdog.test.mjs */
-import { findTodaysReports, TITLE_PREFIX } from '../scripts/delivery-watchdog.mjs';
+import { findTodaysReports, TITLE_PREFIX, reportDayToVerify, REPORT_DUE_UTC_HOUR } from '../scripts/delivery-watchdog.mjs';
 
 let passed = 0, failed = 0;
 const check = (name, cond) => { if (cond) { passed++; console.log('  ok  ' + name); } else { failed++; console.log('FAIL  ' + name); } };
@@ -37,6 +37,21 @@ check('title match is prefix-based, not exact (real titles carry a stats suffix)
   && matching.name !== TITLE_PREFIX);
 check('a custom titlePrefix argument is honoured (site-currency style reuse)',
   findTodaysReports([{ name: 'Custom Report XYZ', created_at: TODAY }], TODAY, 'Custom Report').length === 1);
+
+/* The report is due at REPORT_DUE_UTC_HOUR (the workflow's 18:00 UTC cron).
+   control-retry dispatched this watchdog just after midnight UTC and it judged
+   a report that was not due yet, filing false "NO DAILY SCREENING REPORT
+   FILED TODAY" alarms (2026-09-30 00:44, 2026-10-01 01:28 UTC). Before the
+   due hour it must verify the PREVIOUS day, which is due. */
+check('the due hour matches the workflow cron (18:00 UTC)', REPORT_DUE_UTC_HOUR === 18);
+check('just after midnight UTC verifies the previous day (the regression: 2026-09-30 00:44)',
+  reportDayToVerify(Date.parse('2026-09-30T00:44:00Z')) === '2026-09-29');
+check('before the due hour verifies the previous day',
+  reportDayToVerify(Date.parse('2026-10-01T17:59:59Z')) === '2026-09-30');
+check('at the due hour verifies today', reportDayToVerify(Date.parse('2026-10-01T18:00:00Z')) === '2026-10-01');
+check('late in the day verifies today', reportDayToVerify(Date.parse('2026-10-01T23:59:59Z')) === '2026-10-01');
+check('the previous-day rollover crosses a month boundary',
+  reportDayToVerify(Date.parse('2026-10-01T01:28:00Z')) === '2026-09-30');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

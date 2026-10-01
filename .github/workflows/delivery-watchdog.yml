@@ -70,5 +70,5 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node scripts/asana-alert.mjs \
-            "NO DAILY SCREENING REPORT FILED TODAY -- mandatory sanctions/PEP/adverse-media obligation not evidenced as delivered" \
-            "The Delivery Watchdog found no 'Daily AML/CFT Screening Report' task created today in the screening project. This means today's mandatory sanctions/PEP/adverse-media screening has NOT been evidenced as delivered to the MLRO -- the underlying run (weekly-adverse-media.yml) may have been killed on every attempt today, or Asana delivery itself failed. Check the run history and consider a manual workflow_dispatch of Daily Screening: $RUN_URL"
+            "NO DAILY SCREENING REPORT FILED FOR A DUE DAY -- mandatory sanctions/PEP/adverse-media obligation not evidenced as delivered" \
+            "The Delivery Watchdog found no 'Daily AML/CFT Screening Report' task for the most recent DUE day in the screening project (today's report after 18:00 UTC; before that, the previous UTC day's -- a report is not judged before it is due). The run log names the exact date checked. This means that day's mandatory sanctions/PEP/adverse-media screening has NOT been evidenced as delivered to the MLRO -- the underlying run (weekly-adverse-media.yml) may have been killed on every attempt that day, or Asana delivery itself failed. Check the run history and consider a manual workflow_dispatch of Daily Screening: $RUN_URL"
