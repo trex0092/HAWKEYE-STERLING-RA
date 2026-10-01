@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-01T01:29:10.379Z",
-  "githubRunId": "36801252297",
-  "commit": "efdbdb9c8132e6bd2fc2697830fe3b60ab86fcfd",
-  "screenedSubjects": 906,
+  "generatedAt": "2026-10-01T10:10:12.762Z",
+  "githubRunId": "36847333292",
+  "commit": "1161cfeab4cd2e58ee81daff39395da042799c41",
+  "screenedSubjects": 952,
   "requiredSourceIds": [
     "un-consolidated",
     "ofac-sdn",
@@ -15,18 +15,12 @@
   "reasons": [],
   "warnings": [],
   "evidence": {
-    "screenedSubjects": 906,
+    "screenedSubjects": 952,
     "loadedSources": [
       {
         "id": "uk-ofsi",
         "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
-        "count": 58336,
-        "partial": false
-      },
-      {
-        "id": "ofac-consolidated",
-        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
-        "count": 1664,
+        "count": 58385,
         "partial": false
       },
       {
@@ -36,15 +30,21 @@
         "partial": false
       },
       {
-        "id": "eu-fsf",
-        "name": "EU — Consolidated financial sanctions list (CSV)",
-        "count": 31073,
+        "id": "ofac-consolidated",
+        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
+        "count": 1664,
         "partial": false
       },
       {
         "id": "ofac-sdn",
         "name": "US OFAC — SDN list (CSV)",
         "count": 19452,
+        "partial": false
+      },
+      {
+        "id": "eu-fsf",
+        "name": "EU — Consolidated financial sanctions list (CSV)",
+        "count": 31073,
         "partial": false
       }
     ],
