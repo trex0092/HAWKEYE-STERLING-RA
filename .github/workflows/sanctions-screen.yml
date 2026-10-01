@@ -43,23 +43,14 @@ on:
   schedule:
     - cron: '37 5 * * *'   # 05:37 UTC = 09:37 UAE daily (odd minute)
   workflow_dispatch:
-  # Adverse-media runtime changes need live provider evidence before their
-  # operational badge can legitimately turn green. Limit the push trigger to
-  # the actual adverse-media engine so ordinary merges still do not create a
-  # two-hour full-base operational run.
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/adverse-media.mjs'
 
 permissions:
   contents: read
 
 # This workflow is an OPERATIONAL control, not a code-validation workflow.
-# Source changes are exercised by CI. Ordinary merges remain schedule/manual
-# only; the narrow adverse-media path trigger above is the exception because a
-# provider-runtime fix cannot be validated from unit tests alone and must refresh
-# the runtime assurance evidence it is intended to repair.
+# Source changes are exercised by CI. Keeping the runtime workflow schedule/
+# manual-only prevents ordinary merges from creating hour-long full-base
+# screens or being mistaken by freshness checks for today's mandatory control.
 concurrency:
   group: sanctions-screen-runtime
   cancel-in-progress: false
