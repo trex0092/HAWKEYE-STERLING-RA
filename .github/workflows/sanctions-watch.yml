@@ -106,7 +106,7 @@ jobs:
 
       - name: Trigger an immediate re-screen (TFS without-delay duty)
         # A designation-list CONTENT change re-screens the live customer base
-        # NOW instead of waiting for the case engine's 05:37 cron. The
+        # NOW instead of waiting for the case engine's next daily run. The
         # dispatched run is a normal sanctions-screen.yml run, so the TFS
         # timeline log resolves it as the re-screen evidence automatically on
         # the next watch run, with the shortened latency on the record.

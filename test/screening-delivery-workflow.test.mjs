@@ -6,7 +6,7 @@ const steps = source.split(/^      - /m);
 const step = id => steps.find(text => text.includes('        id: ' + id + '\n'));
 
 test('daily runtime schedule and provider pacing are preserved', () => {
-  assert.match(source, /cron: '37 5 \* \* \*'/);
+  assert.match(source, /cron: '17 0 \* \* \*'/);
   assert.match(step('screen'), /SCREEN_ENRICH_BUDGET_MS: '6000000'/);
   assert.doesNotMatch(step('screen'), /SCREEN_CONCURRENCY:/);
   assert.match(source, /timeout-minutes: 120/);

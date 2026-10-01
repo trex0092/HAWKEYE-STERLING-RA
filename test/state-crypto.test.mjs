@@ -60,8 +60,15 @@ for (const [wf, files] of [
     body.includes('state-crypto.mjs encrypt'));
   check(`${wf} plumbs the STATE_ENCRYPTION_KEY secret`,
     body.includes('STATE_ENCRYPTION_KEY: ${{ secrets.STATE_ENCRYPTION_KEY }}'));
-  check(`${wf} warns loudly when persisting plaintext without the key`,
-    /::warning::.*PLAINTEXT/.test(body));
+  /* The repository is PUBLIC and the state carries customer/employee names:
+     without the key the persist step must fail red, never publish plaintext
+     (it used to ::warning:: and commit the plaintext file). */
+  check(`${wf} refuses to persist plaintext without the key (fails red)`,
+    /::error::STATE_ENCRYPTION_KEY is not set - refusing to publish[^\n]*\n\s*exit 1/.test(body)
+    && !/::warning::.*PLAINTEXT/.test(body));
+  check(`${wf} never stages the plaintext state file for the state branch`,
+    !body.includes('git add -- "${state_files[@]}"')
+    && !body.includes('files+=(data/sanctions-screen-state.json data/screening-cases-state.json)'));
   // the plaintext restore must target HEAD: the overlay step stages the
   // fetched branch copy into the index, so an index-relative restore
   // (`git checkout -- $f`) would re-commit the pre-encryption plaintext

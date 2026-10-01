@@ -1290,6 +1290,63 @@ def now_uae():
 def log(msg):
     print(f"[{datetime.datetime.utcnow().strftime('%H:%M:%S')}] {msg}", flush=True)
 
+# ── PUBLIC-LOG PRIVACY — subject identifiers never reach the GitHub log ──────
+# The repository, and so every Actions run log, is PUBLIC. The screening
+# population is the firm's customers, their principals/UBOs/owners and its
+# employees: their identifiers belong in Asana only. As soon as a population is
+# read from Asana, every identifying value is registered with the runner's
+# `::add-mask::` workflow command, so ANY later line of the job prints `***`.
+# Values shorter than MASK_MIN_LEN are skipped: masking a 2-3 character token
+# blanks unrelated log text and identifies no one on its own. The explicit
+# name-bearing log lines are also removed, so masking is a second layer.
+MASK_MIN_LEN = 4
+
+def mask_values_for_customer(c):
+    """Every identifying string for one population row (pure; unit-tested)."""
+    out = []
+    def add(v):
+        t = " ".join(str(v or "").split())
+        if len(t) < MASK_MIN_LEN:
+            return
+        for x in (t, t.upper(), t.lower(), normalize(t)):
+            if x and len(x) >= MASK_MIN_LEN and x not in out:
+                out.append(x)
+    if not c:
+        return out
+    add(c.get("name"))
+    for n in c.get("individuals") or []:
+        add(n)
+    for n in c.get("entity_owners") or []:
+        add(n)
+    add(c.get("email"))
+    for rec in (c.get("kyc") or {}).get("individuals") or []:
+        if isinstance(rec, dict):
+            for k in ("name", "id_number", "emirates_id"):
+                add(rec.get(k))
+    return out
+
+def mask_population(customers, emit=None):
+    """Register every population identifier with ::add-mask:: (GitHub Actions
+    only, unless an emitter is injected). Returns the number of values masked."""
+    if emit is None:
+        if os.environ.get("GITHUB_ACTIONS") != "true":
+            return 0
+        def emit(line):
+            print(line, flush=True)
+    seen = set()
+    for c in customers or []:
+        for v in mask_values_for_customer(c):
+            if v in seen:
+                continue
+            seen.add(v)
+            emit("::add-mask::" + v)
+    return len(seen)
+
+def subject_log_ref(c):
+    """Non-identifying run-log reference: the opaque Asana gid, never a name."""
+    gid = (c or {}).get("gid") if isinstance(c, dict) else None
+    return f"subject gid {gid}" if gid else "subject (no gid)"
+
 # ── RUN PROGRESS — forensics for a sweep that dies without a trace ───────────
 # When a GitHub runner is LOST mid-sweep the whole VM disappears: the step is
 # left "in_progress" with no conclusion, NO post-step runs (not even one marked
@@ -2219,7 +2276,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                 bing_ok = True
                 _BING_STATE["consecutive_failures"] = 0
                 _BING_GATE.reward()
-                log(f"  adverse-media last-resort retry recovered Bing News coverage for '{name}'")
+                log("  adverse-media last-resort retry recovered Bing News coverage for this subject")
             except Exception as e:
                 log(f"  adverse-media last-resort Bing retry failed ({str(e)[:80]})")
         # GDELT already has its own retry/fallback query and breaker accounting.
@@ -2234,9 +2291,9 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
     # am_error and the report degrades, rather than returning [] that reads as
     # "no adverse media".
     if attempts > 0 and failures >= attempts and not gdelt_ok and not bing_ok:
-        raise RuntimeError(f"adverse-media: all {attempts} Google-News fetches + GDELT + Bing News failed for '{name}'")
+        raise RuntimeError(f"adverse-media: all {attempts} Google-News fetches + GDELT + Bing News failed for this subject")
     if _GNEWS_STATE["open"] and attempts == 0 and not gdelt_ok and not bing_ok:
-        raise RuntimeError(f"adverse-media: Google News circuit open + GDELT + Bing News failed for '{name}'")
+        raise RuntimeError("adverse-media: Google News circuit open + GDELT + Bing News failed for this subject")
 
     articles = dedup_stories(articles)
     # Sort: flagged first, then most-recent first (recency ranking).
@@ -3857,6 +3914,7 @@ def get_all_customers():
         if not next_page or not next_page.get("offset"):
             break
         params["offset"] = next_page["offset"]
+    masked = mask_population(customers)
     log(f"Loaded {len(customers)} customers")
     progress("customers-loaded", customers=len(customers))
     # Fail-safe: 0 customers is never a legitimate state (the Customer Database is
@@ -3924,8 +3982,11 @@ def get_all_customers():
                 "FATAL: 0 employees read from the HR – Employees project while employee "
                 "screening is configured — refusing to screen a population that silently "
                 "dropped out. Check ASANA_EMPLOYEE_DB_GID or set it empty to disable.")
+        masked += mask_population(employees)
         log(f"Loaded {len(employees)} employees (screened with the same pipeline as customers)")
         customers.extend(employees)
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        log(f"{masked} subject identifier(s) masked in this public run log - names are disclosed in Asana only")
     return customers
 
 # ── SCREENING ─────────────────────────────────────────────────────────────────
@@ -4390,7 +4451,7 @@ def screen_name(name, all_lists):
                 if pm:
                     if phon_mode == "shadow":
                         _PHONETIC_SHADOW["count"] += 1
-                        log(f'  PHONETIC-SHADOW: "{name}" ~ "{orig}" [{list_name}] '
+                        log(f'  PHONETIC-SHADOW: screened subject ~ "{orig}" [{list_name}] '
                             f"{pm} key match, fuzzy score {score} — no hit emitted (shadow mode)")
                     else:
                         hits.append({"list": list_name, "matched_entry": orig, "score": score,
@@ -4407,7 +4468,7 @@ def screen_name(name, all_lists):
                         _SHADOW_CHALLENGER["examples"].append(
                             {"subject": name, "entry": orig, "list": list_name,
                              "score": round(score, 1)})
-                        log(f'  SHADOW-CHALLENGER: "{name}" ~ "{orig}" [{list_name}] '
+                        log(f'  SHADOW-CHALLENGER: screened subject ~ "{orig}" [{list_name}] '
                             f"score {score:.1f} in [{SHADOW_THRESHOLD_VALUE:g}, {THRESHOLD:g}) — log-only, no hit")
     best = {}
     for h in hits:
@@ -4720,7 +4781,7 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                     subjects.append((h["subject_name"],"INDIVIDUAL"))
 
             for subject_name, subject_type in subjects:
-                log(f"  Adverse media search: {subject_name}")
+                log(f"  Adverse media search: {subject_type.lower()} subject of {subject_log_ref(m)}")
                 # Degrade loudly, never abort: search_adverse_media raises when
                 # every source fails, and an unguarded raise here would discard
                 # the already-computed sanctions results and post NO task at all
@@ -4729,7 +4790,7 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                     articles = search_adverse_media(subject_name)
                     lines.append(format_adverse_block(subject_name, articles, subject_type))
                 except Exception as e:
-                    log(f"  ! adverse media unavailable for {subject_name}: {e}")
+                    log(f"  ! adverse media unavailable for a {subject_type.lower()} subject of {subject_log_ref(m)}: {e}")
                     lines.append(f"   ⚠️  ADVERSE MEDIA UNAVAILABLE for {subject_name} — all sources failed this run; re-run or review manually.")
 
             lines.append("")
@@ -4994,7 +5055,7 @@ def run_weekly_adverse(customers, run_time):
                     individuals_screened += 1
             except Exception as e:
                 errors += 1
-                log(f"  ! error screening {subj_name}: {e}")
+                log(f"  ! error screening a {subj_type.lower()} of {subject_log_ref(c)}: {e}")
                 continue
             adverse = [a for a in articles if a["flagged"]]
             if adverse:
@@ -5006,7 +5067,7 @@ def run_weekly_adverse(customers, run_time):
                     "articles": adverse,
                 })
             time.sleep(1)  # rate-limit protection
-        log(f"  [{i}/{len(customers)}] {c['name']} - {len(subjects)} subject(s)")
+        log(f"  [{i}/{len(customers)}] {subject_log_ref(c)} - {len(subjects)} subject(s)")
 
     run_end = now_uae()
     stats = {
@@ -7286,7 +7347,7 @@ def run_onboarding(run_time):
         except Exception:
             # Non-coverage is never silent: a customer we cannot date-stamp is
             # flagged so it is screened by the daily batch and reviewed.
-            log(f"  onboarding: unparseable created_at for '{c.get('name','?')}' — left to daily batch")
+            log(f"  onboarding: unparseable created_at for {subject_log_ref(c)} — left to daily batch")
             continue
         if created >= cutoff:
             fresh.append(c)
@@ -7309,7 +7370,7 @@ def run_onboarding(run_time):
             sig = fraudlabs_email_signal(em)
             if not sig["available"]:
                 fl_lost += 1
-                log(f"  fraudlabs: signal unavailable for '{c['name']}' — {sig['error']}")
+                log(f"  fraudlabs: signal unavailable for {subject_log_ref(c)} — {sig['error']}")
                 continue
             if fraudlabs_material(sig):
                 fl_material += 1

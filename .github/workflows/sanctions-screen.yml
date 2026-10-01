@@ -34,14 +34,23 @@ name: Sanctions Screen
 #   ASANA_OM_AM_PEP_SECTION_GID   optional override (section is found/created by name)
 
 on:
-  # Re-scheduled 2026-07-08 as the SCREENING CASE ENGINE: runs daily after the
-  # Sanctions Watch (05:07) with fresh lists, refreshes the per-subject state,
+  # Re-scheduled 2026-07-08 as the SCREENING CASE ENGINE: runs daily, fetches
+  # every designation list itself (fetchListBody), refreshes the per-subject state,
   # then the case-manager step turns every flag into a managed lifecycle CASE
   # (New -> Under Review -> Cleared/Escalated) with a 5-day SLA and aging
   # alerts. Its own flat alert card + daily audit task stay SUPPRESSED so it
   # never duplicates the unified Daily Screening digest.
+  # 09:00 UAE DELIVERY (2026-10-01): results must be in Asana by 09:00 UAE
+  # (05:00 UTC). GitHub delivers this repo's scheduled events 4-6h late (the
+  # 05:37 slot started 09:41-11:57 UTC over 19-30 Sep) and drops most of a
+  # frequent cron (control-retry's 36 daily slots produced 1-3 runs a day), so
+  # no cron here can promise 09:00. The on-time trigger is an external
+  # workflow_dispatch shortly after 00:00 UTC (~95 min run, in Asana ~06:00
+  # UAE). This slot is the BACKSTOP: the earliest same-UTC-day start (a run on
+  # the previous UTC day would break freshness-check's maxAgeDays 0 window),
+  # so a missed dispatch still lands ~08:00-10:00 UAE, not mid-afternoon.
   schedule:
-    - cron: '37 5 * * *'   # 05:37 UTC = 09:37 UAE daily (odd minute)
+    - cron: '17 0 * * *'   # 00:17 UTC = 04:17 UAE daily (odd minute) — backstop to the on-time dispatch
   workflow_dispatch:
 
 permissions:
@@ -317,7 +326,10 @@ jobs:
                 git checkout HEAD -- "$f" 2>/dev/null || true
               done
             else
-              echo "::warning::screen-state persisted in PLAINTEXT (subject data) - set the STATE_ENCRYPTION_KEY secret to encrypt state commits (P30)"
+              # The repository is PUBLIC: plaintext state carries customer and
+              # employee names, so it is never published. Fail red instead.
+              echo "::error::STATE_ENCRYPTION_KEY is not set - refusing to publish screen-state in PLAINTEXT (customer/employee names) to the public repository; state NOT persisted (P30)"
+              exit 1
             fi
 
             GIT_INDEX_FILE="$(mktemp -u)"
@@ -343,13 +355,8 @@ jobs:
               data/badges/adverse-media-operational.svg
               data/badges/pep-operational.svg
             )
-            if [ -n "$STATE_ENCRYPTION_KEY" ]; then
-              files+=(data/sanctions-screen-state.json.enc data/screening-cases-state.json.enc)
-              git update-index --force-remove data/sanctions-screen-state.json data/screening-cases-state.json 2>/dev/null || true
-            else
-              files+=(data/sanctions-screen-state.json data/screening-cases-state.json)
-              git update-index --force-remove data/sanctions-screen-state.json.enc data/screening-cases-state.json.enc 2>/dev/null || true
-            fi
+            files+=(data/sanctions-screen-state.json.enc data/screening-cases-state.json.enc)
+            git update-index --force-remove data/sanctions-screen-state.json data/screening-cases-state.json 2>/dev/null || true
 
             for f in "${files[@]}"; do
               if [ -e "$f" ]; then
