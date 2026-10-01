@@ -952,6 +952,19 @@ pep.bankLabelNames(_redirectedNames, {
 check('PEP harvest: a merged-QID label is banked back onto the holder QID that WDQS returned',
   _redirectedNames.get('Q10')?.name === 'Redirected Person'
   && _redirectedNames.get('Q20')?.name === 'Redirected Person');
+const _terminalUnmatchable = pep.classifyUnscreenableEntities({
+  redirects: [{ from: 'Q30', to: 'Q31' }],
+  entities: {
+    Q31: { labels: {}, aliases: {}, sitelinks: {} },
+    Q40: { missing: '' },
+    Q50: { labels: { en: { value: 'Screenable Person' } }, aliases: {}, sitelinks: {} },
+  },
+}, ['Q30', 'Q40', 'Q50', 'Q60']);
+check('PEP harvest: successful fallback distinguishes terminal upstream-unmatchable items from retryable missing responses',
+  _terminalUnmatchable.length === 2
+  && _terminalUnmatchable.some(x => x.qid === 'Q30' && x.reason === 'no-label-alias-or-wikipedia-sitelink')
+  && _terminalUnmatchable.some(x => x.qid === 'Q40' && x.reason === 'missing-from-current-wikidata')
+  && !_terminalUnmatchable.some(x => x.qid === 'Q50' || x.qid === 'Q60'));
 const _ds = pep.buildPepDataset({
   harvestedAt: '2026-08-05T00:00:00Z',
   holderRows: [
@@ -967,6 +980,25 @@ check('PEP harvest: dedupe keeps the most senior class; unlabeled persons drop; 
   && _ds.entries.find(e => e.qid === 'Q1x').position === 'President of Testland'
   && _ds.entries.find(e => e.qid === 'Q2x').current === false
   && !_ds.entries.find(e => e.qid === 'Q3x'));
+const _dsWithSourceException = pep.buildPepDataset({
+  harvestedAt: '2026-08-05T00:00:00Z',
+  holderRows: [
+    { person: 'Q1x', pos: 'P1', end: '', classKey: 'legislator' },
+    { person: 'Q3x', pos: 'P9', end: '', classKey: 'minister' },
+  ],
+  positions: new Map([['P1', { label: 'MP of Testland', country: 'Testland' }]]),
+  names: new Map([['Q1x', { name: 'Alpha Leader', aliases: [] }]]),
+  expected: 1,
+  excludedQids: ['Q3x'],
+  sourceExpected: 2,
+  unmatchableSourceItems: [{ qid: 'Q3x', target: 'Q3x', reason: 'no-label-alias-or-wikipedia-sitelink' }],
+});
+check('PEP harvest: confirmed upstream-unmatchable source items are excluded from the screenable denominator but remain explicit evidence',
+  _dsWithSourceException.count === 1
+  && !_dsWithSourceException.partial
+  && _dsWithSourceException.sourceExpected === 2
+  && _dsWithSourceException.unmatchableSourceItems.length === 1
+  && _dsWithSourceException.unmatchableSourceItems[0].qid === 'Q3x');
 check('PEP harvest: floor gate refuses a hollow harvest and a >40% shrink, passes a healthy one',
   pep.datasetFloorOk({ count: 10 }, null, { floor: 5000 }).ok === false
   && pep.datasetFloorOk({ count: 6000 }, { count: 12000 }, { floor: 5000, shrinkPct: 0.6 }).ok === false
