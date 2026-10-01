@@ -293,6 +293,9 @@ check('successful sharded PEP completion dispatches Sanctions Screen to rebuild 
   /refresh-after-sharded-completion:/.test(pepWatchdogWf)
   && /github\.event\.workflow_run\.name == 'PEP Shard Harvest'\s*&&\s*github\.event\.workflow_run\.conclusion == 'success'/.test(pepWatchdogWf)
   && /sanctions-screen\.yml\/dispatches/.test(pepWatchdogWf));
+check('sharded refresh dispatches only when the merge job actually published (no-op runs do not re-screen)',
+  /SHARD_RUN_ID:\s*\$\{\{\s*github\.event\.workflow_run\.id\s*\}\}/.test(pepWatchdogWf)
+  && /x\.name === "merge" && x\.conclusion === "success"/.test(pepWatchdogWf));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;

@@ -37,7 +37,72 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  plan:
+    # Is there a banked label backlog to shard? Shards split the checkpoint on
+    # pep-worldwide-state; they never sweep the graph from scratch. Once a
+    # harvest completes, the checkpoint is spent and dropped, so a push that
+    # merely edits this workflow or the harvester (the self-validation trigger
+    # above) finds nothing to do. That is a clean no-op, not an outage: every
+    # shard used to fail red on "no checkpoint" in that state. Anything else
+    # without a checkpoint (no state branch, or no COMPLETE artifact) still
+    # fails loudly here.
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      backlog: ${{ steps.plan.outputs.backlog }}
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            *.githubapp.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Decide whether a checkpoint backlog exists
+        id: plan
+        run: |
+          if ! git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
+            echo "::error::could not read pep-worldwide-state — run the ordinary PEP Worldwide Harvest first"
+            exit 1
+          fi
+          if git cat-file -e FETCH_HEAD:data/pep-worldwide-checkpoint.json 2>/dev/null; then
+            echo "backlog=1" >> "$GITHUB_OUTPUT"
+            echo "checkpoint banked on pep-worldwide-state — sharding the label backlog"
+            exit 0
+          fi
+          if git show FETCH_HEAD:data/pep-worldwide.json > "$RUNNER_TEMP/pep-worldwide.json" 2>/dev/null \
+             && node -e '
+               const fs = require("fs"), zlib = require("zlib");
+               const b = fs.readFileSync(process.argv[1]);
+               const d = JSON.parse((b[0] === 0x1f && b[1] === 0x8b) ? zlib.gunzipSync(b).toString("utf8") : b.toString("utf8"));
+               process.exit(d && d.count > 0 && !d.partial ? 0 : 1);
+             ' "$RUNNER_TEMP/pep-worldwide.json"; then
+            echo "backlog=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::no checkpoint and the published PEP artifact is complete — no label backlog to shard"
+            exit 0
+          fi
+          echo "::error::no checkpoint on pep-worldwide-state and no complete artifact — run the ordinary PEP Worldwide Harvest first so the holders phase is banked, then shard the label backlog"
+          exit 1
+
   shard:
+    needs: plan
+    if: needs.plan.outputs.backlog == '1'
     strategy:
       # One failed shard must not cancel the rest — the merge step refuses to
       # publish an incomplete set anyway, and the survivors' slices stay on
@@ -136,7 +201,19 @@ jobs:
         run: |
           git config user.name "pep-worldwide"
           git config user.email "actions@github.com"
+          # Commit the slice and NOTHING else. The overlay step's
+          # `git checkout FETCH_HEAD -- <checkpoint>` also STAGES the shared
+          # checkpoint, so `git add -- <slice>` alone still committed it: every
+          # pep-shard-<i> branch carried a 22MB spent checkpoint, and merging one
+          # into main put it on every harvest checkout, where it refused to
+          # resume past the cap. Unstage everything, add the slice, verify.
+          git reset -q
           git add -A -- data/pep-shard.json
+          staged="$(git diff --cached --name-only)"
+          if [ "$staged" != "data/pep-shard.json" ]; then
+            echo "::error::shard ${SHARD} commit would carry more than its slice: ${staged}"
+            exit 1
+          fi
           git commit -m "PEP shard ${SHARD} $(date -u +%F) [skip ci]"
           pushed=
           for attempt in 1 2 3 4 5; do
@@ -275,22 +352,10 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join("\n") + "\n");
           '
 
-      - name: Refresh screening runtime evidence after complete sharded PEP harvest
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          # merge-shards now refuses a partial artifact, so reaching this step
-          # means pep-worldwide-state contains a complete PEP list. Re-run the
-          # runtime generator so PEP assurance is refreshed from that artifact,
-          # rather than leaving a stale degraded badge until tomorrow's schedule.
-          code=$(curl -sS -o /tmp/screen-dispatch.out -w '%{http_code}' -X POST \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/sanctions-screen.yml/dispatches" \
-            -d '{"ref":"main"}')
-          if [ "$code" != "204" ]; then
-            cat /tmp/screen-dispatch.out
-            echo "::error::Sanctions Screen refresh dispatch failed with HTTP $code"
-            exit 1
-          fi
-          echo "Sanctions Screen dispatched to rebuild screening assurance from the complete sharded PEP artifact"
+      # The runtime-evidence refresh after a successful merge is dispatched by
+      # pep-chain-watchdog.yml (refresh-after-sharded-completion), which holds
+      # actions: write. It used to ALSO be a step here, but this job holds only
+      # contents: write, so that dispatch could not succeed: it turned a
+      # successful merge red, and a red run suppressed the watchdog's refresh
+      # too. A complete artifact sat on the state branch while runtime
+      # assurance kept reporting PEP as partial.

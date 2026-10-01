@@ -14,6 +14,7 @@ bump merged to `main`.
 
 ### Fixed
 
+- **PEP harvest chain unblocked; sharded completion refreshes runtime assurance again.** A PEP shard branch merged into `main` carried a spent harvest checkpoint (already at the 12-resume cap) and a shard slice. Every weekly harvest checkout then refused to resume. Both files are removed from `main`. The harvest now discards any checkout-borne checkpoint before overlaying `pep-worldwide-state`, the only source of a checkpoint. Shard commits now unstage the overlaid checkpoint and are verified to contain only their slice. The shard merge job no longer attempts a workflow dispatch its `contents: write` token cannot make. That 403 turned a successful merge red and suppressed the watchdog's Sanctions Screen refresh, so assurance kept reporting a complete PEP artifact as partial. The watchdog now dispatches that refresh only when the merge job actually published. A shard run with no checkpoint backlog and a complete artifact is a clean no-op; without either, it still fails loudly. The README "Sanctions Lists Screened" badge now queries the `sanctionsLists` figure that `data/coverage-figures.json` actually publishes.
 - Start independent news providers concurrently, back off shared queues on headerless HTTP 429, and avoid repeating rate-limited GDELT queries.
 - Prioritize missing PEP person names before optional office metadata and reuse validated names already published by the same harvest without changing the completeness denominator.
 
