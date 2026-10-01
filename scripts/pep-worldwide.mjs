@@ -394,7 +394,7 @@ export function labelsUrl(qids) {
    merged/deleted IDs and items whose labels are blank while still preserving a
    human-readable, screenable name. */
 export function fallbackLabelsUrl(qids) {
-  return WD_API + '?action=wbgetentities&format=json&props=labels%7Caliases%7Csitelinks&redirects=yes&maxlag=5&ids='
+  return WD_API + '?action=wbgetentities&format=json&props=labels%7Caliases%7Csitelinks%7Cclaims&redirects=yes&maxlag=5&ids='
     + qids.join('%7C');
 }
 
@@ -446,9 +446,32 @@ export function namesFromEntity(entity) {
   const stripQualifier = value => String(value || '').replace(/\s+\([^()]{1,80}\)\s*$/, '').trim();
   const fallbackPrimary = [sitelinks.enwiki?.title, ...wikiTitles]
     .map(v => stripQualifier(String(v || '').replaceAll('_', ' '))).find(Boolean) || '';
-  const primary = labelPrimary || fallbackPrimary;
+
+  /* Some valid person items have no labels or sitelinks but still carry a
+     literal identity in structured claims. Use only properties whose value is
+     itself a human name, never descriptions or unrelated free text:
+       P1559 = name in native language
+       P1477 = birth name
+       P2561 = name
+     This is a targeted tail fallback only because claims are not requested for
+     the 424k-item normal pass. */
+  const claimValueText = snak => {
+    const v = snak?.datavalue?.value;
+    if (typeof v === 'string') return v.trim();
+    if (v && typeof v.text === 'string') return v.text.trim();
+    return '';
+  };
+  const claimNames = [];
+  for (const prop of ['P1559', 'P1477', 'P2561']) {
+    for (const stmt of (Array.isArray(entity.claims?.[prop]) ? entity.claims[prop] : [])) {
+      const value = claimValueText(stmt?.mainsnak);
+      if (value) claimNames.push(value);
+    }
+  }
+  const primary = labelPrimary || fallbackPrimary || claimNames[0] || '';
 
   const all = new Set(Object.values(labels).map(text).filter(Boolean));
+  for (const value of claimNames) all.add(value);
   for (const arr of Object.values(entity.aliases || {})) {
     if (Array.isArray(arr)) for (const item of arr) {
       const value = text(item);
@@ -1160,6 +1183,7 @@ async function harvest(outfile) {
      one richer wbgetentities pass that follows redirects and exposes Wikipedia
      sitelink titles as a name fallback. Network failures still remain pending. */
   const confirmedMissing = new Set();
+  const fallbackClaimKeys = new Map();
   const fallbackPending = pendingLabels(allQids, names);
   if (fallbackPending.length) {
     console.log(`pep-worldwide: attempting redirect/sitelink fallback for ${fallbackPending.length} unresolved person label(s)`);
@@ -1168,12 +1192,23 @@ async function harvest(outfile) {
       const data = await fetchJsonSafe(fallbackLabelsUrl(batch));
       bankLabelNames(names, data, batch);
       for (const qid of confirmedMissingQids(data, batch)) confirmedMissing.add(qid);
+      const redirects = new Map((Array.isArray(data?.redirects) ? data.redirects : [])
+        .map(x => [String(x?.from || ''), String(x?.to || '')]));
+      for (const qid of batch) {
+        const target = redirects.get(qid) || qid;
+        const ent = data?.entities?.[target] || data?.entities?.[qid];
+        if (!ent || hasScreenableName(namesFromEntity(ent))) continue;
+        fallbackClaimKeys.set(qid, Object.keys(ent.claims || {}).sort());
+      }
     }
     const stillPending = pendingLabels(allQids, names);
     console.log(`pep-worldwide: fallback recovered ${fallbackPending.length - stillPending.length}/${fallbackPending.length}; ${stillPending.length} unresolved`);
     if (stillPending.length) {
-      console.error('pep-worldwide: unresolved QIDs after redirect/sitelink fallback: '
-        + stillPending.slice(0, 50).join(', ')
+      console.error('pep-worldwide: unresolved QIDs after redirect/sitelink/claim fallback: '
+        + stillPending.slice(0, 50).map(q => {
+          const keys = fallbackClaimKeys.get(q) || [];
+          return q + (keys.length ? '[claims:' + keys.join('|') + ']' : '[claims:none]');
+        }).join(', ')
         + (stillPending.length > 50 ? ' ...' : ''));
     }
   }
