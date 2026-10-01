@@ -1299,6 +1299,13 @@ def log(msg):
 # Values shorter than MASK_MIN_LEN are skipped: masking a 2-3 character token
 # blanks unrelated log text and identifies no one on its own. The explicit
 # name-bearing log lines are also removed, so masking is a second layer.
+# Scope is NAMES (the subject, its individuals and corporate owners). Contact
+# email and ID numbers are deliberately NOT masked: neither reaches any log line
+# (FraudLabs sends the email in a POST body, never a URL or error string), and
+# echoing them into a mask command is itself flagged by CodeQL as clear-text
+# logging of private data. A Copilot Autofix for that alert (#725) disabled
+# masking outright -- every run then masked nothing -- so the production path
+# is pinned by test/engine_test.py.
 MASK_MIN_LEN = 4
 
 def mask_values_for_customer(c):
@@ -1318,18 +1325,20 @@ def mask_values_for_customer(c):
         add(n)
     for n in c.get("entity_owners") or []:
         add(n)
-    add(c.get("email"))
     for rec in (c.get("kyc") or {}).get("individuals") or []:
         if isinstance(rec, dict):
-            for k in ("name", "id_number", "emirates_id"):
-                add(rec.get(k))
+            add(rec.get("name"))
     return out
 
 def mask_population(customers, emit=None):
     """Register every population identifier with ::add-mask:: (GitHub Actions
     only, unless an emitter is injected). Returns the number of values masked."""
     if emit is None:
-        return 0
+        if os.environ.get("GITHUB_ACTIONS") != "true":
+            return 0
+        def emit(line):
+            sys.stdout.write(line + "\n")
+            sys.stdout.flush()
     seen = set()
     for c in customers or []:
         for v in mask_values_for_customer(c):

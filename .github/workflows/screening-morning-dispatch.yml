@@ -1,0 +1,72 @@
+name: Screening Morning Dispatch (on-time start)
+
+# Results of the daily screening must be in Asana before 09:00 UAE (05:00 UTC).
+# GitHub starts this repo's SCHEDULED runs 4-6h late (sanctions-screen's 05:37
+# slot started 09:41-11:57 UTC over 19-30 Sep 2026) and drops most firings of
+# a frequent cron, but a workflow_dispatch starts at once. So this workflow is
+# scheduled several times in the UTC evening; whichever firing GitHub delivers
+# first waits on the runner until 00:05 UTC (04:05 UAE) and dispatches Sanctions
+# Screen (~95 min) and Daily Screening. Later firings find today's runs and
+# exit. Each screen's own cron stays as the backstop, and Control Retry,
+# Delivery Watchdog and freshness-check still judge delivery: an accepted
+# dispatch is never reported as delivery. Logic + offline tests:
+# scripts/workflow-recovery.mjs (morningPlan / morningDecision, --self-test).
+on:
+  schedule:
+    - cron: '7 19 * * *'    # on time: waits ~5h; delivered 4-6h late: dispatches ~00:05 UTC
+    - cron: '37 20 * * *'   # second chance if GitHub drops the first firing
+    - cron: '7 22 * * *'    # third chance; delivered late, it dispatches at once
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One waiter at a time; a later firing queues behind it and then exits on the
+# runs the first one dispatched.
+concurrency:
+  group: screening-morning-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            app.asana.com:443
+            *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Validate dispatcher offline
+        run: node scripts/workflow-recovery.mjs --self-test
+      - name: Wait for 00:05 UTC, then dispatch today's screening
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/workflow-recovery.mjs --morning
+      - name: Alert when the morning dispatch could not be verified
+        if: failure()
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "MORNING SCREENING DISPATCH FAILED: today's screening may reach Asana after 09:00 UAE" \
+            "The on-time dispatch of Sanctions Screen / Daily Screening could not be confirmed. Each screen's own cron remains the backstop. Review the job summary. $RUN_URL"
