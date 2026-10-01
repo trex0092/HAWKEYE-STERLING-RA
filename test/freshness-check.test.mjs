@@ -244,7 +244,7 @@ const EXPECTED_CRONS = {
   // single 3-4h outage window could still cost the whole day.
   'weekly-adverse-media.yml': ['7 0 * * *', '7 3 * * *', '7 6 * * *'],
   'regulatory-watch.yml':     ['19 6 * * *'],
-  'sanctions-screen.yml':     ['37 5 * * *'],
+  'sanctions-screen.yml':     ['17 0 * * *'],
   'screening-assurance.yml':  ['17 */6 * * *'],
   'fatf-watchdog.yml':        ['7 6 * * *'],
   'onboarding-screen.yml':    ['11 */6 * * *'],

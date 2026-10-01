@@ -63,10 +63,10 @@ scheduled events "2-4h late, every day" and offsets are tuned empirically
 around that):
 
 ```
+00:17 sanctions-screen       (case engine backstop; fetches its own lists — on-time dispatch ~00:13)
 05:07 sanctions-watch        (fetch lists)
 05:19 site-health
 05:23 function-health        (after site-health)
-05:37 sanctions-screen       (case engine, after sanctions-watch)
 06:07 fatf-watchdog + weekly-adverse-media's 3rd retry pass
 06:19 regulatory-watch
 06:37 anomaly-watch          (after morning screening)

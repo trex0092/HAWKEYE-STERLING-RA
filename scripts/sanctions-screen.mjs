@@ -152,6 +152,47 @@ export function resolveShadowThreshold(raw, threshold) {
   return n;
 }
 
+/* PRIVACY — the repository (and so every Actions run log) is PUBLIC, and the
+   screening population is the firm's customers, their principals/UBOs and its
+   employees. Their names must reach Asana only, never the GitHub log. As soon
+   as the subjects are read from Asana, every identifying value is registered
+   with the runner's `::add-mask::` workflow command, so ANY later line in this
+   job (this step and the case/metrics/delivery steps after it) prints `***`
+   instead. Explicit name-bearing log lines are also removed, so the masking is
+   a second layer, not the only one. Values under MASK_MIN_LEN characters are
+   skipped: masking a 2–3 character token would blank unrelated log text and
+   cannot identify anyone on its own. Pure (emit is injected) — unit-tested. */
+export const MASK_MIN_LEN = 4;
+export function maskValuesForSubject(s) {
+  const out = new Set();
+  const add = (v) => {
+    const t = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+    if (t.length < MASK_MIN_LEN) return;
+    for (const x of [t, t.toUpperCase(), t.toLowerCase(), normalizeName(t)]) {
+      if (x && x.length >= MASK_MIN_LEN) out.add(x);
+    }
+  };
+  if (!s) return [];
+  add(s.name); add(s.key); add(s.parent); add(s.passport);
+  return [...out];
+}
+export function maskSubjectNames(subjects, emit = (line) => process.stdout.write(line + '\n')) {
+  const seen = new Set();
+  for (const s of subjects || []) {
+    for (const v of maskValuesForSubject(s)) {
+      if (seen.has(v)) continue;
+      seen.add(v);
+      emit('::add-mask::' + v);
+    }
+  }
+  return seen.size;
+}
+/* Non-identifying reference for a subject in the run log: its opaque Asana
+   task gid, never its name. */
+export function subjectLogRef(s) {
+  return 'subject ' + ((s && s.gid) ? 'gid ' + s.gid : '(no gid)');
+}
+
 /* The shadow-band row for one raw engine result, or null. Pure — unit-tested;
    only CLEAR results are eligible (anything the engine flags is already an
    alert and needs no shadow evidence). */
@@ -1771,12 +1812,12 @@ export async function screenLocally(subjects, cfg) {
     const sbRow = shadowBandRow(raw, shadowThr, cfg.threshold);
     if (sbRow) {
       shadow.push(sbRow);
-      console.log('sanctions-screen: SHADOW-CHALLENGER "' + sbRow.name + '" best score '
+      console.log('sanctions-screen: SHADOW-CHALLENGER ' + subjectLogRef(s) + ' best score '
         + sbRow.topScore + ' in [' + shadowThr * 100 + ', ' + thr + ') — log-only, no alert');
     }
     if (raw.phoneticShadow && raw.phoneticShadow.length) {
       for (const ps of raw.phoneticShadow) {
-        console.log('sanctions-screen: PHONETIC-SHADOW "' + s.name + '" ~ "' + ps.hitName
+        console.log('sanctions-screen: PHONETIC-SHADOW ' + subjectLogRef(s) + ' ~ "' + ps.hitName
           + '" [' + ps.list + '] ' + ps.shape + ' key match, score ' + ps.score + ' — no hit emitted');
       }
     }
@@ -2086,6 +2127,8 @@ async function main() {
   try { subjects = await fetchAsanaSubjects(CUSTOMER_PROJECT_GID, asanaToken); }
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
+  const onRunner = process.env.GITHUB_ACTIONS === 'true';
+  let maskedCount = onRunner ? maskSubjectNames(subjects) : 0;
 
   if (EMPLOYEE_PROJECT_GID) {
     let employees;
@@ -2093,8 +2136,10 @@ async function main() {
     catch (e) { return bailUnscreened('could not read the HR – Employees project (' + (e && e.message || e) + ') — employee screening is configured, so the run must not proceed without it', today); }
     if (!employees.length) return bailUnscreened('the HR – Employees project returned 0 subjects while employee screening is configured — set ASANA_EMPLOYEE_PROJECT_GID empty to disable it explicitly', today);
     console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
+    if (onRunner) maskedCount += maskSubjectNames(employees);
     subjects = subjects.concat(employees);
   }
+  if (onRunner) console.log('sanctions-screen: ' + maskedCount + ' subject identifier(s) masked in this public run log — names are disclosed in Asana only');
 
   const individuals = subjects.filter(s => s.entityType === 'individual').length;
   const entities = subjects.length - individuals;
@@ -2231,7 +2276,10 @@ async function main() {
     cleared: cleared.map(c => c.name)
   }, null, 2) + '\n');
 
-  console.log(report);
+  /* The report names every matched/cleared subject: echo it only off-runner.
+     On GitHub Actions (public logs) it goes to Asana, never to the log. */
+  if (process.env.GITHUB_ACTIONS === 'true') console.log('sanctions-screen: report written to ' + REPORT_FILE + ' — subject names are delivered to Asana only, not echoed to the public run log');
+  else console.log(report);
   console.log('\nscreened=' + subjects.length + '  new-matches=' + alerts.length + '  total-matches=' + matchCount + '  degraded=' + screen.degraded + '  errored=' + screen.errored);
 
   const title = alerts.length

@@ -491,8 +491,10 @@ jobs:
                 git checkout HEAD -- "$f" 2>/dev/null || true
               done
             else
-              echo "::warning::delta-state persisted in PLAINTEXT (subject data) - set the STATE_ENCRYPTION_KEY secret to encrypt state commits (P30)"
-              git add -- "${state_files[@]}"
+              # The repository is PUBLIC: plaintext state carries customer and
+              # employee names, so it is never published. Fail red instead.
+              echo "::error::STATE_ENCRYPTION_KEY is not set - refusing to publish delta-state in PLAINTEXT (customer/employee names) to the public repository; state NOT persisted (P30)"
+              exit 1
             fi
             git commit -m "chore(screen): update delta-state [skip ci]"
             # Persist on the screen-delta-state branch (main is protected):

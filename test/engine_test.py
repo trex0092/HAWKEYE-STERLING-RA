@@ -4380,6 +4380,44 @@ _n_ww_off = screen.build_unified_narrative([], [], [], [], _meta_ww_off, _st(), 
 check("report: a disabled worldwide net says so explicitly, not silently absent",
       "DISABLED (WORLDWIDE_SANCTIONS=0)" in _n_ww_off)
 
+# ── PUBLIC-LOG PRIVACY: subject identifiers are masked, never logged ─────────
+_cust = {"gid": "111", "name": "Example Gold Trading LLC", "email": "owner@example.com",
+         "individuals": ["Jane Q Example", "Al"], "entity_owners": ["Example Holdings Ltd"],
+         "kyc": {"individuals": [{"name": "Jane Q Example", "id_number": "P1234567"}]}}
+_emp = {"gid": "222", "name": "John Example Staff", "individuals": ["John Example Staff"],
+        "entity_owners": [], "kyc": {}, "kind": "employee"}
+_mv = screen.mask_values_for_customer(_cust)
+check("mask: customer name, individuals, entity owners, email and ID number are masked",
+      all(v in _mv for v in ("Example Gold Trading LLC", "Jane Q Example", "JANE Q EXAMPLE",
+                             "jane q example", "Example Holdings Ltd", "owner@example.com", "P1234567")))
+check("mask: values shorter than MASK_MIN_LEN are not masked",
+      "Al" not in _mv and all(len(v) >= screen.MASK_MIN_LEN for v in _mv))
+_lines = []
+_nm = screen.mask_population([_cust, _emp, _cust], emit=_lines.append)
+check("mask: every emitted line is an ::add-mask:: command, de-duplicated across rows",
+      _lines and all(l.startswith("::add-mask::") for l in _lines)
+      and len(set(_lines)) == len(_lines) == _nm)
+check("mask: the employee population is masked too",
+      "::add-mask::John Example Staff" in _lines)
+_prev_gha = os.environ.pop("GITHUB_ACTIONS", None)
+try:
+    check("mask: off-runner (no injected emitter) nothing is emitted",
+          screen.mask_population([_cust]) == 0)
+finally:
+    if _prev_gha is not None:
+        os.environ["GITHUB_ACTIONS"] = _prev_gha
+check("subject_log_ref identifies a row by gid, never by name",
+      screen.subject_log_ref(_cust) == "subject gid 111" and "Example" not in screen.subject_log_ref(_cust))
+_src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
+_gac = _src[_src.index("def get_all_customers"):_src.index("# ── SCREENING ──")]
+check("get_all_customers masks customers and employees as soon as they are read",
+      "masked = mask_population(customers)" in _gac and "masked += mask_population(employees)" in _gac)
+import re as _re_priv
+_name_logs = [l for l in _src.splitlines()
+              if _re_priv.search(r"\blog\(f", l)
+              and _re_priv.search(r"\{(subj_name|subject_name|c\['name'\]|name)\}|\{c\.get\('name'", l)]
+check("no run-log line interpolates a subject name (public Actions logs)", not _name_logs)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

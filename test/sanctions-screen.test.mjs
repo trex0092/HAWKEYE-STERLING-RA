@@ -1930,5 +1930,45 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     && scr.discoverDatedLink(plHtml, pl, '/attachment/', 'Format: ods') === null);
 }
 
+
+/* PRIVACY: the repository and its run logs are PUBLIC. Customer, principal and
+   employee identifiers must be registered with ::add-mask:: the moment they are
+   read from Asana, and no log line may print a subject name directly. */
+{
+  const subj = [
+    { name: 'Example Gold Trading LLC', key: 'example gold trading llc', gid: '111', entityType: 'organisation' },
+    { name: 'Jane Q Example', key: 'jane q example', gid: '222', entityType: 'individual',
+      parent: 'Example Gold Trading LLC', passport: 'P1234567' },
+    { name: 'Al', key: 'al', gid: '333', entityType: 'individual' },
+  ];
+  const lines = [];
+  const n = scr.maskSubjectNames(subj, l => lines.push(l));
+  const masked = lines.map(l => l.replace('::add-mask::', ''));
+  check('mask: every emitted line is an ::add-mask:: workflow command', lines.length > 0 && lines.every(l => l.startsWith('::add-mask::')));
+  check('mask: count returned equals lines emitted', n === lines.length);
+  check('mask: subject name masked as written, upper- and lower-case',
+    masked.includes('Jane Q Example') && masked.includes('JANE Q EXAMPLE') && masked.includes('jane q example'));
+  check('mask: organisation name, parent and passport masked',
+    masked.includes('Example Gold Trading LLC') && masked.includes('P1234567'));
+  check('mask: values are de-duplicated across subjects (parent == another subject)',
+    new Set(masked).size === masked.length);
+  check('mask: values shorter than MASK_MIN_LEN are not masked (would blank unrelated log text)',
+    !masked.includes('Al') && !masked.includes('al') && masked.every(v => v.length >= scr.MASK_MIN_LEN));
+  check('mask: an empty/absent population emits nothing', scr.maskSubjectNames([], () => { throw new Error('emitted'); }) === 0);
+  check('subjectLogRef identifies a subject by gid, never by name',
+    scr.subjectLogRef(subj[1]) === 'subject gid 222' && !scr.subjectLogRef(subj[1]).includes('Jane'));
+
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  check('engine masks the customer population right after it is read from Asana',
+    /fetchAsanaSubjects\(CUSTOMER_PROJECT_GID[\s\S]{0,400}maskSubjectNames\(subjects\)/.test(src));
+  check('engine masks the employee population right after it is read from Asana',
+    /fetchAsanaEmployeeSubjects\(EMPLOYEE_PROJECT_GID[\s\S]{0,700}maskSubjectNames\(employees\)/.test(src));
+  check('no SHADOW/PHONETIC log line prints a subject name',
+    !/SHADOW-CHALLENGER "' \+ sbRow\.name/.test(src) && !/PHONETIC-SHADOW "' \+ s\.name/.test(src));
+  check('the name-bearing report is not echoed to the run log on GitHub Actions',
+    /GITHUB_ACTIONS === 'true'\) console\.log\('sanctions-screen: report written to/.test(src)
+    && /else console\.log\(report\);/.test(src));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
