@@ -103,6 +103,63 @@ export function hasFullResults(attachmentNames) {
 
 const DEADLINE_MS = 90000; // same bound as asana-alert.mjs, same rationale
 
+/* Evidence for one UTC day: was the report filed and, from the full-results
+   cutover, does one of that day's reports carry BOTH full-results files?
+   Shared by this watchdog and the 09:00-UAE deadline guard
+   (workflow-recovery.mjs --guard), so both judge delivery identically.
+   Resolves { delivered, reason, url }; THROWS when Asana cannot be read --
+   an unread day is unverifiable, never "delivered" and never "missing".
+   Dependencies are injectable for the offline tests. */
+export async function reportEvidence(day, {
+  listTasks = listProjectTasks, listAttachments = gid => asana('/attachments?parent=' + gid + '&limit=100&opt_fields=name'),
+  project = PROJECT_GID, deadlineMs = DEADLINE_MS,
+} = {}) {
+  let timer;
+  // clearTimeout in the finally below is required, not cosmetic: an
+  // uncleared timer keeps Node alive until it fires, so a FAST successful
+  // check would otherwise still hang for the full deadline before exiting.
+  const timedOut = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('exceeded ' + deadlineMs + 'ms deadline')), deadlineMs);
+  });
+  let tasks;
+  try {
+    tasks = await Promise.race([listTasks(project), timedOut]);
+  } catch (e) {
+    throw new Error('could not read Asana project ' + project + ' (' + String(e && e.message || e).slice(0, 200)
+      + ') -- delivery is UNVERIFIABLE, which is not the same as delivered');
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!Array.isArray(tasks)) throw new Error('Asana project ' + project + ' returned no task list -- delivery is UNVERIFIABLE');
+
+  const todays = findTodaysReports(tasks, day);
+  if (!todays.length) {
+    return { delivered: false, reason: 'NO "' + TITLE_PREFIX + '" task found for ' + day + ' (UTC) in project ' + project };
+  }
+  if (!fullResultsRequired(day)) {
+    return { delivered: true, reason: todays.length + ' report(s) filed for ' + day + ' (UTC)',
+      url: todays.map(t => t.permalink_url || t.name).join(', ') };
+  }
+  // At least one of the day's reports must carry BOTH full-results files.
+  for (const t of todays) {
+    let res;
+    try {
+      res = await listAttachments(t.gid);
+    } catch (e) {
+      throw new Error('could not list attachments of ' + (t.permalink_url || t.gid) + ' ('
+        + String(e && e.message || e).slice(0, 200) + ') -- full-results delivery is UNVERIFIABLE');
+    }
+    const names = (res && Array.isArray(res.data) ? res.data : []).map(a => a && a.name);
+    if (hasFullResults(names)) {
+      return { delivered: true, reason: 'report with full results filed for ' + day + ' (UTC)',
+        url: t.permalink_url || t.name };
+    }
+  }
+  return { delivered: false, reason: 'report(s) filed for ' + day + ' (UTC) but NONE carries the full-results '
+    + 'attachments (full-screening-report-*.txt + screening-results-register-*.csv) -- only the capped '
+    + 'card reached Asana: ' + todays.map(t => t.permalink_url || t.name).join(', ') };
+}
+
 async function main() {
   if (!process.env.ASANA_ACCESS_TOKEN) {
     console.error('delivery-watchdog: ASANA_ACCESS_TOKEN missing -- cannot verify delivery; treating as a failure (an unread day is not a delivered day).');
@@ -110,61 +167,20 @@ async function main() {
   }
 
   const today = reportDayToVerify(Date.now()); // the UTC day whose report is due (matches Asana's created_at)
-  let timer;
-  // clearTimeout in the finally below is required, not cosmetic: an
-  // uncleared timer keeps Node alive until it fires, so a FAST successful
-  // check would otherwise still hang for the full deadline before exiting.
-  const timedOut = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('exceeded ' + DEADLINE_MS + 'ms deadline')), DEADLINE_MS);
-  });
-  let tasks;
+  let ev;
   try {
-    tasks = await Promise.race([listProjectTasks(PROJECT_GID), timedOut]);
+    ev = await reportEvidence(today);
   } catch (e) {
-    console.error('delivery-watchdog: could not read Asana project ' + PROJECT_GID + ' (' + String(e && e.message || e).slice(0, 200) + ') -- delivery is UNVERIFIABLE, which is not the same as delivered.');
-    process.exit(2);
-  } finally {
-    clearTimeout(timer);
-  }
-
-  const todays = findTodaysReports(tasks, today);
-
-  if (todays.length && fullResultsRequired(today)) {
-    // At least one of the day's reports must carry BOTH full-results files.
-    let complete = null;
-    for (const t of todays) {
-      let names;
-      try {
-        const res = await asana('/attachments?parent=' + t.gid + '&limit=100&opt_fields=name');
-        names = (res && res.data || []).map(a => a && a.name);
-      } catch (e) {
-        console.error('delivery-watchdog: could not list attachments of ' + (t.permalink_url || t.gid) + ' ('
-          + String(e && e.message || e).slice(0, 200) + ') -- full-results delivery is UNVERIFIABLE');
-        process.exitCode = 2;
-        return;
-      }
-      if (hasFullResults(names)) { complete = t; break; }
-    }
-    if (!complete) {
-      console.error('delivery-watchdog: report(s) filed for ' + today + ' (UTC) but NONE carries the full-results '
-        + 'attachments (full-screening-report-*.txt + screening-results-register-*.csv) -- only the capped '
-        + 'card reached Asana: ' + todays.map(t => t.permalink_url || t.name).join(', '));
-      process.exitCode = 1;
-      return;
-    }
-    console.log('delivery-watchdog: OK -- report with full results filed for ' + today + ' (UTC): '
-      + (complete.permalink_url || complete.name));
+    console.error('delivery-watchdog: ' + String(e && e.message || e));
+    process.exitCode = 2;
     return;
   }
-  if (todays.length) {
-    console.log('delivery-watchdog: OK -- ' + todays.length + ' report(s) filed for ' + today + ' (UTC): '
-      + todays.map(t => t.permalink_url || t.name).join(', '));
+  if (ev.delivered) {
+    console.log('delivery-watchdog: OK -- ' + ev.reason + ': ' + ev.url);
     return;
   }
-
-  console.error('delivery-watchdog: NO "' + TITLE_PREFIX + '" task found for ' + today
-    + ' (UTC, now due) in project ' + PROJECT_GID + ' -- the daily sanctions/PEP/adverse-media screening has NOT '
-    + 'been evidenced as delivered.');
+  console.error('delivery-watchdog: ' + ev.reason + ' -- the daily sanctions/PEP/adverse-media screening has NOT '
+    + 'been evidenced as fully delivered.');
   process.exitCode = 1;
 }
 

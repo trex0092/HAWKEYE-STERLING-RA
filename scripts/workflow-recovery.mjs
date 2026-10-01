@@ -195,7 +195,130 @@ async function morning() {
     ...rows.map(r => `| ${cell(r.id)} | ${cell(r.action)} | ${cell(r.reason)} |`), ''].join('\n');
   console.log(report);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
+  // Hand the dispatched day to the deadline guard (the workflow's next job).
+  // Only the firing that actually dispatched guards, so a later firing that
+  // found today's runs never starts a second guard (or a second alert).
+  if (process.env.GITHUB_OUTPUT && rows.some(r => r.action === 'dispatched')) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `guard_day=${plan.targetDay}\n`);
+  }
   if (rows.some(r => r.action === 'unknown')) process.exitCode = 1;
+}
+
+/* DEADLINE GUARD -- the dispatch above is only an on-time START. A screen run
+ * killed mid-flight (12 of 18 sampled attempts of the daily run, Sep 2026) was
+ * healed only by Control Retry, whose own cron GitHub starts 4-6h late: the
+ * report then reached Asana around midday UTC, hours after 09:00 UAE. The guard
+ * job starts right after the dispatch, watches both screens until the 05:00 UTC
+ * (09:00 UAE) deadline, re-dispatches a screen whose run ended without its
+ * evidence (bounded), and fails red -- alerting in Asana -- when the deadline
+ * passes without full delivery. Evidence, never run state alone:
+ *   - weekly-adverse-media.yml: today's Daily AML/CFT Screening Report WITH both
+ *     full-results attachments in Asana (delivery-watchdog.mjs reportEvidence --
+ *     the run's own conclusion is not evidence: the EOCN review gate turns a
+ *     fully delivered run red);
+ *   - sanctions-screen.yml: a successful run today (its delivery gates fail the
+ *     run when Asana delivery fails).
+ * guardStep / guardWindow / guardVerdict are pure and offline-tested. */
+export const GUARD_DEADLINE_UTC_MIN = 5 * 60;        // 05:00 UTC = 09:00 UAE
+export const GUARD_POLL_MS = 10 * 60000;
+export const GUARD_MAX_REDISPATCH = 2;               // per screen per day
+export const GUARD_DISPATCH_GRACE_MS = 15 * 60000;   // a dispatch not listed as a run by then was lost
+export const GUARD_LATE_START_MS = 150 * 60000;      // started after the deadline: still supervise this long
+export const GUARD_MAX_RUN_MS = 320 * 60000;         // inside the guard job's timeout
+
+export function guardWindow(startMs, targetDayMs) {
+  if (!Number.isFinite(startMs) || !Number.isFinite(targetDayMs)) throw new Error('invalid clock');
+  const deadlineMs = targetDayMs + GUARD_DEADLINE_UTC_MIN * 60000;
+  const endMs = Math.min(startMs + GUARD_MAX_RUN_MS, Math.max(deadlineMs, startMs + (startMs >= deadlineMs ? GUARD_LATE_START_MS : 0)));
+  return { deadlineMs, endMs };
+}
+
+/* One supervision tick for one screen. `delivered` is true / false, or null
+ * when the evidence could not be read (then the guard never acts blind). */
+export function guardStep(runs, { targetDayMs, nowMs, delivered, redispatches = 0, lastDispatchMs = null,
+  branch = 'main', maxRedispatch = GUARD_MAX_REDISPATCH, graceMs = GUARD_DISPATCH_GRACE_MS } = {}) {
+  if (delivered === true) return { action: 'done', reason: 'delivery evidenced' };
+  if (!Array.isArray(runs) || !Number.isFinite(targetDayMs) || !Number.isFinite(nowMs)) {
+    return { action: 'unknown', reason: 'invalid run history or clock' };
+  }
+  if (delivered !== false) return { action: 'unknown', reason: 'delivery evidence unreadable; not re-dispatching blind' };
+  const today = runs.filter(r => r && r.head_branch === branch && EVENTS.has(r.event)
+    && Number.isFinite(runTime(r)) && runTime(r) >= targetDayMs);
+  const active = today.find(r => ACTIVE.has(r.status));
+  if (active) return { action: 'wait', reason: `run ${active.id} is ${active.status}` };
+  if (Number.isFinite(lastDispatchMs) && nowMs - lastDispatchMs < graceMs
+    && !today.some(r => Date.parse(r.created_at || '') >= lastDispatchMs - 60000)) {
+    return { action: 'wait', reason: 'dispatch accepted; its run is not listed yet' };
+  }
+  const why = today.length
+    ? `today's run ${today[0].id} ended ${today[0].conclusion || today[0].status} without delivery evidence`
+    : 'no run started today';
+  if (redispatches >= maxRedispatch) {
+    return { action: 'exhausted', reason: `${why}; ${maxRedispatch} re-dispatches already used -- Control Retry and the Delivery Watchdog take over` };
+  }
+  return { action: 'redispatch', reason: why };
+}
+
+/* Final verdict: green only when every screen evidenced delivery by the deadline. */
+export function guardVerdict(states, deadlineMs) {
+  const missing = states.filter(s => !Number.isFinite(s.doneAtMs));
+  const late = states.filter(s => Number.isFinite(s.doneAtMs) && s.doneAtMs > deadlineMs);
+  if (missing.length) return { ok: false, reason: `not delivered: ${missing.map(s => s.id).join(', ')}` };
+  if (late.length) return { ok: false, reason: `delivered AFTER 09:00 UAE: ${late.map(s => s.id).join(', ')}` };
+  return { ok: true, reason: 'every screen evidenced delivery before 09:00 UAE' };
+}
+
+async function guard() {
+  const api = makeApi({ repo: process.env.GITHUB_REPOSITORY, token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN });
+  const day = String(process.env.GUARD_DAY || '');
+  const targetDayMs = /^\d{4}-\d{2}-\d{2}$/.test(day) ? Date.parse(day + 'T00:00:00Z') : NaN;
+  if (!Number.isFinite(targetDayMs)) throw new Error('GUARD_DAY must be the dispatched UTC day (YYYY-MM-DD)');
+  const startMs = Date.now();
+  const { deadlineMs, endMs } = guardWindow(startMs, targetDayMs);
+  const { reportEvidence } = await import('./delivery-watchdog.mjs');
+  const evidence = {
+    'sanctions-screen.yml': async runs => runs.some(r => r.head_branch === 'main' && EVENTS.has(r.event)
+      && runTime(r) >= targetDayMs && r.status === 'completed' && r.conclusion === 'success'),
+    'weekly-adverse-media.yml': async () => {
+      if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN missing');
+      return (await reportEvidence(day)).delivered;
+    },
+  };
+  const states = MORNING_CONTROLS.map(id => ({ id, redispatches: 0, lastDispatchMs: startMs, doneAtMs: NaN, last: 'not checked' }));
+  console.log(`deadline-guard: ${day}; deadline ${new Date(deadlineMs).toISOString()}; supervising until ${new Date(endMs).toISOString()}`);
+  for (;;) {
+    for (const s of states.filter(x => !Number.isFinite(x.doneAtMs))) {
+      const path = `/actions/workflows/${encodeURIComponent(s.id)}`;
+      let runs = null, delivered = null, evidenceError = '';
+      try { runs = await readRuns(api, path + '/runs', { branch: 'main', created: '>=' + day }); }
+      catch (err) { s.last = 'run history unreadable: ' + err.message; console.log(`deadline-guard: ${s.id} -> ${s.last}`); continue; }
+      try { delivered = await evidence[s.id](runs); }
+      catch (err) { evidenceError = ' (' + String(err.message).slice(0, 200) + ')'; }
+      const step = guardStep(runs, { targetDayMs, nowMs: Date.now(), delivered,
+        redispatches: s.redispatches, lastDispatchMs: s.lastDispatchMs });
+      if (step.action === 'done') s.doneAtMs = Date.now();
+      if (step.action === 'redispatch') {
+        try {
+          await api(path + '/dispatches', { method: 'POST', body: { ref: 'main' } });
+          s.redispatches++;
+          s.lastDispatchMs = Date.now();
+          step.reason += `; re-dispatched (${s.redispatches}/${GUARD_MAX_REDISPATCH}), delivery NOT yet verified`;
+        } catch (err) { step.reason += '; re-dispatch FAILED: ' + err.message; }
+      }
+      s.last = `${step.action}: ${step.reason}${step.action === 'unknown' ? evidenceError : ''}`;
+      console.log(`deadline-guard: ${s.id} -> ${s.last}`);
+    }
+    if (states.every(s => Number.isFinite(s.doneAtMs)) || Date.now() >= endMs) break;
+    await sleep(Math.min(GUARD_POLL_MS, Math.max(1000, endMs - Date.now())));
+  }
+  const verdict = guardVerdict(states, deadlineMs);
+  const cell = value => String(value).replaceAll('|', '/').replace(/[\r\n]/g, ' ');
+  const report = [`# 09:00 UAE deadline guard -- ${day}`, '', `**${verdict.ok ? 'OK' : 'FAILED'}:** ${verdict.reason}`, '',
+    '| Workflow | Delivered at (UTC) | Re-dispatches | Last observation |', '| --- | --- | --- | --- |',
+    ...states.map(s => `| ${cell(s.id)} | ${Number.isFinite(s.doneAtMs) ? new Date(s.doneAtMs).toISOString().slice(11, 16) : 'NOT delivered'} | ${s.redispatches} | ${cell(s.last)} |`), ''].join('\n');
+  console.log(report);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
+  if (!verdict.ok) process.exitCode = 1;
 }
 
 export async function readRuns(api, path, filters, maxPages = 5) {
@@ -345,12 +468,38 @@ export async function selfTest() {
   assert.equal(morningDecision([r({ created_at: '2026-10-02T01:00:00Z', event: 'push' })], target).action, 'dispatch');
   assert.equal(morningDecision(null, target).action, 'unknown');
   assert.deepEqual(MORNING_CONTROLS, ['sanctions-screen.yml', 'weekly-adverse-media.yml']);
-  console.log('workflow-recovery: 39 offline regression checks passed');
+  // Deadline guard: supervises from the dispatch to 05:00 UTC (09:00 UAE).
+  const day2 = Date.parse('2026-10-02T00:00:00Z');
+  const deadline = day2 + 5 * 3600000;
+  assert.equal(guardWindow(day2 + 5 * 60000, day2).endMs, deadline, 'an on-time guard watches until 09:00 UAE');
+  assert.equal(guardWindow(day2 + 6 * 3600000, day2).endMs, day2 + 6 * 3600000 + GUARD_LATE_START_MS,
+    'a guard started after the deadline still supervises the recovery');
+  assert.ok(guardWindow(day2 - 3600000, day2).endMs - (day2 - 3600000) <= GUARD_MAX_RUN_MS, 'never outlives the job');
+  const g = (runs, extra = {}) => guardStep(runs, { targetDayMs: day2, nowMs: day2 + 2 * 3600000, delivered: false, ...extra }).action;
+  const failedToday = r({ created_at: '2026-10-02T00:05:30Z', conclusion: 'failure' });
+  assert.equal(g([failedToday], { delivered: true }), 'done', 'evidence wins over a red run (EOCN gate)');
+  assert.equal(g([failedToday]), 'redispatch', 'a killed run without evidence is re-dispatched before 09:00 UAE');
+  assert.equal(g([failedToday], { delivered: null }), 'unknown', 'unreadable evidence never triggers a blind dispatch');
+  assert.equal(g([r({ created_at: '2026-10-02T00:05:30Z', status: 'in_progress', conclusion: null })]), 'wait');
+  assert.equal(g([failedToday], { redispatches: GUARD_MAX_REDISPATCH }), 'exhausted', 'bounded');
+  assert.equal(g([failedToday], { lastDispatchMs: day2 + 2 * 3600000 - 60000 }), 'wait',
+    'a just-accepted dispatch is not re-sent while its run is not listed yet');
+  assert.equal(g([failedToday], { lastDispatchMs: day2 + 2 * 3600000 - GUARD_DISPATCH_GRACE_MS }), 'redispatch',
+    'a dispatch that never produced a run is retried after the grace period');
+  assert.equal(g([r({ created_at: '2026-10-01T23:00:00Z', conclusion: 'success' })]), 'redispatch',
+    'yesterday\'s run is not today\'s evidence');
+  assert.equal(g([r({ created_at: '2026-10-02T00:05:30Z', conclusion: 'failure', head_branch: 'feature' })]), 'redispatch');
+  assert.equal(g(null), 'unknown');
+  assert.equal(guardVerdict([{ id: 'a', doneAtMs: deadline - 1 }, { id: 'b', doneAtMs: deadline }], deadline).ok, true);
+  assert.equal(guardVerdict([{ id: 'a', doneAtMs: deadline + 1 }], deadline).ok, false, 'late delivery fails loudly');
+  assert.equal(guardVerdict([{ id: 'a', doneAtMs: NaN }], deadline).ok, false);
+  console.log('workflow-recovery: 55 offline regression checks passed');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   (process.argv.includes('--self-test') ? selfTest()
-    : process.argv.includes('--morning') ? morning() : main()).catch(err => {
+    : process.argv.includes('--morning') ? morning()
+    : process.argv.includes('--guard') ? guard() : main()).catch(err => {
     console.error('workflow-recovery: ' + err.message);
     process.exitCode = 1;
   });

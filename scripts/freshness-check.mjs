@@ -74,7 +74,7 @@ export const EXEMPT = {
   'sanctions-runtime-assurance.yml': 'fast evidence refresh for the sanctions domain; sanctions-screen.yml remains the mandatory daily case-engine control and screening-assurance.yml remains the mandatory all-domain runtime control',
   'scorecard.yml': 'security posture scan',
   'scorecard-milestone.yml': 'one-shot dated reminder (files the 2026-09-09 Scorecard 9.0 verification task); date-guarded and title-deduped, deleted after sign-off — no recurring ingestion/eval duty',
-  'screening-morning-dispatch.yml': 'timing dispatcher: starts sanctions-screen.yml and weekly-adverse-media.yml at 00:05 UTC so results reach Asana before 09:00 UAE; both screens are monitored controls above and Delivery Watchdog verifies the report, so a missed dispatch surfaces as a late or missing control, never as green; self-alerts to Asana on failure',
+  'screening-morning-dispatch.yml': 'timing dispatcher: starts sanctions-screen.yml and weekly-adverse-media.yml at 00:05 UTC so results reach Asana before 09:00 UAE; both screens are monitored controls above and Delivery Watchdog verifies the report, so a missed dispatch surfaces as a late or missing control, never as green; its deadline-guard job re-dispatches a failed screen before 09:00 UAE and self-alerts to Asana when delivery is not evidenced by then',
   'site-currency.yml': 'production-deploy currency probe (live APP_VERSION vs main); self-alerting to Asana on drift, red badge is the alarm',
   'site-health.yml': 'site operations probe; self-alerting',
   'stale-branch-audit.yml': 'repository housekeeping (flags branches fully absorbed into main for review); no ingestion/eval duty, never auto-deletes',

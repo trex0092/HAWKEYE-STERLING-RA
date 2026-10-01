@@ -63,7 +63,7 @@ scheduled events "2-4h late, every day" and offsets are tuned empirically
 around that):
 
 ```
-00:05 screening-morning-dispatch (on-time workflow_dispatch of sanctions-screen + daily screening; waits on the runner from its 19:07/20:37/22:07 UTC slots)
+00:05 screening-morning-dispatch (on-time workflow_dispatch of sanctions-screen + daily screening; waits on the runner from its 19:07/20:37/22:07 UTC slots; its guard job then re-dispatches a failed screen and alerts if delivery is not evidenced by 05:00 UTC)
 00:17 sanctions-screen       (case engine backstop; fetches its own lists)
 05:07 sanctions-watch        (fetch lists)
 05:19 site-health
