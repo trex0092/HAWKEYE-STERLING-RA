@@ -42,7 +42,12 @@ function providedToken(event) {
 
 function tokenMatches(event, required) {
   const provided = providedToken(event);
-  return Boolean(provided) && safeEqual(provided, required);
+  if (!provided || !required) return false;
+  try {
+    return safeEqual(provided, required);
+  } catch (e) {
+    return false;
+  }
 }
 
 function sharedTokenOk(event) {
