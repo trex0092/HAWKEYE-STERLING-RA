@@ -27,6 +27,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/pep-shard-harvest.yml'
+      - 'scripts/pep-worldwide.mjs'
 
 permissions:
   contents: read
