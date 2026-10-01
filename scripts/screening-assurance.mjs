@@ -138,6 +138,8 @@ export function assessRuntime({
   const pepRun = e.pepWorldwide || {};
   const pepCount = num(pepDataset?.count);
   const pepExpected = num(pepDataset?.expected);
+  const pepSourceExpected = num(pepDataset?.sourceExpected);
+  const pepUnmatchable = arr(pepDataset?.unmatchableSourceItems);
   const pepAge = ageHours(pepDataset?.harvested, nowMs);
   if (!pepDataset || typeof pepDataset !== 'object') pepReasons.push('worldwide PEP artifact is missing');
   if (pepRun.active !== true) pepReasons.push('daily screen did not load the worldwide PEP artifact');
@@ -157,6 +159,9 @@ export function assessRuntime({
      digest itself labels enrichment "best-effort". A transient live lookup
      failure or enrichment time-budget skip must therefore remain visible, but
      cannot invalidate a fresh, complete local PEP screen. */
+  if (pepUnmatchable.length) {
+    pepWarnings.push(pepUnmatchable.length + ' current Wikidata holder item(s) expose no screenable identity metadata; recorded as upstream source-data exceptions');
+  }
   if (e.pepLookupEnabled !== true) pepWarnings.push('supplementary live per-name PEP lookup is disabled');
   if (num(e.pepErrors) > 0) pepWarnings.push(num(e.pepErrors) + ' supplementary live PEP lookup(s) errored');
   if (num(e.skipped) > 0) pepWarnings.push(num(e.skipped) + ' subject(s) skipped supplementary PEP enrichment');
@@ -164,6 +169,10 @@ export function assessRuntime({
   const pep = domain(pepReasons.length === 0, pepReasons, {
     persons: pepCount,
     expected: pepExpected || pepCount,
+    sourceExpected: pepSourceExpected || pepExpected || pepCount,
+    unmatchableSourceItems: pepUnmatchable.map(x => ({
+      qid: String(x?.qid || ''), target: String(x?.target || ''), reason: String(x?.reason || ''),
+    })),
     partial: !!pepDataset?.partial,
     harvestedAt: pepDataset?.harvested || '',
     ageHours: Number.isFinite(pepAge) ? Math.round(pepAge * 10) / 10 : null,
