@@ -947,7 +947,7 @@ export const GNEWS_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GNEWS_MIN_IN
 export const GDELT_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GDELT_MIN_INTERVAL_MS) || 5000);
 export const BING_MIN_INTERVAL_MS = Math.max(0, Number(process.env.BING_MIN_INTERVAL_MS) || 1000);
 export const ADVERSE_BACKBONE_MAX_ATTEMPTS = Math.max(1,
-  Math.min(5, Number(process.env.ADVERSE_BACKBONE_MAX_ATTEMPTS) || 3));
+  Math.min(5, Number(process.env.ADVERSE_BACKBONE_MAX_ATTEMPTS) || 5));
 
 // Some providers return 429 without Retry-After. Back off the shared queue anyway.
 export const ADVERSE_RATE_LIMIT_BACKOFF_MS = Math.min(900000,
