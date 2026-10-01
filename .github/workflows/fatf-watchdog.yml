@@ -83,7 +83,12 @@ jobs:
           # corrected in the same pass, both here and in the repo variable
           # itself. The real "FATF list moves" section, 1218451989290544, was
           # verified directly against the live Asana API.
-          ASANA_FATF_SECTION_GID: ${{ vars.ASANA_FATF_SECTION_GID || '1218451989290544' }}
+          # REPOINTED 2026-10-01: the "FATF list moves" section (1218451989290544)
+          # no longer exists in HAWKEYE STERLING APP and is not an approved
+          # section (scripts/asana-sections.mjs), so a list-change alert was
+          # created but left outside any section. FATF list moves are
+          # regulatory changes; pinned for the same reason as advisor-eval.
+          ASANA_FATF_SECTION_GID: '1218451992088222'
         run: node scripts/fatf-watchdog.mjs "$MODE"
       - name: Monthly review digest
         # Idempotent monthly digest — self-skips once this month's "Reviews due"
