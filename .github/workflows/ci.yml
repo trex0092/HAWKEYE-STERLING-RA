@@ -207,6 +207,10 @@ jobs:
         run: node test/readiness-review.test.mjs
       - name: Run screening delivery workflow regression tests
         run: node test/screening-delivery-workflow.test.mjs
+      - name: Run screening delivery regression tests
+        run: node test/screening-delivery.test.mjs
+      - name: Run screening schema bootstrap regression tests
+        run: node test/screening-schema-bootstrap.test.mjs
       - name: Run CI coverage drift guard (every test file is wired into a workflow)
         run: node test/ci-coverage.test.mjs
       - name: Run site-currency verdict tests (a stale or unreadable site can never read as current)
