@@ -199,6 +199,18 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance fails when the worldwide PEP artifact is partial',
     !pp.domains.pep.operational);
 
+  const sourceQualityPep = {
+    ...pep,
+    sourceExpected: 50008,
+    sourceUnscreenable: ['Q100', 'Q101', 'Q102', 'Q103', 'Q104', 'Q105', 'Q106', 'Q107'],
+  };
+  const sq = assessRuntime({ results, pepDataset: sourceQualityPep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance stays operational when every screenable PEP identity is covered and nameless live source items remain explicit warnings',
+    sq.domains.pep.operational
+    && sq.domains.pep.warnings.some(r => r.includes('source item'))
+    && sq.domains.pep.evidence.sourceExpected === 50008
+    && sq.domains.pep.evidence.sourceUnscreenable.length === 8);
+
   const pepLiveErrors = structuredClone(results);
   pepLiveErrors.enrichment.pepErrors = 5;
   pepLiveErrors.enrichment.skipped = 1;
