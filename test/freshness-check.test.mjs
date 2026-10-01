@@ -278,9 +278,9 @@ check('Sanctions Screen writes runtime assurance before persisting state',
   && /Persist screening \+ case state/.test(sanctionsScreenWf));
 check('Sanctions Screen verifies freshly persisted assurance through the checker workflow',
   /screening-assurance\.yml\/dispatches/.test(sanctionsScreenWf));
-check('PEP shard accelerator auto-runs only for its own reviewed workflow change on main',
+check('PEP shard accelerator auto-runs only for reviewed harvester implementation/workflow changes on main',
   /push:\s*\n\s*branches:\s*\[main\]/.test(pepShardWf)
-  && /paths:\s*\n\s*- ['"]\.github\/workflows\/pep-shard-harvest\.yml['"]/.test(pepShardWf));
+  && /paths:\s*\n\s*- ['"]\.github\/workflows\/pep-shard-harvest\.yml['"]\s*\n\s*- ['"]scripts\/pep-worldwide\.mjs['"]/.test(pepShardWf));
 
 const pepWatchdogWf = readFileSync(join(wfDir, 'pep-chain-watchdog.yml'), 'utf8');
 check('PEP watchdog observes ordinary and sharded harvests without checking out repository code',
