@@ -968,37 +968,37 @@ check('PEP harvest: successful fallback distinguishes terminal upstream-unmatcha
 const _ds = pep.buildPepDataset({
   harvestedAt: '2026-08-05T00:00:00Z',
   holderRows: [
-    { person: 'Q1x', pos: 'P1', end: '', classKey: 'legislator' },
-    { person: 'Q1x', pos: 'P2', end: '', classKey: 'head-of-state' },
-    { person: 'Q2x', pos: 'P1', end: '2025-01-01', classKey: 'legislator' },
-    { person: 'Q3x', pos: 'P9', end: '', classKey: 'minister' }],
+    { person: 'Q1001', pos: 'P1', end: '', classKey: 'legislator' },
+    { person: 'Q1001', pos: 'P2', end: '', classKey: 'head-of-state' },
+    { person: 'Q1002', pos: 'P1', end: '2025-01-01', classKey: 'legislator' },
+    { person: 'Q1003', pos: 'P9', end: '', classKey: 'minister' }],
   positions: new Map([['P1', { label: 'MP of Testland', country: 'Testland' }], ['P2', { label: 'President of Testland', country: 'Testland' }]]),
-  names: new Map([['Q1x', { name: 'Alpha Leader', aliases: ['A. Leader'] }], ['Q2x', { name: 'Beta Member', aliases: [] }]]),
+  names: new Map([['Q1001', { name: 'Alpha Leader', aliases: ['A. Leader'] }], ['Q1002', { name: 'Beta Member', aliases: [] }]]),
 });
 check('PEP harvest: dedupe keeps the most senior class; unlabeled persons drop; counts per class',
   _ds.count === 2 && _ds.classes['head-of-state'] === 1 && _ds.classes.legislator === 1
-  && _ds.entries.find(e => e.qid === 'Q1x').position === 'President of Testland'
-  && _ds.entries.find(e => e.qid === 'Q2x').current === false
-  && !_ds.entries.find(e => e.qid === 'Q3x'));
+  && _ds.entries.find(e => e.qid === 'Q1001').position === 'President of Testland'
+  && _ds.entries.find(e => e.qid === 'Q1002').current === false
+  && !_ds.entries.find(e => e.qid === 'Q1003'));
 const _dsWithSourceException = pep.buildPepDataset({
   harvestedAt: '2026-08-05T00:00:00Z',
   holderRows: [
-    { person: 'Q1x', pos: 'P1', end: '', classKey: 'legislator' },
-    { person: 'Q3x', pos: 'P9', end: '', classKey: 'minister' },
+    { person: 'Q1001', pos: 'P1', end: '', classKey: 'legislator' },
+    { person: 'Q1003', pos: 'P9', end: '', classKey: 'minister' },
   ],
   positions: new Map([['P1', { label: 'MP of Testland', country: 'Testland' }]]),
-  names: new Map([['Q1x', { name: 'Alpha Leader', aliases: [] }]]),
+  names: new Map([['Q1001', { name: 'Alpha Leader', aliases: [] }]]),
   expected: 1,
-  excludedQids: ['Q3x'],
+  excludedQids: ['Q1003'],
   sourceExpected: 2,
-  unmatchableSourceItems: [{ qid: 'Q3x', target: 'Q3x', reason: 'no-label-alias-or-wikipedia-sitelink' }],
+  unmatchableSourceItems: [{ qid: 'Q1003', target: 'Q1003', reason: 'no-label-alias-or-wikipedia-sitelink' }],
 });
 check('PEP harvest: confirmed upstream-unmatchable source items are excluded from the screenable denominator but remain explicit evidence',
   _dsWithSourceException.count === 1
   && !_dsWithSourceException.partial
   && _dsWithSourceException.sourceExpected === 2
   && _dsWithSourceException.unmatchableSourceItems.length === 1
-  && _dsWithSourceException.unmatchableSourceItems[0].qid === 'Q3x');
+  && _dsWithSourceException.unmatchableSourceItems[0].qid === 'Q1003');
 check('PEP harvest: floor gate refuses a hollow harvest and a >40% shrink, passes a healthy one',
   pep.datasetFloorOk({ count: 10 }, null, { floor: 5000 }).ok === false
   && pep.datasetFloorOk({ count: 6000 }, { count: 12000 }, { floor: 5000, shrinkPct: 0.6 }).ok === false
