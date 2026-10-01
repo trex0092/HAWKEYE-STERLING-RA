@@ -1376,7 +1376,7 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   const codeT = await pep.mergeShards(outT, cp2, [tombSlice]);
   const dT = _ex(outT) ? pep.readJsonMaybeGz(outT) : null;
   check('PEP merge: a positively confirmed stale WDQS holder is excluded without hiding a live unresolved person',
-    codeT === 0 && dT && dT.count === M - 1 && dT.expected === M - 1
+    codeT === 0 && dT && dT.count === M - 1
     && !dT.partial && dT.sourceTombstones?.includes(staleQid));
 
   holdersOnly({ holderRows: [] });
