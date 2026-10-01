@@ -1348,6 +1348,20 @@ def mask_population(customers, emit=None):
             emit("::add-mask::" + v)
     return len(seen)
 
+_URL_QUERY_RE = re.compile(r"\?[^\s'\")]*")
+_URL_PATH_RE = re.compile(r"(url:\s*)\S+", re.I)
+
+def safe_err(e, limit=160):
+    """Exception text safe for the PUBLIC run log. A news-feed request error
+    (requests' "Max retries exceeded with url: /rss/search?q=%22Jane+Roe%22…")
+    carries the subject's name URL-ENCODED in the query string, which
+    ::add-mask:: cannot match. Keep the error type and host; redact the URL
+    path and every query string."""
+    t = f"{type(e).__name__}: {e}"
+    t = _URL_PATH_RE.sub(r"\1<redacted>", t)
+    t = _URL_QUERY_RE.sub("?<redacted>", t)
+    return t[:limit]
+
 def subject_log_ref(c):
     """Non-identifying run-log reference: the opaque Asana gid, never a name."""
     gid = (c or {}).get("gid") if isinstance(c, dict) else None
@@ -2175,7 +2189,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                 _k = type(e).__name__
                 _GNEWS_FAIL_KINDS[_k] = _GNEWS_FAIL_KINDS.get(_k, 0) + 1
                 if _GNEWS_FAIL_KINDS[_k] <= 3:
-                    log(f"  google-news fetch/parse failed ({_k}): {str(e)[:160]}")
+                    log(f"  google-news fetch/parse failed ({_k}): {safe_err(e)}")
             # Feed the adaptive gate: a failure widens the SHARED interval
             # (multiplicative, toward the cap) so the whole worker pool goes
             # quiet enough for a tripped limiter to cool; a success decays it
@@ -2236,7 +2250,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                     log(f"  GDELT down ({GDELT_BREAKER_AFTER} subjects in a row) — circuit OPEN, "
                         "skipping GDELT for the rest of the run; Google News coverage stands")
             else:
-                log(f"  GDELT unavailable for this subject ({str(e)[:80]}) — Google News coverage stands")
+                log(f"  GDELT unavailable for this subject ({safe_err(e, 80)}) — Google News coverage stands")
 
     # Independent THIRD source — Bing News RSS (separate rate-limit pool from
     # both Google News and GDELT). Same contract as the GDELT block above: its
@@ -2262,7 +2276,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                     log(f"  Bing News down ({BING_BREAKER_AFTER} subjects in a row) — circuit OPEN, "
                         "skipping Bing News for the rest of the run; Google News/GDELT coverage stands")
             else:
-                log(f"  Bing News unavailable for this subject ({str(e)[:80]}) — other feeds stand")
+                log(f"  Bing News unavailable for this subject ({safe_err(e, 80)}) — other feeds stand")
 
     # One last-resort retry when the subject has ZERO fresh-story coverage.
     # This is deliberately narrow: retry only the independent global backbones,
@@ -2284,7 +2298,7 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                 _BING_GATE.reward()
                 log("  adverse-media last-resort retry recovered Bing News coverage for this subject")
             except Exception as e:
-                log(f"  adverse-media last-resort Bing retry failed ({str(e)[:80]})")
+                log(f"  adverse-media last-resort Bing retry failed ({safe_err(e, 80)})")
         # GDELT already has its own retry/fallback query and breaker accounting.
         # Do not double-call it here; the last-resort chance uses Bing's
         # independent rate-limit pool so one transient Bing refusal does not
@@ -4835,7 +4849,7 @@ def build_daily_narrative(customers, possible_matches, clear, list_meta,
                     articles = search_adverse_media(subject_name)
                     lines.append(format_adverse_block(subject_name, articles, subject_type))
                 except Exception as e:
-                    log(f"  ! adverse media unavailable for a {subject_type.lower()} subject of {subject_log_ref(m)}: {e}")
+                    log(f"  ! adverse media unavailable for a {subject_type.lower()} subject of {subject_log_ref(m)}: {safe_err(e)}")
                     lines.append(f"   ⚠️  ADVERSE MEDIA UNAVAILABLE for {subject_name} — all sources failed this run; re-run or review manually.")
 
             lines.append("")
@@ -5100,7 +5114,7 @@ def run_weekly_adverse(customers, run_time):
                     individuals_screened += 1
             except Exception as e:
                 errors += 1
-                log(f"  ! error screening a {subj_type.lower()} of {subject_log_ref(c)}: {e}")
+                log(f"  ! error screening a {subj_type.lower()} of {subject_log_ref(c)}: {safe_err(e)}")
                 continue
             adverse = [a for a in articles if a["flagged"]]
             if adverse:
@@ -6521,6 +6535,47 @@ def attach_full_results(task_gid, full_report, register, run_time):
         log(f"OK full results attached to {task_gid} (full report + results register)")
     return ok_report and ok_register
 
+def task_attachment_names(task_gid):
+    """Names of the files attached to a task, or None when Asana cannot be read."""
+    r = asana_request("GET", "https://app.asana.com/api/1.0/attachments",
+                      params={"parent": task_gid, "opt_fields": "name", "limit": 100})
+    if r is None or r.status_code != 200:
+        return None
+    try:
+        return [a.get("name", "") for a in (r.json().get("data") or []) if isinstance(a, dict)]
+    except Exception:
+        return None
+
+def has_full_results(names):
+    """Both full-results files present (same contract as delivery-watchdog.mjs)."""
+    names = names or []
+    return (any(re.match(r"^full-screening-report-\d{4}-\d{2}-\d{2}\.txt$", n or "") for n in names)
+            and any(re.match(r"^screening-results-register-\d{4}-\d{2}-\d{2}\.csv$", n or "") for n in names))
+
+def heal_full_results(existing_gid, narrative, rebuild, register, run_time,
+                      possible_matches, adverse_findings, pep_findings):
+    """A re-run that finds today's report already delivered must still deliver
+    its full results if the first run's attachment upload failed — otherwise
+    Control Retry's re-run skips the card (dedup) and the gap can never heal
+    while the Delivery Watchdog keeps failing. Attaches only when missing."""
+    if not FULL_RESULTS_ATTACH:
+        return
+    names = task_attachment_names(existing_gid)
+    if names is None:
+        log(f"FAIL full results: could not list attachments of {existing_gid} — delivery UNVERIFIABLE")
+        FULL_RESULTS_FAILED["failed"] = True
+        return
+    if has_full_results(names):
+        log(f"  full results already attached to {existing_gid}")
+        return
+    log(f"  {existing_gid} was delivered WITHOUT its full results — attaching them now (self-heal)")
+    full_report = rebuild({"full": True}) if rebuild is not None else narrative
+    if not attach_full_results(existing_gid, full_report, register if register is not None
+                               else build_results_register(possible_matches, [], adverse_findings,
+                                                           pep_findings), run_time):
+        log(f"FAIL full results: self-heal upload to {existing_gid} failed")
+        FULL_RESULTS_FAILED["failed"] = True
+
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
                       rebuild=None, customer_gids=None, register=None):
     dt = run_time.strftime("%d %b %Y")
@@ -6529,6 +6584,8 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
         log(f"SKIP: a {mode} report for {dt} was already delivered as "
             f"{existing_gid} (dedup check added 2026-09-24 after the 17 Sep "
             f"duplicate-posting incident) — not posting a duplicate")
+        heal_full_results(existing_gid, narrative, rebuild, register, run_time,
+                          possible_matches, adverse_findings, pep_findings)
         progress("delivered", task_gid=existing_gid)
         return existing_gid
     n_s, n_a, n_p = len(possible_matches), len(adverse_findings), len(pep_findings)
@@ -7283,7 +7340,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                     # triage_adverse is documented never to raise; if it ever
                     # does, the article must still carry a triage verdict or the
                     # renderer sees a hole. Deterministic-only, and loud.
-                    log(f"  WARN triage failed for an article ({e}) — deterministic verdict stands")
+                    log(f"  WARN triage failed for an article ({safe_err(e)}) — deterministic verdict stands")
                     _art["triage"] = {"severity": "LOW", "relevance": "LOW",
                                       "confidence": "LOW", "ai": False}
     injection_blocked = sum(1 for _n, _a in _triage_work
