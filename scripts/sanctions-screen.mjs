@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
   fitAsanaText, fitAsanaName } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
-import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
+import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName } from './sanctions-match.mjs';
 import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
@@ -1667,7 +1667,17 @@ export async function loadSanctionsLists(cfg) {
   await Promise.all(sources.map(async (s) => {
     try {
       const body = await fetchListBody(s, Number(s.timeoutMs) || cfg.listTimeoutMs);
-      const names = parseList(s, body);
+      const parsed = parseList(s, body);
+      const junk = screenableNames(parsed);
+      if (junk.drifted) {
+        failures.push({ source: s, reason: 'format drift - ' + junk.dropped + ' of ' + parsed.length
+          + ' parsed value(s) are not names (dates / serials / schedule references)' });
+        console.error('sanctions-screen: ' + s.id + ' FORMAT DRIFT - ' + junk.dropped + ' of '
+          + parsed.length + ' parsed values are not names; source not screened');
+        return;
+      }
+      if (junk.dropped) console.warn('sanctions-screen: ' + s.id + ' dropped ' + junk.dropped + ' non-name value(s)');
+      const names = junk.kept;
       if (!names.length) {
         if (s.optional) {
           fetched++;
@@ -1720,6 +1730,21 @@ export async function loadSanctionsLists(cfg) {
     notes,
     unresolvedSources: unresolved.map(x => x.source && x.source.id).filter(Boolean),
   };
+}
+
+/* Format-drift guard for EVERY list, not just generic XML: a parser pointed at
+   a feed whose layout changed can return dates, serials or schedule numbers
+   as "names" (Canada SEMA, 1 Oct 2026: 11,087 values, zero names, reported
+   loaded). Non-name values are dropped and counted; when they are the
+   MAJORITY of what a source parsed, the source is treated as drifted — a
+   failure that marks the screen degraded with the reason — instead of
+   screening junk under a "loaded" label. Pure — unit-tested. */
+export const JUNK_DRIFT_RATIO = 0.5;
+export function screenableNames(names) {
+  const kept = [], dropped = [];
+  for (const n of names || []) (isScreenableName(typeof n === 'string' ? n : n && n.name) ? kept : dropped).push(n);
+  const total = kept.length + dropped.length;
+  return { kept, dropped: dropped.length, drifted: total > 0 && dropped.length / total > JUNK_DRIFT_RATIO };
 }
 
 /* Enrichment fairness: rotate an array by a day-derived offset. The enrichment

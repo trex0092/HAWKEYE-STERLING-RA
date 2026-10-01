@@ -4605,6 +4605,24 @@ finally:
 check("case dedup: an unreadable case list fails OPEN — every case is still created",
       _dd_n2 == 2)
 
+# ── Canada SEMA junk-name guard (published XML with misaligned columns) ──────
+_ca_broken = (b'<data-set><record><EntityOrShip-EntiteOuNavire>1, Part 1</EntityOrShip-EntiteOuNavire>'
+              b'<TitleOrShipType-TitreOuTypeDeNavire>1</TitleOrShipType-TitreOuTypeDeNavire>'
+              b'<LastName-NomDeFamille>44102</LastName-NomDeFamille></record></data-set>')
+_ca_n, _ca_d, _ = screen.parse_canada(_ca_broken)
+check("canada: a feed with only date serials / schedule refs in name fields is UNAVAILABLE, not 'live'",
+      not _ca_n and _ca_d == "unavailable")
+_ca_good = ('<data-set><record><GivenName-Prenom>Ivan</GivenName-Prenom>'
+            '<LastName-NomDeFamille>Petrov</LastName-NomDeFamille></record>'
+            '<record><EntityOrShip-EntiteOuNavire>Rostec Industrial Holding</EntityOrShip-EntiteOuNavire></record>'
+            '</data-set>').encode()
+_ca_n2, _ca_d2, _ = screen.parse_canada(_ca_good)
+check("canada: real person and entity names still parse (recall unchanged)",
+      {"Ivan Petrov", "Rostec Industrial Holding"} <= _ca_n2 and _ca_d2 == "live")
+check("is_screenable_name: digits/dates/schedule refs rejected; real names in any script kept",
+      not screen.is_screenable_name("44102") and not screen.is_screenable_name("1, Part 1")
+      and screen.is_screenable_name("ООО Ромашка") and screen.is_screenable_name("Partners Trading LLC"))
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

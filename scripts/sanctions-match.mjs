@@ -420,6 +420,20 @@ export function parseIdbCsv(body) {
 /* Best-effort generic sanctions XML (Canada SEMA, Switzerland SECO and similar):
    join given/last name tags, take whole/entity name tags, and split alias tags.
    Returns [] if nothing recognisable is found (caller flags coverage degraded). */
+/* A screenable name carries at least two letters (any script) and is not a
+   bare schedule reference. 1 Oct 2026: Canada's official SEMA XML began
+   publishing records whose fields are shifted against their labels — the
+   LastName field holds a date serial ("44102"), EntityOrShip holds the
+   schedule ("1, Part 1") — with NO name anywhere. The generic parser counted
+   11,087 such values as "designated names", passed the 2,500 floor, and the
+   list reported OK while screening nothing. Junk is now dropped, so a list
+   that carries no real names reads 0 and degrades loudly. */
+const SCHEDULE_REF_RE = /^(?:\d+\s*,\s*)?(?:schedule\s+\d+\s*,\s*)?part\s+[\d.]+$/i;
+export function isScreenableName(value) {
+  const v = String(value ?? '').trim();
+  return (v.match(/\p{L}/gu) || []).length >= 2 && !SCHEDULE_REF_RE.test(v);
+}
+
 export function parseGenericXml(body) {
   const s = String(body), names = [];
   const recordRe = /<(record|entry|sanctionEntity|sanctionentity|individual|entity|target)\b[^>]*>([\s\S]*?)<\/\1>/gi;
@@ -438,7 +452,7 @@ export function parseGenericXml(body) {
       for (const a of allTags(block, t)) for (const piece of a.split(/[\/;|]/)) { const v = piece.trim(); if (v) names.push(v); }
     }
   }
-  return matched ? names.filter(Boolean) : [];
+  return matched ? names.filter(isScreenableName) : [];
 }
 
 /* Switzerland SECO "Gesamtliste" XML: <target> blocks whose <identity> carries
