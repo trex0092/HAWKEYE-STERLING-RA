@@ -1578,7 +1578,8 @@ def _asana_notes_size(s):
         total += cost
     return total
 
-def cap_notes(narrative, limit=None, tail_chars=1200):
+def cap_notes(narrative, limit=None, tail_chars=1200,
+              marker="\n…[body truncated — see workflow run log]…\n"):
     """Cap a report to Asana's notes limit WITHOUT amputating the sign-off / retention
     footer at the end — truncate the body, keep the tail. Sizes are measured with
     _asana_notes_size (worst-case rich-text bytes — see above); the head cut lands
@@ -1591,7 +1592,6 @@ def cap_notes(narrative, limit=None, tail_chars=1200):
     if _asana_notes_size(narrative) <= limit:
         return narrative
     tail = narrative[-tail_chars:]
-    marker = "\n…[body truncated — see workflow run log]…\n"
     budget = limit - _asana_notes_size(tail) - _asana_notes_size(marker)
     lo, hi = 0, len(narrative)
     while lo < hi:  # longest head whose worst-case size fits the budget
@@ -5226,6 +5226,7 @@ def enforce_eocn_review_gate():
 # budgets) failed; read by enforce_delivery_gate(). Kill-switch:
 # DELIVERY_HARD_FAIL=0 keeps the alarm but not the exit.
 UNIFIED_DELIVERY_FAILED = {"failed": False}
+FULL_RESULTS_FAILED = {"failed": False}   # card delivered, full-results attachments not
 DELIVERY_HARD_FAIL = os.environ.get("DELIVERY_HARD_FAIL", "1") == "1"
 
 def enforce_delivery_gate():
@@ -5239,6 +5240,12 @@ def enforce_delivery_gate():
     if UNIFIED_DELIVERY_FAILED["failed"]:
         log("DELIVERY GATE: the unified screening task was never created — "
             "failing the run so the freshness alarm and Actions email fire")
+        if DELIVERY_HARD_FAIL:
+            sys.exit(5)
+    if FULL_RESULTS_FAILED["failed"]:
+        log("DELIVERY GATE: the report card was delivered but its full-results "
+            "attachments (complete report + results register) were not — the card's "
+            "'+N more' remainder is missing from Asana; failing the run")
         if DELIVERY_HARD_FAIL:
             sys.exit(5)
 
@@ -5807,7 +5814,12 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     no longer loses its MIDDLE (which was exactly §② ADVERSE MEDIA) to
     cap_notes' head truncation while the header still counted the findings."""
     caps = caps or {}
-    _cand_n = caps.get("candidates") if caps.get("candidates") is not None else 10
+    # caps={"full": True} renders EVERY item -- all candidates, all identity
+    # exclusions, all related-party clusters -- for the full-report attachment
+    # (attach_full_results), so nothing the card cuts lives only in a run log.
+    _full = bool(caps.get("full"))
+    _cand_n = (10 ** 9 if _full else
+               caps.get("candidates") if caps.get("candidates") is not None else 10)
     _arts_n = caps.get("articles")          # None ⇒ every article per finding
     _subj_n = caps.get("subjects")          # None ⇒ every finding per section
     _match_n = caps.get("matches")          # None ⇒ every §① sanctions subject
@@ -5963,16 +5975,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 if h.get("cdd_gaps"):
                     A(f"        ⚠ CDD gaps: {'; '.join(h['cdd_gaps'])}")
             if len(_scored) > _cand_n:
-                A(f"   -> … +{len(_scored) - _cand_n} more similar candidates (see run log)")
+                A(f"   -> … +{len(_scored) - _cand_n} more similar candidates (see the attached full report)")
             if _excluded:
-                _excl_n = min(5, _cand_n)
+                _excl_n = len(_excluded) if _full else min(5, _cand_n)
                 A(f"   EXCLUDED ON IDENTITY — {len(_excluded)} candidate(s) cannot be this customer "
                   "(DOB and nationality both known on both sides, both disagree).")
                 A("   Recorded, not suppressed — review and overrule here if the identity data is wrong:")
                 for h in sorted(_excluded, key=lambda h: -h["score"])[:_excl_n]:
                     A(f"     · {h['list']}: \"{h['matched_entry']}\" {_pct(h['score'])} — {h['identity_excluded']}")
                 if len(_excluded) > _excl_n:
-                    A(f"     · … +{len(_excluded) - _excl_n} more (see run log)")
+                    A(f"     · … +{len(_excluded) - _excl_n} more (see the attached full report)")
             if ctrl:
                 A("   NOTE: company flagged because an owner / director / UBO matches a designation —"
                   " apply OFAC/EU 50%/control aggregation; treat the entity as designated by extension pending review.")
@@ -5981,7 +5993,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         if _match_n is not None and _sanc_total > _match_n:
             A(f"   … +{_sanc_total - _match_n} further sanctions subject(s) not itemised in this card "
               "(report too large for Asana) — CONFIRMED and NEW are listed first, the remainder are "
-              "STANDING potentials. Full list in the workflow run log.")
+              "STANDING potentials. Full list in the attached full report.")
             A("")
     # ALWAYS render list provenance — including on a zero-match run, so a clean
     # result can never hide that a core list was down (a "clear" against a list
@@ -6096,11 +6108,11 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                     A(f"       Also reported by: {shown_src}")
                 A(f"       Link: {a.get('url','(no link)')}")
             if len(f["articles"]) > len(_arts_shown):
-                A(f"   [!] … +{len(f['articles']) - len(_arts_shown)} more article(s) for this subject (see run log)")
+                A(f"   [!] … +{len(f['articles']) - len(_arts_shown)} more article(s) for this subject (see the attached full report)")
             A("   MLRO Decision:  [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR")
             A("")
         if len(_af_sorted) > len(_af_shown):
-            A(f"   … +{len(_af_sorted) - len(_af_shown)} more adverse subject(s) — every one is in the run log; "
+            A(f"   … +{len(_af_sorted) - len(_af_shown)} more adverse subject(s) — every one is in the attached full report; "
               "none is cleared by this truncation.")
             A("")
         rep = stats.get("adverse_repeat") or {}
@@ -6208,7 +6220,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             A("   MLRO Decision:  [ ] not a PEP   [ ] confirmed PEP — EDD + senior-mgmt approval   [ ] investigate")
             A("")
         if len(_pf_sorted) > len(_pf_shown):
-            A(f"   … +{len(_pf_sorted) - len(_pf_shown)} more PEP finding(s) — every one is in the run log; "
+            A(f"   … +{len(_pf_sorted) - len(_pf_shown)} more PEP finding(s) — every one is in the attached full report; "
               "none is cleared by this truncation.")
             A("")
     A("")
@@ -6221,11 +6233,12 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         A("   No shared owners / UBOs or entity-to-UBO links detected across the book.")
     else:
         A("   Hidden connections across the customer base — review for collusion / structuring:")
-        for cl in related[:25]:
+        _rel_n = len(related) if _full else 25
+        for cl in related[:_rel_n]:
             A(f"   • {cl['key'].title()}  ({cl['type']})")
             A(f"       Linked: {', '.join(cl['members'])}")
-        if len(related) > 25:
-            A(f"   • … +{len(related) - 25} more clusters (see run log)")
+        if len(related) > _rel_n:
+            A(f"   • … +{len(related) - _rel_n} more clusters (see the attached full report)")
     A("")
 
     A("━" * 70)
@@ -6373,8 +6386,99 @@ def _existing_report_task(mode, run_time, customer_gids=None):
             return ""
         params["offset"] = next_page["offset"]
 
+# ── FULL RESULTS IN ASANA (attachments) ──────────────────────────────────────
+# The report card is capped by Asana's ~65 KB notes limit, so it itemises the
+# top findings and summarises the rest ("+N more"). The COMPLETE results used
+# to live only in the GitHub run log -- which is public, and since #725 has the
+# subjects' names masked, so the remainder was neither private nor readable.
+# Every report now carries two attachments on its Asana task:
+#   * the full report text, rendered with caps={"full": True} (no item cut);
+#   * a CSV results register: one row per sanctions hit, adverse-media item and
+#     PEP finding, plus one row per customer record with no sanctions match.
+# An upload failure fails the delivery gate (degrade loudly): the card says
+# the detail is attached, so a missing attachment must never pass as delivered.
+FULL_REPORT_TRUNCATION_MARKER = "\n…[body truncated — the complete report is attached to this task]…\n"
+FULL_RESULTS_ATTACH = os.environ.get("FULL_RESULTS_ATTACH", "1") == "1"
+REGISTER_COLUMNS = ["domain", "result", "customer", "customer_record", "subject",
+                    "subject_type", "list_or_source", "matched_name_or_title", "score",
+                    "confidence_or_severity", "detail", "link"]
+
+def _csv_safe(v):
+    """Neutralise spreadsheet formula injection (a cell opening with = + - @
+    or a control character runs as a formula in Excel / Sheets)."""
+    t = "" if v is None else str(v)
+    return "'" + t if t[:1] in ("=", "+", "-", "@", "\t", "\r") else t
+
+def build_results_register(possible_matches, clear, adverse_findings, pep_findings):
+    """CSV bytes (UTF-8 with BOM, so Excel opens non-Latin names correctly)."""
+    rows = []
+    for m in possible_matches or []:
+        for h in m.get("hits") or []:
+            rows.append({"domain": "sanctions",
+                "result": ("EXCLUDED ON IDENTITY" if h.get("identity_excluded")
+                           else "CONFIRMED" if (h.get("score") or 0) >= 100 else "POTENTIAL"),
+                "customer": m.get("name", ""), "customer_record": m.get("permalink", ""),
+                "subject": h.get("subject_name", ""), "subject_type": h.get("subject_type", ""),
+                "list_or_source": h.get("list", ""), "matched_name_or_title": h.get("matched_entry", ""),
+                "score": h.get("score", ""), "confidence_or_severity": h.get("confidence", ""),
+                "detail": h.get("match_context", ""), "link": ""})
+    for c in clear or []:
+        rows.append({"domain": "sanctions", "result": "NO MATCH", "customer": c.get("name", ""),
+                     "customer_record": c.get("permalink", ""), "subject": c.get("name", ""),
+                     "subject_type": "ENTITY" if c.get("kind") != "employee" else "EMPLOYEE"})
+    for f in adverse_findings or []:
+        for a in f.get("articles") or []:
+            rows.append({"domain": "adverse_media", "result": "FLAGGED",
+                "customer": f.get("parent") or f.get("subject_name", ""),
+                "customer_record": f.get("permalink", ""), "subject": f.get("subject_name", ""),
+                "subject_type": f.get("subject_type", ""), "list_or_source": a.get("source", ""),
+                "matched_name_or_title": a.get("title", ""), "score": "",
+                "confidence_or_severity": a.get("tier", "") or a.get("severity", ""),
+                "detail": "; ".join(a.get("categories") or []) + (f" · {a.get('date')}" if a.get("date") else ""),
+                "link": a.get("url", "") or a.get("link", "")})
+    for p in pep_findings or []:
+        rows.append({"domain": "pep", "result": "REVIEW" if p.get("review") else "FLAGGED",
+            "customer": p.get("parent", ""), "customer_record": p.get("permalink", ""),
+            "subject": p.get("subject_name", ""), "subject_type": "INDIVIDUAL",
+            "list_or_source": p.get("category", ""), "matched_name_or_title": p.get("label", ""),
+            "detail": p.get("description", ""), "link": p.get("source_url", "")})
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=REGISTER_COLUMNS, extrasaction="ignore", lineterminator="\n")
+    w.writeheader()
+    for r in rows:
+        w.writerow({k: _csv_safe(r.get(k, "")) for k in REGISTER_COLUMNS})
+    return ("\ufeff" + buf.getvalue()).encode("utf-8")
+
+def upload_task_attachment(task_gid, filename, data, content_type):
+    """Attach a file to an Asana task. Multipart upload: the JSON Content-Type
+    default of asana_request must not be sent (requests sets the boundary)."""
+    headers = {k: v for k, v in ASANA_HEADERS.items() if k.lower() != "content-type"}
+    r = asana_request("POST", "https://app.asana.com/api/1.0/attachments",
+                      headers=headers, data={"parent": task_gid},
+                      files={"file": (filename, data, content_type)}, timeout=120)
+    ok = r is not None and r.status_code in (200, 201)
+    if not ok:
+        log(f"  FAIL attachment {filename}: {getattr(r, 'status_code', 'network')} "
+            f"{(getattr(r, 'text', '') or '')[:200]}")
+    return ok
+
+def attach_full_results(task_gid, full_report, register, run_time):
+    """Attach the complete report + results register; False if either failed."""
+    if not FULL_RESULTS_ATTACH:
+        log("  full-results attachments DISABLED (FULL_RESULTS_ATTACH=0) — the card's "
+            "'+N more' remainder is NOT delivered to Asana")
+        return False
+    day = run_time.strftime("%Y-%m-%d")
+    ok_report = upload_task_attachment(task_gid, f"full-screening-report-{day}.txt",
+                                       full_report.encode("utf-8"), "text/plain; charset=utf-8")
+    ok_register = upload_task_attachment(task_gid, f"screening-results-register-{day}.csv",
+                                         register, "text/csv; charset=utf-8")
+    if ok_report and ok_register:
+        log(f"OK full results attached to {task_gid} (full report + results register)")
+    return ok_report and ok_register
+
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
-                      rebuild=None, customer_gids=None):
+                      rebuild=None, customer_gids=None, register=None):
     dt = run_time.strftime("%d %b %Y")
     existing_gid = _existing_report_task(mode, run_time, customer_gids)
     if existing_gid:
@@ -6418,7 +6522,7 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
             else:
                 log(f"  narrative exceeds the {budget}-byte budget even at the deepest section caps — "
                     "cap_notes backstop will truncate (marker in-body)")
-        notes_body = cap_notes(body, budget)
+        notes_body = cap_notes(body, budget, marker=FULL_REPORT_TRUNCATION_MARKER)
         if mode == "onboarding" and customer_gids:
             # Dedup marker for _existing_report_task's onboarding lookup
             # above — identifies a REPEAT of this exact customer batch, never
@@ -6447,6 +6551,15 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
                 UNIFIED_DELIVERY_FAILED["failed"] = True
                 return None
             log(f"OK Unified daily task created and placed in approved section: {gid}")
+            full_report = rebuild({"full": True}) if rebuild is not None else narrative
+            if not attach_full_results(gid, full_report, register if register is not None
+                                       else build_results_register(possible_matches, [],
+                                                                   adverse_findings, pep_findings),
+                                       run_time):
+                # The card is delivered (cases may still attach to it), but the
+                # run must go red: its "+N more" remainder is not in Asana.
+                log(f"FAIL full results: {gid} delivered WITHOUT its full-report attachments")
+                FULL_RESULTS_FAILED["failed"] = True
             progress("delivered", task_gid=gid)
             return gid
         last = r
@@ -6532,6 +6645,38 @@ def count_new_case_items(possible_matches, adverse_findings, pep_findings):
     return new_s + new_p + new_a
 
 
+def existing_case_subtasks(parent_gid):
+    """{name: gid} of the cases already filed under today's report task, or None
+    when Asana cannot be read. Same-day re-runs (control-retry, coverage
+    make-up, a manual dispatch) return the SAME report task (dedup), and a
+    re-sweep surfaces different news articles for the same person -- so
+    without this lookup each re-run filed a second identical case (1 Oct 2026:
+    nine adverse-media cases filed twice, 11:30 and 12:55 UTC)."""
+    if not parent_gid:
+        return {}
+    found, params = {}, {"opt_fields": "name", "limit": 100}
+    while True:
+        r = asana_request("GET", f"https://app.asana.com/api/1.0/tasks/{parent_gid}/subtasks",
+                          params=params)
+        if r is None or r.status_code != 200:
+            return None
+        data = r.json() if isinstance(r.json(), dict) else {}
+        for t in data.get("data") or []:
+            if t.get("name") and t.get("gid"):
+                found.setdefault(t["name"], t["gid"])
+        nxt = data.get("next_page") or None
+        if not nxt or not nxt.get("offset"):
+            return found
+        params = {**params, "offset": nxt["offset"]}
+
+def append_to_case(case_gid, notes, run_time):
+    """Add a re-run's new evidence to an existing case as a comment."""
+    text = (f"Re-run {run_time.strftime('%d %b %Y %H:%M')} UTC — additional new item(s) for "
+            f"this case:\n\n{notes}")
+    r = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{case_gid}/stories",
+                      json={"data": {"text": cap_notes(text, CASE_NOTES_MAX, tail_chars=CASE_NOTES_TAIL)}})
+    return r is not None and r.status_code in (200, 201)
+
 def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
                     state=None):
     """Create an assigned subtask for each NEW item (sanctions, PEP, adverse),
@@ -6606,8 +6751,24 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         log(f"  case backlog: {len(backlog)} carried item(s) eligible this run")
     combined = sorted(entries + backlog,
                       key=lambda e: (e["p"], e["queued"] or today_iso))
-    created = 0
+    created = appended = 0
     leftover = []
+    existing = existing_case_subtasks(parent_gid)
+    if existing is None:
+        # Fail OPEN: an unreadable case list must never drop a case -- a
+        # duplicate is noise, a missing case is a missed obligation.
+        log("  case dedup: could not read today's existing cases — creating without the same-day check")
+        existing = {}
+    still = []
+    for e in combined:
+        gid = existing.get(e["name"][:250])
+        if gid and append_to_case(gid, e["notes"], run_time):
+            appended += 1
+        else:
+            still.append(e)
+    if appended:
+        log(f"  MLRO cases: {appended} same-day re-run item(s) added to existing cases (no duplicate case)")
+    combined = still
     for i, e in enumerate(combined):
         if i >= CASE_SUBTASK_CAP or not create_case_subtask(
                 parent_gid, e["name"],
@@ -7232,7 +7393,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                    rebuild=lambda caps: build_unified_narrative(
                                        possible_matches, clear, adverse_findings,
                                        pep_findings, list_meta, stats, run_time, caps=caps),
-                                   customer_gids=[c.get("gid", "") for c in customers])
+                                   customer_gids=[c.get("gid", "") for c in customers],
+                                   register=build_results_register(possible_matches, clear,
+                                                                   adverse_findings, pep_findings))
     # MLRO case subtasks for the NEW items only (keeps the case list actionable);
     # overflow/failed items ride the reserved backlog inside `state`.
     open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,

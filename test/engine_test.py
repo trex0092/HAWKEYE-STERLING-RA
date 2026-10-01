@@ -2527,7 +2527,14 @@ class _CaseResp:
     text = ""
     @staticmethod
     def json(): return {"data": {"gid": "1"}}
+class _NoSubtasks:
+    status_code = 200
+    text = ""
+    @staticmethod
+    def json(): return {"data": []}
 def _rec_case(method, url, **kw):
+    if method == "GET" and url.endswith("/subtasks"):   # same-day dedup lookup: no cases yet
+        return _NoSubtasks()
     if "/addProject" in url:      # board attach after a create: not a case itself
         return _CaseResp()
     _case_names.append(((kw.get("json") or {}).get("data") or {}).get("name", ""))
@@ -3067,6 +3074,7 @@ check("legacy daily post failure arms the delivery gate (no more green no-delive
 # section. Follow Ups is reserved for document expiries and pending documents.
 _posted = []
 _attached = []
+_attachment_uploads = []
 def _record_post(method, url, **kw):
     if method == "GET":
         class _G:
@@ -3091,6 +3099,14 @@ def _record_post(method, url, **kw):
             @staticmethod
             def json(): return {"data": {}}
         return _A()
+    if url.endswith("/api/1.0/attachments"):
+        _attachment_uploads.append((kw.get("data"), kw.get("files"), kw.get("headers")))
+        class _Att:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "att-1"}}
+        return _Att()
     raise AssertionError(f"unexpected Asana call: {method} {url}")
 
 screen.asana_request = _record_post
@@ -3136,6 +3152,14 @@ def _stale_section_post(method, url, **kw):
             status_code = 400
             text = "Section must be in project"
         return _Bad()
+    if url.endswith("/api/1.0/attachments"):
+        _attachment_uploads.append((kw.get("data"), kw.get("files"), kw.get("headers")))
+        class _Att:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "att-1"}}
+        return _Att()
     raise AssertionError(f"unexpected Asana call: {method} {url}")
 
 _prev_failed = screen.UNIFIED_DELIVERY_FAILED["failed"]
@@ -3229,6 +3253,14 @@ def _record_shrink(method, url, **kw):
             @staticmethod
             def json(): return {"data": {}}
         return _A()
+    if url.endswith("/api/1.0/attachments"):
+        _attachment_uploads.append((kw.get("data"), kw.get("files"), kw.get("headers")))
+        class _Att:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "att-1"}}
+        return _Att()
     raise AssertionError(f"unexpected Asana call: {method} {url}")
 _orig_stored = screen.NOTES_BUDGET["stored"]
 screen.asana_request = _record_shrink
@@ -3460,6 +3492,8 @@ def _bl_match(name, score=90):
 
 _bl_created = []
 _orig_create_case = screen.create_case_subtask
+_orig_existing_cases = screen.existing_case_subtasks
+screen.existing_case_subtasks = lambda gid: {}   # backlog tests: no same-day cases filed yet
 screen.create_case_subtask = lambda parent, nm, notes, due, section: (_bl_created.append((nm, notes)), True)[1]
 _orig_cap = screen.CASE_SUBTASK_CAP
 screen.CASE_SUBTASK_CAP = 2
@@ -3512,6 +3546,7 @@ try:
           and screen.load_case_backlog(_st5) == [])
 finally:
     screen.create_case_subtask = _orig_create_case
+    screen.existing_case_subtasks = _orig_existing_cases
     screen.CASE_SUBTASK_CAP = _orig_cap
 
 # ── coverage make-up decision + enrichment rotation (spread-across-the-day) ──
@@ -4436,6 +4471,139 @@ _name_logs = [l for l in _src.splitlines()
               if _re_priv.search(r"\blog\(f", l)
               and _re_priv.search(r"\{(subj_name|subject_name|c\['name'\]|name)\}|\{c\.get\('name'", l)]
 check("no run-log line interpolates a subject name (public Actions logs)", not _name_logs)
+
+# ── FULL RESULTS IN ASANA: complete report + results register attached ──────
+# The card is capped by Asana's notes limit; the remainder used to live only in
+# the (public, now name-masked) run log. Every report task now carries both.
+_rel30 = [{"key": f"owner {i}", "type": "shared owner / UBO", "members": [f"Co {i}A", f"Co {i}B"]}
+          for i in range(30)]
+_st_rel = {**_st(), "related_parties": _rel30}
+_n_card = screen.build_unified_narrative([], [], [], [], _meta_ww, _st_rel, _run_dt)
+_n_full = screen.build_unified_narrative([], [], [], [], _meta_ww, _st_rel, _run_dt, caps={"full": True})
+check("full results: the card itemises 25 clusters and points the rest to the attached full report",
+      "+5 more clusters (see the attached full report)" in _n_card and "Owner 29" not in _n_card)
+check("full results: the full render itemises every cluster with no '+N more' cut",
+      "Owner 29" in _n_full and "more clusters" not in _n_full)
+_src_all = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
+check("full results: no report line still sends the reader to the (public, masked) run log",
+      "(see run log)" not in _src_all and "Full list in the workflow run log" not in _src_all
+      and "every one is in the run log" not in _src_all)
+
+_reg = screen.build_results_register(
+    [{"name": "Acme Gold LLC", "permalink": "https://app.asana.com/x/1",
+      "hits": [{"subject_name": "Jane Roe", "subject_type": "INDIVIDUAL", "list": "OFAC SDN",
+                "matched_entry": "ROE, Jane", "score": 92, "confidence": "STRONG"},
+               {"subject_name": "Jane Roe", "subject_type": "INDIVIDUAL", "list": "UN Consolidated",
+                "matched_entry": "Jane R", "score": 100},
+               {"subject_name": "Jane Roe", "subject_type": "INDIVIDUAL", "list": "EU FSF",
+                "matched_entry": "J Roe", "score": 70, "identity_excluded": True}]}],
+    [{"name": "=HYPERLINK(\"x\")", "permalink": "https://app.asana.com/x/2"}],
+    [{"subject_type": "INDIVIDUAL", "subject_name": "John Doe", "parent": "Beta Bullion",
+      "permalink": "https://app.asana.com/x/3",
+      "articles": [{"title": "Doe charged", "source": "Example News", "url": "https://n.example/1",
+                    "tier": "HIGH", "categories": ["Fraud"], "date": "2026-09-30"}]}],
+    [{"subject_name": "Rich Poe", "parent": "Gamma Gold", "permalink": "https://app.asana.com/x/4",
+      "category": "PEP", "label": "Minister", "description": "Cabinet minister",
+      "source_url": "https://www.wikidata.org/wiki/Q1", "review": False}])
+_reg_txt = _reg.decode("utf-8")
+import csv as _csv_reg, io as _io_reg
+_reg_rows = list(_csv_reg.DictReader(_io_reg.StringIO(_reg_txt.lstrip("\ufeff"))))
+check("register: UTF-8 BOM so Excel opens non-Latin names correctly", _reg_txt.startswith("\ufeff"))
+check("register: header carries the documented columns",
+      list(_reg_rows[0].keys()) == screen.REGISTER_COLUMNS)
+check("register: one row per sanctions hit, classed CONFIRMED / POTENTIAL / EXCLUDED ON IDENTITY",
+      [r["result"] for r in _reg_rows if r["domain"] == "sanctions" and r["subject"] == "Jane Roe"]
+      == ["POTENTIAL", "CONFIRMED", "EXCLUDED ON IDENTITY"])
+check("register: customers with no sanctions match are listed too (the complete population)",
+      any(r["result"] == "NO MATCH" for r in _reg_rows))
+check("register: spreadsheet formula injection is neutralised",
+      any(r["customer"] == "'=HYPERLINK(\"x\")" for r in _reg_rows))
+check("register: adverse-media article rows carry title, source, severity and link",
+      any(r["domain"] == "adverse_media" and r["matched_name_or_title"] == "Doe charged"
+          and r["confidence_or_severity"] == "HIGH" and r["link"] == "https://n.example/1" for r in _reg_rows))
+check("register: PEP findings carry role and source",
+      any(r["domain"] == "pep" and r["matched_name_or_title"] == "Minister"
+          and r["link"].endswith("Q1") for r in _reg_rows))
+
+check("attachments: the delivered report task received the full report and the results register",
+      [u[0]["parent"] for u in _attachment_uploads[:2]] == ["1", "1"]
+      and _attachment_uploads[0][1]["file"][0] == "full-screening-report-2026-07-29.txt"
+      and _attachment_uploads[1][1]["file"][0] == "screening-results-register-2026-07-29.csv")
+check("attachments: uploaded as multipart, never with the JSON Content-Type header",
+      all("Content-Type" not in (u[2] or {}) for u in _attachment_uploads))
+
+def _att_fail(method, url, **kw):
+    class _F:
+        status_code = 500
+        text = "boom"
+    return _F()
+_orig_req_att = screen.asana_request
+_prev_frf = screen.FULL_RESULTS_FAILED["failed"]
+screen.asana_request = _att_fail
+screen.FULL_RESULTS_FAILED["failed"] = False
+try:
+    _att_ok = screen.attach_full_results("1", "x", b"y", _dt.datetime(2026, 7, 29))
+finally:
+    screen.asana_request = _orig_req_att
+check("attachments: an upload failure is reported as failure (never as delivered)", _att_ok is False)
+_prev_hf = screen.DELIVERY_HARD_FAIL
+screen.FULL_RESULTS_FAILED["failed"] = True
+screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+screen.DELIVERY_HARD_FAIL = True
+try:
+    screen.enforce_delivery_gate()
+    _gate_exit = None
+except SystemExit as e:
+    _gate_exit = e.code
+finally:
+    screen.DELIVERY_HARD_FAIL = _prev_hf
+    screen.FULL_RESULTS_FAILED["failed"] = _prev_frf
+check("attachments: a delivered card WITHOUT its full results fails the delivery gate (exit 5)",
+      _gate_exit == 5)
+
+# ── SAME-DAY CASE DEDUP: a re-run appends to the existing case, never a duplicate ──
+_dd_calls = []
+class _DDResp:
+    def __init__(self, code, data): self.status_code, self._d, self.text = code, data, ""
+    def json(self): return self._d
+def _dd_asana(method, url, **kw):
+    _dd_calls.append((method, url, kw))
+    if method == "GET" and url.endswith("/subtasks"):
+        return _DDResp(200, {"data": [{"gid": "case-9", "name": "🟡 Adverse-media case: Jane Roe"}]})
+    if url.endswith("/stories"):
+        return _DDResp(201, {"data": {"gid": "s1"}})
+    if url.endswith("/api/1.0/tasks"):
+        return _DDResp(201, {"data": {"gid": "new-case"}})
+    return _DDResp(200, {"data": {}})
+_dd_af = [{"subject_type": "INDIVIDUAL", "subject_name": "Jane Roe", "parent": "Acme", "permalink": "p",
+           "articles": [{"title": "Different article on re-run", "is_new": True, "source": "S", "url": "u"}]},
+          {"subject_type": "INDIVIDUAL", "subject_name": "John Doe", "parent": "Acme", "permalink": "p",
+           "articles": [{"title": "First story", "is_new": True, "source": "S", "url": "u"}]}]
+_orig_ar_dd = screen.asana_request
+screen.asana_request = _dd_asana
+try:
+    _dd_n = screen.open_mlro_cases("report-1", [], _dd_af, [], _dt.datetime(2026, 10, 1, 12, 55))
+finally:
+    screen.asana_request = _orig_ar_dd
+_dd_story = [c for c in _dd_calls if c[1].endswith("/tasks/case-9/stories")]
+_dd_created = [c for c in _dd_calls if c[1].endswith("/api/1.0/tasks")]
+check("case dedup: a same-day re-run adds its new items to the existing case as a comment",
+      len(_dd_story) == 1 and "Different article on re-run" in _dd_story[0][2]["json"]["data"]["text"])
+check("case dedup: no duplicate case is created for a subject already cased today",
+      len(_dd_created) == 1 and "John Doe" in _dd_created[0][2]["json"]["data"]["name"] and _dd_n == 1)
+def _dd_unreadable(method, url, **kw):
+    _dd_calls.append((method, url, kw))
+    if method == "GET":
+        return _DDResp(404, {})
+    return _DDResp(201, {"data": {"gid": "new-case"}})
+_dd_calls.clear()
+screen.asana_request = _dd_unreadable
+try:
+    _dd_n2 = screen.open_mlro_cases("report-1", [], _dd_af, [], _dt.datetime(2026, 10, 1, 12, 55))
+finally:
+    screen.asana_request = _orig_ar_dd
+check("case dedup: an unreadable case list fails OPEN — every case is still created",
+      _dd_n2 == 2)
 
 print()
 if _fail:
