@@ -4,7 +4,7 @@ import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, sco
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
   bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker,
-  RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS, resetAdverseMediaRateGates,
+  RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS, ADVERSE_BACKBONE_MAX_ATTEMPTS, resetAdverseMediaRateGates,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
   gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker,
   checkAdverseMedia } from '../scripts/adverse-media.mjs';
@@ -16,7 +16,8 @@ function check(name, cond) {
   else { failed++; console.log('FAIL  ' + name); }
 }
 check('run-global adverse-media feed gates have safe non-zero production defaults',
-  GNEWS_MIN_INTERVAL_MS >= 250 && GDELT_MIN_INTERVAL_MS >= 1000 && BING_MIN_INTERVAL_MS >= 250);
+  GNEWS_MIN_INTERVAL_MS >= 250 && GDELT_MIN_INTERVAL_MS >= 1000 && BING_MIN_INTERVAL_MS >= 750
+  && ADVERSE_BACKBONE_MAX_ATTEMPTS >= 3);
 
 {
   const gate = new RequestStartGate(20);
@@ -515,16 +516,17 @@ resetGdeltBreaker();
     }
     if (u.includes('www.bing.com')) {
       bingCalls++;
-      if (bingCalls === 1) return { ok: false, status: 503, text: async () => 'try again' };
+      if (bingCalls < 3) return { ok: false, status: 503, text: async () => 'try again' };
       return { ok: true, status: 200, text: async () => '<rss><channel><title>ok</title></channel></rss>' };
     }
     throw new Error('unexpected fetch in retry test: ' + u);
   };
   try {
     const r = await checkAdverseMedia('Retry Recovery LLC', { timeoutMs: 2000, locales: [] });
-    check('last-resort adverse retry recovers coverage when Bing succeeds on the second gated attempt',
+    check('last-resort adverse retry recovers coverage when Bing succeeds within the bounded retry ladder',
       !r.errored && r.retryAttempted === true && r.retryRecovered === true
-      && r.backbones.bing === true && bingCalls === 2);
+      && r.backbones.bing === true && bingCalls === 3
+      && r.backboneStatus.bingAttempts === 3);
     check('recovered subject remains partial when GDELT redundancy is unavailable, never falsely complete',
       r.partial === true && r.sourcesFailed >= 1);
   } finally {
