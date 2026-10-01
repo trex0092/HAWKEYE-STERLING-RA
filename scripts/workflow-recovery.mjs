@@ -21,6 +21,20 @@ export const HELPERS = [
   { id: 'function-health.yml', name: 'Function health verification', maxAgeDays: 0 },
 ];
 
+export function staleSupersededRun(control, activeRuns, {
+  nowMs = Date.now(), currentSha = '', minAgeMs = 30 * 60 * 1000,
+} = {}) {
+  if (control?.id !== 'sanctions-screen.yml' || !Array.isArray(activeRuns)
+      || !currentSha || !Number.isFinite(nowMs)) return null;
+  return activeRuns
+    .filter(run => run && ACTIVE.has(run.status)
+      && typeof run.head_sha === 'string' && run.head_sha
+      && run.head_sha !== currentSha
+      && Number.isFinite(runTime(run))
+      && nowMs - runTime(run) >= minAgeMs)
+    .sort((x, y) => runTime(x) - runTime(y))[0] || null;
+}
+
 export function decide(control, runs, { nowMs = Date.now(), branch = 'main', activeRuns = [] } = {}) {
   if (!Array.isArray(runs) || !Array.isArray(activeRuns) || !Number.isFinite(nowMs)) {
     return { action: 'unknown', reason: 'invalid run history or clock' };
@@ -88,7 +102,9 @@ export function makeApi({ repo, token, fetchImpl = fetch, wait = sleep }) {
         }
         if (!res.ok) throw new Error(`${method} ${path.split('?')[0]} returned HTTP ${res.status}`);
         if (method === 'POST') {
-          if (res.status !== 204) throw new Error(`dispatch returned unexpected HTTP ${res.status}`);
+          if (res.status !== 202 && res.status !== 204) {
+            throw new Error(`${path.endsWith('/cancel') ? 'cancel' : 'dispatch'} returned unexpected HTTP ${res.status}`);
+          }
           return null;
         }
         let data;
@@ -139,6 +155,20 @@ async function main() {
         runs.push(...data.workflow_runs);
       }
       const controlActive = activeRuns.filter(r => r.path === `.github/workflows/${control.id}`);
+      const stale = staleSupersededRun(control, controlActive, {
+        currentSha: process.env.GITHUB_SHA || '',
+      });
+      if (stale) {
+        await api(`/actions/runs/${stale.id}/cancel`, { method: 'POST' });
+        const decision = { action: 'dispatch',
+          reason: `cancelled stale pre-fix run ${stale.id} at ${stale.head_sha}; current main is ${process.env.GITHUB_SHA}` };
+        await api(path + '/dispatches', { method: 'POST', body: { ref: branch } });
+        decision.action = 'dispatched';
+        decision.reason += '; fresh current-main run requested, successful completion NOT yet verified';
+        rows.push({ id: control.id, ...decision });
+        dispatched = true;
+        continue;
+      }
       const decision = decide(control, runs, { branch, activeRuns: controlActive });
       if (decision.action === 'dispatch') {
         await api(path + '/dispatches', { method: 'POST', body: { ref: branch } });
@@ -189,6 +219,15 @@ export async function selfTest() {
   assert.equal(action([r({ created_at: '2026-09-23T00:00:00Z' })], { ...c, maxAgeDays: 8 }), 'healthy');
   assert.equal(action([r({ conclusion: 'failure' })], { ...c, maxAgeDays: 8 }), 'blocked');
   assert.equal(action([r({ event: 'push' })], { ...c, allowPush: true }), 'healthy');
+  const stale = staleSupersededRun({ id: 'sanctions-screen.yml' }, [
+    r({ status: 'in_progress', conclusion: null, head_sha: 'old', created_at: '2026-09-29T10:00:00Z' }),
+  ], { nowMs, currentSha: 'new' });
+  assert.equal(stale?.head_sha, 'old');
+  assert.equal(staleSupersededRun({ id: 'weekly-adverse-media.yml' }, [stale],
+    { nowMs, currentSha: 'new' }), null);
+  assert.equal(staleSupersededRun({ id: 'sanctions-screen.yml' }, [
+    r({ status: 'in_progress', conclusion: null, head_sha: 'new', created_at: '2026-09-29T10:00:00Z' }),
+  ], { nowMs, currentSha: 'new' }), null);
   let calls = 0;
   const response = (status, data = {}) => ({ status, ok: status >= 200 && status < 300,
     headers: { get: () => null }, json: async () => data });
@@ -205,7 +244,7 @@ export async function selfTest() {
   await assert.rejects(readRuns(async () => ({ data: { workflow_runs: [] }, next: true }), '/actions/runs', {}, 2));
   const pages = await readRuns(async path => ({ data: { workflow_runs: [r()] }, next: new URL('https://example.test' + path).searchParams.get('page') === '1' }), '/actions/runs', {});
   assert.equal(pages.length, 2);
-  console.log('workflow-recovery: 22 offline regression checks passed');
+  console.log('workflow-recovery: 25 offline regression checks passed');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
