@@ -387,6 +387,17 @@ export function labelsUrl(qids) {
     + qids.join('%7C');
 }
 
+/* Targeted fallback for the tiny tail that remains after the normal multilingual
+   label pass. Sitelinks are deliberately NOT requested for the full population,
+   because doing so for ~424k people would multiply response size and throttling.
+   For unresolved QIDs only, redirects plus Wikipedia sitelink titles can recover
+   merged/deleted IDs and items whose labels are blank while still preserving a
+   human-readable, screenable name. */
+export function fallbackLabelsUrl(qids) {
+  return WD_API + '?action=wbgetentities&format=json&props=labels%7Caliases%7Csitelinks&redirects=yes&maxlag=5&ids='
+    + qids.join('%7C');
+}
+
 /* SPARQL JSON results → rows of { var: plainValue } (entity URIs reduced to
    their QID). Best-effort: an unrecognised shape yields [], and the caller's
    zero-guards take over. */
@@ -418,7 +429,25 @@ export function namesFromEntity(entity) {
   }
   const labels = entity.labels || {};
   const text = item => typeof item?.value === 'string' ? item.value.trim() : '';
-  const primary = [labels.en, labels.mul, ...Object.values(labels)].map(text).find(Boolean) || '';
+  const labelPrimary = [labels.en, labels.mul, ...Object.values(labels)].map(text).find(Boolean) || '';
+
+  /* Fallback only matters when callers requested sitelinks for an unresolved
+     tail item. Prefer an English Wikipedia title, then any language Wikipedia.
+     Strip a trailing disambiguator such as "(politician)" for the primary name,
+     while retaining the original title as an alias. Non-Wikipedia projects are
+     excluded so a Commons category or Wikispecies taxon can never become a PEP
+     screening name. */
+  const sitelinks = entity.sitelinks || {};
+  const wikiTitles = Object.entries(sitelinks)
+    .filter(([site, link]) => /wiki$/.test(site)
+      && !/^(commons|species|mediawiki|wikidata|foundation)wiki$/.test(site)
+      && typeof link?.title === 'string' && link.title.trim())
+    .map(([, link]) => link.title.trim().replaceAll('_', ' '));
+  const stripQualifier = value => String(value || '').replace(/\s+\([^()]{1,80}\)\s*$/, '').trim();
+  const fallbackPrimary = [sitelinks.enwiki?.title, ...wikiTitles]
+    .map(v => stripQualifier(String(v || '').replaceAll('_', ' '))).find(Boolean) || '';
+  const primary = labelPrimary || fallbackPrimary;
+
   const all = new Set(Object.values(labels).map(text).filter(Boolean));
   for (const arr of Object.values(entity.aliases || {})) {
     if (Array.isArray(arr)) for (const item of arr) {
@@ -426,18 +455,38 @@ export function namesFromEntity(entity) {
       if (value) all.add(value);
     }
   }
+  for (const title of wikiTitles) {
+    all.add(title);
+    const stripped = stripQualifier(title);
+    if (stripped) all.add(stripped);
+  }
   all.delete(primary);
   return { name: primary, aliases: [...all] };
 }
+
 // Failed or empty entities must remain pending, not become banked QIDs.
-export function bankLabelNames(names, data) {
+// When wbgetentities follows a merged-QID redirect, propagate the target's
+// recovered name back onto the original requested QID because holderRows still
+// reference that source QID from the earlier WDQS snapshot.
+export function bankLabelNames(names, data, requestedQids = []) {
   if (!data || data.error || data.errors) return 0;
+  const requested = new Set(Array.isArray(requestedQids) ? requestedQids : []);
+  const redirectedFrom = new Map();
+  for (const r of (Array.isArray(data.redirects) ? data.redirects : [])) {
+    if (!r || !/^Q\d+$/.test(String(r.from || '')) || !/^Q\d+$/.test(String(r.to || ''))) continue;
+    if (!redirectedFrom.has(r.to)) redirectedFrom.set(r.to, []);
+    redirectedFrom.get(r.to).push(r.from);
+  }
+
   let banked = 0;
   for (const [qid, entity] of Object.entries(data.entities || {})) {
     if (!/^Q\d+$/.test(qid)) continue;
     const value = namesFromEntity(entity);
     if (!hasScreenableName(value)) continue;
     names.set(qid, value);
+    for (const from of (redirectedFrom.get(qid) || [])) {
+      if (!requested.size || requested.has(from)) names.set(from, value);
+    }
     banked++;
   }
   return banked;
@@ -1086,6 +1135,28 @@ async function harvest(outfile) {
     }
   }
 
+  /* The normal label API can legitimately return an entity with no labels or
+     a source QID that has since been merged. Retrying that same response forever
+     is non-convergence, not coverage. For the small unresolved tail only, make
+     one richer wbgetentities pass that follows redirects and exposes Wikipedia
+     sitelink titles as a name fallback. Network failures still remain pending. */
+  const fallbackPending = pendingLabels(allQids, names);
+  if (fallbackPending.length) {
+    console.log(`pep-worldwide: attempting redirect/sitelink fallback for ${fallbackPending.length} unresolved person label(s)`);
+    for (let i = 0; i < fallbackPending.length; i += LABEL_CHUNK) {
+      const batch = fallbackPending.slice(i, i + LABEL_CHUNK);
+      const data = await fetchJsonSafe(fallbackLabelsUrl(batch));
+      bankLabelNames(names, data, batch);
+    }
+    const stillPending = pendingLabels(allQids, names);
+    console.log(`pep-worldwide: fallback recovered ${fallbackPending.length - stillPending.length}/${fallbackPending.length}; ${stillPending.length} unresolved`);
+    if (stillPending.length) {
+      console.error('pep-worldwide: unresolved QIDs after redirect/sitelink fallback: '
+        + stillPending.slice(0, 50).join(', ')
+        + (stillPending.length > 50 ? ' ...' : ''));
+    }
+  }
+
   /* A shard's job ends here: it emits the names it holds and writes NOTHING to
      the artifact or the state branch. Assembling the dataset needs every
      shard's slice, and only the merge step has them all — a shard writing its
@@ -1233,6 +1304,15 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
     harvestedAt: st.harvestedAt, holderRows: st.holderRows, positions: st.positions, names,
     expected,
   });
+  /* The sharded path exists to FINISH a stuck label backlog. Publishing a
+     partial merge as a successful recovery makes its workflow green while the
+     PEP runtime correctly stays degraded. Refuse that contradiction: the prior
+     state artifact remains in place, and the run identifies the exact remaining
+     shortfall instead of claiming recovery. */
+  if (dataset.partial) {
+    console.error(`pep-worldwide: REFUSING to publish sharded merge — ${dataset.count}/${expected} persons are screenable; ${expected - dataset.count} remain unresolved after the redirect/sitelink fallback`);
+    return 1;
+  }
   let prev = null;
   try { prev = readJsonMaybeGz(outfile); } catch { prev = null; }
   const gate = datasetFloorOk(dataset, prev);

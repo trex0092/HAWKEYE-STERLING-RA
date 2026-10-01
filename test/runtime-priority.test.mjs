@@ -95,7 +95,9 @@ try {
   assert.ifError(run.error);
   check('real CLI reaches missing persons before optional office enrichment', run.status === pep.RESUME_EXIT_CODE && run.stdout.includes('FETCH_IDS=Q2'));
   check('same-harvest names are reused by the real resume path', run.stdout.includes('reused 1 published names'));
-  check('only the missing person is fetched', (run.stdout.match(/FETCH_IDS=/g) || []).length === 1);
+  check('only the missing person is fetched, first normally then once through the targeted fallback',
+    (run.stdout.match(/FETCH_IDS=Q2/g) || []).length === 2
+    && !run.stdout.includes('FETCH_IDS=Q1'));
   const published = pep.readJsonMaybeGz(outfile);
   check('unresolved source records do not become a false complete artifact', published.partial && published.expected === 2 && published.count === 1);
   const saved = pep.readCheckpoint(cpfile);

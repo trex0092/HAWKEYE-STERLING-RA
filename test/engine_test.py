@@ -3460,7 +3460,7 @@ def _bl_match(name, score=90):
 
 _bl_created = []
 _orig_create_case = screen.create_case_subtask
-screen.create_case_subtask = lambda parent, nm, notes, due: (_bl_created.append((nm, notes)), True)[1]
+screen.create_case_subtask = lambda parent, nm, notes, due, section: (_bl_created.append((nm, notes)), True)[1]
 _orig_cap = screen.CASE_SUBTASK_CAP
 screen.CASE_SUBTASK_CAP = 2
 _bl_run_time = _dt_budget.datetime(2026, 7, 27, 9, 0)
@@ -3490,7 +3490,7 @@ try:
           len(_bl_created) == 2 and "Old Carried" in _bl_created[0][0]
           and "Today New" in _bl_created[1][0])
     # A failed create with a live parent is retried from the backlog next run.
-    screen.create_case_subtask = lambda parent, nm, notes, due: False
+    screen.create_case_subtask = lambda parent, nm, notes, due, section: False
     _st3 = {}
     _n3 = screen.open_mlro_cases("parent-gid", [_bl_match("Flaky Create")], [], [], _bl_run_time, state=_st3)
     check("a failed subtask create is carried to the backlog for retry",
@@ -3502,7 +3502,7 @@ try:
     check("no delivery → no backlog write (items re-alert as new next run)",
           screen.CASE_BACKLOG_KEY not in _st4)
     # Same-name dedup: an item re-listed today never duplicates its carried copy.
-    screen.create_case_subtask = lambda parent, nm, notes, due: (_bl_created.append((nm, notes)), True)[1]
+    screen.create_case_subtask = lambda parent, nm, notes, due, section: (_bl_created.append((nm, notes)), True)[1]
     _bl_created.clear()
     _dup_name = "🔴 SANCTIONS case: Firm 0 — OFAC SDN 90%"
     _st5 = {screen.CASE_BACKLOG_KEY: [{"p": 0, "name": _dup_name, "notes": "old", "queued": "2026-07-20"}]}

@@ -934,6 +934,24 @@ check('PEP harvest: every-language labels and aliases fold into the alias set, o
   _ent.name === 'Test Person' && _ent.aliases.includes('شخص اختبار')
   && _ent.aliases.includes('Тест Персон') && _ent.aliases.includes('T. Person')
   && !_ent.aliases.includes('Test Person'));
+const _fallbackEnt = pep.namesFromEntity({
+  labels: {}, aliases: {},
+  sitelinks: { enwiki: { title: 'Jane Doe (politician)' }, frwiki: { title: 'Jane Doe' } }
+});
+check('PEP harvest: unresolved entities can recover a screenable name from Wikipedia sitelinks',
+  _fallbackEnt.name === 'Jane Doe' && _fallbackEnt.aliases.includes('Jane Doe (politician)'));
+check('PEP harvest: targeted fallback URL follows merged QIDs and requests sitelinks only on the unresolved tail',
+  pep.fallbackLabelsUrl(['Q10']).includes('props=labels%7Caliases%7Csitelinks')
+  && pep.fallbackLabelsUrl(['Q10']).includes('redirects=yes')
+  && pep.fallbackLabelsUrl(['Q10']).endsWith('Q10'));
+const _redirectedNames = new Map();
+pep.bankLabelNames(_redirectedNames, {
+  redirects: [{ from: 'Q10', to: 'Q20' }],
+  entities: { Q20: { labels: { en: { value: 'Redirected Person' } }, aliases: {} } }
+}, ['Q10']);
+check('PEP harvest: a merged-QID label is banked back onto the holder QID that WDQS returned',
+  _redirectedNames.get('Q10')?.name === 'Redirected Person'
+  && _redirectedNames.get('Q20')?.name === 'Redirected Person');
 const _ds = pep.buildPepDataset({
   harvestedAt: '2026-08-05T00:00:00Z',
   holderRows: [
@@ -1329,9 +1347,8 @@ check('PEP checkpoint: the time budget leaves the pause runway before the job ti
   pep.writeJsonGz(half, { v: 1, shard: 0, of: 1, run: 'R2', names: many.slice(0, M / 2).map(q => [q, { name: 'P ' + q, aliases: [] }]) });
   const outH = T + 'outh.json';
   const codeH = await pep.mergeShards(outH, cp2, [half]);
-  const dH = _ex(outH) ? pep.readJsonMaybeGz(outH) : null;
-  check('PEP merge: with no labelQids the denominator falls back to the holder rows, so a short list is flagged PARTIAL',
-    codeH === 0 && dH && dH.count === M / 2 && dH.partial === true && dH.expected === M);
+  check('PEP merge: with no labelQids the denominator falls back to holder rows, and a measured shortfall is refused instead of published PARTIAL',
+    codeH === 1 && !_ex(outH));
   holdersOnly({ holderRows: [] });
   const outE = T + 'oute.json';
   check('PEP merge: REFUSES outright when the shortfall cannot be measured at all',
