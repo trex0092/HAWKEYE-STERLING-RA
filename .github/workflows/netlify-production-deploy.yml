@@ -151,8 +151,16 @@ jobs:
               exit 1
             fi
           fi
-          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOOK_URL")
-          echo "Netlify build hook POST -> HTTP $code"
+          # The hook itself can have a stale/wrong default branch even while
+          # returning HTTP 200. Netlify supports trigger_branch on build hooks,
+          # so pin this recovery path to the repository's production branch
+          # instead of trusting mutable dashboard configuration. Preserve any
+          # existing query string on the secret URL.
+          sep='?'
+          case "$HOOK_URL" in *\?*) sep='&' ;; esac
+          TRIGGER_URL="${HOOK_URL}${sep}trigger_branch=main&trigger_title=github-main-${GITHUB_SHA}"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -d '{}' "$TRIGGER_URL")
+          echo "Netlify build hook POST for branch main -> HTTP $code"
           if [ "$code" != "200" ] && [ "$code" != "201" ] && [ "$code" != "204" ]; then
             echo "::error::Build hook POST failed (HTTP $code) — the hook may have been deleted; recreate it in the Netlify UI."
             exit 1
