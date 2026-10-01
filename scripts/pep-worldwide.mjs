@@ -492,6 +492,25 @@ export function bankLabelNames(names, data, requestedQids = []) {
   return banked;
 }
 
+/* A WDQS snapshot can briefly retain holder statements whose person item has
+   since been deleted. Only an explicit wbgetentities missing/invalid marker is
+   enough to classify that source QID as a tombstone. Blank labels, network
+   failures, API errors and redirects are NOT tombstones and remain unresolved
+   so the harvest still fails closed. */
+export function confirmedMissingQids(data, requestedQids = []) {
+  if (!data || data.error || data.errors) return [];
+  const requested = (Array.isArray(requestedQids) ? requestedQids : [])
+    .map(String).filter(q => /^Q\d+$/.test(q));
+  const redirected = new Set((Array.isArray(data.redirects) ? data.redirects : [])
+    .map(r => String(r?.from || '')).filter(q => /^Q\d+$/.test(q)));
+  const entities = data.entities || {};
+  return requested.filter(qid => {
+    if (redirected.has(qid)) return false;
+    const entity = entities[qid];
+    return !!entity && (Object.hasOwn(entity, 'missing') || Object.hasOwn(entity, 'invalid'));
+  });
+}
+
 /* Assemble the artifact. holderRows: [{ person, pos, end?, classKey }];
    positions: Map(posQid → {label, country}); names: Map(personQid →
    {name, aliases}). Dedupe by person, first class in PEP_ROOT_CLASSES order
@@ -1140,6 +1159,7 @@ async function harvest(outfile) {
      is non-convergence, not coverage. For the small unresolved tail only, make
      one richer wbgetentities pass that follows redirects and exposes Wikipedia
      sitelink titles as a name fallback. Network failures still remain pending. */
+  const confirmedMissing = new Set();
   const fallbackPending = pendingLabels(allQids, names);
   if (fallbackPending.length) {
     console.log(`pep-worldwide: attempting redirect/sitelink fallback for ${fallbackPending.length} unresolved person label(s)`);
@@ -1147,6 +1167,7 @@ async function harvest(outfile) {
       const batch = fallbackPending.slice(i, i + LABEL_CHUNK);
       const data = await fetchJsonSafe(fallbackLabelsUrl(batch));
       bankLabelNames(names, data, batch);
+      for (const qid of confirmedMissingQids(data, batch)) confirmedMissing.add(qid);
     }
     const stillPending = pendingLabels(allQids, names);
     console.log(`pep-worldwide: fallback recovered ${fallbackPending.length - stillPending.length}/${fallbackPending.length}; ${stillPending.length} unresolved`);
@@ -1163,12 +1184,17 @@ async function harvest(outfile) {
      own view would publish a list missing everyone else's people, which the
      shrink gate would then hold against the real one. */
   if (PEP_SHARD_COUNT > 1) {
-    writeJsonGz(outfile, { v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, run: PEP_SHARD_RUN, harvestedAt, names: [...names] });
-    console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`);
+    writeJsonGz(outfile, {
+      v: 1, shard: PEP_SHARD_INDEX, of: PEP_SHARD_COUNT, run: PEP_SHARD_RUN,
+      harvestedAt, names: [...names], missingQids: [...confirmedMissing],
+    });
+    console.log(`pep-worldwide: shard ${PEP_SHARD_INDEX}/${PEP_SHARD_COUNT} done — ${names.size} names emitted to ${outfile} for the merge step`
+      + (confirmedMissing.size ? `; ${confirmedMissing.size} stale WDQS holder QID(s) confirmed missing/invalid` : ''));
     return 0;
   }
 
-  const unresolved = pendingLabels(allQids, names, { count: 1, index: 0 });
+  const unresolved = pendingLabels(allQids, names, { count: 1, index: 0 })
+    .filter(qid => !confirmedMissing.has(qid));
   if (unresolved.length) {
     writeCp('labels', { labelQids: allQids, names: [...names], next: { labelIdx: 0 } });
     shipPartialNow();
@@ -1178,11 +1204,27 @@ async function harvest(outfile) {
 
   await enrichOffices();
 
-  const dataset = buildPepDataset({ harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])), names });
-  const gate = writeArtifact(dataset, (carried) => buildPepDataset({
-    harvestedAt, holderRows, positions: new Map([...positions].map(([q, p]) => [q, p])),
-    names: mergeShardNames([[...names], carried]),
-  }));
+  const finalHolderRows = confirmedMissing.size
+    ? holderRows.filter(r => !confirmedMissing.has(r.person))
+    : holderRows;
+  const finalExpected = Math.max(0, expectedTotal - confirmedMissing.size);
+  if (confirmedMissing.size) {
+    console.log(`pep-worldwide: excluding ${confirmedMissing.size} stale WDQS holder QID(s) positively reported missing/invalid by Wikidata: ${[...confirmedMissing].join(', ')}`);
+  }
+  const dataset = buildPepDataset({
+    harvestedAt, holderRows: finalHolderRows,
+    positions: new Map([...positions].map(([q, p]) => [q, p])), names, expected: finalExpected,
+  });
+  if (confirmedMissing.size) dataset.sourceTombstones = [...confirmedMissing].sort();
+  const gate = writeArtifact(dataset, (carried) => {
+    const rebuilt = buildPepDataset({
+      harvestedAt, holderRows: finalHolderRows,
+      positions: new Map([...positions].map(([q, p]) => [q, p])),
+      names: mergeShardNames([[...names], carried]), expected: finalExpected,
+    });
+    if (confirmedMissing.size) rebuilt.sourceTombstones = [...confirmedMissing].sort();
+    return rebuilt;
+  });
   if (!gate.ok) {
     console.error('pep-worldwide: REFUSING to write — ' + gate.reason + (gate.hadPrev ? ' (previous artifact kept)' : ''));
     process.exit(1);
@@ -1207,6 +1249,7 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
   const st = restoreCheckpoint(cp);
   const slices = [];
   const seen = new Map();
+  const confirmedMissing = new Set();
   for (const f of shardFiles) {
     let s = null;
     try { s = readJsonMaybeGz(f); } catch (e) { s = null; }
@@ -1227,7 +1270,11 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
       return 1;
     }
     seen.set(s.shard, s.run || '');
-    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names${s.run ? ` (run ${s.run})` : ''}`);
+    for (const qid of (Array.isArray(s.missingQids) ? s.missingQids : [])) {
+      if (/^Q\d+$/.test(String(qid))) confirmedMissing.add(String(qid));
+    }
+    console.log(`  shard ${s.shard}/${s.of}: ${s.names.length} names${s.run ? ` (run ${s.run})` : ''}`
+      + (Array.isArray(s.missingQids) && s.missingQids.length ? `; ${s.missingQids.length} confirmed source tombstone(s)` : ''));
     slices.push(s.names);
   }
   const runs = [...new Set(seen.values())];
@@ -1300,17 +1347,35 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
     console.error('pep-worldwide: REFUSING to merge — the checkpoint carries neither a label list nor holder rows, so there is no way to tell how many people the list owes. Publishing would mark an unknown shortfall COMPLETE and the screen would stop warning that a PEP it has never harvested screens clean.');
     return 1;
   }
+
+  /* WDQS is eventually consistent with Wikibase. A holder row can therefore
+     survive briefly after its person item is deleted. Those stale QIDs are not
+     PEPs we failed to label: Wikidata itself has positively reported that the
+     entity no longer exists. Exclude ONLY QIDs whose own shard captured an
+     explicit missing/invalid marker. Existing-but-blank entities, redirects,
+     and request failures stay in the denominator and keep the merge red. */
+  const holderUniverse = new Set(st.holderRows.map(r => r.person));
+  const tombstones = new Set([...confirmedMissing]
+    .filter(qid => holderUniverse.has(qid) && !hasScreenableName(names.get(qid))));
+  const effectiveExpected = Math.max(0, expected - tombstones.size);
+  const effectiveHolderRows = tombstones.size
+    ? st.holderRows.filter(r => !tombstones.has(r.person))
+    : st.holderRows;
+  if (tombstones.size) {
+    console.log(`pep-worldwide: excluding ${tombstones.size} stale WDQS holder QID(s) positively reported missing/invalid by Wikidata: ${[...tombstones].sort().join(', ')}`);
+  }
   const dataset = buildPepDataset({
-    harvestedAt: st.harvestedAt, holderRows: st.holderRows, positions: st.positions, names,
-    expected,
+    harvestedAt: st.harvestedAt, holderRows: effectiveHolderRows, positions: st.positions, names,
+    expected: effectiveExpected,
   });
+  if (tombstones.size) dataset.sourceTombstones = [...tombstones].sort();
   /* The sharded path exists to FINISH a stuck label backlog. Publishing a
      partial merge as a successful recovery makes its workflow green while the
      PEP runtime correctly stays degraded. Refuse that contradiction: the prior
      state artifact remains in place, and the run identifies the exact remaining
      shortfall instead of claiming recovery. */
   if (dataset.partial) {
-    console.error(`pep-worldwide: REFUSING to publish sharded merge — ${dataset.count}/${expected} persons are screenable; ${expected - dataset.count} remain unresolved after the redirect/sitelink fallback`);
+    console.error(`pep-worldwide: REFUSING to publish sharded merge — ${dataset.count}/${effectiveExpected} persons are screenable; ${effectiveExpected - dataset.count} remain unresolved after the redirect/sitelink fallback`);
     return 1;
   }
   let prev = null;
@@ -1324,7 +1389,7 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
   if (!dataset.partial) {
     try { unlinkSync(cpFile); console.log('pep-worldwide: harvest COMPLETE — checkpoint cleared'); } catch { /* none to clear */ }
   }
-  console.log(`pep-worldwide: merged ${slices.length} shards → ${dataset.count} of ${expected} persons${dataset.partial ? ' (PARTIAL)' : ' (complete)'} → ${outfile}`);
+  console.log(`pep-worldwide: merged ${slices.length} shards → ${dataset.count} of ${effectiveExpected} persons${dataset.partial ? ' (PARTIAL)' : ' (complete)'} → ${outfile}`);
   return 0;
 }
 
