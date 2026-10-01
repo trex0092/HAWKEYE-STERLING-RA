@@ -180,8 +180,10 @@ try {
     pep.mergeShardNames([[['Q9', { name: ' ', aliases: [] }]], [['Q9', { name: 'Example Nine', aliases: [] }]]])
       .get('Q9').name === 'Example Nine');
 
-  // Exercise the real non-sharded CLI end-of-pass path, with a persisted old
-  // checkpoint and a deterministic missing-entity response. No provider traffic.
+  // Exercise the real non-sharded CLI end-of-pass path with a persisted old
+  // checkpoint and a deterministic EXISTING-BUT-NAMELESS entity response. A
+  // positive missing/invalid marker is now a source tombstone, but an existing
+  // item with no usable identity must still request a resume and stay partial.
   const dir = mkdtempSync(join(tmpdir(), 'pep-runtime-recovery-'));
   try {
     const outfile = join(dir, 'pep.json');
@@ -205,7 +207,9 @@ try {
     writeFileSync(preload, `globalThis.fetch = async (url) => {
       if (!String(url).startsWith('https://www.wikidata.org/w/api.php?')) throw new Error('Unexpected network');
       return { ok: true, status: 200, headers: { get: () => null },
-        json: async () => ({ entities: { Q2: { id: 'Q2', missing: '' } } }) };
+        json: async () => ({ entities: { Q2: {
+          id: 'Q2', labels: {}, aliases: {}, sitelinks: {}, claims: {}
+        } } }) };
     };`);
     const run = spawnSync(process.execPath,
       ['--import', pathToFileURL(preload).href, 'scripts/pep-worldwide.mjs', 'harvest', outfile],

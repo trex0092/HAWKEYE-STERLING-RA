@@ -940,10 +940,20 @@ const _fallbackEnt = pep.namesFromEntity({
 });
 check('PEP harvest: unresolved entities can recover a screenable name from Wikipedia sitelinks',
   _fallbackEnt.name === 'Jane Doe' && _fallbackEnt.aliases.includes('Jane Doe (politician)'));
-check('PEP harvest: targeted fallback URL follows merged QIDs and requests sitelinks only on the unresolved tail',
-  pep.fallbackLabelsUrl(['Q10']).includes('props=labels%7Caliases%7Csitelinks')
+check('PEP harvest: targeted fallback URL follows merged QIDs and requests sitelinks plus claims only on the unresolved tail',
+  pep.fallbackLabelsUrl(['Q10']).includes('props=labels%7Caliases%7Csitelinks%7Cclaims')
   && pep.fallbackLabelsUrl(['Q10']).includes('redirects=yes')
   && pep.fallbackLabelsUrl(['Q10']).endsWith('Q10'));
+const _claimNameEnt = pep.namesFromEntity({
+  labels: {}, aliases: {}, sitelinks: {},
+  claims: {
+    P1559: [{ mainsnak: { datavalue: { value: { text: 'اسم اختبار', language: 'ar' } } } }],
+    P1477: [{ mainsnak: { datavalue: { value: { text: 'Test Birth Name', language: 'en' } } } }],
+  },
+});
+check('PEP harvest: a valid nameless item can recover identity from structured native-name/birth-name claims',
+  _claimNameEnt.name === 'اسم اختبار'
+  && _claimNameEnt.aliases.includes('Test Birth Name'));
 const _redirectedNames = new Map();
 pep.bankLabelNames(_redirectedNames, {
   redirects: [{ from: 'Q10', to: 'Q20' }],
