@@ -62,8 +62,10 @@
       "url": "https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw",
       "type": "csv",
       "parser": "eu",
-      "minNames": 20000
+      "minNames": 20000,
+      "tokenEnv": "EU_FSF_TOKEN"
     }
   ],
+  "_README_tokenEnv": "tokenEnv: name of a repository secret holding a personal download token. When set, it replaces the url's token parameter for the request only (scripts/sanctions-screen.mjs applySourceToken); the stored url keeps the shared public token. eu-fsf: since 1 Oct 2026 the shared public token redirects to the EU Login sign-in page; the FSF platform's documented machine route is an account's personal crawler/robot URL.",
   "_README_minNames": "minNames: per-source coverage floor. A list parsing below it is a truncated download / parser drift, not a mass de-listing: it still screens (hits are real) but is marked partial (standing matches carried, not cleared) and the run reports DEGRADED. Mirrors screen.py CORE_LIST_FLOORS (~50% of verified baselines). Alias files (mergeInto) carry a floor TOO. They were exempted on the theory that the fold's partial machinery covered them, but that machinery only handles a TOTALLY ABSENT alias file — a truncated-but-nonzero one folded in as full coverage, and because alias hits are recorded under the PRIMARY list name, an alias-derived standing match then cleared as if re-verified."
 }

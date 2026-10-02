@@ -63,6 +63,9 @@ jobs:
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
           ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
+          # Personal EU FSF crawler token (optional): the shared public token now
+          # redirects to EU Login. Unset = public token, and the EU list fails loudly.
+          EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
         run: node scripts/sanctions-runtime-assurance.mjs
 
       - name: Persist sanctions runtime evidence

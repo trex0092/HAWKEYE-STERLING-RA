@@ -223,6 +223,9 @@ jobs:
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
           SCREEN_ENRICH_BUDGET_MS: '6000000'
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
+          # Personal EU FSF crawler token (optional): the shared public token now
+          # redirects to EU Login. Unset = public token, and the EU list fails loudly.
+          EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           # Google News locales swept per subject (pinned core + daily rotation).
           # 8 is the empirical per-IP ceiling from a GitHub runner — the Python
