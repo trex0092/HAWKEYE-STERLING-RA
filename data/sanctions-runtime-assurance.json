@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-01T15:32:43.413Z",
-  "githubRunId": "36884970910",
-  "commit": "f404bf7225ab1d3dbf84bcc1f733db9fadc97ac7",
+  "generatedAt": "2026-10-02T04:18:22.164Z",
+  "githubRunId": "36963883957",
+  "commit": "5bec3b398734f271ee3492b4ebb5de7857822c45",
   "screenedSubjects": 952,
   "requiredSourceIds": [
     "un-consolidated",
@@ -13,7 +13,9 @@
   ],
   "operational": true,
   "reasons": [],
-  "warnings": [],
+  "warnings": [
+    "required sanctions source eu-fsf did not load completely - screened via its declared fallback fr-dgt (19627 names)"
+  ],
   "evidence": {
     "screenedSubjects": 952,
     "loadedSources": [
@@ -21,12 +23,6 @@
         "id": "uk-ofsi",
         "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
         "count": 58308,
-        "partial": false
-      },
-      {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3775,
         "partial": false
       },
       {
@@ -38,13 +34,19 @@
       {
         "id": "ofac-sdn",
         "name": "US OFAC — SDN list (CSV)",
-        "count": 19433,
+        "count": 19464,
         "partial": false
       },
       {
-        "id": "eu-fsf",
-        "name": "EU — Consolidated financial sanctions list (CSV)",
-        "count": 31070,
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3775,
+        "partial": false
+      },
+      {
+        "id": "fr-dgt",
+        "name": "France — Registre national des gels (DGT)",
+        "count": 19627,
         "partial": false
       }
     ],
@@ -55,6 +57,15 @@
       "uk-ofsi",
       "eu-fsf"
     ],
-    "notes": []
+    "servedByFallback": [
+      {
+        "id": "eu-fsf",
+        "fallback": "fr-dgt",
+        "fallbackCount": 19627
+      }
+    ],
+    "notes": [
+      "EU — Consolidated financial sanctions list (CSV) could not be loaded (the endpoint requires a sign-in: redirected to the login page ecas.ec.europa.eu/cas/login (307 webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content (+1 cookie) -> 303 webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content -> 307 ecas.ec.europa.eu/cas/login () - this source now needs a personal download token: set the EU_FSF_TOKEN repository secret - fallback fr-dgt loaded successfully; coverage preserved"
+    ]
   }
 }
