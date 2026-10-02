@@ -95,11 +95,14 @@ DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "05:00")
 DELIVERY_RESERVE_MIN  = int(os.environ.get("DELIVERY_RESERVE_MIN", "20"))
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
-# Payments Register (payment-party screening input). One task per payment; see
-# payment_screen.parse_register_entry for the description template. Unset =
-# payment screening stays INACTIVE (and the report says so). Only OPEN tasks are
-# screened: completing a task (payment reviewed / released) takes it out of scope.
-ASANA_PAYMENTS_GID = os.environ.get("ASANA_PAYMENTS_GID", "").strip()
+# Payments Register — the "Payments Register" SECTION of HAWKEYE STERLING APP
+# (payment-party screening input, read-only; scripts/asana-sections.mjs
+# PAYMENTS_SECTION). One task per payment; see payment_screen.parse_register_entry
+# for the description template. Unset = payment screening stays INACTIVE (and the
+# report says so). Only OPEN tasks in that section are read: completing a task
+# (payment reviewed / released) takes it out of scope, and report cards in the
+# project's other sections are never read as payments.
+ASANA_PAYMENTS_SECTION_GID = os.environ.get("ASANA_PAYMENTS_SECTION_GID", "").strip()
 # Delivery target is configurable so an Asana reorganisation can be repaired by
 # updating repository variables without waiting for a code release. The defaults
 # are the live HAWKEYE STERLING APP project and Assessment Report section,
@@ -3933,7 +3936,7 @@ def get_payment_register():
     caller reports payment screening DEGRADED, never an empty-and-clear register.
     Never logs payment party names (they are disclosed in Asana only)."""
     records, unreadable = [], 0
-    params = {"project": ASANA_PAYMENTS_GID, "completed_since": "now",
+    params = {"section": ASANA_PAYMENTS_SECTION_GID, "completed_since": "now",
               "opt_fields": "gid,name,notes,permalink_url", "limit": 100}
     while True:
         r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=params)
@@ -7561,7 +7564,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         _file_cfg = txn_monitor.feed_configured() and not txn_monitor.feed_parse_error()
         _pay_records = txn_monitor.load_transactions() if _file_cfg else []
         _reg_lines = []
-        if ASANA_PAYMENTS_GID:
+        if ASANA_PAYMENTS_SECTION_GID:
             _reg, _reg_bad = get_payment_register()
             _pay_records = _pay_records + _reg
             _reg_lines.append(f"Payments Register (Asana): {len(_reg)} open payment(s) read"
@@ -7574,7 +7577,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                   f"{len(_tm['alerts'])} alert(s)")
                 _reg_lines += [f"   [{a['severity']}] {a['rule']} — {a['customer']} {a['date']}: "
                                f"{a['detail']}" for a in _tm["alerts"][:25]]
-        _pay_cfg = _file_cfg or bool(ASANA_PAYMENTS_GID)
+        _pay_cfg = _file_cfg or bool(ASANA_PAYMENTS_SECTION_GID)
         _pay_res = None
         if _pay_cfg:
             _core_down = [k.upper() for k, v in list_meta.items()

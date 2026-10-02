@@ -515,7 +515,7 @@ def report_lines(feed_result, configured):
     payment that is not a plain NO MATCH."""
     if not configured:
         return ["Payment screening (parties): engine ready & tested, INACTIVE — no payment "
-                "source connected (Asana Payments Register: ASANA_PAYMENTS_GID; or a file feed: "
+                "source connected (Asana Payments Register section: ASANA_PAYMENTS_SECTION_GID; or a file feed: "
                 "TXN_FEED_PATH). No payment is screened until one is configured."]
     res = feed_result or {"n_payments": 0, "results": [], "errors": []}
     flagged = [r for r in res["results"] if r["outcome"] != "NO MATCH"]

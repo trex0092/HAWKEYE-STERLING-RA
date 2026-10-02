@@ -1073,13 +1073,14 @@ def _reg_stub(method, url, **kw):
 _orig_ar2 = screen.asana_request
 try:
     screen.asana_request = _reg_stub
-    screen.ASANA_PAYMENTS_GID = "999"
+    screen.ASANA_PAYMENTS_SECTION_GID = "999"
     _recs, _bad = screen.get_payment_register()
 finally:
     screen.asana_request = _orig_ar2
-check("register loader: follows pagination and reads only OPEN tasks",
+check("register loader: follows pagination and reads only OPEN tasks of the register SECTION",
       len(_reg_calls) == 2 and _reg_calls[1].get("offset") == "o2"
-      and all(c.get("completed_since") == "now" for c in _reg_calls))
+      and all(c.get("completed_since") == "now" and c.get("section") == "999"
+              and "project" not in c for c in _reg_calls))
 check("register loader: counts the task with no payment instead of dropping it",
       len(_recs) == 2 and _bad == 1 and _recs[0]["permalink"] == "u1")
 try:
@@ -1090,7 +1091,7 @@ except RuntimeError:
     check("register loader: an Asana failure raises (reported DEGRADED, never an empty register)", True)
 finally:
     screen.asana_request = _orig_ar2
-    screen.ASANA_PAYMENTS_GID = ""
+    screen.ASANA_PAYMENTS_SECTION_GID = ""
 check("report: payment screening says INACTIVE without a feed (no implied clearance)",
       len(_inactive) == 1 and "INACTIVE" in _inactive[0])
 _active = payment_screen.report_lines(payment_screen.screen_feed(
