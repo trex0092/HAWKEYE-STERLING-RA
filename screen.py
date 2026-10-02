@@ -6782,7 +6782,7 @@ def post_tm_report(run_time, tm_report):
     name, notes = payment_screen.build_tm_daily_report(
         dt, tm_report.get("feed"), tm_report.get("alerts"),
         register_read=tm_report.get("read", 0), unreadable=tm_report.get("unreadable", 0),
-        degraded=tm_report.get("degraded", ""))
+        degraded=tm_report.get("degraded", ""), rule_errors=tm_report.get("rule_errors"))
     payload = {"data": {"name": name[:250], "notes": cap_notes(notes, ASANA_NOTES_MAX),
                         "due_on": run_time.strftime("%Y-%m-%d"),
                         "assignee": ASANA_ASSIGNEE_GID, "projects": [ASANA_ONGOING_MON_GID]}}
@@ -7625,7 +7625,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # starts DEGRADED and is only marked readable once the register was read
     # AND screened, so a crash anywhere below can never post an all-clear.
     tm_report = {"configured": bool(ASANA_PAYMENTS_SECTION_GID), "read": 0, "unreadable": 0,
-                 "feed": None, "alerts": [],
+                 "feed": None, "alerts": [], "rule_errors": {},
                  "degraded": "the payments in the section could not be read or screened"}
     try:
         _file_cfg = txn_monitor.feed_configured() and not txn_monitor.feed_parse_error()
@@ -7662,7 +7662,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 _reg, all_lists, jurisdiction_table=kyc.load_jurisdiction_risk(),
                 lists_degraded=_core_down, matcher=screen_name, normalizer=normalize,
                 xml_parser=safe_xml_fromstring) if _file_cfg else _pay_res
-            tm_report.update(feed=_reg_res, alerts=_tm["alerts"], degraded="")
+            tm_report.update(feed=_reg_res, alerts=_tm["alerts"],
+                             rule_errors=_tm.get("rule_errors") or {}, degraded="")
         txn_status = "\n   ".join([txn_status] + _reg_lines
                                   + payment_screen.report_lines(_pay_res, _pay_cfg))
     except Exception as e:

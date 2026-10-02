@@ -326,7 +326,9 @@ REGISTER_TEMPLATE_FIELDS = {
     "account with institution": "account_with_institution",
     "beneficial owner": "beneficial_owner",
 }
-_REG_LINE_RE = re.compile(r"^\s*([A-Za-z][A-Za-z ]{1,40}?)\s*:\s*(.*?)\s*$")
+# "Key: value", where the key may carry a bracketed hint that is ignored
+# ("Weight (grams): 1000" is the key "weight").
+_REG_LINE_RE = re.compile(r"^\s*([A-Za-z][A-Za-z ]{1,40}?)\s*(?:\([^)]{0,60}\))?\s*:\s*(.*?)\s*$")
 
 
 def _num(v):
@@ -334,6 +336,72 @@ def _num(v):
         return float(str(v).replace(",", "").strip())
     except (TypeError, ValueError):
         return None
+
+
+def _yes_no(v):
+    v = str(v or "").strip().lower()
+    if v in ("yes", "y", "true"):
+        return True
+    if v in ("no", "n", "false"):
+        return False
+    return None
+
+
+def _first_num(v):
+    m = re.search(r"\d[\d,]*(?:\.\d+)?", str(v or ""))
+    return _num(m.group(0)) if m else None
+
+
+# Optional template lines that feed the monitoring rules (txn_monitor). A line
+# is used only when its value is an explicit yes/no or number; anything else is
+# ignored, never guessed. "Red flags:" takes codes from data/str-red-flags.json.
+REGISTER_MONITORING_FIELDS = (
+    "Type (buy | sell | refund)", "Weight (grams)", "Purpose",
+    "Unit price", "Market price",
+    "Third party payment (yes/no)", "Third party relationship (related | unrelated)",
+    "Corporate paid from personal account (yes/no)", "Source of funds verified (yes/no)",
+    "Payment completed (yes/no)", "Delivery confirmed (yes/no)",
+    "Invoice mismatch (yes/no)", "Route mismatch (yes/no)",
+    "Funding account", "Refund account", "Refund reason documented (yes/no)",
+    "Red flags (codes, e.g. ML-11, TF-07)",
+)
+
+
+def _register_monitoring_fields(fields):
+    out = {}
+    typ = str(fields.get("type") or fields.get("transaction type") or "").strip().lower()
+    if typ:
+        out["transaction_type"] = typ
+    for key, dest in (("weight", "weight_g"), ("weight grams", "weight_g"),
+                      ("unit price", "unit_price"), ("market price", "market_unit_price")):
+        n = _first_num(fields.get(key))
+        if n is not None:
+            out[dest] = n
+    if fields.get("purpose"):
+        out["purpose"] = fields["purpose"]
+    for key, dest in (("third party payment", "third_party_payment"),
+                      ("corporate paid from personal account", "personal_account_for_corporate"),
+                      ("source of funds verified", "source_of_funds_verified"),
+                      ("payment completed", "payment_completed"),
+                      ("delivery confirmed", "delivery_confirmed"),
+                      ("invoice mismatch", "invoice_mismatch"),
+                      ("route mismatch", "route_mismatch"),
+                      ("refund reason documented", "refund_reason_documented")):
+        b = _yes_no(fields.get(key))
+        if b is not None:
+            out[dest] = b
+    if "delivery_confirmed" in out:
+        out["goods_transaction"] = True   # a delivery line means a goods trade
+    for key, dest in (("third party relationship", "third_party_relationship"),
+                      ("funding account", "funding_account"),
+                      ("refund account", "refund_account")):
+        if fields.get(key):
+            out[dest] = str(fields[key]).strip().lower() if dest == "third_party_relationship" \
+                else str(fields[key]).strip()
+    codes = re.findall(r"[A-Za-z]{2}-\d{1,3}", str(fields.get("red flags") or ""))
+    if codes:
+        out["red_flags"] = [c.upper() for c in codes]
+    return out
 
 
 def parse_register_entry(name, notes):
@@ -388,6 +456,7 @@ def parse_register_entry(name, notes):
     emv = _num(fields.get("expected monthly volume"))
     if emv:
         rec["expected_monthly_volume"] = emv
+    rec.update(_register_monitoring_fields(fields))
     # Mirror the main parties into the legacy fields the monitoring rules read.
     other = "originator" if rec["direction"] == "in" else "beneficiary"
     cp = next((p for p in out_parties if p["role"] == other and p.get("name")), None)
@@ -559,14 +628,16 @@ def is_tm_report_task(name):
 
 
 def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
-                          unreadable=0, degraded=""):
+                          unreadable=0, degraded="", rule_errors=None):
     """(task name, task notes) for the daily Transaction Monitoring report.
 
     feed_result — screen_feed() output (None when screening did not run);
     tm_alerts   — txn_monitor.evaluate(...)["alerts"] for the open entries;
     register_read — open payments read from the section; unreadable — tasks
     with nothing screenable; degraded — non-empty when the run could not read
-    or screen the register (then NOTHING is cleared and the title says so)."""
+    or screen the register (then NOTHING is cleared and the title says so);
+    rule_errors — {rule: count} of monitoring rules that crashed (those
+    typologies were not checked, so the title says DEGRADED)."""
     res = feed_result or {"n_payments": 0, "results": [], "errors": []}
     stop = [r for r in res["results"] if r["outcome"].startswith("STOP")]
     review = [r for r in res["results"] if r["outcome"].startswith("REVIEW")]
@@ -574,7 +645,8 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
     clear = [r for r in res["results"] if r["outcome"] == "NO MATCH"]
     alerts = list(tm_alerts or [])
     tallies = f"STOP {len(stop)} · Review {len(review)} · Rule alerts {len(alerts)}"
-    if degraded:
+    rule_errors = dict(rule_errors or {})
+    if degraded or rule_errors:
         status = "DEGRADED — "
     elif stop or review or alerts or prov or unreadable or res["errors"]:
         status = "ACTION REQUIRED — "
@@ -590,12 +662,15 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
         L += ["⚠ DEGRADED — " + degraded,
               "No payment is cleared by this run. Re-run the daily screening or review the "
               + "payments manually.", ""]
+    if rule_errors:
+        L += [f"⚠ {sum(rule_errors.values())} monitoring rule error(s) "
+              + f"[{', '.join(sorted(rule_errors))}] — those typologies were NOT checked this run.", ""]
     L += [bar, "SUMMARY", bar,
           f"Payments read: {register_read}"
           + (f" · ⚠ {unreadable} task(s) with no screenable payment — fill the template "
              "or paste the MT103 / pacs.008" if unreadable else ""),
           f"Payment screening: {len(stop)} STOP · {len(review)} REVIEW · "
-          f"{len(prov)} provisional · {len(clear)} no match",
+          + f"{len(prov)} provisional · {len(clear)} no match",
           f"Monitoring rules: {len(alerts)} alert(s)"]
     if res["errors"]:
         L.append(f"⚠ {len(res['errors'])} payment(s) could not be parsed and were NOT screened.")
@@ -621,8 +696,7 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
                      + " — 'no match' is provisional")
     L.append("")
 
-    L += [bar, "②  MONITORING RULE ALERTS  (cash threshold · structuring · velocity · profile · "
-          "circular flow · new geography · …)", bar]
+    L += [bar, "②  MONITORING RULE ALERTS  (typology rules + STR red flags recorded on the payments)", bar]
     if not alerts:
         L.append("   No rule alert.")
     L += [f"   [{a['severity']}] {a['rule']} — {a['customer']} {a['date']}: {a['detail']}"
