@@ -507,8 +507,9 @@ check('a sectionless mirror still joins the project',
    list-change alerts landed outside any section. Any SECTION-named setting
    with a literal gid must name an approved section. */
 {
-  const { SECTIONS: APPROVED } = await import('../scripts/asana-sections.mjs');
-  const approvedGids = new Set(Object.values(APPROVED).map(x => x.gid));
+  const { SECTIONS: APPROVED, PAYMENTS_SECTION: PAY_IN } = await import('../scripts/asana-sections.mjs');
+  // The Payments Register section is a READ-ONLY input, allowed as a literal.
+  const approvedGids = new Set([...Object.values(APPROVED).map(x => x.gid), PAY_IN]);
   const { readdirSync } = await import('node:fs');
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const files = [
@@ -528,12 +529,15 @@ check('a sectionless mirror still joins the project',
   }
   check('every literal monitoring section gid in workflows/scripts/screen.py is an approved section'
     + (offenders.length ? ' — unapproved: ' + offenders.join(', ') : ''), offenders.length === 0);
-  /* The Payments Register is an INPUT project: the daily run must read the
-     registered one, and it must never be the results project. */
-  const { PAYMENTS_PROJECT, MONITORING_PROJECT } = await import('../scripts/asana-sections.mjs');
+  /* The Payments Register section is an INPUT: the daily run must read the
+     registered one, and it must never be accepted as a results destination. */
+  const { PAYMENTS_SECTION, MONITORING_PROJECT, requireApprovedSection } = await import('../scripts/asana-sections.mjs');
   const wf = readFileSync(join(root, '.github/workflows/weekly-adverse-media.yml'), 'utf8');
-  check('the daily run reads the registered Payments Register project (input, not the results project)',
-    wf.includes("ASANA_PAYMENTS_PROJECT_GID || '" + PAYMENTS_PROJECT + "'") && PAYMENTS_PROJECT !== MONITORING_PROJECT);
+  check('the daily run reads the registered Payments Register section',
+    wf.includes("ASANA_PAYMENTS_SECTION_GID || '" + PAYMENTS_SECTION + "'"));
+  let refused = false;
+  try { requireApprovedSection(MONITORING_PROJECT, PAYMENTS_SECTION); } catch { refused = true; }
+  check('the Payments Register section is refused as a results destination (input only)', refused);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
