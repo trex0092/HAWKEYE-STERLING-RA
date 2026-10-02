@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { countEntries, buildReport, trackErrorStreaks, extractPublishedDate, tfsNewEntries,
   resolveRescreens, capTfsEntries, sealTfsLog, verifyTfsChain, canonicalJson,
   SCREEN_WORKFLOWS, TFS_LOG_CAP, fetchSource, looksLikeHtmlPage,
-  watchedSources, namesFingerprintBody, rescreenTriggers, splitCoveredErrors } from '../scripts/sanctions-watch.mjs';
+  watchedSources, namesFingerprintBody, rescreenTriggers, splitCoveredErrors, WATCHED_FALLBACK_URLS } from '../scripts/sanctions-watch.mjs';
 import { loadSources, fingerprint, computeChanges, contentChanges } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -271,7 +271,7 @@ check('report is quiet when nothing moved',
     { id: 'uk-ofsi', name: 'UK', url: 'https://example.invalid/uk', type: 'csv' },
   ];
   const extra = [
-    { id: 'fr-dgt', name: 'FR DGT', url: 'https://example.invalid/fr', type: 'json', parser: 'json' },
+    { id: 'fr-dgt', name: 'FR DGT', url: 'https://example.invalid/tampered', type: 'json', parser: 'json' },
     { id: 'zz-other', name: 'Not a fallback', url: 'https://example.invalid/zz', type: 'json', parser: 'json' },
     { id: 'off', name: 'Disabled', url: 'https://example.invalid/off', enabled: false },
   ];
@@ -279,11 +279,19 @@ check('report is quiet when nothing moved',
   check('watch adds a core list\'s declared fallback, and only that', w.map(s => s.id).join() === 'eu-fsf,uk-ofsi,fr-dgt');
   check('a watched fallback is fingerprinted by name set and names its primary',
     w[2].fingerprintBy === 'names' && w[2].fallbackFor === 'eu-fsf' && w[0].fingerprintBy === undefined);
+  check('a watched fallback is fetched from the in-code allowlist, never the registry url',
+    w[2].url === WATCHED_FALLBACK_URLS['fr-dgt'] && w[2].parser === 'json' && w[2].name === 'FR DGT');
+  check('a declared fallback missing from the allowlist is not watched',
+    watchedSources([{ id: 'a', name: 'A', url: 'https://x.invalid', fallbackSourceId: 'zz-other' }], extra).length === 1);
   check('a fallback that is disabled or absent is not invented',
     watchedSources([{ id: 'a', name: 'A', url: 'https://x.invalid', fallbackSourceId: 'off' }], extra).length === 1);
   const real = JSON.parse(readFileSync(new URL('../data/sanctions-sources.json', import.meta.url), 'utf8')).sources;
   const realExtra = JSON.parse(readFileSync(new URL('../data/sanctions-extra.json', import.meta.url), 'utf8')).sources;
   check('the live registry watches fr-dgt as the EU fallback', watchedSources(real, realExtra).some(s => s.id === 'fr-dgt' && s.fallbackFor === 'eu-fsf'));
+  check('every allowlisted watch URL equals its registry entry (no drift)',
+    Object.entries(WATCHED_FALLBACK_URLS).every(([id, url]) => (realExtra.find(s => s.id === id) || {}).url === url));
+  check('every fallback the core registry declares is allowlisted for the watch',
+    real.filter(s => s.fallbackSourceId).every(s => Object.prototype.hasOwnProperty.call(WATCHED_FALLBACK_URLS, s.fallbackSourceId)));
 
   const src = { id: 'fr-dgt', parser: 'json', type: 'json' };
   const a = namesFingerprintBody(src, JSON.stringify({ published: '2026-10-01T08:00', items: [{ name: 'Bravo Ltd' }, { name: 'Alpha Co' }] }));

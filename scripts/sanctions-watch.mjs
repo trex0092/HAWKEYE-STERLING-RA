@@ -140,14 +140,26 @@ export async function fetchSource(s, timeoutMs = 45000, { fetchImpl = fetch } = 
    freezes would wait for the next scheduled screen instead of re-screening at
    once. Only fallbacks the core registry names are added, never the whole
    extra file. Pure. */
+/* The watcher fetches a fallback only from this reviewed, in-code allowlist:
+   the registry entry supplies the parser and name, never the URL, so the set
+   of hosts the watch can reach is fixed by code review (test/sanctions-watch
+   pins each URL to its registry entry, so the two cannot drift). */
+export const WATCHED_FALLBACK_URLS = Object.freeze({
+  'fr-dgt': 'https://gels-avoirs.dgtresor.gouv.fr/ApiPublic/api/v1/publication/derniere-publication-fichier-json',
+});
+
 export function watchedSources(core, extra) {
   const ids = new Set(core.map(s => String(s.id)));
-  const extraById = new Map((extra || []).filter(s => s && s.enabled !== false && s.url).map(s => [String(s.id), s]));
+  const extraById = new Map((extra || []).filter(s => s && s.enabled !== false).map(s => [String(s.id), s]));
   const out = core.slice();
   for (const s of core) {
     const fb = String(s.fallbackSourceId || '');
     if (!fb || ids.has(fb) || !extraById.has(fb)) continue;
-    out.push({ ...extraById.get(fb), fingerprintBy: 'names', fallbackFor: s.id });
+    const url = Object.prototype.hasOwnProperty.call(WATCHED_FALLBACK_URLS, fb) ? WATCHED_FALLBACK_URLS[fb] : '';
+    if (!url) { console.warn('sanctions-watch: fallback ' + fb + ' is not in WATCHED_FALLBACK_URLS - not watched'); continue; }
+    const e = extraById.get(fb);
+    out.push({ id: fb, name: String(e.name || fb), jurisdiction: e.jurisdiction, type: e.type, parser: e.parser,
+      url, fingerprintBy: 'names', fallbackFor: s.id });
     ids.add(fb);
   }
   return out;
