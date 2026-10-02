@@ -95,13 +95,14 @@ DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "05:00")
 DELIVERY_RESERVE_MIN  = int(os.environ.get("DELIVERY_RESERVE_MIN", "20"))
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
-# Payments Register — the "Payments Register" SECTION of HAWKEYE STERLING APP
-# (payment-party screening input, read-only; scripts/asana-sections.mjs
+# Payments register — the "Transaction Monitoring" SECTION of HAWKEYE STERLING
+# APP (renamed from "Payments Register"; scripts/asana-sections.mjs
 # PAYMENTS_SECTION). One task per payment; see payment_screen.parse_register_entry
 # for the description template. Unset = payment screening stays INACTIVE (and the
 # report says so). Only OPEN tasks in that section are read: completing a task
-# (payment reviewed / released) takes it out of scope, and report cards in the
-# project's other sections are never read as payments.
+# (payment reviewed / released) takes it out of scope. The daily Transaction
+# Monitoring report (post_tm_report) is filed in the same section and is never
+# read back as a payment (payment_screen.TM_REPORT_PREFIX).
 ASANA_PAYMENTS_SECTION_GID = os.environ.get("ASANA_PAYMENTS_SECTION_GID", "").strip()
 # Delivery target is configurable so an Asana reorganisation can be repaired by
 # updating repository variables without waiting for a code release. The defaults
@@ -3945,6 +3946,8 @@ def get_payment_register():
                                f"{getattr(r, 'status_code', 'network')}")
         data = r.json() if isinstance(r.json(), dict) else {}
         for t in (data.get("data") or []):
+            if payment_screen.is_tm_report_task(t.get("name")):
+                continue   # our own daily report card, filed in the same section
             try:
                 rec = payment_screen.parse_register_entry(t.get("name", ""), t.get("notes", ""))
             except ValueError:
@@ -5321,6 +5324,7 @@ def enforce_eocn_review_gate():
 # DELIVERY_HARD_FAIL=0 keeps the alarm but not the exit.
 UNIFIED_DELIVERY_FAILED = {"failed": False}
 FULL_RESULTS_FAILED = {"failed": False}   # card delivered, full-results attachments not
+TM_REPORT_FAILED = {"failed": False}      # daily Transaction Monitoring report not delivered
 DELIVERY_HARD_FAIL = os.environ.get("DELIVERY_HARD_FAIL", "1") == "1"
 
 def enforce_delivery_gate():
@@ -5334,6 +5338,11 @@ def enforce_delivery_gate():
     if UNIFIED_DELIVERY_FAILED["failed"]:
         log("DELIVERY GATE: the unified screening task was never created — "
             "failing the run so the freshness alarm and Actions email fire")
+        if DELIVERY_HARD_FAIL:
+            sys.exit(5)
+    if TM_REPORT_FAILED["failed"]:
+        log("DELIVERY GATE: the daily Transaction Monitoring report never reached its "
+            "Asana section — failing the run")
         if DELIVERY_HARD_FAIL:
             sys.exit(5)
     if FULL_RESULTS_FAILED["failed"]:
@@ -6741,6 +6750,58 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     UNIFIED_DELIVERY_FAILED["failed"] = True
     return None
 
+def post_tm_report(run_time, tm_report):
+    """File the daily Transaction Monitoring report in the Transaction
+    Monitoring section — one per calendar day (repeat runs the same day find
+    the first and do not post a duplicate). Returns the task gid, or None.
+    A failed delivery sets TM_REPORT_FAILED (the run goes red); a run that
+    could not read or screen the payments still posts, titled DEGRADED."""
+    if not ASANA_PAYMENTS_SECTION_GID or not tm_report.get("configured"):
+        return None
+    dt = run_time.strftime("%d %b %Y")
+    # One day of slack: run_time is local (UAE) time, Asana compares in UTC.
+    since = (run_time - datetime.timedelta(days=1)).strftime("%Y-%m-%dT00:00:00.000Z")
+    params = {"section": ASANA_PAYMENTS_SECTION_GID, "modified_since": since,
+              "opt_fields": "gid,name", "limit": 100}
+    while True:
+        r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=params)
+        if r is None or r.status_code not in (200, 201):
+            log("  TM report: duplicate check unavailable "
+                f"({getattr(r, 'status_code', 'network')}) — posting")
+            break
+        data = r.json() if isinstance(r.json(), dict) else {}
+        for t in (data.get("data") or []):
+            nm = t.get("name") or ""
+            if payment_screen.is_tm_report_task(nm) and nm.endswith(f" — {dt}"):
+                log(f"SKIP: today's Transaction Monitoring report already exists ({t.get('gid')})")
+                return t.get("gid")
+        nxt = data.get("next_page") or None
+        if not nxt or not nxt.get("offset"):
+            break
+        params["offset"] = nxt["offset"]
+    name, notes = payment_screen.build_tm_daily_report(
+        dt, tm_report.get("feed"), tm_report.get("alerts"),
+        register_read=tm_report.get("read", 0), unreadable=tm_report.get("unreadable", 0),
+        degraded=tm_report.get("degraded", ""))
+    payload = {"data": {"name": name[:250], "notes": cap_notes(notes, ASANA_NOTES_MAX),
+                        "due_on": run_time.strftime("%Y-%m-%d"),
+                        "assignee": ASANA_ASSIGNEE_GID, "projects": [ASANA_ONGOING_MON_GID]}}
+    r = asana_request("POST", "https://app.asana.com/api/1.0/tasks", json=payload)
+    if r is None or r.status_code not in (200, 201):
+        log(f"FAIL Transaction Monitoring report: {getattr(r, 'status_code', 'network')} "
+            f"- {getattr(r, 'text', '')[:200]}")
+        TM_REPORT_FAILED["failed"] = True
+        return None
+    gid = _new_task_gid(r)
+    if not gid or _attach_task_sections(gid, [{"project": ASANA_ONGOING_MON_GID,
+                                               "section": ASANA_PAYMENTS_SECTION_GID}]):
+        log(f"FAIL Transaction Monitoring report {gid or '(gid unreadable)'}: created but "
+            "NOT placed in the Transaction Monitoring section")
+        TM_REPORT_FAILED["failed"] = True
+        return None
+    log(f"OK Transaction Monitoring report delivered: {gid}")
+    return gid
+
 def _new_task_gid(resp):
     """gid of the task an Asana create returned, or "" when the body is not
     readable (never raises: attaching a case to the board is best-effort)."""
@@ -7560,14 +7621,22 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # banks in the chain, payment reference) against the same lists. Inert
     # until the transaction feed exists; never fails the run, but a crash is
     # disclosed in the report rather than read as "no payment flagged".
+    # Inputs of the daily Transaction Monitoring report (post_tm_report). It
+    # starts DEGRADED and is only marked readable once the register was read
+    # AND screened, so a crash anywhere below can never post an all-clear.
+    tm_report = {"configured": bool(ASANA_PAYMENTS_SECTION_GID), "read": 0, "unreadable": 0,
+                 "feed": None, "alerts": [],
+                 "degraded": "the payments in the section could not be read or screened"}
     try:
         _file_cfg = txn_monitor.feed_configured() and not txn_monitor.feed_parse_error()
         _pay_records = txn_monitor.load_transactions() if _file_cfg else []
         _reg_lines = []
+        _reg, _tm = [], {"alerts": []}
         if ASANA_PAYMENTS_SECTION_GID:
             _reg, _reg_bad = get_payment_register()
+            tm_report.update(read=len(_reg), unreadable=_reg_bad)
             _pay_records = _pay_records + _reg
-            _reg_lines.append(f"Payments Register (Asana): {len(_reg)} open payment(s) read"
+            _reg_lines.append(f"Transaction Monitoring section (Asana): {len(_reg)} open payment(s) read"
                               + (f"; ⚠ {_reg_bad} task(s) carried no screenable payment "
                                  "(fill the template or paste the MT103/pacs.008)" if _reg_bad else "")
                               + ".")
@@ -7586,12 +7655,22 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 _pay_records, all_lists,
                 jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down,
                 matcher=screen_name, normalizer=normalize, xml_parser=safe_xml_fromstring)
+        if ASANA_PAYMENTS_SECTION_GID:
+            # Only the register's own payments belong in its report (a file
+            # feed, if any, stays in the main report only).
+            _reg_res = payment_screen.screen_feed(
+                _reg, all_lists, jurisdiction_table=kyc.load_jurisdiction_risk(),
+                lists_degraded=_core_down, matcher=screen_name, normalizer=normalize,
+                xml_parser=safe_xml_fromstring) if _file_cfg else _pay_res
+            tm_report.update(feed=_reg_res, alerts=_tm["alerts"], degraded="")
         txn_status = "\n   ".join([txn_status] + _reg_lines
                                   + payment_screen.report_lines(_pay_res, _pay_cfg))
     except Exception as e:
         log(f"  ! payment screening failed: {safe_err(e)}")
         txn_status += ("\n   Payment screening (parties): DEGRADED — the run could not screen the "
                        f"feed's payments ({type(e).__name__}); none is cleared by this run.")
+        tm_report["degraded"] = (f"the payments in the section could not be read or screened "
+                                 f"({type(e).__name__})")
     cdd_gaps_total = sum(m.get("cdd_gap_count", 0) for m in possible_matches)
     arrangements = sum(1 for m in possible_matches if m.get("arrangement"))
 
@@ -7644,6 +7723,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                                    customer_gids=[c.get("gid", "") for c in customers],
                                    register=build_results_register(possible_matches, clear,
                                                                    adverse_findings, pep_findings))
+    if mode in ("daily", "makeup"):
+        post_tm_report(run_time, tm_report)
     # MLRO case subtasks for the NEW items only (keeps the case list actionable);
     # overflow/failed items ride the reserved backlog inside `state`.
     open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,

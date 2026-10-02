@@ -4,9 +4,12 @@
 export const MONITORING_PROJECT = '1216203370612914';
 export const CUSTOMER_PROJECT = '1214107620220121';
 export const EMPLOYEE_PROJECT = '1216239131596624';
-/* "Payments Register" section of HAWKEYE STERLING APP: payment-screening INPUT,
-   read-only. Deliberately NOT in SECTIONS, so requireApprovedSection refuses it
-   as a destination: no report or case card can ever be filed among payments. */
+/* "Transaction Monitoring" section of HAWKEYE STERLING APP (renamed from
+   "Payments Register"; same gid): one task per payment, read by the daily run.
+   Deliberately NOT in SECTIONS, so requireApprovedSection refuses it to every
+   JS notifier. The ONLY card filed there is the engine's own daily Transaction
+   Monitoring report (screen.py post_tm_report), which the payment reader skips
+   by its title prefix (payment_screen.TM_REPORT_PREFIX). */
 export const PAYMENTS_SECTION = '1219097494676108';
 export const SECTIONS = Object.freeze({
   documents: Object.freeze({ gid: '1218451243658328', name: 'Follow Ups' }),
