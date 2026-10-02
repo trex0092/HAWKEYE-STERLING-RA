@@ -496,25 +496,25 @@ async function main() {
     console.log('tfs-log: chain verified, ' + entries.length + ' entr' + (entries.length === 1 ? 'y' : 'ies') + ' intact');
     return;
   }
+  const sources = loadSources(readFileSync(SOURCES_FILE, 'utf8'));
   let extra = [];
   try { extra = (JSON.parse(readFileSync(EXTRA_FILE, 'utf8')).sources) || []; }
   catch (e) { console.warn('sanctions-watch: extra sources unreadable, fallbacks not watched (' + e.message + ')'); }
-  const sources = watchedSources(loadSources(readFileSync(SOURCES_FILE, 'utf8')), extra);
+  for (const fb of watchedSources(sources, extra).slice(sources.length)) sources.push(fb);
   const today = new Date().toISOString().slice(0, 10);
   const prevState = loadState();
   const prev = (prevState && prevState.sources) || {};
 
   const fetched = {};
+  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchSource(s); }));
   const nameCounts = {};
-  await Promise.all(sources.map(async s => {
-    const f = await fetchSource(s);
-    if (s.fingerprintBy === 'names' && f.ok) {
-      const fp = namesFingerprintBody(s, f.body);
-      if (fp) { f.body = fp.text; nameCounts[s.id] = fp.count; }
-      else { f.ok = false; f.body = ''; f.error = 'parsed 0 names - not fingerprinted'; }
-    }
-    fetched[s.id] = f;
-  }));
+  for (const s of sources) {
+    const f = fetched[s.id];
+    if (s.fingerprintBy !== 'names' || !f || !f.ok) continue;
+    const fp = namesFingerprintBody(s, f.body);
+    if (fp) { f.body = fp.text; nameCounts[s.id] = fp.count; }
+    else { f.ok = false; f.body = ''; f.error = 'parsed 0 names - not fingerprinted'; }
+  }
 
   const { changes, state } = computeChanges(sources, prevState, fetched, today);
 
