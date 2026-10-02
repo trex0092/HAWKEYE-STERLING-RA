@@ -5972,8 +5972,15 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("━" * 70)
     A("①  SANCTIONS / WATCHLISTS")
     A("━" * 70)
-    A("   Action class (TFS): a CONFIRMED designation is ILLEGAL TO ENGAGE — freeze without")
-    A("   delay and without prior notice (tipping-off), report to the FIU, reject/offboard.")
+    # Wording follows the registered TFS Name-Match Procedure (POL-07,
+    # docs/aims/tfs-name-match-procedure.md): a sanctions match is reported as a
+    # PNMR / CNMR + FFR in goAML, not as a generic "report to the FIU".
+    A("   Action class (TFS — POL-07 Name-Match Procedure): while ANY match is open, STOP the")
+    A("   dealing at once — no onboarding, trade, delivery or payment (incl. release of metal).")
+    A("   Potential match (cannot be excluded or confirmed) → stays suspended; PNMR in goAML")
+    A("   without delay. CONFIRMED designation → ILLEGAL TO ENGAGE: freeze without delay and")
+    A("   without prior notice (50%/control rule for owned entities); CNMR + FFR in goAML.")
+    A("   STR/SAR is assessed in parallel, not instead. Release only on EOCN/FIU written basis.")
     A("   Distinct from ② and ③ below: sanctions action is mandatory, not risk-based.")
     if not possible_matches:
         A("   No sanctions / watchlist matches — all subjects clear.")
@@ -6062,7 +6069,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             if ctrl:
                 A("   NOTE: company flagged because an owner / director / UBO matches a designation —"
                   " apply OFAC/EU 50%/control aggregation; treat the entity as designated by extension pending review.")
-            A("   MLRO Decision:  [ ] false positive   [ ] escalate / freeze   [ ] investigate")
+            A("   MLRO Decision:  [ ] false positive   [ ] potential — suspended + PNMR   "
+              "[ ] confirmed — freeze + CNMR + FFR   [ ] investigate")
             A("")
         if _match_n is not None and _sanc_total > _match_n:
             A(f"   … +{_sanc_total - _match_n} further sanctions subject(s) not itemised in this card "
@@ -6117,7 +6125,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("   Action class: RISK-BASED review — verify the story before acting; media alone is")
     A("   never conclusive. Source reliability: news = real-time but false-positive-prone;")
     A("   court/enforcement corroboration is strongest but can lag clearances — always")
-    A("   confirm CURRENT status before an adverse decision.")
+    A("   confirm CURRENT status before an adverse decision. Not a TFS event (no PNMR/CNMR);")
+    A("   an STR/SAR follows only where the MLRO forms suspicion.")
     if stats.get("bulletin_failures"):
         A(f"   Regulator-bulletin net: {len(stats['bulletin_failures'])} feed(s) failed this run — "
           "coverage reduced: " + "; ".join(stats["bulletin_failures"][:3]))
@@ -6291,7 +6300,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A(f"   Source: {p.get('source_url') or 'https://www.wikidata.org/wiki/' + p['id']}")
             if p.get("permalink"):
                 A(f"   Customer record: {p['permalink']}")
-            A("   MLRO Decision:  [ ] not a PEP   [ ] confirmed PEP — EDD + senior-mgmt approval   [ ] investigate")
+            A("   MLRO Decision:  [ ] not a PEP   [ ] confirmed PEP/RCA — EDD + senior-mgmt approval "
+              "+ source of funds/wealth   [ ] investigate")
             A("")
         if len(_pf_sorted) > len(_pf_shown):
             A(f"   … +{len(_pf_sorted) - len(_pf_shown)} more PEP finding(s) — every one is in the attached full report; "
@@ -6345,7 +6355,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("MLRO SIGN-OFF")
     A("━" * 70)
     A("   Reviewed by: ____________________   Date: __________")
-    A("   Decision: [ ] all clear   [ ] items escalated   [ ] TFS freeze   [ ] STR/SAR filed   Ref: ______")
+    A("   Decision: [ ] all clear   [ ] items escalated   [ ] PNMR filed   [ ] TFS freeze + CNMR/FFR filed")
+    A("             [ ] STR/SAR filed   goAML Ref: ______")
     A("")
     A("Engine: screen.py · one pass: name-match vs live designation lists, Google News + GDELT + Bing News")
     A("adverse media + OpenSanctions crime watchlist, worldwide PEP/RCA net (OpenSanctions PEPs +")
@@ -6794,6 +6805,49 @@ def append_to_case(case_gid, notes, run_time):
                       json={"data": {"text": cap_notes(text, CASE_NOTES_MAX, tail_chars=CASE_NOTES_TAIL)}})
     return r is not None and r.status_code in (200, 201)
 
+# ── Case-card decision blocks ─────────────────────────────────────────────────
+# The sanctions block follows the registered TFS Name-Match Procedure (POL-07,
+# docs/aims/tfs-name-match-procedure.md): stop the dealing, then PNMR for a
+# potential match or freeze + CNMR + FFR for a confirmed one, all via goAML,
+# with the STR/SAR decision taken in parallel. The PEP block names the FATF
+# R.12 controls; the adverse-media block keeps the media/TFS boundary and the
+# identity check explicit. Every field to complete is left BLANK: these are the
+# MLRO's acts, never pre-filled. The tip-off line stays last in the sanctions
+# block so cap_notes' protected tail keeps it with the checkboxes.
+TFS_CASE_STOP_LINE = ("ACTION NOW (POL-07 step 1): STOP the dealing while this match is open — "
+                      "no onboarding, trade, delivery or payment, and no release of metal/stones.")
+TFS_CASE_DISPOSITION = (
+    "Disposition (MLRO only — POL-07 TFS Name-Match Procedure):",
+    "[ ] false positive — identifiers exclude the subject; suspension lifted",
+    "[ ] potential match — stays suspended; PNMR filed in goAML without delay",
+    "[ ] confirmed match — freeze without delay (50%/control rule); CNMR + FFR filed in goAML",
+    "[ ] investigate — stays suspended while identifiers are compared",
+    "STR/SAR assessed in parallel (not instead):  [ ] not warranted   [ ] filed",
+    "Identifiers compared (name + script variants, DOB, nationality, ID no., address): ______",
+    "Suspension / freeze time: ______   goAML reference: ______   Rationale: ______",
+    "Release only on EOCN/FIU written basis (false-positive confirmation, delisting or direction).",
+    "Do not tip off. UAE Cabinet Resolution 74/2020 applies.",
+)
+PEP_CASE_DISPOSITION = (
+    "Disposition (FATF R.12 — PEP status is permissible with controls; not by itself grounds to decline):",
+    "[ ] not a PEP — identity does not match (record the identifiers compared)",
+    "[ ] confirmed PEP/RCA — EDD + senior-management approval + source of funds/wealth "
+    "established + enhanced ongoing monitoring",
+    "[ ] investigate",
+    "Rationale: ______   Senior-management approver: ______   Date: ______",
+    "Do not tip off the customer (UAE FDL 10/2025).",
+)
+ADVERSE_CASE_DISPOSITION = (
+    "Risk-based review — not a TFS event (no PNMR/CNMR). Verify the story and confirm the "
+    "CURRENT status (charge, conviction, acquittal, clearance) before any adverse decision; "
+    "media alone is never conclusive.",
+    "Identity:  [ ] corroborated (DOB / role / location)   [ ] name-only — disambiguate before acting",
+    "Disposition: [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR",
+    "Rationale: ______",
+    "Do not tip off the customer (UAE FDL 10/2025).",
+)
+
+
 def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings, run_time,
                     state=None):
     """Create an assigned subtask for each NEW item (sanctions, PEP, adverse),
@@ -6816,15 +6870,15 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         top = max(new_hits, key=lambda h: h["score"])
         ctrl = " [OWNERSHIP/CONTROL]" if top.get("control_linkage") else ""
         nm = f"🔴 SANCTIONS case: {m['name']} — {top['list']} {_pct(top['score'])}{ctrl}"
-        notes = [f"Customer: {m['name']}", f"Record: {m.get('permalink','')}", ""]
+        notes = [f"Customer: {m['name']}", f"Record: {m.get('permalink','')}",
+                 TFS_CASE_STOP_LINE, ""]
         for h in new_hits:
             notes.append(f"- [{h['subject_type']}] {h['subject_name']} → {h['list']}: "
                          f"\"{h['matched_entry']}\"  {_pct(h['score'])} ({h.get('confidence','')})"
                          + ("  [owner/UBO → 50%/control rule]" if h.get("control_linkage") else ""))
             if h.get("match_context"):
                 notes.append(f"    {h['match_context']}")
-        notes += ["", "Disposition: [ ] false positive   [ ] escalate / freeze (TFS)   [ ] investigate",
-                  "Do not tip off. UAE Cabinet Resolution 74/2020 applies."]
+        notes += ["", *TFS_CASE_DISPOSITION]
         # Attach an AI-assisted STR/SAR DRAFT for HIGH-risk / confirmed cases (human files).
         risk = m.get("risk")
         if risk and (risk["rating"] == "HIGH" or any(h["score"] >= 95 for h in new_hits)):
@@ -6842,7 +6896,7 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         notes = [f"Subject: {p['subject_name']}" + (f"  (owner/director — {p['parent']})" if p.get("parent") else ""),
                  source_line,
                  f"Description: {p.get('description','')}", f"Record: {p.get('permalink','')}",
-                 "", "Disposition: [ ] not a PEP   [ ] confirmed PEP — apply EDD   [ ] investigate"]
+                 "", *PEP_CASE_DISPOSITION]
         queue.append((1, nm, "\n".join(notes), ASANA_MEDIA_SECTION_GID))
     for f in adverse_findings:
         new_arts = [a for a in f["articles"] if a.get("is_new")]
@@ -6853,7 +6907,7 @@ def open_mlro_cases(parent_gid, possible_matches, adverse_findings, pep_findings
         for a in new_arts:
             notes.append(f"- {a['title']}  [{', '.join(a.get('categories',[])) or 'uncategorised'}]")
             notes.append(f"  {a.get('source','?')} — {a.get('date','?')}  {a.get('url','')}")
-        notes += ["", "Disposition: [ ] no action   [ ] investigate   [ ] escalate   [ ] file STR/SAR"]
+        notes += ["", *ADVERSE_CASE_DISPOSITION]
         queue.append((2, nm, "\n".join(notes), ASANA_MEDIA_SECTION_GID))
 
     # Merge today's NEW items with the carried backlog. Sort key (priority,

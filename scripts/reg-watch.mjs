@@ -250,6 +250,16 @@ export function stateMateriallyChanged(prevState, nextState) {
 }
 
 /* ── Human-readable report (PR body + committed artifact) ── */
+/* What the reviewer records on the Regulatory Watch card for each change, so
+   the card itself evidences the reviewed decision (impact assessed, owner,
+   outcome). Fields are blank by design: the assessment is a human act. */
+export const REG_REVIEW_CHECKLIST = [
+  'Impact: [ ] none (site churn)   [ ] policy / procedure   [ ] training   [ ] obligations register   [ ] screening lists or rules',
+  'Instrument cited (number, date, issuing authority): ______   Effective date: ______',
+  'Assessed by: ______   Date: ______   Decision / follow-up card: ______',
+  'HIGH items are read first; a repealed instrument is never cited as operative law.',
+];
+
 export function buildReport(changes, today, mode) {
   const moved = contentChanges(changes);
   const errors = changes.filter(c => c.status === 'error');
@@ -304,6 +314,11 @@ export function buildReport(changes, today, mode) {
   }
   const transient = errors.filter(e => (e.errorStreak || 0) < ERROR_STREAK_ALERT);
   if (transient.length) appendErrors(lines, transient);
+  if (moved.length) {
+    lines.push('');
+    lines.push('**Reviewer record:**');
+    for (const item of REG_REVIEW_CHECKLIST) lines.push('- ' + item);
+  }
   lines.push('');
   lines.push('_Detection is automatic; wording changes are a reviewed decision. Country black/grey list moves are handled by the FATF Watchdog._');
   return lines.join('\n');
