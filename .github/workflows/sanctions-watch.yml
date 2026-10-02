@@ -61,6 +61,7 @@ jobs:
             umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
             webgate.ec.europa.eu:443
             ecas.ec.europa.eu:443
+            gels-avoirs.dgtresor.gouv.fr:443
             ofsistorage.blob.core.windows.net:443
             sanctionslist.fcdo.gov.uk:443
             app.asana.com:443
