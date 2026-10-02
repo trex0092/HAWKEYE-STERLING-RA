@@ -1141,6 +1141,43 @@ export function describeFetchError(e) {
   return parts.join(' <- ').slice(0, 300);
 }
 
+/* Redirect-loop recovery. Node's fetch keeps no cookies, so an endpoint that
+   sets a cookie and redirects (a WAF / session gate) loops until undici gives
+   up with "redirect count exceeded" — the EU consolidated list from 1 Oct 2026
+   17:54 UTC, after loading on every earlier run. A browser (or Python's
+   requests) carries the cookie and gets through. This follows redirects by
+   hand with a cookie jar, bounded, and records each hop (status + host +
+   path, never the query) so a loop that persists names itself in the log.
+   Only used after the normal fetch has failed with exactly that error.
+   fetchImpl is injectable for the offline tests. */
+export const REDIRECT_MAX_HOPS = 10;
+export async function fetchFollowingCookies(url, options = {}, { fetchImpl = fetch, maxHops = REDIRECT_MAX_HOPS } = {}) {
+  const jar = new Map();
+  const chain = [];
+  let href = url;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    const headers = { ...(options.headers || {}) };
+    if (jar.size) headers.cookie = [...jar].map(([k, v]) => k + '=' + v).join('; ');
+    const r = await fetchImpl(href, { ...options, headers, redirect: 'manual' });
+    const setCookies = (r.headers && typeof r.headers.getSetCookie === 'function') ? r.headers.getSetCookie() : [];
+    for (const c of setCookies) {
+      const pair = String(c).split(';')[0];
+      const eq = pair.indexOf('=');
+      if (eq > 0) jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+    }
+    let where;
+    try { const u = new URL(href); where = u.host + u.pathname; } catch { where = '?'; }
+    chain.push(r.status + ' ' + where + (setCookies.length ? ' (+' + setCookies.length + ' cookie)' : ''));
+    const loc = r.headers && r.headers.get && r.headers.get('location');
+    if (r.status < 300 || r.status > 399 || !loc) return Object.assign(r, { redirectChain: chain });
+    let next;
+    try { next = new URL(loc, href); } catch { throw new Error('redirect to an invalid location after: ' + chain.join(' -> ')); }
+    if (next.protocol !== 'https:' && next.protocol !== 'http:') throw new Error('redirect to unsupported scheme ' + next.protocol);
+    href = next.href;
+  }
+  throw new Error('redirect loop not resolved by carrying cookies (' + maxHops + ' hops): ' + chain.slice(0, 6).join(' -> '));
+}
+
 /* National sanctions endpoints are materially less reliable than Asana.
    Retry transient transport failures and 429/5xx responses before declaring
    coverage degraded. Each attempt gets its own timeout. AbortError means the
@@ -1162,6 +1199,12 @@ async function fetchSourceResponse(url, options = {}, timeoutMs = 60000, attempt
     } catch (e) {
       lastErr = e;
       if (e && e.name === 'AbortError') throw e;
+      if (/redirect count exceeded/i.test(describeFetchError(e))) {
+        console.warn('sanctions-screen: ' + label + ' redirect loop — retrying with cookies carried across redirects');
+        const r = await withTimeout(signal => fetchFollowingCookies(url, { ...options, signal }), timeoutMs);
+        console.warn('sanctions-screen: ' + label + ' redirect chain: ' + r.redirectChain.join(' -> '));
+        return r;
+      }
       if (attempt === max - 1) throw e;
       const delay = Math.min(4000, 750 * (2 ** attempt));
       console.warn('sanctions-screen: ' + label + ' transport failure — retry in ' + delay + 'ms: ' + describeFetchError(e));
