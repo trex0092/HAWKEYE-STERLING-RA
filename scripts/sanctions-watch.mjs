@@ -111,6 +111,9 @@ export async function fetchSource(s, timeoutMs = 45000, { fetchImpl = fetch } = 
   try {
     let res;
     try {
+      // codeql[js/file-access-to-http]: reviewed 2026-10-02, intended design, not a leak.
+      // Same flow the watcher always had: a public designation-list URL from the
+      // reviewed in-repo config (data/sanctions-sources.json); no subject data is sent.
       res = await fetchImpl(href, { signal: ctrl.signal, redirect: 'follow', headers });
     } catch (e) {
       if (!/redirect count exceeded/i.test(describeFetchError(e))) throw e;
