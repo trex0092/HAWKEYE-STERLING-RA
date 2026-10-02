@@ -2004,5 +2004,45 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     /could not be loaded \(' \+ describeFetchError\(e\)/.test(src) && /transport failure — retry in ' \+ delay \+ 'ms: ' \+ describeFetchError\(e\)/.test(src));
 }
 
+// fetchFollowingCookies: a cookie-gated redirect (the EU list's loop) must
+// resolve when the cookie is carried, and a true loop must fail bounded,
+// naming its chain. Offline: a scripted fetch stands in for the server.
+{
+  const resp = (status, { location, cookies = [], body = '' } = {}) => ({
+    status, ok: status >= 200 && status < 300,
+    headers: { get: k => (k === 'location' ? (location || null) : null), getSetCookie: () => cookies },
+    text: async () => body,
+  });
+  const seen = [];
+  const gate = async (url, opts) => {
+    seen.push({ url, cookie: (opts.headers || {}).cookie || '', redirect: opts.redirect });
+    if (!/gate=ok/.test((opts.headers || {}).cookie || '')) return resp(302, { location: url, cookies: ['gate=ok; Path=/; Secure'] });
+    return resp(200, { body: 'Entity_LogicalId;NameAlias_WholeName' });
+  };
+  const r = await scr.fetchFollowingCookies('https://list.example/files/content?token=t', { headers: { 'user-agent': 'x' } }, { fetchImpl: gate });
+  check('redirect: a cookie-gated redirect resolves once the cookie is carried', r.status === 200 && (await r.text()).startsWith('Entity_LogicalId'));
+  check('redirect: the cookie is sent on the next hop and redirects are followed manually',
+    seen.length === 2 && seen[1].cookie === 'gate=ok' && seen.every(x => x.redirect === 'manual'));
+  check('redirect: the hop chain is recorded without the query string',
+    r.redirectChain.length === 2 && /^302 list\.example\/files\/content \(\+1 cookie\)$/.test(r.redirectChain[0]) && !/token/.test(r.redirectChain.join(' ')));
+  let calls = 0;
+  const loop = async (url) => { calls++; return resp(302, { location: url }); };
+  let err = null;
+  try { await scr.fetchFollowingCookies('https://list.example/a', {}, { fetchImpl: loop, maxHops: 4 }); } catch (e) { err = e; }
+  check('redirect: a true loop fails loudly, bounded, and names its chain',
+    err && /redirect loop not resolved/.test(err.message) && /302 list\.example\/a/.test(err.message) && calls === 5);
+  const rel = async (url) => (url.endsWith('/b') ? resp(200, { body: 'ok' }) : resp(301, { location: '/b' }));
+  const r2 = await scr.fetchFollowingCookies('https://list.example/a', {}, { fetchImpl: rel });
+  check('redirect: a relative Location is resolved against the current URL', r2.status === 200 && r2.redirectChain.length === 2);
+  let e2 = null;
+  try { await scr.fetchFollowingCookies('https://list.example/a', {}, { fetchImpl: async () => resp(302, { location: 'file:///etc/passwd' }) }); } catch (e) { e2 = e; }
+  check('redirect: never follows a redirect to a non-http(s) scheme', e2 && /unsupported scheme/.test(e2.message));
+  const plain = await scr.fetchFollowingCookies('https://list.example/a', {}, { fetchImpl: async () => resp(404) });
+  check('redirect: a non-redirect error status is returned as-is for the caller to judge', plain.status === 404);
+  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('redirect: the source fetch falls back to it only on "redirect count exceeded"',
+    /\/redirect count exceeded\/i\.test\(describeFetchError\(e\)\)[\s\S]{0,300}fetchFollowingCookies\(url/.test(src));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
