@@ -14,6 +14,19 @@
 > one exception is **Article 25 of FDL 10/2025** (tipping-off), already cited
 > operatively in code and pinned by CI. Citing a repealed instrument — FDL
 > 20/2018 or Cabinet Decision 10/2019 — as an operative basis fails the build.
+>
+> **Source-citation standard.** The obligation text below is the firm's
+> paraphrase, never statutory text. Each row in `data/obligations.json` carries a
+> `source_citation` in one of two shapes. **needs-source** asserts nothing:
+> article, quote, URL and locator all stay empty, so no drafted wording can pass
+> as law. **sourced** carries the article, the verbatim quote copied from the
+> official text, the official publisher URL, a page/section locator, and the
+> named human (MLRO or Counsel) and date of verification. Only that human
+> promotes a row; tooling and AI agents never do. CI rejects a half-filled row,
+> an elided or `PROPOSED` quote, a non-official or non-HTTPS source and a missing
+> verifier. The rows still owed are counted as `obligationsWithoutSourcedCitation`
+> in [GRC metrics](grc-metrics.md) — 21 of 21 today, closing through
+> open-actions item 5.
 
 ---
 

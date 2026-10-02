@@ -55,6 +55,7 @@
     "unjustifiedSuppressions": 0,
     "obligationsWithoutOwner": 0,
     "obligationsWithoutWatchSource": 1,
+    "obligationsWithoutSourcedCitation": 21,
     "openActionsWithoutTargetDate": 17,
     "residualAboveAppetite": 2,
     "risksWithoutAppetitePosition": 0
