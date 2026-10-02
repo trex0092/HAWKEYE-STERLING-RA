@@ -1029,6 +1029,68 @@ for _call, _why in ((lambda: payment_screen.parse_pacs008(_pacs), "no hardened X
 check("payment_screen does not import screen.py (no import cycle)",
       "import screen" not in open(os.path.join(ROOT, "payment_screen.py"), encoding="utf-8").read().replace(
           "does not import screen.py", ""))
+# ── Asana Payments Register: one task per payment (template or pasted message) ─
+_reg_note = ("Date: 2026-10-01\nDirection: out\nAmount: 250,000\nCurrency: aed\nMethod: wire\n"
+             "Customer: Example Trading LLC\nOriginator: Example Trading LLC\nOriginator country: AE\n"
+             "Beneficiary: Acme General Trading LLC\nBeneficiary country: Hong Kong\n"
+             "Intermediary bank: INTMIRTHXXX\nReference: INVOICE 12345\nExpected monthly volume: 100000\n")
+_re1 = payment_screen.parse_register_entry("PAY-001", _reg_note)
+_re1_roles = {x["role"]: x for x in _re1["parties"]}
+check("register: the template yields amount, currency, direction and the reference",
+      _re1["amount"] == 250000.0 and _re1["currency"] == "AED" and _re1["direction"] == "out"
+      and _re1["remittance_info"] == "INVOICE 12345" and _re1["transaction_id"] == "PAY-001")
+check("register: a BIC on a bank line is read as a BIC, a 2-letter country as a code, a name as a name",
+      _re1_roles["intermediary"].get("bic") == "INTMIRTHXXX" and _re1_roles["originator"]["country"] == "AE"
+      and _re1_roles["beneficiary"]["country_name"] == "Hong Kong")
+check("register: the declared profile feeds the PROFILE_DEVIATION rule",
+      _re1["expected_monthly_volume"] == 100000.0
+      and any(a["rule"] == "PROFILE_DEVIATION" for a in txn_monitor.evaluate([_re1])["alerts"]))
+check("register: a pasted MT103 is screened as a payment message",
+      payment_screen.parse_register_entry("PAY-002", _mt103.split("{4:\n", 1)[1]).get("payment_message"))
+check("register: a task with no payment in it yields nothing (counted by the caller, never screened as clear)",
+      payment_screen.parse_register_entry("PAY-003", "call the client tomorrow") is None)
+_reg_res = payment_screen.screen_feed([{**_re1, "permalink": "https://app.asana.com/0/1/2"}],
+                                      _ps_lists, xml_parser=_px, **_ps_kw)
+check("register: a listed beneficiary in a register entry STOPs the payment",
+      _reg_res["results"][0]["outcome"].startswith("STOP"))
+check("register: the report links the flagged payment back to its Asana task",
+      any("Record: https://app.asana.com/0/1/2" in ln for ln in payment_screen.report_lines(_reg_res, True)))
+
+class _RegResp:
+    def __init__(self, code, data=None): self.status_code, self._d, self.text = code, data, "stub"
+    def json(self): return self._d
+_reg_pages = [
+    _RegResp(200, {"data": [{"gid": "1", "name": "PAY-001", "notes": _reg_note, "permalink_url": "u1"},
+                            {"gid": "2", "name": "note", "notes": "nothing here"}],
+                   "next_page": {"offset": "o2"}}),
+    _RegResp(200, {"data": [{"gid": "3", "name": "PAY-002", "notes": _mt103.split("{4:\n", 1)[1],
+                             "permalink_url": "u3"}], "next_page": None}),
+]
+_reg_calls = []
+def _reg_stub(method, url, **kw):
+    _reg_calls.append(dict(kw.get("params") or {}))
+    return _reg_pages[len(_reg_calls) - 1]
+_orig_ar2 = screen.asana_request
+try:
+    screen.asana_request = _reg_stub
+    screen.ASANA_PAYMENTS_GID = "999"
+    _recs, _bad = screen.get_payment_register()
+finally:
+    screen.asana_request = _orig_ar2
+check("register loader: follows pagination and reads only OPEN tasks",
+      len(_reg_calls) == 2 and _reg_calls[1].get("offset") == "o2"
+      and all(c.get("completed_since") == "now" for c in _reg_calls))
+check("register loader: counts the task with no payment instead of dropping it",
+      len(_recs) == 2 and _bad == 1 and _recs[0]["permalink"] == "u1")
+try:
+    screen.asana_request = lambda *a, **k: _RegResp(500)
+    screen.get_payment_register()
+    check("register loader: an Asana failure raises (reported DEGRADED, never an empty register)", False)
+except RuntimeError:
+    check("register loader: an Asana failure raises (reported DEGRADED, never an empty register)", True)
+finally:
+    screen.asana_request = _orig_ar2
+    screen.ASANA_PAYMENTS_GID = ""
 check("report: payment screening says INACTIVE without a feed (no implied clearance)",
       len(_inactive) == 1 and "INACTIVE" in _inactive[0])
 _active = payment_screen.report_lines(payment_screen.screen_feed(

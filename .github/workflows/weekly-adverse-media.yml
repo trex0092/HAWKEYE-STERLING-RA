@@ -383,6 +383,9 @@ jobs:
           # names the reason instead of a bare 403.
           REGULATOR_UA_CONTACT: ${{ vars.REGULATOR_UA_CONTACT }}
           RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          # Asana "Payments Register" project for payment-party screening (open
+          # tasks only). Unset = payment screening reports INACTIVE, never clear.
+          ASANA_PAYMENTS_GID: ${{ vars.ASANA_PAYMENTS_PROJECT_GID || '1219097497649688' }}
           # '1' only on a retry firing when today already succeeded: the engine
           # then re-sweeps ONLY if that run lost news/PEP coverage (fresh
           # runner = fresh egress IP wins back rate-limited coverage), else

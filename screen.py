@@ -95,6 +95,11 @@ DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "05:00")
 DELIVERY_RESERVE_MIN  = int(os.environ.get("DELIVERY_RESERVE_MIN", "20"))
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
+# Payments Register (payment-party screening input). One task per payment; see
+# payment_screen.parse_register_entry for the description template. Unset =
+# payment screening stays INACTIVE (and the report says so). Only OPEN tasks are
+# screened: completing a task (payment reviewed / released) takes it out of scope.
+ASANA_PAYMENTS_GID = os.environ.get("ASANA_PAYMENTS_GID", "").strip()
 # Delivery target is configurable so an Asana reorganisation can be repaired by
 # updating repository variables without waiting for a code release. The defaults
 # are the live HAWKEYE STERLING APP project and Assessment Report section,
@@ -3922,6 +3927,38 @@ def post_fraudlabs_signal_comment(customer_gid, email_domain, sig, run_time):
     asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{customer_gid}/stories",
                   json={"data": {"text": "\n".join(lines)}})
 
+def get_payment_register():
+    """Open Payments Register tasks as transaction-feed records, plus the count
+    of tasks that carried nothing screenable. Raises on an Asana failure — the
+    caller reports payment screening DEGRADED, never an empty-and-clear register.
+    Never logs payment party names (they are disclosed in Asana only)."""
+    records, unreadable = [], 0
+    params = {"project": ASANA_PAYMENTS_GID, "completed_since": "now",
+              "opt_fields": "gid,name,notes,permalink_url", "limit": 100}
+    while True:
+        r = asana_request("GET", "https://app.asana.com/api/1.0/tasks", params=params)
+        if r is None or r.status_code not in (200, 201):
+            raise RuntimeError(f"Asana payments register fetch failed: "
+                               f"{getattr(r, 'status_code', 'network')}")
+        data = r.json() if isinstance(r.json(), dict) else {}
+        for t in (data.get("data") or []):
+            try:
+                rec = payment_screen.parse_register_entry(t.get("name", ""), t.get("notes", ""))
+            except ValueError:
+                rec = None
+            if rec is None:
+                unreadable += 1
+                continue
+            rec["permalink"] = t.get("permalink_url", "")
+            records.append(rec)
+        nxt = data.get("next_page") or None
+        if not nxt or not nxt.get("offset"):
+            break
+        params["offset"] = nxt["offset"]
+    log(f"Payments register: {len(records)} open payment(s) read, {unreadable} unreadable")
+    return records, unreadable
+
+
 def get_all_customers():
     customers = []
     CUSTOMER_ROWS_SKIPPED.clear()
@@ -7521,16 +7558,33 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # until the transaction feed exists; never fails the run, but a crash is
     # disclosed in the report rather than read as "no payment flagged".
     try:
-        _pay_cfg = txn_monitor.feed_configured() and not txn_monitor.feed_parse_error()
+        _file_cfg = txn_monitor.feed_configured() and not txn_monitor.feed_parse_error()
+        _pay_records = txn_monitor.load_transactions() if _file_cfg else []
+        _reg_lines = []
+        if ASANA_PAYMENTS_GID:
+            _reg, _reg_bad = get_payment_register()
+            _pay_records = _pay_records + _reg
+            _reg_lines.append(f"Payments Register (Asana): {len(_reg)} open payment(s) read"
+                              + (f"; ⚠ {_reg_bad} task(s) carried no screenable payment "
+                                 "(fill the template or paste the MT103/pacs.008)" if _reg_bad else "")
+                              + ".")
+            _tm = txn_monitor.evaluate(_reg)
+            if _tm["alerts"]:
+                _reg_lines.append(f"Register through the monitoring rules (open entries only): "
+                                  f"{len(_tm['alerts'])} alert(s)")
+                _reg_lines += [f"   [{a['severity']}] {a['rule']} — {a['customer']} {a['date']}: "
+                               f"{a['detail']}" for a in _tm["alerts"][:25]]
+        _pay_cfg = _file_cfg or bool(ASANA_PAYMENTS_GID)
         _pay_res = None
         if _pay_cfg:
             _core_down = [k.upper() for k, v in list_meta.items()
                           if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
             _pay_res = payment_screen.screen_feed(
-                txn_monitor.load_transactions(), all_lists,
+                _pay_records, all_lists,
                 jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down,
                 matcher=screen_name, normalizer=normalize, xml_parser=safe_xml_fromstring)
-        txn_status = "\n   ".join([txn_status] + payment_screen.report_lines(_pay_res, _pay_cfg))
+        txn_status = "\n   ".join([txn_status] + _reg_lines
+                                  + payment_screen.report_lines(_pay_res, _pay_cfg))
     except Exception as e:
         log(f"  ! payment screening failed: {safe_err(e)}")
         txn_status += ("\n   Payment screening (parties): DEGRADED — the run could not screen the "

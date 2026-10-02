@@ -528,6 +528,12 @@ check('a sectionless mirror still joins the project',
   }
   check('every literal monitoring section gid in workflows/scripts/screen.py is an approved section'
     + (offenders.length ? ' — unapproved: ' + offenders.join(', ') : ''), offenders.length === 0);
+  /* The Payments Register is an INPUT project: the daily run must read the
+     registered one, and it must never be the results project. */
+  const { PAYMENTS_PROJECT, MONITORING_PROJECT } = await import('../scripts/asana-sections.mjs');
+  const wf = readFileSync(join(root, '.github/workflows/weekly-adverse-media.yml'), 'utf8');
+  check('the daily run reads the registered Payments Register project (input, not the results project)',
+    wf.includes("ASANA_PAYMENTS_PROJECT_GID || '" + PAYMENTS_PROJECT + "'") && PAYMENTS_PROJECT !== MONITORING_PROJECT);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
