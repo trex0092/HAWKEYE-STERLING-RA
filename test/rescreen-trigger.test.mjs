@@ -26,9 +26,12 @@ const watchYml = readFileSync(join(ROOT, '.github/workflows/sanctions-watch.yml'
 const screenYml = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');
 const watchSrc = readFileSync(join(ROOT, 'scripts/sanctions-watch.mjs'), 'utf8');
 
-// the script separates content changes from error alerts for the trigger
+// the script separates content changes from error alerts for the trigger:
+// only a CHANGED list re-screens (a first snapshot is a baseline, an error
+// alert has no new data) - see rescreenTriggers in scripts/sanctions-watch.mjs
 check('watch script emits a content-only changes output',
-  /setOutput\('content_changes', String\(moved\.length\)\)/.test(watchSrc));
+  /setOutput\('content_changes', String\(rescreenTriggers\(changes\)\.length\)\)/.test(watchSrc)
+  && /export function rescreenTriggers[\s\S]{0,120}status === 'changed'/.test(watchSrc));
 
 // the watch workflow dispatches the case engine on that output
 const dispatchStep = watchYml.match(/- name: Trigger an immediate re-screen[\s\S]*?(?=\n {6}- name: )/);
