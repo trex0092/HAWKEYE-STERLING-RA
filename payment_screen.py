@@ -585,11 +585,11 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
     bar = "━" * 60
     L = ["TRANSACTION MONITORING — DAILY REPORT", f"Date: {date_label}",
          "Source: open tasks in the \"Transaction Monitoring\" section (one task per payment). "
-         "Completed tasks are out of scope.", ""]
+         + "Completed tasks are out of scope.", ""]
     if degraded:
         L += ["⚠ DEGRADED — " + degraded,
               "No payment is cleared by this run. Re-run the daily screening or review the "
-              "payments manually.", ""]
+              + "payments manually.", ""]
     L += [bar, "SUMMARY", bar,
           f"Payments read: {register_read}"
           + (f" · ⚠ {unreadable} task(s) with no screenable payment — fill the template "
@@ -633,16 +633,16 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
 
     L += [bar, "③  WHAT TO DO", bar,
           "   STOP — hold the payment; verify identifiers. Potential match: PNMR in goAML. "
-          "Confirmed match: freeze + CNMR + FFR in goAML (POL-07). Release only on an "
-          "EOCN/FIU written basis. Assess STR/SAR in parallel.",
+          + "Confirmed match: freeze + CNMR + FFR in goAML (POL-07). Release only on an "
+          + "EOCN/FIU written basis. Assess STR/SAR in parallel.",
           "   REVIEW — high-risk jurisdiction: apply EDD before release. Incomplete (R.16): "
-          "obtain the missing originator/beneficiary information before release.",
+          + "obtain the missing originator/beneficiary information before release.",
           "   RULE ALERT — review against the customer profile; document the outcome; "
-          "file an STR/SAR in goAML if suspicion is not dispelled.",
+          + "file an STR/SAR in goAML if suspicion is not dispelled.",
           "   When a payment is reviewed, complete its task so it leaves monitoring scope.", "",
           "MLRO DECISION (per flagged payment / alert)",
           "   [ ] cleared — released   [ ] EDD obtained   [ ] PNMR filed   "
-          "[ ] freeze + CNMR + FFR filed   [ ] STR/SAR filed   goAML Ref: ________",
+          + "[ ] freeze + CNMR + FFR filed   [ ] STR/SAR filed   goAML Ref: ________",
           "   Reviewed by: ________________   Date: ________", "",
           "Do not tip off. UAE Cabinet Resolution 74/2020 applies."]
     return name, "\n".join(L)
