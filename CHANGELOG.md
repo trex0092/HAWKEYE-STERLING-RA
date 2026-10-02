@@ -10,7 +10,11 @@ bump merged to `main`.
 
 ## [Unreleased]
 
-- **The daily Transaction Monitoring report names the reporting entity.** The header now opens with the reporting entity and a "Reporting entity:" line. The name comes from the `REPORTING_ENTITY_NAME` repository variable; the daily workflow defaults it to the platform name, "Hawkeye Sterling". If the variable is empty, the report says NOT CONFIGURED instead of guessing. Each case reads `CASE n — Customer: <name>`.
+- **The daily Transaction Monitoring report takes its names from Asana only.** The repository and its settings hold no company name.
+  - The header now names the reporting entity, read at run time from the Asana workspace that holds the monitoring project. If Asana cannot be read, the header says UNAVAILABLE instead of guessing.
+  - Each payment or activity task is tied to its Customer Database record (project `1214107620220121`), by an Asana task link or gid on the `Customer:` line, or by the exact name. A match takes the database's own name, and the case shows its Customer Database link. Names are never logged.
+  - A customer matching no record raises the new `CUSTOMER_NOT_IN_DB` alert (HIGH, R.10: no CDD file on record), and its case says NOT FOUND. Employees are not matched as customers.
+  - Each case reads `CASE n — Customer: <name>`.
 - **SAR red flags, per-customer cases and a more compliant daily Transaction Monitoring report.**
   - The SAR register (506 indicators of suspicious activity in 31 categories: customer behaviour, profile, structuring, cash, third-party, settlement, virtual assets, pricing, documents, phantom trade, circular trading, logistics, UBO, adverse information, PEP, geography, sanctions, TF, PF, gold origin, CAHRA, human rights, environment, corruption, fraud, recycled gold, sudden change, intermediaries, customs, internal conduct, composites) is now `data/sar-red-flags.json`, codes `SAR-CB-01` …. Each names what detects it, using the same vocabulary as the STR register, plus a `kyc` control documented as PARTIAL (CDD gaps are reported for flagged customers only). STR codes are now `STR-ML-11` …; a bare `ML-11` still reads as STR. SAR sanctions / TF / PF flags are CRITICAL, like STR TF / PF / sanctions-evasion flags.
   - **Activity records:** a task in the Transaction Monitoring section with `Customer:` and `Red flags:` but no payment is an activity record. It runs through the rules and the report, never through payment screening.

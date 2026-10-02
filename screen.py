@@ -104,10 +104,7 @@ ASANA_CUSTOMER_DB_GID = "1214107620220121"
 # Monitoring report (post_tm_report) is filed in the same section and is never
 # read back as a payment (payment_screen.TM_REPORT_PREFIX).
 ASANA_PAYMENTS_SECTION_GID = os.environ.get("ASANA_PAYMENTS_SECTION_GID", "").strip()
-# The reporting entity named at the top of the daily Transaction Monitoring
-# report (repository variable REPORTING_ENTITY_NAME; the workflow defaults it
-# to the platform name). Blank = the report says NOT CONFIGURED, never guesses.
-REPORTING_ENTITY_NAME = os.environ.get("REPORTING_ENTITY_NAME", "").strip()
+
 # Delivery target is configurable so an Asana reorganisation can be repaired by
 # updating repository variables without waiting for a code release. The defaults
 # are the live HAWKEYE STERLING APP project and Assessment Report section,
@@ -6754,6 +6751,42 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     UNIFIED_DELIVERY_FAILED["failed"] = True
     return None
 
+def _asana_entity_name():
+    """The reporting entity's name, read from Asana (the workspace that holds
+    the monitoring project) — company names live in Asana only, never in the
+    repository or its settings. "" when it cannot be read: the report then
+    says so instead of guessing."""
+    try:
+        r = asana_request("GET", f"https://app.asana.com/api/1.0/projects/{ASANA_ONGOING_MON_GID}",
+                          params={"opt_fields": "workspace.name"})
+        data = (r.json() or {}).get("data") if r is not None and r.status_code == 200 else None
+        return str(((data or {}).get("workspace") or {}).get("name") or "").strip()
+    except Exception:
+        return ""
+
+def resolve_register_customers(records, customers):
+    """Tie each payment / activity task to its Customer Database record: an
+    Asana task link or gid on the 'Customer:' line, else the exact name
+    (normalised). A match takes the database's own name and link; no match
+    marks the record customer_in_db=False (txn_monitor alerts on it). Names
+    are never logged — they are disclosed in Asana only. Returns {name: link}."""
+    book = [c for c in customers if c.get("kind") != "employee"]
+    by_gid = {str(c.get("gid")): c for c in book if c.get("gid")}
+    by_name = {}
+    for c in book:
+        by_name.setdefault(normalize(c.get("name", "")), c)
+    links = {}
+    for r in records:
+        raw = str(r.get("customer") or "")
+        c = next((by_gid[g] for g in re.findall(r"\d{12,20}", raw) if g in by_gid), None)
+        if c is None and raw.strip():
+            c = by_name.get(normalize(raw))
+        r["customer_in_db"] = c is not None
+        if c is not None:
+            r["customer"] = c["name"]
+            links[c["name"]] = c.get("permalink", "")
+    return links
+
 def _tm_flag_refs(rule):
     """Red-flag register codes a rule evidences, for the TM report. A missing
     register is already a counted rule error (report DEGRADED), so here it
@@ -6797,7 +6830,7 @@ def post_tm_report(run_time, tm_report):
         register_read=tm_report.get("read", 0), unreadable=tm_report.get("unreadable", 0),
         degraded=tm_report.get("degraded", ""), rule_errors=tm_report.get("rule_errors"),
         activities=tm_report.get("activities", 0), flag_refs=_tm_flag_refs,
-        entity_name=REPORTING_ENTITY_NAME)
+        entity_name=_asana_entity_name(), customer_links=tm_report.get("customer_links"))
     payload = {"data": {"name": name[:250], "notes": cap_notes(notes, ASANA_NOTES_MAX),
                         "due_on": run_time.strftime("%Y-%m-%d"),
                         "assignee": ASANA_ASSIGNEE_GID, "projects": [ASANA_ONGOING_MON_GID]}}
@@ -7652,6 +7685,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             _reg, _reg_bad = get_payment_register()
             # Activity-only records (red flags on a customer, no payment) go
             # through the monitoring rules, never through payment screening.
+            if mode in ("daily", "makeup"):
+                # Full book loaded: tie every task to its Customer Database record.
+                tm_report["customer_links"] = resolve_register_customers(_reg, customers)
             _reg_pay = [r for r in _reg if not r.get("activity_only")]
             tm_report.update(read=len(_reg_pay), unreadable=_reg_bad,
                              activities=len(_reg) - len(_reg_pay))

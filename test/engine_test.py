@@ -1324,12 +1324,45 @@ _en_n, _en_b = payment_screen.build_tm_daily_report(
 check("TM report: the reporting entity heads the report and is named on its own line",
       _en_b.startswith("EXAMPLE REPORTING ENTITY LLC — TRANSACTION MONITORING — DAILY REPORT")
       and "Reporting entity: Example Reporting Entity LLC" in _en_b)
-check("TM report: an unset reporting entity is shown as NOT CONFIGURED, never guessed",
-      "NOT CONFIGURED — set the REPORTING_ENTITY_NAME" in _tm_b0
-      and _tm_b0.startswith("REPORTING ENTITY NOT CONFIGURED — "))
-check("the daily workflow passes REPORTING_ENTITY_NAME (repository variable, platform-name default)",
-      "REPORTING_ENTITY_NAME: ${{ vars.REPORTING_ENTITY_NAME || " in open(
+check("TM report: an unreadable reporting entity is shown as UNAVAILABLE, never guessed",
+      "Reporting entity: ⚠ UNAVAILABLE" in _tm_b0 and _tm_b0.startswith("REPORTING ENTITY UNAVAILABLE — "))
+check("no company name in GitHub: the workflow carries no reporting-entity name or default",
+      "REPORTING_ENTITY_NAME" not in open(
           os.path.join(ROOT, ".github", "workflows", "weekly-adverse-media.yml"), encoding="utf-8").read())
+_orig_ar3 = screen.asana_request
+try:
+    screen.asana_request = lambda *a, **k: _RegResp(200, {"data": {"workspace": {"name": "Example Workspace"}}})
+    _ent_ok = screen._asana_entity_name()
+    screen.asana_request = lambda *a, **k: _RegResp(500)
+    _ent_bad = screen._asana_entity_name()
+finally:
+    screen.asana_request = _orig_ar3
+check("reporting entity: read from the Asana workspace; an Asana failure gives '' (report says UNAVAILABLE)",
+      _ent_ok == "Example Workspace" and _ent_bad == "")
+_book = [{"gid": "1214000000000001", "name": "Example Trading LLC", "permalink": "https://app.asana.com/x/1"},
+         {"gid": "1214000000000002", "name": "Demo Gold FZE", "permalink": "https://app.asana.com/x/2"},
+         {"gid": "1216000000000009", "name": "Sample Employee", "kind": "employee"}]
+_rr = [{"customer": "https://app.asana.com/1/1213645083721316/project/1214107620220121/task/1214000000000002"},
+       {"customer": "example trading llc"}, {"customer": "Unknown Buyer Ltd"}, {"customer": "Sample Employee"}]
+_links = screen.resolve_register_customers(_rr, _book)
+check("customer resolver: an Asana task link or the exact name ties the task to its Customer Database record",
+      _rr[0]["customer"] == "Demo Gold FZE" and _rr[1]["customer"] == "Example Trading LLC"
+      and _rr[0]["customer_in_db"] and _rr[1]["customer_in_db"]
+      and _links == {"Demo Gold FZE": "https://app.asana.com/x/2", "Example Trading LLC": "https://app.asana.com/x/1"})
+check("customer resolver: an unknown name, and an employee, are NOT customers (customer_in_db False)",
+      _rr[2]["customer_in_db"] is False and _rr[3]["customer_in_db"] is False)
+check("CUSTOMER_NOT_IN_DB: fires only when the resolver found no customer record",
+      "CUSTOMER_NOT_IN_DB" in _rules([{**_rr[2], "date": "2026-10-01", "amount": 1}])
+      and "CUSTOMER_NOT_IN_DB" not in _rules([{**_rr[1], "date": "2026-10-01", "amount": 1}])
+      and "CUSTOMER_NOT_IN_DB" not in _rules([{"customer": "X", "date": "2026-10-01", "amount": 1}]))
+_cl_n, _cl_b = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []},
+    txn_monitor.evaluate([{**_rr[1], "date": "2026-10-01", "amount": 60000, "method": "cash"},
+                          {**_rr[2], "date": "2026-10-01", "amount": 1}])["alerts"],
+    register_read=2, customer_links=_links)
+check("TM report: each case links its Customer Database record, or says NOT FOUND",
+      "Customer Database: https://app.asana.com/x/1" in _cl_b
+      and "Customer Database: ⚠ NOT FOUND" in _cl_b.split("Customer: Unknown Buyer Ltd")[1])
 _tm_ne, _tm_be = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
     rule_errors={"rule_funnel": 2})
