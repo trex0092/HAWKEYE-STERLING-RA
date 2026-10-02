@@ -2,10 +2,16 @@
   "_comment": [
     "STR red-flag catalogue for transaction monitoring (MLRO list, HAWKEYE STERLING APP note, 2 Oct 2026; FATF / EOCN typologies).",
     "detected_by names what raises each flag automatically: a txn_monitor rule code, 'payment_screening' (payment parties vs sanctions lists), 'screening' (daily customer sanctions / adverse-media / PEP screening), or 'manual' (only a person can observe it).",
-    "Every flag can also be RECORDED on a payment task with a 'Red flags:' line (e.g. 'Red flags: ML-11, TF-07'); the daily Transaction Monitoring report then lists it as a RED_FLAG alert.",
+    "Every flag can also be RECORDED on a payment task with a 'Red flags:' line (e.g. 'Red flags: STR-ML-11, STR-TF-07'; the bare form 'ML-11' is read as STR-ML-11); the daily Transaction Monitoring report then lists it as a RED_FLAG alert.",
     "A red flag is not an STR by itself: the STR question is whether the transaction shows signs that the funds, gold, goods or economic resources are connected to the crime."
   ],
   "version": 1,
+  "register": "STR",
+  "controls": {
+    "payment_screening": "Payment screening: every named party of a payment in the Transaction Monitoring section (and the payment reference) against the sanctions lists, plus FATF-listed jurisdictions and FATF R.16 completeness.",
+    "screening": "Daily customer screening: customers and their owners/UBOs against the sanctions lists, adverse media and PEP sources.",
+    "manual": "Only a person can observe it: record the code on the payment or activity task (Red flags: ...)."
+  },
   "categories": {
     "ML": "Money laundering / financial crime",
     "TF": "Terrorist financing",
@@ -16,7 +22,7 @@
   },
   "flags": [
     {
-      "code": "ML-01",
+      "code": "STR-ML-01",
       "category": "ML",
       "text": "Funds used in the transaction are suspected to be proceeds of fraud.",
       "detected_by": [
@@ -24,7 +30,7 @@
       ]
     },
     {
-      "code": "ML-02",
+      "code": "STR-ML-02",
       "category": "ML",
       "text": "Funds used in the transaction are suspected to be proceeds of embezzlement.",
       "detected_by": [
@@ -32,7 +38,7 @@
       ]
     },
     {
-      "code": "ML-03",
+      "code": "STR-ML-03",
       "category": "ML",
       "text": "Funds used in the transaction are suspected to be proceeds of extortion.",
       "detected_by": [
@@ -40,7 +46,7 @@
       ]
     },
     {
-      "code": "ML-04",
+      "code": "STR-ML-04",
       "category": "ML",
       "text": "Funds used in the transaction are suspected to be proceeds of kickbacks or secret commissions.",
       "detected_by": [
@@ -49,7 +55,7 @@
       ]
     },
     {
-      "code": "ML-05",
+      "code": "STR-ML-05",
       "category": "ML",
       "text": "Funds used in the transaction are suspected to be proceeds of forgery or counterfeiting.",
       "detected_by": [
@@ -57,7 +63,7 @@
       ]
     },
     {
-      "code": "ML-06",
+      "code": "STR-ML-06",
       "category": "ML",
       "text": "Funds used in the transaction are suspected to be proceeds of identity theft.",
       "detected_by": [
@@ -65,7 +71,7 @@
       ]
     },
     {
-      "code": "ML-07",
+      "code": "STR-ML-07",
       "category": "ML",
       "text": "Funds used in the transaction are suspected to originate from a Ponzi or pyramid scheme.",
       "detected_by": [
@@ -73,7 +79,7 @@
       ]
     },
     {
-      "code": "ML-08",
+      "code": "STR-ML-08",
       "category": "ML",
       "text": "Transaction proceeds appear linked to insider trading or market manipulation.",
       "detected_by": [
@@ -81,7 +87,7 @@
       ]
     },
     {
-      "code": "ML-09",
+      "code": "STR-ML-09",
       "category": "ML",
       "text": "Transaction proceeds appear linked to accounting fraud, tax fraud, VAT fraud, wire fraud, or cyber fraud.",
       "detected_by": [
@@ -89,7 +95,7 @@
       ]
     },
     {
-      "code": "ML-10",
+      "code": "STR-ML-10",
       "category": "ML",
       "text": "Transaction involves conversion of suspected criminal proceeds into gold or precious metals.",
       "detected_by": [
@@ -98,7 +104,7 @@
       ]
     },
     {
-      "code": "ML-11",
+      "code": "STR-ML-11",
       "category": "ML",
       "text": "Gold is purchased and rapidly resold in a manner consistent with laundering or layering of funds.",
       "detected_by": [
@@ -106,7 +112,7 @@
       ]
     },
     {
-      "code": "ML-12",
+      "code": "STR-ML-12",
       "category": "ML",
       "text": "Funds are transferred through multiple accounts, companies, or jurisdictions without a genuine commercial purpose.",
       "detected_by": [
@@ -115,7 +121,7 @@
       ]
     },
     {
-      "code": "ML-13",
+      "code": "STR-ML-13",
       "category": "ML",
       "text": "Transaction is unnecessarily complex and appears designed to obscure the source, ownership, or destination of funds.",
       "detected_by": [
@@ -123,7 +129,7 @@
       ]
     },
     {
-      "code": "ML-14",
+      "code": "STR-ML-14",
       "category": "ML",
       "text": "Third-party funds are used to purchase gold without a legitimate contractual or commercial relationship.",
       "detected_by": [
@@ -131,7 +137,7 @@
       ]
     },
     {
-      "code": "ML-15",
+      "code": "STR-ML-15",
       "category": "ML",
       "text": "Transaction proceeds are paid to an unrelated third party without legitimate justification.",
       "detected_by": [
@@ -139,7 +145,7 @@
       ]
     },
     {
-      "code": "ML-16",
+      "code": "STR-ML-16",
       "category": "ML",
       "text": "Corporate transactions are funded through personal accounts without a legitimate explanation.",
       "detected_by": [
@@ -147,7 +153,7 @@
       ]
     },
     {
-      "code": "ML-17",
+      "code": "STR-ML-17",
       "category": "ML",
       "text": "Funds originate from a shell, dormant, or apparently non-operational company without a clear economic role.",
       "detected_by": [
@@ -155,7 +161,7 @@
       ]
     },
     {
-      "code": "ML-18",
+      "code": "STR-ML-18",
       "category": "ML",
       "text": "Transaction value is materially inconsistent with the customer's legitimate business activity, turnover, or financial capacity.",
       "detected_by": [
@@ -164,7 +170,7 @@
       ]
     },
     {
-      "code": "ML-19",
+      "code": "STR-ML-19",
       "category": "ML",
       "text": "Large cash amounts are converted into gold without a credible legitimate source of funds.",
       "detected_by": [
@@ -174,7 +180,7 @@
       ]
     },
     {
-      "code": "ML-20",
+      "code": "STR-ML-20",
       "category": "ML",
       "text": "Transactions are deliberately structured or fragmented to conceal the total amount or avoid monitoring controls.",
       "detected_by": [
@@ -182,7 +188,7 @@
       ]
     },
     {
-      "code": "ML-21",
+      "code": "STR-ML-21",
       "category": "ML",
       "text": "Funds are received and rapidly transferred onward without an identifiable economic purpose.",
       "detected_by": [
@@ -190,7 +196,7 @@
       ]
     },
     {
-      "code": "ML-22",
+      "code": "STR-ML-22",
       "category": "ML",
       "text": "Gold or transaction proceeds circulate through related entities and return to the original party.",
       "detected_by": [
@@ -198,7 +204,7 @@
       ]
     },
     {
-      "code": "ML-23",
+      "code": "STR-ML-23",
       "category": "ML",
       "text": "Same or substantially identical gold is repeatedly bought and sold with no meaningful economic exposure.",
       "detected_by": [
@@ -206,7 +212,7 @@
       ]
     },
     {
-      "code": "ML-24",
+      "code": "STR-ML-24",
       "category": "ML",
       "text": "Transaction is completed at a substantial unexplained commercial loss.",
       "detected_by": [
@@ -215,7 +221,7 @@
       ]
     },
     {
-      "code": "ML-25",
+      "code": "STR-ML-25",
       "category": "ML",
       "text": "Transaction price is materially above or below market value and appears designed to transfer value.",
       "detected_by": [
@@ -223,7 +229,7 @@
       ]
     },
     {
-      "code": "ML-26",
+      "code": "STR-ML-26",
       "category": "ML",
       "text": "Over-invoicing or under-invoicing appears to be used to move or disguise value.",
       "detected_by": [
@@ -232,7 +238,7 @@
       ]
     },
     {
-      "code": "ML-27",
+      "code": "STR-ML-27",
       "category": "ML",
       "text": "Transaction documentation materially misstates the value, quantity, purity, weight, or description of the gold.",
       "detected_by": [
@@ -240,7 +246,7 @@
       ]
     },
     {
-      "code": "ML-28",
+      "code": "STR-ML-28",
       "category": "ML",
       "text": "Payment is made for gold for which no credible evidence of physical delivery exists.",
       "detected_by": [
@@ -248,7 +254,7 @@
       ]
     },
     {
-      "code": "ML-29",
+      "code": "STR-ML-29",
       "category": "ML",
       "text": "Transaction involves forged or falsified invoices, payment records, customs documentation, assay certificates, or certificates of origin.",
       "detected_by": [
@@ -256,7 +262,7 @@
       ]
     },
     {
-      "code": "ML-30",
+      "code": "STR-ML-30",
       "category": "ML",
       "text": "Transaction proceeds appear linked to tax evasion or other predicate offences.",
       "detected_by": [
@@ -264,7 +270,7 @@
       ]
     },
     {
-      "code": "TF-01",
+      "code": "STR-TF-01",
       "category": "TF",
       "text": "Transaction funds are suspected to be intended for a terrorist, terrorist organisation, or terrorist act.",
       "detected_by": [
@@ -272,7 +278,7 @@
       ]
     },
     {
-      "code": "TF-02",
+      "code": "STR-TF-02",
       "category": "TF",
       "text": "Transaction sends funds or economic resources to an entity credibly linked to terrorist financing.",
       "detected_by": [
@@ -280,7 +286,7 @@
       ]
     },
     {
-      "code": "TF-03",
+      "code": "STR-TF-03",
       "category": "TF",
       "text": "Transaction receives funds from a person, entity, or network credibly linked to terrorist financing.",
       "detected_by": [
@@ -288,7 +294,7 @@
       ]
     },
     {
-      "code": "TF-04",
+      "code": "STR-TF-04",
       "category": "TF",
       "text": "Multiple personal, corporate, charity, or non-profit accounts are used to collect and funnel funds to a small number of foreign beneficiaries.",
       "detected_by": [
@@ -296,7 +302,7 @@
       ]
     },
     {
-      "code": "TF-05",
+      "code": "STR-TF-05",
       "category": "TF",
       "text": "International transfers are sent to or received from jurisdictions with elevated terrorist-financing exposure without legitimate commercial justification.",
       "detected_by": [
@@ -305,7 +311,7 @@
       ]
     },
     {
-      "code": "TF-06",
+      "code": "STR-TF-06",
       "category": "TF",
       "text": "Foreign-exchange transactions are conducted through a third party and followed by transfers to a high-risk location with no apparent business nexus.",
       "detected_by": [
@@ -314,7 +320,7 @@
       ]
     },
     {
-      "code": "TF-07",
+      "code": "STR-TF-07",
       "category": "TF",
       "text": "Funds are moved through informal value-transfer systems, underground banking, hawala, or equivalent arrangements in a pattern consistent with TF.",
       "detected_by": [
@@ -322,7 +328,7 @@
       ]
     },
     {
-      "code": "TF-08",
+      "code": "STR-TF-08",
       "category": "TF",
       "text": "Gold is purchased, transferred, or sold as a means of moving value to a terrorist-linked person or network.",
       "detected_by": [
@@ -330,7 +336,7 @@
       ]
     },
     {
-      "code": "TF-09",
+      "code": "STR-TF-09",
       "category": "TF",
       "text": "Transaction involves movement of value through conflict-zone corridors without a legitimate commercial rationale.",
       "detected_by": [
@@ -338,7 +344,7 @@
       ]
     },
     {
-      "code": "TF-10",
+      "code": "STR-TF-10",
       "category": "TF",
       "text": "Commercial transaction proceeds appear to be diverted to a terrorist-linked beneficiary.",
       "detected_by": [
@@ -346,7 +352,7 @@
       ]
     },
     {
-      "code": "TF-11",
+      "code": "STR-TF-11",
       "category": "TF",
       "text": "Funds are funnelled through charities, NPOs, companies, or intermediaries in order to conceal the final beneficiary.",
       "detected_by": [
@@ -355,7 +361,7 @@
       ]
     },
     {
-      "code": "TF-12",
+      "code": "STR-TF-12",
       "category": "TF",
       "text": "Transaction uses numerous small transfers followed by consolidation into a foreign beneficiary account.",
       "detected_by": [
@@ -363,7 +369,7 @@
       ]
     },
     {
-      "code": "TF-13",
+      "code": "STR-TF-13",
       "category": "TF",
       "text": "Precious metals are moved cross-border in a manner that appears intended to finance or support terrorist activity.",
       "detected_by": [
@@ -371,7 +377,7 @@
       ]
     },
     {
-      "code": "TF-14",
+      "code": "STR-TF-14",
       "category": "TF",
       "text": "Transaction proceeds are routed through entities that appear to act on behalf of or at the direction of terrorist-linked persons.",
       "detected_by": [
@@ -379,7 +385,7 @@
       ]
     },
     {
-      "code": "PF-01",
+      "code": "STR-PF-01",
       "category": "PF",
       "text": "Transaction finances goods or technology with potential dual-use or WMD application without a credible legitimate end-use.",
       "detected_by": [
@@ -387,7 +393,7 @@
       ]
     },
     {
-      "code": "PF-02",
+      "code": "STR-PF-02",
       "category": "PF",
       "text": "Transaction involves controlled, embargoed, or proliferation-sensitive goods.",
       "detected_by": [
@@ -395,7 +401,7 @@
       ]
     },
     {
-      "code": "PF-03",
+      "code": "STR-PF-03",
       "category": "PF",
       "text": "Funds are routed through shell companies to finance proliferation-sensitive trade.",
       "detected_by": [
@@ -403,7 +409,7 @@
       ]
     },
     {
-      "code": "PF-04",
+      "code": "STR-PF-04",
       "category": "PF",
       "text": "Transaction involves sanctioned countries or territories associated with proliferation activity.",
       "detected_by": [
@@ -412,7 +418,7 @@
       ]
     },
     {
-      "code": "PF-05",
+      "code": "STR-PF-05",
       "category": "PF",
       "text": "Transaction structure conceals the ultimate end-user of controlled or sensitive goods.",
       "detected_by": [
@@ -420,7 +426,7 @@
       ]
     },
     {
-      "code": "PF-06",
+      "code": "STR-PF-06",
       "category": "PF",
       "text": "Transaction structure conceals the final destination of controlled or sensitive goods.",
       "detected_by": [
@@ -428,7 +434,7 @@
       ]
     },
     {
-      "code": "PF-07",
+      "code": "STR-PF-07",
       "category": "PF",
       "text": "Transaction involves a company whose stated activity is inconsistent with the goods being financed or purchased.",
       "detected_by": [
@@ -436,7 +442,7 @@
       ]
     },
     {
-      "code": "PF-08",
+      "code": "STR-PF-08",
       "category": "PF",
       "text": "Very complex commercial arrangements appear designed to obscure the ultimate destination of funds or goods.",
       "detected_by": [
@@ -445,7 +451,7 @@
       ]
     },
     {
-      "code": "PF-09",
+      "code": "STR-PF-09",
       "category": "PF",
       "text": "Complex legal entities or arrangements appear designed to conceal the beneficial owner of the transaction.",
       "detected_by": [
@@ -453,7 +459,7 @@
       ]
     },
     {
-      "code": "PF-10",
+      "code": "STR-PF-10",
       "category": "PF",
       "text": "Payments originate from or are made to parties not appearing in the underlying trade documentation.",
       "detected_by": [
@@ -461,7 +467,7 @@
       ]
     },
     {
-      "code": "PF-11",
+      "code": "STR-PF-11",
       "category": "PF",
       "text": "International trade documents supporting the transaction appear altered, falsified, or manipulated.",
       "detected_by": [
@@ -469,7 +475,7 @@
       ]
     },
     {
-      "code": "PF-12",
+      "code": "STR-PF-12",
       "category": "PF",
       "text": "Transaction involves goods that appear deliberately misclassified to conceal their controlled or dual-use nature.",
       "detected_by": [
@@ -477,7 +483,7 @@
       ]
     },
     {
-      "code": "PF-13",
+      "code": "STR-PF-13",
       "category": "PF",
       "text": "Payment route is inconsistent with the stated trade route or end-user.",
       "detected_by": [
@@ -485,7 +491,7 @@
       ]
     },
     {
-      "code": "PF-14",
+      "code": "STR-PF-14",
       "category": "PF",
       "text": "Transaction is routed through intermediary jurisdictions with no legitimate commercial connection to the goods.",
       "detected_by": [
@@ -494,7 +500,7 @@
       ]
     },
     {
-      "code": "PF-15",
+      "code": "STR-PF-15",
       "category": "PF",
       "text": "Funds are transferred through entities that appear to function as front companies for proliferation-sensitive procurement.",
       "detected_by": [
@@ -502,7 +508,7 @@
       ]
     },
     {
-      "code": "PF-16",
+      "code": "STR-PF-16",
       "category": "PF",
       "text": "Transaction combines shell entities, sensitive goods, unusual routing, and concealed end-user information.",
       "detected_by": [
@@ -510,7 +516,7 @@
       ]
     },
     {
-      "code": "SE-01",
+      "code": "STR-SE-01",
       "category": "SE",
       "text": "Transaction appears deliberately structured to conceal the involvement of a sanctioned person or entity.",
       "detected_by": [
@@ -518,7 +524,7 @@
       ]
     },
     {
-      "code": "SE-02",
+      "code": "STR-SE-02",
       "category": "SE",
       "text": "Funds or goods are routed through intermediaries to avoid a direct sanctions nexus.",
       "detected_by": [
@@ -527,7 +533,7 @@
       ]
     },
     {
-      "code": "SE-03",
+      "code": "STR-SE-03",
       "category": "SE",
       "text": "Transaction is routed through a third country to conceal dealings with a sanctioned jurisdiction.",
       "detected_by": [
@@ -536,7 +542,7 @@
       ]
     },
     {
-      "code": "SE-04",
+      "code": "STR-SE-04",
       "category": "SE",
       "text": "Beneficiary, payer, ownership, or destination details are altered to avoid sanctions detection.",
       "detected_by": [
@@ -544,7 +550,7 @@
       ]
     },
     {
-      "code": "SE-05",
+      "code": "STR-SE-05",
       "category": "SE",
       "text": "Front companies or shell entities are used to access funds or services for the benefit of a sanctioned party.",
       "detected_by": [
@@ -552,7 +558,7 @@
       ]
     },
     {
-      "code": "SE-06",
+      "code": "STR-SE-06",
       "category": "SE",
       "text": "Transaction indirectly makes funds or economic resources available to a designated person or entity.",
       "detected_by": [
@@ -560,7 +566,7 @@
       ]
     },
     {
-      "code": "SE-07",
+      "code": "STR-SE-07",
       "category": "SE",
       "text": "Transaction involves an entity owned or controlled, directly or indirectly, by a sanctioned person.",
       "detected_by": [
@@ -568,7 +574,7 @@
       ]
     },
     {
-      "code": "SE-08",
+      "code": "STR-SE-08",
       "category": "SE",
       "text": "Payment route changes after sanctions-related concerns emerge.",
       "detected_by": [
@@ -576,7 +582,7 @@
       ]
     },
     {
-      "code": "SE-09",
+      "code": "STR-SE-09",
       "category": "SE",
       "text": "Transaction involves goods under embargo but documentation describes them differently.",
       "detected_by": [
@@ -584,7 +590,7 @@
       ]
     },
     {
-      "code": "SE-10",
+      "code": "STR-SE-10",
       "category": "SE",
       "text": "Transaction documentation appears designed to obscure the true destination, end-user, or beneficial owner.",
       "detected_by": [
@@ -592,7 +598,7 @@
       ]
     },
     {
-      "code": "SE-11",
+      "code": "STR-SE-11",
       "category": "SE",
       "text": "Multiple layers of companies are used to distance the transaction from a sanctioned person.",
       "detected_by": [
@@ -600,7 +606,7 @@
       ]
     },
     {
-      "code": "SE-12",
+      "code": "STR-SE-12",
       "category": "SE",
       "text": "Funds are routed through jurisdictions commonly used as intermediary points to conceal a sanctions nexus.",
       "detected_by": [
@@ -608,7 +614,7 @@
       ]
     },
     {
-      "code": "SE-13",
+      "code": "STR-SE-13",
       "category": "SE",
       "text": "Transaction involves an apparent nominee or intermediary acting for a sanctioned party.",
       "detected_by": [
@@ -616,7 +622,7 @@
       ]
     },
     {
-      "code": "SE-14",
+      "code": "STR-SE-14",
       "category": "SE",
       "text": "Transaction is economically irrational except for the apparent purpose of circumventing sanctions controls.",
       "detected_by": [
@@ -624,7 +630,7 @@
       ]
     },
     {
-      "code": "CO-01",
+      "code": "STR-CO-01",
       "category": "CO",
       "text": "Transaction funds are suspected to derive from bribery or corruption.",
       "detected_by": [
@@ -632,7 +638,7 @@
       ]
     },
     {
-      "code": "CO-02",
+      "code": "STR-CO-02",
       "category": "CO",
       "text": "Transaction contains an unexplained commission or consultancy payment that appears to conceal a bribe.",
       "detected_by": [
@@ -640,7 +646,7 @@
       ]
     },
     {
-      "code": "CO-03",
+      "code": "STR-CO-03",
       "category": "CO",
       "text": "Part of the transaction consideration is secretly returned to an employee, intermediary, official, or decision-maker.",
       "detected_by": [
@@ -648,7 +654,7 @@
       ]
     },
     {
-      "code": "CO-04",
+      "code": "STR-CO-04",
       "category": "CO",
       "text": "Payment is made to a public official, related party, or intermediary without legitimate contractual justification.",
       "detected_by": [
@@ -657,7 +663,7 @@
       ]
     },
     {
-      "code": "CO-05",
+      "code": "STR-CO-05",
       "category": "CO",
       "text": "Transaction includes an off-book payment.",
       "detected_by": [
@@ -665,7 +671,7 @@
       ]
     },
     {
-      "code": "CO-06",
+      "code": "STR-CO-06",
       "category": "CO",
       "text": "Payment description is deliberately falsified to disguise an improper payment.",
       "detected_by": [
@@ -673,7 +679,7 @@
       ]
     },
     {
-      "code": "CO-07",
+      "code": "STR-CO-07",
       "category": "CO",
       "text": "Transaction proceeds appear to derive from misuse or misappropriation of public or corporate funds.",
       "detected_by": [
@@ -681,7 +687,7 @@
       ]
     },
     {
-      "code": "CO-08",
+      "code": "STR-CO-08",
       "category": "CO",
       "text": "Funds appear linked to abuse of power, kleptocracy, or state capture.",
       "detected_by": [
@@ -689,7 +695,7 @@
       ]
     },
     {
-      "code": "CO-09",
+      "code": "STR-CO-09",
       "category": "CO",
       "text": "Transaction proceeds appear connected to organised crime.",
       "detected_by": [
@@ -697,7 +703,7 @@
       ]
     },
     {
-      "code": "CO-10",
+      "code": "STR-CO-10",
       "category": "CO",
       "text": "Transaction proceeds appear connected to drug trafficking or narcotics.",
       "detected_by": [
@@ -705,7 +711,7 @@
       ]
     },
     {
-      "code": "CO-11",
+      "code": "STR-CO-11",
       "category": "CO",
       "text": "Transaction proceeds appear connected to human trafficking or people smuggling.",
       "detected_by": [
@@ -713,7 +719,7 @@
       ]
     },
     {
-      "code": "CO-12",
+      "code": "STR-CO-12",
       "category": "CO",
       "text": "Transaction proceeds appear connected to forced labour or modern slavery.",
       "detected_by": [
@@ -721,7 +727,7 @@
       ]
     },
     {
-      "code": "CO-13",
+      "code": "STR-CO-13",
       "category": "CO",
       "text": "Transaction proceeds appear connected to wildlife trafficking.",
       "detected_by": [
@@ -729,7 +735,7 @@
       ]
     },
     {
-      "code": "CO-14",
+      "code": "STR-CO-14",
       "category": "CO",
       "text": "Transaction proceeds appear connected to cybercrime or ransomware.",
       "detected_by": [
@@ -737,7 +743,7 @@
       ]
     },
     {
-      "code": "CO-15",
+      "code": "STR-CO-15",
       "category": "CO",
       "text": "Transaction proceeds appear connected to illicit darknet activity.",
       "detected_by": [
@@ -745,7 +751,7 @@
       ]
     },
     {
-      "code": "CO-16",
+      "code": "STR-CO-16",
       "category": "CO",
       "text": "Gold is used to convert, conceal, transfer, or integrate proceeds from organised criminal activity.",
       "detected_by": [
@@ -753,7 +759,7 @@
       ]
     },
     {
-      "code": "CP-01",
+      "code": "STR-CP-01",
       "category": "CP",
       "text": "Transaction funds are credibly linked to theft.",
       "detected_by": [
@@ -761,7 +767,7 @@
       ]
     },
     {
-      "code": "CP-02",
+      "code": "STR-CP-02",
       "category": "CP",
       "text": "Transaction funds are credibly linked to blackmail or extortion.",
       "detected_by": [
@@ -769,7 +775,7 @@
       ]
     },
     {
-      "code": "CP-03",
+      "code": "STR-CP-03",
       "category": "CP",
       "text": "Transaction funds are credibly linked to unlawful or criminal activity resulting in arrest, prosecution, conviction, or confiscation proceedings.",
       "detected_by": [
@@ -777,7 +783,7 @@
       ]
     },
     {
-      "code": "CP-04",
+      "code": "STR-CP-04",
       "category": "CP",
       "text": "Transaction involves assets known or suspected to be proceeds of crime.",
       "detected_by": [
@@ -785,7 +791,7 @@
       ]
     },
     {
-      "code": "CP-05",
+      "code": "STR-CP-05",
       "category": "CP",
       "text": "Transaction involves funds subject to seizure, confiscation, freezing, or criminal restraint.",
       "detected_by": [
@@ -793,7 +799,7 @@
       ]
     },
     {
-      "code": "CP-06",
+      "code": "STR-CP-06",
       "category": "CP",
       "text": "Transaction appears intended to dispose of or convert assets before enforcement authorities can seize them.",
       "detected_by": [
@@ -801,7 +807,7 @@
       ]
     },
     {
-      "code": "CP-07",
+      "code": "STR-CP-07",
       "category": "CP",
       "text": "Transaction involves a person or entity credibly linked to criminal proceedings where the funds or assets themselves are suspected criminal proceeds.",
       "detected_by": [
@@ -809,7 +815,7 @@
       ]
     },
     {
-      "code": "CP-08",
+      "code": "STR-CP-08",
       "category": "CP",
       "text": "Transaction appears designed to move assets following a regulatory or criminal enforcement action.",
       "detected_by": [
@@ -817,7 +823,7 @@
       ]
     },
     {
-      "code": "CP-09",
+      "code": "STR-CP-09",
       "category": "CP",
       "text": "Transaction proceeds are linked to a business activity that has been prohibited, debarred, or sanctioned.",
       "detected_by": [
@@ -825,7 +831,7 @@
       ]
     },
     {
-      "code": "CP-10",
+      "code": "STR-CP-10",
       "category": "CP",
       "text": "Transaction is used to conceal beneficial ownership or control of assets associated with criminal proceeds.",
       "detected_by": [

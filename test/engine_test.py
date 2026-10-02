@@ -1099,17 +1099,26 @@ _tm_name, _tm_notes = payment_screen.build_tm_daily_report(
 check("TM report: a STOP payment titles the report ACTION REQUIRED with the tallies and date",
       _tm_name.startswith(payment_screen.TM_REPORT_PREFIX + "ACTION REQUIRED — STOP 1 · Review 0 · Rule alerts ")
       and _tm_name.endswith(" — 02 Oct 2026"))
-check("TM report: the body carries screening, rule alerts, actions, the MLRO decision record and the tipping-off line",
-      all(x in _tm_notes for x in ("①  PAYMENT SCREENING", "②  MONITORING RULE ALERTS", "③  WHAT TO DO",
+check("TM report: the body carries confidentiality, legal basis, screening, alerts, obligations, cases and notes",
+      all(x in _tm_notes for x in ("CONFIDENTIAL", "Article 25", "Federal Decree-Law No. 10 of 2025",
+                                   "POL-19", "①  PAYMENT SCREENING", "②  MONITORING ALERTS",
+                                   "③  REPORTING OBLIGATIONS", "④  CASES BY CUSTOMER", "⑤  OPERATING NOTES",
                                    "STOP — POTENTIAL SANCTIONS MATCH", "PROFILE_DEVIATION",
-                                   "Record: https://app.asana.com/0/1/2", "[ ] PNMR filed",
-                                   "Reviewed by: ________", "Do not tip off.")))
-check("TM report: unreadable payment tasks are disclosed, not dropped",
-      "1 task(s) with no screenable payment" in _tm_notes)
+                                   "Record: https://app.asana.com/0/1/2", "Do not tip off.")))
+check("TM report: a STOP payment raises the TFS obligation (POL-07) in §③",
+      "TFS — 1 potential sanctions match(es)" in _tm_notes and "POL-07" in _tm_notes)
+check("TM report: the STOP payment and the rule alert of one customer form ONE case with the A–H record",
+      _tm_notes.count("▸ CASE ") == 1 and "▸ CASE 1 — Example Trading LLC — highest severity CRITICAL" in _tm_notes
+      and all(x in _tm_notes for x in ("A  Case ref", "B  KYC / CDD / EDD", "D  Screening — sanctions",
+                                       "G  [ ] escalated to Compliance Officer", "[ ] no action — reasons",
+                                       "H  Evidence location", "filing + 5 years")))
+check("TM report: unreadable tasks are disclosed, not dropped",
+      "1 task(s) with nothing usable" in _tm_notes)
 _tm_n0, _tm_b0 = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0)
 check("TM report: an empty register posts 'No open findings' and says there was nothing to screen",
-      "No open findings — STOP 0 · Review 0 · Rule alerts 0" in _tm_n0 and "No payment to screen today." in _tm_b0)
+      "No open findings — STOP 0 · Review 0 · Rule alerts 0 · Customers 0" in _tm_n0
+      and "No payment to screen today." in _tm_b0 and "No customer case today." in _tm_b0)
 _tm_nd, _tm_bd = payment_screen.build_tm_daily_report(
     "02 Oct 2026", None, [], register_read=0, degraded="the payments could not be read (RuntimeError)")
 check("TM report: a run that could not read the payments is titled DEGRADED and clears nothing",
@@ -1170,16 +1179,25 @@ check("TM report delivery: nothing is posted when the section is not configured"
 # ── STR red-flag catalogue + the typology rules it maps to (fictional data) ──
 _rf_doc = json.load(open(os.path.join(ROOT, "data", "str-red-flags.json"), encoding="utf-8"))
 _rf_codes = [f["code"] for f in _rf_doc["flags"]]
-check("red flags: the catalogue holds the MLRO's 100 flags in 6 categories with unique codes",
-      len(_rf_codes) == 100 and len(set(_rf_codes)) == 100
+check("red flags: the STR register holds the MLRO's 100 flags in 6 categories with unique STR- codes",
+      len(_rf_codes) == 100 and len(set(_rf_codes)) == 100 and _rf_doc["register"] == "STR"
+      and all(c.startswith("STR-") for c in _rf_codes)
       and set(_rf_doc["categories"]) == {"ML", "TF", "PF", "SE", "CO", "CP"})
+_sar_doc = json.load(open(os.path.join(ROOT, "data", "sar-red-flags.json"), encoding="utf-8"))
+_sar_codes = [f["code"] for f in _sar_doc["flags"]]
+check("red flags: the SAR register holds 506 flags in 31 categories with unique SAR- codes",
+      len(_sar_codes) == 506 and len(set(_sar_codes)) == 506 and _sar_doc["register"] == "SAR"
+      and len(_sar_doc["categories"]) == 31 and all(c.startswith("SAR-") for c in _sar_codes))
 import re as _re_rf
 _rule_codes = set(_re_rf.findall(r'_alert\("([A-Z_]+)"', open(os.path.join(ROOT, "txn_monitor.py"),
                                                               encoding="utf-8").read()))
-_rf_bad = sorted({d for f in _rf_doc["flags"] for d in f["detected_by"]}
-                 - _rule_codes - {"manual", "screening", "payment_screening"})
-check("red flags: every 'detected_by' names a real rule or control" + (f" — unknown: {_rf_bad}" if _rf_bad else ""),
-      not _rf_bad)
+_rf_bad = sorted({d for doc in (_rf_doc, _sar_doc) for f in doc["flags"] for d in f["detected_by"]}
+                 - _rule_codes - set(_sar_doc["controls"]))
+check("red flags: every 'detected_by' in both registers names a real rule or a defined control"
+      + (f" — unknown: {_rf_bad}" if _rf_bad else ""), not _rf_bad)
+check("red flags: every control a register uses is defined in that register",
+      all(d in doc["controls"] or d in _rule_codes
+          for doc in (_rf_doc, _sar_doc) for f in doc["flags"] for d in f["detected_by"]))
 def _rules(rec_list):
     return [a["rule"] for a in txn_monitor.evaluate(rec_list)["alerts"]]
 _c = "Example Trading LLC"
@@ -1227,9 +1245,9 @@ check("PERSONAL_ACCOUNT and CASH_NO_SOURCE_OF_FUNDS fire only on the recorded fa
 _rfa = txn_monitor.evaluate([{"customer": _c, "date": "2026-10-01", "amount": 1,
                               "red_flags": ["ML-11", "TF-07", "XX-99"]}])["alerts"]
 _rfa_by = {a["detail"].split(" ")[0]: a for a in _rfa if a["rule"] == "RED_FLAG"}
-check("RED_FLAG: a recorded ML flag is HIGH with its text; a TF flag is CRITICAL (possible TFS event)",
-      _rfa_by["ML-11"]["severity"] == "HIGH" and "rapidly resold" in _rfa_by["ML-11"]["detail"]
-      and _rfa_by["TF-07"]["severity"] == "CRITICAL" and "POL-07" in _rfa_by["TF-07"]["detail"])
+check("RED_FLAG: a bare 'ML-11' is the STR register's; HIGH with its text; a TF flag is CRITICAL (possible TFS event)",
+      _rfa_by["STR-ML-11"]["severity"] == "HIGH" and "rapidly resold" in _rfa_by["STR-ML-11"]["detail"]
+      and _rfa_by["STR-TF-07"]["severity"] == "CRITICAL" and "POL-07" in _rfa_by["STR-TF-07"]["detail"])
 check("RED_FLAG: an unknown code is reported, never dropped",
       any("unknown red-flag code 'XX-99'" in a["detail"] for a in _rfa))
 _rf_path = txn_monitor.RED_FLAGS_PATH
@@ -1261,6 +1279,45 @@ check("template: a value that is not an explicit yes/no is ignored, never guesse
 check("template: the filled-in facts reach the rules (third party, phantom delivery, SOF, keyword, red flags)",
       {"THIRD_PARTY_PAYMENT", "PHANTOM_DELIVERY", "CASH_NO_SOURCE_OF_FUNDS", "REFERENCE_KEYWORD",
        "RED_FLAG"} <= set(_rules([_tpl])))
+_sar_a = txn_monitor.evaluate([{"customer": _c, "date": "2026-10-01", "amount": 1,
+                                "red_flags": ["sar-cb-3", "SAR-SA-01"]}])["alerts"]
+_sar_by = {a["detail"].split(" ")[0]: a for a in _sar_a if a["rule"] == "RED_FLAG"}
+check("RED_FLAG: SAR codes are normalised ('sar-cb-3' → SAR-CB-03, HIGH); a SAR sanctions flag is CRITICAL",
+      _sar_by["SAR-CB-03"]["severity"] == "HIGH" and "Source of Funds" in _sar_by["SAR-CB-03"]["detail"]
+      and _sar_by["SAR-SA-01"]["severity"] == "CRITICAL")
+_act = payment_screen.parse_register_entry("ACT-1", "Customer: Demo Gold FZE\nDate: 2026-10-02\n"
+                                           "Red flags: SAR-CB-14, SAR-UB-05\n")
+check("activity record: 'Customer:' + 'Red flags:' with no payment is an activity record, not unreadable",
+      _act and _act["activity_only"] is True and _act["red_flags"] == ["SAR-CB-14", "SAR-UB-05"]
+      and "RED_FLAG" in _rules([_act]))
+check("activity record: a task with red flags but no customer stays unreadable (counted)",
+      payment_screen.parse_register_entry("ACT-2", "Red flags: SAR-CB-14\n") is None)
+_w = lambda amt, ctry, m="wire", d="2026-10-01": {"customer": _c, "date": d, "amount": amt, "method": m,
+                                                  "counterparty_country": ctry}
+check("THRESHOLD (DPMSR, POL-19 §3): an international wire ≥ AED 55,000 is in scope; a UAE wire is not",
+      "THRESHOLD" in _rules([_w(60000, "Testland")]) and "THRESHOLD" not in _rules([_w(60000, "AE")])
+      and any("DPMSR" in a["detail"] for a in txn_monitor.evaluate([_w(60000, "Testland")])["alerts"]))
+check("LINKED_THRESHOLD: two same-day cash payments summing ≥ AED 55,000 are a linked series; different days are not",
+      "LINKED_THRESHOLD" in _rules([_w(30000, "", "cash"), _w(30000, "", "cash")])
+      and "LINKED_THRESHOLD" not in _rules([_w(30000, "", "cash"), _w(30000, "", "cash", "2026-10-02")]))
+check("alerts carry their payment's id and task link for the report",
+      txn_monitor.evaluate([{**_w(60000, "Testland"), "transaction_id": "PAY-9",
+                             "permalink": "u9"}])["alerts"][0]["permalink"] == "u9")
+check("red-flag cross-reference: STRUCTURING cites its STR and SAR register entries",
+      {"STR-ML-20", "SAR-ST-01"} <= set(txn_monitor.red_flag_refs("STRUCTURING")))
+_multi = [{"customer": "Demo Gold FZE", "date": "2026-10-01", "amount": 60000, "method": "cash",
+           "transaction_id": "P1", "red_flags": ["SAR-CB-14", "STR-ML-19"],
+           "source_of_funds_verified": False}]
+_mn, _mb = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, txn_monitor.evaluate(_multi)["alerts"],
+    register_read=1, flag_refs=txn_monitor.red_flag_refs)
+check("TM report: 3+ distinct indicators on one customer are marked MULTIPLE INDICATORS",
+      "▸ CASE 1 — Demo Gold FZE" in _mb and "MULTIPLE INDICATORS" in _mb)
+check("TM report: a DPMSR-scope payment raises the DPMSR obligation and the case lists it",
+      "DPMSR — 1 transaction(s)/series" in _mb and "Obligations: TFS (POL-07)" not in _mb
+      and "DPMSR" in _mb.split("▸ CASE 1")[1])
+check("TM report: rule alerts cite the red-flag register entries they evidence",
+      "Red-flag register: " in _mb)
 _tm_ne, _tm_be = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
     rule_errors={"rule_funnel": 2})

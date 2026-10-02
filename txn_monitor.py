@@ -65,11 +65,12 @@ REFERENCE_KEYWORDS = {
     "informal value transfer wording (hawala / underground banking)": (
         "hawala", "hundi", "informal transfer", "underground banking"),
 }
-RED_FLAGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                              "data", "str-red-flags.json")
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+RED_FLAGS_PATH = os.path.join(_DATA_DIR, "str-red-flags.json")      # STR register
+SAR_RED_FLAGS_PATH = os.path.join(_DATA_DIR, "sar-red-flags.json")  # SAR register
 _RED_FLAGS = {}
-# Categories where a recorded flag can mean a TFS event, not only an STR.
-TFS_FLAG_CATEGORIES = {"TF", "PF", "SE"}
+# Categories where a recorded flag can mean a TFS event, not only an STR/SAR.
+TFS_FLAG_CATEGORIES = {"STR": {"TF", "PF", "SE"}, "SAR": {"SA", "TF", "PF"}}
 
 
 def feed_configured():
@@ -124,13 +125,49 @@ def _norm(s):
 
 
 # ── RULES ─────────────────────────────────────────────────────────────────────
+def _dpmsr_scope(t):
+    """In DPMSR scope (POL-19 §3): cash, or an INTERNATIONAL wire — a wire whose
+    counterparty country is recorded and is not the UAE."""
+    m = _norm(t.get("method"))
+    if m == "cash":
+        return "cash"
+    c = _norm(t.get("counterparty_country"))
+    if m == "wire" and c and c not in HOME_COUNTRIES:
+        return "international wire"
+    return ""
+
+
 def rule_threshold(txns):
-    """Single transaction at/above the DPMS cash reporting threshold."""
+    """Single transaction at/above the DPMS reporting threshold: cash or an
+    international wire (POL-19 §3). The DPMSR is filed regardless of suspicion."""
     out = []
     for t in txns:
-        if _norm(t.get("method")) == "cash" and _amt(t) >= CASH_REPORT_THRESHOLD:
+        kind = _dpmsr_scope(t)
+        if kind and _amt(t) >= CASH_REPORT_THRESHOLD:
             out.append(_alert("THRESHOLD", "HIGH", t,
-                f"cash {_amt(t):,.0f} AED ≥ reporting threshold {CASH_REPORT_THRESHOLD:,.0f}"))
+                f"{kind} {_amt(t):,.0f} AED ≥ DPMSR threshold {CASH_REPORT_THRESHOLD:,.0f} — "
+                "DPMSR in goAML regardless of suspicion (POL-19 §3)"))
+    return out
+
+
+def rule_linked_threshold(txns):
+    """Cumulative linked dealings (POL-19 §3: 'single or cumulative linked'):
+    two or more in-scope transactions on the SAME calendar day, each below the
+    threshold, that together reach it. Same-day linkage is the minimum the
+    engine can establish from dates alone; wider linkage stays with the
+    STRUCTURING rule and the MLRO."""
+    by_day = defaultdict(list)
+    for t in txns:
+        if _dpmsr_scope(t) and 0 < _amt(t) < CASH_REPORT_THRESHOLD and _d(t.get("date")):
+            by_day[_d(t["date"])].append(t)
+    out = []
+    for d, ts in sorted(by_day.items()):
+        total = sum(_amt(t) for t in ts)
+        if len(ts) >= 2 and total >= CASH_REPORT_THRESHOLD:
+            out.append(_alert("LINKED_THRESHOLD", "HIGH", ts[0],
+                f"{len(ts)} cash/international-wire transactions on {d} total {total:,.0f} AED "
+                f"(each < {CASH_REPORT_THRESHOLD:,.0f}) — DPMSR on the linked series "
+                "(POL-19 §3); assess for structuring"))
     return out
 
 
@@ -530,30 +567,52 @@ def rule_cash_no_source_of_funds(txns):
 
 
 def load_red_flags():
-    """code -> flag, from data/str-red-flags.json. Raises if the catalogue is
-    missing or malformed (the rule error is counted, never a silent pass)."""
+    """code -> flag, from the STR and SAR registers (data/str-red-flags.json,
+    data/sar-red-flags.json). Raises if either is missing or malformed (the
+    rule error is counted, never a silent pass)."""
     if not _RED_FLAGS:
-        with open(RED_FLAGS_PATH, encoding="utf-8") as fh:
-            doc = json.load(fh)
-        cats = doc["categories"]
-        for f in doc["flags"]:
-            _RED_FLAGS[f["code"]] = {**f, "category_label": cats[f["category"]]}
+        loaded = {}
+        for path in (RED_FLAGS_PATH, SAR_RED_FLAGS_PATH):
+            with open(path, encoding="utf-8") as fh:
+                doc = json.load(fh)
+            cats, reg = doc["categories"], doc["register"]
+            for f in doc["flags"]:
+                loaded[f["code"]] = {**f, "register": reg, "category_label": cats[f["category"]]}
+        _RED_FLAGS.update(loaded)
     return _RED_FLAGS
 
 
+def normalise_flag_code(code):
+    """'ml-11' / 'STR-ML-11' -> 'STR-ML-11'; 'sar-cb-3' -> 'SAR-CB-03'."""
+    parts = str(code or "").strip().upper().split("-")
+    if len(parts) == 2:
+        parts = ["STR"] + parts            # bare codes are the STR register's
+    if len(parts) != 3 or not parts[2].isdigit():
+        return str(code or "").strip().upper()
+    return f"{parts[0]}-{parts[1]}-{int(parts[2]):02d}"
+
+
+def red_flag_refs(rule):
+    """Codes of the catalogued red flags this rule detects (for the report)."""
+    return [c for c, f in load_red_flags().items() if rule in f.get("detected_by", [])]
+
+
 def rule_red_flag_recorded(txns):
-    """Red flags a person recorded on the payment ('Red flags: ML-11, TF-07').
-    TF / PF / sanctions-evasion flags are CRITICAL: they can be a TFS event."""
+    """Red flags a person recorded on a payment or activity task ('Red flags:
+    STR-ML-11, SAR-CB-03'; a bare 'ML-11' is the STR register's). STR TF / PF /
+    sanctions-evasion and SAR sanctions / TF / PF flags are CRITICAL: they can
+    be a TFS event, not only an STR/SAR."""
     catalogue = load_red_flags()
     out = []
     for t in txns:
         for code in t.get("red_flags") or []:
-            f = catalogue.get(str(code).strip().upper())
+            f = catalogue.get(normalise_flag_code(code))
             if f is None:
                 out.append(_alert("RED_FLAG", "HIGH", t,
-                    f"unknown red-flag code '{code}' — correct it (codes: data/str-red-flags.json)"))
+                    f"unknown red-flag code '{code}' — correct it (STR-.. / SAR-.. codes in the "
+                    "red-flag registers)"))
                 continue
-            tfs = f["category"] in TFS_FLAG_CATEGORIES
+            tfs = f["category"] in TFS_FLAG_CATEGORIES.get(f["register"], set())
             out.append(_alert("RED_FLAG", "CRITICAL" if tfs else "HIGH", t,
                 f"{f['code']} ({f['category_label']}): {f['text']} — "
                 + ("apply POL-07 if a designated party may be involved; assess STR/SAR"
@@ -569,7 +628,7 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_invoice_mismatch, rule_route_mismatch,
           rule_profile_deviation, rule_circular_flow, rule_new_geography,
           rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
-          rule_reference_keyword, rule_personal_account,
+          rule_reference_keyword, rule_personal_account, rule_linked_threshold,
           rule_cash_no_source_of_funds, rule_red_flag_recorded]
 
 
@@ -583,7 +642,9 @@ def _any_customer(txns):
 def _alert(rule, severity, t, detail):
     return {"rule": rule, "severity": severity,
             "customer": t.get("customer", "?"), "date": t.get("date", ""),
-            "amount": _amt(t) if "amount" in t else None, "detail": detail}
+            "amount": _amt(t) if "amount" in t else None, "detail": detail,
+            # links the alert back to its payment / activity task, when known
+            "transaction_id": t.get("transaction_id", ""), "permalink": t.get("permalink", "")}
 
 
 def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):

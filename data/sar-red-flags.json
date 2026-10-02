@@ -1,0 +1,4152 @@
+{
+  "_comment": [
+    "SAR red-flag register (the firm's internal reference, HAWKEYE STERLING APP note, 2 Oct 2026): indicators of suspicious ACTIVITY, AML/CFT/CPF, sanctions, trade-based ML, responsible sourcing, fraud, corruption and internal-conduct risk.",
+    "A red flag is an indicator requiring review, not evidence that an offence occurred. Detection does not equal guilt; clearance is not assumed while material information is missing, pending, inconsistent, unverifiable or unresolved.",
+    "detected_by: a txn_monitor rule code, or a control named in 'controls'. Any flag can be RECORDED on a task in the Transaction Monitoring section ('Red flags: SAR-CB-03'), on a payment or on an activity-only task.",
+    "A red flag does not automatically require an external SAR/STR: the decision follows the internal review, escalation and MLRO assessment (POL-19)."
+  ],
+  "version": 1,
+  "register": "SAR",
+  "controls": {
+    "payment_screening": "Payment screening: every named party of a payment in the Transaction Monitoring section (and the payment reference) against the sanctions lists, plus FATF-listed jurisdictions and FATF R.16 completeness.",
+    "screening": "Daily customer screening: customers and their owners/UBOs against the sanctions lists, adverse media and PEP sources.",
+    "kyc": "PARTIAL - the daily screening reports R.10 CDD gaps (missing ID, nationality, date of birth, proof of address, expired documents) for the customers it flags, and shared owners/UBOs across the whole customer book.",
+    "manual": "Only a person can observe it: record the code on the payment or activity task (Red flags: ...)."
+  },
+  "categories": {
+    "CB": "Customer behaviour and cooperation",
+    "PR": "Customer profile and business model",
+    "ST": "Structuring and threshold avoidance",
+    "CA": "Cash related",
+    "TP": "Third party payment",
+    "BA": "Bank account and settlement",
+    "VA": "Alternative payment and virtual asset",
+    "PX": "Pricing",
+    "ID": "Invoice and trade documentation",
+    "PG": "Phantom trade and physical goods",
+    "BB": "Back-to-back and circular trading",
+    "SL": "Shipping and logistics",
+    "UB": "Corporate ownership and UBO",
+    "AM": "Adverse information and criminality",
+    "PE": "PEP and influence",
+    "GE": "Geographic risk",
+    "SA": "Sanctions",
+    "TF": "Terrorist financing",
+    "PF": "Proliferation financing",
+    "GO": "Gold origin and mining",
+    "RS": "Responsible sourcing and CAHRA",
+    "HR": "Human rights linked to sourcing",
+    "EN": "Environmental and protected area",
+    "CO": "Corruption and bribery",
+    "FD": "Fraud and document integrity",
+    "RG": "Recycled gold and refining",
+    "SC": "Sudden change",
+    "IM": "Suspicious intermediaries",
+    "TX": "Tax, customs and cross-border",
+    "EM": "Internal employee and whistleblowing",
+    "CM": "Composite red flags requiring particular attention"
+  },
+  "flags": [
+    {
+      "code": "SAR-CB-01",
+      "category": "CB",
+      "text": "Customer refuses to provide identification documents.",
+      "detected_by": [
+        "kyc"
+      ]
+    },
+    {
+      "code": "SAR-CB-02",
+      "category": "CB",
+      "text": "Customer is reluctant to provide identification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-03",
+      "category": "CB",
+      "text": "Customer refuses or delays Source of Funds documentation.",
+      "detected_by": [
+        "CASH_NO_SOURCE_OF_FUNDS"
+      ]
+    },
+    {
+      "code": "SAR-CB-04",
+      "category": "CB",
+      "text": "Customer refuses or delays Source of Wealth information.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-05",
+      "category": "CB",
+      "text": "Customer refuses to disclose beneficial ownership.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-06",
+      "category": "CB",
+      "text": "Customer fails to provide UBO information after a formal request.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-07",
+      "category": "CB",
+      "text": "Customer provides incomplete KYC information.",
+      "detected_by": [
+        "kyc"
+      ]
+    },
+    {
+      "code": "SAR-CB-08",
+      "category": "CB",
+      "text": "Customer provides inconsistent KYC information.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-09",
+      "category": "CB",
+      "text": "Customer provides information that cannot be independently verified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-10",
+      "category": "CB",
+      "text": "Customer repeatedly avoids updating expired or outdated KYC documents.",
+      "detected_by": [
+        "kyc"
+      ]
+    },
+    {
+      "code": "SAR-CB-11",
+      "category": "CB",
+      "text": "Customer is evasive when asked routine compliance questions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-12",
+      "category": "CB",
+      "text": "Customer appears nervous when compliance requirements are discussed.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-13",
+      "category": "CB",
+      "text": "Customer appears unusually concerned about AML procedures.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-14",
+      "category": "CB",
+      "text": "Customer asks about reporting thresholds.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-15",
+      "category": "CB",
+      "text": "Customer asks what amount will trigger regulatory reporting.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-16",
+      "category": "CB",
+      "text": "Customer asks about detection limits.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-17",
+      "category": "CB",
+      "text": "Customer asks how transactions are monitored.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-18",
+      "category": "CB",
+      "text": "Customer asks how to avoid being flagged.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-19",
+      "category": "CB",
+      "text": "Customer attempts to bypass screening, controls, or verification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-20",
+      "category": "CB",
+      "text": "Customer attempts to influence a screening result.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-21",
+      "category": "CB",
+      "text": "Customer attempts to interfere with compliance verification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-22",
+      "category": "CB",
+      "text": "Customer suddenly cancels a transaction when additional information is requested.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-23",
+      "category": "CB",
+      "text": "Customer avoids face to face contact without an apparent legitimate reason.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-24",
+      "category": "CB",
+      "text": "Customer uses inconsistent names across transactions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-25",
+      "category": "CB",
+      "text": "Customer uses different identification documents on separate transactions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-26",
+      "category": "CB",
+      "text": "Customer uses different addresses without reasonable explanation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-27",
+      "category": "CB",
+      "text": "Customer provides an address that cannot be located.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-28",
+      "category": "CB",
+      "text": "Customer's address conflicts with other information supplied.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-29",
+      "category": "CB",
+      "text": "Registered office appears non operational.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-30",
+      "category": "CB",
+      "text": "Customer actually operates from a different address without clear justification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-31",
+      "category": "CB",
+      "text": "Customer or company cannot be located on expected government or commercial registers.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-32",
+      "category": "CB",
+      "text": "Customer uses generic email domains such as Gmail or Outlook instead of an expected corporate domain, where inconsistent with the business profile.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-33",
+      "category": "CB",
+      "text": "Customer is accompanied by another person who appears to control or direct the transaction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-34",
+      "category": "CB",
+      "text": "Customer appears uninterested in transaction details.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-35",
+      "category": "CB",
+      "text": "Customer appears uninterested in payment terms.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-36",
+      "category": "CB",
+      "text": "Customer appears unaware of its own business structure.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-37",
+      "category": "CB",
+      "text": "Customer appears unaware of transactions supposedly being conducted by its company.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-38",
+      "category": "CB",
+      "text": "Directors appear not to exercise real activity or control over the company.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-39",
+      "category": "CB",
+      "text": "Shareholders appear inactive or disconnected from the business.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-40",
+      "category": "CB",
+      "text": "Nominal directors appear to lack the expected knowledge of the company or its business.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-41",
+      "category": "CB",
+      "text": "Multiple apparently unrelated companies use the same correspondence address or flexi desk.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-42",
+      "category": "CB",
+      "text": "Customer fails to cooperate with Enhanced Due Diligence.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-43",
+      "category": "CB",
+      "text": "Customer refuses requests for supporting documentation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-44",
+      "category": "CB",
+      "text": "Customer gives conflicting explanations of the purpose of the business relationship.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-45",
+      "category": "CB",
+      "text": "Customer gives conflicting explanations concerning beneficial ownership.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-46",
+      "category": "CB",
+      "text": "Multiple apparently unrelated customers use the same telephone number, email address, IP address, device, or digital onboarding credentials without a legitimate connection.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CB-47",
+      "category": "CB",
+      "text": "Several apparently unrelated companies use the same authorised representative, signatory, telephone number, or contact person without a clear commercial explanation.",
+      "detected_by": [
+        "kyc"
+      ]
+    },
+    {
+      "code": "SAR-PR-01",
+      "category": "PR",
+      "text": "New customer conducts an unusually large transaction immediately after onboarding.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-02",
+      "category": "PR",
+      "text": "Transaction value is disproportionate to the customer's known financial standing.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PR-03",
+      "category": "PR",
+      "text": "Transaction volume is inconsistent with the customer's business.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PR-04",
+      "category": "PR",
+      "text": "Precious metal activity does not correspond with the customer's stated business activity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-05",
+      "category": "PR",
+      "text": "Customer profile does not support the quantity of gold being purchased or sold.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PR-06",
+      "category": "PR",
+      "text": "Customer's transaction frequency materially exceeds expected activity.",
+      "detected_by": [
+        "VELOCITY"
+      ]
+    },
+    {
+      "code": "SAR-PR-07",
+      "category": "PR",
+      "text": "Sudden significant increase in transaction volume without explanation.",
+      "detected_by": [
+        "VELOCITY",
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PR-08",
+      "category": "PR",
+      "text": "Sudden significant increase in transaction value without explanation.",
+      "detected_by": [
+        "VELOCITY",
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PR-09",
+      "category": "PR",
+      "text": "Sudden change in the nature of transactions without commercial justification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-10",
+      "category": "PR",
+      "text": "Business activity declared during onboarding differs from observed activity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-11",
+      "category": "PR",
+      "text": "Newly established company conducts substantial precious metal transactions without credible commercial history.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-12",
+      "category": "PR",
+      "text": "Newly formed legal entities are introduced into transactions without an evident commercial purpose.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-13",
+      "category": "PR",
+      "text": "Customer operates in a business sector inconsistent with the nature of the gold trade being conducted.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-14",
+      "category": "PR",
+      "text": "Customer's apparent financial resources are inconsistent with transaction size.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PR-15",
+      "category": "PR",
+      "text": "Supplier's shipment volume exceeds its known production capacity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-16",
+      "category": "PR",
+      "text": "Supplier's trading volume exceeds its known or documented trading capacity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-17",
+      "category": "PR",
+      "text": "Frequency of shipments is inconsistent with the supplier's historic capacity or activity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-18",
+      "category": "PR",
+      "text": "A dormant or previously inactive company suddenly begins significant precious-metals activity without a credible business rationale.",
+      "detected_by": [
+        "VELOCITY"
+      ]
+    },
+    {
+      "code": "SAR-PR-19",
+      "category": "PR",
+      "text": "The customer's premises, staffing, online presence, or operational footprint is materially inconsistent with the scale of its claimed business activity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PR-20",
+      "category": "PR",
+      "text": "The customer's website or publicly stated business activities materially conflict with its trade licence, KYC profile, or declared business model.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ST-01",
+      "category": "ST",
+      "text": "Multiple transactions just below AED 55,000.",
+      "detected_by": [
+        "STRUCTURING"
+      ]
+    },
+    {
+      "code": "SAR-ST-02",
+      "category": "ST",
+      "text": "Repeated gold purchases just below AED 55,000.",
+      "detected_by": [
+        "STRUCTURING"
+      ]
+    },
+    {
+      "code": "SAR-ST-03",
+      "category": "ST",
+      "text": "Several cash transactions in one day, individually below AED 55,000.",
+      "detected_by": [
+        "LINKED_THRESHOLD",
+        "STRUCTURING"
+      ]
+    },
+    {
+      "code": "SAR-ST-04",
+      "category": "ST",
+      "text": "Several transactions over a short period that collectively appear designed to avoid the threshold.",
+      "detected_by": [
+        "STRUCTURING",
+        "LINKED_THRESHOLD"
+      ]
+    },
+    {
+      "code": "SAR-ST-05",
+      "category": "ST",
+      "text": "One intended purchase is divided into several smaller transactions.",
+      "detected_by": [
+        "STRUCTURING",
+        "LINKED_THRESHOLD"
+      ]
+    },
+    {
+      "code": "SAR-ST-06",
+      "category": "ST",
+      "text": "Multiple related persons appear to conduct separate transactions that are economically connected.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ST-07",
+      "category": "ST",
+      "text": "Family members, representatives, or associated entities conduct linked transactions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ST-08",
+      "category": "ST",
+      "text": "Transactions are deliberately fragmented without economic justification.",
+      "detected_by": [
+        "STRUCTURING"
+      ]
+    },
+    {
+      "code": "SAR-ST-09",
+      "category": "ST",
+      "text": "Cash-based activity is heavily fragmented.",
+      "detected_by": [
+        "STRUCTURING",
+        "ROUND_AMOUNT"
+      ]
+    },
+    {
+      "code": "SAR-ST-10",
+      "category": "ST",
+      "text": "Customer explicitly asks how to remain below reporting thresholds.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CA-01",
+      "category": "CA",
+      "text": "Customer insists on cash when bank settlement would ordinarily be expected.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CA-02",
+      "category": "CA",
+      "text": "Customer prefers cash despite safer or more conventional payment methods being available.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CA-03",
+      "category": "CA",
+      "text": "Large cash payment with no clearly established Source of Funds.",
+      "detected_by": [
+        "CASH_NO_SOURCE_OF_FUNDS"
+      ]
+    },
+    {
+      "code": "SAR-CA-04",
+      "category": "CA",
+      "text": "Frequent small gold purchases using cash.",
+      "detected_by": [
+        "STRUCTURING",
+        "ROUND_AMOUNT"
+      ]
+    },
+    {
+      "code": "SAR-CA-05",
+      "category": "CA",
+      "text": "Unexplained increase in cash activity.",
+      "detected_by": [
+        "VELOCITY"
+      ]
+    },
+    {
+      "code": "SAR-CA-06",
+      "category": "CA",
+      "text": "Cash transactions inconsistent with the customer's normal profile.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-CA-07",
+      "category": "CA",
+      "text": "Cash based transactions are repeatedly fragmented.",
+      "detected_by": [
+        "STRUCTURING",
+        "LINKED_THRESHOLD"
+      ]
+    },
+    {
+      "code": "SAR-CA-08",
+      "category": "CA",
+      "text": "Customer attempts to use cash to purchase precious metals at unusual prices.",
+      "detected_by": [
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-CA-09",
+      "category": "CA",
+      "text": "Supplier suddenly asks for cash contrary to normal contractual terms.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CA-10",
+      "category": "CA",
+      "text": "Cash intensive behaviour lacks credible commercial justification.",
+      "detected_by": [
+        "THRESHOLD",
+        "ROUND_AMOUNT"
+      ]
+    },
+    {
+      "code": "SAR-TP-01",
+      "category": "TP",
+      "text": "Payment is made by an unrelated third party.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-TP-02",
+      "category": "TP",
+      "text": "Payment is requested to an unrelated third party.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-TP-03",
+      "category": "TP",
+      "text": "Customer uses another company's bank account to purchase gold.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-TP-04",
+      "category": "TP",
+      "text": "Customer uses an individual's bank account for a corporate transaction.",
+      "detected_by": [
+        "PERSONAL_ACCOUNT"
+      ]
+    },
+    {
+      "code": "SAR-TP-05",
+      "category": "TP",
+      "text": "Payment originates from a person with no contractual role.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-TP-06",
+      "category": "TP",
+      "text": "Supplier requests payment into an account not held in its name.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-TP-07",
+      "category": "TP",
+      "text": "Third party is introduced without a clear commercial or legal connection.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-TP-08",
+      "category": "TP",
+      "text": "Customer insists on involving unnecessary intermediaries.",
+      "detected_by": [
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-TP-09",
+      "category": "TP",
+      "text": "Multiple third parties are used in the payment chain without commercial justification.",
+      "detected_by": [
+        "MULTI_JURISDICTION",
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-TP-10",
+      "category": "TP",
+      "text": "Payment instructions frequently change between unrelated accounts.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TP-11",
+      "category": "TP",
+      "text": "Beneficiary bank details differ from contractual documentation without explanation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-01",
+      "category": "BA",
+      "text": "Customer frequently changes bank accounts.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-02",
+      "category": "BA",
+      "text": "Same bank account is used for apparently unrelated businesses.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-03",
+      "category": "BA",
+      "text": "Payments are routed through offshore accounts without a clear business purpose.",
+      "detected_by": [
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-BA-04",
+      "category": "BA",
+      "text": "Customer proposes fiduciary or trust accounts without a credible reason.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-05",
+      "category": "BA",
+      "text": "Payment method differs materially from the agreed contract.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-06",
+      "category": "BA",
+      "text": "Payment method differs from the firm's accepted payment arrangements.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-07",
+      "category": "BA",
+      "text": "Settlement route is unnecessarily complicated.",
+      "detected_by": [
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-BA-08",
+      "category": "BA",
+      "text": "Funds originate from a country unrelated to either party or the transaction.",
+      "detected_by": [
+        "MULTI_JURISDICTION",
+        "NEW_GEOGRAPHY"
+      ]
+    },
+    {
+      "code": "SAR-BA-09",
+      "category": "BA",
+      "text": "Funds are remitted to a jurisdiction unrelated to the underlying trade.",
+      "detected_by": [
+        "ROUTE_MISMATCH",
+        "NEW_GEOGRAPHY"
+      ]
+    },
+    {
+      "code": "SAR-BA-10",
+      "category": "BA",
+      "text": "Payment path changes shortly before settlement.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-11",
+      "category": "BA",
+      "text": "Multiple payment channels are used for one transaction without commercial necessity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-12",
+      "category": "BA",
+      "text": "Overpayment is followed by a request to refund the excess to a different bank account or an unrelated third party.",
+      "detected_by": [
+        "REFUND_DIVERSION"
+      ]
+    },
+    {
+      "code": "SAR-BA-13",
+      "category": "BA",
+      "text": "A transaction is cancelled after funds are received and the customer requests the refund to an account different from the original funding account.",
+      "detected_by": [
+        "REFUND_DIVERSION"
+      ]
+    },
+    {
+      "code": "SAR-BA-14",
+      "category": "BA",
+      "text": "Repeated purchase cancellations and refund requests occur without a credible commercial explanation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BA-15",
+      "category": "BA",
+      "text": "Refund instructions are changed shortly before the repayment is processed.",
+      "detected_by": [
+        "REFUND_DIVERSION"
+      ]
+    },
+    {
+      "code": "SAR-BA-16",
+      "category": "BA",
+      "text": "A corporate transaction is requested to be refunded to a personal bank account without a legitimate and documented reason.",
+      "detected_by": [
+        "REFUND_DIVERSION",
+        "PERSONAL_ACCOUNT"
+      ]
+    },
+    {
+      "code": "SAR-VA-01",
+      "category": "VA",
+      "text": "Customer proposes unnecessary virtual currency settlement.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-VA-02",
+      "category": "VA",
+      "text": "Customer proposes prepaid cards.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-VA-03",
+      "category": "VA",
+      "text": "Customer proposes E wallets without a clear business rationale.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-VA-04",
+      "category": "VA",
+      "text": "Customer proposes PayPal or similar consumer payment methods for high value bullion activity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-VA-05",
+      "category": "VA",
+      "text": "Customer proposes multiple payment technologies solely to complicate settlement.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-VA-06",
+      "category": "VA",
+      "text": "Customer uses unregulated payment channels.",
+      "detected_by": [
+        "REFERENCE_KEYWORD"
+      ]
+    },
+    {
+      "code": "SAR-VA-07",
+      "category": "VA",
+      "text": "Customer uses virtual assets in circumstances inconsistent with the business relationship.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-VA-08",
+      "category": "VA",
+      "text": "Customer uses privacy enhancing payment technologies.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-VA-09",
+      "category": "VA",
+      "text": "Use of mixers, tumblers, or other mechanisms intended to obscure the source or destination of virtual assets.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PX-01",
+      "category": "PX",
+      "text": "Precious metals are sold significantly below normal market value.",
+      "detected_by": [
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PX-02",
+      "category": "PX",
+      "text": "Precious metals are purchased significantly above normal market value.",
+      "detected_by": [
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PX-03",
+      "category": "PX",
+      "text": "Unusually high premiums over prevailing market rates.",
+      "detected_by": [
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PX-04",
+      "category": "PX",
+      "text": "Unusually large discounts to prevailing market rates.",
+      "detected_by": [
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PX-05",
+      "category": "PX",
+      "text": "Transaction value is more than 10 percent above current market value without written explanation.",
+      "detected_by": [
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PX-06",
+      "category": "PX",
+      "text": "Transaction value is more than 10 percent below current market value without written explanation.",
+      "detected_by": [
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PX-07",
+      "category": "PX",
+      "text": "Metal pricing appears manipulated.",
+      "detected_by": [
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PX-08",
+      "category": "PX",
+      "text": "Customer appears indifferent to obtaining a commercially reasonable price.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PX-09",
+      "category": "PX",
+      "text": "Transaction produces little or no economic margin without an evident business reason.",
+      "detected_by": [
+        "RAPID_RESALE"
+      ]
+    },
+    {
+      "code": "SAR-PX-10",
+      "category": "PX",
+      "text": "Pricing differs materially from weight, purity, assay, and market price.",
+      "detected_by": [
+        "PRICING_DEVIATION",
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-01",
+      "category": "ID",
+      "text": "Invoice is vague.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-02",
+      "category": "ID",
+      "text": "Invoice is vague and incomplete.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-03",
+      "category": "ID",
+      "text": "Invoice description does not match the goods.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-04",
+      "category": "ID",
+      "text": "Invoice weight does not match shipment weight.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-05",
+      "category": "ID",
+      "text": "Invoice purity does not match assay results.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-06",
+      "category": "ID",
+      "text": "Invoice value does not correspond to quantity or purity.",
+      "detected_by": [
+        "INVOICE_MISMATCH",
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-ID-07",
+      "category": "ID",
+      "text": "Invoice contains unusual structures.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-08",
+      "category": "ID",
+      "text": "Multiple invoices are used unnecessarily for one commercial transaction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-09",
+      "category": "ID",
+      "text": "Under invoicing.",
+      "detected_by": [
+        "PRICING_DEVIATION",
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-10",
+      "category": "ID",
+      "text": "Over invoicing.",
+      "detected_by": [
+        "PRICING_DEVIATION",
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-11",
+      "category": "ID",
+      "text": "False certificate of origin.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-12",
+      "category": "ID",
+      "text": "Origin certificate cannot be independently verified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-13",
+      "category": "ID",
+      "text": "Origin documents appear altered.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-14",
+      "category": "ID",
+      "text": "Origin documents appear falsified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-15",
+      "category": "ID",
+      "text": "Supporting documents contain unexplained inconsistencies.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-16",
+      "category": "ID",
+      "text": "Shipment documents do not match invoices.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-17",
+      "category": "ID",
+      "text": "Customs documentation does not match shipment information.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-18",
+      "category": "ID",
+      "text": "Export documents are missing.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-19",
+      "category": "ID",
+      "text": "Customs declarations are missing.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-20",
+      "category": "ID",
+      "text": "Chain of custody documents are incomplete.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-21",
+      "category": "ID",
+      "text": "Chain of custody documents conflict with the declared origin.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-22",
+      "category": "ID",
+      "text": "Material lacks proper title or ownership documentation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-23",
+      "category": "ID",
+      "text": "Material is unregistered.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-24",
+      "category": "ID",
+      "text": "Material is undocumented.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-ID-25",
+      "category": "ID",
+      "text": "Physical goods cannot be reconciled to the paperwork.",
+      "detected_by": [
+        "INVOICE_MISMATCH",
+        "PHANTOM_DELIVERY"
+      ]
+    },
+    {
+      "code": "SAR-ID-26",
+      "category": "ID",
+      "text": "Assay result is inconsistent with documentation.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-27",
+      "category": "ID",
+      "text": "Weight or purity materially differs from declarations.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-ID-28",
+      "category": "ID",
+      "text": "Serial numbers, bar numbers, refinery marks, assay references, or shipment references do not reconcile with the supporting records.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-PG-01",
+      "category": "PG",
+      "text": "Transaction is supported by paperwork but there is no evidence of physical delivery.",
+      "detected_by": [
+        "PHANTOM_DELIVERY"
+      ]
+    },
+    {
+      "code": "SAR-PG-02",
+      "category": "PG",
+      "text": "Phantom shipment.",
+      "detected_by": [
+        "PHANTOM_DELIVERY"
+      ]
+    },
+    {
+      "code": "SAR-PG-03",
+      "category": "PG",
+      "text": "Goods purportedly move but transport records cannot substantiate the movement.",
+      "detected_by": [
+        "PHANTOM_DELIVERY"
+      ]
+    },
+    {
+      "code": "SAR-PG-04",
+      "category": "PG",
+      "text": "Declared quantity cannot be reconciled against received material.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-PG-05",
+      "category": "PG",
+      "text": "Customer repeatedly trades essentially the same quantity of gold without material transformation.",
+      "detected_by": [
+        "RAPID_RESALE"
+      ]
+    },
+    {
+      "code": "SAR-PG-06",
+      "category": "PG",
+      "text": "Repeated re refining of apparently the same material.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PG-07",
+      "category": "PG",
+      "text": "Scrap volumes exceed what the customer's business could reasonably generate.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-PG-08",
+      "category": "PG",
+      "text": "Refining activity is inconsistent with the customer's business profile.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PG-09",
+      "category": "PG",
+      "text": "Assay documents for refining material are missing.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PG-10",
+      "category": "PG",
+      "text": "Assay documents appear altered.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PG-11",
+      "category": "PG",
+      "text": "Goods apparently circulate between parties without a genuine economic change in ownership.",
+      "detected_by": [
+        "CIRCULAR_FLOW",
+        "RAPID_RESALE"
+      ]
+    },
+    {
+      "code": "SAR-BB-01",
+      "category": "BB",
+      "text": "Same parcel of gold is bought and immediately resold.",
+      "detected_by": [
+        "RAPID_RESALE"
+      ]
+    },
+    {
+      "code": "SAR-BB-02",
+      "category": "BB",
+      "text": "Substantially identical quantity and grade is repeatedly bought and sold.",
+      "detected_by": [
+        "RAPID_RESALE"
+      ]
+    },
+    {
+      "code": "SAR-BB-03",
+      "category": "BB",
+      "text": "Back-to-back transactions occur with little or no commercial margin.",
+      "detected_by": [
+        "RAPID_RESALE",
+        "PASSTHROUGH"
+      ]
+    },
+    {
+      "code": "SAR-BB-04",
+      "category": "BB",
+      "text": "No meaningful change in form, location, ownership, or economic risk occurs between purchase and resale.",
+      "detected_by": [
+        "RAPID_RESALE"
+      ]
+    },
+    {
+      "code": "SAR-BB-05",
+      "category": "BB",
+      "text": "Gold repeatedly moves between connected counterparties.",
+      "detected_by": [
+        "CIRCULAR_FLOW"
+      ]
+    },
+    {
+      "code": "SAR-BB-06",
+      "category": "BB",
+      "text": "Funds circulate through the same group of entities.",
+      "detected_by": [
+        "CIRCULAR_FLOW"
+      ]
+    },
+    {
+      "code": "SAR-BB-07",
+      "category": "BB",
+      "text": "Gold or funds return to the original party or an associated party.",
+      "detected_by": [
+        "CIRCULAR_FLOW"
+      ]
+    },
+    {
+      "code": "SAR-BB-08",
+      "category": "BB",
+      "text": "Transactions form a closed loop with no genuine commercial purpose.",
+      "detected_by": [
+        "CIRCULAR_FLOW"
+      ]
+    },
+    {
+      "code": "SAR-BB-09",
+      "category": "BB",
+      "text": "Apparent ownership changes while ultimate beneficial control remains the same.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-BB-10",
+      "category": "BB",
+      "text": "Gold is returned, exchanged, repurchased, or reintroduced shortly after sale without a credible commercial reason.",
+      "detected_by": [
+        "RAPID_RESALE"
+      ]
+    },
+    {
+      "code": "SAR-BB-11",
+      "category": "BB",
+      "text": "The customer repeatedly buys and sells substantially identical metal over a short period without meaningful economic exposure or commercial rationale.",
+      "detected_by": [
+        "RAPID_RESALE"
+      ]
+    },
+    {
+      "code": "SAR-SL-01",
+      "category": "SL",
+      "text": "Shipment documents conflict with the declared origin.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-SL-02",
+      "category": "SL",
+      "text": "Shipment route conflicts with the stated destination.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-SL-03",
+      "category": "SL",
+      "text": "Sudden change of trade route without explanation.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-SL-04",
+      "category": "SL",
+      "text": "Sudden change of delivery instructions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SL-05",
+      "category": "SL",
+      "text": "Sudden change of shipment method.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SL-06",
+      "category": "SL",
+      "text": "Circuitous shipping route.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-SL-07",
+      "category": "SL",
+      "text": "Use of unrelated transit jurisdictions.",
+      "detected_by": [
+        "ROUTE_MISMATCH",
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-SL-08",
+      "category": "SL",
+      "text": "Routing through countries with no obvious connection to buyer or seller.",
+      "detected_by": [
+        "ROUTE_MISMATCH",
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-SL-09",
+      "category": "SL",
+      "text": "Routing through high-risk jurisdictions.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-SL-10",
+      "category": "SL",
+      "text": "Routing through CAHRAs.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SL-11",
+      "category": "SL",
+      "text": "Use of unusual freight forwarders.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SL-12",
+      "category": "SL",
+      "text": "Use of transport providers with no logical relationship to the trade.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SL-13",
+      "category": "SL",
+      "text": "Transportation route cannot be verified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SL-14",
+      "category": "SL",
+      "text": "Material is routed through unexpected locations.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-SL-15",
+      "category": "SL",
+      "text": "Origin country has no known mining capacity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SL-16",
+      "category": "SL",
+      "text": "Origin country has negligible mining or refining capacity inconsistent with stated supply.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SL-17",
+      "category": "SL",
+      "text": "Declared route appears designed to obscure true origin or destination.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-UB-01",
+      "category": "UB",
+      "text": "Corporate structure is unnecessarily complex.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-02",
+      "category": "UB",
+      "text": "Multiple ownership layers make the UBO difficult to identify.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-03",
+      "category": "UB",
+      "text": "Ownership structure lacks an evident commercial rationale.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-04",
+      "category": "UB",
+      "text": "Shell companies are used.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-05",
+      "category": "UB",
+      "text": "Nominee shareholders are used.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-06",
+      "category": "UB",
+      "text": "Nominee directors are used.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-07",
+      "category": "UB",
+      "text": "Beneficial ownership is obscured.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-08",
+      "category": "UB",
+      "text": "Frequent unexplained changes in beneficial ownership.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-09",
+      "category": "UB",
+      "text": "Frequent unexplained changes of directors.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-10",
+      "category": "UB",
+      "text": "Frequent unexplained changes in company structure.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-11",
+      "category": "UB",
+      "text": "UBO refuses to confirm status.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-12",
+      "category": "UB",
+      "text": "UBO information conflicts with corporate documents.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-13",
+      "category": "UB",
+      "text": "Effective control appears different from legal share ownership.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-14",
+      "category": "UB",
+      "text": "Company is registered in a secrecy jurisdiction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-15",
+      "category": "UB",
+      "text": "Entity is established in a jurisdiction with weak ownership transparency.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-16",
+      "category": "UB",
+      "text": "Several unrelated companies share the same address.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-17",
+      "category": "UB",
+      "text": "Directors appear to be figureheads.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-18",
+      "category": "UB",
+      "text": "Ownership, management, or control abruptly changes immediately before or after significant transactions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-19",
+      "category": "UB",
+      "text": "A power of attorney or authorised signatory is appointed shortly before a material transaction without a clear and documented business reason.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-UB-20",
+      "category": "UB",
+      "text": "Frequent unexplained changes occur in authorised signatories or powers of attorney.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-AM-01",
+      "category": "AM",
+      "text": "Customer has credible adverse media relating to financial crime.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-AM-02",
+      "category": "AM",
+      "text": "Shareholder has credible adverse media relating to financial crime.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-AM-03",
+      "category": "AM",
+      "text": "Supplier is subject to credible negative media concerning criminal networks.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-AM-04",
+      "category": "AM",
+      "text": "Customer is under criminal investigation.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-AM-05",
+      "category": "AM",
+      "text": "Counterparty is linked to persons under investigation for financial crimes.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-AM-06",
+      "category": "AM",
+      "text": "Customer is associated with suspected money laundering.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-AM-07",
+      "category": "AM",
+      "text": "Customer is associated with terrorist financing.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-AM-08",
+      "category": "AM",
+      "text": "Customer is associated with organized criminal activity.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-AM-09",
+      "category": "AM",
+      "text": "Supplier has a material history of fraud.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-AM-10",
+      "category": "AM",
+      "text": "Supplier or customer has a material bribery or corruption history.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-AM-11",
+      "category": "AM",
+      "text": "Counterparty is linked to tax evasion.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-AM-12",
+      "category": "AM",
+      "text": "Counterparty is linked to smuggling.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-AM-13",
+      "category": "AM",
+      "text": "Counterparty has documented involvement in illegal mining.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-AM-14",
+      "category": "AM",
+      "text": "Counterparty is linked to trafficking or other predicate offences.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-AM-15",
+      "category": "AM",
+      "text": "Supplier has a serious history of regulatory non-compliance that is inconsistent with the firm's risk appetite.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PE-01",
+      "category": "PE",
+      "text": "Customer is a Politically Exposed Person.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-PE-02",
+      "category": "PE",
+      "text": "UBO is a PEP.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-PE-03",
+      "category": "PE",
+      "text": "Customer is a family member of a PEP.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-PE-04",
+      "category": "PE",
+      "text": "Customer is a close associate of a PEP.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-PE-05",
+      "category": "PE",
+      "text": "Customer has unexplained professional connections to a PEP.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PE-06",
+      "category": "PE",
+      "text": "A public official appears to influence the transaction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PE-07",
+      "category": "PE",
+      "text": "Commercial arrangements involving a PEP lack economic rationale.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PE-08",
+      "category": "PE",
+      "text": "PEP related wealth or transaction activity is inconsistent with known legitimate income or business activity.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-GE-01",
+      "category": "GE",
+      "text": "Customer is located in a high-risk jurisdiction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GE-02",
+      "category": "GE",
+      "text": "Supplier operates in a high-risk jurisdiction.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-GE-03",
+      "category": "GE",
+      "text": "Funds originate from a high-risk jurisdiction.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-GE-04",
+      "category": "GE",
+      "text": "Funds are sent to a high-risk jurisdiction.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-GE-05",
+      "category": "GE",
+      "text": "Gold originates from a high-risk jurisdiction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GE-06",
+      "category": "GE",
+      "text": "Transactions pass through jurisdictions unrelated to the trade.",
+      "detected_by": [
+        "MULTI_JURISDICTION",
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-GE-07",
+      "category": "GE",
+      "text": "Customer has links to countries with weak AML controls.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GE-08",
+      "category": "GE",
+      "text": "Counterparty is linked to jurisdictions with high corruption exposure.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GE-09",
+      "category": "GE",
+      "text": "Counterparty is located in a tax haven jurisdiction without a valid business rationale.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GE-10",
+      "category": "GE",
+      "text": "Trade is routed through a FATF high risk or increased monitoring jurisdiction.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-GE-11",
+      "category": "GE",
+      "text": "Trade involves conflict affected and high-risk areas.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GE-12",
+      "category": "GE",
+      "text": "Customer operates in a high-risk trade corridor.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SA-01",
+      "category": "SA",
+      "text": "Customer appears on an applicable sanctions list.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-02",
+      "category": "SA",
+      "text": "Supplier appears on an applicable sanctions list.",
+      "detected_by": [
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-03",
+      "category": "SA",
+      "text": "UBO appears on a sanctions list.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-04",
+      "category": "SA",
+      "text": "Director or shareholder appears on a sanctions list.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-05",
+      "category": "SA",
+      "text": "Customer is owned by a designated person.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-06",
+      "category": "SA",
+      "text": "Customer is controlled by a designated person.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-07",
+      "category": "SA",
+      "text": "Counterparty acts on behalf of a sanctioned person.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SA-08",
+      "category": "SA",
+      "text": "Supplier is linked indirectly to a sanctioned entity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SA-09",
+      "category": "SA",
+      "text": "Vessel used in the supply chain has sanctions exposure.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SA-10",
+      "category": "SA",
+      "text": "Jurisdiction is subject to relevant sanctions or embargoes.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-11",
+      "category": "SA",
+      "text": "Customer attempts to circumvent sanctions screening.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SA-12",
+      "category": "SA",
+      "text": "Customer requests transactions be structured to avoid a sanctions nexus.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SA-13",
+      "category": "SA",
+      "text": "Existing customer produces a positive result during re-screening after previously screening clear.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-14",
+      "category": "SA",
+      "text": "Partial name match cannot be satisfactorily resolved.",
+      "detected_by": [
+        "screening",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-SA-15",
+      "category": "SA",
+      "text": "Identifying data appears to have been altered to avoid a sanctions match.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SA-16",
+      "category": "SA",
+      "text": "Use of intermediaries appears designed to distance the actual sanctioned party from the transaction.",
+      "detected_by": [
+        "MULTI_JURISDICTION",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-TF-01",
+      "category": "TF",
+      "text": "Customer has links to conflict zones.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TF-02",
+      "category": "TF",
+      "text": "Customer uses unregulated money transfer channels.",
+      "detected_by": [
+        "REFERENCE_KEYWORD"
+      ]
+    },
+    {
+      "code": "SAR-TF-03",
+      "category": "TF",
+      "text": "Customer uses intermediaries without a clear commercial purpose.",
+      "detected_by": [
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-TF-04",
+      "category": "TF",
+      "text": "Unusual transfer of precious metals occurs through a high-risk corridor.",
+      "detected_by": [
+        "HIGH_RISK_GEO"
+      ]
+    },
+    {
+      "code": "SAR-TF-05",
+      "category": "TF",
+      "text": "Customer or counterparty has links to persons or entities associated with terrorism.",
+      "detected_by": [
+        "screening",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-TF-06",
+      "category": "TF",
+      "text": "Transaction involves jurisdictions or routes associated with terrorist financing risks.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-TF-07",
+      "category": "TF",
+      "text": "Gold or funds are moved in a manner inconsistent with economic purpose.",
+      "detected_by": [
+        "PASSTHROUGH",
+        "FUNNEL"
+      ]
+    },
+    {
+      "code": "SAR-TF-08",
+      "category": "TF",
+      "text": "Charities, donations, or similar arrangements appear to be used to obscure the ultimate beneficiary.",
+      "detected_by": [
+        "REFERENCE_KEYWORD",
+        "FUNNEL"
+      ]
+    },
+    {
+      "code": "SAR-TF-09",
+      "category": "TF",
+      "text": "Legitimate business revenue appears potentially diverted to prohibited organizations.",
+      "detected_by": [
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-TF-10",
+      "category": "TF",
+      "text": "Transaction is associated with a sanctioned terrorist person, organization, or controlled entity.",
+      "detected_by": [
+        "screening",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-PF-01",
+      "category": "PF",
+      "text": "Customer deals in sensitive goods without a legitimate purpose.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PF-02",
+      "category": "PF",
+      "text": "Customer makes unusual requests involving dual use goods.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PF-03",
+      "category": "PF",
+      "text": "Transaction passes through a jurisdiction associated with PF risk.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-PF-04",
+      "category": "PF",
+      "text": "Transaction passes through an embargoed jurisdiction.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-PF-05",
+      "category": "PF",
+      "text": "Customer attempts to conceal the end user.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PF-06",
+      "category": "PF",
+      "text": "Customer attempts to conceal the final destination.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-PF-07",
+      "category": "PF",
+      "text": "Customer attempts to conceal the intended purpose of goods.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PF-08",
+      "category": "PF",
+      "text": "Counterparty has links to controlled or restricted goods.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PF-09",
+      "category": "PF",
+      "text": "Counterparty has unclear ownership combined with dual use goods exposure.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PF-10",
+      "category": "PF",
+      "text": "Unexplained trade involving jurisdictions subject to proliferation related UN restrictions.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-PF-11",
+      "category": "PF",
+      "text": "Trade routes appear deliberately designed to obscure a proliferation sensitive nexus.",
+      "detected_by": [
+        "ROUTE_MISMATCH",
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-PF-12",
+      "category": "PF",
+      "text": "Customer activity does not align with its normal business but involves sensitive goods or jurisdictions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-PF-13",
+      "category": "PF",
+      "text": "Transaction involves an entity designated under PF related sanctions.",
+      "detected_by": [
+        "screening",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-PF-14",
+      "category": "PF",
+      "text": "Customer provides misleading end use or end user information.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-01",
+      "category": "GO",
+      "text": "Gold originates from a location with no credible mining activity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-02",
+      "category": "GO",
+      "text": "Gold volume exceeds known production capacity of the stated mine.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-03",
+      "category": "GO",
+      "text": "Material originates from an unknown source.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-04",
+      "category": "GO",
+      "text": "Material originates from an unapproved source.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-05",
+      "category": "GO",
+      "text": "Origin cannot be independently verified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-06",
+      "category": "GO",
+      "text": "Supplier cannot produce mining licences or concessions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-07",
+      "category": "GO",
+      "text": "Mining site cannot be verified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-08",
+      "category": "GO",
+      "text": "Mining operation appears unlicensed.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-09",
+      "category": "GO",
+      "text": "Material appears to come from illegal mining.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-10",
+      "category": "GO",
+      "text": "Supplier cannot demonstrate lawful ownership of material.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-11",
+      "category": "GO",
+      "text": "Supplier cannot demonstrate legitimate export rights.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-12",
+      "category": "GO",
+      "text": "Origin differs between documents.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-GO-13",
+      "category": "GO",
+      "text": "True mine or source is obscured by intermediaries.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-14",
+      "category": "GO",
+      "text": "Gold is declared as recycled despite indicators suggesting mined origin, or vice versa.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-15",
+      "category": "GO",
+      "text": "Supplier's claimed source changes repeatedly without justification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-16",
+      "category": "GO",
+      "text": "Supplier's production or trading capacity does not support actual shipments.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-17",
+      "category": "GO",
+      "text": "A supplier refuses an independent site visit, audit, refinery verification, or source verification where such due diligence is reasonably required.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-18",
+      "category": "GO",
+      "text": "A supplier abruptly changes its mine, refinery, aggregator, exporter, or logistics provider without a documented commercial rationale.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-GO-19",
+      "category": "GO",
+      "text": "A declared refinery or processor cannot confirm having received, processed, or handled the relevant material.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-01",
+      "category": "RS",
+      "text": "Gold originates from a conflict zone.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-02",
+      "category": "RS",
+      "text": "Gold passes through a conflict affected or high-risk area that was not disclosed.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-03",
+      "category": "RS",
+      "text": "Supplier is linked to armed groups.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-04",
+      "category": "RS",
+      "text": "Non state armed groups control mine sites.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-05",
+      "category": "RS",
+      "text": "Armed groups control transportation routes.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-06",
+      "category": "RS",
+      "text": "Armed groups control points where metals are traded.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-07",
+      "category": "RS",
+      "text": "Armed groups control refining points.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-08",
+      "category": "RS",
+      "text": "Illegal taxation occurs at mine sites.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-09",
+      "category": "RS",
+      "text": "Illegal taxation occurs along transport routes.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-10",
+      "category": "RS",
+      "text": "Illegal taxation or extortion affects traders or exporters.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-11",
+      "category": "RS",
+      "text": "Supplier fails to disclose CAHRA exposure.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-12",
+      "category": "RS",
+      "text": "Unexpected route through a CAHRA.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-13",
+      "category": "RS",
+      "text": "Supplier suddenly changes source to a CAHRA.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-14",
+      "category": "RS",
+      "text": "Material's chain of custody contains unexplained gaps in a high-risk region.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RS-15",
+      "category": "RS",
+      "text": "A customer or supplier requests that origin, refinery, serial-number, or chain-of-custody information be removed from commercial or compliance records.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-01",
+      "category": "HR",
+      "text": "Forced labour.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-02",
+      "category": "HR",
+      "text": "Child labour.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-03",
+      "category": "HR",
+      "text": "Worst forms of child labour.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-04",
+      "category": "HR",
+      "text": "Human trafficking.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-05",
+      "category": "HR",
+      "text": "Slavery or slavery like practices.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-06",
+      "category": "HR",
+      "text": "Physical abuse of workers.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-07",
+      "category": "HR",
+      "text": "Psychological abuse.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-08",
+      "category": "HR",
+      "text": "Torture.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-09",
+      "category": "HR",
+      "text": "Cruel, inhuman, or degrading treatment.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-10",
+      "category": "HR",
+      "text": "Sexual violence.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-11",
+      "category": "HR",
+      "text": "Crimes against humanity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-12",
+      "category": "HR",
+      "text": "Genocide.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-13",
+      "category": "HR",
+      "text": "Unlawful detention.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-14",
+      "category": "HR",
+      "text": "Intimidation of workers or communities.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-15",
+      "category": "HR",
+      "text": "Suppression of freedom of association.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-16",
+      "category": "HR",
+      "text": "Suppression of legitimate worker organization.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-17",
+      "category": "HR",
+      "text": "Serious discrimination.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-18",
+      "category": "HR",
+      "text": "Violence against women.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-19",
+      "category": "HR",
+      "text": "Exploitation of Indigenous peoples.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-20",
+      "category": "HR",
+      "text": "Displacement of Indigenous peoples without appropriate consent.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-21",
+      "category": "HR",
+      "text": "Mining on Indigenous lands.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-HR-22",
+      "category": "HR",
+      "text": "Serious community allegations supported by credible evidence concerning human rights abuse.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-01",
+      "category": "EN",
+      "text": "Material originates from a World Heritage Site.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-02",
+      "category": "EN",
+      "text": "Material originates from a government protected area.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-03",
+      "category": "EN",
+      "text": "Supplier conducts illegal extraction in protected areas.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-04",
+      "category": "EN",
+      "text": "Deforestation linked to mining.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-05",
+      "category": "EN",
+      "text": "Water pollution.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-06",
+      "category": "EN",
+      "text": "Air pollution.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-07",
+      "category": "EN",
+      "text": "Soil contamination.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-08",
+      "category": "EN",
+      "text": "Destruction of biodiversity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-09",
+      "category": "EN",
+      "text": "Habitat destruction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-10",
+      "category": "EN",
+      "text": "Serious landscape modification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-11",
+      "category": "EN",
+      "text": "Harm to cultural heritage.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-12",
+      "category": "EN",
+      "text": "Serious impact on public or private infrastructure.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-13",
+      "category": "EN",
+      "text": "Improper waste disposal.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-14",
+      "category": "EN",
+      "text": "Unsafe handling of mercury.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-15",
+      "category": "EN",
+      "text": "Unsafe handling of cyanide.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-16",
+      "category": "EN",
+      "text": "Environmental permits cannot be produced.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-17",
+      "category": "EN",
+      "text": "Environmental licence is expired, inconsistent, or unverifiable.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-18",
+      "category": "EN",
+      "text": "Credible reports show serious environmental misconduct.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-19",
+      "category": "EN",
+      "text": "Supplier conceals environmental violations.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EN-20",
+      "category": "EN",
+      "text": "Environmental impacts materially conflict with information supplied during due diligence.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-01",
+      "category": "CO",
+      "text": "Cash or unrecorded payments.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-02",
+      "category": "CO",
+      "text": "Secret commissions.",
+      "detected_by": [
+        "REFERENCE_KEYWORD"
+      ]
+    },
+    {
+      "code": "SAR-CO-03",
+      "category": "CO",
+      "text": "Kickbacks.",
+      "detected_by": [
+        "REFERENCE_KEYWORD"
+      ]
+    },
+    {
+      "code": "SAR-CO-04",
+      "category": "CO",
+      "text": "Facilitation payments.",
+      "detected_by": [
+        "REFERENCE_KEYWORD"
+      ]
+    },
+    {
+      "code": "SAR-CO-05",
+      "category": "CO",
+      "text": "Payment offered to obtain preferential treatment.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-06",
+      "category": "CO",
+      "text": "Benefit offered to influence a commercial decision.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-07",
+      "category": "CO",
+      "text": "Bribery involving a public official.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-08",
+      "category": "CO",
+      "text": "Bid rigging.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-09",
+      "category": "CO",
+      "text": "Procurement manipulation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-10",
+      "category": "CO",
+      "text": "Improper gift or hospitality.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-11",
+      "category": "CO",
+      "text": "Excessive hospitality.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-12",
+      "category": "CO",
+      "text": "Cash equivalent gift.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-13",
+      "category": "CO",
+      "text": "Gift during tendering or bidding.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-14",
+      "category": "CO",
+      "text": "Gift to a government official.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-15",
+      "category": "CO",
+      "text": "Charitable donation appears linked to obtaining a business advantage.",
+      "detected_by": [
+        "REFERENCE_KEYWORD"
+      ]
+    },
+    {
+      "code": "SAR-CO-16",
+      "category": "CO",
+      "text": "Travel sponsorship has no genuine business purpose.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-17",
+      "category": "CO",
+      "text": "Undisclosed personal benefit.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-18",
+      "category": "CO",
+      "text": "Conflict of interest is concealed.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-19",
+      "category": "CO",
+      "text": "Nepotism or favoritism affects a business decision.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-20",
+      "category": "CO",
+      "text": "Extortion or coercion.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-21",
+      "category": "CO",
+      "text": "Abuse of authority.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-22",
+      "category": "CO",
+      "text": "Misuse of inside information.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-23",
+      "category": "CO",
+      "text": "Information is manipulated or falsified to hide a bribe.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-24",
+      "category": "CO",
+      "text": "Intermediary with unclear role is paid an unusual commission.",
+      "detected_by": [
+        "REFERENCE_KEYWORD"
+      ]
+    },
+    {
+      "code": "SAR-CO-25",
+      "category": "CO",
+      "text": "Employee or third party requests an off-book payment.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-26",
+      "category": "CO",
+      "text": "Repeat gifts or hospitality appear designed to create influence.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-27",
+      "category": "CO",
+      "text": "Government facing transaction involves unusual payments or intermediaries.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CO-28",
+      "category": "CO",
+      "text": "Counterparty asks that a payment description be disguised.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-01",
+      "category": "FD",
+      "text": "Forged identity documents.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-02",
+      "category": "FD",
+      "text": "Altered identity documents.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-03",
+      "category": "FD",
+      "text": "False corporate documents.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-04",
+      "category": "FD",
+      "text": "Falsified licences.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-05",
+      "category": "FD",
+      "text": "Altered trade licence.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-06",
+      "category": "FD",
+      "text": "False certificate of origin.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-07",
+      "category": "FD",
+      "text": "Falsified invoice.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-FD-08",
+      "category": "FD",
+      "text": "Manipulated assay.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-FD-09",
+      "category": "FD",
+      "text": "Falsified customs documentation.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-FD-10",
+      "category": "FD",
+      "text": "Fraudulent production records.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-11",
+      "category": "FD",
+      "text": "Fraudulent tax documentation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-12",
+      "category": "FD",
+      "text": "Falsified beneficial ownership records.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-13",
+      "category": "FD",
+      "text": "Documents contain inconsistent fonts, dates, numbers, or issuing details requiring verification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-14",
+      "category": "FD",
+      "text": "Details differ across documents that should correspond.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-FD-15",
+      "category": "FD",
+      "text": "Supplier refuses independent verification of records.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-16",
+      "category": "FD",
+      "text": "Attempt to conceal or destroy information.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-17",
+      "category": "FD",
+      "text": "Falsification of company records.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-18",
+      "category": "FD",
+      "text": "Attempt to obstruct an investigation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-19",
+      "category": "FD",
+      "text": "Tax, VAT, registration, or corporate identification numbers conflict across documents that should relate to the same entity.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-FD-20",
+      "category": "FD",
+      "text": "Bullion markings appear altered, removed, inconsistent, or deliberately obscured.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-RG-01",
+      "category": "RG",
+      "text": "Scrap volume is inconsistent with stated business activity.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-RG-02",
+      "category": "RG",
+      "text": "Customer generates quantities of recycled gold inconsistent with its normal operations.",
+      "detected_by": [
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-RG-03",
+      "category": "RG",
+      "text": "Same material appears repeatedly for re-refining.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RG-04",
+      "category": "RG",
+      "text": "Refining frequency has no apparent economic rationale.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RG-05",
+      "category": "RG",
+      "text": "Assay documentation is missing.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RG-06",
+      "category": "RG",
+      "text": "Assay documentation appears altered.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RG-07",
+      "category": "RG",
+      "text": "Source of scrap cannot be established.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RG-08",
+      "category": "RG",
+      "text": "Recycled gold appears to have been deliberately misclassified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RG-09",
+      "category": "RG",
+      "text": "Chain of custody for recycled material is incomplete.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RG-10",
+      "category": "RG",
+      "text": "Customer cannot identify previous owner or commercial source where that information should reasonably exist.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-RG-11",
+      "category": "RG",
+      "text": "Refining activity appears designed to transform or disguise traceability of the material.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-01",
+      "category": "SC",
+      "text": "Sudden change in bank account.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-02",
+      "category": "SC",
+      "text": "Sudden change in ownership.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-03",
+      "category": "SC",
+      "text": "Sudden change in directors.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-04",
+      "category": "SC",
+      "text": "Sudden change in shareholder composition.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-05",
+      "category": "SC",
+      "text": "Sudden change in operating location.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-06",
+      "category": "SC",
+      "text": "Sudden change in gold source.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-07",
+      "category": "SC",
+      "text": "Sudden change in shipping route.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-SC-08",
+      "category": "SC",
+      "text": "Sudden change in payment method.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-09",
+      "category": "SC",
+      "text": "Sudden change in destination.",
+      "detected_by": [
+        "NEW_GEOGRAPHY"
+      ]
+    },
+    {
+      "code": "SAR-SC-10",
+      "category": "SC",
+      "text": "Sudden change in transaction volume.",
+      "detected_by": [
+        "VELOCITY",
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-SC-11",
+      "category": "SC",
+      "text": "Sudden change in transaction frequency.",
+      "detected_by": [
+        "VELOCITY"
+      ]
+    },
+    {
+      "code": "SAR-SC-12",
+      "category": "SC",
+      "text": "Sudden change in transaction value.",
+      "detected_by": [
+        "VELOCITY",
+        "PROFILE_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-SC-13",
+      "category": "SC",
+      "text": "Sudden change in business model.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-SC-14",
+      "category": "SC",
+      "text": "Sudden appearance of new intermediaries.",
+      "detected_by": [
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-SC-15",
+      "category": "SC",
+      "text": "Sudden adverse media or sanctions information.",
+      "detected_by": [
+        "screening"
+      ]
+    },
+    {
+      "code": "SAR-SC-16",
+      "category": "SC",
+      "text": "Change occurs immediately before a significant transaction without credible explanation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-IM-01",
+      "category": "IM",
+      "text": "Broker or intermediary has no clear economic function.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-IM-02",
+      "category": "IM",
+      "text": "Intermediary cannot explain its role.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-IM-03",
+      "category": "IM",
+      "text": "Unrelated intermediary directs payment.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-IM-04",
+      "category": "IM",
+      "text": "Unrelated intermediary controls shipment instructions.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-IM-05",
+      "category": "IM",
+      "text": "Multiple layers of agents obscure supplier and buyer.",
+      "detected_by": [
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-IM-06",
+      "category": "IM",
+      "text": "Intermediary is in a high-risk jurisdiction unrelated to the goods.",
+      "detected_by": [
+        "HIGH_RISK_GEO",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-IM-07",
+      "category": "IM",
+      "text": "Commission paid to intermediary is disproportionate.",
+      "detected_by": [
+        "REFERENCE_KEYWORD"
+      ]
+    },
+    {
+      "code": "SAR-IM-08",
+      "category": "IM",
+      "text": "Intermediary appears connected to the UBO but that relationship is undisclosed.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-IM-09",
+      "category": "IM",
+      "text": "Intermediary is introduced immediately before completion of a transaction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-IM-10",
+      "category": "IM",
+      "text": "Customer insists the firm communicate only through an intermediary despite no apparent need.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-IM-11",
+      "category": "IM",
+      "text": "Intermediary is used to conceal end user or destination.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-TX-01",
+      "category": "TX",
+      "text": "Suspected tax evasion.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TX-02",
+      "category": "TX",
+      "text": "Undeclared transportation of precious metals.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TX-03",
+      "category": "TX",
+      "text": "Smuggling indicators.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TX-04",
+      "category": "TX",
+      "text": "Export licence cannot be verified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TX-05",
+      "category": "TX",
+      "text": "Import licence cannot be verified.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TX-06",
+      "category": "TX",
+      "text": "Customs paperwork conflicts with commercial invoices.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-TX-07",
+      "category": "TX",
+      "text": "Declared customs value materially differs from commercial value.",
+      "detected_by": [
+        "INVOICE_MISMATCH",
+        "PRICING_DEVIATION"
+      ]
+    },
+    {
+      "code": "SAR-TX-08",
+      "category": "TX",
+      "text": "False description of metal, weight, or purity.",
+      "detected_by": [
+        "INVOICE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-TX-09",
+      "category": "TX",
+      "text": "Country of origin is misrepresented.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TX-10",
+      "category": "TX",
+      "text": "Transaction route appears designed to evade customs scrutiny.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-TX-11",
+      "category": "TX",
+      "text": "Taxes or royalties appear materially inconsistent with production.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TX-12",
+      "category": "TX",
+      "text": "Supplier cannot evidence payment of required royalties or government fees.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-TX-13",
+      "category": "TX",
+      "text": "Cross border movement is inconsistent with declared trade route.",
+      "detected_by": [
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-TX-14",
+      "category": "TX",
+      "text": "Material is carried across borders outside established logistics arrangements without adequate explanation.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-01",
+      "category": "EM",
+      "text": "Employee manipulates due diligence findings.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-02",
+      "category": "EM",
+      "text": "Employee suppresses a compliance alert.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-03",
+      "category": "EM",
+      "text": "Employee fails to escalate an obvious red flag.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-04",
+      "category": "EM",
+      "text": "Employee attempts to override compliance without authority.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-05",
+      "category": "EM",
+      "text": "Employee accepts a secret commission or kickback.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-06",
+      "category": "EM",
+      "text": "Employee has an undisclosed relationship with a supplier or customer.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-07",
+      "category": "EM",
+      "text": "Employee repeatedly favors one counterparty without objective business justification.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-08",
+      "category": "EM",
+      "text": "Unauthorized access to customer or compliance information.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-09",
+      "category": "EM",
+      "text": "Unauthorized alteration of records.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-10",
+      "category": "EM",
+      "text": "Theft or misuse of precious metals.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-11",
+      "category": "EM",
+      "text": "Mishandling customer property.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-12",
+      "category": "EM",
+      "text": "Attempt to obstruct a compliance review.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-13",
+      "category": "EM",
+      "text": "Attempt to conceal information from Compliance.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-14",
+      "category": "EM",
+      "text": "Staff member tips off a customer about an investigation or possible STR or SAR.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-15",
+      "category": "EM",
+      "text": "Staff member requests that suspicious activity not be documented.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-16",
+      "category": "EM",
+      "text": "Staff member processes a transaction despite an active compliance hold.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-17",
+      "category": "EM",
+      "text": "An employee accesses, downloads, or exports unusually large quantities of KYC, transaction, or compliance information without a legitimate business need.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-18",
+      "category": "EM",
+      "text": "An employee shares system credentials or permits another person to use their compliance-system access.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-19",
+      "category": "EM",
+      "text": "A whistleblower or reporting employee is subjected to retaliation, intimidation, threats, disadvantage, or attempts to identify them improperly.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-20",
+      "category": "EM",
+      "text": "An employee repeatedly closes, downgrades, or clears compliance alerts without sufficient documented rationale or supporting evidence.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-EM-21",
+      "category": "EM",
+      "text": "A compliance decision is informally overridden outside the authorised approval and escalation workflow.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CM-01",
+      "category": "CM",
+      "text": "New company, high value gold purchases, third party payment, and offshore bank account.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT",
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-CM-02",
+      "category": "CM",
+      "text": "Complex UBO structure, personal email, flexi desk address, and reluctance to provide ownership records.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CM-03",
+      "category": "CM",
+      "text": "Cash transaction below AED 55,000 repeated several times in a short period.",
+      "detected_by": [
+        "STRUCTURING",
+        "LINKED_THRESHOLD"
+      ]
+    },
+    {
+      "code": "SAR-CM-04",
+      "category": "CM",
+      "text": "Supplier claims gold originated in one country, but shipping documents show transit through a CAHRA and assay or customs documents do not reconcile.",
+      "detected_by": [
+        "INVOICE_MISMATCH",
+        "ROUTE_MISMATCH"
+      ]
+    },
+    {
+      "code": "SAR-CM-05",
+      "category": "CM",
+      "text": "Customer from an unrelated jurisdiction pays for another entity's purchase.",
+      "detected_by": [
+        "THIRD_PARTY_PAYMENT"
+      ]
+    },
+    {
+      "code": "SAR-CM-06",
+      "category": "CM",
+      "text": "Supplier's claimed production capacity is far below actual shipment volume.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CM-07",
+      "category": "CM",
+      "text": "Gold is bought and rapidly resold at little or no margin through related companies.",
+      "detected_by": [
+        "RAPID_RESALE",
+        "CIRCULAR_FLOW"
+      ]
+    },
+    {
+      "code": "SAR-CM-08",
+      "category": "CM",
+      "text": "Transaction is routed through several entities and ultimately returns funds to the original group.",
+      "detected_by": [
+        "CIRCULAR_FLOW",
+        "MULTI_JURISDICTION"
+      ]
+    },
+    {
+      "code": "SAR-CM-09",
+      "category": "CM",
+      "text": "UBO changes immediately before a major transaction.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CM-10",
+      "category": "CM",
+      "text": "Customer cancels the transaction immediately after SOF, SOW, or UBO questions are raised.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CM-11",
+      "category": "CM",
+      "text": "Supplier previously screened clear, later appears in sanctions re screening, and requests changed payment instructions.",
+      "detected_by": [
+        "screening",
+        "payment_screening"
+      ]
+    },
+    {
+      "code": "SAR-CM-12",
+      "category": "CM",
+      "text": "Dual use or sensitive goods exposure combined with concealed end user and high-risk routing.",
+      "detected_by": [
+        "ROUTE_MISMATCH",
+        "HIGH_RISK_GEO"
+      ]
+    },
+    {
+      "code": "SAR-CM-13",
+      "category": "CM",
+      "text": "Adverse media involving illegal mining combined with unverifiable origin records.",
+      "detected_by": [
+        "manual"
+      ]
+    },
+    {
+      "code": "SAR-CM-14",
+      "category": "CM",
+      "text": "PEP connection combined with opaque beneficial ownership, unexplained wealth, and unusual high value precious metal activity.",
+      "detected_by": [
+        "screening",
+        "PROFILE_DEVIATION"
+      ]
+    }
+  ]
+}
