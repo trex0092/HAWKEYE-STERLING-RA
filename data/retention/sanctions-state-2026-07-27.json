@@ -1,0 +1,69 @@
+{
+  "updated": "2026-07-27",
+  "sources": {
+    "ofac-sdn": {
+      "hash": "32171d81827728c226e6c775af45da59c3ae2cfb9092557e5350500b7987d8b4",
+      "bytes": 5448935,
+      "checkedAt": "2026-07-27",
+      "changedAt": "2026-07-25",
+      "contentAsOf": "2026-07-27",
+      "status": 200,
+      "prevHash": "81207060e57bda4bb01b9eaddd6756fec644298d10007dbb6a73b258df0ad6b6",
+      "count": 19255,
+      "errStreak": 0
+    },
+    "ofac-sdn-alt": {
+      "hash": "3d9a9446749db6ebc81b70530d5ffde3008fae0411457f8e23ec5a5512d085e7",
+      "bytes": 1029596,
+      "checkedAt": "2026-07-27",
+      "changedAt": "2026-07-27",
+      "contentAsOf": "2026-07-27",
+      "status": 200,
+      "count": 20351,
+      "errStreak": 0
+    },
+    "ofac-consolidated": {
+      "hash": "6e5519fed95a07bf8e73782db9610f87644d9120fba99bcfe0413c07a5246b8a",
+      "bytes": 345861,
+      "checkedAt": "2026-07-27",
+      "changedAt": "2026-07-25",
+      "contentAsOf": "2026-07-27",
+      "status": 200,
+      "prevHash": "5867ed72ddd74b96359bb7849950ca68f47bb6716f5da36af6cbc17586ff8e29",
+      "count": 442,
+      "errStreak": 0
+    },
+    "un-consolidated": {
+      "hash": "526af7e0f23fda448108e436830819ba33fdf00a411c63bbeebf83febfb15af2",
+      "bytes": 673636,
+      "checkedAt": "2026-07-27",
+      "changedAt": "2026-07-24",
+      "contentAsOf": "2026-07-27",
+      "status": 200,
+      "prevHash": "a728faf842b5054117515f36b8cdc1ead1a5c30183e04dfa2fe5ca3b32304217",
+      "count": 1011,
+      "errStreak": 0
+    },
+    "uk-ofsi": {
+      "hash": "7a1df99a31bd06dbe4ad3e47f43c3ef98eea53bc6cdce3f8f0e05ac900080b70",
+      "bytes": 15708355,
+      "checkedAt": "2026-07-27",
+      "changedAt": "2026-06-16",
+      "contentAsOf": "2026-07-27",
+      "status": 200,
+      "count": 19762,
+      "errStreak": 0
+    },
+    "eu-fsf": {
+      "hash": "946bcc6ed18c5e66069433279c0972541d0e2a8d22530bd0e47aa9a232119d81",
+      "bytes": 20602587,
+      "checkedAt": "2026-07-27",
+      "changedAt": "2026-07-20",
+      "contentAsOf": "2026-07-27",
+      "status": 200,
+      "prevHash": "5396c953828fdb4f5ab473e51c203c4f94991f9fb2cfb7111707efc1fd3a0822",
+      "count": 42474,
+      "errStreak": 0
+    }
+  }
+}

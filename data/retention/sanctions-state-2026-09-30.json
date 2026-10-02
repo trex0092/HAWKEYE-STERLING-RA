@@ -1,0 +1,71 @@
+{
+  "updated": "2026-09-30",
+  "sources": {
+    "ofac-sdn": {
+      "hash": "b31c9d0277446f2022af3e389060120aa648f8f23dbacda7df5f541a19200ee4",
+      "bytes": 5530125,
+      "checkedAt": "2026-09-30",
+      "changedAt": "2026-09-30",
+      "contentAsOf": "2026-09-30",
+      "status": 200,
+      "prevHash": "9de877621a889b52cdb2694a5ec18026bb3fedeee80b0a79b96fa791baf55179",
+      "count": 19445,
+      "errStreak": 0
+    },
+    "ofac-sdn-alt": {
+      "hash": "338158fed05d77daa7cee9faa16998821dbe4c07f7c7c4d6c8f74e5f7e61f4ca",
+      "bytes": 1024336,
+      "checkedAt": "2026-09-30",
+      "changedAt": "2026-09-30",
+      "contentAsOf": "2026-09-30",
+      "status": 200,
+      "prevHash": "b5de50c451cf97341b664ffbc5d3ddac8b8cedc81d5cded801fa6527f92b468e",
+      "count": 20221,
+      "errStreak": 0
+    },
+    "ofac-consolidated": {
+      "hash": "1c3609367afcfbf20afa5a9a9969888ce7bf5f1671c0e5e62418be1c7aa8e092",
+      "bytes": 347103,
+      "checkedAt": "2026-09-30",
+      "changedAt": "2026-09-30",
+      "contentAsOf": "2026-09-30",
+      "status": 200,
+      "prevHash": "c9196b486efa2f4e425b8622bbc421d3c6e3298eee5c663fb4acd93d9a299c91",
+      "count": 442,
+      "errStreak": 0
+    },
+    "un-consolidated": {
+      "hash": "fec3dd43c4eee1e83c419cef51fd8923bdef4a091140a89e78b219179cbdba3d",
+      "bytes": 613859,
+      "checkedAt": "2026-09-30",
+      "changedAt": "2026-09-29",
+      "contentAsOf": "2026-09-30",
+      "status": 200,
+      "prevHash": "0dcccd832f08c5e71d42611b9c717fc8a2d37c88aa731a90f11fc7ce00edf42a",
+      "count": 1011,
+      "errStreak": 0
+    },
+    "uk-ofsi": {
+      "hash": "a1966e9f75d68bbfcd38a03c8de439463a9aa9c896d9195b5207a729fb616aeb",
+      "bytes": 47765233,
+      "checkedAt": "2026-09-30",
+      "changedAt": "2026-09-29",
+      "contentAsOf": "2026-09-30",
+      "status": 200,
+      "prevHash": "993bbbd6566d5606d9637721de18f23e737e18b009769bf14d566c2a2af04e77",
+      "count": 58451,
+      "errStreak": 0
+    },
+    "eu-fsf": {
+      "hash": "c492d22122aaf1dfebe585dac235d154fd957f3b325873e587bde65c4a2d703f",
+      "bytes": 21320168,
+      "checkedAt": "2026-09-30",
+      "changedAt": "2026-09-23",
+      "contentAsOf": "2026-09-30",
+      "status": 200,
+      "prevHash": "41302ed1adfe569dffe6f58fa190eb2cc35d514dafde8f0ec5ddac51c82cc9fb",
+      "count": 43891,
+      "errStreak": 0
+    }
+  }
+}
