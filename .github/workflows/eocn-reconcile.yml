@@ -166,18 +166,12 @@ jobs:
           set -u
           git config user.name "eocn-reconcile"
           git config user.email "actions@github.com"
-          git add data/eocn-local-terrorist-list.json
-          git commit -m "eocn: prepared weekly review — merge records MLRO sign-off"
-          # Single rolling branch (rebuilt as <main> + one commit each run) so
-          # stale preparations never pile up; auth is the ephemeral env token in
-          # the push URL — the checkout persists no credentials.
-          pushed=
-          for attempt in 1 2 3 4 5; do
-            git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/eocn-reconcile && { pushed=1; break; }
-            echo "push failed (attempt $attempt) — retrying"
-            sleep $((attempt * 3))
-          done
-          [ -n "$pushed" ] || { echo "::error::push of the prepared eocn-reconcile branch failed"; exit 1; }
+          # Single rolling review branch. Written on its own tip
+          # (scripts/push-state-branch.sh) so the Actions token never pushes a
+          # workflow-file change; a PR from it into main still diffs to the
+          # EOCN list only. Created from main when absent (e.g. after a merge).
+          scripts/push-state-branch.sh eocn-reconcile "eocn: prepared weekly review — merge records MLRO sign-off" \
+            data/eocn-local-terrorist-list.json
 
       - name: Check for an already-open EOCN review task
         id: existing

@@ -209,24 +209,17 @@ jobs:
           # are gitignored; this persists the fingerprint state and any AI draft
           # so the same change is not re-alerted next run. Branch protection
           # blocks direct pushes to main (GH006 — verified in run 28922304236),
-          # so the data lives on the reg-watch-state branch: always rebuilt as
-          # <current main> + one data commit, force-updated each run. Auth is
-          # the ephemeral env token in the push URL — the checkout persists no
-          # credentials, so nothing lands in .git/config.
+          # so the data lives on the reg-watch-state branch, written by
+          # scripts/push-state-branch.sh as <the branch's own tip> + these data
+          # paths (never <main> + data: a workflow change on main would make
+          # that push a workflow update, which the Actions token may not do).
           if [ -n "$(git status --porcelain data/ docs/research/auto 2>/dev/null)" ]; then
             git config user.name "regulatory-watch"
             git config user.email "actions@github.com"
-            git add data/reg-watch-state.json
-            git add data/reg-watch-snapshots 2>/dev/null || true
-            git add docs/research/auto 2>/dev/null || true
-            git commit -m "$PR_TITLE [skip ci]"
-            pushed=
-            for attempt in 1 2 3 4 5; do
-              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/reg-watch-state && { pushed=1; break; }
-              echo "push failed (attempt $attempt) — retrying"
-              sleep $((attempt * 3))
-            done
-            [ -n "$pushed" ] || { echo "::error::state push to reg-watch-state failed after 5 attempts — state NOT persisted"; exit 1; }
+            paths=(data/reg-watch-state.json)
+            [ -d data/reg-watch-snapshots ] && paths+=(data/reg-watch-snapshots)
+            [ -d docs/research/auto ] && paths+=(docs/research/auto)
+            scripts/push-state-branch.sh reg-watch-state "$PR_TITLE [skip ci]" "${paths[@]}"
           else
             echo "state unchanged"
           fi
