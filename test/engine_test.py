@@ -1108,7 +1108,7 @@ check("TM report: the body carries confidentiality, legal basis, screening, aler
 check("TM report: a STOP payment raises the TFS obligation (POL-07) in §③",
       "TFS — 1 potential sanctions match(es)" in _tm_notes and "POL-07" in _tm_notes)
 check("TM report: the STOP payment and the rule alert of one customer form ONE case with the A–H record",
-      _tm_notes.count("▸ CASE ") == 1 and "▸ CASE 1 — Example Trading LLC — highest severity CRITICAL" in _tm_notes
+      _tm_notes.count("▸ CASE ") == 1 and "▸ CASE 1 — Customer: Example Trading LLC — highest severity CRITICAL" in _tm_notes
       and all(x in _tm_notes for x in ("A  Case ref", "B  KYC / CDD / EDD", "D  Screening — sanctions",
                                        "G  [ ] escalated to Compliance Officer", "[ ] no action — reasons",
                                        "H  Evidence location", "filing + 5 years")))
@@ -1312,12 +1312,24 @@ _mn, _mb = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, txn_monitor.evaluate(_multi)["alerts"],
     register_read=1, flag_refs=txn_monitor.red_flag_refs)
 check("TM report: 3+ distinct indicators on one customer are marked MULTIPLE INDICATORS",
-      "▸ CASE 1 — Demo Gold FZE" in _mb and "MULTIPLE INDICATORS" in _mb)
+      "▸ CASE 1 — Customer: Demo Gold FZE" in _mb and "MULTIPLE INDICATORS" in _mb)
 check("TM report: a DPMSR-scope payment raises the DPMSR obligation and the case lists it",
       "DPMSR — 1 transaction(s)/series" in _mb and "Obligations: TFS (POL-07)" not in _mb
       and "DPMSR" in _mb.split("▸ CASE 1")[1])
 check("TM report: rule alerts cite the red-flag register entries they evidence",
       "Red-flag register: " in _mb)
+_en_n, _en_b = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
+    entity_name="Example Reporting Entity LLC")
+check("TM report: the reporting entity heads the report and is named on its own line",
+      _en_b.startswith("EXAMPLE REPORTING ENTITY LLC — TRANSACTION MONITORING — DAILY REPORT")
+      and "Reporting entity: Example Reporting Entity LLC" in _en_b)
+check("TM report: an unset reporting entity is shown as NOT CONFIGURED, never guessed",
+      "NOT CONFIGURED — set the REPORTING_ENTITY_NAME" in _tm_b0
+      and _tm_b0.startswith("REPORTING ENTITY NOT CONFIGURED — "))
+check("the daily workflow passes REPORTING_ENTITY_NAME (repository variable, platform-name default)",
+      "REPORTING_ENTITY_NAME: ${{ vars.REPORTING_ENTITY_NAME || " in open(
+          os.path.join(ROOT, ".github", "workflows", "weekly-adverse-media.yml"), encoding="utf-8").read())
 _tm_ne, _tm_be = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
     rule_errors={"rule_funnel": 2})

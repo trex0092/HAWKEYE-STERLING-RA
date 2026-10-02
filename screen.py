@@ -104,6 +104,10 @@ ASANA_CUSTOMER_DB_GID = "1214107620220121"
 # Monitoring report (post_tm_report) is filed in the same section and is never
 # read back as a payment (payment_screen.TM_REPORT_PREFIX).
 ASANA_PAYMENTS_SECTION_GID = os.environ.get("ASANA_PAYMENTS_SECTION_GID", "").strip()
+# The reporting entity named at the top of the daily Transaction Monitoring
+# report (repository variable REPORTING_ENTITY_NAME; the workflow defaults it
+# to the platform name). Blank = the report says NOT CONFIGURED, never guesses.
+REPORTING_ENTITY_NAME = os.environ.get("REPORTING_ENTITY_NAME", "").strip()
 # Delivery target is configurable so an Asana reorganisation can be repaired by
 # updating repository variables without waiting for a code release. The defaults
 # are the live HAWKEYE STERLING APP project and Assessment Report section,
@@ -6792,7 +6796,8 @@ def post_tm_report(run_time, tm_report):
         dt, tm_report.get("feed"), tm_report.get("alerts"),
         register_read=tm_report.get("read", 0), unreadable=tm_report.get("unreadable", 0),
         degraded=tm_report.get("degraded", ""), rule_errors=tm_report.get("rule_errors"),
-        activities=tm_report.get("activities", 0), flag_refs=_tm_flag_refs)
+        activities=tm_report.get("activities", 0), flag_refs=_tm_flag_refs,
+        entity_name=REPORTING_ENTITY_NAME)
     payload = {"data": {"name": name[:250], "notes": cap_notes(notes, ASANA_NOTES_MAX),
                         "due_on": run_time.strftime("%Y-%m-%d"),
                         "assignee": ASANA_ASSIGNEE_GID, "projects": [ASANA_ONGOING_MON_GID]}}

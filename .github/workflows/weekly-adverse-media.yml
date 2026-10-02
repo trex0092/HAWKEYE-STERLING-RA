@@ -383,6 +383,9 @@ jobs:
           # names the reason instead of a bare 403.
           REGULATOR_UA_CONTACT: ${{ vars.REGULATOR_UA_CONTACT }}
           RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          # Reporting entity named at the top of the daily Transaction Monitoring
+          # report. Set the repository variable to the legal name registered on goAML.
+          REPORTING_ENTITY_NAME: ${{ vars.REPORTING_ENTITY_NAME || 'Hawkeye Sterling' }}
           # "Transaction Monitoring" section of HAWKEYE STERLING APP: one task per
           # payment (open tasks only) + the engine's daily Transaction Monitoring
           # report, filed there once a day. Unset = payment screening reports
